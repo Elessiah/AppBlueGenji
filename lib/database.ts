@@ -573,7 +573,7 @@ export class Database {
             return ({success: false, error: result.error});
         if (!result.result)
             return ({success: false, error: "We are out of the registration period !"});
-        if (!(await this.isTeamExist(id_team) == -1))
+        if (await this.isTeamExist(id_team) == -1)
             return ({success: false, error: "This team does not exist!"});
         const id_team_tournament: number = await this.isTeamRegister(id_tournament, id_team);
         if (id_team_tournament == -1)

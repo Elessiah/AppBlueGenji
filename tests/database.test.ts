@@ -12,6 +12,7 @@ import {
     SQLGetResult,
     getTournamentTeams, Tournament
 } from "../lib/types";
+import {sleep} from "../lib/sleep";
 
 describe("Database", () => {
     let database: Database;
@@ -609,12 +610,14 @@ describe("Database", () => {
         status = await database.editTournament(idTournament, null, null, null, null, null, now);
         expect(status.success).toBeTruthy();
 
+        //      Pour éviter un problème d'égalité avec les périodes d'inscriptions et les inscriptions
+        await sleep(500);
+
         // Test inscription
         status = await database.tournamentRegistration(idTournament, team_one_id);
         expect(status.success).toBeTruthy();
 
         // Inscription deuxième équipe
-
         status = await database.tournamentRegistration(idTournament, team_two_id);
         expect(status.success).toBeTruthy();
 
@@ -633,6 +636,30 @@ describe("Database", () => {
         expect(userHistory.success).toBeTruthy();
         expect(userHistory.histories.length).toEqual(1);
         expect(getHistories.histories).toEqual(userHistory.histories);
+
+        // Test désinscription
+        status = await database.tournamentUnregistration(idTournament, team_two_id);
+        expect(status.success).toBeTruthy();
+
+        // Vérification désinscription par getRegisterTeams
+        getTeams = await database.getRegisterTeams(idTournament);
+        expect(getTeams.success).toBeTruthy();
+        expect(getTeams.teams.length).toEqual(1);
+
+        // Vérification désinscription par récupération des historiques teams
+        getHistories = await database.getTeamHistory(team_two_id);
+        expect(getHistories.success).toBeTruthy();
+        expect(getHistories.histories.length).toEqual(0);
+
+        // Vérification désinscription par récupération des historiques utilisateurs
+        userHistory = await database.getUserHistory(second_owner_id);
+        expect(userHistory.success).toBeTruthy();
+        expect(userHistory.histories.length).toEqual(0);
+
+        // Réinscription pour test suppression de tournois
+        // Inscription deuxième équipe
+        status = await database.tournamentRegistration(idTournament, team_two_id);
+        expect(status.success).toBeTruthy();
 
         // Test suppression
         status = await database.deleteTournament(idTournament);
@@ -697,6 +724,8 @@ describe("Database", () => {
 
         // Test size tournois
         //      Init tournois
+        let tmp_date: Date = new Date();
+        tmp_date.setMilliseconds(tmp_date.getMilliseconds() + 400);
         setResult = await database.createTournament(
             nameTournamentTest,
             "Je suis une description sans importance.",
@@ -705,7 +734,7 @@ describe("Database", () => {
             owner_id,
             new Date(baseYear, baseMonth, baseDate, baseHour, baseMinutes),
             new Date(baseYear, baseMonth, baseDate, baseHour, baseMinutes),
-            new Date(baseYear, baseMonth, baseDate + 12, baseHour, baseMinutes),
+            tmp_date,
             new Date(baseYear, baseMonth, baseDate + 13, baseHour, baseMinutes));
         expect(setResult.success).toBeTruthy();
         BadIdTournament = setResult.id;
@@ -735,6 +764,27 @@ describe("Database", () => {
         status = await database.tournamentRegistration(BadIdTournament, team_five_id);
         expect(status.success).toBeFalsy();
         expect(status.error).toEqual("Tournament does not exist or is full!");
+
+        // Désinscription team pas inscrite
+        status = await database.tournamentUnregistration(BadIdTournament, team_five_id);
+        expect(status.success).toBeFalsy();
+        expect(status.error).toEqual("This team is not register to this tournament!");
+
+        // Désinscription team id éroné
+        status = await database.tournamentUnregistration(BadIdTournament, -1);
+        expect(status.success).toBeFalsy();
+
+        // Désinscription tournois id éroné
+        status = await database.tournamentUnregistration(-1, team_one_id);
+        expect(status.success).toBeFalsy();
+
+        // Désinscription après close_registration
+        //      Sleep pour attendre la fin des inscriptions
+        await sleep(800);
+        //      Test désinscription
+        status = await database.tournamentUnregistration(BadIdTournament, team_one_id);
+        expect(status.success).toBeFalsy();
+        expect(status.error).toEqual("We are out of the registration period !")
 
         // Test avec user éroné
         setResult = await database.createTournament(
@@ -895,7 +945,7 @@ describe("Database", () => {
         expect(status.error).toEqual("The size of the tournament must be at least for 4 teams!");
 
         // Test edit visibility in the past
-        let tmp_date: Date = new Date(now);
+        tmp_date = new Date(now);
         tmp_date.setHours(tmp_date.getHours() - 1);
         status = await database.editTournament(idEditTournament, null, null, null, null, tmp_date);
         expect(status.success).toBeFalsy();
