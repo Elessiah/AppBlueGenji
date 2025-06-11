@@ -327,6 +327,12 @@ export class Database {
             return ({success: false, error: "Database not connected !", id: -1});
         if (name.length < 5)
             return ({success: false, error: "Tournament name must be at least 5 characters!", id: -1});
+        if (name.length > 25)
+            return ({success: false, error: "Tournament name cannot exceed 25 characters!", id: -1});
+        if (description.length > 500)
+            return ({success: false, error: "Tournament description cannot exceed 500 characters!", id: -1});
+        if (size < 4)
+            return ({success: false, error: "The size of the tournament must be at least for 4 teams!", id: -1});
         if (await this.isUserExist(owner_id) == -1)
             return ({success: false, error: "User does not exist!", id: -1});
         const now = new Date();
@@ -402,10 +408,16 @@ export class Database {
         let values: unknown[] = [];
         let updates: string = "";
         if (name) {
+            if (name.length < 5)
+                return ({success: false, error: "Tournament name must be at least 5 characters!"});
+            if (name.length > 25)
+                return ({success: false, error: "Tournament name cannot exceed 25 characters!"});
             updates = "name = ?";
             values.push(name);
         }
         if (description) {
+            if (description.length > 500)
+                return ({success: false, error: "Tournament description cannot exceed 500 characters!"});
             if (updates.length > 0)
                 updates += ",";
             updates += "description = ?";
@@ -418,6 +430,8 @@ export class Database {
             values.push(format);
         }
         if (size) {
+            if (size < 4)
+                return ({success: false, error: "The size of the tournament must be at least for 4 teams!"});
             if (updates.length > 0)
                 updates += ",";
             updates += "size = ?";
@@ -520,6 +534,10 @@ export class Database {
         await this.ready;
         if (!this.db)
             return ({success: false, error: "Database not connected !"});
+        if (await this.isTeamExist(id_team) == -1)
+            return ({success: false, error: "Team does not exist!"});
+        if (await this.isTeamRegister(id_tournament, id_team) != -1)
+            return ({success: false, error: "Team already registered!"});
         // Vérifie que le tournois existe et qu'il n'est pas complet
         if (!(await this.isTournamentExist(id_tournament, true)))
             return ({success: false, error: "Tournament does not exist or is full!"});
@@ -529,10 +547,6 @@ export class Database {
             return ({success: false, error: status.error});
         if (!status.result)
             return ({success: false, error: "We are out of the registration period !"});
-        if (await this.isTeamExist(id_team) == -1)
-            return ({success: false, error: "Team does not exist!"});
-        if (await this.isTeamRegister(id_tournament, id_team) != -1)
-            return ({success: false, error: "Team already registered!"});
         const [result] = await this.db.execute<mysql.ResultSetHeader>(`INSERT INTO team_tournament (id_tournament, id_team)
                                                                        VALUES (?, ?)`, [id_tournament, id_team]);
         const team_tournament_id = result.insertId;
