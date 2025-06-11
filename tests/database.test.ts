@@ -1,0 +1,891 @@
+import {Database} from "../lib/database";
+import {afterAll, beforeAll, describe, expect, test} from "@jest/globals"
+import {
+    getTeamMembers,
+    getTeams,
+    getHistories,
+    id,
+    status,
+    Team,
+    User,
+    UserHistory,
+    SQLGetResult,
+    getTournamentTeams, Tournament
+} from "../lib/types";
+
+describe("Database", () => {
+    let database: Database;
+    // User perfect use
+    const nameUserManagement: string = "JestElessiah";
+
+    // User bad use
+    const badUserManagement: string = "BadElessiah";
+    const nameAlreadyUsed: string = "Used";
+
+    // Team perfect use
+    const nameTeamManagement: string = "JestTeamAilée";
+    const name2TeamManagement: string = "JestTeamAilée2";
+
+    // Team bad use
+    const badTeamManagement: string = "BadTeamAilée";
+    const bad2TeamManagement: string = "Bad2TeamAilée";
+    const bad3TeamManagement: string = "Bad3TeamAilée";
+
+    // Tournament management perfect use
+    const nameTournamentTest: string = "TournamentJest";
+    const teamTournamentTest: string = "Tournament2Jest";
+    let idTournament: number | undefined;
+
+    // Tournament management bad use
+    const BadTournamentTest: string = "TournamentBad";
+    const Bad2TournamentTest: string = "Tournament2Bad";
+    let BadIdTournament: number | undefined;
+
+    //      Init Date
+    const now = new Date();
+    const baseYear = now.getFullYear();
+    const baseMonth = now.getMonth();
+    const baseDate = now.getDate();
+    const baseHour = now.getHours();
+    const baseMinutes = now.getMinutes();
+    beforeAll(async () => {
+        database = Database.getInstance();
+        await database.ready;
+    });
+    test("Primary database function", async() => {
+        // Test insert sain
+        let insertStatus : status & id = await database.insert({ table: "user_history", columns : ["id_user", "id_team_tournament"], values: [0, 0]});
+        expect(insertStatus.success).toBeTruthy();
+        const insertId: number = insertStatus.id;
+
+        // Test get sain
+        let result : SQLGetResult = await database.get({ table: "user_history", values: ["*"], whereOption: [{ column: "id_user", condition: "=", value: 0}]});
+        expect(result.success).toBeTruthy();
+        let history = result.result as History[];
+        expect(history.length).toEqual(1);
+        expect(history[0]).toEqual({ user_history_id: insertId, id_user: 0, id_team_tournament: 0 });
+
+        // Test update sain
+        let status : status = await database.update({ table: "user_history", columns: ["id_user"], values: [48]}, [{ column: "id_user", condition: "=", value: 0}]);
+        expect(status.success).toBeTruthy();
+
+        // Vérification update
+        result = await database.get({ table: "user_history", whereOption: [{ column: "id_user", condition: "=", value: 48}]});
+        expect(result.success).toBeTruthy();
+        history = result.result as History[];
+        expect(history.length).toEqual(1);
+        expect(history[0]).toEqual({ user_history_id: insertId, id_user: 48, id_team_tournament: 0 });
+
+        // Test remove sain
+        status = await database.remove({ table: "user_history", whereOption: [{ column: "id_user", condition: "=", value: 48}]});
+        expect(status.success).toBeTruthy();
+
+        // Vérification suppression
+        result = await database.get({ table: "user_history",  whereOption: [{ column: "id_user", condition: "=", value: 48}]});
+        expect(result.success).toBeTruthy();
+        expect(result.result.length).toEqual(0);
+    });
+    test("User management perfect use", async() => {
+        // Création utilisateur
+        let setResult: status & id = await database.newUser(nameUserManagement);
+        expect(setResult.success).toBeTruthy();
+        expect(setResult.id).not.toEqual(-1);
+
+        // Test récupération par Nom
+        let getResult : status & Partial<User>;
+        getResult = await database.getUser(nameUserManagement);
+        expect(getResult).toEqual({success: true, error: '', user_id: setResult.id, username: nameUserManagement, id_team: null, is_admin: false});
+
+        // Test récupération par ID
+        let secondGetResult: status & Partial<User>;
+        secondGetResult = await database.getUser(setResult.id);
+        expect(secondGetResult).toEqual(getResult);
+
+        // Test edit name par ID
+        let status : status = await database.editUsername(setResult.id, nameUserManagement.toUpperCase());
+        expect(status.success).toBeTruthy();
+
+        // Vérification edit
+        secondGetResult = await database.getUser(setResult.id);
+        expect(secondGetResult).toBeTruthy();
+        expect(secondGetResult).toEqual({...getResult, username: nameUserManagement.toUpperCase()});
+
+        // Test edit name par Nom
+        status = await database.editUsername(nameUserManagement.toUpperCase(), nameUserManagement);
+        expect(status.success).toBeTruthy();
+
+        // Vérification edit
+        secondGetResult = await database.getUser(setResult.id);
+        expect(secondGetResult).toBeTruthy();
+        expect(secondGetResult).toEqual({...getResult, username: nameUserManagement});
+        expect(secondGetResult.username).toEqual(nameUserManagement);
+
+        // Test suppression par Nom
+        let delResult = await database.deleteUser(nameUserManagement);
+        expect(delResult.success).toBeTruthy();
+        getResult = await database.getUser(nameUserManagement);
+        expect(getResult.success).toBeFalsy();
+
+        // Test Création admin
+        setResult = await database.newUser(nameUserManagement, true);
+        expect(setResult.success).toBeTruthy();
+        expect(setResult.id).not.toEqual(-1);
+
+        // Vérification admin
+        getResult = await database.getUser(nameUserManagement);
+        expect(getResult).toEqual({success: true, error: '', user_id: setResult.id, username: nameUserManagement, id_team: null, is_admin: true});
+
+        // Test suppression par ID
+        delResult = await database.deleteUser(setResult.id);
+        expect(delResult.success).toBeTruthy();
+    });
+    test("User management bad use", async() => {
+        // Init test user
+        let setResult : status & id = await database.newUser(badUserManagement);
+        expect(setResult.success).toBeTruthy();
+        expect(setResult.id).not.toEqual(-1);
+        const id_user : number = setResult.id;
+
+        setResult = await database.newUser(nameAlreadyUsed);
+        expect(setResult.success).toBeTruthy();
+        expect(setResult.id).not.toEqual(-1);
+
+        // Test création doublons
+        let setError : status & id = await database.newUser(badUserManagement);
+        expect(setError.success).toBeFalsy();
+        expect(setError.error).toEqual("Username already exist !");
+
+        // Test création trop courte
+        setError = await database.newUser("");
+        expect(setError.success).toBeFalsy();
+        expect(setError.error).toEqual("The name must be at least 3 characters and maximum 15!");
+        setError = await database.newUser("az");
+        expect(setError.success).toBeFalsy();
+        expect(setError.error).toEqual("The name must be at least 3 characters and maximum 15!");
+
+        // Test création trop longue
+        setError = await database.newUser("1234567890123456");
+        expect(setError.success).toBeFalsy();
+        expect(setError.error).toEqual("The name must be at least 3 characters and maximum 15!");
+
+        // Test récupération par Nom éroné
+        let getError : status & Partial<User> = await database.getUser("az");
+        expect(getError.success).toBeFalsy();
+
+        // Test récupération par ID éroné
+        getError = await database.getUser(-1);
+        expect(getError.success).toBeFalsy();
+
+        // Test edit par ID éroné
+        let status : status = await database.editUsername(-1, badUserManagement.toUpperCase());
+        expect(status.success).toBeFalsy();
+
+        // Test edit avec nouveau Nom non conforme
+        //          Trop court
+        status = await database.editUsername(id_user, "");
+        expect(status.success).toBeFalsy();
+        status = await database.editUsername(id_user, "za");
+        expect(status.success).toBeFalsy();
+
+        //          Déjà pris
+        status = await database.editUsername(id_user, nameAlreadyUsed);
+        expect(status.success).toBeFalsy();
+
+        //          Le même
+        status = await database.editUsername(id_user, badUserManagement);
+        expect(status.success).toBeFalsy();
+
+        //          Trop long
+        status = await database.editUsername(id_user, "12345678901234567");
+        expect(status.success).toBeFalsy();
+
+        // Test edit avec ID éroné
+        status = await database.editUsername(-1, badUserManagement.toUpperCase());
+        expect(status.success).toBeFalsy();
+
+        // Test suppression par Nom éroné
+        status = await database.deleteUser("er");
+        expect(status.success).toBeFalsy();
+
+        // Test suppression par ID eroné
+        status = await database.deleteUser(-1);
+        expect(status.success).toBeFalsy();
+    });
+    test("Team Management perfect use", async() => {
+        // Création test User
+        let setUserResult: status & id = await database.newUser(nameTeamManagement);
+        expect(setUserResult.success).toBeTruthy();
+        expect(setUserResult.id).not.toEqual(-1);
+        const user1_id: number = setUserResult.id;
+
+        // Création test user 2
+        setUserResult = await database.newUser(name2TeamManagement);
+        expect(setUserResult.success).toBeTruthy();
+        expect(setUserResult.id).not.toBeUndefined();
+        const user2_id: number = setUserResult.id;
+
+        // Test création d'équipe
+        let setTeamResult : status & id = await database.createTeam(name2TeamManagement, user1_id);
+        expect(setTeamResult.success).toBeTruthy();
+        expect(setUserResult.id).not.toEqual(-1);
+        const team1_id = setTeamResult.id;
+
+        // Vérification création
+        let getResult: SQLGetResult = await database.get({ table: "team", whereOption: [{ column: "team_id", condition: "=", value: setTeamResult.id}] });
+        expect(getResult.success).toBeTruthy();
+        expect(getResult.result.length).toBe(1);
+        let verifTeam : Team = getResult.result[0] as Team;
+        expect(verifTeam.team_id).toEqual(team1_id);
+        expect(verifTeam.name).toEqual(name2TeamManagement);
+        expect(verifTeam.id_owner).toEqual(user1_id);
+
+        // Vérification MAJ user1
+        let getUserResult: status & Partial<User> = await database.getUser(nameTeamManagement);
+        expect(getUserResult.success).toBeTruthy();
+        expect(getUserResult.id_team).toEqual(team1_id);
+
+        // Test rename team
+        let status : status = await database.renameTeam(team1_id, nameTeamManagement);
+        expect(status.success);
+
+        // Vérification rename
+        getResult = await database.get({ table: "team", whereOption: [{ column: "team_id", condition: "=", value: setTeamResult.id}] });
+        expect(getResult.success).toBeTruthy();
+        expect(getResult.result.length).toBe(1);
+        verifTeam = getResult.result[0] as Team;
+        expect(verifTeam.name).toEqual(nameTeamManagement);
+
+        // Test ajout de membre
+        status = await database.addTeamMember(user2_id, team1_id);
+        expect(status.success).toBeTruthy();
+
+        // Vérification maj user
+        getUserResult = await database.getUser(name2TeamManagement);
+        expect(getUserResult.success).toBeTruthy();
+        expect(getUserResult.id_team).toEqual(team1_id);
+
+        // Test récupération des membres par ID
+        const teamMembers : getTeamMembers = await database.getTeamMembers(team1_id);
+        expect(teamMembers.success).toBeTruthy();
+        expect(teamMembers.members.length).toEqual(2);
+
+        // Test récupération des membres par Nom
+        const secondMembers = await database.getTeamMembers(nameTeamManagement);
+        expect(secondMembers.success).toBeTruthy();
+        expect(secondMembers.members.length).toEqual(2);
+        expect(teamMembers).toEqual(secondMembers);
+        expect({success: true, error: "", ...secondMembers.members[1], is_admin: false}).toEqual(getUserResult);
+
+        // Test switch ownership
+        status = await database.giveTeamOwnership(user1_id, user2_id);
+        expect(status.success).toBeTruthy();
+
+        // Test kick d'une équipe
+        status = await database.rmTeamMember(user1_id);
+        expect(status.success).toBeTruthy();
+
+        // Vérification maj profil
+        getUserResult = await database.getUser(user1_id);
+        expect(getUserResult.success).toBeTruthy();
+        expect(getUserResult.id_team).toBeNull();
+
+        // Rajout pour test suppression
+        status = await database.addTeamMember(user1_id, team1_id);
+        expect(status.success).toBeTruthy();
+
+        // Test suppression team
+        status = await database.hardDeleteTeam(team1_id);
+        expect(status.success).toBeTruthy();
+
+        // Vérification maj profil owner
+        getUserResult = await database.getUser(user2_id);
+        expect(getUserResult.success).toBeTruthy();
+        expect(getUserResult.id_team).toBeNull();
+
+        // Vérification maj profil member
+        getUserResult = await database.getUser(user1_id);
+        expect(getUserResult.success).toBeTruthy();
+        expect(getUserResult.id_team).toBeNull();
+    });
+    test("Team Management bad use", async() => {
+        // Init
+        //      User 1
+        let setUserResult: status & id = await database.newUser(badTeamManagement);
+        expect(setUserResult.success).toBeTruthy();
+        expect(setUserResult.id).not.toEqual(-1);
+        const user1 = setUserResult.id;
+
+        //      User 2
+        setUserResult = await database.newUser(bad2TeamManagement);
+        expect(setUserResult.success).toBeTruthy();
+        expect(setUserResult.id).not.toEqual(-1);
+        const user2 = setUserResult.id;
+
+        //      User 3
+        setUserResult = await database.newUser(bad3TeamManagement);
+        expect(setUserResult.success).toBeTruthy();
+        expect(setUserResult.id).not.toEqual(-1);
+        const user3 = setUserResult.id;
+
+        //      Test Team
+        let setTeamResult: status & id = await database.createTeam(badTeamManagement, user1);
+        expect(setTeamResult.success).toBeTruthy();
+        expect(setTeamResult.id).not.toEqual(-1);
+        const test_team = setTeamResult.id;
+
+        // Test création avec utilisateur non existant
+        setTeamResult = await database.createTeam(badTeamManagement, 1596357);
+        expect(setTeamResult.success).toBeFalsy();
+        expect(setTeamResult.error).toEqual("This user does not exist!");
+        expect(setTeamResult.id).toEqual(-1);
+
+        // Test création avec nom trop court
+        setTeamResult = await database.createTeam("", user1);
+        expect(setTeamResult.success).toBeFalsy();
+        expect(setTeamResult.error).toEqual("The name must be at least 3 characters and maximum 15!");
+        expect(setTeamResult.id).toEqual(-1);
+        setTeamResult = await database.createTeam("az", user1);
+        expect(setTeamResult.success).toBeFalsy();
+        expect(setTeamResult.error).toEqual("The name must be at least 3 characters and maximum 15!");
+        expect(setTeamResult.id).toEqual(-1);
+
+        // Test création avec nom trop long
+        setTeamResult = await database.createTeam("1234567890123456", user1);
+        expect(setTeamResult.success).toBeFalsy();
+        expect(setTeamResult.error).toEqual("The name must be at least 3 characters and maximum 15!");
+        expect(setTeamResult.id).toEqual(-1);
+
+        // Test création d'équipe en doublons
+        const sameTeamName: status & id = await database.createTeam(badTeamManagement, user1);
+        expect(sameTeamName.success).toBeFalsy();
+        expect(sameTeamName.error).toEqual("Team name already exist !");
+        expect(sameTeamName.id).toEqual(-1);
+
+        // Test rename avec nom déjà pris
+        let status : status = await database.renameTeam(test_team, badTeamManagement);
+        expect(status.success).toBeFalsy();
+
+        // Test rename avec nom trop court
+        status = await database.renameTeam(test_team, "");
+        expect(status.success).toBeFalsy();
+        status = await database.renameTeam(test_team, "az");
+        expect(status.success).toBeFalsy();
+
+        // Test rename avec nom trop long
+        status = await database.renameTeam(test_team, "1234567890123456");
+        expect(status.success).toBeFalsy();
+
+        // Test rename d'une team inexistante
+        status = await database.renameTeam(-1, "JefonctionnePas")
+        expect(status.success).toBeFalsy();
+
+        // Test ajout de membre avec paramètre user cassé
+         status = await database.addTeamMember(448844, test_team);
+        expect(status.success).toBeFalsy();
+
+        // Test ajout de membre avec paramètre team cassé
+        status = await database.addTeamMember(user2, 884488);
+        expect(status.success).toBeFalsy();
+
+        // Test ajout de membre avec double paramètre cassé
+        status = await database.addTeamMember(9999999, 9999999);
+        expect(status.success).toBeFalsy();
+
+        // Test ajout de l'owner dans sa propre équipe
+        status = await database.addTeamMember(user1, test_team);
+        expect(status.success).toBeFalsy();
+
+        // Test ajout double invitation
+        //      Invitation fonctionnelle
+        status = await database.addTeamMember(user2, test_team);
+        expect(status.success).toBeTruthy();
+        //      Invitation non fonctionnelle
+        status = await database.addTeamMember(user2, test_team);
+        expect(status.success).toBeFalsy();
+
+        // Test give ownership à un utilisateur hors équipe
+        status = await database.giveTeamOwnership(user1, user3);
+        expect(status.success).toBeFalsy();
+
+        // Test give owner à l'owner
+        status = await database.giveTeamOwnership(user1, user1);
+        expect(status.success).toBeTruthy(); // Ne se passe rien mais génère pas d'erreur donc OK
+
+        // Test give non owner à lui-même
+        status = await database.giveTeamOwnership(user2, user2);
+        expect(status.success).toBeFalsy();
+
+        // Test owner éroné
+        status = await database.giveTeamOwnership(-1, user2);
+        expect(status.success).toBeFalsy();
+
+        // Test new_owner éroné
+        status = await database.giveTeamOwnership(user1, -1);
+        expect(status.success).toBeFalsy();
+
+        // Test double éroné
+        status = await database.giveTeamOwnership(-1, -1);
+        expect(status.success).toBeFalsy();
+
+        // Ajout user3 pour plus de tests
+        status = await database.addTeamMember(user3, test_team);
+        expect(status.success).toBeTruthy();
+
+        // Test non owner à other non owner
+        status = await database.addTeamMember(user2, user3);
+        expect(status.success).toBeFalsy();
+
+        // Test récupération des membres par ID avec paramètres cassé
+        let teamMembers : getTeamMembers = await database.getTeamMembers(1234567890123456);
+        expect(teamMembers.success).toBeFalsy();
+
+        // Test récupération des membres par Nom avec nom inconnu
+        teamMembers = await database.getTeamMembers("Je ne suis pas un nom d'équipe !");
+        expect(teamMembers.success).toBeFalsy();
+
+        // Test kick avec entrée cassé
+        status = await database.rmTeamMember(546511);
+        expect(status.success).toBeFalsy();
+
+        // Test kick owner
+        status = await database.rmTeamMember(user1);
+        expect(status.success).toBeFalsy();
+
+        // Test suppression avec id eroné
+        status = await database.hardDeleteTeam(-1);
+        expect(status.success).toBeFalsy();
+
+        // Test suppression avec nom eroné
+        status = await database.hardDeleteTeam("");
+        expect(status.success).toBeFalsy();
+
+        status = await database.hardDeleteTeam("az");
+        expect(status.success).toBeFalsy();
+    });
+    test("Tournament Management perfect use", async() => {
+        // Init Test variables
+
+        //      Init Users
+        let setResult: status & id = await database.newUser(nameTournamentTest);
+        expect(setResult.success).toBeTruthy();
+        const owner_id: number = setResult.id;
+        setResult = await database.newUser(teamTournamentTest);
+        expect(setResult.success).toBeTruthy();
+        const second_owner_id: number = setResult.id;
+
+        //      Init Teams
+        setResult = await database.createTeam(nameTournamentTest, owner_id);
+        expect(setResult.success).toBeTruthy();
+        const team_one_id = setResult.id;
+        setResult = await database.createTeam(teamTournamentTest, second_owner_id);
+        expect(setResult.success).toBeTruthy();
+        const team_two_id = setResult.id;
+
+        // Init settings tournament
+        const visibility = new Date(baseYear, baseMonth, baseDate, baseHour + 1, baseMinutes);
+        const open_registration = new Date(baseYear, baseMonth, baseDate + 5, baseHour, baseMinutes);
+        const close_registration = new Date(baseYear, baseMonth, baseDate + 12, baseHour, baseMinutes);
+        const start = new Date(baseYear, baseMonth, baseDate + 13, baseHour, baseMinutes);
+        const description: string = "Je suis une description sans importance.";
+        const format: 'SIMPLE' | 'DOUBLE' | null = 'SIMPLE';
+        const size: number = 8;
+
+        // Test création de tournois
+        setResult = await database.createTournament(
+            nameTournamentTest,
+            description,
+            format,
+            size,
+            owner_id,
+            visibility,
+            open_registration,
+            close_registration,
+            start);
+        expect(setResult.success).toBeTruthy();
+        idTournament = setResult.id;
+
+        // Test récupération
+        const tournament: status & Partial<Tournament> = await database.getTournament(idTournament);
+        expect(tournament.success).toBeTruthy();
+        expect(tournament.name).toEqual(nameTournamentTest);
+        expect(tournament.description).toEqual(description);
+        expect(tournament.format).toEqual(format);
+        expect(tournament.size).toEqual(size);
+        expect(tournament.id_owner).toEqual(owner_id);
+        expect(tournament.creation_date).not.toBeUndefined();
+        if (!tournament.creation_date)
+            throw "Erreur !";
+        expect(tournament.creation_date.getTime() - now.getTime()).toBeLessThanOrEqual(1000);
+        expect(tournament.start_visibility?.getTime()).toEqual(visibility.getTime());
+        expect(tournament.open_registration?.getTime()).toEqual(open_registration.getTime());
+        expect(tournament.close_registration?.getTime()).toEqual(close_registration.getTime());
+        expect(tournament.start?.getTime()).toEqual(start.getTime());
+
+        // Test edit name
+        let status: status = await database.editTournament(idTournament, teamTournamentTest);
+        expect(status.success).toBeTruthy();
+
+        // Vérification edit name
+        let test_tournament: status & Partial<Tournament> = await database.getTournament(idTournament);
+        expect(test_tournament).toEqual({...tournament, name: teamTournamentTest});
+
+        // Test edit description et retour OG name
+        status = await database.editTournament(idTournament, nameTournamentTest, description.toUpperCase());
+        expect(status.success).toBeTruthy();
+
+        // Vérification edit description et nom
+        test_tournament = await database.getTournament(idTournament);
+        expect(test_tournament).toEqual({...tournament, description: description.toUpperCase()});
+
+        // Test edit format et retour description
+        status = await database.editTournament(idTournament, null, description, "DOUBLE");
+        expect(status.success).toBeTruthy();
+
+        // Vérification edit format
+        test_tournament = await database.getTournament(idTournament);
+        expect(test_tournament).toEqual({...tournament, format: "DOUBLE"});
+
+        // Test edit size et retour format
+        status = await database.editTournament(idTournament, null, null, 'SIMPLE', 4);
+        expect(status.success).toBeTruthy();
+
+        // Vérification edit size et format
+        test_tournament = await database.getTournament(idTournament);
+        expect(test_tournament).toEqual({...tournament, size: 4});
+
+        // Test edit start_visibility et retour size
+        let tmp_date: Date = new Date(visibility);
+        tmp_date.setHours(tmp_date.getHours() + 1);
+        status = await database.editTournament(idTournament, null, null, null, 8, tmp_date);
+        expect(status.success).toBeTruthy();
+
+        // Vérification edit start_visibility et retour size
+        test_tournament = await database.getTournament(idTournament);
+        expect(test_tournament).toEqual({...tournament, start_visibility: tmp_date});
+
+        // Test edit open_registration et retour start_visibility
+        tmp_date = new Date(open_registration);
+        tmp_date.setHours(open_registration.getHours() - 1);
+        status = await database.editTournament(idTournament, null, null, null, null, visibility, tmp_date);
+        expect(status.success).toBeTruthy();
+
+        // Vérification edit open_registration et retour start_visibility
+        test_tournament = await database.getTournament(idTournament);
+        expect(test_tournament).toEqual({...tournament, open_registration: tmp_date});
+
+        // Test edit close_registration et retour open_registration
+        tmp_date = new Date(close_registration);
+        tmp_date.setHours(close_registration.getHours() + 10);
+        status = await database.editTournament(idTournament, null, null, null, null, null, open_registration, tmp_date);
+        expect(status.success).toBeTruthy();
+
+        // Vérification edit close_registration et retour open_registration
+        test_tournament = await database.getTournament(idTournament);
+        expect(test_tournament).toEqual({...tournament, close_registration: tmp_date});
+
+        // Test edit start et retour close_registration
+        tmp_date = new Date(start);
+        tmp_date.setHours(start.getHours() + 8);
+        status = await database.editTournament(idTournament, null, null, null, null, null, null, close_registration, tmp_date);
+        expect(status.success).toBeTruthy();
+
+        // Vérification edit start et retour close_registration
+        test_tournament = await database.getTournament(idTournament);
+        expect(test_tournament).toEqual({...tournament, start: tmp_date});
+
+        // Test edit retour close_registration
+        status = await database.editTournament(idTournament, null, null, null, null, null, null, null, start);
+        expect(status.success).toBeTruthy();
+
+        // Vérification edit start_visibility et retour size
+        test_tournament = await database.getTournament(idTournament);
+        expect(test_tournament).toEqual({...tournament});
+
+        // Ouverture des inscriptions pour les tests
+        status = await database.editTournament(idTournament, null, null, null, null, null, now);
+        expect(status.success).toBeTruthy();
+
+        // Test inscription
+        status = await database.tournamentRegistration(idTournament, team_one_id);
+        expect(status.success).toBeTruthy();
+
+        // Inscription deuxième équipe
+
+        status = await database.tournamentRegistration(idTournament, team_two_id);
+        expect(status.success).toBeTruthy();
+
+        // Vérification inscription par getRegisterTeams
+        let getTeams : getTournamentTeams = await database.getRegisterTeams(idTournament);
+        expect(getTeams.success).toBeTruthy();
+        expect(getTeams.teams.length).toEqual(2);
+
+        // Vérification inscription par récupération des historiques teams
+        let getHistories: getHistories = await database.getTeamHistory(team_one_id);
+        expect(getHistories.success).toBeTruthy();
+        expect(getHistories.histories.length).toEqual(1);
+
+        // Vérification inscription par récupération des historiques utilisateurs
+        let userHistory: getHistories = await database.getUserHistory(owner_id);
+        expect(userHistory.success).toBeTruthy();
+        expect(userHistory.histories.length).toEqual(1);
+        expect(getHistories.histories).toEqual(userHistory.histories);
+
+        // Test suppression
+        status = await database.deleteTournament(idTournament);
+        expect(status.success).toBeTruthy();
+
+        // Vérification suppression par getTeams
+        getTeams = await database.getRegisterTeams(idTournament);
+        expect(getTeams.success).toBeFalsy();
+        expect(getTeams.teams.length).toEqual(0);
+
+        // Vérification suppression du tournoi par historique des équipes
+        getHistories = await database.getTeamHistory(team_one_id);
+        expect(getHistories.success).toBeTruthy();
+        expect(getHistories.histories.length).toEqual(0);
+
+        // Vérification suppression du tournoi par historique des équipes
+        getHistories = await database.getTeamHistory(team_one_id);
+        expect(getHistories.success).toBeTruthy();
+        expect(getHistories.histories.length).toEqual(0);
+
+        // Test inscription tournoi supprimé
+        status = await database.tournamentRegistration(idTournament, team_one_id);
+        expect(status.success).toBeFalsy();
+    });
+    test("Tournament Management bad use", async() => {
+        // Init Test variables
+
+        //      Init Users
+        let setResult: status & id = await database.newUser(BadTournamentTest);
+        expect(setResult.success).toBeTruthy();
+        const owner_id: number = setResult.id;
+        setResult = await database.newUser(Bad2TournamentTest);
+        expect(setResult.success).toBeTruthy();
+        const second_owner_id: number = setResult.id;
+
+        //      Init Teams
+        setResult = await database.createTeam(BadTournamentTest, owner_id);
+        expect(setResult.success).toBeTruthy();
+        const team_one_id = setResult.id;
+        setResult = await database.createTeam(Bad2TournamentTest, second_owner_id);
+        expect(setResult.success).toBeTruthy();
+        const team_two_id = setResult.id;
+
+        // Test size tournois
+        //      Init tournois
+        setResult = await database.createTournament(
+            nameTournamentTest,
+            "Je suis une description sans importance.",
+            'SIMPLE',
+            1,
+            owner_id,
+            new Date(baseYear, baseMonth, baseDate, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 12, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 13, baseHour, baseMinutes));
+        expect(setResult.success).toBeTruthy();
+        BadIdTournament = setResult.id;
+
+        // Inscription team 1
+        let status: status = await database.tournamentRegistration(BadIdTournament, team_one_id);
+        expect(status.success).toBeTruthy();
+
+        // Inscription team 2
+        status = await database.tournamentRegistration(BadIdTournament, team_two_id);
+        expect(status.success).toBeFalsy();
+
+        // Nettoyage
+        status = await database.deleteTournament(BadIdTournament);
+        expect(status.success).toBeTruthy();
+
+        // Init tournament
+        setResult = await database.createTournament(
+            nameTournamentTest,
+            "Je suis une description sans importance.",
+            'SIMPLE',
+            8,
+            owner_id,
+            new Date(baseYear, baseMonth, baseDate, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 12, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 13, baseHour, baseMinutes));
+        expect(setResult.success).toBeTruthy();
+        BadIdTournament = setResult.id;
+
+        // Test avec user éroné
+        setResult = await database.createTournament(
+            nameTournamentTest,
+            "Je suis une description sans importance.",
+            'SIMPLE',
+            8,
+            -1,
+            new Date(baseYear, baseMonth, baseDate, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 5, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 12, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 13, baseHour, baseMinutes));
+        expect(setResult.success).toBeFalsy();
+        expect(setResult.error).toEqual("User does not exist!");
+
+        // Test création de tournois avec nom trop court
+        setResult = await database.createTournament(
+            "az",
+            "Je suis une description sans importance.",
+            'SIMPLE',
+            8,
+            owner_id,
+            new Date(baseYear, baseMonth, baseDate, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 5, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 12, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 13, baseHour, baseMinutes));
+        expect(setResult.success).toBeFalsy();
+        expect(setResult.error).toEqual("Tournament name must be at least 5 characters!");
+
+        // Test création de tournois avec start_visibility dans le passé
+        setResult = await database.createTournament(
+            nameTournamentTest,
+            "Je suis une description sans importance.",
+            'SIMPLE',
+            8,
+            owner_id,
+            new Date(baseYear - 1, baseMonth, baseDate, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 5, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 12, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 13, baseHour, baseMinutes));
+        expect(setResult.success).toBeFalsy();
+        expect(setResult.error).toEqual("You cannot setup a date in the past !");
+
+        // Test création de tournoi avec ouverture inscription dans le passé
+        setResult = await database.createTournament(
+            nameTournamentTest,
+            "Je suis une description sans importance.",
+            'SIMPLE',
+            8,
+            owner_id,
+            new Date(baseYear, baseMonth, baseDate, baseHour, baseMinutes),
+            new Date(baseYear - 1, baseMonth, baseDate + 5, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 12, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 13, baseHour, baseMinutes));
+        expect(setResult.success).toBeFalsy();
+        expect(setResult.error).toEqual("You cannot setup a date in the past !");
+
+        // Test création de tournoi avec une fermeture d'inscription avant l'ouverture
+        setResult = await database.createTournament(
+            nameTournamentTest,
+            "Je suis une description sans importance.",
+            'SIMPLE',
+            8,
+            owner_id,
+            new Date(baseYear, baseMonth, baseDate, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 5, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 13, baseHour, baseMinutes));
+        expect(setResult.success).toBeFalsy();
+        expect(setResult.error).toEqual("You cannot setup the close registration date before or at the same time as the open registration date or the start of the visibility of the tournament!");
+
+        // Test création de tournoi avec un début avant la fin des inscriptions
+        setResult = await database.createTournament(
+            nameTournamentTest,
+            "Je suis une description sans importance.",
+            'SIMPLE',
+            8,
+            owner_id,
+            new Date(baseYear, baseMonth, baseDate, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 5, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 12, baseHour, baseMinutes),
+            new Date(baseYear, baseMonth, baseDate + 3, baseHour, baseMinutes));
+        expect(setResult.success).toBeFalsy();
+        expect(setResult.error).toEqual("You cannot start the tournament before the close registration date!");
+
+        // Test récupération avec id de tournois éroné
+        let getTeams: getTeams = await database.getRegisterTeams(-1);
+        expect(getTeams.success).toBeFalsy();
+        expect(getTeams.teams.length).toEqual(0);
+
+        // Test inscription doublons
+        //      First
+        status = await database.tournamentRegistration(BadIdTournament, team_one_id);
+        expect(status.success).toBeTruthy();
+        //      Second
+        status = await database.tournamentRegistration(BadIdTournament, team_one_id);
+        expect(status.success).toBeFalsy();
+
+        // Test inscription avec id de tournois éroné
+        status = await database.tournamentRegistration(-1, team_two_id)
+        expect(status.success).toBeFalsy();
+
+        // Test inscription avec id de team éroné
+        status = await database.tournamentRegistration(BadIdTournament, -1);
+        expect(status.success).toBeFalsy();
+
+        // Test inscription avec paramètres éronés
+        status = await database.tournamentRegistration(-1, -1);
+        expect(status.success).toBeFalsy();
+
+        // Test double suppression
+        //      First
+        status = await database.deleteTournament(BadIdTournament);
+        expect(status.success).toBeTruthy();
+        //      Second
+        status = await database.deleteTournament(BadIdTournament);
+        expect(status.success).toBeFalsy();
+
+        // Test suppression avec paramètre eroné
+        status = await database.deleteTournament(-1);
+        expect(status.success).toBeFalsy();
+    });
+    test("History perfect use", async() => {
+
+    });
+    test("History bad use", async() => {
+        /*
+        // Récupération des historiques utilisateurs avec ID éroné
+        userHistory = await database.getUserHistory(-1);
+        expect(userHistory.success).toBeFalsy();
+        expect(userHistory.histories.length).toEqual(0);
+
+        // Test récupération des historiques de Team avec ID éroné
+        getHistories = await database.getTeamHistory(-1);
+        expect(getHistories.success).toBeFalsy();
+        expect(getHistories.histories.length).toEqual(0);
+         */
+    });
+    afterAll(async () => {
+        // Nettoyage Partie Primaire
+        await database.remove({ table: "user_history", whereOption: [{ column: "id_team_tournament", condition: "=", value: 0}]});
+
+        // Nettoyage Partie User Perfect
+        await database.deleteUser(nameUserManagement);
+
+        // Nettoyage Partie User Bad
+        await database.deleteUser(badUserManagement);
+        await database.deleteUser(nameAlreadyUsed);
+
+        // Nettoyage Partie Team Perfect
+        await database.deleteUser(nameTeamManagement);
+        await database.deleteUser(name2TeamManagement);
+        await database.hardDeleteTeam(nameTeamManagement);
+
+        // Nettoyage Partie Team Bad
+        await database.deleteUser(badTeamManagement);
+        await database.deleteUser(bad2TeamManagement);
+        await database.deleteUser(bad3TeamManagement)
+        await database.hardDeleteTeam(badTeamManagement);
+
+        // Nettoyage Partie Tournois Perfect
+        if (idTournament)
+            await database.deleteTournament(idTournament);
+        await database.hardDeleteTeam(teamTournamentTest);
+        await database.hardDeleteTeam(nameTournamentTest);
+        await database.deleteUser(nameTournamentTest);
+        await database.deleteUser(teamTournamentTest);
+
+        // Nettoyage Partie Tournois Bad
+        if (BadIdTournament)
+            await database.deleteTournament(BadIdTournament);
+        await database.hardDeleteTeam(BadTournamentTest);
+        await database.hardDeleteTeam(Bad2TournamentTest);
+        await database.deleteUser(BadTournamentTest);
+        await database.deleteUser(Bad2TournamentTest);
+    });
+});
