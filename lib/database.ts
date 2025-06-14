@@ -315,7 +315,7 @@ export class Database {
 
     public async createTournament(name: string,
                                   description: string,
-                                  format: 'SIMPLE' | 'DOUBLE',
+                                  format: 'SIMPLE',
                                   size: number,
                                   owner_id: number,
                                   start_visibility: Date,
@@ -510,6 +510,20 @@ export class Database {
         return ({success: true, error: "", ...tournament});
     }
 
+    public async isTournamentEnded(id: number): Promise<status & {result: boolean}> {
+        await this.ready;
+        if (!this.db)
+            return ({success: false, error: "Database not connected!", result: false});
+        if (!(await this.isTournamentExist(id)))
+            return ({success: false, error: "This tournament does not exist!", result: false});
+        const [count] = await this.db.execute(`SELECT COUNT(*) as nb_teams
+                                                   FROM team_tournament
+                                                   WHERE id_tournament = ? AND position = -1`, [id]);
+        const result = count as ({ nb_teams: number })[];
+        const nbTeams: number = result[0].nb_teams;
+        return ({success: true, error: "", result: nbTeams == 0});
+    }
+
     public async deleteTournament(id: number): Promise<status> {
         await this.ready;
         if (!this.db)
@@ -530,26 +544,27 @@ export class Database {
     }
 
     public async tournamentRegistration(id_tournament: number,
-                                        id_team: number): Promise<status> {
+                                        id_team: number): Promise<status & { id_team_tournament: number, id_user_history: number }> {
         await this.ready;
         if (!this.db)
-            return ({success: false, error: "Database not connected !"});
+            return ({success: false, error: "Database not connected !", id_team_tournament: -1, id_user_history: -1});
         if (await this.isTeamExist(id_team) == -1)
-            return ({success: false, error: "Team does not exist!"});
+            return ({success: false, error: "Team does not exist!", id_team_tournament: -1, id_user_history: -1});
         if (await this.isTeamRegister(id_tournament, id_team) != -1)
-            return ({success: false, error: "Team already registered!"});
+            return ({success: false, error: "Team already registered!", id_team_tournament: -1, id_user_history: -1});
         // Vérifie que le tournois existe et qu'il n'est pas complet
         if (!(await this.isTournamentExist(id_tournament, true)))
-            return ({success: false, error: "Tournament does not exist or is full!"});
+            return ({success: false, error: "Tournament does not exist or is full!", id_team_tournament: -1, id_user_history: -1});
         // Vérifie si le tournois existe aussi mais pas s'il est complet
         const status: status & {result: boolean} = await this.isRegistrationPeriod(id_tournament);
         if (!status.success)
-            return ({success: false, error: status.error});
+            return ({success: false, error: status.error, id_team_tournament: -1, id_user_history: -1});
         if (!status.result)
-            return ({success: false, error: "We are out of the registration period !"});
-        const [result] = await this.db.execute<mysql.ResultSetHeader>(`INSERT INTO team_tournament (id_tournament, id_team)
+            return ({success: false, error: "We are out of the registration period !", id_team_tournament: -1, id_user_history: -1});
+        let [result] = await this.db.execute<mysql.ResultSetHeader>(`INSERT INTO team_tournament (id_tournament, id_team)
                                                                        VALUES (?, ?)`, [id_tournament, id_team]);
-        const team_tournament_id = result.insertId;
+        const team_tournament_id: number = result.insertId;
+        let user_history_id: number = -1;
         const [rows] = await this.db.execute(`SELECT user_id
                                               FROM user
                                               WHERE id_team = ?`, [id_team]);
@@ -557,10 +572,11 @@ export class Database {
         if (members_id.length > 0) {
             const values = members_id.map(() => '(?, ?)').join(', ');
             const params = members_id.flatMap((member: {user_id: number}) => ([member.user_id, team_tournament_id]));
-            await this.db.execute(`INSERT INTO user_history (id_user, id_team_tournament)
-                                   VALUES ${values}`, params);
+            [result] = await this.db.execute<mysql.ResultSetHeader>(`INSERT INTO user_history (id_user, id_team_tournament)
+                                              VALUES ${values}`, params);
+            user_history_id = result.insertId;
         }
-        return ({success: true, error: ""});
+        return ({success: true, error: "", id_team_tournament: team_tournament_id, id_user_history: user_history_id});
     }
 
     public async tournamentUnregistration(id_tournament: number,
@@ -633,15 +649,22 @@ export class Database {
         await this.ready;
         if (!this.db)
             return ({success: false, error: "Database not connected!", matchs: []});
-        if (!(await this.isTournamentExist(id_tournament, false, true))) // Doit empêcher, le cas 0 team
-            return ({success: false, error: "Tournament does not exist!", matchs: []});
-        const [rows] = await this.db.execute(`SELECT start FROM tournament WHERE tournament_id = ?` [id_tournament]);
-        const start: Date = (rows as {start: Date}[])[0].start;
+        const status: status & {result: boolean} = await this.isTournamentEnded(id_tournament);
+        if (!status.success)
+            return ({success: false, error: status.error, matchs: []});
+        else if (status.result)
+            return ({success: false, error: "Tournament has ended!", matchs: []});
+        const [rows] = await this.db.execute(`SELECT start, current_round FROM tournament WHERE tournament_id = ?`, [id_tournament]);
+        const info: {start: Date, current_round: number} = (rows as unknown[])[0] as {start: Date, current_round: number};
+        if (info.start > new Date())
+            return ({success: false, error: "The tournament has not begun!", matchs: []});
+        if (info.current_round != -1)
+            return ({success: false, error: "The tournament has already start!", matchs: []});
         const result: getTournamentTeams = await this.getRegisterTeams(id_tournament);
         if (!result.success)
             return ({ success: false, error: result.error, matchs: []});
         const teams: (Team & TeamTournament)[] = result.teams;
-        await this.setupFirstRound(teams, start);
+        await this.setupFirstRound(teams, info.start);
         return (await this.getMatchs(id_tournament));
     }
 
@@ -649,26 +672,44 @@ export class Database {
         await this.ready;
         if (!this.db)
             return ({success: false, error: "Database not connected!", matchs: []});
-        if (!(await this.isTournamentExist(id_tournament, false, true)))
-            return ({success: false, error: "Tournament does not exist!", matchs: []});
+        const status: status & { result: boolean } = await this.isTournamentEnded(id_tournament);
+        if (!status.success)
+            return ({success: false, error: status.error, matchs: []});
+        else if (status.result) // Success True, car ce n'est pas une erreur et ça permet de boucler sur matchs.lengths pour faire fonctionner le tournois
+            return ({success: true, error: "Tournament has ended!", matchs: []});
         if (!(await this.isAllMatchEnded(id_tournament)))
             return ({success: false, error: "All match has not ended!", matchs: []});
-        const [rows_size] = await this.db.execute(`SELECT tournament.size, tournament.current_round FROM tournament WHERE tournament_id = ?`, [id_tournament]);
-        const tournament_info: {size: number, current_round: number} = (rows_size as unknown[])[0] as {size: number, current_round: number};
+        const [rows_size] = await this.db.execute(`SELECT tournament.size, tournament.current_round
+                                                   FROM tournament
+                                                   WHERE tournament_id = ?`, [id_tournament]);
+        const tournament_info: { size: number, current_round: number } = (rows_size as unknown[])[0] as {
+            size: number,
+            current_round: number
+        };
+        if (tournament_info.current_round == -1)
+            return ({success: false, error: "This tournament have not start yet !", matchs: []});
+        // On incrémente de un car on est un round mais on ne met pas à jour la BDD pour pas être bloquant en cas d'échec
+        tournament_info.current_round++;
+
         // On calcule le nombre de matchs à préparer
         const match_to_setup: number = (tournament_info.size / 2 ** tournament_info.current_round) / 2;
-        const [rows] = await this.db.execute(`SELECT tournament_match.*
+        const match_to_fetch: number = match_to_setup * 2;
+        const [rows] = await this.db.execute(`SELECT tournament_match.*,
+                                                     th.id_team AS id_team_host,
+                                                     tg.id_team AS id_team_guest
                                               FROM tournament_match
-                                              WHERE id_tournament = ?
-                                              ORDER BY tournament_match_id
-                                              LIMIT ?`, [id_tournament, (match_to_setup * 2)]);
-        const previous_round: TournamentMatch[] = rows as TournamentMatch[];
+                                                INNER JOIN team_tournament th ON tournament_match.id_team_tournament_host = th.team_tournament_id
+                                                INNER JOIN team_tournament tg ON tournament_match.id_team_tournament_guest = tg.team_tournament_id
+                                              WHERE tournament_match.id_tournament = ?
+                                              ORDER BY tournament_match.tournament_match_id
+                                              LIMIT ${match_to_fetch}`, [id_tournament]);
+        const previous_round: (TournamentMatch & {id_team_host: number, id_team_guest: number})[] = rows as (TournamentMatch & {id_team_host: number, id_team_guest: number})[];
         let nmatch: number = 0;
         let errors: string = "";
         for (let i = 0; i < match_to_setup; i++) {
-            const id_host: number = previous_round[nmatch].victory == "host" ? previous_round[nmatch].id_team_tournament_host : previous_round[nmatch].id_team_tournament_guest;
+            const id_host: number = previous_round[nmatch].victory == "host" ? previous_round[nmatch].id_team_host : previous_round[nmatch].id_team_guest;
             nmatch++;
-            const id_guest: number = previous_round[nmatch].victory == "host" ? previous_round[nmatch].id_team_tournament_host : previous_round[nmatch].id_team_tournament_guest;
+            const id_guest: number = previous_round[nmatch].victory == "host" ? previous_round[nmatch].id_team_host : previous_round[nmatch].id_team_guest;
             nmatch++;
             const status = await this.scheduleMatch(id_tournament, id_host, id_guest, new Date);
             if (!status.success)
@@ -676,7 +717,9 @@ export class Database {
         }
         if (errors.length)
             return ({success: false, error: "All matchs setup with errors : " + errors, matchs: []});
-        await this.db.execute(`UPDATE tournament SET current_round = ? WHERE tournament_id = ?`, [tournament_info.current_round + 1, id_tournament]);
+        await this.db.execute(`UPDATE tournament
+                               SET current_round = ?
+                               WHERE tournament_id = ?`, [tournament_info.current_round, id_tournament]);
         return (await this.getMatchs(id_tournament, match_to_setup));
     }
 
@@ -699,7 +742,7 @@ export class Database {
             if (id_host_register == -1)
                 return ({success: false, error: "The host team is not register or has been eliminated!", id: -1});
         }
-        let id_guest_register;
+        let id_guest_register = -1;
         guest = await this.isTeamExist(guest, true);
         if (guest == -1) {
             victory = 'host';
@@ -739,6 +782,7 @@ export class Database {
             if (!status.success)
                 return ({ success: false, error: status.error });
         }
+        await this.manageTournamentWinner(id_match);
         return ({success: true, error: ""});
     }
 
@@ -750,9 +794,9 @@ export class Database {
         if (!(await this.isTournamentExist(id_tournament)))
             return ({success: false, error: "Tournament does not exist!", matchs: []});
         let addons: string = "";
-        if (nbFromLast < 0)
+        if (nbFromLast > 0)
             addons = ` LIMIT ${nbFromLast} `;
-        const [rows] = await this.db.execute(`SELECT tournament_match.*
+        const [rows] = await this.db.execute(`SELECT *
                                               FROM tournament_match
                                               WHERE tournament_match.id_tournament = ?
                                               ORDER BY tournament_match_id DESC ${addons}`, [id_tournament]);
@@ -794,7 +838,7 @@ export class Database {
                                     team_id       INTEGER PRIMARY KEY AUTO_INCREMENT,
                                     name          VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,
                                     creation_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    id_owner      INTEGER                          NOT NULL
+                                    id_owner      INTEGER
                                 );`);
         await this.db!.execute(`CREATE TABLE IF NOT EXISTS tournament
                                 (
@@ -867,8 +911,11 @@ export class Database {
 
         if (params.whereOption.length > 0) {
             query += ` WHERE `;
-            params.whereOption.forEach((elem) => {
+            params.whereOption.forEach((elem, index, array) => {
                 query += ` ${elem.column} ${elem.condition} ?`;
+                if (index + 1 < array.length) {
+                    query += ` AND `;
+                }
                 values.push(elem.value);
             });
         }
@@ -933,8 +980,7 @@ export class Database {
     }
 
     private async isTournamentExist(id: number,
-                                    checkFreeSlots: boolean = false,
-                                    notEnded: boolean = false): Promise<boolean> {
+                                    checkFreeSlots: boolean = false): Promise<boolean> {
         await this.ready;
         if (!this.db)
             return false;
@@ -944,31 +990,19 @@ export class Database {
         const [rows] = await this.db.execute(`SELECT tournament_id ${size}
                                               FROM tournament
                                               WHERE tournament_id = ?`, [id]);
-        if (!checkFreeSlots && !notEnded) {
+        if (!checkFreeSlots) {
             const tournaments = rows as { tournament_id: number }[];
             return (!!tournaments.length);
-        } else if (checkFreeSlots) {
-            const tournaments = rows as ({ tournament_id: number } & { size: number })[];
-            if (tournaments.length == 0)
-                return false;
-            const [count] = await this.db.execute(`SELECT COUNT(*) as nb_teams
-                                                   FROM team_tournament
-                                                   WHERE id_tournament = ?`, [id]);
-            const result = count as ({ nb_teams: number })[];
-            const nbTeams: number = result[0].nb_teams;
-            return tournaments[0].size != nbTeams;
-
-        } else {
-            const tournaments = rows as ({ tournament_id: number } & { size: number })[];
-            if (tournaments.length == 0)
-                return false;
-            const [count] = await this.db.execute(`SELECT COUNT(*) as nb_teams
-                                                   FROM team_tournament
-                                                   WHERE id_tournament = ? AND position = -1`, [id]);
-            const result  = count as ({ nb_teams: number })[];
-            const nbTeams: number = result[0].nb_teams;
-            return (!!nbTeams);
         }
+        const tournaments = rows as ({ tournament_id: number } & { size: number })[];
+        if (tournaments.length == 0)
+            return false;
+        const [count] = await this.db.execute(`SELECT COUNT(*) as nb_teams
+                                               FROM team_tournament
+                                               WHERE id_tournament = ?`, [id]);
+        const result = count as ({ nb_teams: number })[];
+        const nbTeams: number = result[0].nb_teams;
+        return tournaments[0].size != nbTeams;
     }
 
     private async isRegistrationPeriod(tournament_id: number): Promise<status & {result: boolean}> {
@@ -980,7 +1014,8 @@ export class Database {
         const [rows] = await this.db.execute(`SELECT open_registration, close_registration FROM tournament WHERE tournament_id = ?`, [tournament_id]);
         const tournament_info = (rows as unknown[])[0] as {open_registration: Date, close_registration: Date};
         const now = new Date();
-        if (now > tournament_info.open_registration && now < tournament_info.close_registration)
+        // Précision d'une seconde car la base de donnée arrondi
+        if ((now.getTime() - tournament_info.open_registration.getTime()) >= -1000 && (now.getTime() - tournament_info.close_registration.getTime()) < 1000)
             return ({success: true, error: "", result: true});
         return ({success: true, error: "", result: false});
     }
@@ -993,7 +1028,7 @@ export class Database {
             return -1;
         let filter: string = "";
         if (checkStillRunning)
-            filter = "AND position != -1";
+            filter = "AND position = -1";
         const [rows] = await this.db.execute(`SELECT team_tournament_id
                                               FROM team_tournament
                                               WHERE id_tournament = ?
@@ -1049,7 +1084,6 @@ export class Database {
         if (!this.db)
             return ({success: false, error: "Database not connected!"});
         const tournament_size = this.findSizeTournament(teams.length);
-        await this.db.execute(`UPDATE tournament SET size = ?, current_round = 0 WHERE tournament.tournament_id = ?`, [tournament_size, teams[0].id_tournament])
         const byes: number = tournament_size - teams.length;
         const byesInterval: number = byes ? (Math.floor(tournament_size / byes)) - 1 : 0;
         let nteam: number = 0;
@@ -1074,6 +1108,8 @@ export class Database {
             if (!status.success)
                 return ({ success: false, error: status.error });
         }
+        // En dernier car s'il y a un problème avec ScheduleMatch, c'est pas bloquant pour retry
+        await this.db.execute(`UPDATE tournament SET size = ?, current_round = 0 WHERE tournament.tournament_id = ?`, [tournament_size, teams[0].id_tournament]);
         return ({ success: true, error: "" });
     }
 
@@ -1088,7 +1124,7 @@ export class Database {
                                                        LEFT JOIN team_tournament
                                                                  ON id_team_tournament_guest = team_tournament.team_tournament_id
                                               WHERE team_tournament.id_tournament && tournament_match.victory IS NULL`);
-        return (!!(rows as unknown[]).length);
+        return (!(rows as unknown[]).length);
     }
 
     private async setLoserPosition(id_match: number): Promise<status> {
@@ -1115,6 +1151,24 @@ export class Database {
         if (name.length < 3 || name.length > 15) {
             return ({success: false, error: "The name must be at least 3 characters and maximum 15!"});
         }
+        return ({success: true, error: ""});
+    }
+
+    private async manageTournamentWinner(match_id: number): Promise<status> {
+        await this.ready;
+        if (!this.db)
+            return ({success: false, error: "The database is not connected!"});
+        let [rows] = await this.db.execute(`SELECT id_tournament FROM tournament_match WHERE tournament_match_id = ?`, [match_id]);
+        if ((rows as unknown[]).length == 0)
+            return ({success: false, error: "This match does not exist !"});
+        const tournament_id: number = ((rows as unknown[])[0] as {id_tournament: number}).id_tournament;
+        [rows] = await this.db.execute(`SELECT COUNT(*) as nbTeams FROM team_tournament WHERE id_tournament = ? && position = -1`, [tournament_id]);
+        if ((rows as unknown[]).length == 0)
+            return ({success: true, error: ""}); // Pas d'équipes inscrites ou tournois terminé. Bizarre voire impossible ici, mais au cas où
+        const nbTeams: number = ((rows as unknown[])[0] as {nbTeams: number}).nbTeams;
+        if (nbTeams > 1)
+            return ({success: true, error: ""});
+        await this.db.execute(`UPDATE team_tournament SET position=1 WHERE id_tournament=? AND position=-1`, [tournament_id]);
         return ({success: true, error: ""});
     }
 }

@@ -1,5 +1,7 @@
 import {Database} from "../lib/database";
 import {afterAll, beforeAll, describe, expect, test} from "@jest/globals"
+import 'jest-extended';
+
 import {
     getTeamMembers,
     getTeams,
@@ -8,9 +10,12 @@ import {
     status,
     Team,
     User,
-    UserHistory,
     SQLGetResult,
-    getTournamentTeams, Tournament
+    getTournamentTeams,
+    Tournament,
+    getMatchs,
+    TournamentMatch,
+    TeamTournament
 } from "../lib/types";
 import {sleep} from "../lib/sleep";
 
@@ -45,6 +50,12 @@ describe("Database", () => {
     const Bad5TournamentTest: string = "Tournament5Bad";
     let BadIdTournament: number | undefined;
     let BadEditTournament: number | undefined;
+
+    // Match & History
+    const namesMatchsHistory: string[] = ["MatchHistory1", "MatchHistory2", "MatchHistory3", "MatchHistory4"];
+    const substituteName: string = "MatchHistorySub";
+    let MatchHistoryTournament: number | undefined;
+    let MatchHistory2Tournament: number | undefined;
 
     //      Init Date
     const now = new Date();
@@ -725,7 +736,7 @@ describe("Database", () => {
         // Test size tournois
         //      Init tournois
         let tmp_date: Date = new Date();
-        tmp_date.setMilliseconds(tmp_date.getMilliseconds() + 400);
+        tmp_date.setMilliseconds(tmp_date.getMilliseconds() + 1000);
         setResult = await database.createTournament(
             nameTournamentTest,
             "Je suis une description sans importance.",
@@ -739,6 +750,8 @@ describe("Database", () => {
         expect(setResult.success).toBeTruthy();
         BadIdTournament = setResult.id;
 
+        // Petit sleep pour s'éloigner du départ
+        await sleep(100);
         // Inscription team 1/4
         let status: status = await database.tournamentRegistration(BadIdTournament, team_one_id);
         expect(status.success).toBeTruthy();
@@ -780,7 +793,7 @@ describe("Database", () => {
 
         // Désinscription après close_registration
         //      Sleep pour attendre la fin des inscriptions
-        await sleep(800);
+        await sleep(2000);
         //      Test désinscription
         status = await database.tournamentUnregistration(BadIdTournament, team_one_id);
         expect(status.success).toBeFalsy();
@@ -1036,10 +1049,310 @@ describe("Database", () => {
         status = await database.deleteTournament(-1);
         expect(status.success).toBeFalsy();
     });
-    test("History perfect use", async() => {
+    test("Match and History perfect use", async() => {
+        // Init
+        // Init variables
+        const users: number[] = [];
+        const teams: number[] = [];
+        const registrations:  number[] = [];
+        let setStatus: status & id;
+        let status: status;
 
-    });
-    test("History bad use", async() => {
+        //      Init user and teams
+        for (const name of namesMatchsHistory) {
+         setStatus = await database.newUser(name);
+         expect(setStatus.success).toBeTruthy();
+         users.push(setStatus.id);
+         setStatus = await database.createTeam(name, setStatus.id);
+         expect(setStatus.success).toBeTruthy();
+         teams.push(setStatus.id);
+        }
+        setStatus = await database.newUser(substituteName)
+        expect(setStatus.success).toBeTruthy();
+        const substitute: number = setStatus.id;
+        status = await database.addTeamMember(substitute, teams[0]);
+        expect(status.success).toBeTruthy();
+
+        //      Init Tournament
+        let visibility: Date = new Date();
+        let open_registration: Date = new Date();
+        let close_registration: Date = new Date();
+        close_registration.setSeconds(close_registration.getSeconds() + 2);
+        let start: Date = new Date(close_registration);
+        setStatus = await database.createTournament("Tournois Test", "Premier tournois à tourner", "SIMPLE", 4, users[0], visibility, open_registration, close_registration, start);
+        expect(setStatus.success).toBeTruthy();
+        MatchHistoryTournament = setStatus.id;
+        //      Registration
+        let setRegistration: status & {id_team_tournament: number, id_user_history: number};
+        for (const team of teams) {
+            setRegistration = await database.tournamentRegistration(MatchHistoryTournament, team);
+            expect(setRegistration.success).toBeTruthy();
+            registrations.push(setRegistration.id_team_tournament);
+        }
+        // Sleep pour attendre la fin des inscriptions
+        await sleep(2500);
+
+        // Test lancement de tournois
+        let matchs: getMatchs = await database.setupTournament(MatchHistoryTournament);
+
+        // Test Valeur de retour match 1
+        expect(matchs.success).toBeTruthy();
+        expect(matchs.matchs.length).toEqual(2);
+        expect(registrations).toContain(matchs.matchs[0].id_team_tournament_host);
+        expect(registrations).toContain(matchs.matchs[0].id_team_tournament_guest);
+        expect(matchs.matchs[0].score_host).toEqual(0);
+        expect(matchs.matchs[0].score_guest).toEqual(0);
+        expect(matchs.matchs[0].victory).toBeNull();
+        const match1: TournamentMatch = matchs.matchs[0];
+
+        // Test fonction getMatchs qui doit renvoyer la même chose !
+        const secondMatchs: getMatchs = await database.getMatchs(MatchHistoryTournament);
+        expect(matchs).toEqual(secondMatchs);
+
+        // Vérification avec GET match 1
+        let getResult: SQLGetResult = await database.get({table: "tournament_match", whereOption: [{column: "tournament_match_id", condition: "=", value: match1.tournament_match_id}]});
+        expect(getResult.success).toBeTruthy();
+        expect(getResult.result.length).toEqual(1);
+        let match: TournamentMatch = getResult.result[0] as TournamentMatch;
+        expect(matchs.matchs[0]).toEqual(match);
+
+        // Test valeur de retour match 2
+        expect(registrations).toContain(matchs.matchs[1].id_team_tournament_host);
+        expect(registrations).toContain(matchs.matchs[1].id_team_tournament_guest);
+        expect(matchs.matchs[1].score_host).toEqual(0);
+        expect(matchs.matchs[1].score_guest).toEqual(0);
+        expect(matchs.matchs[0].victory).toBeNull();
+        const match2: TournamentMatch = matchs.matchs[1];
+
+        // Vérification avec GET match 2
+        getResult = await database.get({table: "tournament_match", whereOption: [{column: "tournament_match_id", condition: "=", value: match2.tournament_match_id}]});
+        expect(getResult.success).toBeTruthy();
+        expect(getResult.result.length).toEqual(1);
+        match = getResult.result[0] as TournamentMatch;
+        expect(matchs.matchs[1]).toEqual(match);
+
+        // Test Update des scores guest
+        status = await database.updateScore(match1.tournament_match_id, 0, 1);
+        expect(status.success).toBeTruthy();
+
+        // Vérification update
+        getResult = await database.get({table: "tournament_match", whereOption: [{column: "tournament_match_id", condition: "=", value: match1.tournament_match_id}]});
+        expect(getResult.success).toBeTruthy();
+        expect(getResult.result.length).toEqual(1);
+        match = getResult.result[0] as TournamentMatch;
+        expect(match.victory).toBeNull();
+        expect(match.score_host).toEqual(0);
+        expect(match.score_guest).toEqual(1);
+
+        // Test Update des scores host
+        status = await database.updateScore(match2.tournament_match_id, 1, 0);
+        expect(status.success).toBeTruthy();
+
+        // Vérification update
+        getResult = await database.get({table: "tournament_match", whereOption: [{column: "tournament_match_id", condition: "=", value: match2.tournament_match_id}]});
+        expect(getResult.success).toBeTruthy();
+        expect(getResult.result.length).toEqual(1);
+        match = getResult.result[0] as TournamentMatch;
+        expect(match.victory).toBeNull();
+        expect(match.score_host).toEqual(1);
+        expect(match.score_guest).toEqual(0);
+
+        // Test update victory for guest
+        status = await database.updateScore(match1.tournament_match_id, 0, 2, "guest");
+        expect(status.success).toBeTruthy();
+        let i: number = 0;
+        while (i < registrations.length && match1.id_team_tournament_guest != registrations[i])
+            i += 1;
+        const final_team1_index = i;
+
+
+        // Vérification update
+        getResult = await database.get({table: "tournament_match", whereOption: [{column: "tournament_match_id", condition: "=", value: match1.tournament_match_id}]});
+        expect(getResult.success).toBeTruthy();
+        expect(getResult.result.length).toEqual(1);
+        match = getResult.result[0] as TournamentMatch;
+        expect(match.victory).toEqual("guest");
+        expect(match.score_host).toEqual(0);
+        expect(match.score_guest).toEqual(2);
+
+        // Test Update des scores victory host
+        status = await database.updateScore(match2.tournament_match_id, 2, 0, "host");
+        expect(status.success).toBeTruthy();
+        i = 0;
+        while (i < registrations.length && match2.id_team_tournament_host != registrations[i])
+            i += 1;
+        const final_team2_index = i;
+
+        // Vérification update
+        getResult = await database.get({table: "tournament_match", whereOption: [{column: "tournament_match_id", condition: "=", value: match2.tournament_match_id}]});
+        expect(getResult.success).toBeTruthy();
+        expect(getResult.result.length).toEqual(1);
+        match = getResult.result[0] as TournamentMatch;
+        expect(match.victory).toEqual("host");
+        expect(match.score_host).toEqual(2);
+        expect(match.score_guest).toEqual(0);
+
+        // Test setup next round
+        matchs = await database.setupNextRound(MatchHistoryTournament);
+        expect(matchs.success).toBeTruthy();
+        expect(matchs.matchs.length).toEqual(1);
+        expect([registrations[final_team1_index], registrations[final_team2_index]]).toContain(matchs.matchs[0].id_team_tournament_host);
+        expect([registrations[final_team1_index], registrations[final_team2_index]]).toContain(matchs.matchs[0].id_team_tournament_guest);
+        expect(matchs.matchs[0].victory).toBeNull();
+        expect(matchs.matchs[0].score_host).toEqual(0);
+        expect(matchs.matchs[0].score_guest).toEqual(0);
+
+        // Update victory for host
+        status = await database.updateScore(matchs.matchs[0].tournament_match_id, 2, 1, "host");
+        expect(status.success).toBeTruthy();
+        i = 0;
+        while (i < registrations.length && match2.id_team_tournament_host != registrations[i])
+            i += 1;
+        const winner_team_index: number = i;
+
+        // Test setup next round pour tester la butée
+        matchs = await database.setupNextRound(MatchHistoryTournament);
+        expect(matchs.success).toBeTruthy();
+        expect(matchs.matchs.length).toEqual(0);
+
+        // Test positions des historiques
+        //      TOP 4
+        getResult = await database.get({table: "team_tournament", whereOption: [{column: "position", condition: "=", value: 4}, {column: "id_tournament", condition: "=", value: MatchHistoryTournament}]});
+        expect(getResult.success).toBeTruthy();
+        expect(getResult.result.length).toEqual(2);
+        let teamsHistory: TeamTournament[] = getResult.result as TeamTournament[];
+        expect([registrations[final_team1_index], registrations[final_team2_index]]).not.toContain(teamsHistory[0].team_tournament_id);
+        expect([registrations[final_team1_index], registrations[final_team2_index]]).not.toContain(teamsHistory[1].team_tournament_id);
+        //      TOP 2
+        // Set Loser marche pas !!
+        getResult = await database.get({table: "team_tournament", whereOption: [{column: "position", condition: "=", value: 2}, {column: "id_tournament", condition: "=", value: MatchHistoryTournament}]});
+        expect(getResult.success).toBeTruthy();
+        expect(getResult.result.length).toEqual(1);
+        teamsHistory = getResult.result as TeamTournament[];
+        expect([registrations[final_team1_index], registrations[final_team2_index]]).toContain(teamsHistory[0].team_tournament_id);
+        expect(teamsHistory[0].team_tournament_id).not.toEqual(registrations[winner_team_index]);
+        //      TOP 1
+        getResult = await database.get({table: "team_tournament", whereOption: [{column: "position", condition: "=", value: 1}, {column: "id_tournament", condition: "=", value: MatchHistoryTournament}]});
+        expect(getResult.success).toBeTruthy();
+        expect(getResult.result.length).toEqual(1);
+        teamsHistory = getResult.result as TeamTournament[];
+        expect(teamsHistory[0].team_tournament_id).toEqual(registrations[winner_team_index]);
+
+        // Test récupération des historiques par team
+        //      Top 1
+        let getHistories: getHistories = await database.getTeamHistory(teams[winner_team_index]);
+        expect(getHistories.success).toBeTruthy();
+        expect(getHistories.histories.length).toEqual(1);
+        expect(getHistories.histories[0].team_name).toEqual(namesMatchsHistory[winner_team_index]);
+        expect(getHistories.histories[0].position).toEqual(1);
+        expect(getHistories.histories[0].id_tournament).toEqual(MatchHistoryTournament);
+        expect(getHistories.histories[0].id_team).toEqual(teams[winner_team_index]);
+        expect(getHistories.histories[0].team_tournament_id).toEqual(registrations[winner_team_index]);
+
+        // Test récupération des historiques par user
+        let secondGetHistories: getHistories = await database.getUserHistory(users[winner_team_index]);
+        expect(secondGetHistories.histories).toEqual(getHistories.histories);
+
+        // Test avec deux tournois et switch d'équipe
+        status = await database.rmTeamMember(substitute);
+        expect(status.success).toBeTruthy();
+        status = await database.addTeamMember(substitute, teams[3]);
+        expect(status.success).toBeTruthy();
+
+        //      Init Tournament
+        visibility = new Date();
+        open_registration = new Date();
+        close_registration = new Date();
+        close_registration.setSeconds(close_registration.getSeconds() + 2);
+        start = new Date(close_registration);
+        setStatus = await database.createTournament("Tournois Test2", "Premier tournois à tourner", "SIMPLE", 4, users[0], visibility, open_registration, close_registration, start);
+        expect(setStatus.success).toBeTruthy();
+        MatchHistory2Tournament = setStatus.id;
+        //      Registrations
+        for (const team of teams) {
+            setRegistration = await database.tournamentRegistration(MatchHistory2Tournament, team);
+            expect(setRegistration.success).toBeTruthy();
+            registrations.push(setRegistration.id_team_tournament);
+        }
+        // Sleep pour attendre la fin des inscriptions
+        await sleep(2500);
+
+        // Exécution du tournoi
+        matchs = await database.setupTournament(MatchHistory2Tournament);
+        expect(matchs.success).toBeTruthy();
+        expect(matchs.matchs.length).toEqual(2);
+
+        // Exécution match 1
+        status = await database.updateScore(matchs.matchs[0].tournament_match_id, 5, 2, 'host');
+        expect(status.success).toBeTruthy();
+
+        // Exécution match 2
+        status = await database.updateScore(matchs.matchs[1].tournament_match_id, 2, 5, 'guest');
+        expect(status.success).toBeTruthy();
+
+        // Passage round suivant
+        matchs = await database.setupNextRound(MatchHistory2Tournament);
+        expect(matchs.success).toBeTruthy();
+        expect(matchs.matchs.length).toEqual(1);
+
+        // Exécution finale
+        status = await database.updateScore(matchs.matchs[0].tournament_match_id, 5, 2, 'host');
+        expect(status.success).toBeTruthy();
+
+        // Vérification historique
+        getHistories = await database.getUserHistory(substitute);
+        expect(getHistories.success).toBeTruthy();
+        expect(getHistories.histories.length).toEqual(2);
+
+        secondGetHistories = await database.getTeamHistory(teams[0]);
+        expect(secondGetHistories.success).toBeTruthy();
+        expect(secondGetHistories.histories.length).toEqual(2);
+
+        // Comparaison des historiques sachant qu'on récupère du plus jeune au plus vieux
+        expect(getHistories.histories[1]).toEqual(secondGetHistories.histories[1]);
+
+        secondGetHistories = await database.getTeamHistory(teams[3]);
+        expect(secondGetHistories.success).toBeTruthy();
+        expect(secondGetHistories.histories.length).toEqual(2);
+
+        // Comparaison des historiques avec la deuxième équipe
+        expect(getHistories.histories[0]).toEqual(secondGetHistories.histories[0]);
+
+        // Test soft team delete
+        status = await database.softDeleteTeam(teams[0]);
+        expect(status.success).toBeTruthy();
+        status = await database.softDeleteTeam(teams[3]);
+        expect(status.success).toBeTruthy();
+
+        // Les historiques doivent être conservés
+
+        secondGetHistories = await database.getUserHistory(substitute);
+        expect(secondGetHistories.success).toBeTruthy();
+        expect(secondGetHistories.histories.length).toEqual(2);
+        expect(secondGetHistories.histories).toEqual(getHistories.histories);
+
+        // Test hard team delete
+        status = await database.hardDeleteTeam(teams[0]);
+        expect(status.success).toBeTruthy();
+        status = await database.hardDeleteTeam(teams[3]);
+        expect(status.success).toBeTruthy();
+
+        // Les historiques doivent disparaitre
+        getHistories = await database.getUserHistory(substitute);
+        expect(getHistories.success).toBeTruthy();
+        expect(getHistories.histories.length).toEqual(0);
+
+        // Test delete tournament
+        status = await database.deleteTournament(MatchHistoryTournament);
+        expect(status.success).toBeTruthy();
+
+        // Vérification historique. Le tournoi doit disparaitre
+        getHistories = await database.getTeamHistory(teams[1]);
+        expect(getHistories.success).toBeTruthy();
+        expect(getHistories.histories.length).toEqual(1);
+        expect(getHistories.histories[0].id_tournament).toEqual(MatchHistory2Tournament);
+    }, 10000);
+    test("Match and History bad use", async() => {
         /*
         // Récupération des historiques utilisateurs avec ID éroné
         userHistory = await database.getUserHistory(-1);
@@ -1097,5 +1410,16 @@ describe("Database", () => {
         await database.deleteUser(Bad3TournamentTest);
         await database.deleteUser(Bad4TournamentTest);
         await database.deleteUser(Bad5TournamentTest);
+
+        // Nettoyage Partie Match & History Perfect
+        if (MatchHistoryTournament)
+            await database.deleteTournament(MatchHistoryTournament);
+        if (MatchHistory2Tournament)
+            await database.deleteTournament(MatchHistory2Tournament);
+        for (const name of namesMatchsHistory) {
+            await database.hardDeleteTeam(name);
+            await database.deleteUser(name);
+        }
+        await database.deleteUser(substituteName);
     });
 });
