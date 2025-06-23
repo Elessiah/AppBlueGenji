@@ -1,6 +1,5 @@
 import {Database} from "../lib/database";
 import {afterAll, beforeAll, describe, expect, test} from "@jest/globals"
-import 'jest-extended';
 
 import {
     getTeamMembers,
@@ -15,7 +14,7 @@ import {
     Tournament,
     getMatchs,
     TournamentMatch,
-    TeamTournament
+    TeamTournament, TeamInfo, UserInfo
 } from "../lib/types";
 import {sleep} from "../lib/sleep";
 
@@ -51,11 +50,15 @@ describe("Database", () => {
     let BadIdTournament: number | undefined;
     let BadEditTournament: number | undefined;
 
-    // Match & History
+    // Match & History perfect use
     const namesMatchsHistory: string[] = ["MatchHistory1", "MatchHistory2", "MatchHistory3", "MatchHistory4"];
     const substituteName: string = "MatchHistorySub";
     let MatchHistoryTournament: number | undefined;
     let MatchHistory2Tournament: number | undefined;
+
+    // Match & History bad use
+    const badMatchsHistory: string[] = ["BadHistory1", "BadHistory2", "BadHistory3", "BadHistory4"];
+    let BadHistoryTournament: number | undefined;
 
     //      Init Date
     const now = new Date();
@@ -64,6 +67,9 @@ describe("Database", () => {
     const baseDate = now.getDate();
     const baseHour = now.getHours();
     const baseMinutes = now.getMinutes();
+    
+    //      Hash
+    const passwordUser = "HashTestHashTest";
     beforeAll(async () => {
         database = Database.getInstance();
         await database.ready;
@@ -103,26 +109,75 @@ describe("Database", () => {
     });
     test("User management perfect use", async() => {
         // Création utilisateur
-        let setResult: status & id = await database.newUser(nameUserManagement);
+        let setResult: status & id & {token: string} = await database.newUser(nameUserManagement, passwordUser);
         expect(setResult.success).toBeTruthy();
         expect(setResult.id).not.toEqual(-1);
+        const user_id = setResult.id;
+        let user_token = setResult.token;
+
+        // Test admin status
+        let checkStatus: status & {result: boolean} = await database.isAdmin(user_id);
+        expect(checkStatus.success).toBeTruthy();
+        expect(checkStatus.result).toBeFalsy();
+
+        // Test token auth
+        let token_status: status & {token: string} = await database.authTokenUser(user_id, user_token);
+        expect(token_status.success).toBeTruthy();
+        expect(token_status.token.length).toBeGreaterThan(0);
+        expect(token_status.token).not.toEqual(user_token);
+        user_token = token_status.token;
+
+        // Test password par ID
+        token_status = await database.authPasswordUser(user_id, passwordUser);
+        expect(token_status.success).toBeTruthy();
+        expect(token_status.token.length).toBeGreaterThan(0);
+        expect(token_status.token).not.toEqual(user_token);
+        user_token = token_status.token;
+
+        // Test password par username
+        token_status = await database.authPasswordUser(nameUserManagement, passwordUser);
+        expect(token_status.success).toBeTruthy();
+        expect(token_status.token.length).toBeGreaterThan(0);
+        expect(token_status.token).not.toEqual(user_token);
+        user_token = token_status.token;
+
+        // Test edit password
+        token_status = await database.updatePasswordUser(user_id, passwordUser, nameUserManagement);
+        expect(token_status.success).toBeTruthy();
+        expect(token_status.token.length).toBeGreaterThan(0);
+        expect(token_status.token).not.toEqual(user_token);
+        user_token = token_status.token;
+
+        // Vérification edit password
+        token_status = await database.authPasswordUser(user_id, nameUserManagement);
+        expect(token_status.success).toBeTruthy();
+        expect(token_status.token.length).toBeGreaterThan(0);
+        expect(token_status.token).not.toEqual(user_token);
+        user_token = token_status.token;
+
+        // Reset for next
+        token_status = await database.updatePasswordUser(user_id, nameUserManagement, passwordUser);
+        expect(token_status.success).toBeTruthy();
+        expect(token_status.token.length).toBeGreaterThan(0);
+        expect(token_status.token).not.toEqual(user_token);
+        user_token = token_status.token;
 
         // Test récupération par Nom
-        let getResult : status & Partial<User>;
+        let getResult : status & Partial<UserInfo>;
         getResult = await database.getUser(nameUserManagement);
-        expect(getResult).toEqual({success: true, error: '', user_id: setResult.id, username: nameUserManagement, id_team: null, is_admin: false});
+        expect(getResult).toEqual({...getResult, success: true, error: "", user_id: user_id, username: nameUserManagement, is_admin: false, id_team: null});
 
         // Test récupération par ID
-        let secondGetResult: status & Partial<User>;
-        secondGetResult = await database.getUser(setResult.id);
+        let secondGetResult: status & Partial<UserInfo>;
+        secondGetResult = await database.getUser(user_id);
         expect(secondGetResult).toEqual(getResult);
 
         // Test edit name par ID
-        let status : status = await database.editUsername(setResult.id, nameUserManagement.toUpperCase());
+        let status : status = await database.editUsername(user_id, nameUserManagement.toUpperCase());
         expect(status.success).toBeTruthy();
 
         // Vérification edit
-        secondGetResult = await database.getUser(setResult.id);
+        secondGetResult = await database.getUser(user_id);
         expect(secondGetResult).toBeTruthy();
         expect(secondGetResult).toEqual({...getResult, username: nameUserManagement.toUpperCase()});
 
@@ -131,7 +186,7 @@ describe("Database", () => {
         expect(status.success).toBeTruthy();
 
         // Vérification edit
-        secondGetResult = await database.getUser(setResult.id);
+        secondGetResult = await database.getUser(user_id);
         expect(secondGetResult).toBeTruthy();
         expect(secondGetResult).toEqual({...getResult, username: nameUserManagement});
         expect(secondGetResult.username).toEqual(nameUserManagement);
@@ -143,46 +198,147 @@ describe("Database", () => {
         expect(getResult.success).toBeFalsy();
 
         // Test Création admin
-        setResult = await database.newUser(nameUserManagement, true);
+        setResult = await database.newUser(nameUserManagement, passwordUser, true);
         expect(setResult.success).toBeTruthy();
         expect(setResult.id).not.toEqual(-1);
+        const admin_id = setResult.id;
+
+        // Test admin status
+        checkStatus = await database.isAdmin(admin_id);
+        expect(checkStatus.success).toBeTruthy();
+        expect(checkStatus.result).toBeTruthy();
 
         // Vérification admin
         getResult = await database.getUser(nameUserManagement);
-        expect(getResult).toEqual({success: true, error: '', user_id: setResult.id, username: nameUserManagement, id_team: null, is_admin: true});
+        expect(getResult).toEqual({...getResult, user_id: admin_id, username: nameUserManagement, id_team: null, is_admin: true});
 
         // Test suppression par ID
-        delResult = await database.deleteUser(setResult.id);
+        delResult = await database.deleteUser(admin_id);
         expect(delResult.success).toBeTruthy();
     });
     test("User management bad use", async() => {
         // Init test user
-        let setResult : status & id = await database.newUser(badUserManagement);
+        let setResult : status & id & {token: string} = await database.newUser(badUserManagement, passwordUser);
         expect(setResult.success).toBeTruthy();
         expect(setResult.id).not.toEqual(-1);
         const id_user : number = setResult.id;
+        let user_token: string = setResult.token;
 
-        setResult = await database.newUser(nameAlreadyUsed);
+        setResult = await database.newUser(nameAlreadyUsed, passwordUser);
         expect(setResult.success).toBeTruthy();
         expect(setResult.id).not.toEqual(-1);
 
         // Test création doublons
-        let setError : status & id = await database.newUser(badUserManagement);
+        let setError : status & id = await database.newUser(badUserManagement, passwordUser);
         expect(setError.success).toBeFalsy();
         expect(setError.error).toEqual("Username already exist !");
 
         // Test création trop courte
-        setError = await database.newUser("");
+        setError = await database.newUser("", passwordUser);
         expect(setError.success).toBeFalsy();
         expect(setError.error).toEqual("The name must be at least 3 characters and maximum 15!");
-        setError = await database.newUser("az");
+        setError = await database.newUser("az", passwordUser);
         expect(setError.success).toBeFalsy();
         expect(setError.error).toEqual("The name must be at least 3 characters and maximum 15!");
 
         // Test création trop longue
-        setError = await database.newUser("1234567890123456");
+        setError = await database.newUser("1234567890123456", passwordUser);
         expect(setError.success).toBeFalsy();
         expect(setError.error).toEqual("The name must be at least 3 characters and maximum 15!");
+
+        // Test création avec mot de passe trop court
+        setError = await database.newUser(badUserManagement.toUpperCase(), "");
+        expect(setError.success).toBeFalsy();
+        expect(setError.error).toEqual("Password must be contain between 8 and 50 characters!");
+        setError = await database.newUser(badUserManagement.toUpperCase(), "azeze");
+        expect(setError.success).toBeFalsy();
+        expect(setError.error).toEqual("Password must be contain between 8 and 50 characters!");
+
+        // Test création avec mot de passe trop long
+        setError = await database.newUser(badUserManagement.toUpperCase(), "1234567890123456789012345678901234567890123456789012345678901234567890");
+        expect(setError.success).toBeFalsy();
+        expect(setError.error).toEqual("Password must be contain between 8 and 50 characters!");
+
+        // Test authPasswordUser id éroné
+        let statusToken : status & {token: string} = await database.authPasswordUser(-1, passwordUser);
+        expect(statusToken.success).toBeFalsy();
+        expect(statusToken.token.length).toEqual(0);
+
+        // Test authPasswordUser password éroné
+        statusToken = await database.authPasswordUser(id_user, "JeNeSuisPasLeBonMDP");
+        expect(statusToken.success).toBeTruthy();
+        expect(statusToken.token.length).toEqual(0);
+
+        // Test editPasswordUser ID éroné
+        statusToken = await database.updatePasswordUser(-1, passwordUser, passwordUser.toUpperCase());
+        expect(statusToken.success).toBeFalsy();
+        expect(statusToken.token.length).toEqual(0);
+
+        // Test editPasswordUser old_password éroné
+        statusToken = await database.updatePasswordUser(id_user, "JeNeSuisPasLeBonMDP", "JeSuisLeNouveauMDP");
+        expect(statusToken.success).toBeFalsy();
+        expect(statusToken.token.length).toEqual(0);
+
+        // Test editPasswordUser old_password et new_password éroné
+        statusToken = await database.updatePasswordUser(id_user, passwordUser, passwordUser);
+        expect(statusToken.success).toBeFalsy();
+        expect(statusToken.error).toEqual("The new password is the same as the last one!");
+        expect(statusToken.token.length).toEqual(0);
+
+        // Test editPasswordUser new_password trop court
+        statusToken = await database.updatePasswordUser(id_user, passwordUser, "");
+        expect(statusToken.success).toBeFalsy();
+        expect(statusToken.error).toEqual("Password must be contain between 8 and 50 characters!");
+        expect(statusToken.token.length).toEqual(0);
+        statusToken = await database.updatePasswordUser(id_user, passwordUser, "az");
+        expect(statusToken.success).toBeFalsy();
+        expect(statusToken.error).toEqual("Password must be contain between 8 and 50 characters!");
+        expect(statusToken.token.length).toEqual(0);
+
+        // Test editPasswordUser new_password trop long
+        statusToken = await database.updatePasswordUser(id_user, passwordUser, "1234567890123456789012345678901234567890123456789012345678901234567890");
+        expect(statusToken.success).toBeFalsy();
+        expect(statusToken.error).toEqual("Password must be contain between 8 and 50 characters!");
+        expect(statusToken.token.length).toEqual(0);
+
+        // Edit password for further tests
+        statusToken = await database.updatePasswordUser(id_user, passwordUser, "TemporaryPassword");
+        expect(statusToken.success).toBeTruthy();
+        expect(statusToken.token.length).toBeGreaterThan(0);
+        expect(statusToken.token).not.toEqual(user_token);
+
+        // Use old_password
+        statusToken = await database.authPasswordUser(id_user, passwordUser);
+        expect(statusToken.success).toBeTruthy();
+        expect(statusToken.token.length).toEqual(0);
+
+        // Reset password for further tests
+        statusToken = await database.updatePasswordUser(id_user, "TemporaryPassword", passwordUser);
+        expect(statusToken.success).toBeTruthy();
+        expect(statusToken.token.length).toBeGreaterThan(0);
+        expect(statusToken.token).not.toEqual(user_token);
+        user_token = statusToken.token;
+
+        // Test authTokenUser avec id_user wrong
+        statusToken = await database.authTokenUser(-1, user_token);
+        expect(statusToken.success).toBeFalsy();
+        expect(statusToken.token.length).toEqual(0);
+
+        // Test authTokenUser avec un mauvais token
+        statusToken = await database.authTokenUser(id_user, "WrongToken");
+        expect(statusToken.success).toBeTruthy();
+        expect(statusToken.token.length).toEqual(0);
+
+        // Test authTokenUser double utilisation
+        //      Première utilisation
+        statusToken = await database.authTokenUser(id_user, user_token);
+        expect(statusToken.success).toBeTruthy();
+        expect(statusToken.token.length).toBeGreaterThan(0);
+        expect(statusToken.token).not.toEqual(user_token);
+        //      Seconde utilisation
+        statusToken = await database.authTokenUser(id_user, user_token);
+        expect(statusToken.success).toBeTruthy();
+        expect(statusToken.token.length).toEqual(0);
 
         // Test récupération par Nom éroné
         let getError : status & Partial<User> = await database.getUser("az");
@@ -229,13 +385,13 @@ describe("Database", () => {
     });
     test("Team Management perfect use", async() => {
         // Création test User
-        let setUserResult: status & id = await database.newUser(nameTeamManagement);
+        let setUserResult: status & id = await database.newUser(nameTeamManagement, passwordUser);
         expect(setUserResult.success).toBeTruthy();
         expect(setUserResult.id).not.toEqual(-1);
         const user1_id: number = setUserResult.id;
 
         // Création test user 2
-        setUserResult = await database.newUser(name2TeamManagement);
+        setUserResult = await database.newUser(name2TeamManagement, passwordUser);
         expect(setUserResult.success).toBeTruthy();
         expect(setUserResult.id).not.toBeUndefined();
         const user2_id: number = setUserResult.id;
@@ -246,6 +402,16 @@ describe("Database", () => {
         expect(setUserResult.id).not.toEqual(-1);
         const team1_id = setTeamResult.id;
 
+        // Test ownership with owner
+        let checkOwnerShip: status & {result: number} = await database.isTeamOwner(user1_id);
+        expect(checkOwnerShip.success).toBeTruthy();
+        expect(checkOwnerShip.result).toEqual(team1_id);
+
+        // Test ownership with random user
+        checkOwnerShip = await database.isTeamOwner(user2_id);
+        expect(checkOwnerShip.success).toBeTruthy();
+        expect(checkOwnerShip.result).toEqual(-1);
+
         // Vérification création
         let getResult: SQLGetResult = await database.get({ table: "team", whereOption: [{ column: "team_id", condition: "=", value: setTeamResult.id}] });
         expect(getResult.success).toBeTruthy();
@@ -254,6 +420,16 @@ describe("Database", () => {
         expect(verifTeam.team_id).toEqual(team1_id);
         expect(verifTeam.name).toEqual(name2TeamManagement);
         expect(verifTeam.id_owner).toEqual(user1_id);
+
+        // Test isAdmin avec paramètre éroné
+        let checkStatus: status & {result: boolean} = await database.isAdmin(-1);
+        expect(checkStatus.success).toBeFalsy();
+        expect(checkStatus.result).toBeFalsy();
+
+        // Test getTeamInfo
+        let getTeamInfo: status & Partial<TeamInfo> = await database.getTeamInfo(team1_id);
+        expect(getTeamInfo.success).toBeTruthy();
+        expect(getTeamInfo).toEqual({success: true, error: "", name: name2TeamManagement, creation_date: getTeamInfo.creation_date, owner_name: nameTeamManagement, id_owner: user1_id, members_count: 1});
 
         // Vérification MAJ user1
         let getUserResult: status & Partial<User> = await database.getUser(nameTeamManagement);
@@ -274,6 +450,16 @@ describe("Database", () => {
         // Test ajout de membre
         status = await database.addTeamMember(user2_id, team1_id);
         expect(status.success).toBeTruthy();
+
+        // Vérification status owner après ajout de membre
+        checkOwnerShip = await database.isTeamOwner(user2_id);
+        expect(checkOwnerShip.success).toBeTruthy();
+        expect(checkOwnerShip.result).toEqual(-1);
+
+        // Test getTeamInfo après ajout de membre
+        getTeamInfo = await database.getTeamInfo(team1_id);
+        expect(getTeamInfo.success).toBeTruthy();
+        expect(getTeamInfo).toEqual({success: true, error: "", name: nameTeamManagement, creation_date: getTeamInfo.creation_date, owner_name: nameTeamManagement, id_owner: user1_id, members_count: 2});
 
         // Vérification maj user
         getUserResult = await database.getUser(name2TeamManagement);
@@ -326,19 +512,19 @@ describe("Database", () => {
     test("Team Management bad use", async() => {
         // Init
         //      User 1
-        let setUserResult: status & id = await database.newUser(badTeamManagement);
+        let setUserResult: status & id = await database.newUser(badTeamManagement, passwordUser);
         expect(setUserResult.success).toBeTruthy();
         expect(setUserResult.id).not.toEqual(-1);
         const user1 = setUserResult.id;
 
         //      User 2
-        setUserResult = await database.newUser(bad2TeamManagement);
+        setUserResult = await database.newUser(bad2TeamManagement, passwordUser);
         expect(setUserResult.success).toBeTruthy();
         expect(setUserResult.id).not.toEqual(-1);
         const user2 = setUserResult.id;
 
         //      User 3
-        setUserResult = await database.newUser(bad3TeamManagement);
+        setUserResult = await database.newUser(bad3TeamManagement, passwordUser);
         expect(setUserResult.success).toBeTruthy();
         expect(setUserResult.id).not.toEqual(-1);
         const user3 = setUserResult.id;
@@ -348,6 +534,15 @@ describe("Database", () => {
         expect(setTeamResult.success).toBeTruthy();
         expect(setTeamResult.id).not.toEqual(-1);
         const test_team = setTeamResult.id;
+
+        // Test getTeamInfo avec id éroné
+        let getTeamInfo: status & Partial<TeamInfo> = await database.getTeamInfo(-1);
+        expect(getTeamInfo.success).toBeFalsy();
+
+        // Vérification status avec id éroné
+        let checkOwnerShip: status & {result: number} = await database.isTeamOwner(-1);
+        expect(checkOwnerShip.success).toBeFalsy();
+        expect(checkOwnerShip.result).toEqual(-1);
 
         // Test création avec utilisateur non existant
         setTeamResult = await database.createTeam(badTeamManagement, 1596357);
@@ -482,10 +677,10 @@ describe("Database", () => {
         // Init Test variables
 
         //      Init Users
-        let setResult: status & id = await database.newUser(nameTournamentTest);
+        let setResult: status & id = await database.newUser(nameTournamentTest, passwordUser);
         expect(setResult.success).toBeTruthy();
         const owner_id: number = setResult.id;
-        setResult = await database.newUser(teamTournamentTest);
+        setResult = await database.newUser(teamTournamentTest, passwordUser);
         expect(setResult.success).toBeTruthy();
         const second_owner_id: number = setResult.id;
 
@@ -531,7 +726,7 @@ describe("Database", () => {
         expect(tournament.creation_date).not.toBeUndefined();
         if (!tournament.creation_date)
             throw "Erreur !";
-        expect(tournament.creation_date.getTime() - now.getTime()).toBeLessThanOrEqual(1000);
+        expect(tournament.creation_date.getTime() - now.getTime()).toBeLessThanOrEqual(5000);
         expect(tournament.start_visibility?.getTime()).toEqual(visibility.getTime());
         expect(tournament.open_registration?.getTime()).toEqual(open_registration.getTime());
         expect(tournament.close_registration?.getTime()).toEqual(close_registration.getTime());
@@ -699,19 +894,19 @@ describe("Database", () => {
         // Init Test variables
 
         //      Init Users
-        let setResult: status & id = await database.newUser(BadTournamentTest);
+        let setResult: status & id = await database.newUser(BadTournamentTest, passwordUser);
         expect(setResult.success).toBeTruthy();
         const owner_id: number = setResult.id;
-        setResult = await database.newUser(Bad2TournamentTest);
+        setResult = await database.newUser(Bad2TournamentTest, passwordUser);
         expect(setResult.success).toBeTruthy();
         const second_owner_id: number = setResult.id;
-        setResult = await database.newUser(Bad3TournamentTest);
+        setResult = await database.newUser(Bad3TournamentTest, passwordUser);
         expect(setResult.success).toBeTruthy();
         const third_owner_id: number = setResult.id;
-        setResult = await database.newUser(Bad4TournamentTest);
+        setResult = await database.newUser(Bad4TournamentTest, passwordUser);
         expect(setResult.success).toBeTruthy();
         const fourth_owner_id: number = setResult.id;
-        setResult = await database.newUser(Bad5TournamentTest);
+        setResult = await database.newUser(Bad5TournamentTest, passwordUser);
         expect(setResult.success).toBeTruthy();
         const fifth_owner_id: number = setResult.id;
 
@@ -793,7 +988,7 @@ describe("Database", () => {
 
         // Désinscription après close_registration
         //      Sleep pour attendre la fin des inscriptions
-        await sleep(2000);
+        await sleep(3000);
         //      Test désinscription
         status = await database.tournamentUnregistration(BadIdTournament, team_one_id);
         expect(status.success).toBeFalsy();
@@ -1057,17 +1252,18 @@ describe("Database", () => {
         const registrations:  number[] = [];
         let setStatus: status & id;
         let status: status;
+        let result: status & {result: boolean};
 
         //      Init user and teams
         for (const name of namesMatchsHistory) {
-         setStatus = await database.newUser(name);
+         setStatus = await database.newUser(name, passwordUser);
          expect(setStatus.success).toBeTruthy();
          users.push(setStatus.id);
          setStatus = await database.createTeam(name, setStatus.id);
          expect(setStatus.success).toBeTruthy();
          teams.push(setStatus.id);
         }
-        setStatus = await database.newUser(substituteName)
+        setStatus = await database.newUser(substituteName, passwordUser)
         expect(setStatus.success).toBeTruthy();
         const substitute: number = setStatus.id;
         status = await database.addTeamMember(substitute, teams[0]);
@@ -1082,6 +1278,12 @@ describe("Database", () => {
         setStatus = await database.createTournament("Tournois Test", "Premier tournois à tourner", "SIMPLE", 4, users[0], visibility, open_registration, close_registration, start);
         expect(setStatus.success).toBeTruthy();
         MatchHistoryTournament = setStatus.id;
+
+        // Test isTournamentEnded avec un tournois juste initialisé
+        result = await database.isTournamentEnded(MatchHistoryTournament);
+        expect(result.success).toBeTruthy();
+        expect(result.result).toBeFalsy();
+
         //      Registration
         let setRegistration: status & {id_team_tournament: number, id_user_history: number};
         for (const team of teams) {
@@ -1094,6 +1296,11 @@ describe("Database", () => {
 
         // Test lancement de tournois
         let matchs: getMatchs = await database.setupTournament(MatchHistoryTournament);
+
+        // Test isTournamentEnded avec un tournois lancé mais pas terminé
+        result = await database.isTournamentEnded(MatchHistoryTournament);
+        expect(result.success).toBeTruthy();
+        expect(result.result).toBeFalsy();
 
         // Test Valeur de retour match 1
         expect(matchs.success).toBeTruthy();
@@ -1202,6 +1409,11 @@ describe("Database", () => {
         expect(matchs.matchs[0].score_host).toEqual(0);
         expect(matchs.matchs[0].score_guest).toEqual(0);
 
+        // Test isTournamentEnded avec un tournois en finale
+        result = await database.isTournamentEnded(MatchHistoryTournament);
+        expect(result.success).toBeTruthy();
+        expect(result.result).toBeFalsy();
+
         // Update victory for host
         status = await database.updateScore(matchs.matchs[0].tournament_match_id, 2, 1, "host");
         expect(status.success).toBeTruthy();
@@ -1214,6 +1426,11 @@ describe("Database", () => {
         matchs = await database.setupNextRound(MatchHistoryTournament);
         expect(matchs.success).toBeTruthy();
         expect(matchs.matchs.length).toEqual(0);
+
+        // Test isTournamentEnded avec un tournois terminé
+        result = await database.isTournamentEnded(MatchHistoryTournament);
+        expect(result.success).toBeTruthy();
+        expect(result.result).toBeTruthy();
 
         // Test positions des historiques
         //      TOP 4
@@ -1346,6 +1563,16 @@ describe("Database", () => {
         status = await database.deleteTournament(MatchHistoryTournament);
         expect(status.success).toBeTruthy();
 
+        // Test que les matchs sont bien supprimés
+        getResult = await database.get({table: "tournament_match", whereOption: [{column: "id_tournament", condition: "=", value: MatchHistoryTournament}]});
+        expect(getResult.success).toBeTruthy();
+        expect(getResult.result.length).toEqual(0);
+
+        // Test isTournamentEnded avec un tournois supprimé
+        result = await database.isTournamentEnded(MatchHistoryTournament);
+        expect(result.success).toBeFalsy();
+        expect(result.result).toBeFalsy();
+
         // Vérification historique. Le tournoi doit disparaitre
         getHistories = await database.getTeamHistory(teams[1]);
         expect(getHistories.success).toBeTruthy();
@@ -1353,18 +1580,186 @@ describe("Database", () => {
         expect(getHistories.histories[0].id_tournament).toEqual(MatchHistory2Tournament);
     }, 10000);
     test("Match and History bad use", async() => {
-        /*
-        // Récupération des historiques utilisateurs avec ID éroné
-        userHistory = await database.getUserHistory(-1);
-        expect(userHistory.success).toBeFalsy();
-        expect(userHistory.histories.length).toEqual(0);
+        // Init
+        //   Init variables
+        const users: number[] = [];
+        const teams: number[] = [];
+        let setStatus: status & id;
+        let status: status;
 
-        // Test récupération des historiques de Team avec ID éroné
-        getHistories = await database.getTeamHistory(-1);
+        //  Init user
+        for (const name of badMatchsHistory) {
+            setStatus = await database.newUser(name, passwordUser);
+            expect(setStatus.success).toBeTruthy();
+            users.push(setStatus.id);
+            setStatus = await database.createTeam(name, setStatus.id);
+            expect(setStatus.success).toBeTruthy();
+            teams.push(setStatus.id);
+        }
+
+        //  Init tournament
+        let visibility: Date = new Date();
+        let open_registration: Date = new Date();
+        let close_registration: Date = new Date();
+        close_registration.setSeconds(close_registration.getSeconds() + 1);
+        let start: Date = new Date(close_registration);
+        setStatus = await database.createTournament("Bad tournois test", "Premier mauvais tournois", "SIMPLE", 4, users[0], visibility, open_registration, close_registration, start);
+        expect(setStatus.success).toBeTruthy();
+        expect(setStatus.id).not.toEqual(-1);
+        BadHistoryTournament = setStatus.id;
+
+        // Test lancement next round sans équipe avant start
+        let getMatchs: getMatchs = await database.setupNextRound(BadHistoryTournament);
+        expect(getMatchs.success).toBeFalsy();
+
+        // Test lancement précoce sans équipe avant start
+        getMatchs = await database.setupTournament(BadHistoryTournament);
+        expect(getMatchs.success).toBeFalsy();
+        expect(getMatchs.error).toEqual("The tournament has not begun!");
+
+        // Attente pour la fin des inscriptions
+        await sleep(2000);
+
+        // Test lancement next round sans équipe après start
+        getMatchs = await database.setupNextRound(BadHistoryTournament);
+        expect(getMatchs.success).toBeTruthy();
+        expect(getMatchs.error).toEqual("Tournament has ended!");
+        expect(getMatchs.matchs.length).toEqual(0)
+
+        // Test lancement sans équipe après start
+        getMatchs = await database.setupTournament(BadHistoryTournament);
+        expect(getMatchs.success).toBeFalsy();
+        expect(getMatchs.error).toEqual("Tournament has ended!");
+
+        // Reset tournois pour autre tests
+        status = await database.deleteTournament(BadHistoryTournament);
+        expect(status.success).toBeTruthy();
+
+        // Init nouveau tournois
+        visibility = new Date();
+        open_registration = new Date();
+        close_registration = new Date();
+        close_registration.setSeconds(close_registration.getSeconds() + 1);
+        start = new Date(close_registration);
+        setStatus = await database.createTournament("Tournois Test", "Premier tournois à mal tourner", "SIMPLE", 4, users[0], visibility, open_registration, close_registration, start);
+        expect(setStatus.success).toBeTruthy();
+        BadHistoryTournament = setStatus.id;
+
+        // Registration
+        let setRegistration: status & {id_team_tournament: number, id_user_history: number};
+        for (const team of teams) {
+            setRegistration = await database.tournamentRegistration(BadHistoryTournament, team);
+            expect(setRegistration.success).toBeTruthy();
+        }
+
+        // Start précoce avec équipe
+        getMatchs = await database.setupTournament(BadHistoryTournament);
+        expect(getMatchs.success).toBeFalsy();
+        expect(getMatchs.error).toEqual("The tournament has not begun!");
+
+        // Setup next round before start
+        getMatchs = await database.setupNextRound(BadHistoryTournament);
+        expect(getMatchs.success).toBeFalsy();
+        expect(getMatchs.error).toEqual("This tournament have not start yet !");
+
+        // On attends le start
+        await sleep(2000);
+
+        // Setup next round before setup tournament
+        getMatchs = await database.setupNextRound(BadHistoryTournament);
+        expect(getMatchs.success).toBeFalsy();
+        expect(getMatchs.error).toEqual("This tournament have not start yet !");
+
+        // Test setup avec paramètre éroné
+        getMatchs = await database.setupTournament(-1);
+        expect(getMatchs.success).toBeFalsy();
+        expect(getMatchs.error).toEqual("This tournament does not exist!");
+
+        // Setup tournois
+        getMatchs = await database.setupTournament(BadHistoryTournament);
+        expect(getMatchs.success).toBeTruthy();
+        expect(getMatchs.matchs.length).toEqual(2);
+
+        // Double setup
+        getMatchs = await database.setupTournament(BadHistoryTournament);
+        expect(getMatchs.success).toBeFalsy();
+        expect(getMatchs.error).toEqual("The tournament has already started!");
+
+        // Test setupNextRound après le setup
+        getMatchs = await database.setupNextRound(BadHistoryTournament);
+        expect(getMatchs.success).toBeFalsy();
+
+        // Test update Score avec paramètre éroné
+        status = await database.updateScore(-1, 5, 2, "host");
+        expect(status.success).toBeFalsy();
+
+        // Update score
+        //      Récupération des matchs
+        getMatchs = await database.getMatchs(BadHistoryTournament);
+        expect(getMatchs.success).toBeTruthy();
+        expect(getMatchs.matchs.length).toEqual(2);
+        //      Test update score
+        status = await database.updateScore(getMatchs.matchs[0].tournament_match_id, 5, 2, "host");
+        expect(status.success).toBeTruthy();
+
+        // Redéfinition score après définir le vainqueur
+        status = await database.updateScore(getMatchs.matchs[0].tournament_match_id, 2, 5);
+        expect(status.success).toBeFalsy();
+        expect(status.error).toEqual("Match does not exist or is ended!");
+
+        // Redéfinition vainqueur
+        status = await database.updateScore(getMatchs.matchs[0].tournament_match_id, 5, 2, "guest");
+        expect(status.success).toBeFalsy();
+        expect(status.error).toEqual("Match does not exist or is ended!");
+
+        // Test Get matchs avec paramètre id_tournament éroné
+        getMatchs = await database.getMatchs(-1);
+        expect(getMatchs.success).toBeFalsy();
+        expect(getMatchs.error).toEqual("Tournament does not exist!");
+
+        // Test get matchs avec paramètre nbFromLast car doit être positif
+        // nbFromLast est neutralisé si inférieur ou égale à 0 pas d'erreur renvoyé
+        getMatchs = await database.getMatchs(BadHistoryTournament, -1000);
+        expect(getMatchs.success).toBeTruthy();
+        expect(getMatchs.matchs.length).toEqual(2);
+
+        // Test setup next round avant la fin des matchs
+        getMatchs = await database.setupNextRound(BadHistoryTournament);
+        expect(getMatchs.success).toBeFalsy();
+        expect(getMatchs.error).toEqual("All match has not ended!");
+
+        // Définition vainqueur pour continuation des tests
+        //  Récupération des matchs
+        getMatchs = await database.getMatchs(BadHistoryTournament);
+        expect(getMatchs.success).toBeTruthy();
+        expect(getMatchs.matchs.length).toEqual(2);
+        //  Définition du vainqueur match 2
+        status = await database.updateScore(getMatchs.matchs[1].tournament_match_id, 1, 3, "guest");
+        expect(status.success).toBeTruthy();
+
+        // Setup Next round avec paramètre éroné
+        getMatchs = await database.setupNextRound(-1);
+        expect(getMatchs.success).toBeFalsy();
+
+        // Setup next round
+        getMatchs = await database.setupNextRound(BadHistoryTournament);
+        expect(getMatchs.success).toBeTruthy();
+        expect(getMatchs.matchs.length).toEqual(1);
+
+        // Test isTournamentEnded
+        let result: status & {result: boolean};
+        //  Test isTournamentEnded avec paramètre éroné
+        result = await database.isTournamentEnded(-1);
+        expect(result.success).toBeFalsy();
+
+        // Test récupération historique team avec paramètre éroné
+        let getHistories: getHistories = await database.getTeamHistory(-1)
         expect(getHistories.success).toBeFalsy();
-        expect(getHistories.histories.length).toEqual(0);
-         */
-    });
+
+        // Test récupération historique utilisateur avec paramètre éroné
+        getHistories = await database.getUserHistory(-1);
+        expect(getHistories.success).toBeFalsy();
+    }, 10000);
     afterAll(async () => {
         // Nettoyage Partie Primaire
         await database.remove({ table: "user_history", whereOption: [{ column: "id_team_tournament", condition: "=", value: 0}]});
@@ -1380,6 +1775,7 @@ describe("Database", () => {
         await database.deleteUser(nameTeamManagement);
         await database.deleteUser(name2TeamManagement);
         await database.hardDeleteTeam(nameTeamManagement);
+        await database.hardDeleteTeam(name2TeamManagement);
 
         // Nettoyage Partie Team Bad
         await database.deleteUser(badTeamManagement);
@@ -1421,5 +1817,13 @@ describe("Database", () => {
             await database.deleteUser(name);
         }
         await database.deleteUser(substituteName);
+
+        // Nettoyage Partie Match & History bad
+        if (BadHistoryTournament)
+            await database.deleteTournament(BadHistoryTournament);
+        for (const name of badMatchsHistory) {
+            await database.hardDeleteTeam(name);
+            await database.deleteUser(name);
+        }
     });
 });

@@ -1,5 +1,7 @@
 import mysql from 'mysql2/promise';
 import dotenv from "dotenv";
+import crypto from 'crypto';
+import bcrypt from 'bcrypt';
 
 dotenv.config();
 
@@ -18,7 +20,7 @@ import {
     TournamentMatch,
     getMatchs,
     getTournamentTeams,
-    TeamTournament, id, Tournament,
+    TeamTournament, id, Tournament, token_payload, TeamInfo, UserInfo,
 } from './types';
 
 export class Database {
@@ -33,12 +35,10 @@ export class Database {
     // Primary function
     public async insert(params: SQLEditParams): Promise<status & id> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected!", id: -1});
         try {
             const placeholders = params.values.map(() => "?").join(", ");
 
-            const [result] = await this.db.execute<mysql.ResultSetHeader>(
+            const [result] = await this.db!.execute<mysql.ResultSetHeader>(
                 `INSERT INTO ${params.table} (${params.columns.join(", ")})
                  VALUES (${placeholders})`,
                 params.values,
@@ -52,8 +52,6 @@ export class Database {
 
     public async update(params: SQLEditParams, where: SQLWhere[]): Promise<status> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected!"});
         if (where.length === 0)
             return ({success: false, error: "Impossible car trop dangereux"});
         try {
@@ -63,7 +61,7 @@ export class Database {
                 filter += ` ${elem.column} ${elem.condition} ?`;
                 params.values.push(elem.value);
             })
-            await this.db.execute(
+            await this.db!.execute(
                 `UPDATE ${params.table}
                  SET ${placeholders} ${filter}`,
                 params.values,
@@ -79,8 +77,6 @@ export class Database {
         rawParams: Partial<SQLGetParams>,
     ): Promise<SQLGetResult> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected!", result: []})
         const query = await this.buildSelectQuery(rawParams, true);
 
         try {
@@ -94,8 +90,6 @@ export class Database {
 
     public async remove(rawParams: Partial<SQLGetParams>): Promise<status> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected !"});
         const query = await this.buildSelectQuery(rawParams, false);
 
         await this.db!.execute(query.query, query.values);
@@ -105,42 +99,105 @@ export class Database {
 
     // App function
     public async newUser(username: string,
-                         is_admin: boolean = false): Promise<status & id> {
+                         password: string,
+                         is_admin: boolean = false): Promise<status & id & {token: string}> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected !", id: -1});
         const status = this.checkNameNorm(username);
         if (!status.success)
-            return ({...status, id: -1});
+            return ({...status, id: -1, token: ""});
         if (await this.isUserExist(username) != -1) {
-            return ({success: false, error: "Username already exist !", id: -1});
+            return ({success: false, error: "Username already exist !", id: -1, token: ""});
         }
-        const [result] = await this.db.execute<mysql.ResultSetHeader>(`INSERT INTO user (username, is_admin)
-                                                                       VALUES (?, ?)`, [username, is_admin]);
-        return ({success: true, error: "", id: result.insertId});
+        if (password.length <= 8 || password.length >= 50)
+            return ({success: false, error: "Password must be contain between 8 and 50 characters!", id: -1, token: ""});
+        const hash: string = await bcrypt.hash(password, 10);
+        const [result] = await this.db!.execute<mysql.ResultSetHeader>(`INSERT INTO user (username, hash, is_admin)
+                                                                       VALUES (?, ?, ?)`, [username, hash, is_admin]);
+        const token: string = this.createToken(result.insertId);
+        await this.db!.execute(`UPDATE user SET token = ? WHERE user_id = ?`, [token, result.insertId]);
+        return ({success: true, error: "", id: result.insertId, token: token});
     }
 
-    public async getUser(user: number | string): Promise<status & Partial<User>> {
+    public async isAdmin(user: string | number): Promise<status & {result: boolean}> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected !"});
+        user = await this.isUserExist(user);
+        if (user == -1)
+            return ({success: false, error: "This user does not exist !", result: false});
+        const [rows] = await this.db!.execute(`SELECT is_admin FROM user WHERE user_id = ?`, [user]);
+        return ({success: true, error: "", result: (rows as {is_admin: boolean}[])[0].is_admin});
+    }
+
+    public async authTokenUser(id: number,
+                               token: string): Promise<status & {token: string}> {
+        await this.ready;
+        const [rows] = await this.db!.execute(`SELECT token FROM user WHERE user_id = ?`, [id]);
+        if ((rows as unknown[]).length == 0)
+            return ({success: false, error: "This user does not exist!", token: ""});
+        const bdd_token: string = ((rows as unknown[])[0] as {token: string}).token;
+        if (bdd_token != token)
+            return ({success: true, error: "", token: ""}); // Pas d'erreur de programme juste auth rejeté
+        const new_token = this.createToken(id);
+        await this.db!.execute(`UPDATE user SET token = ? WHERE user_id = ?`, [new_token, id]);
+        return ({success: true, error: "", token: new_token});
+    }
+
+    public async authPasswordUser(user: number | string,
+                                  password: string): Promise<status & {token: string}> {
+        await this.ready;
+        user = await this.isUserExist(user);
+        if (user == -1)
+            return ({success: false, error: "This user does not exist!", token: ""});
+        const [rows] = await this.db!.execute(`SELECT hash FROM user WHERE user_id = ?`, [user]);
+        const db_hash = ((rows as unknown[])[0] as {hash: string}).hash;
+        if (!(await bcrypt.compare(password, db_hash)))
+            return ({success: true, error: "", token: ""});
+        const token: string = this.createToken(user);
+        await this.db!.execute(`UPDATE user SET token = ? WHERE user_id = ?`, [token, user]);
+        return ({success: true, error: "", token: token});
+    }
+
+    public async updatePasswordUser(id: number,
+                                    old_password: string,
+                                    new_password: string): Promise<status & {token: string}> {
+        await this.ready;
+        if (old_password == new_password)
+            return ({success: false, error: "The new password is the same as the last one!", token: ""});
+        if (new_password.length < 8 || new_password.length > 50)
+            return ({success: false, error: "Password must be contain between 8 and 50 characters!", token: ""});
+        const status: status & {token: string} = await this.authPasswordUser(id, old_password);
+        if (!status.success)
+            return (status);
+        if (status.token.length == 0)
+            return ({success: false, error: "Old password is wrong", token: ""});
+        const hash: string = await bcrypt.hash(new_password, 10);
+        await this.db!.execute(`UPDATE user SET hash = ? WHERE user_id = ?`, [hash, id]);
+        return (status);
+    }
+
+    public async getUser(user: number | string): Promise<status & Partial<UserInfo>> {
+        await this.ready;
         user = await this.isUserExist(user);
         if (user == -1)
             return ({success: false, error: "This user does not exist!"});
-        const [rows] = await this.db.execute(`SELECT *
-                                              FROM user
-                                              WHERE user_id = ?`, [user]);
-        const users = rows as User[];
+        const [rows] = await this.db!.execute(`SELECT user.user_id, user.username, user.is_admin, user.id_team
+                                               FROM user
+                                               WHERE user_id = ?`, [user]);
+        const users = rows as UserInfo[];
         if (users.length)
-            return ({success: true, error: "", ...users[0], is_admin: Boolean(users[0].is_admin)});
+            return ({
+                success: true,
+                error: "",
+                user_id: users[0].user_id,
+                username: users[0].username,
+                id_team: users[0].id_team,
+                is_admin: Boolean(users[0].is_admin)
+            });
         return ({success: true, error: ""});
     }
 
     public async editUsername(user: number | string,
                               new_username: string): Promise<status> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected !"});
         user = await this.isUserExist(user);
         if (user == -1)
             return ({success: false, error: "User does not exist!"});
@@ -149,7 +206,7 @@ export class Database {
             return status;
         if (await this.isUserExist(new_username) != -1)
             return ({success: false, error: "Username already exist or it's already your username!"});
-        await this.db.execute(`UPDATE user
+        await this.db!.execute(`UPDATE user
                                SET username = ?
                                WHERE user_id = ?`, [new_username, user]);
         return ({success: true, error: ""});
@@ -157,16 +214,14 @@ export class Database {
 
     public async deleteUser(user: number | string): Promise<status> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected !"});
         user = await this.isUserExist(user);
         if (user == -1) {
             return ({success: false, error: "This user does not exist!"});
         }
-        await this.db.execute(`DELETE
+        await this.db!.execute(`DELETE
                                FROM user_history
                                WHERE id_user = ?`, [user]);
-        await this.db.execute(`DELETE
+        await this.db!.execute(`DELETE
                                FROM user
                                WHERE user_id = ?`, [user]);
         return ({success: true, error: ""});
@@ -175,8 +230,6 @@ export class Database {
     public async createTeam(name: string,
                             id_owner: number): Promise<status & id> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected !", id: -1});
         let status: status = this.checkNameNorm(name);
         if (!status.success)
             return ({...status, id: -1});
@@ -185,7 +238,7 @@ export class Database {
         }
         if (await this.isTeamExist(name) != -1)
             return ({success: false, error: "Team name already exist !", id: -1});
-        const [result] = await this.db.execute<mysql.ResultSetHeader>(`INSERT INTO team (name, id_owner)
+        const [result] = await this.db!.execute<mysql.ResultSetHeader>(`INSERT INTO team (name, id_owner)
                                                                        VALUES (?, ?)`, [name, id_owner]);
         status = await this.addTeamMember(id_owner, result.insertId);
         if (!status.success) {
@@ -195,11 +248,27 @@ export class Database {
         return ({success: true, error: "", id: result.insertId});
     }
 
+    public async getTeamInfo(team: number | string): Promise<status & Partial<TeamInfo>> {
+        await this.ready;
+        team = await this.isTeamExist(team);
+        if (team == -1)
+            return ({success: false, error: "This team does not exist!"});
+        const [rows] = await this.db!.execute(`SELECT team.name,
+                                                      team.creation_date,
+                                                      team.id_owner,
+                                                      owner.username         as owner_name,
+                                                      COUNT(members.id_team) as members_count
+                                               FROM team
+                                                        LEFT JOIN user owner ON owner.user_id = team.id_owner
+                                                        LEFT JOIN user members ON members.id_team = team.team_id
+                                               GROUP BY team.team_id, team.id_owner , team.name, team.creation_date, owner.username`);
+        const statusTeamInfo: status & TeamInfo = { success: true, error: "", ...((rows as unknown[])[0] as TeamInfo)};
+        return (statusTeamInfo);
+    }
+
     public async renameTeam(team: number | string,
                             new_name: string): Promise<status> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected !"});
         const status: status = this.checkNameNorm(new_name);
         if (!status.success)
             return status;
@@ -208,15 +277,13 @@ export class Database {
             return ({ success: false, error: "This team does not exist!"});
         if (await this.isTeamExist(new_name) != -1)
             return ({success: false, error: "The new name is already used!"});
-        await this.db.execute(`UPDATE team SET name = ? WHERE team_id = ?`, [new_name, team]);
+        await this.db!.execute(`UPDATE team SET name = ? WHERE team_id = ?`, [new_name, team]);
         return ({success: true, error: ""});
     }
 
     public async giveTeamOwnership(owner: number | string,
                                    new_owner: number | string):  Promise<status> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected !"});
         const status: status & {result: number} = await this.isTeamOwner(owner);
         if (!status.success)
             return ({success: false, error: status.error});
@@ -228,24 +295,22 @@ export class Database {
             return ({success: false,  error: user.error});
         if (user.id_team == null || user.id_team != status.result)
             return ({success: false,  error: "This user is not in the previous owner's team!"});
-        await this.db.execute(`UPDATE team SET id_owner = ? WHERE team_id = ?`, [user.user_id, user.id_team]);
+        await this.db!.execute(`UPDATE team SET id_owner = ? WHERE team_id = ?`, [user.user_id, user.id_team]);
         return ({success: true, error: ""});
     }
 
     public async hardDeleteTeam(team: number | string): Promise<status> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected !"});
         team = await this.isTeamExist(team);
         if (team == -1)
             return ({success: false, error: "This team does not exist!"});
-        await this.db.execute(`UPDATE user
+        await this.db!.execute(`UPDATE user
                                SET id_team = null
                                WHERE id_team = ?`, [team]);
-        await this.db.execute(`DELETE
+        await this.db!.execute(`DELETE
                                FROM team
                                WHERE team_id = ?`, [team]);
-        await this.db.execute(`DELETE
+        await this.db!.execute(`DELETE
                                FROM team_tournament
                                WHERE id_team = ?`, [team]);
         return ({success: true, error: ""});
@@ -253,15 +318,13 @@ export class Database {
 
     public async softDeleteTeam(team: number | string): Promise<status> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected !"});
         team = await this.isTeamExist(team);
         if (team == -1)
             return ({success: false, error: "This team does not exist!"});
-        await this.db.execute(`UPDATE user
+        await this.db!.execute(`UPDATE user
                                SET id_team = null
                                WHERE id_team = ?`, [team]);
-        await this.db.execute(`UPDATE team
+        await this.db!.execute(`UPDATE team
                                SET id_owner = null
                                WHERE team_id = ?`, [team]);
         return ({success: true, error: ""});
@@ -270,8 +333,6 @@ export class Database {
     public async addTeamMember(id_user: number,
                                team: number | string): Promise<status> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected !"});
         team = await this.isTeamExist(team, true);
         if (team == -1)
             return ({success: false, error: "This team does not exist or is inactive!"});
@@ -279,7 +340,7 @@ export class Database {
         if (user == -1) {
             return ({success: false, error: "User do not exist or has already a team!"});
         }
-        await this.db.execute(`UPDATE user
+        await this.db!.execute(`UPDATE user
                                SET id_team = ?
                                WHERE user_id = ?`, [team, id_user]);
         return ({success: true, error: ""});
@@ -287,30 +348,43 @@ export class Database {
 
     public async rmTeamMember(id_user: number): Promise<status> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected !"});
         const status: status & { result: number } = await this.isTeamOwner(id_user);
         if (!status.success)
             return ({success: false, error: status.error});
         if (status.result != -1)
             return ({success: false, error: "This user is the owner of the team"});
-        await this.db.execute(`UPDATE user
+        await this.db!.execute(`UPDATE user
                                SET id_team = null
                                WHERE user_id = ?`, [id_user]);
         return ({success: true, error: ""});
     }
 
+    public async isTeamOwner(target_user: number | string): Promise<status & { result: number }> {
+        await this.ready;
+        const tmp: status & Partial<User> = await this.getUser(target_user);
+        if (!tmp.success)
+            return ({success: tmp.success, error: tmp.error, result: -1});
+        const user: status & Partial<User> = tmp as status & Partial<User>;
+        if (!user.id_team)
+            return ({success: true, error: "", result: -1});
+        const [rows] = await this.db!.execute(`SELECT team_id
+                                              FROM team
+                                              WHERE id_owner = ?`, [user.user_id]);
+        const ids = (rows as ({team_id: number})[]);
+        if (ids.length == 0)
+            return ({success: true, error: "", result: -1})
+        return ({success: true, error: "", result: ids[0].team_id});
+    }
+
     public async getTeamMembers(team: number | string): Promise<getTeamMembers> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected !", members: []});
         team = await this.isTeamExist(team, true);
         if (team == -1)
             return ({success: false, error: "This team does not exist or is deleted!", members: []});
-        const [rows] = await this.db.execute(`SELECT *
-                                              FROM user
-                                              WHERE id_team = ?`, [team]);
-        return ({success: true, error: "", members: rows as User[]});
+        const [rows] = await this.db!.execute(`SELECT user.user_id, user.username, user.id_team, user.is_admin
+                                               FROM user
+                                               WHERE id_team = ?`, [team]);
+        return ({success: true, error: "", members: rows as UserInfo[]});
     }
 
     public async createTournament(name: string,
@@ -323,8 +397,6 @@ export class Database {
                                   close_registration: Date,
                                   start: Date): Promise<status & id> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected !", id: -1});
         if (name.length < 5)
             return ({success: false, error: "Tournament name must be at least 5 characters!", id: -1});
         if (name.length > 25)
@@ -351,7 +423,7 @@ export class Database {
                 error: "You cannot start the tournament before the close registration date!",
                 id: -1
             });
-        const [result] = await this.db.execute<mysql.ResultSetHeader>(`INSERT INTO tournament
+        const [result] = await this.db!.execute<mysql.ResultSetHeader>(`INSERT INTO tournament
                                                                        (name,
                                                                         description,
                                                                         format,
@@ -386,11 +458,9 @@ export class Database {
                                 close_registration: Date | null = null,
                                 start: Date | null = null) : Promise<status> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected!"});
         if (!(await this.isTournamentExist(id_tournament)))
             return ({success: false, error: "This tournament does not exist!"});
-        const [open_rows] = await this.db.execute(`SELECT tournament.start_visibility,
+        const [open_rows] = await this.db!.execute(`SELECT tournament.start_visibility,
                                                           tournament.open_registration,
                                                           tournament.close_registration,
                                                           tournament.start
@@ -493,7 +563,7 @@ export class Database {
         if (updates.length == 0)
             return ({success: false, error: "Nothing to update!"});
         values.push(id_tournament);
-        await this.db.execute(`UPDATE tournament
+        await this.db!.execute(`UPDATE tournament
                                SET ${updates}
                                WHERE tournament_id = ?`, values);
         return ({success: true, error: ""});
@@ -501,53 +571,55 @@ export class Database {
 
     public async getTournament(id: number): Promise<status & Partial<Tournament>> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected!"});
         if (!(await this.isTournamentExist(id)))
             return ({success: false, error: "Tournament does not exist!"});
-        const [rows] = await this.db.execute(`SELECT * FROM tournament WHERE tournament.tournament_id = ?`, [id]);
+        const [rows] = await this.db!.execute(`SELECT * FROM tournament WHERE tournament.tournament_id = ?`, [id]);
         const tournament = (rows as Tournament[])[0] as Tournament;
         return ({success: true, error: "", ...tournament});
     }
 
     public async isTournamentEnded(id: number): Promise<status & {result: boolean}> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected!", result: false});
         if (!(await this.isTournamentExist(id)))
             return ({success: false, error: "This tournament does not exist!", result: false});
-        const [count] = await this.db.execute(`SELECT COUNT(*) as nb_teams
+        const [count] = await this.db!.execute(`SELECT position
                                                    FROM team_tournament
-                                                   WHERE id_tournament = ? AND position = -1`, [id]);
-        const result = count as ({ nb_teams: number })[];
-        const nbTeams: number = result[0].nb_teams;
-        return ({success: true, error: "", result: nbTeams == 0});
+                                                   WHERE id_tournament = ?
+                                                   ORDER BY position`, [id]);
+        const result = count as ({ position: number })[];
+        if (result.length == 0) {
+            const [rows] = await this.db!.execute(`SELECT close_registration FROM tournament WHERE tournament_id = ?`, [id]);
+            const close_registration = ((rows as unknown[])[0] as {close_registration: Date}).close_registration;
+            const now = new Date;
+            if (now > close_registration)
+                return ({success: true, error: "No team are register to this tournament!", result: true});
+            else
+                return ({success: true, error: "", result: false});
+        }
+        return ({success: true, error: "", result: result[0].position != -1});
     }
 
     public async deleteTournament(id: number): Promise<status> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected !"});
         if (!(await this.isTournamentExist(id)))
             return ({success: false, error: "Tournament does not exist!"});
-        await this.db.execute(`DELETE
+        await this.db!.execute(`DELETE
                                FROM tournament
                                WHERE tournament_id = ?`, [id]);
-        await this.db.execute(`DELETE user_history
+        await this.db!.execute(`DELETE user_history
                                FROM user_history
                                         JOIN team_tournament ON user_history.id_team_tournament = team_tournament.team_tournament_id
                                WHERE team_tournament.id_tournament = ?`, [id])
-        await this.db.execute(`DELETE
+        await this.db!.execute(`DELETE
                                FROM team_tournament
                                WHERE id_tournament = ?`, [id]);
+        await this.db!.execute(`DELETE FROM tournament_match WHERE id_tournament = ?`, [id]);
         return ({success: true, error: ""});
     }
 
     public async tournamentRegistration(id_tournament: number,
                                         id_team: number): Promise<status & { id_team_tournament: number, id_user_history: number }> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected !", id_team_tournament: -1, id_user_history: -1});
         if (await this.isTeamExist(id_team) == -1)
             return ({success: false, error: "Team does not exist!", id_team_tournament: -1, id_user_history: -1});
         if (await this.isTeamRegister(id_tournament, id_team) != -1)
@@ -561,18 +633,18 @@ export class Database {
             return ({success: false, error: status.error, id_team_tournament: -1, id_user_history: -1});
         if (!status.result)
             return ({success: false, error: "We are out of the registration period !", id_team_tournament: -1, id_user_history: -1});
-        let [result] = await this.db.execute<mysql.ResultSetHeader>(`INSERT INTO team_tournament (id_tournament, id_team)
+        let [result] = await this.db!.execute<mysql.ResultSetHeader>(`INSERT INTO team_tournament (id_tournament, id_team)
                                                                        VALUES (?, ?)`, [id_tournament, id_team]);
         const team_tournament_id: number = result.insertId;
         let user_history_id: number = -1;
-        const [rows] = await this.db.execute(`SELECT user_id
+        const [rows] = await this.db!.execute(`SELECT user_id
                                               FROM user
                                               WHERE id_team = ?`, [id_team]);
         const members_id: {user_id: number}[] = rows as { user_id: number }[];
         if (members_id.length > 0) {
             const values = members_id.map(() => '(?, ?)').join(', ');
             const params = members_id.flatMap((member: {user_id: number}) => ([member.user_id, team_tournament_id]));
-            [result] = await this.db.execute<mysql.ResultSetHeader>(`INSERT INTO user_history (id_user, id_team_tournament)
+            [result] = await this.db!.execute<mysql.ResultSetHeader>(`INSERT INTO user_history (id_user, id_team_tournament)
                                               VALUES ${values}`, params);
             user_history_id = result.insertId;
         }
@@ -582,8 +654,6 @@ export class Database {
     public async tournamentUnregistration(id_tournament: number,
                                           id_team: number) : Promise<status> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected !"});
         const result: status & {result: boolean} = await this.isRegistrationPeriod(id_tournament);
         if (!result.success)
             return ({success: false, error: result.error});
@@ -594,18 +664,16 @@ export class Database {
         const id_team_tournament: number = await this.isTeamRegister(id_tournament, id_team);
         if (id_team_tournament == -1)
             return ({success: false, error: "This team is not register to this tournament!"});
-        await this.db.execute(`DELETE FROM user_history WHERE id_team_tournament = ?`, [id_team_tournament]);
-        await this.db.execute(`DELETE FROM team_tournament WHERE team_tournament_id = ?`, [id_team_tournament]);
+        await this.db!.execute(`DELETE FROM user_history WHERE id_team_tournament = ?`, [id_team_tournament]);
+        await this.db!.execute(`DELETE FROM team_tournament WHERE team_tournament_id = ?`, [id_team_tournament]);
         return ({success: true, error: ""});
     }
 
     public async getRegisterTeams(id_tournament: number): Promise<getTournamentTeams> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected!", teams: []});
         if (!(await this.isTournamentExist(id_tournament)))
             return ({success: false, error: "Tournament does not exist!", teams: []});
-        const [rows] = await this.db.execute(`SELECT *
+        const [rows] = await this.db!.execute(`SELECT *
                                               FROM team
                                                        INNER JOIN team_tournament ON team_tournament.id_team = team.team_id
                                               WHERE team_tournament.id_tournament = ?`, [id_tournament]);
@@ -613,28 +681,25 @@ export class Database {
         return ({success: true, error: "", teams: teams});
     }
 
-    public async getTeamHistory(id_team: number): Promise<getHistories> {
+    public async getTeamHistory(team: number | string): Promise<getHistories> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected !", histories: []});
-        if (await this.isTeamExist(id_team) == -1)
+        team = await this.isTeamExist(team);
+        if (team == -1)
             return ({success: false, error: "Team does not exist!", histories: []});
-        const [rows] = await this.db.execute(`SELECT tournament.*, team_tournament.*, team.name as team_name
+        const [rows] = await this.db!.execute(`SELECT tournament.*, team_tournament.*, team.name as team_name
                                               FROM team_tournament
                                                        INNER JOIN tournament ON id_tournament = tournament.tournament_id
                                                        INNER JOIN team ON team_tournament.id_team = team.team_id
                                               WHERE id_team = ?
-                                              ORDER BY start DESC`, [id_team]);
+                                              ORDER BY start DESC`, [team]);
         return ({success: true, error: "", histories: rows as History[]});
     }
 
     public async getUserHistory(id_user: number): Promise<getHistories> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected!", histories: []});
         if (await this.isUserExist(id_user) == -1)
             return ({success: false, error: "User not found!", histories: []});
-        const [rows] = await this.db.execute(`SELECT tournament.*, team_tournament.*, team.name as team_name
+        const [rows] = await this.db!.execute(`SELECT tournament.*, team_tournament.*, team.name as team_name
                                               FROM tournament
                                                        INNER JOIN team_tournament ON tournament.tournament_id = team_tournament.id_tournament
                                                        INNER JOIN team ON team_tournament.id_team = team.team_id
@@ -647,19 +712,18 @@ export class Database {
     // Tester un tournoi qui a déjà terminé
     public async setupTournament(id_tournament: number): Promise<getMatchs> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected!", matchs: []});
         const status: status & {result: boolean} = await this.isTournamentEnded(id_tournament);
         if (!status.success)
             return ({success: false, error: status.error, matchs: []});
         else if (status.result)
             return ({success: false, error: "Tournament has ended!", matchs: []});
-        const [rows] = await this.db.execute(`SELECT start, current_round FROM tournament WHERE tournament_id = ?`, [id_tournament]);
+        const now = new Date();
+        const [rows] = await this.db!.execute(`SELECT start, current_round FROM tournament WHERE tournament_id = ?`, [id_tournament]);
         const info: {start: Date, current_round: number} = (rows as unknown[])[0] as {start: Date, current_round: number};
-        if (info.start > new Date())
+        if (info.start > now)
             return ({success: false, error: "The tournament has not begun!", matchs: []});
         if (info.current_round != -1)
-            return ({success: false, error: "The tournament has already start!", matchs: []});
+            return ({success: false, error: "The tournament has already started!", matchs: []});
         const result: getTournamentTeams = await this.getRegisterTeams(id_tournament);
         if (!result.success)
             return ({ success: false, error: result.error, matchs: []});
@@ -670,8 +734,6 @@ export class Database {
 
     public async setupNextRound(id_tournament: number): Promise<getMatchs> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected!", matchs: []});
         const status: status & { result: boolean } = await this.isTournamentEnded(id_tournament);
         if (!status.success)
             return ({success: false, error: status.error, matchs: []});
@@ -679,7 +741,7 @@ export class Database {
             return ({success: true, error: "Tournament has ended!", matchs: []});
         if (!(await this.isAllMatchEnded(id_tournament)))
             return ({success: false, error: "All match has not ended!", matchs: []});
-        const [rows_size] = await this.db.execute(`SELECT tournament.size, tournament.current_round
+        const [rows_size] = await this.db!.execute(`SELECT tournament.size, tournament.current_round
                                                    FROM tournament
                                                    WHERE tournament_id = ?`, [id_tournament]);
         const tournament_info: { size: number, current_round: number } = (rows_size as unknown[])[0] as {
@@ -694,7 +756,7 @@ export class Database {
         // On calcule le nombre de matchs à préparer
         const match_to_setup: number = (tournament_info.size / 2 ** tournament_info.current_round) / 2;
         const match_to_fetch: number = match_to_setup * 2;
-        const [rows] = await this.db.execute(`SELECT tournament_match.*,
+        const [rows] = await this.db!.execute(`SELECT tournament_match.*,
                                                      th.id_team AS id_team_host,
                                                      tg.id_team AS id_team_guest
                                               FROM tournament_match
@@ -717,7 +779,7 @@ export class Database {
         }
         if (errors.length)
             return ({success: false, error: "All matchs setup with errors : " + errors, matchs: []});
-        await this.db.execute(`UPDATE tournament
+        await this.db!.execute(`UPDATE tournament
                                SET current_round = ?
                                WHERE tournament_id = ?`, [tournament_info.current_round, id_tournament]);
         return (await this.getMatchs(id_tournament, match_to_setup));
@@ -728,8 +790,6 @@ export class Database {
                                guest: string | number,
                                date: Date): Promise<status & id> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected!", id: -1});
         if (!(await this.isTournamentExist(id_tournament)))
             return ({success: false, error: "The tournament does not exist!", id: -1});
         let victory: 'host' | 'guest' | null = null;
@@ -755,7 +815,7 @@ export class Database {
         now.setMinutes(now.getMinutes() - 1);
         if (now > date)
             return ({success: false, error: "The date must not be in the past!", id: -1});
-        const [result] = await this.db.execute<mysql.ResultSetHeader>(`INSERT INTO tournament_match (id_tournament, id_team_tournament_host, id_team_tournament_guest, victory, start_date)
+        const [result] = await this.db!.execute<mysql.ResultSetHeader>(`INSERT INTO tournament_match (id_tournament, id_team_tournament_host, id_team_tournament_guest, victory, start_date)
                                                                        VALUES (?, ?, ?, ?, ?)`,
             [
                 id_tournament, id_host_register, id_guest_register, victory, date
@@ -768,11 +828,9 @@ export class Database {
                              guest_score: number,
                              victory: 'host' | 'guest' | null = null): Promise<status> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected!"});
         if (!(await this.isMatchExist(id_match, true)))
             return ({success: false, error: "Match does not exist or is ended!"});
-        await this.db.execute(`UPDATE tournament_match
+        await this.db!.execute(`UPDATE tournament_match
                                SET score_host  = ?,
                                    score_guest = ?,
                                    victory     = ?
@@ -789,14 +847,12 @@ export class Database {
     public async getMatchs(id_tournament: number,
                            nbFromLast: number = -1): Promise<getMatchs> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected!", matchs: []});
         if (!(await this.isTournamentExist(id_tournament)))
             return ({success: false, error: "Tournament does not exist!", matchs: []});
         let addons: string = "";
         if (nbFromLast > 0)
             addons = ` LIMIT ${nbFromLast} `;
-        const [rows] = await this.db.execute(`SELECT *
+        const [rows] = await this.db!.execute(`SELECT *
                                               FROM tournament_match
                                               WHERE tournament_match.id_tournament = ?
                                               ORDER BY tournament_match_id DESC ${addons}`, [id_tournament]);
@@ -830,6 +886,8 @@ export class Database {
                                 (
                                     user_id  INTEGER PRIMARY KEY AUTO_INCREMENT,
                                     username VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,
+                                    hash     VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,
+                                    token    VARCHAR(512) COLLATE utf8mb4_bin DEFAULT NULL,
                                     id_team  INTEGER DEFAULT NULL,
                                     is_admin BOOLEAN DEFAULT false
                                 );`);
@@ -932,19 +990,17 @@ export class Database {
     private async isTeamExist(team: string | number,
                               checkWithoutDel: boolean = false): Promise<number> {
         await this.ready;
-        if (!this.db)
-            return -1;
         let teams: {team_id: number}[];
         let delFilter: string = "";
         if (checkWithoutDel)
             delFilter = " AND id_owner IS NOT NULL";
         if (typeof team == typeof "string") {
-            const [rows] = await this.db.execute(`SELECT team_id
+            const [rows] = await this.db!.execute(`SELECT team_id
                                                   FROM team
                                                   WHERE name LIKE ? ${delFilter}`, [team]);
             teams = rows as {team_id: number}[];
         } else {
-            const [rows] = await this.db.execute(`SELECT team_id
+            const [rows] = await this.db!.execute(`SELECT team_id
                                                   FROM team
                                                   WHERE team_id = ? ${delFilter}`, [team]);
             teams = rows as {team_id: number}[];
@@ -957,19 +1013,17 @@ export class Database {
     private async isUserExist(user: string | number,
                               checkWithoutTeam: boolean = false): Promise<number> {
         await this.ready;
-        if (!this.db)
-            return -1;
         let users: {user_id: number}[];
         let teamFilter: string = "";
         if (checkWithoutTeam)
             teamFilter = " AND id_team IS NULL";
         if (typeof user == typeof "string") {
-            const [rows] = await this.db.execute(`SELECT user_id
+            const [rows] = await this.db!.execute(`SELECT user_id
                                                   FROM user
                                                   WHERE username LIKE ? ${teamFilter}`, [user]);
             users = rows as {user_id: number}[];
         } else {
-            const [rows] = await this.db.execute(`SELECT user_id
+            const [rows] = await this.db!.execute(`SELECT user_id
                                                   FROM user
                                                   WHERE user_id = ? ${teamFilter}`, [user]);
             users = rows as {user_id: number}[];
@@ -982,12 +1036,10 @@ export class Database {
     private async isTournamentExist(id: number,
                                     checkFreeSlots: boolean = false): Promise<boolean> {
         await this.ready;
-        if (!this.db)
-            return false;
         let size: string = "";
         if (checkFreeSlots)
             size = `, size`
-        const [rows] = await this.db.execute(`SELECT tournament_id ${size}
+        const [rows] = await this.db!.execute(`SELECT tournament_id ${size}
                                               FROM tournament
                                               WHERE tournament_id = ?`, [id]);
         if (!checkFreeSlots) {
@@ -997,7 +1049,7 @@ export class Database {
         const tournaments = rows as ({ tournament_id: number } & { size: number })[];
         if (tournaments.length == 0)
             return false;
-        const [count] = await this.db.execute(`SELECT COUNT(*) as nb_teams
+        const [count] = await this.db!.execute(`SELECT COUNT(*) as nb_teams
                                                FROM team_tournament
                                                WHERE id_tournament = ?`, [id]);
         const result = count as ({ nb_teams: number })[];
@@ -1007,11 +1059,9 @@ export class Database {
 
     private async isRegistrationPeriod(tournament_id: number): Promise<status & {result: boolean}> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected!", result: false});
         if (!await this.isTournamentExist(tournament_id))
             return ({success: false, error: "This tournament does not exist !", result: false});
-        const [rows] = await this.db.execute(`SELECT open_registration, close_registration FROM tournament WHERE tournament_id = ?`, [tournament_id]);
+        const [rows] = await this.db!.execute(`SELECT open_registration, close_registration FROM tournament WHERE tournament_id = ?`, [tournament_id]);
         const tournament_info = (rows as unknown[])[0] as {open_registration: Date, close_registration: Date};
         const now = new Date();
         // Précision d'une seconde car la base de donnée arrondi
@@ -1024,12 +1074,10 @@ export class Database {
                                  team_id: number,
                                  checkStillRunning: boolean = false): Promise<number> {
         await this.ready;
-        if (!this.db)
-            return -1;
         let filter: string = "";
         if (checkStillRunning)
             filter = "AND position = -1";
-        const [rows] = await this.db.execute(`SELECT team_tournament_id
+        const [rows] = await this.db!.execute(`SELECT team_tournament_id
                                               FROM team_tournament
                                               WHERE id_tournament = ?
                                                 AND id_team = ? ${filter}`, [tournament_id, team_id]);
@@ -1039,34 +1087,13 @@ export class Database {
         return (ids[0].team_tournament_id);
     }
 
-    private async isTeamOwner(target_user: number | string): Promise<status & { result: number }> {
-        await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected!", result: -1});
-        const tmp: status & Partial<User> = await this.getUser(target_user);
-        if (!tmp.success)
-            return ({success: tmp.success, error: tmp.error, result: -1});
-        const user: status & Partial<User> = tmp as status & Partial<User>;
-        if (!user.id_team)
-            return ({success: true, error: "", result: -1});
-        const [rows] = await this.db.execute(`SELECT team_id
-                                              FROM team
-                                              WHERE id_owner = ?`, [user.user_id]);
-        const ids = (rows as ({team_id: number})[]);
-        if (ids.length == 0)
-            return ({success: true, error: "", result: -1})
-        return ({success: true, error: "", result: ids[0].team_id});
-    }
-
     private async isMatchExist(id_match: number,
                                checkStillRunning: boolean = false): Promise<boolean> {
         await this.ready;
-        if (!this.db)
-            return false;
         let filter: string = "";
         if (checkStillRunning)
             filter = ' AND victory IS NULL ';
-        const [rows] = await this.db.execute(`SELECT tournament_match_id
+        const [rows] = await this.db!.execute(`SELECT tournament_match_id
                                               FROM tournament_match
                                               WHERE tournament_match_id = ? ${filter}`, [id_match])
         const ids = rows as {tournament_match_id: number}[];
@@ -1081,8 +1108,6 @@ export class Database {
     private async setupFirstRound(teams: (Team & TeamTournament)[],
                                   start: Date): Promise<status> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected!"});
         const tournament_size = this.findSizeTournament(teams.length);
         const byes: number = tournament_size - teams.length;
         const byesInterval: number = byes ? (Math.floor(tournament_size / byes)) - 1 : 0;
@@ -1109,17 +1134,15 @@ export class Database {
                 return ({ success: false, error: status.error });
         }
         // En dernier car s'il y a un problème avec ScheduleMatch, c'est pas bloquant pour retry
-        await this.db.execute(`UPDATE tournament SET size = ?, current_round = 0 WHERE tournament.tournament_id = ?`, [tournament_size, teams[0].id_tournament]);
+        await this.db!.execute(`UPDATE tournament SET size = ?, current_round = 0 WHERE tournament.tournament_id = ?`, [tournament_size, teams[0].id_tournament]);
         return ({ success: true, error: "" });
     }
 
     private async isAllMatchEnded(tournament_id: number): Promise<boolean> {
         await this.ready;
-        if (!this.db)
-            return false;
         if (!(await this.isTournamentExist(tournament_id)))
             return false;
-        const [rows] = await this.db.execute(`SELECT tournament_match_id
+        const [rows] = await this.db!.execute(`SELECT tournament_match_id
                                               FROM tournament_match
                                                        LEFT JOIN team_tournament
                                                                  ON id_team_tournament_guest = team_tournament.team_tournament_id
@@ -1129,21 +1152,19 @@ export class Database {
 
     private async setLoserPosition(id_match: number): Promise<status> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "Database not connected!"});
-        const [rows_match] = await this.db.execute(`SELECT * FROM tournament_match WHERE tournament_match_id = ?`, [id_match]);
+        const [rows_match] = await this.db!.execute(`SELECT * FROM tournament_match WHERE tournament_match_id = ?`, [id_match]);
         if ((rows_match as TournamentMatch[]).length == 0)
             return ({success: false, error: "No match found!"});
         const match: TournamentMatch = (rows_match as TournamentMatch[])[0];
         if (!match.victory)
             return ({success: false, error: "No loser found for this match"});
-        const [info_rows] = await this.db.execute(`SELECT size, current_round FROM tournament WHERE tournament_id = ?`, [match.id_tournament])
+        const [info_rows] = await this.db!.execute(`SELECT size, current_round FROM tournament WHERE tournament_id = ?`, [match.id_tournament])
         if ((info_rows as unknown[]).length == 0)
             return ({success: false, error: "No tournament found!"});
         const tournament_info: {size: number, current_round: number} = (info_rows as unknown[])[0] as {size: number, current_round: number};
         const position: number = (tournament_info.size / 2 ** tournament_info.current_round);
         const id_loser: number = match.victory == 'host' ? match.id_team_tournament_guest : match.id_team_tournament_host;
-        await this.db.execute(`UPDATE team_tournament SET position = ? WHERE team_tournament_id = ?`, [position, id_loser]);
+        await this.db!.execute(`UPDATE team_tournament SET position = ? WHERE team_tournament_id = ?`, [position, id_loser]);
         return ({success: true, error: ""});
     }
 
@@ -1156,19 +1177,32 @@ export class Database {
 
     private async manageTournamentWinner(match_id: number): Promise<status> {
         await this.ready;
-        if (!this.db)
-            return ({success: false, error: "The database is not connected!"});
-        let [rows] = await this.db.execute(`SELECT id_tournament FROM tournament_match WHERE tournament_match_id = ?`, [match_id]);
+        let [rows] = await this.db!.execute(`SELECT id_tournament FROM tournament_match WHERE tournament_match_id = ?`, [match_id]);
         if ((rows as unknown[]).length == 0)
             return ({success: false, error: "This match does not exist !"});
         const tournament_id: number = ((rows as unknown[])[0] as {id_tournament: number}).id_tournament;
-        [rows] = await this.db.execute(`SELECT COUNT(*) as nbTeams FROM team_tournament WHERE id_tournament = ? && position = -1`, [tournament_id]);
+        [rows] = await this.db!.execute(`SELECT COUNT(*) as nbTeams FROM team_tournament WHERE id_tournament = ? && position = -1`, [tournament_id]);
         if ((rows as unknown[]).length == 0)
             return ({success: true, error: ""}); // Pas d'équipes inscrites ou tournois terminé. Bizarre voire impossible ici, mais au cas où
         const nbTeams: number = ((rows as unknown[])[0] as {nbTeams: number}).nbTeams;
         if (nbTeams > 1)
             return ({success: true, error: ""});
-        await this.db.execute(`UPDATE team_tournament SET position=1 WHERE id_tournament=? AND position=-1`, [tournament_id]);
+        await this.db!.execute(`UPDATE team_tournament SET position=1 WHERE id_tournament=? AND position=-1`, [tournament_id]);
         return ({success: true, error: ""});
+    }
+
+    private generateToken(): string {
+        return crypto.randomBytes(16).toString('hex');
+    }
+
+    private createToken(user_id: number): string {
+        const token_payload: token_payload = {
+            user_id: user_id,
+            creation: Date.now(),
+            token: this.generateToken(),
+        };
+
+        const token_base64 = Buffer.from(JSON.stringify(token_payload)).toString('base64url');
+        return token_base64;
     }
 }

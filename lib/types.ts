@@ -43,7 +43,7 @@ export interface SQLGetResult {
 }
 
 export interface getTeamMembers {
-    members: User[];
+    members: UserInfo[];
     success:  boolean;
     error: string;
 }
@@ -83,6 +83,15 @@ export interface getHistories {
 export interface User {
     user_id: number;
     username: string;
+    hash: string;
+    token: string;
+    id_team: number;
+    is_admin: boolean;
+}
+
+export interface UserInfo {
+    user_id: number;
+    username: string;
     id_team: number;
     is_admin: boolean;
 }
@@ -96,8 +105,16 @@ export interface UserHistory {
 export interface Team {
     team_id: number;
     name: string;
-    creation_date: string;
+    creation_date: Date;
     id_owner: number;
+}
+
+export interface TeamInfo {
+    name: string;
+    creation_date: Date;
+    owner_name: string;
+    id_owner: number
+    members_count: number;
 }
 
 export interface TeamTournament {
@@ -133,4 +150,10 @@ export interface TournamentMatch {
 
 export interface id {
     id: number;
+}
+
+export interface token_payload {
+    user_id: number;
+    creation: number;
+    token: string;
 }
