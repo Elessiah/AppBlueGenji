@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {Database} from "../../../lib/database";
+import {Controller} from "../../../lib/controller";
 import {status, id} from "../../../lib/types";
 
 export async function create(body: {
@@ -23,7 +23,7 @@ export async function create(body: {
         || body.start === undefined) {
         return (NextResponse.json({error: "At least one parameter is missing! ('name', 'description', 'format', 'size', 'start_visibility', 'open_registration', 'close_registration', 'start'"}, {status: 400}));
     }
-    const database = Database.getInstance();
+    const database = Controller.getInstance();
     const status: status & id = await database.createTournament(body.name,
         body.description,
         body.format,

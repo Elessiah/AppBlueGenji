@@ -23,13 +23,13 @@ import {
     TeamTournament, id, Tournament, token_payload, TeamInfo, UserInfo,
 } from './types';
 
-export class Database {
+export class Controller {
     // public
-    public static getInstance(): Database {
-        if (!Database.instance) {
-            Database.instance = new Database();
+    public static getInstance(): Controller {
+        if (!Controller.instance) {
+            Controller.instance = new Controller();
         }
-        return Database.instance;
+        return Controller.instance;
     }
 
     // Primary function
@@ -253,7 +253,8 @@ export class Database {
         team = await this.isTeamExist(team);
         if (team == -1)
             return ({success: false, error: "This team does not exist!"});
-        const [rows] = await this.db!.execute(`SELECT team.name,
+        const [rows] = await this.db!.execute(`SELECT team.team_id,
+                                                      team.name,
                                                       team.creation_date,
                                                       team.id_owner,
                                                       owner.username         as owner_name,
@@ -861,7 +862,7 @@ export class Database {
     }
 
     // private
-    private static instance: Database;
+    private static instance: Controller;
     private db: mysql.Connection | null = null;
     public readonly ready: Promise<void>;
 

@@ -1,4 +1,4 @@
-import {Database} from "../lib/database";
+import {Controller} from "../lib/controller";
 import {afterAll, beforeAll, describe, expect, test} from "@jest/globals"
 
 import {
@@ -19,7 +19,7 @@ import {
 import {sleep} from "../lib/sleep";
 
 describe("Database", () => {
-    let database: Database;
+    let database: Controller;
     // User perfect use
     const nameUserManagement: string = "JestElessiah";
 
@@ -71,7 +71,7 @@ describe("Database", () => {
     //      Hash
     const passwordUser = "HashTestHashTest";
     beforeAll(async () => {
-        database = Database.getInstance();
+        database = Controller.getInstance();
         await database.ready;
     });
     test("Primary database function", async() => {
@@ -429,7 +429,7 @@ describe("Database", () => {
         // Test getTeamInfo
         let getTeamInfo: status & Partial<TeamInfo> = await database.getTeamInfo(team1_id);
         expect(getTeamInfo.success).toBeTruthy();
-        expect(getTeamInfo).toEqual({success: true, error: "", name: name2TeamManagement, creation_date: getTeamInfo.creation_date, owner_name: nameTeamManagement, id_owner: user1_id, members_count: 1});
+        expect(getTeamInfo).toEqual({success: true, error: "", team_id: team1_id, name: name2TeamManagement, creation_date: getTeamInfo.creation_date, owner_name: nameTeamManagement, id_owner: user1_id, members_count: 1});
 
         // Vérification MAJ user1
         let getUserResult: status & Partial<User> = await database.getUser(nameTeamManagement);
@@ -459,7 +459,7 @@ describe("Database", () => {
         // Test getTeamInfo après ajout de membre
         getTeamInfo = await database.getTeamInfo(team1_id);
         expect(getTeamInfo.success).toBeTruthy();
-        expect(getTeamInfo).toEqual({success: true, error: "", name: nameTeamManagement, creation_date: getTeamInfo.creation_date, owner_name: nameTeamManagement, id_owner: user1_id, members_count: 2});
+        expect(getTeamInfo).toEqual({success: true, error: "", team_id: team1_id, name: nameTeamManagement, creation_date: getTeamInfo.creation_date, owner_name: nameTeamManagement, id_owner: user1_id, members_count: 2});
 
         // Vérification maj user
         getUserResult = await database.getUser(name2TeamManagement);

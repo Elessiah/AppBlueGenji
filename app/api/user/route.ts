@@ -1,6 +1,7 @@
+// app/api/user/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import {status, getHistories, UserInfo} from "../../../lib/types";
-import {Database} from "../../../lib/database";
+import {Controller} from "../../../lib/controller";
 import {secureRequest} from "../../../lib/secureRequest";
 import {newUser} from "./new";
 import {updatePassword} from "./updatePasword";
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         id = parseInt(id, 10);
     if (get && get != "history")
         return (NextResponse.json({error: "If you want to fetch history 'g' must equal 'history'!"}, {status: 400}));
-    const database = Database.getInstance();
+    const database = Controller.getInstance();
     if (get == "history") {
         if (id == null)
             return (NextResponse.json({error: "'id' is required to fetch the history !"}, {status: 400}));

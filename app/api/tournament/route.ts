@@ -1,5 +1,6 @@
+// app/api/tournament/route.ts
 import {NextRequest, NextResponse} from "next/server";
-import {Database} from "../../../lib/database";
+import {Controller} from "../../../lib/controller";
 import {getMatchs, getTournamentTeams, status, Tournament} from "../../../lib/types";
 import {secureRequest} from "../../../lib/secureRequest";
 import {create} from "./create";
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     id = parseInt(id, 10);
     if (get && get != "teams" && get != "matchs")
         return (NextResponse.json({error: "'g' must equal to 'teams' or 'matchs' to fetch it!"}, {status: 400}));
-    const database = Database.getInstance();
+    const database = Controller.getInstance();
     if (get == "teams") {
         const teamsRegistration: getTournamentTeams = await database.getRegisterTeams(id);
         if (!teamsRegistration.success)

@@ -110,6 +110,7 @@ export interface Team {
 }
 
 export interface TeamInfo {
+    team_id: number;
     name: string;
     creation_date: Date;
     owner_name: string;

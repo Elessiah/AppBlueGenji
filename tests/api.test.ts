@@ -15,7 +15,7 @@ import {
     History,
     getMatchs
 } from "../lib/types";
-import {Database} from "../lib/database";
+import {Controller} from "../lib/controller";
 import {owner} from "../app/api/team/owner";
 import {sleep} from "../lib/sleep";
 
@@ -851,7 +851,7 @@ describe("api", () => {
         // Test destruct team
 
         //      Création admin
-        const database = Database.getInstance();
+        const database = Controller.getInstance();
         await database.deleteUser(adminTeam);
         const setUser: status & id &{token: string} = await database.newUser(adminTeam, "admin1234", true);
         expect(setUser.success).toBeTruthy();
@@ -1439,7 +1439,7 @@ describe("api", () => {
         await sleep(3000);
 
         //      Lancement tournoi
-        const database = Database.getInstance();
+        const database = Controller.getInstance();
         const status: getMatchs = await database.setupTournament(PTID);
         expect(status.success).toBeTruthy();
 
@@ -1831,7 +1831,7 @@ describe("api", () => {
         BTtoken2 = tmp_token!;
     });
     afterAll(async() => {
-        const database = Database.getInstance();
+        const database = Controller.getInstance();
 
         // User Perfect use
         await database.deleteUser(idUserAPI);

@@ -1,12 +1,12 @@
 import {NextResponse} from "next/server";
 import {status} from "../../../lib/types";
-import {Database} from "../../../lib/database";
+import {Controller} from "../../../lib/controller";
 
 export async function destruct(body: {id_team: number | undefined},
                                user_id: number): Promise<NextResponse> {
     if (body.id_team === undefined)
         return (NextResponse.json({error: "'id_team' is required!"}, {status: 400}));
-    const database = Database.getInstance();
+    const database = Controller.getInstance();
     const checkStatus: status & {result: boolean} = await database.isAdmin(user_id);
     if (!checkStatus.success)
         return (NextResponse.json({error: checkStatus.error}, {status: 400}));

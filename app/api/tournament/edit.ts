@@ -1,6 +1,6 @@
 import {NextResponse} from "next/server";
 import {status, Tournament} from "../../../lib/types";
-import {Database} from "../../../lib/database";
+import {Controller} from "../../../lib/controller";
 
 export async function edit(body: {  id_tournament: number | undefined,
                                     name: string | undefined,
@@ -14,7 +14,7 @@ export async function edit(body: {  id_tournament: number | undefined,
                            user_id: number): Promise<NextResponse> {
     if (body.id_tournament === undefined)
         return (NextResponse.json({error: "'id_tournament' is required!"}, {status: 400}));
-    const database = Database.getInstance();
+    const database = Controller.getInstance();
     const getTournament: status & Partial<Tournament> = await database.getTournament(body.id_tournament);
     if (!getTournament.success)
         return (NextResponse.json({error: getTournament.error}, {status: 400}));
