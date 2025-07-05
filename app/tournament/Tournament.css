@@ -1,0 +1,179 @@
+.tournament-single-page {
+    padding: 2rem;
+    background-color: black;
+    color: #e0faff;
+    font-family: "Orbitron", sans-serif;
+    min-height: calc(100vh - 80px);
+}
+
+.tournament-info {
+    margin-bottom: 2rem;
+}
+
+.tournament-name {
+    font-size: 2rem;
+    color: #00bfff;
+    text-shadow: 0 0 5px #00bfff88;
+    margin-bottom: 0.5rem;
+}
+
+.tournament-description {
+    font-size: 0.85rem;
+    color: #ccc;
+    margin-bottom: 0.4rem;
+}
+
+.team-count {
+    font-size: 0.85rem;
+    color: #88faff;
+    font-style: italic;
+}
+
+.bracket-section {
+    margin-top: 2rem;
+    margin-bottom: 2rem;
+}
+
+.bracket {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    border-left: 2px solid #00bfff40;
+    padding-left: 1rem;
+}
+
+.match {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.team-slot {
+    padding: 0.5rem 1rem;
+    background-color: #0f0f0f;
+    border: 1px solid #00bfff33;
+    border-radius: 4px;
+    transition: 0.2s;
+}
+
+.team-slot.winner {
+    border: 1px solid #00ffcc;
+    background-color: #002f3b;
+    color: #00ffcc;
+    font-weight: bold;
+}
+
+.team-list-section {
+    margin-top: 2rem;
+}
+
+.team-list {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.team-entry {
+    background-color: #0f0f0f;
+    border: 1px solid #00bfff33;
+    padding: 0.8rem 1rem;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.team-entry a {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.team-entry a:hover {
+    color: #00a3cc;
+}
+
+.tournament-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.subscription-button {
+    background-color: #004d1a;
+    border: 1px solid #00ff88;
+    color: #00ff88;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-family: "Orbitron", sans-serif;
+    cursor: pointer;
+    box-shadow: 0 0 10px #00ff8844;
+    transition: all 0.2s ease-in-out;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.subscription-button:hover {
+    background-color: #00ff88;
+    color: black;
+    box-shadow: 0 0 15px #00ff88aa;
+}
+
+.unsubscription-button {
+    background-color: #1a0000;
+    border: 1px solid #ff4d4d;
+    color: #ff4d4d;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-family: "Orbitron", sans-serif;
+    cursor: pointer;
+    box-shadow: 0 0 10px #00ff8844;
+    transition: all 0.2s ease-in-out;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.unsubscription-button:hover {
+    background-color: #ff4d4d;
+    color: white;
+    box-shadow: 0 0 15px #00ff88aa;
+}
+
+.arbre-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.score-button {
+    background-color: #004d1a;
+    border: 1px solid #00ff88;
+    color: #00ff88;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-family: "Orbitron", sans-serif;
+    cursor: pointer;
+    box-shadow: 0 0 10px #00ff8844;
+    transition: all 0.2s ease-in-out;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.score-button:hover {
+    background-color: #00ff88;
+    color: black;
+    box-shadow: 0 0 15px #00ff88aa;
+}

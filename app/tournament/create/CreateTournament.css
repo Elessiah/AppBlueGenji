@@ -1,0 +1,71 @@
+.form-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    min-height: calc(100vh - 80px);
+    background-color: black;
+    color: #e0faff;
+    font-family: "Orbitron", sans-serif;
+}
+
+.styled-form {
+    background-color: #0a0a0a;
+    padding: 2rem;
+    border-left: 2px solid #00bfff;
+    border-bottom: 2px solid #00bfff;
+    box-shadow: 0 0 10px #00bfff55, inset 0 0 6px #00bfff33;
+    border-radius: 12px;
+    max-width: 500px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.styled-form h1 {
+    font-size: 1.5rem;
+    color: #00bfff;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.styled-form label {
+    font-size: 0.9rem;
+    color: #88faff;
+}
+
+.styled-form input,
+.styled-form textarea,
+.styled-form select {
+    padding: 0.6rem;
+    background-color: #101010;
+    border: 1px solid #00bfff40;
+    color: #e0faff;
+    border-radius: 6px;
+    font-family: inherit;
+    resize: none;
+}
+
+.styled-form input[type="date"] {
+    cursor: pointer;
+}
+
+.submit-button {
+    margin-top: 1rem;
+    background-color: #002233;
+    border: 1px solid #00bfff;
+    color: #00bfff;
+    padding: 0.6rem;
+    font-size: 0.95rem;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 0 10px #00bfff40;
+    transition: all 0.2s ease-in-out;
+}
+
+.submit-button:hover {
+    background-color: #00bfff;
+    color: black;
+    box-shadow: 0 0 15px #00bfffaa;
+}

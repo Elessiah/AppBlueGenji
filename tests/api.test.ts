@@ -1781,7 +1781,7 @@ describe("api", () => {
         response = await GETTOUR(request);
         expect(response.status).toEqual(400);
         error =  await response.json() as {error: string};
-        expect(error.error).toEqual("'g' must equal to 'teams' or 'matchs' to fetch it!");
+        expect(error.error).toEqual("'g' must equal to 'teams', 'list' or 'matchs' to fetch it!");
 
         // Test erase sans token
         request = new NextRequest(`https://localhost/tournament/`, {

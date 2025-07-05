@@ -1,0 +1,95 @@
+.tournament-page {
+    padding: 2rem;
+    background-color: black;
+    color: #e0faff;
+    min-height: 100vh;
+    font-family: "Orbitron", sans-serif;
+}
+
+.page-title {
+    text-align: center;
+    font-size: 2rem;
+    color: #00bfff;
+    margin-bottom: 2rem;
+    text-shadow: 0 0 6px #00bfff60;
+}
+
+.tournament-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    justify-items: center;
+    margin-bottom: 2rem;
+}
+
+.tournament-card {
+    background-color: #0a0a0a;
+    border: 2px solid #00bfff60;
+    box-shadow: 0 0 10px #00bfff30;
+    border-radius: 12px;
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 400px;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+}
+
+.tournament-card:hover {
+    transform: scale(1.03);
+    box-shadow: 0 0 20px #00bfff80;
+    border-color: #00bfff;
+}
+
+.tournament-card h2 {
+    margin-bottom: 0.8rem;
+    font-size: 1.3rem;
+    color: #00bfff;
+    text-shadow: 0 0 4px #00bfff55;
+}
+
+.tournament-card p {
+    font-size: 0.9rem;
+    margin: 0.3rem 0;
+}
+
+.start-date {
+    color: #88faff;
+    font-style: italic;
+}
+
+.tournament-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.create-button {
+    background-color: #004d1a;
+    border: 1px solid #00ff88;
+    color: #00ff88;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-family: "Orbitron", sans-serif;
+    cursor: pointer;
+    box-shadow: 0 0 10px #00ff8844;
+    transition: all 0.2s ease-in-out;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.create-button:hover {
+    background-color: #00ff88;
+    color: black;
+    box-shadow: 0 0 15px #00ff88aa;
+}
+

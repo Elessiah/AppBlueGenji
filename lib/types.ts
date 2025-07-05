@@ -85,14 +85,14 @@ export interface User {
     username: string;
     hash: string;
     token: string;
-    id_team: number;
+    id_team: number | null;
     is_admin: boolean;
 }
 
 export interface UserInfo {
     user_id: number;
     username: string;
-    id_team: number;
+    id_team: number | null;
     is_admin: boolean;
 }
 
@@ -138,6 +138,8 @@ export interface Tournament {
     close_registration: Date;
     start: Date;
 }
+
+export type TournamentTeamsCount = Tournament & {nb_teams: number};
 
 export interface TournamentMatch {
     tournament_match_id: number;

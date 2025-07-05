@@ -1,0 +1,107 @@
+.register-page {
+    height: calc(100vh - 80px);
+    background: black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: "Orbitron", sans-serif;
+}
+
+.register-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 350px;
+    padding: 2rem;
+
+    background-color: rgba(10, 10, 10, 0.85);
+    backdrop-filter: blur(5px);
+    color: #e0faff;
+
+    border: 2px solid #00bfff;
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+    box-shadow: inset -2px 0 10px #00bfff40, inset 0 -2px 10px #00bfff40;
+}
+
+.register-form h1 {
+    font-size: 1.5rem;
+    color: #00bfff;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.register-form label {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.register-form input {
+    background-color: #0f0f0f;
+    border: 1px solid #00bfff80;
+    padding: 0.75rem 1rem;
+    color: #e0faff;
+    font-family: "Orbitron", sans-serif;
+    border-radius: 4px;
+    transition: border 0.2s;
+}
+
+.register-form input:focus {
+    outline: none;
+    border-color: #00bfff;
+    box-shadow: 0 0 5px #00bfff;
+}
+
+.register-form .submit-button {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background-color: #00bfff;
+    color: #000;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.register-form .submit-button:hover {
+    background-color: #00a3cc;
+}
+
+.register-form a:hover {
+    color: #00bfff;
+    transform: translateY(-3px);
+}
+
+.register-form a {
+    font-family: 'Orbitron', sans-serif;
+    color: #e0faff;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-decoration: none;
+    transition: color 0.2s, transform 0.2s;
+}
+
+.password-container {
+    position: relative;
+    width: 100%;
+}
+
+.password-container input {
+    width: 100%;
+}
+
+.eye-button {
+    position: absolute;
+    padding: 0.3rem 0.6rem;
+    margin-top: 0.6rem;
+    right: 0;
+    background: none;
+    color: #00bfff;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.eye-button:hover {
+    transform:  translateY(1px);
+}

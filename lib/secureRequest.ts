@@ -7,9 +7,14 @@ export async function secureRequest(
     handler: (req: NextRequest, user_id: number) => Promise<NextResponse>
 ) {
     let token: string | null = req.headers.get('token');
-    if (!token)
+    if (token == null)
         return NextResponse.json({ error: 'Non authorized!' }, { status: 401 });
-    let payload: token_payload = JSON.parse(Buffer.from(token, "base64url").toString("utf-8")) as token_payload;
+    let payload: token_payload;
+    try {
+        payload = JSON.parse(Buffer.from(token, "base64url").toString("utf-8")) as token_payload;
+    } catch (e) {
+        return NextResponse.json({ error: 'Non authorized!' }, { status: 401 });
+    }
     const user_id = payload.user_id;
     const database = Controller.getInstance();
     const tokenStatus: status & {token: string} = await database.authTokenUser(user_id, token);
@@ -21,5 +26,7 @@ export async function secureRequest(
     if (response.headers.get('token') == null)
         response.headers.set('token', tokenStatus.token);
     response.headers.set('Cache-Control', 'no-cache');
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set("Access-Control-Expose-Headers", 'token')
     return response;
 }

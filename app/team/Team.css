@@ -1,0 +1,152 @@
+.team-page {
+    min-height: calc(100vh - 80px);
+    width: 100%;
+    background-color: black;
+    color: #e0faff;
+    padding: 2rem;
+    font-family: "Orbitron", sans-serif;
+}
+
+.team-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    margin-bottom: 2rem;
+}
+
+.top-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.team-name {
+    font-size: 2.2rem;
+    color: #00bfff;
+    font-family: "Orbitron", sans-serif;
+    text-shadow: 0 0 5px #00bfff55;
+    margin: 0;
+}
+
+.team-meta p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #aaa;
+}
+
+.meta-data {
+    font-weight: bold;
+    color: #e0faff;
+}
+
+.delete-button {
+    background-color: #1a0000;
+    border: 1px solid #ff4d4d;
+    color: #ff4d4d;
+    padding: 0.5rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all 0.2s ease-in-out;
+}
+
+.delete-button:hover {
+    background-color: #ff4d4d;
+    color: white;
+}
+
+.add-button {
+    background-color: #004d1a;
+    border: 1px solid #00ff88;
+    color: #00ff88;
+    padding: 0.5rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all 0.2s ease-in-out;
+}
+
+.add-button:hover {
+    background-color: #00ff88;
+    color: black;
+    box-shadow: 0 0 15px #00ff88aa;
+}
+
+.team-section {
+    margin-top: 1.5rem;
+}
+
+.member-list {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.member-item {
+    display: flex;
+    justify-content: space-between;
+    width: fit-content;
+    background-color: #0f0f0f;
+    padding: 0.6rem 1rem;
+    border: 1px solid #00bfff40;
+    border-radius: 6px;
+}
+
+.member-item a:hover {
+    color: #00a3cc;
+}
+
+.kick-button {
+    background: none;
+    border: none;
+    color: #ff5555;
+    cursor: pointer;
+    padding-left: 2rem;
+    transition: color 0.2s;
+}
+
+.kick-button:hover {
+    color: #ff2222;
+    transform: scale(1.1);
+}
+
+.match-list {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    margin-top: 0.5rem;
+}
+
+.match-item {
+    background-color: #0f0f0f;
+    padding: 0.8rem 1rem;
+    border: 1px solid #00bfff40;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.match-item a {
+    display: flex;
+    justify-content: space-between;
+}
+
+.match-item a:hover {
+    color: #00a3cc;
+}
+
+.empty-history {
+    color: #666;
+    font-style: italic;
+}
