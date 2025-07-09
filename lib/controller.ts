@@ -346,7 +346,6 @@ export class Controller {
         team = await this.isTeamExist(team, true);
         if (team == -1)
             return ({success: false, error: "This team does not exist or is inactive!"});
-        console.log("Username: ", user);
         user = await this.isUserExist(user, true);
         if (user == -1) {
             return ({success: false, error: "User do not exist or has already a team!"});
@@ -829,7 +828,6 @@ export class Controller {
         // On calcule le nombre de matchs à préparer
         const match_to_setup: number = (tournament_info.size / 2 ** tournament_info.current_round) / 2;
         const match_to_fetch: number = match_to_setup * 2;
-        console.log("match to fetch: ", match_to_fetch, "Match to setup: ", match_to_setup);
         const [rows] = await this.db!.execute(`SELECT tournament_match.*,
                                                      th.id_team AS id_team_host,
                                                      tg.id_team AS id_team_guest
@@ -843,10 +841,6 @@ export class Controller {
         let nmatch: number = 0;
         let errors: string = "";
         for (let i = 0; i < match_to_setup; i++) {
-            console.log("nmatch: ", nmatch);
-            console.log("previous round :", previous_round);
-            console.log("previous round : ", previous_round[nmatch]);
-            console.log("previous round2 : ", previous_round[nmatch + 1]);
             const id_host: number = previous_round[nmatch].victory == "host" ? previous_round[nmatch].id_team_host : previous_round[nmatch].id_team_guest;
             nmatch++;
             const id_guest: number = previous_round[nmatch].victory == "host" ? previous_round[nmatch].id_team_host : previous_round[nmatch].id_team_guest;
@@ -926,9 +920,9 @@ export class Controller {
             return ({success: false, error: "Match has disappeared apparently..."});
         const id_tournament: number = (rows as {id_tournament: number}[])[0].id_tournament;
         if (await this.isAllMatchEnded(id_tournament)) {
-         const getMatchs: getMatchs = await this.setupNextRound(id_tournament);
-         if (!getMatchs.success)
-             return ({success: false, error: getMatchs.error});
+            const getMatchs: getMatchs = await this.setupNextRound(id_tournament);
+            if (!getMatchs.success)
+                return ({success: false, error: getMatchs.error});
         }
         return ({success: true, error: ""});
     }
@@ -1217,11 +1211,9 @@ export class Controller {
             let nbyes: number = 0;
             const nb_matchs: number = tournament_size / 2;
             for (let nmatch: number = 0; nmatch < nb_matchs; nmatch++) {
-                console.log("Value: ", teams, nteam);
                 let match: { id_host: number, id_guest: number } = {id_host: -1, id_guest: -1};
                 for (let n_slot = 0; n_slot < 2; n_slot++) {
                     let team_id: number;
-                    console.log("interval: ", byesInterval, "nbyes: ", nbyes, "byes: ", byes, "nteam: ", nteam);
                     if (byesInterval && nbyes < byes && nteam % byesInterval === 0) {
                         team_id = -1;
                         nbyes++;
@@ -1236,7 +1228,6 @@ export class Controller {
                 }
                 const status: status & id = await this.scheduleMatch(teams[0].id_tournament, match.id_host, match.id_guest, start);
                 if (!status.success) {
-                    console.log("Error: ", status.error);
                     return ({success: false, error: status.error});
                 }
             }
@@ -1254,7 +1245,7 @@ export class Controller {
                                               FROM tournament_match
                                                        LEFT JOIN team_tournament
                                                                  ON id_team_tournament_guest = team_tournament.team_tournament_id
-                                              WHERE team_tournament.id_tournament && tournament_match.victory IS NULL`);
+                                              WHERE team_tournament.id_tournament = ? && tournament_match.victory IS NULL`, [tournament_id]);
         return (!(rows as unknown[]).length);
     }
 
@@ -1326,12 +1317,11 @@ export class Controller {
                                                  OR COUNT(CASE WHEN tournament_match.victory IS NOT NULL THEN 1 END) = 0;
         `);
         const tournaments: {tournament_id: number, current_round:number}[] = rows as {tournament_id: number, current_round:number}[];
-        console.log(tournaments);
         if (tournaments.length == 0)
             return;
         for (const tournament of tournaments) {
             if (tournament.current_round == -1)
-                console.log(await this.setupTournament(tournament.tournament_id));
+                await this.setupTournament(tournament.tournament_id);
             else {
                 await this.setupNextRound(tournament.tournament_id);
             }

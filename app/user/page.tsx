@@ -84,13 +84,10 @@ export default function User() {
     }
 
     useEffect(() => {
-        console.log("Get Profile ?");
         getProfile();
     }, [username, id]);
 
-    console.log("UserID: ", user.user_id, "Profile: ", profile.user_id, "Test Owner ?",  ownProfile);
     if ((!ownProfile && user.user_id == profile.user_id) || user.is_admin) {
-        console.log("User own the profile !");
         setOwnProfile(true);
     } else if (ownProfile && user.user_id != profile.user_id && !user.is_admin) {
         setOwnProfile(false);

@@ -736,7 +736,7 @@ describe("api", () => {
                     'Content-Type': 'application/json',
                     'token': token!,
                 },
-                body: JSON.stringify({command: "add", id_team: idPerfectTeam, id_user: idUser2Team})
+                body: JSON.stringify({command: "add", id_team: idPerfectTeam, user: idUser2Team})
             });
         response = await POSTTEAM(request);
         expect(response.status).toEqual(200);
@@ -807,7 +807,7 @@ describe("api", () => {
                     'Content-Type': 'application/json',
                     'token': token!,
                 },
-                body: JSON.stringify({command: "rm", id_team: idPerfectTeam, id_user: idUser2Team})
+                body: JSON.stringify({command: "rm", id_team: idPerfectTeam, user: idUser2Team})
             });
         response = await POSTTEAM(request);
         expect(response.status).toEqual(200);
@@ -1143,7 +1143,7 @@ describe("api", () => {
                     'Content-Type': 'application/json',
                     'token': token!,
                 },
-                body: JSON.stringify({command: "add", id_team: idBadTeam, id_user: badUserID2Team})
+                body: JSON.stringify({command: "add", id_team: idBadTeam, user: badUserID2Team})
             });
         response = await POSTTEAM(request);
         expect(response.status).toEqual(200);
@@ -1175,7 +1175,7 @@ describe("api", () => {
                     'Content-Type': 'application/json',
                     'token': token!,
                 },
-                body: JSON.stringify({command: "rm", id_user: badUserID2Team})
+                body: JSON.stringify({command: "rm", user: badUserID2Team})
             });
         response = await POSTTEAM(request);
         expect(response.status).toEqual(400);
@@ -1745,7 +1745,7 @@ describe("api", () => {
                 'Content-Type': 'application/json',
                 'token': BTtoken1,
             },
-            body: JSON.stringify({command: "add", id_user: iduserBT2, id_team: id_teamBT})
+            body: JSON.stringify({command: "add", user: iduserBT2, id_team: id_teamBT})
         });
         response = await POSTTEAM(request);
         expect(response.status).toEqual(200);

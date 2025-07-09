@@ -21,10 +21,8 @@ export default function ScoreModal({
     const [score, setScore] = useState<{match_id: number, score_host: number, score_guest: number, victory: "host" | "guest" | null }>({match_id: -1, score_host: 0, score_guest: 0, victory: null});
     const [teams, setTeams] = useState<{host: Team & TeamTournament, guest: Team & TeamTournament}>();
     const {user, setUser} = useUser();
-    console.log("Début édit score: ", tournament.matchs);
 
     useEffect(() => {
-        console.log("UseEffect!");
         if (!isOpen)
             return;
         if (user.id_team == null) {
@@ -81,7 +79,6 @@ export default function ScoreModal({
         onClose();
     };
 
-    console.log("isOpen: ", isOpen);
     if (!isOpen) return null;
 
     return (

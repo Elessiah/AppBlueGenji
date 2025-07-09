@@ -1372,7 +1372,6 @@ describe("Database", () => {
             i += 1;
         const final_team1_index = i;
 
-
         // Vérification update
         getResult = await database.get({table: "tournament_match", whereOption: [{column: "tournament_match_id", condition: "=", value: match1.tournament_match_id}]});
         expect(getResult.success).toBeTruthy();
@@ -1399,8 +1398,8 @@ describe("Database", () => {
         expect(match.score_host).toEqual(2);
         expect(match.score_guest).toEqual(0);
 
-        // Test setup next round
-        matchs = await database.setupNextRound(MatchHistoryTournament);
+        // Test du setup next round
+        matchs = await database.getMatchs(MatchHistoryTournament, 1);
         expect(matchs.success).toBeTruthy();
         expect(matchs.matchs.length).toEqual(1);
         expect([registrations[final_team1_index], registrations[final_team2_index]]).toContain(matchs.matchs[0].id_team_tournament_host);
@@ -1409,7 +1408,7 @@ describe("Database", () => {
         expect(matchs.matchs[0].score_host).toEqual(0);
         expect(matchs.matchs[0].score_guest).toEqual(0);
 
-        // Test isTournamentEnded avec un tournois en finale
+        // Test isTournamentEnded avec un tournoi en finale
         result = await database.isTournamentEnded(MatchHistoryTournament);
         expect(result.success).toBeTruthy();
         expect(result.result).toBeFalsy();
@@ -1508,7 +1507,7 @@ describe("Database", () => {
         expect(status.success).toBeTruthy();
 
         // Passage round suivant
-        matchs = await database.setupNextRound(MatchHistory2Tournament);
+        matchs = await database.getMatchs(MatchHistory2Tournament, 1);
         expect(matchs.success).toBeTruthy();
         expect(matchs.matchs.length).toEqual(1);
 
@@ -1742,7 +1741,7 @@ describe("Database", () => {
         expect(getMatchs.success).toBeFalsy();
 
         // Setup next round
-        getMatchs = await database.setupNextRound(BadHistoryTournament);
+        getMatchs = await database.getMatchs(BadHistoryTournament, 1);
         expect(getMatchs.success).toBeTruthy();
         expect(getMatchs.matchs.length).toEqual(1);
 
