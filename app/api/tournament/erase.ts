@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {Database} from "../../../lib/database";
+import {Database} from "../../../lib/database/database";
 import {status, Tournament} from "../../../lib/types";
 
 export async function erase(body: {id_tournament: number | undefined},

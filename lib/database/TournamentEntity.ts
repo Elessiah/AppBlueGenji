@@ -8,7 +8,7 @@ import {
     TeamTournament,
     Tournament, Match,
     TournamentTeamsCount
-} from "./types";
+} from "../types";
 import {Database} from "./database";
 import mysql from "mysql2/promise";
 import {TeamEntity} from "./TeamEntity";

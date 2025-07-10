@@ -1,8 +1,8 @@
 // app/api/user/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import {status, getHistories, UserInfo} from "../../../lib/types";
-import {Database} from "../../../lib/database";
-import {secureRequest} from "../../../lib/secureRequest";
+import {Database} from "../../../lib/database/database";
+import {secureRequest} from "../../../lib/API/secureRequest";
 import {newUser} from "./new";
 import {updatePassword} from "./updatePasword";
 import {updateUsername} from "./updateUsername";

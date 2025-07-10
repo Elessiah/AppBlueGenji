@@ -1,6 +1,6 @@
 import {TournamentEntity} from "./TournamentEntity";
 import {TeamEntity} from "./TeamEntity";
-import {status, getMatchs, Match, id} from "./types";
+import {status, getMatchs, Match, id} from "../types";
 import {Database} from "./database";
 import mysql from "mysql2/promise";
 

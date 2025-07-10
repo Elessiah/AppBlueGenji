@@ -1,8 +1,8 @@
 // app/api/tournament/route.ts
 import {NextRequest, NextResponse} from "next/server";
-import {Database} from "../../../lib/database";
+import {Database} from "../../../lib/database/database";
 import {getMatchs, getTournamentTeams, status, Tournament} from "../../../lib/types";
-import {secureRequest} from "../../../lib/secureRequest";
+import {secureRequest} from "../../../lib/API/secureRequest";
 import {create} from "./create";
 import {edit} from "./edit";
 import {erase} from "./erase";

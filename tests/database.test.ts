@@ -1,4 +1,4 @@
-import {Database} from "../lib/database";
+import {Database} from "../lib/database/database";
 import {afterAll, beforeAll, describe, expect, test} from "@jest/globals"
 
 import {
@@ -16,7 +16,7 @@ import {
     Match,
     TeamTournament, TeamInfo, UserInfo
 } from "../lib/types";
-import {sleep} from "../lib/sleep";
+import {sleep} from "../lib/tools/sleep";
 
 describe("Database", () => {
     let database: Database;

@@ -1,6 +1,6 @@
 import {NextResponse} from "next/server";
 import {status, Tournament} from "../../../lib/types";
-import {Database} from "../../../lib/database";
+import {Database} from "../../../lib/database/database";
 
 export async function edit(body: {  id_tournament: number | undefined,
                                     name: string | undefined,

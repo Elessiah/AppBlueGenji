@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {Database} from "../../../lib/database";
+import {Database} from "../../../lib/database/database";
 import {status} from "../../../lib/types";
 
 export async function registration(body: {id_tournament: number | undefined},

@@ -1,5 +1,5 @@
 import {UserEntity} from "./UserEntity";
-import {getHistories, getTeamMembers, History, id, status, Team, TeamInfo, User, UserInfo} from "./types";
+import {getHistories, getTeamMembers, History, id, status, Team, TeamInfo, User, UserInfo} from "../types";
 import {Database} from "./database";
 import mysql from "mysql2/promise";
 

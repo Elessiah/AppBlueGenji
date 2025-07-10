@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {Database} from "../../../lib/database";
+import {Database} from "../../../lib/database/database";
 import {status, id} from "../../../lib/types";
 
 export async function create(body: {

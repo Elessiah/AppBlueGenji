@@ -1,4 +1,4 @@
-import {Database} from "../../../lib/database";
+import {Database} from "../../../lib/database/database";
 import {NextResponse} from "next/server";
 
 export async function newUser(body: {username: string | undefined, password: string | undefined}): Promise<NextResponse> {

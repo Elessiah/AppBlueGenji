@@ -15,9 +15,9 @@ import {
     History,
     getMatchs
 } from "../lib/types";
-import {Database} from "../lib/database";
+import {Database} from "../lib/database/database";
 import {owner} from "../app/api/team/owner";
-import {sleep} from "../lib/sleep";
+import {sleep} from "../lib/tools/sleep";
 
 describe("api", () => {
     // User perfect Use

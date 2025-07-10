@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {Database} from "../../../lib/database";
+import {Database} from "../../../lib/database/database";
 
 export async function updateUsername(body: {new_username: string | undefined},
                                      user_id: number): Promise<NextResponse> {

@@ -1,6 +1,6 @@
 import {NextResponse} from "next/server";
 import {status} from "../../../lib/types";
-import {Database} from "../../../lib/database";
+import {Database} from "../../../lib/database/database";
 
 export async function owner(body: {owner: number | string | undefined, new_owner: number | string | undefined},
                             user_id: number) : Promise<NextResponse>

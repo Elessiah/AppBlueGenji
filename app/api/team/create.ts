@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {Database} from "../../../lib/database";
+import {Database} from "../../../lib/database/database";
 
 export async function create(body: {name: string | undefined},
                              user_id: number): Promise<NextResponse> {

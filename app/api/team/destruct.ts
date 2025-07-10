@@ -1,6 +1,6 @@
 import {NextResponse} from "next/server";
 import {status} from "../../../lib/types";
-import {Database} from "../../../lib/database";
+import {Database} from "../../../lib/database/database";
 
 export async function destruct(body: {id_team: number | undefined},
                                user_id: number): Promise<NextResponse> {

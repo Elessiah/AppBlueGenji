@@ -21,7 +21,7 @@ import {
     getMatchs,
     getTournamentTeams,
     TeamTournament, id, Tournament, token_payload, TeamInfo, UserInfo, TournamentTeamsCount,
-} from './types';
+} from '../types';
 
 export class Database {
     // public

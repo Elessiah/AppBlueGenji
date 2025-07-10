@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import {status, token_payload} from "./types";
-import {Database} from "./database";
+import {status, token_payload} from "../types";
+import {Database} from "../database/database";
 
 export async function secureRequest(
     req: NextRequest,
