@@ -1,4 +1,4 @@
-import {id, status, User, UserInfo, token_payload, getHistories, History} from "./types";
+import {id, status, User, UserInfo, token_payload, getHistories, History} from "../types";
 import bcrypt from "bcrypt";
 import mysql from "mysql2/promise";
 import {Database} from "./database";
@@ -87,6 +87,16 @@ export class UserEntity {
         this.is_admin = true;
         this.is_loaded = true;
         return ({success: true, error: "", id: result.insertId, token: token});
+    }
+
+    public async isAdmin(): Promise<status & {result: boolean}> {
+        if (!this.is_loaded || !this.id)
+            return ({success: false, error: "Empty object!", result: false});
+        if (await this.isExist(this.id) == -1)
+            return ({success: false, error: "This user does not exist !", result: false});
+        const database:  Database = await Database.getInstance();
+        const [rows] = await database.db!.execute(`SELECT is_admin FROM user WHERE user_id = ?`, [this.id]);
+        return ({success: true, error: "", result: (rows as {is_admin: boolean}[])[0].is_admin});
     }
 
     public async authToken(token: string): Promise<status & {token: string}> {
