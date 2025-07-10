@@ -114,7 +114,7 @@ export interface TeamInfo {
     name: string;
     creation_date: Date;
     owner_name: string;
-    id_owner: number
+    id_owner: number | null;
     members_count: number;
 }
 
