@@ -1,7 +1,7 @@
-import {id, status, User, UserInfo, token_payload} from "./types";
+import {id, status, User, UserInfo, token_payload, getHistories, History} from "./types";
 import bcrypt from "bcrypt";
 import mysql from "mysql2/promise";
-import {Controller} from "./controller";
+import {Database} from "./database";
 import crypto from "crypto";
 import {TeamEntity} from "./TeamEntity";
 
@@ -32,7 +32,7 @@ export class UserEntity {
         user = await this.isExist(user);
         if (user == -1)
             return ({success: false, error: "This user does not exist!"});
-        const database: Controller = await Controller.getInstance();
+        const database: Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT * FROM user WHERE user_id = ?`, [user]);
         const user_data: User = (rows as User[])[0];
         this.id = user_data.user_id;
@@ -59,7 +59,7 @@ export class UserEntity {
     public async new(username: string,
                      password: string,
                      is_admin: boolean = false): Promise<status & id & {token: string}> {
-        const database: Controller = await Controller.getInstance();
+        const database: Database = await Database.getInstance();
         const status = this.checkNameNorm(username);
         if (!status.success)
             return ({...status, id: -1, token: ""});
@@ -92,7 +92,7 @@ export class UserEntity {
     public async authToken(token: string): Promise<status & {token: string}> {
         if (!this.is_loaded)
             return ({success: false, error: "Empty object!", token: ""});
-        const database : Controller = await Controller.getInstance();
+        const database : Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT token FROM user WHERE user_id = ?`, [this.id]);
         if ((rows as unknown[]).length == 0)
             return ({success: false, error: "This user does not exist!", token: ""});
@@ -107,7 +107,7 @@ export class UserEntity {
     public async authPassword(password: string): Promise<status & {token: string}> {
         if (!this.is_loaded)
             return ({success: false, error: "Empty object!", token: ""});
-        const database : Controller = await Controller.getInstance();
+        const database : Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT hash FROM user WHERE user_id = ?`, [this.id]);
         if ((rows as unknown[]).length == 0)
             return ({success: false, error: "This user does not exist!", token: ""});
@@ -133,7 +133,7 @@ export class UserEntity {
         if (status.token.length == 0)
             return ({success: false, error: "Old password is wrong", token: ""});
         const hash: string = await bcrypt.hash(new_password, 10);
-        const database: Controller = await Controller.getInstance();
+        const database: Database = await Database.getInstance();
         await database.db!.execute(`UPDATE user SET hash = ? WHERE user_id = ?`, [hash, this.id]);
         return (status);
     }
@@ -149,7 +149,7 @@ export class UserEntity {
             return status;
         if (await this.isExist(new_username) != -1)
             return ({success: false, error: "Username already exist or it's already your username!"});
-        const database: Controller = await Controller.getInstance();
+        const database: Database = await Database.getInstance();
         await database.db!.execute(`UPDATE user
                                SET username = ?
                                WHERE user_id = ?`, [new_username, user]);
@@ -159,7 +159,7 @@ export class UserEntity {
 
     public async isExist(user: string | number,
                          checkWithoutTeam: boolean = false): Promise<number> {
-        const database: Controller = await Controller.getInstance();
+        const database: Database = await Database.getInstance();
         let users: { user_id: number }[];
         let teamFilter: string = "";
         if (checkWithoutTeam)
@@ -199,14 +199,31 @@ export class UserEntity {
             if (!status.success)
                 return ({success: false, error: status.error});
         }
-        const database: Controller = await Controller.getInstance();
+        const database: Database = await Database.getInstance();
         await database.db!.execute(`DELETE
                                     FROM user_history
                                     WHERE id_user = ?`, [user]);
         await database.db!.execute(`DELETE
                                     FROM user
                                     WHERE user_id = ?`, [user]);
+        this.is_loaded = false;
         return ({success: true, error: ""});
+    }
+
+    public async getUserHistory(): Promise<getHistories> {
+        if (!this.is_loaded || !this.id)
+            return ({success: false, error: "Empty object!", histories: []});
+        if (await this.isExist(this.id) == -1)
+            return ({success: false, error: "User not found!", histories: []});
+        const database: Database = await Database.getInstance();
+        const [rows] = await database.db!.execute(`SELECT tournament.*, team_tournament.*, team.name as team_name
+                                              FROM tournament
+                                                       INNER JOIN team_tournament ON tournament.tournament_id = team_tournament.id_tournament
+                                                       INNER JOIN team ON team_tournament.id_team = team.team_id
+                                                       INNER JOIN user_history ON team_tournament.team_tournament_id = user_history.id_team_tournament
+                                              WHERE user_history.id_user = ?
+                                              ORDER BY tournament.start DESC`, [this.id]);
+        return ({success: true, error: "", histories: rows as History[]});
     }
 
     private checkNameNorm(name: string): status {

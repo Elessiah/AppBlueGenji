@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {Controller} from "../../../lib/controller";
+import {Database} from "../../../lib/database";
 import {status} from "../../../lib/types";
 
 export async function registration(body: {id_tournament: number | undefined},
@@ -7,7 +7,7 @@ export async function registration(body: {id_tournament: number | undefined},
                                    unregistration: boolean): Promise<NextResponse> {
     if (body.id_tournament === undefined)
         return (NextResponse.json({error: "'id_tournament' is required!"}, {status: 400}));
-    const database = Controller.getInstance();
+    const database = Database.getInstance();
     const statusID: status & {result: number} = await database.isTeamOwner(user_id);
     if (!statusID.success)
         return (NextResponse.json({error: statusID.error}, {status: 400}));

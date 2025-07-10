@@ -67,7 +67,7 @@ export interface getTournaments {
 }
 
 export interface getMatchs {
-    matchs: TournamentMatch[];
+    matchs: Match[];
     success: boolean;
     error: string;
 }
@@ -131,6 +131,7 @@ export interface Tournament {
     description: string;
     format: 'SIMPLE' | 'DOUBLE';
     size: number;
+    current_round: number;
     id_owner: number;
     creation_date: Date;
     start_visibility: Date;
@@ -141,7 +142,7 @@ export interface Tournament {
 
 export type TournamentTeamsCount = Tournament & {nb_teams: number};
 
-export interface TournamentMatch {
+export interface Match {
     tournament_match_id: number;
     id_tournament: number;
     id_team_tournament_host: number;
@@ -149,6 +150,7 @@ export interface TournamentMatch {
     score_host: number;
     score_guest: number;
     victory: 'host' | 'guest' | null;
+    start_date: Date;
 }
 
 export interface id {

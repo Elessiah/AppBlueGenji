@@ -1,4 +1,4 @@
-import {Controller} from "../lib/controller";
+import {Database} from "../lib/database";
 import {afterAll, beforeAll, describe, expect, test} from "@jest/globals"
 
 import {
@@ -13,13 +13,13 @@ import {
     getTournamentTeams,
     Tournament,
     getMatchs,
-    TournamentMatch,
+    Match,
     TeamTournament, TeamInfo, UserInfo
 } from "../lib/types";
 import {sleep} from "../lib/sleep";
 
 describe("Database", () => {
-    let database: Controller;
+    let database: Database;
     // User perfect use
     const nameUserManagement: string = "JestElessiah";
 
@@ -71,7 +71,7 @@ describe("Database", () => {
     //      Hash
     const passwordUser = "HashTestHashTest";
     beforeAll(async () => {
-        database = Controller.getInstance();
+        database = Database.getInstance();
         await database.ready;
     });
     test("Primary database function", async() => {
@@ -1310,7 +1310,7 @@ describe("Database", () => {
         expect(matchs.matchs[0].score_host).toEqual(0);
         expect(matchs.matchs[0].score_guest).toEqual(0);
         expect(matchs.matchs[0].victory).toBeNull();
-        const match1: TournamentMatch = matchs.matchs[0];
+        const match1: Match = matchs.matchs[0];
 
         // Test fonction getMatchs qui doit renvoyer la même chose !
         const secondMatchs: getMatchs = await database.getMatchs(MatchHistoryTournament);
@@ -1320,7 +1320,7 @@ describe("Database", () => {
         let getResult: SQLGetResult = await database.get({table: "tournament_match", whereOption: [{column: "tournament_match_id", condition: "=", value: match1.tournament_match_id}]});
         expect(getResult.success).toBeTruthy();
         expect(getResult.result.length).toEqual(1);
-        let match: TournamentMatch = getResult.result[0] as TournamentMatch;
+        let match: Match = getResult.result[0] as Match;
         expect(matchs.matchs[0]).toEqual(match);
 
         // Test valeur de retour match 2
@@ -1329,13 +1329,13 @@ describe("Database", () => {
         expect(matchs.matchs[1].score_host).toEqual(0);
         expect(matchs.matchs[1].score_guest).toEqual(0);
         expect(matchs.matchs[0].victory).toBeNull();
-        const match2: TournamentMatch = matchs.matchs[1];
+        const match2: Match = matchs.matchs[1];
 
         // Vérification avec GET match 2
         getResult = await database.get({table: "tournament_match", whereOption: [{column: "tournament_match_id", condition: "=", value: match2.tournament_match_id}]});
         expect(getResult.success).toBeTruthy();
         expect(getResult.result.length).toEqual(1);
-        match = getResult.result[0] as TournamentMatch;
+        match = getResult.result[0] as Match;
         expect(matchs.matchs[1]).toEqual(match);
 
         // Test Update des scores guest
@@ -1346,7 +1346,7 @@ describe("Database", () => {
         getResult = await database.get({table: "tournament_match", whereOption: [{column: "tournament_match_id", condition: "=", value: match1.tournament_match_id}]});
         expect(getResult.success).toBeTruthy();
         expect(getResult.result.length).toEqual(1);
-        match = getResult.result[0] as TournamentMatch;
+        match = getResult.result[0] as Match;
         expect(match.victory).toBeNull();
         expect(match.score_host).toEqual(0);
         expect(match.score_guest).toEqual(1);
@@ -1359,7 +1359,7 @@ describe("Database", () => {
         getResult = await database.get({table: "tournament_match", whereOption: [{column: "tournament_match_id", condition: "=", value: match2.tournament_match_id}]});
         expect(getResult.success).toBeTruthy();
         expect(getResult.result.length).toEqual(1);
-        match = getResult.result[0] as TournamentMatch;
+        match = getResult.result[0] as Match;
         expect(match.victory).toBeNull();
         expect(match.score_host).toEqual(1);
         expect(match.score_guest).toEqual(0);
@@ -1376,7 +1376,7 @@ describe("Database", () => {
         getResult = await database.get({table: "tournament_match", whereOption: [{column: "tournament_match_id", condition: "=", value: match1.tournament_match_id}]});
         expect(getResult.success).toBeTruthy();
         expect(getResult.result.length).toEqual(1);
-        match = getResult.result[0] as TournamentMatch;
+        match = getResult.result[0] as Match;
         expect(match.victory).toEqual("guest");
         expect(match.score_host).toEqual(0);
         expect(match.score_guest).toEqual(2);
@@ -1393,7 +1393,7 @@ describe("Database", () => {
         getResult = await database.get({table: "tournament_match", whereOption: [{column: "tournament_match_id", condition: "=", value: match2.tournament_match_id}]});
         expect(getResult.success).toBeTruthy();
         expect(getResult.result.length).toEqual(1);
-        match = getResult.result[0] as TournamentMatch;
+        match = getResult.result[0] as Match;
         expect(match.victory).toEqual("host");
         expect(match.score_host).toEqual(2);
         expect(match.score_guest).toEqual(0);

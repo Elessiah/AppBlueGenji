@@ -1,6 +1,6 @@
 import {UserEntity} from "./UserEntity";
-import {getTeamMembers, id, status, Team, TeamInfo, User, UserInfo} from "./types";
-import {Controller} from "./controller";
+import {getHistories, getTeamMembers, History, id, status, Team, TeamInfo, User, UserInfo} from "./types";
+import {Database} from "./database";
 import mysql from "mysql2/promise";
 
 export class TeamEntity {
@@ -31,7 +31,7 @@ export class TeamEntity {
         team = await this.isExist(team);
         if (team == -1)
             return ({success: false, error: "This team does not exist!"})
-        const database: Controller = await Controller.getInstance();
+        const database: Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT team.team_id,
                                                       team.name,
                                                       team.creation_date,
@@ -68,7 +68,7 @@ export class TeamEntity {
         }
         if (await this.isExist(name) != -1)
             return ({success: false, error: "Team name already exist !", id: -1});
-        const database: Controller = await Controller.getInstance();
+        const database: Database = await Database.getInstance();
         const [result] = await database.db!.execute<mysql.ResultSetHeader>(`INSERT INTO team (name, id_owner)
                                                                             VALUES (?, ?)`, [name, owner.id]);
         this.id = result.insertId;
@@ -94,7 +94,7 @@ export class TeamEntity {
             return ({ success: false, error: "This team does not exist!"});
         if (await this.isExist(new_name) != -1)
             return ({success: false, error: "The new name is already used!"});
-        const database: Controller = await Controller.getInstance();
+        const database: Database = await Database.getInstance();
         await database.db!.execute(`UPDATE team SET name = ? WHERE team_id = ?`, [new_name, team]);
         this.name = new_name
         return ({success: true, error: ""});
@@ -116,7 +116,7 @@ export class TeamEntity {
             return ({success: false, error: status.error});
         if (new_owner.team == null || !new_owner.team.id || new_owner.team.id != this.id)
             return ({success: false,  error: "This user is not in the previous owner's team!"});
-        const database: Controller = await Controller.getInstance();
+        const database: Database = await Database.getInstance();
         await database.db!.execute(`UPDATE team SET id_owner = ? WHERE team_id = ?`, [new_owner.id, new_owner.team.id]);
         this.owner = new UserEntity(new_owner);
         return ({success: true, error: ""});
@@ -127,7 +127,7 @@ export class TeamEntity {
             return ({success: false, error: "Empty Object!"});
         if (await this.isExist(this.id))
             return ({success: false, error: "This team does not exist!"});
-        const database: Controller = await Controller.getInstance();
+        const database: Database = await Database.getInstance();
         await database.db!.execute(`UPDATE user
                                SET id_team = null
                                WHERE id_team = ?`, [this.id]);
@@ -137,6 +137,7 @@ export class TeamEntity {
         await database.db!.execute(`DELETE
                                FROM team_tournament
                                WHERE id_team = ?`, [this.id]);
+        this.is_loaded = false;
         return ({success: true, error: ""});
     }
 
@@ -145,7 +146,7 @@ export class TeamEntity {
             return ({success: false, error: "Empty Object!"});
         if (await this.isExist(this.id))
             return ({success: false, error: "This team does not exist!"});
-        const database: Controller = await Controller.getInstance();
+        const database: Database = await Database.getInstance();
         await database.db!.execute(`UPDATE user
                                SET id_team = null
                                WHERE id_team = ?`, [this.id]);
@@ -166,7 +167,7 @@ export class TeamEntity {
         if (!status.success) {
             return ({success: false, error: status.error });
         }
-        const database: Controller = await Controller.getInstance();
+        const database: Database = await Database.getInstance();
         await database.db!.execute(`UPDATE user
                                SET id_team = ?
                                WHERE user_id = ?`, [this.id, user]);
@@ -185,7 +186,7 @@ export class TeamEntity {
             return ({success: false, error: status.error});
         if (this.owner!.compare(user))
             return ({success: false, error: "This user is the owner of the team"});
-        const database: Controller = await Controller.getInstance();
+        const database: Database = await Database.getInstance();
         await database.db!.execute(`UPDATE user
                                SET id_team = null
                                WHERE user_id = ?`, [user]);
@@ -197,7 +198,7 @@ export class TeamEntity {
             return ({success: false, error: "Broken user!", result: -1});
         if (target_user.team === null)
             return ({success: true, error: "", result: -1});
-        const database: Controller = await Controller.getInstance();
+        const database: Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT team_id
                                               FROM team
                                               WHERE id_owner = ?`, [target_user.id]);
@@ -212,7 +213,7 @@ export class TeamEntity {
             return ({success: false, error: "Empty Object!", members: []});
         if (await this.isExist(this.id, true) == -1)
             return ({success: false, error: "This team does not exist or is deleted!", members: []});
-        const database: Controller = await Controller.getInstance();
+        const database: Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT user.user_id, user.username, user.id_team, user.is_admin
                                                FROM user
                                                WHERE id_team = ?`, [this.id]);
@@ -225,7 +226,7 @@ export class TeamEntity {
         let delFilter: string = "";
         if (checkWithoutDel)
             delFilter = " AND id_owner IS NOT NULL";
-        const database: Controller = await Controller.getInstance();
+        const database: Database = await Database.getInstance();
         if (typeof team == typeof "string") {
             const [rows] = await database.db!.execute(`SELECT team_id
                                                   FROM team
@@ -240,6 +241,21 @@ export class TeamEntity {
         if (!!teams.length)
             return (teams[0].team_id);
         return (-1)
+    }
+
+    public async getTeamHistory(): Promise<getHistories> {
+        if (!this.is_loaded || !this.id)
+            return ({success: false, error: "Empty object!", histories: []});
+        if (await this.isExist(this.id) == -1)
+            return ({success: false, error: "Team does not exist!", histories: []});
+        const database: Database = await Database.getInstance();
+        const [rows] = await database.db!.execute(`SELECT tournament.*, team_tournament.*, team.name as team_name
+                                              FROM team_tournament
+                                                       INNER JOIN tournament ON id_tournament = tournament.tournament_id
+                                                       INNER JOIN team ON team_tournament.id_team = team.team_id
+                                              WHERE id_team = ?
+                                              ORDER BY start DESC`, [this.id]);
+        return ({success: true, error: "", histories: rows as History[]});
     }
 
     private checkNameNorm(name: string): status {

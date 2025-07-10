@@ -1,7 +1,7 @@
 "use client";
 
 import React, {useEffect, useState} from "react";
-import {Team, TeamTournament, Tournament, TournamentMatch} from "../../lib/types";
+import {Team, TeamTournament, Tournament, Match} from "../../lib/types";
 import {useUser} from "./contexts/User";
 import "./editScoreModal.css";
 
@@ -9,7 +9,7 @@ type ScoreModalProps = {
     isOpen: boolean;
     setError: React.Dispatch<React.SetStateAction<{error: string, once: boolean}>>;
     onClose: () => void;
-    tournament: Tournament & { matchs: TournamentMatch[], teams: (Team & TeamTournament)[] };
+    tournament: Tournament & { matchs: Match[], teams: (Team & TeamTournament)[] };
 };
 
 export default function ScoreModal({

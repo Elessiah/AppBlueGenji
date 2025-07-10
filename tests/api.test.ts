@@ -11,11 +11,11 @@ import {
     Tournament,
     Team,
     TeamTournament,
-    TournamentMatch,
+    Match,
     History,
     getMatchs
 } from "../lib/types";
-import {Controller} from "../lib/controller";
+import {Database} from "../lib/database";
 import {owner} from "../app/api/team/owner";
 import {sleep} from "../lib/sleep";
 
@@ -851,7 +851,7 @@ describe("api", () => {
         // Test destruct team
 
         //      Création admin
-        const database = Controller.getInstance();
+        const database = Database.getInstance();
         await database.deleteUser(adminTeam);
         const setUser: status & id &{token: string} = await database.newUser(adminTeam, "admin1234", true);
         expect(setUser.success).toBeTruthy();
@@ -1346,7 +1346,7 @@ describe("api", () => {
         request = new NextRequest(`https://localhost/tournament/?id=${PTID}&g=matchs`);
         response = await GETTOUR(request);
         expect(response.status).toEqual(200);
-        let matchs: TournamentMatch[] = (await response.json() as {matchs: TournamentMatch[]}).matchs;
+        let matchs: Match[] = (await response.json() as {matchs: Match[]}).matchs;
         expect(matchs.length).toEqual(0);
 
         // Test registration
@@ -1439,7 +1439,7 @@ describe("api", () => {
         await sleep(3000);
 
         //      Lancement tournoi
-        const database = Controller.getInstance();
+        const database = Database.getInstance();
         const status: getMatchs = await database.setupTournament(PTID);
         expect(status.success).toBeTruthy();
 
@@ -1447,7 +1447,7 @@ describe("api", () => {
         request = new NextRequest(`https://localhost/tournament/?id=${PTID}&g=matchs`);
         response = await GETTOUR(request);
         expect(response.status).toEqual(200);
-        matchs = (await response.json() as {matchs: TournamentMatch[]}).matchs;
+        matchs = (await response.json() as {matchs: Match[]}).matchs;
         expect(matchs.length).toEqual(2);
         for (const match of matchs) {
             expect(match.id_tournament).toEqual(PTID);
@@ -1831,7 +1831,7 @@ describe("api", () => {
         BTtoken2 = tmp_token!;
     });
     afterAll(async() => {
-        const database = Controller.getInstance();
+        const database = Database.getInstance();
 
         // User Perfect use
         await database.deleteUser(idUserAPI);

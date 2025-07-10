@@ -1,12 +1,12 @@
 import {NextResponse} from "next/server";
 import {status, TeamInfo, UserInfo} from "../../../lib/types";
-import {Controller} from "../../../lib/controller";
+import {Database} from "../../../lib/database";
 
 export async function erase(body: {id_team: number | undefined},
                             user_id: number): Promise<NextResponse> {
     if (body.id_team === undefined)
         return (NextResponse.json({error: "'id_team' is required!"}, {status: 400}));
-    const database = Controller.getInstance();
+    const database = Database.getInstance();
     const getTeamInfo: status & Partial<TeamInfo> = await database.getTeamInfo(body.id_team);
     if (!getTeamInfo.success)
         return (NextResponse.json({error: getTeamInfo.error}, {status: 400}));

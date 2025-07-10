@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {status, token_payload} from "./types";
-import {Controller} from "./controller";
+import {Database} from "./database";
 
 export async function secureRequest(
     req: NextRequest,
@@ -16,7 +16,7 @@ export async function secureRequest(
         return NextResponse.json({ error: 'Non authorized!' }, { status: 401 });
     }
     const user_id = payload.user_id;
-    const database = Controller.getInstance();
+    const database = Database.getInstance();
     const tokenStatus: status & {token: string} = await database.authTokenUser(user_id, token);
     if (!tokenStatus.success)
         return NextResponse.json({error: tokenStatus.error}, {status: 500});

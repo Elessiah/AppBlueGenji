@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {Controller} from "../../../lib/controller";
+import {Database} from "../../../lib/database";
 import {status, User, TeamInfo} from "../../../lib/types";
 
 export async function members(body: {user: number | string | undefined,
@@ -8,7 +8,7 @@ export async function members(body: {user: number | string | undefined,
                               is_remove: boolean = false) : Promise<NextResponse> {
     if (body.user === undefined || body.id_team === undefined)
         return (NextResponse.json({error: "'id_user' and 'id_team' are required!"}, {status: 400}));
-    const database = Controller.getInstance();
+    const database = Database.getInstance();
     const caller: status & Partial<User> = await database.getUser(id_user);
     if (!caller.success)
         return (NextResponse.json({error: caller.error}, {status: 400}));

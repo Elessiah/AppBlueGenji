@@ -4,7 +4,7 @@ import {redirect, usePathname, useSearchParams} from "next/navigation";
 import Modal from "../components/Modal";
 import {useEffect, useState} from "react";
 import "./Tournament.css";
-import {Team, TeamTournament, Tournament, TournamentMatch} from "../../lib/types";
+import {Team, TeamTournament, Tournament, Match} from "../../lib/types";
 import { Bracket, IRoundProps } from 'react-brackets';
 import Link from "next/link";
 import {PencilIcon} from "lucide-react";
@@ -12,7 +12,7 @@ import ScoreModal from "../components/editScoreModal";
 
 export default function TournamentPage() {
     const [tournament, setTournament] = useState<(Tournament & {
-        matchs: TournamentMatch[],
+        matchs: Match[],
         teams: (Team & TeamTournament)[]
     }) | null>(null);
     let lastUpdate: Date = new Date();
@@ -24,7 +24,7 @@ export default function TournamentPage() {
 
     let urlError: string | null = searchParams.get('error');
     let strID: string | null = searchParams.get('id');
-    let tmpInfo: Tournament & { matchs: TournamentMatch[], teams: (Team & TeamTournament)[] };
+    let tmpInfo: Tournament & { matchs: Match[], teams: (Team & TeamTournament)[] };
 
     if (strID === null)
         redirect(urlError ? `/tournament/list?error=${error}` : `/tournament/list`);
@@ -89,7 +89,7 @@ export default function TournamentPage() {
             }
         }
         if (isTournamentEnded()) {
-            const final: TournamentMatch = tournament.matchs[tournament.matchs.length - 1];
+            const final: Match = tournament.matchs[tournament.matchs.length - 1];
             rounds.push({title: `Vainqueur`, seeds: [{id: final.id_tournament + 1, teams: [{name: final.victory == "host" ? tournament.teams.find(u => u.team_tournament_id == final.id_team_tournament_host)?.name : tournament.teams.find(u => u.team_tournament_id == final.id_team_tournament_guest)?.name}]}]});
         }
         return rounds;

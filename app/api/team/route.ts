@@ -1,6 +1,6 @@
 // app/api/team/route.ts
 import {NextRequest, NextResponse} from "next/server";
-import {Controller} from "../../../lib/controller";
+import {Database} from "../../../lib/database";
 import {getHistories, getTeamMembers, status, Team, TeamInfo, History} from "../../../lib/types";
 import {secureRequest} from "../../../lib/secureRequest";
 import {members} from "./members";
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         team = name!;
     if (get && get != 'history' && get != 'members')
         return (NextResponse.json({error: "'g' must equal 'history' or 'members'"}, {status: 400}));
-    const database = Controller.getInstance();
+    const database = Database.getInstance();
     if (get == "history") {
         const getHistory: getHistories = await database.getTeamHistory(team);
         if (!getHistory.success)
