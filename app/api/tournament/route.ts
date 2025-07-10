@@ -1,13 +1,13 @@
 // app/api/tournament/route.ts
 import {NextRequest, NextResponse} from "next/server";
-import {Database} from "../../../lib/database/database";
-import {getMatchs, getTournamentTeams, status, Tournament} from "../../../lib/types";
+import {getMatchs, getTournamentTeams, status} from "../../../lib/types";
 import {secureRequest} from "../../../lib/API/secureRequest";
 import {create} from "./create";
 import {edit} from "./edit";
 import {erase} from "./erase";
 import {registration} from "./registration";
 import {matchEdit} from "./matchEdit";
+import {TournamentEntity} from "../../../lib/database/TournamentEntity";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     const {searchParams} = new URL(request.url);
@@ -18,26 +18,39 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     id = parseInt(id as string, 10);
     if (get && get != "teams" && get != "matchs" && get != "list")
         return (NextResponse.json({error: "'g' must equal to 'teams', 'list' or 'matchs' to fetch it!"}, {status: 400}));
-    const database = Database.getInstance();
+    const tournament: TournamentEntity = new TournamentEntity();
+    const status: status = await tournament.fetch(id);
+    if (!status.success)
+        return (NextResponse.json({error: status.error}, {status: 400}));
     if (get == "teams") {
-        const teamsRegistration: getTournamentTeams = await database.getRegisterTeams(id);
+        const teamsRegistration: getTournamentTeams = await tournament.getRegisterTeams();
         if (!teamsRegistration.success)
             return (NextResponse.json({error: teamsRegistration.error}, {status: 400}));
         return (NextResponse.json({ teams: teamsRegistration.teams}, {status: 200}));
     }
     if (get == "matchs") {
-        const getMatchs: getMatchs = await database.getMatchs(id);
+        const getMatchs: getMatchs = await tournament.getMatchs(id);
         if (!getMatchs.success)
             return (NextResponse.json({error: getMatchs.error}, {status: 400}));
         return (NextResponse.json({ matchs: getMatchs.matchs}, {status: 200}));
     }
     if (get == "list") {
-        return (NextResponse.json({...(await database.getAllTournaments())}, {status: 200}));
+        return (NextResponse.json({...(await tournament.getAll())}, {status: 200}));
     }
-    const getTournament: status & Partial<Tournament> = await database.getTournament(id);
-    if (!getTournament.success)
-        return (NextResponse.json({error: getTournament.error}, {status: 400}));
-    return (NextResponse.json({tournament_id: getTournament.tournament_id, name: getTournament.name, description: getTournament.description, format: getTournament.format, size: getTournament.size, id_owner: getTournament.id_owner, creation_date: getTournament.creation_date, start_visibility: getTournament.start_visibility, open_registration: getTournament.open_registration, close_registration: getTournament.close_registration, start: getTournament.start}, {status: 200}));
+    return (NextResponse.json({
+        tournament_id: tournament.id,
+            name: tournament.name,
+            description: tournament.description,
+            format: tournament.format,
+            size: tournament.size,
+            id_owner: tournament.owner!.id!,
+            creation_date: tournament.creation_date,
+            start_visibility: tournament.start_visibility,
+            open_registration: tournament.open_registration,
+            close_registration: tournament.close_registration,
+            start: tournament.start
+    },
+        {status: 200}));
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {

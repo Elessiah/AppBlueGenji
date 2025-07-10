@@ -8,6 +8,7 @@ import {updatePassword} from "./updatePasword";
 import {updateUsername} from "./updateUsername";
 import {deleteUser} from "./deleteUser";
 import {auth} from "./auth";
+import {UserEntity} from "../../../lib/database/UserEntity";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     const {searchParams} = new URL(request.url);
@@ -23,23 +24,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         id = parseInt(id, 10);
     if (get && get != "history")
         return (NextResponse.json({error: "If you want to fetch history 'g' must equal 'history'!"}, {status: 400}));
-    const database = Database.getInstance();
+    const user: UserEntity = new UserEntity();
+    const status: status = await user.fetch(id ? id : username!);
     if (get == "history") {
-        if (id == null)
-            return (NextResponse.json({error: "'id' is required to fetch the history !"}, {status: 400}));
-        const getHistory: getHistories = await database.getUserHistory(id as number);
+        if (!status.success)
+            return (NextResponse.json({error: status.error}, {status: 400}));
+        const getHistory: getHistories = await user.getUserHistory();
         if (!getHistory.success)
             return (NextResponse.json({error: getHistory.error}, {status: 400}));
         return (NextResponse.json({...getHistory.histories}, {status: 200}));
     }
-    const getUser: status & Partial<UserInfo> = await database.getUser(username ? username : id!);
-    if (!getUser.success)
-        return (NextResponse.json({error: getUser.error}, {status: 500}));
     return (NextResponse.json({
-            user_id: getUser.user_id,
-            username: getUser.username,
-            id_team: getUser.id_team,
-            is_admin: getUser.is_admin
+            user_id: user.id,
+            username: user.name,
+            id_team: user.team ? user.team.id : null,
+            is_admin: user.is_admin,
         },
         {status: 200}));
 }

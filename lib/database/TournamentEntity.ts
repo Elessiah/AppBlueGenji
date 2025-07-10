@@ -344,7 +344,7 @@ export class TournamentEntity {
         return ({success: true, error: ""});
     }
 
-    public async tournamentRegistration(team: TeamEntity): Promise<status & { id_team_tournament: number, id_user_history: number }> {
+    public async getRegistration(team: TeamEntity): Promise<status & { id_team_tournament: number, id_user_history: number }> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!", id_team_tournament: -1, id_user_history: -1});
         if (!team.is_loaded || !team.id)
@@ -381,7 +381,7 @@ export class TournamentEntity {
         return ({success: true, error: "", id_team_tournament: team_tournament_id, id_user_history: user_history_id});
     }
 
-    public async tournamentUnregistration(team: TeamEntity) : Promise<status> {
+    public async unregistration(team: TeamEntity) : Promise<status> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!"});
         if (!team.is_loaded || !team.id)
@@ -400,6 +400,43 @@ export class TournamentEntity {
         await database.db!.execute(`DELETE FROM user_history WHERE id_team_tournament = ?`, [id_team_tournament]);
         await database.db!.execute(`DELETE FROM team_tournament WHERE team_tournament_id = ?`, [id_team_tournament]);
         return ({success: true, error: ""});
+    }
+
+    public async registration(team: TeamEntity): Promise<status & { id_team_tournament: number, id_user_history: number }> {
+        if (!this.is_loaded || !this.id)
+            return ({success: false, error: "Empty Object!", id_team_tournament: -1, id_user_history: -1});
+        if (!team.is_loaded || !team.id)
+            return ({success: false, error: "Empty Object team!", id_team_tournament: -1, id_user_history: -1});
+        if (await team.isExist(team.id) == -1)
+            return ({success: false, error: "Team does not exist!", id_team_tournament: -1, id_user_history: -1});
+        // Vérifie que le tournois existe et qu'il n'est pas complet
+        if (!(await this.isExist(this.id, true)))
+            return ({success: false, error: "Tournament does not exist or is full!", id_team_tournament: -1, id_user_history: -1});
+        if (await this.isTeamRegister(team) != -1)
+            return ({success: false, error: "Team already registered!", id_team_tournament: -1, id_user_history: -1});
+        // Vérifie si le tournois existe aussi mais pas s'il est complet
+        const status: status & {result: boolean} = await this.isRegistrationPeriod();
+        if (!status.success)
+            return ({success: false, error: status.error, id_team_tournament: -1, id_user_history: -1});
+        if (!status.result)
+            return ({success: false, error: "We are out of the registration period !", id_team_tournament: -1, id_user_history: -1});
+        const database: Database = await Database.getInstance();
+        let [result] = await database.db!.execute<mysql.ResultSetHeader>(`INSERT INTO team_tournament (id_tournament, id_team)
+                                                                       VALUES (?, ?)`, [this.id, team.id]);
+        const team_tournament_id: number = result.insertId;
+        let user_history_id: number = -1;
+        const [rows] = await database.db!.execute(`SELECT user_id
+                                              FROM user
+                                              WHERE id_team = ?`, [team.id]);
+        const members_id: {user_id: number}[] = rows as { user_id: number }[];
+        if (members_id.length > 0) {
+            const values = members_id.map(() => '(?, ?)').join(', ');
+            const params = members_id.flatMap((member: {user_id: number}) => ([member.user_id, team_tournament_id]));
+            [result] = await database.db!.execute<mysql.ResultSetHeader>(`INSERT INTO user_history (id_user, id_team_tournament)
+                                              VALUES ${values}`, params);
+            user_history_id = result.insertId;
+        }
+        return ({success: true, error: "", id_team_tournament: team_tournament_id, id_user_history: user_history_id});
     }
 
     public async getRegisterTeams(): Promise<getTournamentTeams> {

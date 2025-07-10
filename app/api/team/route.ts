@@ -9,43 +9,39 @@ import {erase} from "./erase";
 import {owner} from "./owner";
 import {rename} from "./rename";
 import {create} from "./create";
+import {TeamEntity} from "../../../lib/database/TeamEntity";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     const {searchParams} = new URL(request.url);
     const id: string | number | null = searchParams.get('id');
     const name: string | null = searchParams.get('name');
-    let team : string | number;
     const get: string | null = searchParams.get('g');
     if ((id === null && !name) || (id && name))
         return (NextResponse.json({error: "Need 'id' (X)OR 'name' to fetch a team!"}, {status: 400}));
-    if (id)
-        team = parseInt(id, 10);
-    else
-        team = name!;
     if (get && get != 'history' && get != 'members')
         return (NextResponse.json({error: "'g' must equal 'history' or 'members'"}, {status: 400}));
-    const database = Database.getInstance();
+    const team: TeamEntity = new TeamEntity();
+    const status: status = await team.fetch(id ? id : name!);
+    if (!status.success)
+        return (NextResponse.json({error: status.error}, {status: 400}));
     if (get == "history") {
-        const getHistory: getHistories = await database.getTeamHistory(team);
+        const getHistory: getHistories = await team.getTeamHistory();
         if (!getHistory.success)
             return (NextResponse.json({error: getHistory.error}, {status: 400}));
         return (NextResponse.json({ histories: getHistory.histories}, {status: 200}));
     }
     if (get == "members") {
-        const getTeamMembers: getTeamMembers = await database.getTeamMembers(team);
+        const getTeamMembers: getTeamMembers = await team.getMembers();
         if (!getTeamMembers.success)
             return (NextResponse.json({error: getTeamMembers.error}, {status: 400}));
         return (NextResponse.json({members: getTeamMembers.members}, {status: 200}));
     }
-    const getTeam: status & Partial<TeamInfo> = await database.getTeamInfo(team);
-    if (!getTeam.success)
-        return (NextResponse.json({error: getTeam.error}, {status: 400}));
     return (NextResponse.json({
-        name: getTeam.name,
-        creation_date: getTeam.creation_date,
-        owner_name: getTeam.owner_name,
-        id_owner: getTeam.id_owner,
-        members_count: getTeam.members_count
+        name: team.name,
+        creation_date: team.creation_date,
+        owner_name: team.owner ? team.owner.name : "",
+        id_owner: team.owner ? team.owner.id : null,
+        members_count: team.members_count,
     }));
 }
 

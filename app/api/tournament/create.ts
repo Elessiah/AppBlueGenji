@@ -1,6 +1,8 @@
 import {NextResponse} from "next/server";
 import {Database} from "../../../lib/database/database";
 import {status, id} from "../../../lib/types";
+import {TournamentEntity} from "../../../lib/database/TournamentEntity";
+import {UserEntity} from "../../../lib/database/UserEntity";
 
 export async function create(body: {
                                  name: string | undefined,
@@ -23,12 +25,16 @@ export async function create(body: {
         || body.start === undefined) {
         return (NextResponse.json({error: "At least one parameter is missing! ('name', 'description', 'format', 'size', 'start_visibility', 'open_registration', 'close_registration', 'start'"}, {status: 400}));
     }
-    const database = Database.getInstance();
-    const status: status & id = await database.createTournament(body.name,
+    const tournament: TournamentEntity = new TournamentEntity();
+    const owner: UserEntity = new UserEntity();
+    const strictStatus: status = await owner.fetch(user_id);
+    if (!strictStatus.success)
+        return (NextResponse.json({error: strictStatus.error}, {status: 400}));
+    const status: status & id = await tournament.create(body.name,
         body.description,
         body.format,
         body.size,
-        user_id,
+        owner,
         new Date(body.start_visibility),
         new Date(body.open_registration),
         new Date(body.close_registration),
