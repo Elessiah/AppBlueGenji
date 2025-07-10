@@ -3,11 +3,12 @@ import bcrypt from "bcrypt";
 import mysql from "mysql2/promise";
 import {Controller} from "./controller";
 import crypto from "crypto";
+import {TeamEntity} from "./TeamEntity";
 
 export class UserEntity {
     public id: number | undefined;
     public name: string | undefined;
-    public id_team: number | null | undefined;
+    public team: TeamEntity | null | undefined;
     public is_admin: boolean | undefined;
     public is_loaded: boolean = false;
 
@@ -21,7 +22,7 @@ export class UserEntity {
             }
             this.id = user.id;
             this.name = user.name;
-            this.id_team = user.id_team;
+            this.team = user.team == null ? null : new TeamEntity(user.team);
             this.is_admin = user.is_admin;
             this.is_loaded = true;
         }
@@ -36,10 +37,23 @@ export class UserEntity {
         const user_data: User = (rows as User[])[0];
         this.id = user_data.user_id;
         this.name = user_data.username;
-        this.id_team = user_data.id_team;
         this.is_admin = user_data.is_admin;
         this.is_loaded = true;
+        if (user_data.id_team == null) {
+            this.team = null;
+        } else {
+            this.team = new TeamEntity();
+            const status: status = await this.team.fetch(user_data.id_team);
+            if (!status.success)
+                return ({success: false, error: status.error});
+        }
         return ({success: true, error: ""});
+    }
+
+    public compare(other: UserEntity): boolean {
+        if (!this.is_loaded || !other.is_loaded)
+            return false;
+        return (this.id == other.id);
     }
 
     public async new(username: string,
@@ -69,7 +83,7 @@ export class UserEntity {
                                    WHERE user_id = ?`, [token, result.insertId]);
         this.id = result.insertId;
         this.name = username;
-        this.id_team = null;
+        this.team = null;
         this.is_admin = true;
         this.is_loaded = true;
         return ({success: true, error: "", id: result.insertId, token: token});
@@ -173,11 +187,15 @@ export class UserEntity {
         if (user == -1) {
             return ({success: false, error: "This user does not exist!"});
         }
-        const ownedTeam: status & { result: number } = await this.isTeamOwner(user);
+        const team = new TeamEntity();
+        const ownedTeam: status & { result: number } = await team.isTeamOwner(this);
         if (!ownedTeam.success)
             return ({success: false, error: ownedTeam.error})
         if (ownedTeam.result != -1) {
-            const status: status = await this.softDeleteTeam(ownedTeam.result);
+            let status: status = await team.fetch(ownedTeam.result);
+            if (!status.success)
+                return ({success: false, error: status.error});
+            status = await team.softDelete();
             if (!status.success)
                 return ({success: false, error: status.error});
         }
