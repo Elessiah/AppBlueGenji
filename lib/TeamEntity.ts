@@ -114,10 +114,10 @@ export class TeamEntity {
         status = await new_owner.fetch(new_owner.id); // Making sure the user is up to date
         if (!status.success)
             return ({success: false, error: status.error});
-        if (new_owner.id_team == null || new_owner.id_team != this.id)
+        if (new_owner.team == null || !new_owner.team.id || new_owner.team.id != this.id)
             return ({success: false,  error: "This user is not in the previous owner's team!"});
         const database: Controller = await Controller.getInstance();
-        await database.db!.execute(`UPDATE team SET id_owner = ? WHERE team_id = ?`, [new_owner.id, new_owner.id_team]);
+        await database.db!.execute(`UPDATE team SET id_owner = ? WHERE team_id = ?`, [new_owner.id, new_owner.team.id]);
         this.owner = new UserEntity(new_owner);
         return ({success: true, error: ""});
     }
@@ -193,9 +193,9 @@ export class TeamEntity {
     }
 
     public async isTeamOwner(target_user: UserEntity): Promise<status & { result: number }> {
-        if (!target_user.is_loaded || !target_user.id || target_user.id_team === undefined)
+        if (!target_user.is_loaded || !target_user.id || target_user.team === undefined || (target_user.team && !target_user.team.id))
             return ({success: false, error: "Broken user!", result: -1});
-        if (target_user.id_team === null)
+        if (target_user.team === null)
             return ({success: true, error: "", result: -1});
         const database: Controller = await Controller.getInstance();
         const [rows] = await database.db!.execute(`SELECT team_id
