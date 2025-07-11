@@ -81,7 +81,7 @@ export interface getHistories {
 }
 
 export interface User {
-    user_id: number;
+    id_user: number;
     username: string;
     hash: string;
     token: string;
@@ -90,49 +90,48 @@ export interface User {
 }
 
 export interface UserInfo {
-    user_id: number;
+    id_user: number;
     username: string;
     id_team: number | null;
     is_admin: boolean;
 }
 
-export interface UserHistory {
-    user_history_id: number;
+export interface UserTeam {
     id_user: number;
     id_team_tournament: number;
 }
 
 export interface Team {
-    team_id: number;
+    id_team: number;
     name: string;
     creation_date: Date;
-    id_owner: number;
+    id_user: number;
 }
 
 export interface TeamInfo {
-    team_id: number;
+    id_team: number;
     name: string;
     creation_date: Date;
-    owner_name: string;
-    id_owner: number | null;
+    username: string;
+    id_user: number | null;
     members_count: number;
 }
 
 export interface TeamTournament {
-    team_tournament_id: number;
+    id_team_tournament: number;
     id_tournament: number;
     id_team: number;
     position: number;
 }
 
 export interface Tournament {
-    tournament_id: number;
+    id_tournament: number;
     name: string;
     description: string;
     format: 'SIMPLE' | 'DOUBLE';
     size: number;
     current_round: number;
-    id_owner: number;
+    id_user: number;
     creation_date: Date;
     start_visibility: Date;
     open_registration: Date;
@@ -143,13 +142,9 @@ export interface Tournament {
 export type TournamentTeamsCount = Tournament & {nb_teams: number};
 
 export interface Match {
-    tournament_match_id: number;
+    id_match: number;
     id_tournament: number;
-    id_team_tournament_host: number;
-    id_team_tournament_guest: number;
-    score_host: number;
-    score_guest: number;
-    victory: 'host' | 'guest' | null;
+    victory: number | null;
     start_date: Date;
 }
 
