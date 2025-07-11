@@ -33,9 +33,9 @@ export class UserEntity {
         if (user == -1)
             return ({success: false, error: "This user does not exist!"});
         const database: Database = await Database.getInstance();
-        const [rows] = await database.db!.execute(`SELECT * FROM user WHERE user_id = ?`, [user]);
+        const [rows] = await database.db!.execute(`SELECT * FROM user WHERE id_user = ?`, [user]);
         const user_data: User = (rows as User[])[0];
-        this.id = user_data.user_id;
+        this.id = user_data.id_user;
         this.name = user_data.username;
         this.is_admin = user_data.is_admin;
         this.is_loaded = true;
@@ -80,7 +80,7 @@ export class UserEntity {
         const token: string = this.createToken(result.insertId);
         await database.db!.execute(`UPDATE user
                                    SET token = ?
-                                   WHERE user_id = ?`, [token, result.insertId]);
+                                   WHERE id_user = ?`, [token, result.insertId]);
         this.id = result.insertId;
         this.name = username;
         this.team = null;
@@ -89,28 +89,18 @@ export class UserEntity {
         return ({success: true, error: "", id: result.insertId, token: token});
     }
 
-    public async isAdmin(): Promise<status & {result: boolean}> {
-        if (!this.is_loaded || !this.id)
-            return ({success: false, error: "Empty object!", result: false});
-        if (await this.isExist(this.id) == -1)
-            return ({success: false, error: "This user does not exist !", result: false});
-        const database:  Database = await Database.getInstance();
-        const [rows] = await database.db!.execute(`SELECT is_admin FROM user WHERE user_id = ?`, [this.id]);
-        return ({success: true, error: "", result: (rows as {is_admin: boolean}[])[0].is_admin});
-    }
-
     public async authToken(token: string): Promise<status & {token: string}> {
         if (!this.is_loaded)
             return ({success: false, error: "Empty object!", token: ""});
         const database : Database = await Database.getInstance();
-        const [rows] = await database.db!.execute(`SELECT token FROM user WHERE user_id = ?`, [this.id]);
+        const [rows] = await database.db!.execute(`SELECT token FROM user WHERE id_user = ?`, [this.id]);
         if ((rows as unknown[]).length == 0)
             return ({success: false, error: "This user does not exist!", token: ""});
         const bdd_token: string = ((rows as unknown[])[0] as {token: string}).token;
         if (bdd_token != token)
             return ({success: true, error: "", token: ""}); // Pas d'erreur de programme juste auth rejeté
         const new_token = this.createToken(this.id!);
-        await database.db!.execute(`UPDATE user SET token = ? WHERE user_id = ?`, [new_token, this.id]);
+        await database.db!.execute(`UPDATE user SET token = ? WHERE id_user = ?`, [new_token, this.id]);
         return ({success: true, error: "", token: new_token});
     }
 
@@ -118,14 +108,14 @@ export class UserEntity {
         if (!this.is_loaded)
             return ({success: false, error: "Empty object!", token: ""});
         const database : Database = await Database.getInstance();
-        const [rows] = await database.db!.execute(`SELECT hash FROM user WHERE user_id = ?`, [this.id]);
+        const [rows] = await database.db!.execute(`SELECT hash FROM user WHERE id_user = ?`, [this.id]);
         if ((rows as unknown[]).length == 0)
             return ({success: false, error: "This user does not exist!", token: ""});
         const db_hash = ((rows as unknown[])[0] as {hash: string}).hash;
         if (!(await bcrypt.compare(password, db_hash)))
             return ({success: true, error: "", token: ""});
         const token: string = this.createToken(this.id!);
-        await database.db!.execute(`UPDATE user SET token = ? WHERE user_id = ?`, [token, this.id]);
+        await database.db!.execute(`UPDATE user SET token = ? WHERE id_user = ?`, [token, this.id]);
         return ({success: true, error: "", token: token});
     }
 
@@ -144,11 +134,11 @@ export class UserEntity {
             return ({success: false, error: "Old password is wrong", token: ""});
         const hash: string = await bcrypt.hash(new_password, 10);
         const database: Database = await Database.getInstance();
-        await database.db!.execute(`UPDATE user SET hash = ? WHERE user_id = ?`, [hash, this.id]);
+        await database.db!.execute(`UPDATE user SET hash = ? WHERE id_user = ?`, [hash, this.id]);
         return (status);
     }
 
-    public async editUsername(new_username: string): Promise<status> {
+    public async rename(new_username: string): Promise<status> {
         if (!this.is_loaded)
             return ({success: false, error: "Empty object!"});
         const user = await this.isExist(this.id!);
@@ -162,7 +152,7 @@ export class UserEntity {
         const database: Database = await Database.getInstance();
         await database.db!.execute(`UPDATE user
                                SET username = ?
-                               WHERE user_id = ?`, [new_username, user]);
+                               WHERE id_user = ?`, [new_username, user]);
         this.name = new_username;
         return ({success: true, error: ""});
     }
@@ -175,14 +165,14 @@ export class UserEntity {
         if (checkWithoutTeam)
             teamFilter = " AND id_team IS NULL";
         if (typeof user == typeof "string") {
-            const [rows] = await database.db!.execute(`SELECT user_id
+            const [rows] = await database.db!.execute(`SELECT id_user
                                                        FROM user
                                                        WHERE username LIKE ? ${teamFilter}`, [user]);
             users = rows as { user_id: number }[];
         } else {
-            const [rows] = await database.db!.execute(`SELECT user_id
+            const [rows] = await database.db!.execute(`SELECT id_user
                                                        FROM user
-                                                       WHERE user_id = ? ${teamFilter}`, [user]);
+                                                       WHERE id_user = ? ${teamFilter}`, [user]);
             users = rows as { user_id: number }[];
         }
         if (!!users.length)
@@ -211,16 +201,13 @@ export class UserEntity {
         }
         const database: Database = await Database.getInstance();
         await database.db!.execute(`DELETE
-                                    FROM user_history
-                                    WHERE id_user = ?`, [user]);
-        await database.db!.execute(`DELETE
                                     FROM user
-                                    WHERE user_id = ?`, [user]);
+                                    WHERE id_user = ?`, [user]);
         this.is_loaded = false;
         return ({success: true, error: ""});
     }
 
-    public async getUserHistory(): Promise<getHistories> {
+    public async getHistory(): Promise<getHistories> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty object!", histories: []});
         if (await this.isExist(this.id) == -1)
@@ -228,10 +215,10 @@ export class UserEntity {
         const database: Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT tournament.*, team_tournament.*, team.name as team_name
                                               FROM tournament
-                                                       INNER JOIN team_tournament ON tournament.tournament_id = team_tournament.id_tournament
-                                                       INNER JOIN team ON team_tournament.id_team = team.team_id
-                                                       INNER JOIN user_history ON team_tournament.team_tournament_id = user_history.id_team_tournament
-                                              WHERE user_history.id_user = ?
+                                                       INNER JOIN team_tournament ON tournament.id_tournament = team_tournament.id_tournament
+                                                       INNER JOIN team ON team_tournament.id_team = team.id_team
+                                                       INNER JOIN user_team ON team.id_team = user_team.id_team
+                                              WHERE user_team.id_user = ?
                                               ORDER BY tournament.start DESC`, [this.id]);
         return ({success: true, error: "", histories: rows as History[]});
     }
