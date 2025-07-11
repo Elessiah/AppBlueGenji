@@ -124,59 +124,79 @@ export class Database {
     private async initialize() {
         await this.db!.execute(`CREATE TABLE IF NOT EXISTS user
                                 (
-                                    user_id  INTEGER PRIMARY KEY AUTO_INCREMENT,
-                                    username VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,
-                                    hash     VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,
-                                    token    VARCHAR(512) COLLATE utf8mb4_bin DEFAULT NULL,
-                                    id_team  INTEGER DEFAULT NULL,
-                                    is_admin BOOLEAN DEFAULT false
+                                    id_user  INTEGER PRIMARY KEY AUTO_INCREMENT,
+                                    username VARCHAR(15) COLLATE utf8mb4_bin NOT NULL,
+                                    hash     VARCHAR(60) COLLATE utf8mb4_bin NOT NULL,
+                                    token    VARCHAR(140) COLLATE utf8mb4_bin DEFAULT NULL,
+                                    is_admin BOOLEAN                          DEFAULT false
                                 );`);
         await this.db!.execute(`CREATE TABLE IF NOT EXISTS team
                                 (
-                                    team_id       INTEGER PRIMARY KEY AUTO_INCREMENT,
-                                    name          VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,
+                                    id_team       INTEGER PRIMARY KEY AUTO_INCREMENT,
+                                    name          VARCHAR(15) COLLATE utf8mb4_bin NOT NULL,
                                     creation_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    id_owner      INTEGER
+                                    id_user       INTEGER,
+                                    FOREIGN KEY (id_user) REFERENCES user (id_user)
+                                        ON DELETE SET NULL
+                                );`);
+        await this.db!.execute(`CREATE TABLE IF NOT EXISTS user_team
+                                (
+                                    id_user INTEGER NOT NULL,
+                                    id_team INTEGER NOT NULL,
+                                    PRIMARY KEY (id_user, id_team),
+                                    FOREIGN KEY (id_user) REFERENCES user (id_user)
+                                        ON DELETE CASCADE,
+                                    FOREIGN KEY (id_team) REFERENCES team (id_team)
+                                        ON DELETE CASCADE
                                 );`);
         await this.db!.execute(`CREATE TABLE IF NOT EXISTS tournament
                                 (
-                                    tournament_id      INTEGER PRIMARY KEY AUTO_INCREMENT,
-                                    name               VARCHAR(255) NOT NULL,
-                                    description        TEXT         NOT NULL,
+                                    id_tournament      INTEGER PRIMARY KEY AUTO_INCREMENT,
+                                    name               VARCHAR(255)              NOT NULL,
+                                    description        TEXT                      NOT NULL,
                                     format             ENUM ('SIMPLE', 'DOUBLE') NOT NULL,
-                                    size               INTEGER      NOT NULL,
-                                    id_owner           INTEGER      NOT NULL,
+                                    size               INTEGER                   NOT NULL,
+                                    id_user            INTEGER,
                                     creation_date      DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    start_visibility   DATETIME     NOT NULL,
-                                    open_registration  DATETIME     NOT NULL,
-                                    close_registration DATETIME     NOT NULL,
-                                    start              DATETIME     NOT NULL,
-                                    current_round      INTEGER DEFAULT -1 NOT NULL
+                                    start_visibility   DATETIME                  NOT NULL,
+                                    open_registration  DATETIME                  NOT NULL,
+                                    close_registration DATETIME                  NOT NULL,
+                                    start              DATETIME                  NOT NULL,
+                                    current_round      INTEGER  DEFAULT -1       NOT NULL,
+                                    FOREIGN KEY (id_user) REFERENCES user (id_user)
+                                        ON DELETE SET NULL
                                 );`);
         await this.db!.execute(`CREATE TABLE IF NOT EXISTS team_tournament
                                 (
-                                    team_tournament_id       INTEGER PRIMARY KEY AUTO_INCREMENT,
-                                    id_tournament            INTEGER NOT NULL,
-                                    id_team                  INTEGER NOT NULL,
-                                    position                 INTEGER DEFAULT -1
+                                    id_tournament INTEGER NOT NULL,
+                                    id_team       INTEGER NOT NULL,
+                                    position      INTEGER DEFAULT -1,
+                                    PRIMARY KEY (id_tournament, id_team),
+                                    FOREIGN KEY (id_tournament) REFERENCES tournament (id_tournament)
+                                        ON DELETE CASCADE,
+                                    FOREIGN KEY (id_team) REFERENCES team (id_team)
+                                        ON DELETE CASCADE
                                 );`);
         await this.db!.execute(`CREATE TABLE IF NOT EXISTS \`match\`
                                 (
-                                    tournament_match_id      INTEGER PRIMARY KEY AUTO_INCREMENT,
-                                    id_tournament            INTEGER  NOT NULL,
-                                    id_team_tournament_host  INTEGER  NOT NULL,
-                                    id_team_tournament_guest INTEGER  NOT NULL,
-                                    score_host               INTEGER                                             DEFAULT 0,
-                                    score_guest              INTEGER                                             DEFAULT 0,
-                                    victory                  ENUM ('host', 'guest') DEFAULT NULL,
-                                    start_date               DATETIME NOT NULL
+                                    id_match        INTEGER PRIMARY KEY AUTO_INCREMENT,
+                                    id_tournament   INTEGER  NOT NULL,
+                                    id_victory_team INTEGER DEFAULT NULL,
+                                    start_date      DATETIME NOT NULL,
+                                    FOREIGN KEY (id_tournament) REFERENCES tournament (id_tournament)
+                                        ON DELETE CASCADE,
+                                    FOREIGN KEY (id_victory_team) REFERENCES team (id_team)
                                 );`);
-        await this.db!.execute(`CREATE TABLE IF NOT EXISTS user_history
+        await this.db!.execute(`CREATE TABLE IF NOT EXISTS team_match
                                 (
-                                    user_history_id    INTEGER PRIMARY KEY AUTO_INCREMENT,
-                                    id_user            INTEGER NOT NULL,
-                                    id_team_tournament INTEGER NOT NULL
-                                );`);
+                                    id_match INTEGER NOT NULL,
+                                    id_team  INTEGER NOT NULL,
+                                    PRIMARY KEY (id_match, id_team),
+                                    FOREIGN KEY (id_match) REFERENCES \`match\` (id_match)
+                                        ON DELETE CASCADE,
+                                    FOREIGN KEY (id_team) REFERENCES team (id_team)
+                                        ON DELETE CASCADE
+                                )`);
     }
 
     private async buildSelectQuery(
@@ -227,3 +247,5 @@ export class Database {
         return {success: true, error: "", query: query, values: values};
     }
 }
+
+await Database.getInstance();
