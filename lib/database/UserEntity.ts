@@ -195,7 +195,7 @@ export class UserEntity {
                                                        INNER JOIN team_tournament ON tournament.id_tournament = team_tournament.id_tournament
                                                        INNER JOIN team ON team_tournament.id_team = team.id_team
                                                        INNER JOIN user_team ON team.id_team = user_team.id_team
-                                              WHERE user_team.id_user = ?
+                                              WHERE user_team.id_user = ? AND tournament.close_registration > user_team.date_join AND tournament.start < user_team.date_leave
                                               ORDER BY tournament.start DESC`, [this.id]);
         return ({success: true, error: "", histories: rows as History[]});
     }
