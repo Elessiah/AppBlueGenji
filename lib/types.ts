@@ -85,14 +85,12 @@ export interface User {
     username: string;
     hash: string;
     token: string;
-    id_team: number | null;
     is_admin: boolean;
 }
 
 export interface UserInfo {
     id_user: number;
     username: string;
-    id_team: number | null;
     is_admin: boolean;
 }
 
