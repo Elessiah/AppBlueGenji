@@ -8,6 +8,7 @@ export class TeamEntity {
     public name: string | undefined;
     public creation_date: Date | undefined;
     public id_user: number | null | undefined;
+    public username: string | null | undefined;
     public members_count: number | undefined;
     public is_loaded: boolean = false;
 
@@ -23,6 +24,7 @@ export class TeamEntity {
             this.name = team.name;
             this.creation_date = team.creation_date;
             this.id_user = team.id_user;
+            this.username = team.username;
             this.is_loaded = true;
         }
     }
@@ -36,11 +38,13 @@ export class TeamEntity {
                                                       team.name,
                                                       team.creation_date,
                                                       team.id_user,
+                                                      owner.username,
                                                       COUNT(members.date_join) as members_count
                                                FROM team
                                                         LEFT JOIN user_team members ON members.id_team = team.id_team
+                                                        LEFT JOIN user owner ON owner.id_user = team.id_user
                                                WHERE team.id_team = ?
-                                               GROUP BY team.id_team, team.id_user, team.name, team.creation_date`, [team]);
+                                               GROUP BY team.id_team, team.creation_date, team.id_user, owner.username, team.name`, [team]);
         const team_data: TeamInfo = (rows as TeamInfo[])[0];
         this.id = team_data.id_team;
         this.name = team_data.name;
