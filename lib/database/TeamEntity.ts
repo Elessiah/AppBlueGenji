@@ -28,7 +28,7 @@ export class TeamEntity {
     }
 
     public async fetch(team: number | string): Promise<status> {
-        team = await this.isExist(team);
+        team = await TeamEntity.isExist(team);
         if (team == -1)
             return ({success: false, error: "This team does not exist!"})
         const database: Database = await Database.getInstance();
@@ -55,11 +55,11 @@ export class TeamEntity {
         let status: status = this.checkNameNorm(name);
         if (!status.success)
             return ({...status, id: -1});
-        if (!owner.id || await owner.isExist(owner.id) == -1) {
+        if (!owner.id || await UserEntity.isExist(owner.id) == -1) {
             return ({success: false, error: "Parameter owner does not exist or badly construct", id: -1});
         }
         this.id_user = owner.id;
-        if (await this.isExist(name) != -1)
+        if (await TeamEntity.isExist(name) != -1)
             return ({success: false, error: "Team name already exist !", id: -1});
         const database: Database = await Database.getInstance();
         const [result] = await database.db!.execute<mysql.ResultSetHeader>(`INSERT INTO team (name, id_user)
@@ -82,10 +82,10 @@ export class TeamEntity {
         const status: status = this.checkNameNorm(new_name);
         if (!status.success)
             return status;
-        const team = await this.isExist(this.id, true);
+        const team = await TeamEntity.isExist(this.id, true);
         if (team == -1)
             return ({ success: false, error: "This team does not exist!"});
-        if (await this.isExist(new_name) != -1)
+        if (await TeamEntity.isExist(new_name) != -1)
             return ({success: false, error: "The new name is already used!"});
         const database: Database = await Database.getInstance();
         await database.db!.execute(`UPDATE team SET name = ? WHERE id_team = ?`, [new_name, team]);
@@ -118,7 +118,7 @@ export class TeamEntity {
     public async hardDelete(): Promise<status> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!"});
-        if (await this.isExist(this.id))
+        if (await TeamEntity.isExist(this.id))
             return ({success: false, error: "This team does not exist!"});
         const database: Database = await Database.getInstance();
         await database.db!.execute(`DELETE
@@ -131,7 +131,7 @@ export class TeamEntity {
     public async softDelete(): Promise<status> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!"});
-        if (await this.isExist(this.id))
+        if (await TeamEntity.isExist(this.id))
             return ({success: false, error: "This team does not exist!"});
         const database: Database = await Database.getInstance();
         await database.db!.execute(`UPDATE user_team
@@ -148,7 +148,7 @@ export class TeamEntity {
             return ({success: false, error: "Empty Object!"});
         if (!user.is_loaded || !user.id)
             return ({success: false, error: "Broken user!"});
-        if (await this.isExist(this.id, true))
+        if (await TeamEntity.isExist(this.id, true))
             return ({success: false, error: "This team does not exist or is inactive!"});
         const status: status = await user.fetch(user.id); // Making sure user up to date
         if (!status.success) {
@@ -165,7 +165,7 @@ export class TeamEntity {
             return ({success: false, error: "Empty Object!"});
         if (!user.is_loaded || !user.id)
             return ({success: false, error: "Broken user!"});
-        if (await this.isExist(this.id, true))
+        if (await TeamEntity.isExist(this.id, true))
             return ({success: false, error: "This team does not exist or is inactive!"});
         const status: status = await user.fetch(user.id); // Making sure user up to date
         if (!status.success)
@@ -197,7 +197,7 @@ export class TeamEntity {
     public async getMembers(): Promise<getTeamMembers> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!", members: []});
-        if (await this.isExist(this.id, true) == -1)
+        if (await TeamEntity.isExist(this.id, true) == -1)
             return ({success: false, error: "This team does not exist or is deleted!", members: []});
         const database: Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT user.id_user, user.username, user.is_admin
@@ -208,8 +208,24 @@ export class TeamEntity {
         return ({success: true, error: "", members: rows as UserInfo[]});
     }
 
-    public async isExist(team: string | number,
-                         checkWithoutDel: boolean = false): Promise<number> {
+    public async getHistory(): Promise<getHistories> {
+        if (!this.is_loaded || !this.id)
+            return ({success: false, error: "Empty object!", histories: []});
+        if (await TeamEntity.isExist(this.id) == -1)
+            return ({success: false, error: "Team does not exist!", histories: []});
+        const database: Database = await Database.getInstance();
+        const [rows] = await database.db!.execute(`SELECT tournament.*, team_tournament.*, team.name as team_name
+                                              FROM team_tournament
+                                                       INNER JOIN tournament ON tournament.id_tournament = team_tournament.id_tournament
+                                                       INNER JOIN team ON team_tournament.id_team = team.id_team
+                                              WHERE team_tournament.id_team = ?
+                                              ORDER BY start DESC`, [this.id]);
+        return ({success: true, error: "", histories: rows as History[]});
+    }
+
+    // Static
+    public static async isExist(team: string | number,
+                                checkWithoutDel: boolean = false): Promise<number> {
         let teams: {team_id: number}[];
         let delFilter: string = "";
         if (checkWithoutDel)
@@ -231,21 +247,7 @@ export class TeamEntity {
         return (-1)
     }
 
-    public async getHistory(): Promise<getHistories> {
-        if (!this.is_loaded || !this.id)
-            return ({success: false, error: "Empty object!", histories: []});
-        if (await this.isExist(this.id) == -1)
-            return ({success: false, error: "Team does not exist!", histories: []});
-        const database: Database = await Database.getInstance();
-        const [rows] = await database.db!.execute(`SELECT tournament.*, team_tournament.*, team.name as team_name
-                                              FROM team_tournament
-                                                       INNER JOIN tournament ON tournament.id_tournament = team_tournament.id_tournament
-                                                       INNER JOIN team ON team_tournament.id_team = team.id_team
-                                              WHERE team_tournament.id_team = ?
-                                              ORDER BY start DESC`, [this.id]);
-        return ({success: true, error: "", histories: rows as History[]});
-    }
-
+    // Private
     private checkNameNorm(name: string): status {
         if (name.length < 3 || name.length > 15) {
             return ({success: false, error: "The name must be at least 3 characters and maximum 15!"});

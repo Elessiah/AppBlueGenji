@@ -7,7 +7,7 @@ import {
     Team,
     TeamTournament,
     Tournament, Match,
-    TournamentTeamsCount, strictTeamMatch, MatchTeams
+    TournamentTeamsCount, TeamAndMatch, MatchTeams
 } from "../types";
 import {Database} from "./database";
 import mysql from "mysql2/promise";
@@ -92,7 +92,7 @@ export class TournamentEntity {
             return ({success: false, error: "The size of the tournament must be at least for 4 teams!", id: -1});
         if (!owner.is_loaded || !owner.id)
             return ({success: false, error: "Broken user!", id: -1});
-        if (await owner.isExist(owner.id) == -1)
+        if (await UserEntity.isExist(owner.id) == -1)
             return ({success: false, error: "User does not exist!", id: -1});
         const now = new Date();
         now.setMinutes(now.getMinutes() - 5);
@@ -147,7 +147,7 @@ export class TournamentEntity {
                       start: Date | null = null): Promise<status> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!"});
-        if (!(await this.isExist(this.id)))
+        if (!(await TournamentEntity.isExist(this.id)))
             return ({success: false, error: "This tournament does not exist!"});
         const database: Database = await Database.getInstance();
         const [open_rows] = await database.db!.execute(`SELECT tournament.start_visibility,
@@ -307,7 +307,7 @@ export class TournamentEntity {
     public async isEnded(): Promise<status & { result: boolean }> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!", result: false});
-        if (!(await this.isExist(this.id)))
+        if (!(await TournamentEntity.isExist(this.id)))
             return ({success: false, error: "This tournament does not exist!", result: false});
         const database: Database = await Database.getInstance()
         const [count] = await database.db!.execute(`SELECT position
@@ -332,7 +332,7 @@ export class TournamentEntity {
     public async delete(): Promise<status> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!"});
-        if (!(await this.isExist(this.id)))
+        if (!(await TournamentEntity.isExist(this.id)))
             return ({success: false, error: "Tournament does not exist!"});
         const database: Database = await Database.getInstance();
         await database.db!.execute(`DELETE
@@ -348,11 +348,11 @@ export class TournamentEntity {
     public async getRegistration(team: TeamEntity): Promise<status & Partial<TeamTournament>> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!"});
-        if (!(await this.isExist(this.id)))
+        if (!(await TournamentEntity.isExist(this.id)))
             return ({success: false, error: "Tournament does not exist!"});
         if (!team.is_loaded || !team.id)
             return ({success: false, error: "Parameter team is empty!"});
-        if (await team.isExist(team.id) == -1)
+        if (await TeamEntity.isExist(team.id) == -1)
             return ({success: false, error: "Team does not exist!"});
         const database: Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT *
@@ -369,7 +369,7 @@ export class TournamentEntity {
             return ({success: false, error: "Empty Object!"});
         if (!team.is_loaded || !team.id)
             return ({success: false, error: "Broken object team"});
-        if (await team.isExist(team.id) == -1)
+        if (await TeamEntity.isExist(team.id) == -1)
             return ({success: false, error: "This team does not exist !"});
         const result: status & { result: boolean } = await this.isRegistrationPeriod();
         if (!result.success)
@@ -390,10 +390,10 @@ export class TournamentEntity {
             return ({success: false, error: "Empty Object!"});
         if (!team.is_loaded || !team.id)
             return ({success: false, error: "Empty Object team!"});
-        if (await team.isExist(team.id) == -1)
+        if (await TeamEntity.isExist(team.id) == -1)
             return ({success: false, error: "Team does not exist!"});
         // Vérifie que le tournoi existe et qu'il n'est pas complet
-        if (!(await this.isExist(this.id, true)))
+        if (!(await TournamentEntity.isExist(this.id, true)))
             return ({
                 success: false,
                 error: "Tournament does not exist or is full!"
@@ -417,7 +417,7 @@ export class TournamentEntity {
     public async getRegisterTeams(): Promise<getTournamentTeams> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!", teams: []});
-        if (!(await this.isExist(this.id)))
+        if (!(await TournamentEntity.isExist(this.id)))
             return ({success: false, error: "Tournament does not exist!", teams: []});
         const database: Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT *
@@ -462,7 +462,7 @@ export class TournamentEntity {
     public async getMatchs(nbFromLast: number = -1): Promise<getMatchs> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!", matchs: []});
-        if (!(await this.isExist(this.id)))
+        if (!(await TournamentEntity.isExist(this.id)))
             return ({success: false, error: "Tournament does not exist!", matchs: []});
         let addons: string = "";
         if (nbFromLast > 0)
@@ -476,39 +476,15 @@ export class TournamentEntity {
         return ({success: true, error: "", matchs: matchs})
     }
 
-    public async isExist(id: number,
-                         checkFreeSlots: boolean = false): Promise<boolean> {
-        let size: string = "";
-        if (checkFreeSlots)
-            size = `, size`;
-        const database: Database = await Database.getInstance();
-        const [rows] = await database.db!.execute(`SELECT id_tournament ${size}
-                                                   FROM tournament
-                                                   WHERE id_tournament = ?`, [id]);
-        if (!checkFreeSlots) {
-            const tournaments = rows as { tournament_id: number }[];
-            return (!!tournaments.length);
-        }
-        const tournaments = rows as ({ tournament_id: number } & { size: number })[];
-        if (tournaments.length == 0)
-            return false;
-        const [count] = await database.db!.execute(`SELECT COUNT(*) as nb_teams
-                                                    FROM team_tournament
-                                                    WHERE id_tournament = ?`, [id]);
-        const result = count as ({ nb_teams: number })[];
-        const nbTeams: number = result[0].nb_teams;
-        return tournaments[0].size != nbTeams;
-    }
-
     public async isTeamRegister(team: TeamEntity,
                                 checkStillRunning: boolean = false): Promise<boolean> {
         if (!this.is_loaded || !this.id)
             return false;
-        if (!await this.isExist(this.id))
+        if (!await TournamentEntity.isExist(this.id))
             return false;
         if (!team.is_loaded || !team.id)
             return false;
-        if (!await team.isExist(team.id))
+        if (!await TeamEntity.isExist(team.id))
             return false;
         let filter: string = "";
         if (checkStillRunning)
@@ -525,7 +501,7 @@ export class TournamentEntity {
     public async isAllMatchEnded(): Promise<boolean> {
         if (!this.is_loaded || !this.id)
             return false;
-        if (!(await this.isExist(this.id)))
+        if (!(await TournamentEntity.isExist(this.id)))
             return false;
         const database: Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT id_match
@@ -560,7 +536,7 @@ export class TournamentEntity {
         // On calcule le nombre de matchs à préparer
         const match_to_setup: number = (tournament_info.size / 2 ** tournament_info.current_round) / 2;
         const match_to_fetch: number = match_to_setup * 2;
-        const [rows] = await database.db!.execute(`SELECT m.id_match, m.id_victory_team, team_match.id_team
+        const [rows] = await database.db!.execute(`SELECT m.id_match, m.id_victory_team, team_match.id_team,
                                                    FROM (SELECT *
                                                          FROM \`match\`
                                                          WHERE id_tournament = ?
@@ -568,7 +544,7 @@ export class TournamentEntity {
                                                          LIMIT ${match_to_fetch}) as m
                                                             INNER JOIN team_match ON m.id_match = team_match.id_match
                                                    ORDER BY m.id_match`, [this.id]);
-        const previous_round: MatchTeams[] = await this.groupByMatchID(rows as strictTeamMatch[]);
+        const previous_round: MatchTeams[] = await MatchEntity.groupByMatchID(rows as TeamAndMatch[]);
         let nmatch: number = 0;
         let errors: string = "";
         const match: MatchEntity = new MatchEntity();
@@ -597,11 +573,36 @@ export class TournamentEntity {
         return (await this.getMatchs(match_to_setup));
     }
 
+    // Static
+    public static async isExist(id: number,
+                                checkFreeSlots: boolean = false): Promise<boolean> {
+        let size: string = "";
+        if (checkFreeSlots)
+            size = `, size`;
+        const database: Database = await Database.getInstance();
+        const [rows] = await database.db!.execute(`SELECT id_tournament ${size}
+                                                   FROM tournament
+                                                   WHERE id_tournament = ?`, [id]);
+        if (!checkFreeSlots) {
+            const tournaments = rows as { tournament_id: number }[];
+            return (!!tournaments.length);
+        }
+        const tournaments = rows as ({ tournament_id: number } & { size: number })[];
+        if (tournaments.length == 0)
+            return false;
+        const [count] = await database.db!.execute(`SELECT COUNT(*) as nb_teams
+                                                    FROM team_tournament
+                                                    WHERE id_tournament = ?`, [id]);
+        const result = count as ({ nb_teams: number })[];
+        const nbTeams: number = result[0].nb_teams;
+        return tournaments[0].size != nbTeams;
+    }
+
     // Private
     private async isRegistrationPeriod(): Promise<status & { result: boolean }> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!", result: false});
-        if (!await this.isExist(this.id))
+        if (!await TournamentEntity.isExist(this.id))
             return ({success: false, error: "This tournament does not exist !", result: false});
         const database: Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT open_registration, close_registration
@@ -702,16 +703,5 @@ export class TournamentEntity {
                 await this.setupNextRound();
             }
         }
-    }
-
-    private async groupByMatchID(teamsMatch: strictTeamMatch[]): Promise<MatchTeams[]> {
-        let matchs: MatchTeams[] = [];
-        for (const team of teamsMatch) {
-            if (matchs.length == 0 || team.id_match != matchs[matchs.length - 1].id_match) {
-                matchs.push({id_match: team.id_match, id_victory_team: team.id_victory_team, teams: []});
-            }
-            matchs[matchs.length - 1].teams.push({id_team: team.id_team});
-        }
-        return (matchs);
     }
 }

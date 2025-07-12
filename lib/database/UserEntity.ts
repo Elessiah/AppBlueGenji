@@ -29,7 +29,7 @@ export class UserEntity {
     }
 
     public async fetch(user: number | string): Promise<status> {
-        user = await this.isExist(user);
+        user = await UserEntity.isExist(user);
         if (user == -1)
             return ({success: false, error: "This user does not exist!"});
         const database: Database = await Database.getInstance();
@@ -63,7 +63,7 @@ export class UserEntity {
         const status = this.checkNameNorm(username);
         if (!status.success)
             return ({...status, id: -1, token: ""});
-        if (await this.isExist(username) != -1) {
+        if (await UserEntity.isExist(username) != -1) {
             return ({success: false, error: "Username already exist !", id: -1, token: ""});
         }
         if (password.length < 8 || password.length > 50)
@@ -141,13 +141,13 @@ export class UserEntity {
     public async rename(new_username: string): Promise<status> {
         if (!this.is_loaded)
             return ({success: false, error: "Empty object!"});
-        const user = await this.isExist(this.id!);
+        const user = await TeamEntity.isExist(this.id!);
         if (user == -1)
             return ({success: false, error: "User does not exist!"});
         const status = this.checkNameNorm(new_username);
         if (!status.success)
             return status;
-        if (await this.isExist(new_username) != -1)
+        if (await TeamEntity.isExist(new_username) != -1)
             return ({success: false, error: "Username already exist or it's already your username!"});
         const database: Database = await Database.getInstance();
         await database.db!.execute(`UPDATE user
@@ -157,33 +157,10 @@ export class UserEntity {
         return ({success: true, error: ""});
     }
 
-    public async isExist(user: string | number,
-                         checkWithoutTeam: boolean = false): Promise<number> {
-        const database: Database = await Database.getInstance();
-        let users: { user_id: number }[];
-        let teamFilter: string = "";
-        if (checkWithoutTeam)
-            teamFilter = " AND id_team IS NULL";
-        if (typeof user == typeof "string") {
-            const [rows] = await database.db!.execute(`SELECT id_user
-                                                       FROM user
-                                                       WHERE username LIKE ? ${teamFilter}`, [user]);
-            users = rows as { user_id: number }[];
-        } else {
-            const [rows] = await database.db!.execute(`SELECT id_user
-                                                       FROM user
-                                                       WHERE id_user = ? ${teamFilter}`, [user]);
-            users = rows as { user_id: number }[];
-        }
-        if (!!users.length)
-            return (users[0].user_id);
-        return (-1);
-    }
-
     public async delete(): Promise<status> {
         if (!this.is_loaded)
             return ({success: false, error: "Empty object!"});
-        const user = await this.isExist(this.id!);
+        const user = await TeamEntity.isExist(this.id!);
         if (user == -1) {
             return ({success: false, error: "This user does not exist!"});
         }
@@ -210,7 +187,7 @@ export class UserEntity {
     public async getHistory(): Promise<getHistories> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty object!", histories: []});
-        if (await this.isExist(this.id) == -1)
+        if (await TeamEntity.isExist(this.id) == -1)
             return ({success: false, error: "User not found!", histories: []});
         const database: Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT tournament.*, team_tournament.*, team.name as team_name
@@ -223,6 +200,31 @@ export class UserEntity {
         return ({success: true, error: "", histories: rows as History[]});
     }
 
+    // Static
+    public static async isExist(user: string | number,
+                                checkWithoutTeam: boolean = false): Promise<number> {
+        const database: Database = await Database.getInstance();
+        let users: { user_id: number }[];
+        let teamFilter: string = "";
+        if (checkWithoutTeam)
+            teamFilter = " AND id_team IS NULL";
+        if (typeof user == typeof "string") {
+            const [rows] = await database.db!.execute(`SELECT id_user
+                                                       FROM user
+                                                       WHERE username LIKE ? ${teamFilter}`, [user]);
+            users = rows as { user_id: number }[];
+        } else {
+            const [rows] = await database.db!.execute(`SELECT id_user
+                                                       FROM user
+                                                       WHERE id_user = ? ${teamFilter}`, [user]);
+            users = rows as { user_id: number }[];
+        }
+        if (!!users.length)
+            return (users[0].user_id);
+        return (-1);
+    }
+
+    // Private
     private checkNameNorm(name: string): status {
         if (name.length < 3 || name.length > 15) {
             return ({success: false, error: "The name must be at least 3 characters and maximum 15!"});

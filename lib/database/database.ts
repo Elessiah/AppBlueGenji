@@ -193,6 +193,7 @@ export class Database {
                                 (
                                     id_match INTEGER NOT NULL,
                                     id_team  INTEGER NOT NULL,
+                                    score    INTEGER DEFAULT 0,
                                     PRIMARY KEY (id_match, id_team),
                                     FOREIGN KEY (id_match) REFERENCES \`match\` (id_match)
                                         ON DELETE CASCADE,
