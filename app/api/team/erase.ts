@@ -16,9 +16,9 @@ export async function erase(body: {id_team: number | undefined},
     status = await user.fetch(user_id);
     if (!status.success)
         return (NextResponse.json({error: status.error}, {status: 400}));
-    if (team.owner && team.owner.id != user_id && !user.is_admin) {
+    if (team.id_user && team.id_user != user_id && !user.is_admin) {
         return (NextResponse.json({error: "You don't have the permission to do this!"}, {status: 403}));
-    } else if (!team.owner) {
+    } else if (!team.id_user) {
         return (NextResponse.json({error: "Team already deactivated!"}, {status: 400}));
     }
     status = await team.softDelete();

@@ -25,7 +25,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (!status.success)
         return (NextResponse.json({error: status.error}, {status: 400}));
     if (get == "history") {
-        const getHistory: getHistories = await team.getTeamHistory();
+        const getHistory: getHistories = await team.getHistory();
         if (!getHistory.success)
             return (NextResponse.json({error: getHistory.error}, {status: 400}));
         return (NextResponse.json({ histories: getHistory.histories}, {status: 200}));
@@ -39,8 +39,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return (NextResponse.json({
         name: team.name,
         creation_date: team.creation_date,
-        owner_name: team.owner ? team.owner.name : "",
-        id_owner: team.owner ? team.owner.id : null,
+        owner_name: team.username ? team.username : "",
+        id_owner: team.id_user,
         members_count: team.members_count,
     }));
 }

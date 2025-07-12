@@ -29,7 +29,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (get == "history") {
         if (!status.success)
             return (NextResponse.json({error: status.error}, {status: 400}));
-        const getHistory: getHistories = await user.getUserHistory();
+        const getHistory: getHistories = await user.getHistory();
         if (!getHistory.success)
             return (NextResponse.json({error: getHistory.error}, {status: 400}));
         return (NextResponse.json({...getHistory.histories}, {status: 200}));

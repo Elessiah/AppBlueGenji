@@ -23,7 +23,7 @@ export async function members(body: {user: number | string | undefined,
             return (NextResponse.json({error: "You need to be in a team to manage its members."}, {status: 400}));
         if (caller.team.id! != team.id)
             return (NextResponse.json({error: "You need to be in your team to manage its members."}, {status: 400}));
-        if (caller.id != team.owner!.id!)
+        if (caller.id != team.id_user)
             return (NextResponse.json({error: "You need to be the owner of the team to manage it."}, {status: 400}));
     }
     const target: UserEntity = new UserEntity();
@@ -32,7 +32,7 @@ export async function members(body: {user: number | string | undefined,
         return (NextResponse.json({error: status.error}, {status: 400}));
     if (target.team)
         return (NextResponse.json({error: "The member is already in another team."}, {status: 400}))
-    if (!caller.is_admin && caller.id != team.owner!.id!)
+    if (!caller.is_admin && caller.id != team.id_user)
         return (NextResponse.json({error: "You don't have the permission to do this! Ask the team owner !"}, {status: 403}));
     if (is_remove)
         status = await team.rmMember(target);

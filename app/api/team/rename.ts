@@ -19,7 +19,7 @@ export async function rename(body: {
     status = await user.fetch(user_id);
     if (!status.success)
         return (NextResponse.json({error: status.error}, {status: 400}));
-    if (team.owner && team.owner.id != user_id && !user.is_admin) {
+    if (team.id_user != user_id && !user.is_admin) {
         return (NextResponse.json({error: "You don't have the permission to do this!"}, {status: 403}));
     }
     status = await team.rename(body.new_name);

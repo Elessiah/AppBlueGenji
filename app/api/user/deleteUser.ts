@@ -11,7 +11,7 @@ export async function deleteUser(body: {user_id: number | undefined},
     let status: status = await user.fetch(caller_id);
     if (!status.success)
         return (NextResponse.json({error: status.error}, {status: 400}))
-    if (caller_id != body.user_id && !(await user.isAdmin()).result)
+    if (caller_id != body.user_id && !user.is_admin)
         return (NextResponse.json({error: "Only admin can delete users!"}, {status: 403}));
     status = await user.fetch(body.user_id);
     if (!status.success)
