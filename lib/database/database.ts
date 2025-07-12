@@ -143,6 +143,8 @@ export class Database {
                                 (
                                     id_user INTEGER NOT NULL,
                                     id_team INTEGER NOT NULL,
+                                    date_join DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    date_leave DATETIME DEFAULT NULL,
                                     PRIMARY KEY (id_user, id_team),
                                     FOREIGN KEY (id_user) REFERENCES user (id_user)
                                         ON DELETE CASCADE,

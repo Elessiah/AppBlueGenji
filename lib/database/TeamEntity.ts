@@ -1,5 +1,5 @@
 import {UserEntity} from "./UserEntity";
-import {getHistories, getTeamMembers, History, id, status, Team, TeamInfo, User, UserInfo} from "../types";
+import {getHistories, getTeamMembers, History, id, status, TeamInfo, UserInfo} from "../types";
 import {Database} from "./database";
 import mysql from "mysql2/promise";
 
@@ -7,7 +7,7 @@ export class TeamEntity {
     public id: number | undefined;
     public name: string | undefined;
     public creation_date: Date | undefined;
-    public owner: UserEntity | null | undefined;
+    public id_user: number | null | undefined;
     public members_count: number | undefined;
     public is_loaded: boolean = false;
 
@@ -22,7 +22,7 @@ export class TeamEntity {
             this.id = team.id;
             this.name = team.name;
             this.creation_date = team.creation_date;
-            this.owner = team.owner == null ? null : new UserEntity(team.owner);
+            this.id_user = team.id_user;
             this.is_loaded = true;
         }
     }
@@ -32,28 +32,21 @@ export class TeamEntity {
         if (team == -1)
             return ({success: false, error: "This team does not exist!"})
         const database: Database = await Database.getInstance();
-        const [rows] = await database.db!.execute(`SELECT team.team_id,
+        const [rows] = await database.db!.execute(`SELECT team.id_team,
                                                       team.name,
                                                       team.creation_date,
-                                                      team.id_owner,
-                                                      COUNT(members.id_team) as members_count
+                                                      team.id_user,
+                                                      COUNT(members.date_join) as members_count
                                                FROM team
-                                                        LEFT JOIN user members ON members.id_team = team.team_id
-                                               WHERE team_id = ?
-                                               GROUP BY team.team_id, team.id_owner , team.name, team.creation_date`, [team]);
+                                                        LEFT JOIN user_team members ON members.id_team = team.id_team
+                                               WHERE team.id_team = ?
+                                               GROUP BY team.id_team, team.id_user, team.name, team.creation_date`, [team]);
         const team_data: TeamInfo = (rows as TeamInfo[])[0];
-        this.id = team_data.team_id;
+        this.id = team_data.id_team;
         this.name = team_data.name;
         this.creation_date = team_data.creation_date;
         this.members_count = team_data.members_count;
-        if (team_data.id_owner != null) {
-            this.owner = new UserEntity();
-            const status = await this.owner.fetch(team_data.id_owner);
-            if (!status.success)
-                return (status);
-        } else {
-            this.owner = null;
-        }
+        this.id_user = team_data.id_user;
         return ({success: true, error: ""});
     }
 
@@ -62,14 +55,14 @@ export class TeamEntity {
         let status: status = this.checkNameNorm(name);
         if (!status.success)
             return ({...status, id: -1});
-        this.owner = new UserEntity(owner);
-        if (!this.owner.id || await this.owner.isExist(this.owner.id) == -1) {
-            return ({success: false, error: "Owner does not exist or badly construct", id: -1});
+        if (!owner.id || await owner.isExist(owner.id) == -1) {
+            return ({success: false, error: "Parameter owner does not exist or badly construct", id: -1});
         }
+        this.id_user = owner.id;
         if (await this.isExist(name) != -1)
             return ({success: false, error: "Team name already exist !", id: -1});
         const database: Database = await Database.getInstance();
-        const [result] = await database.db!.execute<mysql.ResultSetHeader>(`INSERT INTO team (name, id_owner)
+        const [result] = await database.db!.execute<mysql.ResultSetHeader>(`INSERT INTO team (name, id_user)
                                                                             VALUES (?, ?)`, [name, owner.id]);
         this.id = result.insertId;
         this.name = name;
@@ -95,8 +88,8 @@ export class TeamEntity {
         if (await this.isExist(new_name) != -1)
             return ({success: false, error: "The new name is already used!"});
         const database: Database = await Database.getInstance();
-        await database.db!.execute(`UPDATE team SET name = ? WHERE team_id = ?`, [new_name, team]);
-        this.name = new_name
+        await database.db!.execute(`UPDATE team SET name = ? WHERE id_team = ?`, [new_name, team]);
+        this.name = new_name;
         return ({success: true, error: ""});
     }
 
@@ -107,9 +100,9 @@ export class TeamEntity {
         if (!owner.is_loaded || !new_owner.is_loaded || !new_owner.id || !owner.id)
             return ({success: false, error: "Object passed in parameter are broken or empty!"})
         let status: status = await this.fetch(this.id); // Making sure the team is up to date
-        if (!this.owner)
+        if (!this.id_user)
             return ({success: false, error: "Team deleted ! Cannot edit owner!"});
-        if (!owner.compare(this.owner))
+        if (this.id_user !== owner.id)
             return ({success: false, error: "The owner in parameter is not the owner of the team!"});
         status = await new_owner.fetch(new_owner.id); // Making sure the user is up to date
         if (!status.success)
@@ -117,8 +110,8 @@ export class TeamEntity {
         if (new_owner.team == null || !new_owner.team.id || new_owner.team.id != this.id)
             return ({success: false,  error: "This user is not in the previous owner's team!"});
         const database: Database = await Database.getInstance();
-        await database.db!.execute(`UPDATE team SET id_owner = ? WHERE team_id = ?`, [new_owner.id, new_owner.team.id]);
-        this.owner = new UserEntity(new_owner);
+        await database.db!.execute(`UPDATE team SET id_user = ? WHERE id_team = ?`, [new_owner.id, new_owner.team.id]);
+        this.id_user = new_owner.id;
         return ({success: true, error: ""});
     }
 
@@ -128,14 +121,8 @@ export class TeamEntity {
         if (await this.isExist(this.id))
             return ({success: false, error: "This team does not exist!"});
         const database: Database = await Database.getInstance();
-        await database.db!.execute(`UPDATE user
-                               SET id_team = null
-                               WHERE id_team = ?`, [this.id]);
         await database.db!.execute(`DELETE
                                FROM team
-                               WHERE team_id = ?`, [this.id]);
-        await database.db!.execute(`DELETE
-                               FROM team_tournament
                                WHERE id_team = ?`, [this.id]);
         this.is_loaded = false;
         return ({success: true, error: ""});
@@ -147,12 +134,12 @@ export class TeamEntity {
         if (await this.isExist(this.id))
             return ({success: false, error: "This team does not exist!"});
         const database: Database = await Database.getInstance();
-        await database.db!.execute(`UPDATE user
-                               SET id_team = null
+        await database.db!.execute(`UPDATE user_team
+                               SET date_leave = CURRENT_TIMESTAMP
                                WHERE id_team = ?`, [this.id]);
         await database.db!.execute(`UPDATE team
-                               SET id_owner = null
-                               WHERE team_id = ?`, [this.id]);
+                               SET id_user = null
+                               WHERE id_team = ?`, [this.id]);
         return ({success: true, error: ""});
     }
 
@@ -168,9 +155,8 @@ export class TeamEntity {
             return ({success: false, error: status.error });
         }
         const database: Database = await Database.getInstance();
-        await database.db!.execute(`UPDATE user
-                               SET id_team = ?
-                               WHERE user_id = ?`, [this.id, user]);
+        await database.db!.execute(`INSERT INTO user_team (id_user, id_team)
+                               VALUES (?, ?)`, [this.id, user.id]);
         return ({success: true, error: ""});
     }
 
@@ -184,12 +170,12 @@ export class TeamEntity {
         const status: status = await user.fetch(user.id); // Making sure user up to date
         if (!status.success)
             return ({success: false, error: status.error});
-        if (this.owner!.compare(user))
+        if (this.id_user == user.id)
             return ({success: false, error: "This user is the owner of the team"});
         const database: Database = await Database.getInstance();
-        await database.db!.execute(`UPDATE user
-                               SET id_team = null
-                               WHERE user_id = ?`, [user]);
+        await database.db!.execute(`UPDATE user_team
+                               SET date_leave = CURRENT_TIMESTAMP
+                               WHERE id_user = ?`, [user.id]);
         return ({success: true, error: ""});
     }
 
@@ -199,9 +185,9 @@ export class TeamEntity {
         if (target_user.team === null)
             return ({success: true, error: "", result: -1});
         const database: Database = await Database.getInstance();
-        const [rows] = await database.db!.execute(`SELECT team_id
+        const [rows] = await database.db!.execute(`SELECT id_team
                                               FROM team
-                                              WHERE id_owner = ?`, [target_user.id]);
+                                              WHERE id_user = ?`, [target_user.id]);
         const ids = (rows as ({team_id: number})[]);
         if (ids.length == 0)
             return ({success: true, error: "", result: -1})
@@ -214,9 +200,11 @@ export class TeamEntity {
         if (await this.isExist(this.id, true) == -1)
             return ({success: false, error: "This team does not exist or is deleted!", members: []});
         const database: Database = await Database.getInstance();
-        const [rows] = await database.db!.execute(`SELECT user.user_id, user.username, user.id_team, user.is_admin
-                                               FROM user
-                                               WHERE id_team = ?`, [this.id]);
+        const [rows] = await database.db!.execute(`SELECT user.id_user, user.username, user.is_admin
+                                                   FROM user
+                                                            INNER JOIN user_team ON user_team.id_user = user.id_user
+                                                   WHERE user_team.id_team = ?
+                                                     AND user_team.date_leave IS NULL`, [this.id]);
         return ({success: true, error: "", members: rows as UserInfo[]});
     }
 
@@ -228,14 +216,14 @@ export class TeamEntity {
             delFilter = " AND id_owner IS NOT NULL";
         const database: Database = await Database.getInstance();
         if (typeof team == typeof "string") {
-            const [rows] = await database.db!.execute(`SELECT team_id
+            const [rows] = await database.db!.execute(`SELECT id_team
                                                   FROM team
                                                   WHERE name LIKE ? ${delFilter}`, [team]);
             teams = rows as {team_id: number}[];
         } else {
-            const [rows] = await database.db!.execute(`SELECT team_id
+            const [rows] = await database.db!.execute(`SELECT id_team
                                                   FROM team
-                                                  WHERE team_id = ? ${delFilter}`, [team]);
+                                                  WHERE id_team = ? ${delFilter}`, [team]);
             teams = rows as {team_id: number}[];
         }
         if (!!teams.length)
@@ -243,7 +231,7 @@ export class TeamEntity {
         return (-1)
     }
 
-    public async getTeamHistory(): Promise<getHistories> {
+    public async getHistory(): Promise<getHistories> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty object!", histories: []});
         if (await this.isExist(this.id) == -1)
@@ -251,9 +239,9 @@ export class TeamEntity {
         const database: Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT tournament.*, team_tournament.*, team.name as team_name
                                               FROM team_tournament
-                                                       INNER JOIN tournament ON id_tournament = tournament.tournament_id
-                                                       INNER JOIN team ON team_tournament.id_team = team.team_id
-                                              WHERE id_team = ?
+                                                       INNER JOIN tournament ON tournament.id_tournament = team_tournament.id_tournament
+                                                       INNER JOIN team ON team_tournament.id_team = team.id_team
+                                              WHERE team_tournament.id_team = ?
                                               ORDER BY start DESC`, [this.id]);
         return ({success: true, error: "", histories: rows as History[]});
     }
