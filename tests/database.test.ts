@@ -355,6 +355,18 @@ describe("Database", () => {
         expect(team.name).toEqual(name2TeamManagement);
         expect(team.id_user).toEqual(user.id);
 
+        // Test fetch ID
+        let status: status = await team.fetch(team.id!);
+        expect(status.success).toBeTruthy();
+        expect(team.name).toEqual(name2TeamManagement);
+        expect(team.id_user).toEqual(user.id);
+
+        // Test fetch Name
+        status = await team.fetch(team.name!);
+        expect(status.success).toBeTruthy();
+        expect(team.name).toEqual(name2TeamManagement);
+        expect(team.id_user).toEqual(user.id);
+
         // Test ownership with owner
         let checkOwnerShip: status & {result: number} = await TeamEntity.isTeamOwner(user);
         expect(checkOwnerShip.success).toBeTruthy();
@@ -376,7 +388,7 @@ describe("Database", () => {
         expect(verifTeam.id_user).toEqual(user.id);
 
         // Vérification MAJ user1
-        let status: status = await user.fetch(user.id!);
+        status = await user.fetch(user.id!);
         expect(status.success).toBeTruthy();
 
         // Test rename team
@@ -443,185 +455,192 @@ describe("Database", () => {
     test("Team Management bad use", async() => {
         // Init
         //      User 1
-        let setUserResult: status & id = await database.newUser(badTeamManagement, passwordUser);
+        const user: UserEntity = new UserEntity();
+        let setUserResult: status & id = await user.new(badTeamManagement, passwordUser);
         expect(setUserResult.success).toBeTruthy();
         expect(setUserResult.id).not.toEqual(-1);
-        const user1 = setUserResult.id;
 
         //      User 2
-        setUserResult = await database.newUser(bad2TeamManagement, passwordUser);
+        const user2: UserEntity = new UserEntity();
+        setUserResult = await user2.new(bad2TeamManagement, passwordUser);
         expect(setUserResult.success).toBeTruthy();
         expect(setUserResult.id).not.toEqual(-1);
-        const user2 = setUserResult.id;
 
         //      User 3
-        setUserResult = await database.newUser(bad3TeamManagement, passwordUser);
+        const user3: UserEntity = new UserEntity();
+        setUserResult = await user3.new(bad3TeamManagement, passwordUser);
         expect(setUserResult.success).toBeTruthy();
         expect(setUserResult.id).not.toEqual(-1);
-        const user3 = setUserResult.id;
 
         //      Test Team
-        let setTeamResult: status & id = await database.createTeam(badTeamManagement, user1);
+        const team: TeamEntity = new TeamEntity();
+        let setTeamResult: status & id = await team.create(badTeamManagement, user);
         expect(setTeamResult.success).toBeTruthy();
         expect(setTeamResult.id).not.toEqual(-1);
-        const test_team = setTeamResult.id;
 
-        // Test getTeamInfo avec id éroné
-        let getTeamInfo: status & Partial<TeamInfo> = await database.getTeamInfo(-1);
-        expect(getTeamInfo.success).toBeFalsy();
+        //      Test Team 2
+        const team2: TeamEntity = new TeamEntity();
+        setTeamResult = await team2.create(bad2TeamManagement, user2);
+        expect(setTeamResult.success).toBeTruthy();
+        expect(setTeamResult.id).not.toEqual(-1);
+
+        // Test fetch ID eroné
+        const errorTeam: TeamEntity = new TeamEntity();
+        let status: status = await errorTeam.fetch(-1);
+        expect(status.success).toBeFalsy();
+        expect(status.error).toEqual("This team does not exist!");
+        expect(errorTeam.is_loaded).toEqual(false);
+
+        // Test fetch Name éroné
+        status = await errorTeam.fetch(" ");
+        expect(status.success).toBeFalsy();
+        expect(status.error).toEqual("This team does not exist!");
+        expect(errorTeam.is_loaded).toEqual(false);
 
         // Vérification status avec id éroné
-        let checkOwnerShip: status & {result: number} = await database.isTeamOwner(-1);
+        let checkOwnerShip: status & {result: number} = await TeamEntity.isTeamOwner(new UserEntity());
         expect(checkOwnerShip.success).toBeFalsy();
+        expect(checkOwnerShip.error).toEqual("Broken user!");
         expect(checkOwnerShip.result).toEqual(-1);
 
-        // Test création avec utilisateur non existant
-        setTeamResult = await database.createTeam(badTeamManagement, 1596357);
+        // Test création avec utilisateur broken
+        const errorUser: UserEntity = new UserEntity();
+        setTeamResult = await errorTeam.create(badTeamManagement, errorUser);
         expect(setTeamResult.success).toBeFalsy();
-        expect(setTeamResult.error).toEqual("This user does not exist!");
+        expect(setTeamResult.error).toEqual("Parameter owner does not exist or badly constructed");
+        expect(setTeamResult.id).toEqual(-1);
+
+        // Test création avec utilisateur inconnu
+        status = await errorUser.fetch(user.id!);
+        expect(status.success).toBeTruthy();
+        errorUser.id = -1;
+        errorUser.name = " ";
+        setTeamResult = await errorTeam.create(badTeamManagement, errorUser);
+        expect(setTeamResult.success).toBeFalsy();
+        expect(setTeamResult.error).toEqual("Parameter owner does not exist or badly constructed");
         expect(setTeamResult.id).toEqual(-1);
 
         // Test création avec nom trop court
-        setTeamResult = await database.createTeam("", user1);
+        setTeamResult = await errorTeam.create("", user3);
         expect(setTeamResult.success).toBeFalsy();
         expect(setTeamResult.error).toEqual("The name must be at least 3 characters and maximum 15!");
         expect(setTeamResult.id).toEqual(-1);
-        setTeamResult = await database.createTeam("az", user1);
+        setTeamResult = await errorTeam.create("az", user3);
         expect(setTeamResult.success).toBeFalsy();
         expect(setTeamResult.error).toEqual("The name must be at least 3 characters and maximum 15!");
         expect(setTeamResult.id).toEqual(-1);
 
         // Test création avec nom trop long
-        setTeamResult = await database.createTeam("1234567890123456", user1);
+        setTeamResult = await errorTeam.create("1234567890123456", user3);
         expect(setTeamResult.success).toBeFalsy();
         expect(setTeamResult.error).toEqual("The name must be at least 3 characters and maximum 15!");
         expect(setTeamResult.id).toEqual(-1);
 
         // Test création d'équipe en doublons
-        const sameTeamName: status & id = await database.createTeam(badTeamManagement, user1);
+        const sameTeamName: status & id = await errorTeam.create(badTeamManagement, user3);
         expect(sameTeamName.success).toBeFalsy();
         expect(sameTeamName.error).toEqual("Team name already exist !");
         expect(sameTeamName.id).toEqual(-1);
 
         // Test rename avec nom déjà pris
-        let status : status = await database.renameTeam(test_team, badTeamManagement);
+        status = await team2.rename(badTeamManagement);
         expect(status.success).toBeFalsy();
 
         // Test rename avec nom trop court
-        status = await database.renameTeam(test_team, "");
+        status = await team2.rename("");
         expect(status.success).toBeFalsy();
-        status = await database.renameTeam(test_team, "az");
+        status = await team2.rename("az");
         expect(status.success).toBeFalsy();
 
         // Test rename avec nom trop long
-        status = await database.renameTeam(test_team, "1234567890123456");
-        expect(status.success).toBeFalsy();
-
-        // Test rename d'une team inexistante
-        status = await database.renameTeam(-1, "JefonctionnePas")
+        status = await team2.rename("1234567890123456");
         expect(status.success).toBeFalsy();
 
         // Test ajout de membre avec paramètre user cassé
-         status = await database.addTeamMember(448844, test_team);
-        expect(status.success).toBeFalsy();
-
-        // Test ajout de membre avec paramètre team cassé
-        status = await database.addTeamMember(user2, 884488);
-        expect(status.success).toBeFalsy();
-
-        // Test ajout de membre avec double paramètre cassé
-        status = await database.addTeamMember(9999999, 9999999);
+         status = await team.addMember(errorUser);
         expect(status.success).toBeFalsy();
 
         // Test ajout de l'owner dans sa propre équipe
-        status = await database.addTeamMember(user1, test_team);
+        status = await team.addMember(user);
         expect(status.success).toBeFalsy();
 
         // Test ajout double invitation
         //      Invitation fonctionnelle
-        status = await database.addTeamMember(user2, test_team);
+        status = await team.addMember(user3);
         expect(status.success).toBeTruthy();
         //      Invitation non fonctionnelle
-        status = await database.addTeamMember(user2, test_team);
+        status = await team.addMember(user3);
         expect(status.success).toBeFalsy();
 
+        status = await team2.hardDelete();
+        expect(status.success).toBeTruthy();
+
         // Test give ownership à un utilisateur hors équipe
-        status = await database.giveTeamOwnership(user1, user3);
+        status = await team.giveOwnership(user, user2);
         expect(status.success).toBeFalsy();
 
         // Test give owner à l'owner
-        status = await database.giveTeamOwnership(user1, user1);
+        status = await team.giveOwnership(user, user);
         expect(status.success).toBeTruthy(); // Ne se passe rien mais génère pas d'erreur donc OK
 
         // Test give non owner à lui-même
-        status = await database.giveTeamOwnership(user2, user2);
+        status = await team.giveOwnership(user3, user3);
         expect(status.success).toBeFalsy();
 
         // Test owner éroné
-        status = await database.giveTeamOwnership(-1, user2);
+        status = await team.giveOwnership(errorUser, user2);
         expect(status.success).toBeFalsy();
 
         // Test new_owner éroné
-        status = await database.giveTeamOwnership(user1, -1);
+        status = await team.giveOwnership(user, errorUser);
         expect(status.success).toBeFalsy();
 
         // Test double éroné
-        status = await database.giveTeamOwnership(-1, -1);
+        status = await team.giveOwnership(errorUser, errorUser);
         expect(status.success).toBeFalsy();
 
         // Ajout user3 pour plus de tests
-        status = await database.addTeamMember(user3, test_team);
+        status = await team.addMember(user2);
         expect(status.success).toBeTruthy();
 
         // Test non owner à other non owner
-        status = await database.addTeamMember(user2, user3);
+        status = await team.giveOwnership(user2, user3);
         expect(status.success).toBeFalsy();
 
-        // Test récupération des membres par ID avec paramètres cassé
-        let teamMembers : getTeamMembers = await database.getTeamMembers(1234567890123456);
-        expect(teamMembers.success).toBeFalsy();
-
-        // Test récupération des membres par Nom avec nom inconnu
-        teamMembers = await database.getTeamMembers("Je ne suis pas un nom d'équipe !");
+        // Test récupération des membres avec classe broken
+        let teamMembers : getTeamMembers = await errorTeam.getMembers();
         expect(teamMembers.success).toBeFalsy();
 
         // Test kick avec entrée cassé
-        status = await database.rmTeamMember(546511);
+        status = await team.rmMember(errorUser);
         expect(status.success).toBeFalsy();
 
         // Test kick owner
-        status = await database.rmTeamMember(user1);
+        status = await team.rmMember(user);
         expect(status.success).toBeFalsy();
 
-        // Test suppression avec id eroné
-        status = await database.hardDeleteTeam(-1);
-        expect(status.success).toBeFalsy();
-
-        // Test suppression avec nom eroné
-        status = await database.hardDeleteTeam("");
-        expect(status.success).toBeFalsy();
-
-        status = await database.hardDeleteTeam("az");
+        // Test suppression avec paramètre éroné
+        status = await errorTeam.hardDelete();
         expect(status.success).toBeFalsy();
     });
     test("Tournament Management perfect use", async() => {
         // Init Test variables
 
         //      Init Users
-        let setResult: status & id = await database.newUser(nameTournamentTest, passwordUser);
+        const user: UserEntity = new UserEntity();
+        let setResult: status & id = await user.new(nameTournamentTest, passwordUser);
         expect(setResult.success).toBeTruthy();
-        const owner_id: number = setResult.id;
-        setResult = await database.newUser(teamTournamentTest, passwordUser);
+        const user2: UserEntity = new UserEntity();
+        setResult = await user2.new(teamTournamentTest, passwordUser);
         expect(setResult.success).toBeTruthy();
-        const second_owner_id: number = setResult.id;
 
         //      Init Teams
-        setResult = await database.createTeam(nameTournamentTest, owner_id);
+        const team: TeamEntity = new TeamEntity();
+        setResult = await team.create(nameTournamentTest, user);
         expect(setResult.success).toBeTruthy();
-        const team_one_id = setResult.id;
-        setResult = await database.createTeam(teamTournamentTest, second_owner_id);
+        const team2: TeamEntity = new TeamEntity();
+        setResult = await team2.create(teamTournamentTest, user2);
         expect(setResult.success).toBeTruthy();
-        const team_two_id = setResult.id;
 
         // Init settings tournament
         const visibility = new Date(baseYear, baseMonth, baseDate, baseHour + 1, baseMinutes);
@@ -633,27 +652,24 @@ describe("Database", () => {
         const size: number = 8;
 
         // Test création de tournois
-        setResult = await database.createTournament(
+        const tournament: TournamentEntity = new TournamentEntity();
+        setResult = await tournament.create(
             nameTournamentTest,
             description,
             format,
             size,
-            owner_id,
+            user,
             visibility,
             open_registration,
             close_registration,
             start);
         expect(setResult.success).toBeTruthy();
         idTournament = setResult.id;
-
-        // Test récupération
-        const tournament: status & Partial<Tournament> = await database.getTournament(idTournament);
-        expect(tournament.success).toBeTruthy();
         expect(tournament.name).toEqual(nameTournamentTest);
         expect(tournament.description).toEqual(description);
         expect(tournament.format).toEqual(format);
         expect(tournament.size).toEqual(size);
-        expect(tournament.id_owner).toEqual(owner_id);
+        expect(tournament.owner!.id!).toEqual(user.id);
         expect(tournament.creation_date).not.toBeUndefined();
         if (!tournament.creation_date)
             throw "Erreur !";
@@ -663,162 +679,208 @@ describe("Database", () => {
         expect(tournament.close_registration?.getTime()).toEqual(close_registration.getTime());
         expect(tournament.start?.getTime()).toEqual(start.getTime());
 
-        // Test edit name
-        let status: status = await database.editTournament(idTournament, teamTournamentTest);
+        let copyTournament: TournamentEntity = new TournamentEntity(tournament);
+        let status: status = await tournament.fetch(tournament.id!);
         expect(status.success).toBeTruthy();
+        expect(tournament.compare(copyTournament)).toBeTruthy()
+        const OGTournament: TournamentEntity = new TournamentEntity(tournament);
+
+        // Test edit name
+        status = await tournament.edit(teamTournamentTest);
+        expect(status.success).toBeTruthy();
+        expect(tournament.name).toEqual(teamTournamentTest);
 
         // Vérification edit name
-        let test_tournament: status & Partial<Tournament> = await database.getTournament(idTournament);
-        expect(test_tournament).toEqual({...tournament, name: teamTournamentTest});
+        copyTournament = new TournamentEntity(tournament);
+        status = await tournament.fetch(tournament.id!);
+        expect(status.success).toBeTruthy();
+        expect(tournament.compare(copyTournament)).toBeTruthy();
 
         // Test edit description et retour OG name
-        status = await database.editTournament(idTournament, nameTournamentTest, description.toUpperCase());
+        status = await tournament.edit(nameTournamentTest, description.toUpperCase());
         expect(status.success).toBeTruthy();
+        expect(tournament.name).toEqual(nameTournamentTest);
+        expect(tournament.description).toEqual(description.toUpperCase());
 
         // Vérification edit description et nom
-        test_tournament = await database.getTournament(idTournament);
-        expect(test_tournament).toEqual({...tournament, description: description.toUpperCase()});
+        copyTournament = new TournamentEntity(tournament);
+        status = await tournament.fetch(tournament.id!);
+        expect(status.success).toBeTruthy();
+        expect(tournament.compare(copyTournament)).toBeTruthy();
 
         // Test edit format et retour description
-        status = await database.editTournament(idTournament, null, description, "DOUBLE");
+        status = await tournament.edit(null, description, "DOUBLE");
         expect(status.success).toBeTruthy();
+        expect(tournament.description).toEqual(description);
+        expect(tournament.format).toEqual("DOUBLE");
 
         // Vérification edit format
-        test_tournament = await database.getTournament(idTournament);
-        expect(test_tournament).toEqual({...tournament, format: "DOUBLE"});
+        copyTournament = new TournamentEntity(tournament);
+        status = await tournament.fetch(tournament.id!);
+        expect(status.success).toBeTruthy();
+        expect(tournament.compare(copyTournament)).toBeTruthy();
 
         // Test edit size et retour format
-        status = await database.editTournament(idTournament, null, null, 'SIMPLE', 4);
+        status = await tournament.edit(null, null, format, 4);
         expect(status.success).toBeTruthy();
+        expect(tournament.format).toEqual(format);
+        expect(tournament.size).toEqual(4);
 
         // Vérification edit size et format
-        test_tournament = await database.getTournament(idTournament);
-        expect(test_tournament).toEqual({...tournament, size: 4});
+        copyTournament = new TournamentEntity(tournament);
+        status = await tournament.fetch(tournament.id!);
+        expect(status.success).toBeTruthy();
+        expect(tournament.compare(copyTournament)).toBeTruthy();
 
         // Test edit start_visibility et retour size
         let tmp_date: Date = new Date(visibility);
         tmp_date.setHours(tmp_date.getHours() + 1);
-        status = await database.editTournament(idTournament, null, null, null, 8, tmp_date);
+        status = await tournament.edit(null, null, null, size, tmp_date);
         expect(status.success).toBeTruthy();
+        expect(tournament.size).toEqual(size);
+        expect(tournament.start_visibility?.getTime()).toEqual(tmp_date.getTime());
 
         // Vérification edit start_visibility et retour size
-        test_tournament = await database.getTournament(idTournament);
-        expect(test_tournament).toEqual({...tournament, start_visibility: tmp_date});
+        copyTournament = new TournamentEntity(tournament);
+        status = await tournament.fetch(tournament.id!);
+        expect(status.success).toBeTruthy();
+        expect(tournament.compare(copyTournament)).toBeTruthy();
 
         // Test edit open_registration et retour start_visibility
         tmp_date = new Date(open_registration);
         tmp_date.setHours(open_registration.getHours() - 1);
-        status = await database.editTournament(idTournament, null, null, null, null, visibility, tmp_date);
+        status = await tournament.edit(null, null, null, null, visibility, tmp_date);
         expect(status.success).toBeTruthy();
+        expect(tournament.start_visibility?.getTime()).toEqual(visibility.getTime());
+        expect(tournament.open_registration?.getTime()).toEqual(tmp_date.getTime());
 
         // Vérification edit open_registration et retour start_visibility
-        test_tournament = await database.getTournament(idTournament);
-        expect(test_tournament).toEqual({...tournament, open_registration: tmp_date});
+        copyTournament = new TournamentEntity(tournament);
+        status = await tournament.fetch(tournament.id!);
+        expect(status.success).toBeTruthy();
+        expect(tournament.compare(copyTournament)).toBeTruthy();
 
         // Test edit close_registration et retour open_registration
         tmp_date = new Date(close_registration);
         tmp_date.setHours(close_registration.getHours() + 10);
-        status = await database.editTournament(idTournament, null, null, null, null, null, open_registration, tmp_date);
+        status = await tournament.edit(null, null, null, null, null, open_registration, tmp_date);
         expect(status.success).toBeTruthy();
+        expect(tournament.open_registration?.getTime()).toEqual(open_registration.getTime());
+        expect(tournament.close_registration?.getTime()).toEqual(tmp_date.getTime());
 
         // Vérification edit close_registration et retour open_registration
-        test_tournament = await database.getTournament(idTournament);
-        expect(test_tournament).toEqual({...tournament, close_registration: tmp_date});
+        copyTournament = new TournamentEntity(tournament);
+        status = await tournament.fetch(tournament.id!);
+        expect(status.success).toBeTruthy();
+        expect(tournament.compare(copyTournament)).toBeTruthy();
 
         // Test edit start et retour close_registration
         tmp_date = new Date(start);
         tmp_date.setHours(start.getHours() + 8);
-        status = await database.editTournament(idTournament, null, null, null, null, null, null, close_registration, tmp_date);
+        status = await tournament.edit(null, null, null, null, null, null, close_registration, tmp_date);
         expect(status.success).toBeTruthy();
+        expect(tournament.close_registration?.getTime()).toEqual(close_registration.getTime());
+        expect(tournament.start?.getTime()).toEqual(tmp_date.getTime());
 
         // Vérification edit start et retour close_registration
-        test_tournament = await database.getTournament(idTournament);
-        expect(test_tournament).toEqual({...tournament, start: tmp_date});
+        copyTournament = new TournamentEntity(tournament);
+        status = await tournament.fetch(tournament.id!);
+        expect(status.success).toBeTruthy();
+        expect(tournament.compare(copyTournament)).toBeTruthy();
 
         // Test edit retour close_registration
-        status = await database.editTournament(idTournament, null, null, null, null, null, null, null, start);
+        status = await tournament.edit(null, null, null, null, null, null, null, start);
         expect(status.success).toBeTruthy();
 
-        // Vérification edit start_visibility et retour size
-        test_tournament = await database.getTournament(idTournament);
-        expect(test_tournament).toEqual({...tournament});
+        // Vérification edit retour OG
+        expect(tournament.compare(OGTournament)).toBeTruthy();
 
         // Ouverture des inscriptions pour les tests
-        status = await database.editTournament(idTournament, null, null, null, null, null, now);
+        status = await tournament.edit(null, null, null, null, null, now);
         expect(status.success).toBeTruthy();
 
         //      Pour éviter un problème d'égalité avec les périodes d'inscriptions et les inscriptions
-        await sleep(500);
+        await sleep(1000);
 
         // Test inscription
-        status = await database.tournamentRegistration(idTournament, team_one_id);
+        status = await tournament.registration(team);
         expect(status.success).toBeTruthy();
 
         // Inscription deuxième équipe
-        status = await database.tournamentRegistration(idTournament, team_two_id);
+        status = await tournament.registration(team2);
         expect(status.success).toBeTruthy();
 
         // Vérification inscription par getRegisterTeams
-        let getTeams : getTournamentTeams = await database.getRegisterTeams(idTournament);
+        let getTeams : getTournamentTeams = await tournament.getRegisterTeams();
         expect(getTeams.success).toBeTruthy();
         expect(getTeams.teams.length).toEqual(2);
 
         // Vérification inscription par récupération des historiques teams
-        let getHistories: getHistories = await database.getTeamHistory(team_one_id);
+        let getHistories: getHistories = await team.getHistory();
         expect(getHistories.success).toBeTruthy();
         expect(getHistories.histories.length).toEqual(1);
 
         // Vérification inscription par récupération des historiques utilisateurs
-        let userHistory: getHistories = await database.getUserHistory(owner_id);
+        let userHistory: getHistories = await user.getHistory();
         expect(userHistory.success).toBeTruthy();
         expect(userHistory.histories.length).toEqual(1);
         expect(getHistories.histories).toEqual(userHistory.histories);
 
         // Test désinscription
-        status = await database.tournamentUnregistration(idTournament, team_two_id);
+        status = await tournament.unregistration(team2);
         expect(status.success).toBeTruthy();
 
         // Vérification désinscription par getRegisterTeams
-        getTeams = await database.getRegisterTeams(idTournament);
+        getTeams = await tournament.getRegisterTeams();
         expect(getTeams.success).toBeTruthy();
         expect(getTeams.teams.length).toEqual(1);
 
         // Vérification désinscription par récupération des historiques teams
-        getHistories = await database.getTeamHistory(team_two_id);
+        getHistories = await team2.getHistory();
         expect(getHistories.success).toBeTruthy();
         expect(getHistories.histories.length).toEqual(0);
 
         // Vérification désinscription par récupération des historiques utilisateurs
-        userHistory = await database.getUserHistory(second_owner_id);
+        userHistory = await user2.getHistory();
         expect(userHistory.success).toBeTruthy();
         expect(userHistory.histories.length).toEqual(0);
 
         // Réinscription pour test suppression de tournois
         // Inscription deuxième équipe
-        status = await database.tournamentRegistration(idTournament, team_two_id);
+        status = await tournament.registration(team2);
         expect(status.success).toBeTruthy();
 
         // Test suppression
-        status = await database.deleteTournament(idTournament);
+        status = await tournament.delete();
         expect(status.success).toBeTruthy();
 
         // Vérification suppression par getTeams
-        getTeams = await database.getRegisterTeams(idTournament);
+        getTeams = await tournament.getRegisterTeams();
         expect(getTeams.success).toBeFalsy();
         expect(getTeams.teams.length).toEqual(0);
 
         // Vérification suppression du tournoi par historique des équipes
-        getHistories = await database.getTeamHistory(team_one_id);
+        getHistories = await team.getHistory();
         expect(getHistories.success).toBeTruthy();
         expect(getHistories.histories.length).toEqual(0);
 
         // Vérification suppression du tournoi par historique des équipes
-        getHistories = await database.getTeamHistory(team_one_id);
+        getHistories = await team2.getHistory();
+        expect(getHistories.success).toBeTruthy();
+        expect(getHistories.histories.length).toEqual(0);
+
+        // Vérification suppression du tournoi par historique des utilisateurs
+        getHistories = await user2.getHistory();
+        expect(getHistories.success).toBeTruthy();
+        expect(getHistories.histories.length).toEqual(0);
+
+        // Vérification suppression du tournoi par historique des utilisateurs
+        getHistories = await user2.getHistory();
         expect(getHistories.success).toBeTruthy();
         expect(getHistories.histories.length).toEqual(0);
 
         // Test inscription tournoi supprimé
-        status = await database.tournamentRegistration(idTournament, team_one_id);
+        status = await tournament.registration(team);
         expect(status.success).toBeFalsy();
     });
     test("Tournament Management bad use", async() => {
@@ -1724,11 +1786,12 @@ describe("Database", () => {
         status = await delUser.fetch(name2TeamManagement);
         if (status.success)
             await delUser.delete();
-        console.log(nameTeamManagement);
-        console.log(name2TeamManagement);
 
         // Nettoyage Partie Team Bad
         status = await delTeam.fetch(badTeamManagement);
+        if (status.success)
+            await delTeam.hardDelete();
+        status = await delTeam.fetch(bad2TeamManagement);
         if (status.success)
             await delTeam.hardDelete();
         status = await delUser.fetch(badTeamManagement);

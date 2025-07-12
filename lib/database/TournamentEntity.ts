@@ -64,18 +64,36 @@ export class TournamentEntity {
         this.current_round = tournament_data.current_round;
         this.owner = new UserEntity();
         this.creation_date = new Date(tournament_data.creation_date!);
+        this.start_visibility = new Date(tournament_data.start_visibility);
         this.open_registration = new Date(tournament_data.open_registration!);
         this.close_registration = new Date(tournament_data.close_registration!);
         this.start = tournament_data.start;
         const status: status = await this.owner.fetch(tournament_data.id_user);
         if (!status.success)
             return ({success: false, error: status.error});
+        this.is_loaded = true;
         return ({success: true, error: ""});
+    }
+
+    public async compare(other: TournamentEntity): Promise<boolean> {
+        if (!this.is_loaded || !other.is_loaded)
+            return false;
+        return (this.id == other.id
+            && this.name == other.name
+            && this.description == other.description
+            && this.format == other.format
+            && this.size == other.size
+            && this.current_round == other.current_round
+            && this.owner!.compare(other.owner!)
+            && this.creation_date!.getTime() == other.creation_date!.getTime()
+            && this.open_registration!.getTime() == other.open_registration!.getTime()
+            && this.close_registration!.getTime() == other.close_registration!.getTime()
+            && this.start!.getTime() == other.start!.getTime());
     }
 
     public async create(name: string,
                         description: string,
-                        format: 'SIMPLE',
+                        format: 'SIMPLE' |  'DOUBLE',
                         size: number,
                         owner: UserEntity,
                         start_visibility: Date,
@@ -256,6 +274,7 @@ export class TournamentEntity {
         await database.db!.execute(`UPDATE tournament
                                     SET ${updates}
                                     WHERE id_tournament = ?`, values);
+        await this.fetch(this.id); // Mise à jour de l'objet
         return ({success: true, error: ""});
     }
 
@@ -536,7 +555,7 @@ export class TournamentEntity {
         // On calcule le nombre de matchs à préparer
         const match_to_setup: number = (tournament_info.size / 2 ** tournament_info.current_round) / 2;
         const match_to_fetch: number = match_to_setup * 2;
-        const [rows] = await database.db!.execute(`SELECT m.id_match, m.id_victory_team, team_match.id_team,
+        const [rows] = await database.db!.execute(`SELECT m.id_match, m.id_victory_team, team_match.id_team
                                                    FROM (SELECT *
                                                          FROM \`match\`
                                                          WHERE id_tournament = ?

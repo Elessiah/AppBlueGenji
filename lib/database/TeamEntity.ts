@@ -31,8 +31,10 @@ export class TeamEntity {
 
     public async fetch(team: number | string): Promise<status> {
         team = await TeamEntity.isExist(team);
-        if (team == -1)
+        if (team == -1) {
+            this.is_loaded = false;
             return ({success: false, error: "This team does not exist!"})
+        }
         const database: Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT team.id_team,
                                                       team.name,
@@ -51,6 +53,7 @@ export class TeamEntity {
         this.creation_date = team_data.creation_date;
         this.members_count = team_data.members_count;
         this.id_user = team_data.id_user;
+        this.is_loaded = true;
         return ({success: true, error: ""});
     }
 
@@ -158,6 +161,8 @@ export class TeamEntity {
             return ({success: false, error: "Empty Object!"});
         if (!user.is_loaded || !user.id)
             return ({success: false, error: "Broken user!"});
+        if (await UserEntity.isExist(user.id) == -1)
+            return ({success: false, error: "This user does not exist!"});
         if (await TeamEntity.isExist(this.id, true) == -1)
             return ({success: false, error: "This team does not exist or is inactive!"});
         const checkStatus: status & {result: number} = await TeamEntity.isMemberOfTeam(user.id);

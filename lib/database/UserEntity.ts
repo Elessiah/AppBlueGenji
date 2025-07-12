@@ -190,7 +190,7 @@ export class UserEntity {
     public async getHistory(): Promise<getHistories> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty object!", histories: []});
-        if (await TeamEntity.isExist(this.id) == -1)
+        if (await UserEntity.isExist(this.id) == -1)
             return ({success: false, error: "User not found!", histories: []});
         const database: Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT tournament.*, team_tournament.*, team.name as team_name
@@ -198,7 +198,7 @@ export class UserEntity {
                                                        INNER JOIN team_tournament ON tournament.id_tournament = team_tournament.id_tournament
                                                        INNER JOIN team ON team_tournament.id_team = team.id_team
                                                        INNER JOIN user_team ON team.id_team = user_team.id_team
-                                              WHERE user_team.id_user = ? AND tournament.close_registration > user_team.date_join AND tournament.start < user_team.date_leave
+                                              WHERE user_team.id_user = ? AND tournament.close_registration > user_team.date_join AND (user_team.date_leave IS NULL OR tournament.start < user_team.date_leave)
                                               ORDER BY tournament.start DESC`, [this.id]);
         return ({success: true, error: "", histories: rows as History[]});
     }
