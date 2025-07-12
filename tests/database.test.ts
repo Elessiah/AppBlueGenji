@@ -341,126 +341,104 @@ describe("Database", () => {
         expect(setUserResult.success).toBeTruthy();
         expect(setUserResult.id).not.toEqual(-1);
 
-        const user1_id: number = setUserResult.id;
-
         // Création test user 2
-        setUserResult = await database.newUser(name2TeamManagement, passwordUser);
+        const user2: UserEntity = new UserEntity();
+        setUserResult = await user2.new(name2TeamManagement, passwordUser);
         expect(setUserResult.success).toBeTruthy();
         expect(setUserResult.id).not.toBeUndefined();
-        const user2_id: number = setUserResult.id;
 
         // Test création d'équipe
-        let setTeamResult : status & id = await database.createTeam(name2TeamManagement, user1_id);
+        const team: TeamEntity = new TeamEntity();
+        let setTeamResult : status & id = await team.create(name2TeamManagement, user);
         expect(setTeamResult.success).toBeTruthy();
         expect(setUserResult.id).not.toEqual(-1);
-        const team1_id = setTeamResult.id;
+        expect(team.name).toEqual(name2TeamManagement);
+        expect(team.id_user).toEqual(user.id);
 
         // Test ownership with owner
-        let checkOwnerShip: status & {result: number} = await database.isTeamOwner(user1_id);
+        let checkOwnerShip: status & {result: number} = await TeamEntity.isTeamOwner(user);
         expect(checkOwnerShip.success).toBeTruthy();
-        expect(checkOwnerShip.result).toEqual(team1_id);
+        expect(checkOwnerShip.result).toEqual(team.id);
 
         // Test ownership with random user
-        checkOwnerShip = await database.isTeamOwner(user2_id);
+        checkOwnerShip = await TeamEntity.isTeamOwner(user2);
         expect(checkOwnerShip.success).toBeTruthy();
         expect(checkOwnerShip.result).toEqual(-1);
 
         // Vérification création
-        let getResult: SQLGetResult = await database.get({ table: "team", whereOption: [{ column: "team_id", condition: "=", value: setTeamResult.id}] });
+        const database: Database = await Database.getInstance();
+        let getResult: SQLGetResult = await database.get({ table: "team", whereOption: [{ column: "id_team", condition: "=", value: setTeamResult.id}] });
         expect(getResult.success).toBeTruthy();
         expect(getResult.result.length).toBe(1);
         let verifTeam : Team = getResult.result[0] as Team;
-        expect(verifTeam.team_id).toEqual(team1_id);
+        expect(verifTeam.id_team).toEqual(team.id);
         expect(verifTeam.name).toEqual(name2TeamManagement);
-        expect(verifTeam.id_owner).toEqual(user1_id);
-
-        // Test isAdmin avec paramètre éroné
-        let checkStatus: status & {result: boolean} = await database.isAdmin(-1);
-        expect(checkStatus.success).toBeFalsy();
-        expect(checkStatus.result).toBeFalsy();
-
-        // Test getTeamInfo
-        let getTeamInfo: status & Partial<TeamInfo> = await database.getTeamInfo(team1_id);
-        expect(getTeamInfo.success).toBeTruthy();
-        expect(getTeamInfo).toEqual({success: true, error: "", team_id: team1_id, name: name2TeamManagement, creation_date: getTeamInfo.creation_date, owner_name: nameTeamManagement, id_owner: user1_id, members_count: 1});
+        expect(verifTeam.id_user).toEqual(user.id);
 
         // Vérification MAJ user1
-        let getUserResult: status & Partial<User> = await database.getUser(nameTeamManagement);
-        expect(getUserResult.success).toBeTruthy();
-        expect(getUserResult.id_team).toEqual(team1_id);
-
-        // Test rename team
-        let status : status = await database.renameTeam(team1_id, nameTeamManagement);
-        expect(status.success);
-
-        // Vérification rename
-        getResult = await database.get({ table: "team", whereOption: [{ column: "team_id", condition: "=", value: setTeamResult.id}] });
-        expect(getResult.success).toBeTruthy();
-        expect(getResult.result.length).toBe(1);
-        verifTeam = getResult.result[0] as Team;
-        expect(verifTeam.name).toEqual(nameTeamManagement);
-
-        // Test ajout de membre
-        status = await database.addTeamMember(user2_id, team1_id);
+        let status: status = await user.fetch(user.id!);
         expect(status.success).toBeTruthy();
 
+        // Test rename team
+        status = await team.rename(nameTeamManagement);
+        expect(status.success);
+        expect(team.name).toEqual(nameTeamManagement);
+
+        // Test ajout de membre
+        status = await team.addMember(user2);
+        expect(status.success).toBeTruthy();
+        expect(team.members_count).toEqual(2);
+        status = await team.fetch(team.id!);
+        expect(status.success).toBeTruthy();
+        expect(team.members_count).toEqual(2);
+
         // Vérification status owner après ajout de membre
-        checkOwnerShip = await database.isTeamOwner(user2_id);
+        checkOwnerShip = await TeamEntity.isTeamOwner(user2);
         expect(checkOwnerShip.success).toBeTruthy();
         expect(checkOwnerShip.result).toEqual(-1);
 
-        // Test getTeamInfo après ajout de membre
-        getTeamInfo = await database.getTeamInfo(team1_id);
-        expect(getTeamInfo.success).toBeTruthy();
-        expect(getTeamInfo).toEqual({success: true, error: "", team_id: team1_id, name: nameTeamManagement, creation_date: getTeamInfo.creation_date, owner_name: nameTeamManagement, id_owner: user1_id, members_count: 2});
+        // Test getMembers après ajout de membre
+        const getMembers: getTeamMembers = await team.getMembers();
+        expect(getMembers.success).toBeTruthy();
+        expect(getMembers.members.length).toBe(2);
+        expect(getMembers.members[0].id_user).toEqual(user.id);
+        expect(getMembers.members[1].id_user).toEqual(user2.id);
 
-        // Vérification maj user
-        getUserResult = await database.getUser(name2TeamManagement);
-        expect(getUserResult.success).toBeTruthy();
-        expect(getUserResult.id_team).toEqual(team1_id);
-
-        // Test récupération des membres par ID
-        const teamMembers : getTeamMembers = await database.getTeamMembers(team1_id);
-        expect(teamMembers.success).toBeTruthy();
-        expect(teamMembers.members.length).toEqual(2);
-
-        // Test récupération des membres par Nom
-        const secondMembers = await database.getTeamMembers(nameTeamManagement);
-        expect(secondMembers.success).toBeTruthy();
-        expect(secondMembers.members.length).toEqual(2);
-        expect(teamMembers).toEqual(secondMembers);
-        expect({success: true, error: "", ...secondMembers.members[1], is_admin: false}).toEqual(getUserResult);
+        // Vérification user2 profile
+        let checkStatus: status & {result: number} = await TeamEntity.isMemberOfTeam(user2.id!);
+        expect(checkStatus.success).toBeTruthy();
+        expect(checkStatus.result).toEqual(team.id);
 
         // Test switch ownership
-        status = await database.giveTeamOwnership(user1_id, user2_id);
+        status = await team.giveOwnership(user, user2);
         expect(status.success).toBeTruthy();
 
         // Test kick d'une équipe
-        status = await database.rmTeamMember(user1_id);
+        status = await team.rmMember(user);
         expect(status.success).toBeTruthy();
 
         // Vérification maj profil
-        getUserResult = await database.getUser(user1_id);
-        expect(getUserResult.success).toBeTruthy();
-        expect(getUserResult.id_team).toBeNull();
+        checkStatus = await TeamEntity.isMemberOfTeam(user.id!);
+        expect(checkStatus.success).toBeTruthy();
+        expect(checkStatus.result).toEqual(-1);
 
         // Rajout pour test suppression
-        status = await database.addTeamMember(user1_id, team1_id);
+        status = await team.addMember(user);
         expect(status.success).toBeTruthy();
 
         // Test suppression team
-        status = await database.hardDeleteTeam(team1_id);
+        status = await team.hardDelete();
         expect(status.success).toBeTruthy();
 
         // Vérification maj profil owner
-        getUserResult = await database.getUser(user2_id);
-        expect(getUserResult.success).toBeTruthy();
-        expect(getUserResult.id_team).toBeNull();
+        checkStatus = await TeamEntity.isMemberOfTeam(user.id!);
+        expect(checkStatus.success).toBeTruthy();
+        expect(checkStatus.result).toEqual(-1);
 
         // Vérification maj profil member
-        getUserResult = await database.getUser(user1_id);
-        expect(getUserResult.success).toBeTruthy();
-        expect(getUserResult.id_team).toBeNull();
+        checkStatus = await TeamEntity.isMemberOfTeam(user2.id!);
+        expect(checkStatus.success).toBeTruthy();
+        expect(checkStatus.result).toEqual(-1);
     });
     test("Team Management bad use", async() => {
         // Init
@@ -1746,6 +1724,8 @@ describe("Database", () => {
         status = await delUser.fetch(name2TeamManagement);
         if (status.success)
             await delUser.delete();
+        console.log(nameTeamManagement);
+        console.log(name2TeamManagement);
 
         // Nettoyage Partie Team Bad
         status = await delTeam.fetch(badTeamManagement);

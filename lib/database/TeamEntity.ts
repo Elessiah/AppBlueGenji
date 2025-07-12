@@ -77,6 +77,7 @@ export class TeamEntity {
         this.name = name;
         this.creation_date = new Date();
         this.is_loaded = true;
+        this.members_count = 0;
         status = await this.addMember(owner);
         if (!status.success) {
             await this.hardDelete();
@@ -127,7 +128,7 @@ export class TeamEntity {
     public async hardDelete(): Promise<status> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!"});
-        if (await TeamEntity.isExist(this.id))
+        if (await TeamEntity.isExist(this.id) == -1)
             return ({success: false, error: "This team does not exist!"});
         const database: Database = await Database.getInstance();
         await database.db!.execute(`DELETE
@@ -140,7 +141,7 @@ export class TeamEntity {
     public async softDelete(): Promise<status> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!"});
-        if (await TeamEntity.isExist(this.id))
+        if (await TeamEntity.isExist(this.id) == -1)
             return ({success: false, error: "This team does not exist!"});
         const database: Database = await Database.getInstance();
         await database.db!.execute(`UPDATE user_team
@@ -157,7 +158,7 @@ export class TeamEntity {
             return ({success: false, error: "Empty Object!"});
         if (!user.is_loaded || !user.id)
             return ({success: false, error: "Broken user!"});
-        if (await TeamEntity.isExist(this.id, true))
+        if (await TeamEntity.isExist(this.id, true) == -1)
             return ({success: false, error: "This team does not exist or is inactive!"});
         const checkStatus: status & {result: number} = await TeamEntity.isMemberOfTeam(user.id);
         if (!checkStatus.success)
@@ -166,7 +167,8 @@ export class TeamEntity {
             return ({success: false, error: "User already member of another team!"});
         const database: Database = await Database.getInstance();
         await database.db!.execute(`INSERT INTO user_team (id_user, id_team)
-                               VALUES (?, ?)`, [this.id, user.id]);
+                               VALUES (?, ?) ON DUPLICATE KEY UPDATE date_leave = NULL`, [user.id, this.id]);
+        this.members_count! += 1;
         return ({success: true, error: ""});
     }
 
@@ -175,7 +177,7 @@ export class TeamEntity {
             return ({success: false, error: "Empty Object!"});
         if (!user.is_loaded || !user.id)
             return ({success: false, error: "Broken user!"});
-        if (await TeamEntity.isExist(this.id, true))
+        if (await TeamEntity.isExist(this.id, true) == -1)
             return ({success: false, error: "This team does not exist or is inactive!"});
         const status: status = await user.fetch(user.id); // Making sure user up to date
         if (!status.success)
@@ -221,40 +223,43 @@ export class TeamEntity {
     // Static
     public static async isExist(team: string | number,
                                 checkWithoutDel: boolean = false): Promise<number> {
-        let teams: {team_id: number}[];
+        let teams: {id_team: number}[];
         let delFilter: string = "";
         if (checkWithoutDel)
-            delFilter = " AND id_owner IS NOT NULL";
+            delFilter = " AND id_user IS NOT NULL";
         const database: Database = await Database.getInstance();
         if (typeof team == typeof "string") {
             const [rows] = await database.db!.execute(`SELECT id_team
                                                   FROM team
                                                   WHERE name LIKE ? ${delFilter}`, [team]);
-            teams = rows as {team_id: number}[];
+            teams = rows as {id_team: number}[];
         } else {
             const [rows] = await database.db!.execute(`SELECT id_team
                                                   FROM team
                                                   WHERE id_team = ? ${delFilter}`, [team]);
-            teams = rows as {team_id: number}[];
+            teams = rows as {id_team: number}[];
         }
         if (!!teams.length)
-            return (teams[0].team_id);
+            return (teams[0].id_team);
         return (-1)
     }
 
     public static async isTeamOwner(target_user: UserEntity): Promise<status & { result: number }> {
         if (!target_user.is_loaded || !target_user.id || target_user.team === undefined || (target_user.team && !target_user.team.id))
             return ({success: false, error: "Broken user!", result: -1});
+        const status: status = await target_user.fetch(target_user.id); // Update User
+        if (!status.success)
+            return ({success: true, error: "", result: -1});
         if (target_user.team === null)
             return ({success: true, error: "", result: -1});
         const database: Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT id_team
                                               FROM team
                                               WHERE id_user = ?`, [target_user.id]);
-        const ids = (rows as ({team_id: number})[]);
+        const ids = (rows as ({id_team: number})[]);
         if (ids.length == 0)
             return ({success: true, error: "", result: -1})
-        return ({success: true, error: "", result: ids[0].team_id});
+        return ({success: true, error: "", result: ids[0].id_team});
     }
 
     public static async isMemberOfTeam(id_user: number): Promise<status & { result: number }> {

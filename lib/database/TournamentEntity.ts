@@ -484,7 +484,7 @@ export class TournamentEntity {
             return false;
         if (!team.is_loaded || !team.id)
             return false;
-        if (!await TeamEntity.isExist(team.id))
+        if (await TeamEntity.isExist(team.id) == -1)
             return false;
         let filter: string = "";
         if (checkStillRunning)
