@@ -148,6 +148,29 @@ export interface Match {
     start_date: Date;
 }
 
+export interface TeamMatch {
+    id_match: number;
+    id_team: number;
+    score: number;
+}
+
+export interface TeamAndMatch {
+    id_match: number;
+    id_tournament: number;
+    id_victory_team: number;
+    start_date: Date;
+    id_team: number;
+    score: number;
+}
+
+export interface MatchTeams {
+    id_match: number;
+    id_tournament: number;
+    id_victory_team: number;
+    start_date: Date;
+    teams: {id_team: number, score: number}[];
+}
+
 export interface id {
     id: number;
 }
