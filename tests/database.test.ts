@@ -17,9 +17,13 @@ import {
     TeamTournament, TeamInfo, UserInfo
 } from "../lib/types";
 import {sleep} from "../lib/tools/sleep";
+import {UserEntity} from "../lib/database/UserEntity";
+import {TournamentEntity} from "../lib/database/TournamentEntity";
+import { TeamEntity } from "../lib/database/TeamEntity";
 
 describe("Database", () => {
-    let database: Database;
+    // Primary functions
+    let id_primary_user: number;
     // User perfect use
     const nameUserManagement: string = "JestElessiah";
 
@@ -71,149 +75,132 @@ describe("Database", () => {
     //      Hash
     const passwordUser = "HashTestHashTest";
     beforeAll(async () => {
-        database = Database.getInstance();
-        await database.ready;
     });
     test("Primary database function", async() => {
+        // Récupération de l'instance
+        const database: Database = await Database.getInstance();
         // Test insert sain
-        let insertStatus : status & id = await database.insert({ table: "user_history", columns : ["id_user", "id_team_tournament"], values: [0, 0]});
+        let insertStatus : status & id = await database.insert({ table: "user", columns : ["username", "hash"], values: ["TestInsertJEST", "MyElessiah"]});
         expect(insertStatus.success).toBeTruthy();
-        const insertId: number = insertStatus.id;
+        id_primary_user = insertStatus.id;
 
         // Test get sain
-        let result : SQLGetResult = await database.get({ table: "user_history", values: ["*"], whereOption: [{ column: "id_user", condition: "=", value: 0}]});
+        let result : SQLGetResult = await database.get({ table: "user", values: ["*"], whereOption: [{ column: "username", condition: "=", value: "TestInsertJEST"}]});
         expect(result.success).toBeTruthy();
-        let history = result.result as History[];
-        expect(history.length).toEqual(1);
-        expect(history[0]).toEqual({ user_history_id: insertId, id_user: 0, id_team_tournament: 0 });
+        let userInfos = result.result as User[];
+        expect(userInfos.length).toEqual(1);
+        expect(userInfos[0]).toEqual({ id_user: id_primary_user, username: "TestInsertJEST", hash: "MyElessiah", token: null, is_admin: 0 });
 
         // Test update sain
-        let status : status = await database.update({ table: "user_history", columns: ["id_user"], values: [48]}, [{ column: "id_user", condition: "=", value: 0}]);
+        let status : status = await database.update({ table: "user", columns: ["username"], values: ["48"]}, [{ column: "id_user", condition: "=", value: id_primary_user}]);
         expect(status.success).toBeTruthy();
 
         // Vérification update
-        result = await database.get({ table: "user_history", whereOption: [{ column: "id_user", condition: "=", value: 48}]});
+        result = await database.get({ table: "user", whereOption: [{ column: "id_user", condition: "=", value: id_primary_user}]});
         expect(result.success).toBeTruthy();
-        history = result.result as History[];
-        expect(history.length).toEqual(1);
-        expect(history[0]).toEqual({ user_history_id: insertId, id_user: 48, id_team_tournament: 0 });
+        userInfos = result.result as User[];
+        expect(userInfos.length).toEqual(1);
+        expect(userInfos[0]).toEqual({ id_user: id_primary_user, username: "48", hash: "MyElessiah", token: null, is_admin: 0 });
 
         // Test remove sain
-        status = await database.remove({ table: "user_history", whereOption: [{ column: "id_user", condition: "=", value: 48}]});
+        status = await database.remove({ table: "user", whereOption: [{ column: "id_user", condition: "=", value: id_primary_user}]});
         expect(status.success).toBeTruthy();
 
         // Vérification suppression
-        result = await database.get({ table: "user_history",  whereOption: [{ column: "id_user", condition: "=", value: 48}]});
+        result = await database.get({ table: "user",  whereOption: [{ column: "id_user", condition: "=", value: id_primary_user}]});
         expect(result.success).toBeTruthy();
         expect(result.result.length).toEqual(0);
     });
     test("User management perfect use", async() => {
         // Création utilisateur
-        let setResult: status & id & {token: string} = await database.newUser(nameUserManagement, passwordUser);
+        const user: UserEntity = new UserEntity();
+        let setResult: status & id & {token: string} = await user.new(nameUserManagement, passwordUser);
         expect(setResult.success).toBeTruthy();
         expect(setResult.id).not.toEqual(-1);
-        const user_id = setResult.id;
+        expect(user.id).toEqual(setResult.id);
+        expect(user.name).toEqual(nameUserManagement);
+        expect(user.team).toBeNull();
+        expect(user.is_admin).toEqual(false);
         let user_token = setResult.token;
 
-        // Test admin status
-        let checkStatus: status & {result: boolean} = await database.isAdmin(user_id);
-        expect(checkStatus.success).toBeTruthy();
-        expect(checkStatus.result).toBeFalsy();
+        // Test fetch ID
+        let status : status = await user.fetch(user.id!);
+        expect(status.success).toBeTruthy();
+        expect(user.id).toEqual(setResult.id);
+        expect(user.name).toEqual(nameUserManagement);
+        expect(user.team).toBeNull();
+        expect(user.is_admin).toEqual(false);
+
+        // Test fetch Username
+        status = await user.fetch(nameUserManagement);
+        expect(status.success).toBeTruthy();
+        expect(user.id).toEqual(setResult.id);
+        expect(user.name).toEqual(nameUserManagement);
+        expect(user.team).toBeNull();
+        expect(user.is_admin).toEqual(false);
 
         // Test token auth
-        let token_status: status & {token: string} = await database.authTokenUser(user_id, user_token);
+        let token_status: status & {token: string} = await user.authToken(user_token);
         expect(token_status.success).toBeTruthy();
         expect(token_status.token.length).toBeGreaterThan(0);
         expect(token_status.token).not.toEqual(user_token);
         user_token = token_status.token;
 
-        // Test password par ID
-        token_status = await database.authPasswordUser(user_id, passwordUser);
-        expect(token_status.success).toBeTruthy();
-        expect(token_status.token.length).toBeGreaterThan(0);
-        expect(token_status.token).not.toEqual(user_token);
-        user_token = token_status.token;
-
-        // Test password par username
-        token_status = await database.authPasswordUser(nameUserManagement, passwordUser);
+        // Test password
+        token_status = await user.authPassword(passwordUser);
         expect(token_status.success).toBeTruthy();
         expect(token_status.token.length).toBeGreaterThan(0);
         expect(token_status.token).not.toEqual(user_token);
         user_token = token_status.token;
 
         // Test edit password
-        token_status = await database.updatePasswordUser(user_id, passwordUser, nameUserManagement);
+        token_status = await user.updatePassword(passwordUser, nameUserManagement);
         expect(token_status.success).toBeTruthy();
         expect(token_status.token.length).toBeGreaterThan(0);
         expect(token_status.token).not.toEqual(user_token);
         user_token = token_status.token;
 
         // Vérification edit password
-        token_status = await database.authPasswordUser(user_id, nameUserManagement);
+        token_status = await user.authPassword(nameUserManagement);
         expect(token_status.success).toBeTruthy();
         expect(token_status.token.length).toBeGreaterThan(0);
         expect(token_status.token).not.toEqual(user_token);
         user_token = token_status.token;
 
         // Reset for next
-        token_status = await database.updatePasswordUser(user_id, nameUserManagement, passwordUser);
+        token_status = await user.updatePassword(nameUserManagement, passwordUser);
         expect(token_status.success).toBeTruthy();
         expect(token_status.token.length).toBeGreaterThan(0);
         expect(token_status.token).not.toEqual(user_token);
         user_token = token_status.token;
 
-        // Test récupération par Nom
-        let getResult : status & Partial<UserInfo>;
-        getResult = await database.getUser(nameUserManagement);
-        expect(getResult).toEqual({...getResult, success: true, error: "", user_id: user_id, username: nameUserManagement, is_admin: false, id_team: null});
-
-        // Test récupération par ID
-        let secondGetResult: status & Partial<UserInfo>;
-        secondGetResult = await database.getUser(user_id);
-        expect(secondGetResult).toEqual(getResult);
-
-        // Test edit name par ID
-        let status : status = await database.editUsername(user_id, nameUserManagement.toUpperCase());
+        // Test rename
+        status = await user.rename(nameUserManagement.toUpperCase());
         expect(status.success).toBeTruthy();
+        expect(user.name).toEqual(nameUserManagement.toUpperCase());
+        expect((await user.fetch(nameUserManagement)).success).toBeFalsy();
+        expect((await user.fetch(nameUserManagement.toUpperCase())).success).toBeTruthy();
 
-        // Vérification edit
-        secondGetResult = await database.getUser(user_id);
-        expect(secondGetResult).toBeTruthy();
-        expect(secondGetResult).toEqual({...getResult, username: nameUserManagement.toUpperCase()});
-
-        // Test edit name par Nom
-        status = await database.editUsername(nameUserManagement.toUpperCase(), nameUserManagement);
+        // Reset name for next
+        status = await user.rename(nameUserManagement);
         expect(status.success).toBeTruthy();
+        expect(user.name).toEqual(nameUserManagement);
 
-        // Vérification edit
-        secondGetResult = await database.getUser(user_id);
-        expect(secondGetResult).toBeTruthy();
-        expect(secondGetResult).toEqual({...getResult, username: nameUserManagement});
-        expect(secondGetResult.username).toEqual(nameUserManagement);
-
-        // Test suppression par Nom
-        let delResult = await database.deleteUser(nameUserManagement);
+        // Test suppression
+        let delResult = await user.delete();
         expect(delResult.success).toBeTruthy();
-        getResult = await database.getUser(nameUserManagement);
-        expect(getResult.success).toBeFalsy();
+        expect(user.is_loaded).toBeFalsy();
+        expect((await user.fetch(nameUserManagement)).success).toBeFalsy();
 
         // Test Création admin
-        setResult = await database.newUser(nameUserManagement, passwordUser, true);
+        setResult = await user.new(nameUserManagement, passwordUser, true);
         expect(setResult.success).toBeTruthy();
         expect(setResult.id).not.toEqual(-1);
+        expect(user.is_admin).toBeTruthy();
         const admin_id = setResult.id;
 
-        // Test admin status
-        checkStatus = await database.isAdmin(admin_id);
-        expect(checkStatus.success).toBeTruthy();
-        expect(checkStatus.result).toBeTruthy();
-
-        // Vérification admin
-        getResult = await database.getUser(nameUserManagement);
-        expect(getResult).toEqual({...getResult, user_id: admin_id, username: nameUserManagement, id_team: null, is_admin: true});
-
         // Test suppression par ID
-        delResult = await database.deleteUser(admin_id);
+        delResult = await user.delete();
         expect(delResult.success).toBeTruthy();
     });
     test("User management bad use", async() => {
@@ -1760,69 +1747,158 @@ describe("Database", () => {
         expect(getHistories.success).toBeFalsy();
     }, 10000);
     afterAll(async () => {
+        console.log("Nettoyage !");
+        const database: Database = await Database.getInstance();
+        const delUser: UserEntity = new UserEntity();
+        const delTeam: TeamEntity = new TeamEntity();
+        const delTournament: TournamentEntity = new TournamentEntity();
+
         // Nettoyage Partie Primaire
-        await database.remove({ table: "user_history", whereOption: [{ column: "id_team_tournament", condition: "=", value: 0}]});
+        await database.remove({ table: "user", whereOption: [{ column: "id_user", condition: "=", value: id_primary_user}]});
 
         // Nettoyage Partie User Perfect
-        await database.deleteUser(nameUserManagement);
+        console.log("Removing : ", nameUserManagement)
+        let status: status = await delUser.fetch(nameUserManagement);
+        console.log("Status : ", status.success);
+        if (status.success)
+            await delUser.delete();
 
         // Nettoyage Partie User Bad
-        await database.deleteUser(badUserManagement);
-        await database.deleteUser(nameAlreadyUsed);
+        status = await delUser.fetch(badUserManagement);
+        if (status.success)
+            await delUser.delete();
+        status = await delUser.fetch(nameAlreadyUsed);
+        if (status.success)
+            await delUser.delete();
 
         // Nettoyage Partie Team Perfect
-        await database.deleteUser(nameTeamManagement);
-        await database.deleteUser(name2TeamManagement);
-        await database.hardDeleteTeam(nameTeamManagement);
-        await database.hardDeleteTeam(name2TeamManagement);
+        status = await delTeam.fetch(nameTeamManagement);
+        if (status.success)
+            await delTeam.hardDelete();
+        status = await delTeam.fetch(name2TeamManagement);
+        if (status.success)
+            await delTeam.hardDelete();
+        status = await delUser.fetch(nameTeamManagement);
+        if (status.success)
+            await delUser.delete();
+        status = await delUser.fetch(name2TeamManagement);
+        if (status.success)
+            await delUser.delete();
 
         // Nettoyage Partie Team Bad
-        await database.deleteUser(badTeamManagement);
-        await database.deleteUser(bad2TeamManagement);
-        await database.deleteUser(bad3TeamManagement)
-        await database.hardDeleteTeam(badTeamManagement);
+        status = await delTeam.fetch(badTeamManagement);
+        if (status.success)
+            await delTeam.hardDelete();
+        status = await delUser.fetch(badTeamManagement);
+        if (status.success)
+            await delUser.delete();
+        status = await delUser.fetch(bad2TeamManagement);
+        if (status.success)
+            await delUser.delete();
+        status = await delUser.fetch(bad3TeamManagement);
+        if (status.success)
+            await delUser.delete();
 
         // Nettoyage Partie Tournois Perfect
-        if (idTournament)
-            await database.deleteTournament(idTournament);
-        await database.hardDeleteTeam(teamTournamentTest);
-        await database.hardDeleteTeam(nameTournamentTest);
-        await database.deleteUser(nameTournamentTest);
-        await database.deleteUser(teamTournamentTest);
+        if (idTournament) {
+            status = await delTournament.fetch(idTournament);
+            if (status.success)
+                await delTournament.delete();
+        }
+        status = await delTeam.fetch(teamTournamentTest);
+        if (status.success)
+            await delTeam.hardDelete();
+        status = await delTeam.fetch(nameTournamentTest);
+        if (status.success)
+            await delTeam.hardDelete();
+        status = await delUser.fetch(nameTournamentTest);
+        if (status.success)
+            await delUser.delete();
+        status = await delUser.fetch(teamTournamentTest);
+        if (status.success)
+            await delUser.delete();
 
         // Nettoyage Partie Tournois Bad
-        if (BadIdTournament)
-            await database.deleteTournament(BadIdTournament);
-        if (BadEditTournament)
-            await database.deleteTournament(BadEditTournament);
-        await database.hardDeleteTeam(BadTournamentTest);
-        await database.hardDeleteTeam(Bad2TournamentTest);
-        await database.hardDeleteTeam(Bad3TournamentTest);
-        await database.hardDeleteTeam(Bad4TournamentTest);
-        await database.hardDeleteTeam(Bad5TournamentTest);
-        await database.deleteUser(BadTournamentTest);
-        await database.deleteUser(Bad2TournamentTest);
-        await database.deleteUser(Bad3TournamentTest);
-        await database.deleteUser(Bad4TournamentTest);
-        await database.deleteUser(Bad5TournamentTest);
+        if (BadIdTournament) {
+            status = await delTournament.fetch(BadIdTournament);
+            if (status.success)
+                await delTournament.delete();
+        }
+        if (BadEditTournament) {
+            status = await delTournament.fetch(BadEditTournament);
+            if (status.success)
+                await delTournament.delete();
+        }
+        status = await delTeam.fetch(BadTournamentTest);
+        if (status.success)
+            await delTeam.hardDelete();
+        status = await delTeam.fetch(Bad2TournamentTest);
+        if (status.success)
+            await delTeam.hardDelete();
+        status = await delTeam.fetch(Bad3TournamentTest);
+        if (status.success)
+            await delTeam.hardDelete();
+        status = await delTeam.fetch(Bad4TournamentTest);
+        if (status.success)
+            await delTeam.hardDelete();
+        status = await delTeam.fetch(Bad5TournamentTest);
+        if (status.success)
+            await delTeam.hardDelete();
+        status = await delUser.fetch(BadTournamentTest);
+        if (status.success)
+            await delUser.delete();
+        status = await delUser.fetch(Bad2TournamentTest);
+        if (status.success)
+            await delUser.delete();
+        status = await delUser.fetch(Bad3TournamentTest);
+        if (status.success)
+            await delUser.delete();
+        status = await delUser.fetch(Bad4TournamentTest);
+        if (status.success)
+            await delUser.delete();
+        status = await delUser.fetch(Bad5TournamentTest);
+        if (status.success)
+            await delUser.delete();
 
         // Nettoyage Partie Match & History Perfect
-        if (MatchHistoryTournament)
-            await database.deleteTournament(MatchHistoryTournament);
-        if (MatchHistory2Tournament)
-            await database.deleteTournament(MatchHistory2Tournament);
-        for (const name of namesMatchsHistory) {
-            await database.hardDeleteTeam(name);
-            await database.deleteUser(name);
+        if (MatchHistoryTournament) {
+            status = await delTournament.fetch(MatchHistoryTournament);
+            if (status.success)
+                await delTournament.delete();
         }
-        await database.deleteUser(substituteName);
+        if (MatchHistory2Tournament) {
+            status = await delTournament.fetch(MatchHistory2Tournament);
+            if (status.success)
+                await delTournament.delete();
+        }
+        for (const name of namesMatchsHistory) {
+            status = await delTeam.fetch(name);
+            if (status.success)
+                await delTeam.hardDelete();
+            status = await delUser.fetch(name);
+            if (status.success)
+                await delUser.delete();
+        }
+        status = await delUser.fetch(substituteName);
+        if (status.success)
+            await delUser.delete();
 
         // Nettoyage Partie Match & History bad
-        if (BadHistoryTournament)
-            await database.deleteTournament(BadHistoryTournament);
-        for (const name of badMatchsHistory) {
-            await database.hardDeleteTeam(name);
-            await database.deleteUser(name);
+        if (BadHistoryTournament){
+            status = await delTournament.fetch(BadHistoryTournament);
+            if (status.success)
+                await delTournament.delete();
         }
+        for (const name of badMatchsHistory) {
+            status = await delTeam.fetch(name);
+            if (status.success)
+                await delTeam.hardDelete();
+            status = await delUser.fetch(name);
+            if (status.success)
+                await delUser.delete();
+        }
+
+        // Fermeture de la base de donnée
+        await Database.disconnect();
     });
 });

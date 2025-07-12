@@ -37,9 +37,9 @@ export class UserEntity {
         const user_data: User = (rows as User[])[0];
         this.id = user_data.id_user;
         this.name = user_data.username;
-        this.is_admin = user_data.is_admin;
+        this.is_admin = Boolean(user_data.is_admin);
         this.is_loaded = true;
-        const checkStatus: status & {result: number} = await TeamEntity.isMemberOfTeam(this);
+        const checkStatus: status & {result: number} = await TeamEntity.isMemberOfTeam(this.id);
         if (!checkStatus.success)
             return ({success: false, error: checkStatus.error});
         if (checkStatus.result == -1) {
@@ -87,7 +87,7 @@ export class UserEntity {
         this.id = result.insertId;
         this.name = username;
         this.team = null;
-        this.is_admin = true;
+        this.is_admin = is_admin;
         this.is_loaded = true;
         return ({success: true, error: "", id: result.insertId, token: token});
     }
@@ -144,7 +144,7 @@ export class UserEntity {
     public async rename(new_username: string): Promise<status> {
         if (!this.is_loaded)
             return ({success: false, error: "Empty object!"});
-        const user = await TeamEntity.isExist(this.id!);
+        const user = await UserEntity.isExist(this.id!);
         if (user == -1)
             return ({success: false, error: "User does not exist!"});
         const status = this.checkNameNorm(new_username);
@@ -163,7 +163,7 @@ export class UserEntity {
     public async delete(): Promise<status> {
         if (!this.is_loaded)
             return ({success: false, error: "Empty object!"});
-        const user = await TeamEntity.isExist(this.id!);
+        const user = await UserEntity.isExist(this.id!);
         if (user == -1) {
             return ({success: false, error: "This user does not exist!"});
         }
@@ -207,23 +207,26 @@ export class UserEntity {
     public static async isExist(user: string | number,
                                 checkWithoutTeam: boolean = false): Promise<number> {
         const database: Database = await Database.getInstance();
-        let users: { user_id: number }[];
-        let teamFilter: string = "";
-        if (checkWithoutTeam)
-            teamFilter = " AND id_team IS NULL";
+        let users: { id_user: number }[];
         if (typeof user == typeof "string") {
             const [rows] = await database.db!.execute(`SELECT id_user
                                                        FROM user
-                                                       WHERE username LIKE ? ${teamFilter}`, [user]);
-            users = rows as { user_id: number }[];
+                                                       WHERE username LIKE ?`, [user]);
+            users = rows as { id_user: number }[];
         } else {
             const [rows] = await database.db!.execute(`SELECT id_user
                                                        FROM user
-                                                       WHERE id_user = ? ${teamFilter}`, [user]);
-            users = rows as { user_id: number }[];
+                                                       WHERE id_user = ?`, [user]);
+            users = rows as { id_user: number }[];
         }
-        if (!!users.length)
-            return (users[0].user_id);
+        if (users.length > 0) {
+            if (checkWithoutTeam) {
+                const checkStatus: status & { result: number } = await TeamEntity.isMemberOfTeam(users[0].id_user);
+                if (!checkStatus.success || checkStatus.result != -1)
+                    return (-1)
+            }
+            return (users[0].id_user);
+        }
         return (-1);
     }
 

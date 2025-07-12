@@ -159,7 +159,7 @@ export class TeamEntity {
             return ({success: false, error: "Broken user!"});
         if (await TeamEntity.isExist(this.id, true))
             return ({success: false, error: "This team does not exist or is inactive!"});
-        const checkStatus: status & {result: number} = await TeamEntity.isMemberOfTeam(user);
+        const checkStatus: status & {result: number} = await TeamEntity.isMemberOfTeam(user.id);
         if (!checkStatus.success)
             return ({success: false, error: checkStatus.error});
         if (checkStatus.result != -1)
@@ -257,11 +257,9 @@ export class TeamEntity {
         return ({success: true, error: "", result: ids[0].team_id});
     }
 
-    public static async isMemberOfTeam(target_user: UserEntity): Promise<status & { result: number }> {
-        if (!target_user.is_loaded || !target_user.id)
-            return  ({success: false, error: "Broken parameter user", result: -1});
+    public static async isMemberOfTeam(id_user: number): Promise<status & { result: number }> {
         const database: Database = await Database.getInstance();
-        const [rows] = await database.db!.execute(`SELECT id_team FROM user_team WHERE id_user = ? AND date_leave IS NULL`, [target_user.id]);
+        const [rows] = await database.db!.execute(`SELECT id_team FROM user_team WHERE id_user = ? AND date_leave IS NULL`, [id_user]);
         if ((rows as unknown[]).length == 0)
             return ({success: true, error: "", result: -1});
         return ({success: true, error: "", result: (rows as {id_team: number}[])[0].id_team});
