@@ -183,21 +183,6 @@ export class TeamEntity {
         return ({success: true, error: ""});
     }
 
-    public async isTeamOwner(target_user: UserEntity): Promise<status & { result: number }> {
-        if (!target_user.is_loaded || !target_user.id || target_user.team === undefined || (target_user.team && !target_user.team.id))
-            return ({success: false, error: "Broken user!", result: -1});
-        if (target_user.team === null)
-            return ({success: true, error: "", result: -1});
-        const database: Database = await Database.getInstance();
-        const [rows] = await database.db!.execute(`SELECT id_team
-                                              FROM team
-                                              WHERE id_user = ?`, [target_user.id]);
-        const ids = (rows as ({team_id: number})[]);
-        if (ids.length == 0)
-            return ({success: true, error: "", result: -1})
-        return ({success: true, error: "", result: ids[0].team_id});
-    }
-
     public async getMembers(): Promise<getTeamMembers> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!", members: []});
@@ -249,6 +234,21 @@ export class TeamEntity {
         if (!!teams.length)
             return (teams[0].team_id);
         return (-1)
+    }
+
+    public static async isTeamOwner(target_user: UserEntity): Promise<status & { result: number }> {
+        if (!target_user.is_loaded || !target_user.id || target_user.team === undefined || (target_user.team && !target_user.team.id))
+            return ({success: false, error: "Broken user!", result: -1});
+        if (target_user.team === null)
+            return ({success: true, error: "", result: -1});
+        const database: Database = await Database.getInstance();
+        const [rows] = await database.db!.execute(`SELECT id_team
+                                              FROM team
+                                              WHERE id_user = ?`, [target_user.id]);
+        const ids = (rows as ({team_id: number})[]);
+        if (ids.length == 0)
+            return ({success: true, error: "", result: -1})
+        return ({success: true, error: "", result: ids[0].team_id});
     }
 
     // Private

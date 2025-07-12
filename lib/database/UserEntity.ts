@@ -165,7 +165,7 @@ export class UserEntity {
             return ({success: false, error: "This user does not exist!"});
         }
         const team = new TeamEntity();
-        const ownedTeam: status & { result: number } = await team.isTeamOwner(this);
+        const ownedTeam: status & { result: number } = await TeamEntity.isTeamOwner(this);
         if (!ownedTeam.success)
             return ({success: false, error: ownedTeam.error})
         if (ownedTeam.result != -1) {
