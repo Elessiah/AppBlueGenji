@@ -39,11 +39,14 @@ export class UserEntity {
         this.name = user_data.username;
         this.is_admin = user_data.is_admin;
         this.is_loaded = true;
-        if (user_data.id_team == null) {
+        const checkStatus: status & {result: number} = await TeamEntity.isMemberOfTeam(this);
+        if (!checkStatus.success)
+            return ({success: false, error: checkStatus.error});
+        if (checkStatus.result == -1) {
             this.team = null;
         } else {
             this.team = new TeamEntity();
-            const status: status = await this.team.fetch(user_data.id_team);
+            const status: status = await this.team.fetch(checkStatus.result);
             if (!status.success)
                 return ({success: false, error: status.error});
         }

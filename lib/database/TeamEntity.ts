@@ -60,8 +60,13 @@ export class TeamEntity {
         if (!status.success)
             return ({...status, id: -1});
         if (!owner.id || await UserEntity.isExist(owner.id) == -1) {
-            return ({success: false, error: "Parameter owner does not exist or badly construct", id: -1});
+            return ({success: false, error: "Parameter owner does not exist or badly constructed", id: -1});
         }
+        status = await owner.fetch(owner.id);
+        if (!status.success)
+            return ({...status, id: -1});
+        if (owner.team)
+            return ({success: false, error: "User already have a team !", id: -1});
         this.id_user = owner.id;
         if (await TeamEntity.isExist(name) != -1)
             return ({success: false, error: "Team name already exist !", id: -1});
@@ -154,10 +159,11 @@ export class TeamEntity {
             return ({success: false, error: "Broken user!"});
         if (await TeamEntity.isExist(this.id, true))
             return ({success: false, error: "This team does not exist or is inactive!"});
-        const status: status = await user.fetch(user.id); // Making sure user up to date
-        if (!status.success) {
-            return ({success: false, error: status.error });
-        }
+        const checkStatus: status & {result: number} = await TeamEntity.isMemberOfTeam(user);
+        if (!checkStatus.success)
+            return ({success: false, error: checkStatus.error});
+        if (checkStatus.result != -1)
+            return ({success: false, error: "User already member of another team!"});
         const database: Database = await Database.getInstance();
         await database.db!.execute(`INSERT INTO user_team (id_user, id_team)
                                VALUES (?, ?)`, [this.id, user.id]);
@@ -249,6 +255,16 @@ export class TeamEntity {
         if (ids.length == 0)
             return ({success: true, error: "", result: -1})
         return ({success: true, error: "", result: ids[0].team_id});
+    }
+
+    public static async isMemberOfTeam(target_user: UserEntity): Promise<status & { result: number }> {
+        if (!target_user.is_loaded || !target_user.id)
+            return  ({success: false, error: "Broken parameter user", result: -1});
+        const database: Database = await Database.getInstance();
+        const [rows] = await database.db!.execute(`SELECT id_team FROM user_team WHERE id_user = ? AND date_leave IS NULL`, [target_user.id]);
+        if ((rows as unknown[]).length == 0)
+            return ({success: true, error: "", result: -1});
+        return ({success: true, error: "", result: (rows as {id_team: number}[])[0].id_team});
     }
 
     // Private
