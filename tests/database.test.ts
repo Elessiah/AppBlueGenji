@@ -205,176 +205,142 @@ describe("Database", () => {
     });
     test("User management bad use", async() => {
         // Init test user
-        let setResult : status & id & {token: string} = await database.newUser(badUserManagement, passwordUser);
+        const user: UserEntity = new UserEntity();
+        let setResult : status & id & {token: string} = await user.new(badUserManagement, passwordUser);
         expect(setResult.success).toBeTruthy();
         expect(setResult.id).not.toEqual(-1);
         const id_user : number = setResult.id;
         let user_token: string = setResult.token;
 
-        setResult = await database.newUser(nameAlreadyUsed, passwordUser);
+        const user2: UserEntity = new UserEntity();
+        setResult = await user2.new(nameAlreadyUsed, passwordUser);
         expect(setResult.success).toBeTruthy();
         expect(setResult.id).not.toEqual(-1);
 
         // Test création doublons
-        let setError : status & id = await database.newUser(badUserManagement, passwordUser);
+        const badUser: UserEntity = new UserEntity();
+        let setError : status & id = await badUser.new(badUserManagement, passwordUser);
         expect(setError.success).toBeFalsy();
         expect(setError.error).toEqual("Username already exist !");
 
         // Test création trop courte
-        setError = await database.newUser("", passwordUser);
+        setError = await badUser.new("", passwordUser);
         expect(setError.success).toBeFalsy();
         expect(setError.error).toEqual("The name must be at least 3 characters and maximum 15!");
-        setError = await database.newUser("az", passwordUser);
+        setError = await badUser.new("az", passwordUser);
         expect(setError.success).toBeFalsy();
         expect(setError.error).toEqual("The name must be at least 3 characters and maximum 15!");
 
         // Test création trop longue
-        setError = await database.newUser("1234567890123456", passwordUser);
+        setError = await badUser.new("1234567890123456", passwordUser);
         expect(setError.success).toBeFalsy();
         expect(setError.error).toEqual("The name must be at least 3 characters and maximum 15!");
 
         // Test création avec mot de passe trop court
-        setError = await database.newUser(badUserManagement.toUpperCase(), "");
+        setError = await badUser.new(badUserManagement.toUpperCase(), "");
         expect(setError.success).toBeFalsy();
         expect(setError.error).toEqual("Password must be contain between 8 and 50 characters!");
-        setError = await database.newUser(badUserManagement.toUpperCase(), "azeze");
+        setError = await badUser.new(badUserManagement.toUpperCase(), "azeze");
         expect(setError.success).toBeFalsy();
         expect(setError.error).toEqual("Password must be contain between 8 and 50 characters!");
 
         // Test création avec mot de passe trop long
-        setError = await database.newUser(badUserManagement.toUpperCase(), "1234567890123456789012345678901234567890123456789012345678901234567890");
+        setError = await badUser.new(badUserManagement.toUpperCase(), "1234567890123456789012345678901234567890123456789012345678901234567890");
         expect(setError.success).toBeFalsy();
         expect(setError.error).toEqual("Password must be contain between 8 and 50 characters!");
 
-        // Test authPasswordUser id éroné
-        let statusToken : status & {token: string} = await database.authPasswordUser(-1, passwordUser);
-        expect(statusToken.success).toBeFalsy();
-        expect(statusToken.token.length).toEqual(0);
-
         // Test authPasswordUser password éroné
-        statusToken = await database.authPasswordUser(id_user, "JeNeSuisPasLeBonMDP");
+        let statusToken: status & {token: string} = await user.authPassword("JeNeSuisPasLeBonMDP");
         expect(statusToken.success).toBeTruthy();
         expect(statusToken.token.length).toEqual(0);
 
-        // Test editPasswordUser ID éroné
-        statusToken = await database.updatePasswordUser(-1, passwordUser, passwordUser.toUpperCase());
-        expect(statusToken.success).toBeFalsy();
-        expect(statusToken.token.length).toEqual(0);
-
         // Test editPasswordUser old_password éroné
-        statusToken = await database.updatePasswordUser(id_user, "JeNeSuisPasLeBonMDP", "JeSuisLeNouveauMDP");
+        statusToken = await user.updatePassword("JeNeSuisPasLeBonMDP", "JeSuisLeNouveauMDP");
         expect(statusToken.success).toBeFalsy();
         expect(statusToken.token.length).toEqual(0);
 
         // Test editPasswordUser old_password et new_password éroné
-        statusToken = await database.updatePasswordUser(id_user, passwordUser, passwordUser);
+        statusToken = await user.updatePassword(passwordUser, passwordUser);
         expect(statusToken.success).toBeFalsy();
         expect(statusToken.error).toEqual("The new password is the same as the last one!");
         expect(statusToken.token.length).toEqual(0);
 
         // Test editPasswordUser new_password trop court
-        statusToken = await database.updatePasswordUser(id_user, passwordUser, "");
+        statusToken = await user.updatePassword(passwordUser, "");
         expect(statusToken.success).toBeFalsy();
         expect(statusToken.error).toEqual("Password must be contain between 8 and 50 characters!");
         expect(statusToken.token.length).toEqual(0);
-        statusToken = await database.updatePasswordUser(id_user, passwordUser, "az");
+        statusToken = await user.updatePassword(passwordUser, "az");
         expect(statusToken.success).toBeFalsy();
         expect(statusToken.error).toEqual("Password must be contain between 8 and 50 characters!");
         expect(statusToken.token.length).toEqual(0);
 
         // Test editPasswordUser new_password trop long
-        statusToken = await database.updatePasswordUser(id_user, passwordUser, "1234567890123456789012345678901234567890123456789012345678901234567890");
+        statusToken = await user.updatePassword(passwordUser, "1234567890123456789012345678901234567890123456789012345678901234567890");
         expect(statusToken.success).toBeFalsy();
         expect(statusToken.error).toEqual("Password must be contain between 8 and 50 characters!");
         expect(statusToken.token.length).toEqual(0);
 
         // Edit password for further tests
-        statusToken = await database.updatePasswordUser(id_user, passwordUser, "TemporaryPassword");
+        statusToken = await user.updatePassword(passwordUser, "TemporaryPassword");
         expect(statusToken.success).toBeTruthy();
         expect(statusToken.token.length).toBeGreaterThan(0);
         expect(statusToken.token).not.toEqual(user_token);
 
         // Use old_password
-        statusToken = await database.authPasswordUser(id_user, passwordUser);
+        statusToken = await user.authPassword(passwordUser);
         expect(statusToken.success).toBeTruthy();
         expect(statusToken.token.length).toEqual(0);
 
         // Reset password for further tests
-        statusToken = await database.updatePasswordUser(id_user, "TemporaryPassword", passwordUser);
+        statusToken = await user.updatePassword("TemporaryPassword", passwordUser);
         expect(statusToken.success).toBeTruthy();
         expect(statusToken.token.length).toBeGreaterThan(0);
         expect(statusToken.token).not.toEqual(user_token);
         user_token = statusToken.token;
 
-        // Test authTokenUser avec id_user wrong
-        statusToken = await database.authTokenUser(-1, user_token);
-        expect(statusToken.success).toBeFalsy();
-        expect(statusToken.token.length).toEqual(0);
-
         // Test authTokenUser avec un mauvais token
-        statusToken = await database.authTokenUser(id_user, "WrongToken");
+        statusToken = await user.authToken("WrongToken");
         expect(statusToken.success).toBeTruthy();
         expect(statusToken.token.length).toEqual(0);
 
         // Test authTokenUser double utilisation
         //      Première utilisation
-        statusToken = await database.authTokenUser(id_user, user_token);
+        statusToken = await user.authToken(user_token);
         expect(statusToken.success).toBeTruthy();
         expect(statusToken.token.length).toBeGreaterThan(0);
         expect(statusToken.token).not.toEqual(user_token);
         //      Seconde utilisation
-        statusToken = await database.authTokenUser(id_user, user_token);
+        statusToken = await user.authToken(user_token);
         expect(statusToken.success).toBeTruthy();
         expect(statusToken.token.length).toEqual(0);
 
-        // Test récupération par Nom éroné
-        let getError : status & Partial<User> = await database.getUser("az");
-        expect(getError.success).toBeFalsy();
-
-        // Test récupération par ID éroné
-        getError = await database.getUser(-1);
-        expect(getError.success).toBeFalsy();
-
-        // Test edit par ID éroné
-        let status : status = await database.editUsername(-1, badUserManagement.toUpperCase());
-        expect(status.success).toBeFalsy();
-
         // Test edit avec nouveau Nom non conforme
         //          Trop court
-        status = await database.editUsername(id_user, "");
+        let status: status = await user.rename("");
         expect(status.success).toBeFalsy();
-        status = await database.editUsername(id_user, "za");
+        status = await user.rename("za");
         expect(status.success).toBeFalsy();
 
         //          Déjà pris
-        status = await database.editUsername(id_user, nameAlreadyUsed);
+        status = await user.rename(nameAlreadyUsed);
         expect(status.success).toBeFalsy();
 
         //          Le même
-        status = await database.editUsername(id_user, badUserManagement);
+        status = await user.rename(badUserManagement);
         expect(status.success).toBeFalsy();
 
         //          Trop long
-        status = await database.editUsername(id_user, "12345678901234567");
-        expect(status.success).toBeFalsy();
-
-        // Test edit avec ID éroné
-        status = await database.editUsername(-1, badUserManagement.toUpperCase());
-        expect(status.success).toBeFalsy();
-
-        // Test suppression par Nom éroné
-        status = await database.deleteUser("er");
-        expect(status.success).toBeFalsy();
-
-        // Test suppression par ID eroné
-        status = await database.deleteUser(-1);
+        status = await user.rename("12345678901234567");
         expect(status.success).toBeFalsy();
     });
     test("Team Management perfect use", async() => {
         // Création test User
-        let setUserResult: status & id = await database.newUser(nameTeamManagement, passwordUser);
+        const user: UserEntity = new UserEntity();
+        let setUserResult: status & id = await user.new(nameTeamManagement, passwordUser);
         expect(setUserResult.success).toBeTruthy();
         expect(setUserResult.id).not.toEqual(-1);
+
         const user1_id: number = setUserResult.id;
 
         // Création test user 2
@@ -1747,19 +1713,15 @@ describe("Database", () => {
         expect(getHistories.success).toBeFalsy();
     }, 10000);
     afterAll(async () => {
-        console.log("Nettoyage !");
         const database: Database = await Database.getInstance();
         const delUser: UserEntity = new UserEntity();
         const delTeam: TeamEntity = new TeamEntity();
         const delTournament: TournamentEntity = new TournamentEntity();
 
         // Nettoyage Partie Primaire
-        await database.remove({ table: "user", whereOption: [{ column: "id_user", condition: "=", value: id_primary_user}]});
 
         // Nettoyage Partie User Perfect
-        console.log("Removing : ", nameUserManagement)
         let status: status = await delUser.fetch(nameUserManagement);
-        console.log("Status : ", status.success);
         if (status.success)
             await delUser.delete();
 
