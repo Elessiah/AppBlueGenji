@@ -25,13 +25,6 @@ import {
 
 export class Database {
     // public
-    public static async getInstance(): Promise<Database> {
-        if (!Database.instance) {
-            Database.instance = new Database();
-            await Database.instance.ready;
-        }
-        return Database.instance;
-    }
 
     // Primary function
     public async insert(params: SQLEditParams): Promise<status & id> {
@@ -98,9 +91,20 @@ export class Database {
         return {success: true, error: ""};
     }
 
-    // App function
+    // Static
+    public static async getInstance(): Promise<Database> {
+        if (!Database.instance) {
+            Database.instance = new Database();
+            await Database.instance.ready;
+        }
+        return Database.instance;
+    }
 
-    // private
+    public static async disconnect() {
+        if (!Database.instance)
+            await this.db!.end();
+    }
+    // Private
     private static instance: Database;
     public db: mysql.Connection | null = null;
     public readonly ready: Promise<void>;
@@ -251,4 +255,4 @@ export class Database {
     }
 }
 
-await Database.getInstance();
+// await Database.getInstance();

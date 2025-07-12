@@ -150,7 +150,7 @@ export class UserEntity {
         const status = this.checkNameNorm(new_username);
         if (!status.success)
             return status;
-        if (await TeamEntity.isExist(new_username) != -1)
+        if (await UserEntity.isExist(new_username) != -1)
             return ({success: false, error: "Username already exist or it's already your username!"});
         const database: Database = await Database.getInstance();
         await database.db!.execute(`UPDATE user
