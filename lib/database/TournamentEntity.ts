@@ -632,13 +632,9 @@ export class TournamentEntity {
         if (!await TournamentEntity.isExist(this.id))
             return ({success: false, error: "This tournament does not exist !", result: false});
         const database: Database = await Database.getInstance();
-        const [rows] = await database.db!.execute(`SELECT open_registration, close_registration
-                                                   FROM tournament
-                                                   WHERE id_tournament = ?`, [this.id]);
-        const tournament_info = (rows as unknown[])[0] as { open_registration: Date, close_registration: Date };
         const now = new Date();
         // Précision d'une seconde car la base de donnée arrondi
-        if ((now.getTime() - tournament_info.open_registration.getTime()) >= -1000 && (now.getTime() - tournament_info.close_registration.getTime()) < 1000)
+        if ((now.getTime() - this.open_registration!.getTime()) >= -1000 && (now.getTime() - this.close_registration!.getTime()) < 1000)
             return ({success: true, error: "", result: true});
         return ({success: true, error: "", result: false});
     }

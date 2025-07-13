@@ -1,5 +1,4 @@
 import {NextResponse} from "next/server";
-import {Database} from "../../../lib/database/database";
 import {status} from "../../../lib/types";
 import {TournamentEntity} from "../../../lib/database/TournamentEntity";
 import {UserEntity} from "../../../lib/database/UserEntity";
@@ -25,6 +24,8 @@ export async function registration(body: {id_tournament: number | undefined},
     status = await team.fetch(user.team.id!);
     if (!status.success)
         return (NextResponse.json({error: status.error}, {status: 400}));
+    if (team.id_user != user.id)
+        return (NextResponse.json({error: "You need to own a team to register !"}, {status: 403}));
     if (unregistration)
         status = await tournament.unregistration(team);
     else
