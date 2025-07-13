@@ -18,7 +18,7 @@ import {
     SQLGetResult,
     SQLWhere,
     Match,
-    getMatchs,
+    getMatchsServer,
     getTournamentTeams,
     TeamTournament, id, Tournament, token_payload, TeamInfo, UserInfo, TournamentTeamsCount,
 } from '../types';

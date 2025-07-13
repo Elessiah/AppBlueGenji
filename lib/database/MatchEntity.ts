@@ -1,6 +1,6 @@
 import {TournamentEntity} from "./TournamentEntity";
 import {TeamEntity} from "./TeamEntity";
-import {status, getMatchs, Match, id, TeamMatch, TeamAndMatch, MatchTeams} from "../types";
+import {status, getMatchsServer, Match, id, TeamMatch, TeamAndMatch, MatchTeams} from "../types";
 import {Database} from "./database";
 import mysql from "mysql2/promise";
 
@@ -141,7 +141,7 @@ export class MatchEntity {
         }
         await this.manageTournamentWinner();
         if (await this.tournament.isAllMatchEnded()) {
-            const getMatchs: getMatchs = await this.tournament.setupNextRound();
+            const getMatchs: getMatchsServer = await this.tournament.setupNextRound();
             if (!getMatchs.success)
                 return ({success: false, error: getMatchs.error});
         }

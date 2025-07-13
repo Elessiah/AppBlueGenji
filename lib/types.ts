@@ -68,8 +68,14 @@ export interface getTournaments {
     error: string;
 }
 
-export interface getMatchs {
+export interface getMatchsServer {
     matchs: MatchEntity[];
+    success: boolean;
+    error: string;
+}
+
+export interface getMatchsClient {
+    matchs: Match[];
     success: boolean;
     error: string;
 }
@@ -143,8 +149,9 @@ export type TournamentTeamsCount = Tournament & {nb_teams: number};
 
 export interface Match {
     id_match: number;
-    id_tournament: number;
-    victory: number | null;
+    tournament: Tournament;
+    teams: TeamMatch[];
+    id_victory_team: number | null;
     start_date: Date;
 }
 

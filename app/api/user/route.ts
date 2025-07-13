@@ -35,9 +35,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         return (NextResponse.json({...getHistory.histories}, {status: 200}));
     }
     return (NextResponse.json({
-            user_id: user.id,
+            id_user: user.id,
             username: user.name,
-            id_team: user.team ? user.team.id : null,
             is_admin: user.is_admin,
         },
         {status: 200}));

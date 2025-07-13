@@ -37,16 +37,17 @@ export class TeamEntity {
         }
         const database: Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT team.id_team,
-                                                      team.name,
-                                                      team.creation_date,
-                                                      team.id_user,
-                                                      owner.username,
-                                                      COUNT(members.date_join) as members_count
-                                               FROM team
-                                                        LEFT JOIN user_team members ON members.id_team = team.id_team
-                                                        LEFT JOIN user owner ON owner.id_user = team.id_user
-                                               WHERE team.id_team = ?
-                                               GROUP BY team.id_team, team.creation_date, team.id_user, owner.username, team.name`, [team]);
+                                                          team.name,
+                                                          team.creation_date,
+                                                          team.id_user,
+                                                          owner.username,
+                                                          COUNT(IF(members.date_leave IS NULL, 1, NULL)) as members_count
+                                                   FROM team
+                                                            LEFT JOIN user_team members ON members.id_team = team.id_team
+                                                            LEFT JOIN user owner ON owner.id_user = team.id_user
+                                                   WHERE team.id_team = ?
+                                                   GROUP BY team.id_team, team.creation_date, team.id_user,
+                                                            owner.username, team.name`, [team]);
         const team_data: TeamInfo = (rows as TeamInfo[])[0];
         this.id = team_data.id_team;
         this.name = team_data.name;

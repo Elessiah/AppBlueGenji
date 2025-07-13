@@ -10,6 +10,7 @@ import {owner} from "./owner";
 import {rename} from "./rename";
 import {create} from "./create";
 import {TeamEntity} from "../../../lib/database/TeamEntity";
+import {UserEntity} from "../../../lib/database/UserEntity";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     const {searchParams} = new URL(request.url);
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (get && get != 'history' && get != 'members')
         return (NextResponse.json({error: "'g' must equal 'history' or 'members'"}, {status: 400}));
     const team: TeamEntity = new TeamEntity();
-    const status: status = await team.fetch(id ? id : name!);
+    let status: status = await team.fetch(id ? Number(id) : name!);
     if (!status.success)
         return (NextResponse.json({error: status.error}, {status: 400}));
     if (get == "history") {
@@ -36,13 +37,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             return (NextResponse.json({error: getTeamMembers.error}, {status: 400}));
         return (NextResponse.json({members: getTeamMembers.members}, {status: 200}));
     }
+    let user: UserEntity | null = new UserEntity();
+    if (team.id_user == null)
+        user = null;
+    else
+        status = await user.fetch(team.id_user!);
+    if (!status.success)
+        return (NextResponse.json({error: status.error}, {status: 400}));
     return (NextResponse.json({
+        id_team: team.id,
         name: team.name,
         creation_date: team.creation_date,
-        owner_name: team.username ? team.username : "",
-        id_owner: team.id_user,
+        username: user ? user.name : "",
+        id_user: user ? user.id : null,
         members_count: team.members_count,
-    }));
+    }, {status: 200}));
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {

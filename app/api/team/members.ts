@@ -30,7 +30,7 @@ export async function members(body: {user: number | string | undefined,
     status = await target.fetch(body.user);
     if (!status.success)
         return (NextResponse.json({error: status.error}, {status: 400}));
-    if (target.team)
+    if (!is_remove && target.team)
         return (NextResponse.json({error: "The member is already in another team."}, {status: 400}))
     if (!caller.is_admin && caller.id != team.id_user)
         return (NextResponse.json({error: "You don't have the permission to do this! Ask the team owner !"}, {status: 403}));

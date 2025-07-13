@@ -1,6 +1,6 @@
 import {UserEntity} from "./UserEntity";
 import {
-    getMatchs,
+    getMatchsServer,
     getTournamentTeams,
     id,
     status,
@@ -447,7 +447,7 @@ export class TournamentEntity {
         return ({success: true, error: "", teams: teams});
     }
 
-    public async setup(): Promise<getMatchs> {
+    public async setup(): Promise<getMatchsServer> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!", matchs: []});
         const status: status & { result: boolean } = await this.isEnded();
@@ -478,7 +478,7 @@ export class TournamentEntity {
         return (await this.getMatchs());
     }
 
-    public async getMatchs(nbFromLast: number = -1): Promise<getMatchs> {
+    public async getMatchs(nbFromLast: number = -1): Promise<getMatchsServer> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!", matchs: []});
         if (!(await TournamentEntity.isExist(this.id)))
@@ -537,7 +537,7 @@ export class TournamentEntity {
         return (!(rows as unknown[]).length);
     }
 
-    public async setupNextRound(): Promise<getMatchs> {
+    public async setupNextRound(): Promise<getMatchsServer> {
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!", matchs: []});
         const status: status & { result: boolean } = await this.isEnded();

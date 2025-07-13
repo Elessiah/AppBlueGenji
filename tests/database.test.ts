@@ -11,7 +11,7 @@ import {
     User,
     SQLGetResult,
     getTournamentTeams,
-    getMatchs,
+    getMatchsServer,
 } from "../lib/types";
 import {sleep} from "../lib/tools/sleep";
 import {UserEntity} from "../lib/database/UserEntity";
@@ -1290,7 +1290,7 @@ describe("Database", () => {
         await sleep(2500);
 
         // Test lancement de tournois
-        let matchs: getMatchs = await tournament.setup();
+        let matchs: getMatchsServer = await tournament.setup();
 
         // Test isTournamentEnded avec un tournois lancé mais pas terminé
         result = await tournament.isEnded();
@@ -1308,7 +1308,7 @@ describe("Database", () => {
         const match1: MatchEntity = new MatchEntity(matchs.matchs[0]);
 
         // Test fonction getMatchs qui doit renvoyer la même chose !
-        const secondMatchs: getMatchs = await tournament.getMatchs();
+        const secondMatchs: getMatchsServer = await tournament.getMatchs();
         expect(matchs.matchs).toEqual(secondMatchs.matchs);
 
         // Test valeur de retour match 2
@@ -1572,7 +1572,7 @@ describe("Database", () => {
         BadHistoryTournament = setStatus.id;
 
         // Test lancement next round sans équipe avant start
-        let getMatchs: getMatchs = await tournament.setupNextRound();
+        let getMatchs: getMatchsServer = await tournament.setupNextRound();
         expect(getMatchs.success).toBeFalsy();
 
         // Test lancement précoce sans équipe avant start

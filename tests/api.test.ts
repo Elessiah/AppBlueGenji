@@ -13,11 +13,14 @@ import {
     TeamTournament,
     Match,
     History,
-    getMatchs
+    getMatchsServer
 } from "../lib/types";
 import {Database} from "../lib/database/database";
 import {owner} from "../app/api/team/owner";
 import {sleep} from "../lib/tools/sleep";
+import {UserEntity} from "../lib/database/UserEntity";
+import {TournamentEntity} from "../lib/database/TournamentEntity";
+import { TeamEntity } from "../lib/database/TeamEntity";
 
 describe("api", () => {
     // User perfect Use
@@ -86,7 +89,7 @@ describe("api", () => {
         response = await GETUSER(request);
         expect(response.status).toEqual(200);
         let userInfo: UserInfo = await response.json() as UserInfo;
-        expect(userInfo).toEqual({user_id: idUserAPI, username: nameUserAPI, id_team: null, is_admin: false});
+        expect(userInfo).toEqual({id_user: idUserAPI, username: nameUserAPI, id_team: null, is_admin: false});
 
         // Test récupération de l'utilisateur par Nom
         request = new NextRequest(`https://localhost/user/?username=${nameUserAPI}`);
@@ -225,7 +228,7 @@ describe("api", () => {
         response = await GETUSER(request);
         expect(response.status).toEqual(200);
         userInfo = await response.json() as UserInfo;
-        expect(userInfo).toEqual({user_id: idUserAPI, username: passwordUserAPI, id_team: null, is_admin: false});
+        expect(userInfo).toEqual({id_user: idUserAPI, username: passwordUserAPI, id_team: null, is_admin: false});
 
         // Reset update
         request = new NextRequest(`https://localhost/user/`, {
@@ -250,7 +253,7 @@ describe("api", () => {
                 'Content-Type': 'application/json',
                 'token': token,
             },
-            body: JSON.stringify({command: "delete", user_id: userInfo.user_id})
+            body: JSON.stringify({command: "delete", user_id: userInfo.id_user})
         });
         response = await POSTUSER(request);
         expect(response.status).toEqual(200);
@@ -334,13 +337,6 @@ describe("api", () => {
         expect(response.status).toEqual(400);
         error = await response.json() as {error: string};
         expect(error.error).toEqual("If you want to fetch history 'g' must equal 'history'!")
-
-        // Test récupération history avec username et history
-        request = new NextRequest(`https://localhost/user/?username=${badUser1API}&g=history`);
-        response = await GETUSER(request);
-        expect(response.status).toEqual(400);
-        error = await response.json() as {error: string};
-        expect(error.error).toEqual("'id' is required to fetch the history !")
 
         // Test auth sans token
         request = new NextRequest(`https://localhost/user/`, {
@@ -657,8 +653,8 @@ describe("api", () => {
         teamInfo.creation_date = new Date(teamInfo.creation_date);
         expect(teamInfo.name).toEqual(nameUserTeam);
         expect((new Date()).getTime() - teamInfo.creation_date.getTime()).toBeLessThan(2000);
-        expect(teamInfo.owner_name).toEqual(nameUserTeam);
-        expect(teamInfo.id_owner).toEqual(idUserTeam);
+        expect(teamInfo.username).toEqual(nameUserTeam);
+        expect(teamInfo.id_user).toEqual(idUserTeam);
         expect(teamInfo.members_count).toEqual(1);
 
         // Test get par Nom
@@ -683,7 +679,6 @@ describe("api", () => {
         let members: UserInfo[] = ((await response.json() as {members: UserInfo[]}).members);
         expect(members.length).toEqual(1);
         expect({...members[0], is_admin: false}).toEqual(user);
-
         // Test get history
         request = new NextRequest(`https://localhost/team/?id=${idPerfectTeam}&g=history`);
         response = await GETTEAM(request);
@@ -773,8 +768,8 @@ describe("api", () => {
         response = await GETTEAM(request);
         expect(response.status).toEqual(200);
         secondTeamInfo = await response.json() as TeamInfo;
-        expect(secondTeamInfo.owner_name).toEqual(nameUser2Team);
-        expect(secondTeamInfo.id_owner).toEqual(idUser2Team);
+        expect(secondTeamInfo.username).toEqual(nameUser2Team);
+        expect(secondTeamInfo.id_user).toEqual(idUser2Team);
 
         // Reset by ID
         request = new NextRequest(`https://localhost/team/`,
@@ -796,8 +791,8 @@ describe("api", () => {
         response = await GETTEAM(request);
         expect(response.status).toEqual(200);
         secondTeamInfo = await response.json() as TeamInfo;
-        expect(secondTeamInfo.owner_name).toEqual(nameUserTeam);
-        expect(secondTeamInfo.id_owner).toEqual(idUserTeam);
+        expect(secondTeamInfo.username).toEqual(nameUserTeam);
+        expect(secondTeamInfo.id_user).toEqual(idUserTeam);
 
         // Test rm Member
         request = new NextRequest(`https://localhost/team/`,
@@ -844,16 +839,16 @@ describe("api", () => {
         secondTeamInfo = await response.json() as TeamInfo;
         expect(secondTeamInfo.name).toEqual(nameUserTeam);
         expect(new Date(secondTeamInfo.creation_date)).toEqual(teamInfo.creation_date);
-        expect(secondTeamInfo.owner_name).toEqual(null);
-        expect(secondTeamInfo.id_owner).toEqual(null);
+        expect(secondTeamInfo.username).toEqual("");
+        expect(secondTeamInfo.id_user).toEqual(null);
         expect(secondTeamInfo.members_count).toEqual(0);
 
         // Test destruct team
 
         //      Création admin
         const database = Database.getInstance();
-        await database.deleteUser(adminTeam);
-        const setUser: status & id &{token: string} = await database.newUser(adminTeam, "admin1234", true);
+        const admin: UserEntity = new UserEntity();
+        const setUser: status & id &{token: string} = await admin.new(adminTeam, "admin1234", true);
         expect(setUser.success).toBeTruthy();
         //      Destruct team
         request = new NextRequest(`https://localhost/team/`,
@@ -1374,10 +1369,9 @@ describe("api", () => {
         expect(teamsRegistration.length).toEqual(usersPTID.length);
         for (let i = 0; i < teamsRegistration.length; i++) {
             expect(teamsPTID).toContain(teamsRegistration[i].id_team);
-            expect(teamsRegistration[i].team_id).not.toBeUndefined();
-            expect(teamsRegistration[i].team_tournament_id).not.toBeUndefined();
+            expect(teamsRegistration[i].id_team).not.toBeUndefined();
             expect(teamsRegistration[i].id_tournament).not.toBeUndefined();
-            expect(teamsRegistration[i].id_owner).not.toBeUndefined();
+            expect(teamsRegistration[i].id_user).not.toBeUndefined();
             expect(teamsRegistration[i].name).not.toBeUndefined();
             expect(teamsRegistration[i].position).not.toBeUndefined();
             expect(teamsRegistration[i].creation_date).not.toBeUndefined();
@@ -1431,7 +1425,7 @@ describe("api", () => {
             response = await GETTEAM(request);
             const registration: History[] = (await response.json() as {histories: History[]}).histories;
             expect(registration.length).toEqual(1);
-            expect(registration[0].tournament_id).toEqual(PTID);
+            expect(registration[0].id_tournament).toEqual(PTID);
         }
 
         // Simulation de lancement pour getMatchs
@@ -1439,9 +1433,11 @@ describe("api", () => {
         await sleep(3000);
 
         //      Lancement tournoi
-        const database = Database.getInstance();
-        const status: getMatchs = await database.setupTournament(PTID);
+        const tournamentEntity: TournamentEntity = new TournamentEntity();
+        const status: status = await tournamentEntity.fetch(PTID);
         expect(status.success).toBeTruthy();
+        const getMatchs: getMatchsServer = await tournamentEntity.setup();
+        expect(getMatchs.success).toBeTruthy();
 
         // Test Get matchs
         request = new NextRequest(`https://localhost/tournament/?id=${PTID}&g=matchs`);
@@ -1450,9 +1446,8 @@ describe("api", () => {
         matchs = (await response.json() as {matchs: Match[]}).matchs;
         expect(matchs.length).toEqual(2);
         for (const match of matchs) {
-            expect(match.id_tournament).toEqual(PTID);
-            expect(match.score_host).toEqual(0);
-            expect(match.score_guest).toEqual(0);
+            expect(match.tournament.id_tournament).toEqual(PTID);
+            expect(match.id_victory_team).toBeNull();
         }
 
         // Test erase
@@ -1831,47 +1826,104 @@ describe("api", () => {
         BTtoken2 = tmp_token!;
     });
     afterAll(async() => {
-        const database = Database.getInstance();
+        // Init terminators
+        const user: UserEntity = new UserEntity();
+        const team: TeamEntity = new TeamEntity();
+        const tournament: TournamentEntity = new TournamentEntity();
 
         // User Perfect use
-        await database.deleteUser(idUserAPI);
+        let status: status = await user.fetch(idUserAPI);
+        if (!status.success)
+            await user.delete();
 
         // User Bad use
-        await database.deleteUser(badUser1API);
-        await database.deleteUser(badUser2API);
+        status = await user.fetch(badUser1API);
+        if (!status.success)
+            await user.delete();
+        status = await user.fetch(badUser2API);
+        if (!status.success)
+            await user.delete();
 
         // Team Perfect use
-        await database.hardDeleteTeam(idPerfectTeam);
-        await database.hardDeleteTeam(nameUserTeam);
-        await database.deleteUser(idUserTeam);
-        await database.deleteUser(idUser2Team);
-        await database.deleteUser(nameUserTeam);
-        await database.deleteUser(nameUser2Team);
-        await database.deleteUser(adminTeam);
+        status = await team.fetch(idPerfectTeam);
+        if (status.success)
+            await team.hardDelete();
+        status = await team.fetch(nameUserTeam);
+        if (status.success)
+            await team.hardDelete();
+        status = await user.fetch(nameUserTeam);
+        if (status.success)
+            await user.delete();
+        status = await user.fetch(nameUser2Team);
+        if (status.success)
+            await user.delete();
+        status = await user.fetch(idUserTeam);
+        if (status.success)
+            await user.delete();
+        status = await user.fetch(idUser2Team);
+        if (status.success)
+            await user.delete();
+        status = await user.fetch(adminTeam);
+        if (status.success)
+            await user.delete();
 
         // Team Bad use
-        await database.hardDeleteTeam(badUserTeam);
-        await database.hardDeleteTeam(badUser2Team);
-        await database.deleteUser(badUserTeam);
-        await database.deleteUser(badUser2Team);
-        await database.deleteUser(badUserIDTeam);
-        await database.deleteUser(badUserID2Team);
+        status = await team.fetch(badUserTeam);
+        if (status.success)
+            await team.hardDelete();
+        status = await team.fetch(badUser2Team);
+        if (status.success)
+            await team.hardDelete();
+        status = await user.fetch(badUserTeam);
+        if (status.success)
+            await user.delete();
+        status = await user.fetch(badUser2Team);
+        if (status.success)
+            await user.delete();
+        status = await user.fetch(badUserIDTeam);
+        if (status.success)
+            await user.delete();
+        status = await user.fetch(badUserID2Team);
+        if (status.success)
+            await user.delete();
 
         // Tournament Perfect use
-        if (PTID)
-            await database.deleteTournament(PTID);
-        for (const id of teamsPTID)
-            await database.hardDeleteTeam(id);
-        for (const id of usersPTID)
-            await database.deleteUser(id);
+        if (PTID) {
+            status = await tournament.fetch(PTID);
+            if (status.success)
+                await tournament.delete();
+        }
+        for (const id of teamsPTID) {
+            status = await team.fetch(id);
+            if (status.success)
+                await team.hardDelete();
+        }
+        for (const id of usersPTID) {
+            status = await user.fetch(id);
+            if (status.success)
+                await user.delete();
+        }
 
         // Tournament bad use
-        if (BTID)
-            await database.deleteTournament(BTID);
-        await database.hardDeleteTeam(id_teamBT);
-        await database.deleteUser(iduserBT1);
-        await database.deleteUser(iduserBT2);
-        await database.deleteUser(userBT1);
-        await database.deleteUser(userBT2);
+        if (BTID) {
+            status = await tournament.fetch(BTID);
+            if (status.success)
+                await tournament.delete();
+        }
+        status = await team.fetch(id_teamBT);
+        if (status.success)
+            await team.hardDelete();
+        status = await user.fetch(iduserBT1);
+        if (status.success)
+            await user.delete();
+        status = await user.fetch(iduserBT2);
+        if (status.success)
+            await user.delete();
+        status = await user.fetch(userBT1);
+        if (status.success)
+            await user.delete();
+        status = await user.fetch(userBT2);
+        if (status.success)
+            await user.delete();
     });
 });

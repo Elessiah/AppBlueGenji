@@ -1,6 +1,6 @@
 // app/api/tournament/route.ts
 import {NextRequest, NextResponse} from "next/server";
-import {getMatchs, getTournamentTeams, status} from "../../../lib/types";
+import {getMatchsClient, getMatchsServer, getTournamentTeams, Match, status} from "../../../lib/types";
 import {secureRequest} from "../../../lib/API/secureRequest";
 import {create} from "./create";
 import {edit} from "./edit";
@@ -29,10 +29,33 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         return (NextResponse.json({ teams: teamsRegistration.teams}, {status: 200}));
     }
     if (get == "matchs") {
-        const getMatchs: getMatchs = await tournament.getMatchs(id);
+        const getMatchs: getMatchsServer = await tournament.getMatchs(id);
         if (!getMatchs.success)
             return (NextResponse.json({error: getMatchs.error}, {status: 400}));
-        return (NextResponse.json({ matchs: getMatchs.matchs}, {status: 200}));
+        const clientVersion: Match[] = [];
+        for (const match of getMatchs.matchs) {
+            clientVersion.push({
+                    id_match: match.id!,
+                    tournament: {
+                        id_tournament: match.tournament!.id!,
+                        name: match.tournament!.name!,
+                        description: match.tournament!.description!,
+                        format: match.tournament!.format!,
+                        size: match.tournament!.size!,
+                        current_round: match.tournament!.current_round!,
+                        id_user: match.tournament!.owner!.id!,
+                        creation_date: match.tournament!.creation_date!,
+                        start_visibility: match.tournament!.start_visibility!,
+                        open_registration: match.tournament!.open_registration!,
+                        close_registration: match.tournament!.close_registration!,
+                        start: match.tournament!.start!
+                    },
+                    teams: match.teams!,
+                    id_victory_team: match.id_victory_team!,
+                    start_date: match.start_date!,
+                });
+        }
+        return (NextResponse.json({ matchs: clientVersion}, {status: 200}));
     }
     if (get == "list") {
         return (NextResponse.json({...(await tournament.getAll())}, {status: 200}));
