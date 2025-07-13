@@ -31,7 +31,7 @@ export class MatchEntity {
                                                    FROM (SELECT *
                                                          FROM \`match\`
                                                          WHERE id_match = ?) as m
-                                                            INNER JOIN team_match ON m.id_match = team_match.id_match`, [id]);
+                                                            LEFT JOIN team_match ON m.id_match = team_match.id_match`, [id]);
         if ((rows as unknown[]).length == 0)
             return ({success: false, error: "This match does not exist!"});
         const match: MatchTeams = (await MatchEntity.groupByMatchID((rows as TeamAndMatch[])))[0];
@@ -47,7 +47,20 @@ export class MatchEntity {
         }
         this.id_victory_team = match.id_victory_team;
         this.start_date = new Date(match.start_date);
+        this.is_loaded = true;
         return ({success: true, error: ""});
+    }
+
+    public compare(other: MatchEntity): boolean {
+        if (!this.is_loaded || other.is_loaded)
+            return false;
+        return (this.id == other.id
+        && this.tournament!.compare(other.tournament!)
+        && this.teams!.length === other.teams!.length
+            && this.teams!.every((val, index) => val.id_team === other.teams![index].id_team)
+            && this.id_victory_team == other.id_victory_team
+            && this.start_date == other.start_date
+        )
     }
 
     public async create(tournament: TournamentEntity,
@@ -66,7 +79,7 @@ export class MatchEntity {
                 return ({success: false, error: "Team host object is empty !", id: -1});
             if (await TeamEntity.isExist(host.id, true) == -1)
                 return ({success: false, error: "The host team does not exist!", id: -1});
-            if (await tournament.isTeamRegister(host, true))
+            if (!await tournament.isTeamRegister(host, true))
                 return ({success: false, error: "The host team is not register or has been eliminated!", id: -1});
         }
         if (guest == null) {
@@ -79,7 +92,7 @@ export class MatchEntity {
                 id_victory_team = guest.id;
             if (await TeamEntity.isExist(guest.id, true) == -1)
                 return ({success: false, error: "The guest team does not exist!", id: -1});
-            if (await tournament.isTeamRegister(guest, true))
+            if (!await tournament.isTeamRegister(guest, true))
                 return ({success: false, error: "The guest team is not register or has been eliminated!", id: -1});
         }
         const now = new Date();
@@ -92,6 +105,10 @@ export class MatchEntity {
             [
                 tournament.id, id_victory_team, date
             ]);
+        if (host)
+            await database.db!.execute(`INSERT INTO team_match (id_match, id_team) VALUES (?, ?)`, [result.insertId, host.id]);
+        if (guest)
+            await database.db!.execute(`INSERT INTO team_match (id_match, id_team) VALUES (?, ?)`, [result.insertId, guest.id])
         if (id_victory_team)
             await this.manageTournamentWinner();
         await this.fetch(result.insertId); // Mise à jour de l'objet
@@ -104,6 +121,8 @@ export class MatchEntity {
             return ({success: false, error: "Empty Object!"});
         if (!(await MatchEntity.isExist(this.id, true)))
             return ({success: false, error: "Match does not exist or is ended!"});
+        if (id_victory_team && !this.teams.find((team) => team.id_team == id_victory_team))
+            return ({success: false, error: "The victory team, does not play the match or does not exist !"});
         if (scores.length != this.teams.length)
             return ({success: false, error: "The number of scores does not match the teams number"});
         const database: Database = await Database.getInstance();
@@ -145,7 +164,7 @@ export class MatchEntity {
                                 checkStillRunning: boolean = false): Promise<boolean> {
         let filter: string = "";
         if (checkStillRunning)
-            filter = ' AND victory IS NULL ';
+            filter = ' AND id_victory_team IS NULL ';
         const database: Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT id_match
                                               FROM \`match\`

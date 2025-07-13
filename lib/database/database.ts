@@ -101,8 +101,8 @@ export class Database {
     }
 
     public static async disconnect() {
-        if (!Database.instance)
-            await this.db!.end();
+        if (Database.instance && Database.instance.db)
+            await Database.instance.db.end();
     }
     // Private
     private static instance: Database;
@@ -192,6 +192,7 @@ export class Database {
                                     FOREIGN KEY (id_tournament) REFERENCES tournament (id_tournament)
                                         ON DELETE CASCADE,
                                     FOREIGN KEY (id_victory_team) REFERENCES team (id_team)
+                                        ON DELETE SET NULL
                                 );`);
         await this.db!.execute(`CREATE TABLE IF NOT EXISTS team_match
                                 (

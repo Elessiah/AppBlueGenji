@@ -75,7 +75,7 @@ export class TournamentEntity {
         return ({success: true, error: ""});
     }
 
-    public async compare(other: TournamentEntity): Promise<boolean> {
+    public compare(other: TournamentEntity): boolean {
         if (!this.is_loaded || !other.is_loaded)
             return false;
         return (this.id == other.id
@@ -442,7 +442,7 @@ export class TournamentEntity {
         const [rows] = await database.db!.execute(`SELECT *
                                                    FROM team
                                                             INNER JOIN team_tournament ON team_tournament.id_team = team.id_team
-                                                   WHERE team_tournament.id_tournament = ?`, [this.id]);
+                                                   WHERE team_tournament.id_tournament = ? ORDER BY team.id_team`, [this.id]);
         const teams = rows as (Team & TeamTournament)[];
         return ({success: true, error: "", teams: teams});
     }
@@ -487,12 +487,20 @@ export class TournamentEntity {
         if (nbFromLast > 0)
             addons = ` LIMIT ${nbFromLast} `;
         const database: Database = await Database.getInstance();
-        const [rows] = await database.db!.execute(`SELECT *
+        const [rows] = await database.db!.execute(`SELECT id_match
                                                    FROM \`match\`
                                                    WHERE \`match\`.id_tournament = ?
                                                    ORDER BY id_match DESC ${addons}`, [this.id]);
-        const matchs = rows as Match[];
-        return ({success: true, error: "", matchs: matchs})
+        const matchs = rows as {id_match: number}[];
+        const entities: MatchEntity[] = [];
+        for (const match of matchs) {
+            const entity: MatchEntity = new MatchEntity();
+            const status: status = await entity.fetch(match.id_match);
+            if (!status.success)
+                return ({success: false, error: status.error, matchs: []});
+            entities.push(entity);
+        }
+        return ({success: true, error: "", matchs: entities});
     }
 
     public async isTeamRegister(team: TeamEntity,
@@ -663,25 +671,21 @@ export class TournamentEntity {
                     team_guest: null
                 };
                 for (let n_slot = 0; n_slot < 2; n_slot++) {
-                    let team_id: number;
+                    let team: TeamEntity | null;
                     if (byesInterval && nbyes < byes && nteam % byesInterval === 0) {
-                        team_id = -1;
+                        team = null;
                         nbyes++;
                     } else {
-                        team_id = teams[nteam].id_team;
+                        team = new TeamEntity();
+                        const status: status = await team.fetch(teams[nteam].id_team);
+                        if (!status.success)
+                            return ({success: false, error: status.error});
                         nteam += 1;
                     }
-                    if (!n_slot) {
-                        match.team_host = new TeamEntity();
-                        const status: status = await match.team_host.fetch(team_id);
-                        if (!status.success)
-                            return ({success: false, error: status.error});
-                    } else {
-                        match.team_guest = new TeamEntity();
-                        const status: status = await match.team_guest.fetch(team_id);
-                        if (!status.success)
-                            return ({success: false, error: status.error});
-                    }
+                    if (!n_slot)
+                        match.team_host = team;
+                    else
+                        match.team_guest = team;
                 }
                 const status: status & id = await Match.create(this, match.team_host, match.team_guest, start);
                 if (!status.success) {

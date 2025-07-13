@@ -149,7 +149,7 @@ export class TeamEntity {
         const database: Database = await Database.getInstance();
         await database.db!.execute(`UPDATE user_team
                                SET date_leave = CURRENT_TIMESTAMP
-                               WHERE id_team = ?`, [this.id]);
+                               WHERE id_team = ? AND date_leave IS NULL`, [this.id]);
         await database.db!.execute(`UPDATE team
                                SET id_user = null
                                WHERE id_team = ?`, [this.id]);

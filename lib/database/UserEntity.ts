@@ -194,12 +194,15 @@ export class UserEntity {
             return ({success: false, error: "User not found!", histories: []});
         const database: Database = await Database.getInstance();
         const [rows] = await database.db!.execute(`SELECT tournament.*, team_tournament.*, team.name as team_name
-                                              FROM tournament
-                                                       INNER JOIN team_tournament ON tournament.id_tournament = team_tournament.id_tournament
-                                                       INNER JOIN team ON team_tournament.id_team = team.id_team
-                                                       INNER JOIN user_team ON team.id_team = user_team.id_team
-                                              WHERE user_team.id_user = ? AND tournament.close_registration > user_team.date_join AND (user_team.date_leave IS NULL OR tournament.start < user_team.date_leave)
-                                              ORDER BY tournament.start DESC`, [this.id]);
+                                                   FROM team
+                                                            LEFT JOIN team_tournament ON team_tournament.id_team = team.id_team
+                                                            LEFT JOIN user_team ON user_team.id_team = team.id_team
+                                                            LEFT JOIN tournament ON team_tournament.id_tournament = tournament.id_tournament
+                                                   WHERE user_team.id_user = ?
+                                                     AND user_team.date_join < tournament.start
+                                                     AND (user_team.date_leave IS NULL OR
+                                                          user_team.date_leave >= tournament.start)
+                                                   ORDER BY tournament.start DESC`, [this.id]);
         return ({success: true, error: "", histories: rows as History[]});
     }
 

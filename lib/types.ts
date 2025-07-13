@@ -1,3 +1,5 @@
+import {MatchEntity} from "./database/MatchEntity";
+
 export interface status {
     success: boolean;
     error: string;
@@ -67,7 +69,7 @@ export interface getTournaments {
 }
 
 export interface getMatchs {
-    matchs: Match[];
+    matchs: MatchEntity[];
     success: boolean;
     error: string;
 }
