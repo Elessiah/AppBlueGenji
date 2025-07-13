@@ -984,14 +984,14 @@ describe("api", () => {
         response = await GETTEAM(request);
         expect(response.status).toEqual(400);
         error = await response.json() as {error: string};
-        expect(error.error).toEqual("This team does not exist or is deleted!");
+        expect(error.error).toEqual("This team does not exist!");
 
         // Test GET members avec name éroné
         request = new NextRequest(`https://localhost/team/?name=prout&g=members`);
         response = await GETTEAM(request);
         expect(response.status).toEqual(400);
         error = await response.json() as {error: string};
-        expect(error.error).toEqual("This team does not exist or is deleted!");
+        expect(error.error).toEqual("This team does not exist!");
 
         // Test GET avec g éroné
         request = new NextRequest(`https://localhost/team/?name=${badUserTeam}&g=proiut`);
@@ -1005,14 +1005,14 @@ describe("api", () => {
         response = await GETTEAM(request);
         expect(response.status).toEqual(400);
         error = await response.json() as {error: string};
-        expect(error.error).toEqual("Team does not exist!");
+        expect(error.error).toEqual("This team does not exist!");
 
         // Test GET history avec name éroné
         request = new NextRequest(`https://localhost/team/?name=prout&g=history`);
         response = await GETTEAM(request);
         expect(response.status).toEqual(400);
         error = await response.json() as {error: string};
-        expect(error.error).toEqual("Team does not exist!");
+        expect(error.error).toEqual("This team does not exist!");
 
         // Test rename sans new_name
         request = new NextRequest(`https://localhost/team/`,
