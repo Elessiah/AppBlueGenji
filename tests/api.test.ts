@@ -89,7 +89,7 @@ describe("api", () => {
         response = await GETUSER(request);
         expect(response.status).toEqual(200);
         let userInfo: UserInfo = await response.json() as UserInfo;
-        expect(userInfo).toEqual({id_user: idUserAPI, username: nameUserAPI, is_admin: false});
+        expect(userInfo).toEqual({id_user: idUserAPI, username: nameUserAPI, id_team: null, is_admin: false});
 
         // Test récupération de l'utilisateur par Nom
         request = new NextRequest(`https://localhost/user/?username=${nameUserAPI}`);
@@ -228,7 +228,7 @@ describe("api", () => {
         response = await GETUSER(request);
         expect(response.status).toEqual(200);
         userInfo = await response.json() as UserInfo;
-        expect(userInfo).toEqual({id_user: idUserAPI, username: passwordUserAPI, is_admin: false});
+        expect(userInfo).toEqual({id_user: idUserAPI, username: passwordUserAPI, id_team: null, is_admin: false});
 
         // Reset update
         request = new NextRequest(`https://localhost/user/`, {
@@ -678,7 +678,7 @@ describe("api", () => {
         expect(response.status).toEqual(200);
         let members: UserInfo[] = ((await response.json() as {members: UserInfo[]}).members);
         expect(members.length).toEqual(1);
-        expect({...members[0], is_admin: false}).toEqual(user);
+        expect({...members[0], is_admin: false, id_team: idPerfectTeam}).toEqual(user);
         // Test get history
         request = new NextRequest(`https://localhost/team/?id=${idPerfectTeam}&g=history`);
         response = await GETTEAM(request);
@@ -815,7 +815,7 @@ describe("api", () => {
         expect(response.status).toEqual(200);
         members = (await response.json() as {members: UserInfo[]}).members;
         expect(members.length).toEqual(1);
-        expect({...members[0], is_admin: false}).toEqual(user);
+        expect({...members[0], is_admin: false, id_team: idPerfectTeam}).toEqual(user);
 
         // Test erase Team
         request = new NextRequest(`https://localhost/team/`,

@@ -99,6 +99,7 @@ export interface User {
 export interface UserInfo {
     id_user: number;
     username: string;
+    id_team: number | null;
     is_admin: boolean;
 }
 

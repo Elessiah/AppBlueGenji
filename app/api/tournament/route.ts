@@ -19,9 +19,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (get && get != "teams" && get != "matchs" && get != "list")
         return (NextResponse.json({error: "'g' must equal to 'teams', 'list' or 'matchs' to fetch it!"}, {status: 400}));
     const tournament: TournamentEntity = new TournamentEntity();
-    const status: status = await tournament.fetch(id);
-    if (!status.success)
-        return (NextResponse.json({error: status.error}, {status: 400}));
+    if (!get || get != "list") {
+        const status: status = await tournament.fetch(id);
+        if (!status.success)
+            return (NextResponse.json({error: status.error}, {status: 400}));
+    }
     if (get == "teams") {
         const teamsRegistration: getTournamentTeams = await tournament.getRegisterTeams();
         if (!teamsRegistration.success)

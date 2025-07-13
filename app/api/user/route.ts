@@ -9,6 +9,7 @@ import {updateUsername} from "./updateUsername";
 import {deleteUser} from "./deleteUser";
 import {auth} from "./auth";
 import {UserEntity} from "../../../lib/database/UserEntity";
+import {TeamEntity} from "../../../lib/database/TeamEntity";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     const {searchParams} = new URL(request.url);
@@ -34,9 +35,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             return (NextResponse.json({error: getHistory.error}, {status: 400}));
         return (NextResponse.json({...getHistory.histories}, {status: 200}));
     }
+    const checkStatus = await TeamEntity.isMemberOfTeam(user.id!);
+    if (!checkStatus.success)
+        return (NextResponse.json({error: checkStatus.error}, {status: 400}));
     return (NextResponse.json({
             id_user: user.id,
             username: user.name,
+            id_team: checkStatus.result == -1 ? null : checkStatus.result,
             is_admin: user.is_admin,
         },
         {status: 200}));
