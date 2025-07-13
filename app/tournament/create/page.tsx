@@ -29,7 +29,7 @@ export default function CreateTournamentPage() {
     }
 
     const [form, setForm] = useState(defaultForm);
-    if (user.user_id == -1)
+    if (user.id_user == -1)
         redirect("/login?error=Vous devez être connecté pour créer un tournoi !");
 
     const handleSubmit = (e: React.FormEvent) => {

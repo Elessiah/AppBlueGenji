@@ -18,7 +18,7 @@ export default function Team() {
     const searchParams = useSearchParams();
     let id: string | number | null = searchParams.get('id');
     const urlError = searchParams.get('error');
-    let tmpTeamProfile: TeamProfile = {team_id: -1, name: "", creation_date: new Date(), owner_name: "", id_owner: -1, members_count: 0, histories: [], members: []}
+    let tmpTeamProfile: TeamProfile = {id_team: -1, name: "", creation_date: new Date(), username: "", id_user: -1, members_count: 0, histories: [], members: []}
 
     const [teamProfile, setTeamProfile] = useState(tmpTeamProfile);
     const [isInvitOpen, setInvitOpen] = useState(false);
@@ -67,7 +67,7 @@ export default function Team() {
             }
         }
         setTeamProfile(tmpTeamProfile);
-        if (user.is_admin || user.user_id == tmpTeamProfile.id_owner)
+        if (user.is_admin || user.id_user == tmpTeamProfile.id_user)
             setIsOwner(true);
     }
 
@@ -124,7 +124,7 @@ export default function Team() {
                     </p>
                     <p>
                         <i>Détenue par </i>
-                        <span className="meta-data">{teamProfile.owner_name}</span>
+                        <span className="meta-data">{teamProfile.username}</span>
                     </p>
                 </div>
             </div>
@@ -137,8 +137,8 @@ export default function Team() {
                                 <li key={index} className="member-item">
                                     <Link href={`/user?username=${member.username}`}><span>{member.username}</span></Link>
                                     {
-                                        isOwner && member.user_id != user.user_id ?
-                                        <button className="kick-button" title="Expulser" onClick={() => {kickUser(member.user_id)}}>
+                                        isOwner && member.id_user != user.id_user ?
+                                        <button className="kick-button" title="Expulser" onClick={() => {kickUser(member.id_user)}}>
                                             <X size={16} />
                                         </button>
                                         :
@@ -155,7 +155,7 @@ export default function Team() {
                         <ul className="match-list">
                             {teamProfile.histories.map((history: History, index: number) => (
                                 <li key={index} className="match-item">
-                                    <Link href={`/tournament?id=${history.tournament_id}`}>
+                                    <Link href={`/tournament?id=${history.id_tournament}`}>
                                     <span>{history.name}</span>
                                     <span>Début: {history.start.toLocaleDateString()}</span>
                                     {

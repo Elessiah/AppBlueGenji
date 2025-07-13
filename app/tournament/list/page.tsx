@@ -51,7 +51,7 @@ export default function List() {
             {
                 tournaments.pending.length > 0 ?
                 tournaments.pending.map((tournament, index) => (
-                    <div key={index} className="tournament-card" onClick={() => redirect(`/tournament?id=${tournament.tournament_id}`)}>
+                    <div key={index} className="tournament-card" onClick={() => redirect(`/tournament?id=${tournament.id_tournament}`)}>
                         <h2>{tournament.name}</h2>
                         <p>
                             <b>{tournament.nb_teams}</b> / {tournament.size} équipes
@@ -76,7 +76,7 @@ export default function List() {
             {
                 tournaments.active.length > 0 ?
                 tournaments.active.map((tournament, index) => (
-                <div key={index} className="tournament-card" onClick={() => redirect(`/tournament?id=${tournament.tournament_id}`)}>
+                <div key={index} className="tournament-card" onClick={() => redirect(`/tournament?id=${tournament.id_tournament}`)}>
                     <h2>{tournament.name}</h2>
                     <p>
                         <b>{tournament.nb_teams}</b> / {tournament.size} équipes
@@ -101,7 +101,7 @@ export default function List() {
             {
                 tournaments.ended.length > 0 ?
                 tournaments.ended.map((tournament, index) => (
-                <div key={index} className="tournament-card" onClick={() => redirect(`/tournament?id=${tournament.tournament_id}`)}>
+                <div key={index} className="tournament-card" onClick={() => redirect(`/tournament?id=${tournament.id_tournament}`)}>
                     <h2>{tournament.name}</h2>
                     <p>
                         <b>{tournament.nb_teams}</b> / {tournament.size} équipes

@@ -18,7 +18,7 @@
     height: 80px;
     padding: 0 2rem;
 
-    background: rgba(10, 10, 10, 0.85);
+    background: rgb(10, 10, 10, 0.85);
     backdrop-filter: blur(6px);
 
     border-left: 2px solid #00bfff;

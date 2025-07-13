@@ -20,7 +20,7 @@ export default function Register() {
     const [error, setError] = useState<{error: string, once: boolean}>({error: "", once: false});
     const {user, setUser} = useUser();
 
-    if (user.user_id != -1) {
+    if (user.id_user != -1) {
         if (urlError) {
             redirect(`/user?username=${username}&error=${urlError}`);
         } else {
@@ -51,7 +51,7 @@ export default function Register() {
                 return;
             }
             const result: id = await response.json();
-            setUser({user_id: result.id, username: username, token: response.headers.get('token')!, id_team: null, is_admin: false});
+            setUser({id_user: result.id, username: username, token: response.headers.get('token')!, id_team: null, is_admin: false});
             redirect("/user?username=" + user.username);
         })();
     };

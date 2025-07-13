@@ -22,7 +22,7 @@ export default function Login() {
     if (!error.once && urlError != null)
         setError({error: urlError, once: true});
 
-    if (user.user_id != -1) {
+    if (user.id_user != -1) {
         redirect("/user?username=" + username);
     }
 

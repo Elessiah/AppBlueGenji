@@ -31,7 +31,7 @@ export default function User() {
     const getProfile = async () => {
         if (id) {
             id = parseInt(id as string, 10);
-            if (user.user_id != -1 && id == user.user_id) {
+            if (user.id_user != -1 && id == user.id_user) {
                 tmp_profile = {...user, team_name: "", histories: []};
             } else {
                 const response = await fetch(`/api/user?id=${id}`);
@@ -41,7 +41,7 @@ export default function User() {
                 tmp_profile = {...(await response.json() as UserInfo), team_name: "", histories: []};
             }
         } else if (username) {
-            if (user.user_id != -1 && username == user.username) {
+            if (user.id_user != -1 && username == user.username) {
                 tmp_profile = {...user, team_name: "", histories: []};
             } else {
                 const response = await fetch(`/api/user?username=${username}`);
@@ -50,7 +50,7 @@ export default function User() {
                 }
                 tmp_profile = {...(await response.json() as UserInfo), team_name: "", histories: []};
             }
-        } else if (user.user_id != -1) {
+        } else if (user.id_user != -1) {
             redirect("/user?username=" + user.username);
         } else {
             redirect("/login");
@@ -63,7 +63,7 @@ export default function User() {
             const fetchTeam = await response.json() as TeamInfo;
             tmp_profile.team_name = fetchTeam.name;
         }
-        const response = await fetch(`/api/user?id=${tmp_profile.user_id}&g=history`);
+        const response = await fetch(`/api/user?id=${tmp_profile.id_user}&g=history`);
         if (!response.ok) {
             redirect(`/?error=${(await response.json()).error}`);
         }
@@ -87,9 +87,9 @@ export default function User() {
         getProfile();
     }, [username, id]);
 
-    if ((!ownProfile && user.user_id == profile.user_id) || user.is_admin) {
+    if ((!ownProfile && user.id_user == profile.id_user) || user.is_admin) {
         setOwnProfile(true);
-    } else if (ownProfile && user.user_id != profile.user_id && !user.is_admin) {
+    } else if (ownProfile && user.id_user != profile.id_user && !user.is_admin) {
         setOwnProfile(false);
     }
 
@@ -115,7 +115,7 @@ export default function User() {
                                         'Content-Type': 'application/json',
                                         'token': user.token,
                                     },
-                                    body: JSON.stringify({command: "delete", user_id: user.user_id}),
+                                    body: JSON.stringify({command: "delete", user_id: user.id_user}),
                                 });
                                 if (!response.ok)
                                     alert((await response.json()).error);
@@ -130,7 +130,7 @@ export default function User() {
                         <button
                             className="delete-button"
                             onClick={() => {
-                                setUser({user_id: -1, username: "", token: "", id_team: null, is_admin: false});
+                                setUser({id_user: -1, username: "", token: "", id_team: null, is_admin: false});
                                 redirect("/login?error=Vous avez été déconnecté");
                             }
                         }

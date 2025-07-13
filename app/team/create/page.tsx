@@ -39,7 +39,7 @@ export default function CreateTeam() {
         })();
     }
 
-    if (user.user_id == -1) {
+    if (user.id_user == -1) {
         redirect("/login?error=Tu dois être connecté pour créer une équipe");
     }
     if (user.id_team !== null)

@@ -52,7 +52,7 @@ export default function TournamentPage() {
             return false;
         if (tournament.matchs.length == 0)
             return false;
-        const matchRemaining = tournament.matchs.find((u) => u.victory == null);
+        const matchRemaining = tournament.matchs.find((u) => u.id_victory_team == null);
         return matchRemaining == undefined;
     }
 
@@ -73,7 +73,7 @@ export default function TournamentPage() {
             rounds.push({title: `Round ${nround + 1}`, seeds: []});
         for(let nmatch: number = 0; nmatch < tournament.matchs.length; nmatch++) {
             const match = tournament.matchs.toReversed()[nmatch];
-            rounds[nround].seeds.push({id: match.tournament_match_id, date: tournament.start.toDateString(), teams: [{name: tournament.teams.find(u => u.team_tournament_id == match.id_team_tournament_host)?.name || "..."}, {name: tournament.teams.find(u => u.team_tournament_id == match.id_team_tournament_guest)?.name || "..."}]});
+            rounds[nround].seeds.push({id: match.id_match, date: tournament.start.toDateString(), teams: [{name: tournament.teams.find(u => u.id_team == match.teams[0].id_team)?.name || "..."}, {name: tournament.teams.find(u => u.id_team == match.teams[1].id_team)?.name || "..."}]});
             if (nmatch == ((nbRoundMatch - startNbRoundMatch) - 1)) {
                 nround++;
                 startNbRoundMatch = nmatch;
@@ -90,7 +90,7 @@ export default function TournamentPage() {
         }
         if (isTournamentEnded()) {
             const final: Match = tournament.matchs[tournament.matchs.length - 1];
-            rounds.push({title: `Vainqueur`, seeds: [{id: final.id_tournament + 1, teams: [{name: final.victory == "host" ? tournament.teams.find(u => u.team_tournament_id == final.id_team_tournament_host)?.name : tournament.teams.find(u => u.team_tournament_id == final.id_team_tournament_guest)?.name}]}]});
+            rounds.push({title: `Vainqueur`, seeds: [{id: final.id_match + 1, teams: [{name: final.id_victory_team == final.teams[0].id_team ? tournament.teams.find(u => u.id_team == final.teams[0].id_team)?.name : tournament.teams.find(u => u.id_team == final.teams[1].id_team)?.name}]}]});
         }
         return rounds;
     }
@@ -126,14 +126,14 @@ export default function TournamentPage() {
                 'Content-Type': 'application/json',
                 'token': user.token,
             },
-            body: JSON.stringify({command: join ? "register" : "unregister", id_tournament: tournament!.tournament_id})
+            body: JSON.stringify({command: join ? "register" : "unregister", id_tournament: tournament!.id_tournament})
         });
         if (!response.ok) {
             setError({error: (await response.json()).error, once: true});
         }
         if (response.headers.get('token') != null)
             setUser((prevState) => ({...prevState, token: response.headers.get('token')!}))
-        getTournament(tournament!.tournament_id);
+        getTournament(tournament!.id_tournament);
     };
 
     useEffect(() => {
@@ -154,7 +154,7 @@ export default function TournamentPage() {
         return <main className={"tournament-single-page"}></main>
     return (
         <main className="tournament-single-page">
-            <ScoreModal isOpen={isOpen} setError={setError} tournament={tournament} onClose={() => {setIsOpen(false); getTournament(tournament!.tournament_id)}}></ScoreModal>
+            <ScoreModal isOpen={isOpen} setError={setError} tournament={tournament} onClose={() => {setIsOpen(false); getTournament(tournament!.id_tournament)}}></ScoreModal>
             <Modal text={error.error} onClose={() => {
                 setError({error: "", once: true})
             }}></Modal>
@@ -220,7 +220,7 @@ export default function TournamentPage() {
                         <>
                     {tournament.teams.map((team, index) => (
                         <li key={index} className="team-entry">
-                            <Link href={`/team?id=${team.team_id}`}>
+                            <Link href={`/team?id=${team.id_team}`}>
                                 {team.name}
                             </Link>
                         </li>
