@@ -89,7 +89,7 @@ describe("api", () => {
         response = await GETUSER(request);
         expect(response.status).toEqual(200);
         let userInfo: UserInfo = await response.json() as UserInfo;
-        expect(userInfo).toEqual({id_user: idUserAPI, username: nameUserAPI, id_team: null, is_admin: false});
+        expect(userInfo).toEqual({id_user: idUserAPI, username: nameUserAPI, is_admin: false});
 
         // Test récupération de l'utilisateur par Nom
         request = new NextRequest(`https://localhost/user/?username=${nameUserAPI}`);
@@ -228,7 +228,7 @@ describe("api", () => {
         response = await GETUSER(request);
         expect(response.status).toEqual(200);
         userInfo = await response.json() as UserInfo;
-        expect(userInfo).toEqual({id_user: idUserAPI, username: passwordUserAPI, id_team: null, is_admin: false});
+        expect(userInfo).toEqual({id_user: idUserAPI, username: passwordUserAPI, is_admin: false});
 
         // Reset update
         request = new NextRequest(`https://localhost/user/`, {
@@ -1833,15 +1833,18 @@ describe("api", () => {
 
         // User Perfect use
         let status: status = await user.fetch(idUserAPI);
-        if (!status.success)
+        if (status.success)
+            await user.delete();
+        status = await user.fetch(nameUserAPI);
+        if (status.success)
             await user.delete();
 
         // User Bad use
         status = await user.fetch(badUser1API);
-        if (!status.success)
+        if (status.success)
             await user.delete();
         status = await user.fetch(badUser2API);
-        if (!status.success)
+        if (status.success)
             await user.delete();
 
         // Team Perfect use
