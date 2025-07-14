@@ -1,4 +1,4 @@
 git pull
 npm install --force
-npm build
+npm run build
 pm2 restart bluegenji
