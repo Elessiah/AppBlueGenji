@@ -29,7 +29,9 @@ export default function User() {
     const [editOpen, setEditOpen] = useState(false);
 
     const getProfile = async () => {
+        console.log("Getting profile");
         if (id) {
+            console.log("ID");
             id = parseInt(id as string, 10);
             if (user.id_user != -1 && id == user.id_user) {
                 tmp_profile = {...user, team_name: "", histories: []};
@@ -41,16 +43,19 @@ export default function User() {
                 tmp_profile = {...(await response.json() as UserInfo), team_name: "", histories: []};
             }
         } else if (username) {
+            console.log("Username");
             if (user.id_user != -1 && username == user.username) {
                 tmp_profile = {...user, team_name: "", histories: []};
             } else {
                 const response = await fetch(`/api/user?username=${username}`);
+                console.log("response", response.status);
                 if (!response.ok) {
                     redirect(`/?error=${(await response.json()).error}`);
                 }
                 tmp_profile = {...(await response.json() as UserInfo), team_name: "", histories: []};
             }
         } else if (user.id_user != -1) {
+            console.log("user: ", user);
             redirect("/user?username=" + user.username);
         } else {
             redirect("/login");

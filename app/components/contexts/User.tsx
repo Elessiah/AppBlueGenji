@@ -6,7 +6,7 @@ interface UserContextType {
     user: UserInfo & {token: string},
     setUser: React.Dispatch<React.SetStateAction<UserInfo & {token: string}>>
 }
-const defaultUser: UserInfo & {token: string} = {user_id: -1, username: "", token: "", id_team: null, is_admin: false};
+const defaultUser: UserInfo & {token: string} = {id_user: -1, username: "", token: "", id_team: null, is_admin: false};
 const defaultContextUser = {user: defaultUser, setUser: () => {}};
 
 const UserContext = createContext<UserContextType>(defaultContextUser);

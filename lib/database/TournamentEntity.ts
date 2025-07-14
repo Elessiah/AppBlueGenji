@@ -479,6 +479,7 @@ export class TournamentEntity {
     }
 
     public async getMatchs(nbFromLast: number = -1): Promise<getMatchsServer> {
+        await this.checkEvent();
         if (!this.is_loaded || !this.id)
             return ({success: false, error: "Empty Object!", matchs: []});
         if (!(await TournamentEntity.isExist(this.id)))
@@ -709,17 +710,21 @@ export class TournamentEntity {
                                                  HAVING COUNT(\`match\`.id_match) = 0
                                                      OR COUNT(CASE WHEN \`match\`.id_victory_team IS NOT NULL THEN 1 END) = 0;
         `);
-        const tournaments: { tournament_id: number, current_round: number }[] = rows as {
-            tournament_id: number,
+        const tournaments: { id_tournament: number, current_round: number }[] = rows as {
+            id_tournament: number,
             current_round: number
         }[];
         if (tournaments.length == 0)
             return;
         for (const tournament of tournaments) {
-            if (tournament.current_round == -1)
-                await this.setup();
-            else {
-                await this.setupNextRound();
+            const Entity: TournamentEntity = new TournamentEntity();
+            const status: status = await Entity.fetch(tournament.id_tournament);
+            if (!status.success)
+                continue;
+            if (tournament.current_round == -1) {
+                await Entity.setup();
+            } else {
+                await Entity.setupNextRound();
             }
         }
     }

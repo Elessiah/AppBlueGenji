@@ -1436,7 +1436,7 @@ describe("api", () => {
         const tournamentEntity: TournamentEntity = new TournamentEntity();
         const status: status = await tournamentEntity.fetch(PTID);
         expect(status.success).toBeTruthy();
-        const getMatchs: getMatchsServer = await tournamentEntity.setup();
+        const getMatchs: getMatchsServer = await tournamentEntity.getMatchs();
         expect(getMatchs.success).toBeTruthy();
 
         // Test Get matchs

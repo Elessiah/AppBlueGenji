@@ -120,6 +120,7 @@ export default function TournamentPage() {
     }
 
     const handleSubscription = async(join: boolean = true) => {
+        console.log("Id tournament: ", tournament!.id_tournament);
         const response = await fetch("/api/tournament",  {
             method: "POST",
             headers: {

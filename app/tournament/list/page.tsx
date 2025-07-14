@@ -28,7 +28,9 @@ export default function List() {
         const getTournaments = async() => {
             const response = await fetch("/api/tournament?g=list");
             if (!response.ok) {
-                setError({error: (await response.json()).error,  once: true});
+                const error = await response.json();
+                console.log(error);
+                setError({error: error.error,  once: true});
                 return;
             }
             setTournaments(await response.json());

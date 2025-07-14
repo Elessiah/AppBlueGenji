@@ -63,7 +63,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         return (NextResponse.json({...(await tournament.getAll())}, {status: 200}));
     }
     return (NextResponse.json({
-        tournament_id: tournament.id,
+        id_tournament: tournament.id,
             name: tournament.name,
             description: tournament.description,
             format: tournament.format,
