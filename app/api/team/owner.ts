@@ -1,6 +1,5 @@
 import {NextResponse} from "next/server";
 import {status} from "../../../lib/types";
-import {Database} from "../../../lib/database/database";
 import {UserEntity} from "../../../lib/database/UserEntity";
 
 export async function owner(body: {

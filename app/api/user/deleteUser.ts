@@ -1,4 +1,3 @@
-import {Database} from "../../../lib/database/database";
 import {NextResponse} from "next/server";
 import {UserEntity} from "../../../lib/database/UserEntity";
 import {status} from "../../../lib/types";

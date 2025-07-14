@@ -1,23 +1,14 @@
 "use client";
-import {useUser} from "../../components/contexts/User";
 import {redirect, useSearchParams} from "next/navigation";
 import Modal from "../../components/Modal";
 import {useEffect, useState} from "react";
 import "./List.css";
 import {TournamentTeamsCount} from "../../../lib/types";
 import {Plus} from "lucide-react";
-import Link from "next/link";
-
-type Tournament= {
-    name: string;
-    currentPlayers: number;
-    maxPlayers: number;
-    startDate: string; // ISO date
-};
 
 export default function List() {
     const searchParams = useSearchParams();
-    let urlError: string | null = searchParams.get('error');
+    const urlError: string | null = searchParams.get('error');
     const [error, setError] = useState<{error: string, once: boolean}>({error: "", once: false});
     const [tournaments, setTournaments] = useState<{pending: TournamentTeamsCount[], active: TournamentTeamsCount[], ended: TournamentTeamsCount[]}>({pending: [], active: [], ended: []});
 
@@ -29,7 +20,6 @@ export default function List() {
             const response = await fetch("/api/tournament?g=list");
             if (!response.ok) {
                 const error = await response.json();
-                console.log(error);
                 setError({error: error.error,  once: true});
                 return;
             }

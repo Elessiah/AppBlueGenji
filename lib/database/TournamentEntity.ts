@@ -6,8 +6,10 @@ import {
     status,
     Team,
     TeamTournament,
-    Tournament, Match,
-    TournamentTeamsCount, TeamAndMatch, MatchTeams
+    Tournament,
+    TournamentTeamsCount,
+    TeamAndMatch,
+    MatchTeams
 } from "../types";
 import {Database} from "./database";
 import mysql from "mysql2/promise";
@@ -183,7 +185,7 @@ export class TournamentEntity {
         const now = new Date;
         if (now > dates.open_registration)
             return ({success: false, error: "This is too late to edit the tournament. Registration has begin!"});
-        let values: unknown[] = [];
+        const values: unknown[] = [];
         let updates: string = "";
         if (name) {
             if (name.length < 5)
@@ -283,7 +285,7 @@ export class TournamentEntity {
         active: TournamentTeamsCount[],
         ended: TournamentTeamsCount[]
     }> {
-        this.checkEvent();
+        await this.checkEvent();
         const database: Database = await Database.getInstance()
         let [rows] = await database.db!.execute(`SELECT tournament.*, COUNT(team_tournament.id_team) as nb_teams
                                                  FROM tournament
@@ -632,7 +634,6 @@ export class TournamentEntity {
             return ({success: false, error: "Empty Object!", result: false});
         if (!await TournamentEntity.isExist(this.id))
             return ({success: false, error: "This tournament does not exist !", result: false});
-        const database: Database = await Database.getInstance();
         const now = new Date();
         // Précision d'une seconde car la base de donnée arrondi
         if ((now.getTime() - this.open_registration!.getTime()) >= -1000 && (now.getTime() - this.close_registration!.getTime()) < 1000)
@@ -663,7 +664,7 @@ export class TournamentEntity {
             let nbyes: number = 0;
             const nb_matchs: number = tournament_size / 2;
             for (let nmatch: number = 0; nmatch < nb_matchs; nmatch++) {
-                let match: { team_host: TeamEntity | null, team_guest: TeamEntity | null } = {
+                const match: { team_host: TeamEntity | null, team_guest: TeamEntity | null } = {
                     team_host: null,
                     team_guest: null
                 };
@@ -701,7 +702,7 @@ export class TournamentEntity {
 
     private async checkEvent(): Promise<void> {
         const database: Database = await Database.getInstance();
-        let [rows] = await database.db!.execute(`SELECT tournament.id_tournament, tournament.current_round
+        const [rows] = await database.db!.execute(`SELECT tournament.id_tournament, tournament.current_round
                                                  FROM tournament
                                                           LEFT JOIN \`match\`
                                                                     ON \`match\`.id_tournament = tournament.id_tournament

@@ -62,7 +62,7 @@ export default function Login() {
             <form className="login-form" onSubmit={handleSubmit}>
                 <h1>Connexion</h1>
 
-                <label htmlFor="username">Nom d'utilisateur</label>
+                <label htmlFor="username">Nom d&aposutilisateur</label>
                 <input
                     id="username"
                     type="username"
@@ -92,7 +92,7 @@ export default function Login() {
                     </button>
                 </div>
                 <button type="submit" className={"submit-button"}>Se connecter</button>
-                <Link href={"/register"} className={"text-button"}>S'inscrire</Link>
+                <Link href={"/register"} className={"text-button"}>S&aposinscrire</Link>
             </form>
         </main>
     );

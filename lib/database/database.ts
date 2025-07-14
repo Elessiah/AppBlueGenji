@@ -1,26 +1,16 @@
 import mysql from 'mysql2/promise';
 import dotenv from "dotenv";
-import crypto from 'crypto';
-import bcrypt from 'bcrypt';
 
 dotenv.config();
 
 import {
-    getTeamMembers,
-    History,
-    getHistories,
     status,
-    Team,
-    User,
     SQLGetParams,
     SQLEditParams,
     SQLQuery,
     SQLGetResult,
     SQLWhere,
-    Match,
-    getMatchsServer,
-    getTournamentTeams,
-    TeamTournament, id, Tournament, token_payload, TeamInfo, UserInfo, TournamentTeamsCount,
+    id
 } from '../types';
 
 export class Database {
@@ -39,7 +29,7 @@ export class Database {
             );
 
             return {success: true, error: "", id: result.insertId};
-        } catch (error: any) {
+        } catch (error: any) {// eslint-disable-line
             return {success: false, error: error.message, id: -1};
         }
     }
@@ -62,7 +52,7 @@ export class Database {
             );
 
             return {success: true, error: ""};
-        } catch (error: any) {
+        } catch (error: any) {// eslint-disable-line
             return {success: false, error: error.message};
         }
     }
@@ -77,7 +67,7 @@ export class Database {
             const [rows] = await this.db!.execute(query.query, query.values);
 
             return ({success: true, error: "", result: rows as unknown[]});
-        } catch (error: any) {
+        } catch (error: any) {// eslint-disable-line
             return ({success: false, error: error.message, result: []});
         }
     }
@@ -233,7 +223,7 @@ export class Database {
         }
         query += ` FROM ${params.table} ${params.joinOption?.join(" ")} `;
 
-        let values: (string | number | bigint)[] = [];
+        const values: (string | number | bigint)[] = [];
 
         if (params.whereOption.length > 0) {
             query += ` WHERE `;

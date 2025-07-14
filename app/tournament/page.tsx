@@ -22,8 +22,8 @@ export default function TournamentPage() {
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
-    let urlError: string | null = searchParams.get('error');
-    let strID: string | null = searchParams.get('id');
+    const urlError: string | null = searchParams.get('error');
+    const strID: string | null = searchParams.get('id');
     let tmpInfo: Tournament & { matchs: Match[], teams: (Team & TeamTournament)[] };
 
     if (strID === null)
@@ -57,7 +57,7 @@ export default function TournamentPage() {
     }
 
     const generateBracket = (): IRoundProps[] => {
-        let rounds: IRoundProps[] = [];
+        const rounds: IRoundProps[] = [];
         if (!tournament || !tournament.matchs || tournament.matchs.length == 0)
             return rounds;
         let nround: number = 0;
@@ -120,7 +120,6 @@ export default function TournamentPage() {
     }
 
     const handleSubscription = async(join: boolean = true) => {
-        console.log("Id tournament: ", tournament!.id_tournament);
         const response = await fetch("/api/tournament",  {
             method: "POST",
             headers: {
@@ -143,7 +142,7 @@ export default function TournamentPage() {
 
         if (!isTournamentEnded()) {
             const interval = setInterval(() => {
-                lastUpdate = new Date();
+                lastUpdate = new Date();// eslint-disable-line
                 getTournament(id);
             }, 5000);
 
@@ -155,7 +154,7 @@ export default function TournamentPage() {
         return <main className={"tournament-single-page"}></main>
     return (
         <main className="tournament-single-page">
-            <ScoreModal isOpen={isOpen} setError={setError} tournament={tournament} onClose={() => {setIsOpen(false); getTournament(tournament!.id_tournament)}}></ScoreModal>
+            <ScoreModal isOpen={isOpen} setErrorAction={setError} tournament={tournament} onCloseAction={() => {setIsOpen(false); getTournament(tournament!.id_tournament)}}></ScoreModal>
             <Modal text={error.error} onClose={() => {
                 setError({error: "", once: true})
             }}></Modal>

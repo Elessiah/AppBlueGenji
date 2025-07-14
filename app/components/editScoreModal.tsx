@@ -7,18 +7,18 @@ import "./editScoreModal.css";
 
 type ScoreModalProps = {
     isOpen: boolean;
-    setError: React.Dispatch<React.SetStateAction<{error: string, once: boolean}>>;
-    onClose: () => void;
+    setErrorAction: React.Dispatch<React.SetStateAction<{error: string, once: boolean}>>;
+    onCloseAction: () => void;
     tournament: Tournament & { matchs: Match[], teams: (Team & TeamTournament)[] };
 };
 
 export default function ScoreModal({
                                        isOpen,
-                                       setError,
-                                       onClose,
+                                       setErrorAction,
+                                       onCloseAction,
                                        tournament,
                                    }: ScoreModalProps) {
-    const [score, setScore] = useState<{match_id: number, score_host: number, score_guest: number, victory: "host" | "guest" | null }>({match_id: -1, score_host: 0, score_guest: 0, victory: null});
+    const [score, setScore] = useState<{match_id: number, score_host: number, score_guest: number, victory: number | null }>({match_id: -1, score_host: 0, score_guest: 0, victory: null});
     const [teams, setTeams] = useState<{host: Team & TeamTournament, guest: Team & TeamTournament}>();
     const {user, setUser} = useUser();
 
@@ -26,37 +26,37 @@ export default function ScoreModal({
         if (!isOpen)
             return;
         if (user.id_team == null) {
-            setError({error: "Vous devez avoir une team pour éditer des scores.", once: true});
-            onClose();
+            setErrorAction({error: "Vous devez avoir une team pour éditer des scores.", once: true});
+            onCloseAction();
             return;
         }
-        const user_team = tournament.teams.find(u => u.team_id == user.id_team);
+        const user_team = tournament.teams.find(u => u.id_team == user.id_team);
         if (user_team == undefined) {
-            setError({error: "Votre équipe doit participer au tournois pour remplir des scores.", once: true});
-            onClose();
+            setErrorAction({error: "Votre équipe doit participer au tournois pour remplir des scores.", once: true});
+            onCloseAction();
             return;
         }
-        if (user_team.id_owner != user.user_id) {
-            setError({error: "Vous devez être le propriétaire de l'équipe pour remplir les scores.", once: true});
-            onClose();
+        if (user_team.id_user != user.id_user) {
+            setErrorAction({error: "Vous devez être le propriétaire de l'équipe pour remplir les scores.", once: true});
+            onCloseAction();
             return;
         }
-        const match = tournament.matchs.find(u => (u.id_team_tournament_host == user_team.team_tournament_id || u.id_team_tournament_guest == user_team.team_tournament_id) && u.victory == null);
+        const match = tournament.matchs.find(u => (u.teams[0].id_team == user_team.id_team || u.teams[1].id_team == user_team.id_team) && u.id_victory_team == null);
         if (match == undefined) {
-            setError({error: "Vous devez avoir un match en cours pour éditer un score.", once: true});
-            onClose();
+            setErrorAction({error: "Vous devez avoir un match en cours pour éditer un score.", once: true});
+            onCloseAction();
             return;
         }
-        const host = tournament.teams.find(u => u.team_tournament_id == match.id_team_tournament_host);
-        const guest = tournament.teams.find(u => u.team_tournament_id == match.id_team_tournament_guest);
+        const host = tournament.teams.find(u => u.id_team == match.teams[0].id_team);
+        const guest = tournament.teams.find(u => u.id_team == match.teams[1].id_team);
         if (guest == undefined || host == undefined) {
-            setError({error: "Oups... Une erreur est apparu. Essayez plus tard ou demander un admin.", once: true});
-            onClose();
+            setErrorAction({error: "Oups... Une erreur est apparu. Essayez plus tard ou demander un admin.", once: true});
+            onCloseAction();
             return;
         }
         setTeams({host: host, guest: guest});
-        setScore({match_id: match.tournament_match_id, score_host: match.score_host, score_guest: match.score_guest, victory: match.victory});
-    }, [isOpen]);
+        setScore({match_id: match.id_match, score_host: match.teams[0].score, score_guest: match.teams[1].score, victory: match.id_victory_team});
+    }, [isOpen]);// eslint-disable-line
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -73,10 +73,10 @@ export default function ScoreModal({
                 setUser((prevState) => ({...prevState, token: response.headers.get('token')!}));
             const result = await response.json();
             if (!response.ok)
-                setError({error: result.error, once: true});
-            setError({error: "Score mis à jour!", once: true});
+                setErrorAction({error: result.error, once: true});
+            setErrorAction({error: "Score mis à jour!", once: true});
         })();
-        onClose();
+        onCloseAction();
     };
 
     if (!isOpen) return null;
@@ -105,7 +105,7 @@ export default function ScoreModal({
                     />
 
                     <label>Gagnant</label>
-                    <select value={score.victory ? score.victory : ""} onChange={(e) => setScore((prevState) =>  ({...prevState, victory: (e.target.value == "" ? null : e.target.value) as ("host" | "guest" | null)}))}>
+                    <select value={score.victory ? score.victory : ""} onChange={(e) => setScore((prevState) =>  ({...prevState, id_victory_team: (e.target.value == "" ? null : e.target.value) as (number | null)}))}>
                         <option value="">Aucun</option>
                         <option value="host">{teams?.host.name}</option>
                         <option value="guest">{teams?.guest.name}</option>
@@ -113,7 +113,7 @@ export default function ScoreModal({
 
                     <div className="modal-buttons">
                         <button type="submit" className="submit-btn">Valider</button>
-                        <button type="button" className="cancel-btn" onClick={onClose}>Annuler</button>
+                        <button type="button" className="cancel-btn" onClick={onCloseAction}>Annuler</button>
                     </div>
                 </form>
             </div>

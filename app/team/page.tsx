@@ -93,7 +93,7 @@ export default function Team() {
 
     useEffect(() => {
         getTeam();
-    }, [id]);
+    }, [id]);// eslint-disable-line
 
     return (
         <main className="team-page">

@@ -60,9 +60,9 @@ export default function Register() {
         <main className="register-page">
             <Modal text={error.error} onClose={() => {setError({error: "", once: true})}}></Modal>
             <form className="register-form" onSubmit={handleSubmit}>
-                <h1>S'inscrire</h1>
+                <h1>S&aposinscrire</h1>
 
-                <label htmlFor="username">Nom d'utilisateur</label>
+                <label htmlFor="username">Nom d&aposutilisateur</label>
                 <input
                     id="username"
                     type="username"
@@ -118,7 +118,7 @@ export default function Register() {
                     </button>
                 </div>
 
-                <button type="submit" className={"submit-button"}>S'inscrire</button>
+                <button type="submit" className={"submit-button"}>S&aposinscrire</button>
                 <Link href={"/login"} className={"text-button"}>Se connecter</Link>
             </form>
         </main>

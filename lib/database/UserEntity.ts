@@ -1,4 +1,4 @@
-import {id, status, User, UserInfo, token_payload, getHistories, History} from "../types";
+import {id, status, User, token_payload, getHistories, History} from "../types";
 import bcrypt from "bcrypt";
 import mysql from "mysql2/promise";
 import {Database} from "./database";

@@ -1,7 +1,7 @@
 "use client";
 
-import { Pencil, Trash2 } from "lucide-react";
-import {redirect, usePathname, useSearchParams} from "next/navigation";
+import { Pencil } from "lucide-react";
+import {redirect, useSearchParams} from "next/navigation";
 import {useUser} from "../components/contexts/User";
 import {History, TeamInfo, UserInfo} from "../../lib/types";
 import {useEffect, useState} from "react";
@@ -29,9 +29,7 @@ export default function User() {
     const [editOpen, setEditOpen] = useState(false);
 
     const getProfile = async () => {
-        console.log("Getting profile");
         if (id) {
-            console.log("ID");
             id = parseInt(id as string, 10);
             if (user.id_user != -1 && id == user.id_user) {
                 tmp_profile = {...user, team_name: "", histories: []};
@@ -43,7 +41,6 @@ export default function User() {
                 tmp_profile = {...(await response.json() as UserInfo), team_name: "", histories: []};
             }
         } else if (username) {
-            console.log("Username");
             if (user.id_user != -1 && username == user.username) {
                 tmp_profile = {...user, team_name: "", histories: []};
             } else {
@@ -55,7 +52,6 @@ export default function User() {
                 tmp_profile = {...(await response.json() as UserInfo), team_name: "", histories: []};
             }
         } else if (user.id_user != -1) {
-            console.log("user: ", user);
             redirect("/user?username=" + user.username);
         } else {
             redirect("/login");
@@ -90,7 +86,7 @@ export default function User() {
 
     useEffect(() => {
         getProfile();
-    }, [username, id]);
+    }, [username, id]);// eslint-disable-line
 
     if ((!ownProfile && user.id_user == profile.id_user) || user.is_admin) {
         setOwnProfile(true);

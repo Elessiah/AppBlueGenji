@@ -1,6 +1,6 @@
 // app/api/tournament/route.ts
 import {NextRequest, NextResponse} from "next/server";
-import {getMatchsClient, getMatchsServer, getTournamentTeams, Match, status} from "../../../lib/types";
+import {getMatchsServer, getTournamentTeams, Match, status} from "../../../lib/types";
 import {secureRequest} from "../../../lib/API/secureRequest";
 import {create} from "./create";
 import {edit} from "./edit";

@@ -1,6 +1,5 @@
 import {NextResponse} from "next/server";
-import {status, TeamInfo, UserInfo} from "../../../lib/types";
-import {Database} from "../../../lib/database/database";
+import {status} from "../../../lib/types";
 import {TeamEntity} from "../../../lib/database/TeamEntity";
 import {UserEntity} from "../../../lib/database/UserEntity";
 

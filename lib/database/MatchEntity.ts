@@ -1,6 +1,6 @@
 import {TournamentEntity} from "./TournamentEntity";
 import {TeamEntity} from "./TeamEntity";
-import {status, getMatchsServer, Match, id, TeamMatch, TeamAndMatch, MatchTeams} from "../types";
+import {status, getMatchsServer, id, TeamMatch, TeamAndMatch, MatchTeams} from "../types";
 import {Database} from "./database";
 import mysql from "mysql2/promise";
 
@@ -37,7 +37,7 @@ export class MatchEntity {
         const match: MatchTeams = (await MatchEntity.groupByMatchID((rows as TeamAndMatch[])))[0];
         this.id = match.id_match;
         this.tournament = new TournamentEntity();
-        let status: status = await this.tournament.fetch(match.id_tournament);
+        const status: status = await this.tournament.fetch(match.id_tournament);
         if (!status.success) {
             return ({success: false, error: status.error});
         }
@@ -150,7 +150,7 @@ export class MatchEntity {
 
     // Static
     public static async groupByMatchID(teamsMatch: TeamAndMatch[]): Promise<MatchTeams[]> {
-        let matchs: MatchTeams[] = [];
+        const matchs: MatchTeams[] = [];
         for (const team of teamsMatch) {
             if (matchs.length == 0 || team.id_match != matchs[matchs.length - 1].id_match) {
                 matchs.push({id_match: team.id_match, id_tournament: team.id_tournament, id_victory_team: team.id_victory_team, start_date: team.start_date, teams: []});

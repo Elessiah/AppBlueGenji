@@ -1,7 +1,6 @@
 // app/api/team/route.ts
 import {NextRequest, NextResponse} from "next/server";
-import {Database} from "../../../lib/database/database";
-import {getHistories, getTeamMembers, status, Team, TeamInfo, History} from "../../../lib/types";
+import {getHistories, getTeamMembers, status} from "../../../lib/types";
 import {secureRequest} from "../../../lib/API/secureRequest";
 import {members} from "./members";
 import {destruct} from "./destruct";

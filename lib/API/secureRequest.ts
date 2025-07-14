@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import {status, token_payload} from "../types";
-import {Database} from "../database/database";
 import {UserEntity} from "../database/UserEntity";
 
 export async function secureRequest(
     req: NextRequest,
     handler: (req: NextRequest, user_id: number) => Promise<NextResponse>
 ) {
-    let token: string | null = req.headers.get('token');
+    const token: string | null = req.headers.get('token');
     if (token == null)
         return NextResponse.json({ error: 'Non authorized!' }, { status: 401 });
     let payload: token_payload;
     try {
         payload = JSON.parse(Buffer.from(token, "base64url").toString("utf-8")) as token_payload;
-    } catch (e) {
+    } catch (e) { // eslint-disable-line
         return NextResponse.json({ error: 'Non authorized!' }, { status: 401 });
     }
     const user = new UserEntity();

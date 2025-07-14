@@ -20,7 +20,7 @@ const defaultForm = {
 
 export default function CreateTournamentPage() {
     const searchParams = useSearchParams();
-    let urlError: string | null = searchParams.get('error');
+    const urlError: string | null = searchParams.get('error');
     const [error, setError] = useState<{ error: string, once: boolean }>({error: "", once: false});
     const {user, setUser} = useUser();
 
