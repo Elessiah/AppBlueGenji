@@ -8,6 +8,7 @@ import {useUser} from "../components/contexts/User";
 import {id} from "../../lib/types"
 import {redirect, useSearchParams} from "next/navigation";
 import Modal from "../components/Modal";
+import ConsentModal from "../components/consentModal";
 
 export default function Register() {
     const searchParams = useSearchParams();
@@ -19,6 +20,7 @@ export default function Register() {
     const [showPassword, setShowPassword] = useState<boolean>(false);
     const [error, setError] = useState<{error: string, once: boolean}>({error: "", once: false});
     const {user, setUser} = useUser();
+    const [consentOpen, setConsentOpen] = useState(true);
 
     if (user.id_user != -1) {
         if (urlError) {
@@ -59,10 +61,10 @@ export default function Register() {
     return (
         <main className="register-page">
             <Modal text={error.error} onClose={() => {setError({error: "", once: true})}}></Modal>
+            <ConsentModal isOpen={consentOpen} onAcceptAction={() => setConsentOpen(false)}></ConsentModal>
             <form className="register-form" onSubmit={handleSubmit}>
-                <h1>S&aposinscrire</h1>
-
-                <label htmlFor="username">Nom d&aposutilisateur</label>
+                <h1>S'inscrire</h1>
+                <label htmlFor="username">Nom d'utilisateur</label>
                 <input
                     id="username"
                     type="username"
@@ -118,7 +120,7 @@ export default function Register() {
                     </button>
                 </div>
 
-                <button type="submit" className={"submit-button"}>S&aposinscrire</button>
+                <button type="submit" className={"submit-button"}>S'inscrire</button>
                 <Link href={"/login"} className={"text-button"}>Se connecter</Link>
             </form>
         </main>

@@ -49,7 +49,7 @@ export default function CreateTeam() {
             <form className={"creation-form"} onSubmit={handleSubmit}>
                 <h1>Créer une équipe</h1>
 
-                <label htmlFor="name">Nom de l&aposéquipe</label>
+                <label htmlFor="name">Nom de l'équipe</label>
                 <input
                     id="name"
                     type="text"
