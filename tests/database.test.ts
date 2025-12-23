@@ -1,4 +1,4 @@
-import {Database} from "../lib/database/database";
+import {Database} from "../lib/data/database";
 import {afterAll, beforeAll, describe, expect, test} from "@jest/globals"
 
 import {

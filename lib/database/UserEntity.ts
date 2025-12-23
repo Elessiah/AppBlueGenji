@@ -1,7 +1,7 @@
 import {id, status, User, token_payload, getHistories, History} from "../types";
 import bcrypt from "bcrypt";
 import mysql from "mysql2/promise";
-import {Database} from "./database";
+import {Database} from "../data/database";
 import crypto from "crypto";
 import {TeamEntity} from "./TeamEntity";
 
@@ -33,7 +33,7 @@ export class UserEntity {
         if (user == -1)
             return ({success: false, error: "This user does not exist!"});
         const database: Database = await Database.getInstance();
-        const [rows] = await database.db!.execute(`SELECT * FROM user WHERE id_user = ?`, [user]);
+        const [rows] = await database.sql!.execute(`SELECT * FROM user WHERE id_user = ?`, [user]);
         const user_data: User = (rows as User[])[0];
         this.id = user_data.id_user;
         this.name = user_data.username;
@@ -77,13 +77,13 @@ export class UserEntity {
                 token: ""
             });
         const hash: string = await bcrypt.hash(password, 10);
-        const [result] = await database.db!.execute<mysql.ResultSetHeader>(`INSERT INTO user (username, hash, is_admin)
-                                                                            VALUES (?, ?,
+        const [result] = await database.sql!.execute<mysql.ResultSetHeader>(`INSERT INTO user (username, hash, is_admin)
+                                                                             VALUES (?, ?,
                                                                                     ?)`, [username, hash, is_admin]);
         const token: string = this.createToken(result.insertId);
-        await database.db!.execute(`UPDATE user
-                                   SET token = ?
-                                   WHERE id_user = ?`, [token, result.insertId]);
+        await database.sql!.execute(`UPDATE user
+                                     SET token = ?
+                                     WHERE id_user = ?`, [token, result.insertId]);
         this.id = result.insertId;
         this.name = username;
         this.team = null;
@@ -96,14 +96,14 @@ export class UserEntity {
         if (!this.is_loaded)
             return ({success: false, error: "Empty object!", token: ""});
         const database : Database = await Database.getInstance();
-        const [rows] = await database.db!.execute(`SELECT token FROM user WHERE id_user = ?`, [this.id]);
+        const [rows] = await database.sql!.execute(`SELECT token FROM user WHERE id_user = ?`, [this.id]);
         if ((rows as unknown[]).length == 0)
             return ({success: false, error: "This user does not exist!", token: ""});
         const bdd_token: string = ((rows as unknown[])[0] as {token: string}).token;
         if (bdd_token != token)
             return ({success: true, error: "", token: ""}); // Pas d'erreur de programme juste auth rejeté
         const new_token = this.createToken(this.id!);
-        await database.db!.execute(`UPDATE user SET token = ? WHERE id_user = ?`, [new_token, this.id]);
+        await database.sql!.execute(`UPDATE user SET token = ?WHERE id_user = ?`, [new_token, this.id]);
         return ({success: true, error: "", token: new_token});
     }
 
@@ -111,14 +111,14 @@ export class UserEntity {
         if (!this.is_loaded)
             return ({success: false, error: "Empty object!", token: ""});
         const database : Database = await Database.getInstance();
-        const [rows] = await database.db!.execute(`SELECT hash FROM user WHERE id_user = ?`, [this.id]);
+        const [rows] = await database.sql!.execute(`SELECT hash FROM user WHERE id_user = ?`, [this.id]);
         if ((rows as unknown[]).length == 0)
             return ({success: false, error: "This user does not exist!", token: ""});
         const db_hash = ((rows as unknown[])[0] as {hash: string}).hash;
         if (!(await bcrypt.compare(password, db_hash)))
             return ({success: true, error: "", token: ""});
         const token: string = this.createToken(this.id!);
-        await database.db!.execute(`UPDATE user SET token = ? WHERE id_user = ?`, [token, this.id]);
+        await database.sql!.execute(`UPDATE user SET token = ?WHERE id_user = ?`, [token, this.id]);
         return ({success: true, error: "", token: token});
     }
 
@@ -137,7 +137,7 @@ export class UserEntity {
             return ({success: false, error: "Old password is wrong", token: ""});
         const hash: string = await bcrypt.hash(new_password, 10);
         const database: Database = await Database.getInstance();
-        await database.db!.execute(`UPDATE user SET hash = ? WHERE id_user = ?`, [hash, this.id]);
+        await database.sql!.execute(`UPDATE user SET hash = ?WHERE id_user = ?`, [hash, this.id]);
         return (status);
     }
 
@@ -151,11 +151,11 @@ export class UserEntity {
         if (!status.success)
             return status;
         if (await UserEntity.isExist(new_username) != -1)
-            return ({success: false, error: "Username already exist or it's already your username!"});
+                return ({success: false, error: "Username already exist or it's already your username!"});
         const database: Database = await Database.getInstance();
-        await database.db!.execute(`UPDATE user
-                               SET username = ?
-                               WHERE id_user = ?`, [new_username, user]);
+        await database.sql!.execute(`UPDATE user
+                                     SET username = ?
+                                     WHERE id_user = ?`, [new_username, user]);
         this.name = new_username;
         return ({success: true, error: ""});
     }
@@ -180,7 +180,7 @@ export class UserEntity {
                 return ({success: false, error: status.error});
         }
         const database: Database = await Database.getInstance();
-        await database.db!.execute(`DELETE
+        await database.sql!.execute(`DELETE
                                     FROM user
                                     WHERE id_user = ?`, [user]);
         this.is_loaded = false;
@@ -193,7 +193,7 @@ export class UserEntity {
         if (await UserEntity.isExist(this.id) == -1)
             return ({success: false, error: "User not found!", histories: []});
         const database: Database = await Database.getInstance();
-        const [rows] = await database.db!.execute(`SELECT tournament.*, team_tournament.*, team.name as team_name
+        const [rows] = await database.sql!.execute(`SELECT tournament.*, team_tournament.*, team.name as team_name
                                                    FROM team
                                                             LEFT JOIN team_tournament ON team_tournament.id_team = team.id_team
                                                             LEFT JOIN user_team ON user_team.id_team = team.id_team
@@ -212,12 +212,12 @@ export class UserEntity {
         const database: Database = await Database.getInstance();
         let users: { id_user: number }[];
         if (typeof user == typeof "string") {
-            const [rows] = await database.db!.execute(`SELECT id_user
+            const [rows] = await database.sql!.execute(`SELECT id_user
                                                        FROM user
                                                        WHERE username LIKE ?`, [user]);
             users = rows as { id_user: number }[];
         } else {
-            const [rows] = await database.db!.execute(`SELECT id_user
+            const [rows] = await database.sql!.execute(`SELECT id_user
                                                        FROM user
                                                        WHERE id_user = ?`, [user]);
             users = rows as { id_user: number }[];

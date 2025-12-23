@@ -45,7 +45,7 @@ export interface SQLGetResult {
 }
 
 export interface getTeamMembers {
-    members: UserInfo[];
+    members: Player[];
     success:  boolean;
     error: string;
 }
@@ -96,10 +96,10 @@ export interface User {
     is_admin: boolean;
 }
 
-export interface UserInfo {
+export interface Player {
     id_user: number;
     username: string;
-    id_team: number | null;
+    id_team: number;
     is_admin: boolean;
 }
 
@@ -152,12 +152,11 @@ export interface Match {
     id_match: number;
     tournament: Tournament;
     teams: TeamMatch[];
-    id_victory_team: number | null;
+    id_victory_team: number;
     start_date: Date;
 }
 
 export interface TeamMatch {
-    id_match: number;
     id_team: number;
     score: number;
 }
@@ -176,7 +175,7 @@ export interface MatchTeams {
     id_tournament: number;
     id_victory_team: number;
     start_date: Date;
-    teams: {id_team: number, score: number}[];
+    teams: TeamMatch[];
 }
 
 export interface id {

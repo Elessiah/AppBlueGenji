@@ -35,6 +35,14 @@ export class Database {
     public async execute(sql: string, params?: unknown[]): Promise<[mysql.QueryResult, mysql.FieldPacket[]]> {
         return this.Connection.execute(sql, params);
     }
+
+    public async beginTransaction() {
+        await this.Connection.beginTransaction();
+    }
+
+    public async commit() {
+        await this.Connection.commit();
+    }
     // #endregion
 
     // #region Attributs Privés
@@ -88,10 +96,7 @@ export class Database {
                                  (
                                     id_team       INTEGER PRIMARY KEY AUTO_INCREMENT,
                                     name          VARCHAR(15) COLLATE utf8mb4_bin NOT NULL,
-                                    creation_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    id_user       INTEGER,
-                                    FOREIGN KEY (id_user) REFERENCES user (id_user)
-                                        ON DELETE SET NULL
+                                    creation_date DATETIME DEFAULT CURRENT_TIMESTAMP
                                  );`);
         await this.Connection.execute(`CREATE TABLE IF NOT EXISTS user_team
                                  (
@@ -105,6 +110,18 @@ export class Database {
                                     FOREIGN KEY (id_team) REFERENCES team (id_team)
                                         ON DELETE CASCADE
                                  );`);
+        await this.Connection.execute(`CREATE TABLE IF NOT EXISTS team_owner
+                                        (
+                                            id_user INTEGER NOT NULL,
+                                            id_team INTEGER NOT NULL,
+                                            PRIMARY KEY (id_user, id_team),
+                                            FOREIGN KEY (id_user) 
+                                                REFERENCES user (id_user)
+                                                ON DELETE CASCADE,
+                                            FOREIGN KEY (id_team) 
+                                                REFERENCES team (id_team)
+                                                ON DELETE CASCADE
+                                       )`);
         await this.Connection.execute(`CREATE TABLE IF NOT EXISTS tournament
                                  (
                                     id_tournament      INTEGER PRIMARY KEY AUTO_INCREMENT,

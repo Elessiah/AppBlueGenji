@@ -54,7 +54,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-    return secureRequest(request, async (request, user_id): Promise<NextResponse> => {
+    return await secureRequest(request, async (request, user_id): Promise<NextResponse> => {
         const body = await request.json();
         const command: string | null = body.command;
         if (!command)

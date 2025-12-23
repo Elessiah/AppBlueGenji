@@ -2,7 +2,7 @@
 import {redirect, useSearchParams} from "next/navigation";
 import {useEffect, useState} from "react";
 import { useUser } from "../components/contexts/User";
-import {History, TeamInfo, UserInfo} from "../../lib/types";
+import {History, TeamInfo, Player} from "../../lib/types";
 import {MailPlus, Trash2, X } from "lucide-react";
 import "./Team.css";
 import Link from "next/link";
@@ -10,7 +10,7 @@ import Modal from "../components/Modal";
 import AddMemberModal from "../components/addMemberModal";
 
 type TeamProfile = TeamInfo & {
-    members: UserInfo[],
+    members: Player[],
     histories: History[],
 }
 
@@ -48,7 +48,7 @@ export default function Team() {
             if (!response.ok) {
                 redirect("/?error="+ (await response.json()).error);
             }
-            const result = await response.json() as {members: UserInfo[]};
+            const result = await response.json() as {members: Player[]};
             tmpTeamProfile.members = result.members;
         }
         response = await fetch(`/api/team?id=${id}&g=history`);
@@ -133,7 +133,7 @@ export default function Team() {
             <div className="team-section">
                     <h2>Membres</h2>
                     <ul className="member-list">
-                        {teamProfile.members.map((member: UserInfo, index: number) => (
+                        {teamProfile.members.map((member: Player, index: number) => (
                                 <li key={index} className="member-item">
                                     <Link href={`/user?username=${member.username}`}><span>{member.username}</span></Link>
                                     {

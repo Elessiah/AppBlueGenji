@@ -5,6 +5,7 @@ import {useEffect, useState} from "react";
 import "./List.css";
 import {TournamentTeamsCount} from "../../../lib/types";
 import {Plus} from "lucide-react";
+import Header from "../../components/Header";
 
 export default function List() {
     const searchParams = useSearchParams();
@@ -30,6 +31,7 @@ export default function List() {
     }, []);
     return (
     <main className="tournament-page">
+        <Header/>
         <Modal text={error.error} onClose={() => {setError({error: "", once: true})}}></Modal>
         <div className="tournament-header">
             <button className="create-button" onClick={() => redirect("/tournament/create")}>

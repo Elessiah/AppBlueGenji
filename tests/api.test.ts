@@ -7,7 +7,7 @@ import {
     id,
     status,
     TeamInfo,
-    UserInfo,
+    Player,
     Tournament,
     Team,
     TeamTournament,
@@ -15,7 +15,7 @@ import {
     History,
     getMatchsServer
 } from "../lib/types";
-import {Database} from "../lib/database/database";
+import {Database} from "../lib/data/database";
 import {owner} from "../app/api/team/owner";
 import {sleep} from "../lib/tools/sleep";
 import {UserEntity} from "../lib/database/UserEntity";
@@ -88,14 +88,14 @@ describe("api", () => {
         request = new NextRequest(`https://localhost/user/?id=${idUserAPI}`);
         response = await GETUSER(request);
         expect(response.status).toEqual(200);
-        let userInfo: UserInfo = await response.json() as UserInfo;
+        let userInfo: Player = await response.json() as Player;
         expect(userInfo).toEqual({id_user: idUserAPI, username: nameUserAPI, id_team: null, is_admin: false});
 
         // Test récupération de l'utilisateur par Nom
         request = new NextRequest(`https://localhost/user/?username=${nameUserAPI}`);
         response = await GETUSER(request);
         expect(response.status).toEqual(200);
-        const secondUserInfo: UserInfo = await response.json() as UserInfo;
+        const secondUserInfo: Player = await response.json() as Player;
         expect(secondUserInfo).toEqual(userInfo);
 
         // Test validité du token de la command new
@@ -227,7 +227,7 @@ describe("api", () => {
         request = new NextRequest(`https://localhost/user/?id=${idUserAPI}`);
         response = await GETUSER(request);
         expect(response.status).toEqual(200);
-        userInfo = await response.json() as UserInfo;
+        userInfo = await response.json() as Player;
         expect(userInfo).toEqual({id_user: idUserAPI, username: passwordUserAPI, id_team: null, is_admin: false});
 
         // Reset update
@@ -671,12 +671,12 @@ describe("api", () => {
         request = new NextRequest(`https://localhost/user/?id=${idUserTeam}`);
         response = await GETUSER(request);
         expect(response.status).toEqual(200);
-        let user: UserInfo = await response.json() as UserInfo;
+        let user: Player = await response.json() as Player;
         //      Test get members
         request = new NextRequest(`https://localhost/team/?name=${nameUserTeam}&g=members`);
         response = await GETTEAM(request);
         expect(response.status).toEqual(200);
-        let members: UserInfo[] = ((await response.json() as {members: UserInfo[]}).members);
+        let members: Player[] = ((await response.json() as {members: Player[]}).members);
         expect(members.length).toEqual(1);
         expect({...members[0], is_admin: false, id_team: idPerfectTeam}).toEqual(user);
         // Test get history
@@ -742,7 +742,7 @@ describe("api", () => {
         request = new NextRequest(`https://localhost/team/?name=${nameUserTeam}&g=members`);
         response = await GETTEAM(request);
         expect(response.status).toEqual(200);
-        members = (await response.json() as {members: UserInfo[]}).members;
+        members = (await response.json() as {members: Player[]}).members;
         expect(members.length).toEqual(2);
         expect(members[0].username).not.toEqual(members[1].username);
         expect([nameUserTeam, nameUser2Team]).toContain(members[0].username);
@@ -813,7 +813,7 @@ describe("api", () => {
         request = new NextRequest(`https://localhost/team/?name=${nameUserTeam}&g=members`);
         response = await GETTEAM(request);
         expect(response.status).toEqual(200);
-        members = (await response.json() as {members: UserInfo[]}).members;
+        members = (await response.json() as {members: Player[]}).members;
         expect(members.length).toEqual(1);
         expect({...members[0], is_admin: false, id_team: idPerfectTeam}).toEqual(user);
 

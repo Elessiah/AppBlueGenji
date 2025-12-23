@@ -6,7 +6,7 @@ import "./Login.css";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { useUser } from "../components/contexts/User";
-import { UserInfo } from "../../lib/types";
+import { Player } from "../../lib/types";
 import {redirect, useSearchParams} from "next/navigation";
 import Modal from "../components/Modal";
 
@@ -46,12 +46,12 @@ export default function Login() {
             }
             const token = response.headers.get('token')!;
             response = await fetch("/api/user?username=" + username);
-            const result: { error: string } | UserInfo = await response.json();
+            const result: { error: string } | Player = await response.json();
             if (!response.ok) {
                 setError({error:(await response.json()).error, once: true});
                 return;
             }
-            setUser({...result as UserInfo, token: token});
+            setUser({...result as Player, token: token});
             redirect("/tournament");
         })();
     };

@@ -15,9 +15,19 @@ export default function Home() {
             {/* Logo central */}
             <div className="triangle-center">
                 <img src="/logo_bg.webp" alt="BlueGenji" />
+                <svg viewBox="0 0 200 200" className="circle-text">
+                    <defs>
+                        <path id="circlePath" d="M 30,150 A 80,80 0 0,0 170,150" />
+                    </defs>
+                    <text>
+                        <textPath href="#circlePath" startOffset="50%" textAnchor="middle">
+                            BlueGenji
+                        </textPath>
+                    </text>
+                </svg>
             </div>
 
-            {/* Triangles en cascade */}
+            {/* Triangles en cascade
             {items.map((item, index) => (
                 <motion.div
                     key={item.className}
@@ -28,9 +38,14 @@ export default function Home() {
                         bounce: 0.4,
                         duration: 0.6, }}
                 >
-                    <img src={item.src} className={`triangle ${item.className}`} alt={item.alt} />
+
                 </motion.div>
             ))}
+             */}
+            <img src="/BotPart.png" className='triangle top' />
+            <img src="/MarvelRivalsPart.jpg" className='triangle right' />
+            <img src="/tournamentPart.jpeg" className='triangle bottom' />
+            <img src="/OverwatchPart.png" className='triangle left' />
         </div>
     );
 }

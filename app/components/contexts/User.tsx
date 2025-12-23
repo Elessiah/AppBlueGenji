@@ -1,18 +1,18 @@
 "use client";
 import React, { createContext, useContext, useState } from "react";
-import {UserInfo} from "../../../lib/types";
+import {Player} from "../../../lib/types";
 
 interface UserContextType {
-    user: UserInfo & {token: string},
-    setUser: React.Dispatch<React.SetStateAction<UserInfo & {token: string}>>
+    user: Player & {token: string},
+    setUser: React.Dispatch<React.SetStateAction<Player & {token: string}>>
 }
-const defaultUser: UserInfo & {token: string} = {id_user: -1, username: "", token: "", id_team: null, is_admin: false};
+const defaultUser: Player & {token: string} = {id_user: -1, username: "", token: "", id_team: null, is_admin: false};
 const defaultContextUser = {user: defaultUser, setUser: () => {}};
 
 const UserContext = createContext<UserContextType>(defaultContextUser);
 
 export function UserProvider({children}: {children: React.ReactNode}) {
-    const [user, setUser] = useState<UserInfo & {token: string}>(defaultUser);
+    const [user, setUser] = useState<Player & {token: string}>(defaultUser);
     return (
         <UserContext.Provider value={{ user: user, setUser: setUser }}>
             {children}

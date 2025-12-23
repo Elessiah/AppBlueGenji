@@ -3,14 +3,14 @@
 import { Pencil } from "lucide-react";
 import {redirect, useSearchParams} from "next/navigation";
 import {useUser} from "../components/contexts/User";
-import {History, TeamInfo, UserInfo} from "../../lib/types";
+import {History, TeamInfo, Player} from "../../lib/types";
 import {useEffect, useState} from "react";
 import "./User.css";
 import Modal from "../components/Modal";
 import Link from "next/link";
 import EditProfileModal from "../components/editProfileModal";
 
-type Profile = UserInfo & {
+type Profile = Player & {
     team_name: string;
     histories: History[];
 }
@@ -38,7 +38,7 @@ export default function User() {
                 if (!response.ok) {
                     redirect(`/?error=${(await response.json()).error}`);
                 }
-                tmp_profile = {...(await response.json() as UserInfo), team_name: "", histories: []};
+                tmp_profile = {...(await response.json() as Player), team_name: "", histories: []};
             }
         } else if (username) {
             if (user.id_user != -1 && username == user.username) {
@@ -49,7 +49,7 @@ export default function User() {
                 if (!response.ok) {
                     redirect(`/?error=${(await response.json()).error}`);
                 }
-                tmp_profile = {...(await response.json() as UserInfo), team_name: "", histories: []};
+                tmp_profile = {...(await response.json() as Player), team_name: "", histories: []};
             }
         } else if (user.id_user != -1) {
             redirect("/user?username=" + user.username);
