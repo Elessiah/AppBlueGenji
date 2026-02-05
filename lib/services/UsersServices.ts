@@ -1,12 +1,12 @@
 // user.service.ts
-import type { Pool, ResultSetHeader } from "mysql2/promise";
+import type {Connection, ResultSetHeader} from "mysql2/promise";
 import bcrypt from "bcrypt";
 import crypto from "node:crypto";
 import {User, UserRow} from "../types";
 
 
 export class UserService {
-    constructor(private readonly db: Pool) {}
+    constructor(private readonly db: Connection) {}
 
     private static normalizeUser(row: UserRow): User {
         return {
