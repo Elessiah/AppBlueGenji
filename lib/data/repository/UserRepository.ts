@@ -5,18 +5,15 @@ import bcrypt from "bcrypt";
 import {ResultSetHeader} from "mysql2";
 
 export class UserRepository {
-    // #region Attributs
 
+    // Attributs privés
     /**
      * Contient la classe Database
      * @private
      */
     private database: Database;
 
-    // #endregion
-
-    // #region Constructeur
-
+    // Constructeur
     /**
      * Construit l'objet par rapport à une instance de base de donnée
      * @param database Doit être une instance de Database
@@ -24,8 +21,6 @@ export class UserRepository {
     constructor(database: Database) {
         this.database = database;
     }
-
-    // #endregion
 
     // #region Méthodes Publiques
 
@@ -200,7 +195,7 @@ export class UserRepository {
     }
 
     public async delete(id: number): Promise<status> {
-
+        await this.database.execute(`DELETE user WHERE id_user = ?`, [id]);
     }
 
     // #endregion

@@ -115,7 +115,7 @@ export class MatchRepository {
 
     // #endregion
 
-    // #region Méthodes Publiques
+    // #region Méthodes Privées
 
     private async manageTournamentWinner(id_tournament: number): Promise<status> {
         const [rows] = await this.database.execute(`SELECT COUNT(*) as nbTeams FROM team_tournament WHERE id_tournament = ? && position = -1`, [id_tournament]);
