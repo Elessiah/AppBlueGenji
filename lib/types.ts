@@ -1,4 +1,4 @@
-import {RowDataPacket} from "mysql2/promise";
+import {type Pool, RowDataPacket} from "mysql2/promise";
 
 export interface User {
     id_user: number;
@@ -39,3 +39,39 @@ export type Membership = {
         role: TeamMemberRole;
     }
 export type MembershipRow = RowDataPacket & Membership;
+
+export type MatchBracket = "UPPER" | "LOWER";
+
+export type Match = {
+    id_match: number;
+    id_tournament: number;
+    start_at: Date | null;
+    round: number;
+    bracket: MatchBracket | null;
+    match_index: number | null;
+};
+
+export type MatchRow = RowDataPacket & {
+    id_match: number;
+    id_tournament: number;
+    start_at: Date | null;
+    round: number;
+    bracket: MatchBracket | null;
+    match_index: number | null;
+};
+
+export type MatchParticipation = {
+    id_participation: number;
+    id_match: number;
+    id_team: number;
+    score: number;
+    is_winner: boolean;
+};
+
+export type ParticipationRow = RowDataPacket & {
+    id_participation: number;
+    id_match: number;
+    id_team: number;
+    score: number;
+    is_winner: 0 | 1;
+};
