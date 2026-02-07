@@ -75,3 +75,47 @@ export type ParticipationRow = RowDataPacket & {
     score: number;
     is_winner: 0 | 1;
 };
+
+export type TournamentFormat = "SIMPLE" | "DOUBLE";
+export type TournamentStatus = "DRAFT" | "OPEN" | "RUNNING" | "DONE";
+
+export type Tournament = {
+    id_tournament: number;
+    organizer_user_id: number;
+    name: string;
+    description: string | null;
+    format: TournamentFormat;
+    max_teams: number;
+    created_at: Date;
+    start_visibility_at: Date | null;
+    open_registration_at: Date | null;
+    close_registration_at: Date | null;
+    start_at: Date | null;
+    status: TournamentStatus;
+    current_round: number | null;
+};
+
+export type TournamentRow = RowDataPacket & {
+    id_tournament: number;
+    organizer_user_id: number;
+    name: string;
+    description: string | null;
+    format: TournamentFormat;
+    max_teams: number;
+    created_at: Date;
+    start_visibility_at: Date | null;
+    open_registration_at: Date | null;
+    close_registration_at: Date | null;
+    start_at: Date | null;
+    status: TournamentStatus;
+    current_round: number | null;
+};
+
+export type RegistrationRow = RowDataPacket & {
+    id_registration: number;
+    id_tournament: number;
+    id_team: number;
+    registered_at: Date;
+    final_position: number | null;
+    seed: number | null;
+};
