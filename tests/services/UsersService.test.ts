@@ -2,7 +2,7 @@
 import type { Connection } from "mysql2/promise";
 import crypto from "node:crypto";
 import bcrypt from "bcrypt";
-import { UserService } from "../../lib/services/UsersService";
+import { UserService } from "../../lib/data/services/UsersService";
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 
 jest.mock("bcrypt", () => ({

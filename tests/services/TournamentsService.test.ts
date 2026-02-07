@@ -1,7 +1,7 @@
 // tests/services/TournamentsService.test.ts
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import type {Connection, Pool, PoolConnection} from "mysql2/promise";
-import { TournamentService } from "../../lib/services/TournamentsService";
+import { TournamentService } from "../../lib/data/services/TournamentsService";
 import type { TournamentFormat, TournamentStatus } from "../../lib/types";
 
 function mockPool() {

@@ -1,6 +1,6 @@
 // match.service.ts
 import type {Connection, ResultSetHeader, RowDataPacket} from "mysql2/promise";
-import {Match, MatchBracket, MatchParticipation, MatchRow, ParticipationRow} from "../types";
+import {Match, MatchBracket, MatchParticipation, MatchRow, ParticipationRow} from "../../types";
 
 /**
  * Objet service pour la table Matches

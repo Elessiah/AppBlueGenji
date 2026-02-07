@@ -1,6 +1,6 @@
 // tournament.service.ts
 import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import {RegistrationRow, Tournament, TournamentFormat, TournamentRow, TournamentStatus} from "../types";
+import {RegistrationRow, Tournament, TournamentFormat, TournamentRow, TournamentStatus} from "../../types";
 
 /**
  * Objet service pour la table SQL Tournaments

@@ -1,6 +1,6 @@
 // team.service.ts
 import type {Connection, ResultSetHeader, RowDataPacket} from "mysql2/promise";
-import {Membership, MembershipRow, Team, TeamMemberRole, TeamRow} from "../types";
+import {Membership, MembershipRow, Team, TeamMemberRole, TeamRow} from "../../types";
 
 /**
  * Objet service de la table Teams

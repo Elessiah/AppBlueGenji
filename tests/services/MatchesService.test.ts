@@ -1,7 +1,7 @@
 // tests/services/MatchesService.test.ts
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import type { Connection } from "mysql2/promise";
-import { MatchService } from "../../lib/services/MatchesService";
+import { MatchService } from "../../lib/data/services/MatchesService";
 
 function mockConn(){
     const execute = jest.fn() as unknown as Connection["execute"];

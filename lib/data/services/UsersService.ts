@@ -2,7 +2,7 @@
 import type {Connection, ResultSetHeader} from "mysql2/promise";
 import bcrypt from "bcrypt";
 import crypto from "node:crypto";
-import {User, UserRow} from "../types";
+import {User, UserRow} from "../../types";
 
 /**
  * Objet Service pour la table User
