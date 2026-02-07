@@ -2,10 +2,21 @@
 import type {Connection, ResultSetHeader, RowDataPacket} from "mysql2/promise";
 import {Membership, MembershipRow, Team, TeamMemberRole, TeamRow} from "../types";
 
-
+/**
+ * Objet service de la table Teams
+ */
 export class TeamService {
+    /**
+     * Constructeur permettant de récupérer la connection à la base de données
+     * @param db
+     */
     constructor(private readonly db: Connection) {}
 
+    /**
+     * Transforme l'objet brut retourné par SQL en objet métier
+     * @param row Objet brut retourné par SQL
+     * @private
+     */
     private static normalizeTeam(row: TeamRow): Team {
         return {
             id_team: row.id_team,
@@ -14,6 +25,11 @@ export class TeamService {
         };
     }
 
+    /**
+     * Transforme l'objet brut retourné par SQL en objet métier
+     * @param row Objet brut retourné par SQL
+     * @private
+     */
     private static normalizeMembership(row: MembershipRow): Membership {
         return {
             id_membership: row.id_membership,
@@ -25,6 +41,11 @@ export class TeamService {
         };
     }
 
+    /**
+     * Créer une nouvelle équipe
+     * @param name Nouveau nom
+     * @param ownerUserId ID de l'utilisateur propriétaire
+     */
     async createTeam(name: string, ownerUserId: number): Promise<Team> {
         try {
             await this.db.beginTransaction();
@@ -54,6 +75,10 @@ export class TeamService {
         }
     }
 
+    /**
+     * Récupère une équipe
+     * @param id_team ID de l'équipe à récupérer
+     */
     async getById(id_team: number): Promise<Team | null> {
         const [rows] = await this.db.execute<TeamRow[]>(
             `SELECT id_team, name, created_at
@@ -67,6 +92,10 @@ export class TeamService {
         return TeamService.normalizeTeam(rows[0]);
     }
 
+    /**
+     * Récupère une équipe
+     * @param name Nom de l'équipe à récupérer
+     */
     async getByName(name: string): Promise<Team | null> {
         const [rows] = await this.db.execute<TeamRow[]>(
             `SELECT id_team, name, created_at
