@@ -4,10 +4,21 @@ import bcrypt from "bcrypt";
 import crypto from "node:crypto";
 import {User, UserRow} from "../types";
 
-
+/**
+ * Objet Service pour la table User
+ */
 export class UserService {
+    /**
+     * Constructeur pour récupérer la connexion à la base de donnée
+     * @param db Connexion à la base de donnée
+     */
     constructor(private readonly db: Connection) {}
 
+    /**
+     * Transforme l'objet brut retourné par SQL en objet User
+     * @param row Objet brut retourné par SQL
+     * @private
+     */
     private static normalizeUser(row: UserRow): User {
         return {
             id_user: row.id_user,
@@ -17,10 +28,20 @@ export class UserService {
         };
     }
 
+    /**
+     * Génère un nouveau token aléatoire sur 48 caractères
+     * @private
+     */
     private static newToken(): string {
         return crypto.randomBytes(48).toString("hex"); // 96 chars
     }
 
+    /**
+     * Créé un nouveau utilisateur
+     * @param username Nom d'utilisateur
+     * @param password Mot de passe
+     * @param isAdmin s'il est admin ou pas. Défaut à false
+     */
     async createUser(username: string, password: string, isAdmin = false): Promise<User> {
         const password_hash = await bcrypt.hash(password, 12);
 
@@ -35,6 +56,11 @@ export class UserService {
         return user;
     }
 
+    /**
+     * Authentifie un utilisateur avec son nom d'utilisateur et son mot de passe
+     * @param username Nom d'utilisateur
+     * @param password Mot de passe
+     */
     async authenticate(username: string, password: string): Promise<{ user: User; token: string } | null> {
         const [rows] = await this.db.execute<UserRow[]>(
             `SELECT id_user, username, hash, token, is_admin, created_at
@@ -59,6 +85,10 @@ export class UserService {
         return { user: UserService.normalizeUser(rows[0]), token };
     }
 
+    /**
+     * Récupère un utilisateur par son ID
+     * @param id_user ID de l'utilisateur à récupérer
+     */
     async getById(id_user: number): Promise<User | null> {
         const [rows] = await this.db.execute<UserRow[]>(
             `SELECT id_user, username, hash, token, is_admin, created_at
@@ -72,6 +102,10 @@ export class UserService {
         return UserService.normalizeUser(rows[0]);
     }
 
+    /**
+     * Récupère l'utilisateur par son nom d'utilisateur
+     * @param username
+     */
     async getByUsername(username: string): Promise<User | null> {
         const [rows] = await this.db.execute<UserRow[]>(
             `SELECT id_user, username, hash, token, is_admin, created_at
@@ -85,6 +119,10 @@ export class UserService {
         return UserService.normalizeUser(rows[0]);
     }
 
+    /**
+     * Récupère un utilisateur par son token
+     * @param token
+     */
     async getByToken(token: string): Promise<User | null> {
         const [rows] = await this.db.execute<UserRow[]>(
             `SELECT id_user, username, hash, token, is_admin, created_at
@@ -98,6 +136,10 @@ export class UserService {
         return UserService.normalizeUser(rows[0]);
     }
 
+    /**
+     * Change le token d'un utilisateur
+     * @param id_user ID de l'utilisateur à mettre à jour
+     */
     async rotateToken(id_user: number): Promise<string> {
         const token: string = UserService.newToken();
         const [res] = await this.db.execute<ResultSetHeader>(
@@ -108,6 +150,10 @@ export class UserService {
         return token;
     }
 
+    /**
+     * Supprime le token d'un utilisateur
+     * @param id_user ID de l'utilisateur à mettre à jour
+     */
     async revokeToken(id_user: number): Promise<void> {
         const [res] = await this.db.execute<ResultSetHeader>(
             `UPDATE users SET token = NULL WHERE id_user = ?`,
@@ -116,6 +162,11 @@ export class UserService {
         if (res.affectedRows !== 1) throw new Error("USER_NOT_FOUND");
     }
 
+    /**
+     * Modifie le mot de passe d'un utilisateur
+     * @param id_user ID de l'utilisateur à mettre à jour
+     * @param newPassword Nouveau mot de passe à appliquer
+     */
     async changePassword(id_user: number, newPassword: string): Promise<void> {
         const password_hash: string = await bcrypt.hash(newPassword, 12);
         const [res] = await this.db.execute<ResultSetHeader>(
@@ -125,6 +176,11 @@ export class UserService {
         if (res.affectedRows !== 1) throw new Error("USER_NOT_FOUND");
     }
 
+    /**
+     * Change le status admin d'un utilisateur
+     * @param id_user ID de l'utilisateur à mettre à jour
+     * @param is_admin Status admin à appliquer
+     */
     async setAdmin(id_user: number, is_admin: boolean): Promise<void> {
         const [res] = await this.db.execute<ResultSetHeader>(
             `UPDATE users SET is_admin = ? WHERE id_user = ?`,
@@ -133,6 +189,10 @@ export class UserService {
         if (res.affectedRows !== 1) throw new Error("USER_NOT_FOUND");
     }
 
+    /**
+     * Supprime un utilisateur
+     * @param id_user ID de l'utilisateur à supprimer
+     */
     async deleteUser(id_user: number): Promise<void> {
         const [res] = await this.db.execute<ResultSetHeader>(
             `DELETE FROM users WHERE id_user = ?`,

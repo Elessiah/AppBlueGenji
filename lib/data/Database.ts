@@ -25,7 +25,7 @@ class Database {
             // Entités
             await database.execute(`CREATE TABLE IF NOT EXISTS users (
                                             id_user INT AUTO_INCREMENT PRIMARY KEY,
-                                            username VARCHAR(30) NOT NULL,
+                                            username VARCHAR(30) NOT NULL UNIQUE,
                                             hash VARCHAR(30) NOT NULL,
                                             token VARCHAR(48) DEFAULT NULL,
                                             is_admin BOOLEAN DEFAULT false,

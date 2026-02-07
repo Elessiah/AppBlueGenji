@@ -3,7 +3,7 @@ import type {Connection, ResultSetHeader, RowDataPacket} from "mysql2/promise";
 import {Match, MatchBracket, MatchParticipation, MatchRow, ParticipationRow} from "../types";
 
 /**
- * Objet service pour un match
+ * Objet service pour la table Matches
  */
 export class MatchService {
     /**
