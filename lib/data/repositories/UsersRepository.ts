@@ -7,7 +7,7 @@ import {User, UserRow} from "../../types";
 /**
  * Objet Service pour la table User
  */
-export class UserService {
+export class UsersRepository {
     /**
      * Constructeur pour récupérer la connexion à la base de donnée
      * @param db Connexion à la base de donnée
@@ -75,14 +75,14 @@ export class UserService {
         const status: boolean = await bcrypt.compare(password, rows[0].password_hash);
         if (!status) return null;
 
-        const token: string = UserService.newToken();
+        const token: string = UsersRepository.newToken();
 
         await this.db.execute<ResultSetHeader>(
             `UPDATE users SET token = ? WHERE id_user = ?`,
             [token, rows[0].id_user]
         );
 
-        return { user: UserService.normalizeUser(rows[0]), token };
+        return { user: UsersRepository.normalizeUser(rows[0]), token };
     }
 
     /**
@@ -99,7 +99,7 @@ export class UserService {
         );
 
         if (rows.length === 0) return null;
-        return UserService.normalizeUser(rows[0]);
+        return UsersRepository.normalizeUser(rows[0]);
     }
 
     /**
@@ -116,7 +116,7 @@ export class UserService {
         );
 
         if (rows.length === 0) return null;
-        return UserService.normalizeUser(rows[0]);
+        return UsersRepository.normalizeUser(rows[0]);
     }
 
     /**
@@ -133,7 +133,7 @@ export class UserService {
         );
 
         if (rows.length === 0) return null;
-        return UserService.normalizeUser(rows[0]);
+        return UsersRepository.normalizeUser(rows[0]);
     }
 
     /**
@@ -141,7 +141,7 @@ export class UserService {
      * @param id_user ID de l'utilisateur à mettre à jour
      */
     async rotateToken(id_user: number): Promise<string> {
-        const token: string = UserService.newToken();
+        const token: string = UsersRepository.newToken();
         const [res] = await this.db.execute<ResultSetHeader>(
             `UPDATE users SET token = ? WHERE id_user = ?`,
             [token, id_user]

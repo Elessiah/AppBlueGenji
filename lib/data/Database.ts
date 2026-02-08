@@ -4,7 +4,7 @@ import "dotenv/config";
 class Database {
     private static instance: Connection;
 
-    static async getPool(): Promise<Connection> {
+    static async getConnection(): Promise<Connection> {
         if (!Database.instance) {
             Database.instance = await mysql.createConnection({
                 host: process.env.DB_HOST,

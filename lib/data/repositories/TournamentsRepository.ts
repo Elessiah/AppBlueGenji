@@ -5,7 +5,7 @@ import {RegistrationRow, Tournament, TournamentFormat, TournamentRow, Tournament
 /**
  * Objet service pour la table SQL Tournaments
  */
-export class TournamentService {
+export class TournamentsRepository {
     /**
      * Constructeur permettant de récupérer la connexion
      * @param db
@@ -108,7 +108,7 @@ export class TournamentService {
         );
 
         if (rows.length === 0) return null;
-        return TournamentService.normalizeTournament(rows[0]);
+        return TournamentsRepository.normalizeTournament(rows[0]);
     }
 
     /**
@@ -125,7 +125,7 @@ export class TournamentService {
        ORDER BY created_at DESC`,
             [status]
         );
-        return rows.map(TournamentService.normalizeTournament);
+        return rows.map(TournamentsRepository.normalizeTournament);
     }
 
     /**
@@ -142,7 +142,7 @@ export class TournamentService {
        ORDER BY COALESCE(start_visibility_at, created_at) DESC`,
             [now]
         );
-        return rows.map(TournamentService.normalizeTournament);
+        return rows.map(TournamentsRepository.normalizeTournament);
     }
 
     /**
@@ -258,7 +258,7 @@ export class TournamentService {
      * Récupère toutes les équipes inscrites à un tournoi
      * @param id_tournament ID du tournoi où récupérer les équipes
      */
-    async listRegisteredTeams(id_tournament: number): Promise<Array<ReturnType<typeof TournamentService.normalizeRegistration>>> {
+    async listRegisteredTeams(id_tournament: number): Promise<Array<ReturnType<typeof TournamentsRepository.normalizeRegistration>>> {
         const [rows] = await this.db.execute<RegistrationRow[]>(
             `SELECT id_registration, id_tournament, id_team, registered_at, final_position, seed
        FROM registrations
@@ -266,7 +266,7 @@ export class TournamentService {
        ORDER BY COALESCE(seed, 2147483647) ASC, registered_at ASC`,
             [id_tournament]
         );
-        return rows.map(TournamentService.normalizeRegistration);
+        return rows.map(TournamentsRepository.normalizeRegistration);
     }
 
     /**

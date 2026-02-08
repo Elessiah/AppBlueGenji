@@ -5,7 +5,7 @@ import {Membership, MembershipRow, Team, TeamMemberRole, TeamRow} from "../../ty
 /**
  * Objet service de la table Teams
  */
-export class TeamService {
+export class TeamsRepository {
     /**
      * Constructeur permettant de récupérer la connection à la base de données
      * @param db
@@ -89,7 +89,7 @@ export class TeamService {
         );
 
         if (rows.length === 0) return null;
-        return TeamService.normalizeTeam(rows[0]);
+        return TeamsRepository.normalizeTeam(rows[0]);
     }
 
     /**
@@ -106,7 +106,7 @@ export class TeamService {
         );
 
         if (rows.length === 0) return null;
-        return TeamService.normalizeTeam(rows[0]);
+        return TeamsRepository.normalizeTeam(rows[0]);
     }
 
     async listTeams(): Promise<Team[]> {
@@ -116,7 +116,7 @@ export class TeamService {
        ORDER BY created_at DESC`
         );
 
-        return rows.map(TeamService.normalizeTeam);
+        return rows.map(TeamsRepository.normalizeTeam);
     }
 
     async addMember(id_team: number, id_user: number, role: TeamMemberRole = "MEMBER"): Promise<void> {
@@ -159,7 +159,7 @@ export class TeamService {
         if (res.affectedRows === 0) throw new Error("NO_ACTIVE_MEMBERSHIP");
     }
 
-    async listMembers(id_team: number): Promise<Array<ReturnType<typeof TeamService.normalizeMembership>>> {
+    async listMembers(id_team: number): Promise<Array<ReturnType<typeof TeamsRepository.normalizeMembership>>> {
         const [rows] = await this.db.execute<MembershipRow[]>(
             `SELECT id_membership, id_user, id_team, joined_at, left_at, role
                    FROM memberships
@@ -168,10 +168,10 @@ export class TeamService {
                         [id_team]
         );
 
-        return rows.map(TeamService.normalizeMembership);
+        return rows.map(TeamsRepository.normalizeMembership);
     }
 
-    async getActiveMembers(id_team: number): Promise<Array<ReturnType<typeof TeamService.normalizeMembership>>> {
+    async getActiveMembers(id_team: number): Promise<Array<ReturnType<typeof TeamsRepository.normalizeMembership>>> {
         const [rows] = await this.db.execute<MembershipRow[]>(
             `SELECT id_membership, id_user, id_team, joined_at, left_at, role
                    FROM memberships
@@ -180,7 +180,7 @@ export class TeamService {
                         [id_team]
         );
 
-        return rows.map(TeamService.normalizeMembership);
+        return rows.map(TeamsRepository.normalizeMembership);
     }
 
     async isMemberActive(id_team: number, id_user: number): Promise<boolean> {

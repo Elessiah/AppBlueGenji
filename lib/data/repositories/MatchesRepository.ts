@@ -5,7 +5,7 @@ import {Match, MatchBracket, MatchParticipation, MatchRow, ParticipationRow} fro
 /**
  * Objet service pour la table Matches
  */
-export class MatchService {
+export class MatchRepository {
     /**
      * Constructeur pour récupérer la connexion à la base de données
      * @param db Connection de la base de données à récupérer
@@ -87,7 +87,7 @@ export class MatchService {
             [id_match]
         );
         if (rows.length === 0) return null;
-        return MatchService.normalizeMatch(rows[0]);
+        return MatchRepository.normalizeMatch(rows[0]);
     }
 
     /**
@@ -102,7 +102,7 @@ export class MatchService {
        ORDER BY round ASC, COALESCE(bracket, 'UPPER') ASC, COALESCE(match_index, 2147483647) ASC, id_match ASC`,
             [id_tournament]
         );
-        return rows.map(MatchService.normalizeMatch);
+        return rows.map(MatchRepository.normalizeMatch);
     }
 
     /**
@@ -119,7 +119,7 @@ export class MatchService {
        ORDER BY COALESCE(match_index, 2147483647) ASC, id_match ASC`,
             [id_tournament, round, bracket, bracket]
         );
-        return rows.map(MatchService.normalizeMatch);
+        return rows.map(MatchRepository.normalizeMatch);
     }
 
     /**
@@ -198,7 +198,7 @@ export class MatchService {
             [id_participation]
         );
         if (rows.length === 0) return null;
-        return MatchService.normalizeParticipation(rows[0]);
+        return MatchRepository.normalizeParticipation(rows[0]);
     }
 
     /**
@@ -213,7 +213,7 @@ export class MatchService {
        ORDER BY id_participation ASC`,
             [id_match]
         );
-        return rows.map(MatchService.normalizeParticipation);
+        return rows.map(MatchRepository.normalizeParticipation);
     }
 
     /**

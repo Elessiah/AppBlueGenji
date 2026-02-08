@@ -1,7 +1,7 @@
-// tests/services/MatchesService.test.ts
+// tests/repositories/MatchesRepository.test.ts
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import type { Connection } from "mysql2/promise";
-import { MatchService } from "../../lib/data/services/MatchesService";
+import { MatchRepository } from "../../lib/data/repositories/MatchesRepository";
 
 function mockConn(){
     const execute = jest.fn() as unknown as Connection["execute"];
@@ -35,7 +35,7 @@ describe("MatchService", () => {
     describe("createMatch", () => {
         it("insert puis getById", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ insertId: 10 } as unknown, []] as unknown);
 
@@ -88,7 +88,7 @@ describe("MatchService", () => {
 
         it("throw MATCH_CREATE_FAILED si getById renvoie null", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ insertId: 10 } as unknown, []] as unknown);
             db.execute.mockImplementationOnce(async () => [[] as unknown, []] as unknown);
@@ -102,7 +102,7 @@ describe("MatchService", () => {
     describe("getById", () => {
         it("null si pas trouvé", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [[] as unknown, []] as unknown);
 
@@ -111,7 +111,7 @@ describe("MatchService", () => {
 
         it("normalize start_at null + types", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(
                 async () =>
@@ -144,7 +144,7 @@ describe("MatchService", () => {
     describe("listByTournament / listByRound", () => {
         it("listByTournament: map normalize", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             const d = new Date("2026-02-01T10:00:00.000Z");
             db.execute.mockImplementationOnce(
@@ -201,7 +201,7 @@ describe("MatchService", () => {
 
         it("listByRound: passe bracket null par défaut", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [[] as unknown, []] as unknown);
 
@@ -217,7 +217,7 @@ describe("MatchService", () => {
     describe("updateMatch", () => {
         it("ne fait rien si patch vide", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             await service.updateMatch(1, {});
             expect(db.execute).not.toHaveBeenCalled();
@@ -225,7 +225,7 @@ describe("MatchService", () => {
 
         it("update ok", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 1 } as unknown, []] as unknown);
 
@@ -240,7 +240,7 @@ describe("MatchService", () => {
 
         it("throw MATCH_NOT_FOUND si affectedRows != 1", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 0 } as unknown, []] as unknown);
 
@@ -251,7 +251,7 @@ describe("MatchService", () => {
     describe("deleteMatch", () => {
         it("ok", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 1 } as unknown, []] as unknown);
             await expect(service.deleteMatch(1)).resolves.toBeUndefined();
@@ -259,7 +259,7 @@ describe("MatchService", () => {
 
         it("throw MATCH_NOT_FOUND", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 0 } as unknown, []] as unknown);
             await expect(service.deleteMatch(1)).rejects.toThrow("MATCH_NOT_FOUND");
@@ -269,7 +269,7 @@ describe("MatchService", () => {
     describe("participations", () => {
         it("addTeamToMatch: insert puis getParticipationById", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ insertId: 55 } as unknown, []] as unknown);
             db.execute.mockImplementationOnce(
@@ -301,7 +301,7 @@ describe("MatchService", () => {
 
         it("addTeamToMatch: throw PARTICIPATION_CREATE_FAILED si getParticipationById null", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ insertId: 55 } as unknown, []] as unknown);
             db.execute.mockImplementationOnce(async () => [[] as unknown, []] as unknown);
@@ -311,7 +311,7 @@ describe("MatchService", () => {
 
         it("getParticipationById: null si pas trouvé", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [[] as unknown, []] as unknown);
 
@@ -320,7 +320,7 @@ describe("MatchService", () => {
 
         it("listParticipations: map normalize", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(
                 async () =>
@@ -343,7 +343,7 @@ describe("MatchService", () => {
 
         it("setScore: ok", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 1 } as unknown, []] as unknown);
 
@@ -352,7 +352,7 @@ describe("MatchService", () => {
 
         it("setScore: throw PARTICIPATION_NOT_FOUND", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 0 } as unknown, []] as unknown);
 
@@ -361,7 +361,7 @@ describe("MatchService", () => {
 
         it("removeTeamFromMatch: ok", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 1 } as unknown, []] as unknown);
 
@@ -370,7 +370,7 @@ describe("MatchService", () => {
 
         it("removeTeamFromMatch: throw PARTICIPATION_NOT_FOUND", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 0 } as unknown, []] as unknown);
 
@@ -381,7 +381,7 @@ describe("MatchService", () => {
     describe("setWinner", () => {
         it("transaction ok: update all false, update winner true, commit, end", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             // @ts-expect-error Problème de conversion
             db.beginTransaction.mockResolvedValueOnce(undefined);
@@ -418,7 +418,7 @@ describe("MatchService", () => {
 
         it("rollback si winner pas dans le match + end appelé", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             // @ts-expect-error Problème de conversion
             db.beginTransaction.mockResolvedValueOnce(undefined);
@@ -443,7 +443,7 @@ describe("MatchService", () => {
 
         it("rollback si erreur SQL sur update all false + end appelé", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             // @ts-expect-error Problème de conversion
             db.beginTransaction.mockResolvedValueOnce(undefined);
@@ -467,7 +467,7 @@ describe("MatchService", () => {
     describe("helpers", () => {
         it("getWinnerTeamId: null si pas de winner", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [[] as unknown, []] as unknown);
 
@@ -476,7 +476,7 @@ describe("MatchService", () => {
 
         it("getWinnerTeamId: number", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [[{ id_team: "7" }] as unknown, []] as unknown);
 
@@ -485,7 +485,7 @@ describe("MatchService", () => {
 
         it("setMatchStartAt: ok", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 1 } as unknown, []] as unknown);
 
@@ -495,7 +495,7 @@ describe("MatchService", () => {
 
         it("setMatchStartAt: throw MATCH_NOT_FOUND", async () => {
             const db = mockConn();
-            const service = new MatchService(db);
+            const service = new MatchRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 0 } as unknown, []] as unknown);
 

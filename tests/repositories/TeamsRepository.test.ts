@@ -1,7 +1,7 @@
-// tests/services/TeamsService.test.ts
+// tests/repositories/TeamsRepository.test.ts
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import type { Connection } from "mysql2/promise";
-import { TeamService } from "../../lib/data/services/TeamsService";
+import { TeamsRepository } from "../../lib/data/repositories/TeamsRepository";
 
 function mockConn() {
     const execute = jest.fn() as unknown as Connection["execute"];
@@ -35,7 +35,7 @@ describe("TeamService", () => {
     describe("createTeam", () => {
         it("crée une équipe, crée le membership OWNER, commit, puis retourne getById", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             // beginTransaction
             // @ts-expect-error Problème de conversion
@@ -86,7 +86,7 @@ describe("TeamService", () => {
 
         it("rollback si erreur pendant l'insert membership", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             // @ts-expect-error Problème de conversion
             db.beginTransaction.mockResolvedValueOnce(undefined);
@@ -109,7 +109,7 @@ describe("TeamService", () => {
 
         it("throw TEAM_CREATE_FAILED si getById renvoie null", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             // @ts-expect-error Problème de conversion
             db.beginTransaction.mockResolvedValueOnce(undefined);
@@ -137,7 +137,7 @@ describe("TeamService", () => {
     describe("getById / getByName", () => {
         it("getById: null si pas de row", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [[] as unknown, []] as unknown);
 
@@ -146,7 +146,7 @@ describe("TeamService", () => {
 
         it("getById: normalize", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             const createdAt = new Date("2026-02-01T10:00:00.000Z");
             db.execute.mockImplementationOnce(
@@ -162,7 +162,7 @@ describe("TeamService", () => {
 
         it("getByName: normalize", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             const createdAt = new Date("2026-02-01T10:00:00.000Z");
             db.execute.mockImplementationOnce(
@@ -180,7 +180,7 @@ describe("TeamService", () => {
     describe("listTeams", () => {
         it("map normalize + tri géré côté SQL", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             const d1 = new Date("2026-02-02T10:00:00.000Z");
             const d2 = new Date("2026-02-01T10:00:00.000Z");
@@ -206,7 +206,7 @@ describe("TeamService", () => {
     describe("addMember", () => {
         it("throw MEMBERSHIP_ALREADY_ACTIVE si membership actif existe", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             // SELECT active -> une row
             db.execute.mockImplementationOnce(async () => [[{ 1: 1 }] as unknown, []] as unknown);
@@ -220,7 +220,7 @@ describe("TeamService", () => {
 
         it("insert membership si pas actif", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             // SELECT active -> vide
             db.execute.mockImplementationOnce(async () => [[] as unknown, []] as unknown);
@@ -241,7 +241,7 @@ describe("TeamService", () => {
     describe("leaveTeam", () => {
         it("ok si affectedRows > 0", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 1 } as unknown, []] as unknown);
 
@@ -250,7 +250,7 @@ describe("TeamService", () => {
 
         it("throw NO_ACTIVE_MEMBERSHIP si affectedRows == 0", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 0 } as unknown, []] as unknown);
 
@@ -261,7 +261,7 @@ describe("TeamService", () => {
     describe("setMemberRole", () => {
         it("ok si affectedRows > 0", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 1 } as unknown, []] as unknown);
 
@@ -270,7 +270,7 @@ describe("TeamService", () => {
 
         it("throw NO_ACTIVE_MEMBERSHIP si affectedRows == 0", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 0 } as unknown, []] as unknown);
 
@@ -281,7 +281,7 @@ describe("TeamService", () => {
     describe("listMembers / getActiveMembers", () => {
         it("listMembers: normalizeMembership (left_at peut être null)", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             const joined = new Date("2026-02-01T10:00:00.000Z");
             const left = new Date("2026-02-02T10:00:00.000Z");
@@ -334,7 +334,7 @@ describe("TeamService", () => {
 
         it("getActiveMembers: normalizeMembership", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             const joined = new Date("2026-02-01T10:00:00.000Z");
 
@@ -372,7 +372,7 @@ describe("TeamService", () => {
     describe("isMemberActive", () => {
         it("true si row existe", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [[{ 1: 1 }] as unknown, []] as unknown);
 
@@ -381,7 +381,7 @@ describe("TeamService", () => {
 
         it("false si aucune row", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [[] as unknown, []] as unknown);
 
@@ -392,7 +392,7 @@ describe("TeamService", () => {
     describe("deleteTeam", () => {
         it("ok si affectedRows == 1", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 1 } as unknown, []] as unknown);
 
@@ -401,7 +401,7 @@ describe("TeamService", () => {
 
         it("throw TEAM_NOT_FOUND si affectedRows != 1", async () => {
             const db = mockConn();
-            const service = new TeamService(db);
+            const service = new TeamsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 0 } as unknown, []] as unknown);
 

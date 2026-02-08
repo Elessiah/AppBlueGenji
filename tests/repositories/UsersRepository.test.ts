@@ -2,7 +2,7 @@
 import type { Connection } from "mysql2/promise";
 import crypto from "node:crypto";
 import bcrypt from "bcrypt";
-import { UserService } from "../../lib/data/services/UsersService";
+import { UsersRepository } from "../../lib/data/repositories/UsersRepository";
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 
 jest.mock("bcrypt", () => ({
@@ -28,7 +28,7 @@ describe("UserService", () => {
     describe("createUser", () => {
         it("crée un user et le retourne via getById", async () => {
             const db = mockConn();
-            const service = new UserService(db);
+            const service = new UsersRepository(db);
             
             // @ts-expect-error Problème de conversion
             (bcrypt.hash as jest.Mock).mockResolvedValue("hashed_pw");
@@ -82,7 +82,7 @@ describe("UserService", () => {
 
         it("throw USER_CREATE_FAILED si getById renvoie null", async () => {
             const db = mockConn();
-            const service = new UserService(db);
+            const service = new UsersRepository(db);
 
             // @ts-expect-error Problème de conversion
             (bcrypt.hash as unknown as jest.Mock).mockResolvedValue("hashed_pw");
@@ -101,7 +101,7 @@ describe("UserService", () => {
     describe("authenticate", () => {
         it("retourne null si username introuvable", async () => {
             const db = mockConn();
-            const service = new UserService(db);
+            const service = new UsersRepository(db);
 
             db.execute.mockImplementationOnce(async () => [[], undefined] as unknown);
 
@@ -111,7 +111,7 @@ describe("UserService", () => {
 
         it("retourne null si password invalide", async () => {
             const db = mockConn();
-            const service = new UserService(db);
+            const service = new UsersRepository(db);
 
             db.execute.mockImplementationOnce(
                 async () =>
@@ -142,7 +142,7 @@ describe("UserService", () => {
 
         it("retourne {user, token} et met à jour le token si password ok", async () => {
             const db = mockConn();
-            const service = new UserService(db);
+            const service = new UsersRepository(db);
 
             const createdAt = new Date("2026-02-01T10:00:00.000Z");
 
@@ -202,7 +202,7 @@ describe("UserService", () => {
     describe("getters", () => {
         it("getById: null si pas de rows", async () => {
             const db = mockConn();
-            const service = new UserService(db);
+            const service = new UsersRepository(db);
 
             db.execute.mockImplementationOnce(async () => [[], undefined] as unknown);
 
@@ -211,7 +211,7 @@ describe("UserService", () => {
 
         it("getByUsername: normalize si trouvé", async () => {
             const db = mockConn();
-            const service = new UserService(db);
+            const service = new UsersRepository(db);
 
             const createdAt = new Date("2026-02-02T11:00:00.000Z");
             db.execute.mockImplementationOnce(
@@ -241,7 +241,7 @@ describe("UserService", () => {
 
         it("getByToken: null si pas de rows", async () => {
             const db = mockConn();
-            const service = new UserService(db);
+            const service = new UsersRepository(db);
 
             db.execute.mockImplementationOnce(async () => [[], undefined] as unknown);
 
@@ -252,7 +252,7 @@ describe("UserService", () => {
     describe("rotateToken", () => {
         it("retourne un nouveau token si update ok", async () => {
             const db = mockConn();
-            const service = new UserService(db);
+            const service = new UsersRepository(db);
 
             jest
                 .spyOn(crypto, "randomBytes")
@@ -274,7 +274,7 @@ describe("UserService", () => {
 
         it("throw USER_NOT_FOUND si affectedRows != 1", async () => {
             const db = mockConn();
-            const service = new UserService(db);
+            const service = new UsersRepository(db);
 
             db.execute.mockImplementationOnce(
                 async () => [{ affectedRows: 0 } as unknown, undefined] as unknown
@@ -287,7 +287,7 @@ describe("UserService", () => {
     describe("revokeToken", () => {
         it("ok si affectedRows == 1", async () => {
             const db = mockConn();
-            const service = new UserService(db);
+            const service = new UsersRepository(db);
 
             db.execute.mockImplementationOnce(
                 async () => [{ affectedRows: 1 } as unknown, undefined] as unknown
@@ -298,7 +298,7 @@ describe("UserService", () => {
 
         it("throw USER_NOT_FOUND si affectedRows != 1", async () => {
             const db = mockConn();
-            const service = new UserService(db);
+            const service = new UsersRepository(db);
 
             db.execute.mockImplementationOnce(
                 async () => [{ affectedRows: 0 } as unknown, undefined] as unknown
@@ -311,7 +311,7 @@ describe("UserService", () => {
     describe("changePassword", () => {
         it("hash puis update ok", async () => {
             const db = mockConn();
-            const service = new UserService(db);
+            const service = new UsersRepository(db);
 
             // @ts-expect-error Problème de conversion
             (bcrypt.hash as unknown as jest.Mock).mockResolvedValue("new_hash");
@@ -329,7 +329,7 @@ describe("UserService", () => {
 
         it("throw USER_NOT_FOUND si affectedRows != 1", async () => {
             const db = mockConn();
-            const service = new UserService(db);
+            const service = new UsersRepository(db);
 
             // @ts-expect-error Problème de conversion
             (bcrypt.hash as unknown as jest.Mock).mockResolvedValue("new_hash");
@@ -346,7 +346,7 @@ describe("UserService", () => {
     describe("setAdmin", () => {
         it("update ok", async () => {
             const db = mockConn();
-            const service = new UserService(db);
+            const service = new UsersRepository(db);
 
             db.execute.mockImplementationOnce(
                 async () => [{ affectedRows: 1 } as unknown, undefined] as unknown
@@ -361,7 +361,7 @@ describe("UserService", () => {
 
         it("throw USER_NOT_FOUND si affectedRows != 1", async () => {
             const db = mockConn();
-            const service = new UserService(db);
+            const service = new UsersRepository(db);
 
             db.execute.mockImplementationOnce(
                 async () => [{ affectedRows: 0 } as unknown, undefined] as unknown
@@ -374,7 +374,7 @@ describe("UserService", () => {
     describe("deleteUser", () => {
         it("delete ok", async () => {
             const db = mockConn();
-            const service = new UserService(db);
+            const service = new UsersRepository(db);
 
             db.execute.mockImplementationOnce(
                 async () => [{ affectedRows: 1 } as unknown, undefined] as unknown
@@ -389,7 +389,7 @@ describe("UserService", () => {
 
         it("throw USER_NOT_FOUND si affectedRows != 1", async () => {
             const db = mockConn();
-            const service = new UserService(db);
+            const service = new UsersRepository(db);
 
             db.execute.mockImplementationOnce(
                 async () => [{ affectedRows: 0 } as unknown, undefined] as unknown

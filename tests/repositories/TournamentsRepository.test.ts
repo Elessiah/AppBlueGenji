@@ -1,7 +1,7 @@
-// tests/services/TournamentsService.test.ts
+// tests/repositories/TournamentsRepository.test.ts
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import type {Connection, Pool, PoolConnection} from "mysql2/promise";
-import { TournamentService } from "../../lib/data/services/TournamentsService";
+import { TournamentsRepository } from "../../lib/data/repositories/TournamentsRepository";
 import type { TournamentFormat, TournamentStatus } from "../../lib/types";
 
 function mockPool() {
@@ -27,7 +27,7 @@ describe("TournamentService", () => {
     describe("createTournament", () => {
         it("insert puis getById (normalize dates + status DRAFT/current_round null)", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ insertId: 12 } as unknown, []] as unknown);
 
@@ -95,7 +95,7 @@ describe("TournamentService", () => {
 
         it("throw TOURNAMENT_CREATE_FAILED si getById renvoie null", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ insertId: 12 } as unknown, []] as unknown);
             db.execute.mockImplementationOnce(async () => [[] as unknown, []] as unknown);
@@ -114,7 +114,7 @@ describe("TournamentService", () => {
     describe("getById", () => {
         it("null si pas trouvé", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [[] as unknown, []] as unknown);
 
@@ -123,7 +123,7 @@ describe("TournamentService", () => {
 
         it("normalize: dates null + current_round number", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             const createdAt = new Date("2026-02-01T10:00:00.000Z");
 
@@ -172,7 +172,7 @@ describe("TournamentService", () => {
     describe("listByStatus / listVisible", () => {
         it("listByStatus: map normalize", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             const d = new Date("2026-02-01T10:00:00.000Z");
             db.execute.mockImplementationOnce(
@@ -227,7 +227,7 @@ describe("TournamentService", () => {
 
         it("listVisible: passe now en param", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             const now = new Date("2026-02-08T00:00:00.000Z");
             db.execute.mockImplementationOnce(async () => [[] as unknown, []] as unknown);
@@ -244,7 +244,7 @@ describe("TournamentService", () => {
     describe("updateTournament", () => {
         it("ne fait rien si patch vide", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             await service.updateTournament(1, {});
             expect(db.execute).not.toHaveBeenCalled();
@@ -252,7 +252,7 @@ describe("TournamentService", () => {
 
         it("update ok", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 1 } as unknown, []] as unknown);
 
@@ -267,7 +267,7 @@ describe("TournamentService", () => {
 
         it("throw TOURNAMENT_NOT_FOUND si affectedRows != 1", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 0 } as unknown, []] as unknown);
 
@@ -280,7 +280,7 @@ describe("TournamentService", () => {
     describe("setStatus / setCurrentRound / deleteTournament", () => {
         it("setStatus ok", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 1 } as unknown, []] as unknown);
 
@@ -289,7 +289,7 @@ describe("TournamentService", () => {
 
         it("setStatus: throw TOURNAMENT_NOT_FOUND", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 0 } as unknown, []] as unknown);
 
@@ -300,7 +300,7 @@ describe("TournamentService", () => {
 
         it("setCurrentRound ok (null accepté)", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 1 } as unknown, []] as unknown);
 
@@ -309,7 +309,7 @@ describe("TournamentService", () => {
 
         it("deleteTournament ok", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 1 } as unknown, []] as unknown);
 
@@ -320,7 +320,7 @@ describe("TournamentService", () => {
     describe("registrations", () => {
         it("registerTeam ok (seed null par défaut)", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 1 } as unknown, []] as unknown);
 
@@ -334,7 +334,7 @@ describe("TournamentService", () => {
 
         it("registerTeam: throw REGISTRATION_FAILED", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 0 } as unknown, []] as unknown);
 
@@ -343,7 +343,7 @@ describe("TournamentService", () => {
 
         it("unregisterTeam ok", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 1 } as unknown, []] as unknown);
 
@@ -352,7 +352,7 @@ describe("TournamentService", () => {
 
         it("unregisterTeam: throw REGISTRATION_NOT_FOUND", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 0 } as unknown, []] as unknown);
 
@@ -361,7 +361,7 @@ describe("TournamentService", () => {
 
         it("listRegisteredTeams: map normalize (seed/final_position null/number)", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             const regAt = new Date("2026-02-01T10:00:00.000Z");
 
@@ -398,7 +398,7 @@ describe("TournamentService", () => {
 
         it("setTeamSeed ok", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 1 } as unknown, []] as unknown);
 
@@ -407,7 +407,7 @@ describe("TournamentService", () => {
 
         it("setTeamSeed: throw REGISTRATION_NOT_FOUND", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 0 } as unknown, []] as unknown);
 
@@ -416,7 +416,7 @@ describe("TournamentService", () => {
 
         it("setFinalPosition ok", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 1 } as unknown, []] as unknown);
 
@@ -425,7 +425,7 @@ describe("TournamentService", () => {
 
         it("setFinalPosition: throw REGISTRATION_NOT_FOUND", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [{ affectedRows: 0 } as unknown, []] as unknown);
 
@@ -436,7 +436,7 @@ describe("TournamentService", () => {
     describe("helpers", () => {
         it("countRegistrations: 0 si rows[0] absent", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [[] as unknown, []] as unknown);
 
@@ -445,7 +445,7 @@ describe("TournamentService", () => {
 
         it("countRegistrations: number", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [[{ c: 3 }] as unknown, []] as unknown);
 
@@ -454,7 +454,7 @@ describe("TournamentService", () => {
 
         it("isTeamRegistered: true si une row existe", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [[{ 1: 1 }] as unknown, []] as unknown);
 
@@ -463,7 +463,7 @@ describe("TournamentService", () => {
 
         it("isTeamRegistered: false si aucune row", async () => {
             const db = mockPool();
-            const service = new TournamentService(db);
+            const service = new TournamentsRepository(db);
 
             db.execute.mockImplementationOnce(async () => [[] as unknown, []] as unknown);
 
