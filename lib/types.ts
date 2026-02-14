@@ -1,8 +1,10 @@
-import {type Pool, RowDataPacket} from "mysql2/promise";
+import {RowDataPacket} from "mysql2/promise";
 
 export interface User {
     id_user: number;
     username: string;
+    password_hash: string;
+    token: string;
     is_admin: boolean;
     created_at: Date;
 }
@@ -10,11 +12,28 @@ export interface User {
 export type UserRow = RowDataPacket & {
     id_user: number;
     username: string;
-    password_hash: string;
+    hash: string;
     token: string | null;
     is_admin: 0 | 1;
     created_at: Date;
 };
+
+export interface PublicUser {
+    username: string;
+    is_admin: boolean;
+    created_at: Date;
+}
+
+export type PublicUserRow = RowDataPacket & {
+    username: string;
+    is_admin: boolean;
+    created_at: Date;
+}
+
+export interface status {
+    success: boolean;
+    message?: string;
+}
 
 export type Team = {
     id_team: number;

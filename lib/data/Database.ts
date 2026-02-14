@@ -27,7 +27,7 @@ class Database {
                                             id_user INT AUTO_INCREMENT PRIMARY KEY,
                                             username VARCHAR(30) NOT NULL UNIQUE,
                                             hash VARCHAR(30) NOT NULL,
-                                            token VARCHAR(48) DEFAULT NULL,
+                                            token VARCHAR(96) DEFAULT NULL,
                                             is_admin BOOLEAN DEFAULT false,
                                             created_at TIMESTAMP DEFAULT now()
                                     ) `);

@@ -1,401 +1,218 @@
-// __tests__/UserService.test.ts
-import type { Connection } from "mysql2/promise";
-import crypto from "node:crypto";
-import bcrypt from "bcrypt";
-import { UsersRepository } from "../../lib/data/repositories/UsersRepository";
+// tests/repositories/UsersRepository.test.ts
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
+import type { Connection } from "mysql2/promise";
+import { UsersRepository } from "../../lib/data/repositories/UsersRepository";
+import type { UserRow } from "../../lib/types";
 
-jest.mock("bcrypt", () => ({
-    __esModule: true,
-    default: {
-        hash: jest.fn(),
-        compare: jest.fn(),
-    },
-}));
+type ExecuteMock = jest.MockedFunction<
+    (sql: string, params?: unknown[]) => Promise<unknown>
+>;
 
-function mockConn() {
-    const db: Partial<Connection> = {
-        execute: jest.fn() as unknown as Connection["execute"],
-    };
-    return db as Connection & { execute: jest.Mock };
-}
+const makeDb = () => {
+    const execute: ExecuteMock = jest.fn();
+    return { execute } as unknown as Connection;
+};
 
-describe("UserService", () => {
+const userRow = (overrides: Partial<UserRow> = {}): UserRow =>
+    ({
+        id_user: 1,
+        username: "alice",
+        password_hash: "hash",
+        token: null,
+        is_admin: 0,
+        created_at: "2026-01-01T00:00:00.000Z",
+        ...overrides,
+    }) as unknown as UserRow;
+
+describe("UsersRepository", () => {
+    let db: Connection;
+    let execute: ExecuteMock;
+    let repo: UsersRepository;
+
     beforeEach(() => {
-        jest.clearAllMocks();
+        db = makeDb();
+        execute = db.execute as unknown as ExecuteMock;
+        repo = new UsersRepository(db);
     });
 
-    describe("createUser", () => {
-        it("crée un user et le retourne via getById", async () => {
-            const db = mockConn();
-            const service = new UsersRepository(db);
-            
-            // @ts-expect-error Problème de conversion
-            (bcrypt.hash as jest.Mock).mockResolvedValue("hashed_pw");
+    it("getById returns normalized user when found", async () => {
+        execute.mockResolvedValueOnce([[userRow({ is_admin: 1 } as unknown as UserRow)]]);
 
-            // 1) INSERT -> insertId
-            db.execute.mockImplementationOnce(
-                async () => [{ insertId: 42 } as unknown, undefined] as unknown
-            );
+        const user = await repo.getById(1);
 
-            // 2) SELECT (getById) -> row
-            const createdAt = new Date("2026-02-01T10:00:00.000Z");
-            db.execute.mockImplementationOnce(
-                async () =>
-                    [
-                        [
-                            {
-                                id_user: 42,
-                                username: "alice",
-                                password_hash: "hashed_pw",
-                                token: null,
-                                is_admin: 0,
-                                created_at: createdAt,
-                            },
-                        ],
-                        undefined,
-                    ] as unknown
-            );
-
-            const user = await service.createUser("alice", "pw", false);
-
-            expect(bcrypt.hash).toHaveBeenCalledWith("pw", 12);
-
-            expect(db.execute).toHaveBeenNthCalledWith(
-                1,
-                expect.stringContaining("INSERT INTO " + "users"),
-                ["alice", "hashed_pw", false]
-            );
-            expect(db.execute).toHaveBeenNthCalledWith(
-                2,
-                expect.stringContaining("WHERE id_user = ?"),
-                [42]
-            );
-
-            expect(user).toEqual({
-                id_user: 42,
-                username: "alice",
-                is_admin: false,
-                created_at: new Date(createdAt),
-            });
-        });
-
-        it("throw USER_CREATE_FAILED si getById renvoie null", async () => {
-            const db = mockConn();
-            const service = new UsersRepository(db);
-
-            // @ts-expect-error Problème de conversion
-            (bcrypt.hash as unknown as jest.Mock).mockResolvedValue("hashed_pw");
-
-            db.execute.mockImplementationOnce(
-                async () => [{ insertId: 42 } as unknown, undefined] as unknown
-            );
-            db.execute.mockImplementationOnce(async () => [[], undefined] as unknown);
-
-            await expect(service.createUser("alice", "pw")).rejects.toThrow(
-                "USER_CREATE_FAILED"
-            );
-        });
+        expect(execute).toHaveBeenCalledTimes(1);
+        expect(execute).toHaveBeenCalledWith(
+            expect.stringContaining("FROM users"),
+            [1]
+        );
+        expect(user).not.toBeNull();
+        expect(user!.id_user).toBe(1);
+        expect(user!.username).toBe("alice");
+        expect(user!.password_hash).toBe("hash");
+        expect(user!.is_admin).toBe(true);
+        expect(user!.created_at instanceof Date).toBe(true);
     });
 
-    describe("authenticate", () => {
-        it("retourne null si username introuvable", async () => {
-            const db = mockConn();
-            const service = new UsersRepository(db);
+    it("getById returns null when not found", async () => {
+        execute.mockResolvedValueOnce([[]]);
 
-            db.execute.mockImplementationOnce(async () => [[], undefined] as unknown);
+        const user = await repo.getById(999);
 
-            const res = await service.authenticate("alice", "pw");
-            expect(res).toBeNull();
-        });
-
-        it("retourne null si password invalide", async () => {
-            const db = mockConn();
-            const service = new UsersRepository(db);
-
-            db.execute.mockImplementationOnce(
-                async () =>
-                    [
-                        [
-                            {
-                                id_user: 1,
-                                username: "alice",
-                                password_hash: "hashed",
-                                token: null,
-                                is_admin: 0,
-                                created_at: new Date("2026-02-01T10:00:00.000Z"),
-                            },
-                        ],
-                        undefined,
-                    ] as unknown
-            );
-
-            // @ts-expect-error Problème de conversion
-            (bcrypt.compare as unknown as jest.Mock).mockResolvedValue(false);
-
-            const res = await service.authenticate("alice", "badpw");
-
-            expect(bcrypt.compare).toHaveBeenCalledWith("badpw", "hashed");
-            expect(res).toBeNull();
-            expect(db.execute).toHaveBeenCalledTimes(1);
-        });
-
-        it("retourne {user, token} et met à jour le token si password ok", async () => {
-            const db = mockConn();
-            const service = new UsersRepository(db);
-
-            const createdAt = new Date("2026-02-01T10:00:00.000Z");
-
-            db.execute.mockImplementationOnce(
-                async () =>
-                    [
-                        [
-                            {
-                                id_user: 1,
-                                username: "alice",
-                                password_hash: "hashed",
-                                token: null,
-                                is_admin: 1,
-                                created_at: createdAt,
-                            },
-                        ],
-                        undefined,
-                    ] as unknown
-            );
-
-            // @ts-expect-error Problème de conversion
-            (bcrypt.compare as unknown as jest.Mock).mockResolvedValue(true);
-
-            jest
-                .spyOn(crypto, "randomBytes")
-                // @ts-expect-error Problème de conversion
-                .mockReturnValue(Buffer.from("a".repeat(48)) as unknown); // 48 bytes -> 96 chars hex
-
-            db.execute.mockImplementationOnce(
-                async () => [{ affectedRows: 1 } as unknown, undefined] as unknown
-            );
-
-            const res = await service.authenticate("alice", "pw");
-
-            expect(res).not.toBeNull();
-            expect(res!.user).toEqual({
-                id_user: 1,
-                username: "alice",
-                is_admin: true,
-                created_at: new Date(createdAt),
-            });
-            expect(res!.token).toHaveLength(96);
-
-            expect(db.execute).toHaveBeenNthCalledWith(
-                1,
-                expect.stringContaining("FROM users"),
-                ["alice"]
-            );
-            expect(db.execute).toHaveBeenNthCalledWith(
-                2,
-                expect.stringContaining("UPDATE users SET" +" token"),
-                [res!.token, 1]
-            );
-        });
+        expect(user).toBeNull();
     });
 
-    describe("getters", () => {
-        it("getById: null si pas de rows", async () => {
-            const db = mockConn();
-            const service = new UsersRepository(db);
+    it("getByUsername returns normalized user when found", async () => {
+        execute.mockResolvedValueOnce([[userRow({ username: "bob" } as unknown as UserRow)]]);
 
-            db.execute.mockImplementationOnce(async () => [[], undefined] as unknown);
+        const user = await repo.getByUsername("bob");
 
-            await expect(service.getById(1)).resolves.toBeNull();
-        });
-
-        it("getByUsername: normalize si trouvé", async () => {
-            const db = mockConn();
-            const service = new UsersRepository(db);
-
-            const createdAt = new Date("2026-02-02T11:00:00.000Z");
-            db.execute.mockImplementationOnce(
-                async () =>
-                    [
-                        [
-                            {
-                                id_user: 9,
-                                username: "bob",
-                                password_hash: "x",
-                                token: null,
-                                is_admin: 0,
-                                created_at: createdAt,
-                            },
-                        ],
-                        undefined,
-                    ] as unknown
-            );
-
-            await expect(service.getByUsername("bob")).resolves.toEqual({
-                id_user: 9,
-                username: "bob",
-                is_admin: false,
-                created_at: new Date(createdAt),
-            });
-        });
-
-        it("getByToken: null si pas de rows", async () => {
-            const db = mockConn();
-            const service = new UsersRepository(db);
-
-            db.execute.mockImplementationOnce(async () => [[], undefined] as unknown);
-
-            await expect(service.getByToken("t")).resolves.toBeNull();
-        });
+        expect(execute).toHaveBeenCalledWith(
+            expect.stringContaining("WHERE username = ?"),
+            ["bob"]
+        );
+        expect(user).not.toBeNull();
+        expect(user!.username).toBe("bob");
     });
 
-    describe("rotateToken", () => {
-        it("retourne un nouveau token si update ok", async () => {
-            const db = mockConn();
-            const service = new UsersRepository(db);
+    it("getByUsername returns null when not found", async () => {
+        execute.mockResolvedValueOnce([[]]);
 
-            jest
-                .spyOn(crypto, "randomBytes")
-                // @ts-expect-error Problème de conversion
-                .mockReturnValue(Buffer.from("b".repeat(48)) as unknown);
+        const user = await repo.getByUsername("missing");
 
-            db.execute.mockImplementationOnce(
-                async () => [{ affectedRows: 1 } as unknown, undefined] as unknown
-            );
-
-            const token = await service.rotateToken(1);
-            expect(token).toHaveLength(96);
-
-            expect(db.execute).toHaveBeenCalledWith(
-                expect.stringContaining("UPDATE users SET "+ "token"),
-                [token, 1]
-            );
-        });
-
-        it("throw USER_NOT_FOUND si affectedRows != 1", async () => {
-            const db = mockConn();
-            const service = new UsersRepository(db);
-
-            db.execute.mockImplementationOnce(
-                async () => [{ affectedRows: 0 } as unknown, undefined] as unknown
-            );
-
-            await expect(service.rotateToken(999)).rejects.toThrow("USER_NOT_FOUND");
-        });
+        expect(user).toBeNull();
     });
 
-    describe("revokeToken", () => {
-        it("ok si affectedRows == 1", async () => {
-            const db = mockConn();
-            const service = new UsersRepository(db);
+    it("getByToken returns normalized user when found", async () => {
+        execute.mockResolvedValueOnce([[userRow({ token: "t" } as unknown as UserRow)]]);
 
-            db.execute.mockImplementationOnce(
-                async () => [{ affectedRows: 1 } as unknown, undefined] as unknown
-            );
+        const user = await repo.getByToken("t");
 
-            await expect(service.revokeToken(1)).resolves.toBeUndefined();
-        });
-
-        it("throw USER_NOT_FOUND si affectedRows != 1", async () => {
-            const db = mockConn();
-            const service = new UsersRepository(db);
-
-            db.execute.mockImplementationOnce(
-                async () => [{ affectedRows: 0 } as unknown, undefined] as unknown
-            );
-
-            await expect(service.revokeToken(2)).rejects.toThrow("USER_NOT_FOUND");
-        });
+        expect(execute).toHaveBeenCalledWith(
+            expect.stringContaining("WHERE token = ?"),
+            ["t"]
+        );
+        expect(user).not.toBeNull();
+        expect(user!.token).toBeDefined();
     });
 
-    describe("changePassword", () => {
-        it("hash puis update ok", async () => {
-            const db = mockConn();
-            const service = new UsersRepository(db);
+    it("getByToken returns null when not found", async () => {
+        execute.mockResolvedValueOnce([[]]);
 
-            // @ts-expect-error Problème de conversion
-            (bcrypt.hash as unknown as jest.Mock).mockResolvedValue("new_hash");
-            db.execute.mockImplementationOnce(
-                async () => [{ affectedRows: 1 } as unknown, undefined] as unknown
-            );
+        const user = await repo.getByToken("nope");
 
-            await expect(service.changePassword(1, "newpw")).resolves.toBeUndefined();
-            expect(bcrypt.hash).toHaveBeenCalledWith("newpw", 12);
-            expect(db.execute).toHaveBeenCalledWith(
-                expect.stringContaining("UPDATE users SET " + "hash"),
-                ["new_hash", 1]
-            );
-        });
-
-        it("throw USER_NOT_FOUND si affectedRows != 1", async () => {
-            const db = mockConn();
-            const service = new UsersRepository(db);
-
-            // @ts-expect-error Problème de conversion
-            (bcrypt.hash as unknown as jest.Mock).mockResolvedValue("new_hash");
-            db.execute.mockImplementationOnce(
-                async () => [{ affectedRows: 0 } as unknown, undefined] as unknown
-            );
-
-            await expect(service.changePassword(999, "pw")).rejects.toThrow(
-                "USER_NOT_FOUND"
-            );
-        });
+        expect(user).toBeNull();
     });
 
-    describe("setAdmin", () => {
-        it("update ok", async () => {
-            const db = mockConn();
-            const service = new UsersRepository(db);
+    it("create inserts and returns created user", async () => {
+        execute
+            .mockResolvedValueOnce([{ insertId: 7 }]) // INSERT
+            .mockResolvedValueOnce([[userRow({ id_user: 7 } as unknown as UserRow)]]); // SELECT getById
 
-            db.execute.mockImplementationOnce(
-                async () => [{ affectedRows: 1 } as unknown, undefined] as unknown
-            );
+        const created = await repo.create("alice", "hashed_pw", false);
 
-            await expect(service.setAdmin(1, true)).resolves.toBeUndefined();
-            expect(db.execute).toHaveBeenCalledWith(
-                expect.stringContaining("UPDATE users SET " + "is_admin"),
-                [true, 1]
-            );
-        });
-
-        it("throw USER_NOT_FOUND si affectedRows != 1", async () => {
-            const db = mockConn();
-            const service = new UsersRepository(db);
-
-            db.execute.mockImplementationOnce(
-                async () => [{ affectedRows: 0 } as unknown, undefined] as unknown
-            );
-
-            await expect(service.setAdmin(1, true)).rejects.toThrow("USER_NOT_FOUND");
-        });
+        expect(execute).toHaveBeenNthCalledWith(
+            1,
+            expect.stringContaining("INSERT INTO " + "users"),
+            ["alice", "hashed_pw", false]
+        );
+        expect(execute).toHaveBeenNthCalledWith(
+            2,
+            expect.stringContaining("WHERE id_user = ?"),
+            [7]
+        );
+        expect(created.id_user).toBe(7);
+        expect(created.username).toBe("alice");
+        expect(created.password_hash).toBe("hash"); // from mocked row
     });
 
-    describe("deleteUser", () => {
-        it("delete ok", async () => {
-            const db = mockConn();
-            const service = new UsersRepository(db);
+    it("create throws USER_CREATE_FAILED if created user cannot be fetched", async () => {
+        execute
+            .mockResolvedValueOnce([{ insertId: 7 }])
+            .mockResolvedValueOnce([[]]);
 
-            db.execute.mockImplementationOnce(
-                async () => [{ affectedRows: 1 } as unknown, undefined] as unknown
-            );
+        await expect(repo.create("alice", "hashed_pw", false)).rejects.toThrow(
+            "USER_CREATE_FAILED"
+        );
+    });
 
-            await expect(service.deleteUser(1)).resolves.toBeUndefined();
-            expect(db.execute).toHaveBeenCalledWith(
-                expect.stringContaining("DELETE FROM users"),
-                [1]
-            );
-        });
+    it("setToken updates token", async () => {
+        execute.mockResolvedValueOnce([{ affectedRows: 1 }]);
 
-        it("throw USER_NOT_FOUND si affectedRows != 1", async () => {
-            const db = mockConn();
-            const service = new UsersRepository(db);
+        await repo.setToken(1, "newtoken");
 
-            db.execute.mockImplementationOnce(
-                async () => [{ affectedRows: 0 } as unknown, undefined] as unknown
-            );
+        expect(execute).toHaveBeenCalledWith(
+            expect.stringContaining("UPDATE users SET " + "token"),
+            ["newtoken", 1]
+        );
+    });
 
-            await expect(service.deleteUser(999)).rejects.toThrow("USER_NOT_FOUND");
-        });
+    it("setToken throws USER_NOT_FOUND when affectedRows != 1", async () => {
+        execute.mockResolvedValueOnce([{ affectedRows: 0 }]);
+
+        await expect(repo.setToken(1, "x")).rejects.toThrow("USER_NOT_FOUND");
+    });
+
+    it("revokeToken sets token to NULL", async () => {
+        execute.mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+        await repo.revokeToken(1);
+
+        expect(execute).toHaveBeenCalledWith(
+            expect.stringContaining("UPDATE users SET " + "token"),
+            [null, 1]
+        );
+    });
+
+    it("setPasswordHash updates hash", async () => {
+        execute.mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+        await repo.setPasswordHash(1, "newhash");
+
+        expect(execute).toHaveBeenCalledWith(
+            expect.stringContaining("UPDATE users SET " + "hash"),
+            ["newhash", 1]
+        );
+    });
+
+    it("setPasswordHash throws USER_NOT_FOUND when affectedRows != 1", async () => {
+        execute.mockResolvedValueOnce([{ affectedRows: 0 }]);
+
+        await expect(repo.setPasswordHash(1, "h")).rejects.toThrow(
+            "USER_NOT_FOUND"
+        );
+    });
+
+    it("setAdmin updates admin flag", async () => {
+        execute.mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+        await repo.setAdmin(1, true);
+
+        expect(execute).toHaveBeenCalledWith(
+            expect.stringContaining("UPDATE users SET " + "is_admin"),
+            [true, 1]
+        );
+    });
+
+    it("setAdmin throws USER_NOT_FOUND when affectedRows != 1", async () => {
+        execute.mockResolvedValueOnce([{ affectedRows: 0 }]);
+
+        await expect(repo.setAdmin(1, true)).rejects.toThrow("USER_NOT_FOUND");
+    });
+
+    it("delete removes user", async () => {
+        execute.mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+        await repo.delete(1);
+
+        expect(execute).toHaveBeenCalledWith(
+            expect.stringContaining("DELETE FROM users"),
+            [1]
+        );
+    });
+
+    it("delete throws USER_NOT_FOUND when affectedRows != 1", async () => {
+        execute.mockResolvedValueOnce([{ affectedRows: 0 }]);
+
+        await expect(repo.delete(1)).rejects.toThrow("USER_NOT_FOUND");
     });
 });
