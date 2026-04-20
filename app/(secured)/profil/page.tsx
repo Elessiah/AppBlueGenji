@@ -23,8 +23,6 @@ export default function ProfilePage() {
   const [marvelRivalsTag, setMarvelRivalsTag] = useState("");
   const [isAdult, setIsAdult] = useState<string>("unknown");
   const [visibility, setVisibility] = useState({
-    avatar: false,
-    pseudo: false,
     overwatch: false,
     marvel: false,
     major: false,
