@@ -1,0 +1,66 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Next.js build output
+/.next/
+/out/
+/build
+
+# Production
+/.vercel
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Coverage
+/coverage
+
+# Misc
+*.pem
+
+# Debug
+*.seed
+*.pid
+*.pid.lock
+
+# IDE
+.vscode/
+.idea/
+
+# ESLint cache
+.eslintcache
+
+# Turbo (si utilisé)
+.turbo
+
+# Storybook (si utilisé)
+/storybook-static
+
+# Local Next.js telemetry cache
+.next/cache
+
+# Optional: lock files (à garder normalement)
+package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
