@@ -57,10 +57,11 @@ export default function CreateTournamentPage() {
   };
 
   return (
-    <section className="fade-in">
+    <>
       <Link href="/" className="cta-float-home home" style={{ bottom: 28 }}>
         ⌂ Accueil
       </Link>
+      <section className="fade-in">
 
       <div className="ds-header green">
         <div className="ds-header-body">
@@ -178,6 +179,7 @@ export default function CreateTournamentPage() {
           </div>
         </form>
       </div>
-    </section>
+      </section>
+    </>
   );
 }

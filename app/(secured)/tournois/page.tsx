@@ -171,10 +171,11 @@ export default function TournamentsPage() {
   );
 
   return (
-    <section className="fade-in">
+    <>
       <Link href="/" className="cta-float-home home" style={{ bottom: 28 }}>
         ⌂ Accueil
       </Link>
+      <section className="fade-in">
 
       <div className="ds-header green" style={{ marginBottom: 28 }}>
         <div className="ds-header-body">
@@ -236,6 +237,7 @@ export default function TournamentsPage() {
           items={section.items}
         />
       ))}
-    </section>
+      </section>
+    </>
   );
 }
