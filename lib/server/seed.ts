@@ -1,5 +1,5 @@
 import "dotenv/config";
-import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { Pool, ResultSetHeader } from "mysql2/promise";
 import { getDatabase } from "./database";
 
 // Données fictives
@@ -119,7 +119,6 @@ async function createTournamentWithMatches(db: Pool, userIds: number[], teamIds:
 
   // Créer le tournoi
   const now = new Date();
-  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const inTwoDays = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
 
@@ -179,7 +178,7 @@ async function generateDoubleBracketMatches(db: Pool, tournamentId: number, team
 
   for (const match of matches) {
     try {
-      const [result] = await db.execute<ResultSetHeader>(
+      await db.execute<ResultSetHeader>(
         `INSERT INTO bg_matches
         (tournament_id, bracket, round_number, match_number, team1_id, team2_id, status)
         VALUES (?, ?, ?, ?, ?, ?, ?)`,
