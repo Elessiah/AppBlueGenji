@@ -50,13 +50,13 @@ export default function CreateTeamPage() {
               marginBottom: 16,
             }}
           >
-            ← Equipes
+            ← Équipes
           </Link>
           <h1 className="ds-title orange" style={{ fontSize: "clamp(28px, 3vw, 42px)" }}>
-            Creer mon equipe
+            Créer mon équipe
           </h1>
           <p style={{ color: "var(--text-1)", margin: 0, fontSize: 15 }}>
-            Le role Owner est automatiquement attribue au createur.
+            Le rôle Owner est automatiquement attribué au créateur.
           </p>
         </div>
       </div>
@@ -65,8 +65,8 @@ export default function CreateTeamPage() {
         <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           <div className="form-grid">
             <div className="field">
-              <label>Nom d'equipe</label>
-              <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Mon equipe" />
+              <label>Nom d'équipe</label>
+              <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Mon équipe" />
             </div>
             <div className="field">
               <label>
@@ -94,7 +94,7 @@ export default function CreateTeamPage() {
                 cursor: loading ? "not-allowed" : "pointer",
               }}
             >
-              {loading ? "Creation..." : "Creer l'equipe"}
+              {loading ? "Création..." : "Créer l'équipe"}
             </button>
           </div>
         </form>

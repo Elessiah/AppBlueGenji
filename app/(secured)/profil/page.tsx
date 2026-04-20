@@ -9,7 +9,7 @@ import type { FullProfileResponse } from "@/lib/shared/types";
 const VISIBILITY_LABELS: Record<string, string> = {
   overwatch: "BattleTag OW",
   marvel: "Tag Marvel",
-  major: "Majorite",
+  major: "Majorité",
 };
 
 export default function ProfilePage() {
@@ -38,7 +38,8 @@ export default function ProfilePage() {
     setOverwatchBattletag(payload.profile.overwatchBattletag || "");
     setMarvelRivalsTag(payload.profile.marvelRivalsTag || "");
     setIsAdult(payload.profile.isAdult === null ? "unknown" : payload.profile.isAdult ? "yes" : "no");
-    setVisibility(payload.profile.visibility);
+    const v = payload.profile.visibility;
+    setVisibility({ overwatch: !!v.overwatch, marvel: !!v.marvel, major: !!v.major });
   };
 
   useEffect(() => {
@@ -65,7 +66,7 @@ export default function ProfilePage() {
       const payload = (await response.json()) as FullProfileResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "PROFILE_UPDATE_FAILED");
       setData(payload);
-      setStatus("Profil mis a jour.");
+      setStatus("Profil mis à jour.");
     } catch (e) {
       setError((e as Error).message);
     }
@@ -92,7 +93,7 @@ export default function ProfilePage() {
               Mon profil
             </h1>
             <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-              Informations personnelles masquees par defaut
+              Informations personnelles masquées par défaut
             </p>
           </div>
         </div>
@@ -127,7 +128,7 @@ export default function ProfilePage() {
             <div className="field">
               <label>Statut majeur</label>
               <select value={isAdult} onChange={(e) => setIsAdult(e.target.value)}>
-                <option value="unknown">Non renseigne</option>
+                <option value="unknown">Non renseigné</option>
                 <option value="yes">Oui (18+)</option>
                 <option value="no">Non (mineur)</option>
               </select>
@@ -144,7 +145,7 @@ export default function ProfilePage() {
                 margin: "0 0 12px",
               }}
             >
-              Visibilite publique
+              Visibilité publique
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
               {Object.entries(visibility).map(([key, value]) => (
@@ -178,16 +179,16 @@ export default function ProfilePage() {
       </div>
 
       <div className="ds-block">
-        <div className="ds-section-title orange">
+        <div className="ds-section-title blue">
           <h2>Statistiques plateforme</h2>
         </div>
         <div className="ds-stats">
           {[
-            { label: "Tournois joues", value: data.stats.tournamentsPlayed },
-            { label: "Tournois gagnes", value: data.stats.tournamentsWon },
+            { label: "Tournois joués", value: data.stats.tournamentsPlayed },
+            { label: "Tournois gagnés", value: data.stats.tournamentsWon },
             { label: "Victoires", value: data.stats.matchesWon },
-            { label: "Defaites", value: data.stats.matchesLost },
-            { label: "Meilleur rang", value: data.stats.bestRank ?? "-" },
+            { label: "Défaites", value: data.stats.matchesLost },
+            { label: "Meilleur rang", value: data.stats.bestRank ?? "—" },
           ].map((stat) => (
             <div key={stat.label} className="ds-stat">
               <div className="ds-stat-label">{stat.label}</div>

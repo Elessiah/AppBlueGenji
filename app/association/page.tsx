@@ -7,31 +7,41 @@ export default function AssociationPage() {
         ⌂ Accueil
       </Link>
       <Link href="/tournois" className="cta-float">
-        Acceder aux tournois →
+        Accéder aux tournois →
       </Link>
 
-      <section className="fade-in ds-hero">
+      <section className="fade-in ds-hero gold">
         <div className="ds-hero-body" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 56, alignItems: "center" }}>
           <div>
-            <span className="badge" style={{ marginBottom: 24, display: "inline-block" }}>
-              Association loi 1901 - Fondee le 11 septembre 2022
+            <span
+              className="badge"
+              style={{
+                marginBottom: 24,
+                display: "inline-block",
+                borderColor: "rgba(245,195,58,0.45)",
+                background: "rgba(245,195,58,0.1)",
+                color: "rgb(245,195,58)",
+              }}
+            >
+              Association loi 1901 — Fondée le 11 septembre 2022
             </span>
-            <h1 className="ds-title" style={{ fontSize: "clamp(44px, 5vw, 70px)", lineHeight: 1.06, marginBottom: 22 }}>
+            <h1 className="ds-title gold" style={{ fontSize: "clamp(44px, 5vw, 70px)", lineHeight: 1.06, marginBottom: 22 }}>
               Bluegenji
               <br />
               Esport
             </h1>
             <p style={{ fontSize: 17, lineHeight: 1.75, color: "var(--text-1)", margin: "0 0 40px", maxWidth: 480 }}>
-              Structure associative esport dediee a la scene amateur francophone. Implantee au Mans, nous organisons des tournois, des evenements LAN et federons les equipes competitives autour de Marvel Rivals.
+              Structure associative esport dédiée à la scène amateur francophone. Implantée au Mans, nous organisons des
+              tournois, des événements LAN et fédérons les équipes compétitives autour de Marvel Rivals.
             </p>
             <div className="ds-stats">
               {[
-                { label: "Fondee le", value: "11 sept. 2022" },
-                { label: "Siege social", value: "Le Mans (72)" },
-                { label: "Regime", value: "Loi 1901" },
-                { label: "Age minimum", value: "16 ans" },
+                { label: "Fondée le", value: "11 sept. 2022" },
+                { label: "Siège social", value: "Le Mans (72)" },
+                { label: "Régime", value: "Loi 1901" },
+                { label: "Âge minimum", value: "16 ans" },
               ].map((k) => (
-                <div key={k.label} className="ds-stat">
+                <div key={k.label} className="ds-stat gold">
                   <div className="ds-stat-label">{k.label}</div>
                   <div className="ds-stat-value" style={{ fontSize: 16 }}>{k.value}</div>
                 </div>
@@ -42,9 +52,9 @@ export default function AssociationPage() {
           <div
             style={{
               borderRadius: 20,
-              border: "1px dashed rgba(89,212,255,0.28)",
+              border: "1px dashed rgba(245,195,58,0.28)",
               aspectRatio: "4 / 3",
-              background: "linear-gradient(135deg, rgba(13,20,36,0.9) 0%, rgba(22,32,52,0.95) 100%)",
+              background: "linear-gradient(135deg, rgba(28,22,8,0.9) 0%, rgba(36,28,10,0.95) 100%)",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
@@ -58,30 +68,34 @@ export default function AssociationPage() {
                 width: 72,
                 height: 72,
                 borderRadius: "50%",
-                border: "2px dashed rgba(89,212,255,0.35)",
+                border: "2px dashed rgba(245,195,58,0.35)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: 28,
-                color: "rgba(89,212,255,0.5)",
+                color: "rgba(245,195,58,0.5)",
               }}
             >
               📷
             </div>
             <span style={{ color: "var(--text-2)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-              Photo de l'equipe
+              Photo de l'équipe
             </span>
           </div>
         </div>
       </section>
 
       <section className="fade-in" style={{ marginBottom: 32 }}>
-        <div className="ds-section-title blue">
+        <div className="ds-section-title gold">
           <h2>Notre mission</h2>
         </div>
         <div className="grid-2">
           {MISSIONS.map((item) => (
-            <article key={item.title} className="ds-block" style={{ borderColor: `rgba(${item.rgb},0.18)`, position: "relative", overflow: "hidden" }}>
+            <article
+              key={item.title}
+              className="ds-block"
+              style={{ borderColor: `rgba(${item.rgb},0.2)`, position: "relative", overflow: "hidden" }}
+            >
               <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, rgba(${item.rgb},0.85), transparent)` }} />
               <span
                 style={{
@@ -109,8 +123,8 @@ export default function AssociationPage() {
       </section>
 
       <section className="fade-in" style={{ marginBottom: 32 }}>
-        <div className="ds-section-title orange">
-          <h2>Nos activites</h2>
+        <div className="ds-section-title gold">
+          <h2>Nos activités</h2>
         </div>
         <div className="grid-2">
           {ACTIVITIES.map((activity) => (
@@ -168,12 +182,23 @@ export default function AssociationPage() {
       </section>
 
       <section className="fade-in ds-block" style={{ marginBottom: 32 }}>
-        <div className="ds-section-title green">
+        <div className="ds-section-title gold">
           <h2>Le Bureau</h2>
         </div>
         <div className="grid-2" style={{ marginTop: 0 }}>
           {BUREAU.map((person) => (
-            <article key={person.name} className="ds-block" style={{ borderColor: `rgba(${person.rgb},0.2)`, display: "flex", gap: 22, alignItems: "flex-start", position: "relative", overflow: "hidden" }}>
+            <article
+              key={person.name}
+              className="ds-block"
+              style={{
+                borderColor: `rgba(${person.rgb},0.2)`,
+                display: "flex",
+                gap: 22,
+                alignItems: "flex-start",
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
               <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, rgba(${person.rgb},0.85), transparent)` }} />
               <div
                 style={{
@@ -193,7 +218,16 @@ export default function AssociationPage() {
                 👤
               </div>
               <div>
-                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: `rgb(${person.rgb})`, fontWeight: 700, marginBottom: 6 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.1em",
+                    color: `rgb(${person.rgb})`,
+                    fontWeight: 700,
+                    marginBottom: 6,
+                  }}
+                >
                   {person.role}
                 </div>
                 <h3 style={{ fontFamily: "var(--font-title), sans-serif", fontSize: 24, margin: "0 0 10px", letterSpacing: "0.02em" }}>
@@ -207,7 +241,7 @@ export default function AssociationPage() {
       </section>
 
       <section className="fade-in ds-block" style={{ marginBottom: 32 }}>
-        <div className="ds-section-title orange">
+        <div className="ds-section-title gold">
           <h2>Nous rejoindre</h2>
         </div>
         <div className="grid-3" style={{ marginTop: 0 }}>
@@ -225,13 +259,38 @@ export default function AssociationPage() {
               }}
             >
               <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, rgba(${tier.rgb},0.85), transparent)` }} />
-              {tier.featured && <span className="ds-chip" style={{ position: "absolute", top: 16, right: 16 }}>Populaire</span>}
+              {tier.featured && (
+                <span
+                  className="ds-chip"
+                  style={{
+                    position: "absolute",
+                    top: 16,
+                    right: 16,
+                    borderColor: `rgba(${tier.rgb},0.35)`,
+                    background: `rgba(${tier.rgb},0.1)`,
+                    color: `rgb(${tier.rgb})`,
+                  }}
+                >
+                  Populaire
+                </span>
+              )}
               <h3 style={{ fontFamily: "var(--font-title), sans-serif", fontSize: 22, margin: "0 0 20px", color: `rgb(${tier.rgb})`, letterSpacing: "0.03em" }}>
                 {tier.type}
               </h3>
               <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
                 {tier.items.map((item) => (
-                  <li key={item} style={{ display: "flex", gap: 10, padding: "9px 0", borderBottom: "1px solid var(--line)", fontSize: 14, color: "var(--text-1)", lineHeight: 1.5 }}>
+                  <li
+                    key={item}
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      padding: "9px 0",
+                      borderBottom: "1px solid var(--line)",
+                      fontSize: 14,
+                      color: "var(--text-1)",
+                      lineHeight: 1.5,
+                    }}
+                  >
                     <span style={{ color: `rgb(${tier.rgb})` }}>✓</span>
                     {item}
                   </li>
@@ -243,14 +302,15 @@ export default function AssociationPage() {
       </section>
 
       <section className="fade-in ds-block" style={{ marginBottom: 32 }}>
-        <div className="ds-section-title blue">
-          <h2>Cadre legal</h2>
+        <div className="ds-section-title gold">
+          <h2>Cadre légal</h2>
         </div>
         <p style={{ color: "var(--text-1)", margin: "0 0 10px", lineHeight: 1.75, fontSize: 15 }}>
-          Bluegenji Esport est une association regie par la loi du 1er juillet 1901 et le decret du 16 aout 1901.
+          Bluegenji Esport est une association régie par la loi du 1er juillet 1901 et le décret du 16 août 1901.
         </p>
         <p style={{ color: "var(--text-1)", margin: 0, lineHeight: 1.75, fontSize: 15 }}>
-          Ses ressources comprennent les cotisations membres, les subventions et les autres ressources autorisees par les textes en vigueur.
+          Ses ressources comprennent les cotisations membres, les subventions et les autres ressources autorisées par les
+          textes en vigueur.
         </p>
       </section>
     </main>
@@ -258,26 +318,110 @@ export default function AssociationPage() {
 }
 
 const MISSIONS = [
-  { icon: "🏆", title: "Tournois & Evenements", rgb: "89,212,255", desc: "Organisation de competitions en ligne et en LAN, adaptees a toutes les progressions." },
-  { icon: "🤝", title: "Federation d'equipes", rgb: "255,157,46", desc: "Rassembler les equipes participantes pour construire un ecosysteme competitif durable." },
-  { icon: "📡", title: "Retransmission en direct", rgb: "79,224,162", desc: "Production et diffusion live des evenements avec une qualite broadcast." },
-  { icon: "⭐", title: "Formation & Visibilite", rgb: "255,157,46", desc: "Accompagner et mettre en avant joueurs, coaches, managers, casters et organisateurs." },
+  {
+    icon: "🏆",
+    title: "Tournois & Événements",
+    rgb: "245,195,58",
+    desc: "Organisation de compétitions en ligne et en LAN, adaptées à toutes les progressions.",
+  },
+  {
+    icon: "🤝",
+    title: "Fédération d'équipes",
+    rgb: "220,165,35",
+    desc: "Rassembler les équipes participantes pour construire un écosystème compétitif durable.",
+  },
+  {
+    icon: "📡",
+    title: "Retransmission en direct",
+    rgb: "255,210,80",
+    desc: "Production et diffusion live des événements avec une qualité broadcast.",
+  },
+  {
+    icon: "⭐",
+    title: "Formation & Visibilité",
+    rgb: "220,165,35",
+    desc: "Accompagner et mettre en avant joueurs, coaches, managers, casters et organisateurs.",
+  },
 ];
 
 const ACTIVITIES = [
-  { title: "BlueLan", tag: "Evenement presentiel", rgb: "89,212,255", imgLabel: "Photo de l'evenement BlueLan", desc: "Evenement LAN communautaire autour de Marvel Rivals." },
-  { title: "Tournois Marvel Rivals", tag: "Competition en ligne", rgb: "255,157,46", imgLabel: "Capture d'un tournoi en cours", desc: "Competitions regulieres en simple et double elimination." },
-  { title: "Bot Discord inter-serveurs", tag: "Outil communautaire", rgb: "79,224,162", imgLabel: "Apercu du bot Discord", desc: "Reseau de diffusion d'annonces entre serveurs avec filtres automatiques." },
-  { title: "Accompagnement & Coaching", tag: "Formation", rgb: "255,157,46", imgLabel: "Session de coaching", desc: "Encadrement des equipes emergentes: roster, coaching et preparation." },
+  {
+    title: "BlueLan",
+    tag: "Événement présentiel",
+    rgb: "245,195,58",
+    imgLabel: "Photo de l'événement BlueLan",
+    desc: "Événement LAN communautaire autour de Marvel Rivals.",
+  },
+  {
+    title: "Tournois Marvel Rivals",
+    tag: "Compétition en ligne",
+    rgb: "220,165,35",
+    imgLabel: "Capture d'un tournoi en cours",
+    desc: "Compétitions régulières en simple et double élimination.",
+  },
+  {
+    title: "Bot Discord inter-serveurs",
+    tag: "Outil communautaire",
+    rgb: "255,210,80",
+    imgLabel: "Aperçu du bot Discord",
+    desc: "Réseau de diffusion d'annonces entre serveurs avec filtres automatiques.",
+  },
+  {
+    title: "Accompagnement & Coaching",
+    tag: "Formation",
+    rgb: "220,165,35",
+    imgLabel: "Session de coaching",
+    desc: "Encadrement des équipes émergentes : roster, coaching et préparation.",
+  },
 ];
 
 const BUREAU = [
-  { role: "President", name: "Leo PERREAUT", rgb: "89,212,255", desc: "Represente l'association dans les actes de la vie civile et ordonnance les depenses." },
-  { role: "Tresorier", name: "Bryan BOULLEAUX", rgb: "79,224,162", desc: "Tient les comptes de l'association et presente le bilan financier a l'Assemblee Generale." },
+  {
+    role: "Président",
+    name: "Leo PERREAUT",
+    rgb: "245,195,58",
+    desc: "Représente l'association dans les actes de la vie civile et ordonnance les dépenses.",
+  },
+  {
+    role: "Trésorier",
+    name: "Bryan BOULLEAUX",
+    rgb: "220,165,35",
+    desc: "Tient les comptes de l'association et présente le bilan financier à l'Assemblée Générale.",
+  },
 ];
 
 const TIERS = [
-  { type: "Ordinaire", rgb: "89,212,255", featured: false, items: ["Inscription via bulletin d'adhesion", "Sans cotisation", "Acces a tous les evenements", "Participation aux activites"] },
-  { type: "Bienfaiteur", rgb: "255,157,46", featured: true, items: ["Cotisation annuelle definie par l'AG", "Soutien financier direct", "Contribution aux projets", "Mise en avant du soutien"] },
-  { type: "Honneur", rgb: "79,224,162", featured: false, items: ["Decerne par le bureau", "Dispense de cotisation", "Reconnaissance exceptionnelle", "Services rendus a l'association"] },
+  {
+    type: "Ordinaire",
+    rgb: "200,160,40",
+    featured: false,
+    items: [
+      "Inscription via bulletin d'adhésion",
+      "Sans cotisation",
+      "Accès à tous les événements",
+      "Participation aux activités",
+    ],
+  },
+  {
+    type: "Bienfaiteur",
+    rgb: "245,195,58",
+    featured: true,
+    items: [
+      "Cotisation annuelle définie par l'AG",
+      "Soutien financier direct",
+      "Contribution aux projets",
+      "Mise en avant du soutien",
+    ],
+  },
+  {
+    type: "Honneur",
+    rgb: "255,210,80",
+    featured: false,
+    items: [
+      "Décerné par le bureau",
+      "Dispensé de cotisation",
+      "Reconnaissance exceptionnelle",
+      "Services rendus à l'association",
+    ],
+  },
 ];

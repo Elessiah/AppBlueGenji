@@ -42,10 +42,10 @@ export default function TeamsPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
             <div>
               <h1 className="ds-title orange" style={{ fontSize: "clamp(32px, 3.5vw, 48px)" }}>
-                Equipes
+                Équipes
               </h1>
               <p style={{ color: "var(--text-1)", margin: 0, fontSize: 15, lineHeight: 1.6 }}>
-                Annuaire des equipes avec acces au profil team, roster et performances.
+                Annuaire des équipes avec accès au profil team, roster et performances.
               </p>
             </div>
             {!activeTeam && (
@@ -61,7 +61,7 @@ export default function TeamsPage() {
                   marginTop: 4,
                 }}
               >
-                + Creer mon equipe
+                + Créer mon équipe
               </Link>
             )}
           </div>
@@ -71,13 +71,13 @@ export default function TeamsPage() {
               value={search}
               onChange={setSearch}
               onSearch={() => {}}
-              placeholder="Rechercher une equipe..."
+              placeholder="Rechercher une équipe..."
               rgb="255, 157, 46"
             />
           </div>
           {activeTeam && (
             <p className="success" style={{ marginTop: 16, marginBottom: 0 }}>
-              Equipe active:{" "}
+              Équipe active :{" "}
               <Link href={`/equipes/${activeTeam.teamId}`} style={{ fontWeight: 700 }}>
                 {activeTeam.teamName}
               </Link>
@@ -106,7 +106,7 @@ export default function TeamsPage() {
             <div>
               <strong style={{ fontSize: 16, display: "block", marginBottom: 4 }}>{team.name}</strong>
               <span style={{ color: "var(--text-2)", fontSize: 13 }}>
-                {team.membersCount} membre{team.membersCount !== 1 ? "s" : ""} - Creee le{" "}
+                {team.membersCount} membre{team.membersCount !== 1 ? "s" : ""} — Créée le{" "}
                 {new Date(team.createdAt).toLocaleDateString()}
               </span>
             </div>

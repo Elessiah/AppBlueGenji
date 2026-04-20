@@ -36,7 +36,7 @@ export default function PlayersPage() {
             Joueurs
           </h1>
           <p style={{ color: "var(--text-1)", margin: 0, fontSize: 15, lineHeight: 1.6 }}>
-            Annuaire des joueurs inscrits, tries alphabetiquement.
+            Annuaire des joueurs inscrits, triés alphabétiquement.
           </p>
           <div style={{ marginTop: 20 }}>
             <SearchBar

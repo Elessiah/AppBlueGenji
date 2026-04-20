@@ -7,7 +7,7 @@ export default function HomePage() {
         ⌂ Association
       </Link>
       <Link href="/tournois" className="cta-float">
-        Acceder aux tournois →
+        Accéder aux tournois →
       </Link>
 
       <section className="fade-in ds-hero">
@@ -25,7 +25,7 @@ export default function HomePage() {
               Arena
             </h1>
             <p style={{ fontSize: 18, lineHeight: 1.75, color: "var(--text-1)", margin: "0 0 44px", maxWidth: 460 }}>
-              La plateforme de la communaute BlueGenji: tournois, bot Discord inter-serveurs et suivi des equipes autour de Marvel Rivals.
+              La plateforme de la communauté BlueGenji : tournois, bot Discord inter-serveurs et suivi des équipes autour de Marvel Rivals.
             </p>
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
               <Link
@@ -120,7 +120,7 @@ export default function HomePage() {
               </h3>
               <p style={{ color: "var(--text-1)", margin: "0 0 20px", lineHeight: 1.65, fontSize: 15, flex: 1 }}>{f.desc}</p>
               <span style={{ alignSelf: "flex-start", fontSize: 13, fontWeight: 600, color: `rgb(${f.rgb})`, letterSpacing: "0.03em" }}>
-                Decouvrir →
+                Découvrir →
               </span>
             </div>
           </Link>
@@ -136,7 +136,7 @@ const FEATURES = [
     href: "/bot",
     icon: "🤖",
     rgb: "79,224,162",
-    desc: "Reseau inter-serveurs de diffusion d'annonces: scrims, recrutement de joueurs, staff et cast autour de Marvel Rivals.",
+    desc: "Réseau inter-serveurs de diffusion d'annonces : scrims, recrutement de joueurs, staff et cast autour de Marvel Rivals.",
   },
   {
     title: "L'Association",
@@ -150,6 +150,6 @@ const FEATURES = [
     href: "/tournois",
     icon: "🏆",
     rgb: "255,157,46",
-    desc: "Plateforme automatisee de creation et gestion de tournois en simple ou double elimination avec bracket live.",
+    desc: "Plateforme automatisée de création et gestion de tournois en simple ou double élimination avec bracket live.",
   },
 ];

@@ -8,7 +8,7 @@ function mapDiscordError(errorCode: string): string {
   if (errorCode === "BOT_INTERNAL_UNREACHABLE") return "Connexion Discord indisponible (bot non joignable).";
   if (errorCode === "BOT_INTERNAL_UNAUTHORIZED") return "Connexion Discord indisponible (token interne invalide).";
   if (errorCode === "DISCORD_DM_FAILED") return "Impossible d'envoyer le code en DM Discord.";
-  if (errorCode === "CODE_INVALID_OR_EXPIRED") return "Code invalide ou expire.";
+  if (errorCode === "CODE_INVALID_OR_EXPIRED") return "Code invalide ou expiré.";
   if (errorCode === "INVALID_DISCORD_ID") return "Identifiant Discord invalide.";
   if (errorCode === "INVALID_CODE") return "Le code doit contenir 6 chiffres.";
   return errorCode || "Une erreur interne est survenue.";
@@ -34,9 +34,9 @@ export default function LoginPage() {
     const routeError = params.get("error");
     if (routeError === "google_not_configured") setOauthError("Connexion Google indisponible: configuration manquante.");
     else if (routeError === "google_unavailable") setOauthError("Connexion Google temporairement indisponible.");
-    else if (routeError === "oauth") setOauthError("Echec OAuth Google.");
-    else if (routeError === "state") setOauthError("Session OAuth expiree ou invalide.");
-    else if (routeError === "google") setOauthError("Parametres OAuth Google invalides.");
+    else if (routeError === "oauth") setOauthError("Échec OAuth Google.");
+    else if (routeError === "state") setOauthError("Session OAuth expirée ou invalide.");
+    else if (routeError === "google") setOauthError("Paramètres OAuth Google invalides.");
     else setOauthError(null);
   }, []);
 
@@ -54,7 +54,7 @@ export default function LoginPage() {
       const payload = (await response.json()) as { error?: string; expiresAt?: string };
       if (!response.ok) throw new Error(mapDiscordError(payload.error || "FAILED"));
       setRequested(true);
-      setSuccess(`Code envoye en DM Discord (expiration: ${new Date(payload.expiresAt || "").toLocaleTimeString()}).`);
+      setSuccess(`Code envoyé en DM Discord (expiration : ${new Date(payload.expiresAt || "").toLocaleTimeString()}).`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -95,7 +95,7 @@ export default function LoginPage() {
             Connexion
           </h1>
           <p style={{ color: "var(--text-1)", fontSize: 16, margin: 0, maxWidth: 520, lineHeight: 1.7 }}>
-            Connecte-toi via ton compte Google ou par code temporaire envoye par le bot Discord.
+            Connecte-toi via ton compte Google ou par code temporaire envoyé par le bot Discord.
           </p>
           {oauthError && <p className="error" style={{ marginTop: 16, maxWidth: 600 }}>{oauthError}</p>}
         </div>
@@ -125,7 +125,7 @@ export default function LoginPage() {
               OAuth Google
             </h2>
             <p style={{ color: "var(--text-1)", margin: 0, fontSize: 15, lineHeight: 1.65 }}>
-              Connexion rapide et securisee avec ton compte Google existant.
+              Connexion rapide et sécurisée avec ton compte Google existant.
             </p>
           </div>
 
@@ -200,24 +200,24 @@ export default function LoginPage() {
               Code Discord
             </h2>
             <p style={{ color: "var(--text-1)", margin: 0, fontSize: 15, lineHeight: 1.65 }}>
-              Entre ton ID Discord, le bot t'envoie un code a 6 chiffres en DM.
+              Entre ton ID Discord, le bot t'envoie un code à 6 chiffres en DM.
             </p>
           </div>
 
           <form onSubmit={requested ? verifyCode : requestCode} style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 20 }}>
             <div className="field">
-              <label>Identifiant Discord (ID numerique)</label>
+              <label>Identifiant Discord (ID numérique)</label>
               <input required value={discordId} onChange={(e) => setDiscordId(e.target.value)} placeholder="123456789012345678" />
             </div>
 
             <div className="field">
-              <label>Pseudo site <span style={{ color: "var(--text-2)", fontWeight: 400 }}>(premiere connexion)</span></label>
+              <label>Pseudo site <span style={{ color: "var(--text-2)", fontWeight: 400 }}>(première connexion)</span></label>
               <input value={pseudo} onChange={(e) => setPseudo(e.target.value)} placeholder="Ton pseudo" />
             </div>
 
             {requested && (
               <div className="field">
-                <label>Code recu en DM</label>
+                <label>Code reçu en DM</label>
                 <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="6 chiffres" required />
               </div>
             )}
@@ -246,7 +246,7 @@ export default function LoginPage() {
 
       <div style={{ display: "flex", justifyContent: "center" }}>
         <Link href="/" className="btn ghost" style={{ padding: "11px 28px", fontSize: 14 }}>
-          ← Retour a l'accueil
+          ← Retour à l'accueil
         </Link>
       </div>
     </main>

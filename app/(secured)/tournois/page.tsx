@@ -13,10 +13,10 @@ const emptyBuckets: TournamentBuckets = {
 };
 
 const BUCKET_META: Record<keyof TournamentBuckets, { title: string; rgb: string; icon: string }> = {
-  upcoming: { title: "Prochainement", rgb: "89,212,255", icon: "⏳" },
+  upcoming: { title: "Prochainement", rgb: "70,200,180", icon: "⏳" },
   registration: { title: "Inscriptions ouvertes", rgb: "79,224,162", icon: "📋" },
-  running: { title: "En cours", rgb: "255,157,46", icon: "⚔️" },
-  finished: { title: "Termines", rgb: "143,156,176", icon: "🏁" },
+  running: { title: "En cours", rgb: "150,225,60", icon: "⚔️" },
+  finished: { title: "Terminés", rgb: "100,115,130", icon: "🏁" },
 };
 
 function TournamentColumn({
@@ -76,7 +76,7 @@ function TournamentColumn({
 
       {!items.length ? (
         <p style={{ color: "var(--text-2)", fontSize: 14, padding: "18px 24px", margin: 0 }}>
-          Aucun tournoi dans cette categorie.
+          Aucun tournoi dans cette catégorie.
         </p>
       ) : (
         <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
@@ -110,10 +110,10 @@ function TournamentColumn({
               )}
               <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
                 <span style={{ color: "var(--text-2)", fontSize: 12 }}>
-                  {tournament.format === "SINGLE" ? "Simple elim." : "Double elim."}
+                  {tournament.format === "SINGLE" ? "Simple élim." : "Double élim."}
                 </span>
                 <span style={{ color: "var(--text-2)", fontSize: 12 }}>
-                  {tournament.registeredTeams}/{tournament.maxTeams} equipes
+                  {tournament.registeredTeams}/{tournament.maxTeams} équipes
                 </span>
                 <span style={{ color: "var(--text-2)", fontSize: 12 }}>
                   {new Date(tournament.startAt).toLocaleString()}
@@ -192,7 +192,7 @@ export default function TournamentsPage() {
                 Tournois
               </h1>
               <p style={{ color: "var(--text-1)", margin: 0, fontSize: 15, lineHeight: 1.6 }}>
-                Suivi en temps reel des tournois BlueGenji, tries par phase.
+                Suivi en temps réel des tournois BlueGenji, triés par phase.
               </p>
             </div>
             <Link
@@ -207,7 +207,7 @@ export default function TournamentsPage() {
                 marginTop: 4,
               }}
             >
-              + Creer mon tournoi
+              + Créer mon tournoi
             </Link>
           </div>
 

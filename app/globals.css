@@ -15,6 +15,7 @@
   --orange-rgb: 255, 157, 46;
   --green-rgb: 79, 224, 162;
   --danger-rgb: 255, 110, 130;
+  --gold-rgb: 245, 195, 58;
   --radius: 16px;
   --radius-sm: 10px;
   --shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
@@ -771,6 +772,37 @@ select {
 
 .ds-chip.muted {
   --chip-rgb: 143, 156, 176;
+}
+
+.ds-chip.teal {
+  --chip-rgb: 70, 200, 180;
+}
+
+.ds-chip.lime {
+  --chip-rgb: 150, 225, 60;
+}
+
+.ds-hero.gold {
+  --hero-rgb-a: var(--gold-rgb);
+  --hero-rgb-b: var(--gold-rgb);
+}
+
+.ds-header.gold {
+  --header-rgb: var(--gold-rgb);
+}
+
+.ds-section-title.gold {
+  --title-rgb-a: var(--gold-rgb);
+  --title-rgb-b: var(--gold-rgb);
+}
+
+.ds-title.gold {
+  --title-rgb-a: var(--gold-rgb);
+  --title-rgb-b: var(--gold-rgb);
+}
+
+.ds-stat.gold {
+  --stat-rgb: var(--gold-rgb);
 }
 
 @media (max-width: 920px) {

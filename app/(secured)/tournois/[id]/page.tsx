@@ -40,10 +40,10 @@ function groupMatches(matches: BracketMatch[]) {
 }
 
 const STATE_META: Record<string, { label: string; chipClass: string }> = {
-  UPCOMING: { label: "Prochainement", chipClass: "" },
+  UPCOMING: { label: "Prochainement", chipClass: "teal" },
   REGISTRATION: { label: "Inscriptions", chipClass: "green" },
-  RUNNING: { label: "En cours", chipClass: "orange" },
-  FINISHED: { label: "Termine", chipClass: "muted" },
+  RUNNING: { label: "En cours", chipClass: "lime" },
+  FINISHED: { label: "Terminé", chipClass: "muted" },
 };
 
 export default function TournamentDetailPage() {
@@ -121,7 +121,7 @@ export default function TournamentDetailPage() {
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "REGISTRATION_FAILED");
-      setStatus("Inscription validee.");
+      setStatus("Inscription validée.");
       await load();
     } catch (e) {
       setError((e as Error).message);
@@ -144,9 +144,9 @@ export default function TournamentDetailPage() {
         ⌂ Accueil
       </Link>
 
-      <div className="ds-header">
+      <div className="ds-header green">
         <div className="ds-header-body">
-          <h1 className="ds-title blue" style={{ fontSize: "clamp(26px, 3vw, 42px)", marginBottom: 8 }}>
+          <h1 className="ds-title green" style={{ fontSize: "clamp(26px, 3vw, 42px)", marginBottom: 8 }}>
             {detail.card.name}
           </h1>
           {detail.card.description && (
@@ -158,10 +158,10 @@ export default function TournamentDetailPage() {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <span className={`ds-chip ${stateMeta.chipClass}`.trim()}>{stateMeta.label}</span>
             <span className="ds-chip muted" style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>
-              {detail.card.format === "SINGLE" ? "Simple elimination" : "Double elimination"}
+              {detail.card.format === "SINGLE" ? "Simple élimination" : "Double élimination"}
             </span>
             <span className="ds-chip muted" style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>
-              {detail.card.registeredTeams}/{detail.card.maxTeams} equipes
+              {detail.card.registeredTeams}/{detail.card.maxTeams} équipes
             </span>
             {detail.canRegister && (
               <button
@@ -175,7 +175,7 @@ export default function TournamentDetailPage() {
                   borderColor: "rgba(79,224,162,0.35)",
                 }}
               >
-                Inscrire mon equipe
+                Inscrire mon équipe
               </button>
             )}
           </div>
@@ -186,13 +186,13 @@ export default function TournamentDetailPage() {
       {status && <p className="success" style={{ marginBottom: 16 }}>{status}</p>}
 
       <div className="ds-block" style={{ marginBottom: 20 }}>
-        <div className="ds-section-title orange">
+        <div className="ds-section-title green">
           <h2>Arbre du tournoi</h2>
         </div>
 
         {!groups.length ? (
           <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-            Le bracket sera genere automatiquement au demarrage du tournoi.
+            Le bracket sera généré automatiquement au démarrage du tournoi.
           </p>
         ) : (
           groups.map((group) => (
@@ -272,7 +272,7 @@ export default function TournamentDetailPage() {
         </div>
         <div className="table-like">
           <div className="table-row table-header">
-            <span>Equipe</span>
+            <span>Équipe</span>
             <span>Seed</span>
             <span>Inscription</span>
             <span>Classement final</span>

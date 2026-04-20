@@ -51,7 +51,7 @@ export default function TeamDetailPage() {
       if (!response.ok) throw new Error(payload.error || "TEAM_MEMBER_ADD_FAILED");
       setData(payload);
       setMemberPseudo("");
-      setStatus("Membre ajoute.");
+      setStatus("Membre ajouté.");
     } catch (e) {
       setError((e as Error).message);
     }
@@ -70,7 +70,7 @@ export default function TeamDetailPage() {
       const payload = (await response.json()) as TeamDetailResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "TEAM_UPDATE_FAILED");
       setData(payload);
-      setStatus("Equipe mise a jour.");
+      setStatus("Équipe mise à jour.");
     } catch (e) {
       setError((e as Error).message);
     }
@@ -87,7 +87,7 @@ export default function TeamDetailPage() {
       const payload = (await response.json()) as TeamDetailResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "TEAM_MEMBER_UPDATE_FAILED");
       setData(payload);
-      setStatus("Roles mis a jour.");
+      setStatus("Rôles mis à jour.");
     } catch (e) {
       setError((e as Error).message);
     }
@@ -104,7 +104,7 @@ export default function TeamDetailPage() {
       const payload = (await response.json()) as TeamDetailResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "TEAM_MEMBER_REMOVE_FAILED");
       setData(payload);
-      setStatus("Membre retire.");
+      setStatus("Membre retiré.");
     } catch (e) {
       setError((e as Error).message);
     }
@@ -112,7 +112,7 @@ export default function TeamDetailPage() {
 
   const editMemberRoles = async (userId: number, currentRoles: TeamRole[]) => {
     const raw = window.prompt(
-      "Roles (separes par virgule) parmi : COACH, TANK, DPS, HEAL, CAPITAINE, MANAGER",
+      "Rôles (séparés par virgule) parmi : COACH, TANK, DPS, HEAL, CAPITAINE, MANAGER",
       currentRoles.filter((r) => r !== "OWNER").join(", "),
     );
     if (raw === null) return;
@@ -130,7 +130,7 @@ export default function TeamDetailPage() {
   if (!data) {
     return (
       <section className="ds-block" style={{ color: "var(--text-2)" }}>
-        Chargement de l'equipe...
+        Chargement de l'équipe…
       </section>
     );
   }
@@ -178,12 +178,12 @@ export default function TeamDetailPage() {
                   {data.team.name}
                 </h1>
                 <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-                  Historique competitif et gestion du roster
+                  Historique compétitif et gestion du roster
                 </p>
               </div>
             </div>
             <Link href="/equipes" className="btn ghost" style={{ padding: "9px 18px", fontSize: 13, flexShrink: 0 }}>
-              ← Equipes
+              ← Équipes
             </Link>
           </div>
         </div>
@@ -195,12 +195,12 @@ export default function TeamDetailPage() {
       {data.canManage && (
         <div className="ds-block" style={{ marginBottom: 20, borderColor: "rgba(255,157,46,0.18)" }}>
           <div className="ds-section-title orange">
-            <h2>Parametres de l'equipe</h2>
+            <h2>Paramètres de l'équipe</h2>
           </div>
           <form onSubmit={saveMeta}>
             <div className="form-grid">
               <div className="field">
-                <label>Nom equipe</label>
+                <label>Nom de l'équipe</label>
                 <input value={name} onChange={(e) => setName(e.target.value)} />
               </div>
               <div className="field">
@@ -214,7 +214,7 @@ export default function TeamDetailPage() {
                 className="btn"
                 style={{ padding: "10px 24px", background: "rgba(255,157,46,0.14)", borderColor: "rgba(255,157,46,0.35)" }}
               >
-                Mettre a jour
+                Mettre à jour
               </button>
             </div>
           </form>
@@ -222,7 +222,7 @@ export default function TeamDetailPage() {
       )}
 
       <div className="ds-block" style={{ marginBottom: 20 }}>
-        <div className="ds-section-title green">
+        <div className="ds-section-title orange">
           <h2>Membres</h2>
         </div>
 
@@ -230,7 +230,7 @@ export default function TeamDetailPage() {
           <div className="table-row table-header">
             <span>Joueur</span>
             <span>Roles</span>
-            <span>Arrivee</span>
+            <span>Arrivée</span>
             <span>Actions</span>
           </div>
           {data.members.map((member) => (
@@ -310,7 +310,7 @@ export default function TeamDetailPage() {
               <button
                 type="submit"
                 className="btn"
-                style={{ padding: "10px 22px", background: "rgba(89,212,255,0.12)", borderColor: "rgba(89,212,255,0.3)" }}
+                style={{ padding: "10px 22px", background: "rgba(255,157,46,0.12)", borderColor: "rgba(255,157,46,0.3)" }}
               >
                 Ajouter
               </button>
@@ -320,7 +320,7 @@ export default function TeamDetailPage() {
       </div>
 
       <div className="ds-block">
-        <div className="ds-section-title blue">
+        <div className="ds-section-title orange">
           <h2>Historique tournois</h2>
         </div>
         <div className="table-like">

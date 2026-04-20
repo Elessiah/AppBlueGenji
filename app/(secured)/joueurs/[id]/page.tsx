@@ -56,10 +56,10 @@ export default function PlayerDetailPage() {
 
           <div className="ds-stats" style={{ marginTop: 28 }}>
             {[
-              { label: "Tournois joues", value: data.stats.tournamentsPlayed },
-              { label: "Tournois gagnes", value: data.stats.tournamentsWon },
+              { label: "Tournois joués", value: data.stats.tournamentsPlayed },
+              { label: "Tournois gagnés", value: data.stats.tournamentsWon },
               { label: "Victoires", value: data.stats.matchesWon },
-              { label: "Defaites", value: data.stats.matchesLost },
+              { label: "Défaites", value: data.stats.matchesLost },
             ].map((stat) => (
               <div key={stat.label} className="ds-stat">
                 <div className="ds-stat-label">{stat.label}</div>
@@ -71,23 +71,23 @@ export default function PlayerDetailPage() {
       </div>
 
       <div className="ds-block" style={{ marginBottom: 20 }}>
-        <div className="ds-section-title green">
+        <div className="ds-section-title blue">
           <h2>Informations</h2>
         </div>
         <div className="form-grid">
           <div className="field">
             <label>BattleTag Overwatch</label>
-            <input value={data.profile.overwatchBattletag || "Masque"} readOnly />
+            <input value={data.profile.overwatchBattletag || "Masqué"} readOnly />
           </div>
           <div className="field">
             <label>Tag Marvel Rivals</label>
-            <input value={data.profile.marvelRivalsTag || "Masque"} readOnly />
+            <input value={data.profile.marvelRivalsTag || "Masqué"} readOnly />
           </div>
           <div className="field">
-            <label>Majorite</label>
+            <label>Majorité</label>
             <input
               value={
-                data.profile.isAdult === null ? "Masque" : data.profile.isAdult ? "Oui (18+)" : "Non (mineur)"
+                data.profile.isAdult === null ? "Masqué" : data.profile.isAdult ? "Oui (18+)" : "Non (mineur)"
               }
               readOnly
             />
@@ -96,14 +96,14 @@ export default function PlayerDetailPage() {
       </div>
 
       <div className="ds-block" style={{ marginBottom: 20 }}>
-        <div className="ds-section-title orange">
-          <h2>Historique equipes</h2>
+        <div className="ds-section-title blue">
+          <h2>Historique équipes</h2>
         </div>
         <div className="table-like">
           <div className="table-row table-header">
-            <span>Equipe</span>
-            <span>Roles</span>
-            <span>Debut</span>
+            <span>Équipe</span>
+            <span>Rôles</span>
+            <span>Début</span>
             <span>Fin</span>
           </div>
           {data.teamsTimeline.map((entry) => (

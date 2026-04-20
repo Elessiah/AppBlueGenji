@@ -8,7 +8,12 @@
       "Bash(pandoc \"C:/Users/kerya/Downloads/status_association_bluegenji_esport.docx\" -t plain)",
       "Bash(grep -n \"accent\\\\|color\\\\|#[0-9a-fA-F]\\\\{3,6\\\\}\" app/\\\\\\(secured\\\\\\)/equipes/page.tsx app/\\\\\\(secured\\\\\\)/joueurs/page.tsx app/\\\\\\(secured\\\\\\)/tournois/page.tsx)",
       "Bash(npx tsc *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(find \"C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji\" -maxdepth 2 -type d)",
+      "Bash(find \"C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji/app\" -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" -o -name \"*.js\" \\\\\\))",
+      "Bash(find \"C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji\" -type f -name \"*database*\" -o -name \"*db*\" -o -name \"*schema*\")",
+      "Bash(find \"C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji/lib/server\" -type f -name \"*.ts\")",
+      "Bash(cd \"C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji\")"
     ]
   }
 }
