@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function HomePage() {
   return (
     <main className="page-shell">
-      <Link href="/association" className="cta-float-home">
+      <Link href="/association" className="cta-float-home gold">
         ⌂ Association
       </Link>
       <Link href="/tournois" className="cta-float">
@@ -34,7 +34,7 @@ export default function HomePage() {
                 style={{
                   padding: "14px 32px",
                   fontSize: 15,
-                  background: "var(--accent-blue)",
+                  background: "var(--accent-green)",
                   color: "var(--bg-0)",
                   border: "none",
                   fontWeight: 700,
@@ -135,21 +135,21 @@ const FEATURES = [
     title: "Bot Discord",
     href: "/bot",
     icon: "🤖",
-    rgb: "79,224,162",
+    rgb: "167,115,255",
     desc: "Réseau inter-serveurs de diffusion d'annonces : scrims, recrutement de joueurs, staff et cast autour de Marvel Rivals.",
   },
   {
     title: "L'Association",
     href: "/association",
     icon: "🏛",
-    rgb: "89,212,255",
-    desc: "Mission, bureau, activites competitives, evenements LAN et modalites d'adhesion de Bluegenji Esport.",
+    rgb: "245,195,58",
+    desc: "Mission, bureau, activités compétitives, événements LAN et modalités d'adhésion de Bluegenji Esport.",
   },
   {
     title: "Tournois",
     href: "/tournois",
     icon: "🏆",
-    rgb: "255,157,46",
+    rgb: "79,224,162",
     desc: "Plateforme automatisée de création et gestion de tournois en simple ou double élimination avec bracket live.",
   },
 ];

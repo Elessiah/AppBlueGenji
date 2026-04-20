@@ -58,7 +58,7 @@ export default function CreateTournamentPage() {
 
   return (
     <section className="fade-in">
-      <Link href="/" className="cta-float-home" style={{ bottom: 28 }}>
+      <Link href="/" className="cta-float-home home" style={{ bottom: 28 }}>
         ⌂ Accueil
       </Link>
 

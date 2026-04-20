@@ -16,6 +16,7 @@
   --green-rgb: 79, 224, 162;
   --danger-rgb: 255, 110, 130;
   --gold-rgb: 245, 195, 58;
+  --purple-rgb: 167, 115, 255;
   --radius: 16px;
   --radius-sm: 10px;
   --shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
@@ -534,6 +535,30 @@ select {
   color: var(--text-0);
 }
 
+/* Variante dorée — bouton "⌂ Association" sur la landing */
+.cta-float-home.gold {
+  border-color: rgba(245, 195, 58, 0.4);
+  color: rgb(245, 195, 58);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 18px rgba(245, 195, 58, 0.12);
+}
+
+.cta-float-home.gold:hover {
+  border-color: rgba(245, 195, 58, 0.65);
+  color: rgb(255, 215, 80);
+}
+
+/* Variante cyan — bouton "⌂ Accueil" sur les pages internes */
+.cta-float-home.home {
+  border-color: rgba(89, 212, 255, 0.3);
+  color: rgba(89, 212, 255, 0.85);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 16px rgba(89, 212, 255, 0.08);
+}
+
+.cta-float-home.home:hover {
+  border-color: rgba(89, 212, 255, 0.55);
+  color: rgb(89, 212, 255);
+}
+
 @keyframes fade-in-up {
   from {
     opacity: 0;
@@ -803,6 +828,33 @@ select {
 
 .ds-stat.gold {
   --stat-rgb: var(--gold-rgb);
+}
+
+.ds-hero.purple {
+  --hero-rgb-a: var(--purple-rgb);
+  --hero-rgb-b: var(--purple-rgb);
+}
+
+.ds-header.purple {
+  --header-rgb: var(--purple-rgb);
+}
+
+.ds-section-title.purple {
+  --title-rgb-a: var(--purple-rgb);
+  --title-rgb-b: var(--purple-rgb);
+}
+
+.ds-title.purple {
+  --title-rgb-a: var(--purple-rgb);
+  --title-rgb-b: var(--purple-rgb);
+}
+
+.ds-chip.purple {
+  --chip-rgb: var(--purple-rgb);
+}
+
+.ds-stat.purple {
+  --stat-rgb: var(--purple-rgb);
 }
 
 @media (max-width: 920px) {

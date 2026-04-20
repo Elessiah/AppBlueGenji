@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function AssociationPage() {
   return (
     <main className="page-shell">
-      <Link href="/" className="cta-float-home">
+      <Link href="/" className="cta-float-home home">
         ⌂ Accueil
       </Link>
       <Link href="/tournois" className="cta-float">
