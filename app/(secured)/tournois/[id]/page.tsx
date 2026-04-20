@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
 
@@ -38,11 +39,11 @@ function groupMatches(matches: BracketMatch[]) {
     .sort((a, b) => a.key.localeCompare(b.key));
 }
 
-const STATE_META: Record<string, { label: string; rgb: string }> = {
-  UPCOMING: { label: "Prochainement", rgb: "89,212,255" },
-  REGISTRATION: { label: "Inscriptions", rgb: "79,224,162" },
-  RUNNING: { label: "En cours", rgb: "255,157,46" },
-  FINISHED: { label: "Terminé", rgb: "143,156,176" },
+const STATE_META: Record<string, { label: string; chipClass: string }> = {
+  UPCOMING: { label: "Prochainement", chipClass: "" },
+  REGISTRATION: { label: "Inscriptions", chipClass: "green" },
+  RUNNING: { label: "En cours", chipClass: "orange" },
+  FINISHED: { label: "Termine", chipClass: "muted" },
 };
 
 export default function TournamentDetailPage() {
@@ -94,17 +95,14 @@ export default function TournamentDetailPage() {
     setStatus(null);
     const draft = drafts[match.id] || { myScore: "", opponentScore: "" };
     try {
-      const response = await fetch(
-        `/api/tournaments/${tournamentId}/matches/${match.id}/report`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            myScore: Number(draft.myScore),
-            opponentScore: Number(draft.opponentScore),
-          }),
-        },
-      );
+      const response = await fetch(`/api/tournaments/${tournamentId}/matches/${match.id}/report`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          myScore: Number(draft.myScore),
+          opponentScore: Number(draft.opponentScore),
+        }),
+      });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
       setStatus(`Score transmis pour le match #${match.id}.`);
@@ -123,7 +121,7 @@ export default function TournamentDetailPage() {
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "REGISTRATION_FAILED");
-      setStatus("Inscription validée.");
+      setStatus("Inscription validee.");
       await load();
     } catch (e) {
       setError((e as Error).message);
@@ -132,73 +130,23 @@ export default function TournamentDetailPage() {
 
   if (!detail) {
     return (
-      <section
-        style={{
-          borderRadius: 16,
-          border: "1px solid var(--line)",
-          background: "rgba(13,18,30,0.8)",
-          padding: "28px 32px",
-          color: "var(--text-2)",
-        }}
-      >
-        Chargement du tournoi…
+      <section className="ds-block" style={{ color: "var(--text-2)" }}>
+        Chargement du tournoi...
       </section>
     );
   }
 
-  const stateMeta = STATE_META[detail.card.state] ?? { label: detail.card.state, rgb: "143,156,176" };
+  const stateMeta = STATE_META[detail.card.state] ?? { label: detail.card.state, chipClass: "muted" };
 
   return (
     <section className="fade-in">
       <Link href="/" className="cta-float-home" style={{ bottom: 28 }}>
         ⌂ Accueil
       </Link>
-      {/* ── HEADER ─────────────────────────────────────────────────────── */}
-      <div
-        style={{
-          position: "relative",
-          borderRadius: 22,
-          border: "1px solid rgba(89,212,255,0.15)",
-          background:
-            "linear-gradient(135deg, rgba(11,16,27,0.97) 0%, rgba(18,26,44,0.95) 100%)",
-          overflow: "hidden",
-          padding: "40px 40px 36px",
-          marginBottom: 24,
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            pointerEvents: "none",
-            background:
-              "radial-gradient(ellipse at 0% 50%, rgba(89,212,255,0.08) 0%, transparent 50%)",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 3,
-            background: "linear-gradient(90deg, transparent, #59d4ff 40%, transparent)",
-          }}
-        />
-        <div style={{ position: "relative" }}>
-          <h1
-            style={{
-              fontFamily: "var(--font-title), sans-serif",
-              fontSize: "clamp(26px, 3vw, 42px)",
-              fontWeight: 700,
-              letterSpacing: "0.02em",
-              margin: "0 0 8px",
-              background: "linear-gradient(135deg, #f3f7ff 20%, #59d4ff 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}
-          >
+
+      <div className="ds-header">
+        <div className="ds-header-body">
+          <h1 className="ds-title blue" style={{ fontSize: "clamp(26px, 3vw, 42px)", marginBottom: 8 }}>
             {detail.card.name}
           </h1>
           {detail.card.description && (
@@ -207,63 +155,27 @@ export default function TournamentDetailPage() {
             </p>
           )}
 
-          {/* Meta chips */}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            <span
-              style={{
-                padding: "4px 12px",
-                borderRadius: 999,
-                border: `1px solid rgba(${stateMeta.rgb},0.35)`,
-                background: `rgba(${stateMeta.rgb},0.1)`,
-                color: `rgb(${stateMeta.rgb})`,
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-              }}
-            >
-              {stateMeta.label}
+            <span className={`ds-chip ${stateMeta.chipClass}`.trim()}>{stateMeta.label}</span>
+            <span className="ds-chip muted" style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>
+              {detail.card.format === "SINGLE" ? "Simple elimination" : "Double elimination"}
             </span>
-            <span
-              style={{
-                padding: "4px 12px",
-                borderRadius: 999,
-                border: "1px solid var(--line)",
-                background: "rgba(255,255,255,0.04)",
-                fontSize: 12,
-                color: "var(--text-2)",
-              }}
-            >
-              {detail.card.format === "SINGLE" ? "Simple élimination" : "Double élimination"}
-            </span>
-            <span
-              style={{
-                padding: "4px 12px",
-                borderRadius: 999,
-                border: "1px solid var(--line)",
-                background: "rgba(255,255,255,0.04)",
-                fontSize: 12,
-                color: "var(--text-2)",
-              }}
-            >
-              {detail.card.registeredTeams}/{detail.card.maxTeams} équipes
+            <span className="ds-chip muted" style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>
+              {detail.card.registeredTeams}/{detail.card.maxTeams} equipes
             </span>
             {detail.canRegister && (
               <button
                 type="button"
                 onClick={registerTeam}
+                className="btn"
                 style={{
                   padding: "6px 16px",
-                  borderRadius: 999,
-                  border: "1px solid rgba(79,224,162,0.35)",
-                  background: "rgba(79,224,162,0.12)",
-                  color: "var(--text-0)",
                   fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
+                  background: "rgba(79,224,162,0.12)",
+                  borderColor: "rgba(79,224,162,0.35)",
                 }}
               >
-                Inscrire mon équipe
+                Inscrire mon equipe
               </button>
             )}
           </div>
@@ -273,77 +185,39 @@ export default function TournamentDetailPage() {
       {error && <p className="error" style={{ marginBottom: 16 }}>{error}</p>}
       {status && <p className="success" style={{ marginBottom: 16 }}>{status}</p>}
 
-      {/* ── BRACKET ────────────────────────────────────────────────────── */}
-      <div
-        style={{
-          border: "1px solid var(--line)",
-          borderRadius: 20,
-          background: "rgba(13,18,30,0.85)",
-          padding: "28px 32px",
-          marginBottom: 20,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
-          <span
-            style={{
-              flexShrink: 0,
-              width: 4,
-              height: 28,
-              background: "linear-gradient(180deg, #ff9d2e, #59d4ff)",
-              borderRadius: 2,
-              marginTop: 2,
-            }}
-          />
-          <h2
-            style={{
-              fontFamily: "var(--font-title), sans-serif",
-              fontSize: 20,
-              margin: 0,
-              letterSpacing: "0.02em",
-            }}
-          >
-            Arbre du tournoi
-          </h2>
+      <div className="ds-block" style={{ marginBottom: 20 }}>
+        <div className="ds-section-title orange">
+          <h2>Arbre du tournoi</h2>
         </div>
 
-        {groups.length === 0 ? (
+        {!groups.length ? (
           <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-            Le bracket sera généré automatiquement au démarrage du tournoi.
+            Le bracket sera genere automatiquement au demarrage du tournoi.
           </p>
         ) : (
           groups.map((group) => (
             <div key={group.key} className="bracket-group">
-              <p className="bracket-title">{group.key.replace("-", " • Round ")}</p>
+              <p className="bracket-title">{group.key.replace("-", " - Round ")}</p>
               <div className="bracket-grid">
                 {group.grouped.map((match) => {
-                  const team1Win =
-                    match.winnerTeamId !== null && match.winnerTeamId === match.team1Id;
-                  const team2Win =
-                    match.winnerTeamId !== null && match.winnerTeamId === match.team2Id;
+                  const team1Win = match.winnerTeamId !== null && match.winnerTeamId === match.team1Id;
+                  const team2Win = match.winnerTeamId !== null && match.winnerTeamId === match.team2Id;
                   return (
                     <article key={match.id} className="match-card">
                       <div className="match-head">
                         <span>Match #{match.id}</span>
                         <span>{match.status}</span>
                       </div>
-                      <div
-                        className={`team-line ${team1Win ? "win" : match.winnerTeamId ? "lose" : ""}`}
-                      >
+                      <div className={`team-line ${team1Win ? "win" : match.winnerTeamId ? "lose" : ""}`}>
                         <span>{match.team1Name || "BYE"}</span>
-                        <strong>{match.team1Score ?? "—"}</strong>
+                        <strong>{match.team1Score ?? "-"}</strong>
                       </div>
-                      <div
-                        className={`team-line ${team2Win ? "win" : match.winnerTeamId ? "lose" : ""}`}
-                      >
+                      <div className={`team-line ${team2Win ? "win" : match.winnerTeamId ? "lose" : ""}`}>
                         <span>{match.team2Name || "BYE"}</span>
-                        <strong>{match.team2Score ?? "—"}</strong>
+                        <strong>{match.team2Score ?? "-"}</strong>
                       </div>
                       {canReport(match) && (
-                        <form
-                          className="inline"
-                          style={{ marginTop: 8 }}
-                          onSubmit={(e) => submitScore(match, e)}
-                        >
+                        <form className="inline" style={{ marginTop: 8 }} onSubmit={(e) => submitScore(match, e)}>
                           <input
                             type="number"
                             min={0}
@@ -392,40 +266,13 @@ export default function TournamentDetailPage() {
         )}
       </div>
 
-      {/* ── REGISTRATIONS ──────────────────────────────────────────────── */}
-      <div
-        style={{
-          border: "1px solid var(--line)",
-          borderRadius: 20,
-          background: "rgba(13,18,30,0.85)",
-          padding: "28px 32px",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
-          <span
-            style={{
-              flexShrink: 0,
-              width: 4,
-              height: 28,
-              background: "linear-gradient(180deg, #4fe0a2, #59d4ff)",
-              borderRadius: 2,
-              marginTop: 2,
-            }}
-          />
-          <h2
-            style={{
-              fontFamily: "var(--font-title), sans-serif",
-              fontSize: 20,
-              margin: 0,
-              letterSpacing: "0.02em",
-            }}
-          >
-            Inscriptions
-          </h2>
+      <div className="ds-block">
+        <div className="ds-section-title green">
+          <h2>Inscriptions</h2>
         </div>
         <div className="table-like">
           <div className="table-row table-header">
-            <span>Équipe</span>
+            <span>Equipe</span>
             <span>Seed</span>
             <span>Inscription</span>
             <span>Classement final</span>
@@ -433,9 +280,9 @@ export default function TournamentDetailPage() {
           {detail.registrations.map((reg) => (
             <div key={reg.teamId} className="table-row">
               <span>{reg.teamName}</span>
-              <span>{reg.seed ?? "—"}</span>
+              <span>{reg.seed ?? "-"}</span>
               <span>{new Date(reg.registeredAt).toLocaleString()}</span>
-              <span>{reg.finalRank ?? "—"}</span>
+              <span>{reg.finalRank ?? "-"}</span>
             </div>
           ))}
         </div>

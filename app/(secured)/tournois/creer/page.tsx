@@ -46,9 +46,7 @@ export default function CreateTournamentPage() {
         }),
       });
       const payload = (await response.json()) as { error?: string; id?: number };
-      if (!response.ok || !payload.id) {
-        throw new Error(payload.error || "TOURNAMENT_CREATE_FAILED");
-      }
+      if (!response.ok || !payload.id) throw new Error(payload.error || "TOURNAMENT_CREATE_FAILED");
       router.push(`/tournois/${payload.id}`);
       router.refresh();
     } catch (e) {
@@ -63,30 +61,9 @@ export default function CreateTournamentPage() {
       <Link href="/" className="cta-float-home" style={{ bottom: 28 }}>
         ⌂ Accueil
       </Link>
-      {/* ── HEADER ─────────────────────────────────────────────────────── */}
-      <div
-        style={{
-          position: "relative",
-          borderRadius: 22,
-          border: "1px solid rgba(89,212,255,0.15)",
-          background:
-            "linear-gradient(135deg, rgba(11,16,27,0.97) 0%, rgba(18,26,44,0.95) 100%)",
-          overflow: "hidden",
-          padding: "40px 40px 36px",
-          marginBottom: 24,
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 3,
-            background: "linear-gradient(90deg, transparent, #59d4ff 40%, transparent)",
-          }}
-        />
-        <div style={{ position: "relative" }}>
+
+      <div className="ds-header">
+        <div className="ds-header-body">
           <Link
             href="/tournois"
             style={{
@@ -100,38 +77,17 @@ export default function CreateTournamentPage() {
           >
             ← Tournois
           </Link>
-          <h1
-            style={{
-              fontFamily: "var(--font-title), sans-serif",
-              fontSize: "clamp(28px, 3vw, 42px)",
-              fontWeight: 700,
-              letterSpacing: "0.02em",
-              margin: "0 0 10px",
-              background: "linear-gradient(135deg, #f3f7ff 20%, #59d4ff 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}
-          >
-            Créer un tournoi
+          <h1 className="ds-title blue" style={{ fontSize: "clamp(28px, 3vw, 42px)" }}>
+            Creer un tournoi
           </h1>
           <p style={{ color: "var(--text-1)", margin: 0, fontSize: 15 }}>
-            Définis les phases temporelles du tournoi et le format de bracket.
+            Definis les phases temporelles du tournoi et le format de bracket.
           </p>
         </div>
       </div>
 
-      {/* ── FORM ───────────────────────────────────────────────────────── */}
-      <div
-        style={{
-          border: "1px solid var(--line)",
-          borderRadius: 20,
-          background: "rgba(13,18,30,0.88)",
-          padding: "32px 36px",
-        }}
-      >
+      <div className="ds-block">
         <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          {/* Identité */}
           <div>
             <p
               style={{
@@ -142,7 +98,7 @@ export default function CreateTournamentPage() {
                 margin: "0 0 14px",
               }}
             >
-              Identité
+              Identite
             </p>
             <div className="form-grid">
               <div className="field">
@@ -152,22 +108,21 @@ export default function CreateTournamentPage() {
               <div className="field">
                 <label>Format</label>
                 <select value={format} onChange={(e) => setFormat(e.target.value as TournamentFormat)}>
-                  <option value="SINGLE">Simple élimination</option>
-                  <option value="DOUBLE">Double élimination</option>
+                  <option value="SINGLE">Simple elimination</option>
+                  <option value="DOUBLE">Double elimination</option>
                 </select>
               </div>
               <div className="field" style={{ gridColumn: "1 / -1" }}>
                 <label>Description</label>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description du tournoi…" />
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description du tournoi..." />
               </div>
               <div className="field">
-                <label>Nombre max d'équipes</label>
+                <label>Nombre max d'equipes</label>
                 <input type="number" min={2} max={256} value={maxTeams} onChange={(e) => setMaxTeams(Number(e.target.value))} />
               </div>
             </div>
           </div>
 
-          {/* Planning */}
           <div>
             <p
               style={{
@@ -182,11 +137,11 @@ export default function CreateTournamentPage() {
             </p>
             <div className="form-grid">
               <div className="field">
-                <label>Début visibilité (Prochainement)</label>
+                <label>Debut visibilite</label>
                 <input type="datetime-local" value={startVisibilityAt} onChange={(e) => setStartVisibilityAt(e.target.value)} />
               </div>
               <div className="field">
-                <label>Début inscriptions</label>
+                <label>Debut inscriptions</label>
                 <input type="datetime-local" value={registrationOpenAt} onChange={(e) => setRegistrationOpenAt(e.target.value)} />
               </div>
               <div className="field">
@@ -194,7 +149,7 @@ export default function CreateTournamentPage() {
                 <input type="datetime-local" value={registrationCloseAt} onChange={(e) => setRegistrationCloseAt(e.target.value)} />
               </div>
               <div className="field">
-                <label>Début tournoi</label>
+                <label>Debut tournoi</label>
                 <input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} />
               </div>
             </div>
@@ -209,19 +164,16 @@ export default function CreateTournamentPage() {
             <button
               type="submit"
               disabled={loading}
+              className="btn"
               style={{
                 padding: "11px 28px",
-                borderRadius: 999,
-                border: "1px solid rgba(89,212,255,0.35)",
                 background: "rgba(89,212,255,0.15)",
-                color: "var(--text-0)",
-                fontSize: 15,
-                fontWeight: 600,
-                cursor: loading ? "not-allowed" : "pointer",
+                borderColor: "rgba(89,212,255,0.35)",
                 opacity: loading ? 0.6 : 1,
+                cursor: loading ? "not-allowed" : "pointer",
               }}
             >
-              {loading ? "Création…" : "Créer le tournoi"}
+              {loading ? "Creation..." : "Creer le tournoi"}
             </button>
           </div>
         </form>

@@ -3,3 +3,4 @@ export { ButtonLink } from "./ButtonLink";
 export { SearchBar } from "./SearchBar";
 export { LogoutButton } from "./logout-button";
 export { ArenaNav } from "./arena-nav";
+export { Coche } from "./Coche";

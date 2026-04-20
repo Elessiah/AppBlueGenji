@@ -7,7 +7,8 @@
       "Bash(1 ls:*)",
       "Bash(pandoc \"C:/Users/kerya/Downloads/status_association_bluegenji_esport.docx\" -t plain)",
       "Bash(grep -n \"accent\\\\|color\\\\|#[0-9a-fA-F]\\\\{3,6\\\\}\" app/\\\\\\(secured\\\\\\)/equipes/page.tsx app/\\\\\\(secured\\\\\\)/joueurs/page.tsx app/\\\\\\(secured\\\\\\)/tournois/page.tsx)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(npm run *)"
     ]
   }
 }

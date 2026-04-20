@@ -15,7 +15,7 @@ describe("GET /api/auth/google/start", () => {
   beforeEach(() => {
     process.env = { ...originalEnv };
     saveGoogleOAuthStateMock.mockReset();
-    jest.spyOn(crypto, "randomBytes").mockReturnValue(Buffer.alloc(24, 1));
+    jest.spyOn(crypto, "randomBytes").mockImplementation(() => Buffer.alloc(24, 1));
   });
 
   it("redirects to Google authorization URL when config exists", async () => {

@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { Coche } from "@/components/Coche";
 import type { TeamDetailResponse, TeamRole } from "@/lib/shared/types";
 
 const roles: TeamRole[] = ["COACH", "TANK", "DPS", "HEAL", "CAPITAINE", "MANAGER", "OWNER"];
@@ -33,9 +34,7 @@ export default function TeamDetailPage() {
   }, [load]);
 
   const toggleRole = (role: TeamRole) => {
-    setMemberRoles((prev) =>
-      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
-    );
+    setMemberRoles((prev) => (prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]));
   };
 
   const addMember = async (event: FormEvent) => {
@@ -52,7 +51,7 @@ export default function TeamDetailPage() {
       if (!response.ok) throw new Error(payload.error || "TEAM_MEMBER_ADD_FAILED");
       setData(payload);
       setMemberPseudo("");
-      setStatus("Membre ajouté.");
+      setStatus("Membre ajoute.");
     } catch (e) {
       setError((e as Error).message);
     }
@@ -71,7 +70,7 @@ export default function TeamDetailPage() {
       const payload = (await response.json()) as TeamDetailResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "TEAM_UPDATE_FAILED");
       setData(payload);
-      setStatus("Équipe mise à jour.");
+      setStatus("Equipe mise a jour.");
     } catch (e) {
       setError((e as Error).message);
     }
@@ -88,7 +87,7 @@ export default function TeamDetailPage() {
       const payload = (await response.json()) as TeamDetailResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "TEAM_MEMBER_UPDATE_FAILED");
       setData(payload);
-      setStatus("Rôles mis à jour.");
+      setStatus("Roles mis a jour.");
     } catch (e) {
       setError((e as Error).message);
     }
@@ -105,7 +104,7 @@ export default function TeamDetailPage() {
       const payload = (await response.json()) as TeamDetailResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "TEAM_MEMBER_REMOVE_FAILED");
       setData(payload);
-      setStatus("Membre retiré.");
+      setStatus("Membre retire.");
     } catch (e) {
       setError((e as Error).message);
     }
@@ -113,7 +112,7 @@ export default function TeamDetailPage() {
 
   const editMemberRoles = async (userId: number, currentRoles: TeamRole[]) => {
     const raw = window.prompt(
-      "Rôles (séparés par virgule) parmi : COACH, TANK, DPS, HEAL, CAPITAINE, MANAGER",
+      "Roles (separes par virgule) parmi : COACH, TANK, DPS, HEAL, CAPITAINE, MANAGER",
       currentRoles.filter((r) => r !== "OWNER").join(", "),
     );
     if (raw === null) return;
@@ -121,235 +120,117 @@ export default function TeamDetailPage() {
       .split(",")
       .map((v) => v.trim().toUpperCase())
       .filter((v): v is TeamRole => roles.includes(v as TeamRole) && v !== "OWNER");
-    if (parsed.length === 0) { setError("MISSING_ROLE"); return; }
+    if (!parsed.length) {
+      setError("MISSING_ROLE");
+      return;
+    }
     await updateMemberRoles(userId, parsed);
   };
 
   if (!data) {
     return (
-      <section
-        style={{
-          borderRadius: 16,
-          border: "1px solid var(--line)",
-          background: "rgba(13,18,30,0.8)",
-          padding: "28px 32px",
-          color: "var(--text-2)",
-        }}
-      >
-        Chargement de l'équipe…
+      <section className="ds-block" style={{ color: "var(--text-2)" }}>
+        Chargement de l'equipe...
       </section>
     );
   }
 
   return (
     <section className="fade-in">
-      {/* ── HEADER ─────────────────────────────────────────────────────── */}
-      <div
-        style={{
-          position: "relative",
-          borderRadius: 22,
-          border: "1px solid rgba(255,157,46,0.15)",
-          background:
-            "linear-gradient(135deg, rgba(11,16,27,0.97) 0%, rgba(18,26,44,0.95) 100%)",
-          overflow: "hidden",
-          padding: "40px 40px 36px",
-          marginBottom: 24,
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            pointerEvents: "none",
-            background:
-              "radial-gradient(ellipse at 0% 50%, rgba(255,157,46,0.07) 0%, transparent 50%)",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 3,
-            background: "linear-gradient(90deg, transparent, #ff9d2e 40%, transparent)",
-          }}
-        />
-        <div
-          style={{
-            position: "relative",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: 16,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            {data.team.logoUrl ? (
-              <Image
-                src={data.team.logoUrl}
-                alt={data.team.name}
-                width={56}
-                height={56}
-                unoptimized
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: 12,
-                  border: "1px solid rgba(255,157,46,0.3)",
-                  objectFit: "cover",
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: 12,
-                  border: "1.5px dashed rgba(255,157,46,0.3)",
-                  background: "rgba(255,157,46,0.07)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 22,
-                }}
-              >
-                🛡
+      <div className="ds-header orange">
+        <div className="ds-header-body">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              {data.team.logoUrl ? (
+                <Image
+                  src={data.team.logoUrl}
+                  alt={data.team.name}
+                  width={56}
+                  height={56}
+                  unoptimized
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 12,
+                    border: "1px solid rgba(255,157,46,0.3)",
+                    objectFit: "cover",
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 12,
+                    border: "1.5px dashed rgba(255,157,46,0.3)",
+                    background: "rgba(255,157,46,0.07)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 22,
+                  }}
+                >
+                  🛡
+                </div>
+              )}
+              <div>
+                <h1 className="ds-title orange" style={{ fontSize: "clamp(26px, 3vw, 40px)", marginBottom: 6 }}>
+                  {data.team.name}
+                </h1>
+                <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
+                  Historique competitif et gestion du roster
+                </p>
               </div>
-            )}
-            <div>
-              <h1
-                style={{
-                  fontFamily: "var(--font-title), sans-serif",
-                  fontSize: "clamp(26px, 3vw, 40px)",
-                  fontWeight: 700,
-                  letterSpacing: "0.02em",
-                  margin: "0 0 6px",
-                  background: "linear-gradient(135deg, #f3f7ff 20%, #ff9d2e 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >
-                {data.team.name}
-              </h1>
-              <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-                Historique compétitif et gestion du roster
-              </p>
             </div>
+            <Link href="/equipes" className="btn ghost" style={{ padding: "9px 18px", fontSize: 13, flexShrink: 0 }}>
+              ← Equipes
+            </Link>
           </div>
-          <Link href="/equipes" className="btn ghost" style={{ padding: "9px 18px", fontSize: 13, flexShrink: 0 }}>
-            ← Équipes
-          </Link>
         </div>
       </div>
 
       {error && <p className="error" style={{ marginBottom: 16 }}>{error}</p>}
       {status && <p className="success" style={{ marginBottom: 16 }}>{status}</p>}
 
-      {/* ── MANAGE FORM (managers only) ────────────────────────────────── */}
       {data.canManage && (
-        <div
-          style={{
-            border: "1px solid rgba(255,157,46,0.15)",
-            borderRadius: 20,
-            background: "rgba(13,18,30,0.85)",
-            padding: "28px 32px",
-            marginBottom: 20,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
-            <span
-              style={{
-                flexShrink: 0,
-                width: 4,
-                height: 28,
-                background: "linear-gradient(180deg, #ff9d2e, #59d4ff)",
-                borderRadius: 2,
-                marginTop: 2,
-              }}
-            />
-            <h2
-              style={{
-                fontFamily: "var(--font-title), sans-serif",
-                fontSize: 20,
-                margin: 0,
-                letterSpacing: "0.02em",
-              }}
-            >
-              Paramètres de l'équipe
-            </h2>
+        <div className="ds-block" style={{ marginBottom: 20, borderColor: "rgba(255,157,46,0.18)" }}>
+          <div className="ds-section-title orange">
+            <h2>Parametres de l'equipe</h2>
           </div>
           <form onSubmit={saveMeta}>
             <div className="form-grid">
               <div className="field">
-                <label>Nom équipe</label>
+                <label>Nom equipe</label>
                 <input value={name} onChange={(e) => setName(e.target.value)} />
               </div>
               <div className="field">
                 <label>Logo URL</label>
-                <input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://…" />
+                <input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." />
               </div>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
               <button
                 type="submit"
-                style={{
-                  padding: "10px 24px",
-                  borderRadius: 999,
-                  border: "1px solid rgba(255,157,46,0.35)",
-                  background: "rgba(255,157,46,0.14)",
-                  color: "var(--text-0)",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
+                className="btn"
+                style={{ padding: "10px 24px", background: "rgba(255,157,46,0.14)", borderColor: "rgba(255,157,46,0.35)" }}
               >
-                Mettre à jour
+                Mettre a jour
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* ── MEMBERS ────────────────────────────────────────────────────── */}
-      <div
-        style={{
-          border: "1px solid var(--line)",
-          borderRadius: 20,
-          background: "rgba(13,18,30,0.85)",
-          padding: "28px 32px",
-          marginBottom: 20,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
-          <span
-            style={{
-              flexShrink: 0,
-              width: 4,
-              height: 28,
-              background: "linear-gradient(180deg, #4fe0a2, #59d4ff)",
-              borderRadius: 2,
-              marginTop: 2,
-            }}
-          />
-          <h2
-            style={{
-              fontFamily: "var(--font-title), sans-serif",
-              fontSize: 20,
-              margin: 0,
-              letterSpacing: "0.02em",
-            }}
-          >
-            Membres
-          </h2>
+      <div className="ds-block" style={{ marginBottom: 20 }}>
+        <div className="ds-section-title green">
+          <h2>Membres</h2>
         </div>
 
         <div className="table-like">
           <div className="table-row table-header">
             <span>Joueur</span>
-            <span>Rôles</span>
-            <span>Arrivée</span>
+            <span>Roles</span>
+            <span>Arrivee</span>
             <span>Actions</span>
           </div>
           {data.members.map((member) => (
@@ -374,27 +255,19 @@ export default function TeamDetailPage() {
                       onClick={() => editMemberRoles(member.userId, member.roles)}
                       style={{ padding: "4px 10px", fontSize: 12 }}
                     >
-                      Rôles
+                      Roles
                     </button>
                   </>
                 ) : (
-                  "—"
+                  "-"
                 )}
               </span>
             </div>
           ))}
         </div>
 
-        {/* Add member form */}
         {data.canManage && (
-          <form
-            onSubmit={addMember}
-            style={{
-              marginTop: 20,
-              paddingTop: 20,
-              borderTop: "1px solid var(--line)",
-            }}
-          >
+          <form onSubmit={addMember} style={{ marginTop: 20, paddingTop: 20, borderTop: "1px solid var(--line)" }}>
             <p
               style={{
                 fontSize: 12,
@@ -417,35 +290,18 @@ export default function TeamDetailPage() {
                 />
               </div>
               <div className="field">
-                <label>Rôles</label>
+                <label>Roles</label>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, paddingTop: 4 }}>
                   {roles
                     .filter((r) => r !== "OWNER")
                     .map((role) => (
-                      <label
+                      <Coche
                         key={role}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          padding: "5px 10px",
-                          borderRadius: 999,
-                          border: `1px solid ${memberRoles.includes(role) ? "rgba(89,212,255,0.35)" : "var(--line)"}`,
-                          background: memberRoles.includes(role)
-                            ? "rgba(89,212,255,0.1)"
-                            : "transparent",
-                          cursor: "pointer",
-                          fontSize: 13,
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={memberRoles.includes(role)}
-                          onChange={() => toggleRole(role)}
-                          style={{ accentColor: "var(--accent-blue)" }}
-                        />
-                        {role}
-                      </label>
+                        label={role}
+                        checked={memberRoles.includes(role)}
+                        theme="equipe"
+                        onChange={() => toggleRole(role)}
+                      />
                     ))}
                 </div>
               </div>
@@ -453,16 +309,8 @@ export default function TeamDetailPage() {
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
               <button
                 type="submit"
-                style={{
-                  padding: "10px 22px",
-                  borderRadius: 999,
-                  border: "1px solid rgba(89,212,255,0.3)",
-                  background: "rgba(89,212,255,0.12)",
-                  color: "var(--text-0)",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
+                className="btn"
+                style={{ padding: "10px 22px", background: "rgba(89,212,255,0.12)", borderColor: "rgba(89,212,255,0.3)" }}
               >
                 Ajouter
               </button>
@@ -471,36 +319,9 @@ export default function TeamDetailPage() {
         )}
       </div>
 
-      {/* ── TOURNAMENT HISTORY ─────────────────────────────────────────── */}
-      <div
-        style={{
-          border: "1px solid var(--line)",
-          borderRadius: 20,
-          background: "rgba(13,18,30,0.85)",
-          padding: "28px 32px",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
-          <span
-            style={{
-              flexShrink: 0,
-              width: 4,
-              height: 28,
-              background: "linear-gradient(180deg, #59d4ff, #ff9d2e)",
-              borderRadius: 2,
-              marginTop: 2,
-            }}
-          />
-          <h2
-            style={{
-              fontFamily: "var(--font-title), sans-serif",
-              fontSize: 20,
-              margin: 0,
-              letterSpacing: "0.02em",
-            }}
-          >
-            Historique tournois
-          </h2>
+      <div className="ds-block">
+        <div className="ds-section-title blue">
+          <h2>Historique tournois</h2>
         </div>
         <div className="table-like">
           <div className="table-row table-header">
@@ -516,7 +337,7 @@ export default function TeamDetailPage() {
               <span>
                 {entry.wins}W / {entry.losses}L
               </span>
-              <span>{entry.finalRank ?? "—"}</span>
+              <span>{entry.finalRank ?? "-"}</span>
             </div>
           ))}
         </div>
