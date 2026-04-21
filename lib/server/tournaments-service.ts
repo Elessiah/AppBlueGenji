@@ -931,7 +931,7 @@ export async function registerCurrentUserTeam(tournamentId: number, userId: numb
   }
 }
 
-export async function getTournamentDetail(tournamentId: number, userId: number): Promise<TournamentDetail | null> {
+export async function getTournamentDetail(tournamentId: number, userId: number, isAdmin = false): Promise<TournamentDetail | null> {
   const db = await getDatabase();
   const activeTeam = await getUserActiveTeam(userId);
 
@@ -1068,6 +1068,7 @@ export async function getTournamentDetail(tournamentId: number, userId: number):
     canRegister,
     myTeamId,
     canCreateReportsForTeamIds,
+    isAdmin,
   };
 }
 
@@ -1279,4 +1280,65 @@ export async function reportMatchScore(
   }
 }
 
+export async function adminResolveMatch(
+  matchId: number,
+  team1Score: number,
+  team2Score: number,
+): Promise<void> {
+  const db = await getDatabase();
+  const connection = await db.getConnection();
 
+  try {
+    await connection.beginTransaction();
+
+    const [matches] = await connection.execute<MatchRow[]>(
+      `SELECT
+        id,
+        tournament_id,
+        team1_id,
+        team2_id,
+        next_winner_match_id,
+        next_winner_slot,
+        next_loser_match_id,
+        next_loser_slot,
+        winner_team_id
+       FROM bg_matches
+       WHERE id = ?
+       LIMIT 1`,
+      [matchId],
+    );
+
+    if (matches.length === 0) throw new Error("MATCH_NOT_FOUND");
+    const match = matches[0];
+    if (match.winner_team_id !== null) throw new Error("MATCH_ALREADY_COMPLETED");
+    if (match.team1_id === null || match.team2_id === null) throw new Error("MATCH_NOT_READY");
+
+    const winnerTeamId = team1Score > team2Score ? Number(match.team1_id) : Number(match.team2_id);
+    const loserTeamId = winnerTeamId === Number(match.team1_id) ? Number(match.team2_id) : Number(match.team1_id);
+    const tournamentId = Number(match.tournament_id);
+
+    await finalizeMatch(connection, tournamentId, match, {
+      team1Score,
+      team2Score,
+      winnerTeamId,
+      loserTeamId,
+    });
+
+    await tryAutoResolveByes(connection, tournamentId);
+    await finalizeTournamentIfDone(connection, tournamentId);
+
+    await connection.commit();
+
+    publishTournamentEvent({
+      type: "score_resolved",
+      tournamentId,
+      matchId,
+      emittedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}

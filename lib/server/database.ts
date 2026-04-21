@@ -30,7 +30,8 @@ async function runMigrations(db: Pool): Promise<void> {
       visible_marvel TINYINT(1) NOT NULL DEFAULT 0,
       visible_major TINYINT(1) NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      is_admin TINYINT(1) NOT NULL DEFAULT 0
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
@@ -182,7 +183,7 @@ async function runMigrations(db: Pool): Promise<void> {
 
 async function ensureMigrations(db: Pool): Promise<void> {
   if (!migrationPromise) {
-    migrationPromise = runMigrations(db);
+    migrationPromise = runMigrations(db).then();
   }
   await migrationPromise;
 }

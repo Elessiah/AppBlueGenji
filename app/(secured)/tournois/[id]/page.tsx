@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import type { BracketMatch, BracketType, TournamentDetail } from "@/lib/shared/types";
 
 type MatchScoreDraft = Record<number, { myScore: string; opponentScore: string }>;
+type AdminDraft = Record<number, { score1: string; score2: string }>;
 
 function playPing() {
   try {
@@ -41,15 +42,23 @@ const BORDER = "var(--border, #444)";
 function BracketMatchCard({
   match,
   reportable,
+  adminResolvable,
   drafts,
   setDrafts,
+  adminDrafts,
+  setAdminDrafts,
   onSubmit,
+  onAdminResolve,
 }: {
   match: BracketMatch;
   reportable: boolean;
+  adminResolvable: boolean;
   drafts: MatchScoreDraft;
   setDrafts: React.Dispatch<React.SetStateAction<MatchScoreDraft>>;
+  adminDrafts: AdminDraft;
+  setAdminDrafts: React.Dispatch<React.SetStateAction<AdminDraft>>;
   onSubmit: (match: BracketMatch, e: FormEvent) => Promise<void>;
+  onAdminResolve: (match: BracketMatch, score1: number, score2: number) => Promise<void>;
 }) {
   const team1Win = match.winnerTeamId !== null && match.winnerTeamId === match.team1Id;
   const team2Win = match.winnerTeamId !== null && match.winnerTeamId === match.team2Id;
@@ -65,12 +74,21 @@ function BracketMatchCard({
     fontWeight: win ? 600 : 400,
   });
 
+  const handleAdminSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const draft = adminDrafts[match.id] ?? { score1: "", score2: "" };
+    const s1 = Number(draft.score1);
+    const s2 = Number(draft.score2);
+    if (!Number.isFinite(s1) || !Number.isFinite(s2) || s1 === s2) return;
+    void onAdminResolve(match, s1, s2);
+  };
+
   return (
     <div
       style={{
         width: CARD_W,
         background: "var(--surface-1)",
-        border: `1px solid ${BORDER}`,
+        border: `1px solid ${adminResolvable ? "rgba(251,146,60,0.4)" : BORDER}`,
         borderRadius: 6,
         overflow: "hidden",
         fontSize: 13,
@@ -92,6 +110,8 @@ function BracketMatchCard({
           {match.team2Score ?? "-"}
         </strong>
       </div>
+
+      {/* Formulaire équipe */}
       {reportable && (
         <form
           onSubmit={(e) => onSubmit(match, e)}
@@ -136,6 +156,61 @@ function BracketMatchCard({
           </button>
         </form>
       )}
+
+      {/* Formulaire admin */}
+      {adminResolvable && (
+        <form
+          onSubmit={handleAdminSubmit}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            padding: "5px 6px",
+            background: "rgba(251,146,60,0.08)",
+            borderTop: `1px solid rgba(251,146,60,0.25)`,
+          }}
+        >
+          <span style={{ fontSize: 10, color: "rgba(251,146,60,0.9)", fontWeight: 700, letterSpacing: "0.06em", marginRight: 2 }}>
+            ADM
+          </span>
+          <input
+            type="number"
+            min={0}
+            max={99}
+            placeholder={match.team1Name?.slice(0, 4) ?? "T1"}
+            value={adminDrafts[match.id]?.score1 || ""}
+            onChange={(e) =>
+              setAdminDrafts((prev) => ({
+                ...prev,
+                [match.id]: { ...prev[match.id], score1: e.target.value },
+              }))
+            }
+            style={{ width: 46, fontSize: 12 }}
+          />
+          <span style={{ color: "var(--text-2)", fontSize: 11 }}>–</span>
+          <input
+            type="number"
+            min={0}
+            max={99}
+            placeholder={match.team2Name?.slice(0, 4) ?? "T2"}
+            value={adminDrafts[match.id]?.score2 || ""}
+            onChange={(e) =>
+              setAdminDrafts((prev) => ({
+                ...prev,
+                [match.id]: { ...prev[match.id], score2: e.target.value },
+              }))
+            }
+            style={{ width: 46, fontSize: 12 }}
+          />
+          <button
+            className="btn"
+            type="submit"
+            style={{ padding: "3px 8px", fontSize: 12, background: "rgba(251,146,60,0.15)", borderColor: "rgba(251,146,60,0.4)" }}
+          >
+            ✓
+          </button>
+        </form>
+      )}
     </div>
   );
 }
@@ -144,16 +219,24 @@ function BracketTree({
   matches,
   bracketType,
   canReport,
+  adminResolvable,
   drafts,
   setDrafts,
+  adminDrafts,
+  setAdminDrafts,
   onSubmit,
+  onAdminResolve,
 }: {
   matches: BracketMatch[];
   bracketType: BracketType;
   canReport: (m: BracketMatch) => boolean;
+  adminResolvable: (m: BracketMatch) => boolean;
   drafts: MatchScoreDraft;
   setDrafts: React.Dispatch<React.SetStateAction<MatchScoreDraft>>;
+  adminDrafts: AdminDraft;
+  setAdminDrafts: React.Dispatch<React.SetStateAction<AdminDraft>>;
   onSubmit: (match: BracketMatch, e: FormEvent) => Promise<void>;
+  onAdminResolve: (match: BracketMatch, score1: number, score2: number) => Promise<void>;
 }) {
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
   const totalRounds = roundNums.length;
@@ -176,7 +259,6 @@ function BracketTree({
 
         return (
           <div key={roundNum} style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
-            {/* Round label */}
             <div
               style={{
                 height: 26,
@@ -195,7 +277,6 @@ function BracketTree({
             </div>
 
             <div style={{ display: "flex" }}>
-              {/* Match cards */}
               <div style={{ width: CARD_W, flexShrink: 0 }}>
                 {roundMatches.map((match) => (
                   <div
@@ -205,22 +286,24 @@ function BracketTree({
                     <BracketMatchCard
                       match={match}
                       reportable={canReport(match)}
+                      adminResolvable={adminResolvable(match)}
                       drafts={drafts}
                       setDrafts={setDrafts}
+                      adminDrafts={adminDrafts}
+                      setAdminDrafts={setAdminDrafts}
                       onSubmit={onSubmit}
+                      onAdminResolve={onAdminResolve}
                     />
                   </div>
                 ))}
               </div>
 
-              {/* Connectors */}
               {!isLast && (
                 <div style={{ width: CONN_W, flexShrink: 0 }}>
                   {roundMatches.map((match, idx) => {
                     const isTop = idx % 2 === 0;
                     return (
                       <div key={match.id} style={{ height: slotH, position: "relative" }}>
-                        {/* Horizontal from card to midpoint */}
                         <div
                           style={{
                             position: "absolute",
@@ -232,7 +315,6 @@ function BracketTree({
                             transform: "translateY(-1px)",
                           }}
                         />
-                        {/* L-bracket toward meeting point */}
                         <div
                           style={{
                             position: "absolute",
@@ -262,6 +344,7 @@ export default function TournamentDetailPage() {
   const tournamentId = Number(params.id);
   const [detail, setDetail] = useState<TournamentDetail | null>(null);
   const [drafts, setDrafts] = useState<MatchScoreDraft>({});
+  const [adminDrafts, setAdminDrafts] = useState<AdminDraft>({});
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -298,6 +381,13 @@ export default function TournamentDetailPage() {
     );
   };
 
+  const canAdminResolve = (match: BracketMatch): boolean => {
+    if (!detail?.isAdmin) return false;
+    if (match.winnerTeamId !== null) return false;
+    if (match.team1Id === null || match.team2Id === null) return false;
+    return true;
+  };
+
   const submitScore = async (match: BracketMatch, event: FormEvent) => {
     event.preventDefault();
     setError(null);
@@ -315,6 +405,29 @@ export default function TournamentDetailPage() {
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
       setStatus(`Score transmis pour le match #${match.id}.`);
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const adminResolve = async (match: BracketMatch, score1: number, score2: number) => {
+    setError(null);
+    setStatus(null);
+    try {
+      const response = await fetch(`/api/admin/matches/${match.id}/resolve`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ team1Score: score1, team2Score: score2 }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "ADMIN_RESOLVE_FAILED");
+      setStatus(`Match #${match.id} résolu par l'admin.`);
+      setAdminDrafts((prev) => {
+        const next = { ...prev };
+        delete next[match.id];
+        return next;
+      });
       await load();
     } catch (e) {
       setError((e as Error).message);
@@ -347,7 +460,8 @@ export default function TournamentDetailPage() {
 
   const stateMeta = STATE_META[detail.card.state] ?? { label: detail.card.state, chipClass: "muted" };
 
-  const bracketOrder: BracketType[] = ["UPPER", "LOWER", "GRAND"];
+  const bracketOrder: BracketType[] =
+    detail.card.format === "SINGLE" ? ["UPPER"] : ["UPPER", "LOWER", "GRAND"];
   const bracketLabels: Record<BracketType, string> = {
     UPPER: "Tableau principal",
     LOWER: "Tableau perdants",
@@ -382,6 +496,21 @@ export default function TournamentDetailPage() {
               <span className="ds-chip muted" style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>
                 {detail.card.registeredTeams}/{detail.card.maxTeams} équipes
               </span>
+              {detail.isAdmin && (
+                <span
+                  className="ds-chip"
+                  style={{
+                    background: "rgba(251,146,60,0.15)",
+                    border: "1px solid rgba(251,146,60,0.4)",
+                    color: "rgba(251,146,60,0.95)",
+                    textTransform: "none",
+                    letterSpacing: 0,
+                    fontWeight: 700,
+                  }}
+                >
+                  ⚙ Admin
+                </span>
+              )}
               {detail.canRegister && (
                 <button
                   type="button"
@@ -438,9 +567,13 @@ export default function TournamentDetailPage() {
                   matches={matches}
                   bracketType={type}
                   canReport={canReport}
+                  adminResolvable={canAdminResolve}
                   drafts={drafts}
                   setDrafts={setDrafts}
+                  adminDrafts={adminDrafts}
+                  setAdminDrafts={setAdminDrafts}
                   onSubmit={submitScore}
+                  onAdminResolve={adminResolve}
                 />
               </div>
             ))

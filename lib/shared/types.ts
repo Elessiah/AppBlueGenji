@@ -119,6 +119,7 @@ export type TournamentDetail = {
   canRegister: boolean;
   myTeamId: number | null;
   canCreateReportsForTeamIds: number[];
+  isAdmin: boolean;
 };
 
 export type BotStats = {

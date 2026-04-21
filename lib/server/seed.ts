@@ -2,7 +2,7 @@ import "dotenv/config";
 import type { Pool, ResultSetHeader } from "mysql2/promise";
 import { getDatabase } from "./database";
 
-// Données fictives
+// Données fictives - 32+ joueurs et 32+ équipes
 const FICTIONAL_PLAYERS = [
   { pseudo: "ShadowNinja", battletag: "ShadowNinja#1234", marvelTag: "ShadowNinja#2023" },
   { pseudo: "PhoenixRising", battletag: "PhoenixRising#5678", marvelTag: "PhoenixRising#2023" },
@@ -20,6 +20,22 @@ const FICTIONAL_PLAYERS = [
   { pseudo: "InfernoKnight", battletag: "InfernoKnight#4567", marvelTag: "InfernoKnight#2023" },
   { pseudo: "StormChaser", battletag: "StormChaser#8901", marvelTag: "StormChaser#2023" },
   { pseudo: "ObsidianGhost", battletag: "ObsidianGhost#2345", marvelTag: "ObsidianGhost#2023" },
+  { pseudo: "IceBreaker", battletag: "IceBreaker#1111", marvelTag: "IceBreaker#2023" },
+  { pseudo: "VortexMaster", battletag: "VortexMaster#2222", marvelTag: "VortexMaster#2023" },
+  { pseudo: "BlazeFury", battletag: "BlazeFury#3333", marvelTag: "BlazeFury#2023" },
+  { pseudo: "NovaStrike", battletag: "NovaStrike#4444", marvelTag: "NovaStrike#2023" },
+  { pseudo: "SilentAssassin", battletag: "SilentAssassin#5555", marvelTag: "SilentAssassin#2023" },
+  { pseudo: "GhostRecon", battletag: "GhostRecon#6666", marvelTag: "GhostRecon#2023" },
+  { pseudo: "IcePalace", battletag: "IcePalace#7777", marvelTag: "IcePalace#2023" },
+  { pseudo: "InfernoWrath", battletag: "InfernoWrath#8888", marvelTag: "InfernoWrath#2023" },
+  { pseudo: "LightningBolt", battletag: "LightningBolt#9999", marvelTag: "LightningBolt#2023" },
+  { pseudo: "ShadowShift", battletag: "ShadowShift#0000", marvelTag: "ShadowShift#2023" },
+  { pseudo: "VenomStrike", battletag: "VenomStrike#1010", marvelTag: "VenomStrike#2023" },
+  { pseudo: "CrimsonDawn", battletag: "CrimsonDawn#2020", marvelTag: "CrimsonDawn#2023" },
+  { pseudo: "SilverMoon", battletag: "SilverMoon#3030", marvelTag: "SilverMoon#2023" },
+  { pseudo: "DarkVortex", battletag: "DarkVortex#4040", marvelTag: "DarkVortex#2023" },
+  { pseudo: "SolarEclipse", battletag: "SolarEclipse#5050", marvelTag: "SolarEclipse#2023" },
+  { pseudo: "StormSeeker", battletag: "StormSeeker#6060", marvelTag: "StormSeeker#2023" },
 ];
 
 const FICTIONAL_TEAMS = [
@@ -31,6 +47,30 @@ const FICTIONAL_TEAMS = [
   { name: "Shadow Masters", members: [0, 5, 10] },
   { name: "Stellar Nexus", members: [2, 7, 12] },
   { name: "Cosmic Void", members: [1, 8, 15] },
+  { name: "Inferno Squad", members: [16, 17, 18] },
+  { name: "Vortex Crew", members: [19, 20, 21] },
+  { name: "Blaze Titans", members: [22, 23, 24] },
+  { name: "Nova Warriors", members: [25, 26, 27] },
+  { name: "Silent Hunters", members: [28, 29, 30] },
+  { name: "Ghost Division", members: [3, 16, 19] },
+  { name: "Ice Dynasty", members: [9, 22, 25] },
+  { name: "Fire Legends", members: [17, 23, 28] },
+  { name: "Storm Riders", members: [6, 20, 29] },
+  { name: "Shadow Alliance", members: [0, 12, 26] },
+  { name: "Void Reapers", members: [1, 13, 30] },
+  { name: "Stellar Guard", members: [2, 14, 24] },
+  { name: "Cosmic Kings", members: [4, 18, 27] },
+  { name: "Thunder Gods", members: [7, 11, 31] },
+  { name: "Frost Wolves", members: [10, 21, 31] },
+  { name: "Eclipse Sons", members: [15, 25, 31] },
+  { name: "Phoenix Knights", members: [5, 8, 31] },
+  { name: "Dragon Slayers", members: [11, 19, 31] },
+  { name: "Titan Force", members: [20, 24, 31] },
+  { name: "Void Masters", members: [3, 10, 21] },
+  { name: "Star Legends", members: [4, 22, 29] },
+  { name: "Dark Angels", members: [6, 16, 30] },
+  { name: "Light Bringers", members: [8, 26, 27] },
+  { name: "Chaos Warlords", members: [9, 17, 28] },
 ];
 
 async function clearDatabase(db: Pool): Promise<void> {
@@ -119,175 +159,31 @@ async function createTeams(db: Pool, userIds: number[]): Promise<number[]> {
 }
 
 // ========================
-// TOURNAMENT CREATION FUNCTIONS
+// TOURNAMENT CREATION
 // ========================
 
-async function createRegistrationTournament(
+async function createTournamentWithState(
   db: Pool,
   userIds: number[],
-  teamIds: number[],
-  now: Date
+  teamsToRegister: number[],
+  now: Date,
+  state: "REGISTRATION" | "RUNNING" | "FINISHED",
+  description: string
 ): Promise<number> {
-  console.log("  📋 Tournament 1: REGISTRATION (Open for signup)");
+  const teamCount = teamsToRegister.length;
+  const daysAgo = state === "FINISHED" ? 7 : state === "RUNNING" ? 1 : 0;
+  const pastDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+  const futureDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const inTwoDays = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+  const tournamentName = `Test - ${description} ${now.getTime()}`;
+  const format = teamCount <= 8 ? "DOUBLE" : teamCount <= 16 ? "DOUBLE" : "SINGLE";
+  const maxTeams = teamCount <= 4 ? 4 : teamCount <= 8 ? 8 : teamCount <= 16 ? 16 : 32;
 
-  const tournamentName = `Test - Registration Phase ${now.getTime()}`;
-  const [tournamentResult] = await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_tournaments
-    (organizer_user_id, name, description, format, max_teams, state,
-     start_visibility_at, registration_open_at, registration_close_at, start_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      userIds[0],
-      tournamentName,
-      "Tournament in registration phase - teams can sign up now",
-      "DOUBLE",
-      8,
-      "REGISTRATION",
-      now,
-      now,
-      inTwoDays,
-      nextWeek,
-    ]
-  );
+  console.log(`  📊 Tournament: ${description} (${teamCount} teams)`);
 
-  const tournamentId = tournamentResult.insertId as number;
+  const finishedAt = state === "FINISHED" ? pastDate : null;
+  const regCloseAt = state === "REGISTRATION" ? futureDate : pastDate;
 
-  // Register only 5 teams to show both registered and available spots
-  const teamsToRegister = teamIds.slice(0, 5);
-  for (let i = 0; i < teamsToRegister.length; i++) {
-    await db.execute(
-      `INSERT INTO bg_tournament_registrations (tournament_id, team_id, seed)
-      VALUES (?, ?, ?)`,
-      [tournamentId, teamsToRegister[i], i + 1]
-    );
-  }
-
-  console.log(`    ✓ Created: ${tournamentName}`);
-  console.log(`      Status: REGISTRATION | Teams: 5/8 registered\n`);
-
-  return tournamentId;
-}
-
-async function createRunningTournament(
-  db: Pool,
-  userIds: number[],
-  teamIds: number[],
-  now: Date
-): Promise<number> {
-  console.log("  🎮 Tournament 2: RUNNING (Active with completed matches)");
-
-  const pastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-  const tournamentName = `Test - Active Tournament ${now.getTime()}`;
-  const [tournamentResult] = await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_tournaments
-    (organizer_user_id, name, description, format, max_teams, state,
-     start_visibility_at, registration_open_at, registration_close_at, start_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      userIds[0],
-      tournamentName,
-      "Tournament currently running with matches in progress",
-      "DOUBLE",
-      8,
-      "RUNNING",
-      pastWeek,
-      pastWeek,
-      yesterday,
-      yesterday,
-    ]
-  );
-
-  const tournamentId = tournamentResult.insertId as number;
-
-  // Register all 8 teams
-  const teamsToRegister = teamIds.slice(0, 8);
-  for (let i = 0; i < teamsToRegister.length; i++) {
-    await db.execute(
-      `INSERT INTO bg_tournament_registrations (tournament_id, team_id, seed)
-      VALUES (?, ?, ?)`,
-      [tournamentId, teamsToRegister[i], i + 1]
-    );
-  }
-
-  // Generate bracket with some completed matches
-  await generateRunningBracketMatches(db, tournamentId, teamsToRegister);
-
-  console.log(`    ✓ Created: ${tournamentName}`);
-  console.log(`      Status: RUNNING | Teams: 8/8 | Some matches completed\n`);
-
-  return tournamentId;
-}
-
-async function createJustStartedTournament(
-  db: Pool,
-  userIds: number[],
-  teamIds: number[],
-  now: Date
-): Promise<number> {
-  console.log("  🚀 Tournament 3: RUNNING (Just started, no matches yet)");
-
-  const pastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-  const tournamentName = `Test - Just Started ${now.getTime()}`;
-  const [tournamentResult] = await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_tournaments
-    (organizer_user_id, name, description, format, max_teams, state,
-     start_visibility_at, registration_open_at, registration_close_at, start_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      userIds[0],
-      tournamentName,
-      "Tournament just started - matches haven't begun yet",
-      "SINGLE",
-      8,
-      "RUNNING",
-      pastWeek,
-      pastWeek,
-      yesterday,
-      now, // Started just now
-    ]
-  );
-
-  const tournamentId = tournamentResult.insertId as number;
-
-  // Register all 8 teams
-  const teamsToRegister = teamIds.slice(0, 8);
-  for (let i = 0; i < teamsToRegister.length; i++) {
-    await db.execute(
-      `INSERT INTO bg_tournament_registrations (tournament_id, team_id, seed)
-      VALUES (?, ?, ?)`,
-      [tournamentId, teamsToRegister[i], i + 1]
-    );
-  }
-
-  // Generate bracket structure but all PENDING
-  await generatePendingBracketMatches(db, tournamentId, teamsToRegister);
-
-  console.log(`    ✓ Created: ${tournamentName}`);
-  console.log(`      Status: RUNNING | Teams: 8/8 | All matches pending\n`);
-
-  return tournamentId;
-}
-
-async function createFinishedTournament(
-  db: Pool,
-  userIds: number[],
-  teamIds: number[],
-  now: Date
-): Promise<number> {
-  console.log("  ✅ Tournament 4: FINISHED (Completed tournament)");
-
-  const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-
-  const tournamentName = `Test - Finished Tournament ${now.getTime()}`;
   const [tournamentResult] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_tournaments
     (organizer_user_id, name, description, format, max_teams, state, finished_at,
@@ -296,245 +192,164 @@ async function createFinishedTournament(
     [
       userIds[0],
       tournamentName,
-      "Tournament has finished - final results available",
-      "DOUBLE",
-      8,
-      "FINISHED",
-      threeDaysAgo,
-      twoWeeksAgo,
-      twoWeeksAgo,
-      oneWeekAgo,
-      oneWeekAgo,
+      `Tournament with ${teamCount} teams`,
+      format,
+      maxTeams,
+      state,
+      finishedAt,
+      pastDate,
+      pastDate,
+      regCloseAt,
+      pastDate,
     ]
   );
 
   const tournamentId = tournamentResult.insertId as number;
 
-  // Register all 8 teams with final rankings
-  const teamsToRegister = teamIds.slice(0, 8);
+  // Register teams
   for (let i = 0; i < teamsToRegister.length; i++) {
     await db.execute(
       `INSERT INTO bg_tournament_registrations (tournament_id, team_id, seed, final_rank)
       VALUES (?, ?, ?, ?)`,
-      [tournamentId, teamsToRegister[i], i + 1, i + 1] // Simple ranking by seed
+      [
+        tournamentId,
+        teamsToRegister[i],
+        i + 1,
+        state === "FINISHED" ? i + 1 : null,
+      ]
     );
   }
 
-  // Generate fully completed bracket
-  await generateFinishedBracketMatches(db, tournamentId, teamsToRegister);
+  // Generate matches based on state
+  if (state === "REGISTRATION") {
+    // No matches for registration
+    console.log(`    ✓ Created with ${teamsToRegister.length}/${maxTeams} teams registered`);
+  } else if (state === "RUNNING") {
+    // Generate matches - some with progress
+    await generateVariableBracket(db, tournamentId, teamsToRegister, "RUNNING");
+    console.log(`    ✓ Created with bracket (matches in progress)`);
+  } else if (state === "FINISHED") {
+    // Generate fully completed bracket
+    await generateVariableBracket(db, tournamentId, teamsToRegister, "FINISHED");
+    console.log(`    ✓ Created with complete bracket (all matches finished)`);
+  }
 
-  console.log(`    ✓ Created: ${tournamentName}`);
-  console.log(`      Status: FINISHED | Teams: 8/8 | All matches completed\n`);
-
+  console.log(`    ID: ${tournamentId}\n`);
   return tournamentId;
 }
 
-// ========================
-// BRACKET GENERATION FUNCTIONS
-// ========================
+async function generateVariableBracket(
+  db: Pool,
+  tournamentId: number,
+  teamIds: number[],
+  state: "RUNNING" | "FINISHED"
+): Promise<void> {
+  const teamCount = teamIds.length;
 
-interface BracketMatch {
-  bracket: "UPPER" | "LOWER" | "GRAND";
-  round: number;
-  matchNumber: number;
-  team1Id: number | null;
-  team2Id: number | null;
-}
+  // Calculate next power of 2 for bracket size
+  let bracketSize = 1;
+  while (bracketSize < teamCount) {
+    bracketSize *= 2;
+  }
 
-function generateBracketStructure(teamIds: number[]): BracketMatch[] {
-  const matches: BracketMatch[] = [];
+  // Calculate BYEs (teams that skip first round)
+  const byeCount = bracketSize - teamCount;
+  const playingInRound1 = teamCount - byeCount;
+  const firstRoundMatches = playingInRound1 / 2;
 
-  // Upper bracket Round 1 - 4 matches
-  matches.push(
-    { bracket: "UPPER", round: 1, matchNumber: 1, team1Id: teamIds[0], team2Id: teamIds[1] },
-    { bracket: "UPPER", round: 1, matchNumber: 2, team1Id: teamIds[2], team2Id: teamIds[3] },
-    { bracket: "UPPER", round: 1, matchNumber: 3, team1Id: teamIds[4], team2Id: teamIds[5] },
-    { bracket: "UPPER", round: 1, matchNumber: 4, team1Id: teamIds[6], team2Id: teamIds[7] }
-  );
+  console.log(`    Bracket Size: ${bracketSize} | Teams: ${teamCount} | BYEs: ${byeCount} | R1 Matches: ${firstRoundMatches}`);
 
-  // Upper bracket Round 2 - 2 matches
-  matches.push(
-    { bracket: "UPPER", round: 2, matchNumber: 1, team1Id: null, team2Id: null },
-    { bracket: "UPPER", round: 2, matchNumber: 2, team1Id: null, team2Id: null }
-  );
+  // Calculate total rounds needed
+  const rounds = Math.ceil(Math.log2(bracketSize));
 
-  // Upper bracket Round 3 - Final
-  matches.push({ bracket: "UPPER", round: 3, matchNumber: 1, team1Id: null, team2Id: null });
+  // First round - only teams without BYE play
+  for (let i = 0; i < firstRoundMatches; i++) {
+    const team1Id = teamIds[i * 2];
+    const team2Id = teamIds[i * 2 + 1];
 
-  // Lower bracket - 7 matches
-  matches.push(
-    { bracket: "LOWER", round: 1, matchNumber: 1, team1Id: null, team2Id: null },
-    { bracket: "LOWER", round: 1, matchNumber: 2, team1Id: null, team2Id: null },
-    { bracket: "LOWER", round: 1, matchNumber: 3, team1Id: null, team2Id: null },
-    { bracket: "LOWER", round: 1, matchNumber: 4, team1Id: null, team2Id: null },
-    { bracket: "LOWER", round: 2, matchNumber: 1, team1Id: null, team2Id: null },
-    { bracket: "LOWER", round: 2, matchNumber: 2, team1Id: null, team2Id: null },
-    { bracket: "LOWER", round: 3, matchNumber: 1, team1Id: null, team2Id: null }
-  );
+    const status = state === "FINISHED" ? "COMPLETED" : "PENDING";
+    const score1 = status === "COMPLETED" ? 2 : null;
+    const score2 = status === "COMPLETED" ? 1 : null;
+    const winner = status === "COMPLETED" ? team1Id : null;
 
-  // Grand Final
-  matches.push({ bracket: "GRAND", round: 1, matchNumber: 1, team1Id: null, team2Id: null });
-
-  return matches;
-}
-
-async function generatePendingBracketMatches(db: Pool, tournamentId: number, teamIds: number[]): Promise<void> {
-  const matches = generateBracketStructure(teamIds);
-
-  for (const match of matches) {
     await db.execute<ResultSetHeader>(
       `INSERT INTO bg_matches
-      (tournament_id, bracket, round_number, match_number, team1_id, team2_id, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [tournamentId, match.bracket, match.round, match.matchNumber, match.team1Id, match.team2Id, "PENDING"]
-    );
-  }
-}
-
-async function generateRunningBracketMatches(db: Pool, tournamentId: number, teamIds: number[]): Promise<void> {
-  // Upper bracket round 1 with completed matches
-  const upperRound1Matches = [
-    { bracket: "UPPER", round: 1, matchNumber: 1, team1Id: teamIds[0], team2Id: teamIds[1], status: "COMPLETED" },
-    { bracket: "UPPER", round: 1, matchNumber: 2, team1Id: teamIds[2], team2Id: teamIds[3], status: "COMPLETED" },
-    { bracket: "UPPER", round: 1, matchNumber: 3, team1Id: teamIds[4], team2Id: teamIds[5], status: "READY" },
-    { bracket: "UPPER", round: 1, matchNumber: 4, team1Id: teamIds[6], team2Id: teamIds[7], status: "PENDING" },
-  ];
-
-  for (const match of upperRound1Matches) {
-    const [result] = await db.execute<ResultSetHeader>(
-      `INSERT INTO bg_matches
-      (tournament_id, bracket, round_number, match_number, team1_id, team2_id, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [tournamentId, match.bracket, match.round, match.matchNumber, match.team1Id, match.team2Id, match.status]
-    );
-    const matchId = result.insertId as number;
-
-    // Add scores for completed matches
-    if (match.status === "COMPLETED") {
-      const winner = match.matchNumber === 1 ? match.team1Id : match.team2Id;
-      const loser = match.matchNumber === 1 ? match.team2Id : match.team1Id;
-      await db.execute(
-        `UPDATE bg_matches SET
-        team1_score = ?, team2_score = ?, winner_team_id = ?, loser_team_id = ?
-        WHERE id = ?`,
-        [2, 1, winner, loser, matchId]
-      );
-    }
-  }
-
-  // Upper bracket round 2 - one match with teams from round 1
-  await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_matches
-    (tournament_id, bracket, round_number, match_number, team1_id, team2_id, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [tournamentId, "UPPER", 2, 1, teamIds[0], teamIds[2], "READY"]
-  );
-
-  // Upper bracket round 2 match 2
-  await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_matches
-    (tournament_id, bracket, round_number, match_number, team1_id, team2_id, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [tournamentId, "UPPER", 2, 2, null, null, "PENDING"]
-  );
-
-  // Upper bracket round 3
-  await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_matches
-    (tournament_id, bracket, round_number, match_number, team1_id, team2_id, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [tournamentId, "UPPER", 3, 1, null, null, "PENDING"]
-  );
-
-  // Lower bracket matches
-  for (let i = 1; i <= 4; i++) {
-    await db.execute<ResultSetHeader>(
-      `INSERT INTO bg_matches
-      (tournament_id, bracket, round_number, match_number, team1_id, team2_id, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [tournamentId, "LOWER", 1, i, null, null, "PENDING"]
-    );
-  }
-
-  for (let i = 1; i <= 2; i++) {
-    await db.execute<ResultSetHeader>(
-      `INSERT INTO bg_matches
-      (tournament_id, bracket, round_number, match_number, team1_id, team2_id, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [tournamentId, "LOWER", 2, i, null, null, "PENDING"]
-    );
-  }
-
-  await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_matches
-    (tournament_id, bracket, round_number, match_number, team1_id, team2_id, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [tournamentId, "LOWER", 3, 1, null, null, "PENDING"]
-  );
-
-  // Grand final
-  await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_matches
-    (tournament_id, bracket, round_number, match_number, team1_id, team2_id, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [tournamentId, "GRAND", 1, 1, null, null, "PENDING"]
-  );
-}
-
-async function generateFinishedBracketMatches(db: Pool, tournamentId: number, teamIds: number[]): Promise<void> {
-  // All matches completed with results
-  const finishedMatches = [
-    // Upper round 1
-    { bracket: "UPPER", round: 1, m: 1, t1: teamIds[0], t2: teamIds[1], w: teamIds[0] },
-    { bracket: "UPPER", round: 1, m: 2, t1: teamIds[2], t2: teamIds[3], w: teamIds[2] },
-    { bracket: "UPPER", round: 1, m: 3, t1: teamIds[4], t2: teamIds[5], w: teamIds[4] },
-    { bracket: "UPPER", round: 1, m: 4, t1: teamIds[6], t2: teamIds[7], w: teamIds[6] },
-    // Upper round 2
-    { bracket: "UPPER", round: 2, m: 1, t1: teamIds[0], t2: teamIds[2], w: teamIds[0] },
-    { bracket: "UPPER", round: 2, m: 2, t1: teamIds[4], t2: teamIds[6], w: teamIds[4] },
-    // Upper round 3
-    { bracket: "UPPER", round: 3, m: 1, t1: teamIds[0], t2: teamIds[4], w: teamIds[0] },
-    // Lower bracket (simplified - just TBD for losers)
-    { bracket: "LOWER", round: 1, m: 1, t1: teamIds[1], t2: teamIds[3], w: teamIds[1] },
-    { bracket: "LOWER", round: 1, m: 2, t1: teamIds[5], t2: teamIds[7], w: teamIds[5] },
-    { bracket: "LOWER", round: 1, m: 3, t1: null, t2: null, w: null },
-    { bracket: "LOWER", round: 1, m: 4, t1: null, t2: null, w: null },
-    { bracket: "LOWER", round: 2, m: 1, t1: teamIds[1], t2: teamIds[5], w: teamIds[1] },
-    { bracket: "LOWER", round: 2, m: 2, t1: null, t2: null, w: null },
-    { bracket: "LOWER", round: 3, m: 1, t1: null, t2: null, w: null },
-    // Grand final
-    { bracket: "GRAND", round: 1, m: 1, t1: teamIds[0], t2: teamIds[1], w: teamIds[0] },
-  ];
-
-  for (const match of finishedMatches) {
-    const status = match.w ? "COMPLETED" : "PENDING";
-    const [result] = await db.execute<ResultSetHeader>(
-      `INSERT INTO bg_matches
-      (tournament_id, bracket, round_number, match_number, team1_id, team2_id, status, team1_score, team2_score, winner_team_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (tournament_id, bracket, round_number, match_number, team1_id, team2_id, status, team1_score, team2_score, winner_team_id, loser_team_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         tournamentId,
-        match.bracket,
-        match.round,
-        match.m,
-        match.t1,
-        match.t2,
+        "UPPER",
+        1,
+        i + 1,
+        team1Id,
+        team2Id,
         status,
-        match.w ? 2 : null,
-        match.w ? 1 : null,
-        match.w,
+        score1,
+        score2,
+        winner,
+        status === "COMPLETED" ? team2Id : null,
       ]
     );
-
-    if (match.w) {
-      const loser = match.t1 === match.w ? match.t2 : match.t1;
-      await db.execute(`UPDATE bg_matches SET loser_team_id = ? WHERE id = ?`, [loser, result.insertId]);
-    }
   }
+
+  // Rounds 2+ with BYEs resolved
+  // Round 2 will have: winners from R1 matches + teams with BYE
+  const teamsInRound2 = firstRoundMatches + byeCount; // Winners + BYE teams
+  let currentRoundTeams = teamsInRound2;
+
+  for (let round = 2; round <= rounds; round++) {
+    const matchesInRound = Math.ceil(currentRoundTeams / 2);
+
+    for (let i = 0; i < matchesInRound; i++) {
+      const status = state === "FINISHED" ? "COMPLETED" : "PENDING";
+      const score1 = status === "COMPLETED" ? 2 : null;
+      const score2 = status === "COMPLETED" ? 1 : null;
+
+      await db.execute<ResultSetHeader>(
+        `INSERT INTO bg_matches
+        (tournament_id, bracket, round_number, match_number, team1_id, team2_id, status, team1_score, team2_score)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [tournamentId, "UPPER", round, i + 1, null, null, status, score1, score2]
+      );
+    }
+    currentRoundTeams = matchesInRound;
+  }
+
+  // Lower bracket matches (simplified - just empty structure)
+  currentRoundTeams = firstRoundMatches;
+  for (let round = 1; round <= rounds; round++) {
+    const matchesInRound = Math.ceil(currentRoundTeams / 2);
+
+    for (let i = 0; i < matchesInRound; i++) {
+      const status = state === "FINISHED" ? "COMPLETED" : "PENDING";
+      const score1 = status === "COMPLETED" ? 2 : null;
+      const score2 = status === "COMPLETED" ? 1 : null;
+
+      await db.execute<ResultSetHeader>(
+        `INSERT INTO bg_matches
+        (tournament_id, bracket, round_number, match_number, team1_id, team2_id, status, team1_score, team2_score)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [tournamentId, "LOWER", round, i + 1, null, null, status, score1, score2]
+      );
+    }
+    currentRoundTeams = matchesInRound;
+  }
+
+  // Grand final
+  const status = state === "FINISHED" ? "COMPLETED" : "PENDING";
+  const score1 = state === "FINISHED" ? 2 : null;
+  const score2 = state === "FINISHED" ? 1 : null;
+
+  await db.execute<ResultSetHeader>(
+    `INSERT INTO bg_matches
+    (tournament_id, bracket, round_number, match_number, team1_id, team2_id, status, team1_score, team2_score)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [tournamentId, "GRAND", 1, 1, null, null, status, score1, score2]
+  );
 }
 
 async function main(): Promise<void> {
-  console.log("🚀 Starting database seed...\n");
+  console.log("🚀 Starting database seed with variable tournament sizes...\n");
 
   try {
     const db = await getDatabase();
@@ -550,26 +365,50 @@ async function main(): Promise<void> {
     const teamIds = await createTeams(db, userIds);
     console.log(`✓ Created ${teamIds.length} teams\n`);
 
-    // 4. Créer les 4 tournois à différents stades
-    console.log("🎮 Creating multiple tournaments...\n");
+    // 4. Créer des tournois avec BYEs (nombres non-puissance-de-2)
+    console.log("🎮 Creating tournaments with BYE demonstrations...\n");
     const now = new Date();
 
-    const tournamentIds = [];
-    tournamentIds.push(await createRegistrationTournament(db, userIds, teamIds, now));
-    tournamentIds.push(await createRunningTournament(db, userIds, teamIds, now));
-    tournamentIds.push(await createJustStartedTournament(db, userIds, teamIds, now));
-    tournamentIds.push(await createFinishedTournament(db, userIds, teamIds, now));
+    // Tailles de tournois avec BYEs (nombres impairs uniquement pour les BYEs)
+    const tournamentSizes = [
+      { size: 3, name: "Tiny (3)", description: "Small Registration", state: "REGISTRATION" as const },
+      { size: 5, name: "Small (5)", description: "Small Registration", state: "REGISTRATION" as const },
+      { size: 7, name: "Seven (7)", description: "Medium Registration", state: "REGISTRATION" as const },
+      { size: 9, name: "Nine (9)", description: "Large Registration", state: "REGISTRATION" as const },
+      { size: 11, name: "Medium+ (11)", description: "Running - No Matches", state: "RUNNING" as const },
+      { size: 13, name: "Medium+ (13)", description: "Running - No Matches", state: "RUNNING" as const },
+      { size: 27, name: "Large (27)", description: "Running - No Matches", state: "RUNNING" as const },
+      { size: 29, name: "Large (29)", description: "Running - No Matches", state: "RUNNING" as const },
+    ];
+
+    for (const tournament of tournamentSizes) {
+      const { size, name, description, state } = tournament;
+      const teamsToUse = teamIds.slice(0, Math.min(size, teamIds.length));
+
+      await createTournamentWithState(
+        db,
+        userIds,
+        teamsToUse,
+        now,
+        state,
+        `${name} ${description}`
+      );
+    }
 
     console.log("✅ Seed completed successfully!");
     console.log("\nTest data created:");
     console.log(`  - ${userIds.length} test users (Test_*)`);
     console.log(`  - ${teamIds.length} test teams (Test - *)`);
-    console.log(`  - 4 test tournaments with different states:`);
-    console.log(`    1. REGISTRATION - Open for team signup (5/8 teams)`);
-    console.log(`    2. RUNNING - Active tournament with matches in progress`);
-    console.log(`    3. RUNNING - Tournament just started (no matches yet)`);
-    console.log(`    4. FINISHED - Completed tournament with final results`);
-    console.log("\nYou can now test all tournament states and bracket rendering!");
+    console.log(`  - 8 test tournaments with BYE demonstrations (all odd team counts):`);
+    console.log(`    1. 3 teams  - REGISTRATION (open for signup)`);
+    console.log(`    2. 5 teams  - REGISTRATION (open for signup)`);
+    console.log(`    3. 7 teams  - REGISTRATION (open for signup)`);
+    console.log(`    4. 9 teams  - REGISTRATION (open for signup)`);
+    console.log(`    5. 11 teams - RUNNING (no matches completed)`);
+    console.log(`    6. 13 teams - RUNNING (no matches completed)`);
+    console.log(`    7. 27 teams - RUNNING (no matches completed)`);
+    console.log(`    8. 29 teams - RUNNING (no matches completed)`);
+    console.log("\nAll tournaments use odd team counts to demonstrate BYEs!");
 
     process.exit(0);
   } catch (error) {

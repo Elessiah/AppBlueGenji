@@ -13,7 +13,8 @@
       "Bash(find \"C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji/app\" -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" -o -name \"*.js\" \\\\\\))",
       "Bash(find \"C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji\" -type f -name \"*database*\" -o -name \"*db*\" -o -name \"*schema*\")",
       "Bash(find \"C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji/lib/server\" -type f -name \"*.ts\")",
-      "Bash(cd \"C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji\")"
+      "Bash(cd \"C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji\")",
+      "Bash(cat \"C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji\\\\\\\\QUICK_START.txt\")"
     ]
   }
 }

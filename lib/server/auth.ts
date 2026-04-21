@@ -13,6 +13,7 @@ export type AuthUser = {
   googleSub: string | null;
   email: string | null;
   isAdult: boolean | null;
+  isAdmin: boolean;
 };
 
 type UserRow = RowDataPacket & {
@@ -23,6 +24,7 @@ type UserRow = RowDataPacket & {
   google_sub: string | null;
   email: string | null;
   is_adult: 0 | 1 | null;
+  is_admin: 0 | 1;
 };
 
 const SESSION_COOKIE = "bg_session";
@@ -55,6 +57,7 @@ function fromRow(row: UserRow): AuthUser {
     googleSub: row.google_sub,
     email: row.email,
     isAdult: row.is_adult === null ? null : Boolean(row.is_adult),
+    isAdmin: Boolean(row.is_admin),
   };
 }
 
@@ -97,7 +100,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
   const db = await getDatabase();
   const [rows] = await db.execute<UserRow[]>(
-    `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.email, u.is_adult
+    `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.email, u.is_adult, u.is_admin
      FROM bg_user_sessions s
      JOIN bg_users u ON u.id = s.user_id
      WHERE s.token_hash = ?
