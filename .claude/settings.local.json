@@ -14,7 +14,9 @@
       "Bash(find \"C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji\" -type f -name \"*database*\" -o -name \"*db*\" -o -name \"*schema*\")",
       "Bash(find \"C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji/lib/server\" -type f -name \"*.ts\")",
       "Bash(cd \"C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji\")",
-      "Bash(cat \"C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji\\\\\\\\QUICK_START.txt\")"
+      "Bash(cat \"C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji\\\\\\\\QUICK_START.txt\")",
+      "Bash(tree -L 2 -d /c/work/BlueGenji/appbluegenji --ignore node_modules)",
+      "Bash(xargs grep *)"
     ]
   }
 }

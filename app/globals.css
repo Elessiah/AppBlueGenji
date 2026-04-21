@@ -887,4 +887,9 @@ select {
   .ds-block {
     padding: 20px;
   }
+
+  .ds-hero-body {
+    grid-template-columns: 1fr !important;
+    gap: 24px !important;
+  }
 }

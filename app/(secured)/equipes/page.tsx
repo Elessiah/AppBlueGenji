@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { TeamListItem } from "@/lib/shared/types";
+import { formatLocalDate } from "@/lib/shared/dates";
 import { SearchBar } from "@/components/SearchBar";
 
 export default function TeamsPage() {
@@ -107,7 +108,7 @@ export default function TeamsPage() {
               <strong style={{ fontSize: 16, display: "block", marginBottom: 4 }}>{team.name}</strong>
               <span style={{ color: "var(--text-2)", fontSize: 13 }}>
                 {team.membersCount} membre{team.membersCount !== 1 ? "s" : ""} — Créée le{" "}
-                {new Date(team.createdAt).toLocaleDateString()}
+                {formatLocalDate(team.createdAt)}
               </span>
             </div>
             <span style={{ color: "var(--accent-orange)", fontSize: 13, fontWeight: 600, flexShrink: 0 }}>

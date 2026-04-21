@@ -5,6 +5,7 @@ import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Coche } from "@/components/Coche";
+import { formatLocalDate } from "@/lib/shared/dates";
 import type { TeamDetailResponse, TeamRole } from "@/lib/shared/types";
 
 const roles: TeamRole[] = ["COACH", "TANK", "DPS", "HEAL", "CAPITAINE", "MANAGER", "OWNER"];
@@ -237,7 +238,7 @@ export default function TeamDetailPage() {
             <div className="table-row" key={member.membershipId}>
               <Link href={`/joueurs/${member.userId}`}>{member.pseudo}</Link>
               <span>{member.roles.join(", ")}</span>
-              <span>{new Date(member.joinedAt).toLocaleDateString()}</span>
+              <span>{formatLocalDate(member.joinedAt)}</span>
               <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {data.canManage ? (
                   <>

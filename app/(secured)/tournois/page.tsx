@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { formatLocalDateTime } from "@/lib/shared/dates";
 import { SearchBar } from "@/components/SearchBar";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 
@@ -116,7 +117,7 @@ function TournamentColumn({
                   {tournament.registeredTeams}/{tournament.maxTeams} équipes
                 </span>
                 <span style={{ color: "var(--text-2)", fontSize: 12 }}>
-                  {new Date(tournament.startAt).toLocaleString()}
+                  {formatLocalDateTime(tournament.startAt)}
                 </span>
               </div>
             </Link>

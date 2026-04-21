@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { formatLocalDate } from "@/lib/shared/dates";
 import type { FullProfileResponse } from "@/lib/shared/types";
 
 export default function PlayerDetailPage() {
@@ -110,8 +111,8 @@ export default function PlayerDetailPage() {
             <div className="table-row" key={`${entry.teamId}-${entry.joinedAt}`}>
               <Link href={`/equipes/${entry.teamId}`}>{entry.teamName}</Link>
               <span>{entry.roles.join(", ")}</span>
-              <span>{new Date(entry.joinedAt).toLocaleDateString()}</span>
-              <span>{entry.leftAt ? new Date(entry.leftAt).toLocaleDateString() : "Actif"}</span>
+              <span>{formatLocalDate(entry.joinedAt)}</span>
+              <span>{entry.leftAt ? formatLocalDate(entry.leftAt) : "Actif"}</span>
             </div>
           ))}
         </div>

@@ -3,14 +3,8 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { localDateTimeInput } from "@/lib/shared/dates";
 import type { TournamentFormat } from "@/lib/shared/types";
-
-function localDate(hoursFromNow: number): string {
-  const date = new Date(Date.now() + hoursFromNow * 60 * 60 * 1000);
-  date.setSeconds(0, 0);
-  const tzOffset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - tzOffset).toISOString().slice(0, 16);
-}
 
 export default function CreateTournamentPage() {
   const router = useRouter();
@@ -19,10 +13,10 @@ export default function CreateTournamentPage() {
   const [description, setDescription] = useState("");
   const [format, setFormat] = useState<TournamentFormat>("SINGLE");
   const [maxTeams, setMaxTeams] = useState(16);
-  const [startVisibilityAt, setStartVisibilityAt] = useState(localDate(1));
-  const [registrationOpenAt, setRegistrationOpenAt] = useState(localDate(3));
-  const [registrationCloseAt, setRegistrationCloseAt] = useState(localDate(24));
-  const [startAt, setStartAt] = useState(localDate(30));
+  const [startVisibilityAt, setStartVisibilityAt] = useState(localDateTimeInput(1));
+  const [registrationOpenAt, setRegistrationOpenAt] = useState(localDateTimeInput(3));
+  const [registrationCloseAt, setRegistrationCloseAt] = useState(localDateTimeInput(24));
+  const [startAt, setStartAt] = useState(localDateTimeInput(30));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 

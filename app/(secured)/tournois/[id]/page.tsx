@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { formatLocalDateTime } from "@/lib/shared/dates";
 import type { BracketMatch, BracketType, TournamentDetail } from "@/lib/shared/types";
 
 type MatchScoreDraft = Record<number, { myScore: string; opponentScore: string }>;
@@ -595,7 +596,7 @@ export default function TournamentDetailPage() {
               <div key={reg.teamId} className="table-row">
                 <span>{reg.teamName}</span>
                 <span>{reg.seed ?? "-"}</span>
-                <span>{new Date(reg.registeredAt).toLocaleString()}</span>
+                <span>{formatLocalDateTime(reg.registeredAt)}</span>
                 <span>{reg.finalRank ?? "-"}</span>
               </div>
             ))}
