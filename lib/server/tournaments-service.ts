@@ -663,15 +663,20 @@ async function createBracketIfMissing(connection: PoolConnection, tournament: To
   await tryAutoResolveByes(connection, tournament.id);
 }
 
-async function syncTournamentState(connection: PoolConnection, tournamentId: number): Promise<TournamentRow | null> {
+async function syncTournamentState(
+  connection: PoolConnection,
+  tournamentId: number,
+): Promise<{ row: TournamentRow | null; stateChanged: boolean }> {
   const tournament = await loadTournamentRow(connection, tournamentId);
-  if (!tournament) return null;
+  if (!tournament) return { row: null, stateChanged: false };
 
   const computed = computeTournamentState(tournament);
+  let stateChanged = false;
 
   if (computed !== tournament.state) {
     await connection.execute(`UPDATE bg_tournaments SET state = ? WHERE id = ?`, [computed, tournamentId]);
     tournament.state = computed;
+    stateChanged = true;
   }
 
   if (tournament.state === "RUNNING") {
@@ -681,15 +686,16 @@ async function syncTournamentState(connection: PoolConnection, tournamentId: num
     await finalizeTournamentIfDone(connection, tournamentId);
 
     const refreshed = await loadTournamentRow(connection, tournamentId);
-    return refreshed;
+    return { row: refreshed, stateChanged };
   }
 
-  return tournament;
+  return { row: tournament, stateChanged };
 }
 
 async function syncVisibleTournaments(): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
+  const changedIds: number[] = [];
 
   try {
     await connection.beginTransaction();
@@ -699,7 +705,8 @@ async function syncVisibleTournaments(): Promise<void> {
     );
 
     for (const row of rows) {
-      await syncTournamentState(connection, Number(row.id));
+      const { stateChanged } = await syncTournamentState(connection, Number(row.id));
+      if (stateChanged) changedIds.push(Number(row.id));
     }
 
     await connection.commit();
@@ -708,6 +715,10 @@ async function syncVisibleTournaments(): Promise<void> {
     throw error;
   } finally {
     connection.release();
+  }
+
+  for (const id of changedIds) {
+    publishTournamentEvent({ type: "updated", tournamentId: id, emittedAt: new Date().toISOString() });
   }
 }
 
@@ -866,7 +877,7 @@ export async function registerCurrentUserTeam(tournamentId: number, userId: numb
   try {
     await connection.beginTransaction();
 
-    const tournament = await syncTournamentState(connection, tournamentId);
+    const { row: tournament } = await syncTournamentState(connection, tournamentId);
     if (!tournament) {
       throw new Error("TOURNAMENT_NOT_FOUND");
     }
@@ -927,7 +938,7 @@ export async function getTournamentDetail(tournamentId: number, userId: number):
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
-    const tournament = await syncTournamentState(connection, tournamentId);
+    const { row: tournament } = await syncTournamentState(connection, tournamentId);
     await connection.commit();
 
     if (!tournament) {
@@ -1095,7 +1106,7 @@ export async function reportMatchScore(
   try {
     await connection.beginTransaction();
 
-    const tournament = await syncTournamentState(connection, tournamentId);
+    const { row: tournament } = await syncTournamentState(connection, tournamentId);
     if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
     if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
 

@@ -409,9 +409,13 @@ export default function TournamentDetailPage() {
             <h2>Arbre du tournoi</h2>
           </div>
 
-          {!detail.matches.length ? (
+          {detail.card.state === "REGISTRATION" ? (
             <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
               Le bracket sera généré automatiquement au démarrage du tournoi.
+            </p>
+          ) : !detail.matches.length ? (
+            <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
+              Aucun match disponible pour l&apos;instant.
             </p>
           ) : (
             brackets.map(({ type, matches }) => (

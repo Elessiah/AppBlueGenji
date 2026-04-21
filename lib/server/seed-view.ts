@@ -60,7 +60,7 @@ async function viewTestData(): Promise<void> {
          (SELECT COUNT(*) FROM bg_matches WHERE tournament_id = t.id) as match_count
        FROM bg_tournaments t
        LEFT JOIN bg_tournament_registrations tr ON tr.tournament_id = t.id
-       WHERE t.name LIKE 'Test Tournament%'
+       WHERE t.name LIKE 'Test -%'
        GROUP BY t.id, t.name, t.format, t.state, t.max_teams
        ORDER BY t.id`
     );
@@ -75,11 +75,11 @@ async function viewTestData(): Promise<void> {
       });
       console.log(`\n   Total: ${tournaments.length} test tournament(s)`);
 
-      // 4. If we have a tournament, show its bracket
-      if (tournaments.length > 0) {
-        const tournamentId = tournaments[0].id;
+      // 4. Show bracket for each tournament
+      for (const tournament of tournaments) {
         console.log("\n\n📋 TOURNAMENT BRACKET STRUCTURE:");
-        console.log(`   Tournament ID: ${tournamentId} - ${tournaments[0].name}`);
+        console.log(`   Tournament ID: ${tournament.id} - ${tournament.name}`);
+        console.log(`   State: ${tournament.state} | Format: ${tournament.format} | Teams: ${tournament.registered_count}/${tournament.max_teams}`);
 
         // Group matches by bracket and round
         const [matches] = await db.execute<
@@ -90,6 +90,8 @@ async function viewTestData(): Promise<void> {
             team1_name: string | null;
             team2_name: string | null;
             status: string;
+            team1_score: number | null;
+            team2_score: number | null;
           })[]
         >(
           `SELECT
@@ -98,33 +100,40 @@ async function viewTestData(): Promise<void> {
              m.match_number,
              t1.name as team1_name,
              t2.name as team2_name,
-             m.status
+             m.status,
+             m.team1_score,
+             m.team2_score
            FROM bg_matches m
            LEFT JOIN bg_teams t1 ON m.team1_id = t1.id
            LEFT JOIN bg_teams t2 ON m.team2_id = t2.id
            WHERE m.tournament_id = ?
            ORDER BY m.bracket DESC, m.round_number, m.match_number`,
-          [tournamentId]
+          [tournament.id]
         );
 
-        let currentBracket = "";
-        let currentRound = 0;
+        if (matches.length === 0) {
+          console.log("   No matches yet");
+        } else {
+          let currentBracket = "";
+          let currentRound = 0;
 
-        matches.forEach((m) => {
-          if (m.bracket !== currentBracket) {
-            currentBracket = m.bracket;
-            currentRound = 0;
-            console.log(`\n   ${currentBracket} BRACKET:`);
-          }
-          if (m.round_number !== currentRound) {
-            currentRound = m.round_number;
-            console.log(`     Round ${currentRound}:`);
-          }
+          matches.forEach((m) => {
+            if (m.bracket !== currentBracket) {
+              currentBracket = m.bracket;
+              currentRound = 0;
+              console.log(`\n   ${currentBracket} BRACKET:`);
+            }
+            if (m.round_number !== currentRound) {
+              currentRound = m.round_number;
+              console.log(`     Round ${currentRound}:`);
+            }
 
-          const team1 = m.team1_name ? m.team1_name.replace("Test - ", "") : "TBD";
-          const team2 = m.team2_name ? m.team2_name.replace("Test - ", "") : "TBD";
-          console.log(`       Match ${m.match_number}: ${team1} vs ${team2} [${m.status}]`);
-        });
+            const team1 = m.team1_name ? m.team1_name.replace("Test - ", "") : "TBD";
+            const team2 = m.team2_name ? m.team2_name.replace("Test - ", "") : "TBD";
+            const score = m.team1_score !== null ? ` (${m.team1_score}-${m.team2_score})` : "";
+            console.log(`       Match ${m.match_number}: ${team1} vs ${team2} [${m.status}]${score}`);
+          });
+        }
       }
     }
 
