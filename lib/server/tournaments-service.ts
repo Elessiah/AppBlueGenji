@@ -95,7 +95,7 @@ function computeTournamentState(row: Pick<TournamentRow, "state" | "finished_at"
 }
 
 function statusFromTeams(team1Id: number | null, team2Id: number | null): "PENDING" | "READY" {
-  return team1Id !== null || team2Id !== null ? "READY" : "PENDING";
+  return team1Id !== null && team2Id !== null ? "READY" : "PENDING";
 }
 
 function mapCard(row: TournamentListRow): TournamentCard {
@@ -318,13 +318,6 @@ async function finalizeMatch(
     match.next_loser_slot === null ? null : Number(match.next_loser_slot),
     result.loserTeamId,
   );
-
-  publishTournamentEvent({
-    type: "score_resolved",
-    tournamentId,
-    matchId: Number(match.id),
-    emittedAt: new Date().toISOString(),
-  });
 }
 async function tryAutoResolveByes(connection: PoolConnection, tournamentId: number): Promise<void> {
   let hasProgress = true;
@@ -521,16 +514,24 @@ async function resolveExpiredScoreReports(connection: PoolConnection, tournament
 }
 
 async function createBracketIfMissing(connection: PoolConnection, tournament: TournamentRow): Promise<void> {
+  const registeredTeamIds = await loadRegisteredTeamIds(connection, tournament.id);
+  const expectedBracketSize = nextPowerOfTwo(registeredTeamIds.length);
+
   const [existingMatches] = await connection.execute<(RowDataPacket & { c: number })[]>(
     `SELECT COUNT(*) AS c FROM bg_matches WHERE tournament_id = ?`,
     [tournament.id],
   );
 
-  if (Number(existingMatches[0]?.c ?? 0) > 0) {
+  const hasExistingMatches = Number(existingMatches[0]?.c ?? 0) > 0;
+  const bracketSizeChanged = tournament.bracket_size !== expectedBracketSize;
+
+  if (hasExistingMatches && !bracketSizeChanged) {
     return;
   }
 
-  const registeredTeamIds = await loadRegisteredTeamIds(connection, tournament.id);
+  if (hasExistingMatches && bracketSizeChanged) {
+    await connection.execute(`DELETE FROM bg_matches WHERE tournament_id = ?`, [tournament.id]);
+  }
 
   if (registeredTeamIds.length <= 1) {
     if (registeredTeamIds.length === 1) {
@@ -552,7 +553,7 @@ async function createBracketIfMissing(connection: PoolConnection, tournament: To
     return;
   }
 
-  const bracketSize = nextPowerOfTwo(registeredTeamIds.length);
+  const bracketSize = expectedBracketSize;
   const rounds = Math.ceil(Math.log2(bracketSize));
   const upper: number[][] = [];
 
@@ -1268,6 +1269,62 @@ export async function reportMatchScore(
 
     publishTournamentEvent({
       type: "score_reported",
+      tournamentId,
+      matchId,
+      emittedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+export async function adminSaveMatchScores(
+  matchId: number,
+  team1Score: number,
+  team2Score: number,
+): Promise<void> {
+  const db = await getDatabase();
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [matches] = await connection.execute<MatchRow[]>(
+      `SELECT
+        id,
+        tournament_id,
+        team1_id,
+        team2_id,
+        winner_team_id
+       FROM bg_matches
+       WHERE id = ?
+       LIMIT 1`,
+      [matchId],
+    );
+
+    if (matches.length === 0) throw new Error("MATCH_NOT_FOUND");
+    const match = matches[0];
+    if (match.winner_team_id !== null) throw new Error("MATCH_ALREADY_COMPLETED");
+    if (match.team1_id === null || match.team2_id === null) throw new Error("MATCH_NOT_READY");
+
+    const tournamentId = Number(match.tournament_id);
+
+    // Juste mettre à jour les scores sans finalize
+    await connection.execute(
+      `UPDATE bg_matches
+       SET team1_score = ?,
+           team2_score = ?
+       WHERE id = ?`,
+      [team1Score, team2Score, matchId],
+    );
+
+    await connection.commit();
+
+    publishTournamentEvent({
+      type: "score_resolved",
       tournamentId,
       matchId,
       emittedAt: new Date().toISOString(),

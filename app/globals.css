@@ -857,6 +857,53 @@ select {
   --stat-rgb: var(--purple-rgb);
 }
 
+/* Number input sans flèches */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.no-spin-buttons::-webkit-outer-spin-button,
+.no-spin-buttons::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.no-spin-buttons {
+  -moz-appearance: textfield;
+}
+
+/* Bracket scroll styling */
+.bracket-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(89, 212, 255, 0.3) transparent;
+}
+
+.bracket-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+
+.bracket-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.bracket-scroll::-webkit-scrollbar-thumb {
+  background: rgba(89, 212, 255, 0.25);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.bracket-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(89, 212, 255, 0.45);
+  background-clip: padding-box;
+}
+
 @media (max-width: 920px) {
   .grid-2,
   .grid-3 {

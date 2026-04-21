@@ -35,6 +35,354 @@ const STATE_META: Record<string, { label: string; chipClass: string }> = {
   FINISHED: { label: "Terminé", chipClass: "muted" },
 };
 
+function AdminScoreModal({
+  match,
+  score1,
+  score2,
+  onScore1Change,
+  onScore2Change,
+  onClose,
+  onSaveBoth,
+  onSubmit,
+  isLoading,
+}: {
+  match: BracketMatch;
+  score1: string;
+  score2: string;
+  onScore1Change: (val: string) => void;
+  onScore2Change: (val: string) => void;
+  onClose: () => void;
+  onSaveBoth: (s1: number, s2: number) => Promise<void>;
+  onSubmit: (s1: number, s2: number) => Promise<void>;
+  isLoading: boolean;
+}) {
+  const handleSaveScoresOnly = async () => {
+    const s1 = Number(score1);
+    const s2 = Number(score2);
+    if (!Number.isFinite(s1) || !Number.isFinite(s2) || s1 === s2) return;
+    await onSaveBoth(s1, s2);
+    onClose();
+  };
+
+  const handleDefineWinner = async () => {
+    const s1 = Number(score1);
+    const s2 = Number(score2);
+    if (!Number.isFinite(s1) || !Number.isFinite(s2) || s1 === s2) return;
+    await onSubmit(s1, s2);
+    onClose();
+  };
+
+  const s1Num = Number(score1);
+  const s2Num = Number(score2);
+  const isValidScore = Number.isFinite(s1Num) && Number.isFinite(s2Num) && s1Num !== s2Num;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.65)",
+          zIndex: 999,
+        }}
+      />
+      {/* Modal */}
+      <div
+        style={{
+          position: "fixed",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          background: "linear-gradient(135deg, rgba(251,146,60,0.12) 0%, rgba(251,146,60,0.06) 100%)",
+          border: `2px solid rgba(251,146,60,0.5)`,
+          borderRadius: 12,
+          padding: 32,
+          maxWidth: 540,
+          width: "90vw",
+          maxHeight: "90vh",
+          overflow: "auto",
+          zIndex: 1000,
+          boxShadow: "0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(251,146,60,0.2), inset 0 1px 0 rgba(251,146,60,0.1)",
+          backdropFilter: "blur(4px)",
+        }}
+      >
+        <h2 style={{ margin: "0 0 24px", fontSize: 18, fontWeight: 700, color: "var(--text-0)" }}>
+          Éditer le score du match
+        </h2>
+
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 16, alignItems: "end" }}>
+            <div>
+              <label style={{ display: "block", margin: "0 0 10px", fontSize: 12, fontWeight: 700, color: "rgba(251,146,60,0.9)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                {match.team1Name || "Équipe 1"}
+              </label>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const val = Math.max(0, Number(score1 || 0) - 1);
+                    onScore1Change(String(val));
+                  }}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    padding: 0,
+                    fontSize: 16,
+                    fontWeight: 700,
+                    background: "rgba(251,146,60,0.15)",
+                    border: "1px solid rgba(251,146,60,0.3)",
+                    borderRadius: 6,
+                    color: "rgba(251,146,60,0.9)",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "all 0.2s",
+                    flexShrink: 0,
+                  }}
+                  disabled={isLoading}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(251,146,60,0.25)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(251,146,60,0.15)";
+                  }}
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  min={0}
+                  max={99}
+                  value={score1}
+                  onChange={(e) => onScore1Change(e.target.value)}
+                  autoFocus
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    padding: "10px 12px",
+                    fontSize: 22,
+                    fontWeight: 700,
+                    textAlign: "center",
+                    background: "var(--surface-1)",
+                    border: `2px solid rgba(251,146,60,0.4)`,
+                    borderRadius: 8,
+                    color: "var(--text-0)",
+                    transition: "border-color 0.2s",
+                  }}
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const val = Math.min(99, Number(score1 || 0) + 1);
+                    onScore1Change(String(val));
+                  }}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    padding: 0,
+                    fontSize: 16,
+                    fontWeight: 700,
+                    background: "rgba(251,146,60,0.15)",
+                    border: "1px solid rgba(251,146,60,0.3)",
+                    borderRadius: 6,
+                    color: "rgba(251,146,60,0.9)",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "all 0.2s",
+                    flexShrink: 0,
+                  }}
+                  disabled={isLoading}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(251,146,60,0.25)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(251,146,60,0.15)";
+                  }}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text-1)" }}>vs</span>
+            </div>
+
+            <div>
+              <label style={{ display: "block", margin: "0 0 10px", fontSize: 12, fontWeight: 700, color: "rgba(251,146,60,0.9)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                {match.team2Name || "Équipe 2"}
+              </label>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const val = Math.max(0, Number(score2 || 0) - 1);
+                    onScore2Change(String(val));
+                  }}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    padding: 0,
+                    fontSize: 16,
+                    fontWeight: 700,
+                    background: "rgba(251,146,60,0.15)",
+                    border: "1px solid rgba(251,146,60,0.3)",
+                    borderRadius: 6,
+                    color: "rgba(251,146,60,0.9)",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "all 0.2s",
+                    flexShrink: 0,
+                  }}
+                  disabled={isLoading}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(251,146,60,0.25)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(251,146,60,0.15)";
+                  }}
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  min={0}
+                  max={99}
+                  value={score2}
+                  onChange={(e) => onScore2Change(e.target.value)}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    padding: "10px 12px",
+                    fontSize: 22,
+                    fontWeight: 700,
+                    textAlign: "center",
+                    background: "var(--surface-1)",
+                    border: `2px solid rgba(251,146,60,0.4)`,
+                    borderRadius: 8,
+                    color: "var(--text-0)",
+                    transition: "border-color 0.2s",
+                  }}
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const val = Math.min(99, Number(score2 || 0) + 1);
+                    onScore2Change(String(val));
+                  }}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    padding: 0,
+                    fontSize: 16,
+                    fontWeight: 700,
+                    background: "rgba(251,146,60,0.15)",
+                    border: "1px solid rgba(251,146,60,0.3)",
+                    borderRadius: 6,
+                    color: "rgba(251,146,60,0.9)",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "all 0.2s",
+                    flexShrink: 0,
+                  }}
+                  disabled={isLoading}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(251,146,60,0.25)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(251,146,60,0.15)";
+                  }}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {s1Num === s2Num && score1 && score2 && (
+          <div style={{ marginBottom: 20, padding: 12, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 6 }}>
+            <p style={{ margin: 0, fontSize: 13, color: "rgba(239,68,68,0.9)" }}>
+              Les scores ne peuvent pas être égaux
+            </p>
+          </div>
+        )}
+
+        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr 1fr", gap: 12, alignItems: "stretch" }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn"
+            style={{
+              padding: "12px 16px",
+              fontSize: 14,
+              fontWeight: 600,
+              background: "var(--surface-1)",
+              borderColor: "var(--border)",
+              color: "var(--text-1)",
+              cursor: isLoading ? "not-allowed" : "pointer",
+              opacity: isLoading ? 0.6 : 1,
+              whiteSpace: "nowrap",
+            }}
+            disabled={isLoading}
+          >
+            Annuler
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveScoresOnly}
+            className="btn"
+            style={{
+              padding: "12px 16px",
+              fontSize: 13,
+              fontWeight: 600,
+              background: isValidScore ? "rgba(79,224,162,0.15)" : "rgba(79,224,162,0.05)",
+              borderColor: "rgba(79,224,162,0.4)",
+              color: isValidScore ? "rgba(79,224,162,1)" : "rgba(79,224,162,0.5)",
+              cursor: isValidScore && !isLoading ? "pointer" : "not-allowed",
+              opacity: isValidScore && !isLoading ? 1 : 0.5,
+              transition: "all 0.2s",
+            }}
+            disabled={!isValidScore || isLoading}
+          >
+            {isLoading ? "..." : "OK"}
+          </button>
+          <button
+            type="button"
+            onClick={handleDefineWinner}
+            className="btn"
+            style={{
+              padding: "12px 16px",
+              fontSize: 13,
+              fontWeight: 600,
+              background: isValidScore ? "rgba(251,146,60,0.2)" : "rgba(251,146,60,0.08)",
+              borderColor: "rgba(251,146,60,0.5)",
+              color: isValidScore ? "rgba(251,146,60,1)" : "rgba(251,146,60,0.5)",
+              cursor: isValidScore && !isLoading ? "pointer" : "not-allowed",
+              opacity: isValidScore && !isLoading ? 1 : 0.5,
+              transition: "all 0.2s",
+            }}
+            disabled={!isValidScore || isLoading}
+          >
+            {isLoading ? "..." : "✓ Gagnant"}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 const SLOT_H = 90;
 const CARD_W = 210;
 const CONN_W = 40;
@@ -46,20 +394,16 @@ function BracketMatchCard({
   adminResolvable,
   drafts,
   setDrafts,
-  adminDrafts,
-  setAdminDrafts,
   onSubmit,
-  onAdminResolve,
+  onOpenAdminModal,
 }: {
   match: BracketMatch;
   reportable: boolean;
   adminResolvable: boolean;
   drafts: MatchScoreDraft;
   setDrafts: React.Dispatch<React.SetStateAction<MatchScoreDraft>>;
-  adminDrafts: AdminDraft;
-  setAdminDrafts: React.Dispatch<React.SetStateAction<AdminDraft>>;
   onSubmit: (match: BracketMatch, e: FormEvent) => Promise<void>;
-  onAdminResolve: (match: BracketMatch, score1: number, score2: number) => Promise<void>;
+  onOpenAdminModal: (match: BracketMatch) => void;
 }) {
   const team1Win = match.winnerTeamId !== null && match.winnerTeamId === match.team1Id;
   const team2Win = match.winnerTeamId !== null && match.winnerTeamId === match.team2Id;
@@ -74,15 +418,6 @@ function BracketMatchCard({
     color: win ? "var(--text-0)" : hasWinner ? "var(--text-2)" : "var(--text-1)",
     fontWeight: win ? 600 : 400,
   });
-
-  const handleAdminSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    const draft = adminDrafts[match.id] ?? { score1: "", score2: "" };
-    const s1 = Number(draft.score1);
-    const s2 = Number(draft.score2);
-    if (!Number.isFinite(s1) || !Number.isFinite(s2) || s1 === s2) return;
-    void onAdminResolve(match, s1, s2);
-  };
 
   return (
     <div
@@ -158,59 +493,26 @@ function BracketMatchCard({
         </form>
       )}
 
-      {/* Formulaire admin */}
+      {/* Bouton édition admin */}
       {adminResolvable && (
-        <form
-          onSubmit={handleAdminSubmit}
+        <div
           style={{
             display: "flex",
-            alignItems: "center",
-            gap: 4,
+            justifyContent: "center",
             padding: "5px 6px",
             background: "rgba(251,146,60,0.08)",
             borderTop: `1px solid rgba(251,146,60,0.25)`,
           }}
         >
-          <span style={{ fontSize: 10, color: "rgba(251,146,60,0.9)", fontWeight: 700, letterSpacing: "0.06em", marginRight: 2 }}>
-            ADM
-          </span>
-          <input
-            type="number"
-            min={0}
-            max={99}
-            placeholder={match.team1Name?.slice(0, 4) ?? "T1"}
-            value={adminDrafts[match.id]?.score1 || ""}
-            onChange={(e) =>
-              setAdminDrafts((prev) => ({
-                ...prev,
-                [match.id]: { ...prev[match.id], score1: e.target.value },
-              }))
-            }
-            style={{ width: 46, fontSize: 12 }}
-          />
-          <span style={{ color: "var(--text-2)", fontSize: 11 }}>–</span>
-          <input
-            type="number"
-            min={0}
-            max={99}
-            placeholder={match.team2Name?.slice(0, 4) ?? "T2"}
-            value={adminDrafts[match.id]?.score2 || ""}
-            onChange={(e) =>
-              setAdminDrafts((prev) => ({
-                ...prev,
-                [match.id]: { ...prev[match.id], score2: e.target.value },
-              }))
-            }
-            style={{ width: 46, fontSize: 12 }}
-          />
           <button
+            type="button"
+            onClick={() => onOpenAdminModal(match)}
             className="btn"
-            type="submit"
-            style={{ padding: "3px 8px", fontSize: 12, background: "rgba(251,146,60,0.15)", borderColor: "rgba(251,146,60,0.4)" }}
+            style={{ padding: "4px 12px", fontSize: 12, background: "rgba(251,146,60,0.15)", borderColor: "rgba(251,146,60,0.4)" }}
           >
-            ✓
+            ✎ Éditer le score
           </button>
-        </form>
+        </div>
       )}
     </div>
   );
@@ -223,10 +525,8 @@ function BracketTree({
   adminResolvable,
   drafts,
   setDrafts,
-  adminDrafts,
-  setAdminDrafts,
   onSubmit,
-  onAdminResolve,
+  onOpenAdminModal,
 }: {
   matches: BracketMatch[];
   bracketType: BracketType;
@@ -234,10 +534,8 @@ function BracketTree({
   adminResolvable: (m: BracketMatch) => boolean;
   drafts: MatchScoreDraft;
   setDrafts: React.Dispatch<React.SetStateAction<MatchScoreDraft>>;
-  adminDrafts: AdminDraft;
-  setAdminDrafts: React.Dispatch<React.SetStateAction<AdminDraft>>;
   onSubmit: (match: BracketMatch, e: FormEvent) => Promise<void>;
-  onAdminResolve: (match: BracketMatch, score1: number, score2: number) => Promise<void>;
+  onOpenAdminModal: (match: BracketMatch) => void;
 }) {
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
   const totalRounds = roundNums.length;
@@ -249,7 +547,18 @@ function BracketTree({
   };
 
   return (
-    <div style={{ display: "flex", overflowX: "auto", paddingBottom: 8 }}>
+    <div
+      style={{
+        display: "flex",
+        overflowX: "auto",
+        overflowY: "visible",
+        paddingBottom: 16,
+        marginBottom: 8,
+        scrollBehavior: "smooth",
+        minHeight: "fit-content",
+      }}
+      className="bracket-scroll"
+    >
       {roundNums.map((roundNum, roundIdx) => {
         const roundMatches = matches
           .filter((m) => m.roundNumber === roundNum)
@@ -290,10 +599,8 @@ function BracketTree({
                       adminResolvable={adminResolvable(match)}
                       drafts={drafts}
                       setDrafts={setDrafts}
-                      adminDrafts={adminDrafts}
-                      setAdminDrafts={setAdminDrafts}
                       onSubmit={onSubmit}
-                      onAdminResolve={onAdminResolve}
+                      onOpenAdminModal={onOpenAdminModal}
                     />
                   </div>
                 ))}
@@ -348,6 +655,8 @@ export default function TournamentDetailPage() {
   const [adminDrafts, setAdminDrafts] = useState<AdminDraft>({});
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [selectedMatchForAdmin, setSelectedMatchForAdmin] = useState<BracketMatch | null>(null);
+  const [isAdminLoading, setIsAdminLoading] = useState(false);
 
   const load = useCallback(async () => {
     const response = await fetch(`/api/tournaments/${tournamentId}`, { cache: "no-store" });
@@ -412,9 +721,36 @@ export default function TournamentDetailPage() {
     }
   };
 
+  const adminSaveScoresOnly = async (match: BracketMatch, score1: number, score2: number) => {
+    setError(null);
+    setStatus(null);
+    setIsAdminLoading(true);
+    try {
+      const response = await fetch(`/api/admin/matches/${match.id}/scores`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ team1Score: score1, team2Score: score2 }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "ADMIN_SAVE_SCORES_FAILED");
+      setStatus(`Scores sauvegardés pour le match #${match.id}.`);
+      setAdminDrafts((prev) => {
+        const next = { ...prev };
+        delete next[match.id];
+        return next;
+      });
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsAdminLoading(false);
+    }
+  };
+
   const adminResolve = async (match: BracketMatch, score1: number, score2: number) => {
     setError(null);
     setStatus(null);
+    setIsAdminLoading(true);
     try {
       const response = await fetch(`/api/admin/matches/${match.id}/resolve`, {
         method: "POST",
@@ -432,6 +768,8 @@ export default function TournamentDetailPage() {
       await load();
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setIsAdminLoading(false);
     }
   };
 
@@ -549,7 +887,7 @@ export default function TournamentDetailPage() {
             </p>
           ) : (
             brackets.map(({ type, matches }) => (
-              <div key={type} style={{ marginBottom: type !== brackets[brackets.length - 1].type ? 32 : 0 }}>
+              <div key={type} style={{ marginBottom: type !== brackets[brackets.length - 1].type ? 32 : 0, minHeight: 0, overflow: "visible" }}>
                 {brackets.length > 1 && (
                   <p
                     style={{
@@ -571,10 +909,8 @@ export default function TournamentDetailPage() {
                   adminResolvable={canAdminResolve}
                   drafts={drafts}
                   setDrafts={setDrafts}
-                  adminDrafts={adminDrafts}
-                  setAdminDrafts={setAdminDrafts}
                   onSubmit={submitScore}
-                  onAdminResolve={adminResolve}
+                  onOpenAdminModal={setSelectedMatchForAdmin}
                 />
               </div>
             ))
@@ -603,6 +939,31 @@ export default function TournamentDetailPage() {
           </div>
         </div>
       </section>
+
+      {/* Modal d'édition des scores admin */}
+      {selectedMatchForAdmin && (
+        <AdminScoreModal
+          match={selectedMatchForAdmin}
+          score1={adminDrafts[selectedMatchForAdmin.id]?.score1 || String(selectedMatchForAdmin.team1Score ?? "")}
+          score2={adminDrafts[selectedMatchForAdmin.id]?.score2 || String(selectedMatchForAdmin.team2Score ?? "")}
+          onScore1Change={(val) =>
+            setAdminDrafts((prev) => ({
+              ...prev,
+              [selectedMatchForAdmin.id]: { ...prev[selectedMatchForAdmin.id], score1: val },
+            }))
+          }
+          onScore2Change={(val) =>
+            setAdminDrafts((prev) => ({
+              ...prev,
+              [selectedMatchForAdmin.id]: { ...prev[selectedMatchForAdmin.id], score2: val },
+            }))
+          }
+          onClose={() => setSelectedMatchForAdmin(null)}
+          onSaveBoth={(s1, s2) => adminSaveScoresOnly(selectedMatchForAdmin, s1, s2)}
+          onSubmit={(s1, s2) => adminResolve(selectedMatchForAdmin, s1, s2)}
+          isLoading={isAdminLoading}
+        />
+      )}
     </>
   );
 }

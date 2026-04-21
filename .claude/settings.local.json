@@ -16,7 +16,13 @@
       "Bash(cd \"C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji\")",
       "Bash(cat \"C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji\\\\\\\\QUICK_START.txt\")",
       "Bash(tree -L 2 -d /c/work/BlueGenji/appbluegenji --ignore node_modules)",
-      "Bash(xargs grep *)"
+      "Bash(xargs grep *)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(curl -s http://localhost:3001/)",
+      "Bash(curl -s \"http://localhost:3001/connexion\")",
+      "Bash(curl -s http://localhost:3001)",
+      "Bash(curl -s http://localhost:3001/api/tournaments/1 -H 'Cookie: bg_session=__CMDSUB_OUTPUT__')",
+      "Bash(pkill -f \"next dev\")"
     ]
   }
 }
