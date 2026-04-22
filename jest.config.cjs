@@ -5,6 +5,9 @@ module.exports = {
     transform: {
         '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.jest.json' }],
     },
+    moduleNameMapper: {
+        '^@/(.*)$': '<rootDir>/$1',
+    },
     moduleFileExtensions: ['ts', 'tsx', 'js'],
     testMatch: ['**/tests/**/*.test.(ts|tsx|js)'],
 };
