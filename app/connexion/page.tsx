@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/toast";
 
 function mapDiscordError(errorCode: string): string {
   if (errorCode === "BOT_INTERNAL_UNREACHABLE") return "Connexion Discord indisponible (bot non joignable).";
@@ -16,35 +17,30 @@ function mapDiscordError(errorCode: string): string {
 
 export default function LoginPage() {
   const router = useRouter();
+  const { showError, showSuccess } = useToast();
   const [redirect, setRedirect] = useState("/tournois");
-  const [oauthError, setOauthError] = useState<string | null>(null);
 
   const [discordId, setDiscordId] = useState("");
   const [pseudo, setPseudo] = useState("");
   const [code, setCode] = useState("");
   const [requested, setRequested] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     setRedirect(params.get("redirect") || "/tournois");
     const routeError = params.get("error");
-    if (routeError === "google_not_configured") setOauthError("Connexion Google indisponible: configuration manquante.");
-    else if (routeError === "google_unavailable") setOauthError("Connexion Google temporairement indisponible.");
-    else if (routeError === "oauth") setOauthError("Échec OAuth Google.");
-    else if (routeError === "state") setOauthError("Session OAuth expirée ou invalide.");
-    else if (routeError === "google") setOauthError("Paramètres OAuth Google invalides.");
-    else setOauthError(null);
-  }, []);
+    if (routeError === "google_not_configured") showError("Connexion Google indisponible: configuration manquante.");
+    else if (routeError === "google_unavailable") showError("Connexion Google temporairement indisponible.");
+    else if (routeError === "oauth") showError("Échec OAuth Google.");
+    else if (routeError === "state") showError("Session OAuth expirée ou invalide.");
+    else if (routeError === "google") showError("Paramètres OAuth Google invalides.");
+  }, [showError]);
 
   const requestCode = async (event: FormEvent) => {
     event.preventDefault();
     setLoading(true);
-    setError(null);
-    setSuccess(null);
     try {
       const response = await fetch("/api/auth/discord/request", {
         method: "POST",
@@ -54,9 +50,9 @@ export default function LoginPage() {
       const payload = (await response.json()) as { error?: string; expiresAt?: string };
       if (!response.ok) throw new Error(mapDiscordError(payload.error || "FAILED"));
       setRequested(true);
-      setSuccess(`Code envoyé en DM Discord (expiration : ${new Date(payload.expiresAt || "").toLocaleTimeString()}).`);
+      showSuccess(`Code envoyé en DM Discord (expiration : ${new Date(payload.expiresAt || "").toLocaleTimeString()}).`);
     } catch (e) {
-      setError((e as Error).message);
+      showError((e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -65,8 +61,6 @@ export default function LoginPage() {
   const verifyCode = async (event: FormEvent) => {
     event.preventDefault();
     setLoading(true);
-    setError(null);
-    setSuccess(null);
     try {
       const response = await fetch("/api/auth/discord/verify", {
         method: "POST",
@@ -78,7 +72,7 @@ export default function LoginPage() {
       router.push(redirect);
       router.refresh();
     } catch (e) {
-      setError((e as Error).message);
+      showError((e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -97,7 +91,6 @@ export default function LoginPage() {
           <p style={{ color: "var(--text-1)", fontSize: 16, margin: 0, maxWidth: 520, lineHeight: 1.7 }}>
             Connecte-toi via ton compte Google ou par code temporaire envoyé par le bot Discord.
           </p>
-          {oauthError && <p className="error" style={{ marginTop: 16, maxWidth: 600 }}>{oauthError}</p>}
         </div>
       </section>
 
@@ -238,8 +231,6 @@ export default function LoginPage() {
               {loading ? "Chargement..." : requested ? "Valider le code" : "Recevoir un code Discord"}
             </button>
 
-            {error && <p className="error" style={{ margin: 0 }}>{error}</p>}
-            {success && <p className="success" style={{ margin: 0 }}>{success}</p>}
           </form>
         </article>
       </div>

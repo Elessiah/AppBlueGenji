@@ -179,6 +179,66 @@ async function runMigrations(db: Pool): Promise<void> {
         REFERENCES bg_matches(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  // Migration: Add placeholder columns for loser bracket initialization
+  try {
+    await db.execute(`
+      ALTER TABLE bg_matches
+      ADD COLUMN team1_placeholder VARCHAR(255) NULL
+    `);
+  } catch {
+    // Column already exists, ignore
+  }
+  try {
+    await db.execute(`
+      ALTER TABLE bg_matches
+      ADD COLUMN team2_placeholder VARCHAR(255) NULL
+    `);
+  } catch {
+    // Column already exists, ignore
+  }
+
+  // Migration: Add forfeit tracking
+  try {
+    await db.execute(`
+      ALTER TABLE bg_matches
+      ADD COLUMN forfeit_team_id BIGINT NULL
+    `);
+  } catch {
+    // Column already exists, ignore
+  }
+
+  // Migration: Reset invalid forfeit_team_id values (0 or non-matching team IDs)
+  try {
+    await db.execute(`
+      UPDATE bg_matches
+      SET forfeit_team_id = NULL
+      WHERE forfeit_team_id = 0
+      OR (forfeit_team_id IS NOT NULL AND status != 'COMPLETED')
+    `);
+  } catch {
+    // Ignore if already done
+  }
+
+  // Migration: Add has_third_place_match to bg_tournaments
+  try {
+    await db.execute(`
+      ALTER TABLE bg_tournaments
+      ADD COLUMN has_third_place_match TINYINT(1) NOT NULL DEFAULT 0
+    `);
+  } catch {
+    // Column already exists, ignore
+  }
+
+  // Migration: Add THIRD_PLACE to bracket ENUM
+  try {
+    await db.execute(`
+      ALTER TABLE bg_matches
+      MODIFY COLUMN bracket ENUM('UPPER', 'LOWER', 'GRAND', 'THIRD_PLACE') NOT NULL
+    `);
+  } catch {
+    // Ignore if already done
+  }
 }
 
 async function ensureMigrations(db: Pool): Promise<void> {

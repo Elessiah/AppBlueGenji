@@ -1,28 +1,37 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { LogoWithGlow } from "@/components/logo-with-glow";
 import { formatLocalDate } from "@/lib/shared/dates";
 import type { FullProfileResponse } from "@/lib/shared/types";
+import { useToast } from "@/components/ui/toast";
 
 export default function PlayerDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const { showError } = useToast();
   const [data, setData] = useState<FullProfileResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/players/${params.id}`, { cache: "no-store" })
       .then(async (response) => {
         const payload = (await response.json()) as FullProfileResponse & { error?: string };
-        if (!response.ok) throw new Error(payload.error || "PLAYER_LOAD_FAILED");
+        if (!response.ok) {
+          const errorCode = payload.error || "PLAYER_LOAD_FAILED";
+          if (errorCode === "PLAYER_NOT_FOUND") {
+            showError(errorCode);
+            setTimeout(() => router.push("/joueurs"), 1500);
+            return;
+          }
+          throw new Error(errorCode);
+        }
         setData(payload);
       })
-      .catch((e) => setError((e as Error).message));
-  }, [params.id]);
+      .catch((e) => showError((e as Error).message));
+  }, [params.id, router, showError]);
 
-  if (error) return <p className="error">{error}</p>;
   if (!data) return <section className="ds-block" style={{ color: "var(--text-2)" }}>Chargement du profil joueur...</section>;
 
   return (
@@ -31,15 +40,15 @@ export default function PlayerDetailPage() {
         <div className="ds-header-body">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-              <Image
-                className="avatar"
+              <LogoWithGlow
                 src={data.profile.avatarUrl || "/vercel.svg"}
                 alt={data.profile.pseudo}
                 width={64}
                 height={64}
+                size="sm"
+                borderRadius={999}
+                borderColor="rgba(89,212,255,0.3)"
                 unoptimized
-                referrerPolicy="no-referrer"
-                style={{ width: 64, height: 64, borderRadius: "50%", border: "2px solid rgba(89,212,255,0.3)" }}
               />
               <div>
                 <h1 className="ds-title blue" style={{ fontSize: "clamp(26px, 3vw, 40px)", marginBottom: 6 }}>

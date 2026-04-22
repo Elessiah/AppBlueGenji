@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LogoHero } from "@/components/logo-hero";
+import { PageWithPalette } from "@/components/page-with-palette";
 
 export const metadata: Metadata = {
-  title: "BlueGenji - Association Esport Overwatch & Marvel Rivals",
-  description: "Découvrez BlueGenji, association loi 1901 spécialisée en Overwatch 2 et Marvel Rivals. Tournois, événements LAN, coaching et communauté francophone.",
+  title: "BlueGenji - Association Esport Overwatch 2",
+  description: "Découvrez BlueGenji, association loi 1901 spécialisée en Overwatch 2. Tournois, événements LAN, coaching et communauté francophone en ligne.",
   openGraph: {
     title: "BlueGenji - Association Esport",
     description: "Structure compétitive et inclusive pour la scène esport francophone.",
@@ -17,21 +19,22 @@ export const metadata: Metadata = {
 
 export default function AssociationPage() {
   return (
-    <main className="page-shell">
+    <PageWithPalette palette="gold">
+      <main className="page-shell" style={{ position: "relative", zIndex: 1 }}>
       <Link href="/" className="cta-float-home home">⌂ Accueil</Link>
       <Link href="/tournois" className="cta-float">Accéder aux tournois →</Link>
 
       {/* ── HERO ── */}
       <section className="fade-in ds-hero">
-        <div className="ds-hero-body" style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: 52, alignItems: "center" }}>
+        <div className="ds-hero-body" style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 52, alignItems: "center" }}>
           <div>
             <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
               <span className="badge">Association loi 1901</span>
               <span className="badge" style={{ borderColor: "rgba(245,195,58,0.45)", background: "rgba(245,195,58,0.1)", color: "rgb(245,195,58)" }}>
                 Fondée en 2022
               </span>
-              <span className="badge" style={{ borderColor: "rgba(167,115,255,0.4)", background: "rgba(167,115,255,0.09)", color: "rgb(167,115,255)" }}>
-                Le Mans (72)
+              <span className="badge" style={{ borderColor: "rgba(89,212,255,0.4)", background: "rgba(89,212,255,0.09)", color: "rgb(89,212,255)" }}>
+                En ligne
               </span>
             </div>
 
@@ -43,14 +46,14 @@ export default function AssociationPage() {
             </h2>
 
             <p style={{ fontSize: 17, lineHeight: 1.8, color: "var(--text-1)", margin: "0 0 8px", maxWidth: 520 }}>
-              Structure associative compétitive spécialisée{" "}
-              <strong style={{ color: "var(--accent-blue)", fontWeight: 700 }}>Overwatch</strong>
-              {" "}— implantée au Mans. Tournois, événements LAN et accompagnement des équipes de la scène amateur francophone.
+              Structure associative compétitive en ligne spécialisée en{" "}
+              <strong style={{ color: "var(--accent-blue)", fontWeight: 700 }}>Overwatch 2</strong>
+              . Tournois, événements LAN et accompagnement des équipes de la scène amateur francophone.
             </p>
             <p style={{ fontSize: 14, lineHeight: 1.65, color: "var(--text-2)", margin: "0 0 36px", maxWidth: 480 }}>
-              Branche secondaire{" "}
+              Nous accueillons également les compétiteurs{" "}
               <span style={{ color: "rgb(167,115,255)", fontWeight: 600 }}>Marvel Rivals</span>
-              {" "}ouverte aux compétiteurs des deux univers.
+              {" "}dans notre communauté francophone.
             </p>
 
             <div className="ds-stats">
@@ -63,37 +66,7 @@ export default function AssociationPage() {
             </div>
           </div>
 
-          <div style={{
-            width: 220,
-            height: 220,
-            flexShrink: 0,
-            borderRadius: 24,
-            border: "1px dashed rgba(89,212,255,0.22)",
-            background: "linear-gradient(145deg, rgba(9,18,34,0.98) 0%, rgba(14,24,44,0.95) 100%)",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 14,
-            position: "relative",
-            overflow: "hidden",
-          }}>
-            <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 50% 50%, rgba(89,212,255,0.05) 0%, transparent 70%)", pointerEvents: "none" }} />
-            <div style={{
-              width: 84,
-              height: 84,
-              borderRadius: "50%",
-              border: "2px dashed rgba(89,212,255,0.28)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 34,
-              color: "rgba(89,212,255,0.7)",
-            }}>🎮</div>
-            <span style={{ color: "var(--text-2)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center", padding: "0 16px" }}>
-              Logo BlueGenji
-            </span>
-          </div>
+          <LogoHero />
         </div>
       </section>
 
@@ -449,12 +422,13 @@ export default function AssociationPage() {
         </p>
       </section>
     </main>
+    </PageWithPalette>
   );
 }
 
 const HERO_STATS = [
   { label: "Fondée le", value: "11 sept. 2022" },
-  { label: "Siège social", value: "Le Mans (72)" },
+  { label: "Présence", value: "En ligne (FR)" },
   { label: "Régime", value: "Loi 1901" },
   { label: "Âge minimum", value: "16 ans" },
 ];

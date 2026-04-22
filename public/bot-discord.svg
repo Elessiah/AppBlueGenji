@@ -1,0 +1,91 @@
+<svg viewBox="0 0 400 280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="botBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a773ff;stop-opacity:0.15" />
+      <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:0.08" />
+    </linearGradient>
+    <linearGradient id="botBody" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a773ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="400" height="280" fill="url(#botBg)"/>
+
+  <!-- Chat bubbles in background -->
+  <g opacity="0.3">
+    <rect x="30" y="40" width="80" height="40" rx="12" fill="#a773ff"/>
+    <polygon points="110,55 120,45 120,65" fill="#a773ff"/>
+
+    <rect x="240" y="70" width="100" height="35" rx="10" fill="#a773ff"/>
+    <polygon points="240,85 230,80 230,90" fill="#a773ff"/>
+
+    <rect x="50" y="180" width="90" height="35" rx="10" fill="#a773ff"/>
+    <polygon points="140,195 150,185 150,205" fill="#a773ff"/>
+  </g>
+
+  <!-- Main Bot Character -->
+  <g>
+    <!-- Bot Head -->
+    <rect x="140" y="50" width="120" height="120" rx="16" fill="url(#botBody)" filter="url(#glow)"/>
+
+    <!-- Eyes -->
+    <circle cx="170" cy="85" r="12" fill="white"/>
+    <circle cx="230" cy="85" r="12" fill="white"/>
+
+    <!-- Eye pupils -->
+    <circle cx="172" cy="87" r="6" fill="#7c3aed"/>
+    <circle cx="232" cy="87" r="6" fill="#7c3aed"/>
+
+    <!-- Mouth - happy smile -->
+    <path d="M 180 120 Q 200 135 220 120" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Antenna left -->
+    <line x1="155" y1="50" x2="150" y2="20" stroke="#a773ff" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="150" cy="15" r="5" fill="#a773ff"/>
+
+    <!-- Antenna right -->
+    <line x1="245" y1="50" x2="250" y2="20" stroke="#a773ff" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="250" cy="15" r="5" fill="#a773ff"/>
+
+    <!-- Bot Body -->
+    <rect x="150" y="170" width="100" height="80" rx="12" fill="url(#botBody)" opacity="0.9"/>
+
+    <!-- Arms -->
+    <g>
+      <!-- Left arm -->
+      <rect x="115" y="190" width="35" height="20" rx="10" fill="#a773ff"/>
+      <circle cx="115" cy="200" r="8" fill="#8b5cf6"/>
+
+      <!-- Right arm -->
+      <rect x="250" y="190" width="35" height="20" rx="10" fill="#a773ff"/>
+      <circle cx="285" cy="200" r="8" fill="#8b5cf6"/>
+    </g>
+
+    <!-- Buttons on body -->
+    <circle cx="170" cy="200" r="4" fill="white" opacity="0.6"/>
+    <circle cx="200" cy="200" r="4" fill="white" opacity="0.6"/>
+    <circle cx="230" cy="200" r="4" fill="white" opacity="0.6"/>
+
+    <!-- Glow effect around bot -->
+    <circle cx="200" cy="130" r="110" fill="none" stroke="#a773ff" stroke-width="1" opacity="0.2"/>
+  </g>
+
+  <!-- Floating chat indicators -->
+  <g opacity="0.4">
+    <circle cx="320" cy="180" r="3" fill="#a773ff"/>
+    <circle cx="330" cy="180" r="3" fill="#a773ff"/>
+    <circle cx="340" cy="180" r="3" fill="#a773ff"/>
+  </g>
+
+  <!-- Bottom accent line -->
+  <rect x="0" y="270" width="400" height="10" fill="#a773ff" opacity="0.2"/>
+</svg>

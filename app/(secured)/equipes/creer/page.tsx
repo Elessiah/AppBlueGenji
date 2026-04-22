@@ -3,17 +3,17 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useToast } from "@/components/ui/toast";
 
 export default function CreateTeamPage() {
   const router = useRouter();
+  const { showError } = useToast();
   const [name, setName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    setError(null);
     setLoading(true);
     try {
       const response = await fetch("/api/teams", {
@@ -29,7 +29,7 @@ export default function CreateTeamPage() {
       router.push(`/equipes/${payload.teamId}`);
       router.refresh();
     } catch (e) {
-      setError((e as Error).message);
+      showError((e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -75,8 +75,6 @@ export default function CreateTeamPage() {
               <input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." />
             </div>
           </div>
-
-          {error && <p className="error" style={{ margin: 0 }}>{error}</p>}
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
             <Link href="/equipes" className="btn ghost" style={{ padding: "11px 24px" }}>

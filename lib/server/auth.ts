@@ -110,10 +110,6 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   );
 
   if (rows.length === 0) {
-    cookieStore.set(SESSION_COOKIE, "", {
-      ...baseCookieOptions(),
-      maxAge: 0,
-    });
     return null;
   }
 

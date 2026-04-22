@@ -84,8 +84,14 @@ BOT_INTERNAL_TOKEN=                        # must match bot's INTERNAL_API_TOKEN
 ## Key Conventions
 
 - All UI text is in **French**.
+- **Error and success messages** must always appear as overlay notifications (bottom-left) via `useToast()` from `@/components/ui/toast`. Never render them inline in the page body. Use `showError(message)` for errors and `showSuccess(message)` for success feedback.
 - `lib/server/*` is server-only code; never import from client components.
 - `lib/shared/*` is safe to import anywhere.
 - `normalizePseudo()` / `slugifyPseudo()` for username normalization, `toIso()` for dates, `parseRoles()` for JSON role arrays — always use these helpers, don't re-implement.
 - User roles on teams are cumulative strings stored as JSON arrays (`OWNER`, `CAPITAINE`, `MANAGER`, `COACH`, `TANK`, `DPS`, `HEAL`).
 - Admin users have `is_admin = true` in `bg_users`; admin-only routes live under `app/api/admin/`.
+
+## Communication Style
+
+- **Exécute sans détailler** : Ne décris pas ce que tu vas faire avant d'agir. Fais simplement le travail.
+- **Court résumé à la fin** : Une fois le travail terminé, fais un court résumé des changements effectués et des problèmes rencontrés, le cas échéant.

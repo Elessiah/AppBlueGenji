@@ -5,11 +5,12 @@ import { useEffect, useMemo, useState } from "react";
 import type { TeamListItem } from "@/lib/shared/types";
 import { formatLocalDate } from "@/lib/shared/dates";
 import { SearchBar } from "@/components/SearchBar";
+import { useToast } from "@/components/ui/toast";
 
 export default function TeamsPage() {
+  const { showError } = useToast();
   const [teams, setTeams] = useState<TeamListItem[]>([]);
   const [activeTeam, setActiveTeam] = useState<{ teamId: number; teamName: string } | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -26,8 +27,8 @@ export default function TeamsPage() {
         setTeams(payload.teams);
         setActiveTeam(payload.activeTeam || null);
       })
-      .catch((e) => setError((e as Error).message));
-  }, []);
+      .catch((e) => showError((e as Error).message));
+  }, [showError]);
 
   const sorted = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -37,7 +38,11 @@ export default function TeamsPage() {
   }, [teams, search]);
 
   return (
-    <section className="fade-in">
+    <>
+      <Link href="/" className="cta-float-home home" style={{ bottom: 28, padding: "14px 20px", fontSize: 15, fontWeight: 600, background: "rgba(255,157,46,0.15)", borderColor: "rgba(255,157,46,0.3)", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
+        ⌂ Accueil
+      </Link>
+      <section className="fade-in">
       <div className="ds-header orange" style={{ marginBottom: 28 }}>
         <div className="ds-header-body">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
@@ -84,7 +89,6 @@ export default function TeamsPage() {
               </Link>
             </p>
           )}
-          {error && <p className="error" style={{ marginTop: 14, marginBottom: 0 }}>{error}</p>}
         </div>
       </div>
 
@@ -117,6 +121,7 @@ export default function TeamsPage() {
           </Link>
         ))}
       </div>
-    </section>
+      </section>
+    </>
   );
 }

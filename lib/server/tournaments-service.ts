@@ -34,6 +34,7 @@ type TournamentRow = RowDataPacket & {
   created_at: Date;
   organizer_user_id: number;
   finished_at: Date | null;
+  has_third_place_match: number;
 };
 
 type RegistrationRow = RowDataPacket & {
@@ -48,7 +49,7 @@ type RegistrationRow = RowDataPacket & {
 type MatchRow = RowDataPacket & {
   id: number;
   tournament_id: number;
-  bracket: "UPPER" | "LOWER" | "GRAND";
+  bracket: "UPPER" | "LOWER" | "GRAND" | "THIRD_PLACE";
   round_number: number;
   match_number: number;
   status: "PENDING" | "READY" | "AWAITING_CONFIRMATION" | "COMPLETED";
@@ -56,10 +57,13 @@ type MatchRow = RowDataPacket & {
   team2_id: number | null;
   team1_name: string | null;
   team2_name: string | null;
+  team1_placeholder: string | null;
+  team2_placeholder: string | null;
   team1_score: number | null;
   team2_score: number | null;
   winner_team_id: number | null;
   loser_team_id: number | null;
+  forfeit_team_id: number | null;
   next_winner_match_id: number | null;
   next_winner_slot: number | null;
   next_loser_match_id: number | null;
@@ -111,6 +115,7 @@ function mapCard(row: TournamentListRow): TournamentCard {
     registrationOpenAt: row.registration_open_at.toISOString(),
     registrationCloseAt: row.registration_close_at.toISOString(),
     startAt: row.start_at.toISOString(),
+    hasThirdPlaceMatch: Boolean(row.has_third_place_match),
   };
 }
 
@@ -126,10 +131,13 @@ function mapMatch(row: MatchRow): BracketMatch {
     team2Id: row.team2_id === null ? null : Number(row.team2_id),
     team1Name: row.team1_name,
     team2Name: row.team2_name,
+    team1Placeholder: row.team1_placeholder ?? null,
+    team2Placeholder: row.team2_placeholder ?? null,
     team1Score: row.team1_score === null ? null : Number(row.team1_score),
     team2Score: row.team2_score === null ? null : Number(row.team2_score),
     winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
     loserTeamId: row.loser_team_id === null ? null : Number(row.loser_team_id),
+    forfeitTeamId: row.forfeit_team_id === null ? null : Number(row.forfeit_team_id),
     nextWinnerMatchId: row.next_winner_match_id === null ? null : Number(row.next_winner_match_id),
     nextWinnerSlot: row.next_winner_slot === null ? null : Number(row.next_winner_slot),
     nextLoserMatchId: row.next_loser_match_id === null ? null : Number(row.next_loser_match_id),
@@ -155,7 +163,8 @@ async function loadTournamentRow(connection: PoolConnection, tournamentId: numbe
       start_at,
       bracket_size,
       created_at,
-      finished_at
+      finished_at,
+      has_third_place_match
      FROM bg_tournaments
      WHERE id = ?
      LIMIT 1`,
@@ -180,7 +189,7 @@ async function loadRegisteredTeamIds(connection: PoolConnection, tournamentId: n
 async function createMatch(
   connection: PoolConnection,
   tournamentId: number,
-  bracket: "UPPER" | "LOWER" | "GRAND",
+  bracket: "UPPER" | "LOWER" | "GRAND" | "THIRD_PLACE",
   roundNumber: number,
   matchNumber: number,
 ): Promise<number> {
@@ -221,6 +230,32 @@ async function linkMatchLoser(
      WHERE id = ?`,
     [targetMatchId, targetSlot, matchId],
   );
+}
+
+async function linkMatchLoserWithPlaceholder(
+  connection: PoolConnection,
+  sourceMatchId: number,
+  targetMatchId: number,
+  targetSlot: number,
+  sourceRound: number,
+  sourceMatchNumber: number,
+): Promise<void> {
+  // Link the loser connection
+  await linkMatchLoser(connection, sourceMatchId, targetMatchId, targetSlot);
+
+  // Set placeholder text for the target match slot
+  const placeholderText = `Perdant match ${sourceMatchNumber} du upper R${sourceRound}`;
+  if (targetSlot === 1) {
+    await connection.execute(
+      `UPDATE bg_matches SET team1_placeholder = ? WHERE id = ?`,
+      [placeholderText, targetMatchId],
+    );
+  } else {
+    await connection.execute(
+      `UPDATE bg_matches SET team2_placeholder = ? WHERE id = ?`,
+      [placeholderText, targetMatchId],
+    );
+  }
 }
 
 async function setMatchParticipants(
@@ -281,8 +316,8 @@ async function finalizeMatch(
     | "next_loser_slot"
   >,
   result: {
-    team1Score: number;
-    team2Score: number;
+    team1Score: number | null;
+    team2Score: number | null;
     winnerTeamId: number | null;
     loserTeamId: number | null;
   },
@@ -325,6 +360,7 @@ async function tryAutoResolveByes(connection: PoolConnection, tournamentId: numb
   while (hasProgress) {
     hasProgress = false;
 
+    // Cas 1 : exactement une équipe présente, le slot vide n'a plus de feeder en attente → BYE win
     const [candidates] = await connection.execute<MatchRow[]>(
       `SELECT
         id,
@@ -378,6 +414,48 @@ async function tryAutoResolveByes(connection: PoolConnection, tournamentId: numb
 
       hasProgress = true;
     }
+
+    // Cas 2 : les deux slots sont vides (match fantôme — p.ex. deux BYEs consécutifs en upper R1
+    // qui ont chacun envoyé un perdant null vers le même match du lower bracket).
+    // Si aucun feeder non-complété ne peut encore alimenter ce match, on le marque COMPLETED
+    // sans gagnant pour débloquer les rounds suivants.
+    const [ghosts] = await connection.execute<MatchRow[]>(
+      `SELECT id
+       FROM bg_matches
+       WHERE tournament_id = ?
+         AND status <> 'COMPLETED'
+         AND winner_team_id IS NULL
+         AND team1_id IS NULL
+         AND team2_id IS NULL`,
+      [tournamentId],
+    );
+
+    for (const ghost of ghosts) {
+      const [feeders] = await connection.execute<(RowDataPacket & { c: number })[]>(
+        `SELECT COUNT(*) AS c
+         FROM bg_matches
+         WHERE tournament_id = ?
+           AND status <> 'COMPLETED'
+           AND (next_winner_match_id = ? OR next_loser_match_id = ?)`,
+        [tournamentId, ghost.id, ghost.id],
+      );
+
+      if (Number(feeders[0]?.c ?? 0) > 0) {
+        continue;
+      }
+
+      // Aucune équipe ne peut plus arriver : match fantôme, on clôture sans vainqueur
+      await connection.execute(
+        `UPDATE bg_matches
+         SET status = 'COMPLETED',
+             team1_score = 0,
+             team2_score = 0
+         WHERE id = ?`,
+        [ghost.id],
+      );
+
+      hasProgress = true;
+    }
   }
 }
 
@@ -411,6 +489,95 @@ async function finalizeTournamentIfDone(connection: PoolConnection, tournamentId
     [tournamentId],
   );
 
+  // Reset all ranks to recalculate them properly
+  await connection.execute(
+    `UPDATE bg_tournament_registrations
+     SET final_rank = NULL
+     WHERE tournament_id = ?`,
+    [tournamentId],
+  );
+
+  // Query tournament format and third place setting
+  const [tournamentMetaRows] = await connection.execute<(RowDataPacket & { format: string; has_third_place_match: number })[]>(
+    `SELECT format, has_third_place_match FROM bg_tournaments WHERE id = ? LIMIT 1`,
+    [tournamentId],
+  );
+  const tournamentMeta = tournamentMetaRows[0];
+
+  let fallbackStartRank = 3;
+
+  if (tournamentMeta?.format === "DOUBLE") {
+    // Double elimination: rank 1 and 2 from grand final
+    const [grandFinalRows] = await connection.execute<(RowDataPacket & { winner_team_id: number | null; loser_team_id: number | null })[]>(
+      `SELECT winner_team_id, loser_team_id
+       FROM bg_matches
+       WHERE tournament_id = ? AND bracket = 'GRAND' AND round_number = 1`,
+      [tournamentId],
+    );
+    const grandFinal = grandFinalRows[0];
+    if (grandFinal?.winner_team_id) {
+      await connection.execute(
+        `UPDATE bg_tournament_registrations SET final_rank = 1 WHERE tournament_id = ? AND team_id = ?`,
+        [tournamentId, grandFinal.winner_team_id],
+      );
+    }
+    if (grandFinal?.loser_team_id) {
+      await connection.execute(
+        `UPDATE bg_tournament_registrations SET final_rank = 2 WHERE tournament_id = ? AND team_id = ?`,
+        [tournamentId, grandFinal.loser_team_id],
+      );
+    }
+  } else {
+    // Single elimination: rank 1 and 2 from the upper bracket final (last round)
+    const [upperFinalRows] = await connection.execute<(RowDataPacket & { winner_team_id: number | null; loser_team_id: number | null })[]>(
+      `SELECT winner_team_id, loser_team_id
+       FROM bg_matches
+       WHERE tournament_id = ? AND bracket = 'UPPER'
+       ORDER BY round_number DESC
+       LIMIT 1`,
+      [tournamentId],
+    );
+    const upperFinal = upperFinalRows[0];
+    if (upperFinal?.winner_team_id) {
+      await connection.execute(
+        `UPDATE bg_tournament_registrations SET final_rank = 1 WHERE tournament_id = ? AND team_id = ?`,
+        [tournamentId, upperFinal.winner_team_id],
+      );
+    }
+    if (upperFinal?.loser_team_id) {
+      await connection.execute(
+        `UPDATE bg_tournament_registrations SET final_rank = 2 WHERE tournament_id = ? AND team_id = ?`,
+        [tournamentId, upperFinal.loser_team_id],
+      );
+    }
+
+    // Third place match
+    if (tournamentMeta?.has_third_place_match) {
+      const [thirdPlaceRows] = await connection.execute<(RowDataPacket & { winner_team_id: number | null; loser_team_id: number | null })[]>(
+        `SELECT winner_team_id, loser_team_id
+         FROM bg_matches
+         WHERE tournament_id = ? AND bracket = 'THIRD_PLACE'
+         LIMIT 1`,
+        [tournamentId],
+      );
+      const thirdPlace = thirdPlaceRows[0];
+      if (thirdPlace?.winner_team_id) {
+        await connection.execute(
+          `UPDATE bg_tournament_registrations SET final_rank = 3 WHERE tournament_id = ? AND team_id = ?`,
+          [tournamentId, thirdPlace.winner_team_id],
+        );
+      }
+      if (thirdPlace?.loser_team_id) {
+        await connection.execute(
+          `UPDATE bg_tournament_registrations SET final_rank = 4 WHERE tournament_id = ? AND team_id = ?`,
+          [tournamentId, thirdPlace.loser_team_id],
+        );
+      }
+      fallbackStartRank = 5;
+    }
+  }
+
+  // For other teams, rank by wins/losses
   const [rankingRows] = await connection.execute<
     (RowDataPacket & {
       team_id: number;
@@ -430,13 +597,13 @@ async function finalizeTournamentIfDone(connection: PoolConnection, tournamentId
       END) AS last_progress_at
      FROM bg_tournament_registrations r
      LEFT JOIN bg_matches m ON m.tournament_id = r.tournament_id
-     WHERE r.tournament_id = ?
+     WHERE r.tournament_id = ? AND r.final_rank IS NULL
      GROUP BY r.team_id
      ORDER BY wins DESC, losses ASC, last_progress_at DESC`,
     [tournamentId],
   );
 
-  let rank = 1;
+  let rank = fallbackStartRank;
   for (const row of rankingRows) {
     await connection.execute(
       `UPDATE bg_tournament_registrations
@@ -495,6 +662,8 @@ async function resolveExpiredScoreReports(connection: PoolConnection, tournament
         winnerTeamId,
         loserTeamId,
       });
+
+      // Ranks are computed at tournament finalization, not progressively
     }
 
     if (match.team2_report_score !== null && match.team2_report_opponent_score !== null && match.team1_report_score === null) {
@@ -509,6 +678,8 @@ async function resolveExpiredScoreReports(connection: PoolConnection, tournament
         winnerTeamId,
         loserTeamId,
       });
+
+      // Ranks are computed at tournament finalization, not progressively
     }
   }
 }
@@ -570,14 +741,31 @@ async function createBracketIfMissing(connection: PoolConnection, tournament: To
   let grandFinalMatchId: number | null = null;
 
   if (tournament.format === "DOUBLE" && rounds >= 2) {
-    const lowerRounds = 2 * rounds - 2;
-    for (let lowerRound = 1; lowerRound <= lowerRounds; lowerRound += 1) {
-      const phase = Math.ceil(lowerRound / 2);
-      const matchesCount = bracketSize / 2 ** (phase + 1);
-      lower[lowerRound] = [];
-      for (let matchNumber = 1; matchNumber <= matchesCount; matchNumber += 1) {
-        const id = await createMatch(connection, tournament.id, "LOWER", lowerRound, matchNumber);
-        lower[lowerRound].push(id);
+    // Double élimination : le lower bracket a 2*(rounds-1) rounds.
+    //
+    // Règle des match counts par round :
+    //   LR1 = LR2 = bracketSize/4
+    //   LR3 = LR4 = bracketSize/8
+    //   LR2k-1 = LR2k = bracketSize / 2^(k+1)
+    // Formule : matchCount(lbRound) = 2^( rounds - 2 - floor((lbRound-1)/2) )
+    //
+    // Alimentation depuis le upper bracket :
+    //   UB R1 → LR1 (pairage 2:1, slots 1 et 2)
+    //   UB Rk (k≥2) → LR(2*(k-1)) slot 2 (1:1, même index)
+    //
+    // Progression interne au lower bracket :
+    //   Rounds impairs → suivant pair  : 1:1 (winner → slot 1 du même index)
+    //   Rounds pairs   → suivant impair : 2:1 (pairage, deux winners → un match)
+
+    const lowerRoundsCount = 2 * (rounds - 1);
+
+    for (let lbRound = 1; lbRound <= lowerRoundsCount; lbRound += 1) {
+      const matchCount = Math.round(Math.pow(2, rounds - 2 - Math.floor((lbRound - 1) / 2)));
+
+      lower[lbRound] = [];
+      for (let matchNumber = 1; matchNumber <= matchCount; matchNumber += 1) {
+        const id = await createMatch(connection, tournament.id, "LOWER", lbRound, matchNumber);
+        lower[lbRound].push(id);
       }
     }
 
@@ -594,49 +782,98 @@ async function createBracketIfMissing(connection: PoolConnection, tournament: To
         await linkMatchWinner(connection, source, target, slot);
       } else if (grandFinalMatchId) {
         await linkMatchWinner(connection, source, grandFinalMatchId, 1);
+        await connection.execute(
+          `UPDATE bg_matches SET team1_placeholder = ? WHERE id = ?`,
+          [`Gagnant du upper bracket`, grandFinalMatchId],
+        );
       }
 
-      if (tournament.format !== "DOUBLE" || rounds < 2) {
+      if (tournament.format !== "DOUBLE" || rounds < 2 || !grandFinalMatchId) {
         continue;
       }
 
+      // Liaison perdant upper → lower bracket
       if (round === 1) {
+        // UB R1 : pairage 2:1 → LR1 (slots 1 et 2)
         const target = lower[1][Math.floor(matchIndex / 2)];
         const slot = matchIndex % 2 === 0 ? 1 : 2;
-        await linkMatchLoser(connection, source, target, slot);
+        await linkMatchLoserWithPlaceholder(connection, source, target, slot, round, matchIndex + 1);
       } else {
-        const targetRound = 2 * round - 2;
-        const target = lower[targetRound]?.[matchIndex];
+        // UB Rk (k≥2) : 1:1 → LR(2*(round-1)) slot 2
+        const lbTargetRound = 2 * (round - 1);
+        const target = lower[lbTargetRound]?.[matchIndex];
         if (target) {
-          await linkMatchLoser(connection, source, target, 2);
+          await linkMatchLoserWithPlaceholder(connection, source, target, 2, round, matchIndex + 1);
         }
       }
     }
   }
 
+  // Petite finale (3ème place) pour simple élimination
+  if (tournament.format === "SINGLE" && tournament.has_third_place_match && rounds >= 2) {
+    const thirdPlaceId = await createMatch(connection, tournament.id, "THIRD_PLACE", 1, 1);
+    const semis = upper[rounds - 1]; // 2 demi-finales
+    for (let i = 0; i < semis.length; i += 1) {
+      const slot = (i + 1) as 1 | 2;
+      await linkMatchLoser(connection, semis[i], thirdPlaceId, slot);
+      const placeholder = `Perdant demi-finale ${slot}`;
+      await connection.execute(
+        slot === 1
+          ? `UPDATE bg_matches SET team1_placeholder = ? WHERE id = ?`
+          : `UPDATE bg_matches SET team2_placeholder = ? WHERE id = ?`,
+        [placeholder, thirdPlaceId],
+      );
+    }
+  }
+
   if (tournament.format === "DOUBLE" && rounds >= 2) {
-    const lowerRounds = 2 * rounds - 2;
+    const lowerRoundsCount = 2 * (rounds - 1);
 
-    for (let lowerRound = 1; lowerRound <= lowerRounds; lowerRound += 1) {
-      for (let matchIndex = 0; matchIndex < lower[lowerRound].length; matchIndex += 1) {
-        const source = lower[lowerRound][matchIndex];
+    for (let lbRound = 1; lbRound < lowerRoundsCount; lbRound += 1) {
+      for (let matchIndex = 0; matchIndex < lower[lbRound].length; matchIndex += 1) {
+        const source = lower[lbRound][matchIndex];
+        const placeholder = `Gagnant match ${matchIndex + 1} du lower R${lbRound}`;
 
-        if (lowerRound === lowerRounds) {
-          if (grandFinalMatchId) {
-            await linkMatchWinner(connection, source, grandFinalMatchId, 2);
+        if (lbRound % 2 === 1) {
+          // Round impair : 1:1 → slot 1 du même index dans le round suivant
+          const target = lower[lbRound + 1]?.[matchIndex];
+          if (target) {
+            await linkMatchWinner(connection, source, target, 1);
+            await connection.execute(
+              `UPDATE bg_matches SET team1_placeholder = ? WHERE id = ?`,
+              [placeholder, target],
+            );
           }
-          continue;
-        }
-
-        if (lowerRound % 2 === 1) {
-          const target = lower[lowerRound + 1][matchIndex];
-          await linkMatchWinner(connection, source, target, 1);
         } else {
-          const target = lower[lowerRound + 1][Math.floor(matchIndex / 2)];
+          // Round pair : 2:1, pairage des gagnants dans le round suivant
+          const targetIdx = Math.floor(matchIndex / 2);
           const slot = matchIndex % 2 === 0 ? 1 : 2;
-          await linkMatchWinner(connection, source, target, slot);
+          const target = lower[lbRound + 1]?.[targetIdx];
+          if (target) {
+            await linkMatchWinner(connection, source, target, slot);
+            if (slot === 1) {
+              await connection.execute(
+                `UPDATE bg_matches SET team1_placeholder = ? WHERE id = ?`,
+                [placeholder, target],
+              );
+            } else {
+              await connection.execute(
+                `UPDATE bg_matches SET team2_placeholder = ? WHERE id = ?`,
+                [placeholder, target],
+              );
+            }
+          }
         }
       }
+    }
+
+    // Dernier round du lower bracket → Grande Finale slot 2
+    if (lower[lowerRoundsCount]?.length > 0 && grandFinalMatchId) {
+      await linkMatchWinner(connection, lower[lowerRoundsCount][0], grandFinalMatchId, 2);
+      await connection.execute(
+        `UPDATE bg_matches SET team2_placeholder = ? WHERE id = ?`,
+        [`Gagnant du lower bracket`, grandFinalMatchId],
+      );
     }
   }
 
@@ -734,6 +971,7 @@ export async function createTournament(
     registrationOpenAt: string;
     registrationCloseAt: string;
     startAt: string;
+    hasThirdPlaceMatch?: boolean;
   },
 ): Promise<number> {
   const db = await getDatabase();
@@ -764,6 +1002,8 @@ export async function createTournament(
     start_at: startAt,
   });
 
+  const hasThirdPlaceMatch = payload.format === "SINGLE" && Boolean(payload.hasThirdPlaceMatch);
+
   const [insert] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_tournaments (
       organizer_user_id,
@@ -775,8 +1015,9 @@ export async function createTournament(
       start_visibility_at,
       registration_open_at,
       registration_close_at,
-      start_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      start_at,
+      has_third_place_match
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       organizerUserId,
       payload.name.trim(),
@@ -788,6 +1029,7 @@ export async function createTournament(
       registrationOpenAt,
       registrationCloseAt,
       startAt,
+      hasThirdPlaceMatch ? 1 : 0,
     ],
   );
 
@@ -824,6 +1066,7 @@ export async function listTournamentBuckets(searchTerm: string | null): Promise<
       t.created_at,
       t.organizer_user_id,
       t.finished_at,
+      t.has_third_place_match,
       COALESCE(COUNT(r.id), 0) AS registered_teams
      FROM bg_tournaments t
      LEFT JOIN bg_tournament_registrations r ON r.tournament_id = t.id
@@ -842,7 +1085,8 @@ export async function listTournamentBuckets(searchTerm: string | null): Promise<
       t.bracket_size,
       t.created_at,
       t.organizer_user_id,
-      t.finished_at
+      t.finished_at,
+      t.has_third_place_match
      ORDER BY t.start_at DESC`,
     params,
   );
@@ -968,6 +1212,7 @@ export async function getTournamentDetail(tournamentId: number, userId: number, 
       t.created_at,
       t.organizer_user_id,
       t.finished_at,
+      t.has_third_place_match,
       COALESCE(COUNT(r.id), 0) AS registered_teams
      FROM bg_tournaments t
      LEFT JOIN bg_tournament_registrations r ON r.tournament_id = t.id
@@ -986,7 +1231,8 @@ export async function getTournamentDetail(tournamentId: number, userId: number, 
       t.bracket_size,
       t.created_at,
       t.organizer_user_id,
-      t.finished_at`,
+      t.finished_at,
+      t.has_third_place_match`,
     [tournamentId],
   );
 
@@ -1023,10 +1269,13 @@ export async function getTournamentDetail(tournamentId: number, userId: number, 
       m.team2_id,
       t1.name AS team1_name,
       t2.name AS team2_name,
+      m.team1_placeholder,
+      m.team2_placeholder,
       m.team1_score,
       m.team2_score,
       m.winner_team_id,
       m.loser_team_id,
+      m.forfeit_team_id,
       m.next_winner_match_id,
       m.next_winner_slot,
       m.next_loser_match_id,
@@ -1044,7 +1293,7 @@ export async function getTournamentDetail(tournamentId: number, userId: number, 
      LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
      WHERE m.tournament_id = ?
      ORDER BY
-      FIELD(m.bracket, 'UPPER', 'LOWER', 'GRAND') ASC,
+      FIELD(m.bracket, 'UPPER', 'LOWER', 'GRAND', 'THIRD_PLACE') ASC,
       m.round_number ASC,
       m.match_number ASC`,
     [tournamentId],
@@ -1229,6 +1478,8 @@ export async function reportMatchScore(
           winnerTeamId,
           loserTeamId,
         });
+
+        // Ranks are computed at tournament finalization, not progressively
       } else {
         await connection.execute(`UPDATE bg_matches SET status = 'AWAITING_CONFIRMATION' WHERE id = ?`, [matchId]);
 
@@ -1281,10 +1532,65 @@ export async function reportMatchScore(
   }
 }
 
+/**
+ * Vérifie que les matchs suivants (downstream) n'ont pas de scores
+ * Si un match a un gagnant et que son prochain match (winner ou loser) a des scores,
+ * lance une erreur pour empêcher la modification.
+ */
+async function checkDownstreamMatchesHaveNoScores(
+  connection: PoolConnection,
+  match: MatchRow,
+): Promise<void> {
+  // Si le match n'a pas de gagnant, pas besoin de vérifier
+  if (match.winner_team_id === null) {
+    return;
+  }
+
+  const nextWinnerId = match.next_winner_match_id ? Number(match.next_winner_match_id) : null;
+  const nextLoserId = match.next_loser_match_id ? Number(match.next_loser_match_id) : null;
+
+  // Vérifier le match suivant du winner bracket (exclure les BYEs : une seule équipe présente)
+  if (nextWinnerId) {
+    const [results] = await connection.execute<(RowDataPacket & { team1_id: number | null; team2_id: number | null; team1_score: number | null; team2_score: number | null })[]>(
+      `SELECT team1_id, team2_id, team1_score, team2_score FROM bg_matches WHERE id = ? LIMIT 1`,
+      [nextWinnerId],
+    );
+    if (
+      results.length > 0 &&
+      results[0].team1_id !== null &&
+      results[0].team2_id !== null &&
+      results[0].team1_score !== null &&
+      results[0].team2_score !== null &&
+      (results[0].team1_score !== 0 || results[0].team2_score !== 0)
+    ) {
+      throw new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES");
+    }
+  }
+
+  // Vérifier le match suivant du loser bracket (exclure les BYEs : une seule équipe présente)
+  if (nextLoserId) {
+    const [results] = await connection.execute<(RowDataPacket & { team1_id: number | null; team2_id: number | null; team1_score: number | null; team2_score: number | null })[]>(
+      `SELECT team1_id, team2_id, team1_score, team2_score FROM bg_matches WHERE id = ? LIMIT 1`,
+      [nextLoserId],
+    );
+    if (
+      results.length > 0 &&
+      results[0].team1_id !== null &&
+      results[0].team2_id !== null &&
+      results[0].team1_score !== null &&
+      results[0].team2_score !== null &&
+      (results[0].team1_score !== 0 || results[0].team2_score !== 0)
+    ) {
+      throw new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES");
+    }
+  }
+}
+
 export async function adminSaveMatchScores(
   matchId: number,
-  team1Score: number,
-  team2Score: number,
+  team1Score?: number,
+  team2Score?: number,
+  forfeitTeamId?: number,
 ): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
@@ -1298,6 +1604,8 @@ export async function adminSaveMatchScores(
         tournament_id,
         team1_id,
         team2_id,
+        next_winner_match_id,
+        next_loser_match_id,
         winner_team_id
        FROM bg_matches
        WHERE id = ?
@@ -1307,19 +1615,37 @@ export async function adminSaveMatchScores(
 
     if (matches.length === 0) throw new Error("MATCH_NOT_FOUND");
     const match = matches[0];
-    if (match.winner_team_id !== null) throw new Error("MATCH_ALREADY_COMPLETED");
     if (match.team1_id === null || match.team2_id === null) throw new Error("MATCH_NOT_READY");
+
+    // Vérifier que les matchs suivants n'ont pas de scores
+    await checkDownstreamMatchesHaveNoScores(connection, match);
 
     const tournamentId = Number(match.tournament_id);
 
     // Juste mettre à jour les scores sans finalize
-    await connection.execute(
-      `UPDATE bg_matches
-       SET team1_score = ?,
-           team2_score = ?
-       WHERE id = ?`,
-      [team1Score, team2Score, matchId],
-    );
+    if (forfeitTeamId !== undefined) {
+      // Forfeit mode - set scores to null and record forfeit
+      await connection.execute(
+        `UPDATE bg_matches
+         SET team1_score = NULL,
+             team2_score = NULL,
+             forfeit_team_id = ?
+         WHERE id = ?`,
+        [forfeitTeamId, matchId],
+      );
+    } else if (team1Score !== undefined && team2Score !== undefined) {
+      // Normal score mode
+      await connection.execute(
+        `UPDATE bg_matches
+         SET team1_score = ?,
+             team2_score = ?,
+             forfeit_team_id = NULL
+         WHERE id = ?`,
+        [team1Score, team2Score, matchId],
+      );
+    } else {
+      throw new Error("INVALID_REQUEST");
+    }
 
     await connection.commit();
 
@@ -1339,8 +1665,9 @@ export async function adminSaveMatchScores(
 
 export async function adminResolveMatch(
   matchId: number,
-  team1Score: number,
-  team2Score: number,
+  team1Score?: number,
+  team2Score?: number,
+  forfeitTeamId?: number,
 ): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
@@ -1367,20 +1694,56 @@ export async function adminResolveMatch(
 
     if (matches.length === 0) throw new Error("MATCH_NOT_FOUND");
     const match = matches[0];
-    if (match.winner_team_id !== null) throw new Error("MATCH_ALREADY_COMPLETED");
     if (match.team1_id === null || match.team2_id === null) throw new Error("MATCH_NOT_READY");
 
-    const winnerTeamId = team1Score > team2Score ? Number(match.team1_id) : Number(match.team2_id);
-    const loserTeamId = winnerTeamId === Number(match.team1_id) ? Number(match.team2_id) : Number(match.team1_id);
+    // Vérifier que les matchs suivants n'ont pas de scores
+    await checkDownstreamMatchesHaveNoScores(connection, match);
+
     const tournamentId = Number(match.tournament_id);
 
+    let winnerTeamId: number | null;
+    let loserTeamId: number | null;
+    let resultTeam1Score: number | null;
+    let resultTeam2Score: number | null;
+
+    if (forfeitTeamId !== undefined) {
+      // Forfeit mode - non-forfeiting team wins
+      winnerTeamId = forfeitTeamId === Number(match.team1_id) ? Number(match.team2_id) : Number(match.team1_id);
+      loserTeamId = forfeitTeamId === Number(match.team1_id) ? Number(match.team1_id) : Number(match.team2_id);
+      resultTeam1Score = null;
+      resultTeam2Score = null;
+    } else if (team1Score !== undefined && team2Score !== undefined) {
+      // Normal score mode
+      winnerTeamId = team1Score > team2Score ? Number(match.team1_id) : Number(match.team2_id);
+      loserTeamId = winnerTeamId === Number(match.team1_id) ? Number(match.team2_id) : Number(match.team1_id);
+      resultTeam1Score = team1Score;
+      resultTeam2Score = team2Score;
+    } else {
+      throw new Error("INVALID_REQUEST");
+    }
+
     await finalizeMatch(connection, tournamentId, match, {
-      team1Score,
-      team2Score,
+      team1Score: resultTeam1Score,
+      team2Score: resultTeam2Score,
       winnerTeamId,
       loserTeamId,
     });
 
+    // Update forfeit_team_id if needed
+    if (forfeitTeamId !== undefined) {
+      await connection.execute(
+        `UPDATE bg_matches SET forfeit_team_id = ? WHERE id = ?`,
+        [forfeitTeamId, matchId],
+      );
+    } else {
+      // Clear forfeit if resolving with normal scores
+      await connection.execute(
+        `UPDATE bg_matches SET forfeit_team_id = NULL WHERE id = ?`,
+        [matchId],
+      );
+    }
+
+    // Ranks are computed at tournament finalization, not progressively
     await tryAutoResolveByes(connection, tournamentId);
     await finalizeTournamentIfDone(connection, tournamentId);
 

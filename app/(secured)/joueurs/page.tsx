@@ -5,10 +5,11 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { PublicUserProfile } from "@/lib/shared/types";
 import { SearchBar } from "@/components/SearchBar";
+import { useToast } from "@/components/ui/toast";
 
 export default function PlayersPage() {
+  const { showError } = useToast();
   const [players, setPlayers] = useState<PublicUserProfile[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -18,8 +19,8 @@ export default function PlayersPage() {
         if (!response.ok || !payload.players) throw new Error(payload.error || "PLAYERS_LOAD_FAILED");
         setPlayers(payload.players);
       })
-      .catch((e) => setError((e as Error).message));
-  }, []);
+      .catch((e) => showError((e as Error).message));
+  }, [showError]);
 
   const sorted = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -29,7 +30,11 @@ export default function PlayersPage() {
   }, [players, search]);
 
   return (
-    <section className="fade-in">
+    <>
+      <Link href="/" className="cta-float-home home" style={{ bottom: 28, padding: "14px 20px", fontSize: 15, fontWeight: 600, background: "rgba(89,212,255,0.15)", borderColor: "rgba(89,212,255,0.3)", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
+        ⌂ Accueil
+      </Link>
+      <section className="fade-in">
       <div className="ds-header">
         <div className="ds-header-body">
           <h1 className="ds-title blue" style={{ fontSize: "clamp(32px, 3.5vw, 48px)" }}>
@@ -47,7 +52,6 @@ export default function PlayersPage() {
               rgb="89, 212, 255"
             />
           </div>
-          {error && <p className="error" style={{ marginTop: 14 }}>{error}</p>}
         </div>
       </div>
 
@@ -83,6 +87,7 @@ export default function PlayersPage() {
           </Link>
         ))}
       </div>
-    </section>
+      </section>
+    </>
   );
 }

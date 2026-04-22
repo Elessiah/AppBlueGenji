@@ -2,7 +2,7 @@
 
 export type TournamentState = "UPCOMING" | "REGISTRATION" | "RUNNING" | "FINISHED";
 
-export type BracketType = "UPPER" | "LOWER" | "GRAND";
+export type BracketType = "UPPER" | "LOWER" | "GRAND" | "THIRD_PLACE";
 
 export type MatchStatus = "PENDING" | "READY" | "AWAITING_CONFIRMATION" | "COMPLETED";
 
@@ -73,6 +73,7 @@ export type TournamentCard = {
   registrationOpenAt: string;
   registrationCloseAt: string;
   startAt: string;
+  hasThirdPlaceMatch: boolean;
 };
 
 export type TournamentBuckets = {
@@ -93,10 +94,13 @@ export type BracketMatch = {
   team2Id: number | null;
   team1Name: string | null;
   team2Name: string | null;
+  team1Placeholder: string | null;
+  team2Placeholder: string | null;
   team1Score: number | null;
   team2Score: number | null;
   winnerTeamId: number | null;
   loserTeamId: number | null;
+  forfeitTeamId: number | null;
   nextWinnerMatchId: number | null;
   nextWinnerSlot: number | null;
   nextLoserMatchId: number | null;

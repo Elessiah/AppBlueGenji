@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { LogoHero } from "@/components/logo-hero";
+import { PageWithPalette } from "@/components/page-with-palette";
 
 export default function HomePage() {
   return (
-    <main className="page-shell">
+    <PageWithPalette palette="blue">
+      <main className="page-shell" style={{ position: "relative", zIndex: 1 }}>
       <Link href="/association" className="cta-float-home gold">
         ⌂ Association
       </Link>
@@ -17,7 +20,7 @@ export default function HomePage() {
         >
           <div>
             <span className="badge" style={{ marginBottom: 24, display: "inline-block" }}>
-              Esport amateur - Marvel Rivals - Francophone
+              Esport amateur - Overwatch 2 - Francophone
             </span>
             <h1 className="ds-title" style={{ fontSize: "clamp(48px, 5.5vw, 76px)", lineHeight: 1.04, marginBottom: 24 }}>
               BlueGenji
@@ -25,7 +28,7 @@ export default function HomePage() {
               Arena
             </h1>
             <p style={{ fontSize: 18, lineHeight: 1.75, color: "var(--text-1)", margin: "0 0 44px", maxWidth: 460 }}>
-              La plateforme de la communauté BlueGenji : tournois, bot Discord inter-serveurs et suivi des équipes autour de Marvel Rivals.
+              La plateforme de la communauté BlueGenji : tournois, bot Discord inter-serveurs et suivi des équipes spécialisées en Overwatch 2.
             </p>
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
               <Link
@@ -48,39 +51,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div
-            style={{
-              borderRadius: 20,
-              border: "1px dashed rgba(89,212,255,0.28)",
-              aspectRatio: "16 / 10",
-              background: "linear-gradient(135deg, rgba(13,20,36,0.9) 0%, rgba(22,32,52,0.95) 100%)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 14,
-              minHeight: 260,
-            }}
-          >
-            <div
-              style={{
-                width: 72,
-                height: 72,
-                borderRadius: "50%",
-                border: "2px dashed rgba(89,212,255,0.35)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 28,
-                color: "rgba(89,212,255,0.5)",
-              }}
-            >
-              🖥
-            </div>
-            <span style={{ color: "var(--text-2)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-              Capture de la plateforme
-            </span>
-          </div>
+          <LogoHero />
         </div>
       </section>
 
@@ -127,6 +98,7 @@ export default function HomePage() {
         ))}
       </div>
     </main>
+    </PageWithPalette>
   );
 }
 
@@ -136,7 +108,7 @@ const FEATURES = [
     href: "/bot",
     icon: "🤖",
     rgb: "167,115,255",
-    desc: "Réseau inter-serveurs de diffusion d'annonces : scrims, recrutement de joueurs, staff et cast autour de Marvel Rivals.",
+    desc: "Réseau inter-serveurs de diffusion d'annonces : scrims, recrutement de joueurs, staff et cast spécialisés en Overwatch 2.",
   },
   {
     title: "L'Association",

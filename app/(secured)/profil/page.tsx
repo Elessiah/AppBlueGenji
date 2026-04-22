@@ -2,9 +2,11 @@
 
 import Image from "next/image";
 import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
 import { Coche } from "@/components/Coche";
 import type { FullProfileResponse } from "@/lib/shared/types";
+import { useToast } from "@/components/ui/toast";
 
 const VISIBILITY_LABELS: Record<string, string> = {
   overwatch: "BattleTag OW",
@@ -13,9 +15,9 @@ const VISIBILITY_LABELS: Record<string, string> = {
 };
 
 export default function ProfilePage() {
+  const router = useRouter();
+  const { showError, showSuccess } = useToast();
   const [data, setData] = useState<FullProfileResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
 
   const [pseudo, setPseudo] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -28,28 +30,33 @@ export default function ProfilePage() {
     major: false,
   });
 
-  const load = async () => {
-    const response = await fetch("/api/profile", { cache: "no-store" });
-    const payload = (await response.json()) as FullProfileResponse & { error?: string };
-    if (!response.ok) throw new Error(payload.error || "PROFILE_LOAD_FAILED");
-    setData(payload);
-    setPseudo(payload.profile.pseudo);
-    setAvatarUrl(payload.profile.avatarUrl || "");
-    setOverwatchBattletag(payload.profile.overwatchBattletag || "");
-    setMarvelRivalsTag(payload.profile.marvelRivalsTag || "");
-    setIsAdult(payload.profile.isAdult === null ? "unknown" : payload.profile.isAdult ? "yes" : "no");
-    const v = payload.profile.visibility;
-    setVisibility({ overwatch: !!v.overwatch, marvel: !!v.marvel, major: !!v.major });
-  };
-
   useEffect(() => {
-    load().catch((e) => setError((e as Error).message));
-  }, []);
+    const load = async () => {
+      const response = await fetch("/api/profile", { cache: "no-store" });
+      const payload = (await response.json()) as FullProfileResponse & { error?: string };
+      if (!response.ok) {
+        const errorCode = payload.error || "PROFILE_LOAD_FAILED";
+        if (errorCode === "PROFILE_NOT_FOUND") {
+          showError(errorCode);
+          setTimeout(() => router.push("/"), 1500);
+          return;
+        }
+        throw new Error(errorCode);
+      }
+      setData(payload);
+      setPseudo(payload.profile.pseudo);
+      setAvatarUrl(payload.profile.avatarUrl || "");
+      setOverwatchBattletag(payload.profile.overwatchBattletag || "");
+      setMarvelRivalsTag(payload.profile.marvelRivalsTag || "");
+      setIsAdult(payload.profile.isAdult === null ? "unknown" : payload.profile.isAdult ? "yes" : "no");
+      const v = payload.profile.visibility;
+      setVisibility({ overwatch: !!v.overwatch, marvel: !!v.marvel, major: !!v.major });
+    };
+    load().catch((e) => showError((e as Error).message));
+  }, [showError, router]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    setError(null);
-    setStatus(null);
     try {
       const response = await fetch("/api/profile", {
         method: "PATCH",
@@ -66,9 +73,9 @@ export default function ProfilePage() {
       const payload = (await response.json()) as FullProfileResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "PROFILE_UPDATE_FAILED");
       setData(payload);
-      setStatus("Profil mis à jour.");
+      showSuccess("Profil mis à jour.");
     } catch (e) {
-      setError((e as Error).message);
+      showError((e as Error).message);
     }
   };
 
@@ -103,9 +110,6 @@ export default function ProfilePage() {
         <div className="ds-section-title blue">
           <h2>Informations</h2>
         </div>
-
-        {error && <p className="error" style={{ marginBottom: 16 }}>{error}</p>}
-        {status && <p className="success" style={{ marginBottom: 16 }}>{status}</p>}
 
         <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           <div className="form-grid">

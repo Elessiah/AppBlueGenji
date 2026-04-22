@@ -1,21 +1,22 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Coche } from "@/components/Coche";
+import { LogoWithGlow } from "@/components/logo-with-glow";
 import { formatLocalDate } from "@/lib/shared/dates";
 import type { TeamDetailResponse, TeamRole } from "@/lib/shared/types";
+import { useToast } from "@/components/ui/toast";
 
 const roles: TeamRole[] = ["COACH", "TANK", "DPS", "HEAL", "CAPITAINE", "MANAGER", "OWNER"];
 
 export default function TeamDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const teamId = Number(params.id);
+  const { showError, showSuccess } = useToast();
   const [data, setData] = useState<TeamDetailResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
   const [memberPseudo, setMemberPseudo] = useState("");
   const [memberRoles, setMemberRoles] = useState<TeamRole[]>(["DPS"]);
   const [name, setName] = useState("");
@@ -24,15 +25,23 @@ export default function TeamDetailPage() {
   const load = useCallback(async () => {
     const response = await fetch(`/api/teams/${teamId}`, { cache: "no-store" });
     const payload = (await response.json()) as TeamDetailResponse & { error?: string };
-    if (!response.ok) throw new Error(payload.error || "TEAM_LOAD_FAILED");
+    if (!response.ok) {
+      const errorCode = payload.error || "TEAM_LOAD_FAILED";
+      if (errorCode === "TEAM_NOT_FOUND") {
+        showError(errorCode);
+        setTimeout(() => router.push("/equipes"), 1500);
+        return;
+      }
+      throw new Error(errorCode);
+    }
     setData(payload);
     setName(payload.team.name);
     setLogoUrl(payload.team.logoUrl || "");
-  }, [teamId]);
+  }, [teamId, router, showError]);
 
   useEffect(() => {
-    load().catch((e) => setError((e as Error).message));
-  }, [load]);
+    load().catch((e) => showError((e as Error).message));
+  }, [load, showError]);
 
   const toggleRole = (role: TeamRole) => {
     setMemberRoles((prev) => (prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]));
@@ -40,8 +49,6 @@ export default function TeamDetailPage() {
 
   const addMember = async (event: FormEvent) => {
     event.preventDefault();
-    setError(null);
-    setStatus(null);
     try {
       const response = await fetch(`/api/teams/${teamId}/members`, {
         method: "POST",
@@ -52,16 +59,14 @@ export default function TeamDetailPage() {
       if (!response.ok) throw new Error(payload.error || "TEAM_MEMBER_ADD_FAILED");
       setData(payload);
       setMemberPseudo("");
-      setStatus("Membre ajouté.");
+      showSuccess("Membre ajouté.");
     } catch (e) {
-      setError((e as Error).message);
+      showError((e as Error).message);
     }
   };
 
   const saveMeta = async (event: FormEvent) => {
     event.preventDefault();
-    setError(null);
-    setStatus(null);
     try {
       const response = await fetch(`/api/teams/${teamId}`, {
         method: "PATCH",
@@ -71,14 +76,13 @@ export default function TeamDetailPage() {
       const payload = (await response.json()) as TeamDetailResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "TEAM_UPDATE_FAILED");
       setData(payload);
-      setStatus("Équipe mise à jour.");
+      showSuccess("Équipe mise à jour.");
     } catch (e) {
-      setError((e as Error).message);
+      showError((e as Error).message);
     }
   };
 
   const updateMemberRoles = async (userId: number, selectedRoles: TeamRole[]) => {
-    setError(null);
     try {
       const response = await fetch(`/api/teams/${teamId}/members`, {
         method: "PATCH",
@@ -88,14 +92,13 @@ export default function TeamDetailPage() {
       const payload = (await response.json()) as TeamDetailResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "TEAM_MEMBER_UPDATE_FAILED");
       setData(payload);
-      setStatus("Rôles mis à jour.");
+      showSuccess("Rôles mis à jour.");
     } catch (e) {
-      setError((e as Error).message);
+      showError((e as Error).message);
     }
   };
 
   const removeMember = async (userId: number) => {
-    setError(null);
     try {
       const response = await fetch(`/api/teams/${teamId}/members`, {
         method: "DELETE",
@@ -105,9 +108,9 @@ export default function TeamDetailPage() {
       const payload = (await response.json()) as TeamDetailResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "TEAM_MEMBER_REMOVE_FAILED");
       setData(payload);
-      setStatus("Membre retiré.");
+      showSuccess("Membre retiré.");
     } catch (e) {
-      setError((e as Error).message);
+      showError((e as Error).message);
     }
   };
 
@@ -122,7 +125,7 @@ export default function TeamDetailPage() {
       .map((v) => v.trim().toUpperCase())
       .filter((v): v is TeamRole => roles.includes(v as TeamRole) && v !== "OWNER");
     if (!parsed.length) {
-      setError("MISSING_ROLE");
+      showError("MISSING_ROLE");
       return;
     }
     await updateMemberRoles(userId, parsed);
@@ -143,19 +146,15 @@ export default function TeamDetailPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
               {data.team.logoUrl ? (
-                <Image
+                <LogoWithGlow
                   src={data.team.logoUrl}
                   alt={data.team.name}
                   width={56}
                   height={56}
+                  size="sm"
+                  borderRadius={12}
+                  borderColor="rgba(255,157,46,0.3)"
                   unoptimized
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: 12,
-                    border: "1px solid rgba(255,157,46,0.3)",
-                    objectFit: "cover",
-                  }}
                 />
               ) : (
                 <div
@@ -189,9 +188,6 @@ export default function TeamDetailPage() {
           </div>
         </div>
       </div>
-
-      {error && <p className="error" style={{ marginBottom: 16 }}>{error}</p>}
-      {status && <p className="success" style={{ marginBottom: 16 }}>{status}</p>}
 
       {data.canManage && (
         <div className="ds-block" style={{ marginBottom: 20, borderColor: "rgba(255,157,46,0.18)" }}>

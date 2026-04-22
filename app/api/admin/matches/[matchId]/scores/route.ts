@@ -1,8 +1,8 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { adminResolveMatch } from "@/lib/server/tournaments-service";
+import { adminSaveMatchScores } from "@/lib/server/tournaments-service";
 
-export async function POST(req: Request, context: { params: Promise<{ matchId: string }> }) {
+export async function PATCH(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!user.isAdmin) return fail("FORBIDDEN", 403);
@@ -44,7 +44,7 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   }
 
   try {
-    await adminResolveMatch(matchId_, team1Score, team2Score, forfeitTeamId);
+    await adminSaveMatchScores(matchId_, team1Score, team2Score, forfeitTeamId);
     return ok({});
   } catch (e) {
     const msg = (e as Error).message;
@@ -52,6 +52,6 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
       msg === "MATCH_NOT_FOUND" ? 404
       : msg === "MATCH_ALREADY_COMPLETED" || msg === "MATCH_NOT_READY" || msg === "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES" ? 409
       : 500;
-    return fail(msg || "ADMIN_RESOLVE_FAILED", status);
+    return fail(msg || "ADMIN_SAVE_SCORES_FAILED", status);
   }
 }

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import { SearchBar } from "@/components/SearchBar";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
+import { useToast } from "@/components/ui/toast";
 
 const emptyBuckets: TournamentBuckets = {
   upcoming: [],
@@ -31,19 +32,26 @@ function TournamentColumn({
   icon: string;
   items: TournamentCard[];
 }) {
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
     <section
       className="fade-in ds-block"
       style={{ borderColor: `rgba(${rgb},0.18)`, marginBottom: 20, overflow: "hidden", padding: 0 }}
     >
-      <div
+      <button
+        onClick={() => setCollapsed((c) => !c)}
         style={{
           display: "flex",
           alignItems: "center",
           gap: 12,
           padding: "18px 24px",
-          borderBottom: items.length ? `1px solid rgba(${rgb},0.15)` : "none",
           background: `rgba(${rgb},0.05)`,
+          width: "100%",
+          border: "none",
+          borderBottom: !collapsed && items.length ? `1px solid rgba(${rgb},0.15)` : "none",
+          cursor: "pointer",
+          textAlign: "left",
         }}
       >
         <span style={{ fontSize: 18 }}>{icon}</span>
@@ -73,9 +81,21 @@ function TournamentColumn({
             {items.length}
           </span>
         )}
-      </div>
+        <span
+          style={{
+            marginLeft: items.length ? 8 : "auto",
+            color: `rgba(${rgb},0.7)`,
+            fontSize: 13,
+            transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
+            transition: "transform 0.2s",
+            display: "inline-block",
+          }}
+        >
+          ▾
+        </span>
+      </button>
 
-      {!items.length ? (
+      {!collapsed && (!items.length ? (
         <p style={{ color: "var(--text-2)", fontSize: 14, padding: "18px 24px", margin: 0 }}>
           Aucun tournoi dans cette catégorie.
         </p>
@@ -85,14 +105,8 @@ function TournamentColumn({
             <Link
               key={tournament.id}
               href={`/tournois/${tournament.id}`}
-              style={{
-                border: `1px solid rgba(${rgb},0.16)`,
-                borderRadius: 14,
-                background: "rgba(0,0,0,0.2)",
-                padding: "14px 18px",
-                display: "block",
-                textDecoration: "none",
-              }}
+              className="tournament-card"
+              style={{ "--card-rgb": rgb } as React.CSSProperties}
             >
               <strong style={{ fontSize: 15, display: "block", marginBottom: 4 }}>
                 {tournament.name}
@@ -123,15 +137,15 @@ function TournamentColumn({
             </Link>
           ))}
         </div>
-      )}
+      ))}
     </section>
   );
 }
 
 export default function TournamentsPage() {
+  const { showError } = useToast();
   const [search, setSearch] = useState("");
   const [buckets, setBuckets] = useState<TournamentBuckets>(emptyBuckets);
-  const [error, setError] = useState<string | null>(null);
 
   const load = async (term: string) => {
     const url = term.trim()
@@ -149,15 +163,14 @@ export default function TournamentsPage() {
   };
 
   useEffect(() => {
-    load("").catch((e) => setError((e as Error).message));
-  }, []);
+    load("").catch((e) => showError((e as Error).message));
+  }, [showError]);
 
   const onSearch = async () => {
-    setError(null);
     try {
       await load(search);
     } catch (e) {
-      setError((e as Error).message);
+      showError((e as Error).message);
     }
   };
 
@@ -173,7 +186,7 @@ export default function TournamentsPage() {
 
   return (
     <>
-      <Link href="/" className="cta-float-home home" style={{ bottom: 28 }}>
+      <Link href="/" className="cta-float-home home" style={{ bottom: 28, padding: "14px 20px", fontSize: 15, fontWeight: 600, background: "rgba(79,224,162,0.15)", borderColor: "rgba(79,224,162,0.3)", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
         ⌂ Accueil
       </Link>
       <section className="fade-in">
@@ -221,11 +234,6 @@ export default function TournamentsPage() {
             rgb="79, 224, 162"
           />
 
-          {error && (
-            <p className="error" style={{ marginTop: 14, marginBottom: 0 }}>
-              {error}
-            </p>
-          )}
         </div>
       </div>
 

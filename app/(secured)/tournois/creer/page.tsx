@@ -5,25 +5,26 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { localDateTimeInput } from "@/lib/shared/dates";
 import type { TournamentFormat } from "@/lib/shared/types";
+import { useToast } from "@/components/ui/toast";
 
 export default function CreateTournamentPage() {
   const router = useRouter();
+  const { showError } = useToast();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [format, setFormat] = useState<TournamentFormat>("SINGLE");
+  const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(false);
   const [maxTeams, setMaxTeams] = useState(16);
   const [startVisibilityAt, setStartVisibilityAt] = useState(localDateTimeInput(1));
   const [registrationOpenAt, setRegistrationOpenAt] = useState(localDateTimeInput(3));
   const [registrationCloseAt, setRegistrationCloseAt] = useState(localDateTimeInput(24));
   const [startAt, setStartAt] = useState(localDateTimeInput(30));
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setLoading(true);
-    setError(null);
     try {
       const response = await fetch("/api/tournaments", {
         method: "POST",
@@ -37,6 +38,7 @@ export default function CreateTournamentPage() {
           registrationOpenAt: new Date(registrationOpenAt).toISOString(),
           registrationCloseAt: new Date(registrationCloseAt).toISOString(),
           startAt: new Date(startAt).toISOString(),
+          hasThirdPlaceMatch: format === "SINGLE" ? hasThirdPlaceMatch : false,
         }),
       });
       const payload = (await response.json()) as { error?: string; id?: number };
@@ -44,7 +46,7 @@ export default function CreateTournamentPage() {
       router.push(`/tournois/${payload.id}`);
       router.refresh();
     } catch (e) {
-      setError((e as Error).message);
+      showError((e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -102,11 +104,56 @@ export default function CreateTournamentPage() {
               </div>
               <div className="field">
                 <label>Format</label>
-                <select value={format} onChange={(e) => setFormat(e.target.value as TournamentFormat)}>
+                <select value={format} onChange={(e) => { setFormat(e.target.value as TournamentFormat); setHasThirdPlaceMatch(false); }}>
                   <option value="SINGLE">Simple élimination</option>
                   <option value="DOUBLE">Double élimination</option>
                 </select>
               </div>
+              {format === "SINGLE" && (
+                <div className="field" style={{ gridColumn: "1 / -1" }}>
+                  <label htmlFor="third-place" style={{ marginBottom: 12 }}>
+                    Options supplémentaires
+                  </label>
+                  <div
+                    className="checkbox-card"
+                    onClick={() => setHasThirdPlaceMatch(!hasThirdPlaceMatch)}
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 12,
+                      padding: "14px 16px",
+                      border: `1.5px solid ${hasThirdPlaceMatch ? "var(--accent-green)" : "var(--line)"}`,
+                      borderRadius: "10px",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      backgroundColor: hasThirdPlaceMatch ? "rgba(79,224,162,0.06)" : "transparent",
+                    }}
+                  >
+                    <input
+                      id="third-place"
+                      type="checkbox"
+                      checked={hasThirdPlaceMatch}
+                      onChange={(e) => setHasThirdPlaceMatch(e.target.checked)}
+                      style={{
+                        width: 18,
+                        height: 18,
+                        accentColor: "var(--accent-green)",
+                        cursor: "pointer",
+                        flexShrink: 0,
+                        marginTop: 2,
+                      }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <label htmlFor="third-place" style={{ margin: 0, cursor: "pointer", userSelect: "none", fontSize: 14, fontWeight: 500, color: "var(--text-0)", display: "block", marginBottom: 4 }}>
+                        Petite finale
+                      </label>
+                      <p style={{ margin: 0, fontSize: 13, color: "var(--text-2)", lineHeight: 1.4 }}>
+                        Ajoute un match pour déterminer la 3ème place entre les deux perdants des demi-finales
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="field" style={{ gridColumn: "1 / -1" }}>
                 <label>Description</label>
                 <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description du tournoi..." />
@@ -149,8 +196,6 @@ export default function CreateTournamentPage() {
               </div>
             </div>
           </div>
-
-          {error && <p className="error" style={{ margin: 0 }}>{error}</p>}
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
             <Link href="/tournois" className="btn ghost" style={{ padding: "11px 24px" }}>

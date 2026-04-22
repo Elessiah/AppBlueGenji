@@ -28,6 +28,7 @@ export async function POST(req: Request) {
       registrationOpenAt?: string;
       registrationCloseAt?: string;
       startAt?: string;
+      hasThirdPlaceMatch?: boolean;
     };
 
     if (!body.name?.trim()) return fail("MISSING_NAME", 400);
@@ -47,6 +48,7 @@ export async function POST(req: Request) {
       registrationOpenAt: body.registrationOpenAt ?? "",
       registrationCloseAt: body.registrationCloseAt ?? "",
       startAt: body.startAt ?? "",
+      hasThirdPlaceMatch: body.hasThirdPlaceMatch,
     });
 
     return ok({ id }, 201);
