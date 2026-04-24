@@ -1,0 +1,15 @@
+.root {
+  background: linear-gradient(180deg, var(--cyber-bg-1), var(--cyber-bg));
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+.lift {
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.lift:hover {
+  border-color: rgba(90, 200, 255, 0.3);
+}

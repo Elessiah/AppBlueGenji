@@ -1,0 +1,41 @@
+.ticker {
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  background: rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  height: 38px;
+  position: relative;
+  z-index: 1;
+}
+
+.track {
+  display: flex;
+  gap: 48px;
+  white-space: nowrap;
+  height: 100%;
+  align-items: center;
+  animation: cy-tk 58s linear infinite;
+  padding-left: 48px;
+}
+
+@keyframes cy-tk {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.item {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--ink-mute);
+}
+
+.sep {
+  margin-left: 48px;
+  color: var(--blue-500);
+  font-style: normal;
+}

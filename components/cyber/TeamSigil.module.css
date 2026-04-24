@@ -1,0 +1,12 @@
+.root {
+  width: var(--size);
+  height: var(--size);
+  border: 1px solid var(--c);
+  color: var(--c);
+  border-radius: var(--radius);
+  font-family: var(--font-display);
+  font-weight: 600;
+  background: color-mix(in oklab, var(--c) 8%, transparent);
+  display: grid;
+  place-items: center;
+}

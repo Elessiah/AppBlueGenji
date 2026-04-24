@@ -1,0 +1,40 @@
+.root {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 600px) {
+  .root {
+    grid-template-columns: 1fr;
+  }
+}
+
+.match {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-sm);
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--ink-mute);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.row + .row {
+  border-top: 1px solid var(--line-soft);
+}
+
+.row.win {
+  color: var(--ink);
+  background: rgba(90, 200, 255, 0.06);
+}
+
+.row.win .num {
+  color: var(--blue-300);
+}

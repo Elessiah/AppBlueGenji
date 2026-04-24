@@ -1,0 +1,42 @@
+.root {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+}
+
+.label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--ink-mute);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+
+.countdown {
+  display: flex;
+  gap: 10px;
+}
+
+.unit {
+  width: 54px;
+  border: 1px solid var(--line-strong-cy);
+  border-radius: var(--r-cy-sm);
+  text-align: center;
+  padding: 8px 0 6px;
+  background: rgba(90, 200, 255, 0.03);
+}
+
+.val {
+  font-size: 22px;
+  color: var(--ink);
+}
+
+.lbl {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: var(--ink-mute);
+  margin-top: 2px;
+  text-transform: uppercase;
+}
