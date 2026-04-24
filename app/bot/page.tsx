@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { PageWithPalette } from "@/components/page-with-palette";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";

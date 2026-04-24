@@ -91,23 +91,49 @@ BOT_INTERNAL_TOKEN=                        # must match bot's INTERNAL_API_TOKEN
 - User roles on teams are cumulative strings stored as JSON arrays (`OWNER`, `CAPITAINE`, `MANAGER`, `COACH`, `TANK`, `DPS`, `HEAL`).
 - Admin users have `is_admin = true` in `bg_users`; admin-only routes live under `app/api/admin/`.
 
-## Refonte graphique en cours — « Cyber minimal »
+## Design System — « Cyber minimal » (Finalisé)
 
-Une refonte progressive du design system est en cours. Direction : noir profond teinté cool, bleu glacier dompté `#5ac8ff`, beaucoup d'air, typo Inter / JetBrains Mono / Orbitron, glow paramétrable.
+La refonte « Cyber minimal » est complète (Phases 1–7). Design final : noir profond teinté cool, bleu glacier `#5ac8ff`, typographie Inter / JetBrains Mono / Orbitron, glow paramétrable.
 
-**Source de vérité visuelle** : `.maquette_tmp/bluegenji-arena/project/` (handoff bundle Claude Design — `styles.css`, `page.css`, `app.jsx`, `BlueGenji Arena.html`). À lire avant tout travail UI.
+### Tokens CSS
+- **Cyber tokens** : `--cyber-bg`, `--cyber-bg-1`, `--cyber-bg-2`, `--cyber-bg-3`, `--ink`, `--ink-mute`, `--ink-dim`, `--blue-100`–`--blue-700`, `--blue-glow`, `--amber`, `--red-live`, `--line-soft`, `--line-strong-cy`, `--r-cy-sm/md/lg`
+- **Legacy tokens** conservés pour retrocompatibilité : `--bg-0`–`--bg-2`, `--text-0`–`--text-2`, `--accent-blue/orange/green`, `--radius`, `--shadow`
 
-**Plan de refonte** (7 phases) — prompts détaillés dans `.maquette_tmp/PROMPT_HAIKU_PHASE_*.md`. Travailler **une phase = un commit**, jamais sauter. Format commit : `feat(cyber): phase N — <résumé>`.
+### Composants
+Primitives dans `components/cyber/` :
+- **CyberButton** — `variant="primary"|"ghost"`, support `asChild` (Radix Slot)
+- **CyberCard** — `lift`, `ticks`, `as="div|section|article"`, style personnalisé
+- **Pill** — badges inline, variantes `.pill-live`, `.pill-blue`
+- **CyberButton, TeamSigil, CountdownStrip, Ticker, MiniBracket** — composants spécialisés
+- **PublicHeader, PublicFooter** — layouts publics de landing
 
-**Stratégie additive d'abord** :
-- Tokens cyber préfixés `--cyber-*` ou suffixés `-cy` (ex `--line-strong-cy`) pour cohabiter sans collision avec les `--bg-0`/`--text-*`/`--line` existants.
-- Polices Inter/JetBrains Mono/Orbitron ajoutées **en plus** de Rajdhani/Exo_2 (pas de remplacement).
-- Nouveaux primitives dans `components/cyber/` (Pill, CyberCard, CyberButton, TeamSigil, CountdownStrip, Ticker, MiniBracket).
-- **Ne PAS modifier** les classes `ds-*`, `PaletteProvider`, `ArenaNav`, `cta-float-*`, `ToastProvider` tant que la Phase 6 (refonte des pages secured) n'est pas atteinte.
+Classes utilitaires : `.eyebrow`, `.display`, `.mono`, `.logotype`, `.num`, `.fabric`, `.card-ticks`, `.section-head`
 
-**Endpoints landing additifs** (Phase 3) sous `/api/landing/{stats,live,leaderboard,calendar,ticker}` — ne remplacent pas les endpoints existants `/api/{tournaments,teams,players,profile,auth,admin,bot}`.
+### Typographie
+- **Sans-serif** : Inter (`var(--font-sans)`)
+- **Monospace** : JetBrains Mono (`var(--font-mono)`)
+- **Display** : Orbitron (animations logo hero)
+- Legacy : Rajdhani, Exo_2 conservés mais dépréciés
 
-**Multi-jeu** : OW2 + Marvel Rivals. Les profils joueurs portent déjà `overwatchBattletag` et `marvelRivalsTag`. Les tournois recevront un champ `game` en Phase 6 si absent.
+### Notifications & Toasts
+Règle universelle : via `useToast()` (`@/components/ui/toast`), bottom-left overlay, jamais inline. `showError(message)`, `showSuccess(message)`.
+
+### Pages Refaites
+- `/` (landing) — Hero, About, Leaderboard/Calendar, Sponsors, Tournament Board, Ticker
+- `/association` — CyberCard grid, stats
+- `/partenaires` — Sponsors grid
+- `/bot` — Hero 2-col + stats card, Features (3 cards), Commands (1 card gris)
+- `/connexion` — CyberCard centré, 2 étapes (Google OAuth + Discord code)
+- `/(secured)/tournois`, `/equipes`, `/joueurs`, `/profil` — refonte complète avec CyberCard, layouts sécurisés
+
+### Classes CSS Supprimées (Phase 7)
+- `.ds-hero`, `.ds-chip` (toutes variantes)
+- `.cta-float` (conservé `.cta-float-home`)
+- `.shimmer`, `.glow-pulse-*`, `.float-subtle`, `.tournament-card`
+- Réduction : 1549 → 1283 lignes dans `app/globals.css` (-266 lignes)
+
+### Endpoints Landing
+`/api/landing/{stats,live,leaderboard,calendar,ticker}` — coexistence avec endpoints existants (pas de suppression).
 
 ## Communication Style
 

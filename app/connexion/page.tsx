@@ -4,6 +4,8 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
+import { CyberButton } from "@/components/cyber/CyberButton";
+import { CyberCard } from "@/components/cyber/CyberCard";
 
 function mapDiscordError(errorCode: string): string {
   if (errorCode === "BOT_INTERNAL_UNREACHABLE") return "Connexion Discord indisponible (bot non joignable).";
@@ -79,167 +81,151 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="page-shell">
-      <section className="fade-in ds-hero">
-        <div className="ds-hero-body">
-          <span className="badge" style={{ marginBottom: 20, display: "inline-block" }}>
-            Authentification sans mot de passe
-          </span>
-          <h1 className="ds-title" style={{ fontSize: "clamp(36px, 4vw, 54px)", lineHeight: 1.08, marginBottom: 16 }}>
+    <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", position: "relative" }}>
+      <div className="fabric" />
+      <CyberCard ticks style={{ padding: 48, width: "min(480px, calc(100vw - 32px))" }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <h1 className="display" style={{ fontSize: 36, marginTop: 20, marginBottom: 8 }}>
             Connexion
           </h1>
-          <p style={{ color: "var(--text-1)", fontSize: 16, margin: 0, maxWidth: 520, lineHeight: 1.7 }}>
-            Connecte-toi via ton compte Google ou par code temporaire envoyé par le bot Discord.
+          <p className="mono" style={{ color: "var(--ink-mute)", letterSpacing: "0.18em", fontSize: 11, margin: 0 }}>
+            BLUEGENJI · ACCÈS MEMBRE
           </p>
         </div>
-      </section>
 
-      <div className="grid-2" style={{ marginBottom: 24 }}>
-        <article className="ds-block" style={{ borderColor: "rgba(89,212,255,0.2)", position: "relative", overflow: "hidden" }}>
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "linear-gradient(90deg, rgba(89,212,255,0.85), transparent)" }} />
-          <div>
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 48,
-                height: 48,
-                borderRadius: 12,
-                background: "rgba(89,212,255,0.1)",
-                border: "1px solid rgba(89,212,255,0.22)",
-                fontSize: 22,
-                marginBottom: 16,
-              }}
+        {!requested ? (
+          <>
+            <CyberButton
+              variant="primary"
+              asChild
+              style={{ width: "100%", marginBottom: 12 }}
             >
-              🔑
-            </span>
-            <h2 style={{ fontFamily: "var(--font-title), sans-serif", fontSize: 22, margin: "0 0 10px", letterSpacing: "0.02em" }}>
-              OAuth Google
-            </h2>
-            <p style={{ color: "var(--text-1)", margin: 0, fontSize: 15, lineHeight: 1.65 }}>
-              Connexion rapide et sécurisée avec ton compte Google existant.
-            </p>
-          </div>
+              <a href={`/api/auth/google/start?redirect=${encodeURIComponent(redirect)}`}>
+                Continuer avec Google
+              </a>
+            </CyberButton>
 
-          <Link
-            href={`/api/auth/google/start?redirect=${encodeURIComponent(redirect)}`}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.14)",
-              background: "rgba(255,255,255,0.06)",
-              overflow: "hidden",
-              textDecoration: "none",
-              marginTop: 20,
-            }}
-          >
-            <span
-              style={{
-                flexShrink: 0,
-                width: 56,
-                height: 56,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRight: "1px solid rgba(255,255,255,0.1)",
-                background: "rgba(255,255,255,0.04)",
-              }}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 0", color: "var(--ink-dim)" }}>
+              <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
+              <span className="mono" style={{ fontSize: 10, letterSpacing: "0.2em" }}>OU</span>
+              <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
+            </div>
+
+            <form onSubmit={requestCode} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div className="field">
+                <label>Discord ID</label>
+                <input
+                  type="text"
+                  name="discordId"
+                  value={discordId}
+                  onChange={(e) => setDiscordId(e.target.value)}
+                  placeholder="123456789012345678"
+                  required
+                />
+              </div>
+              <CyberButton
+                variant="ghost"
+                type="submit"
+                disabled={loading}
+                style={{ width: "100%" }}
+              >
+                {loading ? "Envoi..." : "Recevoir un code →"}
+              </CyberButton>
+            </form>
+          </>
+        ) : (
+          <>
+            <CyberButton
+              variant="primary"
+              asChild
+              style={{ width: "100%", marginBottom: 12 }}
             >
-              <span
+              <a href={`/api/auth/google/start?redirect=${encodeURIComponent(redirect)}`}>
+                Continuer avec Google
+              </a>
+            </CyberButton>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 0", color: "var(--ink-dim)" }}>
+              <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
+              <span className="mono" style={{ fontSize: 10, letterSpacing: "0.2em" }}>OU</span>
+              <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
+            </div>
+
+            <form onSubmit={verifyCode} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div className="field">
+                <label>Discord ID</label>
+                <input
+                  type="text"
+                  name="discordId"
+                  value={discordId}
+                  onChange={(e) => setDiscordId(e.target.value)}
+                  disabled
+                />
+              </div>
+              <div className="field">
+                <label>Code reçu en DM (6 chiffres)</label>
+                <input
+                  type="text"
+                  name="code"
+                  maxLength={6}
+                  pattern="\d{6}"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  className="num"
+                  style={{ fontSize: 20, letterSpacing: "0.3em", textAlign: "center" }}
+                  required
+                />
+              </div>
+              <div className="field">
+                <label>Pseudo site <span style={{ color: "var(--ink-mute)", fontWeight: 400 }}>(première connexion)</span></label>
+                <input
+                  type="text"
+                  name="pseudo"
+                  value={pseudo}
+                  onChange={(e) => setPseudo(e.target.value)}
+                  placeholder="Ton pseudo"
+                />
+              </div>
+              <CyberButton
+                variant="ghost"
+                type="submit"
+                disabled={loading}
+                style={{ width: "100%" }}
+              >
+                {loading ? "Vérification..." : "Se connecter"}
+              </CyberButton>
+            </form>
+
+            <div style={{ marginTop: 16, textAlign: "center" }}>
+              <button
+                type="button"
+                onClick={() => setRequested(false)}
+                className="mono"
                 style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: "50%",
-                  border: "1.5px dashed rgba(255,255,255,0.25)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
                   fontSize: 11,
-                  color: "rgba(255,255,255,0.3)",
-                  fontWeight: 700,
+                  color: "var(--ink-mute)",
+                  letterSpacing: "0.14em",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
                 }}
               >
-                G
-              </span>
-            </span>
-            <span style={{ flex: 1, textAlign: "center", fontSize: 15, fontWeight: 600, color: "var(--text-0)", padding: "0 20px" }}>
-              Continuer avec Google
-            </span>
+                ← CHANGER D'ID
+              </button>
+            </div>
+          </>
+        )}
+
+        <div style={{ marginTop: 24, textAlign: "center" }}>
+          <Link
+            href="/"
+            className="mono"
+            style={{ fontSize: 11, color: "var(--ink-mute)", letterSpacing: "0.14em" }}
+          >
+            ← RETOUR ACCUEIL
           </Link>
-        </article>
-
-        <article className="ds-block" style={{ borderColor: "rgba(79,224,162,0.2)", position: "relative", overflow: "hidden" }}>
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "linear-gradient(90deg, rgba(79,224,162,0.85), transparent)" }} />
-          <div>
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 48,
-                height: 48,
-                borderRadius: 12,
-                background: "rgba(79,224,162,0.1)",
-                border: "1px solid rgba(79,224,162,0.22)",
-                fontSize: 22,
-                marginBottom: 16,
-              }}
-            >
-              💬
-            </span>
-            <h2 style={{ fontFamily: "var(--font-title), sans-serif", fontSize: 22, margin: "0 0 10px", letterSpacing: "0.02em" }}>
-              Code Discord
-            </h2>
-            <p style={{ color: "var(--text-1)", margin: 0, fontSize: 15, lineHeight: 1.65 }}>
-              Entre ton ID Discord, le bot t'envoie un code à 6 chiffres en DM.
-            </p>
-          </div>
-
-          <form onSubmit={requested ? verifyCode : requestCode} style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 20 }}>
-            <div className="field">
-              <label>Identifiant Discord (ID numérique)</label>
-              <input required value={discordId} onChange={(e) => setDiscordId(e.target.value)} placeholder="123456789012345678" />
-            </div>
-
-            <div className="field">
-              <label>Pseudo site <span style={{ color: "var(--text-2)", fontWeight: 400 }}>(première connexion)</span></label>
-              <input value={pseudo} onChange={(e) => setPseudo(e.target.value)} placeholder="Ton pseudo" />
-            </div>
-
-            {requested && (
-              <div className="field">
-                <label>Code reçu en DM</label>
-                <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="6 chiffres" required />
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn"
-              style={{
-                marginTop: "auto",
-                borderRadius: 12,
-                borderColor: "rgba(79,224,162,0.3)",
-                background: "rgba(79,224,162,0.12)",
-                opacity: loading ? 0.6 : 1,
-                cursor: loading ? "not-allowed" : "pointer",
-              }}
-            >
-              {loading ? "Chargement..." : requested ? "Valider le code" : "Recevoir un code Discord"}
-            </button>
-
-          </form>
-        </article>
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <Link href="/" className="btn ghost" style={{ padding: "11px 28px", fontSize: 14 }}>
-          ← Retour à l'accueil
-        </Link>
-      </div>
+        </div>
+      </CyberCard>
     </main>
   );
 }
