@@ -239,6 +239,23 @@ async function runMigrations(db: Pool): Promise<void> {
   } catch {
     // Ignore if already done
   }
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS bg_sponsors (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(120) NOT NULL,
+      slug VARCHAR(140) NOT NULL UNIQUE,
+      tier ENUM('GOLD', 'SILVER', 'BRONZE', 'PARTNER') NOT NULL DEFAULT 'PARTNER',
+      logo_url TEXT NULL,
+      website_url TEXT NULL,
+      description TEXT NULL,
+      display_order INT NOT NULL DEFAULT 100,
+      active TINYINT(1) NOT NULL DEFAULT 1,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_bg_sponsors_active_order (active, display_order)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
 }
 
 async function ensureMigrations(db: Pool): Promise<void> {

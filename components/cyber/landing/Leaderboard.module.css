@@ -1,0 +1,133 @@
+.root {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-lg);
+  background: rgba(5, 8, 12, 0.68);
+  padding: 20px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.chips {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chip,
+.chipOn {
+  border: 1px solid var(--line-soft);
+  background: transparent;
+  color: var(--ink-mute);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.chipOn {
+  color: var(--blue-300);
+  border-color: rgba(90, 200, 255, 0.34);
+  background: rgba(90, 200, 255, 0.05);
+}
+
+.table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tableHead,
+.row {
+  display: grid;
+  grid-template-columns: 32px 1fr 70px 60px 36px;
+  gap: 10px;
+  align-items: center;
+}
+
+.tableHead {
+  padding: 8px 0 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--ink-mute);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.row {
+  padding: 11px 0;
+  border-bottom: 1px solid rgba(180, 210, 230, 0.06);
+}
+
+.top .rank {
+  color: var(--blue-500);
+}
+
+.rank {
+  font-family: var(--font-mono);
+  color: var(--ink-mute);
+}
+
+.team {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.team span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wl {
+  display: inline-flex;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.wins {
+  color: var(--blue-300);
+}
+
+.losses {
+  color: var(--ink-dim);
+}
+
+.trend {
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+.trendUp {
+  color: #6bd48a;
+}
+
+.trendDown {
+  color: #e87a7a;
+}
+
+.trendFlat {
+  color: var(--ink-dim);
+}
+
+.footer {
+  margin-top: 18px;
+}
+
+.footer a {
+  color: var(--blue-300);
+  letter-spacing: 0.14em;
+  font-size: 11px;
+}
+

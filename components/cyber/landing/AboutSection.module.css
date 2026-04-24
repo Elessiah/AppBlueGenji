@@ -1,0 +1,128 @@
+.root {
+  position: relative;
+  z-index: 1;
+  width: min(1240px, calc(100vw - 40px));
+  margin: 0 auto;
+  padding: 34px 0 12px;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  border-top: 1px solid var(--line-soft);
+  padding: 24px 0 28px;
+}
+
+.sectionTitle {
+  margin: 6px 0 0;
+  font-family: var(--font-sans);
+  font-size: clamp(28px, 3vw, 44px);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+}
+
+.lede {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.65;
+  color: var(--ink);
+}
+
+.stats {
+  margin-top: 26px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.stat {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-md);
+  padding: 14px 16px;
+  background: rgba(90, 200, 255, 0.03);
+}
+
+.stat :global(.mono) {
+  margin-top: 4px;
+  display: inline-block;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--ink-mute);
+  text-transform: uppercase;
+}
+
+.right {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pillar {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 14px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.pillar:last-child {
+  border-bottom: none;
+}
+
+.pillar :global(.mono) {
+  color: var(--blue-300);
+  letter-spacing: 0.16em;
+  font-size: 11px;
+}
+
+.pillar h3 {
+  margin: 0 0 6px;
+  font-family: var(--font-sans);
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.pillar p {
+  margin: 0;
+  color: var(--ink-mute);
+  line-height: 1.7;
+  font-size: 14px;
+}
+
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .root {
+    width: min(1240px, calc(100vw - 24px));
+  }
+
+  .head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .stats {
+    grid-template-columns: 1fr;
+  }
+}
+

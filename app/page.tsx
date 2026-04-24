@@ -1,127 +1,112 @@
-import Link from "next/link";
-import { LogoHero } from "@/components/logo-hero";
 import { PageWithPalette } from "@/components/page-with-palette";
+import { Ticker } from "@/components/cyber";
+import { AboutSection } from "@/components/cyber/landing/AboutSection";
+import { Hero } from "@/components/cyber/landing/Hero";
+import { JoinCTA } from "@/components/cyber/landing/JoinCTA";
+import { LeaderCal } from "@/components/cyber/landing/LeaderCal";
+import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
+import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
+import { SponsorsGrid } from "@/components/cyber/landing/SponsorsGrid";
+import { TournamentBoard } from "@/components/cyber/landing/TournamentBoard";
+import { listTournamentBuckets } from "@/lib/server/tournaments-service";
+import { listSponsors } from "@/lib/server/sponsors-service";
+import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
+import type {
+  LandingCalendarEvent,
+  LandingLeaderboardRow,
+  LandingLive,
+  LandingStats,
+  LandingTickerPayload,
+} from "@/lib/shared/landing";
+import { inferGameLabel, inferPhaseLabel } from "@/lib/shared/landing";
 
-export default function HomePage() {
+export const revalidate = 60;
+export const dynamic = "force-dynamic";
+
+const APP_URL = process.env.APP_URL?.trim() || "http://localhost:3000";
+
+const DEFAULT_STATS: LandingStats = {
+  players: 0,
+  teams: 0,
+  tournaments: 0,
+};
+
+const DEFAULT_TICKER: LandingTickerPayload = {
+  items: [
+    "RÉSULTAT · En attente de nouveaux matches",
+    "INSCRIPTIONS · Prochains brackets à venir",
+    "COMMUNAUTÉ · Rejoindre le Discord BlueGenji",
+  ],
+};
+
+type LandingBuckets = TournamentBuckets;
+
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T | null> {
+  try {
+    const response = await fetch(url, init);
+    if (!response.ok) {
+      return null;
+    }
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeLive(payload: { live: LandingLive | null } | null): LandingLive | null {
+  const live = payload?.live ?? null;
+  if (!live) {
+    return null;
+  }
+
+  return {
+    ...live,
+    game: inferGameLabel(live.tournament.name),
+    phase: inferPhaseLabel(live.currentMatch),
+  };
+}
+
+function chooseNextTournament(buckets: LandingBuckets): TournamentCard | null {
+  return buckets.upcoming[0] ?? buckets.registration[0] ?? buckets.running[0] ?? buckets.finished[0] ?? null;
+}
+
+export default async function HomePage() {
+  const [statsRes, liveRes, leaderboardRes, calendarRes, tickerRes, bucketsRes, sponsors] = await Promise.all([
+    fetchJson<LandingStats>(`${APP_URL}/api/landing/stats`, { next: { revalidate: 60 } }),
+    fetchJson<{ live: LandingLive | null }>(`${APP_URL}/api/landing/live`, { cache: "no-store" }),
+    fetchJson<{ leaderboard: LandingLeaderboardRow[] }>(`${APP_URL}/api/landing/leaderboard`, { next: { revalidate: 300 } }),
+    fetchJson<{ events: LandingCalendarEvent[] }>(`${APP_URL}/api/landing/calendar`, { next: { revalidate: 300 } }),
+    fetchJson<LandingTickerPayload>(`${APP_URL}/api/landing/ticker`, { next: { revalidate: 60 } }),
+    listTournamentBuckets(null).catch(() => ({
+      upcoming: [],
+      registration: [],
+      running: [],
+      finished: [],
+    })),
+    listSponsors().catch(() => []),
+  ]);
+
+  const stats = statsRes ?? DEFAULT_STATS;
+  const live = normalizeLive(liveRes);
+  const leaderboard = leaderboardRes?.leaderboard ?? [];
+  const events = calendarRes?.events ?? [];
+  const ticker = tickerRes ?? DEFAULT_TICKER;
+  const buckets = bucketsRes;
+  const nextUpcoming = chooseNextTournament(buckets);
+
   return (
     <PageWithPalette palette="blue">
-      <main className="page-shell" style={{ position: "relative", zIndex: 1 }}>
-      <Link href="/association" className="cta-float-home gold">
-        ⌂ Association
-      </Link>
-      <Link href="/tournois" className="cta-float">
-        Accéder aux tournois →
-      </Link>
-
-      <section className="fade-in ds-hero">
-        <div
-          className="ds-hero-body"
-          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center" }}
-        >
-          <div>
-            <span className="badge" style={{ marginBottom: 24, display: "inline-block" }}>
-              Esport amateur - Overwatch 2 - Francophone
-            </span>
-            <h1 className="ds-title" style={{ fontSize: "clamp(48px, 5.5vw, 76px)", lineHeight: 1.04, marginBottom: 24 }}>
-              BlueGenji
-              <br />
-              Arena
-            </h1>
-            <p style={{ fontSize: 18, lineHeight: 1.75, color: "var(--text-1)", margin: "0 0 44px", maxWidth: 460 }}>
-              La plateforme de la communauté BlueGenji : tournois, bot Discord inter-serveurs et suivi des équipes spécialisées en Overwatch 2.
-            </p>
-            <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-              <Link
-                href="/tournois"
-                className="btn"
-                style={{
-                  padding: "14px 32px",
-                  fontSize: 15,
-                  background: "var(--accent-green)",
-                  color: "var(--bg-0)",
-                  border: "none",
-                  fontWeight: 700,
-                }}
-              >
-                Voir les tournois
-              </Link>
-              <Link href="/connexion" className="btn ghost" style={{ padding: "14px 32px", fontSize: 15 }}>
-                Rejoindre la plateforme
-              </Link>
-            </div>
-          </div>
-
-          <LogoHero />
-        </div>
-      </section>
-
-      <div className="grid-3" style={{ marginTop: 0 }}>
-        {FEATURES.map((f) => (
-          <Link
-            key={f.title}
-            href={f.href}
-            className="ds-block"
-            style={{
-              borderColor: `rgba(${f.rgb},0.2)`,
-              overflow: "hidden",
-              display: "flex",
-              flexDirection: "column",
-              textDecoration: "none",
-              position: "relative",
-              padding: 0,
-            }}
-          >
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, rgba(${f.rgb},0.85), transparent)` }} />
-            <div
-              style={{
-                aspectRatio: "16 / 7",
-                background: `linear-gradient(135deg, rgba(${f.rgb},0.08) 0%, rgba(13,20,36,0.97) 100%)`,
-                borderBottom: "1px solid var(--line)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 32,
-              }}
-            >
-              {f.icon}
-            </div>
-            <div style={{ padding: "22px 24px 26px", flex: 1, display: "flex", flexDirection: "column" }}>
-              <h3 style={{ fontFamily: "var(--font-title), sans-serif", fontSize: 20, margin: "0 0 10px", letterSpacing: "0.02em" }}>
-                {f.title}
-              </h3>
-              <p style={{ color: "var(--text-1)", margin: "0 0 20px", lineHeight: 1.65, fontSize: 15, flex: 1 }}>{f.desc}</p>
-              <span style={{ alignSelf: "flex-start", fontSize: 13, fontWeight: 600, color: `rgb(${f.rgb})`, letterSpacing: "0.03em" }}>
-                Découvrir →
-              </span>
-            </div>
-          </Link>
-        ))}
-      </div>
-    </main>
+      <main style={{ position: "relative", zIndex: 1 }}>
+        <PublicHeader />
+        <Hero stats={stats} live={live} nextUpcoming={nextUpcoming} />
+        <Ticker items={ticker.items} />
+        <TournamentBoard buckets={buckets} />
+        <LeaderCal leaderboard={leaderboard} events={events} />
+        <AboutSection />
+        <SponsorsGrid sponsors={sponsors} />
+        <JoinCTA />
+        <PublicFooter />
+      </main>
     </PageWithPalette>
   );
 }
-
-const FEATURES = [
-  {
-    title: "Bot Discord",
-    href: "/bot",
-    icon: "🤖",
-    rgb: "167,115,255",
-    desc: "Réseau inter-serveurs de diffusion d'annonces : scrims, recrutement de joueurs, staff et cast spécialisés en Overwatch 2.",
-  },
-  {
-    title: "L'Association",
-    href: "/association",
-    icon: "🏛",
-    rgb: "245,195,58",
-    desc: "Mission, bureau, activités compétitives, événements LAN et modalités d'adhésion de Bluegenji Esport.",
-  },
-  {
-    title: "Tournois",
-    href: "/tournois",
-    icon: "🏆",
-    rgb: "79,224,162",
-    desc: "Plateforme automatisée de création et gestion de tournois en simple ou double élimination avec bracket live.",
-  },
-];

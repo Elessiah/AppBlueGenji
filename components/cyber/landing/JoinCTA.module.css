@@ -1,0 +1,67 @@
+.root {
+  position: relative;
+  z-index: 1;
+  width: min(1240px, calc(100vw - 40px));
+  margin: 0 auto;
+  padding: 34px 0 24px;
+}
+
+.card {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(90, 200, 255, 0.22);
+  padding: 48px;
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: end;
+}
+
+.copy {
+  max-width: 640px;
+}
+
+.copy p {
+  margin: 18px 0 0;
+  color: var(--ink-mute);
+  line-height: 1.75;
+  max-width: 520px;
+}
+
+.accent {
+  color: var(--blue-500);
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 900px) {
+  .inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .root {
+    width: min(1240px, calc(100vw - 24px));
+  }
+
+  .card {
+    padding: 22px;
+  }
+}
+
