@@ -91,6 +91,24 @@ BOT_INTERNAL_TOKEN=                        # must match bot's INTERNAL_API_TOKEN
 - User roles on teams are cumulative strings stored as JSON arrays (`OWNER`, `CAPITAINE`, `MANAGER`, `COACH`, `TANK`, `DPS`, `HEAL`).
 - Admin users have `is_admin = true` in `bg_users`; admin-only routes live under `app/api/admin/`.
 
+## Refonte graphique en cours — « Cyber minimal »
+
+Une refonte progressive du design system est en cours. Direction : noir profond teinté cool, bleu glacier dompté `#5ac8ff`, beaucoup d'air, typo Inter / JetBrains Mono / Orbitron, glow paramétrable.
+
+**Source de vérité visuelle** : `.maquette_tmp/bluegenji-arena/project/` (handoff bundle Claude Design — `styles.css`, `page.css`, `app.jsx`, `BlueGenji Arena.html`). À lire avant tout travail UI.
+
+**Plan de refonte** (7 phases) — prompts détaillés dans `.maquette_tmp/PROMPT_HAIKU_PHASE_*.md`. Travailler **une phase = un commit**, jamais sauter. Format commit : `feat(cyber): phase N — <résumé>`.
+
+**Stratégie additive d'abord** :
+- Tokens cyber préfixés `--cyber-*` ou suffixés `-cy` (ex `--line-strong-cy`) pour cohabiter sans collision avec les `--bg-0`/`--text-*`/`--line` existants.
+- Polices Inter/JetBrains Mono/Orbitron ajoutées **en plus** de Rajdhani/Exo_2 (pas de remplacement).
+- Nouveaux primitives dans `components/cyber/` (Pill, CyberCard, CyberButton, TeamSigil, CountdownStrip, Ticker, MiniBracket).
+- **Ne PAS modifier** les classes `ds-*`, `PaletteProvider`, `ArenaNav`, `cta-float-*`, `ToastProvider` tant que la Phase 6 (refonte des pages secured) n'est pas atteinte.
+
+**Endpoints landing additifs** (Phase 3) sous `/api/landing/{stats,live,leaderboard,calendar,ticker}` — ne remplacent pas les endpoints existants `/api/{tournaments,teams,players,profile,auth,admin,bot}`.
+
+**Multi-jeu** : OW2 + Marvel Rivals. Les profils joueurs portent déjà `overwatchBattletag` et `marvelRivalsTag`. Les tournois recevront un champ `game` en Phase 6 si absent.
+
 ## Communication Style
 
 - **Exécute sans détailler** : Ne décris pas ce que tu vas faire avant d'agir. Fais simplement le travail.
