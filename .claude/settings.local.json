@@ -56,7 +56,11 @@
       "Bash(mysql -h localhost -u elessiah -p\"Chloe.020301.FOL\" bluetournament -e \"SELECT id, pseudo FROM bg_users WHERE pseudo LIKE 'Test_%' LIMIT 1;\")",
       "Bash(mysql -h localhost -u elessiah -p\"Chloe.020301.FOL\" bluetournament -e \"SELECT COUNT\\(*\\) as count FROM bg_users WHERE pseudo LIKE 'Test_%';\")",
       "Bash(mysql -h localhost -u elessiah -p\"Chloe.020301.FOL\" bluetournament -e \"SELECT id FROM bg_users WHERE pseudo LIKE 'Test_%' LIMIT 1;\")",
-      "Bash(curl -s http://localhost:3000/equipes)"
+      "Bash(curl -s http://localhost:3000/equipes)",
+      "Bash(curl -s http://localhost:3000/_dev/cyber-preview)",
+      "Bash(curl -s http://localhost:3000/cyber-preview)",
+      "Bash(curl -s http://localhost:3002/cyber-preview)",
+      "Bash(curl -s http://localhost:3002/preview)"
     ]
   }
 }
