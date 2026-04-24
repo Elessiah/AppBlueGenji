@@ -24,6 +24,7 @@ type TournamentRow = RowDataPacket & {
   name: string;
   description: string | null;
   format: TournamentFormat;
+  game: "OW2" | "MR";
   max_teams: number;
   state: TournamentState;
   start_visibility_at: Date;
@@ -108,6 +109,7 @@ function mapCard(row: TournamentListRow): TournamentCard {
     name: row.name,
     description: row.description,
     format: row.format,
+    game: row.game,
     maxTeams: Number(row.max_teams),
     registeredTeams: Number(row.registered_teams),
     state: row.state,
@@ -155,6 +157,7 @@ async function loadTournamentRow(connection: PoolConnection, tournamentId: numbe
       name,
       description,
       format,
+      game,
       max_teams,
       state,
       start_visibility_at,
@@ -966,6 +969,7 @@ export async function createTournament(
     name: string;
     description: string | null;
     format: TournamentFormat;
+    game?: "OW2" | "MR";
     maxTeams: number;
     startVisibilityAt: string;
     registrationOpenAt: string;
@@ -1003,6 +1007,7 @@ export async function createTournament(
   });
 
   const hasThirdPlaceMatch = payload.format === "SINGLE" && Boolean(payload.hasThirdPlaceMatch);
+  const game = payload.game ?? "OW2";
 
   const [insert] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_tournaments (
@@ -1010,6 +1015,7 @@ export async function createTournament(
       name,
       description,
       format,
+      game,
       max_teams,
       state,
       start_visibility_at,
@@ -1017,12 +1023,13 @@ export async function createTournament(
       registration_close_at,
       start_at,
       has_third_place_match
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       organizerUserId,
       payload.name.trim(),
       payload.description,
       payload.format,
+      game,
       payload.maxTeams,
       temporaryState,
       startVisibilityAt,
@@ -1056,6 +1063,7 @@ export async function listTournamentBuckets(searchTerm: string | null): Promise<
       t.name,
       t.description,
       t.format,
+      t.game,
       t.max_teams,
       t.state,
       t.start_visibility_at,
@@ -1076,6 +1084,7 @@ export async function listTournamentBuckets(searchTerm: string | null): Promise<
       t.name,
       t.description,
       t.format,
+      t.game,
       t.max_teams,
       t.state,
       t.start_visibility_at,

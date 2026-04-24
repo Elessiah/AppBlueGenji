@@ -1,16 +1,23 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useToast } from "@/components/ui/toast";
+import { CyberCard, CyberButton } from "@/components/cyber";
+import { useSetPalette } from "@/lib/palette-context";
 
 export default function CreateTeamPage() {
   const router = useRouter();
   const { showError } = useToast();
+  const setPalette = useSetPalette();
   const [name, setName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setPalette("blue");
+  }, [setPalette]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -36,32 +43,18 @@ export default function CreateTeamPage() {
   };
 
   return (
-    <section className="fade-in">
-      <div className="ds-header orange">
-        <div className="ds-header-body">
-          <Link
-            href="/equipes"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 13,
-              color: "var(--text-2)",
-              marginBottom: 16,
-            }}
-          >
-            ← Équipes
-          </Link>
-          <h1 className="ds-title orange" style={{ fontSize: "clamp(28px, 3vw, 42px)" }}>
-            Créer mon équipe
-          </h1>
-          <p style={{ color: "var(--text-1)", margin: 0, fontSize: 15 }}>
-            Le rôle Owner est automatiquement attribué au créateur.
-          </p>
-        </div>
-      </div>
+    <section className="fade-in container">
+      <Link href="/equipes" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--ink-mute)", marginBottom: 16 }}>
+        ← Équipes
+      </Link>
+      <h1 className="display" style={{ fontSize: 48, margin: "0 0 8px" }}>
+        Créer mon équipe
+      </h1>
+      <p style={{ color: "var(--ink-mute)", margin: "0 0 24px", fontSize: 14 }}>
+        Le rôle Owner est automatiquement attribué au créateur.
+      </p>
 
-      <div className="ds-block">
+      <CyberCard ticks>
         <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           <div className="form-grid">
             <div className="field">
@@ -69,34 +62,26 @@ export default function CreateTeamPage() {
               <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Mon équipe" />
             </div>
             <div className="field">
-              <label>
-                Logo URL <span style={{ color: "var(--text-2)", fontWeight: 400 }}>(optionnel)</span>
-              </label>
+              <label>Logo URL (optionnel)</label>
               <input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." />
             </div>
           </div>
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-            <Link href="/equipes" className="btn ghost" style={{ padding: "11px 24px" }}>
-              Annuler
-            </Link>
-            <button
+            <CyberButton variant="ghost" asChild>
+              <Link href="/equipes">Annuler</Link>
+            </CyberButton>
+            <CyberButton
+              variant="primary"
               type="submit"
               disabled={loading}
-              className="btn"
-              style={{
-                padding: "11px 28px",
-                background: "rgba(255,157,46,0.15)",
-                borderColor: "rgba(255,157,46,0.35)",
-                opacity: loading ? 0.6 : 1,
-                cursor: loading ? "not-allowed" : "pointer",
-              }}
+              style={{ opacity: loading ? 0.6 : 1, cursor: loading ? "not-allowed" : "pointer" }}
             >
               {loading ? "Création..." : "Créer l'équipe"}
-            </button>
+            </CyberButton>
           </div>
         </form>
-      </div>
+      </CyberCard>
     </section>
   );
 }

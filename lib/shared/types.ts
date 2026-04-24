@@ -2,6 +2,8 @@
 
 export type TournamentState = "UPCOMING" | "REGISTRATION" | "RUNNING" | "FINISHED";
 
+export type TournamentGame = "OW2" | "MR";
+
 export type BracketType = "UPPER" | "LOWER" | "GRAND" | "THIRD_PLACE";
 
 export type MatchStatus = "PENDING" | "READY" | "AWAITING_CONFIRMATION" | "COMPLETED";
@@ -66,6 +68,7 @@ export type TournamentCard = {
   name: string;
   description: string | null;
   format: TournamentFormat;
+  game: TournamentGame;
   maxTeams: number;
   registeredTeams: number;
   state: TournamentState;

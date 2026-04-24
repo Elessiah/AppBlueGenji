@@ -1,18 +1,22 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { localDateTimeInput } from "@/lib/shared/dates";
-import type { TournamentFormat } from "@/lib/shared/types";
+import type { TournamentFormat, TournamentGame } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
+import { CyberCard, CyberButton } from "@/components/cyber";
+import { useSetPalette } from "@/lib/palette-context";
 
 export default function CreateTournamentPage() {
   const router = useRouter();
   const { showError } = useToast();
+  const setPalette = useSetPalette();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [game, setGame] = useState<TournamentGame>("OW2");
   const [format, setFormat] = useState<TournamentFormat>("SINGLE");
   const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(false);
   const [maxTeams, setMaxTeams] = useState(16);
@@ -21,6 +25,10 @@ export default function CreateTournamentPage() {
   const [registrationCloseAt, setRegistrationCloseAt] = useState(localDateTimeInput(24));
   const [startAt, setStartAt] = useState(localDateTimeInput(30));
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setPalette("blue");
+  }, [setPalette]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -32,6 +40,7 @@ export default function CreateTournamentPage() {
         body: JSON.stringify({
           name,
           description,
+          game,
           format,
           maxTeams,
           startVisibilityAt: new Date(startVisibilityAt).toISOString(),
@@ -54,61 +63,47 @@ export default function CreateTournamentPage() {
 
   return (
     <>
-      <Link href="/" className="cta-float-home home" style={{ bottom: 28 }}>
+      <Link href="/" className="cta-float-home home">
         ⌂ Accueil
       </Link>
-      <section className="fade-in">
-
-      <div className="ds-header green">
-        <div className="ds-header-body">
-          <Link
-            href="/tournois"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 13,
-              color: "var(--text-2)",
-              marginBottom: 16,
-            }}
-          >
+      <section className="fade-in container">
+        <div style={{ marginBottom: 28 }}>
+          <Link href="/tournois" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--ink-mute)" }}>
             ← Tournois
           </Link>
-          <h1 className="ds-title green" style={{ fontSize: "clamp(28px, 3vw, 42px)" }}>
+          <h1 className="display" style={{ fontSize: 48, margin: "12px 0 8px" }}>
             Créer un tournoi
           </h1>
-          <p style={{ color: "var(--text-1)", margin: 0, fontSize: 15 }}>
-            Définis les phases temporelles du tournoi et le format de bracket.
+          <p style={{ color: "var(--ink-mute)", margin: 0, fontSize: 14 }}>
+            Définis les phases temporelles, le jeu et le format de bracket.
           </p>
         </div>
-      </div>
 
-      <div className="ds-block">
-        <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          <div>
-            <p
-              style={{
-                fontSize: 11,
-                textTransform: "uppercase",
-                letterSpacing: "0.1em",
-                color: "var(--text-2)",
-                margin: "0 0 14px",
-              }}
-            >
-              Identité
-            </p>
-            <div className="form-grid">
-              <div className="field">
-                <label>Nom du tournoi</label>
-                <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Mon tournoi" />
-              </div>
-              <div className="field">
-                <label>Format</label>
-                <select value={format} onChange={(e) => { setFormat(e.target.value as TournamentFormat); setHasThirdPlaceMatch(false); }}>
-                  <option value="SINGLE">Simple élimination</option>
-                  <option value="DOUBLE">Double élimination</option>
-                </select>
-              </div>
+        <CyberCard ticks>
+          <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            <div>
+              <p className="eyebrow" style={{ margin: "0 0 14px" }}>
+                Identité
+              </p>
+              <div className="form-grid">
+                <div className="field">
+                  <label>Nom du tournoi</label>
+                  <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Mon tournoi" />
+                </div>
+                <div className="field">
+                  <label>Jeu</label>
+                  <select value={game} onChange={(e) => setGame(e.target.value as TournamentGame)}>
+                    <option value="OW2">Overwatch 2</option>
+                    <option value="MR">Marvel Rivals</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Format</label>
+                  <select value={format} onChange={(e) => { setFormat(e.target.value as TournamentFormat); setHasThirdPlaceMatch(false); }}>
+                    <option value="SINGLE">Simple élimination</option>
+                    <option value="DOUBLE">Double élimination</option>
+                  </select>
+                </div>
               {format === "SINGLE" && (
                 <div className="field" style={{ gridColumn: "1 / -1" }}>
                   <label htmlFor="third-place" style={{ marginBottom: 12 }}>
@@ -197,27 +192,21 @@ export default function CreateTournamentPage() {
             </div>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-            <Link href="/tournois" className="btn ghost" style={{ padding: "11px 24px" }}>
-              Annuler
-            </Link>
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn"
-              style={{
-                padding: "11px 28px",
-                background: "rgba(79,224,162,0.15)",
-                borderColor: "rgba(79,224,162,0.35)",
-                opacity: loading ? 0.6 : 1,
-                cursor: loading ? "not-allowed" : "pointer",
-              }}
-            >
-              {loading ? "Création..." : "Créer le tournoi"}
-            </button>
-          </div>
-        </form>
-      </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 12 }}>
+              <CyberButton variant="ghost" asChild>
+                <Link href="/tournois">Annuler</Link>
+              </CyberButton>
+              <CyberButton
+                variant="primary"
+                type="submit"
+                disabled={loading}
+                style={{ opacity: loading ? 0.6 : 1, cursor: loading ? "not-allowed" : "pointer" }}
+              >
+                {loading ? "Création..." : "Créer le tournoi"}
+              </CyberButton>
+            </div>
+          </form>
+        </CyberCard>
       </section>
     </>
   );

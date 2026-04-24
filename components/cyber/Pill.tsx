@@ -1,12 +1,13 @@
-import { ReactNode } from "react";
+import { ReactNode, CSSProperties } from "react";
 
 interface PillProps {
   variant?: "default" | "live" | "blue";
   children: ReactNode;
   className?: string;
+  style?: CSSProperties;
 }
 
-export function Pill({ variant = "default", children, className = "" }: PillProps) {
+export function Pill({ variant = "default", children, className = "", style }: PillProps) {
   const classes = [
     "pill",
     variant === "live" && "pill-live",
@@ -17,7 +18,7 @@ export function Pill({ variant = "default", children, className = "" }: PillProp
     .join(" ");
 
   return (
-    <span className={classes}>
+    <span className={classes} style={style}>
       {variant === "live" && <span className="dot" />}
       {children}
     </span>

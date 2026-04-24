@@ -23,6 +23,7 @@ export async function POST(req: Request) {
       name?: string;
       description?: string | null;
       format?: TournamentFormat;
+      game?: "OW2" | "MR";
       maxTeams?: number;
       startVisibilityAt?: string;
       registrationOpenAt?: string;
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
 
     if (!body.name?.trim()) return fail("MISSING_NAME", 400);
     if (body.format !== "SINGLE" && body.format !== "DOUBLE") return fail("INVALID_FORMAT", 400);
+    if (body.game && body.game !== "OW2" && body.game !== "MR") return fail("INVALID_GAME", 400);
 
     const maxTeams = Number(body.maxTeams ?? 0);
     if (!Number.isInteger(maxTeams) || maxTeams < 2 || maxTeams > 256) {
@@ -43,6 +45,7 @@ export async function POST(req: Request) {
       name: body.name.trim(),
       description: body.description ?? null,
       format: body.format,
+      game: body.game ?? "OW2",
       maxTeams,
       startVisibilityAt: body.startVisibilityAt ?? "",
       registrationOpenAt: body.registrationOpenAt ?? "",

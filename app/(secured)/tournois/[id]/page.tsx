@@ -6,6 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import type { BracketMatch, BracketType, TournamentDetail } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
+import { Pill, CyberButton } from "@/components/cyber";
+import { useSetPalette } from "@/lib/palette-context";
 
 type MatchScoreDraft = Record<number, { myScore: string; opponentScore: string }>;
 type AdminDraft = Record<number, { score1: string; score2: string; forfeitTeamId?: number | null }>;
@@ -891,11 +893,16 @@ export default function TournamentDetailPage() {
   const router = useRouter();
   const tournamentId = Number(params.id);
   const { showError, showSuccess } = useToast();
+  const setPalette = useSetPalette();
   const [detail, setDetail] = useState<TournamentDetail | null>(null);
   const [drafts, setDrafts] = useState<MatchScoreDraft>({});
   const [adminDrafts, setAdminDrafts] = useState<AdminDraft>({});
   const [selectedMatchForAdmin, setSelectedMatchForAdmin] = useState<BracketMatch | null>(null);
   const [isAdminLoading, setIsAdminLoading] = useState(false);
+
+  useEffect(() => {
+    setPalette("blue");
+  }, [setPalette]);
 
   const load = useCallback(async () => {
     const response = await fetch(`/api/tournaments/${tournamentId}`, { cache: "no-store" });
@@ -1105,48 +1112,29 @@ export default function TournamentDetailPage() {
                 {detail.card.description}
               </p>
             )}
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-              <span className={`ds-chip ${stateMeta.chipClass}`.trim()}>{stateMeta.label}</span>
-              <span className="ds-chip muted" style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>
-                {detail.card.format === "SINGLE" ? "Simple élimination" : "Double élimination"}
-              </span>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <Pill variant="blue">{detail.card.game}</Pill>
+              <Pill variant={detail.card.state === "RUNNING" ? "live" : "blue"}>
+                {stateMeta.label}
+              </Pill>
+              <Pill variant="blue">
+                {detail.card.format === "SINGLE" ? "Simple élim." : "Double élim."}
+              </Pill>
               {detail.card.hasThirdPlaceMatch && (
-                <span className="ds-chip muted" style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>
-                  Petite finale
-                </span>
+                <Pill variant="blue">Petite finale</Pill>
               )}
-              <span className="ds-chip muted" style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>
-                {detail.card.registeredTeams}/{detail.card.maxTeams} équipes
-              </span>
+              <Pill variant="blue">{detail.card.registeredTeams}/{detail.card.maxTeams}</Pill>
               {detail.isAdmin && (
-                <span
-                  className="ds-chip"
-                  style={{
-                    background: "rgba(89,212,255,0.15)",
-                    border: "1px solid rgba(89,212,255,0.4)",
-                    color: "rgba(89,212,255,0.95)",
-                    textTransform: "none",
-                    letterSpacing: 0,
-                    fontWeight: 700,
-                  }}
-                >
-                  ⚙ Admin
-                </span>
+                <Pill variant="blue">⚙ Admin</Pill>
               )}
               {detail.canRegister && (
-                <button
-                  type="button"
+                <CyberButton
+                  variant="primary"
                   onClick={registerTeam}
-                  className="btn"
-                  style={{
-                    padding: "6px 16px",
-                    fontSize: 13,
-                    background: "rgba(79,224,162,0.12)",
-                    borderColor: "rgba(79,224,162,0.35)",
-                  }}
+                  style={{ fontSize: 13, padding: "6px 16px" }}
                 >
                   Inscrire mon équipe
-                </button>
+                </CyberButton>
               )}
             </div>
           </div>

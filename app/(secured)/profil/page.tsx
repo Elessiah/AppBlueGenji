@@ -7,6 +7,7 @@ import { LogoutButton } from "@/components/logout-button";
 import { Coche } from "@/components/Coche";
 import type { FullProfileResponse } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
+import { useSetPalette } from "@/lib/palette-context";
 
 const VISIBILITY_LABELS: Record<string, string> = {
   overwatch: "BattleTag OW",
@@ -17,6 +18,7 @@ const VISIBILITY_LABELS: Record<string, string> = {
 export default function ProfilePage() {
   const router = useRouter();
   const { showError, showSuccess } = useToast();
+  const setPalette = useSetPalette();
   const [data, setData] = useState<FullProfileResponse | null>(null);
 
   const [pseudo, setPseudo] = useState("");
@@ -29,6 +31,10 @@ export default function ProfilePage() {
     marvel: false,
     major: false,
   });
+
+  useEffect(() => {
+    setPalette("blue");
+  }, [setPalette]);
 
   useEffect(() => {
     const load = async () => {

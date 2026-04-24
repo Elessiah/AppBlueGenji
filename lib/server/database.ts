@@ -240,6 +240,21 @@ async function runMigrations(db: Pool): Promise<void> {
     // Ignore if already done
   }
 
+  // Migration: Add game column to tournaments (multi-game support)
+  try {
+    await db.execute(`
+      ALTER TABLE bg_tournaments
+      ADD COLUMN game ENUM('OW2', 'MR') NOT NULL DEFAULT 'OW2'
+      AFTER description
+    `);
+  } catch (err: unknown) {
+    // Column already exists or other error; MySQL 8.0.29+ supports IF NOT EXISTS
+    const error = err as { message?: string };
+    if (!error.message?.includes("Duplicate column name")) {
+      throw err;
+    }
+  }
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_sponsors (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,

@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import { SearchBar } from "@/components/SearchBar";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
+import { CyberCard, CyberButton, Pill } from "@/components/cyber";
+import { useSetPalette } from "@/lib/palette-context";
 
 const emptyBuckets: TournamentBuckets = {
   upcoming: [],
@@ -14,78 +16,44 @@ const emptyBuckets: TournamentBuckets = {
   finished: [],
 };
 
-const BUCKET_META: Record<keyof TournamentBuckets, { title: string; rgb: string; icon: string }> = {
-  upcoming: { title: "Prochainement", rgb: "70,200,180", icon: "⏳" },
-  registration: { title: "Inscriptions ouvertes", rgb: "79,224,162", icon: "📋" },
-  running: { title: "En cours", rgb: "150,225,60", icon: "⚔️" },
-  finished: { title: "Terminés", rgb: "100,115,130", icon: "🏁" },
-};
-
-function TournamentColumn({
+function TournamentBucketColumn({
   title,
-  rgb,
-  icon,
   items,
 }: {
   title: string;
-  rgb: string;
-  icon: string;
   items: TournamentCard[];
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <section
-      className="fade-in ds-block"
-      style={{ borderColor: `rgba(${rgb},0.18)`, marginBottom: 20, overflow: "hidden", padding: 0 }}
-    >
+    <section style={{ marginBottom: 32 }}>
       <button
         onClick={() => setCollapsed((c) => !c)}
         style={{
           display: "flex",
           alignItems: "center",
           gap: 12,
-          padding: "18px 24px",
-          background: `rgba(${rgb},0.05)`,
+          padding: "16px 0",
           width: "100%",
           border: "none",
-          borderBottom: !collapsed && items.length ? `1px solid rgba(${rgb},0.15)` : "none",
+          background: "transparent",
           cursor: "pointer",
           textAlign: "left",
         }}
       >
-        <span style={{ fontSize: 18 }}>{icon}</span>
-        <h3
-          style={{
-            margin: 0,
-            fontFamily: "var(--font-title), sans-serif",
-            letterSpacing: "0.02em",
-            color: `rgb(${rgb})`,
-          }}
-        >
-          {title}
-        </h3>
+        <span className="eyebrow" style={{ margin: 0 }}>
+          {title.toUpperCase()}
+        </span>
         {!!items.length && (
-          <span
-            className="ds-chip"
-            style={{
-              marginLeft: "auto",
-              letterSpacing: 0,
-              textTransform: "none",
-              fontWeight: 600,
-              borderColor: `rgba(${rgb},0.35)`,
-              background: `rgba(${rgb},0.1)`,
-              color: `rgb(${rgb})`,
-            }}
-          >
+          <Pill variant="blue" style={{ marginLeft: "auto" }}>
             {items.length}
-          </span>
+          </Pill>
         )}
         <span
           style={{
             marginLeft: items.length ? 8 : "auto",
-            color: `rgba(${rgb},0.7)`,
-            fontSize: 13,
+            color: "var(--ink-dim)",
+            fontSize: 14,
             transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
             transition: "transform 0.2s",
             display: "inline-block",
@@ -96,44 +64,41 @@ function TournamentColumn({
       </button>
 
       {!collapsed && (!items.length ? (
-        <p style={{ color: "var(--text-2)", fontSize: 14, padding: "18px 24px", margin: 0 }}>
+        <p style={{ color: "var(--ink-mute)", fontSize: 14, padding: "12px 0", margin: 0 }}>
           Aucun tournoi dans cette catégorie.
         </p>
       ) : (
-        <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12 }}>
           {items.map((tournament) => (
-            <Link
-              key={tournament.id}
-              href={`/tournois/${tournament.id}`}
-              className="tournament-card"
-              style={{ "--card-rgb": rgb } as React.CSSProperties}
-            >
-              <strong style={{ fontSize: 15, display: "block", marginBottom: 4 }}>
-                {tournament.name}
-              </strong>
-              {tournament.description && (
-                <p
-                  style={{
-                    color: "var(--text-1)",
-                    fontSize: 13,
-                    margin: "0 0 8px",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {tournament.description}
-                </p>
-              )}
-              <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-                <span style={{ color: "var(--text-2)", fontSize: 12 }}>
-                  {tournament.format === "SINGLE" ? "Simple élim." : "Double élim."}
-                </span>
-                <span style={{ color: "var(--text-2)", fontSize: 12 }}>
-                  {tournament.registeredTeams}/{tournament.maxTeams} équipes
-                </span>
-                <span style={{ color: "var(--text-2)", fontSize: 12 }}>
-                  {formatLocalDateTime(tournament.startAt)}
-                </span>
-              </div>
+            <Link key={tournament.id} href={`/tournois/${tournament.id}`} style={{ textDecoration: "none" }}>
+              <CyberCard lift>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                  <div>
+                    <Pill variant="blue" style={{ marginBottom: 8, display: "inline-block" }}>
+                      {tournament.game}
+                    </Pill>
+                    <h3 className="display" style={{ fontSize: 20, margin: "0 0 4px" }}>
+                      {tournament.name}
+                    </h3>
+                    <p className="mono" style={{ color: "var(--ink-mute)", margin: 0, fontSize: 12 }}>
+                      {formatLocalDateTime(tournament.startAt)} · {tournament.format === "SINGLE" ? "Simple élim." : "Double élim."}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div className="num" style={{ fontSize: 22, color: "var(--blue-500)" }}>
+                      {tournament.registeredTeams}/{tournament.maxTeams}
+                    </div>
+                    <div className="mono" style={{ color: "var(--ink-dim)", fontSize: 12 }}>
+                      ÉQUIPES
+                    </div>
+                  </div>
+                </div>
+                {tournament.description && (
+                  <p style={{ color: "var(--ink-mute)", fontSize: 13, margin: 0, lineHeight: 1.5 }}>
+                    {tournament.description}
+                  </p>
+                )}
+              </CyberCard>
             </Link>
           ))}
         </div>
@@ -144,8 +109,13 @@ function TournamentColumn({
 
 export default function TournamentsPage() {
   const { showError } = useToast();
+  const setPalette = useSetPalette();
   const [search, setSearch] = useState("");
   const [buckets, setBuckets] = useState<TournamentBuckets>(emptyBuckets);
+
+  useEffect(() => {
+    setPalette("blue");
+  }, [setPalette]);
 
   const load = async (term: string) => {
     const url = term.trim()
@@ -174,78 +144,47 @@ export default function TournamentsPage() {
     }
   };
 
-  const sections = useMemo(
-    () =>
-      (["upcoming", "registration", "running", "finished"] as const).map((key) => ({
-        key,
-        ...BUCKET_META[key],
-        items: buckets[key],
-      })),
-    [buckets],
-  );
-
   return (
     <>
-      <Link href="/" className="cta-float-home home" style={{ bottom: 28, padding: "14px 20px", fontSize: 15, fontWeight: 600, background: "rgba(79,224,162,0.15)", borderColor: "rgba(79,224,162,0.3)", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
+      <Link href="/" className="cta-float-home home">
         ⌂ Accueil
       </Link>
-      <section className="fade-in">
-
-      <div className="ds-header green" style={{ marginBottom: 28 }}>
-        <div className="ds-header-body">
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-              gap: 16,
-              marginBottom: 24,
-            }}
-          >
-            <div>
-              <h1 className="ds-title green" style={{ fontSize: "clamp(32px, 3.5vw, 48px)" }}>
-                Tournois
-              </h1>
-              <p style={{ color: "var(--text-1)", margin: 0, fontSize: 15, lineHeight: 1.6 }}>
-                Suivi en temps réel des tournois BlueGenji, triés par phase.
-              </p>
-            </div>
-            <Link
-              href="/tournois/creer"
-              className="btn"
-              style={{
-                padding: "11px 22px",
-                fontSize: 14,
-                background: "rgba(79,224,162,0.15)",
-                borderColor: "rgba(79,224,162,0.3)",
-                flexShrink: 0,
-                marginTop: 4,
-              }}
-            >
-              + Créer mon tournoi
-            </Link>
+      <section className="fade-in container">
+        <div className="section-head">
+          <div>
+            <span className="eyebrow">PLATEFORME</span>
+            <h1 className="display" style={{ fontSize: 56, margin: "0 0 8px" }}>
+              Tournois BlueGenji
+            </h1>
+            <p className="mono" style={{ color: "var(--ink-mute)", margin: 0 }}>
+              SUIVI TEMPS RÉEL · PHASES MULTIPLES
+            </p>
           </div>
-
-          <SearchBar
-            value={search}
-            onChange={setSearch}
-            onSearch={onSearch}
-            placeholder="Rechercher un tournoi..."
-            rgb="79, 224, 162"
-          />
-
+          <Link href="/tournois/creer">
+            <CyberButton variant="primary">+ Créer un tournoi</CyberButton>
+          </Link>
         </div>
-      </div>
 
-      {sections.map((section) => (
-        <TournamentColumn
-          key={section.key}
-          title={section.title}
-          rgb={section.rgb}
-          icon={section.icon}
-          items={section.items}
+        <SearchBar
+          value={search}
+          onChange={setSearch}
+          onSearch={onSearch}
+          placeholder="Rechercher un tournoi..."
+          rgb="90, 200, 255"
         />
-      ))}
+
+        {(["upcoming", "registration", "running", "finished"] as const).map((key) => (
+          <TournamentBucketColumn
+            key={key}
+            title={{
+              upcoming: "Prochainement",
+              registration: "Inscriptions ouvertes",
+              running: "En cours",
+              finished: "Terminés",
+            }[key]}
+            items={buckets[key]}
+          />
+        ))}
       </section>
     </>
   );
