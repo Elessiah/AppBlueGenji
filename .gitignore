@@ -64,3 +64,6 @@ next-env.d.ts
 package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
+
+# Design handoff (temporary reference files)
+.design-handoff/

@@ -64,7 +64,12 @@ describe("auth", () => {
 
   describe("getCurrentUser", () => {
     it("returns null when no session cookie", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
       const { cookies } = await import("next/headers");
+
+      const mockExecute = jest.fn().mockResolvedValue([[]]);
+      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute });
+
       const mockCookieStore = { get: jest.fn().mockReturnValue(undefined) };
       (cookies as jest.Mock).mockResolvedValue(mockCookieStore);
 
