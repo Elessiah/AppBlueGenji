@@ -234,6 +234,8 @@ interface TournamentDef {
   teamCount: number;
   maxTeams: number;
   daysOffset: number; // négatif = dans le passé
+  format?: "SINGLE" | "DOUBLE";
+  hasThirdPlaceMatch?: boolean;
 }
 
 async function createTournament(
@@ -249,17 +251,21 @@ async function createTournament(
     ? new Date(now.getTime() + 7 * 86400000)
     : new Date(startAt.getTime() - 1 * 86400000);
   const finishedAt = def.state === "FINISHED" ? startAt : null;
+  const format = def.format ?? "DOUBLE";
+  const hasThirdPlace = format === "SINGLE" && Boolean(def.hasThirdPlaceMatch) ? 1 : 0;
 
   const [result] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_tournaments
-     (organizer_user_id, name, game, description, format, max_teams, state,
+     (organizer_user_id, name, game, description, format, has_third_place_match, max_teams, state,
       start_visibility_at, registration_open_at, registration_close_at, start_at, finished_at)
-     VALUES (?, ?, ?, ?, 'DOUBLE', ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       userIds[0],
       `Test - ${def.name}`,
       def.game,
       `Tournoi test ${def.game} — ${def.state}`,
+      format,
+      hasThirdPlace,
       def.maxTeams,
       def.state,
       regOpenAt,
@@ -326,6 +332,13 @@ async function main(): Promise<void> {
       { name: "Marvel Rivals Open", game: "MR", state: "FINISHED", teamCount: 4, maxTeams: 4, daysOffset: -20 },
       { name: "OW2 Winter Cup", game: "OW2", state: "FINISHED", teamCount: 8, maxTeams: 8, daysOffset: -60 },
       { name: "Marvel Rivals Pro Series", game: "MR", state: "FINISHED", teamCount: 8, maxTeams: 8, daysOffset: -45 },
+
+      // 11 équipes — simple sans petite finale
+      { name: "OW2 11-Team Single", game: "OW2", state: "REGISTRATION", teamCount: 11, maxTeams: 16, daysOffset: 18, format: "SINGLE", hasThirdPlaceMatch: false },
+      // 11 équipes — simple avec petite finale
+      { name: "MR 11-Team Single + 3rd", game: "MR", state: "REGISTRATION", teamCount: 11, maxTeams: 16, daysOffset: 22, format: "SINGLE", hasThirdPlaceMatch: true },
+      // 11 équipes — double élimination
+      { name: "OW2 11-Team Double", game: "OW2", state: "REGISTRATION", teamCount: 11, maxTeams: 16, daysOffset: 25, format: "DOUBLE" },
     ];
 
     for (const def of tournaments) {
@@ -338,9 +351,12 @@ async function main(): Promise<void> {
     console.log(`  · ${teamIds.length} équipes (Test - *)`);
     console.log(`  · ${FICTIONAL_SPONSORS.length} sponsors (Test - *)`);
     console.log(`  · ${tournaments.length} tournois dont :`);
-    console.log(`    - 3 REGISTRATION (inscrits ouverts)`);
+    console.log(`    - 6 REGISTRATION (inscrits ouverts, dont 3 × 11 équipes)`);
     console.log(`    - 1 RUNNING avec match READY (live landing)`);
     console.log(`    - 4 FINISHED avec brackets complets (leaderboard + ticker)`);
+    console.log(`    - SINGLE sans petite finale (11 équipes)`);
+    console.log(`    - SINGLE avec petite finale (11 équipes)`);
+    console.log(`    - DOUBLE élimination (11 équipes)`);
 
     process.exit(0);
   } catch (error) {
