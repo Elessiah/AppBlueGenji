@@ -5,6 +5,7 @@ import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { AboutSection } from "@/components/cyber/landing/AboutSection";
 import { CyberCard, CyberButton, TeamSigil } from "@/components/cyber";
+import styles from "./page.module.css";
 
 export const metadata: Metadata = {
   title: "BlueGenji - L'Association Esport",
@@ -20,119 +21,173 @@ export const metadata: Metadata = {
 export default function AssociationPage() {
   return (
     <PageWithPalette palette="gold">
-      <main className="page-shell" style={{ position: "relative", zIndex: 1 }}>
+      <main style={{ position: "relative", zIndex: 1 }}>
         <PublicHeader />
 
-        {/* ── HERO ── */}
-        <section className="container" style={{ padding: "80px 0 40px" }}>
+        {/* HERO */}
+        <section className={`${styles.section} ${styles.heroSection}`}>
           <div className="fabric" />
-          <div className="section-head">
+          <span className="eyebrow">L'ASSOCIATION · LOI 1901</span>
+          <div className={styles.heroGrid}>
             <div>
-              <div className="eyebrow">L'ASSOCIATION · LOI 1901</div>
-              <h1 className="display" style={{ fontSize: 64 }}>
-                Au service de la scène amateur française.
+              <h1 className={`display ${styles.heroTitle}`}>
+                Au service de la scène<br />
+                amateur française.
               </h1>
             </div>
-            <div className="mono" style={{ color: "var(--ink-mute)" }}>
-              FONDÉE EN 2023 · SIÈGE LYON
-            </div>
+            <aside className={styles.heroSide}>
+              <div className={styles.heroFact}>
+                <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 10, letterSpacing: "0.2em" }}>
+                  FONDÉE EN
+                </span>
+                <span className="num" style={{ fontSize: 28 }}>2023</span>
+              </div>
+              <div className={styles.heroFact}>
+                <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 10, letterSpacing: "0.2em" }}>
+                  SIÈGE
+                </span>
+                <span style={{ fontSize: 17 }}>Lyon</span>
+              </div>
+              <div className={styles.heroFact}>
+                <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 10, letterSpacing: "0.2em" }}>
+                  STATUT
+                </span>
+                <span style={{ fontSize: 17 }}>Association loi 1901</span>
+              </div>
+            </aside>
           </div>
         </section>
 
-        {/* ── ABOUT SECTION ── */}
+        {/* ABOUT SECTION */}
         <AboutSection />
 
-        {/* ── MANIFESTO ── */}
-        <section className="container" style={{ paddingBottom: 80 }}>
-          <div className="section-head">
-            <h2>Manifeste</h2>
-            <div className="meta">CE QUI NOUS DÉFINIT</div>
+        {/* MANIFESTE */}
+        <section className={styles.section}>
+          <header className={styles.head}>
+            <div>
+              <span className="eyebrow">SECTION 04</span>
+              <h2 className={styles.sectionTitle}>Manifeste</h2>
+            </div>
+            <span className={styles.meta}>CE QUI NOUS DÉFINIT</span>
+          </header>
+          <div className={styles.manifesteGrid}>
+            <p className={styles.lede}>
+              BlueGenji est née de la conviction que la compétition esport en ligne doit être accessible, transparente et rémunératrice pour tous.
+            </p>
+            <ol className={styles.principles}>
+              {MANIFESTE.map((item, index) => (
+                <li key={item.title} className={styles.principle}>
+                  <span className={`mono ${styles.principleNum}`}>{String(index + 1).padStart(2, "0")}</span>
+                  <div>
+                    <h3 className={styles.principleTitle}>{item.title}</h3>
+                    <p className={styles.principleText}>{item.text}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
           </div>
-          <CyberCard ticks className="manifesto-card">
-            <p style={{ color: "var(--ink-1)", lineHeight: 1.8, marginBottom: 16, fontSize: 15 }}>
-              BlueGenji est née de la conviction que la compétition esport en ligne doit être accessible, transparente et rémunératrice pour tous. Nous créons des tournois de qualité broadcast, gérés par une communauté de bénévoles passionnés qui croient à l'équité et l'inclusion.
-            </p>
-            <p style={{ color: "var(--ink-1)", lineHeight: 1.8, marginBottom: 16, fontSize: 15 }}>
-              Nos cash prizes sont réinvestis directement depuis les frais d'inscription — pas de marge marketing, pas de rétention. Chaque euro engagé revient aux joueurs et équipes qui gagnent, sans exception. Nous ne demandons qu'une adhésion gratuite pour participer, car le talent n'a pas de portefeuille.
-            </p>
-            <p style={{ color: "var(--ink-1)", lineHeight: 1.8, marginBottom: 16, fontSize: 15 }}>
-              L'arbitrage est rigoureux, les brackets sont publics et audités, et les décisions sont justifiées. Nous n'avons pas de relation d'argent avec les équipes, juste une obligation morale de compétition saine. Notre neutralité politique est absolue : nous accueillons toute scène de jeu compétitif qui partage nos valeurs.
-            </p>
-            <p style={{ color: "var(--ink-1)", lineHeight: 1.8, marginBottom: 16, fontSize: 15 }}>
-              BlueGenji c'est aussi une communauté. Casters, coaches, modérateurs, organisateurs. Chacun a sa place pour contribuer à construire une scène francophone où le talent ne suffit pas, où le respect et l'entraide font la différence. Nous ne sommes pas en compétition avec les autres structures : nous apprenons les uns des autres et grandissons ensemble.
-            </p>
-            <p style={{ color: "var(--ink-1)", lineHeight: 1.8, fontSize: 15 }}>
-              Nos tournois parlent d'eux-mêmes. Overwatch 2 depuis la création, Marvel Rivals en croissance, formats simples à double élimination mais aussi round suisses ou de l'endurance, du débutant au semi-pro. Chaque équipe joue pour la même chose : la victoire, le respect, et le prix qu'elle a gagné.
-            </p>
-          </CyberCard>
         </section>
 
-        {/* ── BUREAU ── */}
-        <section className="container" style={{ paddingBottom: 80 }}>
-          <div className="section-head">
-            <h2>Bureau</h2>
-            <div className="meta">4 MEMBRES</div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
+        {/* BUREAU */}
+        <section className={styles.section}>
+          <header className={styles.head}>
+            <div>
+              <span className="eyebrow">SECTION 05</span>
+              <h2 className={styles.sectionTitle}>Bureau</h2>
+            </div>
+            <span className={styles.meta}>4 MEMBRES · BÉNÉVOLES</span>
+          </header>
+          <div className={styles.bureauGrid}>
             {BUREAU.map((b) => (
-              <CyberCard key={b.name} lift>
-                <TeamSigil letter={b.initials} color={b.color} />
-                <h3 style={{ marginBottom: 8, marginTop: 16 }}>{b.name}</h3>
-                <div className="mono" style={{ color: "var(--ink-mute)", fontSize: 12, marginBottom: 12 }}>
-                  {b.role}
+              <CyberCard key={b.name} lift className={styles.bureauCard}>
+                <div className={styles.bureauSigil}>
+                  <TeamSigil letter={b.initials} color={b.color} size={40} />
+                </div>
+                <div className={styles.bureauDivider} />
+                <div>
+                  <h3 className={styles.bureauName}>{b.name}</h3>
+                  <p className={styles.bureauRole}>{b.role}</p>
                 </div>
               </CyberCard>
             ))}
           </div>
         </section>
 
-        {/* ── ADHÉRER ── */}
-        <section className="container" style={{ paddingBottom: 80 }}>
-          <div className="section-head">
-            <h2>Adhérer</h2>
-            <div className="meta">GRATUIT · SANS ENGAGEMENT</div>
-          </div>
-          <CyberCard ticks style={{ padding: 48 }}>
-            <p style={{ color: "var(--ink-1)", lineHeight: 1.8, marginBottom: 24, fontSize: 15 }}>
-              L'adhésion à BlueGenji vous ouvre l'accès complet à tous nos tournois, événements et ressources communautaires. C'est gratuit, sans engagement et sans limite de durée. Il suffit de créer un compte pour commencer.
-            </p>
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-              <CyberButton variant="primary" asChild>
-                <Link href="/connexion">Créer un compte →</Link>
-              </CyberButton>
-              <CyberButton variant="ghost" asChild>
-                <a href="https://discord.gg/bluegenji" target="_blank" rel="noreferrer">
-                  Rejoindre le Discord
-                </a>
-              </CyberButton>
+        {/* ADHÉRER */}
+        <section className={styles.section}>
+          <header className={styles.head}>
+            <div>
+              <span className="eyebrow">SECTION 06</span>
+              <h2 className={styles.sectionTitle}>Adhérer</h2>
             </div>
-          </CyberCard>
+            <span className={styles.meta}>GRATUIT · SANS ENGAGEMENT</span>
+          </header>
+          <div className={styles.adhererGrid}>
+            <div className={styles.adhererText}>
+              <p className={styles.lede}>
+                L&apos;adhésion vous ouvre l&apos;accès complet à tous nos tournois, événements et ressources communautaires.
+              </p>
+              <p className={styles.adhererBody}>
+                Gratuit, sans engagement, sans limite de durée. Il suffit de créer un compte pour commencer.
+              </p>
+            </div>
+            <aside className={styles.adhererSide}>
+              <div className={styles.adhererPerks}>
+                {[
+                  ["00 €", "Cotisation"],
+                  ["48 h", "Validation moyenne"],
+                  ["∞", "Tournois inclus"],
+                ].map(([value, label]) => (
+                  <div key={label} className={styles.adhererPerk}>
+                    <span className={`num ${styles.adhererPerkValue}`}>{value}</span>
+                    <span className="mono">{label}</span>
+                  </div>
+                ))}
+              </div>
+              <div className={styles.ctaRow}>
+                <CyberButton variant="primary" asChild>
+                  <Link href="/connexion">Créer un compte →</Link>
+                </CyberButton>
+                <CyberButton variant="ghost" asChild>
+                  <a href="https://discord.gg/bluegenji" target="_blank" rel="noreferrer">
+                    Rejoindre le Discord
+                  </a>
+                </CyberButton>
+              </div>
+            </aside>
+          </div>
         </section>
 
-        {/* ── DOCUMENTS ── */}
-        <section className="container" style={{ paddingBottom: 80 }}>
-          <div className="section-head">
-            <h2>Documents</h2>
-            <div className="meta">TÉLÉCHARGEABLES</div>
-          </div>
-          <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
+        {/* DOCUMENTS */}
+        <section className={styles.section}>
+          <header className={styles.head}>
+            <div>
+              <span className="eyebrow">SECTION 07</span>
+              <h2 className={styles.sectionTitle}>Documents</h2>
+            </div>
+            <span className={styles.meta}>TÉLÉCHARGEABLES</span>
+          </header>
+          <ul className={styles.docList}>
             <li>
-              <Link href="/statuts.pdf" style={{ color: "var(--accent-blue)", textDecoration: "none" }}>
-                Statuts (PDF) →
+              <Link href="/statuts.pdf" className={styles.docItem}>
+                <span>Statuts de l'association</span>
+                <span className={styles.docMeta}>PDF · 142 KO →</span>
               </Link>
             </li>
             <li>
-              <Link href="/reglement-interieur.pdf" style={{ color: "var(--accent-blue)", textDecoration: "none" }}>
-                Règlement intérieur →
+              <Link href="/reglement-interieur.pdf" className={styles.docItem}>
+                <span>Règlement intérieur</span>
+                <span className={styles.docMeta}>PDF · 89 KO →</span>
               </Link>
             </li>
             <li>
-              <Link href="/rapport-moral-2025.pdf" style={{ color: "var(--accent-blue)", textDecoration: "none" }}>
-                Rapport moral 2025 →
+              <Link href="/rapport-moral-2025.pdf" className={styles.docItem}>
+                <span>Rapport moral 2025</span>
+                <span className={styles.docMeta}>PDF · 156 KO →</span>
               </Link>
             </li>
           </ul>
-          <div className="mono" style={{ color: "var(--ink-dim)", marginTop: 24 }}>
+          <div className={styles.legal}>
             SIRET 912 345 678 00017 · RNA W691234567
           </div>
         </section>
@@ -142,6 +197,29 @@ export default function AssociationPage() {
     </PageWithPalette>
   );
 }
+
+const MANIFESTE = [
+  {
+    title: "Transparence",
+    text: "Cash prizes réinvestis depuis les frais d'inscription, brackets publics et audités, décisions justifiées. Pas de marge marketing, pas de rétention.",
+  },
+  {
+    title: "Accessibilité",
+    text: "Adhésion gratuite à vie pour participer. Le talent n'a pas de portefeuille — chaque euro engagé revient aux joueurs et équipes qui gagnent.",
+  },
+  {
+    title: "Arbitrage",
+    text: "Aucune relation d'argent avec les équipes, juste une obligation morale de compétition saine. Neutralité politique absolue.",
+  },
+  {
+    title: "Communauté",
+    text: "Casters, coaches, modérateurs, organisateurs. Une scène francophone où le respect et l'entraide font la différence, jamais en compétition avec les autres structures.",
+  },
+  {
+    title: "Multi-jeux",
+    text: "Overwatch 2 depuis la création, Marvel Rivals en croissance. Doubles éliminations, rounds suisses, formats endurance — du débutant au semi-pro.",
+  },
+];
 
 const BUREAU = [
   {

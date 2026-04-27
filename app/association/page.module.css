@@ -1,0 +1,337 @@
+.section {
+  position: relative;
+  z-index: 1;
+  width: min(1240px, calc(100vw - 40px));
+  margin: 0 auto;
+  padding: 48px 0;
+}
+
+.heroSection {
+  padding: 80px 0 40px;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  border-top: 1px solid var(--line-soft);
+  padding: 24px 0 28px;
+}
+
+.sectionTitle {
+  margin: 6px 0 0;
+  font-family: var(--font-sans);
+  font-size: clamp(28px, 3vw, 44px);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.heroGrid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 48px;
+  align-items: end;
+  padding-top: 24px;
+}
+
+.heroTitle {
+  font-size: clamp(40px, 6vw, 72px);
+  line-height: 1.05;
+  margin: 14px 0 0;
+  letter-spacing: -0.02em;
+}
+
+.heroSide {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-left: 1px solid var(--line-soft);
+  padding-left: 28px;
+}
+
+.heroFact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bureauGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.bureauCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 24px;
+  min-height: 200px;
+}
+
+.bureauSigil {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--r-cy-md);
+  background: rgba(90, 200, 255, 0.06);
+  border: 1px solid var(--line-soft);
+}
+
+.bureauName {
+  font-family: var(--font-sans);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.bureauRole {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin: 0;
+}
+
+.bureauDivider {
+  width: 32px;
+  height: 1px;
+  background: var(--line-soft);
+  margin: 4px 0;
+}
+
+.prose p {
+  color: var(--ink);
+  line-height: 1.75;
+  margin: 0 0 14px;
+  font-size: 15px;
+}
+
+.prose p:last-child {
+  margin-bottom: 0;
+}
+
+.ctaRow {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* MANIFESTE */
+.manifesteGrid {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 56px;
+  align-items: start;
+}
+
+.lede {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.55;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.principles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.principle {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.principle:first-child {
+  border-top: 1px solid var(--line-soft);
+}
+
+.principleNum {
+  color: var(--blue-300);
+  letter-spacing: 0.16em;
+  font-size: 11px;
+  padding-top: 2px;
+}
+
+.principleTitle {
+  margin: 0 0 6px;
+  font-family: var(--font-sans);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.principleText {
+  margin: 0;
+  color: var(--ink-mute);
+  line-height: 1.7;
+  font-size: 14px;
+}
+
+/* ADHÉRER */
+.adhererGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 56px;
+  align-items: start;
+}
+
+.adhererText {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.adhererBody {
+  margin: 0;
+  color: var(--ink-mute);
+  line-height: 1.7;
+  font-size: 15px;
+}
+
+.adhererSide {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border-left: 1px solid var(--line-soft);
+  padding-left: 28px;
+}
+
+.adhererPerks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.adhererPerk {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-md);
+  padding: 14px 12px;
+  background: rgba(90, 200, 255, 0.03);
+}
+
+.adhererPerkValue {
+  font-size: 22px;
+}
+
+.adhererPerk :global(.mono) {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.docList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.docItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line-soft);
+  transition: color 0.18s ease;
+  color: inherit;
+  text-decoration: none;
+}
+
+.docItem:hover {
+  color: var(--blue-300);
+}
+
+.docMeta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.legal {
+  margin-top: 32px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+@media (max-width: 920px) {
+  .heroGrid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .heroSide {
+    border-left: none;
+    border-top: 1px solid var(--line-soft);
+    padding: 24px 0 0;
+  }
+
+  .bureauGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .manifesteGrid,
+  .adhererGrid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .adhererSide {
+    border-left: none;
+    border-top: 1px solid var(--line-soft);
+    padding: 24px 0 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .section {
+    width: min(1240px, calc(100vw - 24px));
+  }
+
+  .bureauGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .adhererPerks {
+    grid-template-columns: 1fr;
+  }
+}
