@@ -93,7 +93,30 @@ export async function clearSession(): Promise<void> {
   });
 }
 
+async function getDevBypassUser(): Promise<AuthUser | null> {
+  if (process.env.NODE_ENV === "production") return null;
+  const rawId = process.env.DEV_AUTH_USER_ID;
+  if (!rawId) return null;
+  const userId = Number(rawId);
+  if (!Number.isInteger(userId) || userId <= 0) return null;
+
+  const db = await getDatabase();
+  const [rows] = await db.execute<UserRow[]>(
+    `SELECT id, pseudo, avatar_url, discord_id, google_sub, email, is_adult, is_admin
+     FROM bg_users
+     WHERE id = ?
+     LIMIT 1`,
+    [userId],
+  );
+
+  if (rows.length === 0) return null;
+  return fromRow(rows[0]);
+}
+
 export async function getCurrentUser(): Promise<AuthUser | null> {
+  const devUser = await getDevBypassUser();
+  if (devUser) return devUser;
+
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;

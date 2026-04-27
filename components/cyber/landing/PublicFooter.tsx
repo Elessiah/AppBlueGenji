@@ -1,14 +1,6 @@
 import Link from "next/link";
+import Image from "next/image";
 import styles from "./PublicFooter.module.css";
-
-function LogoMark() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-      <path d="M20 3 L36 12 V28 L20 37 L4 28 V12 Z" stroke="#5ac8ff" strokeWidth="1.3" fill="rgba(90,200,255,0.06)" />
-      <path d="M14 15 L20 12 L26 15 L26 25 L20 28 L14 25 Z" stroke="#5ac8ff" strokeWidth="1.3" fill="none" />
-    </svg>
-  );
-}
 
 export function PublicFooter() {
   return (
@@ -16,7 +8,7 @@ export function PublicFooter() {
       <div className={styles.inner}>
         <div className={styles.brand}>
           <div className={styles.brandTop}>
-            <LogoMark />
+            <Image src="/logo_bg.webp" alt="BlueGenji" width={24} height={24} />
             <span className="logotype">BlueGenji</span>
           </div>
           <p>

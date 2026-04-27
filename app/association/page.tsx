@@ -56,13 +56,13 @@ export default function AssociationPage() {
               Nos cash prizes sont réinvestis directement depuis les frais d'inscription — pas de marge marketing, pas de rétention. Chaque euro engagé revient aux joueurs et équipes qui gagnent, sans exception. Nous ne demandons qu'une adhésion gratuite pour participer, car le talent n'a pas de portefeuille.
             </p>
             <p style={{ color: "var(--ink-1)", lineHeight: 1.8, marginBottom: 16, fontSize: 15 }}>
-              L'arbitrage est rigoureux, les brackets sont publics et audités, et les décisions sont justifiées. Nous n'avons pas de relation d'argent avec les équipes — juste une obligation morale de compétition saine. Notre neutralité politique est absolue : nous accueillons toute scène de jeu compétitif qui partage nos valeurs.
+              L'arbitrage est rigoureux, les brackets sont publics et audités, et les décisions sont justifiées. Nous n'avons pas de relation d'argent avec les équipes, juste une obligation morale de compétition saine. Notre neutralité politique est absolue : nous accueillons toute scène de jeu compétitif qui partage nos valeurs.
             </p>
             <p style={{ color: "var(--ink-1)", lineHeight: 1.8, marginBottom: 16, fontSize: 15 }}>
-              BlueGenji c'est aussi une communauté. Casters, coaches, modérateurs, organisateurs — chacun a sa place pour contribuer à construire une scène francophone où le talent ne suffit pas, où le respect et l'entraide font la différence. Nous ne sommes pas en compétition avec les autres structures : nous apprenons les uns des autres et grandissons ensemble.
+              BlueGenji c'est aussi une communauté. Casters, coaches, modérateurs, organisateurs. Chacun a sa place pour contribuer à construire une scène francophone où le talent ne suffit pas, où le respect et l'entraide font la différence. Nous ne sommes pas en compétition avec les autres structures : nous apprenons les uns des autres et grandissons ensemble.
             </p>
             <p style={{ color: "var(--ink-1)", lineHeight: 1.8, fontSize: 15 }}>
-              Nos tournois parlent d'eux-mêmes. Overwatch 2 depuis la création, Marvel Rivals en croissance, formats simples et double élimination, du débutant au semi-pro. Chaque équipe joue pour la même chose : la victoire, le respect, et le prix qu'elle a gagné.
+              Nos tournois parlent d'eux-mêmes. Overwatch 2 depuis la création, Marvel Rivals en croissance, formats simples à double élimination mais aussi round suisses ou de l'endurance, du débutant au semi-pro. Chaque équipe joue pour la même chose : la victoire, le respect, et le prix qu'elle a gagné.
             </p>
           </CyberCard>
         </section>

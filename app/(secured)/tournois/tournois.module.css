@@ -423,9 +423,6 @@
 
 /* live ribbon */
 .cardRibbon {
-  position: absolute;
-  top: 14px;
-  right: 14px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -437,6 +434,8 @@
   border-radius: 999px;
   border: 1px solid var(--line-strong-cy);
   background: var(--cyber-bg-1);
+  margin-bottom: 14px;
+  width: fit-content;
 }
 
 .cardRibbonLive {
@@ -467,7 +466,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 28px;
 }
 
 .cardGame {
@@ -505,7 +504,7 @@
 .cardMeta {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px 18px;
+  gap: 24px 18px;
   padding: 14px 0;
   border-top: 1px solid var(--line-soft);
   border-bottom: 1px solid var(--line-soft);

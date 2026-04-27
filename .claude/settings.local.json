@@ -74,7 +74,29 @@
       "Bash(curl -s --max-time 10 http://localhost:3000/api/landing/leaderboard)",
       "Bash(curl -s --max-time 10 http://localhost:3000/api/landing/calendar)",
       "Bash(curl -s --max-time 10 http://localhost:3000/api/landing/ticker)",
-      "Bash(curl -s --max-time 15 -o /dev/null -w \"HTTP %{http_code} — temps: %{time_total}s\" http://localhost:3000/)"
+      "Bash(curl -s --max-time 15 -o /dev/null -w \"HTTP %{http_code} — temps: %{time_total}s\" http://localhost:3000/)",
+      "WebFetch(domain:api.anthropic.com)",
+      "Bash(cp '/c/Users/kerya/.claude/projects/C--work-BlueGenji-appbluegenji/e630474a-bb42-4d43-ac92-990f266c4261/tool-results/webfetch-1777279367072-n6cdaw.bin' /tmp/design.gz)",
+      "Bash(gunzip -t /tmp/design.gz)",
+      "Bash(gunzip -c /tmp/design.gz)",
+      "Read(//tmp/**)",
+      "Bash(mkdir -p /tmp/design)",
+      "Bash(tar -xf /tmp/design.tar -C /tmp/design)",
+      "Bash(curl -s http://localhost:53288/tournois -I)",
+      "Bash(cd C:\\\\\\\\work\\\\\\\\BlueGenji\\\\\\\\appbluegenji)",
+      "Bash(rm -rf .next node_modules)",
+      "Bash(npm install *)",
+      "Bash(curl -s http://localhost:3000/tournois -b \"bg_session=dummy\")",
+      "Bash(fuser -k 3000/tcp)",
+      "Bash(netstat -ano)",
+      "Bash(awk '{print $5}')",
+      "Bash(xargs -r taskkill /PID /F)",
+      "Bash(taskkill /PID 23344 /F)",
+      "PowerShell($proc = Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess; if \\($proc\\) { Stop-Process -Id $proc -Force; Write-Host \"Process $proc killed\" } else { Write-Host \"No process on port 3000\" }; Start-Sleep -Seconds 1; Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Measure-Object | Select-Object -ExpandProperty Count)",
+      "Bash(curl -s -H \"Cookie: bg_session=test\" http://localhost:3000/tournois)",
+      "Bash(pkill -f \"node\")",
+      "Bash(grep -E \"\\\\.\\(tsx|ts|css\\)$\")",
+      "Bash(curl -s -o /dev/null -w \"status=%{http_code} location=%{redirect_url}\\\\n\" http://localhost:54928/tournois)"
     ]
   }
 }
