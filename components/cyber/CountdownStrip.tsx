@@ -9,12 +9,19 @@ interface CountdownStripProps {
 }
 
 function useCountdown(targetISO: string) {
-  const [now, setNow] = useState(() => new Date());
+  const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
+    setNow(new Date());
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+
+  if (!now) {
+    return { d: "00", h: "00", m: "00", s: "00" };
+  }
 
   const target = new Date(targetISO);
   let delta = Math.max(0, target.getTime() - now.getTime());
@@ -26,7 +33,6 @@ function useCountdown(targetISO: string) {
   delta -= m * 60000;
   const s = Math.floor(delta / 1000);
 
-  const pad = (n: number) => String(n).padStart(2, "0");
   return { d: pad(d), h: pad(h), m: pad(m), s: pad(s) };
 }
 

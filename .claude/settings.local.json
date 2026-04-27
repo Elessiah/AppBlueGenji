@@ -67,7 +67,14 @@
       "Bash(git push *)",
       "Bash(git commit *)",
       "Bash(npm test *)",
-      "Bash(xargs -I {} bash -c 'echo \"=== {} ===\" && head -20 {}')"
+      "Bash(xargs -I {} bash -c 'echo \"=== {} ===\" && head -20 {}')",
+      "Bash(pkill -f \"node.*next\")",
+      "Bash(curl -s --max-time 10 http://localhost:3000/api/landing/stats)",
+      "Bash(curl -s --max-time 10 http://localhost:3000/api/landing/live)",
+      "Bash(curl -s --max-time 10 http://localhost:3000/api/landing/leaderboard)",
+      "Bash(curl -s --max-time 10 http://localhost:3000/api/landing/calendar)",
+      "Bash(curl -s --max-time 10 http://localhost:3000/api/landing/ticker)",
+      "Bash(curl -s --max-time 15 -o /dev/null -w \"HTTP %{http_code} — temps: %{time_total}s\" http://localhost:3000/)"
     ]
   }
 }

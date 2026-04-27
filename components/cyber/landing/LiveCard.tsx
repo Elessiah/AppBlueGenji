@@ -48,7 +48,17 @@ export function LiveCard({ initialLive, nextUpcomingISO }: LiveCardProps) {
         }
         const payload = (await response.json()) as LiveResponse;
         if (mounted) {
-          setLive(payload.live ?? null);
+          const raw = payload.live ?? null;
+          if (raw) {
+            const text = (raw.tournament.name ?? "").toLowerCase();
+            const game = text.includes("marvel") || text.includes("rivals") ? "Marvel Rivals" : "Overwatch 2";
+            const phase = raw.currentMatch
+              ? raw.currentMatch.roundLabel?.toUpperCase?.() ?? "EN ATTENTE"
+              : "EN ATTENTE";
+            setLive({ ...raw, game, phase });
+          } else {
+            setLive(null);
+          }
         }
       } catch {
         if (!mounted) return;

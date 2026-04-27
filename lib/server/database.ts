@@ -289,8 +289,9 @@ export async function getDatabase(): Promise<Pool> {
       database: requireEnv("DB_DATABASE"),
       waitForConnections: true,
       connectionLimit: 10,
+      connectTimeout: 10000,
       namedPlaceholders: true,
-      charset: "utf8mb4_general_ci",
+      charset: "utf8mb4",
     });
   }
 
