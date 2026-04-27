@@ -79,7 +79,12 @@ GOOGLE_CLIENT_SECRET=
 GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
 BOT_INTERNAL_URL=http://127.0.0.1:4400   # optional
 BOT_INTERNAL_TOKEN=                        # must match bot's INTERNAL_API_TOKEN
+DEV_AUTH_USER_ID=                          # optional — bypass auth in dev (see below)
 ```
+
+## Preview / dev auth bypass
+
+Pour vérifier les pages protégées (`/tournois`, `/equipes`, `/joueurs`, `/profil`, etc.) sans passer par Google OAuth ni le code Discord, définir `DEV_AUTH_USER_ID=<id>` dans `.env` (par exemple `321` pour le user admin). La fonction `getCurrentUser()` dans `lib/server/auth.ts` retournera ce user tant que `NODE_ENV !== "production"`, en court-circuitant le cookie de session — toutes les routes API et le `app/(secured)/layout.tsx` s'authentifient automatiquement. **Redémarre le dev server après modification de `.env`** pour que Next.js prenne en compte la nouvelle valeur. Désactiver = supprimer/vider la var. La garde-fou est double (`NODE_ENV !== "production"` ET ID entier valide) ; ne JAMAIS définir cette var en prod.
 
 ## Key Conventions
 
@@ -139,3 +144,4 @@ Règle universelle : via `useToast()` (`@/components/ui/toast`), bottom-left ove
 
 - **Exécute sans détailler** : Ne décris pas ce que tu vas faire avant d'agir. Fais simplement le travail.
 - **Court résumé à la fin** : Une fois le travail terminé, fais un court résumé des changements effectués et des problèmes rencontrés, le cas échéant.
+- **Arrête les previews** : À la fin de chaque prompt, arrête tous les serveurs de prévisualisation (`npm run dev`, tests serveurs, etc.) pour éviter les accumulations de processus.
