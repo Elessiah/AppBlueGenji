@@ -13,14 +13,14 @@ export function PublicHeader() {
           </span>
           <span className={styles.brandText}>
             <span className="logotype">BlueGenji</span>
-            <span className="mono">ARENA · EST. 2023</span>
+            <span className="mono">ARENA</span>
           </span>
         </Link>
 
         <nav className={styles.nav} aria-label="Navigation principale">
-          <a href="/#tournois">Tournois</a>
-          <a href="/#equipes">Équipes</a>
-          <a href="/#calendrier">Calendrier</a>
+          <Link href="/#tournois">Tournois</Link>
+          <Link href="/#equipes">Équipes</Link>
+          <Link href="/#calendrier">Calendrier</Link>
           <Link href="/association">L&apos;asso</Link>
           <Link href="/partenaires">Partenaires</Link>
         </nav>
