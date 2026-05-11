@@ -13,9 +13,9 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
 
   const body = (await req.json()) as { team1Score?: unknown; team2Score?: unknown; forfeitTeamId?: unknown };
 
-  const forfeitTeamId = body.forfeitTeamId ? Number(body.forfeitTeamId) : undefined;
-  const team1Score = body.team1Score ? Number(body.team1Score) : undefined;
-  const team2Score = body.team2Score ? Number(body.team2Score) : undefined;
+  const forfeitTeamId = body.forfeitTeamId !== undefined && body.forfeitTeamId !== null ? Number(body.forfeitTeamId) : undefined;
+  const team1Score = body.team1Score !== undefined && body.team1Score !== null ? Number(body.team1Score) : undefined;
+  const team2Score = body.team2Score !== undefined && body.team2Score !== null ? Number(body.team2Score) : undefined;
 
   // Validate forfeit mode
   if (forfeitTeamId !== undefined) {

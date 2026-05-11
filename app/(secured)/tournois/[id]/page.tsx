@@ -89,7 +89,7 @@ function AdminScoreModal({
       const s1 = Number(score1);
       const s2 = Number(score2);
       if (!Number.isFinite(s1) || !Number.isFinite(s2)) return;
-      if (s1 === s2) { showError("Les scores ne peuvent pas être égaux."); return; }
+      // L'égalité est autorisée : OK enregistre sans déclarer de vainqueur.
       await onSaveBoth(s1, s2);
     }
     onClose();
@@ -110,7 +110,11 @@ function AdminScoreModal({
 
   const s1Num = Number(score1);
   const s2Num = Number(score2);
-  const isValidScore = forfeitTeamId ? true : (Number.isFinite(s1Num) && Number.isFinite(s2Num) && s1Num !== s2Num);
+  const scoresAreFiniteNumbers = Number.isFinite(s1Num) && Number.isFinite(s2Num);
+  // « OK » : autorise l'égalité (pas de vainqueur déclaré).
+  const canSaveScores = forfeitTeamId ? true : scoresAreFiniteNumbers;
+  // « ✓ Gagnant » : nécessite un vainqueur unique (scores différents).
+  const canDeclareWinner = forfeitTeamId ? true : (scoresAreFiniteNumbers && s1Num !== s2Num);
 
   return (
     <>
@@ -467,14 +471,14 @@ function AdminScoreModal({
               padding: "12px 16px",
               fontSize: 13,
               fontWeight: 600,
-              background: isValidScore ? "rgba(79,224,162,0.15)" : "rgba(79,224,162,0.05)",
+              background: canSaveScores ? "rgba(79,224,162,0.15)" : "rgba(79,224,162,0.05)",
               borderColor: "rgba(79,224,162,0.4)",
-              color: isValidScore ? "rgba(79,224,162,1)" : "rgba(79,224,162,0.5)",
-              cursor: isValidScore && !isLoading ? "pointer" : "not-allowed",
-              opacity: isValidScore && !isLoading ? 1 : 0.5,
+              color: canSaveScores ? "rgba(79,224,162,1)" : "rgba(79,224,162,0.5)",
+              cursor: canSaveScores && !isLoading ? "pointer" : "not-allowed",
+              opacity: canSaveScores && !isLoading ? 1 : 0.5,
               transition: "all 0.2s",
             }}
-            disabled={!isValidScore || isLoading}
+            disabled={!canSaveScores || isLoading}
           >
             {isLoading ? "..." : "OK"}
           </button>
@@ -486,14 +490,14 @@ function AdminScoreModal({
               padding: "12px 16px",
               fontSize: 13,
               fontWeight: 600,
-              background: isValidScore ? "rgba(89,212,255,0.2)" : "rgba(89,212,255,0.08)",
+              background: canDeclareWinner ? "rgba(89,212,255,0.2)" : "rgba(89,212,255,0.08)",
               borderColor: "rgba(89,212,255,0.5)",
-              color: isValidScore ? "rgba(89,212,255,1)" : "rgba(89,212,255,0.5)",
-              cursor: isValidScore && !isLoading ? "pointer" : "not-allowed",
-              opacity: isValidScore && !isLoading ? 1 : 0.5,
+              color: canDeclareWinner ? "rgba(89,212,255,1)" : "rgba(89,212,255,0.5)",
+              cursor: canDeclareWinner && !isLoading ? "pointer" : "not-allowed",
+              opacity: canDeclareWinner && !isLoading ? 1 : 0.5,
               transition: "all 0.2s",
             }}
-            disabled={!isValidScore || isLoading}
+            disabled={!canDeclareWinner || isLoading}
           >
             {isLoading ? "..." : "✓ Gagnant"}
           </button>
@@ -1207,8 +1211,8 @@ export default function TournamentDetailPage() {
       {selectedMatchForAdmin && (
         <AdminScoreModal
           match={selectedMatchForAdmin}
-          score1={adminDrafts[selectedMatchForAdmin.id]?.score1 || String(selectedMatchForAdmin.team1Score ?? "")}
-          score2={adminDrafts[selectedMatchForAdmin.id]?.score2 || String(selectedMatchForAdmin.team2Score ?? "")}
+          score1={adminDrafts[selectedMatchForAdmin.id]?.score1 || String(selectedMatchForAdmin.team1Score ?? 0)}
+          score2={adminDrafts[selectedMatchForAdmin.id]?.score2 || String(selectedMatchForAdmin.team2Score ?? 0)}
           forfeitTeamId={adminDrafts[selectedMatchForAdmin.id]?.forfeitTeamId}
           onScore1Change={(val) =>
             setAdminDrafts((prev) => ({

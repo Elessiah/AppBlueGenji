@@ -13,9 +13,9 @@ export async function PATCH(req: Request, context: { params: Promise<{ matchId: 
 
   const body = (await req.json()) as { team1Score?: unknown; team2Score?: unknown; forfeitTeamId?: unknown };
 
-  const forfeitTeamId = body.forfeitTeamId ? Number(body.forfeitTeamId) : undefined;
-  const team1Score = body.team1Score ? Number(body.team1Score) : undefined;
-  const team2Score = body.team2Score ? Number(body.team2Score) : undefined;
+  const forfeitTeamId = body.forfeitTeamId !== undefined && body.forfeitTeamId !== null ? Number(body.forfeitTeamId) : undefined;
+  const team1Score = body.team1Score !== undefined && body.team1Score !== null ? Number(body.team1Score) : undefined;
+  const team2Score = body.team2Score !== undefined && body.team2Score !== null ? Number(body.team2Score) : undefined;
 
   // Validate forfeit mode
   if (forfeitTeamId !== undefined) {
@@ -37,8 +37,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ matchId: 
     ) {
       return fail("INVALID_SCORES", 400);
     }
-
-    if (team1Score === team2Score) return fail("DRAW_NOT_ALLOWED", 400);
+    // L'égalité est autorisée sur cette route : on enregistre les scores sans déclarer de vainqueur.
   } else {
     return fail("MISSING_SCORES_OR_FORFEIT", 400);
   }
