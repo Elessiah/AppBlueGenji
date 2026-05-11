@@ -1,4 +1,3 @@
-import { PageWithPalette } from "@/components/page-with-palette";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { CyberButton } from "@/components/cyber/CyberButton";
@@ -52,7 +51,7 @@ export default async function BotPage() {
   const statsFallback = (value: number) => (value >= 0 ? value : "—");
 
   return (
-    <PageWithPalette palette="blue">
+    <>
       <PublicHeader />
 
       <main style={{ position: "relative" }}>
@@ -161,6 +160,6 @@ export default async function BotPage() {
       </main>
 
       <PublicFooter />
-    </PageWithPalette>
+    </>
   );
 }

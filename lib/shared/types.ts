@@ -25,6 +25,8 @@ export type VisibilitySettings = {
   major: boolean;
 };
 
+export type PlayerRole = TeamRole;
+
 export type PublicUserProfile = {
   id: number;
   pseudo: string;
@@ -34,6 +36,17 @@ export type PublicUserProfile = {
   isAdult: boolean | null;
   visibility: VisibilitySettings;
   createdAt: string;
+  // Enriched fields for /joueurs listing
+  team?: {
+    id: number;
+    name: string;
+    colorIndex: number;
+  } | null;
+  roles?: PlayerRole[];
+  games?: ("OW2" | "MR")[];
+  tournamentsCount?: number;
+  wins?: number;
+  losses?: number;
 };
 
 export type TeamListItem = {
@@ -42,6 +55,14 @@ export type TeamListItem = {
   logoUrl: string | null;
   membersCount: number;
   createdAt: string;
+  rank: number;
+  points: number;
+  wins: number;
+  losses: number;
+  form: ("w" | "l" | "d")[];
+  games: ("OW2" | "MR")[];
+  rosterPreview: { userId: number; pseudo: string; avatarUrl: string | null }[];
+  region: string | null;
 };
 
 export type TeamMember = {

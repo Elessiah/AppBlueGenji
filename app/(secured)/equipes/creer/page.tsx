@@ -1,23 +1,17 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useToast } from "@/components/ui/toast";
 import { CyberCard, CyberButton } from "@/components/cyber";
-import { useSetPalette } from "@/lib/palette-context";
 
 export default function CreateTeamPage() {
   const router = useRouter();
   const { showError } = useToast();
-  const setPalette = useSetPalette();
   const [name, setName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setPalette("blue");
-  }, [setPalette]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();

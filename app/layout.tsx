@@ -2,8 +2,6 @@
 import { Exo_2, Rajdhani, Inter, JetBrains_Mono, Orbitron } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
-import { Background3D } from "@/components/bg-canvas-3d";
-import { PaletteProvider } from "@/lib/palette-context";
 
 const titleFont = Rajdhani({
   subsets: ["latin"],
@@ -49,10 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr">
       <body className={`${titleFont.variable} ${bodyFont.variable} ${sansFont.variable} ${monoFont.variable} ${displayFont.variable}`}>
-        <PaletteProvider>
-          <Background3D />
-          <ToastProvider>{children}</ToastProvider>
-        </PaletteProvider>
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );

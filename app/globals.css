@@ -15,7 +15,6 @@
   --orange-rgb: 255, 157, 46;
   --green-rgb: 79, 224, 162;
   --danger-rgb: 255, 110, 130;
-  --gold-rgb: 245, 195, 58;
   --purple-rgb: 167, 115, 255;
   --radius: 16px;
   --radius-sm: 10px;
@@ -438,79 +437,6 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
   flex-wrap: wrap;
 }
 
-.nav-shell {
-  margin-bottom: 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-
-.nav-links {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.nav-link {
-  --nav-color: 89, 212, 255;
-  padding: 8px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--text-1);
-  font-weight: 600;
-  overflow: hidden;
-  transition: background 0.22s ease, border-color 0.22s ease, color 0.22s ease, transform 0.22s ease, box-shadow 0.22s ease;
-  user-select: none;
-  -webkit-user-select: none;
-  position: relative;
-}
-
-.nav-link::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 50%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
-  transform: skewX(-15deg);
-  transition: left 0.45s ease;
-  pointer-events: none;
-}
-
-.nav-link:hover::before {
-  left: 150%;
-}
-
-.nav-link:hover {
-  color: rgb(var(--nav-color));
-  border-color: rgba(var(--nav-color), 0.45);
-  background: rgba(var(--nav-color), 0.1);
-  transform: translateY(-1px);
-}
-
-.nav-link.active {
-  color: rgb(var(--nav-color));
-  border-color: rgba(var(--nav-color), 0.55);
-  background: rgba(var(--nav-color), 0.16);
-}
-
-.avatar-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid var(--line-strong);
-  object-fit: cover;
-  background: rgba(255, 255, 255, 0.06);
-}
 
 .table-like {
   border: 1px solid var(--line);
@@ -693,26 +619,6 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
     inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
-/* Variante dorée */
-.cta-float-home.gold {
-  border-color: rgba(245, 195, 58, 0.45);
-  background: rgba(40, 30, 6, 0.70);
-  color: rgb(245, 195, 58);
-  box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.45),
-    0 0 22px rgba(245, 195, 58, 0.15),
-    inset 0 1px 0 rgba(245, 195, 58, 0.12);
-  animation: ctaGlowGold 3.2s ease-in-out infinite;
-}
-
-.cta-float-home.gold:hover {
-  border-color: rgba(245, 195, 58, 0.72);
-  color: rgb(255, 220, 90);
-  box-shadow:
-    0 8px 28px rgba(0, 0, 0, 0.45),
-    0 0 24px rgba(245, 195, 58, 0.2),
-    inset 0 1px 0 rgba(245, 195, 58, 0.22);
-}
 
 /* Variante cyan */
 .cta-float-home.home {
@@ -987,24 +893,6 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
   margin-top: 4px;
   font-size: 22px;
   font-weight: 700;
-}
-
-.ds-header.gold {
-  --header-rgb: var(--gold-rgb);
-}
-
-.ds-section-title.gold {
-  --title-rgb-a: var(--gold-rgb);
-  --title-rgb-b: var(--gold-rgb);
-}
-
-.ds-title.gold {
-  --title-rgb-a: var(--gold-rgb);
-  --title-rgb-b: var(--gold-rgb);
-}
-
-.ds-stat.gold {
-  --stat-rgb: var(--gold-rgb);
 }
 
 .ds-header.purple {

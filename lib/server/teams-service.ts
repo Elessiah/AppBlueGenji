@@ -4,14 +4,6 @@ import { parseRoles, toIso } from "@/lib/server/serialization";
 import type { TeamDetailResponse, TeamListItem, TeamMember, TeamRole } from "@/lib/shared/types";
 import { getUserIdByPseudo, sanitizeRoles } from "@/lib/server/users-service";
 
-type TeamRow = RowDataPacket & {
-  id: number;
-  name: string;
-  logo_url: string | null;
-  created_at: Date;
-  members_count: number;
-};
-
 type TeamMemberRow = RowDataPacket & {
   membership_id: number;
   user_id: number;
@@ -61,26 +53,171 @@ async function userOwnsTeam(teamId: number, userId: number): Promise<boolean> {
 
 export async function listTeams(): Promise<TeamListItem[]> {
   const db = await getDatabase();
-  const [rows] = await db.execute<TeamRow[]>(
+
+  // Get teams with member count, wins, losses
+  const [teamRows] = await db.execute<
+    (RowDataPacket & {
+      id: number;
+      name: string;
+      logo_url: string | null;
+      created_at: Date;
+      members_count: number;
+      wins: number;
+      losses: number;
+    })[]
+  >(
     `SELECT
       t.id,
       t.name,
       t.logo_url,
       t.created_at,
-      COALESCE(COUNT(tm.id), 0) AS members_count
+      COALESCE(COUNT(DISTINCT tm.id), 0) AS members_count,
+      COALESCE(SUM(CASE WHEN m.winner_team_id = t.id THEN 1 ELSE 0 END), 0) AS wins,
+      COALESCE(SUM(CASE WHEN m.status = 'COMPLETED' AND m.winner_team_id IS NOT NULL AND m.winner_team_id != t.id AND (m.team1_id = t.id OR m.team2_id = t.id) THEN 1 ELSE 0 END), 0) AS losses
      FROM bg_teams t
      LEFT JOIN bg_team_members tm ON tm.team_id = t.id AND tm.left_at IS NULL
-     GROUP BY t.id, t.name, t.logo_url, t.created_at
-     ORDER BY t.name ASC`,
+     LEFT JOIN bg_matches m ON (m.team1_id = t.id OR m.team2_id = t.id)
+     GROUP BY t.id, t.name, t.logo_url, t.created_at`,
   );
 
-  return rows.map((row) => ({
+  // Get form data (last 10 matches per team) - simplified approach
+  const allMatches = await db.execute<
+    (RowDataPacket & {
+      id: number;
+      team1_id: number | null;
+      team2_id: number | null;
+      winner_team_id: number | null;
+      created_at: Date;
+    })[]
+  >(
+    `SELECT id, team1_id, team2_id, winner_team_id, created_at
+     FROM bg_matches
+     WHERE status = 'COMPLETED'
+     ORDER BY created_at DESC
+     LIMIT 1000`,
+  );
+
+  // Build form data for each team
+  const formByTeam = new Map<number, ("w" | "l" | "d")[]>();
+  const matchesPerTeam = new Map<number, number>();
+
+  for (const match of allMatches[0]) {
+    if (match.team1_id) {
+      if (!matchesPerTeam.has(match.team1_id)) {
+        matchesPerTeam.set(match.team1_id, 0);
+        formByTeam.set(match.team1_id, []);
+      }
+      if (matchesPerTeam.get(match.team1_id)! < 10) {
+        formByTeam.get(match.team1_id)!.push(match.winner_team_id === match.team1_id ? "w" : "l");
+        matchesPerTeam.set(match.team1_id, matchesPerTeam.get(match.team1_id)! + 1);
+      }
+    }
+    if (match.team2_id) {
+      if (!matchesPerTeam.has(match.team2_id)) {
+        matchesPerTeam.set(match.team2_id, 0);
+        formByTeam.set(match.team2_id, []);
+      }
+      if (matchesPerTeam.get(match.team2_id)! < 10) {
+        formByTeam.get(match.team2_id)!.push(match.winner_team_id === match.team2_id ? "w" : "l");
+        matchesPerTeam.set(match.team2_id, matchesPerTeam.get(match.team2_id)! + 1);
+      }
+    }
+  }
+
+  // Get roster preview
+  const [rosterRows] = await db.execute<
+    (RowDataPacket & {
+      team_id: number;
+      user_id: number;
+      pseudo: string;
+      avatar_url: string | null;
+    })[]
+  >(
+    `SELECT
+      tm.team_id,
+      u.id AS user_id,
+      u.pseudo,
+      u.avatar_url
+     FROM (
+       SELECT team_id, user_id, ROW_NUMBER() OVER (PARTITION BY team_id ORDER BY joined_at ASC) as rn
+       FROM bg_team_members
+       WHERE left_at IS NULL
+     ) limited_members
+     JOIN bg_team_members tm ON tm.user_id = limited_members.user_id AND tm.team_id = limited_members.team_id
+     JOIN bg_users u ON u.id = tm.user_id
+     WHERE limited_members.rn <= 6
+     ORDER BY tm.team_id, tm.joined_at ASC`,
+  );
+
+  // Get games practiced
+  const [gameRows] = await db.execute<
+    (RowDataPacket & {
+      team_id: number;
+      game: "OW2" | "MR";
+    })[]
+  >(
+    `SELECT DISTINCT
+      tr.team_id,
+      t.game
+     FROM bg_tournament_registrations tr
+     JOIN bg_tournaments t ON t.id = tr.tournament_id
+     ORDER BY tr.team_id, t.game`,
+  );
+
+  // Organize roster by team
+  const rosterByTeam = new Map<
+    number,
+    { userId: number; pseudo: string; avatarUrl: string | null }[]
+  >();
+  for (const row of rosterRows) {
+    if (!rosterByTeam.has(row.team_id)) {
+      rosterByTeam.set(row.team_id, []);
+    }
+    rosterByTeam.get(row.team_id)!.push({
+      userId: Number(row.user_id),
+      pseudo: row.pseudo,
+      avatarUrl: row.avatar_url,
+    });
+  }
+
+  // Organize games by team
+  const gamesByTeam = new Map<number, ("OW2" | "MR")[]>();
+  for (const row of gameRows) {
+    if (!gamesByTeam.has(row.team_id)) {
+      gamesByTeam.set(row.team_id, []);
+    }
+    gamesByTeam.get(row.team_id)!.push(row.game);
+  }
+
+  // Transform rows and calculate rank
+  const unsorted: Omit<TeamListItem, "rank">[] = teamRows.map((row) => ({
     id: Number(row.id),
     name: row.name,
     logoUrl: row.logo_url,
     membersCount: Number(row.members_count),
     createdAt: row.created_at.toISOString(),
+    wins: Number(row.wins),
+    losses: Number(row.losses),
+    points: Number(row.wins) * 3 + Number(row.losses) * 1,
+    form: formByTeam.get(Number(row.id)) || [],
+    games: gamesByTeam.get(Number(row.id)) || [],
+    rosterPreview: rosterByTeam.get(Number(row.id)) || [],
+    region: null,
   }));
+
+  // Sort and assign rank
+  unsorted.sort((a, b) => {
+    if (b.points !== a.points) return b.points - a.points;
+    if (b.wins !== a.wins) return b.wins - a.wins;
+    return a.name.localeCompare(b.name, "fr");
+  });
+
+  const teams: TeamListItem[] = unsorted.map((team, index) => ({
+    ...team,
+    rank: index + 1,
+  }));
+
+  return teams;
 }
 
 export async function createTeam(ownerUserId: number, name: string, logoUrl: string | null): Promise<number> {

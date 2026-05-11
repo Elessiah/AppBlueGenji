@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import { PageWithPalette } from "@/components/page-with-palette";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { CyberCard, CyberButton } from "@/components/cyber";
@@ -38,8 +37,7 @@ export default async function PartenairesPage() {
   };
 
   return (
-    <PageWithPalette palette="gold">
-      <main className="page-shell" style={{ position: "relative", zIndex: 1 }}>
+    <main className="page-shell" style={{ position: "relative", zIndex: 1 }}>
         <PublicHeader />
 
         {/* ── HERO ── */}
@@ -182,6 +180,5 @@ export default async function PartenairesPage() {
 
         <PublicFooter />
       </main>
-    </PageWithPalette>
   );
 }

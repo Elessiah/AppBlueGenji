@@ -1,4 +1,3 @@
-import { PageWithPalette } from "@/components/page-with-palette";
 import { Ticker } from "@/components/cyber";
 import { AboutSection } from "@/components/cyber/landing/AboutSection";
 import { Hero } from "@/components/cyber/landing/Hero";
@@ -44,18 +43,16 @@ export default async function HomePage() {
   const nextUpcoming = chooseNextTournament(buckets);
 
   return (
-    <PageWithPalette palette="blue">
-      <main style={{ position: "relative", zIndex: 1 }}>
-        <PublicHeader />
-        <Hero stats={stats} live={live} nextUpcoming={nextUpcoming} />
-        <Ticker items={ticker.items} />
-        <TournamentBoard buckets={buckets} />
-        <LeaderCal leaderboard={leaderboard} events={events} />
-        <AboutSection />
-        <SponsorsGrid sponsors={sponsors} />
-        <JoinCTA />
-        <PublicFooter />
-      </main>
-    </PageWithPalette>
+    <main style={{ position: "relative", zIndex: 1 }}>
+      <PublicHeader />
+      <Hero stats={stats} live={live} nextUpcoming={nextUpcoming} />
+      <Ticker items={ticker.items} />
+      <TournamentBoard buckets={buckets} />
+      <LeaderCal leaderboard={leaderboard} events={events} />
+      <AboutSection />
+      <SponsorsGrid sponsors={sponsors} />
+      <JoinCTA />
+      <PublicFooter />
+    </main>
   );
 }

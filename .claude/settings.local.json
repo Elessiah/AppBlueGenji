@@ -96,7 +96,13 @@
       "Bash(curl -s -H \"Cookie: bg_session=test\" http://localhost:3000/tournois)",
       "Bash(pkill -f \"node\")",
       "Bash(grep -E \"\\\\.\\(tsx|ts|css\\)$\")",
-      "Bash(curl -s -o /dev/null -w \"status=%{http_code} location=%{redirect_url}\\\\n\" http://localhost:54928/tournois)"
+      "Bash(curl -s -o /dev/null -w \"status=%{http_code} location=%{redirect_url}\\\\n\" http://localhost:54928/tournois)",
+      "Bash(mkdir -p /tmp/design-mock)",
+      "Bash(cp \"C:\\\\Users\\\\kerya\\\\.claude\\\\projects\\\\C--work-BlueGenji-appbluegenji\\\\a53a705c-61e5-459c-b351-610a5ab6400f\\\\tool-results\\\\webfetch-1777565064650-pszkaw.bin\" design.gz)",
+      "Bash(gunzip -k design.gz)",
+      "Bash(tar -xf design)",
+      "Bash(cygpath -w /tmp/design-mock/bluegenji-arena/README.md)",
+      "Bash(find components/SearchBar* -type f)"
     ]
   }
 }

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PageWithPalette } from "@/components/page-with-palette";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { AboutSection } from "@/components/cyber/landing/AboutSection";
@@ -20,8 +19,7 @@ export const metadata: Metadata = {
 
 export default function AssociationPage() {
   return (
-    <PageWithPalette palette="gold">
-      <main style={{ position: "relative", zIndex: 1 }}>
+    <main style={{ position: "relative", zIndex: 1 }}>
         <PublicHeader />
 
         {/* HERO */}
@@ -194,7 +192,6 @@ export default function AssociationPage() {
 
         <PublicFooter />
       </main>
-    </PageWithPalette>
   );
 }
 

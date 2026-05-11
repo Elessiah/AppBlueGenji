@@ -1,18 +1,16 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { localDateTimeInput } from "@/lib/shared/dates";
 import type { TournamentFormat, TournamentGame } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { CyberCard, CyberButton } from "@/components/cyber";
-import { useSetPalette } from "@/lib/palette-context";
 
 export default function CreateTournamentPage() {
   const router = useRouter();
   const { showError } = useToast();
-  const setPalette = useSetPalette();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -25,10 +23,6 @@ export default function CreateTournamentPage() {
   const [registrationCloseAt, setRegistrationCloseAt] = useState(localDateTimeInput(24));
   const [startAt, setStartAt] = useState(localDateTimeInput(30));
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setPalette("blue");
-  }, [setPalette]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();

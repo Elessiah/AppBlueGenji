@@ -1,0 +1,168 @@
+/* Navigation — secured pages (joueurs, équipes, tournois) */
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(7, 10, 16, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.navInner {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 14px 0;
+  gap: 24px;
+}
+
+.navLeft {
+  display: flex;
+  gap: 28px;
+}
+
+.navLink {
+  position: relative;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  padding: 8px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: color 0.15s;
+  text-decoration: none;
+}
+
+.navLink::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border: 1px solid currentColor;
+  opacity: 0.4;
+  transform: rotate(45deg);
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.navLink:hover {
+  color: rgb(var(--nav-rgb));
+}
+
+.navLinkActive {
+  color: rgb(var(--nav-rgb));
+}
+
+.navLinkActive::before {
+  background: rgb(var(--nav-rgb));
+  border-color: rgb(var(--nav-rgb));
+  opacity: 1;
+  box-shadow: 0 0 calc(8px * var(--glow, 1)) rgba(var(--nav-rgb), 0.6);
+}
+
+.navLinkActive::after {
+  content: "";
+  position: absolute;
+  bottom: -15px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgb(var(--nav-rgb));
+  box-shadow: 0 0 calc(10px * var(--glow, 1)) rgba(var(--nav-rgb), 0.6);
+}
+
+.navLogo {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid rgba(90, 200, 255, 0.25);
+  border-radius: 10px;
+  background: rgba(90, 200, 255, 0.04);
+  position: relative;
+  text-decoration: none;
+}
+
+.navLogo::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border: 1px solid rgba(90, 200, 255, 0.12);
+  border-radius: 50%;
+  animation: ringSpin 18s linear infinite;
+  pointer-events: none;
+}
+
+.navLogo::after {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  border: 1px solid rgba(167, 115, 255, 0.1);
+  border-radius: 50%;
+  animation: ringSpin 28s linear infinite reverse;
+  pointer-events: none;
+}
+
+@keyframes ringSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.navRight {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  align-items: center;
+}
+
+.navHome {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  padding: 8px 14px;
+  border: 1px solid var(--line-strong-cy);
+  border-radius: var(--r-cy-sm);
+  transition: all 0.15s;
+  text-decoration: none;
+}
+
+.navHome:hover {
+  color: var(--blue-300);
+  border-color: rgba(90, 200, 255, 0.35);
+}
+
+.avatarChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px 6px 6px;
+  border: 1px solid var(--line-strong-cy);
+  border-radius: 999px;
+  background: var(--cyber-bg-1);
+  transition: border-color 0.15s;
+  text-decoration: none;
+}
+
+.avatarChip:hover {
+  border-color: rgba(90, 200, 255, 0.35);
+}
+
+.avatarChip img {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong-cy);
+}
+
+.avatarChip span {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+}

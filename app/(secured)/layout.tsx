@@ -5,9 +5,9 @@ export default async function SecuredLayout({ children }: { children: React.Reac
   const user = await requireCurrentUser();
 
   return (
-    <main className="page-shell">
+    <>
       <ArenaNav pseudo={user.pseudo} avatarUrl={user.avatarUrl} />
-      {children}
-    </main>
+      <main className="page-shell">{children}</main>
+    </>
   );
 }

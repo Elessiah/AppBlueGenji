@@ -143,7 +143,98 @@ export async function listPlayers(): Promise<PublicUserProfile[]> {
      ORDER BY pseudo ASC`,
   );
 
-  return rows.map(mapPublicUser);
+  const baseUsers = rows.map(mapPublicUser);
+  const userIds = baseUsers.map((u) => u.id);
+
+  if (userIds.length === 0) return baseUsers;
+
+  // Get current team memberships and roles
+  const [teamMemberships] = await db.execute<
+    (RowDataPacket & {
+      user_id: number;
+      team_id: number;
+      team_name: string;
+      roles_json: string;
+    })[]
+  >(
+    `SELECT tm.user_id, tm.team_id, t.name AS team_name, tm.roles_json
+     FROM bg_team_members tm
+     JOIN bg_teams t ON t.id = tm.team_id
+     WHERE tm.user_id IN (${userIds.map(() => "?").join(",")})
+       AND tm.left_at IS NULL`,
+    userIds,
+  );
+
+  const membershipByUserId = new Map(teamMemberships.map((m) => [m.user_id, m]));
+
+  // Get tournament counts per user
+  const [tournamentsData] = await db.execute<
+    (RowDataPacket & {
+      user_id: number;
+      tournament_count: number;
+    })[]
+  >(
+    `SELECT tm.user_id, COUNT(DISTINCT tr.tournament_id) AS tournament_count
+     FROM bg_team_members tm
+     JOIN bg_tournament_registrations tr ON tr.team_id = tm.team_id
+     WHERE tm.user_id IN (${userIds.map(() => "?").join(",")})
+     GROUP BY tm.user_id`,
+    userIds,
+  );
+
+  const tournamentsCountByUserId = new Map(
+    tournamentsData.map((t) => [t.user_id, Number(t.tournament_count)]),
+  );
+
+  // Get wins/losses per user (simplified: from their current team)
+  const [winsLossesData] = await db.execute<
+    (RowDataPacket & {
+      user_id: number;
+      wins: number;
+      losses: number;
+    })[]
+  >(
+    `SELECT tm.user_id,
+            COALESCE(SUM(CASE WHEN m.winner_team_id = tm.team_id THEN 1 ELSE 0 END), 0) AS wins,
+            COALESCE(SUM(CASE WHEN m.loser_team_id = tm.team_id THEN 1 ELSE 0 END), 0) AS losses
+     FROM bg_team_members tm
+     LEFT JOIN bg_tournament_registrations tr ON tr.team_id = tm.team_id
+     LEFT JOIN bg_matches m ON m.tournament_id = tr.tournament_id
+       AND (m.winner_team_id = tm.team_id OR m.loser_team_id = tm.team_id)
+     WHERE tm.user_id IN (${userIds.map(() => "?").join(",")})
+       AND tm.left_at IS NULL
+     GROUP BY tm.user_id`,
+    userIds,
+  );
+
+  const winsLossesByUserId = new Map(
+    winsLossesData.map((wl) => [wl.user_id, { wins: Number(wl.wins), losses: Number(wl.losses) }]),
+  );
+
+  return baseUsers.map((user) => {
+    const membership = membershipByUserId.get(user.id);
+    const games: ("OW2" | "MR")[] = [];
+    if (user.overwatchBattletag) games.push("OW2");
+    if (user.marvelRivalsTag) games.push("MR");
+
+    const wl = winsLossesByUserId.get(user.id) ?? { wins: 0, losses: 0 };
+
+    return {
+      ...user,
+      team: membership
+        ? {
+            id: membership.team_id,
+            name: membership.team_name,
+            colorIndex: membership.team_id % 7,
+          }
+        : null,
+      roles: membership ? parseRoles(membership.roles_json) : [],
+      games,
+      tournamentsCount: tournamentsCountByUserId.get(user.id) ?? 0,
+      wins: wl.wins,
+      losses: wl.losses,
+    };
+  });
 }
 
 export async function createOrGetGoogleUser(profile: GoogleProfilePayload): Promise<number> {

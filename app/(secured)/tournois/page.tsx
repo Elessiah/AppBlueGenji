@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
-import { useSetPalette } from "@/lib/palette-context";
 import { BgCanvas } from "./BgCanvas";
 import { Ticker } from "@/components/cyber/Ticker";
 import { formatLocalDateTime } from "@/lib/shared/dates";
@@ -136,16 +135,11 @@ function Section({
 
 export default function TournamentsPage() {
   const { showError } = useToast();
-  const setPalette = useSetPalette();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState<"all" | "ow2" | "mr">("all");
   const [buckets, setBuckets] = useState<TournamentBuckets>(emptyBuckets);
   const [finishedDisplayLimit, setFinishedDisplayLimit] = useState(12);
-
-  useEffect(() => {
-    setPalette("blue");
-  }, [setPalette]);
 
   useEffect(() => {
     const load = async () => {

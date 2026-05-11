@@ -7,7 +7,6 @@ import { formatLocalDateTime } from "@/lib/shared/dates";
 import type { BracketMatch, BracketType, TournamentDetail } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { Pill, CyberButton } from "@/components/cyber";
-import { useSetPalette } from "@/lib/palette-context";
 
 type MatchScoreDraft = Record<number, { myScore: string; opponentScore: string }>;
 type AdminDraft = Record<number, { score1: string; score2: string; forfeitTeamId?: number | null }>;
@@ -893,16 +892,11 @@ export default function TournamentDetailPage() {
   const router = useRouter();
   const tournamentId = Number(params.id);
   const { showError, showSuccess } = useToast();
-  const setPalette = useSetPalette();
   const [detail, setDetail] = useState<TournamentDetail | null>(null);
   const [drafts, setDrafts] = useState<MatchScoreDraft>({});
   const [adminDrafts, setAdminDrafts] = useState<AdminDraft>({});
   const [selectedMatchForAdmin, setSelectedMatchForAdmin] = useState<BracketMatch | null>(null);
   const [isAdminLoading, setIsAdminLoading] = useState(false);
-
-  useEffect(() => {
-    setPalette("blue");
-  }, [setPalette]);
 
   const load = useCallback(async () => {
     const response = await fetch(`/api/tournaments/${tournamentId}`, { cache: "no-store" });
