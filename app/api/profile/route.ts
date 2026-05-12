@@ -19,7 +19,6 @@ export async function PATCH(req: Request) {
   try {
     const body = (await req.json()) as {
       pseudo?: string;
-      avatarUrl?: string | null;
       overwatchBattletag?: string | null;
       marvelRivalsTag?: string | null;
       isAdult?: boolean | null;

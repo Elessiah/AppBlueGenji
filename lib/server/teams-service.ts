@@ -51,6 +51,27 @@ async function userOwnsTeam(teamId: number, userId: number): Promise<boolean> {
   return roles.includes("OWNER");
 }
 
+async function getMemberRoles(teamId: number, userId: number): Promise<TeamRole[] | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { roles_json: string })[]>(
+    `SELECT roles_json
+     FROM bg_team_members
+     WHERE team_id = ?
+       AND user_id = ?
+       AND left_at IS NULL
+     LIMIT 1`,
+    [teamId, userId],
+  );
+  if (rows.length === 0) return null;
+  return parseRoles(rows[0].roles_json);
+}
+
+async function userCanManageTeam(teamId: number, userId: number): Promise<boolean> {
+  const roles = await getMemberRoles(teamId, userId);
+  if (!roles) return false;
+  return roles.includes("OWNER") || roles.includes("MANAGER");
+}
+
 export async function listTeams(): Promise<TeamListItem[]> {
   const db = await getDatabase();
 
@@ -220,7 +241,7 @@ export async function listTeams(): Promise<TeamListItem[]> {
   return teams;
 }
 
-export async function createTeam(ownerUserId: number, name: string, logoUrl: string | null): Promise<number> {
+export async function createTeam(ownerUserId: number, name: string): Promise<number> {
   const db = await getDatabase();
 
   const [existingMembership] = await db.execute<(RowDataPacket & { id: number })[]>(
@@ -242,8 +263,8 @@ export async function createTeam(ownerUserId: number, name: string, logoUrl: str
 
     const [teamInsert] = await connection.execute<ResultSetHeader>(
       `INSERT INTO bg_teams (name, logo_url)
-       VALUES (?, ?)`,
-      [name.trim(), logoUrl],
+       VALUES (?, NULL)`,
+      [name.trim()],
     );
 
     const ownerRoles = JSON.stringify(["OWNER"]);
@@ -312,7 +333,7 @@ export async function getTeamDetail(teamId: number, viewerUserId: number): Promi
     [teamId],
   );
 
-  const canManage = await userOwnsTeam(teamId, viewerUserId);
+  const canManage = await userCanManageTeam(teamId, viewerUserId);
 
   return {
     team: {
@@ -338,7 +359,7 @@ export async function getTeamDetail(teamId: number, viewerUserId: number): Promi
 export async function updateTeamMeta(
   requesterId: number,
   teamId: number,
-  patch: { name?: string; logoUrl?: string | null },
+  patch: { name?: string },
 ): Promise<void> {
   const db = await getDatabase();
   if (!(await userOwnsTeam(teamId, requesterId))) {
@@ -353,15 +374,36 @@ export async function updateTeamMeta(
     params.push(patch.name.trim());
   }
 
-  if (patch.logoUrl !== undefined) {
-    updates.push("logo_url = ?");
-    params.push(patch.logoUrl);
-  }
-
   if (updates.length === 0) return;
 
   params.push(teamId);
   await db.execute(`UPDATE bg_teams SET ${updates.join(", ")} WHERE id = ?`, params);
+}
+
+export async function updateTeamLogo(
+  requesterId: number,
+  teamId: number,
+  logoPath: string | null,
+): Promise<void> {
+  if (!(await userCanManageTeam(teamId, requesterId))) {
+    throw new Error("FORBIDDEN");
+  }
+  const db = await getDatabase();
+  await db.execute(`UPDATE bg_teams SET logo_url = ? WHERE id = ?`, [logoPath, teamId]);
+}
+
+export async function getTeamLogoUrl(teamId: number): Promise<string | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { logo_url: string | null })[]>(
+    `SELECT logo_url FROM bg_teams WHERE id = ? LIMIT 1`,
+    [teamId],
+  );
+  if (rows.length === 0) return null;
+  return rows[0].logo_url;
+}
+
+export async function canManageTeam(teamId: number, userId: number): Promise<boolean> {
+  return userCanManageTeam(teamId, userId);
 }
 
 export async function addTeamMember(
@@ -410,12 +452,19 @@ export async function updateTeamMemberRoles(
   roles: TeamRole[],
 ): Promise<void> {
   const db = await getDatabase();
-  if (!(await userOwnsTeam(teamId, requesterId))) {
-    throw new Error("FORBIDDEN");
-  }
 
-  if (memberUserId === requesterId) {
-    throw new Error("OWNER_CANNOT_EDIT_SELF");
+  const requesterRoles = await getMemberRoles(teamId, requesterId);
+  if (!requesterRoles) throw new Error("FORBIDDEN");
+  const requesterIsOwner = requesterRoles.includes("OWNER");
+  const requesterIsManager = requesterRoles.includes("MANAGER");
+  if (!requesterIsOwner && !requesterIsManager) throw new Error("FORBIDDEN");
+
+  const targetRoles = await getMemberRoles(teamId, memberUserId);
+  if (!targetRoles) throw new Error("MEMBER_NOT_FOUND");
+  const targetIsOwner = targetRoles.includes("OWNER");
+
+  if (targetIsOwner && !requesterIsOwner) {
+    throw new Error("FORBIDDEN");
   }
 
   const filteredRoles = sanitizeRoles(roles).filter((role) => role !== "OWNER");
@@ -423,13 +472,17 @@ export async function updateTeamMemberRoles(
     throw new Error("MISSING_ROLE");
   }
 
+  const finalRoles = targetIsOwner
+    ? (["OWNER", ...filteredRoles] as TeamRole[])
+    : filteredRoles;
+
   const [res] = await db.execute<ResultSetHeader>(
     `UPDATE bg_team_members
      SET roles_json = ?
      WHERE team_id = ?
        AND user_id = ?
        AND left_at IS NULL`,
-    [JSON.stringify(filteredRoles), teamId, memberUserId],
+    [JSON.stringify(finalRoles), teamId, memberUserId],
   );
 
   if (Number(res.affectedRows) === 0) {
@@ -485,4 +538,60 @@ export async function isTeamOwner(userId: number, teamId: number): Promise<boole
   return userOwnsTeam(teamId, userId);
 }
 
+export async function transferTeamOwnership(
+  requesterId: number,
+  teamId: number,
+  newOwnerUserId: number,
+): Promise<void> {
+  if (requesterId === newOwnerUserId) {
+    throw new Error("TRANSFER_TO_SELF");
+  }
+
+  const db = await getDatabase();
+
+  const requesterRoles = await getMemberRoles(teamId, requesterId);
+  if (!requesterRoles || !requesterRoles.includes("OWNER")) {
+    throw new Error("FORBIDDEN");
+  }
+
+  const targetRoles = await getMemberRoles(teamId, newOwnerUserId);
+  if (!targetRoles) {
+    throw new Error("MEMBER_NOT_FOUND");
+  }
+
+  const newOwnerRoles: TeamRole[] = ["OWNER", ...targetRoles.filter((r) => r !== "OWNER")];
+
+  const oldOwnerRemaining = requesterRoles.filter((r) => r !== "OWNER");
+  const oldOwnerRoles: TeamRole[] = oldOwnerRemaining.length === 0 ? ["DPS"] : oldOwnerRemaining;
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    await connection.execute(
+      `UPDATE bg_team_members
+       SET roles_json = ?
+       WHERE team_id = ?
+         AND user_id = ?
+         AND left_at IS NULL`,
+      [JSON.stringify(oldOwnerRoles), teamId, requesterId],
+    );
+
+    await connection.execute(
+      `UPDATE bg_team_members
+       SET roles_json = ?
+       WHERE team_id = ?
+         AND user_id = ?
+         AND left_at IS NULL`,
+      [JSON.stringify(newOwnerRoles), teamId, newOwnerUserId],
+    );
+
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
 

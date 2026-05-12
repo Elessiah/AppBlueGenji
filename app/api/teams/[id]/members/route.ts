@@ -59,7 +59,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     const message = (error as Error).message;
     if (message === "FORBIDDEN") return fail(message, 403);
     if (message === "MEMBER_NOT_FOUND") return fail(message, 404);
-    if (message === "OWNER_CANNOT_EDIT_SELF" || message === "MISSING_ROLE") return fail(message, 400);
+    if (message === "MISSING_ROLE") return fail(message, 400);
     return fail(message || "TEAM_MEMBER_UPDATE_FAILED", 400);
   }
 }

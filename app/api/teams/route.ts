@@ -17,14 +17,14 @@ export async function POST(req: Request) {
   if (!user) return fail("UNAUTHORIZED", 401);
 
   try {
-    const body = (await req.json()) as { name?: string; logoUrl?: string | null };
+    const body = (await req.json()) as { name?: string };
     const name = (body.name ?? "").trim();
 
     if (name.length < 3 || name.length > 60) {
       return fail("INVALID_TEAM_NAME", 400);
     }
 
-    const teamId = await createTeam(user.id, name, body.logoUrl ?? null);
+    const teamId = await createTeam(user.id, name);
     return ok({ teamId }, 201);
   } catch (error) {
     const message = (error as Error).message;

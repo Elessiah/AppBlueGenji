@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
 import { Coche } from "@/components/Coche";
@@ -14,13 +14,15 @@ const VISIBILITY_LABELS: Record<string, string> = {
   major: "Majorité",
 };
 
+const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
 export default function ProfilePage() {
   const router = useRouter();
   const { showError, showSuccess } = useToast();
   const [data, setData] = useState<FullProfileResponse | null>(null);
 
   const [pseudo, setPseudo] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
   const [overwatchBattletag, setOverwatchBattletag] = useState("");
   const [marvelRivalsTag, setMarvelRivalsTag] = useState("");
   const [isAdult, setIsAdult] = useState<string>("unknown");
@@ -29,6 +31,8 @@ export default function ProfilePage() {
     marvel: false,
     major: false,
   });
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -45,7 +49,6 @@ export default function ProfilePage() {
       }
       setData(payload);
       setPseudo(payload.profile.pseudo);
-      setAvatarUrl(payload.profile.avatarUrl || "");
       setOverwatchBattletag(payload.profile.overwatchBattletag || "");
       setMarvelRivalsTag(payload.profile.marvelRivalsTag || "");
       setIsAdult(payload.profile.isAdult === null ? "unknown" : payload.profile.isAdult ? "yes" : "no");
@@ -63,7 +66,6 @@ export default function ProfilePage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           pseudo,
-          avatarUrl: avatarUrl.trim() ? avatarUrl.trim() : null,
           overwatchBattletag: overwatchBattletag.trim() ? overwatchBattletag.trim() : null,
           marvelRivalsTag: marvelRivalsTag.trim() ? marvelRivalsTag.trim() : null,
           isAdult: isAdult === "unknown" ? null : isAdult === "yes",
@@ -76,6 +78,54 @@ export default function ProfilePage() {
       showSuccess("Profil mis à jour.");
     } catch (e) {
       showError((e as Error).message);
+    }
+  };
+
+  const onAvatarChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type) || file.size > MAX_IMAGE_BYTES) {
+      showError("Image trop lourde ou format non supporté");
+      return;
+    }
+
+    setAvatarBusy(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/profile/avatar", {
+        method: "POST",
+        body: formData,
+      });
+      const payload = (await response.json()) as { avatarUrl?: string | null; error?: string };
+      if (!response.ok) throw new Error(payload.error || "AVATAR_UPLOAD_FAILED");
+      setData((prev) =>
+        prev ? { ...prev, profile: { ...prev.profile, avatarUrl: payload.avatarUrl ?? null } } : prev,
+      );
+      showSuccess("Avatar mis à jour.");
+    } catch (e) {
+      showError((e as Error).message);
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  const onAvatarDelete = async () => {
+    setAvatarBusy(true);
+    try {
+      const response = await fetch("/api/profile/avatar", { method: "DELETE" });
+      const payload = (await response.json()) as { avatarUrl?: string | null; error?: string };
+      if (!response.ok) throw new Error(payload.error || "AVATAR_DELETE_FAILED");
+      setData((prev) =>
+        prev ? { ...prev, profile: { ...prev.profile, avatarUrl: null } } : prev,
+      );
+      showSuccess("Avatar supprimé.");
+    } catch (e) {
+      showError((e as Error).message);
+    } finally {
+      setAvatarBusy(false);
     }
   };
 
@@ -118,8 +168,49 @@ export default function ProfilePage() {
               <input value={pseudo} onChange={(e) => setPseudo(e.target.value)} />
             </div>
             <div className="field">
-              <label>Avatar URL</label>
-              <input value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://..." />
+              <label>Avatar</label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={onAvatarChange}
+                style={{ display: "none" }}
+              />
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={avatarBusy}
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    padding: "9px 18px",
+                    fontSize: 13,
+                    opacity: avatarBusy ? 0.6 : 1,
+                    cursor: avatarBusy ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {avatarBusy ? "Envoi…" : "Changer l'avatar"}
+                </button>
+                {data?.profile.avatarUrl ? (
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    disabled={avatarBusy}
+                    onClick={onAvatarDelete}
+                    style={{
+                      padding: "9px 18px",
+                      fontSize: 13,
+                      opacity: avatarBusy ? 0.6 : 1,
+                      cursor: avatarBusy ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    Supprimer
+                  </button>
+                ) : null}
+              </div>
+              <p style={{ fontSize: 11, color: "var(--text-2)", margin: "6px 0 0" }}>
+                PNG, JPEG ou WebP — 5 Mo max
+              </p>
             </div>
             <div className="field">
               <label>BattleTag Overwatch</label>

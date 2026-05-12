@@ -373,7 +373,6 @@ export async function updateOwnProfile(
   userId: number,
   patch: {
     pseudo?: string;
-    avatarUrl?: string | null;
     overwatchBattletag?: string | null;
     marvelRivalsTag?: string | null;
     isAdult?: boolean | null;
@@ -402,7 +401,6 @@ export async function updateOwnProfile(
   await db.execute(
     `UPDATE bg_users
      SET pseudo = COALESCE(?, pseudo),
-         avatar_url = ?,
          overwatch_battletag = ?,
          marvel_rivals_tag = ?,
          is_adult = ?,
@@ -414,7 +412,6 @@ export async function updateOwnProfile(
      WHERE id = ?`,
     [
       patch.pseudo ? normalizePseudo(patch.pseudo) : null,
-      patch.avatarUrl === undefined ? null : patch.avatarUrl,
       patch.overwatchBattletag === undefined ? null : patch.overwatchBattletag,
       patch.marvelRivalsTag === undefined ? null : patch.marvelRivalsTag,
       patch.isAdult === undefined ? null : patch.isAdult,
@@ -425,6 +422,14 @@ export async function updateOwnProfile(
       patch.visibility?.major ?? null,
       userId,
     ],
+  );
+}
+
+export async function updateUserAvatar(userId: number, avatarPath: string | null): Promise<void> {
+  const db = await getDatabase();
+  await db.execute(
+    `UPDATE bg_users SET avatar_url = ? WHERE id = ?`,
+    [avatarPath, userId],
   );
 }
 

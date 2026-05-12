@@ -124,17 +124,21 @@
   font-size: 11px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ink-mute);
+  color: var(--blue-300);
   padding: 8px 14px;
-  border: 1px solid var(--line-strong-cy);
+  border: 1px solid rgba(90, 200, 255, 0.45);
+  background: rgba(90, 200, 255, 0.08);
   border-radius: var(--r-cy-sm);
+  box-shadow: 0 0 12px rgba(90, 200, 255, 0.18), inset 0 0 0 1px rgba(90, 200, 255, 0.04);
   transition: all 0.15s;
   text-decoration: none;
 }
 
 .navHome:hover {
-  color: var(--blue-300);
-  border-color: rgba(90, 200, 255, 0.35);
+  color: var(--blue-200, #8ddcff);
+  border-color: rgba(90, 200, 255, 0.65);
+  background: rgba(90, 200, 255, 0.14);
+  box-shadow: 0 0 18px rgba(90, 200, 255, 0.35);
 }
 
 .avatarChip {

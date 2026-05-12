@@ -29,10 +29,9 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   }
 
   try {
-    const body = (await req.json()) as { name?: string; logoUrl?: string | null };
+    const body = (await req.json()) as { name?: string };
     await updateTeamMeta(user.id, teamId, {
       name: body.name,
-      logoUrl: body.logoUrl,
     });
 
     const detail = await getTeamDetail(teamId, user.id);

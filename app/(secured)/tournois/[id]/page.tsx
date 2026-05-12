@@ -1075,9 +1075,6 @@ export default function TournamentDetailPage() {
 
   return (
     <>
-      <Link href="/" className="cta-float-home home" style={{ bottom: 28 }}>
-        ⌂ Accueil
-      </Link>
       <section className="fade-in">
 
         <div className="ds-header green">
