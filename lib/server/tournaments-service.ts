@@ -933,33 +933,49 @@ async function syncTournamentState(
   return { row: tournament, stateChanged };
 }
 
+let pendingSync: Promise<void> | null = null;
+let lastSyncAt = 0;
+const SYNC_THROTTLE_MS = 1000;
+
 async function syncVisibleTournaments(): Promise<void> {
-  const db = await getDatabase();
-  const connection = await db.getConnection();
-  const changedIds: number[] = [];
+  if (pendingSync) return pendingSync;
+  if (Date.now() - lastSyncAt < SYNC_THROTTLE_MS) return;
 
-  try {
-    await connection.beginTransaction();
+  pendingSync = (async () => {
+    const db = await getDatabase();
+    const connection = await db.getConnection();
+    const changedIds: number[] = [];
 
-    const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
-      `SELECT id FROM bg_tournaments WHERE state <> 'FINISHED'`,
-    );
+    try {
+      await connection.beginTransaction();
 
-    for (const row of rows) {
-      const { stateChanged } = await syncTournamentState(connection, Number(row.id));
-      if (stateChanged) changedIds.push(Number(row.id));
+      const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
+        `SELECT id FROM bg_tournaments WHERE state <> 'FINISHED'`,
+      );
+
+      for (const row of rows) {
+        const { stateChanged } = await syncTournamentState(connection, Number(row.id));
+        if (stateChanged) changedIds.push(Number(row.id));
+      }
+
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
     }
 
-    await connection.commit();
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
+    for (const id of changedIds) {
+      publishTournamentEvent({ type: "updated", tournamentId: id, emittedAt: new Date().toISOString() });
+    }
+  })();
 
-  for (const id of changedIds) {
-    publishTournamentEvent({ type: "updated", tournamentId: id, emittedAt: new Date().toISOString() });
+  try {
+    await pendingSync;
+  } finally {
+    lastSyncAt = Date.now();
+    pendingSync = null;
   }
 }
 
@@ -1185,24 +1201,60 @@ export async function registerCurrentUserTeam(tournamentId: number, userId: numb
   }
 }
 
+async function hasExpiredScoreReports(db: Awaited<ReturnType<typeof getDatabase>>, tournamentId: number): Promise<boolean> {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_matches WHERE tournament_id = ? AND status = 'AWAITING_CONFIRMATION' AND score_deadline_at <= NOW() LIMIT 1`,
+    [tournamentId]
+  );
+  return rows.length > 0;
+}
+
+function hasPendingStateTransition(row: TournamentRow): boolean {
+  const currentState = computeTournamentState(row);
+  return currentState !== row.state;
+}
+
 export async function getTournamentDetail(tournamentId: number, userId: number, isAdmin = false): Promise<TournamentDetail | null> {
   const db = await getDatabase();
   const activeTeam = await getUserActiveTeam(userId);
 
-  const connection = await db.getConnection();
-  try {
-    await connection.beginTransaction();
-    const { row: tournament } = await syncTournamentState(connection, tournamentId);
-    await connection.commit();
+  // Fast read: load tournament without transaction
+  const [tournamentRows] = await db.execute<TournamentRow[]>(
+    `SELECT id, organizer_user_id, name, description, format, game, max_teams, state,
+            start_visibility_at, registration_open_at, registration_close_at, start_at,
+            bracket_size, created_at, finished_at, has_third_place_match
+     FROM bg_tournaments WHERE id = ? LIMIT 1`,
+    [tournamentId]
+  );
+  if (tournamentRows.length === 0) return null;
 
-    if (!tournament) {
-      return null;
+  const tournamentRow = tournamentRows[0];
+
+  // Only sync if tournament is RUNNING and needs reconciliation
+  const needsSync =
+    tournamentRow.state === "RUNNING" &&
+    (tournamentRow.bracket_size === null ||
+      (await hasExpiredScoreReports(db, tournamentId)) ||
+      hasPendingStateTransition(tournamentRow));
+
+  let tournament: TournamentRow | null = tournamentRow;
+  if (needsSync) {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+      const syncResult = await syncTournamentState(connection, tournamentId);
+      tournament = syncResult.row;
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
     }
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
+  }
+
+  if (!tournament) {
+    return null;
   }
 
   const [cardRows] = await db.execute<TournamentListRow[]>(
@@ -1362,6 +1414,7 @@ export async function reportMatchScore(
 
   const db = await getDatabase();
   const connection = await db.getConnection();
+  let pendingBotLog: string | null = null;
 
   try {
     await connection.beginTransaction();
@@ -1514,9 +1567,7 @@ export async function reportMatchScore(
 
         if (teamNames.length > 0) {
           const info = teamNames[0];
-          await sendBotLog(
-            `[Score conflict] Tournoi "${info.tournament_name}" - Match #${matchId} : ${info.team1_name} vs ${info.team2_name}. Validation admin requise.`,
-          );
+          pendingBotLog = `[Score conflict] Tournoi "${info.tournament_name}" - Match #${matchId} : ${info.team1_name} vs ${info.team2_name}. Validation admin requise.`;
         }
       }
     }
@@ -1538,6 +1589,9 @@ export async function reportMatchScore(
     throw error;
   } finally {
     connection.release();
+    if (pendingBotLog) {
+      void sendBotLog(pendingBotLog); // fire-and-forget, pas d'await
+    }
   }
 }
 

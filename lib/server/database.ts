@@ -137,7 +137,7 @@ async function runMigrations(db: Pool): Promise<void> {
     CREATE TABLE IF NOT EXISTS bg_matches (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       tournament_id BIGINT NOT NULL,
-      bracket ENUM('UPPER', 'LOWER', 'GRAND') NOT NULL,
+      bracket ENUM('UPPER', 'LOWER', 'GRAND', 'THIRD_PLACE') NOT NULL,
       round_number INT NOT NULL,
       match_number INT NOT NULL,
       team1_id BIGINT NULL,
@@ -288,7 +288,7 @@ export async function getDatabase(): Promise<Pool> {
       password: requireEnv("DB_PASSWORD"),
       database: requireEnv("DB_DATABASE"),
       waitForConnections: true,
-      connectionLimit: 10,
+      connectionLimit: 25,
       connectTimeout: 10000,
       namedPlaceholders: true,
       charset: "utf8mb4",

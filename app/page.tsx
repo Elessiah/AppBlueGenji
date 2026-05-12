@@ -25,18 +25,19 @@ function chooseNextTournament(buckets: TournamentBuckets): TournamentCard | null
 }
 
 export default async function HomePage() {
-  const [stats, live, leaderboard, events, ticker, buckets, sponsors] = await Promise.all([
+  const buckets = await listTournamentBuckets(null).catch(() => ({
+    upcoming: [],
+    registration: [],
+    running: [],
+    finished: [],
+  }));
+
+  const [stats, live, leaderboard, events, ticker, sponsors] = await Promise.all([
     getLandingStats(),
-    getLandingLive(),
+    getLandingLive(buckets),
     getLandingLeaderboard(),
-    getLandingCalendar(),
+    getLandingCalendar(buckets, 5),
     getLandingTicker(),
-    listTournamentBuckets(null).catch(() => ({
-      upcoming: [],
-      registration: [],
-      running: [],
-      finished: [],
-    })),
     listSponsors().catch(() => []),
   ]);
 
