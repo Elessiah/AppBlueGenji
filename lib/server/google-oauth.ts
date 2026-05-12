@@ -22,6 +22,12 @@ export function getGoogleRedirectUri(): string {
   return `${appUrl.replace(/\/$/, "")}/api/auth/google/callback`;
 }
 
+export function getAppBaseUrl(fallback: string): string {
+  const appUrl = process.env.APP_URL?.trim();
+  if (appUrl) return appUrl.replace(/\/$/, "");
+  return fallback;
+}
+
 export function buildGoogleAuthorizationUrl(state: string): string {
   const params = new URLSearchParams({
     client_id: requireGoogleEnv("GOOGLE_CLIENT_ID"),

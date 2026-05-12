@@ -1,9 +1,10 @@
 ﻿import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { buildGoogleAuthorizationUrl } from "@/lib/server/google-oauth";
+import { buildGoogleAuthorizationUrl, getAppBaseUrl } from "@/lib/server/google-oauth";
 import { saveGoogleOAuthState } from "@/lib/server/auth";
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
+  const base = getAppBaseUrl(req.url);
   const redirectTo = req.nextUrl.searchParams.get("redirect") || "/tournois";
   const state = crypto.randomBytes(24).toString("hex");
 
@@ -17,9 +18,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       message.startsWith("Missing GOOGLE_") || message.includes("Missing GOOGLE_REDIRECT_URI or APP_URL");
 
     if (missingConfig) {
-      return NextResponse.redirect(new URL("/connexion?error=google_not_configured", req.url));
+      return NextResponse.redirect(new URL("/connexion?error=google_not_configured", base));
     }
 
-    return NextResponse.redirect(new URL("/connexion?error=google_unavailable", req.url));
+    return NextResponse.redirect(new URL("/connexion?error=google_unavailable", base));
   }
 }
