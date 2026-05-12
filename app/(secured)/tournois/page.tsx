@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
+import type { TournamentBuckets } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { BgCanvas } from "../_shared/BgCanvas";
 import { Ticker } from "@/components/cyber/Ticker";
-import { formatLocalDateTime } from "@/lib/shared/dates";
 import { RunningCard } from "./cards/RunningCard";
 import { RegistrationCard } from "./cards/RegistrationCard";
 import { UpcomingCard } from "./cards/UpcomingCard";
 import { FinishedCard } from "./cards/FinishedCard";
 import { Section } from "./Section";
+import { filterBuckets, countByGame, type GameFilter } from "./_lib/buckets";
+import { buildTickerItems } from "./_lib/ticker";
 import s from "./tournois.module.css";
 
 const emptyBuckets: TournamentBuckets = {
@@ -21,61 +22,11 @@ const emptyBuckets: TournamentBuckets = {
   finished: [],
 };
 
-function filterBuckets(
-  buckets: TournamentBuckets,
-  query: string,
-  gameFilter: string
-): TournamentBuckets {
-  const filterTournaments = (tournaments: TournamentCard[]) =>
-    tournaments.filter((t) => {
-      const lowerQuery = query.toLowerCase();
-      const nameMatch = t.name.toLowerCase().includes(lowerQuery);
-      const descMatch = (t.description || "").toLowerCase().includes(lowerQuery);
-      const matchQuery = !query || nameMatch || descMatch;
-
-      const matchGame =
-        gameFilter === "all" ||
-        (gameFilter === "ow2" && t.game === "OW2") ||
-        (gameFilter === "mr" && t.game === "MR");
-
-      return matchQuery && matchGame;
-    });
-
-  return {
-    upcoming: filterTournaments(buckets.upcoming),
-    registration: filterTournaments(buckets.registration),
-    running: filterTournaments(buckets.running),
-    finished: filterTournaments(buckets.finished),
-  };
-}
-
-function buildTickerItems(buckets: TournamentBuckets): string[] {
-  const items: string[] = [];
-
-  buckets.running.forEach((t) => {
-    items.push(`RÉSULTAT · ${t.name} · ${t.registeredTeams} équipes engagées`);
-  });
-
-  buckets.registration.slice(0, 3).forEach((t) => {
-    items.push(`INSCRIPTIONS · ${t.name} · ${t.registeredTeams}/${t.maxTeams} équipes`);
-  });
-
-  buckets.upcoming.slice(0, 2).forEach((t) => {
-    items.push(`À VENIR · ${t.name} · ${formatLocalDateTime(t.startAt)}`);
-  });
-
-  if (items.length === 0) {
-    items.push("Aucune actualité tournoi pour le moment");
-  }
-
-  return items;
-}
-
 export default function TournamentsPage() {
   const { showError } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
-  const [gameFilter, setGameFilter] = useState<"all" | "ow2" | "mr">("all");
+  const [gameFilter, setGameFilter] = useState<GameFilter>("all");
   const [buckets, setBuckets] = useState<TournamentBuckets>(emptyBuckets);
   const [finishedDisplayLimit, setFinishedDisplayLimit] = useState(12);
 
@@ -110,19 +61,6 @@ export default function TournamentsPage() {
   }, [query, gameFilter]);
 
   const filteredBuckets = filterBuckets(buckets, query, gameFilter);
-
-  const countByGame = (bracket: "all" | "ow2" | "mr") => {
-    const allTournaments = [
-      ...buckets.upcoming,
-      ...buckets.registration,
-      ...buckets.running,
-      ...buckets.finished,
-    ];
-    if (bracket === "all") return allTournaments.length;
-    if (bracket === "ow2") return allTournaments.filter((t) => t.game === "OW2").length;
-    if (bracket === "mr") return allTournaments.filter((t) => t.game === "MR").length;
-    return 0;
-  };
 
   const totalRunning = filteredBuckets.running.length;
   const totalRegistration = filteredBuckets.registration.length;
@@ -204,10 +142,10 @@ export default function TournamentsPage() {
               <button
                 key={key}
                 className={`${s.chip} ${gameFilter === key ? s.chipOn : ""}`}
-                onClick={() => setGameFilter(key as "all" | "ow2" | "mr")}
+                onClick={() => setGameFilter(key as GameFilter)}
               >
                 {label}
-                <span className={s.num}>{countByGame(key as "all" | "ow2" | "mr")}</span>
+                <span className={s.num}>{countByGame(buckets, key as GameFilter)}</span>
               </button>
             ))}
           </div>
