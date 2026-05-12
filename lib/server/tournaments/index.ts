@@ -57,7 +57,7 @@ import { tryAutoResolveByes } from "./byes";
 import { mapCard, mapMatch } from "./_internal";
 import { getTournamentListRow, getRegistrationRows, getMatchRows, loadTournamentRow } from "./repository";
 import { reportMatchScore } from "./scoring";
-import { publishUpdatedEvent, publishScoreReportedEvent, sendBotLogAsync } from "./notifications";
+import { publishUpdatedEvent, publishScoreReportedEvent, publishScoreResolvedEvent, sendBotLogAsync } from "./notifications";
 
 let pendingSync: Promise<void> | null = null;
 let lastSyncAt = 0;
