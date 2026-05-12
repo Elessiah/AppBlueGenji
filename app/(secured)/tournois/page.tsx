@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
-import { BgCanvas } from "./BgCanvas";
+import { BgCanvas } from "../_shared/BgCanvas";
 import { Ticker } from "@/components/cyber/Ticker";
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import { RunningCard } from "./cards/RunningCard";
 import { RegistrationCard } from "./cards/RegistrationCard";
 import { UpcomingCard } from "./cards/UpcomingCard";
 import { FinishedCard } from "./cards/FinishedCard";
+import { Section } from "./Section";
 import s from "./tournois.module.css";
 
 const emptyBuckets: TournamentBuckets = {
@@ -68,69 +69,6 @@ function buildTickerItems(buckets: TournamentBuckets): string[] {
   }
 
   return items;
-}
-
-interface SectionProps {
-  ix: string;
-  title: string;
-  accent?: string;
-  count: number;
-  defaultOpen?: boolean;
-  emptyMsg: string;
-  dataCols?: "1" | "2" | "3";
-  children: React.ReactNode;
-}
-
-function Section({
-  ix,
-  title,
-  accent,
-  count,
-  defaultOpen = true,
-  emptyMsg,
-  dataCols,
-  children,
-}: SectionProps) {
-  const [expanded, setExpanded] = useState(defaultOpen);
-
-  return (
-    <div className={s.section} data-cols={dataCols}>
-      <button
-        className={s.sectionHead}
-        aria-expanded={expanded}
-        onClick={() => setExpanded((x) => !x)}
-      >
-        <span className={s.sectionIx}>{ix}</span>
-        <h2 className={s.sectionTtl}>
-          {title}
-          {accent && <span className={s.sectionAccent}> {accent}</span>}
-        </h2>
-        <span className={s.sectionCount}>{count}</span>
-        <svg
-          className={s.sectionCaret}
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-        >
-          <path d="M10 6L8 9L6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-        </svg>
-      </button>
-
-      {expanded && (
-        count === 0 ? (
-          <div className={`${s.sectionBody} ${s.empty}`}>
-            <div className={s.emptyTitle}>Vide</div>
-            <div className={s.emptyMsg}>{emptyMsg}</div>
-          </div>
-        ) : (
-          <div className={s.sectionBody}>
-            {children}
-          </div>
-        )
-      )}
-    </div>
-  );
 }
 
 export default function TournamentsPage() {
@@ -193,7 +131,7 @@ export default function TournamentsPage() {
 
   return (
     <div className={s.page}>
-      <BgCanvas />
+      <BgCanvas mode="network" />
       <div className={s.fabric} />
       <div className={s.pageInner}>
         <div className="container">

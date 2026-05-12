@@ -3,16 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { TeamListItem } from "@/lib/shared/types";
+import { getPaletteColor } from "@/lib/shared/palette";
 import s from "./TeamCard.module.css";
 
-const TEAM_COLORS = ["#5ac8ff", "#ff9d2e", "#a773ff", "#4fe0a2", "#ff4d5e", "#8fd5ff", "#f5a524"];
-
-function colorFor(id: number) {
-  return TEAM_COLORS[id % TEAM_COLORS.length];
-}
-
 export function TeamCard({ team }: { team: TeamListItem }) {
-  const color = colorFor(team.id);
+  const color = getPaletteColor(team.id);
   const isTop3 = team.rank <= 3;
 
   return (

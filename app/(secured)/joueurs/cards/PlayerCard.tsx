@@ -3,13 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { PublicUserProfile } from "@/lib/shared/types";
+import { getPaletteColor } from "@/lib/shared/palette";
 import s from "../../_shared/annuaire.module.css";
-
-const TEAM_COLORS = ["#5ac8ff", "#ff9d2e", "#a773ff", "#4fe0a2", "#ff4d5e", "#8fd5ff", "#f5a524"];
-
-function colorFromIndex(i: number) {
-  return TEAM_COLORS[i % TEAM_COLORS.length];
-}
 
 const ROLE_CLASS: Record<string, string> = {
   DPS: s.dps,
@@ -32,7 +27,7 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 export function PlayerCard({ player }: { player: PublicUserProfile }) {
-  const teamColor = player.team ? colorFromIndex(player.team.colorIndex) : "var(--ink-mute)";
+  const teamColor = player.team ? getPaletteColor(player.team.colorIndex) : "var(--ink-mute)";
 
   return (
     <Link href={`/joueurs/${player.id}`} className={s.plCard} style={{ "--c": teamColor } as React.CSSProperties}>

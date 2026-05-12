@@ -6,6 +6,7 @@ import type { PublicUserProfile, PlayerRole } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { Ticker } from "@/components/cyber/Ticker";
 import { BgCanvas } from "../_shared/BgCanvas";
+import { AnnuaireSearchField } from "../_shared/AnnuaireSearchField";
 import { PlayerCard } from "./cards/PlayerCard";
 import s from "../_shared/annuaire.module.css";
 
@@ -115,28 +116,21 @@ export default function PlayersPage() {
           </div>
 
           <div className={s.toolbar}>
-            <div className={s.search}>
-              <span className={s.searchIcon}>
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                  <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.4" />
-                  <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                </svg>
-              </span>
-              <input
-                placeholder="Rechercher un pseudo, une équipe…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              <span className={s.searchKbd}>⌘K</span>
-            </div>
+            <AnnuaireSearchField
+              placeholder="Rechercher un pseudo, une équipe…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
             <div className={s.filters}>
-              {([
-                ["all", "Tous"],
-                ["DPS", "DPS"],
-                ["TANK", "Tank"],
-                ["HEAL", "Heal"],
-                ["COACH", "Coach"],
-              ] as const).map(([k, l]) => (
+              {(
+                [
+                  ["all", "Tous"],
+                  ["DPS", "DPS"],
+                  ["TANK", "Tank"],
+                  ["HEAL", "Heal"],
+                  ["COACH", "Coach"],
+                ] as const
+              ).map(([k, l]) => (
                 <button
                   key={k}
                   className={`${s.chip} ${roleFilter === k ? s.chipOn : ""}`}
@@ -153,10 +147,12 @@ export default function PlayersPage() {
               <span>{filtered.length} joueur{filtered.length > 1 ? "s" : ""}</span>
               <span style={{ color: "var(--ink-dim)" }}>·</span>
               <div style={{ display: "flex", gap: 12 }}>
-                {([
-                  ["all", "Tous"],
-                  ["free", "Free agents"],
-                ] as const).map(([k, l]) => (
+                {(
+                  [
+                    ["all", "Tous"],
+                    ["free", "Free agents"],
+                  ] as const
+                ).map(([k, l]) => (
                   <button
                     key={k}
                     onClick={() => setStatusFilter(k)}
@@ -169,10 +165,12 @@ export default function PlayersPage() {
             </div>
             <div className={s.sortOpts}>
               <span style={{ color: "var(--ink-dim)" }}>Trier :</span>
-              {([
-                ["pseudo", "Pseudo"],
-                ["tournaments", "Tournois"],
-              ] as const).map(([k, l]) => (
+              {(
+                [
+                  ["pseudo", "Pseudo"],
+                  ["tournaments", "Tournois"],
+                ] as const
+              ).map(([k, l]) => (
                 <button
                   key={k}
                   className={`${s.sortBtn} ${sort === k ? s.sortBtnOn : ""}`}

@@ -6,6 +6,7 @@ import type { TeamListItem } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { Ticker } from "@/components/cyber/Ticker";
 import { BgCanvas } from "../_shared/BgCanvas";
+import { AnnuaireSearchField } from "../_shared/AnnuaireSearchField";
 import { TeamCard } from "./cards/TeamCard";
 import { HighlightStrip } from "./cards/HighlightStrip";
 import s from "../_shared/annuaire.module.css";
@@ -122,26 +123,19 @@ export default function TeamsPage() {
           </div>
 
           <div className={s.toolbar}>
-            <div className={s.search}>
-              <span className={s.searchIcon}>
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                  <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.4" />
-                  <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                </svg>
-              </span>
-              <input
-                placeholder="Rechercher une équipe, un tag, une région…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              <span className={s.searchKbd}>⌘K</span>
-            </div>
+            <AnnuaireSearchField
+              placeholder="Rechercher une équipe, un tag, une région…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
             <div className={s.filters}>
-              {([
-                ["all", "Toutes", teams.length],
-                ["ow2", "Overwatch 2", countOw2],
-                ["mr", "Marvel Rivals", countMr],
-              ] as const).map(([k, label, n]) => (
+              {(
+                [
+                  ["all", "Toutes", teams.length],
+                  ["ow2", "Overwatch 2", countOw2],
+                  ["mr", "Marvel Rivals", countMr],
+                ] as const
+              ).map(([k, label, n]) => (
                 <button
                   key={k}
                   className={`${s.chip} ${gameFilter === k ? s.chipOn : ""}`}
@@ -158,12 +152,14 @@ export default function TeamsPage() {
             <span>{filtered.length} équipe{filtered.length > 1 ? "s" : ""}</span>
             <div className={s.sortOpts}>
               <span style={{ color: "var(--ink-dim)" }}>Trier :</span>
-              {([
-                ["rank", "Classement"],
-                ["name", "Nom"],
-                ["wins", "Victoires"],
-                ["members", "Effectif"],
-              ] as const).map(([k, l]) => (
+              {(
+                [
+                  ["rank", "Classement"],
+                  ["name", "Nom"],
+                  ["wins", "Victoires"],
+                  ["members", "Effectif"],
+                ] as const
+              ).map(([k, l]) => (
                 <button
                   key={k}
                   className={`${s.sortBtn} ${sort === k ? s.sortBtnOn : ""}`}
