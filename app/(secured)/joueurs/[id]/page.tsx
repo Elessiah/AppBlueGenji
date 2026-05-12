@@ -1,38 +1,53 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { LogoWithGlow } from "@/components/logo-with-glow";
 import { formatLocalDate } from "@/lib/shared/dates";
 import type { FullProfileResponse } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
+import { useResourceLoader } from "@/lib/shared/hooks/useResourceLoader";
 
 export default function PlayerDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { showError } = useToast();
-  const [data, setData] = useState<FullProfileResponse | null>(null);
+  const { status, data, error } = useResourceLoader<FullProfileResponse>(
+    `/api/players/${params.id}`,
+    {
+      onNotFoundRedirect: () => {
+        showError("PLAYER_NOT_FOUND");
+        setTimeout(() => router.push("/joueurs"), 1500);
+      },
+    },
+  );
 
-  useEffect(() => {
-    fetch(`/api/players/${params.id}`, { cache: "no-store" })
-      .then(async (response) => {
-        const payload = (await response.json()) as FullProfileResponse & { error?: string };
-        if (!response.ok) {
-          const errorCode = payload.error || "PLAYER_LOAD_FAILED";
-          if (errorCode === "PLAYER_NOT_FOUND") {
-            showError(errorCode);
-            setTimeout(() => router.push("/joueurs"), 1500);
-            return;
-          }
-          throw new Error(errorCode);
-        }
-        setData(payload);
-      })
-      .catch((e) => showError((e as Error).message));
-  }, [params.id, router, showError]);
+  if (status === "loading")
+    return <section className="ds-block" style={{ color: "var(--text-2)" }}>Chargement du profil joueur...</section>;
 
-  if (!data) return <section className="ds-block" style={{ color: "var(--text-2)" }}>Chargement du profil joueur...</section>;
+  if (status === "not-found")
+    return (
+      <section className="ds-block" style={{ color: "var(--text-2)" }}>
+        Joueur non trouvé.{" "}
+        <Link href="/joueurs" style={{ color: "var(--blue-100)" }}>
+          Retour aux joueurs
+        </Link>
+      </section>
+    );
+
+  if (status === "error") {
+    showError(error ?? "PLAYER_LOAD_FAILED");
+    return (
+      <section className="ds-block" style={{ color: "var(--text-2)" }}>
+        Erreur lors du chargement du joueur.{" "}
+        <Link href="/joueurs" style={{ color: "var(--blue-100)" }}>
+          Retour aux joueurs
+        </Link>
+      </section>
+    );
+  }
+
+  if (!data) return null;
 
   return (
     <section className="fade-in">
