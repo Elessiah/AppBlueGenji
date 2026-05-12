@@ -70,7 +70,7 @@ export default function PlayersPage() {
       <BgCanvas rgb={ACCENT_RGB} />
 
       <header className={s.page}>
-        <div className={s.fabric} />
+        <div className="fabric" />
         <div className={`container ${s.pageInner}`}>
           <div className={s.pageHead}>
             <div>
@@ -139,7 +139,7 @@ export default function PlayersPage() {
               ] as const).map(([k, l]) => (
                 <button
                   key={k}
-                  className={`${s.chip} ${roleFilter === k ? s.on : ""}`}
+                  className={`${s.chip} ${roleFilter === k ? s.chipOn : ""}`}
                   onClick={() => setRoleFilter(k)}
                 >
                   {l}

@@ -68,7 +68,7 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
       {(player.roles || []).length > 0 && (
         <div className={s.plRoles}>
           {(player.roles || []).slice(0, 4).map((r) => (
-            <span key={r} className={`${s.plRole} ${s[ROLE_CLASS[r]] || ""}`}>
+            <span key={r} className={`${s.plRole} ${ROLE_CLASS[r] || ""}`}>
               {ROLE_LABEL[r] || r}
             </span>
           ))}
