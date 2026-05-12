@@ -1,14 +1,14 @@
 import type { BracketMatch } from "@/lib/shared/types";
 import { useScoreForm } from "../_hooks/useScoreForm";
 
-interface ScoreInputDialogProps {
+interface AdminScoreDialogProps {
   match: BracketMatch | null;
   open: boolean;
   onClose: () => void;
   onSubmitted: () => void;
 }
 
-export function ScoreInputDialog({ match, open, onClose, onSubmitted }: ScoreInputDialogProps) {
+export function AdminScoreDialog({ match, open, onClose, onSubmitted }: AdminScoreDialogProps) {
   const form = useScoreForm(match);
 
   if (!open || !match) return null;

@@ -2,6 +2,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { TournamentBuckets, TournamentDetail, TournamentFormat, TournamentState } from "@/lib/shared/types";
 import { getDatabase } from "@/lib/server/database";
 import { getUserActiveTeam } from "@/lib/server/teams-service";
+import type { TournamentListRow } from "./_internal";
 
 // Internal types
 export type { TournamentRow, RegistrationRow, MatchRow, TournamentListRow } from "./_internal";
@@ -206,7 +207,7 @@ export async function listTournamentBuckets(searchTerm: string | null): Promise<
     params.push(`%${searchTerm.trim().toLowerCase()}%`);
   }
 
-  const [rows] = await db.execute<any[]>(
+  const [rows] = await db.execute<TournamentListRow[]>(
     `SELECT
       t.id,
       t.name,
