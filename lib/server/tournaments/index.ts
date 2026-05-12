@@ -2,7 +2,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { TournamentBuckets, TournamentDetail, TournamentFormat, TournamentState } from "@/lib/shared/types";
 import { getDatabase } from "@/lib/server/database";
 import { getUserActiveTeam } from "@/lib/server/teams-service";
-import type { TournamentListRow } from "./_internal";
+import type { TournamentRow, TournamentListRow } from "./_internal";
 
 // Internal types
 export type { TournamentRow, RegistrationRow, MatchRow, TournamentListRow } from "./_internal";
@@ -316,7 +316,7 @@ export async function getTournamentDetail(
       (await hasExpiredScoreReports(db, tournamentId)) ||
       (await hasPendingStateTransition(tournamentRow)));
 
-  let tournament = tournamentRow;
+  let tournament: TournamentRow | null = tournamentRow;
   if (needsSync) {
     const connection = await db.getConnection();
     try {
