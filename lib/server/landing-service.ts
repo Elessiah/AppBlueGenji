@@ -12,7 +12,7 @@ import {
   type LandingStats,
   type LandingTickerPayload,
 } from "@/lib/shared/landing";
-import type { BracketType, TournamentCard } from "@/lib/shared/types";
+import type { BracketType, TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 
 const DEFAULT_STATS: LandingStats = {
   players: 0,
@@ -75,10 +75,10 @@ function roundLabelFor(bracket: BracketType, roundNumber: number, matchCount: nu
   return `Round ${roundNumber}`;
 }
 
-export async function getLandingLive(): Promise<LandingLive | null> {
+export async function getLandingLive(buckets?: TournamentBuckets): Promise<LandingLive | null> {
   try {
-    const buckets = await listTournamentBuckets(null);
-    const tournament = buckets.running[0] ?? null;
+    const tournamentBuckets = buckets ?? await listTournamentBuckets(null);
+    const tournament = tournamentBuckets.running[0] ?? null;
     if (!tournament) return null;
 
     const db = await getDatabase();
@@ -222,11 +222,24 @@ function toCalendarEvent(card: TournamentCard): LandingCalendarEvent {
   };
 }
 
-export async function getLandingCalendar(limit = 5): Promise<LandingCalendarEvent[]> {
+export async function getLandingCalendar(bucketsOrLimit?: TournamentBuckets | number, limitParam?: number): Promise<LandingCalendarEvent[]> {
+  let buckets: TournamentBuckets | undefined;
+  let limit = limitParam ?? 5;
+
+  // Handle overload: if first param is a number, it's the old API (limit only)
+  if (typeof bucketsOrLimit === "number") {
+    limit = bucketsOrLimit;
+  } else if (bucketsOrLimit) {
+    buckets = bucketsOrLimit;
+    if (limitParam !== undefined) {
+      limit = limitParam;
+    }
+  }
+
   const safeLimit = Math.min(50, Math.max(1, Math.trunc(limit)));
   try {
-    const buckets = await listTournamentBuckets(null);
-    return [...buckets.upcoming, ...buckets.registration, ...buckets.running]
+    const tournamentBuckets = buckets ?? await listTournamentBuckets(null);
+    return [...tournamentBuckets.upcoming, ...tournamentBuckets.registration, ...tournamentBuckets.running]
       .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime())
       .slice(0, safeLimit)
       .map(toCalendarEvent);

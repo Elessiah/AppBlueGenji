@@ -46,6 +46,11 @@ a {
   text-decoration: none;
 }
 
+.container {
+  width: min(1280px, calc(100% - 48px));
+  margin-inline: auto;
+}
+
 .page-shell {
   width: min(1200px, calc(100vw - 40px));
   margin: 0 auto;

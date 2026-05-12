@@ -80,7 +80,7 @@ export default function TeamsPage() {
       <BgCanvas rgb={ACCENT_RGB} />
 
       <header className={s.page}>
-        <div className={s.fabric} />
+        <div className="fabric" />
         <div className={`container ${s.pageInner}`}>
           <div className={s.pageHead}>
             <div>
@@ -148,7 +148,7 @@ export default function TeamsPage() {
                   onClick={() => setGameFilter(k)}
                 >
                   {label}
-                  <span className="num">{n}</span>
+                  <span className={s.num}>{n}</span>
                 </button>
               ))}
             </div>
@@ -192,13 +192,7 @@ export default function TeamsPage() {
           </div>
 
           <div style={{ paddingTop: 24 }}>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
-                gap: 18,
-              }}
-            >
+            <div className={s.tmGrid}>
               {filtered.map((t) => (
                 <TeamCard key={t.id} team={t} />
               ))}
