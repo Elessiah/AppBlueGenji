@@ -918,20 +918,24 @@ export default function TournamentDetailPage() {
   }, [tournamentId, router, showError]);
 
   useEffect(() => {
-    load().catch((e) => showError((e as Error).message));
-  }, [load, showError]);
-
-  useEffect(() => {
     if (!tournamentId) return;
+    let cancelled = false;
+    load().catch((e) => { if (!cancelled) showError((e as Error).message); });
+
     const eventSource = new EventSource(`/api/tournaments/${tournamentId}/stream`);
     eventSource.onmessage = (event) => {
       const payload = JSON.parse(event.data) as { type?: string };
+      if (payload.type === "heartbeat" || payload.type === "connected") return;
       if (payload.type === "score_reported") playPing();
       load().catch(() => undefined);
     };
     eventSource.onerror = () => eventSource.close();
-    return () => eventSource.close();
-  }, [tournamentId, load]);
+
+    return () => {
+      cancelled = true;
+      eventSource.close();
+    };
+  }, [tournamentId, load, showError]);
 
   const canReport = (match: BracketMatch): boolean => {
     if (!detail?.myTeamId) return false;
@@ -966,7 +970,6 @@ export default function TournamentDetailPage() {
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
       showSuccess(`Score transmis pour le match #${match.id}.`);
-      await load();
     } catch (e) {
       showError(translateError((e as Error).message));
     }
@@ -995,7 +998,6 @@ export default function TournamentDetailPage() {
         delete next[match.id];
         return next;
       });
-      await load();
     } catch (e) {
       showError(translateError((e as Error).message));
     } finally {
@@ -1026,7 +1028,6 @@ export default function TournamentDetailPage() {
         delete next[match.id];
         return next;
       });
-      await load();
     } catch (e) {
       showError(translateError((e as Error).message));
     } finally {

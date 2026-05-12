@@ -3,6 +3,32 @@ import type { BotStats } from "@/lib/shared/types";
 const DEFAULT_BOT_INTERNAL_HOST = "127.0.0.1";
 const DEFAULT_BOT_INTERNAL_PORT = "4400";
 
+const BOT_FETCH_TIMEOUT_MS = 1500; // degradation gracieuse : 1.5 s max
+const BOT_LOGIN_FETCH_TIMEOUT_MS = 3000; // login = action utilisateur, on tolère un peu moins
+
+// Circuit breaker simple : si N échecs consécutifs, on court-circuite pendant T ms
+let consecutiveFailures = 0;
+let circuitOpenUntil = 0;
+const CIRCUIT_THRESHOLD = 3;
+const CIRCUIT_COOLDOWN_MS = 30_000;
+
+function isCircuitOpen(): boolean {
+  return Date.now() < circuitOpenUntil;
+}
+
+function recordFailure(): void {
+  consecutiveFailures += 1;
+  if (consecutiveFailures >= CIRCUIT_THRESHOLD) {
+    circuitOpenUntil = Date.now() + CIRCUIT_COOLDOWN_MS;
+    consecutiveFailures = 0;
+  }
+}
+
+function recordSuccess(): void {
+  consecutiveFailures = 0;
+  circuitOpenUntil = 0;
+}
+
 function getInternalHeaders(): HeadersInit {
   const token = process.env.BOT_INTERNAL_TOKEN;
   return token ? { "x-internal-token": token } : {};
@@ -48,6 +74,10 @@ async function safeReadError(response: Response): Promise<string> {
 }
 
 export async function fetchBotStats(): Promise<BotStats> {
+  if (isCircuitOpen()) {
+    return emptyBotStats(); // court-circuit, retour immédiat
+  }
+
   const baseUrl = resolveBotInternalUrl();
 
   try {
@@ -55,14 +85,18 @@ export async function fetchBotStats(): Promise<BotStats> {
       method: "GET",
       headers: getInternalHeaders(),
       cache: "no-store",
+      signal: AbortSignal.timeout(BOT_FETCH_TIMEOUT_MS),
     });
 
     if (!response.ok) {
-      throw new Error(`Bot stats error: ${response.status}`);
+      recordFailure();
+      return emptyBotStats();
     }
 
+    recordSuccess();
     return (await response.json()) as BotStats;
   } catch {
+    recordFailure();
     return emptyBotStats();
   }
 }
@@ -80,7 +114,7 @@ export async function sendDiscordLoginCode(discordId: string, code: string): Pro
       },
       body: JSON.stringify({ discordId, code }),
       cache: "no-store",
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(BOT_LOGIN_FETCH_TIMEOUT_MS),
     });
   } catch {
     throw new Error("BOT_INTERNAL_UNREACHABLE");
@@ -101,10 +135,12 @@ export async function sendDiscordLoginCode(discordId: string, code: string): Pro
 }
 
 export async function sendBotLog(message: string): Promise<void> {
+  if (isCircuitOpen()) return; // best-effort : on skip silencieusement
+
   const baseUrl = resolveBotInternalUrl();
 
   try {
-    await fetch(`${baseUrl}/internal/log`, {
+    const response = await fetch(`${baseUrl}/internal/log`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -112,8 +148,12 @@ export async function sendBotLog(message: string): Promise<void> {
       },
       body: JSON.stringify({ message }),
       cache: "no-store",
+      signal: AbortSignal.timeout(BOT_FETCH_TIMEOUT_MS),
     });
+    if (response.ok) recordSuccess();
+    else recordFailure();
   } catch {
-    // Best effort: tournament flow should not crash if bot log endpoint is unavailable.
+    recordFailure();
+    // Best-effort : on ne propage pas l'erreur.
   }
 }
