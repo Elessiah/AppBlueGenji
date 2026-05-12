@@ -16,6 +16,7 @@ import {
 } from "@/lib/server/landing-service";
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import { listSponsors } from "@/lib/server/sponsors-service";
+import { loadMiniBracket } from "@/lib/server/tournaments/bracket-loader";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 
 export const dynamic = "force-dynamic";
@@ -32,23 +33,23 @@ export default async function HomePage() {
     finished: [],
   }));
 
-  const [stats, live, leaderboard, events, ticker, sponsors] = await Promise.all([
+  const featured = chooseNextTournament(buckets);
+  const [stats, live, leaderboard, events, ticker, sponsors, miniBracket] = await Promise.all([
     getLandingStats(),
     getLandingLive(buckets),
     getLandingLeaderboard(),
     getLandingCalendar(buckets, 5),
     getLandingTicker(),
     listSponsors().catch(() => []),
+    featured ? loadMiniBracket(featured.id) : Promise.resolve([]),
   ]);
-
-  const nextUpcoming = chooseNextTournament(buckets);
 
   return (
     <main style={{ position: "relative", zIndex: 1 }}>
       <PublicHeader />
-      <Hero stats={stats} live={live} nextUpcoming={nextUpcoming} />
+      <Hero stats={stats} live={live} nextUpcoming={featured} />
       <Ticker items={ticker.items} />
-      <TournamentBoard buckets={buckets} />
+      <TournamentBoard buckets={buckets} featured={featured} miniBracket={miniBracket} />
       <LeaderCal leaderboard={leaderboard} events={events} />
       <AboutSection />
       <SponsorsGrid sponsors={sponsors} />
