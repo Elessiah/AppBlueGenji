@@ -271,6 +271,64 @@ async function runMigrations(db: Pool): Promise<void> {
       INDEX idx_bg_sponsors_active_order (active, display_order)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  // Migration: Add SWISS format support
+  try {
+    await db.execute(`
+      ALTER TABLE bg_tournaments
+      MODIFY COLUMN format ENUM('SINGLE', 'DOUBLE', 'SWISS') NOT NULL
+    `);
+  } catch {
+    // Already done
+  }
+
+  // Migration: Add Swiss tournament metadata columns
+  try {
+    await db.execute(`
+      ALTER TABLE bg_tournaments
+      ADD COLUMN swiss_total_rounds INT NULL,
+      ADD COLUMN swiss_current_round INT NOT NULL DEFAULT 0,
+      ADD COLUMN swiss_points_win INT NOT NULL DEFAULT 3,
+      ADD COLUMN swiss_points_draw INT NOT NULL DEFAULT 1,
+      ADD COLUMN swiss_points_loss INT NOT NULL DEFAULT 0,
+      ADD COLUMN swiss_points_bye INT NOT NULL DEFAULT 3,
+      ADD COLUMN swiss_tiebreakers_json JSON NULL
+    `);
+  } catch {
+    // Columns already exist
+  }
+
+  // Migration: Create Swiss standings table
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS bg_swiss_standings (
+      tournament_id BIGINT NOT NULL,
+      team_id BIGINT NOT NULL,
+      points INT NOT NULL DEFAULT 0,
+      wins INT NOT NULL DEFAULT 0,
+      draws INT NOT NULL DEFAULT 0,
+      losses INT NOT NULL DEFAULT 0,
+      byes INT NOT NULL DEFAULT 0,
+      opponent_ids_json JSON NOT NULL,
+      buchholz DECIMAL(6, 2) NOT NULL DEFAULT 0,
+      rank INT NOT NULL DEFAULT 0,
+      PRIMARY KEY (tournament_id, team_id),
+      CONSTRAINT fk_swiss_standings_tournament FOREIGN KEY (tournament_id)
+        REFERENCES bg_tournaments(id) ON DELETE CASCADE,
+      CONSTRAINT fk_swiss_standings_team FOREIGN KEY (team_id)
+        REFERENCES bg_teams(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // Migration: Add Swiss round and bye columns to matches
+  try {
+    await db.execute(`
+      ALTER TABLE bg_matches
+      ADD COLUMN swiss_round INT NULL,
+      ADD COLUMN is_bye BOOLEAN NOT NULL DEFAULT FALSE
+    `);
+  } catch {
+    // Columns already exist
+  }
 }
 
 async function ensureMigrations(db: Pool): Promise<void> {

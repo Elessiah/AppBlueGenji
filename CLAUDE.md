@@ -47,12 +47,14 @@ Auth enforcement: `requireCurrentUser()` is called server-side in `app/(secured)
 Direct MySQL2 pool. Schema migrations run automatically on first query. Tables: `bg_users`, `bg_teams`, `bg_team_members`, `bg_tournaments`, `bg_tournament_registrations`, `bg_matches`, `bg_user_sessions`.
 
 ### Tournament Engine (`lib/server/tournaments-service.ts`)
-Supports single and double elimination brackets. Key concepts:
+Supports single/double elimination and Swiss round formats. Key concepts:
+- **Formats:** `SINGLE`, `DOUBLE`, `SWISS` (see `plans/SwissRound.md` for Swiss spec)
 - **States:** `UPCOMING → REGISTRATION → RUNNING → FINISHED`
 - **Bracket positions:** `UPPER`, `LOWER`, `GRAND` finals
 - **Match status:** `PENDING → READY → AWAITING_CONFIRMATION → COMPLETED`
 - Bye slots for non-power-of-2 participant counts (`BYE_FUNCTIONALITY.md`)
 - Variable bracket sizing (`VARIABLE_SIZE_TOURNAMENTS.md`)
+- Swiss rounds: fixed number of rounds, pairing by points/standing, no elimination
 
 ### Live Updates (`lib/server/live.ts`)
 Node.js `EventEmitter` singleton publishes tournament events (`updated`, `score_reported`, `score_resolved`). Consumed via SSE at `/api/tournaments/[id]/stream`.

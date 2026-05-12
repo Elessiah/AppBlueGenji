@@ -1,4 +1,38 @@
-﻿export type TournamentFormat = "SINGLE" | "DOUBLE";
+﻿export type TournamentFormat = "SINGLE" | "DOUBLE" | "SWISS";
+
+export type SwissTournamentMeta = {
+  totalRounds: number;
+  currentRound: number;
+  pointsForWin: number;
+  pointsForDraw: number;
+  pointsForLoss: number;
+  pointsForBye: number;
+  tiebreakers: SwissTiebreaker[];
+};
+
+export type SwissTiebreaker = "buchholz" | "sonneborn-berger" | "opponent-mwp" | "head-to-head";
+
+export type SwissParticipantStanding = {
+  teamId: number;
+  teamName: string;
+  points: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  byes: number;
+  opponentIds: number[];
+  buchholz: number;
+  rank: number;
+};
+
+export type SwissPairing = {
+  round: number;
+  matches: Array<{
+    matchId: number | null;
+    teamAId: number;
+    teamBId: number | null;
+  }>;
+};
 
 export type TournamentState = "UPCOMING" | "REGISTRATION" | "RUNNING" | "FINISHED";
 
