@@ -49,6 +49,9 @@ export { tryAutoResolveByes } from "./byes";
 // Finalization
 export { finalizeTournamentIfDone, resolveExpiredScoreReports } from "./finalization";
 
+// Swiss
+export { initializeSwissTournament, generateFirstRound, generateNextRound, applySwissMatchResult } from "./swiss";
+
 // Public API functions
 import { syncTournamentState } from "./state";
 import { registerCurrentUserTeam as registerTeamInternal } from "./registration";
@@ -396,6 +399,10 @@ export async function reportMatchScorePublic(
       myScoreRaw,
       opponentScoreRaw,
     );
+
+    // Apply Swiss result if applicable
+    const { applySwissMatchResult } = await import("./tournaments/swiss");
+    await applySwissMatchResult(matchId, connection);
 
     await resolveExpiredScoreReports(connection, tournamentId);
     await tryAutoResolveByes(connection, tournamentId);

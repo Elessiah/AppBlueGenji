@@ -38,6 +38,13 @@ export async function syncTournamentState(
   let stateChanged = false;
 
   if (computed !== tournament.state) {
+    // Handle Swiss tournament initialization when transitioning to RUNNING
+    if (tournament.state === "REGISTRATION" && computed === "RUNNING" && tournament.format === "SWISS") {
+      const { initializeSwissTournament, generateFirstRound } = await import("./swiss");
+      await initializeSwissTournament(tournamentId, connection);
+      await generateFirstRound(tournamentId, connection);
+    }
+
     await updateTournamentState(connection, tournamentId, computed);
     tournament.state = computed;
     stateChanged = true;
