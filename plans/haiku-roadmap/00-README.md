@@ -9,7 +9,8 @@ Cible : **Claude Haiku 4.5**. Chaque sous-fichier est **autonome** : Haiku lit c
 1. Lire **uniquement** le sous-fichier ciblé.
 2. Exécuter sans détour : pas de refactor opportuniste, pas de réécriture hors périmètre.
 3. À la fin de chaque tâche : `npm run lint` + `npm test` (le cas échéant) + court résumé en français.
-4. Arrêter tout `npm run dev` lancé pour vérification.
+4. **Commit à chaque fin de tâche.** Une fois lint + tests verts, créer un commit ciblé sur les fichiers modifiés. Format : `<type>(<scope>): <résumé court>` où `<type>` ∈ `fix|feat|refactor|chore|docs` et `<scope>` reprend le numéro de tâche (ex. `feat(swiss-17): add pairing engine`). Ne jamais laisser une tâche terminée non commitée — le travail non commité peut être écrasé par une tâche parallèle.
+5. Arrêter tout `npm run dev` lancé pour vérification.
 
 ## Séquence d'exécution recommandée
 
