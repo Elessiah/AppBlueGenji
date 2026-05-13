@@ -310,7 +310,7 @@ async function runMigrations(db: Pool): Promise<void> {
       byes INT NOT NULL DEFAULT 0,
       opponent_ids_json JSON NOT NULL,
       buchholz DECIMAL(6, 2) NOT NULL DEFAULT 0,
-      rank INT NOT NULL DEFAULT 0,
+      \`rank\` INT NOT NULL DEFAULT 0,
       PRIMARY KEY (tournament_id, team_id),
       CONSTRAINT fk_swiss_standings_tournament FOREIGN KEY (tournament_id)
         REFERENCES bg_tournaments(id) ON DELETE CASCADE,
