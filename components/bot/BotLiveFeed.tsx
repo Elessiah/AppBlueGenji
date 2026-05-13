@@ -1,54 +1,73 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { FEED } from "./mocks";
+import { useState, useEffect } from 'react';
+import { BotFeedEvent } from '@/lib/shared/types';
 
 export function BotLiveFeed() {
-  const [items, setItems] = useState(FEED);
+  const [items, setItems] = useState<BotFeedEvent[]>([]);
   const [paused, setPaused] = useState(false);
+  const [buffer, setBuffer] = useState<BotFeedEvent[]>([]);
 
   useEffect(() => {
-    if (paused) return;
-    const id = setInterval(() => {
-      setItems((prev) =>
-        prev.map((it) => {
-          const [hh, mm, ss] = it.ts.split(":").map(Number);
-          const total = hh * 3600 + mm * 60 + ss + 1;
-          const h = Math.floor(total / 3600) % 24;
-          const m = Math.floor(total / 60) % 60;
-          const s = total % 60;
-          return {
-            ...it,
-            ts: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`,
-          };
-        })
-      );
-    }, 1000);
-    return () => clearInterval(id);
+    const es = new EventSource('/api/bot/feed/stream');
+
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const data: BotFeedEvent = JSON.parse(event.data);
+        if (paused) {
+          setBuffer((prev) => [data, ...prev]);
+        } else {
+          setItems((prev) => [data, ...prev].slice(0, 13));
+        }
+      } catch {
+        // Skip invalid JSON
+      }
+    };
+
+    es.addEventListener('message', handleMessage);
+    es.addEventListener('feed', handleMessage);
+
+    return () => {
+      es.removeEventListener('message', handleMessage);
+      es.removeEventListener('feed', handleMessage);
+      es.close();
+    };
   }, [paused]);
 
+  const handlePauseToggle = () => {
+    if (paused) {
+      setItems((prev) => [...buffer, ...prev].slice(0, 13));
+      setBuffer([]);
+    }
+    setPaused((p) => !p);
+  };
+
   return (
-    <section className="panel" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+    <section className="panel" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       <div className="panel-head">
         <span className="title">Flux temps réel</span>
         <div className="row gap-2">
           <button
-            className={"chip " + (paused ? "" : "chip-on")}
-            onClick={() => setPaused((p) => !p)}
-            aria-label={paused ? "Reprendre le flux" : "Mettre en pause le flux"}
+            className={'chip ' + (paused ? '' : 'chip-on')}
+            onClick={handlePauseToggle}
+            aria-label={paused ? 'Reprendre le flux' : 'Mettre en pause le flux'}
           >
-            {paused ? "▶ REPRENDRE" : "■ PAUSE"}
+            {paused ? '▶ REPRENDRE' : '■ PAUSE'}
           </button>
         </div>
       </div>
-      <div className="feed" style={{ flex: 1, maxHeight: 420, overflow: "hidden" }}>
-        {items.slice(0, 13).map((f, i) => (
-          <div key={i} className="feed-row">
-            <span className="ts">{f.ts}</span>
-            <span className={"tag " + f.tag}>{f.tag.toUpperCase()}</span>
-            <span className="msg">{f.msg}</span>
-          </div>
-        ))}
+      <div className="feed" style={{ flex: 1, maxHeight: 420, overflow: 'hidden' }}>
+        {items.length === 0 ? (
+          <div style={{ padding: '1rem', color: 'var(--ink-mute)' }}>En attente d'événements...</div>
+        ) : (
+          items.slice(0, 13).map((f) => (
+            <div key={f.id} className="feed-row">
+              <span className="ts">{f.ts}</span>
+              <span className={'tag ' + f.type}>{f.type.toUpperCase()}</span>
+              <span className="msg">{f.summary}</span>
+            </div>
+          ))
+        )}
       </div>
     </section>
   );

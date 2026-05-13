@@ -12,8 +12,22 @@ import { BotLatencyCard } from "@/components/bot/BotLatencyCard";
 import { BotModules } from "@/components/bot/BotModules";
 import { BotCommands } from "@/components/bot/BotCommands";
 import { BotInviteCard } from "@/components/bot/BotInviteCard";
+import { fetchBotStats, fetchBotStatus, fetchBotKpis, fetchBotServers, fetchBotActivity, fetchBotModules } from '@/lib/server/bot-integration';
+
+export const revalidate = 30;
 
 export default async function BotPage() {
+  const [, status, kpis, serversPayload, activity30j] = await Promise.all([
+    fetchBotStats(),
+    fetchBotStatus(),
+    fetchBotKpis(),
+    fetchBotServers(8),
+    fetchBotActivity('30j'),
+  ]);
+
+  const firstGuildId = serversPayload?.servers?.[0]?.id ?? null;
+  const modules = firstGuildId ? await fetchBotModules(firstGuildId) : null;
+
   return (
     <>
       <PublicHeader />
@@ -22,21 +36,21 @@ export default async function BotPage() {
         <div className="container">
           <BotCrumb />
           <BotHero />
-          <BotStatusStrip />
-          <BotKpis />
+          <BotStatusStrip status={status} />
+          <BotKpis kpis={kpis} />
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 40 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-              <BotActivityChart />
-              <BotServersTable />
+              <BotActivityChart initial={activity30j} />
+              <BotServersTable servers={serversPayload?.servers ?? null} />
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               <BotLiveFeed />
-              <BotLatencyCard />
+              <BotLatencyCard status={status} />
             </div>
           </div>
 
-          <BotModules />
+          <BotModules payload={modules} />
           <div style={{ height: 24 }} />
           <BotCommands />
           <BotInviteCard />

@@ -1,56 +1,48 @@
 import { Sparkline } from "./Sparkline";
-import { ACTIVITY } from "./mocks";
+import { BotKpis as BotKpisType } from "@/lib/shared/types";
 
-export function BotKpis() {
-  const kpis = [
+export function BotKpis({ kpis }: { kpis: BotKpisType | null }) {
+  const entries = [
     {
+      key: "servers",
       lbl: "Serveurs",
-      val: "15",
-      delta: "+3",
-      dir: "up" as const,
-      data: [8, 9, 9, 10, 11, 11, 12, 13, 13, 14, 15, 15],
+      data: kpis?.servers,
     },
     {
+      key: "channels",
       lbl: "Channels relayés",
-      val: "57",
-      delta: "+12",
-      dir: "up" as const,
-      data: [30, 33, 35, 38, 40, 42, 45, 48, 50, 53, 55, 57],
+      data: kpis?.channels,
     },
     {
+      key: "messages",
       lbl: "Messages traités",
-      val: "8 419",
       unit: "30j",
-      delta: "+18 %",
-      dir: "up" as const,
-      data: [300, 420, 380, 500, 540, 610, 720, 690, 780, 850, 920, 1010],
+      data: kpis?.messages,
     },
     {
+      key: "relays",
       lbl: "Relais inter-serveur",
-      val: "462",
       unit: "30j",
-      delta: "+24 %",
-      dir: "up" as const,
-      data: ACTIVITY.slice(-12),
+      data: kpis?.relays,
     },
   ];
 
   return (
     <div className="kpis">
-      {kpis.map((kpi) => (
-        <div key={kpi.lbl} className="card card-ticks kpi">
+      {entries.map((entry) => (
+        <div key={entry.key} className="card card-ticks kpi">
           <div className="kpi-head">
-            <span className="kpi-lbl">{kpi.lbl}</span>
-            <span className={`kpi-delta ${kpi.dir}`}>
-              {kpi.dir === "up" ? "▲" : "▼"} {kpi.delta}
+            <span className="kpi-lbl">{entry.lbl}</span>
+            <span className="kpi-delta up">
+              ▲ {entry.data?.delta ?? "—"}
             </span>
           </div>
           <div className="kpi-val">
-            {kpi.val}
-            {kpi.unit && <span className="unit">/ {kpi.unit}</span>}
+            {entry.data ? entry.data.value.toLocaleString("fr-FR") : "—"}
+            {entry.unit && <span className="unit">/ {entry.unit}</span>}
           </div>
           <div className="kpi-spark">
-            <Sparkline data={kpi.data} />
+            {entry.data?.series ? <Sparkline data={entry.data.series} /> : null}
           </div>
         </div>
       ))}

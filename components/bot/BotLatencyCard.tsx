@@ -1,4 +1,16 @@
-export function BotLatencyCard() {
+import { BotStatus } from "@/lib/shared/types";
+
+export function BotLatencyCard({ status }: { status: BotStatus | null }) {
+  const gateway = status?.gatewayLatency ?? 0;
+  const cpu = status?.cpuUsage ?? 0;
+  const ram = status?.ramUsage ?? 0;
+
+  const cells = [
+    { label: "GATEWAY", value: gateway === 0 ? "—" : gateway, unit: "ms", width: Math.min(gateway / 100, 1) * 100 },
+    { label: "CPU", value: cpu === 0 ? "—" : cpu.toFixed(1), unit: "%", width: Math.min(cpu, 100) },
+    { label: "RAM", value: ram === 0 ? "—" : ram.toFixed(0), unit: "MB", width: Math.min(ram / 1024, 1) * 100 },
+  ];
+
   return (
     <section className="panel lat-card">
       <div className="panel-head">
@@ -6,42 +18,17 @@ export function BotLatencyCard() {
         <span className="meta">SAMPLED 5s</span>
       </div>
       <div className="panel-body">
-        <div className="lat-cell">
-          <span className="l">API LATENCY</span>
-          <span className="v ok">
-            47 <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>ms</span>
-          </span>
-          <div className="lat-bar">
-            <i style={{ width: "12%" }} />
+        {cells.map((cell) => (
+          <div key={cell.label} className="lat-cell">
+            <span className="l">{cell.label}</span>
+            <span className="v ok">
+              {cell.value} <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>{cell.unit}</span>
+            </span>
+            <div className="lat-bar">
+              <i style={{ width: `${cell.width}%` }} />
+            </div>
           </div>
-        </div>
-        <div className="lat-cell">
-          <span className="l">GATEWAY</span>
-          <span className="v ok">
-            62 <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>ms</span>
-          </span>
-          <div className="lat-bar">
-            <i style={{ width: "18%" }} />
-          </div>
-        </div>
-        <div className="lat-cell">
-          <span className="l">CPU</span>
-          <span className="v">
-            14<span style={{ fontSize: 12, color: "var(--fg-mute)" }}>%</span>
-          </span>
-          <div className="lat-bar">
-            <i style={{ width: "14%" }} />
-          </div>
-        </div>
-        <div className="lat-cell">
-          <span className="l">RAM</span>
-          <span className="v">
-            312 <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>MB</span>
-          </span>
-          <div className="lat-bar">
-            <i style={{ width: "31%" }} />
-          </div>
-        </div>
+        ))}
       </div>
     </section>
   );

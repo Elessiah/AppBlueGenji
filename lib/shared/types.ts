@@ -192,6 +192,80 @@ export type BotStats = {
   uniqueUsersLast30Days: number;
 };
 
+export type BotStatus = {
+  startupTs: number;
+  uptimeMs: number;
+  version: string;
+  buildHash: string;
+  buildDate: string;
+  gatewayLatency: number;
+  shardCount: { active: number; total: number };
+  cpuUsage: number;
+  ramUsage: number;
+  status: "OPERATIONAL" | "DEGRADED" | "DOWN";
+};
+
+export type BotKpiEntry = {
+  value: number;
+  delta: string;
+  series: number[];
+};
+
+export type BotKpis = {
+  servers: BotKpiEntry;
+  channels: BotKpiEntry;
+  messages: BotKpiEntry;
+  relays: BotKpiEntry;
+};
+
+export type BotServerEntry = {
+  id: string;
+  name: string;
+  memberCount: number;
+  relays30j: number;
+  status: "ok" | "lag" | "off";
+  sparkline: number[];
+  accentColor: string;
+  sigil: string;
+};
+
+export type BotServersPayload = {
+  servers: BotServerEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export type BotActivity = {
+  range: string;
+  labels: string[];
+  relays: number[];
+  scrims: number[];
+  avgPerDay: number;
+};
+
+export type BotModuleKey = "annonces" | "scrims" | "recrutement" | "notifications" | "oauth" | "stats";
+
+export type BotModuleEntry = {
+  key: BotModuleKey;
+  enabled: boolean;
+  count30j: number;
+};
+
+export type BotModulesPayload = {
+  guildId: string;
+  modules: BotModuleEntry[];
+};
+
+export type BotFeedEvent = {
+  id: number;
+  ts: string;
+  type: 'relay' | 'scrim' | 'recr' | 'auth' | 'warn';
+  summary: string;
+  guildId?: string;
+  userId?: string;
+};
+
 export type ProfileStats = {
   tournamentsPlayed: number;
   tournamentsWon: number;

@@ -1,12 +1,33 @@
 "use client";
 
-import { useState } from "react";
-import { MODULES } from "./mocks";
+import { useState, useEffect } from "react";
+import { BotModulesPayload } from "@/lib/shared/types";
 import { Icon } from "./Icon";
 
-export function BotModules() {
-  const [mods, setMods] = useState(MODULES);
-  const toggle = (i: number) => setMods((m) => m.map((x, k) => (k === i ? { ...x, on: !x.on } : x)));
+const MODULE_CONFIG = {
+  annonces: { title: "Annonces", desc: "Diffusion d'annonces cross-serveur", icon: "bell" },
+  scrims: { title: "Scrims", desc: "Organisation des matchs scrims", icon: "swords" },
+  recrutement: { title: "Recrutement", desc: "Gestion des demandes d'adhésion", icon: "user" },
+  notifications: { title: "Notifications", desc: "Alertes en temps réel", icon: "bell" },
+  oauth: { title: "OAuth", desc: "Connexion Discord intégrée", icon: "key" },
+  stats: { title: "Stats", desc: "Statistiques détaillées", icon: "chart" },
+};
+
+export function BotModules({ payload }: { payload: BotModulesPayload | null }) {
+  const [modules, setModules] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (!payload) return;
+    const map: Record<string, boolean> = {};
+    payload.modules.forEach((m) => {
+      map[m.key] = m.enabled;
+    });
+    setModules(map);
+  }, [payload]);
+
+  const toggle = (key: string) => setModules((m) => ({ ...m, [key]: !m[key] }));
+  const list = payload?.modules ?? [];
+  const activeCount = list.filter((m) => m.enabled).length;
 
   return (
     <>
@@ -17,32 +38,36 @@ export function BotModules() {
           </div>
           <h2>Modules</h2>
         </div>
-        <div className="meta">6 INSTALLÉS · 5 ACTIFS · TOGGLE PAR SERVEUR</div>
+        <div className="meta">{list.length} INSTALLÉS · {activeCount} ACTIFS · TOGGLE PAR SERVEUR</div>
       </div>
 
       <div className="modules">
-        {mods.map((m, i) => (
-          <div key={m.title} className="card card-lift mod">
-            <div className="mod-head">
-              <span className="mod-tag">{m.tag}</span>
-              <button
-                className={"mod-toggle " + (m.on ? "" : "off")}
-                onClick={() => toggle(i)}
-                role="button"
-                aria-label={`${m.on ? "Désactiver" : "Activer"} ${m.title}`}
-              />
+        {list.map((m) => {
+          const config = MODULE_CONFIG[m.key];
+          if (!config) return null;
+          return (
+            <div key={m.key} className="card card-lift mod">
+              <div className="mod-head">
+                <span className="mod-tag">{m.key.toUpperCase()}</span>
+                <button
+                  className={"mod-toggle " + (modules[m.key] ? "" : "off")}
+                  onClick={() => toggle(m.key)}
+                  role="button"
+                  aria-label={`${modules[m.key] ? "Désactiver" : "Activer"} ${config.title}`}
+                />
+              </div>
+              <div className="mod-icon">
+                <Icon name={config.icon as "relay" | "swords" | "user" | "bell" | "key" | "chart" | "discord"} size={20} />
+              </div>
+              <div className="mod-title">{config.title}</div>
+              <div className="mod-desc">{config.desc}</div>
+              <div className="mod-foot">
+                <span>{m.count30j} · 30j</span>
+                <span className={modules[m.key] ? "ok" : "warn"}>{modules[m.key] ? "● EN LIGNE" : "○ DÉSACTIVÉ"}</span>
+              </div>
             </div>
-            <div className="mod-icon">
-              <Icon name={m.icon as "relay" | "swords" | "user" | "bell" | "key" | "chart" | "discord"} size={20} />
-            </div>
-            <div className="mod-title">{m.title}</div>
-            <div className="mod-desc">{m.desc}</div>
-            <div className="mod-foot">
-              <span>{m.meta}</span>
-              <span className={m.on ? "ok" : "warn"}>{m.on ? "● EN LIGNE" : "○ DÉSACTIVÉ"}</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </>
   );

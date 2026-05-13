@@ -1,4 +1,12 @@
-import type { BotStats } from "@/lib/shared/types";
+import type {
+  BotStats,
+  BotStatus,
+  BotKpis,
+  BotServersPayload,
+  BotActivity,
+  BotModuleKey,
+  BotModulesPayload,
+} from "@/lib/shared/types";
 
 const DEFAULT_BOT_INTERNAL_HOST = "127.0.0.1";
 const DEFAULT_BOT_INTERNAL_PORT = "4400";
@@ -155,5 +163,190 @@ export async function sendBotLog(message: string): Promise<void> {
   } catch {
     recordFailure();
     // Best-effort : on ne propage pas l'erreur.
+  }
+}
+
+export async function fetchBotStatus(): Promise<BotStatus | null> {
+  if (isCircuitOpen()) {
+    return null;
+  }
+
+  const baseUrl = resolveBotInternalUrl();
+
+  try {
+    const response = await fetch(`${baseUrl}/internal/status`, {
+      method: "GET",
+      headers: getInternalHeaders(),
+      cache: "no-store",
+      signal: AbortSignal.timeout(BOT_FETCH_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      recordFailure();
+      return null;
+    }
+
+    recordSuccess();
+    return (await response.json()) as BotStatus;
+  } catch {
+    recordFailure();
+    return null;
+  }
+}
+
+export async function fetchBotKpis(): Promise<BotKpis | null> {
+  if (isCircuitOpen()) {
+    return null;
+  }
+
+  const baseUrl = resolveBotInternalUrl();
+
+  try {
+    const response = await fetch(`${baseUrl}/internal/kpis`, {
+      method: "GET",
+      headers: getInternalHeaders(),
+      cache: "no-store",
+      signal: AbortSignal.timeout(BOT_FETCH_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      recordFailure();
+      return null;
+    }
+
+    recordSuccess();
+    return (await response.json()) as BotKpis;
+  } catch {
+    recordFailure();
+    return null;
+  }
+}
+
+export async function fetchBotServers(limit: number = 8): Promise<BotServersPayload | null> {
+  if (isCircuitOpen()) {
+    return null;
+  }
+
+  const baseUrl = resolveBotInternalUrl();
+
+  try {
+    const url = new URL(`${baseUrl}/internal/servers`);
+    url.searchParams.set("limit", limit.toString());
+    url.searchParams.set("offset", "0");
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: getInternalHeaders(),
+      cache: "no-store",
+      signal: AbortSignal.timeout(BOT_FETCH_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      recordFailure();
+      return null;
+    }
+
+    recordSuccess();
+    return (await response.json()) as BotServersPayload;
+  } catch {
+    recordFailure();
+    return null;
+  }
+}
+
+export async function fetchBotActivity(
+  range: "7j" | "30j" | "90j"
+): Promise<BotActivity | null> {
+  if (isCircuitOpen()) {
+    return null;
+  }
+
+  const baseUrl = resolveBotInternalUrl();
+
+  try {
+    const url = new URL(`${baseUrl}/internal/activity`);
+    url.searchParams.set("range", range);
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: getInternalHeaders(),
+      cache: "no-store",
+      signal: AbortSignal.timeout(BOT_FETCH_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      recordFailure();
+      return null;
+    }
+
+    recordSuccess();
+    return (await response.json()) as BotActivity;
+  } catch {
+    recordFailure();
+    return null;
+  }
+}
+
+export async function fetchBotModules(guildId: string): Promise<BotModulesPayload | null> {
+  if (isCircuitOpen()) {
+    return null;
+  }
+
+  const baseUrl = resolveBotInternalUrl();
+
+  try {
+    const response = await fetch(`${baseUrl}/internal/servers/${guildId}/modules`, {
+      method: "GET",
+      headers: getInternalHeaders(),
+      cache: "no-store",
+      signal: AbortSignal.timeout(BOT_FETCH_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      recordFailure();
+      return null;
+    }
+
+    recordSuccess();
+    return (await response.json()) as BotModulesPayload;
+  } catch {
+    recordFailure();
+    return null;
+  }
+}
+
+export async function toggleBotModule(
+  guildId: string,
+  moduleKey: BotModuleKey,
+  enabled: boolean
+): Promise<{ ok: boolean }> {
+  if (isCircuitOpen()) {
+    return { ok: false };
+  }
+
+  const baseUrl = resolveBotInternalUrl();
+
+  try {
+    const response = await fetch(`${baseUrl}/internal/servers/${guildId}/modules/${moduleKey}`, {
+      method: "PUT",
+      headers: {
+        "content-type": "application/json",
+        ...getInternalHeaders(),
+      },
+      body: JSON.stringify({ enabled }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(BOT_FETCH_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      recordFailure();
+      return { ok: false };
+    }
+
+    recordSuccess();
+    return { ok: true };
+  } catch {
+    recordFailure();
+    return { ok: false };
   }
 }

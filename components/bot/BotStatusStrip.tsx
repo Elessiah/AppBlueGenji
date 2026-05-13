@@ -1,26 +1,37 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { BotStatus } from "@/lib/shared/types";
 
-export function BotStatusStrip() {
-  const [uptime, setUptime] = useState("21j 14h 32m 18s");
+export function BotStatusStrip({ status }: { status: BotStatus | null }) {
+  const [uptime, setUptime] = useState("—");
 
   useEffect(() => {
-    const base = Date.now();
+    if (!status) return;
+    const base = status.startupTs;
+    const startSec = Math.floor(status.uptimeMs / 1000);
     const id = setInterval(() => {
-      const s = 18 + Math.floor((Date.now() - base) / 1000);
+      const s = startSec + Math.floor((Date.now() - base - status.uptimeMs) / 1000);
+      const d = Math.floor(s / 86400);
+      const h = Math.floor((s % 86400) / 3600);
+      const m = Math.floor((s % 3600) / 60);
       const sec = s % 60;
-      const min = (32 + Math.floor(s / 60)) % 60;
-      setUptime(`21j 14h ${String(min).padStart(2, "0")}m ${String(sec).padStart(2, "0")}s`);
+      setUptime(`${d}j ${h}h ${String(m).padStart(2, "0")}m ${String(sec).padStart(2, "0")}s`);
     }, 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [status]);
+
+  const statusLabel = status?.status ?? "—";
+  const versionLabel = status ? `${status.version} · ${status.buildHash.slice(0, 4)}` : "—";
+  const buildDate = status?.buildDate ?? "—";
+  const latency = status?.gatewayLatency ?? "—";
+  const shards = status ? `${String(status.shardCount.active).padStart(2, "0")} / ${String(status.shardCount.total).padStart(2, "0")}` : "—";
 
   return (
     <div className="status-strip">
-      <div className="status-cell online">
+      <div className={`status-cell ${statusLabel === "OPERATIONAL" ? "online" : ""}`}>
         <span className="lbl">Status</span>
-        <span className="val">OPERATIONAL</span>
+        <span className="val">{statusLabel}</span>
         <span className="sub">Tous les modules nominaux</span>
       </div>
       <div className="status-cell">
@@ -30,17 +41,17 @@ export function BotStatusStrip() {
       </div>
       <div className="status-cell">
         <span className="lbl">Version</span>
-        <span className="val">v2.4.1 · stable</span>
-        <span className="sub">Build 4f8a · 03 Mai 2026</span>
+        <span className="val">{versionLabel}</span>
+        <span className="sub">Build · {buildDate}</span>
       </div>
       <div className="status-cell">
         <span className="lbl">Gateway latency</span>
-        <span className="val">47 ms</span>
+        <span className="val">{latency === "—" ? "—" : `${latency} ms`}</span>
         <span className="sub">Discord WS · OVH Gravelines</span>
       </div>
       <div className="status-cell">
         <span className="lbl">Shards</span>
-        <span className="val">02 / 02</span>
+        <span className="val">{shards}</span>
         <span className="sub">Auto-sharding actif</span>
       </div>
     </div>
