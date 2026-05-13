@@ -401,7 +401,7 @@ export async function reportMatchScorePublic(
     );
 
     // Apply Swiss result if applicable
-    const { applySwissMatchResult } = await import("./tournaments/swiss");
+    const { applySwissMatchResult } = await import("./swiss");
     await applySwissMatchResult(matchId, connection);
 
     await resolveExpiredScoreReports(connection, tournamentId);

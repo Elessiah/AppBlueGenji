@@ -6,7 +6,7 @@ export type TournamentRow = RowDataPacket & {
   id: number;
   name: string;
   description: string | null;
-  format: "SINGLE" | "DOUBLE";
+  format: "SINGLE" | "DOUBLE" | "SWISS";
   game: "OW2" | "MR";
   max_teams: number;
   state: "UPCOMING" | "REGISTRATION" | "RUNNING" | "FINISHED";
