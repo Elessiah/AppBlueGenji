@@ -503,7 +503,8 @@
   background: rgba(107,212,138,0.15);
   border: 1px solid rgba(107,212,138,0.4);
   position: relative;
-  cursor: pointer;
+  cursor: default;
+  pointer-events: none;
 }
 .mod-toggle::after {
   content: "";
