@@ -67,3 +67,7 @@ package-lock.json
 
 # Design handoff (temporary reference files)
 .design-handoff/
+
+# opus-haiku pipeline artifacts
+/plan.json
+/execution_log.md

@@ -52,8 +52,8 @@ Supports single/double elimination and Swiss round formats. Key concepts:
 - **States:** `UPCOMING → REGISTRATION → RUNNING → FINISHED`
 - **Bracket positions:** `UPPER`, `LOWER`, `GRAND` finals
 - **Match status:** `PENDING → READY → AWAITING_CONFIRMATION → COMPLETED`
-- Bye slots for non-power-of-2 participant counts (`BYE_FUNCTIONALITY.md`)
-- Variable bracket sizing (`VARIABLE_SIZE_TOURNAMENTS.md`)
+- Bye slots for non-power-of-2 participant counts (`docs/features/BYE_FUNCTIONALITY.md`)
+- Variable bracket sizing (`docs/features/VARIABLE_SIZE_TOURNAMENTS.md`)
 - Swiss rounds: fixed number of rounds, pairing by points/standing, no elimination
 
 ### Live Updates (`lib/server/live.ts`)
