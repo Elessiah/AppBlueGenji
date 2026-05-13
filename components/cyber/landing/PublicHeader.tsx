@@ -20,9 +20,9 @@ export function PublicHeader() {
         <nav className={styles.nav} aria-label="Navigation principale">
           <Link href="/#tournois">Tournois</Link>
           <Link href="/#equipes">Équipes</Link>
-          <Link href="/#calendrier">Calendrier</Link>
+          <Link href="/joueurs">Joueurs</Link>
+          <Link href="/bot">Bot</Link>
           <Link href="/association">L&apos;asso</Link>
-          <Link href="/partenaires">Partenaires</Link>
         </nav>
 
         <div className={styles.actions}>
