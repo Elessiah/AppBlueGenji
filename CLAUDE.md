@@ -147,3 +147,50 @@ Règle universelle : via `useToast()` (`@/components/ui/toast`), bottom-left ove
 - **Exécute sans détailler** : Ne décris pas ce que tu vas faire avant d'agir. Fais simplement le travail.
 - **Court résumé à la fin** : Une fois le travail terminé, fais un court résumé des changements effectués et des problèmes rencontrés, le cas échéant.
 - **Arrête les previews** : À la fin de chaque prompt, arrête tous les serveurs de prévisualisation (`npm run dev`, tests serveurs, etc.) pour éviter les accumulations de processus.
+
+---
+
+## Règles de travail
+
+### Tests
+- Chaque feature développée doit être accompagnée d'une couverture de tests complète et efficace (`npm test`).
+- Les tests doivent couvrir les cas nominaux, les cas limites et les cas d'erreur.
+- Aucune feature n'est considérée comme terminée sans ses tests associés.
+
+### Branches
+- Pour chaque demande de feature, créer une branche dédiée : `feature/<nom-de-la-feature>` (kebab-case, anglais de préférence).
+- Exemple : `feature/swiss-pairing`, `feature/discord-login`.
+
+### Pull Requests
+- À l'achèvement d'une feature, ouvrir une Pull Request vers `main`.
+- Si le CI de la PR échoue, tenter de corriger automatiquement dans cet ordre : lint → build → tests.
+- Si une erreur ne peut pas être corrigée automatiquement, l'expliquer clairement et proposer une piste de résolution.
+
+### CI / Qualité
+- Le CI GitHub Actions (`.github/workflows/ci.yml`) vérifie à chaque PR : lint → build → tests (dans cet ordre, enchaînés via `needs:`).
+- Ne pas merger si le CI est rouge.
+
+### Gestion de la complexité
+- Pour toute demande importante (≥ 2 features liées, refactoring architectural, intégration d'un nouveau service externe, ou tâche estimée > ~2h), utiliser le skill `/OpusLocalManager` pour planifier et orchestrer le travail.
+
+---
+
+## Pipeline Git (workflow de livraison)
+
+Chaque tâche : quatre commits sur une branche de feature, puis une revue de PR.
+
+**Règle Co-Authored-By :**
+- Le **commit fonctionnel (squelette)** ne porte **aucun** trailer `Co-Authored-By`.
+- Les **commits de pipeline** (docs, tests, polish) portent chacun le trailer `Co-authored-by: Claude Opus 4.8 <noreply@anthropic.com>`.
+
+Après le commit fonctionnel, **s'arrêter et laisser l'utilisateur vérifier** avant de lancer la pipeline.
+
+Ajouter le trailer avec `git commit --trailer 'Co-authored-by: Claude Opus 4.8 <noreply@anthropic.com>'`.
+
+1. **Branche de feature** : `git checkout -b feature/<short-name>`
+2. **Commit fonctionnel** : ≤ 5 mots, impératif minuscule — `add swiss pairing` — *sans Co-Authored-By*
+3. **Commit docs** : README / JSDoc limité à ce qui a été construit — *avec Co-Authored-By*
+4. **Commit tests** : `jest` — *avec Co-Authored-By*
+5. **Commit polish UI/UX** : espacements, états, accessibilité — aucun changement de logique — *avec Co-Authored-By*
+6. **Push** : `git push -u origin feature/<short-name>`
+7. **Revue de PR** : ouvrir la PR (`gh pr create`), puis lancer une revue du diff avec `/code-review --comment` pour poster les retours en **commentaires inline** sur la PR. Traiter les points bloquants, puis seulement rendre la main à l'utilisateur.
