@@ -1,6 +1,8 @@
 import { Icon } from "./Icon";
+import { botInviteUrl } from "@/lib/server/bot-invite";
 
 export function BotHero() {
+  const inviteUrl = botInviteUrl();
   return (
     <div className="bot-hero">
       <div className="bot-id">
@@ -49,7 +51,7 @@ export function BotHero() {
           </a>
           <a
             className="btn btn-primary"
-            href="https://discord.com/api/oauth2/authorize?client_id=1234567890&permissions=1099511627776&scope=bot%20applications.commands"
+            href={inviteUrl}
             target="_blank"
             rel="noreferrer"
           >
