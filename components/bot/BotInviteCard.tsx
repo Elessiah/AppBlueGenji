@@ -1,6 +1,9 @@
 import { Icon } from "./Icon";
+import { botInviteUrl, DEFAULT_BOT_PERMISSIONS } from "@/lib/shared/bot-invite";
 
 export function BotInviteCard() {
+  const inviteUrl = botInviteUrl();
+  const permissions = process.env.DISCORD_BOT_PERMISSIONS?.trim() || DEFAULT_BOT_PERMISSIONS;
   const perms = [
     { lbl: "Envoyer des messages", scope: "SEND_MESSAGES" },
     { lbl: "Lire l'historique", scope: "READ_HISTORY" },
@@ -27,7 +30,7 @@ export function BotInviteCard() {
           <div className="row-actions">
             <a
               className="btn btn-primary"
-              href="https://discord.com/api/oauth2/authorize?client_id=1234567890&permissions=1099511627776&scope=bot%20applications.commands"
+              href={inviteUrl}
               target="_blank"
               rel="noreferrer"
               style={{ padding: "14px 22px" }}
@@ -73,7 +76,7 @@ export function BotInviteCard() {
             </div>
           ))}
           <div style={{ marginTop: 12, fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.16em", color: "var(--fg-dim)" }}>
-            INTEGER · 1099511627776
+            INTEGER · {permissions}
           </div>
         </div>
       </div>
