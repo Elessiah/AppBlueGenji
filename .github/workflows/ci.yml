@@ -48,3 +48,30 @@ jobs:
         run: npm ci
       - name: Run tests
         run: npm test
+
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      # --with-deps installe aussi les libs système Linux requises par Chromium.
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      # Pas de DB en CI : seuls les tests auth (sans prérequis) s'exécutent ;
+      # le parcours authentifié reste skippé tant que E2E_AUTH_USER n'est pas défini.
+      - name: Run E2E tests
+        run: npm run test:e2e
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
