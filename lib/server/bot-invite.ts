@@ -1,4 +1,6 @@
 /**
+ * server-only — lit `process.env` (variables non exposées au navigateur).
+ *
  * Construit l'URL OAuth2 d'invitation du bot Discord à partir de la config
  * d'environnement, plutôt que d'un client_id codé en dur.
  *

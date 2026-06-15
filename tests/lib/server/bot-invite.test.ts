@@ -1,13 +1,15 @@
 import { describe, it, expect, afterEach } from "@jest/globals";
-import { botInviteUrl, DEFAULT_BOT_PERMISSIONS } from "@/lib/shared/bot-invite";
+import { botInviteUrl, DEFAULT_BOT_PERMISSIONS } from "@/lib/server/bot-invite";
 
 describe("botInviteUrl", () => {
   const originalClientId = process.env.DISCORD_BOT_CLIENT_ID;
   const originalPermissions = process.env.DISCORD_BOT_PERMISSIONS;
 
   afterEach(() => {
-    process.env.DISCORD_BOT_CLIENT_ID = originalClientId;
-    process.env.DISCORD_BOT_PERMISSIONS = originalPermissions;
+    if (originalClientId === undefined) delete process.env.DISCORD_BOT_CLIENT_ID;
+    else process.env.DISCORD_BOT_CLIENT_ID = originalClientId;
+    if (originalPermissions === undefined) delete process.env.DISCORD_BOT_PERMISSIONS;
+    else process.env.DISCORD_BOT_PERMISSIONS = originalPermissions;
   });
 
   it("retourne un lien inerte quand aucun client_id n'est configuré", () => {

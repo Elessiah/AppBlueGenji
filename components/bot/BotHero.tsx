@@ -1,5 +1,5 @@
 import { Icon } from "./Icon";
-import { botInviteUrl } from "@/lib/shared/bot-invite";
+import { botInviteUrl } from "@/lib/server/bot-invite";
 
 export function BotHero() {
   const inviteUrl = botInviteUrl();

@@ -1,5 +1,5 @@
 import { Icon } from "./Icon";
-import { botInviteUrl, DEFAULT_BOT_PERMISSIONS } from "@/lib/shared/bot-invite";
+import { botInviteUrl, DEFAULT_BOT_PERMISSIONS } from "@/lib/server/bot-invite";
 
 export function BotInviteCard() {
   const inviteUrl = botInviteUrl();
