@@ -11,6 +11,12 @@ npm run test:e2e:ui       # mode interactif (debug)
 npm run test:e2e:report   # ouvre le dernier rapport HTML
 ```
 
+> Le binaire navigateur (Chromium) n'est pas versionné : il est téléchargé dans
+> un cache utilisateur (`~/AppData/Local/ms-playwright`). Les scripts `test:e2e`
+> et `test:e2e:ui` lancent automatiquement `playwright install chromium` au
+> préalable (hook `pretest:e2e`) — no-op si déjà présent. Pour l'installer
+> manuellement : `npm run e2e:install` (ou `npx playwright install chromium`).
+
 Par défaut, Playwright démarre un serveur de test **neuf** sur un port dédié
 (`3100`, surchargeable via `E2E_PORT`) — il ne réutilise volontairement PAS un
 `npm run dev` déjà lancé, dont le `.env` (notamment `DEV_AUTH_USER_ID`)
