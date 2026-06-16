@@ -1,6 +1,6 @@
 ﻿import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { getTeamDetail, updateTeamMeta } from "@/lib/server/teams-service";
+import { getTeamDetail, softDeleteTeam, updateTeamMeta } from "@/lib/server/teams-service";
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -29,9 +29,10 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   }
 
   try {
-    const body = (await req.json()) as { name?: string };
+    const body = (await req.json()) as { name?: string; description?: string | null };
     await updateTeamMeta(user.id, teamId, {
       name: body.name,
+      description: body.description,
     });
 
     const detail = await getTeamDetail(teamId, user.id);
@@ -40,5 +41,26 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     const message = (error as Error).message;
     if (message === "FORBIDDEN") return fail(message, 403);
     return fail(message || "TEAM_UPDATE_FAILED", 400);
+  }
+}
+
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser();
+  if (!user) return fail("UNAUTHORIZED", 401);
+
+  const { id } = await context.params;
+  const teamId = Number(id);
+  if (!Number.isInteger(teamId) || teamId <= 0) {
+    return fail("INVALID_TEAM_ID", 400);
+  }
+
+  try {
+    await softDeleteTeam(user.id, teamId);
+    return ok({ deleted: true });
+  } catch (error) {
+    const message = (error as Error).message;
+    if (message === "FORBIDDEN") return fail(message, 403);
+    if (message === "TEAM_ALREADY_DELETED") return fail(message, 409);
+    return fail(message || "TEAM_DELETE_FAILED", 400);
   }
 }

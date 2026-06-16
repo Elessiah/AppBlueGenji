@@ -29,6 +29,7 @@ export default function TournamentsPage() {
   const [gameFilter, setGameFilter] = useState<GameFilter>("all");
   const [buckets, setBuckets] = useState<TournamentBuckets>(emptyBuckets);
   const [finishedDisplayLimit, setFinishedDisplayLimit] = useState(12);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -44,6 +45,13 @@ export default function TournamentsPage() {
     };
     load().catch((e) => showError((e as Error).message));
   }, [showError]);
+
+  useEffect(() => {
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then(async (r) => (r.ok ? ((await r.json()) as { user?: { isAdmin?: boolean } }) : null))
+      .then((p) => setIsAdmin(Boolean(p?.user?.isAdmin)))
+      .catch(() => setIsAdmin(false));
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -81,19 +89,21 @@ export default function TournamentsPage() {
             </h1>
             <div className={s.subtitle}>SUIVI TEMPS RÉEL · PHASES MULTIPLES · BRACKETS ARBITRÉS</div>
           </div>
-          <Link href="/tournois/creer">
-            <button className={s.create}>
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M8 3v10M3 8h10"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                />
-              </svg>
-              Créer un tournoi
-            </button>
-          </Link>
+          {isAdmin && (
+            <Link href="/tournois/creer">
+              <button className={s.create}>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M8 3v10M3 8h10"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                Créer un tournoi
+              </button>
+            </Link>
+          )}
         </header>
 
         <div className={s.metrics}>

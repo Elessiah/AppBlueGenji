@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useTeamDetail } from "./_hooks/useTeamDetail";
 import { TeamHeader } from "./_components/TeamHeader";
 import { MembersSection } from "./_components/MembersSection";
+import { MembershipActions } from "./_components/MembershipActions";
 
 export default function TeamDetailPage() {
   const params = useParams<{ id: string }>();
@@ -51,6 +52,7 @@ export default function TeamDetailPage() {
   return (
     <section className="fade-in">
       <TeamHeader team={team} onChanged={refresh} canManage={team.canManage} viewerIsOwner={viewerIsOwner || false} />
+      <MembershipActions team={team} onChanged={refresh} />
       <MembersSection
         teamId={teamId}
         members={team.members}

@@ -2,8 +2,8 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import {
-  addTeamMember,
   getTeamDetail,
+  inviteToTeam,
   removeTeamMember,
   updateTeamMemberRoles,
 } from "@/lib/server/teams-service";
@@ -19,19 +19,22 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
 
   try {
-    const body = (await req.json()) as { pseudo?: string; roles?: TeamRole[] };
+    const body = (await req.json()) as { pseudo?: string };
     if (!body.pseudo?.trim()) {
       return fail("MISSING_PSEUDO", 400);
     }
 
-    await addTeamMember(user.id, teamId, body.pseudo, body.roles ?? []);
+    // Invitation plutôt qu'ajout forcé : le joueur doit accepter (ou sa demande
+    // en attente est validée directement → "JOINED").
+    const result = await inviteToTeam(user.id, teamId, body.pseudo.trim());
     const detail = await getTeamDetail(teamId, user.id);
-    return ok(detail);
+    return ok({ result, ...detail });
   } catch (error) {
     const message = (error as Error).message;
     if (message === "FORBIDDEN") return fail(message, 403);
     if (message === "USER_NOT_FOUND") return fail(message, 404);
     if (message === "USER_ALREADY_IN_TEAM") return fail(message, 409);
+    if (message === "ALREADY_INVITED") return fail(message, 409);
     return fail(message || "TEAM_MEMBER_ADD_FAILED", 400);
   }
 }

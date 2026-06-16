@@ -1,7 +1,7 @@
 ﻿import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import type { RowDataPacket } from "mysql2/promise";
+import type { RowDataPacket, ResultSetHeader } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { normalizePseudo, slugifyPseudo } from "@/lib/server/serialization";
 
@@ -93,18 +93,58 @@ export async function clearSession(): Promise<void> {
   });
 }
 
+/**
+ * Provisionne (ou réutilise) un utilisateur de test « vierge » déterministe :
+ * non-admin, sans équipe, sans battletags ni majorité renseignés, stats à 0.
+ * Utilisé pour les tests E2E du parcours « nouveau compte » via
+ * `DEV_AUTH_USER_ID=fresh`, afin de ne pas dépendre d'un compte réel.
+ */
+const FRESH_TEST_PSEUDO = "e2e_fresh_account";
+
+async function ensureFreshTestUser(): Promise<number> {
+  const db = await getDatabase();
+  const [existing] = await db.execute<UserRow[]>(
+    `SELECT id FROM bg_users WHERE pseudo = ? LIMIT 1`,
+    [FRESH_TEST_PSEUDO],
+  );
+  if (existing.length > 0) return Number(existing[0].id);
+
+  try {
+    const [res] = await db.execute<ResultSetHeader>(
+      `INSERT INTO bg_users (pseudo, is_admin, is_adult) VALUES (?, 0, NULL)`,
+      [FRESH_TEST_PSEUDO],
+    );
+    return Number(res.insertId);
+  } catch {
+    // Création concurrente (contrainte unique sur pseudo) : on relit la ligne.
+    const [row] = await db.execute<UserRow[]>(
+      `SELECT id FROM bg_users WHERE pseudo = ? LIMIT 1`,
+      [FRESH_TEST_PSEUDO],
+    );
+    if (row.length > 0) return Number(row[0].id);
+    throw new Error("FRESH_TEST_USER_PROVISION_FAILED");
+  }
+}
+
 async function getDevBypassUser(): Promise<AuthUser | null> {
   if (process.env.NODE_ENV === "production") return null;
   const rawId = process.env.DEV_AUTH_USER_ID;
   if (!rawId) return null;
-  const userId = Number(rawId);
-  if (!Number.isInteger(userId) || userId <= 0) return null;
+
+  let userId: number;
+  if (rawId === "fresh") {
+    userId = await ensureFreshTestUser();
+  } else {
+    userId = Number(rawId);
+    if (!Number.isInteger(userId) || userId <= 0) return null;
+  }
 
   const db = await getDatabase();
   const [rows] = await db.execute<UserRow[]>(
     `SELECT id, pseudo, avatar_url, discord_id, google_sub, email, is_adult, is_admin
      FROM bg_users
      WHERE id = ?
+       AND is_deleted = 0
      LIMIT 1`,
     [userId],
   );
@@ -128,6 +168,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
      JOIN bg_users u ON u.id = s.user_id
      WHERE s.token_hash = ?
        AND s.expires_at > NOW()
+       AND u.is_deleted = 0
      LIMIT 1`,
     [hashToken(token)],
   );

@@ -30,6 +30,7 @@ type UserRow = RowDataPacket & {
   avatar_url: string | null;
   overwatch_battletag: string | null;
   marvel_rivals_tag: string | null;
+  discord_pseudo: string | null;
   is_adult: 0 | 1 | null;
   visible_avatar: 0 | 1;
   visible_pseudo: 0 | 1;
@@ -106,6 +107,7 @@ export async function getUserById(userId: number): Promise<PublicUserProfile | n
       avatar_url,
       overwatch_battletag,
       marvel_rivals_tag,
+      discord_pseudo,
       is_adult,
       visible_avatar,
       visible_pseudo,
@@ -132,6 +134,7 @@ export async function listPlayers(): Promise<PublicUserProfile[]> {
       avatar_url,
       overwatch_battletag,
       marvel_rivals_tag,
+      discord_pseudo,
       is_adult,
       visible_avatar,
       visible_pseudo,
@@ -375,6 +378,7 @@ export async function updateOwnProfile(
     pseudo?: string;
     overwatchBattletag?: string | null;
     marvelRivalsTag?: string | null;
+    discordPseudo?: string | null;
     isAdult?: boolean | null;
     visibility?: {
       avatar?: boolean;
@@ -403,6 +407,7 @@ export async function updateOwnProfile(
      SET pseudo = COALESCE(?, pseudo),
          overwatch_battletag = ?,
          marvel_rivals_tag = ?,
+         discord_pseudo = ?,
          is_adult = ?,
          visible_avatar = COALESCE(?, visible_avatar),
          visible_pseudo = COALESCE(?, visible_pseudo),
@@ -414,6 +419,7 @@ export async function updateOwnProfile(
       patch.pseudo ? normalizePseudo(patch.pseudo) : null,
       patch.overwatchBattletag === undefined ? null : patch.overwatchBattletag,
       patch.marvelRivalsTag === undefined ? null : patch.marvelRivalsTag,
+      patch.discordPseudo === undefined ? null : patch.discordPseudo,
       patch.isAdult === undefined ? null : patch.isAdult,
       patch.visibility?.avatar ?? null,
       patch.visibility?.pseudo ?? null,
@@ -423,6 +429,37 @@ export async function updateOwnProfile(
       userId,
     ],
   );
+}
+
+/**
+ * Anonymise (« supprime ») le compte de l'utilisateur : toutes les données
+ * personnelles sont effacées et les moyens de connexion révoqués, mais les
+ * statistiques et l'historique générés par la plateforme sont conservés
+ * (les adhésions d'équipe restent rattachées à un profil anonyme).
+ */
+export async function anonymizeOwnAccount(userId: number): Promise<void> {
+  const db = await getDatabase();
+  await db.execute(
+    `UPDATE bg_users
+     SET pseudo = CONCAT('compte_supprime_', id),
+         avatar_url = NULL,
+         overwatch_battletag = NULL,
+         marvel_rivals_tag = NULL,
+         discord_pseudo = NULL,
+         is_adult = NULL,
+         discord_id = NULL,
+         google_sub = NULL,
+         email = NULL,
+         visible_avatar = 0,
+         visible_pseudo = 0,
+         visible_overwatch = 0,
+         visible_marvel = 0,
+         visible_major = 0,
+         is_deleted = 1
+     WHERE id = ?`,
+    [userId],
+  );
+  await db.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
 }
 
 export async function updateUserAvatar(userId: number, avatarPath: string | null): Promise<void> {
@@ -443,6 +480,7 @@ export async function getFullProfile(viewerId: number, targetUserId: number): Pr
       avatar_url,
       overwatch_battletag,
       marvel_rivals_tag,
+      discord_pseudo,
       is_adult,
       visible_avatar,
       visible_pseudo,
@@ -461,7 +499,9 @@ export async function getFullProfile(viewerId: number, targetUserId: number): Pr
   const isSelf = viewerId === targetUserId;
   const profile = mapPublicUser(userRows[0]);
 
-  if (!isSelf) {
+  if (isSelf) {
+    profile.discordPseudo = userRows[0].discord_pseudo;
+  } else {
     if (!profile.visibility.avatar) profile.avatarUrl = null;
     if (!profile.visibility.overwatch) profile.overwatchBattletag = null;
     if (!profile.visibility.marvel) profile.marvelRivalsTag = null;

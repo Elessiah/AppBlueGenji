@@ -71,12 +71,6 @@ export function MembersSection({
     setMemberRoles(["DPS"]);
   };
 
-  const viewerIsOwner = useMemo(() => {
-    if (!viewerUserId) return false;
-    const m = members.find((mb) => mb.userId === viewerUserId);
-    return !!m?.roles.includes("OWNER");
-  }, [members, viewerUserId]);
-
   const suggestions = useMemo(() => {
     const q = memberPseudo.trim().toLowerCase();
     if (!q) return [];
@@ -107,14 +101,14 @@ export function MembersSection({
               <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {canManage ? (
                   <>
-                    {viewerIsOwner && !member.roles.includes("OWNER") && (
+                    {!member.roles.includes("OWNER") && member.userId !== viewerUserId && (
                       <button
                         className="btn ghost"
                         type="button"
                         onClick={() => removeMember(member.userId)}
                         style={{ padding: "4px 10px", fontSize: 12 }}
                       >
-                        Retirer
+                        Exclure
                       </button>
                     )}
                     {(!member.roles.includes("OWNER") || viewerUserId === member.userId) && (
@@ -154,7 +148,7 @@ export function MembersSection({
                 margin: "0 0 14px",
               }}
             >
-              Ajouter un membre
+              Inviter un membre
             </p>
             <div className="form-grid">
               <div className="field" style={{ position: "relative" }}>
@@ -276,7 +270,7 @@ export function MembersSection({
                 className="btn"
                 style={{ padding: "10px 22px", background: "rgba(255,157,46,0.12)", borderColor: "rgba(255,157,46,0.3)" }}
               >
-                Ajouter
+                Inviter
               </button>
             </div>
           </form>

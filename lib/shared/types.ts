@@ -70,6 +70,8 @@ export type PublicUserProfile = {
   isAdult: boolean | null;
   visibility: VisibilitySettings;
   createdAt: string;
+  // Privé — uniquement renseigné quand le viewer consulte son propre profil.
+  discordPseudo?: string | null;
   // Enriched fields for /joueurs listing
   team?: {
     id: number;
@@ -296,9 +298,14 @@ export type TeamDetailResponse = {
     id: number;
     name: string;
     logoUrl: string | null;
+    description: string | null;
     createdAt: string;
+    deletedAt: string | null;
   };
   members: TeamMember[];
   tournaments: TeamHistoryRow[];
   canManage: boolean;
+  // Relation du viewer à l'équipe (self-service / invitations).
+  viewerMembership: "MEMBER" | "OWNER" | "NONE";
+  viewerInvitation: "INVITED" | "REQUESTED" | "NONE";
 };

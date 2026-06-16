@@ -25,7 +25,9 @@ export default function ProfilePage() {
   const [pseudo, setPseudo] = useState("");
   const [overwatchBattletag, setOverwatchBattletag] = useState("");
   const [marvelRivalsTag, setMarvelRivalsTag] = useState("");
+  const [discordPseudo, setDiscordPseudo] = useState("");
   const [isAdult, setIsAdult] = useState<string>("unknown");
+  const [deleting, setDeleting] = useState(false);
   const [visibility, setVisibility] = useState({
     overwatch: false,
     marvel: false,
@@ -33,6 +35,38 @@ export default function ProfilePage() {
   });
   const [avatarBusy, setAvatarBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [invitations, setInvitations] = useState<{ id: number; teamId: number; teamName: string }[]>([]);
+
+  const loadInvitations = async () => {
+    try {
+      const res = await fetch("/api/me/invitations", { cache: "no-store" });
+      if (!res.ok) return;
+      const payload = (await res.json()) as { invitations?: { id: number; teamId: number; teamName: string }[] };
+      setInvitations(payload.invitations ?? []);
+    } catch {
+      // silencieux
+    }
+  };
+
+  useEffect(() => {
+    loadInvitations();
+  }, []);
+
+  const respondInvitation = async (invitationId: number, accept: boolean) => {
+    try {
+      const res = await fetch(`/api/invitations/${invitationId}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ accept }),
+      });
+      const payload = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(payload.error || "INVITATION_RESPOND_FAILED");
+      showSuccess(accept ? "Invitation acceptée." : "Invitation refusée.");
+      await loadInvitations();
+    } catch (e) {
+      showError((e as Error).message);
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -51,6 +85,7 @@ export default function ProfilePage() {
       setPseudo(payload.profile.pseudo);
       setOverwatchBattletag(payload.profile.overwatchBattletag || "");
       setMarvelRivalsTag(payload.profile.marvelRivalsTag || "");
+      setDiscordPseudo(payload.profile.discordPseudo || "");
       setIsAdult(payload.profile.isAdult === null ? "unknown" : payload.profile.isAdult ? "yes" : "no");
       const v = payload.profile.visibility;
       setVisibility({ overwatch: !!v.overwatch, marvel: !!v.marvel, major: !!v.major });
@@ -68,6 +103,7 @@ export default function ProfilePage() {
           pseudo,
           overwatchBattletag: overwatchBattletag.trim() ? overwatchBattletag.trim() : null,
           marvelRivalsTag: marvelRivalsTag.trim() ? marvelRivalsTag.trim() : null,
+          discordPseudo: discordPseudo.trim() ? discordPseudo.trim() : null,
           isAdult: isAdult === "unknown" ? null : isAdult === "yes",
           visibility,
         }),
@@ -78,6 +114,27 @@ export default function ProfilePage() {
       showSuccess("Profil mis à jour.");
     } catch (e) {
       showError((e as Error).message);
+    }
+  };
+
+  const onDeleteAccount = async () => {
+    if (!window.confirm(
+      "Supprimer définitivement ton compte ? Tes informations personnelles seront effacées (le compte devient anonyme), mais tes statistiques resteront conservées. Cette action est irréversible.",
+    )) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      const response = await fetch("/api/profile", { method: "DELETE" });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "ACCOUNT_DELETE_FAILED");
+      showSuccess("Compte supprimé. Tes statistiques restent conservées de façon anonyme.");
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 1200);
+    } catch (e) {
+      showError((e as Error).message);
+      setDeleting(false);
     }
   };
 
@@ -221,6 +278,10 @@ export default function ProfilePage() {
               <input value={marvelRivalsTag} onChange={(e) => setMarvelRivalsTag(e.target.value)} />
             </div>
             <div className="field">
+              <label>Pseudo Discord</label>
+              <input value={discordPseudo} onChange={(e) => setDiscordPseudo(e.target.value)} placeholder="pseudo#0000 ou @pseudo" />
+            </div>
+            <div className="field">
               <label>Statut majeur</label>
               <select value={isAdult} onChange={(e) => setIsAdult(e.target.value)}>
                 <option value="unknown">Non renseigné</option>
@@ -273,6 +334,39 @@ export default function ProfilePage() {
         </form>
       </div>
 
+      {invitations.length > 0 && (
+        <div className="ds-block" style={{ marginBottom: 20 }}>
+          <div className="ds-section-title blue">
+            <h2>Invitations d&apos;équipe ({invitations.length})</h2>
+          </div>
+          <div className="table-like">
+            {invitations.map((inv) => (
+              <div className="table-row" key={inv.id} style={{ alignItems: "center" }}>
+                <span>{inv.teamName}</span>
+                <span style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => respondInvitation(inv.id, true)}
+                    style={{ padding: "4px 12px", fontSize: 12 }}
+                  >
+                    Accepter
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={() => respondInvitation(inv.id, false)}
+                    style={{ padding: "4px 12px", fontSize: 12 }}
+                  >
+                    Refuser
+                  </button>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="ds-block">
         <div className="ds-section-title blue">
           <h2>Statistiques plateforme</h2>
@@ -299,9 +393,28 @@ export default function ProfilePage() {
           paddingTop: 20,
           borderTop: "1px solid var(--line)",
           display: "flex",
-          justifyContent: "flex-end",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
         }}
       >
+        <button
+          type="button"
+          className="btn ghost"
+          onClick={onDeleteAccount}
+          disabled={deleting}
+          style={{
+            padding: "10px 18px",
+            fontSize: 13,
+            color: "var(--red-live, #ff5a6e)",
+            borderColor: "rgba(255,90,110,0.4)",
+            opacity: deleting ? 0.6 : 1,
+            cursor: deleting ? "not-allowed" : "pointer",
+          }}
+        >
+          {deleting ? "Suppression…" : "Supprimer mon compte"}
+        </button>
         <LogoutButton />
       </div>
     </section>

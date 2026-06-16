@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { localDateTimeInput } from "@/lib/shared/dates";
@@ -23,6 +23,18 @@ export default function CreateTournamentPage() {
   const [registrationCloseAt, setRegistrationCloseAt] = useState(localDateTimeInput(24));
   const [startAt, setStartAt] = useState(localDateTimeInput(30));
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then(async (r) => (r.ok ? ((await r.json()) as { user?: { isAdmin?: boolean } }) : null))
+      .then((p) => {
+        if (!p?.user?.isAdmin) {
+          showError("Création de tournoi réservée aux administrateurs.");
+          router.replace("/tournois");
+        }
+      })
+      .catch(() => undefined);
+  }, [router, showError]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();

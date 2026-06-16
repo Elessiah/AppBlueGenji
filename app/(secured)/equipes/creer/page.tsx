@@ -13,6 +13,7 @@ export default function CreateTeamPage() {
   const router = useRouter();
   const { showError } = useToast();
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const logoInputRef = useRef<HTMLInputElement | null>(null);
@@ -35,7 +36,7 @@ export default function CreateTeamPage() {
       const response = await fetch("/api/teams", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, description: description.trim() || null }),
       });
       const payload = (await response.json()) as { error?: string; teamId?: number };
       if (!response.ok || !payload.teamId) throw new Error(payload.error || "TEAM_CREATE_FAILED");
@@ -80,6 +81,15 @@ export default function CreateTeamPage() {
             <div className="field">
               <label>Nom d'équipe</label>
               <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Mon équipe" />
+            </div>
+            <div className="field" style={{ gridColumn: "1 / -1" }}>
+              <label>Description (optionnel)</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Présente ton équipe, vos objectifs, votre ambiance…"
+                rows={3}
+              />
             </div>
             <div className="field">
               <label>Logo (optionnel)</label>

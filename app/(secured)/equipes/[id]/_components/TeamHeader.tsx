@@ -2,6 +2,7 @@
 
 import { ChangeEvent, FormEvent, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { LogoWithGlow } from "@/components/logo-with-glow";
 import type { TeamDetailResponse } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
@@ -19,10 +20,32 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 export function TeamHeader({ team, onChanged, canManage, viewerIsOwner }: TeamHeaderProps) {
   const { showError, showSuccess } = useToast();
+  const router = useRouter();
   const [name, setName] = useState(team.team.name);
+  const [description, setDescription] = useState(team.team.description ?? "");
   const [logoBusy, setLogoBusy] = useState(false);
   const logoFileRef = useRef<HTMLInputElement | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+
+  const deleteTeam = async () => {
+    if (!window.confirm(
+      "Dissoudre cette équipe ? Le nom, la description et le logo seront effacés et les membres détachés, mais les statistiques et l'historique resteront conservés. Action irréversible.",
+    )) {
+      return;
+    }
+    setDeleteBusy(true);
+    try {
+      const response = await fetch(`/api/teams/${team.team.id}`, { method: "DELETE" });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "TEAM_DELETE_FAILED");
+      showSuccess("Équipe dissoute. Ses statistiques restent consultables.");
+      setTimeout(() => router.push("/equipes"), 1000);
+    } catch (e) {
+      showError((e as Error).message);
+      setDeleteBusy(false);
+    }
+  };
 
   const saveMeta = async (event: FormEvent) => {
     event.preventDefault();
@@ -30,7 +53,7 @@ export function TeamHeader({ team, onChanged, canManage, viewerIsOwner }: TeamHe
       const response = await fetch(`/api/teams/${team.team.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, description: description.trim() || null }),
       });
       const payload = (await response.json()) as TeamDetailResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "TEAM_UPDATE_FAILED");
@@ -123,8 +146,8 @@ export function TeamHeader({ team, onChanged, canManage, viewerIsOwner }: TeamHe
                 <h1 className="ds-title orange" style={{ fontSize: "clamp(26px, 3vw, 40px)", marginBottom: 6 }}>
                   {team.team.name}
                 </h1>
-                <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-                  Historique compétitif et gestion du roster
+                <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14, maxWidth: 560 }}>
+                  {team.team.description || "Historique compétitif et gestion du roster"}
                 </p>
               </div>
             </div>
@@ -145,6 +168,15 @@ export function TeamHeader({ team, onChanged, canManage, viewerIsOwner }: TeamHe
               <div className="field">
                 <label>Nom de l'équipe</label>
                 <input value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div className="field" style={{ gridColumn: "1 / -1" }}>
+                <label>Description</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Présente ton équipe…"
+                />
               </div>
               <div className="field">
                 <label>Logo</label>
@@ -203,14 +235,32 @@ export function TeamHeader({ team, onChanged, canManage, viewerIsOwner }: TeamHe
               }}
             >
               {viewerIsOwner ? (
-                <button
-                  type="button"
-                  className="btn ghost"
-                  onClick={() => setTransferOpen(true)}
-                  style={{ padding: "10px 18px", fontSize: 12, borderColor: "rgba(255,157,46,0.35)" }}
-                >
-                  Transférer la propriété
-                </button>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={() => setTransferOpen(true)}
+                    style={{ padding: "10px 18px", fontSize: 12, borderColor: "rgba(255,157,46,0.35)" }}
+                  >
+                    Transférer la propriété
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={deleteTeam}
+                    disabled={deleteBusy}
+                    style={{
+                      padding: "10px 18px",
+                      fontSize: 12,
+                      color: "var(--red-live, #ff5a6e)",
+                      borderColor: "rgba(255,90,110,0.4)",
+                      opacity: deleteBusy ? 0.6 : 1,
+                      cursor: deleteBusy ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {deleteBusy ? "Dissolution…" : "Dissoudre l'équipe"}
+                  </button>
+                </div>
               ) : (
                 <span />
               )}

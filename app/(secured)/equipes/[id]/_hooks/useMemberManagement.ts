@@ -13,9 +13,16 @@ export function useMemberManagement(teamId: number, onChanged: () => void) {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ pseudo, roles }),
         });
-        const payload = (await response.json()) as TeamDetailResponse & { error?: string };
+        const payload = (await response.json()) as TeamDetailResponse & {
+          error?: string;
+          result?: "INVITED" | "JOINED";
+        };
         if (!response.ok) throw new Error(payload.error || "TEAM_MEMBER_ADD_FAILED");
-        showSuccess("Membre ajouté.");
+        showSuccess(
+          payload.result === "JOINED"
+            ? "Demande du joueur validée : il a rejoint l'équipe."
+            : "Invitation envoyée au joueur.",
+        );
         onChanged();
       } catch (e) {
         showError((e as Error).message);

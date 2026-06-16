@@ -17,6 +17,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
+  if (!user.isAdmin) return fail("FORBIDDEN", 403);
 
   try {
     const body = (await req.json()) as {

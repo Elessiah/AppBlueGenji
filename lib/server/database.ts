@@ -329,6 +329,68 @@ async function runMigrations(db: Pool): Promise<void> {
   } catch {
     // Columns already exist
   }
+
+  // Migration: Add Discord pseudo + soft-delete (anonymisation) to users
+  try {
+    await db.execute(`
+      ALTER TABLE bg_users
+      ADD COLUMN discord_pseudo VARCHAR(64) NULL
+    `);
+  } catch {
+    // Column already exists
+  }
+  try {
+    await db.execute(`
+      ALTER TABLE bg_users
+      ADD COLUMN is_deleted TINYINT(1) NOT NULL DEFAULT 0
+    `);
+  } catch {
+    // Column already exists
+  }
+
+  // Migration: Add description to teams
+  try {
+    await db.execute(`
+      ALTER TABLE bg_teams
+      ADD COLUMN description TEXT NULL
+    `);
+  } catch {
+    // Column already exists
+  }
+
+  // Migration: Soft-delete (dissolution) des équipes — conserve les stats
+  try {
+    await db.execute(`
+      ALTER TABLE bg_teams
+      ADD COLUMN deleted_at DATETIME NULL
+    `);
+  } catch {
+    // Column already exists
+  }
+
+  // Migration: Team invitations / join requests
+  // kind = INVITE (management → user) or REQUEST (user → team, self-service)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS bg_team_invitations (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      team_id BIGINT NOT NULL,
+      user_id BIGINT NOT NULL,
+      created_by BIGINT NOT NULL,
+      kind ENUM('INVITE', 'REQUEST') NOT NULL,
+      status ENUM('PENDING', 'ACCEPTED', 'DECLINED', 'CANCELLED') NOT NULL DEFAULT 'PENDING',
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      responded_at DATETIME NULL,
+      INDEX idx_bg_team_inv_team (team_id),
+      INDEX idx_bg_team_inv_user (user_id),
+      INDEX idx_bg_team_inv_status (status),
+      CONSTRAINT fk_bg_team_inv_team FOREIGN KEY (team_id)
+        REFERENCES bg_teams(id) ON DELETE CASCADE,
+      CONSTRAINT fk_bg_team_inv_user FOREIGN KEY (user_id)
+        REFERENCES bg_users(id) ON DELETE CASCADE,
+      CONSTRAINT fk_bg_team_inv_creator FOREIGN KEY (created_by)
+        REFERENCES bg_users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
 }
 
 async function ensureMigrations(db: Pool): Promise<void> {

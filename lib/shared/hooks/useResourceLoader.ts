@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 export type ResourceState<T> =
   | { status: "loading"; data: null; error: null }
@@ -14,13 +14,19 @@ export function useResourceLoader<T>(
 ) {
   const [state, setState] = useState<ResourceState<T>>({ status: "loading", data: null, error: null });
 
+  // Garde la dernière version des options sans la mettre en dépendance de
+  // `fetcher` : un objet littéral recréé à chaque render provoquerait sinon une
+  // boucle de re-fetch infinie (l'effet se relance à chaque render).
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+
   const fetcher = useCallback(async () => {
     setState({ status: "loading", data: null, error: null });
     try {
       const res = await fetch(url, { cache: "no-store" });
       if (res.status === 404) {
         setState({ status: "not-found", data: null, error: null });
-        options?.onNotFoundRedirect?.();
+        optionsRef.current?.onNotFoundRedirect?.();
         return;
       }
       if (!res.ok) {
@@ -33,7 +39,7 @@ export function useResourceLoader<T>(
     } catch (e) {
       setState({ status: "error", data: null, error: (e as Error).message });
     }
-  }, [url, options]);
+  }, [url]);
 
   useEffect(() => {
     fetcher();

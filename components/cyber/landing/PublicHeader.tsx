@@ -1,9 +1,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { CyberButton } from "@/components/cyber";
+import { getCurrentUser } from "@/lib/server/auth";
 import styles from "./PublicHeader.module.css";
 
-export function PublicHeader() {
+export async function PublicHeader() {
+  const user = await getCurrentUser().catch(() => null);
+
   return (
     <header className={styles.root}>
       <div className={styles.inner}>
@@ -26,12 +29,33 @@ export function PublicHeader() {
         </nav>
 
         <div className={styles.actions}>
-          <CyberButton variant="ghost" asChild>
-            <Link href="/connexion">Connexion</Link>
-          </CyberButton>
-          <CyberButton variant="primary" asChild>
-            <Link href="/tournois">Rejoindre →</Link>
-          </CyberButton>
+          {user ? (
+            <Link
+              href="/profil"
+              aria-label="Mon profil"
+              style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
+            >
+              <Image
+                src={user.avatarUrl || "/vercel.svg"}
+                alt="Avatar"
+                width={30}
+                height={30}
+                unoptimized
+                referrerPolicy="no-referrer"
+                style={{ borderRadius: "50%", border: "1.5px solid rgba(89,212,255,0.35)" }}
+              />
+              <span>{user.pseudo}</span>
+            </Link>
+          ) : (
+            <>
+              <CyberButton variant="ghost" asChild>
+                <Link href="/connexion">Connexion</Link>
+              </CyberButton>
+              <CyberButton variant="primary" asChild>
+                <Link href="/connexion">Rejoindre →</Link>
+              </CyberButton>
+            </>
+          )}
         </div>
       </div>
     </header>

@@ -9,6 +9,7 @@ import s from "./arena-nav.module.css";
 type ArenaNavProps = {
   pseudo: string;
   avatarUrl: string | null;
+  activeTeam?: { teamId: number; teamName: string } | null;
 };
 
 const links = [
@@ -17,7 +18,7 @@ const links = [
   { href: "/tournois", label: "Tournois", rgb: "79, 224, 162" },
 ];
 
-export function ArenaNav({ pseudo, avatarUrl }: ArenaNavProps) {
+export function ArenaNav({ pseudo, avatarUrl, activeTeam }: ArenaNavProps) {
   const pathname = usePathname();
 
   return (
@@ -56,6 +57,16 @@ export function ArenaNav({ pseudo, avatarUrl }: ArenaNavProps) {
           <Link href="/" className={s.navHome}>
             ⌂ Accueil
           </Link>
+          {activeTeam && (
+            <Link
+              href={`/equipes/${activeTeam.teamId}`}
+              className={s.navHome}
+              aria-label={`Mon équipe : ${activeTeam.teamName}`}
+              title={activeTeam.teamName}
+            >
+              🛡 Mon équipe
+            </Link>
+          )}
           <Link href="/profil" className={s.avatarChip}>
             <Image
               src={avatarUrl || "/vercel.svg"}
