@@ -3,18 +3,12 @@ import { getDatabase } from "./database";
 import {
   type BureauMember,
   type BureauMemberInput,
+  FALLBACK_BUREAU,
   validateBureauInput,
 } from "@/lib/shared/bureau";
 
 export type { BureauMember, BureauMemberInput } from "@/lib/shared/bureau";
-
-/** Bureau affiché tant qu'aucune ligne n'existe en base (ou si la base est injoignable). */
-export const FALLBACK_BUREAU: BureauMember[] = [
-  { id: -1, name: "Léo Perreaut", role: "Président", initials: "LP", color: "rgb(89, 212, 255)" },
-  { id: -2, name: "Bryan Boulleaux", role: "Trésorier", initials: "BB", color: "rgb(245, 195, 58)" },
-  { id: -3, name: "Sophie Martin", role: "Secrétaire", initials: "SM", color: "rgb(255, 157, 46)" },
-  { id: -4, name: "Jérôme Dubois", role: "Responsable arbitrage", initials: "JD", color: "rgb(167, 115, 255)" },
-];
+export { FALLBACK_BUREAU } from "@/lib/shared/bureau";
 
 interface BureauRow extends RowDataPacket {
   id: number;

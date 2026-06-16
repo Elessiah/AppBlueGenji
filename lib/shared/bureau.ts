@@ -13,6 +13,18 @@ export type BureauMemberInput = {
   color?: string;
 };
 
+/**
+ * Bureau affiché tant qu'aucune ligne n'existe en base (ou si la base est
+ * injoignable). Les `id` négatifs marquent ces membres « de secours » comme
+ * non modifiables côté interface. Partagé client/serveur.
+ */
+export const FALLBACK_BUREAU: BureauMember[] = [
+  { id: -1, name: "Léo Perreaut", role: "Président", initials: "LP", color: "rgb(89, 212, 255)" },
+  { id: -2, name: "Bryan Boulleaux", role: "Trésorier", initials: "BB", color: "rgb(245, 195, 58)" },
+  { id: -3, name: "Sophie Martin", role: "Secrétaire", initials: "SM", color: "rgb(255, 157, 46)" },
+  { id: -4, name: "Jérôme Dubois", role: "Responsable arbitrage", initials: "JD", color: "rgb(167, 115, 255)" },
+];
+
 /** Palette de couleurs « cyber » utilisée pour les sigles du bureau. */
 export const BUREAU_COLORS = [
   "rgb(89, 212, 255)", // bleu glacier
@@ -72,7 +84,12 @@ export function validateBureauInput(input: BureauMemberInput): BureauValidationR
   if (role.length > BUREAU_ROLE_MAX) return { ok: false, error: "ROLE_TOO_LONG" };
 
   const rawInitials = typeof input.initials === "string" ? input.initials.trim() : "";
-  const initials = (rawInitials || computeInitials(name)).slice(0, BUREAU_INITIALS_MAX).toUpperCase();
+  // Découpe par point de code (et non par unité UTF-16) pour ne jamais couper
+  // une paire de substituts — sinon MySQL utf8mb4 rejetterait la chaîne.
+  const initials = [...(rawInitials || computeInitials(name))]
+    .slice(0, BUREAU_INITIALS_MAX)
+    .join("")
+    .toUpperCase();
   if (!initials) return { ok: false, error: "INITIALS_REQUIRED" };
 
   const color = (typeof input.color === "string" && input.color.trim()

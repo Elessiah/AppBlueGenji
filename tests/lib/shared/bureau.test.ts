@@ -67,6 +67,17 @@ describe("validateBureauInput", () => {
     if (result.ok) expect(result.value.initials).toBe("ABCD");
   });
 
+  it("caps initials by code point without splitting surrogate pairs", () => {
+    // 5 emoji (each 2 UTF-16 units) — must keep 4 whole code points, no lone surrogate.
+    const result = validateBureauInput({ name: "X", role: "Role", initials: "😀😁😂🤣😅" });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect([...result.value.initials]).toHaveLength(4);
+      // No unpaired surrogate (would encode as U+FFFD-like / invalid otherwise).
+      expect(result.value.initials).toBe("😀😁😂🤣");
+    }
+  });
+
   it("keeps an explicit color", () => {
     const result = validateBureauInput({ name: "X", role: "Role", color: "rgb(1, 2, 3)" });
     expect(result.ok).toBe(true);

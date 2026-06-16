@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/toast";
 import {
   type BureauMember,
   computeInitials,
+  FALLBACK_BUREAU,
   randomBureauColor,
 } from "@/lib/shared/bureau";
 import styles from "./page.module.css";
@@ -127,7 +128,12 @@ export function BureauSection({ initialMembers, isAdmin }: BureauSectionProps) {
         showError(data.error ? `Échec : ${data.error}` : "Échec de la suppression.");
         return;
       }
-      setMembers((prev) => prev.filter((m) => m.id !== member.id));
+      // Si plus aucun membre réel, réafficher le bureau de secours — c'est ce
+      // que renverrait un rechargement (table vide → FALLBACK_BUREAU).
+      setMembers((prev) => {
+        const next = prev.filter((m) => m.id !== member.id);
+        return next.length === 0 ? FALLBACK_BUREAU : next;
+      });
       showSuccess("Membre du bureau supprimé.");
     } catch {
       showError("Erreur réseau, réessaye.");
