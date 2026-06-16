@@ -44,11 +44,17 @@ export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
   useEffect(() => {
     if (!open) return;
     nameInputRef.current?.focus();
+    // Verrouille le défilement de l'arrière-plan tant que la modale est ouverte.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !busy) close();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, busy]);
 
