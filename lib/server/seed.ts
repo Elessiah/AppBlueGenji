@@ -60,6 +60,13 @@ const FICTIONAL_TEAMS = [
   { name: "Fire Legends", members: [17, 23, 28] },
 ];
 
+const FICTIONAL_BUREAU = [
+  { name: "Léo Perreaut", role: "Président", initials: "LP", color: "rgb(89, 212, 255)" },
+  { name: "Bryan Boulleaux", role: "Trésorier", initials: "BB", color: "rgb(245, 195, 58)" },
+  { name: "Sophie Martin", role: "Secrétaire", initials: "SM", color: "rgb(255, 157, 46)" },
+  { name: "Jérôme Dubois", role: "Responsable arbitrage", initials: "JD", color: "rgb(167, 115, 255)" },
+];
+
 const FICTIONAL_SPONSORS = [
   { name: "Test - HyperX", slug: "test-hyperx", tier: "GOLD" as const, website_url: "https://example.com/hyperx", description: "Périphériques gaming haute performance" },
   { name: "Test - SteelSeries", slug: "test-steelseries", tier: "SILVER" as const, website_url: "https://example.com/steelseries", description: "Équipement esport de référence" },
@@ -83,6 +90,7 @@ async function clearDatabase(db: Pool): Promise<void> {
     { label: "équipes", sql: "DELETE FROM bg_teams WHERE name LIKE 'Test -%'" },
     { label: "joueurs", sql: "DELETE FROM bg_users WHERE pseudo LIKE 'Test_%'" },
     { label: "sponsors", sql: "DELETE FROM bg_sponsors WHERE name LIKE 'Test -%'" },
+    { label: "membres du bureau", sql: "DELETE FROM bg_bureau_members" },
     // Équipes héritées préfixées « Team_ » (underscore échappé pour LIKE).
     { label: "matchs (équipes Team_)", sql: "DELETE FROM bg_matches WHERE team1_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\\_%') OR team2_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\\_%')" },
     { label: "inscriptions (équipes Team_)", sql: "DELETE FROM bg_tournament_registrations WHERE team_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\\_%')" },
@@ -210,6 +218,23 @@ async function createSponsors(db: Pool): Promise<void> {
     }
   }
   console.log(`  ✓ ${FICTIONAL_SPONSORS.length} sponsors créés`);
+}
+
+async function createBureau(db: Pool): Promise<void> {
+  console.log("🏛️  Création des membres du bureau...");
+  for (let i = 0; i < FICTIONAL_BUREAU.length; i++) {
+    const m = FICTIONAL_BUREAU[i];
+    try {
+      await db.execute(
+        `INSERT INTO bg_bureau_members (name, role, initials, color, display_order)
+         VALUES (?, ?, ?, ?, ?)`,
+        [m.name, m.role, m.initials, m.color, (i + 1) * 10]
+      );
+    } catch (error) {
+      console.error(`  ✗ ${m.name}:`, (error as Error).message);
+    }
+  }
+  console.log(`  ✓ ${FICTIONAL_BUREAU.length} membres du bureau créés`);
 }
 
 // Génère un bracket terminé avec winner/loser correctement propagés sur tous les rounds
@@ -444,6 +469,9 @@ async function main(): Promise<void> {
     await createSponsors(db);
     console.log();
 
+    await createBureau(db);
+    console.log();
+
     console.log("🎮 Création des tournois...");
 
     const tournaments: TournamentDef[] = [
@@ -484,6 +512,7 @@ async function main(): Promise<void> {
     console.log(`  · ${userIds.length} joueurs (Test_*)`);
     console.log(`  · ${teamIds.length} équipes (Test - *)`);
     console.log(`  · ${FICTIONAL_SPONSORS.length} sponsors (Test - *)`);
+    console.log(`  · ${FICTIONAL_BUREAU.length} membres du bureau`);
     console.log(`  · ${tournaments.length} tournois dont :`);
     console.log(`    - 6 REGISTRATION (inscrits ouverts, dont 3 × 11 équipes)`);
     console.log(`    - 1 RUNNING avec match READY (live landing)`);

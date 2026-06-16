@@ -3,7 +3,10 @@ import Link from "next/link";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { AboutSection } from "@/components/cyber/landing/AboutSection";
-import { CyberCard, CyberButton, TeamSigil } from "@/components/cyber";
+import { CyberButton } from "@/components/cyber";
+import { getCurrentUser } from "@/lib/server/auth";
+import { listBureauMembers } from "@/lib/server/bureau-service";
+import { BureauSection } from "./BureauSection";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = {
@@ -17,7 +20,10 @@ export const metadata: Metadata = {
   },
 };
 
-export default function AssociationPage() {
+export default async function AssociationPage() {
+  const [user, bureauMembers] = await Promise.all([getCurrentUser(), listBureauMembers()]);
+  const isAdmin = Boolean(user?.isAdmin);
+
   return (
     <main style={{ position: "relative", zIndex: 1 }}>
         <PublicHeader />
@@ -87,29 +93,7 @@ export default function AssociationPage() {
         </section>
 
         {/* BUREAU */}
-        <section className={styles.section}>
-          <header className={styles.head}>
-            <div>
-              <span className="eyebrow">SECTION 05</span>
-              <h2 className={styles.sectionTitle}>Bureau</h2>
-            </div>
-            <span className={styles.meta}>4 MEMBRES · BÉNÉVOLES</span>
-          </header>
-          <div className={styles.bureauGrid}>
-            {BUREAU.map((b) => (
-              <CyberCard key={b.name} lift className={styles.bureauCard}>
-                <div className={styles.bureauSigil}>
-                  <TeamSigil letter={b.initials} color={b.color} size={40} />
-                </div>
-                <div className={styles.bureauDivider} />
-                <div>
-                  <h3 className={styles.bureauName}>{b.name}</h3>
-                  <p className={styles.bureauRole}>{b.role}</p>
-                </div>
-              </CyberCard>
-            ))}
-          </div>
-        </section>
+        <BureauSection initialMembers={bureauMembers} isAdmin={isAdmin} />
 
         {/* ADHÉRER */}
         <section className={styles.section}>
@@ -215,32 +199,5 @@ const MANIFESTE = [
   {
     title: "Multi-jeux",
     text: "Overwatch 2 depuis la création, Marvel Rivals en croissance. Doubles éliminations, rounds suisses, formats endurance — du débutant au semi-pro.",
-  },
-];
-
-const BUREAU = [
-  {
-    name: "Léo Perreaut",
-    role: "Président",
-    initials: "LP",
-    color: "rgb(89, 212, 255)",
-  },
-  {
-    name: "Bryan Boulleaux",
-    role: "Trésorier",
-    initials: "BB",
-    color: "rgb(245, 195, 58)",
-  },
-  {
-    name: "Sophie Martin",
-    role: "Secrétaire",
-    initials: "SM",
-    color: "rgb(255, 157, 46)",
-  },
-  {
-    name: "Jérôme Dubois",
-    role: "Responsable arbitrage",
-    initials: "JD",
-    color: "rgb(167, 115, 255)",
   },
 ];

@@ -391,6 +391,21 @@ async function runMigrations(db: Pool): Promise<void> {
         REFERENCES bg_users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  // Migration: Membres du bureau de l'association (gérables par les admins)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS bg_bureau_members (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(120) NOT NULL,
+      role VARCHAR(120) NOT NULL,
+      initials VARCHAR(4) NOT NULL,
+      color VARCHAR(40) NOT NULL,
+      display_order INT NOT NULL DEFAULT 100,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_bg_bureau_order (display_order)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
 }
 
 async function ensureMigrations(db: Pool): Promise<void> {
