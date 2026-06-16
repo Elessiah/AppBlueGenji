@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { CyberCard, CyberButton } from "@/components/cyber";
@@ -106,12 +105,13 @@ export default async function PartenairesPage() {
                       }}
                     >
                       {sponsor.logoUrl ? (
-                        <Image
+                        // Logos externes fournis par les admins : <img> simple
+                        // (pas d'allowlist de domaines requise par next/image).
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
                           src={sponsor.logoUrl}
                           alt={sponsor.name}
-                          fill
-                          sizes="100%"
-                          style={{ objectFit: "contain", padding: 16 }}
+                          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", padding: 16 }}
                         />
                       ) : (
                         <>
