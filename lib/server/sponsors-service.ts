@@ -34,11 +34,12 @@ function fromRow(row: SponsorRow): Sponsor {
 }
 
 export async function listSponsors(): Promise<Sponsor[]> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
   try {
     const dbPromise = getDatabase();
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Database query timeout")), 5000)
-    );
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => reject(new Error("Database query timeout")), 5000);
+    });
 
     const db = await Promise.race([dbPromise, timeoutPromise]);
     const [rows] = await db.execute<SponsorRow[]>(
@@ -58,6 +59,8 @@ export async function listSponsors(): Promise<Sponsor[]> {
     return rows.map(fromRow);
   } catch {
     return FALLBACK_SPONSORS;
+  } finally {
+    clearTimeout(timeoutHandle);
   }
 }
 
