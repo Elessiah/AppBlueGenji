@@ -1,6 +1,10 @@
 import "dotenv/config";
 import type { Pool, ResultSetHeader } from "mysql2/promise";
 import { getDatabase } from "./database";
+import { loadTournamentRow, loadRegisteredTeamIds, getMatchRows } from "./tournaments/repository";
+import { createSingleEliminationBracket } from "./tournaments/bracket-single";
+import { createDoubleEliminationBracket } from "./tournaments/bracket-double";
+import { finalizeMatch } from "./tournaments/scoring";
 
 const FICTIONAL_PLAYERS = [
   { pseudo: "ShadowNinja", battletag: "ShadowNinja#1234", marvelTag: "ShadowNinja#2023" },
@@ -63,21 +67,45 @@ const FICTIONAL_SPONSORS = [
   { name: "Test - Discord", slug: "test-discord", tier: "PARTNER" as const, website_url: "https://example.com/discord", description: "La plateforme officielle de la communauté" },
 ];
 
+// Supprime toutes les données générées par une exécution précédente du seed
+// (équipes, joueurs, tournois, sponsors), identifiées par les préfixes de test
+// `Test -%` / `Test_%`. Chaque suppression est indépendante : l'échec de l'une
+// ne doit jamais empêcher les autres (sinon des équipes resteraient orphelines).
 async function clearDatabase(db: Pool): Promise<void> {
   console.log("🧹 Nettoyage des données test existantes...");
+
+  // Ordre important : enfants (matchs, inscriptions, membres) avant parents.
+  const steps: { label: string; sql: string }[] = [
+    { label: "matchs", sql: "DELETE FROM bg_matches WHERE tournament_id IN (SELECT id FROM bg_tournaments WHERE name LIKE 'Test -%')" },
+    { label: "inscriptions", sql: "DELETE FROM bg_tournament_registrations WHERE tournament_id IN (SELECT id FROM bg_tournaments WHERE name LIKE 'Test -%')" },
+    { label: "tournois", sql: "DELETE FROM bg_tournaments WHERE name LIKE 'Test -%'" },
+    { label: "membres d'équipe", sql: "DELETE FROM bg_team_members WHERE team_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Test -%')" },
+    { label: "équipes", sql: "DELETE FROM bg_teams WHERE name LIKE 'Test -%'" },
+    { label: "joueurs", sql: "DELETE FROM bg_users WHERE pseudo LIKE 'Test_%'" },
+    { label: "sponsors", sql: "DELETE FROM bg_sponsors WHERE name LIKE 'Test -%'" },
+    // Équipes héritées préfixées « Team_ » (underscore échappé pour LIKE).
+    { label: "matchs (équipes Team_)", sql: "DELETE FROM bg_matches WHERE team1_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\\_%') OR team2_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\\_%')" },
+    { label: "inscriptions (équipes Team_)", sql: "DELETE FROM bg_tournament_registrations WHERE team_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\\_%')" },
+    { label: "membres d'équipe (équipes Team_)", sql: "DELETE FROM bg_team_members WHERE team_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\\_%')" },
+    { label: "équipes Team_", sql: "DELETE FROM bg_teams WHERE name LIKE 'Team\\_%'" },
+  ];
+
   try {
     await db.execute("SET FOREIGN_KEY_CHECKS=0");
-    await db.execute("DELETE FROM bg_matches WHERE tournament_id IN (SELECT id FROM bg_tournaments WHERE name LIKE 'Test -%')");
-    await db.execute("DELETE FROM bg_tournament_registrations WHERE tournament_id IN (SELECT id FROM bg_tournaments WHERE name LIKE 'Test -%')");
-    await db.execute("DELETE FROM bg_tournaments WHERE name LIKE 'Test -%'");
-    await db.execute("DELETE FROM bg_team_members WHERE team_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Test -%')");
-    await db.execute("DELETE FROM bg_teams WHERE name LIKE 'Test -%'");
-    await db.execute("DELETE FROM bg_users WHERE pseudo LIKE 'Test_%'");
-    await db.execute("DELETE FROM bg_sponsors WHERE name LIKE 'Test -%'");
-    await db.execute("SET FOREIGN_KEY_CHECKS=1");
+
+    for (const step of steps) {
+      try {
+        const [result] = await db.execute<ResultSetHeader>(step.sql);
+        if (result.affectedRows > 0) {
+          console.log(`  ✓ ${result.affectedRows} ${step.label} supprimé(s)`);
+        }
+      } catch (error) {
+        console.error(`  ✗ ${step.label}:`, (error as Error).message);
+      }
+    }
+
     console.log("  ✓ Base nettoyée");
-  } catch (error) {
-    console.error("  ✗ Erreur nettoyage:", error);
+  } finally {
     await db.execute("SET FOREIGN_KEY_CHECKS=1");
   }
 }
@@ -129,6 +157,41 @@ async function createTeams(db: Pool, userIds: number[]): Promise<number[]> {
     }
   }
   console.log(`  ✓ ${teamIds.length} équipes créées`);
+  return teamIds;
+}
+
+// Génère en masse des équipes « remplissage » (chacune avec un seul owner) pour
+// alimenter les gros brackets (64 / 128 équipes). Retourne les nouveaux team ids.
+async function createBulkTeams(db: Pool, count: number): Promise<number[]> {
+  console.log(`🤖 Génération de ${count} équipes de remplissage...`);
+  const teamIds: number[] = [];
+  for (let i = 1; i <= count; i++) {
+    try {
+      const pseudo = `Test_BulkUser_${i}`;
+      const [userResult] = await db.execute<ResultSetHeader>(
+        `INSERT INTO bg_users
+         (pseudo, overwatch_battletag, marvel_rivals_tag, visible_avatar, visible_pseudo, visible_overwatch, visible_marvel, is_adult)
+         VALUES (?, ?, ?, 1, 1, 1, 1, 1)`,
+        [pseudo, `BulkUser${i}#${1000 + i}`, `BulkUser${i}#2023`]
+      );
+      const userId = userResult.insertId as number;
+
+      const [teamResult] = await db.execute<ResultSetHeader>(
+        `INSERT INTO bg_teams (name, logo_url) VALUES (?, NULL)`,
+        [`Test - Bracket Team ${i}`]
+      );
+      const teamId = teamResult.insertId as number;
+      teamIds.push(teamId);
+
+      await db.execute(
+        `INSERT INTO bg_team_members (team_id, user_id, roles_json, joined_at) VALUES (?, ?, ?, NOW())`,
+        [teamId, userId, '["OWNER"]']
+      );
+    } catch (error) {
+      console.error(`  ✗ Bracket Team ${i}:`, (error as Error).message);
+    }
+  }
+  console.log(`  ✓ ${teamIds.length} équipes de remplissage créées`);
   return teamIds;
 }
 
@@ -227,6 +290,57 @@ async function generateRunningBracket(
   );
 }
 
+// Génère un vrai bracket (single ou double élimination) via les générateurs de
+// production, puis simule `playWaves` vagues de matchs joués. La tête de chaque
+// bracket reste en READY → le tournoi demeure « en cours » (RUNNING).
+// Fonctionne pour n'importe quelle taille, jusqu'à 64 / 128 équipes.
+async function generateRealRunningBracket(
+  db: Pool,
+  tournamentId: number,
+  format: "SINGLE" | "DOUBLE",
+  playWaves: number
+): Promise<void> {
+  const connection = await db.getConnection();
+  try {
+    const tournament = await loadTournamentRow(connection, tournamentId);
+    if (!tournament) throw new Error(`Tournoi ${tournamentId} introuvable`);
+    const teamIds = await loadRegisteredTeamIds(connection, tournamentId);
+
+    if (format === "DOUBLE") {
+      await createDoubleEliminationBracket(connection, tournament, teamIds);
+    } else {
+      await createSingleEliminationBracket(connection, tournament, teamIds);
+    }
+
+    let played = 0;
+    for (let wave = 0; wave < playWaves; wave++) {
+      const matches = await getMatchRows(connection, tournamentId);
+      const ready = matches.filter(
+        (m) =>
+          m.status === "READY" &&
+          m.team1_id !== null &&
+          m.team2_id !== null &&
+          m.winner_team_id === null
+      );
+      if (ready.length === 0) break;
+
+      for (const m of ready) {
+        // Le mieux classé (team1) gagne — résultat déterministe pour le seed.
+        await finalizeMatch(connection, tournamentId, m, {
+          team1Score: 2,
+          team2Score: 1,
+          winnerTeamId: Number(m.team1_id),
+          loserTeamId: Number(m.team2_id),
+        });
+        played++;
+      }
+    }
+    console.log(`    ↳ bracket ${format} : ${played} matchs simulés`);
+  } finally {
+    connection.release();
+  }
+}
+
 interface TournamentDef {
   name: string;
   game: "OW2" | "MR";
@@ -236,6 +350,7 @@ interface TournamentDef {
   daysOffset: number; // négatif = dans le passé
   format?: "SINGLE" | "DOUBLE";
   hasThirdPlaceMatch?: boolean;
+  playWaves?: number; // RUNNING : nb de vagues de matchs joués via le vrai bracket
 }
 
 async function createTournament(
@@ -288,7 +403,11 @@ async function createTournament(
 
   // Matches selon l'état
   if (def.state === "RUNNING") {
-    await generateRunningBracket(db, tournamentId, teamsToUse);
+    if (def.playWaves !== undefined) {
+      await generateRealRunningBracket(db, tournamentId, format, def.playWaves);
+    } else {
+      await generateRunningBracket(db, tournamentId, teamsToUse);
+    }
   } else if (def.state === "FINISHED") {
     await generateFinishedBracket(db, tournamentId, teamsToUse);
   }
@@ -310,7 +429,16 @@ async function main(): Promise<void> {
     const userIds = await createUsers(db);
     console.log();
 
-    const teamIds = await createTeams(db, userIds);
+    const namedTeamIds = await createTeams(db, userIds);
+    console.log();
+
+    // Pool d'équipes étendu pour alimenter les gros brackets (jusqu'à 128 équipes)
+    const TEAM_POOL_TARGET = 128;
+    const bulkTeamIds = await createBulkTeams(
+      db,
+      Math.max(0, TEAM_POOL_TARGET - namedTeamIds.length)
+    );
+    const teamIds = [...namedTeamIds, ...bulkTeamIds];
     console.log();
 
     await createSponsors(db);
@@ -339,6 +467,12 @@ async function main(): Promise<void> {
       { name: "MR 11-Team Single + 3rd", game: "MR", state: "REGISTRATION", teamCount: 11, maxTeams: 16, daysOffset: 22, format: "SINGLE", hasThirdPlaceMatch: true },
       // 11 équipes — double élimination
       { name: "OW2 11-Team Double", game: "OW2", state: "REGISTRATION", teamCount: 11, maxTeams: 16, daysOffset: 25, format: "DOUBLE" },
+
+      // RUNNING — gros brackets simple & double élimination avec matchs joués
+      { name: "OW2 64-Team Single (en cours)", game: "OW2", state: "RUNNING", teamCount: 64, maxTeams: 64, daysOffset: -2, format: "SINGLE", playWaves: 3 },
+      { name: "MR 64-Team Double (en cours)", game: "MR", state: "RUNNING", teamCount: 64, maxTeams: 64, daysOffset: -2, format: "DOUBLE", playWaves: 4 },
+      { name: "OW2 128-Team Single (en cours)", game: "OW2", state: "RUNNING", teamCount: 128, maxTeams: 128, daysOffset: -3, format: "SINGLE", playWaves: 4 },
+      { name: "MR 128-Team Double (en cours)", game: "MR", state: "RUNNING", teamCount: 128, maxTeams: 128, daysOffset: -3, format: "DOUBLE", playWaves: 5 },
     ];
 
     for (const def of tournaments) {
@@ -357,6 +491,7 @@ async function main(): Promise<void> {
     console.log(`    - SINGLE sans petite finale (11 équipes)`);
     console.log(`    - SINGLE avec petite finale (11 équipes)`);
     console.log(`    - DOUBLE élimination (11 équipes)`);
+    console.log(`    - 4 RUNNING gros brackets : SINGLE & DOUBLE en 64 et 128 équipes (matchs joués)`);
 
     process.exit(0);
   } catch (error) {
