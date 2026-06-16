@@ -5,6 +5,11 @@ import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { CyberButton } from "@/components/cyber";
 import styles from "./page.module.css";
 
+/**
+ * Lien externe vers le règlement intérieur (Google Docs).
+ * Centralisé ici et dans les autres surfaces qui exposent le document
+ * (footer, page association). Voir `docs/features/LEGAL_PAGE.md`.
+ */
 const REGLEMENT_URL =
   "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/edit?usp=sharing";
 
