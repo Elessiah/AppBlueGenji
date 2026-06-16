@@ -49,7 +49,7 @@ export function PublicFooter() {
           <div>
             <div className={styles.heading}>LÉGAL</div>
             <ul>
-              <li><a href="#top">Mentions légales</a></li>
+              <li><Link href="/mentions-legales">Mentions légales</Link></li>
               <li><a href="#top">RGPD</a></li>
               <li><a href="#top">Statuts</a></li>
               <li><a href="#top">Cookies</a></li>
