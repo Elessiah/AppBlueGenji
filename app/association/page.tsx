@@ -6,6 +6,9 @@ import { AboutSection } from "@/components/cyber/landing/AboutSection";
 import { CyberCard, CyberButton, TeamSigil } from "@/components/cyber";
 import styles from "./page.module.css";
 
+const REGLEMENT_URL =
+  "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/edit?usp=sharing";
+
 export const metadata: Metadata = {
   title: "BlueGenji - L'Association Esport",
   description: "BlueGenji, association loi 1901 au service de la scène amateur française pour Overwatch 2 et Marvel Rivals.",
@@ -167,22 +170,22 @@ export default function AssociationPage() {
           </header>
           <ul className={styles.docList}>
             <li>
-              <Link href="/statuts.pdf" className={styles.docItem}>
+              <a href="/statuts.pdf" target="_blank" rel="noreferrer" className={styles.docItem}>
                 <span>Statuts de l'association</span>
-                <span className={styles.docMeta}>PDF · 142 KO →</span>
-              </Link>
+                <span className={styles.docMeta}>PDF →</span>
+              </a>
             </li>
             <li>
-              <Link href="/reglement-interieur.pdf" className={styles.docItem}>
+              <a href={REGLEMENT_URL} target="_blank" rel="noreferrer" className={styles.docItem}>
                 <span>Règlement intérieur</span>
-                <span className={styles.docMeta}>PDF · 89 KO →</span>
-              </Link>
+                <span className={styles.docMeta}>DOC →</span>
+              </a>
             </li>
             <li>
-              <Link href="/rapport-moral-2025.pdf" className={styles.docItem}>
-                <span>Rapport moral 2025</span>
-                <span className={styles.docMeta}>PDF · 156 KO →</span>
-              </Link>
+              <a href="/bulletin_adhesion.docx" target="_blank" rel="noreferrer" className={styles.docItem}>
+                <span>Bulletin d&apos;adhésion</span>
+                <span className={styles.docMeta}>DOCX →</span>
+              </a>
             </li>
           </ul>
           <div className={styles.legal}>

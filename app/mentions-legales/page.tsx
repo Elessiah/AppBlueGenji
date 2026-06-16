@@ -5,6 +5,9 @@ import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { CyberButton } from "@/components/cyber";
 import styles from "./page.module.css";
 
+const REGLEMENT_URL =
+  "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/edit?usp=sharing";
+
 export const metadata: Metadata = {
   title: "BlueGenji - Mentions légales",
   description:
@@ -71,16 +74,22 @@ export default function MentionsLegalesPage() {
         </header>
         <ul className={styles.docList}>
           <li>
-            <Link href="/statuts.pdf" className={styles.docItem}>
+            <a href="/statuts.pdf" target="_blank" rel="noreferrer" className={styles.docItem}>
               <span>Statuts de l&apos;association</span>
               <span className={styles.docMeta}>PDF →</span>
-            </Link>
+            </a>
           </li>
           <li>
-            <Link href="/bulletin-adhesion.pdf" className={styles.docItem}>
+            <a href={REGLEMENT_URL} target="_blank" rel="noreferrer" className={styles.docItem}>
+              <span>Règlement intérieur</span>
+              <span className={styles.docMeta}>DOC →</span>
+            </a>
+          </li>
+          <li>
+            <a href="/bulletin_adhesion.docx" target="_blank" rel="noreferrer" className={styles.docItem}>
               <span>Bulletin d&apos;adhésion</span>
-              <span className={styles.docMeta}>PDF →</span>
-            </Link>
+              <span className={styles.docMeta}>DOCX →</span>
+            </a>
           </li>
         </ul>
         <div className={styles.ctaRow}>

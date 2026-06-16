@@ -2,6 +2,9 @@ import Link from "next/link";
 import Image from "next/image";
 import styles from "./PublicFooter.module.css";
 
+const REGLEMENT_URL =
+  "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/edit?usp=sharing";
+
 export function PublicFooter() {
   return (
     <footer className={styles.root}>
@@ -25,7 +28,7 @@ export function PublicFooter() {
               <li><Link href="/tournois">Tournois actifs</Link></li>
               <li><Link href="/tournois">Archives</Link></li>
               <li><Link href="/joueurs">Classement</Link></li>
-              <li><Link href="/tournois">Règlement</Link></li>
+              <li><a href={REGLEMENT_URL} target="_blank" rel="noreferrer">Règlement</a></li>
             </ul>
           </div>
           <div>
@@ -51,7 +54,7 @@ export function PublicFooter() {
             <ul>
               <li><Link href="/mentions-legales">Mentions légales</Link></li>
               <li><a href="#top">RGPD</a></li>
-              <li><a href="#top">Statuts</a></li>
+              <li><a href="/statuts.pdf" target="_blank" rel="noreferrer">Statuts</a></li>
               <li><a href="#top">Cookies</a></li>
             </ul>
           </div>
