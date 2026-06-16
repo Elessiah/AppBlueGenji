@@ -129,6 +129,18 @@
   color: var(--blue-300);
 }
 
+.docItem:focus-visible {
+  outline: 2px solid var(--blue-300);
+  outline-offset: 4px;
+  color: var(--blue-300);
+}
+
+.prose a:focus-visible {
+  outline: 2px solid var(--blue-300);
+  outline-offset: 2px;
+  border-bottom-color: transparent;
+}
+
 .docMeta {
   font-family: var(--font-mono);
   font-size: 10px;

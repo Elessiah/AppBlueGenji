@@ -79,19 +79,37 @@ export default function MentionsLegalesPage() {
         </header>
         <ul className={styles.docList}>
           <li>
-            <a href="/statuts.pdf" target="_blank" rel="noreferrer" className={styles.docItem}>
+            <a
+              href="/statuts.pdf"
+              target="_blank"
+              rel="noreferrer"
+              className={styles.docItem}
+              aria-label="Statuts de l'association (PDF, nouvel onglet)"
+            >
               <span>Statuts de l&apos;association</span>
               <span className={styles.docMeta}>PDF →</span>
             </a>
           </li>
           <li>
-            <a href={REGLEMENT_URL} target="_blank" rel="noreferrer" className={styles.docItem}>
+            <a
+              href={REGLEMENT_URL}
+              target="_blank"
+              rel="noreferrer"
+              className={styles.docItem}
+              aria-label="Règlement intérieur (Google Docs, nouvel onglet)"
+            >
               <span>Règlement intérieur</span>
               <span className={styles.docMeta}>DOC →</span>
             </a>
           </li>
           <li>
-            <a href="/bulletin_adhesion.docx" target="_blank" rel="noreferrer" className={styles.docItem}>
+            <a
+              href="/bulletin_adhesion.docx"
+              target="_blank"
+              rel="noreferrer"
+              className={styles.docItem}
+              aria-label="Bulletin d'adhésion (DOCX, nouvel onglet)"
+            >
               <span>Bulletin d&apos;adhésion</span>
               <span className={styles.docMeta}>DOCX →</span>
             </a>
