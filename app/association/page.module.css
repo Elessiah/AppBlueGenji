@@ -153,6 +153,17 @@
   background: rgba(90, 200, 255, 0.05);
 }
 
+.bureauAction:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.bureauAction:disabled:hover {
+  color: var(--ink-mute);
+  border-color: var(--line-soft);
+  background: transparent;
+}
+
 .bureauActionDanger:hover {
   color: var(--red-live, #ff6e82);
   border-color: rgba(255, 110, 130, 0.6);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CyberCard, CyberButton, TeamSigil } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import {
@@ -31,9 +31,22 @@ export function BureauSection({ initialMembers, isAdmin }: BureauSectionProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   // Les membres de secours (id négatif) ne sont pas en base : non modifiables.
   const canManage = (m: BureauMember) => isAdmin && m.id > 0;
+
+  // Fermeture au clavier (Échap) + focus initial sur le champ Nom à l'ouverture.
+  useEffect(() => {
+    if (!open) return;
+    nameInputRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !busy) close();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, busy]);
 
   function openCreate() {
     setEditing(null);
@@ -155,13 +168,21 @@ export function BureauSection({ initialMembers, isAdmin }: BureauSectionProps) {
             </div>
             {canManage(b) && (
               <div className={styles.bureauCardActions}>
-                <button type="button" className={styles.bureauAction} onClick={() => openEdit(b)}>
+                <button
+                  type="button"
+                  className={styles.bureauAction}
+                  onClick={() => openEdit(b)}
+                  disabled={busy}
+                  aria-label={`Modifier ${b.name}`}
+                >
                   Modifier
                 </button>
                 <button
                   type="button"
                   className={`${styles.bureauAction} ${styles.bureauActionDanger}`}
                   onClick={() => remove(b)}
+                  disabled={busy}
+                  aria-label={`Supprimer ${b.name}`}
                 >
                   Supprimer
                 </button>
@@ -198,6 +219,7 @@ export function BureauSection({ initialMembers, isAdmin }: BureauSectionProps) {
             <label className={styles.modalField}>
               <span className={styles.modalLabel}>Nom</span>
               <input
+                ref={nameInputRef}
                 className={styles.modalInput}
                 value={form.name}
                 maxLength={120}
