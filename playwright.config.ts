@@ -22,7 +22,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // Les parcours authentifiés partagent une unique identité bypass (DEV_AUTH) :
+  // ils ne sont pas parallélisables. On sérialise dès que le bypass est actif.
+  workers: process.env.CI || process.env.E2E_AUTH_USER ? 1 : undefined,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
 
   use: {

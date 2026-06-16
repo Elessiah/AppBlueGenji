@@ -49,9 +49,20 @@ test.describe("Dashboard tournois (authentifié)", () => {
     await page.getByRole("button", { name: /^Tous/ }).click();
   });
 
-  test("le bouton « Créer un tournoi » mène au formulaire de création", async ({ page }) => {
+  test("le bouton « Créer un tournoi » respecte le gating admin", async ({ page }) => {
     await page.goto("/tournois");
-    await page.getByRole("button", { name: /Créer un tournoi/ }).click();
-    await expect(page).toHaveURL(/\/tournois\/creer/);
+
+    // Statut admin de l'utilisateur bypass courant.
+    const me = await page.request.get("/api/auth/me");
+    const isAdmin = me.ok() ? Boolean((await me.json())?.user?.isAdmin) : false;
+
+    const createBtn = page.getByRole("button", { name: /Créer un tournoi/ });
+    if (isAdmin) {
+      await expect(createBtn).toBeVisible();
+      await createBtn.click();
+      await expect(page).toHaveURL(/\/tournois\/creer/);
+    } else {
+      await expect(createBtn).toHaveCount(0);
+    }
   });
 });

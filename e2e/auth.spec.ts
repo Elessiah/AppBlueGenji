@@ -54,6 +54,11 @@ test.describe("Connexion", () => {
 });
 
 test.describe("Protection des routes sécurisées", () => {
+  // Ces tests vérifient la redirection en l'ABSENCE de session. Si le bypass
+  // DEV_AUTH est actif (E2E_AUTH_USER défini), l'utilisateur est authentifié et
+  // les routes ne redirigent plus : on les ignore alors.
+  test.skip(!!process.env.E2E_AUTH_USER, "Bypass DEV_AUTH actif : pas de redirection attendue.");
+
   for (const path of ["/tournois", "/equipes", "/joueurs", "/profil"]) {
     test(`redirige ${path} vers /connexion sans session`, async ({ page }) => {
       await page.context().clearCookies();
