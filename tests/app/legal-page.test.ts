@@ -82,9 +82,9 @@ describe("public footer wires legal documents", () => {
     expect(source).toContain("href={REGLEMENT_URL}");
   });
 
-  it("routes RGPD and Cookies to the matching legal sections", () => {
-    expect(source).toContain('href="/mentions-legales#donnees-personnelles"');
-    expect(source).toContain('href="/mentions-legales#cookies"');
+  it("routes RGPD and Cookies to the dedicated RGPD page", () => {
+    expect(source).toContain('href="/rgpd"');
+    expect(source).toContain('href="/rgpd#cookies"');
   });
 
   it("no longer routes any legal link to a placeholder anchor", () => {
