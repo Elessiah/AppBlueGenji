@@ -26,6 +26,7 @@ export async function PublicHeader() {
           <Link href="/joueurs">Joueurs</Link>
           <Link href="/bot">Bot</Link>
           <Link href="/association">L&apos;asso</Link>
+          <Link href="/benevoles">Bénévoles</Link>
         </nav>
 
         <div className={styles.actions}>

@@ -36,7 +36,7 @@ export function PublicFooter() {
             <ul>
               <li><a href="https://discord.gg/bluegenji" target="_blank" rel="noreferrer">Discord</a></li>
               <li><a href="#sponsors">Partenaires</a></li>
-              <li><a href="#assoc">Bénévoles</a></li>
+              <li><Link href="/benevoles">Bénévoles</Link></li>
               <li><Link href="/bot">Bot</Link></li>
             </ul>
           </div>
@@ -44,7 +44,7 @@ export function PublicFooter() {
             <div className={styles.heading}>ASSOCIATION</div>
             <ul>
               <li><Link href="/association">Manifeste</Link></li>
-              <li><Link href="/association">Équipe bénévole</Link></li>
+              <li><Link href="/benevoles">Équipe bénévole</Link></li>
               <li><Link href="/association">Partenariats</Link></li>
               <li><Link href="/association">Contact presse</Link></li>
             </ul>
