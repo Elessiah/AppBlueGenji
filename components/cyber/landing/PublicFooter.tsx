@@ -41,7 +41,7 @@ export function PublicFooter() {
             <div className={styles.heading}>ASSOCIATION</div>
             <ul>
               <li><Link href="/association">Manifeste</Link></li>
-              <li><Link href="/association">Équipe bénévole</Link></li>
+              <li><Link href="/benevoles">Équipe bénévole</Link></li>
               <li><Link href="/association">Partenariats</Link></li>
               <li><Link href="/association">Contact presse</Link></li>
             </ul>
