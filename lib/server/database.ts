@@ -406,6 +406,24 @@ async function runMigrations(db: Pool): Promise<void> {
       INDEX idx_bg_bureau_order (display_order)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  // Migration: Bénévoles de l'association, groupés par catégorie dynamique
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS bg_benevoles (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      first_name VARCHAR(80) NOT NULL,
+      pseudo VARCHAR(80) NULL,
+      last_name VARCHAR(80) NOT NULL,
+      category VARCHAR(120) NOT NULL,
+      photo_url VARCHAR(500) NULL,
+      joined_at DATE NOT NULL,
+      display_order INT NOT NULL DEFAULT 100,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_bg_benevoles_category (category),
+      INDEX idx_bg_benevoles_order (display_order)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
 }
 
 async function ensureMigrations(db: Pool): Promise<void> {
