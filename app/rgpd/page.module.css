@@ -144,6 +144,7 @@
 }
 
 .badgeAmber {
+  text-transform: uppercase;
   border-color: rgba(245, 185, 80, 0.3);
   color: var(--amber, #f5b950);
   background: rgba(245, 185, 80, 0.06);

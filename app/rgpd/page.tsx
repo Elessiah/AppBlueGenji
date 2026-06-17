@@ -5,7 +5,7 @@ import {
   DONNEES_PROFIL,
   DONNEE_TOURNOIS,
   DROITS,
-  RGPD_CONTACT_EMAIL,
+  RGPD_CONTACT_EMAIL_FALLBACK,
 } from "@/lib/shared/rgpd-policy";
 import styles from "./page.module.css";
 
@@ -16,6 +16,7 @@ export const metadata: Metadata = {
 };
 
 export default function RgpdPage() {
+  const contactEmail = process.env.RGPD_CONTACT_EMAIL ?? RGPD_CONTACT_EMAIL_FALLBACK;
   return (
     <main style={{ position: "relative", zIndex: 1 }}>
       <PublicHeader />
@@ -80,8 +81,8 @@ export default function RgpdPage() {
             </tr>
           </thead>
           <tbody>
-            {DONNEES_PROFIL.map((d) => (
-              <tr key={d.donnee}>
+            {DONNEES_PROFIL.map((d, i) => (
+              <tr key={i}>
                 <td>{d.donnee}</td>
                 <td>{d.finalite}</td>
                 <td>
@@ -164,7 +165,7 @@ export default function RgpdPage() {
         </header>
         <ul className={styles.rightsList}>
           {DROITS.map((droit, i) => (
-            <li key={droit.title} className={styles.rightItem}>
+            <li key={i} className={styles.rightItem}>
               <span className={styles.rightNum}>{String(i + 1).padStart(2, "0")}</span>
               <div>
                 <h3 className={styles.rightTitle}>{droit.title}</h3>
@@ -176,7 +177,7 @@ export default function RgpdPage() {
       </section>
 
       {/* SECTION 05 — COOKIES */}
-      <section className={styles.section}>
+      <section id="cookies" className={styles.section}>
         <header className={styles.head}>
           <div>
             <span className="eyebrow">SECTION 05</span>
@@ -227,7 +228,7 @@ export default function RgpdPage() {
         </div>
         <div className={styles.contactBlock} style={{ marginTop: 24 }}>
           <span className={styles.contactLabel}>Contact RGPD</span>
-          <span className={styles.contactValue}>{RGPD_CONTACT_EMAIL}</span>
+          <span className={styles.contactValue}>{contactEmail}</span>
           <span className={styles.contactSub}>Objet recommandé : « Demande RGPD — [droit concerné] »</span>
         </div>
         <div className={styles.prose} style={{ marginTop: 20 }}>

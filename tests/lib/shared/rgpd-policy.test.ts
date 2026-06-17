@@ -3,7 +3,7 @@ import {
   DONNEES_PROFIL,
   DONNEE_TOURNOIS,
   DROITS,
-  RGPD_CONTACT_EMAIL,
+  RGPD_CONTACT_EMAIL_FALLBACK,
 } from "@/lib/shared/rgpd-policy";
 
 describe("DONNEES_PROFIL", () => {
@@ -89,8 +89,8 @@ describe("DROITS", () => {
   });
 });
 
-describe("RGPD_CONTACT_EMAIL", () => {
+describe("RGPD_CONTACT_EMAIL_FALLBACK", () => {
   it("is a valid email address", () => {
-    expect(RGPD_CONTACT_EMAIL).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
+    expect(RGPD_CONTACT_EMAIL_FALLBACK).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
   });
 });
