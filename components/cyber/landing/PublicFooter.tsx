@@ -37,7 +37,7 @@ export function PublicFooter() {
               <li><a href="https://discord.gg/bluegenji" target="_blank" rel="noreferrer">Discord</a></li>
               <li><a href="#sponsors">Partenaires</a></li>
               <li><a href="#assoc">Bénévoles</a></li>
-              <li><a href="/bot">Bot</a></li>
+              <li><Link href="/bot">Bot</Link></li>
             </ul>
           </div>
           <div>
@@ -53,9 +53,9 @@ export function PublicFooter() {
             <div className={styles.heading}>LÉGAL</div>
             <ul>
               <li><Link href="/mentions-legales">Mentions légales</Link></li>
-              <li><Link href="/mentions-legales#donnees-personnelles">RGPD</Link></li>
+              <li><Link href="/rgpd">RGPD</Link></li>
               <li><a href="/statuts.pdf" target="_blank" rel="noreferrer">Statuts</a></li>
-              <li><Link href="/mentions-legales#cookies">Cookies</Link></li>
+              <li><Link href="/rgpd#cookies">Cookies</Link></li>
             </ul>
           </div>
         </div>
@@ -68,4 +68,3 @@ export function PublicFooter() {
     </footer>
   );
 }
-
