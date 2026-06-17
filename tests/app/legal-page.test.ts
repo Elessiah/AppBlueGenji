@@ -6,7 +6,7 @@ const ROOT = join(__dirname, "..", "..");
 const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 
 const REGLEMENT_URL =
-  "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/edit?usp=sharing";
+  "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
 
 const STATUTS = "/statuts.pdf";
 const BULLETIN = "/bulletin_adhesion.docx";
@@ -37,9 +37,24 @@ describe("mentions-legales page wires the right documents", () => {
     expect(source).toContain("href={REGLEMENT_URL}");
   });
 
+  it("uses a read-only /preview règlement link, not the editable surface", () => {
+    expect(REGLEMENT_URL).toContain("/preview");
+    expect(source).not.toContain("/edit?usp=sharing");
+  });
+
   it("opens document links in a new tab safely", () => {
     expect(source).toContain('target="_blank"');
     expect(source).toContain('rel="noreferrer"');
+  });
+
+  it("offers the DOCX as a download rather than a blank tab", () => {
+    expect(source).toMatch(/href="\/bulletin_adhesion\.docx"\s+download/);
+  });
+
+  it("exposes anchors for the RGPD and cookies sections", () => {
+    expect(source).toContain('id: "donnees-personnelles"');
+    expect(source).toContain('id: "cookies"');
+    expect(source).toContain("id={section.id}");
   });
 });
 
@@ -67,8 +82,13 @@ describe("public footer wires legal documents", () => {
     expect(source).toContain("href={REGLEMENT_URL}");
   });
 
-  it("no longer routes Règlement or Statuts to placeholder anchors", () => {
+  it("routes RGPD and Cookies to the matching legal sections", () => {
+    expect(source).toContain('href="/mentions-legales#donnees-personnelles"');
+    expect(source).toContain('href="/mentions-legales#cookies"');
+  });
+
+  it("no longer routes any legal link to a placeholder anchor", () => {
     expect(source).not.toMatch(/href="\/tournois">Règlement/);
-    expect(source).not.toMatch(/href="#top">Statuts/);
+    expect(source).not.toContain('href="#top"');
   });
 });

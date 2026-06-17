@@ -25,25 +25,32 @@ hero avec faits clés et sections numérotées (`SECTION 0X`).
 
 Les fichiers statiques sont servis depuis `public/` :
 
-| Document | Cible | Type |
+| Document | Cible | Comportement |
 |---|---|---|
-| Statuts | `/statuts.pdf` | PDF (nouvel onglet) |
-| Bulletin d'adhésion | `/bulletin_adhesion.docx` | DOCX (nouvel onglet) |
-| Règlement intérieur | Google Docs (lien externe) | Doc (nouvel onglet) |
+| Statuts | `/statuts.pdf` | nouvel onglet (`target="_blank"`, viewer PDF) |
+| Bulletin d'adhésion | `/bulletin_adhesion.docx` | téléchargement (`download`) |
+| Règlement intérieur | Google Docs `…/preview` | nouvel onglet, vue lecture seule |
 
-L'URL du règlement est centralisée dans une constante `REGLEMENT_URL` dans chaque
+Le règlement pointe vers l'URL `…/preview` (vue embarquée en lecture seule) et non
+`…/edit`, pour ne pas exposer la surface d'édition du document au public. L'URL est
+centralisée dans une constante `REGLEMENT_URL` dans chaque
 fichier qui l'utilise (`app/association/page.tsx`, `app/mentions-legales/page.tsx`,
 `components/cyber/landing/PublicFooter.tsx`).
 
 ## Boutons connectés
 
-- **Footer** (`PublicFooter`) — colonne LÉGAL : « Mentions légales », « Statuts » ;
+- **Footer** (`PublicFooter`) — colonne LÉGAL : « Mentions légales »,
+  « RGPD » (→ `#donnees-personnelles`), « Statuts », « Cookies » (→ `#cookies`) ;
   colonne COMPÉTITIONS : « Règlement ».
 - **`/association`** — section Documents officiels : Statuts, Règlement intérieur,
   Bulletin d'adhésion.
 - **`/mentions-legales`** — section Documents officiels : Statuts, Règlement
   intérieur, Bulletin d'adhésion.
 
-Les liens vers des fichiers statiques et le Google Doc utilisent
-`<a target="_blank" rel="noreferrer">` (et non `next/link`), adapté aux fichiers
-non routés par Next et aux liens externes.
+Les liens RGPD / Cookies du footer pointent vers les sections ancrées de
+`/mentions-legales` (`id="donnees-personnelles"`, `id="cookies"`), avec un
+`scroll-margin-top` pour dégager le header sticky.
+
+Les liens vers fichiers statiques et le Google Doc utilisent `<a>` (et non
+`next/link`) : `target="_blank" rel="noreferrer"` pour le PDF et le Google Doc,
+`download` pour le `.docx` (que les navigateurs téléchargent au lieu de l'afficher).

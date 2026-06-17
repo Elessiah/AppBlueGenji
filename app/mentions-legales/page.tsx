@@ -11,7 +11,7 @@ import styles from "./page.module.css";
  * (footer, page association). Voir `docs/features/LEGAL_PAGE.md`.
  */
 const REGLEMENT_URL =
-  "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/edit?usp=sharing";
+  "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
 
 export const metadata: Metadata = {
   title: "BlueGenji - Mentions légales",
@@ -56,7 +56,12 @@ export default function MentionsLegalesPage() {
       </section>
 
       {SECTIONS.map((section, index) => (
-        <section key={section.title} className={styles.section}>
+        <section
+          key={section.title}
+          id={section.id}
+          className={styles.section}
+          style={{ scrollMarginTop: 96 }}
+        >
           <header className={styles.head}>
             <div>
               <span className="eyebrow">SECTION {String(index + 1).padStart(2, "0")}</span>
@@ -105,10 +110,9 @@ export default function MentionsLegalesPage() {
           <li>
             <a
               href="/bulletin_adhesion.docx"
-              target="_blank"
-              rel="noreferrer"
+              download
               className={styles.docItem}
-              aria-label="Bulletin d'adhésion (DOCX, nouvel onglet)"
+              aria-label="Bulletin d'adhésion (DOCX, téléchargement)"
             >
               <span>Bulletin d&apos;adhésion</span>
               <span className={styles.docMeta}>DOCX →</span>
@@ -130,7 +134,7 @@ export default function MentionsLegalesPage() {
   );
 }
 
-const SECTIONS: { title: string; meta: string; body: React.ReactNode }[] = [
+const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: string }[] = [
   {
     title: "Éditeur du site",
     meta: "RESPONSABLE DE LA PUBLICATION",
@@ -211,6 +215,7 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode }[] = [
     ),
   },
   {
+    id: "donnees-personnelles",
     title: "Données personnelles",
     meta: "RGPD · RÈGLEMENT UE 2016/679",
     body: (
@@ -232,6 +237,7 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode }[] = [
     ),
   },
   {
+    id: "cookies",
     title: "Cookies",
     meta: "COOKIES STRICTEMENT NÉCESSAIRES",
     body: (

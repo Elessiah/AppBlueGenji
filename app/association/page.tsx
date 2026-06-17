@@ -7,7 +7,7 @@ import { CyberCard, CyberButton, TeamSigil } from "@/components/cyber";
 import styles from "./page.module.css";
 
 const REGLEMENT_URL =
-  "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/edit?usp=sharing";
+  "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
 
 export const metadata: Metadata = {
   title: "BlueGenji - L'Association Esport",
@@ -182,7 +182,7 @@ export default function AssociationPage() {
               </a>
             </li>
             <li>
-              <a href="/bulletin_adhesion.docx" target="_blank" rel="noreferrer" className={styles.docItem}>
+              <a href="/bulletin_adhesion.docx" download className={styles.docItem}>
                 <span>Bulletin d&apos;adhésion</span>
                 <span className={styles.docMeta}>DOCX →</span>
               </a>

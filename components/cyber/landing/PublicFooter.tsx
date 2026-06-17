@@ -3,7 +3,7 @@ import Image from "next/image";
 import styles from "./PublicFooter.module.css";
 
 const REGLEMENT_URL =
-  "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/edit?usp=sharing";
+  "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
 
 export function PublicFooter() {
   return (
@@ -53,9 +53,9 @@ export function PublicFooter() {
             <div className={styles.heading}>LÉGAL</div>
             <ul>
               <li><Link href="/mentions-legales">Mentions légales</Link></li>
-              <li><a href="#top">RGPD</a></li>
+              <li><Link href="/mentions-legales#donnees-personnelles">RGPD</Link></li>
               <li><a href="/statuts.pdf" target="_blank" rel="noreferrer">Statuts</a></li>
-              <li><a href="#top">Cookies</a></li>
+              <li><Link href="/mentions-legales#cookies">Cookies</Link></li>
             </ul>
           </div>
         </div>
