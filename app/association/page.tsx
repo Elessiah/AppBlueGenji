@@ -79,7 +79,7 @@ export default async function AssociationPage() {
           </header>
           <div className={styles.manifesteGrid}>
             <p className={styles.lede}>
-              BlueGenji est née de la conviction que la compétition esport en ligne doit être accessible, transparente et rémunératrice pour tous.
+              BlueGenji est née de la conviction que l&apos;esport amateur mérite une scène fiable, ouverte et sérieuse — où chacun trouve sa place, quel que soit son niveau.
             </p>
             <ol className={styles.principles}>
               {MANIFESTE.map((item, index) => (
@@ -184,23 +184,19 @@ export default async function AssociationPage() {
 
 const MANIFESTE = [
   {
-    title: "Transparence",
-    text: "Cash prizes réinvestis depuis les frais d'inscription, brackets publics et audités, décisions justifiées. Pas de marge marketing, pas de rétention.",
+    title: "Raison d'être",
+    text: "Animer la scène esport amateur en créant des événements compétitifs ouverts à tous. Là où d'autres organisent pour une élite, nous bâtissons des rendez-vous réguliers où chacun peut jouer, progresser et se mesurer aux autres.",
   },
   {
-    title: "Accessibilité",
-    text: "Adhésion gratuite à vie pour participer. Le talent n'a pas de portefeuille — chaque euro engagé revient aux joueurs et équipes qui gagnent.",
+    title: "Valeurs",
+    text: "L'inclusivité et l'ouverture d'esprit. Nous ne jugeons les joueurs sur rien d'autre que leur respect et leurs qualités de jeu — origine, niveau ou profil ne ferment jamais une porte.",
   },
   {
-    title: "Arbitrage",
-    text: "Aucune relation d'argent avec les équipes, juste une obligation morale de compétition saine. Neutralité politique absolue.",
+    title: "Vision",
+    text: "Une scène fiable, éthique et durable où tout le monde trouve sa place, à n'importe quel niveau : pour s'amuser dans un contexte plus sérieux, ou tenter l'ascension vers le monde professionnel.",
   },
   {
-    title: "Communauté",
-    text: "Casters, coaches, modérateurs, organisateurs. Une scène francophone où le respect et l'entraide font la différence, jamais en compétition avec les autres structures.",
-  },
-  {
-    title: "Multi-jeux",
-    text: "Overwatch 2 depuis la création, Marvel Rivals en croissance. Doubles éliminations, rounds suisses, formats endurance — du débutant au semi-pro.",
+    title: "Engagement",
+    text: "Un encadrement sérieux, une activité nourrie et la volonté sincère de construire un environnement à la fois sain et compétitif. Nous prenons cet engagement au sérieux à chaque tournoi.",
   },
 ];
