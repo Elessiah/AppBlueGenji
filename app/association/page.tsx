@@ -9,6 +9,9 @@ import { listBureauMembers } from "@/lib/server/bureau-service";
 import { BureauSection } from "./BureauSection";
 import styles from "./page.module.css";
 
+const REGLEMENT_URL =
+  "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
+
 export const metadata: Metadata = {
   title: "BlueGenji - L'Association Esport",
   description: "BlueGenji, association loi 1901 au service de la scène amateur française pour Overwatch 2 et Marvel Rivals.",
@@ -76,7 +79,7 @@ export default async function AssociationPage() {
           </header>
           <div className={styles.manifesteGrid}>
             <p className={styles.lede}>
-              BlueGenji est née de la conviction que la compétition esport en ligne doit être accessible, transparente et rémunératrice pour tous.
+              BlueGenji est née de la conviction que l&apos;esport amateur mérite une scène fiable, ouverte et sérieuse — où chacun trouve sa place, quel que soit son niveau.
             </p>
             <ol className={styles.principles}>
               {MANIFESTE.map((item, index) => (
@@ -151,22 +154,22 @@ export default async function AssociationPage() {
           </header>
           <ul className={styles.docList}>
             <li>
-              <Link href="/statuts.pdf" className={styles.docItem}>
+              <a href="/statuts.pdf" target="_blank" rel="noreferrer" className={styles.docItem}>
                 <span>Statuts de l'association</span>
-                <span className={styles.docMeta}>PDF · 142 KO →</span>
-              </Link>
+                <span className={styles.docMeta}>PDF →</span>
+              </a>
             </li>
             <li>
-              <Link href="/reglement-interieur.pdf" className={styles.docItem}>
+              <a href={REGLEMENT_URL} target="_blank" rel="noreferrer" className={styles.docItem}>
                 <span>Règlement intérieur</span>
-                <span className={styles.docMeta}>PDF · 89 KO →</span>
-              </Link>
+                <span className={styles.docMeta}>DOC →</span>
+              </a>
             </li>
             <li>
-              <Link href="/rapport-moral-2025.pdf" className={styles.docItem}>
-                <span>Rapport moral 2025</span>
-                <span className={styles.docMeta}>PDF · 156 KO →</span>
-              </Link>
+              <a href="/bulletin_adhesion.docx" download className={styles.docItem}>
+                <span>Bulletin d&apos;adhésion</span>
+                <span className={styles.docMeta}>DOCX →</span>
+              </a>
             </li>
           </ul>
           <div className={styles.legal}>
@@ -181,23 +184,19 @@ export default async function AssociationPage() {
 
 const MANIFESTE = [
   {
-    title: "Transparence",
-    text: "Cash prizes réinvestis depuis les frais d'inscription, brackets publics et audités, décisions justifiées. Pas de marge marketing, pas de rétention.",
+    title: "Raison d'être",
+    text: "Animer la scène esport amateur en créant des événements compétitifs ouverts à tous. Là où d'autres organisent pour une élite, nous bâtissons des rendez-vous réguliers où chacun peut jouer, progresser et se mesurer aux autres.",
   },
   {
-    title: "Accessibilité",
-    text: "Adhésion gratuite à vie pour participer. Le talent n'a pas de portefeuille — chaque euro engagé revient aux joueurs et équipes qui gagnent.",
+    title: "Valeurs",
+    text: "L'inclusivité et l'ouverture d'esprit. Nous ne jugeons les joueurs sur rien d'autre que leur respect et leurs qualités de jeu — origine, niveau ou profil ne ferment jamais une porte.",
   },
   {
-    title: "Arbitrage",
-    text: "Aucune relation d'argent avec les équipes, juste une obligation morale de compétition saine. Neutralité politique absolue.",
+    title: "Vision",
+    text: "Une scène fiable, éthique et durable où tout le monde trouve sa place, à n'importe quel niveau : pour s'amuser dans un contexte plus sérieux, ou tenter l'ascension vers le monde professionnel.",
   },
   {
-    title: "Communauté",
-    text: "Casters, coaches, modérateurs, organisateurs. Une scène francophone où le respect et l'entraide font la différence, jamais en compétition avec les autres structures.",
-  },
-  {
-    title: "Multi-jeux",
-    text: "Overwatch 2 depuis la création, Marvel Rivals en croissance. Doubles éliminations, rounds suisses, formats endurance — du débutant au semi-pro.",
+    title: "Engagement",
+    text: "Un encadrement sérieux, une activité nourrie et la volonté sincère de construire un environnement à la fois sain et compétitif. Nous prenons cet engagement au sérieux à chaque tournoi.",
   },
 ];
