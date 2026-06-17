@@ -1,12 +1,12 @@
 ﻿:root {
-  --bg-0: #090c12;
-  --bg-1: #121826;
-  --bg-2: #1a2235;
+  --bg-0: #07080a;
+  --bg-1: #0d0f13;
+  --bg-2: #14161c;
   --line: rgba(255, 255, 255, 0.12);
   --line-strong: rgba(255, 255, 255, 0.24);
-  --text-0: #f3f7ff;
-  --text-1: #c4cfdf;
-  --text-2: #8f9cb0;
+  --text-0: #eef3fa;
+  --text-1: #c4ccd8;
+  --text-2: #8c95a6;
   --accent-blue: #59d4ff;
   --accent-orange: #ff9d2e;
   --accent-green: #4fe0a2;
@@ -35,9 +35,9 @@ body {
 body {
   color: var(--text-0);
   background:
-    radial-gradient(circle at 12% 10%, rgba(89, 212, 255, 0.2), transparent 42%),
-    radial-gradient(circle at 84% 0%, rgba(255, 157, 46, 0.18), transparent 38%),
-    linear-gradient(135deg, var(--bg-0), var(--bg-1) 42%, var(--bg-2));
+    radial-gradient(520px 360px at 14% 2%, rgba(90, 200, 255, 0.16), transparent 58%),
+    radial-gradient(420px 300px at 88% -4%, rgba(90, 200, 255, 0.1), transparent 58%),
+    linear-gradient(180deg, #06070a, var(--bg-0) 55%, #06070a);
   font-family: var(--font-body), sans-serif;
 }
 
@@ -62,7 +62,7 @@ a {
 .hero {
   border: 1px solid var(--line);
   border-radius: calc(var(--radius) + 6px);
-  background: linear-gradient(140deg, rgba(17, 23, 34, 0.82), rgba(12, 16, 27, 0.9));
+  background: linear-gradient(140deg, rgba(16, 18, 24, 0.82), rgba(9, 10, 14, 0.9));
   padding: 36px;
   box-shadow: var(--shadow);
   overflow: hidden;
@@ -73,7 +73,7 @@ a {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(120deg, rgba(89, 212, 255, 0.08), rgba(255, 157, 46, 0.06));
+  background: radial-gradient(440px 240px at 88% 0%, rgba(90, 200, 255, 0.12), transparent 60%);
   pointer-events: none;
 }
 
@@ -120,7 +120,7 @@ a {
 .card {
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(13, 18, 30, 0.82);
+  background: rgba(17, 19, 25, 0.82);
   padding: 18px;
   position: relative;
   overflow: hidden;
@@ -184,7 +184,7 @@ a {
 .kpi {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: rgba(7, 12, 20, 0.75);
+  background: rgba(10, 11, 15, 0.75);
   padding: 12px;
 }
 
@@ -205,7 +205,7 @@ a {
   margin-top: 26px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(13, 18, 30, 0.76);
+  background: rgba(17, 19, 25, 0.76);
   padding: 22px;
 }
 
@@ -357,7 +357,7 @@ select {
   width: 100%;
   border-radius: 10px;
   border: 1px solid var(--line-strong);
-  background: rgba(7, 12, 20, 0.88);
+  background: rgba(10, 11, 15, 0.88);
   color: var(--text-0);
   padding: 10px 11px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
@@ -369,7 +369,7 @@ select {
   outline: none;
   border-color: var(--accent-green);
   box-shadow: 0 0 12px rgba(79, 224, 162, 0.25), inset 0 1px 0 rgba(79, 224, 162, 0.1);
-  background: rgba(7, 12, 20, 0.95);
+  background: rgba(10, 11, 15, 0.95);
 }
 
 .field textarea {
@@ -388,7 +388,7 @@ select {
 
 .field select:hover:not(:disabled) {
   border-color: var(--accent-green);
-  background-color: rgba(7, 12, 20, 0.92);
+  background-color: rgba(10, 11, 15, 0.92);
 }
 
 input[type="datetime-local"] {
@@ -733,7 +733,7 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
   position: relative;
   border-radius: 22px;
   border: 1px solid rgba(var(--header-rgb), 0.15);
-  background: linear-gradient(135deg, rgba(11, 16, 27, 0.97) 0%, rgba(18, 26, 44, 0.95) 100%);
+  background: linear-gradient(135deg, rgba(12, 14, 18, 0.97) 0%, rgba(20, 23, 30, 0.95) 100%);
   overflow: hidden;
   padding: 40px 40px 36px;
   margin-bottom: 24px;
@@ -772,7 +772,7 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
 .ds-block {
   border: 1px solid var(--line);
   border-radius: 20px;
-  background: rgba(13, 18, 30, 0.85);
+  background: rgba(17, 19, 25, 0.85);
   padding: 28px 32px;
   position: relative;
   overflow: hidden;
@@ -970,13 +970,13 @@ input[type="number"] {
    =========================================================== */
 
 :root {
-  --cyber-bg: #05080c;
-  --cyber-bg-1: #0a0f15;
-  --cyber-bg-2: #0e141c;
-  --cyber-bg-3: #131a24;
-  --ink: #e6f1f5;
-  --ink-mute: #8ea3b0;
-  --ink-dim: #53646f;
+  --cyber-bg: #05060a;
+  --cyber-bg-1: #0a0c11;
+  --cyber-bg-2: #0f1218;
+  --cyber-bg-3: #161a22;
+  --ink: #eaf2f7;
+  --ink-mute: #93a3b2;
+  --ink-dim: #55636f;
   --blue-100: #dff2ff;
   --blue-300: #8fd5ff;
   --blue-500: #5ac8ff;
@@ -1040,8 +1040,8 @@ input[type="number"] {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(1200px 600px at 70% -10%, rgba(90, 200, 255, calc(0.10 * var(--glow, 1))), transparent 60%),
-    radial-gradient(800px 500px at 10% 110%, rgba(90, 200, 255, calc(0.06 * var(--glow, 1))), transparent 60%);
+    radial-gradient(560px 360px at 74% -8%, rgba(90, 200, 255, calc(0.16 * var(--glow, 1))), transparent 62%),
+    radial-gradient(420px 300px at 8% 108%, rgba(90, 200, 255, calc(0.1 * var(--glow, 1))), transparent 62%);
 }
 
 .fabric::after {
