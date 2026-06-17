@@ -5,7 +5,28 @@
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   background: rgba(5, 8, 12, 0.82);
-  border-bottom: 1px solid var(--line-soft);
+}
+
+/* Liseré néon dégradé : s'estompe sur les bords + halo, pas de trait brut */
+.root::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(90, 200, 255, 0.45) 28%,
+    rgba(90, 200, 255, 0.7) 50%,
+    rgba(90, 200, 255, 0.45) 72%,
+    transparent
+  );
+  box-shadow:
+    0 0 12px rgba(90, 200, 255, calc(0.4 * var(--glow, 1))),
+    0 6px 22px rgba(90, 200, 255, calc(0.18 * var(--glow, 1)));
+  pointer-events: none;
 }
 
 .inner {
