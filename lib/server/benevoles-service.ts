@@ -32,15 +32,19 @@ function fromRow(row: BenevoleRow): Benevole {
   };
 }
 
-/** Liste tous les bénévoles triés par catégorie puis par ordre d'affichage. */
+/** Liste tous les bénévoles triés par catégorie puis par ordre d'affichage. Retourne [] si la DB est injoignable. */
 export async function listBenevoles(): Promise<Benevole[]> {
-  const db = await getDatabase();
-  const [rows] = await db.execute<BenevoleRow[]>(
-    `SELECT id, first_name, pseudo, last_name, category, photo_url, joined_at
-     FROM bg_benevoles
-     ORDER BY category ASC, display_order ASC, id ASC`,
-  );
-  return (rows ?? []).map(fromRow);
+  try {
+    const db = await getDatabase();
+    const [rows] = await db.execute<BenevoleRow[]>(
+      `SELECT id, first_name, pseudo, last_name, category, photo_url, joined_at
+       FROM bg_benevoles
+       ORDER BY category ASC, display_order ASC, id ASC`,
+    );
+    return (rows ?? []).map(fromRow);
+  } catch {
+    return [];
+  }
 }
 
 /** Crée un bénévole et le renvoie. */

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CyberButton, CyberCard } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import {
@@ -13,7 +13,6 @@ import {
 import styles from "./page.module.css";
 
 interface BenevoleSectionProps {
-  initialGroups: { category: string; members: Benevole[] }[];
   initialBenevoles: Benevole[];
   isAdmin: boolean;
 }
@@ -27,30 +26,24 @@ interface FormState {
   joinedAt: string;
 }
 
-const today = new Date().toISOString().slice(0, 10);
 const EMPTY_FORM: FormState = {
   firstName: "",
   pseudo: "",
   lastName: "",
   category: "",
   photoUrl: "",
-  joinedAt: today,
+  joinedAt: "",
 };
 
-export function BenevolesSection({ initialGroups, initialBenevoles, isAdmin }: BenevoleSectionProps) {
+export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionProps) {
   const { showError, showSuccess } = useToast();
   const [benevoles, setBenevoles] = useState<Benevole[]>(initialBenevoles);
-  const [groups, setGroups] = useState(initialGroups);
+  const groups = useMemo(() => groupByCategory(benevoles), [benevoles]);
   const [editing, setEditing] = useState<Benevole | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const firstNameRef = useRef<HTMLInputElement>(null);
-
-  // Resync groupement à chaque modification de la liste
-  useEffect(() => {
-    setGroups(groupByCategory(benevoles));
-  }, [benevoles]);
 
   // Focus + Escape
   useEffect(() => {
@@ -66,7 +59,7 @@ export function BenevolesSection({ initialGroups, initialBenevoles, isAdmin }: B
 
   function openCreate() {
     setEditing(null);
-    setForm({ ...EMPTY_FORM });
+    setForm({ ...EMPTY_FORM, joinedAt: new Date().toISOString().slice(0, 10) });
     setOpen(true);
   }
 

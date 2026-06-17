@@ -88,6 +88,18 @@ describe("validateBenevoleInput", () => {
     });
   });
 
+  it("rejects a calendar-invalid date like 2024-02-30", () => {
+    expect(validateBenevoleInput({ ...valid, joinedAt: "2024-02-30" })).toEqual({
+      ok: false, error: "JOINED_AT_INVALID",
+    });
+  });
+
+  it("rejects an impossible month like 2024-13-01", () => {
+    expect(validateBenevoleInput({ ...valid, joinedAt: "2024-13-01" })).toEqual({
+      ok: false, error: "JOINED_AT_INVALID",
+    });
+  });
+
   it("rejects firstName over 80 chars", () => {
     expect(validateBenevoleInput({ ...valid, firstName: "a".repeat(81) })).toEqual({
       ok: false, error: "FIRST_NAME_TOO_LONG",

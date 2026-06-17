@@ -445,6 +445,7 @@ export async function getDatabase(): Promise<Pool> {
       connectTimeout: 10000,
       namedPlaceholders: true,
       charset: "utf8mb4",
+      dateStrings: true,
     });
   }
 

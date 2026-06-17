@@ -3,7 +3,6 @@ import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { getCurrentUser } from "@/lib/server/auth";
 import { listBenevoles } from "@/lib/server/benevoles-service";
-import { groupByCategory } from "@/lib/shared/benevoles";
 import { BenevolesSection } from "./BenevolesSection";
 import styles from "./page.module.css";
 
@@ -21,7 +20,6 @@ export const metadata: Metadata = {
 export default async function BenevolesPage() {
   const [user, benevoles] = await Promise.all([getCurrentUser(), listBenevoles()]);
   const isAdmin = Boolean(user?.isAdmin);
-  const groups = groupByCategory(benevoles);
 
   return (
     <main style={{ position: "relative", zIndex: 1 }}>
@@ -39,7 +37,7 @@ export default async function BenevolesPage() {
         </p>
       </section>
 
-      <BenevolesSection initialGroups={groups} initialBenevoles={benevoles} isAdmin={isAdmin} />
+      <BenevolesSection initialBenevoles={benevoles} isAdmin={isAdmin} />
 
       <PublicFooter />
     </main>

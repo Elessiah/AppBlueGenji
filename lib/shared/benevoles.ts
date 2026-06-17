@@ -52,6 +52,13 @@ export function validateBenevoleInput(input: BenevoleInput): BenevoleValidationR
   if (category.length > BENEVOLE_CATEGORY_MAX) return { ok: false, error: "CATEGORY_TOO_LONG" };
   if (!joinedAt) return { ok: false, error: "JOINED_AT_REQUIRED" };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(joinedAt)) return { ok: false, error: "JOINED_AT_INVALID" };
+  {
+    const [y, m, d] = joinedAt.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) {
+      return { ok: false, error: "JOINED_AT_INVALID" };
+    }
+  }
   if (pseudo && pseudo.length > BENEVOLE_PSEUDO_MAX) return { ok: false, error: "PSEUDO_TOO_LONG" };
   if (photoUrl && photoUrl.length > BENEVOLE_PHOTO_URL_MAX) return { ok: false, error: "PHOTO_URL_TOO_LONG" };
 
