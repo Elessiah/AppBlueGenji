@@ -1174,3 +1174,10 @@ input[type="number"] {
     gap: 24px !important;
   }
 }
+
+/* Survol des cartes partenaires (page /partenaires) — remplace le hover JS
+   qui cassait le rendu (handlers d'événement interdits en Server Component). */
+.sponsor-slot:hover {
+  border-color: rgba(90, 200, 255, 0.5) !important;
+  background: rgba(90, 200, 255, 0.05) !important;
+}

@@ -95,14 +95,6 @@ export default async function PartenairesPage() {
                         overflow: "hidden",
                         transition: "all 0.2s ease",
                       }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLElement).style.borderColor = "rgba(90,200,255,0.5)";
-                        (e.currentTarget as HTMLElement).style.background = "rgba(90,200,255,0.05)";
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLElement).style.borderColor = "var(--line)";
-                        (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.02)";
-                      }}
                     >
                       {sponsor.logoUrl ? (
                         // Logos externes fournis par les admins : <img> simple

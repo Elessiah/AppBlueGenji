@@ -27,6 +27,13 @@ interface FormState {
 
 const EMPTY_FORM: FormState = { name: "", tier: "PARTNER", websiteUrl: "", logoUrl: "", description: "" };
 
+// Tri par palier (GOLD → PARTNER), comme côté serveur. `sort` est stable :
+// l'ordre relatif au sein d'un même palier est préservé (un nouvel élément
+// ajouté en fin reste donc en fin de son palier, cohérent avec display_order).
+function sortByTier(list: Sponsor[]): Sponsor[] {
+  return [...list].sort((a, b) => SPONSOR_TIERS.indexOf(a.tier) - SPONSOR_TIERS.indexOf(b.tier));
+}
+
 export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
   const { showError, showSuccess } = useToast();
   const [items, setItems] = useState<Sponsor[]>(sponsors);
@@ -112,11 +119,11 @@ export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
       }
 
       if (editing) {
-        setItems((prev) => prev.map((s) => (s.id === data.sponsor!.id ? data.sponsor! : s)));
+        setItems((prev) => sortByTier(prev.map((s) => (s.id === data.sponsor!.id ? data.sponsor! : s))));
         showSuccess("Partenaire mis à jour.");
       } else {
         // Si on partait des sponsors de secours, on bascule sur la liste réelle.
-        setItems((prev) => [...prev.filter((s) => s.id > 0), data.sponsor!]);
+        setItems((prev) => sortByTier([...prev.filter((s) => s.id > 0), data.sponsor!]));
         showSuccess("Partenaire ajouté.");
       }
       close();
