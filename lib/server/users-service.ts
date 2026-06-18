@@ -73,7 +73,7 @@ function mapPublicUser(row: UserRow): PublicUserProfile {
       marvel: Boolean(row.visible_marvel),
       major: Boolean(row.visible_major),
     },
-    createdAt: row.created_at.toISOString(),
+    createdAt: toIso(row.created_at)!,
   };
 }
 

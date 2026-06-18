@@ -83,10 +83,10 @@ export function mapCard(row: TournamentListRow): TournamentCard {
     maxTeams: Number(row.max_teams),
     registeredTeams: Number(row.registered_teams),
     state: row.state,
-    startVisibilityAt: row.start_visibility_at.toISOString(),
-    registrationOpenAt: row.registration_open_at.toISOString(),
-    registrationCloseAt: row.registration_close_at.toISOString(),
-    startAt: row.start_at.toISOString(),
+    startVisibilityAt: toIso(row.start_visibility_at)!,
+    registrationOpenAt: toIso(row.registration_open_at)!,
+    registrationCloseAt: toIso(row.registration_close_at)!,
+    startAt: toIso(row.start_at)!,
     hasThirdPlaceMatch: Boolean(row.has_third_place_match),
   };
 }
@@ -115,6 +115,6 @@ export function mapMatch(row: MatchRow): BracketMatch {
     nextLoserMatchId: row.next_loser_match_id === null ? null : Number(row.next_loser_match_id),
     nextLoserSlot: row.next_loser_slot === null ? null : Number(row.next_loser_slot),
     scoreDeadlineAt: toIso(row.score_deadline_at),
-    updatedAt: row.updated_at.toISOString(),
+    updatedAt: toIso(row.updated_at)!,
   };
 }
