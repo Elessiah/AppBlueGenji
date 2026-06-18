@@ -31,22 +31,27 @@ export async function PublicHeader() {
 
         <div className={styles.actions}>
           {user ? (
-            <Link
-              href="/profil"
-              aria-label="Mon profil"
-              style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
-            >
-              <Image
-                src={user.avatarUrl || "/vercel.svg"}
-                alt="Avatar"
-                width={30}
-                height={30}
-                unoptimized
-                referrerPolicy="no-referrer"
-                style={{ borderRadius: "50%", border: "1.5px solid rgba(89,212,255,0.35)" }}
-              />
-              <span>{user.pseudo}</span>
-            </Link>
+            <>
+              <CyberButton variant="primary" asChild>
+                <Link href="/tournois">Accéder à la partie compétitive →</Link>
+              </CyberButton>
+              <Link
+                href="/profil"
+                aria-label="Mon profil"
+                style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
+              >
+                <Image
+                  src={user.avatarUrl || "/vercel.svg"}
+                  alt="Avatar"
+                  width={30}
+                  height={30}
+                  unoptimized
+                  referrerPolicy="no-referrer"
+                  style={{ borderRadius: "50%", border: "1.5px solid rgba(89,212,255,0.35)" }}
+                />
+                <span>{user.pseudo}</span>
+              </Link>
+            </>
           ) : (
             <>
               <CyberButton variant="ghost" asChild>
