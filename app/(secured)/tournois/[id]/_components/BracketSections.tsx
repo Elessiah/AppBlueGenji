@@ -70,6 +70,16 @@ function buildSections(roundNums: number[], bracketType: BracketType): BracketSe
   return sections;
 }
 
+/** Prochain match non terminé du joueur dans ce tableau (null s'il n'y participe pas). */
+function findMyNextMatch(matches: BracketMatch[], myTeamId: number | null): BracketMatch | null {
+  if (myTeamId === null) return null;
+  return (
+    matches
+      .filter((m) => (m.team1Id === myTeamId || m.team2Id === myTeamId) && m.winnerTeamId === null)
+      .sort((a, b) => a.roundNumber - b.roundNumber)[0] ?? null
+  );
+}
+
 /**
  * Détermine la section à ouvrir par défaut : celle du prochain match du joueur,
  * sinon le round actif (premier non terminé), sinon la dernière (finale).
@@ -84,12 +94,8 @@ function defaultOpenKey(
   const sectionOfRound = (roundNum: number) =>
     sections.find((s) => s.rounds.includes(roundNum))?.key ?? null;
 
-  if (myTeamId !== null) {
-    const mine = matches
-      .filter((m) => (m.team1Id === myTeamId || m.team2Id === myTeamId) && m.winnerTeamId === null)
-      .sort((a, b) => a.roundNumber - b.roundNumber)[0];
-    if (mine) return sectionOfRound(mine.roundNumber);
-  }
+  const mine = findMyNextMatch(matches, myTeamId);
+  if (mine) return sectionOfRound(mine.roundNumber);
 
   const active = matches
     .filter((m) => m.status !== "COMPLETED")
@@ -132,6 +138,7 @@ export function BracketSections({
   const totalRounds = roundNums.length;
   const sections = buildSections(roundNums, bracketType);
   const accent = ACCENT[bracketType];
+  const myNextMatchId = findMyNextMatch(matches, myTeamId)?.id ?? null;
 
   const [openKeys, setOpenKeys] = useState<Set<string>>(() => {
     const initial = defaultOpenKey(sections, matches, myTeamId);
@@ -239,6 +246,7 @@ export function BracketSections({
                     roundIdxBase={section.roundIdxBase}
                     qualifyLabel={section.qualifyLabel}
                     accentColor={accent}
+                    scrollTargetMatchId={myNextMatchId}
                     canReport={canReport}
                     adminResolvable={adminResolvable}
                     drafts={drafts}

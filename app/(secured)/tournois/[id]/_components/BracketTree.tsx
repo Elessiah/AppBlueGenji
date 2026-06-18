@@ -1,6 +1,6 @@
 "use client";
 
-import { CSSProperties, FormEvent, Fragment } from "react";
+import { CSSProperties, FormEvent, Fragment, useEffect, useRef } from "react";
 import type { BracketMatch, BracketType } from "@/lib/shared/types";
 import { MatchRow } from "./MatchRow";
 
@@ -25,6 +25,8 @@ interface BracketTreeProps {
   qualifyLabel: string | null;
   /** Couleur d'accent du tableau (distingue principal / perdants / finale). */
   accentColor: string;
+  /** Match du joueur à mettre en évidence et vers lequel défiler à l'ouverture (null = aucun). */
+  scrollTargetMatchId: number | null;
   canReport: (m: BracketMatch) => boolean;
   adminResolvable: (m: BracketMatch) => boolean;
   drafts: MatchScoreDraft;
@@ -41,6 +43,7 @@ export function BracketTree({
   roundIdxBase,
   qualifyLabel,
   accentColor,
+  scrollTargetMatchId,
   canReport,
   adminResolvable,
   drafts,
@@ -48,6 +51,21 @@ export function BracketTree({
   onSubmit,
   onOpenAdminModal,
 }: BracketTreeProps) {
+  const targetRef = useRef<HTMLDivElement>(null);
+  const didScrollRef = useRef(false);
+
+  // Au montage, centre la vue sur le match du joueur (scroll page + scroll horizontal du bracket).
+  useEffect(() => {
+    if (scrollTargetMatchId === null || didScrollRef.current) return;
+    const node = targetRef.current;
+    if (!node) return;
+    didScrollRef.current = true;
+    const id = window.requestAnimationFrame(() => {
+      node.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [scrollTargetMatchId]);
+
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
   const totalRounds = roundNums.length;
 
@@ -133,14 +151,28 @@ export function BracketTree({
               <div style={{ width: CARD_W, flexShrink: 0 }}>
                 {roundMatches.map((match) => {
                   const label = matchLabel(match.matchNumber, globalIdx);
+                  const isTarget = match.id === scrollTargetMatchId;
                   return (
-                    <div key={match.id} style={{ height: slotH, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: label ? 2 : 0 }}>
+                    <div
+                      key={match.id}
+                      ref={isTarget ? targetRef : undefined}
+                      style={{ height: slotH, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: label ? 2 : 0, scrollMargin: 80 }}
+                    >
                       {label && (
-                        <div style={{ fontSize: 11, color: "var(--text-2)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", lineHeight: 1 }}>
-                          {label}
+                        <div style={{ fontSize: 11, color: isTarget ? accentColor : "var(--text-2)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", lineHeight: 1 }}>
+                          {isTarget ? "★ Votre match" : label}
                         </div>
                       )}
-                      <div style={{ display: "flex", alignItems: "center" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          borderRadius: 8,
+                          ...(isTarget
+                            ? { boxShadow: `0 0 0 2px ${accentColor}, 0 0 14px ${accentColor}` }
+                            : {}),
+                        }}
+                      >
                         <MatchRow
                           match={match}
                           reportable={canReport(match)}
