@@ -38,7 +38,9 @@ export function BracketSections({
   const totalRounds = roundNums.length;
   const sections = buildSections(roundNums, bracketType);
   const accent = ACCENT[bracketType];
-  const myNextMatchId = findMyNextMatch(matches, myTeamId)?.id ?? null;
+  const myNext = findMyNextMatch(matches, myTeamId);
+  const myNextMatchId = myNext?.id ?? null;
+  const regionBaseId = `bracket-${bracketType.toLowerCase()}`;
 
   const [openKeys, setOpenKeys] = useState<Set<string>>(() => {
     const initial = defaultOpenKey(sections, matches, myTeamId);
@@ -78,12 +80,14 @@ export function BracketSections({
           const open = openKeys.has(section.key);
           const sectionMatches = matches.filter((m) => section.rounds.includes(m.roundNumber));
           const matchCount = sectionMatches.length;
+          const hasMyMatch = myNext !== null && section.rounds.includes(myNext.roundNumber);
+          const panelId = `${regionBaseId}-${section.key.replace(/\s+/g, "-")}`;
 
           return (
             <div
               key={section.key}
               style={{
-                border: `1px solid ${open ? accent : "var(--border, #444)"}`,
+                border: `1px solid ${open || hasMyMatch ? accent : "var(--border, #444)"}`,
                 borderLeft: `3px solid ${accent}`,
                 borderRadius: 8,
                 overflow: "hidden",
@@ -94,6 +98,13 @@ export function BracketSections({
                 type="button"
                 onClick={() => toggle(section.key)}
                 aria-expanded={open}
+                aria-controls={panelId}
+                onMouseEnter={(e) => {
+                  if (!open) e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                }}
+                onMouseLeave={(e) => {
+                  if (!open) e.currentTarget.style.background = "transparent";
+                }}
                 style={{
                   width: "100%",
                   display: "flex",
@@ -105,6 +116,7 @@ export function BracketSections({
                   cursor: "pointer",
                   textAlign: "left",
                   color: "var(--text-0)",
+                  transition: "background 0.15s ease",
                 }}
               >
                 <span
@@ -134,10 +146,28 @@ export function BracketSections({
                 >
                   {matchCount} match{matchCount > 1 ? "s" : ""}
                 </span>
+                {hasMyMatch && (
+                  <span
+                    style={{
+                      marginLeft: "auto",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                      color: accent,
+                      border: `1px solid ${accent}`,
+                      borderRadius: 999,
+                      padding: "1px 10px",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    ★ Votre match
+                  </span>
+                )}
               </button>
 
               {open && (
-                <div style={{ padding: "4px 14px 0" }}>
+                <div id={panelId} role="region" aria-label={section.title} style={{ padding: "4px 14px 0" }}>
                   <BracketTree
                     matches={sectionMatches}
                     allTournamentMatches={allTournamentMatches}
