@@ -9,12 +9,22 @@ export type MatchScoreDraft = Record<number, { myScore: string; opponentScore: s
 const SLOT_H = 140;
 const CARD_W = 210;
 const CONN_W = 40;
+const BADGE_W = 190;
 const BORDER = "var(--border, #444)";
 
 interface BracketTreeProps {
+  /** Matches de la section uniquement (un ou plusieurs rounds consécutifs). */
   matches: BracketMatch[];
   allTournamentMatches: BracketMatch[];
   bracketType: BracketType;
+  /** Nombre total de rounds du tableau complet (pour nommer les stades). */
+  totalRoundsGlobal: number;
+  /** Index global du premier round de la section (0 = round le plus précoce du tableau). */
+  roundIdxBase: number;
+  /** Libellé du badge terminal « Qualifié en X » (null = dernière section, pas de badge). */
+  qualifyLabel: string | null;
+  /** Couleur d'accent du tableau (distingue principal / perdants / finale). */
+  accentColor: string;
   canReport: (m: BracketMatch) => boolean;
   adminResolvable: (m: BracketMatch) => boolean;
   drafts: MatchScoreDraft;
@@ -27,6 +37,10 @@ export function BracketTree({
   matches,
   allTournamentMatches,
   bracketType,
+  totalRoundsGlobal,
+  roundIdxBase,
+  qualifyLabel,
+  accentColor,
   canReport,
   adminResolvable,
   drafts,
@@ -51,19 +65,26 @@ export function BracketTree({
     roundNums.map((rn) => [rn, totalH / matchesByRound.get(rn)!.length]),
   );
 
-  const roundLabel = (roundNum: number, idx: number) => {
+  // Stade nommé à partir de la fin du tableau complet (index global).
+  const roundLabel = (globalIdx: number) => {
     if (bracketType === "GRAND") return "Grande Finale";
     if (bracketType === "THIRD_PLACE") return "Petite Finale";
-    if (idx === totalRounds - 1) return bracketType === "LOWER" ? "Finale perdants" : "Finale";
-    return `Round ${roundNum}`;
+    const fromEnd = totalRoundsGlobal - 1 - globalIdx;
+    if (fromEnd === 0) return bracketType === "LOWER" ? "Finale perdants" : "Finale";
+    if (fromEnd === 1) return "Demi-finales";
+    if (fromEnd === 2) return "Quarts de finale";
+    if (fromEnd === 3) return "8èmes de finale";
+    return `Round ${globalIdx + 1}`;
   };
 
-  const matchLabel = (matchNum: number, idx: number) => {
+  const matchLabel = (matchNum: number, globalIdx: number) => {
     if (bracketType === "GRAND") return null;
     if (bracketType === "THIRD_PLACE") return null;
-    if (idx === totalRounds - 1) return bracketType === "LOWER" ? `Finale perdants ${matchNum}` : `Finale ${matchNum}`;
-    if (idx === totalRounds - 2) return `Demi finale ${matchNum}`;
-    if (idx === totalRounds - 3) return `Quart de finale ${matchNum}`;
+    const fromEnd = totalRoundsGlobal - 1 - globalIdx;
+    if (fromEnd === 0) return bracketType === "LOWER" ? `Finale perdants ${matchNum}` : `Finale ${matchNum}`;
+    if (fromEnd === 1) return `Demi finale ${matchNum}`;
+    if (fromEnd === 2) return `Quart de finale ${matchNum}`;
+    if (fromEnd === 3) return `8ème de finale ${matchNum}`;
     return `Match ${matchNum}`;
   };
 
@@ -83,6 +104,7 @@ export function BracketTree({
       {roundNums.map((roundNum, roundIdx) => {
         const roundMatches = matchesByRound.get(roundNum)!;
         const slotH = slotHByRound.get(roundNum)!;
+        const globalIdx = roundIdxBase + roundIdx;
         const isLast = roundIdx === totalRounds - 1;
         const nextRoundNum = roundNums[roundIdx + 1];
         const nextSlotH = nextRoundNum !== undefined ? slotHByRound.get(nextRoundNum)! : 0;
@@ -104,13 +126,13 @@ export function BracketTree({
                 fontWeight: 600,
               }}
             >
-              {roundLabel(roundNum, roundIdx)}
+              {roundLabel(globalIdx)}
             </div>
 
             <div style={{ display: "flex" }}>
               <div style={{ width: CARD_W, flexShrink: 0 }}>
                 {roundMatches.map((match) => {
-                  const label = matchLabel(match.matchNumber, roundIdx);
+                  const label = matchLabel(match.matchNumber, globalIdx);
                   return (
                     <div key={match.id} style={{ height: slotH, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: label ? 2 : 0 }}>
                       {label && (
@@ -201,6 +223,65 @@ export function BracketTree({
           </div>
         );
       })}
+
+      {qualifyLabel && (
+        <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
+          <div style={{ height: 26 }} />
+          <div style={{ width: CONN_W + BADGE_W, height: totalH, flexShrink: 0, position: "relative" }}>
+            {(() => {
+              const lastRoundNum = roundNums[roundNums.length - 1];
+              const lastMatches = matchesByRound.get(lastRoundNum)!;
+              const lastSlotH = slotHByRound.get(lastRoundNum)!;
+              return lastMatches.map((match, matchIdx) => {
+                const centerY = (matchIdx + 0.5) * lastSlotH;
+                return (
+                  <Fragment key={match.id}>
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: Math.round(centerY) - 1,
+                        left: 0,
+                        width: CONN_W,
+                        height: 2,
+                        background: accentColor,
+                        opacity: 0.5,
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: Math.round(centerY) - 13,
+                        left: CONN_W,
+                        width: BADGE_W,
+                        height: 26,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "0 10px",
+                        boxSizing: "border-box",
+                        border: `1px solid ${accentColor}`,
+                        borderRadius: 6,
+                        background: "var(--surface-1)",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        letterSpacing: "0.03em",
+                        textTransform: "uppercase",
+                        color: accentColor,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                      }}
+                      title={qualifyLabel}
+                    >
+                      <span aria-hidden style={{ fontSize: 12 }}>↳</span>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{qualifyLabel}</span>
+                    </div>
+                  </Fragment>
+                );
+              });
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
