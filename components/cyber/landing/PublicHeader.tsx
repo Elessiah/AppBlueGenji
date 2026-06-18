@@ -45,7 +45,10 @@ export async function PublicHeader() {
           {user ? (
             <>
               <CyberButton variant="primary" asChild>
-                <Link href="/tournois">Accéder à la partie compétitive →</Link>
+                <Link href="/tournois">
+                  <span className={styles.ctaFull}>Accéder à la partie compétitive →</span>
+                  <span className={styles.ctaShort}>Compétition →</span>
+                </Link>
               </CyberButton>
               <Link
                 href="/profil"
