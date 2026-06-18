@@ -4,6 +4,18 @@ import { CyberButton } from "@/components/cyber";
 import { getCurrentUser } from "@/lib/server/auth";
 import styles from "./PublicHeader.module.css";
 
+/**
+ * En-tête public des pages vitrine (landing, asso, bot…).
+ *
+ * Actions à droite selon l'état de session :
+ * - **Connecté** : bouton « Accéder à la partie compétitive » (→ `/tournois`,
+ *   l'espace sécurisé) suivi de l'avatar cliquable menant au profil.
+ * - **Déconnecté** : « Connexion » (ghost) + « Rejoindre » (primary), tous deux
+ *   vers `/connexion`.
+ *
+ * Server component : lit la session via `getCurrentUser()` (retombe sur `null`
+ * si la session est absente ou invalide).
+ */
 export async function PublicHeader() {
   const user = await getCurrentUser().catch(() => null);
 
