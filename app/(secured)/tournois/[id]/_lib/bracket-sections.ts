@@ -43,27 +43,69 @@ export function qualifyLabelFor(nextStage: string): string {
   }
 }
 
-/** Découpe les rounds d'un tableau en sections : « Premiers tours » groupé, puis un volet par stade. */
+/** Nombre de tours regroupés dans le volet « Phase finale » (quart, demi, finale). */
+const FINAL_PHASE_ROUNDS = 3;
+
+/**
+ * Découpe les rounds d'un tableau en (au plus) deux volets pour garder des
+ * sections denses et lisibles :
+ * - « Phase finale » = les 3 derniers tours (quart, demi, finale) regroupés ;
+ * - « Premiers tours » = tout ce qui précède, en un seul volet.
+ *
+ * Quand un volet ne contient qu'un seul tour, il est nommé d'après son stade
+ * (ex. « 8èmes de finale », « Finale »). Les tableaux à match unique
+ * (GRAND / THIRD_PLACE) restent un volet unique.
+ */
 export function buildSections(roundNums: number[], bracketType: BracketType): BracketSection[] {
   const totalRounds = roundNums.length;
+  if (totalRounds === 0) return [];
+
+  if (bracketType === "GRAND" || bracketType === "THIRD_PLACE") {
+    const title = stageName(0, totalRounds, bracketType);
+    return [{ key: title, title, rounds: [...roundNums], roundIdxBase: 0, qualifyLabel: null }];
+  }
+
+  const finalCount = Math.min(FINAL_PHASE_ROUNDS, totalRounds);
+  const splitIdx = totalRounds - finalCount; // nb de tours dans « Premiers tours »
   const sections: BracketSection[] = [];
 
-  roundNums.forEach((roundNum, idx) => {
-    const stage = stageName(idx, totalRounds, bracketType);
-    const last = sections[sections.length - 1];
-    if (last && last.key === stage) {
-      last.rounds.push(roundNum);
-    } else {
-      sections.push({ key: stage, title: stage, rounds: [roundNum], roundIdxBase: idx, qualifyLabel: null });
-    }
+  if (splitIdx > 0) {
+    const firstTitle = splitIdx > 1 ? "Premiers tours" : stageName(0, totalRounds, bracketType);
+    sections.push({
+      key: firstTitle,
+      title: firstTitle,
+      rounds: roundNums.slice(0, splitIdx),
+      roundIdxBase: 0,
+      qualifyLabel: null,
+    });
+  }
+
+  const finalTitle = finalCount > 1 ? "Phase finale" : stageName(splitIdx, totalRounds, bracketType);
+  sections.push({
+    key: finalTitle,
+    title: finalTitle,
+    rounds: roundNums.slice(splitIdx),
+    roundIdxBase: splitIdx,
+    qualifyLabel: null,
   });
 
-  // Le badge terminal d'une section pointe vers le stade de la section suivante.
-  for (let i = 0; i < sections.length - 1; i++) {
-    sections[i].qualifyLabel = qualifyLabelFor(sections[i + 1].title);
+  // Le badge terminal des « Premiers tours » pointe vers le 1er stade de la phase
+  // finale (ex. les vainqueurs des 8èmes sont « Qualifié en quart de finale »).
+  if (sections.length === 2) {
+    sections[0].qualifyLabel = qualifyLabelFor(stageName(splitIdx, totalRounds, bracketType));
   }
 
   return sections;
+}
+
+/**
+ * Match d'arrivée d'un badge « Qualifié en X » : le vainqueur avance toujours vers
+ * `nextWinnerMatchId`. C'est exactement le match dans lequel le moteur place l'équipe
+ * gagnante (cf. `pushTeamToTarget` côté serveur), donc la redirection au clic mène
+ * précisément là où l'équipe qualifiée jouera. `null` = pas de match suivant (finale).
+ */
+export function qualifyDestinationMatchId(match: BracketMatch): number | null {
+  return match.nextWinnerMatchId;
 }
 
 /** Prochain match non terminé du joueur dans ce tableau (null s'il n'y participe pas). */
