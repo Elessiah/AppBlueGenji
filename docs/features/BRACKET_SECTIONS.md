@@ -9,34 +9,41 @@ avec un repère de qualification en fin de chaque section et un défilement
 automatique vers le match du joueur connecté.
 
 Composants concernés :
-- `app/(secured)/tournois/[id]/_components/BracketSections.tsx` — découpe en volets + état ouvert/fermé.
+- `app/(secured)/tournois/[id]/_lib/bracket-sections.ts` — logique pure de découpage (testée).
+- `app/(secured)/tournois/[id]/_components/BracketSections.tsx` — volets repliables, état ouvert/fermé, défilement.
 - `app/(secured)/tournois/[id]/_components/BracketTree.tsx` — rend une section (un ou plusieurs rounds) + colonne de badges « Qualifié en X ».
 
 ## 📐 Découpage en sections
 
-Pour chaque tableau (`UPPER`, `LOWER`, `GRAND`, `THIRD_PLACE`), les rounds sont
-regroupés en sections nommées à partir de la **fin** du tableau :
+Pour rester **dense et lisible** (idéalement ~3 colonnes par volet, jamais un stade
+isolé), chaque tableau est découpé en **au plus deux volets** :
 
-| Distance depuis la finale | Stade |
-| --- | --- |
-| 0 | `Finale` (`Finale perdants` pour le tableau des perdants) |
-| 1 | `Demi-finales` |
-| 2 | `Quarts de finale` |
-| 3 | `8èmes de finale` |
-| ≥ 4 | `Premiers tours` (tous regroupés dans **un seul** volet) |
+- **« Phase finale »** = les **3 derniers tours** (quart, demi, finale), regroupés.
+- **« Premiers tours »** = tout ce qui précède, en un seul volet.
 
-- Tous les tours antérieurs aux 8èmes sont fusionnés dans le volet **« Premiers tours »**.
-- Chaque stade final (8èmes, quarts, demi, finale) occupe **son propre volet**, donc
-  les 8èmes de finale sont toujours isolés dès qu'il y a des tours avant eux.
-- Les petits brackets génèrent simplement moins de sections.
+Exemples :
+
+| Tableau | Volet 1 | Volet 2 |
+| --- | --- | --- |
+| 128 éq. (7 tours) | Premiers tours : 64es, 32es, 16es, 8es | Phase finale : quart, demi, finale |
+| 64 éq. (6 tours) | Premiers tours : 32es, 16es, 8es | Phase finale : quart, demi, finale |
+| 16 éq. (4 tours) | `8èmes de finale` (1 tour) | Phase finale : quart, demi, finale |
+| 8 éq. (3 tours) | — | Phase finale : quart, demi, finale |
+| 4 éq. (2 tours) | — | Phase finale : demi, finale |
+
+- Quand un volet ne contient qu'**un seul tour**, il est nommé d'après son stade
+  (ex. `8èmes de finale`, `Finale`) plutôt que « Premiers tours ».
 - `GRAND` / `THIRD_PLACE` (un seul match) → une seule section.
 
 ## 🏁 Repère « Qualifié en X »
 
-Pour ne pas « perdre » le joueur au bord d'une section, le dernier round d'un volet
-ne trace pas de connecteur vers le volet suivant : chaque match gagnant pointe (`↳`)
-vers son propre badge indiquant le stade suivant, ex. **« Qualifié en 8ème de finale »**.
-Le libellé est dérivé du nom de la section suivante. La dernière section (finale)
+Pour ne pas « perdre » le joueur au bord d'un volet, le dernier round des « Premiers
+tours » ne trace pas de connecteur vers le volet suivant : chaque match gagnant
+pointe (`↳`) vers son propre badge indiquant le **premier stade de la phase finale**,
+ex. **« Qualifié en quart de finale »** (les vainqueurs des 8èmes rejoignent les
+quarts). Le badge est **cliquable** : il ouvre le volet « Phase finale » et y fait
+défiler jusqu'au match d'arrivée (`nextWinnerMatchId`). Le trait et le badge sont
+recadrés sur le **centre vertical de la carte** (et non du créneau). Le volet final
 n'a pas de badge.
 
 ## 👁️ État par défaut & défilement
@@ -46,8 +53,11 @@ n'a pas de badge.
   le round actif (premier match non `COMPLETED`) ; à défaut la finale.
 - Si le joueur est participant, la page **défile automatiquement** (centrage page +
   scroll horizontal interne) jusqu'à son match, mis en évidence (anneau coloré +
-  label « ★ Votre match »). Le défilement ne se déclenche **qu'une fois** au montage,
-  pour ne pas perturber la lecture lors des mises à jour live.
+  label « ★ Votre match »). Ce défilement initial ne se déclenche **qu'une fois** au
+  montage, pour ne pas perturber la lecture lors des mises à jour live.
+- Un **clic sur un badge « Qualifié en X »** déclenche un défilement à la demande
+  (mécanisme `ScrollRequest { matchId, nonce }`) vers le match d'arrivée, après avoir
+  ouvert le volet qui le contient.
 
 ## 🎨 Distinction des tableaux
 
