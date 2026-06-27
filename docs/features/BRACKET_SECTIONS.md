@@ -16,23 +16,28 @@ Composants concernés :
 ## 📐 Découpage en sections
 
 Pour rester **dense et lisible** (idéalement ~3 colonnes par volet, jamais un stade
-isolé), chaque tableau est découpé en **au plus deux volets** :
+isolé ni un volet géant) :
 
 - **« Phase finale »** = les **3 derniers tours** (quart, demi, finale), regroupés.
-- **« Premiers tours »** = tout ce qui précède, en un seul volet.
+- Les tours précédents sont scindés en **paquets d'au plus 4 colonnes** (constante
+  `MAX_CHUNK_ROUNDS`), répartis en tailles ~égales. Indispensable pour le **tableau des
+  perdants**, bien plus long que le principal (12 tours pour 128 équipes).
 
 Exemples :
 
-| Tableau | Volet 1 | Volet 2 |
-| --- | --- | --- |
-| 128 éq. (7 tours) | Premiers tours : 64es, 32es, 16es, 8es | Phase finale : quart, demi, finale |
-| 64 éq. (6 tours) | Premiers tours : 32es, 16es, 8es | Phase finale : quart, demi, finale |
-| 16 éq. (4 tours) | `8èmes de finale` (1 tour) | Phase finale : quart, demi, finale |
-| 8 éq. (3 tours) | — | Phase finale : quart, demi, finale |
-| 4 éq. (2 tours) | — | Phase finale : demi, finale |
+| Tableau | Volets |
+| --- | --- |
+| Principal 128 éq. (7 tours) | `Premiers tours` (64es…8es) · `Phase finale` |
+| **Perdants 128 éq. (12 tours)** | `Tours 1 à 3` · `Tours 4 à 6` · `Tours 7 à 9` · `Phase finale` |
+| Principal 64 éq. (6 tours) | `Premiers tours` (32es…8es) · `Phase finale` |
+| 16 éq. (4 tours) | `8èmes de finale` (1 tour) · `Phase finale` |
+| 8 éq. (3 tours) | `Phase finale` (quart, demi, finale) |
+| 4 éq. (2 tours) | `Phase finale` (demi, finale) |
 
-- Quand un volet ne contient qu'**un seul tour**, il est nommé d'après son stade
-  (ex. `8èmes de finale`, `Finale`) plutôt que « Premiers tours ».
+- Un volet d'**un seul tour** est nommé d'après son stade (`8èmes de finale`, `Finale`).
+- Un **paquet unique** de premiers tours s'appelle « Premiers tours » ; **plusieurs**
+  paquets s'appellent « Tours A à B ».
+- Le badge entre deux paquets de premiers tours affiche « Qualifié au tour suivant ».
 - `GRAND` / `THIRD_PLACE` (un seul match) → une seule section.
 
 ## 🏁 Repère « Qualifié en X »

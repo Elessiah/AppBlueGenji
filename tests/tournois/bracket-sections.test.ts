@@ -69,6 +69,10 @@ describe("qualifyLabelFor", () => {
   it("retombe sur un libellé générique minuscule pour un stade inconnu", () => {
     expect(qualifyLabelFor("Phase de Poules")).toBe("Qualifié en phase de poules");
   });
+
+  it("utilise un libellé générique entre deux paquets de premiers tours", () => {
+    expect(qualifyLabelFor("Premiers tours")).toBe("Qualifié au tour suivant");
+  });
 });
 
 describe("buildSections", () => {
@@ -85,6 +89,34 @@ describe("buildSections", () => {
     const sections = buildSections([1, 2, 3, 4, 5, 6, 7], "UPPER");
     expect(sections[0].qualifyLabel).toBe("Qualifié en quart de finale");
     expect(sections[1].qualifyLabel).toBeNull();
+  });
+
+  it("scinde un long tableau (perdants 128 éq., 12 tours) en paquets ≤ 4 colonnes", () => {
+    const sections = buildSections([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "LOWER");
+    expect(sections.map((s) => s.title)).toEqual([
+      "Tours 1 à 3",
+      "Tours 4 à 6",
+      "Tours 7 à 9",
+      "Phase finale",
+    ]);
+    // Aucun volet géant : le défaut signalé sur le tableau des perdants.
+    expect(Math.max(...sections.map((s) => s.rounds.length))).toBeLessThanOrEqual(4);
+    // roundIdxBase contigus pour le nommage des stades dans BracketTree.
+    expect(sections.map((s) => s.roundIdxBase)).toEqual([0, 3, 6, 9]);
+  });
+
+  it("chaîne les badges entre paquets puis vers la phase finale (tableau long)", () => {
+    const sections = buildSections([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "LOWER");
+    expect(sections[0].qualifyLabel).toBe("Qualifié au tour suivant");
+    expect(sections[1].qualifyLabel).toBe("Qualifié au tour suivant");
+    expect(sections[2].qualifyLabel).toBe("Qualifié en quart de finale");
+    expect(sections[3].qualifyLabel).toBeNull();
+  });
+
+  it("garde le tableau principal 128 éq. (7 tours) en un seul « Premiers tours » + phase finale", () => {
+    const sections = buildSections([1, 2, 3, 4, 5, 6, 7], "UPPER");
+    expect(sections.map((s) => s.title)).toEqual(["Premiers tours", "Phase finale"]);
+    expect(sections[0].rounds).toEqual([1, 2, 3, 4]);
   });
 
   it("nomme le 1er volet d'après son stade quand il n'a qu'un tour (16 équipes)", () => {

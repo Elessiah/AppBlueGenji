@@ -39,22 +39,43 @@ export function qualifyLabelFor(nextStage: string): string {
     case "Finale": return "Qualifié en finale";
     case "Finale perdants": return "Qualifié en finale perdants";
     case "Grande Finale": return "Qualifié en grande finale";
+    // Stade intermédiaire générique (gros tableau / tableau perdants découpé en paquets).
+    case "Premiers tours": return "Qualifié au tour suivant";
     default: return `Qualifié en ${nextStage.toLowerCase()}`;
   }
 }
 
 /** Nombre de tours regroupés dans le volet « Phase finale » (quart, demi, finale). */
 const FINAL_PHASE_ROUNDS = 3;
+/** Largeur max d'un volet de premiers tours avant de le scinder en paquets. */
+const MAX_CHUNK_ROUNDS = 4;
+
+/** Découpe un tableau d'éléments en `c = ceil(n/max)` paquets de tailles ~égales (diff ≤ 1). */
+function chunkEvenly<T>(items: T[], maxSize: number): T[][] {
+  const n = items.length;
+  if (n === 0) return [];
+  const count = Math.ceil(n / maxSize);
+  const base = Math.floor(n / count);
+  const remainder = n % count;
+  const chunks: T[][] = [];
+  let i = 0;
+  for (let k = 0; k < count; k += 1) {
+    const size = base + (k < remainder ? 1 : 0);
+    chunks.push(items.slice(i, i + size));
+    i += size;
+  }
+  return chunks;
+}
 
 /**
- * Découpe les rounds d'un tableau en (au plus) deux volets pour garder des
- * sections denses et lisibles :
+ * Découpe les rounds d'un tableau en volets denses et lisibles :
  * - « Phase finale » = les 3 derniers tours (quart, demi, finale) regroupés ;
- * - « Premiers tours » = tout ce qui précède, en un seul volet.
+ * - les tours précédents = un ou plusieurs paquets d'au plus {@link MAX_CHUNK_ROUNDS}
+ *   colonnes (important pour le tableau des perdants, bien plus long que le principal).
  *
- * Quand un volet ne contient qu'un seul tour, il est nommé d'après son stade
- * (ex. « 8èmes de finale », « Finale »). Les tableaux à match unique
- * (GRAND / THIRD_PLACE) restent un volet unique.
+ * Un volet d'un seul tour est nommé d'après son stade (« 8èmes de finale »…), un
+ * paquet unique de premiers tours « Premiers tours », et plusieurs paquets
+ * « Tours A à B ». Les tableaux à match unique (GRAND / THIRD_PLACE) restent uniques.
  */
 export function buildSections(roundNums: number[], bracketType: BracketType): BracketSection[] {
   const totalRounds = roundNums.length;
@@ -66,20 +87,25 @@ export function buildSections(roundNums: number[], bracketType: BracketType): Br
   }
 
   const finalCount = Math.min(FINAL_PHASE_ROUNDS, totalRounds);
-  const splitIdx = totalRounds - finalCount; // nb de tours dans « Premiers tours »
+  const splitIdx = totalRounds - finalCount; // nb de tours avant la phase finale
   const sections: BracketSection[] = [];
 
-  if (splitIdx > 0) {
-    const firstTitle = splitIdx > 1 ? "Premiers tours" : stageName(0, totalRounds, bracketType);
-    sections.push({
-      key: firstTitle,
-      title: firstTitle,
-      rounds: roundNums.slice(0, splitIdx),
-      roundIdxBase: 0,
-      qualifyLabel: null,
-    });
-  }
+  // Premiers tours, scindés en paquets si le tableau est long (cas du tableau perdants).
+  const earlyChunks = chunkEvenly(roundNums.slice(0, splitIdx), MAX_CHUNK_ROUNDS);
+  const singleEarly = earlyChunks.length === 1;
+  let base = 0;
+  earlyChunks.forEach((chunk) => {
+    const title =
+      chunk.length === 1
+        ? stageName(base, totalRounds, bracketType)
+        : singleEarly
+          ? "Premiers tours"
+          : `Tours ${chunk[0]} à ${chunk[chunk.length - 1]}`;
+    sections.push({ key: title, title, rounds: chunk, roundIdxBase: base, qualifyLabel: null });
+    base += chunk.length;
+  });
 
+  // Phase finale (les 3 derniers tours).
   const finalTitle = finalCount > 1 ? "Phase finale" : stageName(splitIdx, totalRounds, bracketType);
   sections.push({
     key: finalTitle,
@@ -89,10 +115,11 @@ export function buildSections(roundNums: number[], bracketType: BracketType): Br
     qualifyLabel: null,
   });
 
-  // Le badge terminal des « Premiers tours » pointe vers le 1er stade de la phase
-  // finale (ex. les vainqueurs des 8èmes sont « Qualifié en quart de finale »).
-  if (sections.length === 2) {
-    sections[0].qualifyLabel = qualifyLabelFor(stageName(splitIdx, totalRounds, bracketType));
+  // Chaque volet (sauf le dernier) pointe vers le 1er stade du volet suivant
+  // (ex. vainqueurs des 8èmes → « Qualifié en quart de finale » ; entre deux paquets
+  // de premiers tours → « Qualifié au tour suivant »).
+  for (let i = 0; i < sections.length - 1; i += 1) {
+    sections[i].qualifyLabel = qualifyLabelFor(stageName(sections[i + 1].roundIdxBase, totalRounds, bracketType));
   }
 
   return sections;
