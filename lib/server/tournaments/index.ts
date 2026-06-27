@@ -1,6 +1,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { TournamentBuckets, TournamentDetail, TournamentFormat, TournamentState } from "@/lib/shared/types";
 import { getDatabase } from "@/lib/server/database";
+import { toIso } from "@/lib/server/serialization";
 import { getUserActiveTeam } from "@/lib/server/teams-service";
 import type { TournamentRow, TournamentListRow } from "./_internal";
 
@@ -364,7 +365,7 @@ export async function getTournamentDetail(
         teamName: row.team_name,
         logoUrl: row.logo_url,
         seed: row.seed === null ? null : Number(row.seed),
-        registeredAt: row.registered_at.toISOString(),
+        registeredAt: toIso(row.registered_at)!,
         finalRank: row.final_rank === null ? null : Number(row.final_rank),
       })),
       canRegister,
