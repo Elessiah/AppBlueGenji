@@ -71,36 +71,44 @@ describe("qualifyLabelFor", () => {
 });
 
 describe("buildSections", () => {
-  it("groupe les premiers tours et isole chaque stade final", () => {
-    const sections = buildSections([1, 2, 3, 4, 5, 6], "UPPER");
-    expect(sections.map((s) => s.title)).toEqual([
-      "Premiers tours",
-      "8èmes de finale",
-      "Quarts de finale",
-      "Demi-finales",
-      "Finale",
-    ]);
-    // Premiers tours = rounds 1 et 2 regroupés.
-    expect(sections[0].rounds).toEqual([1, 2]);
+  it("regroupe les premiers tours et la phase finale (quart/demi/finale) sur un grand tableau", () => {
+    const sections = buildSections([1, 2, 3, 4, 5, 6, 7], "UPPER"); // 128 équipes : 64es → finale
+    expect(sections.map((s) => s.title)).toEqual(["Premiers tours", "Phase finale"]);
+    expect(sections[0].rounds).toEqual([1, 2, 3, 4]); // 64es, 32es, 16es, 8es
     expect(sections[0].roundIdxBase).toBe(0);
-    expect(sections[1].rounds).toEqual([3]);
-    expect(sections[1].roundIdxBase).toBe(2);
+    expect(sections[1].rounds).toEqual([5, 6, 7]); // quart, demi, finale
+    expect(sections[1].roundIdxBase).toBe(4);
   });
 
-  it("chaîne les badges de qualification vers le stade suivant, sauf la dernière section", () => {
-    const sections = buildSections([1, 2, 3, 4, 5, 6], "UPPER");
-    expect(sections[0].qualifyLabel).toBe("Qualifié en 8ème de finale");
-    expect(sections[1].qualifyLabel).toBe("Qualifié en quart de finale");
-    expect(sections[3].qualifyLabel).toBe("Qualifié en finale");
-    expect(sections[sections.length - 1].qualifyLabel).toBeNull();
+  it("nomme le badge des premiers tours d'après le 1er stade de la phase finale", () => {
+    const sections = buildSections([1, 2, 3, 4, 5, 6, 7], "UPPER");
+    expect(sections[0].qualifyLabel).toBe("Qualifié en quart de finale");
+    expect(sections[1].qualifyLabel).toBeNull();
   });
 
-  it("ne crée pas de section « Premiers tours » sur un petit bracket", () => {
-    const sections = buildSections([1, 2, 3], "UPPER"); // quarts, demi, finale
-    expect(sections.map((s) => s.title)).toEqual(["Quarts de finale", "Demi-finales", "Finale"]);
+  it("nomme le 1er volet d'après son stade quand il n'a qu'un tour (16 équipes)", () => {
+    const sections = buildSections([1, 2, 3, 4], "UPPER"); // 8es, quart, demi, finale
+    expect(sections.map((s) => s.title)).toEqual(["8èmes de finale", "Phase finale"]);
+    expect(sections[0].rounds).toEqual([1]);
+    expect(sections[1].rounds).toEqual([2, 3, 4]);
+    expect(sections[0].qualifyLabel).toBe("Qualifié en quart de finale");
   });
 
-  it("réduit un tableau d'un seul match à une seule section sans badge", () => {
+  it("réduit la phase finale seule (8 équipes) à un volet unique sans badge", () => {
+    const sections = buildSections([1, 2, 3], "UPPER"); // quart, demi, finale
+    expect(sections).toHaveLength(1);
+    expect(sections[0].title).toBe("Phase finale");
+    expect(sections[0].rounds).toEqual([1, 2, 3]);
+    expect(sections[0].qualifyLabel).toBeNull();
+  });
+
+  it("nomme un volet unique d'après le stade pour 1 ou 2 tours", () => {
+    expect(buildSections([1], "UPPER").map((s) => s.title)).toEqual(["Finale"]);
+    expect(buildSections([1], "LOWER").map((s) => s.title)).toEqual(["Finale perdants"]);
+    expect(buildSections([1, 2], "UPPER").map((s) => s.title)).toEqual(["Phase finale"]);
+  });
+
+  it("réduit un tableau à match unique (GRAND) à une seule section sans badge", () => {
     const sections = buildSections([1], "GRAND");
     expect(sections).toHaveLength(1);
     expect(sections[0].title).toBe("Grande Finale");
@@ -130,30 +138,30 @@ describe("findMyNextMatch", () => {
 });
 
 describe("defaultOpenKey", () => {
-  const rounds = [1, 2, 3, 4]; // 8èmes, quarts, demi, finale
+  const rounds = [1, 2, 3, 4, 5, 6]; // 64 équipes : premiers tours (1-3) + phase finale (4-6)
   const sections = buildSections(rounds, "UPPER");
 
   it("ouvre la section du prochain match du joueur en priorité", () => {
     const matches = [
       mockMatch({ id: 1, roundNumber: 1, status: "COMPLETED", team1Id: 5, team2Id: 6, winnerTeamId: 5 }),
-      mockMatch({ id: 2, roundNumber: 3, team1Id: 5, team2Id: 9, winnerTeamId: null }),
+      mockMatch({ id: 2, roundNumber: 5, team1Id: 5, team2Id: 9, winnerTeamId: null }),
     ];
-    expect(defaultOpenKey(sections, matches, findMyNextMatch(matches, 5))).toBe("Demi-finales");
+    expect(defaultOpenKey(sections, matches, findMyNextMatch(matches, 5))).toBe("Phase finale");
   });
 
-  it("ouvre le round actif si le joueur ne participe pas", () => {
+  it("ouvre le volet du round actif si le joueur ne participe pas", () => {
     const matches = [
       mockMatch({ id: 1, roundNumber: 1, status: "COMPLETED", winnerTeamId: 1 }),
       mockMatch({ id: 2, roundNumber: 2, status: "READY" }),
     ];
-    expect(defaultOpenKey(sections, matches, null)).toBe("Quarts de finale");
+    expect(defaultOpenKey(sections, matches, null)).toBe("Premiers tours");
   });
 
-  it("ouvre la finale quand tout est terminé", () => {
+  it("ouvre la phase finale quand tout est terminé", () => {
     const matches = rounds.map((r, i) =>
       mockMatch({ id: i, roundNumber: r, status: "COMPLETED", winnerTeamId: 1 }),
     );
-    expect(defaultOpenKey(sections, matches, null)).toBe("Finale");
+    expect(defaultOpenKey(sections, matches, null)).toBe("Phase finale");
   });
 
   it("retourne null sans section", () => {
