@@ -351,6 +351,9 @@ export function BracketTree({
                         type="button"
                         onClick={() => onQualifyClick!(match)}
                         title={`${qualifyLabel} — aller au match`}
+                        aria-label={`${qualifyLabel} — aller au match d'arrivée`}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "var(--surface-1)")}
                         style={badgeStyle}
                       >
                         {badgeInner}
