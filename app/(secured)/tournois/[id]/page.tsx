@@ -9,7 +9,8 @@ import { Pill, CyberButton } from "@/components/cyber";
 import { useTournamentLive } from "./_hooks/useTournamentLive";
 import { mapError } from "./_lib/error-map";
 import { AdminScoreDialog } from "./_components/AdminScoreDialog";
-import { BracketTree, MatchScoreDraft } from "./_components/BracketTree";
+import { MatchScoreDraft } from "./_components/BracketTree";
+import { BracketSections } from "./_components/BracketSections";
 
 const STATE_META: Record<string, { label: string; chipClass: string }> = {
   UPCOMING: { label: "Prochainement", chipClass: "teal" },
@@ -191,24 +192,13 @@ export default function TournamentDetailPage() {
           ) : (
             brackets.map(({ type, matches }) => (
               <div key={type} style={{ marginBottom: type !== brackets[brackets.length - 1].type ? 32 : 0, minHeight: 0, overflow: "visible" }}>
-                {brackets.length > 1 && (
-                  <p
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      letterSpacing: "0.1em",
-                      textTransform: "uppercase",
-                      color: "var(--text-2)",
-                      marginBottom: 12,
-                    }}
-                  >
-                    {bracketLabels[type]}
-                  </p>
-                )}
-                <BracketTree
+                <BracketSections
+                  bracketType={type}
+                  bracketLabel={bracketLabels[type]}
+                  showBracketLabel={brackets.length > 1}
                   matches={matches}
                   allTournamentMatches={detail.matches}
-                  bracketType={type}
+                  myTeamId={detail.myTeamId}
                   canReport={canReport}
                   adminResolvable={canAdminResolve}
                   drafts={drafts}
