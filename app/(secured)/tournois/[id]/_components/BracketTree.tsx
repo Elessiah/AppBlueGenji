@@ -325,7 +325,7 @@ export function BracketTree({
                   overflow: "hidden",
                   cursor: clickable ? "pointer" : "default",
                   textAlign: "left",
-                  font: "inherit",
+                  fontFamily: "inherit",
                 };
                 const badgeInner = (
                   <>
