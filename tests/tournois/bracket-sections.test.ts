@@ -5,6 +5,7 @@ import {
   buildSections,
   defaultOpenKey,
   findMyNextMatch,
+  qualifyDestinationMatchId,
   qualifyLabelFor,
   stageName,
 } from "@/app/(secured)/tournois/[id]/_lib/bracket-sections";
@@ -166,6 +167,17 @@ describe("defaultOpenKey", () => {
 
   it("retourne null sans section", () => {
     expect(defaultOpenKey([], [], null)).toBeNull();
+  });
+});
+
+describe("qualifyDestinationMatchId", () => {
+  it("cible le match du vainqueur (nextWinnerMatchId), jamais celui du perdant", () => {
+    const match = mockMatch({ id: 1, nextWinnerMatchId: 42, nextLoserMatchId: 99 });
+    expect(qualifyDestinationMatchId(match)).toBe(42);
+  });
+
+  it("retourne null quand il n'y a pas de match suivant (finale)", () => {
+    expect(qualifyDestinationMatchId(mockMatch({ id: 1, nextWinnerMatchId: null }))).toBeNull();
   });
 });
 

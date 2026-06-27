@@ -98,6 +98,16 @@ export function buildSections(roundNums: number[], bracketType: BracketType): Br
   return sections;
 }
 
+/**
+ * Match d'arrivée d'un badge « Qualifié en X » : le vainqueur avance toujours vers
+ * `nextWinnerMatchId`. C'est exactement le match dans lequel le moteur place l'équipe
+ * gagnante (cf. `pushTeamToTarget` côté serveur), donc la redirection au clic mène
+ * précisément là où l'équipe qualifiée jouera. `null` = pas de match suivant (finale).
+ */
+export function qualifyDestinationMatchId(match: BracketMatch): number | null {
+  return match.nextWinnerMatchId;
+}
+
 /** Prochain match non terminé du joueur dans ce tableau (null s'il n'y participe pas). */
 export function findMyNextMatch(matches: BracketMatch[], myTeamId: number | null): BracketMatch | null {
   if (myTeamId === null) return null;

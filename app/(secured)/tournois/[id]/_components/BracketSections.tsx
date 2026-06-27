@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 import type { BracketMatch, BracketType } from "@/lib/shared/types";
 import { BracketTree, MatchScoreDraft, ScrollRequest } from "./BracketTree";
-import { ACCENT, buildSections, defaultOpenKey, findMyNextMatch } from "../_lib/bracket-sections";
+import { ACCENT, buildSections, defaultOpenKey, findMyNextMatch, qualifyDestinationMatchId } from "../_lib/bracket-sections";
 
 interface BracketSectionsProps {
   bracketType: BracketType;
@@ -58,7 +58,7 @@ export function BracketSections({
 
   // Clic sur un badge « Qualifié en X » : ouvre le volet du match d'arrivée et y défile.
   const handleQualifyClick = (sourceMatch: BracketMatch) => {
-    const destId = sourceMatch.nextWinnerMatchId ?? sourceMatch.nextLoserMatchId;
+    const destId = qualifyDestinationMatchId(sourceMatch);
     if (destId == null) return;
     const dest = matches.find((m) => m.id === destId);
     if (!dest) return;

@@ -1,4 +1,7 @@
-import { describe, it, expect } from "@jest/globals";
+import { describe, it, expect, jest } from "@jest/globals";
+import type { BracketMatch } from "@/lib/shared/types";
+import { finalizeMatch } from "@/lib/server/tournaments/scoring";
+import { qualifyDestinationMatchId } from "@/app/(secured)/tournois/[id]/_lib/bracket-sections";
 
 describe("tournaments-service: match state machine", () => {
   describe("match status transitions", () => {
@@ -165,38 +168,109 @@ describe("tournaments-service: match state machine", () => {
       const matchStatus = "PENDING";
       const feederMatchStatus = "COMPLETED";
       const hasFeeder = feederMatchStatus === "COMPLETED";
-      const canBeReady = hasFeeder;
+      const canBeReady = hasFeeder && matchStatus === "PENDING";
       expect(canBeReady).toBe(true);
     });
   });
 
-  describe("winner propagation", () => {
-    it("winner moves to next winner match", () => {
-      const winnerId = 5;
-      const nextWinnerMatchId = 10;
-      const propagated = winnerId !== null && nextWinnerMatchId !== null;
-      expect(propagated).toBe(true);
+  // Avancement réel : on exerce `finalizeMatch` avec une connexion mockée et on
+  // vérifie que l'équipe gagnante est bien écrite dans le bon slot du bon match
+  // suivant (slot 1 → team1_id, slot 2 → team2_id), et le perdant vers son match.
+  describe("winner propagation (finalizeMatch)", () => {
+    type Call = { sql: string; params: unknown[] };
+
+    const makeConnection = (
+      targetTeams: Record<number, { team1_id: number | null; team2_id: number | null }> = {},
+    ) => {
+      const calls: Call[] = [];
+      const execute = jest.fn(async (sql: string, params: unknown[] = []) => {
+        calls.push({ sql, params });
+        if (sql.trim().startsWith("SELECT")) {
+          const t = targetTeams[Number(params[0])] ?? { team1_id: null, team2_id: null };
+          return [[{ team1_id: t.team1_id, team2_id: t.team2_id }], []];
+        }
+        return [{ affectedRows: 1 }, []];
+      });
+      const connection = { execute } as unknown as Parameters<typeof finalizeMatch>[0];
+      return { connection, calls };
+    };
+
+    const routingUpdates = (calls: Call[]) =>
+      calls.filter((c) => /SET team[12]_id = \? WHERE id = \?/.test(c.sql));
+
+    const baseMatch = {
+      id: 5,
+      team1_id: 7,
+      team2_id: 8,
+      next_winner_match_id: 10,
+      next_winner_slot: 1,
+      next_loser_match_id: null,
+      next_loser_slot: null,
+    };
+    const baseResult = { team1Score: 3, team2Score: 1, winnerTeamId: 7, loserTeamId: 8 };
+
+    it("écrit le gagnant dans team1_id quand le slot suivant est 1", async () => {
+      const { connection, calls } = makeConnection();
+      await finalizeMatch(connection, 1, baseMatch, baseResult);
+      expect(calls).toContainEqual({
+        sql: "UPDATE bg_matches SET team1_id = ? WHERE id = ?",
+        params: [7, 10],
+      });
     });
 
-    it("loser moves to next loser match in double elim", () => {
-      const loserId = 3;
-      const nextLoserMatchId = 8;
-      const propagated = loserId !== null && nextLoserMatchId !== null;
-      expect(propagated).toBe(true);
+    it("écrit le gagnant dans team2_id quand le slot suivant est 2", async () => {
+      const { connection, calls } = makeConnection();
+      await finalizeMatch(connection, 1, { ...baseMatch, next_winner_slot: 2 }, baseResult);
+      expect(calls).toContainEqual({
+        sql: "UPDATE bg_matches SET team2_id = ? WHERE id = ?",
+        params: [7, 10],
+      });
     });
 
-    it("loser eliminated in single elim", () => {
-      const format = "SINGLE";
-      const loserId = 3;
-      const nextLoserMatchId = null;
-      const eliminated = format === "SINGLE" && nextLoserMatchId === null;
-      expect(eliminated).toBe(true);
+    it("envoie le perdant vers son match (double élim) sans toucher au gagnant", async () => {
+      const { connection, calls } = makeConnection();
+      await finalizeMatch(
+        connection,
+        1,
+        { ...baseMatch, next_loser_match_id: 20, next_loser_slot: 2 },
+        baseResult,
+      );
+      expect(calls).toContainEqual({ sql: "UPDATE bg_matches SET team1_id = ? WHERE id = ?", params: [7, 10] });
+      expect(calls).toContainEqual({ sql: "UPDATE bg_matches SET team2_id = ? WHERE id = ?", params: [8, 20] });
     });
 
-    it("winner can have multiple next matches (UB then Grand)", () => {
-      const wins = 2;
-      const nextMatches = wins; // Could advance twice
-      expect(nextMatches).toBeGreaterThan(0);
+    it("n'avance personne quand il n'y a pas de match suivant (finale simple élim)", async () => {
+      const { connection, calls } = makeConnection();
+      await finalizeMatch(
+        connection,
+        1,
+        { ...baseMatch, next_winner_match_id: null, next_winner_slot: null },
+        baseResult,
+      );
+      expect(routingUpdates(calls)).toHaveLength(0);
+    });
+
+    it("passe le match suivant à READY une fois ses deux équipes connues", async () => {
+      const { connection, calls } = makeConnection({ 10: { team1_id: 99, team2_id: 7 } });
+      await finalizeMatch(connection, 1, { ...baseMatch, next_winner_slot: 2 }, baseResult);
+      expect(calls).toContainEqual({
+        sql: "UPDATE bg_matches SET status = ? WHERE id = ?",
+        params: ["READY", 10],
+      });
+    });
+
+    // Cohérence UI ↔ moteur : la redirection du badge « Qualifié » vise exactement le
+    // match dans lequel le moteur place l'équipe gagnante.
+    it("la redirection du badge cible le même match que l'avancement du gagnant", async () => {
+      const uiMatch = { nextWinnerMatchId: 10, nextLoserMatchId: 99 } as BracketMatch;
+      const redirectTarget = qualifyDestinationMatchId(uiMatch);
+
+      const { connection, calls } = makeConnection();
+      await finalizeMatch(connection, 1, baseMatch, baseResult);
+      const winnerPlacement = calls.find((c) => /SET team[12]_id = \? WHERE id = \?/.test(c.sql));
+
+      expect(redirectTarget).toBe(10);
+      expect(winnerPlacement?.params).toEqual([7, redirectTarget]); // gagnant 7 → match 10
     });
   });
 
