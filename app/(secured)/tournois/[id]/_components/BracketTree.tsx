@@ -156,11 +156,11 @@ export function BracketTree({
                     <div
                       key={match.id}
                       ref={isTarget ? targetRef : undefined}
-                      style={{ height: slotH, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: label ? 2 : 0, scrollMargin: 80 }}
+                      style={{ height: slotH, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: label || isTarget ? 2 : 0, scrollMargin: 80 }}
                     >
-                      {label && (
+                      {(label || isTarget) && (
                         <div style={{ fontSize: 11, color: isTarget ? accentColor : "var(--text-2)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", lineHeight: 1 }}>
-                          {isTarget ? "★ Votre match" : label}
+                          {isTarget ? `★ ${label ?? "Votre match"}` : label}
                         </div>
                       )}
                       <div

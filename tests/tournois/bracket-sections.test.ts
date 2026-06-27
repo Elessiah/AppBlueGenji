@@ -138,7 +138,7 @@ describe("defaultOpenKey", () => {
       mockMatch({ id: 1, roundNumber: 1, status: "COMPLETED", team1Id: 5, team2Id: 6, winnerTeamId: 5 }),
       mockMatch({ id: 2, roundNumber: 3, team1Id: 5, team2Id: 9, winnerTeamId: null }),
     ];
-    expect(defaultOpenKey(sections, matches, 5)).toBe("Demi-finales");
+    expect(defaultOpenKey(sections, matches, findMyNextMatch(matches, 5))).toBe("Demi-finales");
   });
 
   it("ouvre le round actif si le joueur ne participe pas", () => {
@@ -157,7 +157,7 @@ describe("defaultOpenKey", () => {
   });
 
   it("retourne null sans section", () => {
-    expect(defaultOpenKey([], [], 1)).toBeNull();
+    expect(defaultOpenKey([], [], null)).toBeNull();
   });
 });
 

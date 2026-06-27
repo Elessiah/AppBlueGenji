@@ -43,7 +43,7 @@ export function BracketSections({
   const regionBaseId = `bracket-${bracketType.toLowerCase()}`;
 
   const [openKeys, setOpenKeys] = useState<Set<string>>(() => {
-    const initial = defaultOpenKey(sections, matches, myTeamId);
+    const initial = defaultOpenKey(sections, matches, myNext);
     return new Set(initial ? [initial] : []);
   });
 

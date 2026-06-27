@@ -79,19 +79,21 @@ export function findMyNextMatch(matches: BracketMatch[], myTeamId: number | null
 /**
  * Détermine la section à ouvrir par défaut : celle du prochain match du joueur,
  * sinon le round actif (premier non terminé), sinon la dernière (finale).
+ *
+ * `myNext` est le prochain match du joueur déjà résolu par {@link findMyNextMatch}
+ * (passé en paramètre pour éviter de reparcourir les matchs deux fois).
  */
 export function defaultOpenKey(
   sections: BracketSection[],
   matches: BracketMatch[],
-  myTeamId: number | null,
+  myNext: BracketMatch | null,
 ): string | null {
   if (!sections.length) return null;
 
   const sectionOfRound = (roundNum: number) =>
     sections.find((s) => s.rounds.includes(roundNum))?.key ?? null;
 
-  const mine = findMyNextMatch(matches, myTeamId);
-  if (mine) return sectionOfRound(mine.roundNumber);
+  if (myNext) return sectionOfRound(myNext.roundNumber);
 
   const active = matches
     .filter((m) => m.status !== "COMPLETED")
