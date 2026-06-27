@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import type { BracketMatch, BracketType } from "@/lib/shared/types";
-import { BracketTree, MatchScoreDraft } from "./BracketTree";
+import { BracketTree, MatchScoreDraft, ScrollRequest } from "./BracketTree";
 import { ACCENT, buildSections, defaultOpenKey, findMyNextMatch } from "../_lib/bracket-sections";
 
 interface BracketSectionsProps {
@@ -46,6 +46,7 @@ export function BracketSections({
     const initial = defaultOpenKey(sections, matches, myNext);
     return new Set(initial ? [initial] : []);
   });
+  const [scrollRequest, setScrollRequest] = useState<ScrollRequest | null>(null);
 
   const toggle = (key: string) =>
     setOpenKeys((prev) => {
@@ -54,6 +55,18 @@ export function BracketSections({
       else next.add(key);
       return next;
     });
+
+  // Clic sur un badge « Qualifié en X » : ouvre le volet du match d'arrivée et y défile.
+  const handleQualifyClick = (sourceMatch: BracketMatch) => {
+    const destId = sourceMatch.nextWinnerMatchId ?? sourceMatch.nextLoserMatchId;
+    if (destId == null) return;
+    const dest = matches.find((m) => m.id === destId);
+    if (!dest) return;
+    const destSection = sections.find((s) => s.rounds.includes(dest.roundNumber));
+    if (!destSection) return;
+    setOpenKeys((prev) => new Set(prev).add(destSection.key));
+    setScrollRequest({ matchId: destId, nonce: Date.now() });
+  };
 
   return (
     <div>
@@ -177,6 +190,8 @@ export function BracketSections({
                     qualifyLabel={section.qualifyLabel}
                     accentColor={accent}
                     scrollTargetMatchId={myNextMatchId}
+                    scrollRequest={scrollRequest}
+                    onQualifyClick={handleQualifyClick}
                     canReport={canReport}
                     adminResolvable={adminResolvable}
                     drafts={drafts}
