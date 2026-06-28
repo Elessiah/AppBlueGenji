@@ -5,10 +5,18 @@ import { deleteSponsor, getSponsorLogoUrl, updateSponsor } from "@/lib/server/sp
 
 const UPLOADED_LOGO_PREFIX = "/uploads/sponsors/";
 
-/** Supprime l'ancien fichier logo s'il était hébergé localement et a changé. */
+/**
+ * Supprime l'ancien fichier logo s'il était hébergé localement et a changé.
+ * Best-effort : une erreur de suppression (fichier verrouillé, permissions) ne
+ * doit pas faire échouer une requête dont la mutation en base a déjà réussi.
+ */
 async function cleanupReplacedLogo(previous: string | null, next: string | null) {
   if (previous && previous !== next && previous.startsWith(UPLOADED_LOGO_PREFIX)) {
-    await deleteStoredImage(previous);
+    try {
+      await deleteStoredImage(previous);
+    } catch (err) {
+      console.error("Failed to delete replaced sponsor logo:", err);
+    }
   }
 }
 

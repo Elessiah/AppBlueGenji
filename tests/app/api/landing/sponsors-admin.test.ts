@@ -152,6 +152,18 @@ describe("DELETE /api/landing/sponsors/[id]", () => {
     expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/sponsors/x.webp");
   });
 
+  it("still succeeds when the file cleanup fails (best-effort)", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    (service.getSponsorLogoUrl as jest.Mock).mockResolvedValue("/uploads/sponsors/x.webp" as never);
+    (service.deleteSponsor as jest.Mock).mockResolvedValue(undefined as never);
+    (deleteStoredImage as jest.Mock).mockRejectedValue(new Error("EPERM") as never);
+    const spy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await DELETE(jsonReq("DELETE", {}), params("4"));
+    expect(res.status).toBe(200);
+    spy.mockRestore();
+  });
+
   it("returns 404 when the sponsor does not exist", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
     (service.deleteSponsor as jest.Mock).mockRejectedValue(new Error("SPONSOR_NOT_FOUND") as never);
