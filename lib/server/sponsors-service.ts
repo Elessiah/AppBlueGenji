@@ -64,6 +64,16 @@ export async function listSponsors(): Promise<Sponsor[]> {
   }
 }
 
+/** Renvoie l'URL du logo d'un sponsor (ou `null`), pour le nettoyage de fichier. */
+export async function getSponsorLogoUrl(id: number): Promise<string | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<SponsorRow[]>(
+    `SELECT logo_url AS logoUrl FROM bg_sponsors WHERE id = ? LIMIT 1`,
+    [id]
+  );
+  return rows.length > 0 ? rows[0].logoUrl : null;
+}
+
 /** Garantit un slug unique en suffixant `-2`, `-3`… si nécessaire. */
 async function ensureUniqueSlug(base: string, excludeId?: number): Promise<string> {
   const db = await getDatabase();

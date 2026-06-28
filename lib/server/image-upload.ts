@@ -3,7 +3,7 @@ import path from "node:path";
 import { unlink, writeFile } from "node:fs/promises";
 import sharp from "sharp";
 
-export type UploadKind = "avatar" | "team-logo";
+export type UploadKind = "avatar" | "team-logo" | "sponsor-logo";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const MAX_DIMENSION = 8000;
@@ -11,19 +11,31 @@ const ALLOWED_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 const KIND_CONFIG: Record<
   UploadKind,
-  { dir: string; relPrefix: string; size: number; fit: "cover" | "contain"; quality: number }
+  { dir: string; relPrefix: string; width: number; height: number; fit: "cover" | "contain"; quality: number }
 > = {
   avatar: {
     dir: path.join(process.cwd(), "public", "uploads", "avatars"),
     relPrefix: "/uploads/avatars/",
-    size: 256,
+    width: 256,
+    height: 256,
     fit: "cover",
     quality: 80,
   },
   "team-logo": {
     dir: path.join(process.cwd(), "public", "uploads", "teams"),
     relPrefix: "/uploads/teams/",
-    size: 512,
+    width: 512,
+    height: 512,
+    fit: "contain",
+    quality: 82,
+  },
+  // Vitrine partenaires : emplacement large 3:1, logo « contain » sur fond
+  // transparent. Résolution cible 600×200 (cf. indice affiché dans la modale).
+  "sponsor-logo": {
+    dir: path.join(process.cwd(), "public", "uploads", "sponsors"),
+    relPrefix: "/uploads/sponsors/",
+    width: 600,
+    height: 200,
     fit: "contain",
     quality: 82,
   },
@@ -102,8 +114,8 @@ export async function processAndStoreImage(
 
   const resized =
     config.fit === "cover"
-      ? pipeline.resize(config.size, config.size, { fit: "cover", position: "centre" })
-      : pipeline.resize(config.size, config.size, {
+      ? pipeline.resize(config.width, config.height, { fit: "cover", position: "centre" })
+      : pipeline.resize(config.width, config.height, {
           fit: "contain",
           background: { r: 0, g: 0, b: 0, alpha: 0 },
         });
@@ -121,7 +133,9 @@ export async function processAndStoreImage(
 export async function deleteStoredImage(relativePath: string | null | undefined): Promise<void> {
   if (!relativePath) return;
   const allowed =
-    relativePath.startsWith("/uploads/avatars/") || relativePath.startsWith("/uploads/teams/");
+    relativePath.startsWith("/uploads/avatars/") ||
+    relativePath.startsWith("/uploads/teams/") ||
+    relativePath.startsWith("/uploads/sponsors/");
   if (!allowed) return;
 
   const safeRelative = relativePath.replace(/^\/+/, "");
