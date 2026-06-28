@@ -143,7 +143,7 @@ export async function listPlayers(): Promise<PublicUserProfile[]> {
       visible_major,
       created_at
      FROM bg_users
-     ORDER BY pseudo ASC`,
+     ORDER BY is_deleted ASC, pseudo ASC`,
   );
 
   const baseUsers = rows.map(mapPublicUser);
