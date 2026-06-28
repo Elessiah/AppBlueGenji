@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/sponsors-service");
+jest.mock("@/lib/server/image-upload");
 
 import { GET, POST } from "@/app/api/landing/sponsors/route";
 import { PUT, DELETE } from "@/app/api/landing/sponsors/[id]/route";
 import { getCurrentUser } from "@/lib/server/auth";
+import { deleteStoredImage } from "@/lib/server/image-upload";
 import * as service from "@/lib/server/sponsors-service";
 
 const admin = { id: 1, isAdmin: true } as Awaited<ReturnType<typeof getCurrentUser>>;
@@ -102,6 +104,28 @@ describe("PUT /api/landing/sponsors/[id]", () => {
     const res = await PUT(jsonReq("PUT", { name: "X" }), params("99"));
     expect(res.status).toBe(404);
   });
+
+  it("deletes the previous uploaded logo when it is replaced", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    (service.getSponsorLogoUrl as jest.Mock).mockResolvedValue("/uploads/sponsors/old.webp" as never);
+    (service.updateSponsor as jest.Mock).mockResolvedValue({
+      id: 3, name: "X", slug: "x", tier: "GOLD", logoUrl: "/uploads/sponsors/new.webp", websiteUrl: null, description: null,
+    } as never);
+
+    await PUT(jsonReq("PUT", { name: "X", logoUrl: "/uploads/sponsors/new.webp" }), params("3"));
+    expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/sponsors/old.webp");
+  });
+
+  it("keeps an external (non-uploaded) logo untouched", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    (service.getSponsorLogoUrl as jest.Mock).mockResolvedValue("https://cdn/old.png" as never);
+    (service.updateSponsor as jest.Mock).mockResolvedValue({
+      id: 3, name: "X", slug: "x", tier: "GOLD", logoUrl: "https://cdn/new.png", websiteUrl: null, description: null,
+    } as never);
+
+    await PUT(jsonReq("PUT", { name: "X", logoUrl: "https://cdn/new.png" }), params("3"));
+    expect(deleteStoredImage).not.toHaveBeenCalled();
+  });
 });
 
 describe("DELETE /api/landing/sponsors/[id]", () => {
@@ -117,6 +141,27 @@ describe("DELETE /api/landing/sponsors/[id]", () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
     (service.deleteSponsor as jest.Mock).mockResolvedValue(undefined as never);
     expect((await DELETE(jsonReq("DELETE", {}), params("4"))).status).toBe(200);
+  });
+
+  it("removes the uploaded logo file alongside the sponsor", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    (service.getSponsorLogoUrl as jest.Mock).mockResolvedValue("/uploads/sponsors/x.webp" as never);
+    (service.deleteSponsor as jest.Mock).mockResolvedValue(undefined as never);
+
+    await DELETE(jsonReq("DELETE", {}), params("4"));
+    expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/sponsors/x.webp");
+  });
+
+  it("still succeeds when the file cleanup fails (best-effort)", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    (service.getSponsorLogoUrl as jest.Mock).mockResolvedValue("/uploads/sponsors/x.webp" as never);
+    (service.deleteSponsor as jest.Mock).mockResolvedValue(undefined as never);
+    (deleteStoredImage as jest.Mock).mockRejectedValue(new Error("EPERM") as never);
+    const spy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await DELETE(jsonReq("DELETE", {}), params("4"));
+    expect(res.status).toBe(200);
+    spy.mockRestore();
   });
 
   it("returns 404 when the sponsor does not exist", async () => {

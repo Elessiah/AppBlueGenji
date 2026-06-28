@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CyberButton } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import {
@@ -27,6 +28,9 @@ interface FormState {
 
 const EMPTY_FORM: FormState = { name: "", tier: "PARTNER", websiteUrl: "", logoUrl: "", description: "" };
 
+const ACCEPTED_LOGO_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const MAX_LOGO_BYTES = 5 * 1024 * 1024;
+
 // Tri par palier (GOLD → PARTNER), comme côté serveur. `sort` est stable :
 // l'ordre relatif au sein d'un même palier est préservé (un nouvel élément
 // ajouté en fin reste donc en fin de son palier, cohérent avec display_order).
@@ -41,7 +45,15 @@ export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const logoFileRef = useRef<HTMLInputElement>(null);
+
+  // La modale est rendue via portail sur <body> : sans ça, elle reste piégée
+  // dans le contexte d'empilement de la section (z-index local) et passe
+  // derrière les sections suivantes (« Rejoindre la scène ») quand on défile.
+  useEffect(() => setMounted(true), []);
 
   // Les sponsors de secours (id négatif) ne sont pas en base : non modifiables.
   const canManage = (s: Sponsor) => isAdmin && s.id > 0;
@@ -158,6 +170,39 @@ export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
     }
   }
 
+  async function onLogoFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // Réinitialise pour permettre de re-sélectionner le même fichier ensuite.
+    event.target.value = "";
+    if (!file) return;
+    if (!ACCEPTED_LOGO_TYPES.includes(file.type)) {
+      showError("Format invalide : PNG, JPEG ou WebP uniquement.");
+      return;
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      showError("Image trop lourde (5 Mo maximum).");
+      return;
+    }
+
+    setLogoBusy(true);
+    try {
+      const data = new FormData();
+      data.append("file", file);
+      const res = await fetch("/api/landing/sponsors/logo", { method: "POST", body: data });
+      const payload = (await res.json()) as { logoUrl?: string; error?: string };
+      if (!res.ok || !payload.logoUrl) {
+        showError(payload.error ? `Échec : ${payload.error}` : "Échec de l'envoi du logo.");
+        return;
+      }
+      setForm((f) => ({ ...f, logoUrl: payload.logoUrl! }));
+      showSuccess("Logo importé.");
+    } catch {
+      showError("Erreur réseau, réessaye.");
+    } finally {
+      setLogoBusy(false);
+    }
+  }
+
   return (
     <section id="sponsors" className={styles.root}>
       <div className={styles.head}>
@@ -229,7 +274,7 @@ export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
         ))}
       </div>
 
-      {open && (
+      {open && mounted && createPortal(
         <div className={styles.modalOverlay} onClick={close} role="presentation">
           <div
             className={styles.modal}
@@ -278,16 +323,56 @@ export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
               />
             </label>
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Logo — URL (optionnel)</span>
+            <div className={styles.modalField}>
+              <span className={styles.modalLabel}>Logo (optionnel)</span>
+              <div className={styles.logoUpload}>
+                {form.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={form.logoUrl} alt="Aperçu du logo" className={styles.logoPreview} />
+                ) : (
+                  <div className={styles.logoPreviewEmpty} aria-hidden="true">
+                    600 × 200
+                  </div>
+                )}
+                <div className={styles.logoUploadActions}>
+                  <input
+                    ref={logoFileRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className={styles.logoFileInput}
+                    onChange={onLogoFile}
+                  />
+                  <button
+                    type="button"
+                    className={styles.logoUploadBtn}
+                    onClick={() => logoFileRef.current?.click()}
+                    disabled={logoBusy || busy}
+                  >
+                    {logoBusy ? "Envoi…" : form.logoUrl ? "Changer le fichier" : "Importer un fichier"}
+                  </button>
+                  {form.logoUrl && (
+                    <button
+                      type="button"
+                      className={`${styles.logoUploadBtn} ${styles.logoUploadBtnDanger}`}
+                      onClick={() => setForm((f) => ({ ...f, logoUrl: "" }))}
+                      disabled={logoBusy || busy}
+                    >
+                      Retirer
+                    </button>
+                  )}
+                </div>
+              </div>
+              <span className={styles.logoHint}>
+                Résolution idéale : 600 × 200 px (ratio 3:1), PNG ou WebP à fond transparent, 5 Mo max.
+              </span>
               <input
                 className={styles.modalInput}
                 value={form.logoUrl}
                 maxLength={2048}
-                placeholder="https://exemple.com/logo.png"
+                placeholder="… ou colle une URL https://exemple.com/logo.png"
                 onChange={(e) => setForm((f) => ({ ...f, logoUrl: e.target.value }))}
               />
-            </label>
+            </div>
 
             <label className={styles.modalField}>
               <span className={styles.modalLabel}>Description (optionnel)</span>
@@ -309,7 +394,8 @@ export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
               </CyberButton>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </section>
   );

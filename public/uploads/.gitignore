@@ -2,4 +2,5 @@
 !.gitignore
 !avatars/
 !teams/
+!sponsors/
 !**/.gitkeep
