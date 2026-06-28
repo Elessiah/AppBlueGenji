@@ -3,6 +3,7 @@ import {
   FALLBACK_SPONSORS,
   createSponsor,
   deleteSponsor,
+  getSponsorLogoUrl,
   listSponsors,
   updateSponsor,
 } from "@/lib/server/sponsors-service";
@@ -113,6 +114,18 @@ describe("sponsors-service", () => {
       await mockDb(execute);
       await expect(updateSponsor(1, { name: "X", tier: "BOGUS" })).rejects.toThrow("INVALID_TIER");
       expect(execute).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getSponsorLogoUrl", () => {
+    it("returns the stored logo url", async () => {
+      await mockDb(jest.fn().mockResolvedValue([[{ logoUrl: "/uploads/sponsors/1-a.webp" }]]));
+      expect(await getSponsorLogoUrl(1)).toBe("/uploads/sponsors/1-a.webp");
+    });
+
+    it("returns null when the sponsor does not exist", async () => {
+      await mockDb(jest.fn().mockResolvedValue([[]]));
+      expect(await getSponsorLogoUrl(999)).toBeNull();
     });
   });
 
