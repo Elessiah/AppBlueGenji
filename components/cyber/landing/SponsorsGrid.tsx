@@ -11,6 +11,7 @@ import {
   SPONSOR_TIERS,
   SPONSOR_TIER_LABELS,
 } from "@/lib/shared/sponsors";
+import { toServedUploadUrl } from "@/lib/shared/uploads";
 import styles from "./SponsorsGrid.module.css";
 
 type SponsorsGridProps = {
@@ -233,7 +234,7 @@ export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
                 // Logos externes fournis par les admins : <img> simple (pas
                 // d'allowlist de domaines requise par next/image).
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={sponsor.logoUrl} alt={sponsor.name} className={styles.logo} />
+                <img src={toServedUploadUrl(sponsor.logoUrl)} alt={sponsor.name} className={styles.logo} />
               ) : (
                 <>
                   <svg className={styles.pattern} viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">
@@ -328,7 +329,7 @@ export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
               <div className={styles.logoUpload}>
                 {form.logoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={form.logoUrl} alt="Aperçu du logo" className={styles.logoPreview} />
+                  <img src={toServedUploadUrl(form.logoUrl)} alt="Aperçu du logo" className={styles.logoPreview} />
                 ) : (
                   <div className={styles.logoPreviewEmpty} aria-hidden="true">
                     600 × 200
