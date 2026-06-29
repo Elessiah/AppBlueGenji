@@ -35,7 +35,7 @@ export function PublicFooter() {
             <div className={styles.heading}>COMMUNAUTÉ</div>
             <ul>
               <li><a href="https://discord.gg/bluegenji" target="_blank" rel="noreferrer">Discord</a></li>
-              <li><a href="#sponsors">Partenaires</a></li>
+              <li><Link href="/#sponsors">Partenaires</Link></li>
               <li><Link href="/benevoles">Bénévoles</Link></li>
               <li><Link href="/bot">Bot</Link></li>
             </ul>

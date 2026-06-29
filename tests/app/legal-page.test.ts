@@ -91,4 +91,11 @@ describe("public footer wires legal documents", () => {
     expect(source).not.toMatch(/href="\/tournois">Règlement/);
     expect(source).not.toContain('href="#top"');
   });
+
+  it("links Partenaires to the landing sponsors section from any page", () => {
+    // Bare in-page anchors only resolve on the landing page; the footer is
+    // rendered everywhere, so the link must be absolute to /#sponsors.
+    expect(source).toContain('href="/#sponsors"');
+    expect(source).not.toContain('href="#sponsors"');
+  });
 });
