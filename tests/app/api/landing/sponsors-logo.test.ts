@@ -41,13 +41,15 @@ describe("POST /api/landing/sponsors/logo", () => {
     expect(await res.json()).toEqual({ error: "FILE_MISSING" });
   });
 
-  it("stores the logo and returns its url for admins", async () => {
+  it("stores the logo and returns its served url for admins", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
     (processAndStoreImage as jest.Mock).mockResolvedValue("/uploads/sponsors/1-abc.webp" as never);
 
     const res = await POST(fileReq(pngFile()));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ logoUrl: "/uploads/sponsors/1-abc.webp" });
+    // Le fichier reste sur disque sous `/uploads/...`, mais l'URL exposée passe
+    // par `/api/uploads/...` (servie par un route handler, cf. bug Turbopack).
+    expect(await res.json()).toEqual({ logoUrl: "/api/uploads/sponsors/1-abc.webp" });
     expect(processAndStoreImage).toHaveBeenCalledWith(expect.any(File), "sponsor-logo", 1);
   });
 
