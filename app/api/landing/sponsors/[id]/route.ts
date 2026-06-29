@@ -2,8 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { deleteSponsor, getSponsorLogoUrl, updateSponsor } from "@/lib/server/sponsors-service";
-
-const UPLOADED_LOGO_PREFIX = "/uploads/sponsors/";
+import { toDiskUploadPath } from "@/lib/shared/uploads";
 
 /**
  * Supprime l'ancien fichier logo s'il était hébergé localement et a changé.
@@ -11,12 +10,13 @@ const UPLOADED_LOGO_PREFIX = "/uploads/sponsors/";
  * doit pas faire échouer une requête dont la mutation en base a déjà réussi.
  */
 async function cleanupReplacedLogo(previous: string | null, next: string | null) {
-  if (previous && previous !== next && previous.startsWith(UPLOADED_LOGO_PREFIX)) {
-    try {
-      await deleteStoredImage(previous);
-    } catch (err) {
-      console.error("Failed to delete replaced sponsor logo:", err);
-    }
+  if (!previous || previous === next) return;
+  const diskPath = toDiskUploadPath(previous);
+  if (!diskPath) return;
+  try {
+    await deleteStoredImage(diskPath);
+  } catch (err) {
+    console.error("Failed to delete replaced sponsor logo:", err);
   }
 }
 

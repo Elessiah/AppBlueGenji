@@ -105,14 +105,15 @@ describe("PUT /api/landing/sponsors/[id]", () => {
     expect(res.status).toBe(404);
   });
 
-  it("deletes the previous uploaded logo when it is replaced", async () => {
+  it("deletes the previous uploaded logo (mapped to its disk path) when replaced", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.getSponsorLogoUrl as jest.Mock).mockResolvedValue("/uploads/sponsors/old.webp" as never);
+    (service.getSponsorLogoUrl as jest.Mock).mockResolvedValue("/api/uploads/sponsors/old.webp" as never);
     (service.updateSponsor as jest.Mock).mockResolvedValue({
-      id: 3, name: "X", slug: "x", tier: "GOLD", logoUrl: "/uploads/sponsors/new.webp", websiteUrl: null, description: null,
+      id: 3, name: "X", slug: "x", tier: "GOLD", logoUrl: "/api/uploads/sponsors/new.webp", websiteUrl: null, description: null,
     } as never);
 
-    await PUT(jsonReq("PUT", { name: "X", logoUrl: "/uploads/sponsors/new.webp" }), params("3"));
+    await PUT(jsonReq("PUT", { name: "X", logoUrl: "/api/uploads/sponsors/new.webp" }), params("3"));
+    // L'URL servie est reconvertie en chemin disque avant suppression.
     expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/sponsors/old.webp");
   });
 
