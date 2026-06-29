@@ -98,4 +98,19 @@ describe("public footer wires legal documents", () => {
     expect(source).toContain('href="/#sponsors"');
     expect(source).not.toContain('href="#sponsors"');
   });
+
+  it("points Manifeste at the matching section anchor on /association", () => {
+    expect(source).toContain('href="/association#manifeste"');
+    expect(read("app/association/page.tsx")).toContain('id="manifeste"');
+  });
+
+  it("routes Partenariats to the landing sponsors section", () => {
+    expect(source).toContain('href="/#sponsors">Partenariats');
+    expect(source).not.toContain('href="/association">Partenariats');
+  });
+
+  it("points Contact presse at the dedicated /association section", () => {
+    expect(source).toContain('href="/association#contact"');
+    expect(read("app/association/ContactSection.tsx")).toContain('id="contact"');
+  });
 });
