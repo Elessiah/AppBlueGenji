@@ -6,7 +6,9 @@ import { AboutSection } from "@/components/cyber/landing/AboutSection";
 import { CyberButton } from "@/components/cyber";
 import { getCurrentUser } from "@/lib/server/auth";
 import { listBureauMembers } from "@/lib/server/bureau-service";
+import { getPressEmail } from "@/lib/server/contact-service";
 import { BureauSection } from "./BureauSection";
+import { ContactSection } from "./ContactSection";
 import styles from "./page.module.css";
 
 const REGLEMENT_URL =
@@ -24,7 +26,11 @@ export const metadata: Metadata = {
 };
 
 export default async function AssociationPage() {
-  const [user, bureauMembers] = await Promise.all([getCurrentUser(), listBureauMembers()]);
+  const [user, bureauMembers, pressEmail] = await Promise.all([
+    getCurrentUser(),
+    listBureauMembers(),
+    getPressEmail(),
+  ]);
   const isAdmin = Boolean(user?.isAdmin);
 
   return (
@@ -69,7 +75,7 @@ export default async function AssociationPage() {
         <AboutSection />
 
         {/* MANIFESTE */}
-        <section className={styles.section}>
+        <section id="manifeste" className={styles.section}>
           <header className={styles.head}>
             <div>
               <span className="eyebrow">SECTION 04</span>
@@ -176,6 +182,9 @@ export default async function AssociationPage() {
             SIRET 912 345 678 00017 · RNA W691234567
           </div>
         </section>
+
+        {/* CONTACT PRESSE */}
+        <ContactSection initialEmail={pressEmail} isAdmin={isAdmin} />
 
         <PublicFooter />
       </main>

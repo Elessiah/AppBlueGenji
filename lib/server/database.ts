@@ -407,6 +407,15 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  // Migration: Réglages clé/valeur de l'association (ex. email contact presse)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS bg_settings (
+      setting_key VARCHAR(80) PRIMARY KEY,
+      setting_value TEXT NOT NULL,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
   // Migration: Bénévoles de l'association, groupés par catégorie dynamique
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_benevoles (
