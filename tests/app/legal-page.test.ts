@@ -109,8 +109,10 @@ describe("public footer wires legal documents", () => {
     expect(source).not.toContain('href="/association">Partenariats');
   });
 
-  it("points Contact presse at the dedicated /association section", () => {
-    expect(source).toContain('href="/association#contact"');
-    expect(read("app/association/ContactSection.tsx")).toContain('id="contact"');
+  it("renders the press contact inline in the footer, not as a section link", () => {
+    // L'email de contact presse est désormais affiché directement dans le footer
+    // (composant éditable), plus de lien/bouton vers une section /association.
+    expect(source).toContain("FooterPressContact");
+    expect(source).not.toContain('href="/association#contact"');
   });
 });

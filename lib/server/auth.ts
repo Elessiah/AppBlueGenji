@@ -1,4 +1,5 @@
 ﻿import crypto from "node:crypto";
+import { cache as reactCache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { RowDataPacket, ResultSetHeader } from "mysql2/promise";
@@ -153,7 +154,19 @@ async function getDevBypassUser(): Promise<AuthUser | null> {
   return fromRow(rows[0]);
 }
 
-export async function getCurrentUser(): Promise<AuthUser | null> {
+// `cache` de React n'est fourni qu'au runtime (React Server Components / Next) ;
+// le paquet `react` résolu sous Jest ne l'expose pas. On retombe alors sur
+// l'identité (pas de mémoïsation en test, comportement inchangé).
+const requestCache: <T extends (...args: never[]) => unknown>(fn: T) => T =
+  typeof reactCache === "function" ? reactCache : (fn) => fn;
+
+/**
+ * Résout l'utilisateur courant pour la requête en cours. Mémoïsé via `cache()`
+ * de React : les multiples appelants d'un même rendu (PublicHeader, PublicFooter,
+ * la page elle-même…) partagent une seule requête de session au lieu d'en
+ * émettre une chacun.
+ */
+export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> => {
   const devUser = await getDevBypassUser();
   if (devUser) return devUser;
 
@@ -178,7 +191,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   }
 
   return fromRow(rows[0]);
-}
+});
 
 export async function requireCurrentUser(): Promise<AuthUser> {
   const user = await getCurrentUser();
