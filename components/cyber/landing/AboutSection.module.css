@@ -44,29 +44,6 @@
   color: var(--ink);
 }
 
-.stats {
-  margin-top: 26px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.stat {
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-cy-md);
-  padding: 14px 16px;
-  background: rgba(90, 200, 255, 0.03);
-}
-
-.stat :global(.mono) {
-  margin-top: 4px;
-  display: inline-block;
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  color: var(--ink-mute);
-  text-transform: uppercase;
-}
-
 .right {
   display: flex;
   flex-direction: column;
@@ -119,10 +96,6 @@
   .head {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .stats {
-    grid-template-columns: 1fr;
   }
 }
 

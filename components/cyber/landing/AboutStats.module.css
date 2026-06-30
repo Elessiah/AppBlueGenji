@@ -1,0 +1,194 @@
+.stats {
+  margin-top: 26px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.stat {
+  position: relative;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-md);
+  padding: 14px 16px;
+  background: rgba(90, 200, 255, 0.03);
+}
+
+.stat :global(.mono) {
+  margin-top: 4px;
+  display: inline-block;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--ink-mute);
+  text-transform: uppercase;
+}
+
+.statActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.action {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  background: transparent;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-sm);
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.action:hover {
+  color: var(--blue-300);
+  border-color: var(--blue-500);
+  background: rgba(90, 200, 255, 0.05);
+}
+
+.action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.action:disabled:hover {
+  color: var(--ink-mute);
+  border-color: var(--line-soft);
+  background: transparent;
+}
+
+.actionDanger:hover {
+  color: var(--red-live, #ff6e82);
+  border-color: rgba(255, 110, 130, 0.6);
+  background: rgba(255, 110, 130, 0.06);
+}
+
+.actionPrimary {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cyber-bg, #06080b);
+  background: var(--blue-400, #5ac8ff);
+  border: 1px solid var(--blue-400, #5ac8ff);
+  border-radius: var(--r-cy-sm);
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.actionPrimary:hover {
+  background: var(--blue-300, #84d6ff);
+  border-color: var(--blue-300, #84d6ff);
+}
+
+.actionPrimary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.addBtn {
+  margin-top: 14px;
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  background: transparent;
+  border: 1px dashed var(--line-soft);
+  border-radius: var(--r-cy-md);
+  padding: 12px;
+  cursor: pointer;
+  transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.addBtn:hover {
+  color: var(--blue-300);
+  border-color: var(--blue-500);
+  background: rgba(90, 200, 255, 0.04);
+}
+
+.addBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Modale d'ajout / édition */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px);
+}
+
+.modal {
+  width: min(440px, 100%);
+  background: var(--cyber-bg-1, #0c0f14);
+  border: 1px solid var(--line-strong-cy, var(--line-soft));
+  border-radius: var(--r-cy-lg, 14px);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+}
+
+.modalTitle {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.modalField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modalLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.modalInput {
+  background: var(--cyber-bg, #06080b);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-sm, 8px);
+  padding: 10px 12px;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.16s ease;
+}
+
+.modalInput:focus {
+  border-color: var(--blue-500);
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+@media (max-width: 720px) {
+  .stats {
+    grid-template-columns: 1fr;
+  }
+}

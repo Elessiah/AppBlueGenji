@@ -6,6 +6,7 @@ import { AboutSection } from "@/components/cyber/landing/AboutSection";
 import { CyberButton } from "@/components/cyber";
 import { getCurrentUser } from "@/lib/server/auth";
 import { listBureauMembers } from "@/lib/server/bureau-service";
+import { listAboutStats } from "@/lib/server/about-stats-service";
 import { BureauSection } from "./BureauSection";
 import styles from "./page.module.css";
 
@@ -24,7 +25,11 @@ export const metadata: Metadata = {
 };
 
 export default async function AssociationPage() {
-  const [user, bureauMembers] = await Promise.all([getCurrentUser(), listBureauMembers()]);
+  const [user, bureauMembers, aboutStats] = await Promise.all([
+    getCurrentUser(),
+    listBureauMembers(),
+    listAboutStats(),
+  ]);
   const isAdmin = Boolean(user?.isAdmin);
 
   return (
@@ -66,7 +71,7 @@ export default async function AssociationPage() {
         </section>
 
         {/* ABOUT SECTION */}
-        <AboutSection />
+        <AboutSection stats={aboutStats} isAdmin={isAdmin} />
 
         {/* MANIFESTE */}
         <section id="manifeste" className={styles.section}>
