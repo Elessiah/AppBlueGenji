@@ -36,11 +36,14 @@ export async function getContactInfo(): Promise<ContactInfo> {
       [CONTACT_EMAIL_KEY, CONTACT_DISCORD_TAG_KEY, CONTACT_DISCORD_URL_KEY],
     );
     const stored = new Map(rows.map((r) => [r.setting_key, r.setting_value?.trim() ?? ""]));
+    // On distingue « jamais configuré » (clé absente → valeur par défaut) de
+    // « explicitement vidé » (clé présente à `""` → canal retiré). Sinon un admin
+    // ne pourrait jamais supprimer un canal : il réapparaîtrait au défaut.
+    const pick = (key: string, fallback: string) => (stored.has(key) ? stored.get(key)! : fallback);
     return {
-      email: stored.get(CONTACT_EMAIL_KEY) || DEFAULT_CONTACT.email,
-      // Le tag n'a pas de défaut « parlant » : on prend la valeur stockée telle quelle.
-      discordTag: stored.get(CONTACT_DISCORD_TAG_KEY) ?? DEFAULT_CONTACT.discordTag,
-      discordUrl: stored.get(CONTACT_DISCORD_URL_KEY) || DEFAULT_CONTACT.discordUrl,
+      email: pick(CONTACT_EMAIL_KEY, DEFAULT_CONTACT.email),
+      discordTag: pick(CONTACT_DISCORD_TAG_KEY, DEFAULT_CONTACT.discordTag),
+      discordUrl: pick(CONTACT_DISCORD_URL_KEY, DEFAULT_CONTACT.discordUrl),
     };
   } catch {
     return { ...DEFAULT_CONTACT };
