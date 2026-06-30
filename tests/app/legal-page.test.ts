@@ -109,10 +109,12 @@ describe("public footer wires legal documents", () => {
     expect(source).not.toContain('href="/association">Partenariats');
   });
 
-  it("renders the press contact inline in the footer, not as a section link", () => {
-    // L'email de contact presse est désormais affiché directement dans le footer
-    // (composant éditable), plus de lien/bouton vers une section /association.
-    expect(source).toContain("FooterPressContact");
+  it("renders a dedicated CONTACT category in the footer", () => {
+    // Catégorie « Contact » éditable (email / Discord), plus de lien vers une
+    // section /association ni de composant presse inline historique.
+    expect(source).toContain(">CONTACT<");
+    expect(source).toContain("FooterContact");
+    expect(source).not.toContain("FooterPressContact");
     expect(source).not.toContain('href="/association#contact"');
   });
 });
