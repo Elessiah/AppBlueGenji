@@ -378,37 +378,6 @@
   color: var(--ink-mute);
 }
 
-/* CONTACT PRESSE */
-.contactGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 48px;
-  align-items: start;
-}
-
-.contactSide {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  align-items: flex-start;
-  border-left: 1px solid var(--line-soft);
-  padding-left: 28px;
-}
-
-.contactEmail {
-  font-family: var(--font-mono);
-  font-size: clamp(16px, 2vw, 22px);
-  letter-spacing: -0.01em;
-  color: var(--blue-300);
-  text-decoration: none;
-  word-break: break-all;
-  transition: color 0.18s ease;
-}
-
-.contactEmail:hover {
-  color: var(--blue-100);
-}
-
 .docList {
   list-style: none;
   padding: 0;
@@ -469,14 +438,12 @@
   }
 
   .manifesteGrid,
-  .adhererGrid,
-  .contactGrid {
+  .adhererGrid {
     grid-template-columns: 1fr;
     gap: 28px;
   }
 
-  .adhererSide,
-  .contactSide {
+  .adhererSide {
     border-left: none;
     border-top: 1px solid var(--line-soft);
     padding: 24px 0 0;

@@ -1,11 +1,20 @@
 import Link from "next/link";
 import Image from "next/image";
+import { getCurrentUser } from "@/lib/server/auth";
+import { getPressEmail } from "@/lib/server/contact-service";
+import { FooterPressContact } from "./FooterPressContact";
 import styles from "./PublicFooter.module.css";
 
 const REGLEMENT_URL =
   "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
 
-export function PublicFooter() {
+export async function PublicFooter() {
+  const [pressEmail, user] = await Promise.all([
+    getPressEmail(),
+    getCurrentUser().catch(() => null),
+  ]);
+  const isAdmin = Boolean(user?.isAdmin);
+
   return (
     <footer className={styles.root}>
       <div className={styles.inner}>
@@ -46,7 +55,7 @@ export function PublicFooter() {
               <li><Link href="/association#manifeste">Manifeste</Link></li>
               <li><Link href="/benevoles">Équipe bénévole</Link></li>
               <li><Link href="/#sponsors">Partenariats</Link></li>
-              <li><Link href="/association#contact">Contact presse</Link></li>
+              <li><FooterPressContact initialEmail={pressEmail} isAdmin={isAdmin} /></li>
             </ul>
           </div>
           <div>
