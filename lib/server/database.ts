@@ -407,6 +407,19 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  // Migration: Cartes « L'association » (valeur + titre, gérables par les admins)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS bg_about_stats (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      value VARCHAR(40) NOT NULL,
+      label VARCHAR(60) NOT NULL,
+      display_order INT NOT NULL DEFAULT 100,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_bg_about_stats_order (display_order)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
   // Migration: Réglages clé/valeur de l'association (ex. email contact presse)
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_settings (

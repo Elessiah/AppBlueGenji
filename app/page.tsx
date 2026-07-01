@@ -16,6 +16,7 @@ import {
 } from "@/lib/server/landing-service";
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import { listSponsors } from "@/lib/server/sponsors-service";
+import { listAboutStats } from "@/lib/server/about-stats-service";
 import { getCurrentUser } from "@/lib/server/auth";
 import { loadMiniBracket } from "@/lib/server/tournaments/bracket-loader";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
@@ -35,13 +36,14 @@ export default async function HomePage() {
   }));
 
   const featured = chooseNextTournament(buckets);
-  const [stats, live, leaderboard, events, ticker, sponsors, miniBracket, user] = await Promise.all([
+  const [stats, live, leaderboard, events, ticker, sponsors, aboutStats, miniBracket, user] = await Promise.all([
     getLandingStats(),
     getLandingLive(buckets),
     getLandingLeaderboard(),
     getLandingCalendar(buckets, 5),
     getLandingTicker(),
     listSponsors().catch(() => []),
+    listAboutStats(),
     featured ? loadMiniBracket(featured.id) : Promise.resolve([]),
     getCurrentUser().catch(() => null),
   ]);
@@ -54,7 +56,7 @@ export default async function HomePage() {
       <Ticker items={ticker.items} />
       <TournamentBoard buckets={buckets} featured={featured} miniBracket={miniBracket} />
       <LeaderCal leaderboard={leaderboard} events={events} />
-      <AboutSection />
+      <AboutSection stats={aboutStats} isAdmin={isAdmin} />
       <SponsorsGrid sponsors={sponsors} isAdmin={isAdmin} />
       <JoinCTA />
       <PublicFooter />

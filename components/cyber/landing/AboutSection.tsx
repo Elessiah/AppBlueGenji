@@ -1,6 +1,13 @@
+import type { AboutStat } from "@/lib/shared/about-stats";
+import { AboutStats } from "./AboutStats";
 import styles from "./AboutSection.module.css";
 
-export function AboutSection() {
+interface AboutSectionProps {
+  stats: AboutStat[];
+  isAdmin: boolean;
+}
+
+export function AboutSection({ stats, isAdmin }: AboutSectionProps) {
   return (
     <section id="assoc" className={styles.root}>
       <div className={styles.head}>
@@ -19,19 +26,7 @@ export function AboutSection() {
             avec des cash prizes réinvestis dans la scène amateur française.
           </p>
 
-          <div className={styles.stats}>
-            {[
-              ["100%", "Bénévole"],
-              ["€4 200", "Prizepool 2025"],
-              ["12", "Arbitres"],
-              ["0 €", "Frais d'inscription"],
-            ].map(([value, label]) => (
-              <div key={label} className={styles.stat}>
-                <div className="num" style={{ fontSize: 26 }}>{value}</div>
-                <div className="mono">{label}</div>
-              </div>
-            ))}
-          </div>
+          <AboutStats initialStats={stats} isAdmin={isAdmin} />
         </div>
 
         <div className={styles.right}>
