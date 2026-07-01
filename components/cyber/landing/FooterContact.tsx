@@ -86,6 +86,7 @@ export function FooterContact({ initialContact, isAdmin }: FooterContactProps) {
         )}
         {contact.discordTag && (
           <li>
+            <span className={styles.tagLabel}>Discord&nbsp;·</span>{" "}
             <span className={styles.tag}>{contact.discordTag}</span>
           </li>
         )}
