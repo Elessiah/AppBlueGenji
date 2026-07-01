@@ -1,4 +1,10 @@
-.tagLabel {
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.itemLabel {
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.12em;

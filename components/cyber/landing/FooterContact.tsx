@@ -80,18 +80,20 @@ export function FooterContact({ initialContact, isAdmin }: FooterContactProps) {
     <>
       <ul>
         {contact.email && (
-          <li>
+          <li className={styles.item}>
+            <span className={styles.itemLabel}>Email</span>
             <a href={`mailto:${contact.email}`}>{contact.email}</a>
           </li>
         )}
         {contact.discordTag && (
-          <li>
-            <span className={styles.tagLabel}>Discord&nbsp;·</span>{" "}
+          <li className={styles.item}>
+            <span className={styles.itemLabel}>Discord</span>
             <span className={styles.tag}>{contact.discordTag}</span>
           </li>
         )}
         {contact.discordUrl && (
-          <li>
+          <li className={styles.item}>
+            <span className={styles.itemLabel}>Serveur</span>
             <a href={contact.discordUrl} target="_blank" rel="noreferrer">
               Serveur Discord
             </a>
