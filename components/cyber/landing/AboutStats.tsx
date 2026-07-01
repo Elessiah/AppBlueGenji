@@ -177,9 +177,11 @@ export function AboutStats({ initialStats, isAdmin }: AboutStatsProps) {
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
-            aria-label={editing ? "Modifier une carte" : "Ajouter une carte"}
+            aria-labelledby="about-stat-modal-title"
           >
-            <h3 className={styles.modalTitle}>{editing ? "Modifier la carte" : "Ajouter une carte"}</h3>
+            <h3 id="about-stat-modal-title" className={styles.modalTitle}>
+              {editing ? "Modifier la carte" : "Ajouter une carte"}
+            </h3>
 
             <label className={styles.modalField}>
               <span className={styles.modalLabel}>Valeur</span>
@@ -189,6 +191,7 @@ export function AboutStats({ initialStats, isAdmin }: AboutStatsProps) {
                 value={form.value}
                 maxLength={ABOUT_STAT_VALUE_MAX}
                 placeholder="100%"
+                enterKeyHint="next"
                 onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
               />
             </label>
@@ -200,6 +203,10 @@ export function AboutStats({ initialStats, isAdmin }: AboutStatsProps) {
                 value={form.label}
                 maxLength={ABOUT_STAT_LABEL_MAX}
                 placeholder="Bénévole"
+                enterKeyHint="done"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !busy) submit();
+                }}
                 onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
               />
             </label>
@@ -208,7 +215,13 @@ export function AboutStats({ initialStats, isAdmin }: AboutStatsProps) {
               <button type="button" className={styles.action} onClick={close} disabled={busy}>
                 Annuler
               </button>
-              <button type="button" className={styles.actionPrimary} onClick={submit} disabled={busy}>
+              <button
+                type="button"
+                className={styles.actionPrimary}
+                onClick={submit}
+                disabled={busy}
+                aria-busy={busy}
+              >
                 {busy ? "…" : editing ? "Enregistrer" : "Ajouter"}
               </button>
             </div>
