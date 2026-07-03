@@ -2,6 +2,18 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { setUserAdmin } from "@/lib/server/users-service";
 
+/**
+ * Accorde ou révoque les droits administrateur d'un utilisateur cible.
+ *
+ * Réservé aux administrateurs. Corps attendu : `{ isAdmin: boolean }`.
+ * Un administrateur ne peut pas modifier ses propres droits afin d'éviter
+ * tout auto-verrouillage de la plateforme.
+ *
+ * @returns `200 { isAdmin }` en cas de succès, ou une erreur
+ *   `401` (non authentifié), `403` (non admin), `400`
+ *   (`INVALID_ID` / `INVALID_PAYLOAD` / `CANNOT_MODIFY_SELF`)
+ *   ou `404` (`USER_NOT_FOUND`).
+ */
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
