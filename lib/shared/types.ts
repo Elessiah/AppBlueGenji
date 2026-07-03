@@ -291,6 +291,10 @@ export type FullProfileResponse = {
   teamsTimeline: UserTeamTimeline[];
   tournaments: TeamHistoryRow[];
   isSelf: boolean;
+  // Statut administrateur du profil consulté.
+  isAdmin: boolean;
+  // Vrai lorsque le viewer est administrateur (débloque la gestion des droits admin).
+  viewerIsAdmin: boolean;
 };
 
 export type TeamDetailResponse = {

@@ -37,6 +37,7 @@ type UserRow = RowDataPacket & {
   visible_overwatch: 0 | 1;
   visible_marvel: 0 | 1;
   visible_major: 0 | 1;
+  is_admin?: 0 | 1;
   created_at: Date;
 };
 
@@ -470,7 +471,11 @@ export async function updateUserAvatar(userId: number, avatarPath: string | null
   );
 }
 
-export async function getFullProfile(viewerId: number, targetUserId: number): Promise<FullProfileResponse | null> {
+export async function getFullProfile(
+  viewerId: number,
+  targetUserId: number,
+  viewerIsAdmin = false,
+): Promise<FullProfileResponse | null> {
   const db = await getDatabase();
 
   const [userRows] = await db.execute<UserRow[]>(
@@ -487,6 +492,7 @@ export async function getFullProfile(viewerId: number, targetUserId: number): Pr
       visible_overwatch,
       visible_marvel,
       visible_major,
+      is_admin,
       created_at
     FROM bg_users
     WHERE id = ?
@@ -497,6 +503,7 @@ export async function getFullProfile(viewerId: number, targetUserId: number): Pr
   if (userRows.length === 0) return null;
 
   const isSelf = viewerId === targetUserId;
+  const targetIsAdmin = Boolean(userRows[0].is_admin);
   const profile = mapPublicUser(userRows[0]);
 
   if (isSelf) {
@@ -592,8 +599,33 @@ export async function getFullProfile(viewerId: number, targetUserId: number): Pr
     },
     teamsTimeline: timeline,
     tournaments,
+    // Ne pas divulguer qui est admin aux non-admins : réservé au viewer admin.
+    isAdmin: viewerIsAdmin ? targetIsAdmin : false,
     isSelf,
+    viewerIsAdmin,
   };
+}
+
+/**
+ * Accorde ou révoque les droits administrateur d'un utilisateur.
+ * Réservé aux administrateurs (contrôle d'accès effectué côté route API).
+ */
+export async function setUserAdmin(targetUserId: number, isAdmin: boolean): Promise<void> {
+  const db = await getDatabase();
+  // On vérifie l'existence en amont : `affectedRows` d'un UPDATE ne compte que
+  // les lignes réellement modifiées (mysql2 sans CLIENT_FOUND_ROWS), donc une
+  // écriture idempotente renverrait 0 et masquerait un utilisateur bien présent.
+  const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
+    [targetUserId],
+  );
+  if (rows.length === 0) {
+    throw new Error("USER_NOT_FOUND");
+  }
+  await db.execute(
+    `UPDATE bg_users SET is_admin = ? WHERE id = ?`,
+    [isAdmin ? 1 : 0, targetUserId],
+  );
 }
 
 export async function getUserIdByPseudo(pseudo: string): Promise<number | null> {
