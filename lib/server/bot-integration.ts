@@ -109,6 +109,56 @@ export async function fetchBotStats(): Promise<BotStats> {
   }
 }
 
+/**
+ * Résout un identifiant Discord fourni par l'utilisateur en Discord ID numérique.
+ * - Un ID numérique (5–32 chiffres) est renvoyé tel quel, sans solliciter le bot (option de repli).
+ * - Un tag (`pseudo` ou legacy `pseudo#1234`) est résolu par le bot s'il partage un serveur
+ *   avec l'utilisateur, sinon `DISCORD_USER_NOT_FOUND` est levé.
+ */
+export async function resolveDiscordUser(handle: string): Promise<string> {
+  const trimmed = handle.trim();
+
+  // Repli : ID numérique direct, pas besoin d'un serveur commun avec le bot.
+  if (/^\d{5,32}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const baseUrl = resolveBotInternalUrl();
+
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/internal/auth/resolve`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...getInternalHeaders(),
+      },
+      body: JSON.stringify({ handle: trimmed }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(BOT_LOGIN_FETCH_TIMEOUT_MS),
+    });
+  } catch {
+    throw new Error("BOT_INTERNAL_UNREACHABLE");
+  }
+
+  if (response.ok) {
+    const payload = (await response.json()) as { discordId?: string };
+    if (payload.discordId && /^\d{5,32}$/.test(payload.discordId)) {
+      return payload.discordId;
+    }
+    throw new Error("DISCORD_USER_NOT_FOUND");
+  }
+
+  if (response.status === 401) {
+    throw new Error("BOT_INTERNAL_UNAUTHORIZED");
+  }
+  if (response.status === 404) {
+    throw new Error("DISCORD_USER_NOT_FOUND");
+  }
+
+  throw new Error(await safeReadError(response));
+}
+
 export async function sendDiscordLoginCode(discordId: string, code: string): Promise<void> {
   const baseUrl = resolveBotInternalUrl();
 
