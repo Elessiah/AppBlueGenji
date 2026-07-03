@@ -48,7 +48,7 @@ test.describe("Connexion", () => {
     await expect(page.getByRole("button", { name: "Se connecter" })).toBeVisible();
 
     // Retour arrière possible
-    await page.getByRole("button", { name: /CHANGER D'ID/ }).click();
+    await page.getByRole("button", { name: /CHANGER DE COMPTE/ }).click();
     await expect(page.getByRole("button", { name: /Recevoir un code/ })).toBeVisible();
   });
 });

@@ -1,10 +1,6 @@
-import { sendDiscordLoginCode } from "@/lib/server/bot-integration";
+import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
 import { fail, ok } from "@/lib/server/http";
 import { createDiscordLoginChallenge } from "@/lib/server/users-service";
-
-function normalizeDiscordId(raw: string): string {
-  return raw.trim();
-}
 
 function mapRequestError(message: string): { code: string; status: number } {
   if (message === "BOT_INTERNAL_UNREACHABLE") {
@@ -13,6 +9,10 @@ function mapRequestError(message: string): { code: string; status: number } {
 
   if (message === "BOT_INTERNAL_UNAUTHORIZED") {
     return { code: "BOT_INTERNAL_UNAUTHORIZED", status: 500 };
+  }
+
+  if (message === "DISCORD_USER_NOT_FOUND") {
+    return { code: "DISCORD_USER_NOT_FOUND", status: 404 };
   }
 
   if (message === "DISCORD_DM_FAILED") {
@@ -24,18 +24,22 @@ function mapRequestError(message: string): { code: string; status: number } {
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as { discordId?: string };
-    const discordId = normalizeDiscordId(body.discordId ?? "");
+    const body = (await req.json()) as { discordId?: string; handle?: string };
+    // `handle` = tag Discord ou ID ; `discordId` conservé pour rétrocompat.
+    const handle = (body.handle ?? body.discordId ?? "").trim();
 
-    if (!/^\d{5,32}$/.test(discordId)) {
-      return fail("INVALID_DISCORD_ID", 400);
+    if (!handle) {
+      return fail("INVALID_DISCORD_HANDLE", 400);
     }
+
+    const discordId = await resolveDiscordUser(handle);
 
     const challenge = await createDiscordLoginChallenge(discordId);
     await sendDiscordLoginCode(discordId, challenge.code);
 
     return ok({
       success: true,
+      discordId,
       expiresAt: challenge.expiresAt.toISOString(),
     });
   } catch (error) {

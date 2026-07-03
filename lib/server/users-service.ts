@@ -318,15 +318,17 @@ export async function createDiscordLoginChallenge(discordId: string): Promise<Di
     [discordId, hashCode(code)],
   );
 
-  const [rows] = await db.execute<(RowDataPacket & { expires_at: Date })[]>(
+  const [rows] = await db.execute<(RowDataPacket & { expires_at: Date | string })[]>(
     `SELECT expires_at FROM bg_discord_login_challenges WHERE id = ? LIMIT 1`,
     [insert.insertId],
   );
 
+  const rawExpiresAt = rows[0]?.expires_at;
   return {
     challengeId: Number(insert.insertId),
     code,
-    expiresAt: rows[0]?.expires_at ?? new Date(Date.now() + 10 * 60 * 1000),
+    // mysql2 peut renvoyer expires_at en string selon la config du pool : on normalise en Date.
+    expiresAt: rawExpiresAt ? new Date(rawExpiresAt) : new Date(Date.now() + 10 * 60 * 1000),
   };
 }
 

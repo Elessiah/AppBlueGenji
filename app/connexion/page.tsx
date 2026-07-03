@@ -13,6 +13,8 @@ function mapDiscordError(errorCode: string): string {
   if (errorCode === "DISCORD_DM_FAILED") return "Impossible d'envoyer le code en DM Discord.";
   if (errorCode === "CODE_INVALID_OR_EXPIRED") return "Code invalide ou expiré.";
   if (errorCode === "INVALID_DISCORD_ID") return "Identifiant Discord invalide.";
+  if (errorCode === "INVALID_DISCORD_HANDLE") return "Renseigne ton tag Discord ou ton ID.";
+  if (errorCode === "DISCORD_USER_NOT_FOUND") return "Tag introuvable : le bot doit partager un serveur avec toi. Utilise plutôt ton ID Discord.";
   if (errorCode === "INVALID_CODE") return "Le code doit contenir 6 chiffres.";
   return errorCode || "Une erreur interne est survenue.";
 }
@@ -22,7 +24,8 @@ export default function LoginPage() {
   const { showError, showSuccess } = useToast();
   const [redirect, setRedirect] = useState("/tournois");
 
-  const [discordId, setDiscordId] = useState("");
+  const [handle, setHandle] = useState("");
+  const [resolvedId, setResolvedId] = useState("");
   const [pseudo, setPseudo] = useState("");
   const [code, setCode] = useState("");
   const [requested, setRequested] = useState(false);
@@ -47,10 +50,11 @@ export default function LoginPage() {
       const response = await fetch("/api/auth/discord/request", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ discordId }),
+        body: JSON.stringify({ handle }),
       });
-      const payload = (await response.json()) as { error?: string; expiresAt?: string };
+      const payload = (await response.json()) as { error?: string; expiresAt?: string; discordId?: string };
       if (!response.ok) throw new Error(mapDiscordError(payload.error || "FAILED"));
+      setResolvedId(payload.discordId || "");
       setRequested(true);
       showSuccess(`Code envoyé en DM Discord (expiration : ${new Date(payload.expiresAt || "").toLocaleTimeString()}).`);
     } catch (e) {
@@ -67,7 +71,7 @@ export default function LoginPage() {
       const response = await fetch("/api/auth/discord/verify", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ discordId, code, pseudo }),
+        body: JSON.stringify({ discordId: resolvedId, code, pseudo }),
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(mapDiscordError(payload.error || "FAILED"));
@@ -113,15 +117,18 @@ export default function LoginPage() {
 
             <form onSubmit={requestCode} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div className="field">
-                <label>Discord ID</label>
+                <label>Tag Discord ou ID</label>
                 <input
                   type="text"
-                  name="discordId"
-                  value={discordId}
-                  onChange={(e) => setDiscordId(e.target.value)}
-                  placeholder="123456789012345678"
+                  name="handle"
+                  value={handle}
+                  onChange={(e) => setHandle(e.target.value)}
+                  placeholder="ton_pseudo ou 123456789012345678"
                   required
                 />
+                <span className="mono" style={{ fontSize: 10, color: "var(--ink-dim)", letterSpacing: "0.08em", marginTop: 4 }}>
+                  Le tag fonctionne si le bot partage un serveur avec toi, sinon utilise ton ID Discord.
+                </span>
               </div>
               <CyberButton
                 variant="ghost"
@@ -153,12 +160,11 @@ export default function LoginPage() {
 
             <form onSubmit={verifyCode} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div className="field">
-                <label>Discord ID</label>
+                <label>Compte Discord</label>
                 <input
                   type="text"
-                  name="discordId"
-                  value={discordId}
-                  onChange={(e) => setDiscordId(e.target.value)}
+                  name="handle"
+                  value={handle}
                   disabled
                 />
               </div>
@@ -210,7 +216,7 @@ export default function LoginPage() {
                   cursor: "pointer",
                 }}
               >
-                ← CHANGER D'ID
+                ← CHANGER DE COMPTE
               </button>
             </div>
           </>
