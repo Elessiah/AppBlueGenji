@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { LogoWithGlow } from "@/components/logo-with-glow";
@@ -11,8 +12,8 @@ import { useResourceLoader } from "@/lib/shared/hooks/useResourceLoader";
 export default function PlayerDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { showError } = useToast();
-  const { status, data, error } = useResourceLoader<FullProfileResponse>(
+  const { showError, showSuccess } = useToast();
+  const { status, data, error, refresh } = useResourceLoader<FullProfileResponse>(
     `/api/players/${params.id}`,
     {
       onNotFoundRedirect: () => {
@@ -21,6 +22,26 @@ export default function PlayerDetailPage() {
       },
     },
   );
+  const [adminBusy, setAdminBusy] = useState(false);
+
+  const toggleAdmin = async (nextIsAdmin: boolean) => {
+    setAdminBusy(true);
+    try {
+      const res = await fetch(`/api/admin/users/${params.id}/admin`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ isAdmin: nextIsAdmin }),
+      });
+      const payload = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(payload.error || "ADMIN_UPDATE_FAILED");
+      showSuccess(nextIsAdmin ? "Droits administrateur accordés." : "Droits administrateur révoqués.");
+      await refresh();
+    } catch (e) {
+      showError((e as Error).message);
+    } finally {
+      setAdminBusy(false);
+    }
+  };
 
   if (status === "loading")
     return <section className="ds-block" style={{ color: "var(--text-2)" }}>Chargement du profil joueur...</section>;
@@ -119,6 +140,35 @@ export default function PlayerDetailPage() {
           </div>
         </div>
       </div>
+
+      {data.viewerIsAdmin && !data.isSelf && (
+        <div className="ds-block" style={{ marginBottom: 20 }}>
+          <div className="ds-section-title blue">
+            <h2>Administration</h2>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ color: "var(--text-2)", fontSize: 14 }}>Statut administrateur</span>
+              <span className="badge" style={{ fontSize: 11 }}>
+                {data.isAdmin ? "Administrateur" : "Utilisateur standard"}
+              </span>
+            </div>
+            <button
+              type="button"
+              className={data.isAdmin ? "btn ghost" : "btn"}
+              style={{ padding: "9px 18px", fontSize: 13 }}
+              disabled={adminBusy}
+              onClick={() => toggleAdmin(!data.isAdmin)}
+            >
+              {adminBusy
+                ? "..."
+                : data.isAdmin
+                  ? "Révoquer les droits admin"
+                  : "Promouvoir administrateur"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="ds-block" style={{ marginBottom: 20 }}>
         <div className="ds-section-title blue">
