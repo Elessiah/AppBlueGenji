@@ -147,6 +147,47 @@ export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
     }
   }
 
+  // Le tri d'affichage regroupe d'abord par palier : un déplacement n'a de sens
+  // qu'entre voisins d'un même palier. Ces gardes désactivent les flèches sinon.
+  const canMoveUp = (index: number) =>
+    index > 0 && items[index - 1].tier === items[index].tier;
+  const canMoveDown = (index: number) =>
+    index < items.length - 1 && items[index + 1].tier === items[index].tier;
+
+  // Déplace un partenaire d'un cran au sein de son palier et persiste l'ordre.
+  // Mise à jour optimiste avec rollback en cas d'échec.
+  async function move(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= items.length) return;
+    if (items[target].tier !== items[index].tier) return;
+
+    const previous = items;
+    const reordered = [...items];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    setItems(reordered);
+
+    setBusy(true);
+    try {
+      const res = await fetch("/api/landing/sponsors/reorder", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: reordered.map((s) => s.id) }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        showError(data.error ? `Échec : ${data.error}` : "Échec du réordonnancement.");
+        setItems(previous);
+        return;
+      }
+      showSuccess("Ordre des partenaires mis à jour.");
+    } catch {
+      showError("Erreur réseau, réessaye.");
+      setItems(previous);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function remove(sponsor: Sponsor) {
     if (!window.confirm(`Supprimer le partenaire « ${sponsor.name} » ?`)) return;
     setBusy(true);
@@ -222,7 +263,7 @@ export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
       </div>
 
       <div className={styles.grid}>
-        {displaySponsors.map((sponsor) => (
+        {displaySponsors.map((sponsor, index) => (
           <div key={sponsor.id} className={styles.slotWrap}>
             <a
               href={sponsor.websiteUrl ?? "#"}
@@ -251,6 +292,24 @@ export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
             </a>
             {canManage(sponsor) && (
               <div className={styles.slotActions}>
+                <button
+                  type="button"
+                  className={styles.slotAction}
+                  onClick={() => move(index, -1)}
+                  disabled={busy || !canMoveUp(index)}
+                  aria-label={`Déplacer ${sponsor.name} vers le haut`}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  className={styles.slotAction}
+                  onClick={() => move(index, 1)}
+                  disabled={busy || !canMoveDown(index)}
+                  aria-label={`Déplacer ${sponsor.name} vers le bas`}
+                >
+                  ↓
+                </button>
                 <button
                   type="button"
                   className={styles.slotAction}

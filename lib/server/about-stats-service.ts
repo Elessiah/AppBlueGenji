@@ -1,5 +1,6 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "./database";
+import { applyDisplayOrder } from "./reorder";
 import {
   type AboutStat,
   type AboutStatInput,
@@ -70,6 +71,14 @@ export async function updateAboutStat(id: number, input: AboutStatInput): Promis
   if (res.affectedRows === 0) throw new Error("ABOUT_STAT_NOT_FOUND");
 
   return { id, value, label };
+}
+
+/**
+ * Réordonne les cartes « L'association » selon la liste d'ids fournie (premier =
+ * affiché en tête). Réécrit `display_order` de façon atomique.
+ */
+export async function reorderAboutStats(ids: number[]): Promise<void> {
+  await applyDisplayOrder("bg_about_stats", ids);
 }
 
 /** Supprime une carte. Lève `ABOUT_STAT_NOT_FOUND` si l'id n'existe pas. */

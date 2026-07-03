@@ -1,5 +1,6 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "./database";
+import { applyDisplayOrder } from "./reorder";
 import {
   type BureauMember,
   type BureauMemberInput,
@@ -80,6 +81,14 @@ export async function updateBureauMember(id: number, input: BureauMemberInput): 
   if (res.affectedRows === 0) throw new Error("BUREAU_MEMBER_NOT_FOUND");
 
   return { id, name, role, initials, color };
+}
+
+/**
+ * Réordonne les membres du bureau selon la liste d'ids fournie (premier =
+ * affiché en tête). Réécrit `display_order` de façon atomique.
+ */
+export async function reorderBureauMembers(ids: number[]): Promise<void> {
+  await applyDisplayOrder("bg_bureau_members", ids);
 }
 
 /** Supprime un membre du bureau. Lève `BUREAU_MEMBER_NOT_FOUND` si l'id n'existe pas. */

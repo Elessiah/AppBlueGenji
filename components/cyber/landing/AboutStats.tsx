@@ -107,6 +107,39 @@ export function AboutStats({ initialStats, isAdmin }: AboutStatsProps) {
     }
   }
 
+  // Déplace une carte d'un cran (direction -1 = vers la gauche/le haut, +1 = vers
+  // la droite/le bas) et persiste le nouvel ordre. Optimiste avec rollback.
+  async function move(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= stats.length) return;
+
+    const previous = stats;
+    const reordered = [...stats];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    setStats(reordered);
+
+    setBusy(true);
+    try {
+      const res = await fetch("/api/association/about-stats/reorder", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: reordered.map((s) => s.id) }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        showError(data.error ? `Échec : ${data.error}` : "Échec du réordonnancement.");
+        setStats(previous);
+        return;
+      }
+      showSuccess("Ordre des cartes mis à jour.");
+    } catch {
+      showError("Erreur réseau, réessaye.");
+      setStats(previous);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function remove(stat: AboutStat) {
     if (!window.confirm(`Supprimer la carte « ${stat.value} · ${stat.label} » ?`)) return;
     setBusy(true);
@@ -134,12 +167,30 @@ export function AboutStats({ initialStats, isAdmin }: AboutStatsProps) {
   return (
     <>
       <div className={styles.stats}>
-        {stats.map((s) => (
+        {stats.map((s, index) => (
           <div key={s.id} className={styles.stat}>
             <div className="num" style={{ fontSize: 26 }}>{s.value}</div>
             <div className="mono">{s.label}</div>
             {canManage(s) && (
               <div className={styles.statActions}>
+                <button
+                  type="button"
+                  className={styles.action}
+                  onClick={() => move(index, -1)}
+                  disabled={busy || index === 0}
+                  aria-label={`Déplacer la carte ${s.label} vers la gauche`}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  className={styles.action}
+                  onClick={() => move(index, 1)}
+                  disabled={busy || index === stats.length - 1}
+                  aria-label={`Déplacer la carte ${s.label} vers la droite`}
+                >
+                  ↓
+                </button>
                 <button
                   type="button"
                   className={styles.action}

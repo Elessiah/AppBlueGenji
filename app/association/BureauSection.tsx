@@ -118,6 +118,39 @@ export function BureauSection({ initialMembers, isAdmin }: BureauSectionProps) {
     }
   }
 
+  // Déplace un membre d'un cran (direction -1 = vers le haut, +1 = vers le bas)
+  // et persiste le nouvel ordre. Mise à jour optimiste avec rollback en cas d'échec.
+  async function move(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= members.length) return;
+
+    const previous = members;
+    const reordered = [...members];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    setMembers(reordered);
+
+    setBusy(true);
+    try {
+      const res = await fetch("/api/association/bureau/reorder", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: reordered.map((m) => m.id) }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        showError(data.error ? `Échec : ${data.error}` : "Échec du réordonnancement.");
+        setMembers(previous);
+        return;
+      }
+      showSuccess("Ordre du bureau mis à jour.");
+    } catch {
+      showError("Erreur réseau, réessaye.");
+      setMembers(previous);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function remove(member: BureauMember) {
     if (!window.confirm(`Supprimer ${member.name} du bureau ?`)) return;
     setBusy(true);
@@ -162,7 +195,7 @@ export function BureauSection({ initialMembers, isAdmin }: BureauSectionProps) {
       </header>
 
       <div className={styles.bureauGrid}>
-        {members.map((b) => (
+        {members.map((b, index) => (
           <CyberCard key={b.id} lift className={styles.bureauCard}>
             <div className={styles.bureauSigil}>
               <TeamSigil letter={b.initials} color={b.color} size={40} />
@@ -174,6 +207,24 @@ export function BureauSection({ initialMembers, isAdmin }: BureauSectionProps) {
             </div>
             {canManage(b) && (
               <div className={styles.bureauCardActions}>
+                <button
+                  type="button"
+                  className={styles.bureauAction}
+                  onClick={() => move(index, -1)}
+                  disabled={busy || index === 0}
+                  aria-label={`Déplacer ${b.name} vers le haut`}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  className={styles.bureauAction}
+                  onClick={() => move(index, 1)}
+                  disabled={busy || index === members.length - 1}
+                  aria-label={`Déplacer ${b.name} vers le bas`}
+                >
+                  ↓
+                </button>
                 <button
                   type="button"
                   className={styles.bureauAction}
