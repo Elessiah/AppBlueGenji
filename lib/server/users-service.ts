@@ -599,8 +599,9 @@ export async function getFullProfile(
     },
     teamsTimeline: timeline,
     tournaments,
+    // Ne pas divulguer qui est admin aux non-admins : réservé au viewer admin.
+    isAdmin: viewerIsAdmin ? targetIsAdmin : false,
     isSelf,
-    isAdmin: targetIsAdmin,
     viewerIsAdmin,
   };
 }
@@ -611,13 +612,20 @@ export async function getFullProfile(
  */
 export async function setUserAdmin(targetUserId: number, isAdmin: boolean): Promise<void> {
   const db = await getDatabase();
-  const [result] = await db.execute<ResultSetHeader>(
-    `UPDATE bg_users SET is_admin = ? WHERE id = ? AND is_deleted = 0`,
-    [isAdmin ? 1 : 0, targetUserId],
+  // On vérifie l'existence en amont : `affectedRows` d'un UPDATE ne compte que
+  // les lignes réellement modifiées (mysql2 sans CLIENT_FOUND_ROWS), donc une
+  // écriture idempotente renverrait 0 et masquerait un utilisateur bien présent.
+  const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
+    [targetUserId],
   );
-  if (result.affectedRows === 0) {
+  if (rows.length === 0) {
     throw new Error("USER_NOT_FOUND");
   }
+  await db.execute(
+    `UPDATE bg_users SET is_admin = ? WHERE id = ?`,
+    [isAdmin ? 1 : 0, targetUserId],
+  );
 }
 
 export async function getUserIdByPseudo(pseudo: string): Promise<number | null> {

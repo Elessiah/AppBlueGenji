@@ -33,34 +33,55 @@ describe("users-service admin management", () => {
   afterEach(() => jest.restoreAllMocks());
 
   describe("setUserAdmin", () => {
-    it("grants admin rights (is_admin = 1)", async () => {
-      const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }]);
+    it("grants admin rights (is_admin = 1) after checking existence", async () => {
+      const execute = jest
+        .fn()
+        .mockResolvedValueOnce([[{ id: 7 }]]) // existence check
+        .mockResolvedValueOnce([{ affectedRows: 1 }]); // update
       await mockDb(execute);
 
       await setUserAdmin(7, true);
 
-      expect(execute).toHaveBeenCalledTimes(1);
-      const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
-      expect(sql).toMatch(/UPDATE bg_users SET is_admin = \?/);
-      expect(sql).toMatch(/is_deleted = 0/);
+      expect(execute).toHaveBeenCalledTimes(2);
+      const [selectSql] = execute.mock.calls[0] as [string, unknown[]];
+      expect(selectSql).toMatch(/SELECT id FROM bg_users/);
+      expect(selectSql).toMatch(/is_deleted = 0/);
+      const [updateSql, params] = execute.mock.calls[1] as [string, unknown[]];
+      expect(updateSql).toMatch(/UPDATE bg_users SET is_admin = \?/);
       expect(params).toEqual([1, 7]);
     });
 
     it("revokes admin rights (is_admin = 0)", async () => {
-      const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }]);
+      const execute = jest
+        .fn()
+        .mockResolvedValueOnce([[{ id: 7 }]])
+        .mockResolvedValueOnce([{ affectedRows: 1 }]);
       await mockDb(execute);
 
       await setUserAdmin(7, false);
 
-      const [, params] = execute.mock.calls[0] as [string, unknown[]];
+      const [, params] = execute.mock.calls[1] as [string, unknown[]];
       expect(params).toEqual([0, 7]);
     });
 
-    it("throws USER_NOT_FOUND when no row is updated", async () => {
-      const execute = jest.fn().mockResolvedValue([{ affectedRows: 0 }]);
+    it("throws USER_NOT_FOUND without updating when the user does not exist", async () => {
+      const execute = jest.fn().mockResolvedValueOnce([[]]); // existence check → empty
       await mockDb(execute);
 
       await expect(setUserAdmin(999, true)).rejects.toThrow("USER_NOT_FOUND");
+      expect(execute).toHaveBeenCalledTimes(1); // no UPDATE issued
+    });
+
+    it("still succeeds on an idempotent write (no false USER_NOT_FOUND)", async () => {
+      // La cible existe mais est déjà dans l'état demandé : l'UPDATE ne change
+      // aucune ligne (affectedRows = 0) — ne doit PAS lever USER_NOT_FOUND.
+      const execute = jest
+        .fn()
+        .mockResolvedValueOnce([[{ id: 7 }]])
+        .mockResolvedValueOnce([{ affectedRows: 0 }]);
+      await mockDb(execute);
+
+      await expect(setUserAdmin(7, true)).resolves.toBeUndefined();
     });
   });
 
@@ -81,10 +102,11 @@ describe("users-service admin management", () => {
       expect(profile?.isSelf).toBe(false);
     });
 
-    it("defaults viewerIsAdmin to false for non-admin viewers", async () => {
+    it("hides the target admin status from non-admin viewers", async () => {
+      // La cible EST admin, mais le viewer ne l'est pas : on ne divulgue pas.
       const execute = jest
         .fn()
-        .mockResolvedValueOnce([[userRow({ id: 7, is_admin: 0 })]])
+        .mockResolvedValueOnce([[userRow({ id: 7, is_admin: 1 })]])
         .mockResolvedValueOnce([[]])
         .mockResolvedValueOnce([[]])
         .mockResolvedValueOnce([[{}]]);
