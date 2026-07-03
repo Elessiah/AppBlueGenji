@@ -294,19 +294,21 @@ export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
               <div className={styles.slotActions}>
                 <button
                   type="button"
-                  className={styles.slotAction}
+                  className={`${styles.slotAction} ${styles.moveAction}`}
                   onClick={() => move(index, -1)}
                   disabled={busy || !canMoveUp(index)}
                   aria-label={`Déplacer ${sponsor.name} vers le haut`}
+                  title="Monter"
                 >
                   ↑
                 </button>
                 <button
                   type="button"
-                  className={styles.slotAction}
+                  className={`${styles.slotAction} ${styles.moveAction}`}
                   onClick={() => move(index, 1)}
                   disabled={busy || !canMoveDown(index)}
                   aria-label={`Déplacer ${sponsor.name} vers le bas`}
+                  title="Descendre"
                 >
                   ↓
                 </button>

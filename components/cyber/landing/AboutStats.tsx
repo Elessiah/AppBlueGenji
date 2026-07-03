@@ -175,19 +175,21 @@ export function AboutStats({ initialStats, isAdmin }: AboutStatsProps) {
               <div className={styles.statActions}>
                 <button
                   type="button"
-                  className={styles.action}
+                  className={`${styles.action} ${styles.moveAction}`}
                   onClick={() => move(index, -1)}
                   disabled={busy || index === 0}
                   aria-label={`Déplacer la carte ${s.label} vers la gauche`}
+                  title="Déplacer avant"
                 >
                   ↑
                 </button>
                 <button
                   type="button"
-                  className={styles.action}
+                  className={`${styles.action} ${styles.moveAction}`}
                   onClick={() => move(index, 1)}
                   disabled={busy || index === stats.length - 1}
                   aria-label={`Déplacer la carte ${s.label} vers la droite`}
+                  title="Déplacer après"
                 >
                   ↓
                 </button>

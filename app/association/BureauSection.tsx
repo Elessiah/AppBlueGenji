@@ -209,19 +209,21 @@ export function BureauSection({ initialMembers, isAdmin }: BureauSectionProps) {
               <div className={styles.bureauCardActions}>
                 <button
                   type="button"
-                  className={styles.bureauAction}
+                  className={`${styles.bureauAction} ${styles.moveAction}`}
                   onClick={() => move(index, -1)}
                   disabled={busy || index === 0}
                   aria-label={`Déplacer ${b.name} vers le haut`}
+                  title="Monter"
                 >
                   ↑
                 </button>
                 <button
                   type="button"
-                  className={styles.bureauAction}
+                  className={`${styles.bureauAction} ${styles.moveAction}`}
                   onClick={() => move(index, 1)}
                   disabled={busy || index === members.length - 1}
                   aria-label={`Déplacer ${b.name} vers le bas`}
+                  title="Descendre"
                 >
                   ↓
                 </button>

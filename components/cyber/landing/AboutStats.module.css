@@ -67,6 +67,17 @@
   background: rgba(255, 110, 130, 0.06);
 }
 
+/* Flèches de réordonnancement : carré compact, glyphe centré. */
+.moveAction {
+  flex: 0 0 auto;
+  min-width: 30px;
+  padding-left: 0;
+  padding-right: 0;
+  font-size: 12px;
+  line-height: 1;
+  text-align: center;
+}
+
 .actionPrimary {
   font-family: var(--font-mono);
   font-size: 10px;

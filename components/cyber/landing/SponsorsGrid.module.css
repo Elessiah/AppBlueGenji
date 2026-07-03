@@ -105,6 +105,17 @@
   background: rgba(5, 8, 12, 0.85);
 }
 
+/* Flèches de réordonnancement : carré compact, glyphe centré. */
+.moveAction {
+  flex: 0 0 auto;
+  min-width: 26px;
+  padding-left: 0;
+  padding-right: 0;
+  font-size: 11px;
+  line-height: 1;
+  text-align: center;
+}
+
 /* Modale d'ajout / édition */
 .modalOverlay {
   position: fixed;
