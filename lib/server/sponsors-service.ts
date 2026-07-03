@@ -1,5 +1,6 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "./database";
+import { applyDisplayOrder } from "./reorder";
 import {
   type Sponsor,
   type SponsorInput,
@@ -134,6 +135,16 @@ export async function updateSponsor(id: number, input: SponsorInput): Promise<Sp
   );
 
   return { id, name, slug, tier, logoUrl, websiteUrl, description };
+}
+
+/**
+ * Réordonne les partenaires selon la liste d'ids fournie (premier = affiché en
+ * tête). Réécrit `display_order` de façon atomique. Le tri par palier (tier)
+ * reste prioritaire à l'affichage : ce réordonnancement n'agit qu'entre
+ * partenaires d'un même palier.
+ */
+export async function reorderSponsors(ids: number[]): Promise<void> {
+  await applyDisplayOrder("bg_sponsors", ids);
 }
 
 /** Supprime un sponsor. Lève `SPONSOR_NOT_FOUND` si l'id n'existe pas. */
