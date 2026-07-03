@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { fetchBotStats, sendDiscordLoginCode } from "@/lib/server/bot-integration";
+import { fetchBotStats, resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
 
 const originalEnv = { ...process.env };
 
@@ -67,6 +67,56 @@ describe("bot-integration", () => {
     );
 
     await expect(sendDiscordLoginCode("123456789", "123456")).rejects.toThrow("DISCORD_DM_FAILED");
+  });
+
+  it("resolveDiscordUser returns a numeric id without calling the bot", async () => {
+    const fetchMock = jest.spyOn(global, "fetch");
+
+    await expect(resolveDiscordUser("123456789012345678")).resolves.toBe("123456789012345678");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("resolveDiscordUser resolves a tag via the bot resolve endpoint", async () => {
+    const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ discordId: "999888777666555444", matchedBy: "tag" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    await expect(resolveDiscordUser("keryan")).resolves.toBe("999888777666555444");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:4400/internal/auth/resolve",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("resolveDiscordUser throws DISCORD_USER_NOT_FOUND on 404", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ error: "DISCORD_USER_NOT_FOUND" }), {
+        status: 404,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    await expect(resolveDiscordUser("ghost")).rejects.toThrow("DISCORD_USER_NOT_FOUND");
+  });
+
+  it("resolveDiscordUser throws DISCORD_USER_NOT_FOUND when the bot returns no id", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    await expect(resolveDiscordUser("ghost")).rejects.toThrow("DISCORD_USER_NOT_FOUND");
+  });
+
+  it("resolveDiscordUser throws BOT_INTERNAL_UNREACHABLE when the bot is down", async () => {
+    jest.spyOn(global, "fetch").mockRejectedValue(new Error("ECONNREFUSED"));
+
+    await expect(resolveDiscordUser("keryan")).rejects.toThrow("BOT_INTERNAL_UNREACHABLE");
   });
 
   it("returns empty stats when stats endpoint fails", async () => {
