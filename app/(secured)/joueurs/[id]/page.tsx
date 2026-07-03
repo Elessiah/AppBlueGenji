@@ -158,10 +158,16 @@ export default function PlayerDetailPage() {
               className={data.isAdmin ? "btn ghost" : "btn"}
               style={{ padding: "9px 18px", fontSize: 13 }}
               disabled={adminBusy}
+              aria-busy={adminBusy}
+              aria-label={
+                data.isAdmin
+                  ? `Révoquer les droits administrateur de ${data.profile.pseudo}`
+                  : `Promouvoir ${data.profile.pseudo} administrateur`
+              }
               onClick={() => toggleAdmin(!data.isAdmin)}
             >
               {adminBusy
-                ? "..."
+                ? "En cours…"
                 : data.isAdmin
                   ? "Révoquer les droits admin"
                   : "Promouvoir administrateur"}
