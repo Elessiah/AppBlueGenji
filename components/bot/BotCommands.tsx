@@ -21,7 +21,7 @@ export function BotCommands() {
 
       <div className="card card-ticks">
         <div className="panel-head">
-          <span className="title mono">~/bluegenji_relay $ help</span>
+          <span className="title mono">~/bluegenji_bot $ help</span>
           <span className="meta">DERNIÈRE MAJ · BUILD 4f8a</span>
         </div>
         <div className="cmds">

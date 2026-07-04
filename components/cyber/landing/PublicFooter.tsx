@@ -75,7 +75,6 @@ export async function PublicFooter() {
 
       <div className={styles.bottom}>
         <span>© 2026 BLUEGENJI · TOUS DROITS RÉSERVÉS</span>
-        <span>BUILT WITH ♠ IN LYON</span>
       </div>
     </footer>
   );

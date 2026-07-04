@@ -30,10 +30,10 @@ export function BotHero() {
             BOT DISCORD · INTER-SERVEURS
           </span>
           <h1 className="bot-title">
-            BlueGenji <span className="accent">Relay</span>
+            BlueGenji <span className="accent">Bot</span>
           </h1>
           <div className="bot-handle">
-            <span className="h">@bluegenji_relay#7340</span>
+            <span className="h">@BlueGenji Bot#8242</span>
             <span className="badge">
               <Icon name="discord" /> APP
             </span>

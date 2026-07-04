@@ -1,5 +1,5 @@
 ﻿import crypto from "node:crypto";
-import { cache as reactCache } from "react";
+import * as React from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { RowDataPacket, ResultSetHeader } from "mysql2/promise";
@@ -157,6 +157,9 @@ async function getDevBypassUser(): Promise<AuthUser | null> {
 // `cache` de React n'est fourni qu'au runtime (React Server Components / Next) ;
 // le paquet `react` résolu sous Jest ne l'expose pas. On retombe alors sur
 // l'identité (pas de mémoïsation en test, comportement inchangé).
+const reactCache = (React as {
+  cache?: <T extends (...args: never[]) => unknown>(fn: T) => T;
+}).cache;
 const requestCache: <T extends (...args: never[]) => unknown>(fn: T) => T =
   typeof reactCache === "function" ? reactCache : (fn) => fn;
 

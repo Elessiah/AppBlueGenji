@@ -79,4 +79,4 @@ export const DROITS: DroitEntry[] = [
   },
 ];
 
-export const RGPD_CONTACT_EMAIL_FALLBACK = "kgalaxie84@gmail.com";
+export const RGPD_CONTACT_EMAIL_FALLBACK = "keryan.h@outlook.fr";
