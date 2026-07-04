@@ -353,6 +353,7 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
+            aria-busy={busy || photoBusy}
             aria-label={editing ? "Modifier un bénévole" : "Ajouter un bénévole"}
           >
             <h3 className={styles.modalTitle}>

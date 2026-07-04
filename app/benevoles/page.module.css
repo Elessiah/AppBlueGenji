@@ -151,6 +151,13 @@
   background: transparent;
 }
 
+.categoryMove:focus-visible,
+.action:focus-visible,
+.photoUploadBtn:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
 /* Volunteer grid */
 .grid {
   display: grid;
