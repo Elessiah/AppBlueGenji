@@ -440,12 +440,23 @@ async function runMigrations(db: Pool): Promise<void> {
       photo_url VARCHAR(500) NULL,
       joined_at DATE NOT NULL,
       display_order INT NOT NULL DEFAULT 100,
+      category_order INT NOT NULL DEFAULT 100,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_bg_benevoles_category (category),
       INDEX idx_bg_benevoles_order (display_order)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  // Migration: ordre d'affichage des catégories de bénévoles (réordonnable admin)
+  try {
+    await db.execute(`
+      ALTER TABLE bg_benevoles
+      ADD COLUMN category_order INT NOT NULL DEFAULT 100
+    `);
+  } catch {
+    // Column already exists
+  }
 }
 
 async function ensureMigrations(db: Pool): Promise<void> {

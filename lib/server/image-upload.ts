@@ -3,7 +3,7 @@ import path from "node:path";
 import { unlink, writeFile } from "node:fs/promises";
 import sharp from "sharp";
 
-export type UploadKind = "avatar" | "team-logo" | "sponsor-logo";
+export type UploadKind = "avatar" | "team-logo" | "sponsor-logo" | "benevole-photo";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const MAX_DIMENSION = 8000;
@@ -38,6 +38,15 @@ const KIND_CONFIG: Record<
     height: 200,
     fit: "contain",
     quality: 82,
+  },
+  // Photo de bénévole : portrait carré recadré « cover », rendu en cercle côté UI.
+  "benevole-photo": {
+    dir: path.join(process.cwd(), "public", "uploads", "benevoles"),
+    relPrefix: "/uploads/benevoles/",
+    width: 256,
+    height: 256,
+    fit: "cover",
+    quality: 80,
   },
 };
 
@@ -135,7 +144,8 @@ export async function deleteStoredImage(relativePath: string | null | undefined)
   const allowed =
     relativePath.startsWith("/uploads/avatars/") ||
     relativePath.startsWith("/uploads/teams/") ||
-    relativePath.startsWith("/uploads/sponsors/");
+    relativePath.startsWith("/uploads/sponsors/") ||
+    relativePath.startsWith("/uploads/benevoles/");
   if (!allowed) return;
 
   const safeRelative = relativePath.replace(/^\/+/, "");
