@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
 import { getUserById, updateUserAvatar } from "@/lib/server/users-service";
+import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
@@ -19,12 +20,11 @@ export async function POST(req: Request) {
 
   try {
     const current = await getUserById(user.id);
-    const newPath = await processAndStoreImage(file, "avatar", user.id);
-    await updateUserAvatar(user.id, newPath);
-    if (current?.avatarUrl?.startsWith("/uploads/avatars/")) {
-      await deleteStoredImage(current.avatarUrl);
-    }
-    return ok({ avatarUrl: newPath });
+    const diskPath = await processAndStoreImage(file, "avatar", user.id);
+    const servedUrl = toServedUploadUrl(diskPath);
+    await updateUserAvatar(user.id, servedUrl);
+    await deleteStoredImage(toDiskUploadPath(current?.avatarUrl));
+    return ok({ avatarUrl: servedUrl });
   } catch (error) {
     return fail((error as Error).message || "AVATAR_UPLOAD_FAILED", 400);
   }
@@ -35,9 +35,7 @@ export async function DELETE() {
   if (!user) return fail("UNAUTHORIZED", 401);
 
   const current = await getUserById(user.id);
-  if (current?.avatarUrl?.startsWith("/uploads/avatars/")) {
-    await deleteStoredImage(current.avatarUrl);
-  }
+  await deleteStoredImage(toDiskUploadPath(current?.avatarUrl));
   await updateUserAvatar(user.id, null);
   return ok({ avatarUrl: null });
 }
