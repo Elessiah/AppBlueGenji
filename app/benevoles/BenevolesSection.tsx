@@ -10,7 +10,11 @@ import {
   formatJoinedAt,
   groupByCategory,
 } from "@/lib/shared/benevoles";
+import { toServedUploadUrl } from "@/lib/shared/uploads";
 import styles from "./page.module.css";
+
+const ACCEPTED_PHOTO_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
 interface BenevoleSectionProps {
   initialBenevoles: Benevole[];
@@ -43,7 +47,9 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const firstNameRef = useRef<HTMLInputElement>(null);
+  const photoFileRef = useRef<HTMLInputElement>(null);
 
   // Focus + Escape
   useEffect(() => {
@@ -150,6 +156,76 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
     }
   }
 
+  async function onPhotoFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // Réinitialise pour permettre de re-sélectionner le même fichier ensuite.
+    event.target.value = "";
+    if (!file) return;
+    if (!ACCEPTED_PHOTO_TYPES.includes(file.type)) {
+      showError("Format invalide : PNG, JPEG ou WebP uniquement.");
+      return;
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      showError("Image trop lourde (5 Mo maximum).");
+      return;
+    }
+
+    setPhotoBusy(true);
+    try {
+      const data = new FormData();
+      data.append("file", file);
+      const res = await fetch("/api/benevoles/photo", { method: "POST", body: data });
+      const payload = (await res.json()) as { photoUrl?: string; error?: string };
+      if (!res.ok || !payload.photoUrl) {
+        showError(payload.error ? `Échec : ${payload.error}` : "Échec de l'envoi de la photo.");
+        return;
+      }
+      setForm((f) => ({ ...f, photoUrl: payload.photoUrl! }));
+      showSuccess("Photo importée.");
+    } catch {
+      showError("Erreur réseau, réessaye.");
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  // Déplace une catégorie d'un cran (admin). Mise à jour optimiste : on réordonne
+  // la liste plate pour refléter le nouvel ordre, avec rollback en cas d'échec.
+  async function moveCategory(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= groups.length) return;
+
+    const order = groups.map((g) => g.category);
+    [order[index], order[target]] = [order[target], order[index]];
+
+    const previous = benevoles;
+    const reordered = order.flatMap(
+      (cat) => groups.find((g) => g.category === cat)!.members,
+    );
+    setBenevoles(reordered);
+
+    setBusy(true);
+    try {
+      const res = await fetch("/api/benevoles/reorder", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categories: order }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        showError(data.error ? `Échec : ${data.error}` : "Échec du réordonnancement.");
+        setBenevoles(previous);
+        return;
+      }
+      showSuccess("Ordre des catégories mis à jour.");
+    } catch {
+      showError("Erreur réseau, réessaye.");
+      setBenevoles(previous);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const totalCount = benevoles.length;
 
   return (
@@ -183,11 +259,35 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
           </div>
         ) : (
           <div className={styles.categories}>
-            {groups.map(({ category, members }) => (
+            {groups.map(({ category, members }, index) => (
               <div key={category} className={styles.categoryBlock}>
                 <div className={styles.categoryHeader}>
                   <span className={styles.categoryTitle}>{category}</span>
                   <span className={styles.categoryCount}>{members.length}</span>
+                  {isAdmin && groups.length > 1 && (
+                    <div className={styles.categoryActions}>
+                      <button
+                        type="button"
+                        className={styles.categoryMove}
+                        onClick={() => moveCategory(index, -1)}
+                        disabled={busy || index === 0}
+                        aria-label={`Déplacer la catégorie ${category} vers le haut`}
+                        title="Monter la catégorie"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.categoryMove}
+                        onClick={() => moveCategory(index, 1)}
+                        disabled={busy || index === groups.length - 1}
+                        aria-label={`Déplacer la catégorie ${category} vers le bas`}
+                        title="Descendre la catégorie"
+                      >
+                        ↓
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className={styles.grid}>
                   {members.map((b) => (
@@ -195,7 +295,7 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
                       <div className={styles.avatarWrap}>
                         {b.photoUrl ? (
                           <Image
-                            src={b.photoUrl}
+                            src={toServedUploadUrl(b.photoUrl)}
                             alt={formatDisplayName(b)}
                             width={80}
                             height={80}
@@ -253,6 +353,7 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
+            aria-busy={busy || photoBusy}
             aria-label={editing ? "Modifier un bénévole" : "Ajouter un bénévole"}
           >
             <h3 className={styles.modalTitle}>
@@ -263,7 +364,7 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
             <div className={styles.modalPreview}>
               {form.photoUrl ? (
                 <Image
-                  src={form.photoUrl}
+                  src={toServedUploadUrl(form.photoUrl)}
                   alt="Aperçu"
                   width={56}
                   height={56}
@@ -343,16 +444,46 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
               />
             </label>
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>URL de la photo (optionnel)</span>
+            <div className={styles.modalField}>
+              <span className={styles.modalLabel}>Photo (optionnel)</span>
+              <div className={styles.photoUploadActions}>
+                <input
+                  ref={photoFileRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className={styles.photoFileInput}
+                  onChange={onPhotoFile}
+                />
+                <button
+                  type="button"
+                  className={styles.photoUploadBtn}
+                  onClick={() => photoFileRef.current?.click()}
+                  disabled={photoBusy || busy}
+                >
+                  {photoBusy ? "Envoi…" : form.photoUrl ? "Changer la photo" : "Importer une image"}
+                </button>
+                {form.photoUrl && (
+                  <button
+                    type="button"
+                    className={`${styles.photoUploadBtn} ${styles.photoUploadBtnDanger}`}
+                    onClick={() => set("photoUrl", "")}
+                    disabled={photoBusy || busy}
+                  >
+                    Retirer
+                  </button>
+                )}
+              </div>
+              <span className={styles.photoHint}>
+                Carré recadré automatiquement, PNG / JPEG / WebP, 5 Mo max.
+              </span>
               <input
                 className={styles.modalInput}
                 value={form.photoUrl}
                 maxLength={500}
-                placeholder="https://example.com/avatar.jpg"
+                placeholder="… ou colle une URL https://example.com/avatar.jpg"
                 onChange={(e) => set("photoUrl", e.target.value)}
               />
-            </label>
+            </div>
 
             <div className={styles.modalActions}>
               <CyberButton variant="ghost" onClick={close} disabled={busy}>

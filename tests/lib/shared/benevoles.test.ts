@@ -4,6 +4,7 @@ import {
   formatJoinedAt,
   groupByCategory,
   validateBenevoleInput,
+  validateCategoryReorder,
   type Benevole,
 } from "@/lib/shared/benevoles";
 
@@ -154,6 +155,43 @@ describe("groupByCategory", () => {
   it("preserves insertion order of categories", () => {
     const groups = groupByCategory(benevoles);
     expect(groups.map((g) => g.category)).toEqual(["Dev", "Arbitre"]);
+  });
+});
+
+describe("validateCategoryReorder", () => {
+  it("accepts an ordered list of category names", () => {
+    const result = validateCategoryReorder(["Dev", "Arbitre", "Caster"]);
+    expect(result).toEqual({ ok: true, categories: ["Dev", "Arbitre", "Caster"] });
+  });
+
+  it("trims whitespace from each category", () => {
+    const result = validateCategoryReorder(["  Dev  ", " Arbitre "]);
+    expect(result).toEqual({ ok: true, categories: ["Dev", "Arbitre"] });
+  });
+
+  it("rejects a non-array", () => {
+    expect(validateCategoryReorder("Dev")).toEqual({ ok: false, error: "CATEGORIES_REQUIRED" });
+    expect(validateCategoryReorder(null)).toEqual({ ok: false, error: "CATEGORIES_REQUIRED" });
+  });
+
+  it("rejects an empty array", () => {
+    expect(validateCategoryReorder([])).toEqual({ ok: false, error: "CATEGORIES_EMPTY" });
+  });
+
+  it("rejects a non-string entry", () => {
+    expect(validateCategoryReorder(["Dev", 42])).toEqual({ ok: false, error: "INVALID_CATEGORY" });
+  });
+
+  it("rejects an empty / whitespace-only entry", () => {
+    expect(validateCategoryReorder(["Dev", "   "])).toEqual({ ok: false, error: "INVALID_CATEGORY" });
+  });
+
+  it("rejects a duplicate category", () => {
+    expect(validateCategoryReorder(["Dev", "Dev"])).toEqual({ ok: false, error: "DUPLICATE_CATEGORY" });
+  });
+
+  it("treats trimmed duplicates as duplicates", () => {
+    expect(validateCategoryReorder(["Dev", " Dev "])).toEqual({ ok: false, error: "DUPLICATE_CATEGORY" });
   });
 });
 

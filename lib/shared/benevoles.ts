@@ -68,6 +68,33 @@ export function validateBenevoleInput(input: BenevoleInput): BenevoleValidationR
   };
 }
 
+export type CategoryReorderResult =
+  | { ok: true; categories: string[] }
+  | { ok: false; error: string };
+
+/**
+ * Valide une liste ordonnée de noms de catégories (nouvel ordre d'affichage).
+ * Refuse une liste vide, une entrée non-string / vide, ou un doublon (après
+ * trim). Partagé client/serveur pour réordonner les catégories de bénévoles.
+ */
+export function validateCategoryReorder(raw: unknown): CategoryReorderResult {
+  if (!Array.isArray(raw)) return { ok: false, error: "CATEGORIES_REQUIRED" };
+  if (raw.length === 0) return { ok: false, error: "CATEGORIES_EMPTY" };
+
+  const categories: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of raw) {
+    if (typeof entry !== "string") return { ok: false, error: "INVALID_CATEGORY" };
+    const category = entry.trim();
+    if (!category) return { ok: false, error: "INVALID_CATEGORY" };
+    if (seen.has(category)) return { ok: false, error: "DUPLICATE_CATEGORY" };
+    seen.add(category);
+    categories.push(category);
+  }
+
+  return { ok: true, categories };
+}
+
 /** Groupe une liste plate de bénévoles par catégorie, dans l'ordre de première apparition. */
 export function groupByCategory(benevoles: Benevole[]): { category: string; members: Benevole[] }[] {
   const map = new Map<string, Benevole[]>();
