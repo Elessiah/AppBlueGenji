@@ -1,1 +1,1 @@
-npm run build; npm run test; npm run seed; next start
+git pull; npm run build; npm run test; npm run seed; next start
