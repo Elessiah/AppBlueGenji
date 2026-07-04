@@ -126,8 +126,17 @@ export default function LoginPage() {
                   placeholder="ton_pseudo ou 123456789012345678"
                   required
                 />
-                <span className="mono" style={{ fontSize: 10, color: "var(--ink-dim)", letterSpacing: "0.08em", marginTop: 4 }}>
-                  Le tag fonctionne si le bot partage un serveur avec toi, sinon utilise ton ID Discord.
+                <span className="mono" style={{ fontSize: 10, color: "var(--ink-dim)", letterSpacing: "0.08em", marginTop: 4, lineHeight: 1.5 }}>
+                  Le tag fonctionne si le bot partage un serveur avec toi, sinon utilise ton ID Discord ou{" "}
+                  <Link
+                    href="https://discord.gg/VPGZ4eBfwN"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "var(--blue-300)", textDecoration: "underline" }}
+                  >
+                    rejoins notre serveur
+                  </Link>
+                  .
                 </span>
               </div>
               <CyberButton
