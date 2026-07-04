@@ -272,10 +272,16 @@ export default function ProfilePage() {
             <div className="field">
               <label>BattleTag Overwatch</label>
               <input value={overwatchBattletag} onChange={(e) => setOverwatchBattletag(e.target.value)} placeholder="Pseudo#1234" />
+              <p style={{ fontSize: 11, color: "var(--text-2)", margin: "6px 0 0" }}>
+                Sert uniquement à ce que les autres joueurs puissent t&apos;ajouter en jeu — jamais pour des statistiques.
+              </p>
             </div>
             <div className="field">
               <label>Tag Marvel Rivals</label>
               <input value={marvelRivalsTag} onChange={(e) => setMarvelRivalsTag(e.target.value)} />
+              <p style={{ fontSize: 11, color: "var(--text-2)", margin: "6px 0 0" }}>
+                Sert uniquement à ce que les autres joueurs puissent t&apos;ajouter en jeu — jamais pour des statistiques.
+              </p>
             </div>
             <div className="field">
               <label>Pseudo Discord</label>
@@ -399,22 +405,38 @@ export default function ProfilePage() {
           flexWrap: "wrap",
         }}
       >
-        <button
-          type="button"
-          className="btn ghost"
-          onClick={onDeleteAccount}
-          disabled={deleting}
-          style={{
-            padding: "10px 18px",
-            fontSize: 13,
-            color: "var(--red-live, #ff5a6e)",
-            borderColor: "rgba(255,90,110,0.4)",
-            opacity: deleting ? 0.6 : 1,
-            cursor: deleting ? "not-allowed" : "pointer",
-          }}
-        >
-          {deleting ? "Suppression…" : "Supprimer mon compte"}
-        </button>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <a
+            href="/api/profile/export"
+            download
+            className="btn ghost"
+            style={{
+              padding: "10px 18px",
+              fontSize: 13,
+              textDecoration: "none",
+              display: "inline-flex",
+              alignItems: "center",
+            }}
+          >
+            Exporter mes données
+          </a>
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={onDeleteAccount}
+            disabled={deleting}
+            style={{
+              padding: "10px 18px",
+              fontSize: 13,
+              color: "var(--red-live, #ff5a6e)",
+              borderColor: "rgba(255,90,110,0.4)",
+              opacity: deleting ? 0.6 : 1,
+              cursor: deleting ? "not-allowed" : "pointer",
+            }}
+          >
+            {deleting ? "Suppression…" : "Supprimer mon compte"}
+          </button>
+        </div>
         <LogoutButton />
       </div>
     </section>

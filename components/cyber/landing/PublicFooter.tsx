@@ -27,7 +27,6 @@ export async function PublicFooter() {
             Association loi 1901. Tournois Overwatch 2 et Marvel Rivals pour la
             scène amateur francophone.
           </p>
-          <div className="mono">SIRET 912 345 678 00017 · RNA W691234567</div>
         </div>
 
         <div className={styles.columns}>

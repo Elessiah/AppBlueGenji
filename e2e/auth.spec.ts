@@ -11,7 +11,43 @@ import { test, expect } from "@playwright/test";
  *    quand il n'y a ni cookie de session ni DEV_AUTH_USER_ID).
  */
 
+test.describe("Consentement RGPD", () => {
+  test("affiche la popup à la première visite et débloque la connexion après acceptation", async ({
+    page,
+  }) => {
+    await page.goto("/connexion");
+
+    const dialog = page.getByRole("dialog", { name: /Avant de continuer/ });
+    await expect(dialog).toBeVisible();
+
+    // Tant que la popup est ouverte, la voie Discord est masquée derrière.
+    await page.getByRole("button", { name: /accepte et je continue/i }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByRole("button", { name: /Recevoir un code/ })).toBeVisible();
+  });
+
+  test("le refus ramène à l'accueil sans enregistrer de consentement", async ({ page }) => {
+    await page.goto("/connexion");
+    await page.getByRole("button", { name: /^Refuser$/ }).click();
+
+    // Retour en arrière total : on quitte /connexion…
+    await expect(page).not.toHaveURL(/\/connexion/);
+    // …et rien n'a été persisté.
+    const consent = await page.evaluate(() => window.localStorage.getItem("bg_rgpd_consent"));
+    expect(consent).toBeNull();
+  });
+});
+
 test.describe("Connexion", () => {
+  // L'utilisateur a déjà consenti (RGPD) : la popup ne s'affiche pas et les
+  // voies d'authentification sont directement actionnables. Le gate de
+  // consentement est couvert séparément ci-dessus.
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("bg_rgpd_consent", "1");
+    });
+  });
+
   test("affiche les deux voies d'authentification", async ({ page }) => {
     await page.goto("/connexion");
 

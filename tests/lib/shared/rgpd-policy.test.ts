@@ -7,17 +7,24 @@ import {
 } from "@/lib/shared/rgpd-policy";
 
 describe("DONNEES_PROFIL", () => {
-  it("covers all five profile data types", () => {
+  it("covers all profile data types", () => {
     const names = DONNEES_PROFIL.map((d) => d.donnee);
     expect(names).toContain("Pseudo site");
     expect(names).toContain("Pseudo Overwatch 2");
     expect(names).toContain("Pseudo Discord");
+    expect(names).toContain("ID Discord");
     expect(names).toContain("Pseudo Marvel Rivals");
     expect(names).toContain("Avatar");
   });
 
-  it("has exactly 5 entries", () => {
-    expect(DONNEES_PROFIL).toHaveLength(5);
+  it("has exactly 6 entries", () => {
+    expect(DONNEES_PROFIL).toHaveLength(6);
+  });
+
+  it("discloses that the Discord user ID is stored for Discord login", () => {
+    const idDiscord = DONNEES_PROFIL.find((d) => d.donnee === "ID Discord");
+    expect(idDiscord).toBeDefined();
+    expect(idDiscord?.finalite).toMatch(/Discord/);
   });
 
   it("every profile entry uses Consentement as legal basis", () => {

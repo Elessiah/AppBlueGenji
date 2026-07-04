@@ -177,9 +177,6 @@ export default async function AssociationPage() {
               </a>
             </li>
           </ul>
-          <div className={styles.legal}>
-            SIRET 912 345 678 00017 · RNA W691234567
-          </div>
         </section>
 
         <PublicFooter />
