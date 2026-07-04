@@ -297,6 +297,36 @@ export type FullProfileResponse = {
   viewerIsAdmin: boolean;
 };
 
+/**
+ * Export RGPD (droit à la portabilité, art. 20) de l'intégralité des données
+ * personnelles d'un utilisateur, dans un format lisible par machine (JSON).
+ * Contient les identifiants bruts (email, Discord, Google) réservés au
+ * propriétaire du compte — ne jamais exposer à un tiers.
+ */
+export type PersonalDataExport = {
+  exportedAt: string;
+  account: {
+    id: number;
+    pseudo: string;
+    email: string | null;
+    discordId: string | null;
+    discordPseudo: string | null;
+    googleSub: string | null;
+    isAdult: boolean | null;
+    isAdmin: boolean;
+    createdAt: string;
+  };
+  profile: {
+    avatarUrl: string | null;
+    overwatchBattletag: string | null;
+    marvelRivalsTag: string | null;
+    visibility: VisibilitySettings;
+  };
+  stats: ProfileStats;
+  teamsTimeline: UserTeamTimeline[];
+  tournaments: TeamHistoryRow[];
+};
+
 export type TeamDetailResponse = {
   team: {
     id: number;

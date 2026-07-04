@@ -46,8 +46,7 @@ export default function RgpdPage() {
         </header>
         <div className={styles.prose}>
           <p>
-            <strong>BlueGenji</strong> — association loi 1901, siège social à Lyon.<br />
-            SIRET 912 345 678 00017 · RNA W691234567
+            <strong>BlueGenji</strong> — association loi 1901, siège social à Lyon.
           </p>
           <p>
             Pour toute question relative à vos données personnelles, contactez-nous
@@ -102,8 +101,9 @@ export default function RgpdPage() {
           </tbody>
         </table>
         <p style={{ marginTop: 16, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
-          * Les données de profil sont supprimées dans les 30 jours suivant la clôture du compte.
-          Les sessions (cookie <code>bg_session</code>) expirent au bout de 30 jours d'inactivité.
+          * Les données de profil sont anonymisées immédiatement lors de la suppression du compte
+          (des copies de sauvegarde techniques peuvent subsister quelques jours). Les sessions
+          (cookie <code>bg_session</code>) expirent 30 jours après la connexion.
         </p>
       </section>
 

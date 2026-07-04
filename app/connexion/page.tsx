@@ -6,6 +6,9 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
 import { CyberButton } from "@/components/cyber/CyberButton";
 import { CyberCard } from "@/components/cyber/CyberCard";
+import { RgpdConsentModal } from "@/components/cyber/RgpdConsentModal";
+
+const CONSENT_STORAGE_KEY = "bg_rgpd_consent";
 
 function mapDiscordError(errorCode: string): string {
   if (errorCode === "BOT_INTERNAL_UNREACHABLE") return "Connexion Discord indisponible (bot non joignable).";
@@ -30,6 +33,29 @@ export default function LoginPage() {
   const [code, setCode] = useState("");
   const [requested, setRequested] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Consentement RGPD requis avant toute création de compte. Tant qu'il n'est
+  // pas accordé, la carte de connexion est masquée derrière la popup et aucune
+  // requête d'authentification n'est déclenchée.
+  const [consentGiven, setConsentGiven] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setConsentGiven(window.localStorage.getItem(CONSENT_STORAGE_KEY) === "1");
+  }, []);
+
+  const acceptConsent = () => {
+    try {
+      window.localStorage.setItem(CONSENT_STORAGE_KEY, "1");
+    } catch {
+      // localStorage indisponible (mode privé) : on continue en mémoire.
+    }
+    setConsentGiven(true);
+  };
+
+  const refuseConsent = () => {
+    // Retour en arrière total : aucune donnée n'a été enregistrée.
+    router.push("/");
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -86,6 +112,9 @@ export default function LoginPage() {
 
   return (
     <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", position: "relative" }}>
+      {!consentGiven && (
+        <RgpdConsentModal onAccept={acceptConsent} onRefuse={refuseConsent} />
+      )}
       <div className="fabric" />
       <CyberCard ticks style={{ padding: 48, width: "min(480px, calc(100vw - 32px))" }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>

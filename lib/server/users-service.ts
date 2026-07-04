@@ -5,6 +5,7 @@ import { ensureUniquePseudo } from "@/lib/server/auth";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
 import type {
   FullProfileResponse,
+  PersonalDataExport,
   PublicUserProfile,
   TeamHistoryRow,
   TeamRole,
@@ -605,6 +606,84 @@ export async function getFullProfile(
     isAdmin: viewerIsAdmin ? targetIsAdmin : false,
     isSelf,
     viewerIsAdmin,
+  };
+}
+
+/**
+ * Rassemble l'intégralité des données personnelles du propriétaire du compte
+ * pour l'export RGPD (droit à la portabilité, art. 20). Retourne les données
+ * brutes non masquées — l'appelant DOIT s'assurer que `userId` est bien celui
+ * de l'utilisateur authentifié (jamais un tiers).
+ */
+export async function exportOwnData(userId: number): Promise<PersonalDataExport> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<
+    (RowDataPacket & {
+      id: number;
+      pseudo: string;
+      avatar_url: string | null;
+      overwatch_battletag: string | null;
+      marvel_rivals_tag: string | null;
+      discord_pseudo: string | null;
+      discord_id: string | null;
+      google_sub: string | null;
+      email: string | null;
+      is_adult: 0 | 1 | null;
+      is_admin: 0 | 1;
+      visible_avatar: 0 | 1;
+      visible_pseudo: 0 | 1;
+      visible_overwatch: 0 | 1;
+      visible_marvel: 0 | 1;
+      visible_major: 0 | 1;
+      created_at: Date;
+    })[]
+  >(
+    `SELECT id, pseudo, avatar_url, overwatch_battletag, marvel_rivals_tag,
+            discord_pseudo, discord_id, google_sub, email, is_adult, is_admin,
+            visible_avatar, visible_pseudo, visible_overwatch, visible_marvel, visible_major,
+            created_at
+     FROM bg_users
+     WHERE id = ? AND is_deleted = 0
+     LIMIT 1`,
+    [userId],
+  );
+
+  if (rows.length === 0) throw new Error("PROFILE_NOT_FOUND");
+  const row = rows[0];
+
+  // Réutilise l'agrégation existante pour les stats, l'historique d'équipes et
+  // le palmarès de tournois (vue « self » = données complètes non masquées).
+  const full = await getFullProfile(userId, userId);
+  if (!full) throw new Error("PROFILE_NOT_FOUND");
+
+  return {
+    exportedAt: new Date().toISOString(),
+    account: {
+      id: Number(row.id),
+      pseudo: row.pseudo,
+      email: row.email,
+      discordId: row.discord_id,
+      discordPseudo: row.discord_pseudo,
+      googleSub: row.google_sub,
+      isAdult: row.is_adult === null ? null : Boolean(row.is_adult),
+      isAdmin: Boolean(row.is_admin),
+      createdAt: toIso(row.created_at) ?? new Date().toISOString(),
+    },
+    profile: {
+      avatarUrl: row.avatar_url,
+      overwatchBattletag: row.overwatch_battletag,
+      marvelRivalsTag: row.marvel_rivals_tag,
+      visibility: {
+        avatar: Boolean(row.visible_avatar),
+        pseudo: Boolean(row.visible_pseudo),
+        overwatch: Boolean(row.visible_overwatch),
+        marvel: Boolean(row.visible_marvel),
+        major: Boolean(row.visible_major),
+      },
+    },
+    stats: full.stats,
+    teamsTimeline: full.teamsTimeline,
+    tournaments: full.tournaments,
   };
 }
 

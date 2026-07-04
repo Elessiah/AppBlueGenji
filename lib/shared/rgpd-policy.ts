@@ -21,7 +21,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
   },
   {
     donnee: "Pseudo Overwatch 2",
-    finalite: "Affichage profil, statistiques de jeu",
+    finalite: "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique",
     base: "Consentement",
     duree: "Durée du compte",
   },
@@ -32,8 +32,14 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     duree: "Durée du compte",
   },
   {
+    donnee: "ID Discord",
+    finalite: "Connexion par code Discord (envoi du code en DM) — stocké uniquement si tu te connectes via Discord",
+    base: "Consentement",
+    duree: "Durée du compte",
+  },
+  {
     donnee: "Pseudo Marvel Rivals",
-    finalite: "Affichage profil, statistiques de jeu",
+    finalite: "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique",
     base: "Consentement",
     duree: "Durée du compte",
   },
