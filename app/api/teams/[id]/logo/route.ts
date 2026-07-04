@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
 import { canManageTeam, getTeamLogoUrl, updateTeamLogo } from "@/lib/server/teams-service";
+import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -29,12 +30,11 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   try {
     const currentLogo = await getTeamLogoUrl(teamId);
-    const newPath = await processAndStoreImage(file, "team-logo", teamId);
-    await updateTeamLogo(user.id, teamId, newPath);
-    if (currentLogo?.startsWith("/uploads/teams/")) {
-      await deleteStoredImage(currentLogo);
-    }
-    return ok({ logoUrl: newPath });
+    const diskPath = await processAndStoreImage(file, "team-logo", teamId);
+    const servedUrl = toServedUploadUrl(diskPath);
+    await updateTeamLogo(user.id, teamId, servedUrl);
+    await deleteStoredImage(toDiskUploadPath(currentLogo));
+    return ok({ logoUrl: servedUrl });
   } catch (error) {
     const message = (error as Error).message;
     if (message === "FORBIDDEN") return fail(message, 403);
@@ -55,9 +55,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   try {
     const currentLogo = await getTeamLogoUrl(teamId);
     await updateTeamLogo(user.id, teamId, null);
-    if (currentLogo?.startsWith("/uploads/teams/")) {
-      await deleteStoredImage(currentLogo);
-    }
+    await deleteStoredImage(toDiskUploadPath(currentLogo));
     return ok({ logoUrl: null });
   } catch (error) {
     const message = (error as Error).message;
