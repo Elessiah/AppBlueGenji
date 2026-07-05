@@ -2,8 +2,10 @@
 
 ## Vue d'ensemble
 
-La page **`/recrutement`** présente les annonces des équipes qui recherchent des
-joueuses, joueurs, coachs ou managers. Les administrateurs y gèrent les annonces
+La page **`/recrutement`** présente les annonces de recrutement du **staff
+bénévole de l'association** (arbitres, casters, développeurs, community managers,
+graphistes, modérateurs, événementiel, administration…) plutôt que des joueurs.
+Les gestionnaires du recrutement (`ADMIN` + `RECRUTEUR`) y gèrent les annonces
 (ajout, modification, suppression, réordonnancement) et peuvent mettre en avant
 une annonce **urgente** sur l'ensemble du site, sous forme de **banderole
 discrète** ou de **modale**.
@@ -18,14 +20,18 @@ Table `bg_recruitment_ads` (migration auto dans `lib/server/database.ts`) :
 | Colonne         | Type                                   | Rôle |
 | --------------- | -------------------------------------- | ---- |
 | `title`         | `VARCHAR(140)` **requis**              | Titre de l'annonce |
-| `team_name`     | `VARCHAR(120)` nullable                | Équipe qui recrute |
-| `game`          | `ENUM('OW2','MR','ANY')`               | Jeu concerné |
-| `roles`         | `VARCHAR(200)` nullable                | Postes recherchés (texte libre) |
+| `team_name`     | `VARCHAR(120)` nullable                | Référent / contact (pôle, personne) |
+| `domain`        | `ENUM(ARBITRAGE, CASTING, DEV, COMMUNICATION, DESIGN, MODERATION, EVENEMENTIEL, ADMIN, AUTRE)` | Pôle de bénévolat visé (défaut `AUTRE`) |
+| `roles`         | `VARCHAR(200)` nullable                | Missions / profil recherché (texte libre) |
 | `body`          | `TEXT` nullable                        | Description |
 | `contact_url`   | `VARCHAR(2048)` nullable               | Lien de candidature (Discord, formulaire…) |
 | `highlight`     | `ENUM('NONE','BANNER','MODAL')`        | Mode de mise en avant urgente |
 | `active`        | `TINYINT(1)`                           | Visible publiquement (`0` = brouillon) |
 | `display_order` | `INT`                                  | Ordre d'affichage (réordonnable) |
+
+> La colonne `domain` remplace l'ancienne colonne `game` (jeu OW2/MR/ANY) : une
+> migration renomme et reconvertit automatiquement la colonne, les anciennes
+> valeurs étant ramenées à `AUTRE`.
 
 ## Mise en avant urgente (`highlight`)
 
