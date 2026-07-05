@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { getCurrentUser } from "@/lib/server/auth";
+import { can } from "@/lib/shared/permissions";
 import { listBenevoles } from "@/lib/server/benevoles-service";
 import { BenevolesSection } from "./BenevolesSection";
 import styles from "./page.module.css";
@@ -19,7 +20,8 @@ export const metadata: Metadata = {
 
 export default async function BenevolesPage() {
   const [user, benevoles] = await Promise.all([getCurrentUser(), listBenevoles()]);
-  const isAdmin = Boolean(user?.isAdmin);
+  // Gestion des bénévoles : administrateurs + Community Managers.
+  const isAdmin = can(user, "showcase");
 
   return (
     <main style={{ position: "relative", zIndex: 1 }}>

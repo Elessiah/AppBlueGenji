@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { getCurrentUser } from "@/lib/server/auth";
+import { can } from "@/lib/shared/permissions";
 import { listRecruitmentAds } from "@/lib/server/recruitment-service";
 import { RecruitmentSection } from "./RecruitmentSection";
 import styles from "./page.module.css";
@@ -20,8 +21,9 @@ export const metadata: Metadata = {
 
 export default async function RecrutementPage() {
   const user = await getCurrentUser().catch(() => null);
-  const isAdmin = Boolean(user?.isAdmin);
-  // Les administrateurs voient aussi les brouillons (annonces inactives).
+  // Gestion du recrutement : administrateurs + Recruteurs.
+  const isAdmin = can(user, "recruitment");
+  // Les gestionnaires du recrutement voient aussi les brouillons (annonces inactives).
   const ads = await listRecruitmentAds(isAdmin);
 
   return (
