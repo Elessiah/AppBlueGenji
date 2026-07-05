@@ -348,6 +348,17 @@ async function runMigrations(db: Pool): Promise<void> {
     // Column already exists
   }
 
+  // Migration: Rôles de permission cumulables (ARBITRE, COMMUNITY_MANAGER,
+  // RECRUTEUR). Le rôle ADMIN reste porté par la colonne `is_admin`.
+  try {
+    await db.execute(`
+      ALTER TABLE bg_users
+      ADD COLUMN platform_roles_json JSON NULL
+    `);
+  } catch {
+    // Column already exists
+  }
+
   // Migration: Add description to teams
   try {
     await db.execute(`

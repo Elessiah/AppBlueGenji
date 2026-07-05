@@ -2,11 +2,12 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { reorderRecruitmentAds } from "@/lib/server/recruitment-service";
 import { validateReorderIds } from "@/lib/shared/reorder";
+import { can } from "@/lib/shared/permissions";
 
 export async function PUT(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  if (!user.isAdmin) return fail("FORBIDDEN", 403);
+  if (!can(user, "recruitment")) return fail("FORBIDDEN", 403);
 
   let body: { ids?: unknown };
   try {

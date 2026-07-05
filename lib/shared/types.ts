@@ -1,4 +1,6 @@
-﻿export type TournamentFormat = "SINGLE" | "DOUBLE" | "SWISS";
+﻿import type { PlatformRole } from "./permissions";
+
+export type TournamentFormat = "SINGLE" | "DOUBLE" | "SWISS";
 
 export type SwissTournamentMeta = {
   totalRounds: number;
@@ -293,7 +295,9 @@ export type FullProfileResponse = {
   isSelf: boolean;
   // Statut administrateur du profil consulté.
   isAdmin: boolean;
-  // Vrai lorsque le viewer est administrateur (débloque la gestion des droits admin).
+  // Rôles de permission du profil consulté (uniquement renseigné pour un viewer admin).
+  roles: PlatformRole[];
+  // Vrai lorsque le viewer est administrateur (débloque la gestion des rôles).
   viewerIsAdmin: boolean;
 };
 

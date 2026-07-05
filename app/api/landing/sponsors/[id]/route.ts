@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/server/auth";
+import { can } from "@/lib/shared/permissions";
 import { fail, ok } from "@/lib/server/http";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { deleteSponsor, getSponsorLogoUrl, updateSponsor } from "@/lib/server/sponsors-service";
@@ -29,7 +30,7 @@ function parseId(raw: string): number | null {
 export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  if (!user.isAdmin) return fail("FORBIDDEN", 403);
+  if (!can(user, "showcase")) return fail("FORBIDDEN", 403);
 
   const { id: rawId } = await context.params;
   const id = parseId(rawId);
@@ -63,7 +64,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
 export async function DELETE(_req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  if (!user.isAdmin) return fail("FORBIDDEN", 403);
+  if (!can(user, "showcase")) return fail("FORBIDDEN", 403);
 
   const { id: rawId } = await context.params;
   const id = parseId(rawId);

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import type { RowDataPacket, ResultSetHeader } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { normalizePseudo, slugifyPseudo } from "@/lib/server/serialization";
+import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 
 export type AuthUser = {
   id: number;
@@ -15,6 +16,8 @@ export type AuthUser = {
   email: string | null;
   isAdult: boolean | null;
   isAdmin: boolean;
+  /** Rôles de permission cumulables (inclut `ADMIN` si `isAdmin`). */
+  roles: PlatformRole[];
 };
 
 type UserRow = RowDataPacket & {
@@ -26,7 +29,18 @@ type UserRow = RowDataPacket & {
   email: string | null;
   is_adult: 0 | 1 | null;
   is_admin: 0 | 1;
+  platform_roles_json: string | null;
 };
+
+/**
+ * Reconstitue la liste complète des rôles d'un utilisateur : le rôle `ADMIN`
+ * dérive de `is_admin`, les autres rôles cumulables sont stockés en JSON.
+ * L'ensemble est dédupliqué et trié par `sanitizePlatformRoles`.
+ */
+export function resolveRoles(isAdmin: boolean, rolesJson: unknown): PlatformRole[] {
+  const stored = sanitizePlatformRoles(rolesJson);
+  return sanitizePlatformRoles(isAdmin ? ["ADMIN", ...stored] : stored);
+}
 
 const SESSION_COOKIE = "bg_session";
 const OAUTH_COOKIE = "bg_google_oauth";
@@ -59,6 +73,7 @@ function fromRow(row: UserRow): AuthUser {
     email: row.email,
     isAdult: row.is_adult === null ? null : Boolean(row.is_adult),
     isAdmin: Boolean(row.is_admin),
+    roles: resolveRoles(Boolean(row.is_admin), row.platform_roles_json),
   };
 }
 
@@ -142,7 +157,7 @@ async function getDevBypassUser(): Promise<AuthUser | null> {
 
   const db = await getDatabase();
   const [rows] = await db.execute<UserRow[]>(
-    `SELECT id, pseudo, avatar_url, discord_id, google_sub, email, is_adult, is_admin
+    `SELECT id, pseudo, avatar_url, discord_id, google_sub, email, is_adult, is_admin, platform_roles_json
      FROM bg_users
      WHERE id = ?
        AND is_deleted = 0
@@ -179,7 +194,7 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
 
   const db = await getDatabase();
   const [rows] = await db.execute<UserRow[]>(
-    `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.email, u.is_adult, u.is_admin
+    `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.email, u.is_adult, u.is_admin, u.platform_roles_json
      FROM bg_user_sessions s
      JOIN bg_users u ON u.id = s.user_id
      WHERE s.token_hash = ?

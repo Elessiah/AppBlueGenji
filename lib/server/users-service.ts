@@ -1,8 +1,9 @@
 ﻿import crypto from "node:crypto";
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { ensureUniquePseudo } from "@/lib/server/auth";
+import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
+import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 import type {
   FullProfileResponse,
   PersonalDataExport,
@@ -39,6 +40,7 @@ type UserRow = RowDataPacket & {
   visible_marvel: 0 | 1;
   visible_major: 0 | 1;
   is_admin?: 0 | 1;
+  platform_roles_json?: string | null;
   created_at: Date;
 };
 
@@ -496,6 +498,7 @@ export async function getFullProfile(
       visible_marvel,
       visible_major,
       is_admin,
+      platform_roles_json,
       created_at
     FROM bg_users
     WHERE id = ?
@@ -507,6 +510,7 @@ export async function getFullProfile(
 
   const isSelf = viewerId === targetUserId;
   const targetIsAdmin = Boolean(userRows[0].is_admin);
+  const targetRoles = resolveRoles(targetIsAdmin, userRows[0].platform_roles_json);
   const profile = mapPublicUser(userRows[0]);
 
   if (isSelf) {
@@ -602,8 +606,9 @@ export async function getFullProfile(
     },
     teamsTimeline: timeline,
     tournaments,
-    // Ne pas divulguer qui est admin aux non-admins : réservé au viewer admin.
+    // Ne pas divulguer qui est admin / quels rôles aux non-admins : réservé au viewer admin.
     isAdmin: viewerIsAdmin ? targetIsAdmin : false,
+    roles: viewerIsAdmin ? targetRoles : [],
     isSelf,
     viewerIsAdmin,
   };
@@ -707,6 +712,40 @@ export async function setUserAdmin(targetUserId: number, isAdmin: boolean): Prom
     `UPDATE bg_users SET is_admin = ? WHERE id = ?`,
     [isAdmin ? 1 : 0, targetUserId],
   );
+}
+
+/**
+ * Remplace l'intégralité des rôles de permission d'un utilisateur.
+ * Le rôle `ADMIN` est persisté via la colonne `is_admin` ; les autres rôles
+ * cumulables (ARBITRE, COMMUNITY_MANAGER, RECRUTEUR) dans `platform_roles_json`.
+ * Réservé aux administrateurs (contrôle d'accès effectué côté route API).
+ *
+ * @returns la liste normalisée des rôles effectivement enregistrés.
+ */
+export async function setUserRoles(
+  targetUserId: number,
+  roles: PlatformRole[],
+): Promise<PlatformRole[]> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
+    [targetUserId],
+  );
+  if (rows.length === 0) {
+    throw new Error("USER_NOT_FOUND");
+  }
+
+  const sanitized = sanitizePlatformRoles(roles);
+  const isAdmin = sanitized.includes("ADMIN");
+  // Ne persister en JSON que les rôles cumulables non-ADMIN (ADMIN ⇔ is_admin).
+  const nonAdminRoles = sanitized.filter((role) => role !== "ADMIN");
+
+  await db.execute(
+    `UPDATE bg_users SET is_admin = ?, platform_roles_json = ? WHERE id = ?`,
+    [isAdmin ? 1 : 0, JSON.stringify(nonAdminRoles), targetUserId],
+  );
+
+  return sanitized;
 }
 
 export async function getUserIdByPseudo(pseudo: string): Promise<number | null> {

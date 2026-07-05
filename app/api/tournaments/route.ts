@@ -1,6 +1,7 @@
 ﻿import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { createTournament, listTournamentBuckets } from "@/lib/server/tournaments-service";
+import { can } from "@/lib/shared/permissions";
 import type { TournamentFormat } from "@/lib/shared/types";
 
 export async function GET(req: Request) {
@@ -17,7 +18,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  if (!user.isAdmin) return fail("FORBIDDEN", 403);
+  if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
 
   try {
     const body = (await req.json()) as {

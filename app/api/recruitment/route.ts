@@ -1,12 +1,13 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { createRecruitmentAd, listRecruitmentAds } from "@/lib/server/recruitment-service";
+import { can } from "@/lib/shared/permissions";
 
 export async function GET() {
   const user = await getCurrentUser().catch(() => null);
   try {
-    // Les administrateurs voient aussi les annonces inactives (brouillons).
-    const ads = await listRecruitmentAds(Boolean(user?.isAdmin));
+    // Les gestionnaires du recrutement voient aussi les annonces inactives (brouillons).
+    const ads = await listRecruitmentAds(can(user, "recruitment"));
     return Response.json({ ads });
   } catch (error) {
     console.error("Failed to fetch recruitment ads:", error);
@@ -17,7 +18,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  if (!user.isAdmin) return fail("FORBIDDEN", 403);
+  if (!can(user, "recruitment")) return fail("FORBIDDEN", 403);
 
   let body: Record<string, unknown>;
   try {
