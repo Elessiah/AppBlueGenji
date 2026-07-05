@@ -10,10 +10,10 @@ import styles from "./page.module.css";
 export const metadata: Metadata = {
   title: "BlueGenji - Recrutement",
   description:
-    "Les équipes qui recrutent sur BlueGenji Arena : trouve ta prochaine équipe Overwatch 2 ou Marvel Rivals.",
+    "Rejoins le staff bénévole de BlueGenji Arena : arbitrage, casting, développement, communication, design, modération et plus.",
   openGraph: {
     title: "BlueGenji - Recrutement",
-    description: "Équipes en recherche de joueurs et joueuses sur la scène esport francophone.",
+    description: "L'association recrute ses bénévoles pour faire vivre la scène esport francophone.",
     type: "website",
     locale: "fr_FR",
   },
@@ -32,14 +32,14 @@ export default async function RecrutementPage() {
 
       <section className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
-        <span className="eyebrow">COMMUNAUTÉ · RECRUTEMENT</span>
+        <span className="eyebrow">ASSOCIATION · BÉNÉVOLAT</span>
         <h1 className={`display ${styles.heroTitle}`}>
-          Les équipes<br />
-          recrutent.
+          L'asso recrute<br />
+          son staff.
         </h1>
         <p className={styles.heroSub}>
-          Tanks, DPS, soutiens, coachs, managers… découvre les annonces des équipes
-          de la scène BlueGenji et trouve ta prochaine place.
+          Arbitres, casters, développeurs, community managers, graphistes, modérateurs…
+          l'association tourne grâce à ses bénévoles. Trouve la mission qui te correspond.
         </p>
       </section>
 

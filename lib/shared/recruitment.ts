@@ -1,10 +1,31 @@
-export const RECRUITMENT_GAMES = ["OW2", "MR", "ANY"] as const;
-export type RecruitmentGame = (typeof RECRUITMENT_GAMES)[number];
+/**
+ * Pôles de bénévolat de l'association : le recrutement vise le staff (arbitres,
+ * casters, dev, com…) plutôt que les joueurs. `AUTRE` sert de valeur par défaut
+ * et de fourre-tout pour les missions hors catégories.
+ */
+export const RECRUITMENT_DOMAINS = [
+  "ARBITRAGE",
+  "CASTING",
+  "DEV",
+  "COMMUNICATION",
+  "DESIGN",
+  "MODERATION",
+  "EVENEMENTIEL",
+  "ADMIN",
+  "AUTRE",
+] as const;
+export type RecruitmentDomain = (typeof RECRUITMENT_DOMAINS)[number];
 
-export const RECRUITMENT_GAME_LABELS: Record<RecruitmentGame, string> = {
-  OW2: "Overwatch 2",
-  MR: "Marvel Rivals",
-  ANY: "Tous jeux",
+export const RECRUITMENT_DOMAIN_LABELS: Record<RecruitmentDomain, string> = {
+  ARBITRAGE: "Arbitrage",
+  CASTING: "Casting / Commentaire",
+  DEV: "Développement",
+  COMMUNICATION: "Communication",
+  DESIGN: "Design / Graphisme",
+  MODERATION: "Modération",
+  EVENEMENTIEL: "Événementiel",
+  ADMIN: "Administration",
+  AUTRE: "Autre",
 };
 
 /**
@@ -26,7 +47,7 @@ export type RecruitmentAd = {
   id: number;
   title: string;
   teamName: string | null;
-  game: RecruitmentGame;
+  domain: RecruitmentDomain;
   roles: string | null;
   body: string | null;
   contactUrl: string | null;
@@ -37,7 +58,7 @@ export type RecruitmentAd = {
 export type RecruitmentAdInput = {
   title: string;
   teamName?: string | null;
-  game?: RecruitmentGame | string;
+  domain?: RecruitmentDomain | string;
   roles?: string | null;
   body?: string | null;
   contactUrl?: string | null;
@@ -51,8 +72,8 @@ export const RECRUITMENT_ROLES_MAX = 200;
 export const RECRUITMENT_BODY_MAX = 2000;
 export const RECRUITMENT_URL_MAX = 2048;
 
-function isGame(value: unknown): value is RecruitmentGame {
-  return typeof value === "string" && (RECRUITMENT_GAMES as readonly string[]).includes(value);
+function isDomain(value: unknown): value is RecruitmentDomain {
+  return typeof value === "string" && (RECRUITMENT_DOMAINS as readonly string[]).includes(value);
 }
 
 function isHighlight(value: unknown): value is RecruitmentHighlight {
@@ -72,7 +93,7 @@ export type RecruitmentValidationResult =
       value: {
         title: string;
         teamName: string | null;
-        game: RecruitmentGame;
+        domain: RecruitmentDomain;
         roles: string | null;
         body: string | null;
         contactUrl: string | null;
@@ -83,20 +104,20 @@ export type RecruitmentValidationResult =
   | { ok: false; error: string };
 
 /**
- * Valide et normalise une annonce de recrutement. Le titre est requis ; le jeu
- * défaut « ANY » ; la mise en avant défaut « NONE ». Équipe / rôles / corps /
- * lien sont optionnels et ramenés à `null` si vides. `active` défaut `true`.
- * Partagé client/serveur.
+ * Valide et normalise une annonce de recrutement. Le titre est requis ; le pôle
+ * défaut « AUTRE » ; la mise en avant défaut « NONE ». Référent / missions /
+ * corps / lien sont optionnels et ramenés à `null` si vides. `active` défaut
+ * `true`. Partagé client/serveur.
  */
 export function validateRecruitmentAdInput(input: RecruitmentAdInput): RecruitmentValidationResult {
   const title = typeof input.title === "string" ? input.title.trim() : "";
   if (!title) return { ok: false, error: "TITLE_REQUIRED" };
   if (title.length > RECRUITMENT_TITLE_MAX) return { ok: false, error: "TITLE_TOO_LONG" };
 
-  let game: RecruitmentGame = "ANY";
-  if (input.game !== undefined && input.game !== null && input.game !== "") {
-    if (!isGame(input.game)) return { ok: false, error: "INVALID_GAME" };
-    game = input.game;
+  let domain: RecruitmentDomain = "AUTRE";
+  if (input.domain !== undefined && input.domain !== null && input.domain !== "") {
+    if (!isDomain(input.domain)) return { ok: false, error: "INVALID_DOMAIN" };
+    domain = input.domain;
   }
 
   let highlight: RecruitmentHighlight = "NONE";
@@ -111,5 +132,5 @@ export function validateRecruitmentAdInput(input: RecruitmentAdInput): Recruitme
   const contactUrl = normalizeOptional(input.contactUrl, RECRUITMENT_URL_MAX);
   const active = input.active === undefined ? true : Boolean(input.active);
 
-  return { ok: true, value: { title, teamName, game, roles, body, contactUrl, highlight, active } };
+  return { ok: true, value: { title, teamName, domain, roles, body, contactUrl, highlight, active } };
 }
