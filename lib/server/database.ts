@@ -457,6 +457,27 @@ async function runMigrations(db: Pool): Promise<void> {
   } catch {
     // Column already exists
   }
+
+  // Migration: annonces de recrutement (page dédiée + mise en avant urgente
+  // via banderole ou modale). Réordonnable par les administrateurs.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS bg_recruitment_ads (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      title VARCHAR(140) NOT NULL,
+      team_name VARCHAR(120) NULL,
+      game ENUM('OW2', 'MR', 'ANY') NOT NULL DEFAULT 'ANY',
+      roles VARCHAR(200) NULL,
+      body TEXT NULL,
+      contact_url VARCHAR(2048) NULL,
+      highlight ENUM('NONE', 'BANNER', 'MODAL') NOT NULL DEFAULT 'NONE',
+      active TINYINT(1) NOT NULL DEFAULT 1,
+      display_order INT NOT NULL DEFAULT 100,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_bg_recruitment_active_order (active, display_order),
+      INDEX idx_bg_recruitment_highlight (highlight)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
 }
 
 async function ensureMigrations(db: Pool): Promise<void> {

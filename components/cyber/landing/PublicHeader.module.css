@@ -34,7 +34,7 @@
   margin: 0 auto;
   min-height: 78px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   gap: 24px;
   align-items: center;
 }
@@ -90,6 +90,7 @@
 }
 
 .actions {
+  justify-self: end;
   display: inline-flex;
   gap: 10px;
   align-items: center;
