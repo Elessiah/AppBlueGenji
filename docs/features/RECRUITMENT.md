@@ -41,6 +41,12 @@ mémorise sa fermeture par annonce dans `sessionStorage` (elle ne réapparaît p
 avant une nouvelle session, ou tant que l'admin ne change pas l'annonce mise en
 avant).
 
+L'endpoint `/api/recruitment/highlight` renvoie une réponse publique identique
+pour tous les visiteurs : elle est mise en cache
+(`Cache-Control: public, max-age=60, stale-while-revalidate=300`) pour éviter une
+requête DB à chaque chargement de page. Un changement admin est répercuté en
+~1 min au plus.
+
 ## API
 
 | Méthode & route                    | Accès  | Rôle |

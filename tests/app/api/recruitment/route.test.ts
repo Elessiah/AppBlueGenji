@@ -166,13 +166,16 @@ describe("PUT /api/recruitment/reorder", () => {
 });
 
 describe("GET /api/recruitment/highlight", () => {
-  it("returns the highlighted ad without auth", async () => {
+  it("returns the highlighted ad without auth, cacheable", async () => {
     const banner = { ...sampleAd, highlight: "BANNER" };
     (service.getHighlightedAd as jest.Mock).mockResolvedValue(banner as never);
 
     const res = await HIGHLIGHT();
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ad: banner });
+    // Réponse publique mise en cache pour éviter une requête DB par page.
+    expect(res.headers.get("Cache-Control")).toContain("max-age=60");
+    expect(res.headers.get("Cache-Control")).toContain("stale-while-revalidate");
   });
 
   it("returns null when there is nothing to highlight", async () => {
@@ -180,5 +183,14 @@ describe("GET /api/recruitment/highlight", () => {
     const res = await HIGHLIGHT();
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ad: null });
+  });
+
+  it("does not cache the degraded (error) response", async () => {
+    (service.getHighlightedAd as jest.Mock).mockRejectedValue(new Error("down") as never);
+    const spy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const res = await HIGHLIGHT();
+    expect(res.status).toBe(500);
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+    spy.mockRestore();
   });
 });
