@@ -105,13 +105,22 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
   const { title, teamName, game, roles, body, contactUrl, highlight, active } = validation.value;
 
   const db = await getDatabase();
-  const [res] = await db.execute<ResultSetHeader>(
+  // On vérifie l'existence par un SELECT plutôt que via `affectedRows` : sans
+  // `CLIENT_FOUND_ROWS`, mysql2 compte les lignes *modifiées*, donc un
+  // enregistrement sans changement renverrait 0 et masquerait une annonce
+  // pourtant présente derrière un faux `RECRUITMENT_NOT_FOUND`.
+  const [existing] = await db.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_recruitment_ads WHERE id = ? LIMIT 1`,
+    [id],
+  );
+  if (existing.length === 0) throw new Error("RECRUITMENT_NOT_FOUND");
+
+  await db.execute<ResultSetHeader>(
     `UPDATE bg_recruitment_ads
      SET title = ?, team_name = ?, game = ?, roles = ?, body = ?, contact_url = ?, highlight = ?, active = ?
      WHERE id = ?`,
     [title, teamName, game, roles, body, contactUrl, highlight, active ? 1 : 0, id],
   );
-  if (res.affectedRows === 0) throw new Error("RECRUITMENT_NOT_FOUND");
 
   return { id, title, teamName, game, roles, body, contactUrl, highlight, active };
 }
