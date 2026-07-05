@@ -64,5 +64,37 @@ describe("users-service admin management", () => {
       expect(profile?.isAdmin).toBe(false);
       expect(profile?.viewerIsAdmin).toBe(false);
     });
+
+    it("exposes staff roles publicly via displayRoles, even to non-admin viewers", async () => {
+      const execute = jest
+        .fn()
+        .mockResolvedValueOnce([
+          [userRow({ id: 7, is_admin: 0, platform_roles_json: JSON.stringify(["RECRUTEUR", "ARBITRE"]) })],
+        ])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[{}]]);
+      await mockDb(execute);
+
+      const profile = await getFullProfile(1, 7);
+
+      // Non divulgué dans le champ admin `roles`, mais public dans `displayRoles`.
+      expect(profile?.roles).toEqual([]);
+      expect(profile?.displayRoles).toEqual(["ARBITRE", "RECRUTEUR"]);
+    });
+
+    it("includes ADMIN in displayRoles for an admin target", async () => {
+      const execute = jest
+        .fn()
+        .mockResolvedValueOnce([[userRow({ id: 7, is_admin: 1 })]])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[{}]]);
+      await mockDb(execute);
+
+      const profile = await getFullProfile(1, 7);
+
+      expect(profile?.displayRoles).toContain("ADMIN");
+    });
   });
 });

@@ -108,9 +108,24 @@ export default function PlayerDetailPage() {
                 <h1 className="ds-title blue" style={{ fontSize: "clamp(26px, 3vw, 40px)", marginBottom: 6 }}>
                   {data.profile.pseudo}
                 </h1>
-                <span className="badge" style={{ fontSize: 11 }}>
-                  Joueur BlueGenji
-                </span>
+                <div
+                  aria-label="Rôles du joueur"
+                  style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 2 }}
+                >
+                  <span className="badge" style={{ fontSize: 11 }}>
+                    Joueur BlueGenji
+                  </span>
+                  {data.displayRoles.map((role) => (
+                    <span
+                      key={role}
+                      className="pill pill-blue"
+                      style={{ fontSize: 11 }}
+                      title={ROLE_DESCRIPTIONS[role]}
+                    >
+                      {ROLE_LABELS[role]}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
             <Link href="/joueurs" className="btn ghost" style={{ padding: "9px 18px", fontSize: 13, flexShrink: 0 }}>

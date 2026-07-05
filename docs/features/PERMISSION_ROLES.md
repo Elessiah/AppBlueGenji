@@ -57,3 +57,9 @@ La gestion des rôles se fait depuis la fiche joueur (`/joueurs/[id]`), section
 « Rôles & permissions », visible uniquement par un administrateur consultant le
 profil d'un autre utilisateur. Les cases à cocher sont cumulables et
 enregistrées via `POST /api/admin/users/[id]/roles`.
+
+Les rôles sont par ailleurs affichés publiquement comme badges (titres staff) en
+en-tête de la fiche joueur, à côté du badge « Joueur BlueGenji ». Ce rendu
+s'appuie sur le champ `displayRoles` de `FullProfileResponse`, renseigné pour
+tous les visiteurs — distinct du champ `roles` (réservé au viewer admin pour
+l'édition, non divulgué aux autres).
