@@ -13,7 +13,7 @@ interface RecruitmentRow extends RowDataPacket {
   id: number;
   title: string;
   team_name: string | null;
-  game: RecruitmentAd["game"];
+  domain: RecruitmentAd["domain"];
   roles: string | null;
   body: string | null;
   contact_url: string | null;
@@ -26,7 +26,7 @@ function fromRow(row: RecruitmentRow): RecruitmentAd {
     id: Number(row.id),
     title: row.title,
     teamName: row.team_name,
-    game: row.game,
+    domain: row.domain,
     roles: row.roles,
     body: row.body,
     contactUrl: row.contact_url,
@@ -35,7 +35,7 @@ function fromRow(row: RecruitmentRow): RecruitmentAd {
   };
 }
 
-const SELECT_COLUMNS = `id, title, team_name, game, roles, body, contact_url, highlight, active`;
+const SELECT_COLUMNS = `id, title, team_name, domain, roles, body, contact_url, highlight, active`;
 
 /**
  * Liste les annonces de recrutement, triées par ordre d'affichage. Par défaut
@@ -84,25 +84,25 @@ export async function getHighlightedAd(): Promise<RecruitmentAd | null> {
 export async function createRecruitmentAd(input: RecruitmentAdInput): Promise<RecruitmentAd> {
   const validation = validateRecruitmentAdInput(input);
   if (!validation.ok) throw new Error(validation.error);
-  const { title, teamName, game, roles, body, contactUrl, highlight, active } = validation.value;
+  const { title, teamName, domain, roles, body, contactUrl, highlight, active } = validation.value;
 
   const db = await getDatabase();
   const [res] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_recruitment_ads
-       (title, team_name, game, roles, body, contact_url, highlight, active, display_order)
+       (title, team_name, domain, roles, body, contact_url, highlight, active, display_order)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?,
        (SELECT COALESCE(MAX(display_order), 0) + 10 FROM bg_recruitment_ads AS r))`,
-    [title, teamName, game, roles, body, contactUrl, highlight, active ? 1 : 0],
+    [title, teamName, domain, roles, body, contactUrl, highlight, active ? 1 : 0],
   );
 
-  return { id: Number(res.insertId), title, teamName, game, roles, body, contactUrl, highlight, active };
+  return { id: Number(res.insertId), title, teamName, domain, roles, body, contactUrl, highlight, active };
 }
 
 /** Met à jour une annonce existante. Lève `RECRUITMENT_NOT_FOUND` si absente. */
 export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput): Promise<RecruitmentAd> {
   const validation = validateRecruitmentAdInput(input);
   if (!validation.ok) throw new Error(validation.error);
-  const { title, teamName, game, roles, body, contactUrl, highlight, active } = validation.value;
+  const { title, teamName, domain, roles, body, contactUrl, highlight, active } = validation.value;
 
   const db = await getDatabase();
   // On vérifie l'existence par un SELECT plutôt que via `affectedRows` : sans
@@ -117,12 +117,12 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
 
   await db.execute<ResultSetHeader>(
     `UPDATE bg_recruitment_ads
-     SET title = ?, team_name = ?, game = ?, roles = ?, body = ?, contact_url = ?, highlight = ?, active = ?
+     SET title = ?, team_name = ?, domain = ?, roles = ?, body = ?, contact_url = ?, highlight = ?, active = ?
      WHERE id = ?`,
-    [title, teamName, game, roles, body, contactUrl, highlight, active ? 1 : 0, id],
+    [title, teamName, domain, roles, body, contactUrl, highlight, active ? 1 : 0, id],
   );
 
-  return { id, title, teamName, game, roles, body, contactUrl, highlight, active };
+  return { id, title, teamName, domain, roles, body, contactUrl, highlight, active };
 }
 
 /**

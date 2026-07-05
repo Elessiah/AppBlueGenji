@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CyberButton } from "@/components/cyber";
-import { RECRUITMENT_GAME_LABELS, type RecruitmentAd } from "@/lib/shared/recruitment";
+import { RECRUITMENT_DOMAIN_LABELS, type RecruitmentAd } from "@/lib/shared/recruitment";
 import styles from "./recruitment-highlight.module.css";
 
 /**
@@ -55,7 +55,7 @@ export function RecruitmentHighlight() {
 
   if (!ad || dismissed || ad.highlight === "NONE") return null;
 
-  const meta = [ad.teamName, RECRUITMENT_GAME_LABELS[ad.game], ad.roles]
+  const meta = [ad.teamName, RECRUITMENT_DOMAIN_LABELS[ad.domain], ad.roles]
     .filter(Boolean)
     .join(" · ");
 

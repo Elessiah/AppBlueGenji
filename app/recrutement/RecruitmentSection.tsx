@@ -5,10 +5,10 @@ import { CyberButton, CyberCard, Pill } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import {
   type RecruitmentAd,
-  type RecruitmentGame,
+  type RecruitmentDomain,
   type RecruitmentHighlight,
-  RECRUITMENT_GAMES,
-  RECRUITMENT_GAME_LABELS,
+  RECRUITMENT_DOMAINS,
+  RECRUITMENT_DOMAIN_LABELS,
   RECRUITMENT_HIGHLIGHTS,
   RECRUITMENT_HIGHLIGHT_LABELS,
 } from "@/lib/shared/recruitment";
@@ -22,7 +22,7 @@ interface RecruitmentSectionProps {
 interface FormState {
   title: string;
   teamName: string;
-  game: RecruitmentGame;
+  domain: RecruitmentDomain;
   roles: string;
   body: string;
   contactUrl: string;
@@ -33,7 +33,7 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   title: "",
   teamName: "",
-  game: "ANY",
+  domain: "AUTRE",
   roles: "",
   body: "",
   contactUrl: "",
@@ -72,7 +72,7 @@ export function RecruitmentSection({ initialAds, isAdmin }: RecruitmentSectionPr
     setForm({
       title: ad.title,
       teamName: ad.teamName ?? "",
-      game: ad.game,
+      domain: ad.domain,
       roles: ad.roles ?? "",
       body: ad.body ?? "",
       contactUrl: ad.contactUrl ?? "",
@@ -103,7 +103,7 @@ export function RecruitmentSection({ initialAds, isAdmin }: RecruitmentSectionPr
     const payload = {
       title: form.title.trim(),
       teamName: form.teamName.trim() || null,
-      game: form.game,
+      domain: form.domain,
       roles: form.roles.trim() || null,
       body: form.body.trim() || null,
       contactUrl: form.contactUrl.trim() || null,
@@ -214,7 +214,7 @@ export function RecruitmentSection({ initialAds, isAdmin }: RecruitmentSectionPr
 
         {count === 0 ? (
           <div className={styles.empty}>
-            <p>Aucune annonce de recrutement pour le moment.</p>
+            <p>Aucun poste à pourvoir dans le staff pour le moment.</p>
             {isAdmin && (
               <CyberButton variant="primary" onClick={openCreate}>
                 Publier la première annonce
@@ -227,7 +227,7 @@ export function RecruitmentSection({ initialAds, isAdmin }: RecruitmentSectionPr
               <CyberCard key={ad.id} lift className={styles.card}>
                 <div className={styles.cardHead}>
                   <div className={styles.cardTags}>
-                    <Pill variant="blue">{RECRUITMENT_GAME_LABELS[ad.game]}</Pill>
+                    <Pill variant="blue">{RECRUITMENT_DOMAIN_LABELS[ad.domain]}</Pill>
                     {ad.highlight !== "NONE" && <Pill variant="live">Urgent</Pill>}
                     {!ad.active && <Pill>Inactif</Pill>}
                   </div>
@@ -259,7 +259,7 @@ export function RecruitmentSection({ initialAds, isAdmin }: RecruitmentSectionPr
 
                 <h3 className={styles.cardTitle}>{ad.title}</h3>
                 {ad.teamName && <p className={styles.cardTeam}>{ad.teamName}</p>}
-                {ad.roles && <p className={styles.cardRoles}>Postes : {ad.roles}</p>}
+                {ad.roles && <p className={styles.cardRoles}>Missions : {ad.roles}</p>}
                 {ad.body && <p className={styles.cardBody}>{ad.body}</p>}
 
                 <div className={styles.cardFooter}>
@@ -320,45 +320,46 @@ export function RecruitmentSection({ initialAds, isAdmin }: RecruitmentSectionPr
                 className={styles.modalInput}
                 value={form.title}
                 maxLength={140}
-                placeholder="Recherche TANK pour la Ligue BlueGenji"
+                placeholder="Recherche arbitre pour les tournois du dimanche"
                 onChange={(e) => set("title", e.target.value)}
               />
             </label>
 
             <div className={styles.modalRow}>
               <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Équipe (optionnel)</span>
+                <span className={styles.modalLabel}>Référent / contact (optionnel)</span>
                 <input
                   className={styles.modalInput}
                   value={form.teamName}
                   maxLength={120}
-                  placeholder="Team Sakura"
+                  placeholder="Pôle arbitrage · Marie"
                   onChange={(e) => set("teamName", e.target.value)}
                 />
               </label>
               <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Jeu</span>
+                <span className={styles.modalLabel}>Pôle</span>
                 <select
                   className={styles.modalInput}
-                  value={form.game}
-                  onChange={(e) => set("game", e.target.value as RecruitmentGame)}
+                  value={form.domain}
+                  onChange={(e) => set("domain", e.target.value as RecruitmentDomain)}
                 >
-                  {RECRUITMENT_GAMES.map((g) => (
-                    <option key={g} value={g}>
-                      {RECRUITMENT_GAME_LABELS[g]}
+                  {RECRUITMENT_DOMAINS.map((d) => (
+                    <option key={d} value={d}>
+                      {RECRUITMENT_DOMAIN_LABELS[d]}
                     </option>
                   ))}
                 </select>
+                <span className={styles.modalHint}>Domaine de bénévolat concerné.</span>
               </label>
             </div>
 
             <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Postes recherchés (optionnel)</span>
+              <span className={styles.modalLabel}>Missions / profil recherché (optionnel)</span>
               <input
                 className={styles.modalInput}
                 value={form.roles}
                 maxLength={200}
-                placeholder="TANK, HEAL, Coach…"
+                placeholder="Arbitrer les matchs, gérer les litiges…"
                 onChange={(e) => set("roles", e.target.value)}
               />
             </label>
@@ -370,7 +371,7 @@ export function RecruitmentSection({ initialAds, isAdmin }: RecruitmentSectionPr
                 value={form.body}
                 maxLength={2000}
                 rows={4}
-                placeholder="Rythme des entraînements, niveau attendu, ambiance…"
+                placeholder="Disponibilités attendues, compétences, ambiance de l'équipe…"
                 onChange={(e) => set("body", e.target.value)}
               />
             </label>

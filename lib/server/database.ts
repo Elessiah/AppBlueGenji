@@ -470,13 +470,14 @@ async function runMigrations(db: Pool): Promise<void> {
   }
 
   // Migration: annonces de recrutement (page dédiée + mise en avant urgente
-  // via banderole ou modale). Réordonnable par les administrateurs.
+  // via banderole ou modale). Réordonnable par les administrateurs. La colonne
+  // `domain` porte le pôle de bénévolat visé (recrutement du staff associatif).
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_recruitment_ads (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       title VARCHAR(140) NOT NULL,
       team_name VARCHAR(120) NULL,
-      game ENUM('OW2', 'MR', 'ANY') NOT NULL DEFAULT 'ANY',
+      domain ENUM('ARBITRAGE', 'CASTING', 'DEV', 'COMMUNICATION', 'DESIGN', 'MODERATION', 'EVENEMENTIEL', 'ADMIN', 'AUTRE') NOT NULL DEFAULT 'AUTRE',
       roles VARCHAR(200) NULL,
       body TEXT NULL,
       contact_url VARCHAR(2048) NULL,
@@ -489,6 +490,38 @@ async function runMigrations(db: Pool): Promise<void> {
       INDEX idx_bg_recruitment_highlight (highlight)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  // Migration: réorientation « staff associatif » — l'ancienne colonne `game`
+  // (jeu : OW2/MR/ANY) devient `domain` (pôle de bénévolat). On élargit d'abord
+  // en VARCHAR pour renommer sans erreur de conversion d'ENUM, on neutralise les
+  // anciennes valeurs, puis on reverrouille sur le nouvel ENUM. Chaque étape est
+  // tolérante : sur une base récente `domain` existe déjà et les ALTER échouent
+  // silencieusement.
+  try {
+    await db.execute(`
+      ALTER TABLE bg_recruitment_ads
+      CHANGE COLUMN game domain VARCHAR(32) NOT NULL DEFAULT 'AUTRE'
+    `);
+  } catch {
+    // `game` déjà renommé (base récente) ou table absente.
+  }
+  try {
+    await db.execute(`
+      UPDATE bg_recruitment_ads
+      SET domain = 'AUTRE'
+      WHERE domain NOT IN ('ARBITRAGE', 'CASTING', 'DEV', 'COMMUNICATION', 'DESIGN', 'MODERATION', 'EVENEMENTIEL', 'ADMIN', 'AUTRE')
+    `);
+  } catch {
+    // Rien à normaliser.
+  }
+  try {
+    await db.execute(`
+      ALTER TABLE bg_recruitment_ads
+      MODIFY COLUMN domain ENUM('ARBITRAGE', 'CASTING', 'DEV', 'COMMUNICATION', 'DESIGN', 'MODERATION', 'EVENEMENTIEL', 'ADMIN', 'AUTRE') NOT NULL DEFAULT 'AUTRE'
+    `);
+  } catch {
+    // Colonne déjà au bon type.
+  }
 }
 
 async function ensureMigrations(db: Pool): Promise<void> {

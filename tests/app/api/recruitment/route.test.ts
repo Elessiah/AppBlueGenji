@@ -23,9 +23,9 @@ const arbitre = { id: 4, isAdmin: false, roles: ["ARBITRE"] } as Awaited<
 
 const sampleAd = {
   id: 5,
-  title: "Recherche TANK",
+  title: "Recherche arbitre",
   teamName: null,
-  game: "ANY",
+  domain: "AUTRE",
   roles: null,
   body: null,
   contactUrl: null,
@@ -106,10 +106,10 @@ describe("POST /api/recruitment", () => {
 
   it("returns 400 with the validation error message", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.createRecruitmentAd as jest.Mock).mockRejectedValue(new Error("INVALID_GAME") as never);
-    const res = await POST(jsonReq("POST", { title: "X", game: "LOL" }));
+    (service.createRecruitmentAd as jest.Mock).mockRejectedValue(new Error("INVALID_DOMAIN") as never);
+    const res = await POST(jsonReq("POST", { title: "X", domain: "LOL" }));
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "INVALID_GAME" });
+    expect(await res.json()).toEqual({ error: "INVALID_DOMAIN" });
   });
 });
 

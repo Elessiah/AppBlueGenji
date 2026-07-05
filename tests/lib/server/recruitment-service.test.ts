@@ -24,10 +24,10 @@ describe("recruitment-service", () => {
         [
           {
             id: 2,
-            title: "Recherche TANK",
-            team_name: "Sakura",
-            game: "OW2",
-            roles: "TANK",
+            title: "Recherche arbitre",
+            team_name: "Pôle arbitrage",
+            domain: "ARBITRAGE",
+            roles: "Arbitrage",
             body: null,
             contact_url: null,
             highlight: "NONE",
@@ -41,10 +41,10 @@ describe("recruitment-service", () => {
       expect(result).toEqual([
         {
           id: 2,
-          title: "Recherche TANK",
-          teamName: "Sakura",
-          game: "OW2",
-          roles: "TANK",
+          title: "Recherche arbitre",
+          teamName: "Pôle arbitrage",
+          domain: "ARBITRAGE",
+          roles: "Arbitrage",
           body: null,
           contactUrl: null,
           highlight: "NONE",
@@ -76,7 +76,7 @@ describe("recruitment-service", () => {
             id: 5,
             title: "URGENT",
             team_name: null,
-            game: "ANY",
+            domain: "AUTRE",
             roles: null,
             body: null,
             contact_url: null,
@@ -101,9 +101,9 @@ describe("recruitment-service", () => {
     it("inserts and returns the new ad", async () => {
       const execute = jest.fn().mockResolvedValue([{ insertId: 9 }]);
       await mockDb(execute);
-      const ad = await createRecruitmentAd({ title: "Recherche HEAL", game: "MR" });
+      const ad = await createRecruitmentAd({ title: "Recherche caster", domain: "CASTING" });
       expect(ad.id).toBe(9);
-      expect(ad.game).toBe("MR");
+      expect(ad.domain).toBe("CASTING");
       expect(ad.highlight).toBe("NONE");
     });
 
@@ -142,8 +142,8 @@ describe("recruitment-service", () => {
     it("rejects invalid input", async () => {
       const execute = jest.fn();
       await mockDb(execute);
-      await expect(updateRecruitmentAd(1, { title: "X", game: "LOL" })).rejects.toThrow(
-        "INVALID_GAME",
+      await expect(updateRecruitmentAd(1, { title: "X", domain: "LOL" })).rejects.toThrow(
+        "INVALID_DOMAIN",
       );
       expect(execute).not.toHaveBeenCalled();
     });

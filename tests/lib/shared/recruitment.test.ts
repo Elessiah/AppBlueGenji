@@ -1,19 +1,19 @@
 import { describe, expect, it } from "@jest/globals";
 import {
-  RECRUITMENT_GAMES,
+  RECRUITMENT_DOMAINS,
   RECRUITMENT_HIGHLIGHTS,
   validateRecruitmentAdInput,
 } from "@/lib/shared/recruitment";
 
 describe("validateRecruitmentAdInput", () => {
   it("accepts a minimal valid input with defaults", () => {
-    const result = validateRecruitmentAdInput({ title: "Recherche TANK" });
+    const result = validateRecruitmentAdInput({ title: "Recherche arbitre" });
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toEqual({
-        title: "Recherche TANK",
+        title: "Recherche arbitre",
         teamName: null,
-        game: "ANY",
+        domain: "AUTRE",
         roles: null,
         body: null,
         contactUrl: null,
@@ -25,27 +25,27 @@ describe("validateRecruitmentAdInput", () => {
 
   it("trims the title and optional fields, nulling empties", () => {
     const result = validateRecruitmentAdInput({
-      title: "  Team Sakura recrute  ",
+      title: "  Pôle arbitrage recrute  ",
       teamName: "  ",
-      roles: " TANK, HEAL ",
+      roles: " Arbitrage, litiges ",
       body: "",
       contactUrl: " https://discord.gg/x ",
     });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.title).toBe("Team Sakura recrute");
+      expect(result.value.title).toBe("Pôle arbitrage recrute");
       expect(result.value.teamName).toBeNull();
-      expect(result.value.roles).toBe("TANK, HEAL");
+      expect(result.value.roles).toBe("Arbitrage, litiges");
       expect(result.value.body).toBeNull();
       expect(result.value.contactUrl).toBe("https://discord.gg/x");
     }
   });
 
-  it("accepts every valid game", () => {
-    for (const game of RECRUITMENT_GAMES) {
-      const result = validateRecruitmentAdInput({ title: "X", game });
+  it("accepts every valid domain", () => {
+    for (const domain of RECRUITMENT_DOMAINS) {
+      const result = validateRecruitmentAdInput({ title: "X", domain });
       expect(result.ok).toBe(true);
-      if (result.ok) expect(result.value.game).toBe(game);
+      if (result.ok) expect(result.value.domain).toBe(domain);
     }
   });
 
@@ -63,11 +63,11 @@ describe("validateRecruitmentAdInput", () => {
     if (result.ok) expect(result.value.active).toBe(false);
   });
 
-  it("falls back to defaults when game/highlight are empty strings", () => {
-    const result = validateRecruitmentAdInput({ title: "X", game: "", highlight: "" });
+  it("falls back to defaults when domain/highlight are empty strings", () => {
+    const result = validateRecruitmentAdInput({ title: "X", domain: "", highlight: "" });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.game).toBe("ANY");
+      expect(result.value.domain).toBe("AUTRE");
       expect(result.value.highlight).toBe("NONE");
     }
   });
@@ -92,10 +92,10 @@ describe("validateRecruitmentAdInput", () => {
     });
   });
 
-  it("rejects an invalid game", () => {
-    expect(validateRecruitmentAdInput({ title: "X", game: "LOL" })).toEqual({
+  it("rejects an invalid domain", () => {
+    expect(validateRecruitmentAdInput({ title: "X", domain: "LOL" })).toEqual({
       ok: false,
-      error: "INVALID_GAME",
+      error: "INVALID_DOMAIN",
     });
   });
 

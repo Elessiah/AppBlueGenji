@@ -29,7 +29,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
     const ad = await updateRecruitmentAd(id, {
       title: typeof body.title === "string" ? body.title : "",
       teamName: typeof body.teamName === "string" ? body.teamName : null,
-      game: typeof body.game === "string" ? body.game : undefined,
+      domain: typeof body.domain === "string" ? body.domain : undefined,
       roles: typeof body.roles === "string" ? body.roles : null,
       body: typeof body.body === "string" ? body.body : null,
       contactUrl: typeof body.contactUrl === "string" ? body.contactUrl : null,
