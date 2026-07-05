@@ -108,7 +108,10 @@ export default function PlayerDetailPage() {
                 <h1 className="ds-title blue" style={{ fontSize: "clamp(26px, 3vw, 40px)", marginBottom: 6 }}>
                   {data.profile.pseudo}
                 </h1>
-                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+                <div
+                  aria-label="Rôles du joueur"
+                  style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 2 }}
+                >
                   <span className="badge" style={{ fontSize: 11 }}>
                     Joueur BlueGenji
                   </span>
