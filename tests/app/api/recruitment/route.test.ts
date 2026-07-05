@@ -12,6 +12,14 @@ import * as service from "@/lib/server/recruitment-service";
 
 const admin = { id: 1, isAdmin: true } as Awaited<ReturnType<typeof getCurrentUser>>;
 const normalUser = { id: 2, isAdmin: false } as Awaited<ReturnType<typeof getCurrentUser>>;
+// Rôle scopé : accès recrutement sans être administrateur.
+const recruteur = { id: 3, isAdmin: false, roles: ["RECRUTEUR"] } as Awaited<
+  ReturnType<typeof getCurrentUser>
+>;
+// Rôle scopé sur un autre domaine : ne doit PAS ouvrir le recrutement.
+const arbitre = { id: 4, isAdmin: false, roles: ["ARBITRE"] } as Awaited<
+  ReturnType<typeof getCurrentUser>
+>;
 
 const sampleAd = {
   id: 5,
@@ -72,8 +80,23 @@ describe("POST /api/recruitment", () => {
     expect((await POST(jsonReq("POST", { title: "X" }))).status).toBe(403);
   });
 
+  it("rejects a role scoped to another domain (ARBITRE) with 403", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
+    expect((await POST(jsonReq("POST", { title: "X" }))).status).toBe(403);
+    expect(service.createRecruitmentAd).not.toHaveBeenCalled();
+  });
+
   it("creates an ad for admins", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    (service.createRecruitmentAd as jest.Mock).mockResolvedValue(sampleAd as never);
+
+    const res = await POST(jsonReq("POST", { title: "Recherche TANK" }));
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ ad: sampleAd });
+  });
+
+  it("creates an ad for a scoped RECRUTEUR (non-admin)", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(recruteur as never);
     (service.createRecruitmentAd as jest.Mock).mockResolvedValue(sampleAd as never);
 
     const res = await POST(jsonReq("POST", { title: "Recherche TANK" }));
