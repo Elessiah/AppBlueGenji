@@ -46,6 +46,9 @@ export const RECRUITMENT_HIGHLIGHT_LABELS: Record<RecruitmentHighlight, string> 
 export type RecruitmentAd = {
   id: number;
   title: string;
+  // Référent / contact de l'annonce (pôle ou personne). Historiquement nommé
+  // `teamName` / `team_name` du temps du recrutement de joueurs — conservé tel
+  // quel pour éviter une migration, mais l'UI l'affiche comme « Référent ».
   teamName: string | null;
   domain: RecruitmentDomain;
   roles: string | null;
