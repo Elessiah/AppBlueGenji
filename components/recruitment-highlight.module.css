@@ -193,3 +193,12 @@
   gap: 10px;
   margin-top: 12px;
 }
+
+/* Respecte la préférence système « animations réduites ». */
+@media (prefers-reduced-motion: reduce) {
+  .bannerDot,
+  .modalOverlay,
+  .modal {
+    animation: none;
+  }
+}

@@ -99,3 +99,12 @@
   color: var(--blue-300);
   background: rgba(90, 200, 255, 0.06);
 }
+
+/* Respecte la préférence système « animations réduites ». */
+@media (prefers-reduced-motion: reduce) {
+  .bar,
+  .panel {
+    transition: none;
+    animation: none;
+  }
+}
