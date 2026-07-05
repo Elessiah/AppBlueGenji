@@ -609,6 +609,8 @@ export async function getFullProfile(
     // Ne pas divulguer qui est admin / quels rôles aux non-admins : réservé au viewer admin.
     isAdmin: viewerIsAdmin ? targetIsAdmin : false,
     roles: viewerIsAdmin ? targetRoles : [],
+    // Les rôles staff sont des titres publics affichés à tous les visiteurs.
+    displayRoles: targetRoles,
     isSelf,
     viewerIsAdmin,
   };

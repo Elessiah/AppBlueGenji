@@ -297,6 +297,8 @@ export type FullProfileResponse = {
   isAdmin: boolean;
   // Rôles de permission du profil consulté (uniquement renseigné pour un viewer admin).
   roles: PlatformRole[];
+  // Rôles de permission publics (titres staff) affichés à tous les visiteurs.
+  displayRoles: PlatformRole[];
   // Vrai lorsque le viewer est administrateur (débloque la gestion des rôles).
   viewerIsAdmin: boolean;
 };
