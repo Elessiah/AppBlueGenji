@@ -97,6 +97,7 @@ Pour vérifier les pages protégées (`/tournois`, `/equipes`, `/joueurs`, `/pro
 - `normalizePseudo()` / `slugifyPseudo()` for username normalization, `toIso()` for dates, `parseRoles()` for JSON role arrays — always use these helpers, don't re-implement.
 - User roles on teams are cumulative strings stored as JSON arrays (`OWNER`, `CAPITAINE`, `MANAGER`, `COACH`, `TANK`, `DPS`, `HEAL`).
 - Admin users have `is_admin = true` in `bg_users`; admin-only routes live under `app/api/admin/`.
+- **Rôles de permission de plateforme** (cumulables, distincts des rôles d'équipe) : `ADMIN`, `ARBITRE` (tournois), `COMMUNITY_MANAGER` (site vitrine + association), `RECRUTEUR` (recrutement). Toujours protéger une route avec `can(user, "<permission>")` de `@/lib/shared/permissions` (permissions : `tournaments`, `showcase`, `recruitment`, `roles`) — ne pas tester `user.isAdmin` directement pour un domaine scopé. `ADMIN` a tous les droits. Voir `docs/features/PERMISSION_ROLES.md`.
 
 ## Design System — « Cyber minimal » (Finalisé)
 
@@ -180,15 +181,14 @@ Règle universelle : via `useToast()` (`@/components/ui/toast`), bottom-left ove
 Chaque tâche : quatre commits sur une branche de feature, puis une revue de PR.
 
 **Règle Co-Authored-By :**
-- Le **commit fonctionnel (squelette)** ne porte **aucun** trailer `Co-Authored-By`.
-- Les **commits de pipeline** (docs, tests, polish) portent chacun le trailer `Co-authored-by: Claude Opus 4.8 <noreply@anthropic.com>`.
+- **Tous** les commits (fonctionnel, docs, tests, polish) portent le trailer `Co-authored-by: Claude Opus 4.8 <noreply@anthropic.com>`.
 
-Après le commit fonctionnel, **s'arrêter et laisser l'utilisateur vérifier** avant de lancer la pipeline.
+Enchaîner la pipeline **sans s'arrêter** : ne pas attendre de validation de l'utilisateur après le commit fonctionnel — dérouler les commits, le push et la PR d'affilée.
 
 Ajouter le trailer avec `git commit --trailer 'Co-authored-by: Claude Opus 4.8 <noreply@anthropic.com>'`.
 
 1. **Branche de feature** : `git checkout -b feature/<short-name>`
-2. **Commit fonctionnel** : ≤ 5 mots, impératif minuscule — `add swiss pairing` — *sans Co-Authored-By*
+2. **Commit fonctionnel** : ≤ 5 mots, impératif minuscule — `add swiss pairing` — *avec Co-Authored-By*
 3. **Commit docs** : README / JSDoc limité à ce qui a été construit — *avec Co-Authored-By*
 4. **Commit tests** : `jest` — *avec Co-Authored-By*
 5. **Commit polish UI/UX** : espacements, états, accessibilité — aucun changement de logique — *avec Co-Authored-By*
