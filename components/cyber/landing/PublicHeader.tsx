@@ -34,12 +34,6 @@ export async function PublicHeader() {
         </Link>
 
         <div className={styles.actions}>
-          <CyberButton variant="ghost" asChild>
-            <Link href="/recrutement">
-              <span className={styles.ctaFull}>Recrutement</span>
-              <span className={styles.ctaShort}>Recrut.</span>
-            </Link>
-          </CyberButton>
           {user ? (
             <>
               <CyberButton variant="primary" asChild>
