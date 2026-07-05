@@ -693,28 +693,6 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
 }
 
 /**
- * Accorde ou révoque les droits administrateur d'un utilisateur.
- * Réservé aux administrateurs (contrôle d'accès effectué côté route API).
- */
-export async function setUserAdmin(targetUserId: number, isAdmin: boolean): Promise<void> {
-  const db = await getDatabase();
-  // On vérifie l'existence en amont : `affectedRows` d'un UPDATE ne compte que
-  // les lignes réellement modifiées (mysql2 sans CLIENT_FOUND_ROWS), donc une
-  // écriture idempotente renverrait 0 et masquerait un utilisateur bien présent.
-  const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
-    [targetUserId],
-  );
-  if (rows.length === 0) {
-    throw new Error("USER_NOT_FOUND");
-  }
-  await db.execute(
-    `UPDATE bg_users SET is_admin = ? WHERE id = ?`,
-    [isAdmin ? 1 : 0, targetUserId],
-  );
-}
-
-/**
  * Remplace l'intégralité des rôles de permission d'un utilisateur.
  * Le rôle `ADMIN` est persisté via la colonne `is_admin` ; les autres rôles
  * cumulables (ARBITRE, COMMUNITY_MANAGER, RECRUTEUR) dans `platform_roles_json`.
