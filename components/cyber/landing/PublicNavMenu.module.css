@@ -1,0 +1,110 @@
+.root {
+  position: relative;
+  display: inline-flex;
+}
+
+/* ---- Bouton burger ---- */
+.burger {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 42px;
+  height: 42px;
+  padding: 0 10px;
+  background: rgba(90, 200, 255, 0.05);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-sm, 8px);
+  cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+
+.burger:hover {
+  border-color: var(--blue-500);
+  background: rgba(90, 200, 255, 0.1);
+}
+
+.burger:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+.bar {
+  display: block;
+  height: 2px;
+  width: 100%;
+  border-radius: 2px;
+  background: var(--ink);
+  transition: transform 0.22s ease, opacity 0.18s ease;
+}
+
+.burgerOpen .bar:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.burgerOpen .bar:nth-child(2) {
+  opacity: 0;
+}
+
+.burgerOpen .bar:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* ---- Panneau déroulant ---- */
+.panel {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 50;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  background: var(--cyber-bg-1, #0c0f14);
+  border: 1px solid var(--line-strong-cy, var(--line-soft));
+  border-radius: var(--r-cy-md, 10px);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.7),
+    0 0 26px rgba(90, 200, 255, calc(0.1 * var(--glow, 1)));
+  animation: panelIn 0.18s ease;
+}
+
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.link {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  padding: 11px 14px;
+  border-radius: var(--r-cy-sm, 8px);
+  transition: color 0.16s ease, background 0.16s ease;
+}
+
+.link:hover {
+  color: var(--ink);
+  background: rgba(90, 200, 255, 0.08);
+}
+
+.linkActive {
+  color: var(--blue-300);
+  background: rgba(90, 200, 255, 0.06);
+}
+
+/* Respecte la préférence système « animations réduites ». */
+@media (prefers-reduced-motion: reduce) {
+  .bar,
+  .panel {
+    transition: none;
+    animation: none;
+  }
+}

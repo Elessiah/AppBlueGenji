@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { CyberButton } from "@/components/cyber";
 import { getCurrentUser } from "@/lib/server/auth";
+import { PublicNavMenu } from "./PublicNavMenu";
 import styles from "./PublicHeader.module.css";
 
 /**
@@ -32,16 +33,13 @@ export async function PublicHeader() {
           </span>
         </Link>
 
-        <nav className={styles.nav} aria-label="Navigation principale">
-          <Link href="/#tournois">Tournois</Link>
-          <Link href="/#equipes">Équipes</Link>
-          <Link href="/joueurs">Joueurs</Link>
-          <Link href="/bot">Bot</Link>
-          <Link href="/association">L&apos;asso</Link>
-          <Link href="/benevoles">Bénévoles</Link>
-        </nav>
-
         <div className={styles.actions}>
+          <CyberButton variant="ghost" asChild>
+            <Link href="/recrutement">
+              <span className={styles.ctaFull}>Recrutement</span>
+              <span className={styles.ctaShort}>Recrut.</span>
+            </Link>
+          </CyberButton>
           {user ? (
             <>
               <CyberButton variant="primary" asChild>
@@ -77,6 +75,7 @@ export async function PublicHeader() {
               </CyberButton>
             </>
           )}
+          <PublicNavMenu />
         </div>
       </div>
     </header>

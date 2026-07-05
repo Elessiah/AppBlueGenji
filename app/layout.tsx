@@ -2,6 +2,7 @@
 import { Exo_2, Rajdhani, Inter, JetBrains_Mono, Orbitron } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
+import { RecruitmentHighlight } from "@/components/recruitment-highlight";
 
 const titleFont = Rajdhani({
   subsets: ["latin"],
@@ -47,7 +48,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr">
       <body className={`${titleFont.variable} ${bodyFont.variable} ${sansFont.variable} ${monoFont.variable} ${displayFont.variable}`}>
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <RecruitmentHighlight />
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );
