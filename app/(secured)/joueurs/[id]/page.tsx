@@ -1,11 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { LogoWithGlow } from "@/components/logo-with-glow";
 import { formatLocalDate } from "@/lib/shared/dates";
 import type { FullProfileResponse } from "@/lib/shared/types";
+import {
+  PLATFORM_ROLES,
+  ROLE_DESCRIPTIONS,
+  ROLE_LABELS,
+  type PlatformRole,
+} from "@/lib/shared/permissions";
 import { useToast } from "@/components/ui/toast";
 import { useResourceLoader } from "@/lib/shared/hooks/useResourceLoader";
 
@@ -22,24 +28,36 @@ export default function PlayerDetailPage() {
       },
     },
   );
-  const [adminBusy, setAdminBusy] = useState(false);
+  const [rolesBusy, setRolesBusy] = useState(false);
+  const [selectedRoles, setSelectedRoles] = useState<PlatformRole[]>([]);
 
-  const toggleAdmin = async (nextIsAdmin: boolean) => {
-    setAdminBusy(true);
+  // Resynchronise la sélection locale à chaque (re)chargement du profil.
+  useEffect(() => {
+    if (data?.roles) setSelectedRoles(data.roles);
+  }, [data?.roles]);
+
+  const toggleRole = (role: PlatformRole) => {
+    setSelectedRoles((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
+    );
+  };
+
+  const saveRoles = async () => {
+    setRolesBusy(true);
     try {
-      const res = await fetch(`/api/admin/users/${params.id}/admin`, {
+      const res = await fetch(`/api/admin/users/${params.id}/roles`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ isAdmin: nextIsAdmin }),
+        body: JSON.stringify({ roles: selectedRoles }),
       });
       const payload = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(payload.error || "ADMIN_UPDATE_FAILED");
-      showSuccess(nextIsAdmin ? "Droits administrateur accordés." : "Droits administrateur révoqués.");
+      if (!res.ok) throw new Error(payload.error || "ROLES_UPDATE_FAILED");
+      showSuccess("Rôles mis à jour.");
       await refresh();
     } catch (e) {
       showError((e as Error).message);
     } finally {
-      setAdminBusy(false);
+      setRolesBusy(false);
     }
   };
 
@@ -144,33 +162,45 @@ export default function PlayerDetailPage() {
       {data.viewerIsAdmin && !data.isSelf && (
         <div className="ds-block" style={{ marginBottom: 20 }}>
           <div className="ds-section-title blue">
-            <h2>Administration</h2>
+            <h2>Rôles &amp; permissions</h2>
           </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ color: "var(--text-2)", fontSize: 14 }}>Statut administrateur</span>
-              <span className="badge" style={{ fontSize: 11 }}>
-                {data.isAdmin ? "Administrateur" : "Utilisateur standard"}
-              </span>
-            </div>
+          <p style={{ color: "var(--text-2)", fontSize: 13, marginBottom: 16 }}>
+            Les rôles sont cumulables. Un administrateur dispose de tous les droits, dont l&apos;attribution des rôles.
+          </p>
+          <div role="group" aria-label="Rôles de permission" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {PLATFORM_ROLES.map((role) => {
+              const checked = selectedRoles.includes(role);
+              return (
+                <label
+                  key={role}
+                  style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: rolesBusy ? "default" : "pointer" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={rolesBusy}
+                    onChange={() => toggleRole(role)}
+                    style={{ marginTop: 3 }}
+                  />
+                  <span>
+                    <span style={{ display: "block", fontSize: 14, color: "var(--text-0)" }}>{ROLE_LABELS[role]}</span>
+                    <span style={{ display: "block", fontSize: 12, color: "var(--text-2)" }}>{ROLE_DESCRIPTIONS[role]}</span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
             <button
               type="button"
-              className={data.isAdmin ? "btn ghost" : "btn"}
+              className="btn"
               style={{ padding: "9px 18px", fontSize: 13 }}
-              disabled={adminBusy}
-              aria-busy={adminBusy}
-              aria-label={
-                data.isAdmin
-                  ? `Révoquer les droits administrateur de ${data.profile.pseudo}`
-                  : `Promouvoir ${data.profile.pseudo} administrateur`
-              }
-              onClick={() => toggleAdmin(!data.isAdmin)}
+              disabled={rolesBusy}
+              aria-busy={rolesBusy}
+              aria-label={`Enregistrer les rôles de ${data.profile.pseudo}`}
+              onClick={saveRoles}
             >
-              {adminBusy
-                ? "En cours…"
-                : data.isAdmin
-                  ? "Révoquer les droits admin"
-                  : "Promouvoir administrateur"}
+              {rolesBusy ? "Enregistrement…" : "Enregistrer les rôles"}
             </button>
           </div>
         </div>

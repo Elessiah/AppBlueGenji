@@ -1,11 +1,12 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { adminSaveMatchScores } from "@/lib/server/tournaments-service";
+import { can } from "@/lib/shared/permissions";
 
 export async function PATCH(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  if (!user.isAdmin) return fail("FORBIDDEN", 403);
+  if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
 
   const { matchId } = await context.params;
   const matchId_ = Number(matchId);

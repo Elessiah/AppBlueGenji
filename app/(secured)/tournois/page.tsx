@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { TournamentBuckets } from "@/lib/shared/types";
+import { can, type PlatformRole } from "@/lib/shared/permissions";
 import { useToast } from "@/components/ui/toast";
 import { BgCanvas } from "../_shared/BgCanvas";
 import { Ticker } from "@/components/cyber/Ticker";
@@ -48,8 +49,10 @@ export default function TournamentsPage() {
 
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store" })
-      .then(async (r) => (r.ok ? ((await r.json()) as { user?: { isAdmin?: boolean } }) : null))
-      .then((p) => setIsAdmin(Boolean(p?.user?.isAdmin)))
+      .then(async (r) =>
+        r.ok ? ((await r.json()) as { user?: { isAdmin?: boolean; roles?: PlatformRole[] } }) : null,
+      )
+      .then((p) => setIsAdmin(can(p?.user, "tournaments")))
       .catch(() => setIsAdmin(false));
   }, []);
 

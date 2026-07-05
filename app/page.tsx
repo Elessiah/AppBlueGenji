@@ -18,6 +18,7 @@ import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import { listSponsors } from "@/lib/server/sponsors-service";
 import { listAboutStats } from "@/lib/server/about-stats-service";
 import { getCurrentUser } from "@/lib/server/auth";
+import { can } from "@/lib/shared/permissions";
 import { loadMiniBracket } from "@/lib/server/tournaments/bracket-loader";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 
@@ -47,7 +48,8 @@ export default async function HomePage() {
     featured ? loadMiniBracket(featured.id) : Promise.resolve([]),
     getCurrentUser().catch(() => null),
   ]);
-  const isAdmin = Boolean(user?.isAdmin);
+  // Gestion du site vitrine : administrateurs + Community Managers.
+  const isAdmin = can(user, "showcase");
 
   return (
     <main style={{ position: "relative", zIndex: 1 }}>

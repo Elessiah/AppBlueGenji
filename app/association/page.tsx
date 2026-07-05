@@ -5,6 +5,7 @@ import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { AboutSection } from "@/components/cyber/landing/AboutSection";
 import { CyberButton } from "@/components/cyber";
 import { getCurrentUser } from "@/lib/server/auth";
+import { can } from "@/lib/shared/permissions";
 import { listBureauMembers } from "@/lib/server/bureau-service";
 import { listAboutStats } from "@/lib/server/about-stats-service";
 import { BureauSection } from "./BureauSection";
@@ -30,7 +31,8 @@ export default async function AssociationPage() {
     listBureauMembers(),
     listAboutStats(),
   ]);
-  const isAdmin = Boolean(user?.isAdmin);
+  // Gestion de l'association : administrateurs + Community Managers.
+  const isAdmin = can(user, "showcase");
 
   return (
     <main style={{ position: "relative", zIndex: 1 }}>

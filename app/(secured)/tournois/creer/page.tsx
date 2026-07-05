@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { localDateTimeInput } from "@/lib/shared/dates";
 import type { TournamentFormat, TournamentGame } from "@/lib/shared/types";
+import { can, type PlatformRole } from "@/lib/shared/permissions";
 import { useToast } from "@/components/ui/toast";
 import { CyberCard, CyberButton } from "@/components/cyber";
 
@@ -26,10 +27,12 @@ export default function CreateTournamentPage() {
 
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store" })
-      .then(async (r) => (r.ok ? ((await r.json()) as { user?: { isAdmin?: boolean } }) : null))
+      .then(async (r) =>
+        r.ok ? ((await r.json()) as { user?: { isAdmin?: boolean; roles?: PlatformRole[] } }) : null,
+      )
       .then((p) => {
-        if (!p?.user?.isAdmin) {
-          showError("Création de tournoi réservée aux administrateurs.");
+        if (!can(p?.user, "tournaments")) {
+          showError("Création de tournoi réservée aux arbitres et administrateurs.");
           router.replace("/tournois");
         }
       })

@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteRecruitmentAd, updateRecruitmentAd } from "@/lib/server/recruitment-service";
+import { can } from "@/lib/shared/permissions";
 
 function parseId(raw: string): number | null {
   const id = Number(raw);
@@ -11,7 +12,7 @@ function parseId(raw: string): number | null {
 export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  if (!user.isAdmin) return fail("FORBIDDEN", 403);
+  if (!can(user, "recruitment")) return fail("FORBIDDEN", 403);
 
   const { id: rawId } = await context.params;
   const id = parseId(rawId);
@@ -45,7 +46,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
 export async function DELETE(_req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  if (!user.isAdmin) return fail("FORBIDDEN", 403);
+  if (!can(user, "recruitment")) return fail("FORBIDDEN", 403);
 
   const { id: rawId } = await context.params;
   const id = parseId(rawId);
