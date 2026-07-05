@@ -214,7 +214,7 @@ export function RecruitmentSection({ initialAds, isAdmin }: RecruitmentSectionPr
 
         {count === 0 ? (
           <div className={styles.empty}>
-            <p>Aucune annonce de recrutement pour le moment.</p>
+            <p>Aucun poste à pourvoir dans le staff pour le moment.</p>
             {isAdmin && (
               <CyberButton variant="primary" onClick={openCreate}>
                 Publier la première annonce
@@ -349,6 +349,7 @@ export function RecruitmentSection({ initialAds, isAdmin }: RecruitmentSectionPr
                     </option>
                   ))}
                 </select>
+                <span className={styles.modalHint}>Domaine de bénévolat concerné.</span>
               </label>
             </div>
 
