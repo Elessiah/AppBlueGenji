@@ -217,7 +217,7 @@ export default function ProfilePage() {
               Mon profil
             </h1>
             <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-              Informations personnelles masquées par défaut
+              Pseudo et avatar publics par défaut — chaque information reste masquable
             </p>
           </div>
         </div>
