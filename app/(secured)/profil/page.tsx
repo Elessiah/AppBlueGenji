@@ -9,6 +9,8 @@ import type { FullProfileResponse } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 
 const VISIBILITY_LABELS: Record<string, string> = {
+  pseudo: "Pseudo",
+  avatar: "Avatar",
   overwatch: "BattleTag OW",
   marvel: "Tag Marvel",
   major: "Majorité",
@@ -29,6 +31,8 @@ export default function ProfilePage() {
   const [isAdult, setIsAdult] = useState<string>("unknown");
   const [deleting, setDeleting] = useState(false);
   const [visibility, setVisibility] = useState({
+    pseudo: false,
+    avatar: false,
     overwatch: false,
     marvel: false,
     major: false,
@@ -88,7 +92,13 @@ export default function ProfilePage() {
       setDiscordPseudo(payload.profile.discordPseudo || "");
       setIsAdult(payload.profile.isAdult === null ? "unknown" : payload.profile.isAdult ? "yes" : "no");
       const v = payload.profile.visibility;
-      setVisibility({ overwatch: !!v.overwatch, marvel: !!v.marvel, major: !!v.major });
+      setVisibility({
+        pseudo: !!v.pseudo,
+        avatar: !!v.avatar,
+        overwatch: !!v.overwatch,
+        marvel: !!v.marvel,
+        major: !!v.major,
+      });
     };
     load().catch((e) => showError((e as Error).message));
   }, [showError, router]);
@@ -207,7 +217,7 @@ export default function ProfilePage() {
               Mon profil
             </h1>
             <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-              Informations personnelles masquées par défaut
+              Pseudo et avatar publics par défaut — chaque information reste masquable
             </p>
           </div>
         </div>

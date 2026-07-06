@@ -6,6 +6,6 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
 
-  const players = await listPlayers();
+  const players = await listPlayers(user.id);
   return ok({ players });
 }

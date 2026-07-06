@@ -81,6 +81,23 @@ function mapPublicUser(row: UserRow): PublicUserProfile {
   };
 }
 
+/**
+ * Applique les réglages de visibilité d'un profil pour un spectateur tiers :
+ * chaque champ non public est masqué. Le pseudo masqué devient « Joueur #id »,
+ * l'avatar masqué devient `null`. Aucun effet lorsque le spectateur consulte
+ * son propre profil (`isSelf`). Centralise la logique de masquage pour que
+ * l'annuaire `/joueurs` et la fiche profil `/joueurs/[id]` restent cohérents.
+ */
+function applyVisibility<T extends PublicUserProfile>(profile: T, isSelf: boolean): T {
+  if (isSelf) return profile;
+  if (!profile.visibility.pseudo) profile.pseudo = `Joueur #${profile.id}`;
+  if (!profile.visibility.avatar) profile.avatarUrl = null;
+  if (!profile.visibility.overwatch) profile.overwatchBattletag = null;
+  if (!profile.visibility.marvel) profile.marvelRivalsTag = null;
+  if (!profile.visibility.major) profile.isAdult = null;
+  return profile;
+}
+
 function hashCode(code: string): string {
   return crypto.createHash("sha256").update(code).digest("hex");
 }
@@ -129,7 +146,7 @@ export async function getUserById(userId: number): Promise<PublicUserProfile | n
   return mapPublicUser(rows[0]);
 }
 
-export async function listPlayers(): Promise<PublicUserProfile[]> {
+export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]> {
   const db = await getDatabase();
   const [rows] = await db.execute<UserRow[]>(
     `SELECT
@@ -150,8 +167,22 @@ export async function listPlayers(): Promise<PublicUserProfile[]> {
      ORDER BY is_deleted ASC, pseudo ASC`,
   );
 
-  const baseUsers = rows.map(mapPublicUser);
+  const baseUsers = rows.map((row) =>
+    applyVisibility(mapPublicUser(row), Number(row.id) === viewerId),
+  );
   const userIds = baseUsers.map((u) => u.id);
+
+  // Les badges de jeu se dérivent des tags bruts : jouer à OW2/MR n'est pas
+  // une donnée privée (seule la chaîne exacte du battletag l'est), donc ils
+  // restent affichés même si `visible_overwatch`/`visible_marvel` masque le tag.
+  const gamesByUserId = new Map<number, ("OW2" | "MR")[]>(
+    rows.map((row) => {
+      const games: ("OW2" | "MR")[] = [];
+      if (row.overwatch_battletag) games.push("OW2");
+      if (row.marvel_rivals_tag) games.push("MR");
+      return [Number(row.id), games];
+    }),
+  );
 
   if (userIds.length === 0) return baseUsers;
 
@@ -220,9 +251,7 @@ export async function listPlayers(): Promise<PublicUserProfile[]> {
 
   return baseUsers.map((user) => {
     const membership = membershipByUserId.get(user.id);
-    const games: ("OW2" | "MR")[] = [];
-    if (user.overwatchBattletag) games.push("OW2");
-    if (user.marvelRivalsTag) games.push("MR");
+    const games = gamesByUserId.get(user.id) ?? [];
 
     const wl = winsLossesByUserId.get(user.id) ?? { wins: 0, losses: 0 };
 
@@ -516,11 +545,7 @@ export async function getFullProfile(
   if (isSelf) {
     profile.discordPseudo = userRows[0].discord_pseudo;
   } else {
-    if (!profile.visibility.avatar) profile.avatarUrl = null;
-    if (!profile.visibility.overwatch) profile.overwatchBattletag = null;
-    if (!profile.visibility.marvel) profile.marvelRivalsTag = null;
-    if (!profile.visibility.major) profile.isAdult = null;
-    if (!profile.visibility.pseudo) profile.pseudo = `Joueur #${profile.id}`;
+    applyVisibility(profile, false);
   }
 
   const [timelineRows] = await db.execute<TeamTimelineRow[]>(
