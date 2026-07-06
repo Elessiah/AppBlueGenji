@@ -174,6 +174,7 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
     ),
   },
   {
+    id: "hebergement",
     title: "Hébergement",
     meta: "HÉBERGEUR",
     body: (
