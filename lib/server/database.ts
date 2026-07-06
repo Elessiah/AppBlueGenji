@@ -24,8 +24,8 @@ async function runMigrations(db: Pool): Promise<void> {
       is_adult TINYINT(1) NULL DEFAULT NULL,
       overwatch_battletag VARCHAR(64) NULL,
       marvel_rivals_tag VARCHAR(64) NULL,
-      visible_avatar TINYINT(1) NOT NULL DEFAULT 0,
-      visible_pseudo TINYINT(1) NOT NULL DEFAULT 0,
+      visible_avatar TINYINT(1) NOT NULL DEFAULT 1,
+      visible_pseudo TINYINT(1) NOT NULL DEFAULT 1,
       visible_overwatch TINYINT(1) NOT NULL DEFAULT 0,
       visible_marvel TINYINT(1) NOT NULL DEFAULT 0,
       visible_major TINYINT(1) NOT NULL DEFAULT 0,
@@ -346,6 +346,16 @@ async function runMigrations(db: Pool): Promise<void> {
     `);
   } catch {
     // Column already exists
+  }
+
+  // Migration: avatar + pseudo visibles par défaut (le pseudo/avatar est
+  // l'identité publique de base). Aligne les installs existantes sur le nouveau
+  // défaut sans écraser les choix explicites déjà enregistrés.
+  try {
+    await db.execute(`ALTER TABLE bg_users ALTER COLUMN visible_avatar SET DEFAULT 1`);
+    await db.execute(`ALTER TABLE bg_users ALTER COLUMN visible_pseudo SET DEFAULT 1`);
+  } catch {
+    // Default already applied
   }
 
   // Migration: Rôles de permission cumulables (ARBITRE, COMMUNITY_MANAGER,
