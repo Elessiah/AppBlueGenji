@@ -14,8 +14,6 @@ type HeroProps = {
 };
 
 export function Hero({ stats, live, nextUpcoming }: HeroProps) {
-  const countdownTarget = nextUpcoming?.startAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
   return (
     <section className={styles.root}>
       <div className="fabric" />
@@ -67,7 +65,9 @@ export function Hero({ stats, live, nextUpcoming }: HeroProps) {
 
         <div className={styles.right}>
           <LiveCard initialLive={live} nextUpcomingISO={nextUpcoming?.startAt ?? null} />
-          <CountdownStrip targetISO={countdownTarget} label={nextUpcoming ? `PROCHAIN TOURNOI · ${nextUpcoming.name}` : "PROCHAIN TOURNOI"} />
+          {nextUpcoming && (
+            <CountdownStrip targetISO={nextUpcoming.startAt} label={`PROCHAIN TOURNOI · ${nextUpcoming.name}`} />
+          )}
         </div>
       </div>
     </section>
