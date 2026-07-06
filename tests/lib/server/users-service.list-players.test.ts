@@ -67,12 +67,14 @@ describe("listPlayers visibility", () => {
     expect(players[0].avatarUrl).toBe("/api/uploads/avatars/x.webp");
   });
 
-  it("hides game badges derived from a hidden battletag", async () => {
+  it("masks the battletag string but keeps the game badge visible", async () => {
     const players = await runList(
       [userRow({ visible_overwatch: 0, visible_marvel: 1 })],
       999,
     );
+    // La chaîne exacte du tag est privée…
     expect(players[0].overwatchBattletag).toBeNull();
-    expect(players[0].games).toEqual(["MR"]);
+    // …mais le fait de jouer au jeu reste public (badges dérivés des tags bruts).
+    expect(players[0].games).toEqual(["OW2", "MR"]);
   });
 });
