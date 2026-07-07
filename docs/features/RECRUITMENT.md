@@ -24,11 +24,10 @@ Table `bg_recruitment_ads` (migration auto dans `lib/server/database.ts`) :
 | `domain`        | `ENUM(ARBITRAGE, CASTING, DEV, COMMUNICATION, DESIGN, MODERATION, EVENEMENTIEL, ADMIN, AUTRE)` | Pôle de bénévolat visé (défaut `AUTRE`) |
 | `roles`         | `VARCHAR(200)` nullable                | Missions / profil recherché (texte libre) |
 | `body`          | `TEXT` nullable                        | Description |
-| `contact_url`   | `VARCHAR(2048)` nullable               | Lien de candidature (Discord, formulaire…) |
+| `contact_url`   | `VARCHAR(2048)` nullable               | Lien de candidature — idéalement un ticket SpiceWorks (bouton « Postuler → ») |
 | `contact_discord` | `VARCHAR(120)` nullable              | Contact Discord : pseudo (copiable) ou lien d'invitation |
-| `contact_email` | `VARCHAR(254)` nullable                | Contact email (affiché en `mailto:`) |
 | `contact_discord_id` | `VARCHAR(32)` nullable            | ID Discord (snowflake) pour le deep-link « Ouvrir » |
-| `contact_preferred` | `ENUM('AUTO','DISCORD','EMAIL','LINK')` | Canal mis en avant (stylé en primaire) |
+| `contact_preferred` | `ENUM('AUTO','DISCORD','LINK')`   | Canal mis en avant (stylé en primaire) |
 | `highlight`     | `ENUM('NONE','BANNER','MODAL')`        | Mode de mise en avant urgente |
 | `active`        | `TINYINT(1)`                           | Visible publiquement (`0` = brouillon) |
 | `display_order` | `INT`                                  | Ordre d'affichage (réordonnable) |
@@ -39,9 +38,12 @@ Table `bg_recruitment_ads` (migration auto dans `lib/server/database.ts`) :
 
 ## Tags de contact
 
-Chaque annonce peut exposer, en plus du lien « Postuler » (`contact_url`), des
-**tags de contact** cliquables (avec icône de canal) sous la description :
+Chaque annonce expose deux canaux de contact, sous la description (tags cliquables
+avec icône) et dans le pied de carte :
 
+- **Lien de candidature** (`contact_url`) — bouton « Postuler → ». Destiné en
+  premier lieu à un **lien vers un ticket SpiceWorks** (ou tout formulaire /
+  invitation). Le canal email a été abandonné au profit de ce lien.
 - **Discord** (`contact_discord`) — si la valeur est un pseudo, le tag copie le
   pseudo dans le presse-papiers (toast de confirmation) ; si c'est une URL
   (`https://…` ou `discord.gg/…`), il devient un lien « Rejoindre ».
@@ -49,22 +51,24 @@ Chaque annonce peut exposer, en plus du lien « Postuler » (`contact_url`), des
   connu, un tag supplémentaire ouvre la conversation directe
   (`discord.com/users/<id>`). L'ID n'est retenu que tant que le pseudo associé
   n'est pas remplacé (garde-fou côté client + validation).
-- **Email** (`contact_email`) — masqué par défaut (anti-scraping) : un tag
-  « Révéler l'email » l'affiche, puis un lien `mailto:` avec sujet pré-rempli
-  (`Candidature — <titre>`). La validation partagée refuse un email manifestement
-  malformé (`INVALID_EMAIL`). L'email **n'est jamais obligatoire**.
-- **Copier les contacts** — dès qu'au moins deux canaux existent, un tag copie un
-  bloc formaté (Discord + email + lien) prêt à coller en DM.
+- **Copier les contacts** — lorsque Discord ET lien existent, un tag copie un
+  bloc formaté (Discord + lien) prêt à coller en DM.
 
 **Canal préféré** (`contact_preferred`, défaut `AUTO`) : le recruteur peut mettre
-un canal en avant (`DISCORD`, `EMAIL`, `LINK`) ; le tag correspondant est stylé en
-primaire (bleu glacier). `AUTO` = aucun canal privilégié.
+un canal en avant (`DISCORD`, `LINK`) ; le tag correspondant est stylé en primaire
+(bleu glacier). `AUTO` = aucun canal privilégié.
 
-**Auto-complétion** : à la création d'une annonce, le formulaire pré-remplit
-Discord + email à partir du profil du recruteur connecté (`discord_pseudo`,
-`discord_id`, `email` via `getRecruiterContactDefaults()`), **sans bloquer
-l'édition** — le recruteur peut modifier ou vider chaque champ. En édition d'une
-annonce existante, aucun pré-remplissage : on affiche les valeurs enregistrées.
+**Auto-complétion** : à la création d'une annonce, le formulaire pré-remplit le
+Discord à partir du profil du recruteur connecté (`discord_pseudo`, `discord_id`
+via `getRecruiterContactDefaults()`), **sans bloquer l'édition** — le recruteur
+peut modifier ou vider le champ. En édition d'une annonce existante, aucun
+pré-remplissage : on affiche les valeurs enregistrées.
+
+> **Abandon de l'email.** Un canal email avait été envisagé mais retiré : exposé
+> en clair par l'API publique `GET /api/recruitment`, il n'offrait aucune vraie
+> protection anti-scraping, et pré-remplir l'email de connexion du recruteur
+> risquait de publier une adresse personnelle. Le contact passe désormais par le
+> lien de candidature (ticket SpiceWorks) et Discord.
 
 ## Mise en avant urgente (`highlight`)
 
