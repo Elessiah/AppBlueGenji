@@ -3,7 +3,8 @@ import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
-import { listRecruitmentAds } from "@/lib/server/recruitment-service";
+import { getRecruiterContactDefaults, listRecruitmentAds } from "@/lib/server/recruitment-service";
+import type { RecruiterContactDefaults } from "@/lib/shared/recruitment";
 import { RecruitmentSection } from "./RecruitmentSection";
 import styles from "./page.module.css";
 
@@ -25,6 +26,11 @@ export default async function RecrutementPage() {
   const isAdmin = can(user, "recruitment");
   // Les gestionnaires du recrutement voient aussi les brouillons (annonces inactives).
   const ads = await listRecruitmentAds(isAdmin);
+  // Coordonnées du recruteur pour pré-remplir le formulaire (édition libre).
+  const contactDefaults: RecruiterContactDefaults =
+    isAdmin && user
+      ? await getRecruiterContactDefaults(user.id)
+      : { discord: null, discordId: null };
 
   return (
     <main style={{ position: "relative", zIndex: 1 }}>
@@ -43,7 +49,7 @@ export default async function RecrutementPage() {
         </p>
       </section>
 
-      <RecruitmentSection initialAds={ads} isAdmin={isAdmin} />
+      <RecruitmentSection initialAds={ads} isAdmin={isAdmin} contactDefaults={contactDefaults} />
 
       <PublicFooter />
     </main>

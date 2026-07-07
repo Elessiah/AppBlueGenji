@@ -30,6 +30,9 @@ describe("recruitment-service", () => {
             roles: "Arbitrage",
             body: null,
             contact_url: null,
+            contact_discord: "arbitre_bg",
+            contact_discord_id: "123456789012345678",
+            contact_preferred: "DISCORD",
             highlight: "NONE",
             active: 1,
           },
@@ -47,6 +50,9 @@ describe("recruitment-service", () => {
           roles: "Arbitrage",
           body: null,
           contactUrl: null,
+          contactDiscord: "arbitre_bg",
+          contactDiscordId: "123456789012345678",
+          contactPreferred: "DISCORD",
           highlight: "NONE",
           active: true,
         },
@@ -105,6 +111,27 @@ describe("recruitment-service", () => {
       expect(ad.id).toBe(9);
       expect(ad.domain).toBe("CASTING");
       expect(ad.highlight).toBe("NONE");
+      expect(ad.contactPreferred).toBe("AUTO");
+    });
+
+    it("persists the contact tags (Discord id, preferred channel)", async () => {
+      const execute = jest.fn().mockResolvedValue([{ insertId: 10 }]);
+      await mockDb(execute);
+      const ad = await createRecruitmentAd({
+        title: "Recherche arbitre",
+        contactDiscord: "marie",
+        contactDiscordId: "123456789012345678",
+        contactPreferred: "DISCORD",
+      });
+      expect(ad.contactDiscord).toBe("marie");
+      expect(ad.contactDiscordId).toBe("123456789012345678");
+      expect(ad.contactPreferred).toBe("DISCORD");
+      // Les nouvelles colonnes figurent bien dans l'INSERT et ses paramètres.
+      const [sql, values] = execute.mock.calls[0];
+      expect(sql).toContain("contact_discord_id");
+      expect(sql).toContain("contact_preferred");
+      expect(sql).not.toContain("contact_email");
+      expect(values).toEqual(expect.arrayContaining(["123456789012345678", "DISCORD"]));
     });
 
     it("rejects invalid input before touching the database", async () => {
