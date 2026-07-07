@@ -133,7 +133,7 @@
   white-space: pre-wrap;
 }
 
-/* Tags de contact (Discord / email) */
+/* Tags de contact (Discord / lien) */
 .contactTags {
   display: flex;
   flex-wrap: wrap;
