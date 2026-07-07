@@ -51,8 +51,6 @@ avec icône) et dans le pied de carte :
   connu, un tag supplémentaire ouvre la conversation directe
   (`discord.com/users/<id>`). L'ID n'est retenu que tant que le pseudo associé
   n'est pas remplacé (garde-fou côté client + validation).
-- **Copier les contacts** — lorsque Discord ET lien existent, un tag copie un
-  bloc formaté (Discord + lien) prêt à coller en DM.
 
 **Canal préféré** (`contact_preferred`, défaut `AUTO`) : le recruteur peut mettre
 un canal en avant (`DISCORD`, `LINK`) ; le tag correspondant est stylé en primaire
