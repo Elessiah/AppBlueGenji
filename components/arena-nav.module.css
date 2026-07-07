@@ -190,4 +190,71 @@
   font-weight: 500;
   color: var(--ink);
   letter-spacing: 0.02em;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Tablette : on resserre les espacements ── */
+@media (max-width: 900px) {
+  .navInner {
+    gap: 14px;
+  }
+
+  .navLeft {
+    gap: 18px;
+  }
+
+  .navRight {
+    gap: 10px;
+  }
+}
+
+/* ── Mobile : passage sur deux lignes (logo + avatar en haut, liens en bas) ──
+   Les raccourcis « Accueil » / « Mon équipe » sont masqués (l'accueil reste
+   accessible via le logo, l'équipe via l'onglet Équipes). */
+@media (max-width: 720px) {
+  .navInner {
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "logo right"
+      "left left";
+    gap: 12px 16px;
+    padding: 12px 0;
+  }
+
+  .navLogo {
+    grid-area: logo;
+    width: 44px;
+    height: 44px;
+  }
+
+  .navRight {
+    grid-area: right;
+    justify-content: flex-end;
+  }
+
+  .navLeft {
+    grid-area: left;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 14px 20px;
+  }
+
+  .navHome {
+    display: none;
+  }
+}
+
+/* ── Très petits écrans : liens plus compacts ── */
+@media (max-width: 380px) {
+  .navLeft {
+    gap: 10px 14px;
+  }
+
+  .navLink {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+  }
 }

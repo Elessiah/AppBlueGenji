@@ -39,12 +39,12 @@ export default async function BotPage() {
           <BotStatusStrip status={status} />
           <BotKpis kpis={kpis} />
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 40 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div className="bot-grid">
+            <div className="bot-stack">
               <BotActivityChart initial={activity30j} />
               <BotServersTable servers={serversPayload?.servers ?? null} />
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div className="bot-stack">
               <BotLiveFeed />
               <BotLatencyCard status={status} />
             </div>

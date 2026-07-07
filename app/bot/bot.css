@@ -665,8 +665,42 @@
   .kpis { grid-template-columns: repeat(2, 1fr); }
   .modules { grid-template-columns: repeat(2, 1fr); }
 }
+@media (max-width: 860px) {
+  .cmds { grid-template-columns: 1fr; }
+  .cmd-row { border-right: none; }
+  .cmd-row:nth-last-child(2) { border-bottom: 1px solid var(--line); }
+  .invite-inner { grid-template-columns: 1fr; gap: 32px; }
+  .invite-card { padding: 28px; }
+  /* Hero bot : on empile identité + CTA */
+  .bot-hero {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 20px;
+  }
+  .bot-cta { align-items: flex-start; }
+  .bot-title { font-size: 44px; }
+  /* Fil d'ariane : autorise le retour à la ligne du endpoint */
+  .bot-crumb { flex-wrap: wrap; }
+  .bot-crumb .endpoint { margin-left: 0; }
+}
 @media (max-width: 640px) {
   .kpis, .modules { grid-template-columns: 1fr; }
+  /* Table serveurs : on masque relais + tendance, trop étroit sinon */
+  .srv-head, .srv-row {
+    grid-template-columns: 22px 1fr auto auto;
+    gap: 10px;
+  }
+  .srv-head > span:nth-child(4),
+  .srv-head > span:nth-child(6),
+  .srv-row > span:nth-child(4),
+  .srv-row > .srv-spark {
+    display: none;
+  }
+  .invite-card { padding: 22px; }
+  .invite-copy h3 { font-size: 28px; }
+  .bot-title { font-size: 34px; }
+  .bot-cta .row-actions { flex-wrap: wrap; }
+  .bot-id { gap: 16px; }
   .status-strip { grid-template-columns: repeat(2, 1fr); }
   .bot-hero { flex-direction: column; gap: 24px; }
 }

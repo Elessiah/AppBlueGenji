@@ -20,7 +20,7 @@ export function Hero({ stats, live, nextUpcoming }: HeroProps) {
       <div className={styles.inner}>
         <div className={styles.left}>
           <span className="eyebrow">ASSOCIATION ESPORT · LOI 1901</span>
-          <h1 className="display" style={{ fontSize: "clamp(48px, 7vw, 82px)" }}>
+          <h1 className="display" style={{ fontSize: "clamp(38px, 7vw, 82px)" }}>
             Organiser,
             <br />
             jouer,
