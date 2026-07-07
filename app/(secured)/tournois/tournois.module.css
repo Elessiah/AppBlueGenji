@@ -687,7 +687,9 @@
 }
 
 @media (max-width: 720px) {
-  .sectionBody {
+  .sectionBody,
+  .section[data-cols="2"] .sectionBody,
+  .section[data-cols="1"] .sectionBody {
     grid-template-columns: 1fr;
   }
   .pageHead {
