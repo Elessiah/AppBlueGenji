@@ -112,7 +112,7 @@ describe("POST /api/recruitment", () => {
     expect(await res.json()).toEqual({ error: "INVALID_DOMAIN" });
   });
 
-  it("forwards the Discord/email contact tags to the service", async () => {
+  it("forwards the Discord contact and preferred channel to the service", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
     (service.createRecruitmentAd as jest.Mock).mockResolvedValue(sampleAd as never);
 
@@ -120,13 +120,15 @@ describe("POST /api/recruitment", () => {
       jsonReq("POST", {
         title: "Recherche caster",
         contactDiscord: "marie#0001",
-        contactEmail: "recrutement@bluegenji.gg",
+        contactDiscordId: "123456789012345678",
+        contactPreferred: "DISCORD",
       }),
     );
     expect(service.createRecruitmentAd).toHaveBeenCalledWith(
       expect.objectContaining({
         contactDiscord: "marie#0001",
-        contactEmail: "recrutement@bluegenji.gg",
+        contactDiscordId: "123456789012345678",
+        contactPreferred: "DISCORD",
       }),
     );
   });

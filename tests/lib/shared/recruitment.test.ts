@@ -19,7 +19,6 @@ describe("validateRecruitmentAdInput", () => {
         body: null,
         contactUrl: null,
         contactDiscord: null,
-        contactEmail: null,
         contactDiscordId: null,
         contactPreferred: "AUTO",
         highlight: "NONE",
@@ -111,43 +110,22 @@ describe("validateRecruitmentAdInput", () => {
     });
   });
 
-  it("trims and keeps Discord/email contacts", () => {
-    const result = validateRecruitmentAdInput({
-      title: "X",
-      contactDiscord: "  marie#0001  ",
-      contactEmail: "  Recrutement@bluegenji.gg  ",
-    });
+  it("trims and keeps the Discord contact", () => {
+    const result = validateRecruitmentAdInput({ title: "X", contactDiscord: "  marie#0001  " });
     expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value.contactDiscord).toBe("marie#0001");
-      expect(result.value.contactEmail).toBe("Recrutement@bluegenji.gg");
-    }
+    if (result.ok) expect(result.value.contactDiscord).toBe("marie#0001");
   });
 
-  it("nulls empty Discord/email contacts", () => {
-    const result = validateRecruitmentAdInput({ title: "X", contactDiscord: "   ", contactEmail: "" });
+  it("nulls an empty Discord contact", () => {
+    const result = validateRecruitmentAdInput({ title: "X", contactDiscord: "   " });
     expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value.contactDiscord).toBeNull();
-      expect(result.value.contactEmail).toBeNull();
-    }
+    if (result.ok) expect(result.value.contactDiscord).toBeNull();
   });
 
   it("truncates an over-long Discord contact to the max length", () => {
     const result = validateRecruitmentAdInput({ title: "X", contactDiscord: "a".repeat(200) });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.contactDiscord).toHaveLength(120);
-  });
-
-  it("rejects a malformed email", () => {
-    expect(validateRecruitmentAdInput({ title: "X", contactEmail: "not-an-email" })).toEqual({
-      ok: false,
-      error: "INVALID_EMAIL",
-    });
-    expect(validateRecruitmentAdInput({ title: "X", contactEmail: "a@b" })).toEqual({
-      ok: false,
-      error: "INVALID_EMAIL",
-    });
   });
 
   it("accepts every valid contact channel and defaults to AUTO", () => {

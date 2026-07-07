@@ -31,7 +31,6 @@ describe("recruitment-service", () => {
             body: null,
             contact_url: null,
             contact_discord: "arbitre_bg",
-            contact_email: "arbitrage@bluegenji.gg",
             contact_discord_id: "123456789012345678",
             contact_preferred: "DISCORD",
             highlight: "NONE",
@@ -52,7 +51,6 @@ describe("recruitment-service", () => {
           body: null,
           contactUrl: null,
           contactDiscord: "arbitre_bg",
-          contactEmail: "arbitrage@bluegenji.gg",
           contactDiscordId: "123456789012345678",
           contactPreferred: "DISCORD",
           highlight: "NONE",
@@ -123,17 +121,17 @@ describe("recruitment-service", () => {
         title: "Recherche arbitre",
         contactDiscord: "marie",
         contactDiscordId: "123456789012345678",
-        contactEmail: "marie@bluegenji.gg",
-        contactPreferred: "EMAIL",
+        contactPreferred: "DISCORD",
       });
       expect(ad.contactDiscord).toBe("marie");
       expect(ad.contactDiscordId).toBe("123456789012345678");
-      expect(ad.contactPreferred).toBe("EMAIL");
+      expect(ad.contactPreferred).toBe("DISCORD");
       // Les nouvelles colonnes figurent bien dans l'INSERT et ses paramètres.
       const [sql, values] = execute.mock.calls[0];
       expect(sql).toContain("contact_discord_id");
       expect(sql).toContain("contact_preferred");
-      expect(values).toEqual(expect.arrayContaining(["123456789012345678", "EMAIL"]));
+      expect(sql).not.toContain("contact_email");
+      expect(values).toEqual(expect.arrayContaining(["123456789012345678", "DISCORD"]));
     });
 
     it("rejects invalid input before touching the database", async () => {
