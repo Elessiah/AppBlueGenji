@@ -111,6 +111,25 @@ describe("POST /api/recruitment", () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "INVALID_DOMAIN" });
   });
+
+  it("forwards the Discord/email contact tags to the service", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    (service.createRecruitmentAd as jest.Mock).mockResolvedValue(sampleAd as never);
+
+    await POST(
+      jsonReq("POST", {
+        title: "Recherche caster",
+        contactDiscord: "marie#0001",
+        contactEmail: "recrutement@bluegenji.gg",
+      }),
+    );
+    expect(service.createRecruitmentAd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contactDiscord: "marie#0001",
+        contactEmail: "recrutement@bluegenji.gg",
+      }),
+    );
+  });
 });
 
 describe("PUT /api/recruitment/[id]", () => {

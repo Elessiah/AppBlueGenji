@@ -17,6 +17,8 @@ describe("validateRecruitmentAdInput", () => {
         roles: null,
         body: null,
         contactUrl: null,
+        contactDiscord: null,
+        contactEmail: null,
         highlight: "NONE",
         active: true,
       });
@@ -103,6 +105,45 @@ describe("validateRecruitmentAdInput", () => {
     expect(validateRecruitmentAdInput({ title: "X", highlight: "POPUP" })).toEqual({
       ok: false,
       error: "INVALID_HIGHLIGHT",
+    });
+  });
+
+  it("trims and keeps Discord/email contacts", () => {
+    const result = validateRecruitmentAdInput({
+      title: "X",
+      contactDiscord: "  marie#0001  ",
+      contactEmail: "  Recrutement@bluegenji.gg  ",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.contactDiscord).toBe("marie#0001");
+      expect(result.value.contactEmail).toBe("Recrutement@bluegenji.gg");
+    }
+  });
+
+  it("nulls empty Discord/email contacts", () => {
+    const result = validateRecruitmentAdInput({ title: "X", contactDiscord: "   ", contactEmail: "" });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.contactDiscord).toBeNull();
+      expect(result.value.contactEmail).toBeNull();
+    }
+  });
+
+  it("truncates an over-long Discord contact to the max length", () => {
+    const result = validateRecruitmentAdInput({ title: "X", contactDiscord: "a".repeat(200) });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.contactDiscord).toHaveLength(120);
+  });
+
+  it("rejects a malformed email", () => {
+    expect(validateRecruitmentAdInput({ title: "X", contactEmail: "not-an-email" })).toEqual({
+      ok: false,
+      error: "INVALID_EMAIL",
+    });
+    expect(validateRecruitmentAdInput({ title: "X", contactEmail: "a@b" })).toEqual({
+      ok: false,
+      error: "INVALID_EMAIL",
     });
   });
 });
