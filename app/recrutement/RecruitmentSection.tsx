@@ -286,20 +286,6 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
     }
   }
 
-  // Copie l'ensemble des canaux de contact d'une annonce, prêt à coller en DM.
-  async function copyAllContacts(ad: RecruitmentAd) {
-    const lines: string[] = [];
-    if (ad.contactDiscord) lines.push(`Discord : ${ad.contactDiscord}`);
-    if (ad.contactUrl) lines.push(`Lien : ${ad.contactUrl}`);
-    if (lines.length === 0) return;
-    try {
-      await navigator.clipboard.writeText(lines.join("\n"));
-      showSuccess("Contacts copiés dans le presse-papiers.");
-    } catch {
-      showError("Impossible de copier, copie manuellement.");
-    }
-  }
-
   const count = ads.length;
 
   return (
@@ -412,17 +398,6 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
                         <span className={styles.contactTagVal}>Ouvrir</span>
                         <OpenGlyph />
                       </a>
-                    )}
-                    {[ad.contactDiscord, ad.contactUrl].filter(Boolean).length >= 2 && (
-                      <button
-                        type="button"
-                        className={styles.contactTag}
-                        onClick={() => copyAllContacts(ad)}
-                        title="Copier tous les contacts"
-                      >
-                        <CopyGlyph />
-                        <span className={styles.contactTagVal}>Copier les contacts</span>
-                      </button>
                     )}
                   </div>
                 )}
