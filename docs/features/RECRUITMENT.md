@@ -25,6 +25,8 @@ Table `bg_recruitment_ads` (migration auto dans `lib/server/database.ts`) :
 | `roles`         | `VARCHAR(200)` nullable                | Missions / profil recherché (texte libre) |
 | `body`          | `TEXT` nullable                        | Description |
 | `contact_url`   | `VARCHAR(2048)` nullable               | Lien de candidature (Discord, formulaire…) |
+| `contact_discord` | `VARCHAR(120)` nullable              | Contact Discord : pseudo (copiable) ou lien d'invitation |
+| `contact_email` | `VARCHAR(254)` nullable                | Contact email (affiché en `mailto:`) |
 | `highlight`     | `ENUM('NONE','BANNER','MODAL')`        | Mode de mise en avant urgente |
 | `active`        | `TINYINT(1)`                           | Visible publiquement (`0` = brouillon) |
 | `display_order` | `INT`                                  | Ordre d'affichage (réordonnable) |
@@ -32,6 +34,23 @@ Table `bg_recruitment_ads` (migration auto dans `lib/server/database.ts`) :
 > La colonne `domain` remplace l'ancienne colonne `game` (jeu OW2/MR/ANY) : une
 > migration renomme et reconvertit automatiquement la colonne, les anciennes
 > valeurs étant ramenées à `AUTRE`.
+
+## Tags de contact
+
+Chaque annonce peut exposer, en plus du lien « Postuler » (`contact_url`), des
+**tags de contact** cliquables sous la description :
+
+- **Discord** (`contact_discord`) — si la valeur est un pseudo, le tag copie le
+  pseudo dans le presse-papiers (toast de confirmation) ; si c'est une URL
+  (`https://…` ou `discord.gg/…`), il devient un lien « Rejoindre → ».
+- **Email** (`contact_email`) — tag `mailto:`. La validation partagée refuse un
+  email manifestement malformé (`INVALID_EMAIL`).
+
+**Auto-complétion** : à la création d'une annonce, le formulaire pré-remplit ces
+deux champs à partir du profil du recruteur connecté (`discord_pseudo`, `email`
+via `getRecruiterContactDefaults()`), **sans bloquer l'édition** — le recruteur
+peut modifier ou vider chaque champ. En édition d'une annonce existante, aucun
+pré-remplissage : on affiche les valeurs enregistrées.
 
 ## Mise en avant urgente (`highlight`)
 
