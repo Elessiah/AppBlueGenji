@@ -491,6 +491,8 @@ async function runMigrations(db: Pool): Promise<void> {
       roles VARCHAR(200) NULL,
       body TEXT NULL,
       contact_url VARCHAR(2048) NULL,
+      contact_discord VARCHAR(120) NULL,
+      contact_email VARCHAR(254) NULL,
       highlight ENUM('NONE', 'BANNER', 'MODAL') NOT NULL DEFAULT 'NONE',
       active TINYINT(1) NOT NULL DEFAULT 1,
       display_order INT NOT NULL DEFAULT 100,
@@ -531,6 +533,26 @@ async function runMigrations(db: Pool): Promise<void> {
     `);
   } catch {
     // Colonne déjà au bon type.
+  }
+
+  // Migration: canaux de contact directs (tags Discord / email). Sur une base
+  // ancienne les colonnes manquent ; sur une base récente elles existent déjà et
+  // les ALTER échouent silencieusement.
+  try {
+    await db.execute(`
+      ALTER TABLE bg_recruitment_ads
+      ADD COLUMN contact_discord VARCHAR(120) NULL AFTER contact_url
+    `);
+  } catch {
+    // Colonne déjà présente.
+  }
+  try {
+    await db.execute(`
+      ALTER TABLE bg_recruitment_ads
+      ADD COLUMN contact_email VARCHAR(254) NULL AFTER contact_discord
+    `);
+  } catch {
+    // Colonne déjà présente.
   }
 }
 

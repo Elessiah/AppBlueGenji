@@ -54,8 +54,23 @@ export type RecruitmentAd = {
   roles: string | null;
   body: string | null;
   contactUrl: string | null;
+  // Canaux de contact directs affichés comme « tags » cliquables sur l'annonce :
+  // pseudo Discord (copiable) et email (mailto). Complètent le lien `contactUrl`
+  // (« Postuler »). Auto-remplis depuis le profil du recruteur à la création.
+  contactDiscord: string | null;
+  contactEmail: string | null;
   highlight: RecruitmentHighlight;
   active: boolean;
+};
+
+/**
+ * Valeurs de contact pré-remplies dans le formulaire de création à partir du
+ * profil du recruteur connecté. Purement indicatives : l'UI les pré-remplit mais
+ * laisse l'édition libre (le recruteur peut vider ou remplacer chaque champ).
+ */
+export type RecruiterContactDefaults = {
+  discord: string | null;
+  email: string | null;
 };
 
 export type RecruitmentAdInput = {
@@ -65,6 +80,8 @@ export type RecruitmentAdInput = {
   roles?: string | null;
   body?: string | null;
   contactUrl?: string | null;
+  contactDiscord?: string | null;
+  contactEmail?: string | null;
   highlight?: RecruitmentHighlight | string;
   active?: boolean;
 };
@@ -74,6 +91,13 @@ export const RECRUITMENT_TEAM_MAX = 120;
 export const RECRUITMENT_ROLES_MAX = 200;
 export const RECRUITMENT_BODY_MAX = 2000;
 export const RECRUITMENT_URL_MAX = 2048;
+export const RECRUITMENT_DISCORD_MAX = 120;
+export const RECRUITMENT_EMAIL_MAX = 254;
+
+// Validation d'email volontairement permissive : présence d'un `@` entouré de
+// caractères, avec un point dans le domaine. On refuse le garbage évident sans
+// prétendre couvrir la RFC 5322.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function isDomain(value: unknown): value is RecruitmentDomain {
   return typeof value === "string" && (RECRUITMENT_DOMAINS as readonly string[]).includes(value);
@@ -100,6 +124,8 @@ export type RecruitmentValidationResult =
         roles: string | null;
         body: string | null;
         contactUrl: string | null;
+        contactDiscord: string | null;
+        contactEmail: string | null;
         highlight: RecruitmentHighlight;
         active: boolean;
       };
@@ -109,8 +135,9 @@ export type RecruitmentValidationResult =
 /**
  * Valide et normalise une annonce de recrutement. Le titre est requis ; le pôle
  * défaut « AUTRE » ; la mise en avant défaut « NONE ». Référent / missions /
- * corps / lien sont optionnels et ramenés à `null` si vides. `active` défaut
- * `true`. Partagé client/serveur.
+ * corps / lien / Discord / email sont optionnels et ramenés à `null` si vides.
+ * L'email, s'il est fourni, doit avoir une forme plausible (sinon `INVALID_EMAIL`).
+ * `active` défaut `true`. Partagé client/serveur.
  */
 export function validateRecruitmentAdInput(input: RecruitmentAdInput): RecruitmentValidationResult {
   const title = typeof input.title === "string" ? input.title.trim() : "";
@@ -133,7 +160,17 @@ export function validateRecruitmentAdInput(input: RecruitmentAdInput): Recruitme
   const roles = normalizeOptional(input.roles, RECRUITMENT_ROLES_MAX);
   const body = normalizeOptional(input.body, RECRUITMENT_BODY_MAX);
   const contactUrl = normalizeOptional(input.contactUrl, RECRUITMENT_URL_MAX);
+  const contactDiscord = normalizeOptional(input.contactDiscord, RECRUITMENT_DISCORD_MAX);
+
+  const contactEmail = normalizeOptional(input.contactEmail, RECRUITMENT_EMAIL_MAX);
+  if (contactEmail !== null && !EMAIL_RE.test(contactEmail)) {
+    return { ok: false, error: "INVALID_EMAIL" };
+  }
+
   const active = input.active === undefined ? true : Boolean(input.active);
 
-  return { ok: true, value: { title, teamName, domain, roles, body, contactUrl, highlight, active } };
+  return {
+    ok: true,
+    value: { title, teamName, domain, roles, body, contactUrl, contactDiscord, contactEmail, highlight, active },
+  };
 }

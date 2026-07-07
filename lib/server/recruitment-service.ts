@@ -2,12 +2,17 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "./database";
 import { applyDisplayOrder } from "./reorder";
 import {
+  type RecruiterContactDefaults,
   type RecruitmentAd,
   type RecruitmentAdInput,
   validateRecruitmentAdInput,
 } from "@/lib/shared/recruitment";
 
-export type { RecruitmentAd, RecruitmentAdInput } from "@/lib/shared/recruitment";
+export type {
+  RecruiterContactDefaults,
+  RecruitmentAd,
+  RecruitmentAdInput,
+} from "@/lib/shared/recruitment";
 
 interface RecruitmentRow extends RowDataPacket {
   id: number;
@@ -17,6 +22,8 @@ interface RecruitmentRow extends RowDataPacket {
   roles: string | null;
   body: string | null;
   contact_url: string | null;
+  contact_discord: string | null;
+  contact_email: string | null;
   highlight: RecruitmentAd["highlight"];
   active: number;
 }
@@ -30,12 +37,14 @@ function fromRow(row: RecruitmentRow): RecruitmentAd {
     roles: row.roles,
     body: row.body,
     contactUrl: row.contact_url,
+    contactDiscord: row.contact_discord,
+    contactEmail: row.contact_email,
     highlight: row.highlight,
     active: Boolean(row.active),
   };
 }
 
-const SELECT_COLUMNS = `id, title, team_name, domain, roles, body, contact_url, highlight, active`;
+const SELECT_COLUMNS = `id, title, team_name, domain, roles, body, contact_url, contact_discord, contact_email, highlight, active`;
 
 /**
  * Liste les annonces de recrutement, triées par ordre d'affichage. Par défaut
@@ -80,29 +89,63 @@ export async function getHighlightedAd(): Promise<RecruitmentAd | null> {
   }
 }
 
+/**
+ * Récupère les coordonnées du recruteur (pseudo Discord + email) pour
+ * pré-remplir le formulaire de création d'annonce. Retourne des valeurs `null`
+ * si l'utilisateur est introuvable ou la base injoignable — l'auto-complétion
+ * est un confort, jamais un point de blocage.
+ */
+export async function getRecruiterContactDefaults(userId: number): Promise<RecruiterContactDefaults> {
+  try {
+    const db = await getDatabase();
+    const [rows] = await db.execute<(RowDataPacket & { discord_pseudo: string | null; email: string | null })[]>(
+      `SELECT discord_pseudo, email FROM bg_users WHERE id = ? LIMIT 1`,
+      [userId],
+    );
+    if (rows.length === 0) return { discord: null, email: null };
+    return { discord: rows[0].discord_pseudo, email: rows[0].email };
+  } catch {
+    return { discord: null, email: null };
+  }
+}
+
 /** Crée une annonce et la renvoie. Placée en fin de liste. */
 export async function createRecruitmentAd(input: RecruitmentAdInput): Promise<RecruitmentAd> {
   const validation = validateRecruitmentAdInput(input);
   if (!validation.ok) throw new Error(validation.error);
-  const { title, teamName, domain, roles, body, contactUrl, highlight, active } = validation.value;
+  const { title, teamName, domain, roles, body, contactUrl, contactDiscord, contactEmail, highlight, active } =
+    validation.value;
 
   const db = await getDatabase();
   const [res] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_recruitment_ads
-       (title, team_name, domain, roles, body, contact_url, highlight, active, display_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?,
+       (title, team_name, domain, roles, body, contact_url, contact_discord, contact_email, highlight, active, display_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
        (SELECT COALESCE(MAX(display_order), 0) + 10 FROM bg_recruitment_ads AS r))`,
-    [title, teamName, domain, roles, body, contactUrl, highlight, active ? 1 : 0],
+    [title, teamName, domain, roles, body, contactUrl, contactDiscord, contactEmail, highlight, active ? 1 : 0],
   );
 
-  return { id: Number(res.insertId), title, teamName, domain, roles, body, contactUrl, highlight, active };
+  return {
+    id: Number(res.insertId),
+    title,
+    teamName,
+    domain,
+    roles,
+    body,
+    contactUrl,
+    contactDiscord,
+    contactEmail,
+    highlight,
+    active,
+  };
 }
 
 /** Met à jour une annonce existante. Lève `RECRUITMENT_NOT_FOUND` si absente. */
 export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput): Promise<RecruitmentAd> {
   const validation = validateRecruitmentAdInput(input);
   if (!validation.ok) throw new Error(validation.error);
-  const { title, teamName, domain, roles, body, contactUrl, highlight, active } = validation.value;
+  const { title, teamName, domain, roles, body, contactUrl, contactDiscord, contactEmail, highlight, active } =
+    validation.value;
 
   const db = await getDatabase();
   // On vérifie l'existence par un SELECT plutôt que via `affectedRows` : sans
@@ -117,12 +160,13 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
 
   await db.execute<ResultSetHeader>(
     `UPDATE bg_recruitment_ads
-     SET title = ?, team_name = ?, domain = ?, roles = ?, body = ?, contact_url = ?, highlight = ?, active = ?
+     SET title = ?, team_name = ?, domain = ?, roles = ?, body = ?, contact_url = ?,
+         contact_discord = ?, contact_email = ?, highlight = ?, active = ?
      WHERE id = ?`,
-    [title, teamName, domain, roles, body, contactUrl, highlight, active ? 1 : 0, id],
+    [title, teamName, domain, roles, body, contactUrl, contactDiscord, contactEmail, highlight, active ? 1 : 0, id],
   );
 
-  return { id, title, teamName, domain, roles, body, contactUrl, highlight, active };
+  return { id, title, teamName, domain, roles, body, contactUrl, contactDiscord, contactEmail, highlight, active };
 }
 
 /**

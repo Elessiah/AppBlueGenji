@@ -4,11 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { CyberButton, CyberCard, Pill } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import {
+  type RecruiterContactDefaults,
   type RecruitmentAd,
   type RecruitmentDomain,
   type RecruitmentHighlight,
+  RECRUITMENT_DISCORD_MAX,
   RECRUITMENT_DOMAINS,
   RECRUITMENT_DOMAIN_LABELS,
+  RECRUITMENT_EMAIL_MAX,
   RECRUITMENT_HIGHLIGHTS,
   RECRUITMENT_HIGHLIGHT_LABELS,
 } from "@/lib/shared/recruitment";
@@ -17,6 +20,7 @@ import styles from "./page.module.css";
 interface RecruitmentSectionProps {
   initialAds: RecruitmentAd[];
   isAdmin: boolean;
+  contactDefaults?: RecruiterContactDefaults;
 }
 
 interface FormState {
@@ -26,6 +30,8 @@ interface FormState {
   roles: string;
   body: string;
   contactUrl: string;
+  contactDiscord: string;
+  contactEmail: string;
   highlight: RecruitmentHighlight;
   active: boolean;
 }
@@ -37,11 +43,19 @@ const EMPTY_FORM: FormState = {
   roles: "",
   body: "",
   contactUrl: "",
+  contactDiscord: "",
+  contactEmail: "",
   highlight: "NONE",
   active: true,
 };
 
-export function RecruitmentSection({ initialAds, isAdmin }: RecruitmentSectionProps) {
+// Un contact Discord fourni sous forme d'URL (invitation, lien profil) devient un
+// lien ; sinon c'est un pseudo à copier.
+function isUrl(value: string): boolean {
+  return /^(https?:\/\/|discord\.gg\/)/i.test(value.trim());
+}
+
+export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: RecruitmentSectionProps) {
   const { showError, showSuccess } = useToast();
   const [ads, setAds] = useState<RecruitmentAd[]>(initialAds);
   const [editing, setEditing] = useState<RecruitmentAd | null>(null);
@@ -63,7 +77,12 @@ export function RecruitmentSection({ initialAds, isAdmin }: RecruitmentSectionPr
 
   function openCreate() {
     setEditing(null);
-    setForm(EMPTY_FORM);
+    // Pré-remplissage depuis le profil du recruteur — modifiable / effaçable.
+    setForm({
+      ...EMPTY_FORM,
+      contactDiscord: contactDefaults?.discord ?? "",
+      contactEmail: contactDefaults?.email ?? "",
+    });
     setOpen(true);
   }
 
@@ -76,6 +95,8 @@ export function RecruitmentSection({ initialAds, isAdmin }: RecruitmentSectionPr
       roles: ad.roles ?? "",
       body: ad.body ?? "",
       contactUrl: ad.contactUrl ?? "",
+      contactDiscord: ad.contactDiscord ?? "",
+      contactEmail: ad.contactEmail ?? "",
       highlight: ad.highlight,
       active: ad.active,
     });
@@ -107,6 +128,8 @@ export function RecruitmentSection({ initialAds, isAdmin }: RecruitmentSectionPr
       roles: form.roles.trim() || null,
       body: form.body.trim() || null,
       contactUrl: form.contactUrl.trim() || null,
+      contactDiscord: form.contactDiscord.trim() || null,
+      contactEmail: form.contactEmail.trim() || null,
       highlight: form.highlight,
       active: form.active,
     };
@@ -190,6 +213,17 @@ export function RecruitmentSection({ initialAds, isAdmin }: RecruitmentSectionPr
     }
   }
 
+  // Copie un pseudo Discord dans le presse-papiers (les pseudos ne sont pas des
+  // liens). Toast de confirmation, jamais inline.
+  async function copyContact(value: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      showSuccess(`${label} copié : ${value}`);
+    } catch {
+      showError("Impossible de copier, copie manuellement.");
+    }
+  }
+
   const count = ads.length;
 
   return (
@@ -261,6 +295,43 @@ export function RecruitmentSection({ initialAds, isAdmin }: RecruitmentSectionPr
                 {ad.teamName && <p className={styles.cardTeam}>{ad.teamName}</p>}
                 {ad.roles && <p className={styles.cardRoles}>Missions : {ad.roles}</p>}
                 {ad.body && <p className={styles.cardBody}>{ad.body}</p>}
+
+                {(ad.contactDiscord || ad.contactEmail) && (
+                  <div className={styles.contactTags} aria-label="Contacts">
+                    {ad.contactDiscord &&
+                      (isUrl(ad.contactDiscord) ? (
+                        <a
+                          className={styles.contactTag}
+                          href={
+                            ad.contactDiscord.startsWith("http")
+                              ? ad.contactDiscord
+                              : `https://${ad.contactDiscord}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <span className={styles.contactTagKey}>Discord</span>
+                          <span className={styles.contactTagVal}>Rejoindre →</span>
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.contactTag}
+                          onClick={() => copyContact(ad.contactDiscord!, "Pseudo Discord")}
+                          title="Copier le pseudo Discord"
+                        >
+                          <span className={styles.contactTagKey}>Discord</span>
+                          <span className={styles.contactTagVal}>{ad.contactDiscord}</span>
+                        </button>
+                      ))}
+                    {ad.contactEmail && (
+                      <a className={styles.contactTag} href={`mailto:${ad.contactEmail}`}>
+                        <span className={styles.contactTagKey}>Email</span>
+                        <span className={styles.contactTagVal}>{ad.contactEmail}</span>
+                      </a>
+                    )}
+                  </div>
+                )}
 
                 <div className={styles.cardFooter}>
                   {ad.contactUrl && (
@@ -386,6 +457,36 @@ export function RecruitmentSection({ initialAds, isAdmin }: RecruitmentSectionPr
                 onChange={(e) => set("contactUrl", e.target.value)}
               />
             </label>
+
+            <div className={styles.modalRow}>
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Contact Discord (optionnel)</span>
+                <input
+                  className={styles.modalInput}
+                  value={form.contactDiscord}
+                  maxLength={RECRUITMENT_DISCORD_MAX}
+                  placeholder="pseudo#0000 ou lien d'invitation"
+                  onChange={(e) => set("contactDiscord", e.target.value)}
+                />
+                <span className={styles.modalHint}>Pseudo (copiable) ou lien d'invitation Discord.</span>
+              </label>
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Contact email (optionnel)</span>
+                <input
+                  className={styles.modalInput}
+                  type="email"
+                  value={form.contactEmail}
+                  maxLength={RECRUITMENT_EMAIL_MAX}
+                  placeholder="recrutement@bluegenji.gg"
+                  onChange={(e) => set("contactEmail", e.target.value)}
+                />
+              </label>
+            </div>
+            {!editing && (contactDefaults?.discord || contactDefaults?.email) && (
+              <p className={styles.modalHint}>
+                Pré-rempli depuis ton profil — modifie ou efface librement.
+              </p>
+            )}
 
             <label className={styles.modalField}>
               <span className={styles.modalLabel}>Mise en avant (annonce urgente)</span>

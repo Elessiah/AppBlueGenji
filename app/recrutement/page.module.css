@@ -133,6 +133,55 @@
   white-space: pre-wrap;
 }
 
+/* Tags de contact (Discord / email) */
+.contactTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.contactTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-mute);
+  text-decoration: none;
+  background: var(--cyber-bg-2, rgba(90, 200, 255, 0.03));
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-sm);
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.contactTag:hover {
+  color: var(--ink);
+  border-color: var(--blue-500);
+  background: rgba(90, 200, 255, 0.06);
+}
+
+.contactTag:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+.contactTagKey {
+  flex-shrink: 0;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--blue-300);
+}
+
+.contactTagVal {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .cardFooter {
   display: flex;
   align-items: center;
