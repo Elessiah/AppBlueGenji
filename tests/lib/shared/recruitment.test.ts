@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  RECRUITMENT_CONTACT_CHANNELS,
   RECRUITMENT_DOMAINS,
   RECRUITMENT_HIGHLIGHTS,
   validateRecruitmentAdInput,
@@ -19,6 +20,8 @@ describe("validateRecruitmentAdInput", () => {
         contactUrl: null,
         contactDiscord: null,
         contactEmail: null,
+        contactDiscordId: null,
+        contactPreferred: "AUTO",
         highlight: "NONE",
         active: true,
       });
@@ -145,5 +148,48 @@ describe("validateRecruitmentAdInput", () => {
       ok: false,
       error: "INVALID_EMAIL",
     });
+  });
+
+  it("accepts every valid contact channel and defaults to AUTO", () => {
+    for (const channel of RECRUITMENT_CONTACT_CHANNELS) {
+      const result = validateRecruitmentAdInput({ title: "X", contactPreferred: channel });
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.value.contactPreferred).toBe(channel);
+    }
+    const empty = validateRecruitmentAdInput({ title: "X", contactPreferred: "" });
+    expect(empty.ok).toBe(true);
+    if (empty.ok) expect(empty.value.contactPreferred).toBe("AUTO");
+  });
+
+  it("rejects an invalid contact channel", () => {
+    expect(validateRecruitmentAdInput({ title: "X", contactPreferred: "SMS" })).toEqual({
+      ok: false,
+      error: "INVALID_CONTACT_CHANNEL",
+    });
+  });
+
+  it("keeps a Discord id only when a pseudo accompanies it", () => {
+    const withPseudo = validateRecruitmentAdInput({
+      title: "X",
+      contactDiscord: "marie",
+      contactDiscordId: "123456789012345678",
+    });
+    expect(withPseudo.ok).toBe(true);
+    if (withPseudo.ok) expect(withPseudo.value.contactDiscordId).toBe("123456789012345678");
+
+    // Sans pseudo, l'id seul ne sert à rien : neutralisé.
+    const orphan = validateRecruitmentAdInput({ title: "X", contactDiscordId: "123456789012345678" });
+    expect(orphan.ok).toBe(true);
+    if (orphan.ok) expect(orphan.value.contactDiscordId).toBeNull();
+  });
+
+  it("drops a Discord id that is not a snowflake", () => {
+    const result = validateRecruitmentAdInput({
+      title: "X",
+      contactDiscord: "marie",
+      contactDiscordId: "not-a-snowflake",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.contactDiscordId).toBeNull();
   });
 });
