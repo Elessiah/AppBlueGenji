@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { CyberButton, CyberCard, Pill } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import {
   type RecruiterContactDefaults,
   type RecruitmentAd,
+  type RecruitmentContactChannel,
   type RecruitmentDomain,
   type RecruitmentHighlight,
+  RECRUITMENT_CONTACT_CHANNELS,
+  RECRUITMENT_CONTACT_CHANNEL_LABELS,
   RECRUITMENT_DISCORD_MAX,
   RECRUITMENT_DOMAINS,
   RECRUITMENT_DOMAIN_LABELS,
@@ -32,6 +35,7 @@ interface FormState {
   contactUrl: string;
   contactDiscord: string;
   contactEmail: string;
+  contactPreferred: RecruitmentContactChannel;
   highlight: RecruitmentHighlight;
   active: boolean;
 }
@@ -45,6 +49,7 @@ const EMPTY_FORM: FormState = {
   contactUrl: "",
   contactDiscord: "",
   contactEmail: "",
+  contactPreferred: "AUTO",
   highlight: "NONE",
   active: true,
 };
@@ -55,6 +60,58 @@ function isUrl(value: string): boolean {
   return /^(https?:\/\/|discord\.gg\/)/i.test(value.trim());
 }
 
+// Normalise une URL Discord/lien pour l'attribut href (préfixe le schéma si absent).
+function toHref(value: string): string {
+  const v = value.trim();
+  return v.startsWith("http") ? v : `https://${v}`;
+}
+
+/* Icônes de canal — Discord en glyphe de marque (fill), le reste en trait (stroke)
+   pour rester cohérent avec l'iconographie « cyber minimal » du site. */
+function DiscordGlyph() {
+  return (
+    <svg className={styles.contactTagIcon} viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+      <path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.011c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+    </svg>
+  );
+}
+
+function strokeIcon(children: ReactNode) {
+  return (
+    <svg
+      className={styles.contactTagIcon}
+      viewBox="0 0 24 24"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  );
+}
+
+const MailGlyph = () => strokeIcon(<><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-10 6L2 7" /></>);
+const CopyGlyph = () =>
+  strokeIcon(
+    <>
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </>,
+  );
+const OpenGlyph = () =>
+  strokeIcon(
+    <>
+      <path d="M15 3h6v6" />
+      <path d="M10 14 21 3" />
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    </>,
+  );
+
 export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: RecruitmentSectionProps) {
   const { showError, showSuccess } = useToast();
   const [ads, setAds] = useState<RecruitmentAd[]>(initialAds);
@@ -62,7 +119,13 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Emails révélés (anti-scraping) : masqués tant que le visiteur n'a pas cliqué.
+  const [revealed, setRevealed] = useState<Set<number>>(new Set());
   const titleRef = useRef<HTMLInputElement>(null);
+  // Couple (pseudo, id Discord) cohérent connu au moment de l'ouverture du
+  // formulaire. On ne renvoie l'`id` (deep-link) que si le pseudo n'a pas été
+  // remplacé, pour éviter d'associer l'id d'un recruteur à un pseudo tiers.
+  const discordSnapshot = useRef<{ pseudo: string; id: string | null }>({ pseudo: "", id: null });
 
   useEffect(() => {
     if (!open) return;
@@ -77,12 +140,10 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
 
   function openCreate() {
     setEditing(null);
+    const discord = contactDefaults?.discord ?? "";
     // Pré-remplissage depuis le profil du recruteur — modifiable / effaçable.
-    setForm({
-      ...EMPTY_FORM,
-      contactDiscord: contactDefaults?.discord ?? "",
-      contactEmail: contactDefaults?.email ?? "",
-    });
+    setForm({ ...EMPTY_FORM, contactDiscord: discord, contactEmail: contactDefaults?.email ?? "" });
+    discordSnapshot.current = { pseudo: discord, id: contactDefaults?.discordId ?? null };
     setOpen(true);
   }
 
@@ -97,9 +158,12 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
       contactUrl: ad.contactUrl ?? "",
       contactDiscord: ad.contactDiscord ?? "",
       contactEmail: ad.contactEmail ?? "",
+      contactPreferred: ad.contactPreferred,
       highlight: ad.highlight,
       active: ad.active,
     });
+    // L'id enregistré reste valide tant que le pseudo n'est pas modifié.
+    discordSnapshot.current = { pseudo: ad.contactDiscord ?? "", id: ad.contactDiscordId };
     setOpen(true);
   }
 
@@ -121,6 +185,11 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
     }
 
     setBusy(true);
+    const discord = form.contactDiscord.trim();
+    // On ne conserve l'id de deep-link que si le pseudo est resté celui pour
+    // lequel l'id a été dérivé (profil du recruteur ou valeur enregistrée).
+    const contactDiscordId =
+      discord && discord === discordSnapshot.current.pseudo ? discordSnapshot.current.id : null;
     const payload = {
       title: form.title.trim(),
       teamName: form.teamName.trim() || null,
@@ -128,8 +197,10 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
       roles: form.roles.trim() || null,
       body: form.body.trim() || null,
       contactUrl: form.contactUrl.trim() || null,
-      contactDiscord: form.contactDiscord.trim() || null,
+      contactDiscord: discord || null,
       contactEmail: form.contactEmail.trim() || null,
+      contactDiscordId,
+      contactPreferred: form.contactPreferred,
       highlight: form.highlight,
       active: form.active,
     };
@@ -213,8 +284,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
     }
   }
 
-  // Copie un pseudo Discord dans le presse-papiers (les pseudos ne sont pas des
-  // liens). Toast de confirmation, jamais inline.
+  // Copie une valeur dans le presse-papiers. Toast de confirmation, jamais inline.
   async function copyContact(value: string, label: string) {
     try {
       await navigator.clipboard.writeText(value);
@@ -222,6 +292,25 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
     } catch {
       showError("Impossible de copier, copie manuellement.");
     }
+  }
+
+  // Copie l'ensemble des canaux de contact d'une annonce, prêt à coller en DM.
+  async function copyAllContacts(ad: RecruitmentAd) {
+    const lines: string[] = [];
+    if (ad.contactDiscord) lines.push(`Discord : ${ad.contactDiscord}`);
+    if (ad.contactEmail) lines.push(`Email : ${ad.contactEmail}`);
+    if (ad.contactUrl) lines.push(`Lien : ${ad.contactUrl}`);
+    if (lines.length === 0) return;
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+      showSuccess("Contacts copiés dans le presse-papiers.");
+    } catch {
+      showError("Impossible de copier, copie manuellement.");
+    }
+  }
+
+  function revealEmail(id: number) {
+    setRevealed((prev) => new Set(prev).add(id));
   }
 
   const count = ads.length;
@@ -296,46 +385,85 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
                 {ad.roles && <p className={styles.cardRoles}>Missions : {ad.roles}</p>}
                 {ad.body && <p className={styles.cardBody}>{ad.body}</p>}
 
-                {(ad.contactDiscord || ad.contactEmail) && (
+                {(ad.contactDiscord || ad.contactEmail || ad.contactDiscordId) && (
                   <div className={styles.contactTags} aria-label="Contacts">
                     {ad.contactDiscord &&
                       (isUrl(ad.contactDiscord) ? (
                         <a
-                          className={styles.contactTag}
-                          href={
-                            ad.contactDiscord.startsWith("http")
-                              ? ad.contactDiscord
-                              : `https://${ad.contactDiscord}`
-                          }
+                          className={`${styles.contactTag} ${ad.contactPreferred === "DISCORD" ? styles.contactTagPrimary : ""}`}
+                          href={toHref(ad.contactDiscord)}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
+                          <DiscordGlyph />
                           <span className={styles.contactTagKey}>Discord</span>
-                          <span className={styles.contactTagVal}>Rejoindre →</span>
+                          <span className={styles.contactTagVal}>Rejoindre</span>
+                          <OpenGlyph />
                         </a>
                       ) : (
                         <button
                           type="button"
-                          className={styles.contactTag}
+                          className={`${styles.contactTag} ${ad.contactPreferred === "DISCORD" ? styles.contactTagPrimary : ""}`}
                           onClick={() => copyContact(ad.contactDiscord!, "Pseudo Discord")}
                           title="Copier le pseudo Discord"
                         >
+                          <DiscordGlyph />
                           <span className={styles.contactTagKey}>Discord</span>
                           <span className={styles.contactTagVal}>{ad.contactDiscord}</span>
+                          <CopyGlyph />
                         </button>
                       ))}
-                    {ad.contactEmail && (
-                      <a className={styles.contactTag} href={`mailto:${ad.contactEmail}`}>
-                        <span className={styles.contactTagKey}>Email</span>
-                        <span className={styles.contactTagVal}>{ad.contactEmail}</span>
+                    {ad.contactDiscordId && (
+                      <a
+                        className={styles.contactTag}
+                        href={`https://discord.com/users/${ad.contactDiscordId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Ouvrir la conversation Discord"
+                      >
+                        <DiscordGlyph />
+                        <span className={styles.contactTagVal}>Ouvrir</span>
+                        <OpenGlyph />
                       </a>
+                    )}
+                    {ad.contactEmail &&
+                      (revealed.has(ad.id) ? (
+                        <a
+                          className={`${styles.contactTag} ${ad.contactPreferred === "EMAIL" ? styles.contactTagPrimary : ""}`}
+                          href={`mailto:${ad.contactEmail}?subject=${encodeURIComponent(`Candidature — ${ad.title}`)}`}
+                        >
+                          <MailGlyph />
+                          <span className={styles.contactTagKey}>Email</span>
+                          <span className={styles.contactTagVal}>{ad.contactEmail}</span>
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          className={`${styles.contactTag} ${ad.contactPreferred === "EMAIL" ? styles.contactTagPrimary : ""}`}
+                          onClick={() => revealEmail(ad.id)}
+                          title="Afficher l'adresse email"
+                        >
+                          <MailGlyph />
+                          <span className={styles.contactTagVal}>Révéler l'email</span>
+                        </button>
+                      ))}
+                    {[ad.contactDiscord, ad.contactEmail, ad.contactUrl].filter(Boolean).length >= 2 && (
+                      <button
+                        type="button"
+                        className={styles.contactTag}
+                        onClick={() => copyAllContacts(ad)}
+                        title="Copier tous les contacts"
+                      >
+                        <CopyGlyph />
+                        <span className={styles.contactTagVal}>Copier les contacts</span>
+                      </button>
                     )}
                   </div>
                 )}
 
                 <div className={styles.cardFooter}>
                   {ad.contactUrl && (
-                    <CyberButton variant="ghost" asChild>
+                    <CyberButton variant={ad.contactPreferred === "LINK" ? "primary" : "ghost"} asChild>
                       <a href={ad.contactUrl} target="_blank" rel="noopener noreferrer">
                         Postuler →
                       </a>
@@ -487,6 +615,22 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
                 Pré-rempli depuis ton profil — modifie ou efface librement.
               </p>
             )}
+
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Canal de contact préféré</span>
+              <select
+                className={styles.modalInput}
+                value={form.contactPreferred}
+                onChange={(e) => set("contactPreferred", e.target.value as RecruitmentContactChannel)}
+              >
+                {RECRUITMENT_CONTACT_CHANNELS.map((c) => (
+                  <option key={c} value={c}>
+                    {RECRUITMENT_CONTACT_CHANNEL_LABELS[c]}
+                  </option>
+                ))}
+              </select>
+              <span className={styles.modalHint}>Le canal choisi est mis en avant sur l'annonce.</span>
+            </label>
 
             <label className={styles.modalField}>
               <span className={styles.modalLabel}>Mise en avant (annonce urgente)</span>

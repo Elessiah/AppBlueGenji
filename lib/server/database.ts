@@ -493,6 +493,8 @@ async function runMigrations(db: Pool): Promise<void> {
       contact_url VARCHAR(2048) NULL,
       contact_discord VARCHAR(120) NULL,
       contact_email VARCHAR(254) NULL,
+      contact_discord_id VARCHAR(32) NULL,
+      contact_preferred ENUM('AUTO', 'DISCORD', 'EMAIL', 'LINK') NOT NULL DEFAULT 'AUTO',
       highlight ENUM('NONE', 'BANNER', 'MODAL') NOT NULL DEFAULT 'NONE',
       active TINYINT(1) NOT NULL DEFAULT 1,
       display_order INT NOT NULL DEFAULT 100,
@@ -550,6 +552,22 @@ async function runMigrations(db: Pool): Promise<void> {
     await db.execute(`
       ALTER TABLE bg_recruitment_ads
       ADD COLUMN contact_email VARCHAR(254) NULL AFTER contact_discord
+    `);
+  } catch {
+    // Colonne déjà présente.
+  }
+  try {
+    await db.execute(`
+      ALTER TABLE bg_recruitment_ads
+      ADD COLUMN contact_discord_id VARCHAR(32) NULL AFTER contact_email
+    `);
+  } catch {
+    // Colonne déjà présente.
+  }
+  try {
+    await db.execute(`
+      ALTER TABLE bg_recruitment_ads
+      ADD COLUMN contact_preferred ENUM('AUTO', 'DISCORD', 'EMAIL', 'LINK') NOT NULL DEFAULT 'AUTO' AFTER contact_discord_id
     `);
   } catch {
     // Colonne déjà présente.

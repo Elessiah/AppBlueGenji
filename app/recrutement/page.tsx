@@ -28,7 +28,9 @@ export default async function RecrutementPage() {
   const ads = await listRecruitmentAds(isAdmin);
   // Coordonnées du recruteur pour pré-remplir le formulaire (édition libre).
   const contactDefaults: RecruiterContactDefaults =
-    isAdmin && user ? await getRecruiterContactDefaults(user.id) : { discord: null, email: null };
+    isAdmin && user
+      ? await getRecruiterContactDefaults(user.id)
+      : { discord: null, discordId: null, email: null };
 
   return (
     <main style={{ position: "relative", zIndex: 1 }}>

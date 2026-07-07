@@ -37,6 +37,8 @@ export async function POST(req: Request) {
       contactUrl: typeof body.contactUrl === "string" ? body.contactUrl : null,
       contactDiscord: typeof body.contactDiscord === "string" ? body.contactDiscord : null,
       contactEmail: typeof body.contactEmail === "string" ? body.contactEmail : null,
+      contactDiscordId: typeof body.contactDiscordId === "string" ? body.contactDiscordId : null,
+      contactPreferred: typeof body.contactPreferred === "string" ? body.contactPreferred : undefined,
       highlight: typeof body.highlight === "string" ? body.highlight : undefined,
       active: typeof body.active === "boolean" ? body.active : undefined,
     });

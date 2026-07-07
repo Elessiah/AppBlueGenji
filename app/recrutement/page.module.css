@@ -169,6 +169,11 @@
   outline-offset: 2px;
 }
 
+.contactTagIcon {
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
 .contactTagKey {
   flex-shrink: 0;
   letter-spacing: 0.12em;
@@ -180,6 +185,21 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Canal préféré : tag mis en avant en bleu glacier. */
+.contactTagPrimary {
+  color: var(--ink);
+  border-color: var(--blue-500);
+  background: rgba(90, 200, 255, 0.1);
+}
+
+.contactTagPrimary .contactTagKey {
+  color: var(--blue-100);
+}
+
+.contactTagPrimary:hover {
+  background: rgba(90, 200, 255, 0.16);
 }
 
 .cardFooter {
