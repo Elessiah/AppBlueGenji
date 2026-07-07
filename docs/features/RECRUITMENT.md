@@ -27,6 +27,8 @@ Table `bg_recruitment_ads` (migration auto dans `lib/server/database.ts`) :
 | `contact_url`   | `VARCHAR(2048)` nullable               | Lien de candidature (Discord, formulaire…) |
 | `contact_discord` | `VARCHAR(120)` nullable              | Contact Discord : pseudo (copiable) ou lien d'invitation |
 | `contact_email` | `VARCHAR(254)` nullable                | Contact email (affiché en `mailto:`) |
+| `contact_discord_id` | `VARCHAR(32)` nullable            | ID Discord (snowflake) pour le deep-link « Ouvrir » |
+| `contact_preferred` | `ENUM('AUTO','DISCORD','EMAIL','LINK')` | Canal mis en avant (stylé en primaire) |
 | `highlight`     | `ENUM('NONE','BANNER','MODAL')`        | Mode de mise en avant urgente |
 | `active`        | `TINYINT(1)`                           | Visible publiquement (`0` = brouillon) |
 | `display_order` | `INT`                                  | Ordre d'affichage (réordonnable) |
@@ -38,19 +40,31 @@ Table `bg_recruitment_ads` (migration auto dans `lib/server/database.ts`) :
 ## Tags de contact
 
 Chaque annonce peut exposer, en plus du lien « Postuler » (`contact_url`), des
-**tags de contact** cliquables sous la description :
+**tags de contact** cliquables (avec icône de canal) sous la description :
 
 - **Discord** (`contact_discord`) — si la valeur est un pseudo, le tag copie le
   pseudo dans le presse-papiers (toast de confirmation) ; si c'est une URL
-  (`https://…` ou `discord.gg/…`), il devient un lien « Rejoindre → ».
-- **Email** (`contact_email`) — tag `mailto:`. La validation partagée refuse un
-  email manifestement malformé (`INVALID_EMAIL`).
+  (`https://…` ou `discord.gg/…`), il devient un lien « Rejoindre ».
+- **Ouvrir Discord** (`contact_discord_id`) — quand un ID Discord (snowflake) est
+  connu, un tag supplémentaire ouvre la conversation directe
+  (`discord.com/users/<id>`). L'ID n'est retenu que tant que le pseudo associé
+  n'est pas remplacé (garde-fou côté client + validation).
+- **Email** (`contact_email`) — masqué par défaut (anti-scraping) : un tag
+  « Révéler l'email » l'affiche, puis un lien `mailto:` avec sujet pré-rempli
+  (`Candidature — <titre>`). La validation partagée refuse un email manifestement
+  malformé (`INVALID_EMAIL`). L'email **n'est jamais obligatoire**.
+- **Copier les contacts** — dès qu'au moins deux canaux existent, un tag copie un
+  bloc formaté (Discord + email + lien) prêt à coller en DM.
 
-**Auto-complétion** : à la création d'une annonce, le formulaire pré-remplit ces
-deux champs à partir du profil du recruteur connecté (`discord_pseudo`, `email`
-via `getRecruiterContactDefaults()`), **sans bloquer l'édition** — le recruteur
-peut modifier ou vider chaque champ. En édition d'une annonce existante, aucun
-pré-remplissage : on affiche les valeurs enregistrées.
+**Canal préféré** (`contact_preferred`, défaut `AUTO`) : le recruteur peut mettre
+un canal en avant (`DISCORD`, `EMAIL`, `LINK`) ; le tag correspondant est stylé en
+primaire (bleu glacier). `AUTO` = aucun canal privilégié.
+
+**Auto-complétion** : à la création d'une annonce, le formulaire pré-remplit
+Discord + email à partir du profil du recruteur connecté (`discord_pseudo`,
+`discord_id`, `email` via `getRecruiterContactDefaults()`), **sans bloquer
+l'édition** — le recruteur peut modifier ou vider chaque champ. En édition d'une
+annonce existante, aucun pré-remplissage : on affiche les valeurs enregistrées.
 
 ## Mise en avant urgente (`highlight`)
 
