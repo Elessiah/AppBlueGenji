@@ -30,7 +30,7 @@ export default async function RecrutementPage() {
   const contactDefaults: RecruiterContactDefaults =
     isAdmin && user
       ? await getRecruiterContactDefaults(user.id)
-      : { discord: null, discordId: null, email: null };
+      : { discord: null, discordId: null };
 
   return (
     <main style={{ position: "relative", zIndex: 1 }}>

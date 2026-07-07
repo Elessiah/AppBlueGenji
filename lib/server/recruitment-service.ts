@@ -23,7 +23,6 @@ interface RecruitmentRow extends RowDataPacket {
   body: string | null;
   contact_url: string | null;
   contact_discord: string | null;
-  contact_email: string | null;
   contact_discord_id: string | null;
   contact_preferred: RecruitmentAd["contactPreferred"];
   highlight: RecruitmentAd["highlight"];
@@ -40,7 +39,6 @@ function fromRow(row: RecruitmentRow): RecruitmentAd {
     body: row.body,
     contactUrl: row.contact_url,
     contactDiscord: row.contact_discord,
-    contactEmail: row.contact_email,
     contactDiscordId: row.contact_discord_id,
     contactPreferred: row.contact_preferred ?? "AUTO",
     highlight: row.highlight,
@@ -48,7 +46,7 @@ function fromRow(row: RecruitmentRow): RecruitmentAd {
   };
 }
 
-const SELECT_COLUMNS = `id, title, team_name, domain, roles, body, contact_url, contact_discord, contact_email, contact_discord_id, contact_preferred, highlight, active`;
+const SELECT_COLUMNS = `id, title, team_name, domain, roles, body, contact_url, contact_discord, contact_discord_id, contact_preferred, highlight, active`;
 
 /**
  * Liste les annonces de recrutement, triées par ordre d'affichage. Par défaut
@@ -94,7 +92,7 @@ export async function getHighlightedAd(): Promise<RecruitmentAd | null> {
 }
 
 /**
- * Récupère les coordonnées du recruteur (pseudo Discord + email) pour
+ * Récupère les coordonnées Discord du recruteur (pseudo + id snowflake) pour
  * pré-remplir le formulaire de création d'annonce. Retourne des valeurs `null`
  * si l'utilisateur est introuvable ou la base injoignable — l'auto-complétion
  * est un confort, jamais un point de blocage.
@@ -103,15 +101,15 @@ export async function getRecruiterContactDefaults(userId: number): Promise<Recru
   try {
     const db = await getDatabase();
     const [rows] = await db.execute<
-      (RowDataPacket & { discord_pseudo: string | null; discord_id: string | null; email: string | null })[]
+      (RowDataPacket & { discord_pseudo: string | null; discord_id: string | null })[]
     >(
-      `SELECT discord_pseudo, discord_id, email FROM bg_users WHERE id = ? LIMIT 1`,
+      `SELECT discord_pseudo, discord_id FROM bg_users WHERE id = ? LIMIT 1`,
       [userId],
     );
-    if (rows.length === 0) return { discord: null, discordId: null, email: null };
-    return { discord: rows[0].discord_pseudo, discordId: rows[0].discord_id, email: rows[0].email };
+    if (rows.length === 0) return { discord: null, discordId: null };
+    return { discord: rows[0].discord_pseudo, discordId: rows[0].discord_id };
   } catch {
-    return { discord: null, discordId: null, email: null };
+    return { discord: null, discordId: null };
   }
 }
 
@@ -127,7 +125,6 @@ export async function createRecruitmentAd(input: RecruitmentAdInput): Promise<Re
     body,
     contactUrl,
     contactDiscord,
-    contactEmail,
     contactDiscordId,
     contactPreferred,
     highlight,
@@ -137,9 +134,9 @@ export async function createRecruitmentAd(input: RecruitmentAdInput): Promise<Re
   const db = await getDatabase();
   const [res] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_recruitment_ads
-       (title, team_name, domain, roles, body, contact_url, contact_discord, contact_email,
+       (title, team_name, domain, roles, body, contact_url, contact_discord,
         contact_discord_id, contact_preferred, highlight, active, display_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
        (SELECT COALESCE(MAX(display_order), 0) + 10 FROM bg_recruitment_ads AS r))`,
     [
       title,
@@ -149,7 +146,6 @@ export async function createRecruitmentAd(input: RecruitmentAdInput): Promise<Re
       body,
       contactUrl,
       contactDiscord,
-      contactEmail,
       contactDiscordId,
       contactPreferred,
       highlight,
@@ -166,7 +162,6 @@ export async function createRecruitmentAd(input: RecruitmentAdInput): Promise<Re
     body,
     contactUrl,
     contactDiscord,
-    contactEmail,
     contactDiscordId,
     contactPreferred,
     highlight,
@@ -186,7 +181,6 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
     body,
     contactUrl,
     contactDiscord,
-    contactEmail,
     contactDiscordId,
     contactPreferred,
     highlight,
@@ -207,7 +201,7 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
   await db.execute<ResultSetHeader>(
     `UPDATE bg_recruitment_ads
      SET title = ?, team_name = ?, domain = ?, roles = ?, body = ?, contact_url = ?,
-         contact_discord = ?, contact_email = ?, contact_discord_id = ?, contact_preferred = ?,
+         contact_discord = ?, contact_discord_id = ?, contact_preferred = ?,
          highlight = ?, active = ?
      WHERE id = ?`,
     [
@@ -218,7 +212,6 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
       body,
       contactUrl,
       contactDiscord,
-      contactEmail,
       contactDiscordId,
       contactPreferred,
       highlight,
@@ -236,7 +229,6 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
     body,
     contactUrl,
     contactDiscord,
-    contactEmail,
     contactDiscordId,
     contactPreferred,
     highlight,

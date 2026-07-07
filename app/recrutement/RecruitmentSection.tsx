@@ -14,7 +14,6 @@ import {
   RECRUITMENT_DISCORD_MAX,
   RECRUITMENT_DOMAINS,
   RECRUITMENT_DOMAIN_LABELS,
-  RECRUITMENT_EMAIL_MAX,
   RECRUITMENT_HIGHLIGHTS,
   RECRUITMENT_HIGHLIGHT_LABELS,
 } from "@/lib/shared/recruitment";
@@ -34,7 +33,6 @@ interface FormState {
   body: string;
   contactUrl: string;
   contactDiscord: string;
-  contactEmail: string;
   contactPreferred: RecruitmentContactChannel;
   highlight: RecruitmentHighlight;
   active: boolean;
@@ -48,7 +46,6 @@ const EMPTY_FORM: FormState = {
   body: "",
   contactUrl: "",
   contactDiscord: "",
-  contactEmail: "",
   contactPreferred: "AUTO",
   highlight: "NONE",
   active: true,
@@ -95,7 +92,6 @@ function strokeIcon(children: ReactNode) {
   );
 }
 
-const MailGlyph = () => strokeIcon(<><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-10 6L2 7" /></>);
 const CopyGlyph = () =>
   strokeIcon(
     <>
@@ -119,8 +115,6 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  // Emails révélés (anti-scraping) : masqués tant que le visiteur n'a pas cliqué.
-  const [revealed, setRevealed] = useState<Set<number>>(new Set());
   const titleRef = useRef<HTMLInputElement>(null);
   // Couple (pseudo, id Discord) cohérent connu au moment de l'ouverture du
   // formulaire. On ne renvoie l'`id` (deep-link) que si le pseudo n'a pas été
@@ -141,8 +135,8 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
   function openCreate() {
     setEditing(null);
     const discord = contactDefaults?.discord ?? "";
-    // Pré-remplissage depuis le profil du recruteur — modifiable / effaçable.
-    setForm({ ...EMPTY_FORM, contactDiscord: discord, contactEmail: contactDefaults?.email ?? "" });
+    // Pré-remplissage du Discord depuis le profil du recruteur — modifiable / effaçable.
+    setForm({ ...EMPTY_FORM, contactDiscord: discord });
     discordSnapshot.current = { pseudo: discord, id: contactDefaults?.discordId ?? null };
     setOpen(true);
   }
@@ -157,7 +151,6 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
       body: ad.body ?? "",
       contactUrl: ad.contactUrl ?? "",
       contactDiscord: ad.contactDiscord ?? "",
-      contactEmail: ad.contactEmail ?? "",
       contactPreferred: ad.contactPreferred,
       highlight: ad.highlight,
       active: ad.active,
@@ -198,7 +191,6 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
       body: form.body.trim() || null,
       contactUrl: form.contactUrl.trim() || null,
       contactDiscord: discord || null,
-      contactEmail: form.contactEmail.trim() || null,
       contactDiscordId,
       contactPreferred: form.contactPreferred,
       highlight: form.highlight,
@@ -298,7 +290,6 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
   async function copyAllContacts(ad: RecruitmentAd) {
     const lines: string[] = [];
     if (ad.contactDiscord) lines.push(`Discord : ${ad.contactDiscord}`);
-    if (ad.contactEmail) lines.push(`Email : ${ad.contactEmail}`);
     if (ad.contactUrl) lines.push(`Lien : ${ad.contactUrl}`);
     if (lines.length === 0) return;
     try {
@@ -307,10 +298,6 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
     } catch {
       showError("Impossible de copier, copie manuellement.");
     }
-  }
-
-  function revealEmail(id: number) {
-    setRevealed((prev) => new Set(prev).add(id));
   }
 
   const count = ads.length;
@@ -385,7 +372,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
                 {ad.roles && <p className={styles.cardRoles}>Missions : {ad.roles}</p>}
                 {ad.body && <p className={styles.cardBody}>{ad.body}</p>}
 
-                {(ad.contactDiscord || ad.contactEmail || ad.contactDiscordId) && (
+                {(ad.contactDiscord || ad.contactDiscordId) && (
                   <div className={styles.contactTags} aria-label="Contacts">
                     {ad.contactDiscord &&
                       (isUrl(ad.contactDiscord) ? (
@@ -426,28 +413,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
                         <OpenGlyph />
                       </a>
                     )}
-                    {ad.contactEmail &&
-                      (revealed.has(ad.id) ? (
-                        <a
-                          className={`${styles.contactTag} ${ad.contactPreferred === "EMAIL" ? styles.contactTagPrimary : ""}`}
-                          href={`mailto:${ad.contactEmail}?subject=${encodeURIComponent(`Candidature — ${ad.title}`)}`}
-                        >
-                          <MailGlyph />
-                          <span className={styles.contactTagKey}>Email</span>
-                          <span className={styles.contactTagVal}>{ad.contactEmail}</span>
-                        </a>
-                      ) : (
-                        <button
-                          type="button"
-                          className={`${styles.contactTag} ${ad.contactPreferred === "EMAIL" ? styles.contactTagPrimary : ""}`}
-                          onClick={() => revealEmail(ad.id)}
-                          title="Afficher l'adresse email"
-                        >
-                          <MailGlyph />
-                          <span className={styles.contactTagVal}>Révéler l'email</span>
-                        </button>
-                      ))}
-                    {[ad.contactDiscord, ad.contactEmail, ad.contactUrl].filter(Boolean).length >= 2 && (
+                    {[ad.contactDiscord, ad.contactUrl].filter(Boolean).length >= 2 && (
                       <button
                         type="button"
                         className={styles.contactTag}
@@ -581,38 +547,28 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
                 className={styles.modalInput}
                 value={form.contactUrl}
                 maxLength={2048}
-                placeholder="https://discord.gg/…"
+                placeholder="https://…/ticket (SpiceWorks, formulaire…)"
                 onChange={(e) => set("contactUrl", e.target.value)}
               />
+              <span className={styles.modalHint}>
+                Bouton « Postuler → » de l'annonce. Idéal : un lien vers un ticket SpiceWorks.
+              </span>
             </label>
 
-            <div className={styles.modalRow}>
-              <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Contact Discord (optionnel)</span>
-                <input
-                  className={styles.modalInput}
-                  value={form.contactDiscord}
-                  maxLength={RECRUITMENT_DISCORD_MAX}
-                  placeholder="pseudo#0000 ou lien d'invitation"
-                  onChange={(e) => set("contactDiscord", e.target.value)}
-                />
-                <span className={styles.modalHint}>Pseudo (copiable) ou lien d'invitation Discord.</span>
-              </label>
-              <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Contact email (optionnel)</span>
-                <input
-                  className={styles.modalInput}
-                  type="email"
-                  value={form.contactEmail}
-                  maxLength={RECRUITMENT_EMAIL_MAX}
-                  placeholder="recrutement@bluegenji.gg"
-                  onChange={(e) => set("contactEmail", e.target.value)}
-                />
-              </label>
-            </div>
-            {!editing && (contactDefaults?.discord || contactDefaults?.email) && (
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Contact Discord (optionnel)</span>
+              <input
+                className={styles.modalInput}
+                value={form.contactDiscord}
+                maxLength={RECRUITMENT_DISCORD_MAX}
+                placeholder="pseudo#0000 ou lien d'invitation"
+                onChange={(e) => set("contactDiscord", e.target.value)}
+              />
+              <span className={styles.modalHint}>Pseudo (copiable) ou lien d'invitation Discord.</span>
+            </label>
+            {!editing && contactDefaults?.discord && (
               <p className={styles.modalHint}>
-                Pré-rempli depuis ton profil — modifie ou efface librement.
+                Discord pré-rempli depuis ton profil — modifie ou efface librement.
               </p>
             )}
 

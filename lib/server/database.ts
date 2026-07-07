@@ -492,9 +492,8 @@ async function runMigrations(db: Pool): Promise<void> {
       body TEXT NULL,
       contact_url VARCHAR(2048) NULL,
       contact_discord VARCHAR(120) NULL,
-      contact_email VARCHAR(254) NULL,
       contact_discord_id VARCHAR(32) NULL,
-      contact_preferred ENUM('AUTO', 'DISCORD', 'EMAIL', 'LINK') NOT NULL DEFAULT 'AUTO',
+      contact_preferred ENUM('AUTO', 'DISCORD', 'LINK') NOT NULL DEFAULT 'AUTO',
       highlight ENUM('NONE', 'BANNER', 'MODAL') NOT NULL DEFAULT 'NONE',
       active TINYINT(1) NOT NULL DEFAULT 1,
       display_order INT NOT NULL DEFAULT 100,
@@ -537,9 +536,9 @@ async function runMigrations(db: Pool): Promise<void> {
     // Colonne déjà au bon type.
   }
 
-  // Migration: canaux de contact directs (tags Discord / email). Sur une base
-  // ancienne les colonnes manquent ; sur une base récente elles existent déjà et
-  // les ALTER échouent silencieusement.
+  // Migration: canaux de contact directs (tag Discord + lien de candidature). Sur
+  // une base ancienne les colonnes manquent ; sur une base récente elles existent
+  // déjà et les ALTER échouent silencieusement.
   try {
     await db.execute(`
       ALTER TABLE bg_recruitment_ads
@@ -551,7 +550,7 @@ async function runMigrations(db: Pool): Promise<void> {
   try {
     await db.execute(`
       ALTER TABLE bg_recruitment_ads
-      ADD COLUMN contact_email VARCHAR(254) NULL AFTER contact_discord
+      ADD COLUMN contact_discord_id VARCHAR(32) NULL AFTER contact_discord
     `);
   } catch {
     // Colonne déjà présente.
@@ -559,18 +558,32 @@ async function runMigrations(db: Pool): Promise<void> {
   try {
     await db.execute(`
       ALTER TABLE bg_recruitment_ads
-      ADD COLUMN contact_discord_id VARCHAR(32) NULL AFTER contact_email
+      ADD COLUMN contact_preferred ENUM('AUTO', 'DISCORD', 'LINK') NOT NULL DEFAULT 'AUTO' AFTER contact_discord_id
     `);
   } catch {
     // Colonne déjà présente.
   }
+
+  // Migration: abandon du canal email. On neutralise l'ancienne valeur de canal
+  // préféré `EMAIL`, on resserre l'ENUM, puis on supprime la colonne `contact_email`
+  // si elle subsiste d'une version antérieure. Étapes tolérantes.
+  try {
+    await db.execute(`UPDATE bg_recruitment_ads SET contact_preferred = 'AUTO' WHERE contact_preferred = 'EMAIL'`);
+  } catch {
+    // Valeur déjà absente / colonne au bon type.
+  }
   try {
     await db.execute(`
       ALTER TABLE bg_recruitment_ads
-      ADD COLUMN contact_preferred ENUM('AUTO', 'DISCORD', 'EMAIL', 'LINK') NOT NULL DEFAULT 'AUTO' AFTER contact_discord_id
+      MODIFY COLUMN contact_preferred ENUM('AUTO', 'DISCORD', 'LINK') NOT NULL DEFAULT 'AUTO'
     `);
   } catch {
-    // Colonne déjà présente.
+    // ENUM déjà resserré.
+  }
+  try {
+    await db.execute(`ALTER TABLE bg_recruitment_ads DROP COLUMN contact_email`);
+  } catch {
+    // Colonne déjà absente (cas nominal).
   }
 }
 
