@@ -3,6 +3,8 @@ import {
   RECRUITMENT_CONTACT_CHANNELS,
   RECRUITMENT_DOMAINS,
   RECRUITMENT_HIGHLIGHTS,
+  RECRUITMENT_MODAL_INTERVAL_MS,
+  shouldShowRecruitmentModal,
   validateRecruitmentAdInput,
 } from "@/lib/shared/recruitment";
 
@@ -169,5 +171,43 @@ describe("validateRecruitmentAdInput", () => {
     });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.contactDiscordId).toBeNull();
+  });
+});
+
+describe("shouldShowRecruitmentModal", () => {
+  const now = 1_700_000_000_000;
+
+  it("shows the modal when never seen (null timestamp)", () => {
+    expect(shouldShowRecruitmentModal(null, now)).toBe(true);
+  });
+
+  it("hides the modal when seen just now", () => {
+    expect(shouldShowRecruitmentModal(now, now)).toBe(false);
+  });
+
+  it("hides the modal within the 7-day window", () => {
+    const sixDaysAgo = now - 6 * 24 * 60 * 60 * 1000;
+    expect(shouldShowRecruitmentModal(sixDaysAgo, now)).toBe(false);
+  });
+
+  it("shows the modal exactly one week after the last view", () => {
+    expect(shouldShowRecruitmentModal(now - RECRUITMENT_MODAL_INTERVAL_MS, now)).toBe(true);
+  });
+
+  it("shows the modal once the window has fully elapsed", () => {
+    const eightDaysAgo = now - 8 * 24 * 60 * 60 * 1000;
+    expect(shouldShowRecruitmentModal(eightDaysAgo, now)).toBe(true);
+  });
+
+  it("shows the modal when the stored timestamp is invalid (NaN)", () => {
+    expect(shouldShowRecruitmentModal(Number.NaN, now)).toBe(true);
+  });
+
+  it("shows the modal when the stored timestamp is in the future (skewed clock)", () => {
+    expect(shouldShowRecruitmentModal(now + 60_000, now)).toBe(true);
+  });
+
+  it("spans exactly seven days", () => {
+    expect(RECRUITMENT_MODAL_INTERVAL_MS).toBe(7 * 24 * 60 * 60 * 1000);
   });
 });
