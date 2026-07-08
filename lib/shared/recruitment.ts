@@ -44,6 +44,26 @@ export const RECRUITMENT_HIGHLIGHT_LABELS: Record<RecruitmentHighlight, string> 
 };
 
 /**
+ * Fenêtre d'anti-répétition de la modale de recrutement prioritaire : une fois
+ * affichée à un utilisateur, elle ne réapparaît pas avant 7 jours (mémorisé côté
+ * client par un horodatage `localStorage`). Ne concerne que la modale (`MODAL`) ;
+ * la banderole reste fermée pour la seule session courante.
+ */
+export const RECRUITMENT_MODAL_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Décide si la modale prioritaire doit s'afficher, à partir de l'horodatage du
+ * dernier affichage (`seenAt`, ms epoch ; `null` si jamais vue) et de l'instant
+ * courant `now`. Vraie si jamais vue, si l'horodatage est invalide ou situé dans
+ * le futur (horloge décalée), ou si au moins `RECRUITMENT_MODAL_INTERVAL_MS` se
+ * sont écoulés depuis le dernier affichage.
+ */
+export function shouldShowRecruitmentModal(seenAt: number | null, now: number): boolean {
+  if (seenAt === null || !Number.isFinite(seenAt) || seenAt > now) return true;
+  return now - seenAt >= RECRUITMENT_MODAL_INTERVAL_MS;
+}
+
+/**
  * Canal de contact mis en avant sur l'annonce. `AUTO` : aucun canal privilégié,
  * tous les tags sont équivalents. Les autres valeurs stylent le tag correspondant
  * en primaire pour guider les intéressés vers le canal préféré du recruteur.
