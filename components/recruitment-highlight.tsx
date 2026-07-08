@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CyberButton } from "@/components/cyber";
-import { RECRUITMENT_DOMAIN_LABELS, type RecruitmentAd } from "@/lib/shared/recruitment";
+import {
+  RECRUITMENT_DOMAIN_LABELS,
+  type RecruitmentAd,
+  shouldShowRecruitmentModal,
+} from "@/lib/shared/recruitment";
 import styles from "./recruitment-highlight.module.css";
 
 /**
@@ -11,9 +15,11 @@ import styles from "./recruitment-highlight.module.css";
  * renvoyée par `/api/recruitment/highlight` — soit une banderole discrète
  * (`highlight = "BANNER"`), soit une modale (`highlight = "MODAL"`).
  *
- * La fermeture est mémorisée par annonce dans `sessionStorage` : une fois
- * masquée, l'annonce ne réapparaît pas avant un nouvel onglet / une nouvelle
- * session (ou tant que l'admin ne change pas l'annonce mise en avant).
+ * La banderole se ferme pour la session courante (`sessionStorage`, par annonce).
+ * La modale est plus intrusive : une fois affichée, elle ne réapparaît pas avant
+ * 7 jours pour le même utilisateur (`localStorage`, horodatage par annonce), même
+ * s'il quitte la page sans la fermer. Changer l'annonce mise en avant repart avec
+ * une clé neuve, donc une nouvelle annonce urgente peut réapparaître aussitôt.
  */
 export function RecruitmentHighlight() {
   const [ad, setAd] = useState<RecruitmentAd | null>(null);
@@ -25,13 +31,26 @@ export function RecruitmentHighlight() {
       .then((res) => (res.ok ? res.json() : { ad: null }))
       .then((data: { ad: RecruitmentAd | null }) => {
         if (cancelled || !data.ad) return;
-        setAd(data.ad);
+        const found = data.ad;
+        setAd(found);
         try {
-          if (sessionStorage.getItem(dismissKey(data.ad.id)) === "1") {
+          if (found.highlight === "MODAL") {
+            // Modale prioritaire : une seule apparition par fenêtre de 7 jours et
+            // par utilisateur. On lit l'horodatage du dernier affichage…
+            const raw = localStorage.getItem(seenKey(found.id));
+            const seenAt = raw === null ? null : Number(raw);
+            if (!shouldShowRecruitmentModal(seenAt, Date.now())) {
+              setDismissed(true);
+            } else {
+              // …et on l'enregistre tout de suite : la modale « compte » comme vue
+              // même si l'utilisateur quitte la page sans la fermer.
+              localStorage.setItem(seenKey(found.id), String(Date.now()));
+            }
+          } else if (sessionStorage.getItem(dismissKey(found.id)) === "1") {
             setDismissed(true);
           }
         } catch {
-          // sessionStorage indisponible (mode privé) : on affiche l'annonce.
+          // Stockage indisponible (mode privé) : on affiche l'annonce.
         }
       })
       .catch(() => {
@@ -45,7 +64,11 @@ export function RecruitmentHighlight() {
   function dismiss() {
     if (ad) {
       try {
-        sessionStorage.setItem(dismissKey(ad.id), "1");
+        // La banderole se referme pour la session courante. La modale est déjà
+        // horodatée à l'affichage (fenêtre hebdomadaire) : rien à mémoriser ici.
+        if (ad.highlight === "BANNER") {
+          sessionStorage.setItem(dismissKey(ad.id), "1");
+        }
       } catch {
         // Ignore : la fermeture reste effective pour la vue courante.
       }
@@ -122,4 +145,8 @@ export function RecruitmentHighlight() {
 
 function dismissKey(id: number): string {
   return `bg_recr_highlight_dismissed_${id}`;
+}
+
+function seenKey(id: number): string {
+  return `bg_recr_highlight_seen_${id}`;
 }
