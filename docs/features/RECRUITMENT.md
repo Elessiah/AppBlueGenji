@@ -77,10 +77,23 @@ pré-remplissage : on affiche les valeurs enregistrées.
 Une **seule** annonce est mise en avant à la fois : la première annonce active
 dont `highlight <> 'NONE'`, selon `display_order`
 (`getHighlightedAd()`). Le composant client `RecruitmentHighlight`, monté dans
-le layout racine, récupère cette annonce via `GET /api/recruitment/highlight` et
-mémorise sa fermeture par annonce dans `sessionStorage` (elle ne réapparaît pas
-avant une nouvelle session, ou tant que l'admin ne change pas l'annonce mise en
-avant).
+le layout racine, récupère cette annonce via `GET /api/recruitment/highlight`.
+
+La mémorisation de l'affichage dépend du mode :
+
+- `BANNER` — la fermeture est mémorisée par annonce dans `sessionStorage` : la
+  banderole ne réapparaît pas avant une nouvelle session (ou tant que l'admin ne
+  change pas l'annonce mise en avant).
+- `MODAL` — plus intrusive, elle n'apparaît qu'**une fois par semaine et par
+  utilisateur** : à son affichage, un horodatage est enregistré par annonce dans
+  `localStorage` (`bg_recr_highlight_seen_<id>`) et elle reste masquée tant que
+  moins de `RECRUITMENT_MODAL_INTERVAL_MS` (7 jours) se sont écoulés. L'horodatage
+  est posé dès l'affichage (pas seulement à la fermeture), donc la modale « compte »
+  comme vue même si l'utilisateur quitte la page sans la fermer. La décision est
+  isolée dans le helper pur `shouldShowRecruitmentModal(seenAt, now)`
+  (`lib/shared/recruitment.ts`), testé unitairement. Changer l'annonce mise en
+  avant repart sur une clé neuve : une nouvelle annonce urgente peut donc
+  réapparaître aussitôt.
 
 L'endpoint `/api/recruitment/highlight` renvoie une réponse publique identique
 pour tous les visiteurs : elle est mise en cache
