@@ -62,6 +62,9 @@ Node.js `EventEmitter` singleton publishes tournament events (`updated`, `score_
 ### Bot Integration (`lib/server/bot-integration.ts`)
 HTTP calls to an internal Discord bot (configurable host/port). Gracefully degrades if bot is unreachable. Used for: auth DM codes, score conflict logging, stats.
 
+### Bot Documentation (`lib/server/bot-docs.ts`)
+`/bot/docs/[[...slug]]` sert la doc Markdown du projet `blueGenjiBot`. Les fichiers ne sont **pas** copiés dans ce dépôt : ils sont lus sur disque à chaque revalidation (60 s) depuis le dossier voisin (`../blueGenjiBot`, surchargeable via `BOT_DOCS_PATH`), donc une mise à jour de la doc du bot apparaît sans rebuild. Les pages exposées sont listées dans `BOT_DOC_SECTIONS` — ce registre sert aussi de garde-fou anti-traversée de chemin : ajouter un doc = ajouter une entrée. Le rendu Markdown est un mini-parser maison (titres, listes, code, liens), sans dépendance externe. Si un fichier est introuvable, la page dégrade avec un message au lieu de planter.
+
 ### Shared Types (`lib/shared/types.ts`)
 All TypeScript interfaces live here. Read this file first when working on any feature.
 
@@ -82,6 +85,7 @@ GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
 BOT_INTERNAL_URL=http://127.0.0.1:4400   # optional
 BOT_INTERNAL_TOKEN=                        # must match bot's INTERNAL_API_TOKEN
 DEV_AUTH_USER_ID=                          # optional — bypass auth in dev (see below)
+BOT_DOCS_PATH=                             # optional — chemin du projet blueGenjiBot (défaut: ../blueGenjiBot)
 ```
 
 ## Preview / dev auth bypass

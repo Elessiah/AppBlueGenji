@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Icon } from "./Icon";
 import { botInviteUrl, DEFAULT_BOT_PERMISSIONS } from "@/lib/server/bot-invite";
 
@@ -47,14 +48,9 @@ export function BotInviteCard() {
                 />
               </svg>
             </a>
-            <a
-              className="btn btn-ghost"
-              href="https://docs.bluegenji-esport.fr/bot"
-              target="_blank"
-              rel="noreferrer"
-            >
+            <Link className="btn btn-ghost" href="/bot/docs">
               Documentation
-            </a>
+            </Link>
           </div>
         </div>
 
