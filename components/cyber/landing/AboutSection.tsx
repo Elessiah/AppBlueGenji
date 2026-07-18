@@ -15,7 +15,7 @@ export function AboutSection({ stats, isAdmin }: AboutSectionProps) {
           <span className="eyebrow">SECTION 03</span>
           <h2 className={styles.sectionTitle}>L&apos;association</h2>
         </div>
-        <div className={styles.meta}>LOI 1901 · LYON · 2023</div>
+        <div className={styles.meta}>LOI 1901 · STRASBOURG · 2020</div>
       </div>
 
       <div className={styles.grid}>

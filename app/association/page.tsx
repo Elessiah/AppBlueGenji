@@ -54,13 +54,13 @@ export default async function AssociationPage() {
                 <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 10, letterSpacing: "0.2em" }}>
                   FONDÉE EN
                 </span>
-                <span className="num" style={{ fontSize: 28 }}>2023</span>
+                <span className="num" style={{ fontSize: 28 }}>2020</span>
               </div>
               <div className={styles.heroFact}>
                 <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 10, letterSpacing: "0.2em" }}>
                   SIÈGE
                 </span>
-                <span style={{ fontSize: 17 }}>Lyon</span>
+                <span style={{ fontSize: 17 }}>Strasbourg</span>
               </div>
               <div className={styles.heroFact}>
                 <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 10, letterSpacing: "0.2em" }}>

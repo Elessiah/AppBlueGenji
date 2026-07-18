@@ -102,7 +102,10 @@
       "Bash(gunzip -k design.gz)",
       "Bash(tar -xf design)",
       "Bash(cygpath -w /tmp/design-mock/bluegenji-arena/README.md)",
-      "Bash(find components/SearchBar* -type f)"
+      "Bash(find components/SearchBar* -type f)",
+      "Bash(sed -i 's|<span className=\"num\" style={{ fontSize: 28 }}>2023</span>|<span className=\"num\" style={{ fontSize: 28 }}>2020</span>|; s|<span style={{ fontSize: 17 }}>Lyon</span>|<span style={{ fontSize: 17 }}>Strasbourg</span>|' app/association/page.tsx)",
+      "Bash(sed -i 's|LOI 1901 · LYON · 2023|LOI 1901 · STRASBOURG · 2020|' components/cyber/landing/AboutSection.tsx)",
+      "Bash(sed -i 's|association loi 1901, siège social à Lyon|association loi 1901, siège social à Strasbourg|' app/rgpd/page.tsx)"
     ]
   }
 }
