@@ -155,15 +155,35 @@ export function renderInline(text: string): string {
 export function renderMarkdown(markdown: string): string {
   const lines = markdown.replace(/^﻿/, "").replace(/\r\n/g, "\n").split("\n");
   const out: string[] = [];
-  let listOpen = false;
   let paragraph: string[] = [];
   let fence: string[] | null = null;
+  // Indentation (en colonnes) de chaque niveau de liste ouvert. `liOpen` suit le
+  // `<li>` du niveau courant : une sous-liste s'ouvre *à l'intérieur* de ce `<li>`,
+  // sinon le HTML produit serait invalide (`<ul>` enfant direct de `<ul>`).
+  const listStack: number[] = [];
+  let liOpen = false;
 
-  const closeList = () => {
-    if (listOpen) {
-      out.push("</ul>");
-      listOpen = false;
+  const closeLi = () => {
+    if (liOpen) {
+      out[out.length - 1] += "</li>";
+      liOpen = false;
     }
+  };
+  const openLevel = (indent: number) => {
+    out.push("<ul>");
+    listStack.push(indent);
+    liOpen = false;
+  };
+  const closeLevel = () => {
+    closeLi();
+    out.push("</ul>");
+    listStack.pop();
+    // En remontant d'un cran, le `<li>` parent est toujours ouvert.
+    liOpen = listStack.length > 0;
+  };
+  const closeList = () => {
+    while (listStack.length) closeLevel();
+    liOpen = false;
   };
   const closeParagraph = () => {
     if (paragraph.length) {
@@ -207,14 +227,19 @@ export function renderMarkdown(markdown: string): string {
       continue;
     }
 
-    const bullet = /^\s*[-*]\s+(.*)$/.exec(line);
+    const bullet = /^([ \t]*)[-*]\s+(.*)$/.exec(line);
     if (bullet) {
       closeParagraph();
-      if (!listOpen) {
-        out.push("<ul>");
-        listOpen = true;
+      const indent = bullet[1].replace(/\t/g, "  ").length;
+      const current = listStack[listStack.length - 1];
+      if (!listStack.length || indent > current) {
+        openLevel(indent);
+      } else {
+        while (listStack.length > 1 && indent < listStack[listStack.length - 1]) closeLevel();
+        closeLi();
       }
-      out.push(`<li>${renderInline(bullet[1].trim())}</li>`);
+      out.push(`<li>${renderInline(bullet[2].trim())}`);
+      liOpen = true;
       continue;
     }
 

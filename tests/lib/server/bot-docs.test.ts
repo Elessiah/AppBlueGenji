@@ -75,6 +75,28 @@ describe("renderMarkdown", () => {
     expect(renderMarkdown("- un\n\nSuite")).toBe("<ul>\n<li>un</li>\n</ul>\n<p>Suite</p>");
   });
 
+  it("imbrique les puces indentées dans le <li> parent", () => {
+    // `doc/internal-api.md` documente ses endpoints avec des sous-puces : sans
+    // imbrication, le détail d'un endpoint devient son frère dans la liste.
+    expect(renderMarkdown("- endpoint\n  - body\n- autre")).toBe(
+      "<ul>\n<li>endpoint\n<ul>\n<li>body</li>\n</ul></li>\n<li>autre</li>\n</ul>",
+    );
+  });
+
+  it("remonte de plusieurs niveaux d'un coup", () => {
+    expect(renderMarkdown("- a\n  - b\n    - c\n- d")).toBe(
+      "<ul>\n<li>a\n<ul>\n<li>b\n<ul>\n<li>c</li>\n</ul></li>\n</ul></li>\n<li>d</li>\n</ul>",
+    );
+  });
+
+  it("ferme tous les niveaux imbriqués en fin de document", () => {
+    expect(renderMarkdown("- a\n  - b")).toBe("<ul>\n<li>a\n<ul>\n<li>b</li>\n</ul></li>\n</ul>");
+  });
+
+  it("traite une tabulation comme une indentation", () => {
+    expect(renderMarkdown("- a\n\t- b")).toBe("<ul>\n<li>a\n<ul>\n<li>b</li>\n</ul></li>\n</ul>");
+  });
+
   it("fusionne les lignes d'un même paragraphe", () => {
     expect(renderMarkdown("une phrase\ncoupée")).toBe("<p>une phrase coupée</p>");
   });

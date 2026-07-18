@@ -63,7 +63,9 @@
   color: var(--ink);
   margin: 26px 0 10px;
 }
-.docs-content h4 {
+.docs-content h4,
+.docs-content h5,
+.docs-content h6 {
   font-family: var(--mono);
   font-size: 12px;
   letter-spacing: 0.16em;
@@ -85,6 +87,15 @@
   position: relative;
   padding-left: 20px;
 }
+/* Sous-listes (ex. le corps des endpoints dans « API interne »). */
+.docs-content li > ul {
+  margin: 8px 0 0;
+  padding-left: 4px;
+}
+.docs-content li > ul li::before {
+  background: none;
+  border-color: var(--line-strong);
+}
 .docs-content li::before {
   content: "";
   position: absolute;
@@ -104,7 +115,9 @@
   border: 1px solid var(--line);
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.3);
-  white-space: nowrap;
+  /* Les signatures de commandes sont longues (`/assign-channel channel:… rank-max:…`) :
+     sans coupure, elles débordent horizontalement de la page sur mobile. */
+  overflow-wrap: anywhere;
 }
 .docs-content pre {
   margin: 0 0 16px;
