@@ -60,4 +60,6 @@ export {
   getTournamentDetail,
   reportMatchScorePublic,
   adminResolveMatchPublic,
+  // Survival
+  forfeitSurvivalTeamPublic as forfeitSurvivalTeam,
 } from "./tournaments";

@@ -5,6 +5,15 @@ export async function finalizeTournamentIfDone(
   connection: PoolConnection,
   tournamentId: number,
 ): Promise<void> {
+  // Le mode Survie pilote lui-même sa clôture et son classement final
+  // (ordre d'élimination) via reconcileSurvival — ne pas le finaliser ici,
+  // sinon le classement générique par victoires écraserait le résultat.
+  const [formatRows] = await connection.execute<(RowDataPacket & { format: string })[]>(
+    `SELECT format FROM bg_tournaments WHERE id = ? LIMIT 1`,
+    [tournamentId],
+  );
+  if (formatRows[0]?.format === "SURVIVAL") return;
+
   const [remaining] = await connection.execute<(RowDataPacket & { c: number })[]>(
     `SELECT COUNT(*) AS c
      FROM bg_matches

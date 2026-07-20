@@ -11,6 +11,7 @@ import { mapError } from "./_lib/error-map";
 import { AdminScoreDialog } from "./_components/AdminScoreDialog";
 import { MatchScoreDraft } from "./_components/BracketTree";
 import { BracketSections } from "./_components/BracketSections";
+import { SurvivalView } from "./_components/SurvivalView";
 
 const STATE_META: Record<string, { label: string; chipClass: string }> = {
   UPCOMING: { label: "Prochainement", chipClass: "teal" },
@@ -85,6 +86,20 @@ export default function TournamentDetailPage() {
     }
   };
 
+  const forfeitTeam = async () => {
+    if (!window.confirm("Déclarer forfait ? Votre équipe quittera définitivement le tournoi.")) {
+      return;
+    }
+    try {
+      const response = await fetch(`/api/tournaments/${tournamentId}/forfeit`, { method: "POST" });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "FORFEIT_FAILED");
+      showSuccess("Forfait enregistré.");
+    } catch (e) {
+      showError(mapError((e as Error).message));
+    }
+  };
+
   const registerTeam = async () => {
     try {
       const response = await fetch(`/api/tournaments/${tournamentId}/register`, {
@@ -99,6 +114,18 @@ export default function TournamentDetailPage() {
   };
 
   const stateMeta = STATE_META[detail.card.state] ?? { label: detail.card.state, chipClass: "muted" };
+
+  // Forfait possible : mon équipe est encore active dans un tournoi Survie en cours.
+  const survivalForfeitTeamId =
+    detail.card.format === "SURVIVAL" &&
+    detail.card.state === "RUNNING" &&
+    detail.myTeamId !== null &&
+    detail.canCreateReportsForTeamIds.includes(detail.myTeamId) &&
+    detail.survival?.standings.some(
+      (s) => s.teamId === detail.myTeamId && s.status === "ACTIVE",
+    )
+      ? detail.myTeamId
+      : null;
 
   const bracketOrder: BracketType[] =
     detail.card.format === "SINGLE"
@@ -154,7 +181,11 @@ export default function TournamentDetailPage() {
                 {stateMeta.label}
               </Pill>
               <Pill variant="blue">
-                {detail.card.format === "SINGLE" ? "Simple élim." : "Double élim."}
+                {detail.card.format === "SINGLE"
+                  ? "Simple élim."
+                  : detail.card.format === "SURVIVAL"
+                    ? "Survie"
+                    : "Double élim."}
               </Pill>
               {detail.card.hasThirdPlaceMatch && (
                 <Pill variant="blue">Petite finale</Pill>
@@ -183,8 +214,26 @@ export default function TournamentDetailPage() {
 
           {detail.card.state === "REGISTRATION" ? (
             <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-              Le bracket sera généré automatiquement au démarrage du tournoi.
+              {detail.card.format === "SURVIVAL"
+                ? "Le classement de départ (seeding) et les rounds seront générés au démarrage du tournoi."
+                : "Le bracket sera généré automatiquement au démarrage du tournoi."}
             </p>
+          ) : detail.card.format === "SURVIVAL" && detail.survival ? (
+            <SurvivalView
+              survival={detail.survival}
+              matches={detail.matches}
+              allTournamentMatches={detail.matches}
+              myTeamId={detail.myTeamId}
+              isFinished={detail.card.state === "FINISHED"}
+              canReport={canReport}
+              adminResolvable={canAdminResolve}
+              drafts={drafts}
+              onScoreChange={handleScoreChange}
+              onSubmit={submitScore}
+              onOpenAdminModal={setSelectedMatchForAdmin}
+              forfeitTeamId={survivalForfeitTeamId}
+              onForfeit={forfeitTeam}
+            />
           ) : !detail.matches.length ? (
             <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
               Aucun match disponible pour l&apos;instant.

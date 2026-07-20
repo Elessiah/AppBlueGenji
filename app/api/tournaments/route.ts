@@ -32,15 +32,26 @@ export async function POST(req: Request) {
       registrationCloseAt?: string;
       startAt?: string;
       hasThirdPlaceMatch?: boolean;
+      survivalRoundsPerCut?: number;
     };
 
     if (!body.name?.trim()) return fail("MISSING_NAME", 400);
-    if (body.format !== "SINGLE" && body.format !== "DOUBLE") return fail("INVALID_FORMAT", 400);
+    if (body.format !== "SINGLE" && body.format !== "DOUBLE" && body.format !== "SURVIVAL") {
+      return fail("INVALID_FORMAT", 400);
+    }
     if (body.game && body.game !== "OW2" && body.game !== "MR") return fail("INVALID_GAME", 400);
 
     const maxTeams = Number(body.maxTeams ?? 0);
     if (!Number.isInteger(maxTeams) || maxTeams < 2 || maxTeams > 256) {
       return fail("INVALID_MAX_TEAMS", 400);
+    }
+
+    let survivalRoundsPerCut: number | null = null;
+    if (body.format === "SURVIVAL") {
+      survivalRoundsPerCut = Number(body.survivalRoundsPerCut ?? 0);
+      if (!Number.isInteger(survivalRoundsPerCut) || survivalRoundsPerCut < 1 || survivalRoundsPerCut > 50) {
+        return fail("INVALID_SURVIVAL_ROUNDS", 400);
+      }
     }
 
     const id = await createTournament(user.id, {
@@ -54,6 +65,7 @@ export async function POST(req: Request) {
       registrationCloseAt: body.registrationCloseAt ?? "",
       startAt: body.startAt ?? "",
       hasThirdPlaceMatch: body.hasThirdPlaceMatch,
+      survivalRoundsPerCut,
     });
 
     return ok({ id }, 201);

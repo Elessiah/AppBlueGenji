@@ -47,8 +47,8 @@ Auth enforcement: `requireCurrentUser()` is called server-side in `app/(secured)
 Direct MySQL2 pool. Schema migrations run automatically on first query. Tables: `bg_users`, `bg_teams`, `bg_team_members`, `bg_tournaments`, `bg_tournament_registrations`, `bg_matches`, `bg_user_sessions`.
 
 ### Tournament Engine (`lib/server/tournaments-service.ts`)
-Supports single/double elimination and Swiss round formats. Key concepts:
-- **Formats:** `SINGLE`, `DOUBLE`, `SWISS` (see `plans/SwissRound.md` for Swiss spec)
+Supports single/double elimination, Swiss round and Survival formats. Key concepts:
+- **Formats:** `SINGLE`, `DOUBLE`, `SWISS` (see `plans/SwissRound.md`), `SURVIVAL` (single group, seed by site ranking, adjacent pairing, periodic bottom-2 cuts until one champion — see `docs/features/SURVIVAL_MODE.md`). Survival logic lives in `lib/shared/survival.ts` (pure) + `lib/server/tournaments/survival.ts` (orchestration, idempotent `reconcileSurvival`).
 - **States:** `UPCOMING → REGISTRATION → RUNNING → FINISHED`
 - **Bracket positions:** `UPPER`, `LOWER`, `GRAND` finals
 - **Match status:** `PENDING → READY → AWAITING_CONFIRMATION → COMPLETED`

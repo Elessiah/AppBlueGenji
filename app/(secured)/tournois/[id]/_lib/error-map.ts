@@ -14,6 +14,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   TEAM_ALREADY_REGISTERED: "Ton équipe est déjà inscrite.",
   REGISTRATION_CLOSED: "Les inscriptions ne sont pas ouvertes.",
   NO_ACTIVE_TEAM: "Tu dois d'abord créer ou rejoindre une équipe.",
+  NOT_SURVIVAL: "Le forfait n'est disponible que pour les tournois en mode Survie.",
+  TEAM_ALREADY_OUT: "Ton équipe n'est plus en lice dans ce tournoi.",
+  TEAM_NOT_IN_TOURNAMENT: "Ton équipe n'est pas inscrite à ce tournoi.",
+  FORFEIT_FAILED: "Erreur lors de la déclaration de forfait.",
 };
 
 export function mapError(errorCode: string): string {
