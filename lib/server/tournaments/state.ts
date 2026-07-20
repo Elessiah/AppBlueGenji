@@ -45,9 +45,23 @@ export async function syncTournamentState(
       await generateFirstRound(tournamentId, connection);
     }
 
+    const isSurvivalStart =
+      tournament.state === "REGISTRATION" && computed === "RUNNING" && tournament.format === "SURVIVAL";
+    if (isSurvivalStart) {
+      const { initializeSurvivalTournament, generateSurvivalRound } = await import("./survival");
+      await initializeSurvivalTournament(tournamentId, connection);
+      await generateSurvivalRound(tournamentId, connection);
+    }
+
     await updateTournamentState(connection, tournamentId, computed);
     tournament.state = computed;
     stateChanged = true;
+
+    // Après passage en RUNNING : clôture immédiate si départ à ≤ 1 équipe.
+    if (isSurvivalStart) {
+      const { reconcileSurvival } = await import("./survival");
+      await reconcileSurvival(tournamentId, connection);
+    }
   }
 
   return { row: tournament, stateChanged };

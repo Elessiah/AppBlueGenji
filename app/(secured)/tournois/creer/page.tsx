@@ -18,6 +18,7 @@ export default function CreateTournamentPage() {
   const [game, setGame] = useState<TournamentGame>("OW2");
   const [format, setFormat] = useState<TournamentFormat>("SINGLE");
   const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(false);
+  const [survivalRoundsPerCut, setSurvivalRoundsPerCut] = useState(3);
   const [maxTeams, setMaxTeams] = useState(16);
   const [startVisibilityAt, setStartVisibilityAt] = useState(localDateTimeInput(1));
   const [registrationOpenAt, setRegistrationOpenAt] = useState(localDateTimeInput(3));
@@ -57,6 +58,7 @@ export default function CreateTournamentPage() {
           registrationCloseAt: new Date(registrationCloseAt).toISOString(),
           startAt: new Date(startAt).toISOString(),
           hasThirdPlaceMatch: format === "SINGLE" ? hasThirdPlaceMatch : false,
+          survivalRoundsPerCut: format === "SURVIVAL" ? survivalRoundsPerCut : undefined,
         }),
       });
       const payload = (await response.json()) as { error?: string; id?: number };
@@ -111,8 +113,27 @@ export default function CreateTournamentPage() {
                   <select value={format} onChange={(e) => { setFormat(e.target.value as TournamentFormat); setHasThirdPlaceMatch(false); }}>
                     <option value="SINGLE">Simple élimination</option>
                     <option value="DOUBLE">Double élimination</option>
+                    <option value="SURVIVAL">Survie</option>
                   </select>
                 </div>
+              {format === "SURVIVAL" && (
+                <div className="field">
+                  <label htmlFor="survival-rounds">Rounds avant élimination</label>
+                  <input
+                    id="survival-rounds"
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={survivalRoundsPerCut}
+                    onChange={(e) => setSurvivalRoundsPerCut(Number(e.target.value))}
+                  />
+                  <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-2)", lineHeight: 1.4 }}>
+                    Toutes les équipes s&apos;affrontent par paires selon leur classement. Après ce
+                    nombre de rounds, les deux dernières équipes sont éliminées, et ainsi de suite
+                    jusqu&apos;à la championne.
+                  </p>
+                </div>
+              )}
               {format === "SINGLE" && (
                 <div className="field" style={{ gridColumn: "1 / -1" }}>
                   <label htmlFor="third-place" style={{ marginBottom: 12 }}>

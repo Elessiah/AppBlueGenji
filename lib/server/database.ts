@@ -330,6 +330,47 @@ async function runMigrations(db: Pool): Promise<void> {
     // Columns already exist
   }
 
+  // Migration: Add SURVIVAL format support
+  try {
+    await db.execute(`
+      ALTER TABLE bg_tournaments
+      MODIFY COLUMN format ENUM('SINGLE', 'DOUBLE', 'SWISS', 'SURVIVAL') NOT NULL
+    `);
+  } catch {
+    // Already done
+  }
+
+  // Migration: Add Survival tournament metadata columns.
+  // survival_rounds_per_cut = nombre de rounds joués entre chaque coupe.
+  try {
+    await db.execute(`
+      ALTER TABLE bg_tournaments
+      ADD COLUMN survival_rounds_per_cut INT NULL,
+      ADD COLUMN survival_current_round INT NOT NULL DEFAULT 0
+    `);
+  } catch {
+    // Columns already exist
+  }
+
+  // Migration: Create Survival standings table.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS bg_survival_standings (
+      tournament_id BIGINT NOT NULL,
+      team_id BIGINT NOT NULL,
+      seed INT NOT NULL DEFAULT 0,
+      wins INT NOT NULL DEFAULT 0,
+      losses INT NOT NULL DEFAULT 0,
+      status ENUM('ACTIVE', 'ELIMINATED', 'FORFEIT') NOT NULL DEFAULT 'ACTIVE',
+      eliminated_round INT NULL,
+      \`rank\` INT NOT NULL DEFAULT 0,
+      PRIMARY KEY (tournament_id, team_id),
+      CONSTRAINT fk_survival_standings_tournament FOREIGN KEY (tournament_id)
+        REFERENCES bg_tournaments(id) ON DELETE CASCADE,
+      CONSTRAINT fk_survival_standings_team FOREIGN KEY (team_id)
+        REFERENCES bg_teams(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
   // Migration: Add Discord pseudo + soft-delete (anonymisation) to users
   try {
     await db.execute(`

@@ -1,6 +1,24 @@
 ﻿import type { PlatformRole } from "./permissions";
 
-export type TournamentFormat = "SINGLE" | "DOUBLE" | "SWISS";
+export type TournamentFormat = "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL";
+
+export type SurvivalStandingRow = {
+  teamId: number;
+  teamName: string;
+  logoUrl: string | null;
+  seed: number;
+  wins: number;
+  losses: number;
+  status: "ACTIVE" | "ELIMINATED" | "FORFEIT";
+  eliminatedRound: number | null;
+  rank: number;
+};
+
+export type SurvivalMeta = {
+  roundsPerCut: number;
+  currentRound: number;
+  standings: SurvivalStandingRow[];
+};
 
 export type SwissTournamentMeta = {
   totalRounds: number;
@@ -136,6 +154,8 @@ export type TournamentCard = {
   registrationCloseAt: string;
   startAt: string;
   hasThirdPlaceMatch: boolean;
+  /** Mode Survie : nombre de rounds joués entre chaque coupe (élimination). */
+  survivalRoundsPerCut: number | null;
 };
 
 export type TournamentBuckets = {
@@ -186,6 +206,8 @@ export type TournamentDetail = {
   myTeamId: number | null;
   canCreateReportsForTeamIds: number[];
   isAdmin: boolean;
+  /** Métadonnées du mode Survie (null pour les autres formats). */
+  survival: SurvivalMeta | null;
 };
 
 export type BotStats = {

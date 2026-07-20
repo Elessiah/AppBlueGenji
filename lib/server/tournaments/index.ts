@@ -53,6 +53,15 @@ export { finalizeTournamentIfDone, resolveExpiredScoreReports } from "./finaliza
 // Swiss
 export { initializeSwissTournament, generateFirstRound, generateNextRound, applySwissMatchResult } from "./swiss";
 
+// Survival
+export {
+  initializeSurvivalTournament,
+  generateSurvivalRound,
+  reconcileSurvival,
+  forfeitSurvivalTeam,
+  loadSurvivalMeta,
+} from "./survival";
+
 // Public API functions
 import { syncTournamentState } from "./state";
 import { registerCurrentUserTeam as registerTeamInternal } from "./registration";
@@ -122,6 +131,7 @@ export async function createTournament(
     registrationCloseAt: string;
     startAt: string;
     hasThirdPlaceMatch?: boolean;
+    survivalRoundsPerCut?: number | null;
   },
 ): Promise<number> {
   const db = await getDatabase();
@@ -163,6 +173,13 @@ export async function createTournament(
   const hasThirdPlaceMatch = payload.format === "SINGLE" && Boolean(payload.hasThirdPlaceMatch);
   const game = payload.game ?? "OW2";
 
+  // Mode Survie : nombre de rounds joués entre chaque coupe (min. 1). Ignoré
+  // pour les autres formats.
+  const survivalRoundsPerCut =
+    payload.format === "SURVIVAL"
+      ? Math.max(1, Math.trunc(Number(payload.survivalRoundsPerCut ?? 1)))
+      : null;
+
   const [insert] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_tournaments (
       organizer_user_id,
@@ -176,8 +193,9 @@ export async function createTournament(
       registration_open_at,
       registration_close_at,
       start_at,
-      has_third_place_match
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      has_third_place_match,
+      survival_rounds_per_cut
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       organizerUserId,
       payload.name.trim(),
@@ -191,6 +209,7 @@ export async function createTournament(
       registrationCloseAt,
       startAt,
       hasThirdPlaceMatch ? 1 : 0,
+      survivalRoundsPerCut,
     ],
   );
 
@@ -229,6 +248,8 @@ export async function listTournamentBuckets(searchTerm: string | null): Promise<
       t.organizer_user_id,
       t.finished_at,
       t.has_third_place_match,
+      t.survival_rounds_per_cut,
+      t.survival_current_round,
       COALESCE(COUNT(r.id), 0) AS registered_teams
      FROM bg_tournaments t
      LEFT JOIN bg_tournament_registrations r ON r.tournament_id = t.id
@@ -249,7 +270,9 @@ export async function listTournamentBuckets(searchTerm: string | null): Promise<
       t.created_at,
       t.organizer_user_id,
       t.finished_at,
-      t.has_third_place_match
+      t.has_third_place_match,
+      t.survival_rounds_per_cut,
+      t.survival_current_round
      ORDER BY t.start_at DESC`,
     params,
   );
@@ -357,6 +380,11 @@ export async function getTournamentDetail(
 
     const canCreateReportsForTeamIds = myTeamId ? [myTeamId] : [];
 
+    const survival =
+      card.format === "SURVIVAL"
+        ? await (await import("./survival")).loadSurvivalMeta(connection, tournamentId)
+        : null;
+
     return {
       card,
       matches: matches.map(mapMatch),
@@ -372,6 +400,7 @@ export async function getTournamentDetail(
       myTeamId,
       canCreateReportsForTeamIds,
       isAdmin,
+      survival,
     };
   } finally {
     connection.release();
@@ -407,6 +436,11 @@ export async function reportMatchScorePublic(
 
     await resolveExpiredScoreReports(connection, tournamentId);
     await tryAutoResolveByes(connection, tournamentId);
+
+    // Réconcilie le mode Survie (idempotent) avant la finalisation générique.
+    const { reconcileSurvival } = await import("./survival");
+    await reconcileSurvival(tournamentId, connection);
+
     await finalizeTournamentIfDone(connection, tournamentId);
 
     await connection.commit();
@@ -438,17 +472,50 @@ export async function adminSaveMatchScoresPublic(
     const { adminSaveMatchScores: adminSaveInternal } = await import("./admin");
     await adminSaveInternal(connection, matchId, team1Score, team2Score, forfeitTeamId);
 
-    await connection.commit();
-
-    // Need to get tournament ID for event
+    // Need to get tournament ID for event + Survival reconciliation
     const [matchData] = await connection.execute<(RowDataPacket & { tournament_id: number })[]>(
       `SELECT tournament_id FROM bg_matches WHERE id = ? LIMIT 1`,
       [matchId],
     );
+    const savedTournamentId = matchData.length > 0 ? Number(matchData[0].tournament_id) : null;
 
-    if (matchData.length > 0) {
-      publishScoreResolvedEvent(Number(matchData[0].tournament_id), matchId);
+    if (savedTournamentId !== null) {
+      const { reconcileSurvival } = await import("./survival");
+      await reconcileSurvival(savedTournamentId, connection);
     }
+
+    await connection.commit();
+
+    if (savedTournamentId !== null) {
+      publishScoreResolvedEvent(savedTournamentId, matchId);
+    }
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+/**
+ * Déclare le forfait d'une équipe dans un tournoi Survie (l'équipe quitte la
+ * compétition). Ouvre sa propre transaction et publie l'évènement de mise à jour.
+ */
+export async function forfeitSurvivalTeamPublic(
+  tournamentId: number,
+  teamId: number,
+): Promise<void> {
+  const db = await getDatabase();
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const { forfeitSurvivalTeam } = await import("./survival");
+    await forfeitSurvivalTeam(tournamentId, teamId, connection);
+
+    await connection.commit();
+    publishUpdatedEvent(tournamentId);
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -482,6 +549,10 @@ export async function adminResolveMatchPublic(
     await adminResolveMatch(connection, matchId, team1Score, team2Score, forfeitTeamId);
 
     await tryAutoResolveByes(connection, tournamentId);
+
+    const { reconcileSurvival } = await import("./survival");
+    await reconcileSurvival(tournamentId, connection);
+
     await finalizeTournamentIfDone(connection, tournamentId);
 
     await connection.commit();

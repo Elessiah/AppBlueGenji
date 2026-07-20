@@ -6,7 +6,7 @@ export type TournamentRow = RowDataPacket & {
   id: number;
   name: string;
   description: string | null;
-  format: "SINGLE" | "DOUBLE" | "SWISS";
+  format: "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL";
   game: "OW2" | "MR";
   max_teams: number;
   state: "UPCOMING" | "REGISTRATION" | "RUNNING" | "FINISHED";
@@ -19,6 +19,8 @@ export type TournamentRow = RowDataPacket & {
   organizer_user_id: number;
   finished_at: Date | null;
   has_third_place_match: number;
+  survival_rounds_per_cut: number | null;
+  survival_current_round: number;
 };
 
 export type RegistrationRow = RowDataPacket & {
@@ -88,6 +90,8 @@ export function mapCard(row: TournamentListRow): TournamentCard {
     registrationCloseAt: toIso(row.registration_close_at)!,
     startAt: toIso(row.start_at)!,
     hasThirdPlaceMatch: Boolean(row.has_third_place_match),
+    survivalRoundsPerCut:
+      row.survival_rounds_per_cut === null ? null : Number(row.survival_rounds_per_cut),
   };
 }
 
