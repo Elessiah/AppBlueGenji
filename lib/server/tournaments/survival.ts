@@ -33,10 +33,11 @@ interface StandingDbRow extends RowDataPacket {
 async function loadTournament(
   conn: PoolConnection,
   tournamentId: number,
+  forUpdate = false,
 ): Promise<TournamentSurvivalRow | null> {
   const [rows] = await conn.execute<TournamentSurvivalRow[]>(
     `SELECT format, state, survival_rounds_per_cut, survival_current_round
-     FROM bg_tournaments WHERE id = ? LIMIT 1`,
+     FROM bg_tournaments WHERE id = ? LIMIT 1${forUpdate ? " FOR UPDATE" : ""}`,
     [tournamentId],
   );
   return rows.length === 0 ? null : rows[0];
@@ -250,7 +251,10 @@ export async function reconcileSurvival(
   tournamentId: number,
   conn: PoolConnection,
 ): Promise<void> {
-  const tournament = await loadTournament(conn, tournamentId);
+  // Verrou de ligne : sérialise les réconciliations concurrentes (deux reports
+  // simultanés clôturant le même round) pour éviter de générer deux fois le
+  // round suivant ou d'appliquer deux fois une coupe.
+  const tournament = await loadTournament(conn, tournamentId, true);
   if (!tournament || tournament.format !== "SURVIVAL") return;
   if (tournament.state === "FINISHED") return;
 
@@ -326,7 +330,7 @@ export async function forfeitSurvivalTeam(
   teamId: number,
   conn: PoolConnection,
 ): Promise<void> {
-  const tournament = await loadTournament(conn, tournamentId);
+  const tournament = await loadTournament(conn, tournamentId, true);
   if (!tournament || tournament.format !== "SURVIVAL") throw new Error("NOT_SURVIVAL");
   if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
 
