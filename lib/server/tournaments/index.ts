@@ -332,7 +332,13 @@ export async function getTournamentDetail(
   const db = await getDatabase();
   const activeTeam = await getUserActiveTeam(userId);
 
-  const tournamentRow = await loadTournamentRow(await db.getConnection(), tournamentId);
+  let tournamentRow: TournamentRow | null;
+  const detailConnection = await db.getConnection();
+  try {
+    tournamentRow = await loadTournamentRow(detailConnection, tournamentId);
+  } finally {
+    detailConnection.release();
+  }
   if (!tournamentRow) return null;
 
   const { hasPendingStateTransition } = await import("./state");
