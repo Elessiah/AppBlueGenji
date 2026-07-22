@@ -5,6 +5,11 @@ import { loadTournamentRow, loadRegisteredTeamIds, getMatchRows } from "./tourna
 import { createSingleEliminationBracket } from "./tournaments/bracket-single";
 import { createDoubleEliminationBracket } from "./tournaments/bracket-double";
 import { finalizeMatch } from "./tournaments/scoring";
+import {
+  initializeSurvivalTournament,
+  generateSurvivalRound,
+  reconcileSurvival,
+} from "./tournaments/survival";
 
 const FICTIONAL_PLAYERS = [
   { pseudo: "ShadowNinja", battletag: "ShadowNinja#1234", marvelTag: "ShadowNinja#2023" },
@@ -366,6 +371,55 @@ async function generateRealRunningBracket(
   }
 }
 
+// Génère un tournoi « Survie » réaliste via l'orchestration de production
+// (initialize + generate + reconcile). Le vainqueur déterministe est l'équipe la
+// mieux classée de chaque paire (team1). Pour un tournoi RUNNING, on s'arrête
+// après `playWaves` vagues (des matchs restent READY) ; pour un FINISHED, on
+// joue jusqu'au sacre de la championne (l'état passe à FINISHED via reconcile).
+async function generateSurvivalTournament(
+  db: Pool,
+  tournamentId: number,
+  finish: boolean,
+  playWaves: number
+): Promise<void> {
+  const connection = await db.getConnection();
+  try {
+    await initializeSurvivalTournament(tournamentId, connection);
+    await generateSurvivalRound(tournamentId, connection);
+    await reconcileSurvival(tournamentId, connection);
+
+    let waves = 0;
+    let played = 0;
+    while (true) {
+      const matches = await getMatchRows(connection, tournamentId);
+      const ready = matches.filter(
+        (m) =>
+          m.status === "READY" &&
+          m.team1_id !== null &&
+          m.team2_id !== null &&
+          m.winner_team_id === null
+      );
+      if (ready.length === 0) break; // plus rien à jouer (souvent : terminé)
+      if (!finish && waves >= playWaves) break; // laisse le tournoi en cours
+
+      for (const m of ready) {
+        await finalizeMatch(connection, tournamentId, m, {
+          team1Score: 2,
+          team2Score: 1,
+          winnerTeamId: Number(m.team1_id),
+          loserTeamId: Number(m.team2_id),
+        });
+        played++;
+      }
+      await reconcileSurvival(tournamentId, connection);
+      waves++;
+    }
+    console.log(`    ↳ survie : ${played} matchs simulés sur ${waves} rounds`);
+  } finally {
+    connection.release();
+  }
+}
+
 interface TournamentDef {
   name: string;
   game: "OW2" | "MR";
@@ -373,9 +427,10 @@ interface TournamentDef {
   teamCount: number;
   maxTeams: number;
   daysOffset: number; // négatif = dans le passé
-  format?: "SINGLE" | "DOUBLE";
+  format?: "SINGLE" | "DOUBLE" | "SURVIVAL";
   hasThirdPlaceMatch?: boolean;
   playWaves?: number; // RUNNING : nb de vagues de matchs joués via le vrai bracket
+  survivalRoundsPerCut?: number; // SURVIVAL : nb de rounds entre chaque coupe
 }
 
 async function createTournament(
@@ -390,15 +445,20 @@ async function createTournament(
   const regCloseAt = def.state === "REGISTRATION"
     ? new Date(now.getTime() + 7 * 86400000)
     : new Date(startAt.getTime() - 1 * 86400000);
-  const finishedAt = def.state === "FINISHED" ? startAt : null;
   const format = def.format ?? "DOUBLE";
+  const isSurvival = format === "SURVIVAL";
   const hasThirdPlace = format === "SINGLE" && Boolean(def.hasThirdPlaceMatch) ? 1 : 0;
+  const survivalRoundsPerCut = isSurvival ? def.survivalRoundsPerCut ?? 2 : null;
+  // Le mode Survie est piloté par l'orchestration (initialize → reconcile) : on
+  // insère toujours en RUNNING, puis reconcileSurvival fait passer à FINISHED.
+  const insertState = isSurvival ? "RUNNING" : def.state;
+  const finishedAt = !isSurvival && def.state === "FINISHED" ? startAt : null;
 
   const [result] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_tournaments
-     (organizer_user_id, name, game, description, format, has_third_place_match, max_teams, state,
-      start_visibility_at, registration_open_at, registration_close_at, start_at, finished_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     (organizer_user_id, name, game, description, format, has_third_place_match, survival_rounds_per_cut,
+      max_teams, state, start_visibility_at, registration_open_at, registration_close_at, start_at, finished_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       userIds[0],
       `Test - ${def.name}`,
@@ -406,8 +466,9 @@ async function createTournament(
       `Tournoi test ${def.game} — ${def.state}`,
       format,
       hasThirdPlace,
+      survivalRoundsPerCut,
       def.maxTeams,
-      def.state,
+      insertState,
       regOpenAt,
       regOpenAt,
       regCloseAt,
@@ -417,19 +478,28 @@ async function createTournament(
   );
   const tournamentId = result.insertId as number;
 
-  // Inscriptions
+  // Inscriptions — en Survie, seed et classement final sont gérés par
+  // l'orchestration (bg_survival_standings), on laisse donc final_rank à NULL.
   const teamsToUse = teamIds.slice(0, Math.min(def.teamCount, teamIds.length));
+  const presetFinalRank = def.state === "FINISHED" && !isSurvival;
   for (let i = 0; i < teamsToUse.length; i++) {
     await db.execute(
       `INSERT INTO bg_tournament_registrations (tournament_id, team_id, seed, final_rank) VALUES (?, ?, ?, ?)`,
-      [tournamentId, teamsToUse[i], i + 1, def.state === "FINISHED" ? i + 1 : null]
+      [tournamentId, teamsToUse[i], i + 1, presetFinalRank ? i + 1 : null]
     );
   }
 
   // Matches selon l'état
-  if (def.state === "RUNNING") {
+  if (isSurvival) {
+    await generateSurvivalTournament(db, tournamentId, def.state === "FINISHED", def.playWaves ?? 3);
+    if (def.state === "FINISHED") {
+      // Backdate la clôture (reconcile a posé finished_at = NOW()) pour un
+      // classement historique cohérent (leaderboard / ticker).
+      await db.execute(`UPDATE bg_tournaments SET finished_at = ? WHERE id = ?`, [startAt, tournamentId]);
+    }
+  } else if (def.state === "RUNNING") {
     if (def.playWaves !== undefined) {
-      await generateRealRunningBracket(db, tournamentId, format, def.playWaves);
+      await generateRealRunningBracket(db, tournamentId, format as "SINGLE" | "DOUBLE", def.playWaves);
     } else {
       await generateRunningBracket(db, tournamentId, teamsToUse);
     }
@@ -496,6 +566,12 @@ async function main(): Promise<void> {
       // 11 équipes — double élimination
       { name: "OW2 11-Team Double", game: "OW2", state: "REGISTRATION", teamCount: 11, maxTeams: 16, daysOffset: 25, format: "DOUBLE" },
 
+      // SURVIE — mode « Survie » (groupe unique, coupes périodiques)
+      { name: "OW2 Survie Arena (en cours)", game: "OW2", state: "RUNNING", teamCount: 10, maxTeams: 16, daysOffset: -2, format: "SURVIVAL", survivalRoundsPerCut: 2, playWaves: 3 },
+      { name: "MR Survie Royale (en cours)", game: "MR", state: "RUNNING", teamCount: 7, maxTeams: 8, daysOffset: -1, format: "SURVIVAL", survivalRoundsPerCut: 1, playWaves: 2 },
+      { name: "OW2 Survie Championnat", game: "OW2", state: "FINISHED", teamCount: 12, maxTeams: 16, daysOffset: -40, format: "SURVIVAL", survivalRoundsPerCut: 2 },
+      { name: "MR Survie Last Stand", game: "MR", state: "FINISHED", teamCount: 8, maxTeams: 8, daysOffset: -28, format: "SURVIVAL", survivalRoundsPerCut: 1 },
+
       // RUNNING — gros brackets simple & double élimination avec matchs joués
       { name: "OW2 64-Team Single (en cours)", game: "OW2", state: "RUNNING", teamCount: 64, maxTeams: 64, daysOffset: -2, format: "SINGLE", playWaves: 3 },
       { name: "MR 64-Team Double (en cours)", game: "MR", state: "RUNNING", teamCount: 64, maxTeams: 64, daysOffset: -2, format: "DOUBLE", playWaves: 4 },
@@ -520,6 +596,7 @@ async function main(): Promise<void> {
     console.log(`    - SINGLE sans petite finale (11 équipes)`);
     console.log(`    - SINGLE avec petite finale (11 équipes)`);
     console.log(`    - DOUBLE élimination (11 équipes)`);
+    console.log(`    - 2 SURVIE en cours + 2 SURVIE terminés (mode Survie)`);
     console.log(`    - 4 RUNNING gros brackets : SINGLE & DOUBLE en 64 et 128 équipes (matchs joués)`);
 
     process.exit(0);
