@@ -352,6 +352,18 @@ async function runMigrations(db: Pool): Promise<void> {
     // Columns already exist
   }
 
+  // Migration: Add Survival barrage counter.
+  // survival_barrage_rounds = nombre de rounds de barrage d'équilibrage joués
+  // (0 ou 1) ; ils ne comptent pas dans la cadence des coupes.
+  try {
+    await db.execute(`
+      ALTER TABLE bg_tournaments
+      ADD COLUMN survival_barrage_rounds INT NOT NULL DEFAULT 0
+    `);
+  } catch {
+    // Column already exists
+  }
+
   // Migration: Create Survival standings table.
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_survival_standings (
