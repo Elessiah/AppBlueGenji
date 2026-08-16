@@ -1,0 +1,56 @@
+.frame {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-lg);
+  background: linear-gradient(180deg, var(--cyber-bg-1), var(--cyber-bg));
+  padding: 18px 18px 14px;
+}
+
+/* Les schémas sont dessinés à largeur fixe : ils défilent horizontalement sur
+   mobile plutôt que de se tasser jusqu'à l'illisible. */
+.scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.svg {
+  display: block;
+  min-width: 520px;
+  width: 100%;
+  height: auto;
+}
+
+.caption {
+  margin: 12px 2px 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-mute);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0 2px 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  flex-shrink: 0;
+}
