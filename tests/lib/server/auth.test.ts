@@ -134,6 +134,92 @@ describe("auth", () => {
     });
   });
 
+  describe("getCurrentUser dev bypass (DEV_AUTH_USER_ID)", () => {
+    const bypassUser = {
+      id: 321,
+      pseudo: "admin",
+      avatar_url: null,
+      discord_id: null,
+      google_sub: null,
+      email: null,
+      is_adult: null,
+      is_admin: 1,
+    };
+
+    function mockNoCookie() {
+      return { get: jest.fn().mockReturnValue(undefined) };
+    }
+
+    async function runWithEnv(nodeEnv: string | undefined) {
+      if (nodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = nodeEnv;
+      }
+      process.env.DEV_AUTH_USER_ID = "321";
+
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+
+      const mockExecute = jest.fn().mockResolvedValue([[bypassUser]]);
+      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute });
+      (cookies as jest.Mock).mockResolvedValue(mockNoCookie());
+
+      return getCurrentUser();
+    }
+
+    it("is active in development and returns the targeted user without a session cookie", async () => {
+      const user = await runWithEnv("development");
+      expect(user).not.toBeNull();
+      expect(user?.id).toBe(321);
+      expect(user?.isAdmin).toBe(true);
+    });
+
+    it("is INACTIVE in production even when DEV_AUTH_USER_ID is set", async () => {
+      expect(await runWithEnv("production")).toBeNull();
+    });
+
+    it("is INACTIVE when NODE_ENV is test (allowlist, not denylist)", async () => {
+      expect(await runWithEnv("test")).toBeNull();
+    });
+
+    it("is INACTIVE when NODE_ENV is staging (allowlist, not denylist)", async () => {
+      expect(await runWithEnv("staging")).toBeNull();
+    });
+
+    it("is INACTIVE when NODE_ENV is undefined (misconfigured server)", async () => {
+      expect(await runWithEnv(undefined)).toBeNull();
+    });
+
+    it("is INACTIVE in development when DEV_AUTH_USER_ID is absent", async () => {
+      process.env.NODE_ENV = "development";
+      delete process.env.DEV_AUTH_USER_ID;
+
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+
+      const mockExecute = jest.fn().mockResolvedValue([[bypassUser]]);
+      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute });
+      (cookies as jest.Mock).mockResolvedValue(mockNoCookie());
+
+      expect(await getCurrentUser()).toBeNull();
+    });
+
+    it("is INACTIVE in development when DEV_AUTH_USER_ID is not a valid id", async () => {
+      process.env.NODE_ENV = "development";
+      process.env.DEV_AUTH_USER_ID = "abc";
+
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+
+      const mockExecute = jest.fn().mockResolvedValue([[bypassUser]]);
+      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute });
+      (cookies as jest.Mock).mockResolvedValue(mockNoCookie());
+
+      expect(await getCurrentUser()).toBeNull();
+    });
+  });
+
   describe("clearSession", () => {
     it("clears cookie and database session when token exists", async () => {
       const { getDatabase } = await import("@/lib/server/database");
