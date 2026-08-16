@@ -14,7 +14,7 @@ npm run build        # Production build
 npm run lint         # ESLint
 npm test             # Jest test suite
 npm run test:coverage
-npm run seed         # Populate MySQL with test data (16 users, 8 teams, 4 tournaments)
+npm run seed         # Populate MySQL with test data (matrice de cas, voir ci-dessous)
 npm run seed:view    # Inspect seeded test data
 ```
 
@@ -92,6 +92,16 @@ BOT_DOCS_PATH=                             # optional — chemin du projet blueG
 ## Preview / dev auth bypass
 
 Pour vérifier les pages protégées (`/tournois`, `/equipes`, `/joueurs`, `/profil`, etc.) sans passer par Google OAuth ni le code Discord, définir `DEV_AUTH_USER_ID=<id>` dans `.env` (par exemple `321` pour le user admin). La fonction `getCurrentUser()` dans `lib/server/auth.ts` retournera ce user tant que `NODE_ENV !== "production"`, en court-circuitant le cookie de session — toutes les routes API et le `app/(secured)/layout.tsx` s'authentifient automatiquement. **Redémarre le dev server après modification de `.env`** pour que Next.js prenne en compte la nouvelle valeur. Désactiver = supprimer/vider la var. La garde-fou est double (`NODE_ENV !== "production"` ET ID entier valide) ; ne JAMAIS définir cette var en prod.
+
+## Jeu de test (`npm run seed`)
+
+`npm run seed` **écrase** les données de test (tout ce qui est préfixé `Test_` / `Test - `, plus la table `bg_bureau_members`) puis régénère une matrice de cas destinée à couvrir un maximum de combinaisons en une exécution :
+
+- **Comptes** (`lib/server/seed.ts` → `SPECIAL_USERS`) : admin, un compte par rôle de plateforme (`ARBITRE`, `COMMUNITY_MANAGER`, `RECRUTEUR`) + un cumul, profil tout privé / tout public, mineur, majorité inconnue, sans tags de jeu, sans équipe, compte anonymisé. L'id de l'admin est affiché en fin de seed : c'est la valeur à mettre dans `DEV_AUTH_USER_ID`.
+- **Équipes** : rosters complets avec rôles cumulés (`OWNER`/`CAPITAINE`/`TANK`/`DPS`/`HEAL`/`COACH`/`MANAGER`), plus les cas limites (équipe à un seul membre, équipe sans joueur, avec/sans logo) et ~140 équipes de remplissage pour les gros brackets.
+- **Tournois** (`lib/server/seed-cases.ts` → `TOURNAMENTS`) : la matrice **état × format × effectif × situation de match**. 4 états, 4 formats (`SINGLE` avec/sans petite finale, `DOUBLE`, `SWISS`, `SURVIVAL`), effectifs de 0 à 128 (puissances de 2 et effectifs à byes), survie impaire 3/5/7/9/11/15/21 (barrage) avec cadences 1/2/3 et forfaits, plus les états intermédiaires du cycle de report (report en attente, conflit de scores, délai dépassé).
+
+Ajouter un cas = ajouter une entrée à `TOURNAMENTS` ; `lib/server/seed-cases.ts` est volontairement sans accès base pour rester testable (`tests/lib/server/seed-cases.test.ts` garde la couverture de la matrice). Les résultats de matchs sont tirés par un LCG réamorcé par tournoi : **le seed est reproductible** d'une exécution à l'autre.
 
 ## Key Conventions
 
