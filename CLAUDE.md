@@ -48,7 +48,7 @@ Direct MySQL2 pool. Schema migrations run automatically on first query. Tables: 
 
 ### Tournament Engine (`lib/server/tournaments-service.ts`)
 Supports single/double elimination, Swiss round and Survival formats. Key concepts:
-- **Formats:** `SINGLE`, `DOUBLE`, `SWISS` (see `plans/SwissRound.md`), `SURVIVAL` (single group, seed by site ranking, adjacent pairing, periodic bottom-2 cuts until one champion — see `docs/features/SURVIVAL_MODE.md`). Survival logic lives in `lib/shared/survival.ts` (pure) + `lib/server/tournaments/survival.ts` (orchestration, idempotent `reconcileSurvival`).
+- **Formats:** `SINGLE`, `DOUBLE`, `SWISS` (see `plans/SwissRound.md`), `SURVIVAL` (single group, seed by site ranking, adjacent pairing, periodic bottom-2 cuts until one champion ; odd field → round-1 barrage between the bottom two so no byes are ever handed out — see `docs/features/SURVIVAL_MODE.md`). Survival logic lives in `lib/shared/survival.ts` (pure) + `lib/server/tournaments/survival.ts` (orchestration, idempotent `reconcileSurvival`).
 - **States:** `UPCOMING → REGISTRATION → RUNNING → FINISHED`
 - **Bracket positions:** `UPPER`, `LOWER`, `GRAND` finals
 - **Match status:** `PENDING → READY → AWAITING_CONFIRMATION → COMPLETED`
