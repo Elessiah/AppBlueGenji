@@ -256,6 +256,7 @@ export default function TournamentDetailPage() {
                   onScoreChange={handleScoreChange}
                   onSubmit={submitScore}
                   onOpenAdminModal={setSelectedMatchForAdmin}
+                  format={detail.card.format}
                 />
               </div>
             ))

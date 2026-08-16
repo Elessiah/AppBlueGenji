@@ -1,65 +1,107 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { TournamentFormat } from "@/lib/shared/types";
+import { hasScoreInput, type MatchScoreState } from "@/lib/shared/match-lock";
 import { MatchRow } from "./_internal";
 import { finalizeMatch } from "./scoring";
 import { tryAutoResolveByes } from "./byes";
 
+interface DependentMatchRow extends RowDataPacket {
+  id: number;
+  round_number: number;
+  team1_id: number | null;
+  team2_id: number | null;
+  team1_score: number | null;
+  team2_score: number | null;
+  winner_team_id: number | null;
+  forfeit_team_id: number | null;
+  team1_reported_at: string | null;
+  team2_reported_at: string | null;
+}
+
+const DEPENDENT_COLUMNS = `id, round_number, team1_id, team2_id, team1_score, team2_score,
+   winner_team_id, forfeit_team_id, team1_reported_at, team2_reported_at`;
+
+function toMatchScoreState(row: DependentMatchRow): MatchScoreState {
+  return {
+    id: Number(row.id),
+    roundNumber: Number(row.round_number),
+    team1Id: row.team1_id === null ? null : Number(row.team1_id),
+    team2Id: row.team2_id === null ? null : Number(row.team2_id),
+    team1Score: row.team1_score === null ? null : Number(row.team1_score),
+    team2Score: row.team2_score === null ? null : Number(row.team2_score),
+    winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
+    forfeitTeamId: row.forfeit_team_id === null ? null : Number(row.forfeit_team_id),
+    hasPendingReport: row.team1_reported_at !== null || row.team2_reported_at !== null,
+    nextWinnerMatchId: null,
+    nextLoserMatchId: null,
+  };
+}
+
+/**
+ * Refuse la modification d'un score dès que la manche suivante porte la moindre
+ * saisie — un score (même 0), un vainqueur, un forfait ou un report en attente.
+ * La règle vaut aussi pour les admins : réécrire un résultat amont changerait
+ * les participants d'un match déjà entamé.
+ *
+ * La liste des matchs dépendants suit le format : liens de bracket en
+ * élimination simple/double, rounds ultérieurs en survie et en ronde suisse (où
+ * les appariements sont recalculés depuis le classement). Voir
+ * `lib/shared/match-lock.ts`, partagé avec l'interface.
+ */
 export async function checkDownstreamMatchesHaveNoScores(
   connection: PoolConnection,
   match: MatchRow,
 ): Promise<void> {
-  if (match.winner_team_id === null) {
-    return;
+  const [currentRows] = await connection.execute<
+    (RowDataPacket & {
+      round_number: number;
+      winner_team_id: number | null;
+      next_winner_match_id: number | null;
+      next_loser_match_id: number | null;
+      tournament_id: number;
+      format: TournamentFormat;
+    })[]
+  >(
+    `SELECT m.round_number, m.winner_team_id, m.next_winner_match_id, m.next_loser_match_id,
+            m.tournament_id, t.format
+     FROM bg_matches m
+     JOIN bg_tournaments t ON t.id = m.tournament_id
+     WHERE m.id = ?
+     LIMIT 1`,
+    [match.id],
+  );
+
+  const current = currentRows[0];
+  // Match indécis : rien n'a encore été propagé, la saisie reste ouverte.
+  if (!current || current.winner_team_id === null) return;
+
+  let dependents: DependentMatchRow[];
+
+  if (current.format === "SURVIVAL" || current.format === "SWISS") {
+    const [rows] = await connection.execute<DependentMatchRow[]>(
+      `SELECT ${DEPENDENT_COLUMNS}
+       FROM bg_matches
+       WHERE tournament_id = ? AND round_number > ?`,
+      [Number(current.tournament_id), Number(current.round_number)],
+    );
+    dependents = rows;
+  } else {
+    const targets = [current.next_winner_match_id, current.next_loser_match_id]
+      .filter((id): id is number => id !== null && id !== undefined)
+      .map(Number);
+    if (targets.length === 0) return;
+
+    const [rows] = await connection.execute<DependentMatchRow[]>(
+      `SELECT ${DEPENDENT_COLUMNS}
+       FROM bg_matches
+       WHERE id IN (${targets.map(() => "?").join(", ")})`,
+      targets,
+    );
+    dependents = rows;
   }
 
-  const nextWinnerId = match.next_winner_match_id ? Number(match.next_winner_match_id) : null;
-  const nextLoserId = match.next_loser_match_id ? Number(match.next_loser_match_id) : null;
-
-  if (nextWinnerId) {
-    const [results] = await connection.execute<
-      (RowDataPacket & {
-        team1_id: number | null;
-        team2_id: number | null;
-        team1_score: number | null;
-        team2_score: number | null;
-      })[]
-    >(
-      `SELECT team1_id, team2_id, team1_score, team2_score FROM bg_matches WHERE id = ? LIMIT 1`,
-      [nextWinnerId],
-    );
-    if (
-      results.length > 0 &&
-      results[0].team1_id !== null &&
-      results[0].team2_id !== null &&
-      results[0].team1_score !== null &&
-      results[0].team2_score !== null &&
-      (results[0].team1_score !== 0 || results[0].team2_score !== 0)
-    ) {
-      throw new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES");
-    }
-  }
-
-  if (nextLoserId) {
-    const [results] = await connection.execute<
-      (RowDataPacket & {
-        team1_id: number | null;
-        team2_id: number | null;
-        team1_score: number | null;
-        team2_score: number | null;
-      })[]
-    >(
-      `SELECT team1_id, team2_id, team1_score, team2_score FROM bg_matches WHERE id = ? LIMIT 1`,
-      [nextLoserId],
-    );
-    if (
-      results.length > 0 &&
-      results[0].team1_id !== null &&
-      results[0].team2_id !== null &&
-      results[0].team1_score !== null &&
-      results[0].team2_score !== null &&
-      (results[0].team1_score !== 0 || results[0].team2_score !== 0)
-    ) {
-      throw new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES");
-    }
+  if (dependents.map(toMatchScoreState).some(hasScoreInput)) {
+    throw new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES");
   }
 }
 

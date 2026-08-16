@@ -53,6 +53,7 @@ Supports single/double elimination, Swiss round and Survival formats. Key concep
 - **States:** `UPCOMING → REGISTRATION → RUNNING → FINISHED`
 - **Bracket positions:** `UPPER`, `LOWER`, `GRAND` finals
 - **Match status:** `PENDING → READY → AWAITING_CONFIRMATION → COMPLETED`
+- **Verrouillage de l'édition d'un score** (`lib/shared/match-lock.ts`) : un score n'est plus modifiable — **y compris par un admin** — dès que la manche suivante porte la moindre saisie (un score même nul, un vainqueur, un forfait, ou un report en attente de confirmation). Les matchs dépendants suivent le format : liens `next_winner_match_id` / `next_loser_match_id` en élimination, tous les rounds ultérieurs en survie et en ronde suisse (leurs appariements sont recalculés depuis le classement). Le module est pur et partagé : le serveur l'applique dans `checkDownstreamMatchesHaveNoScores` (`lib/server/tournaments/admin.ts`, erreur `CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES` → 409) et l'interface masque le bouton « Éditer le score » au profit d'un indicateur « 🔒 Score verrouillé ». Les byes et matchs fantômes sont ignorés : leur score (1-0, 0-0) est posé par le moteur, pas saisi.
 - Bye slots for non-power-of-2 participant counts (`docs/features/BYE_FUNCTIONALITY.md`)
 - Variable bracket sizing (`docs/features/VARIABLE_SIZE_TOURNAMENTS.md`)
 - Swiss rounds: fixed number of rounds, pairing by points/standing, no elimination

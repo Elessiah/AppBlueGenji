@@ -1,30 +1,27 @@
 import { useState } from "react";
 import type { BracketMatch } from "@/lib/shared/types";
 import { mapError } from "../_lib/error-map";
+import { scoreFormStateFor, type ScoreFormState } from "../_lib/score-form";
 import { useToast } from "@/components/ui/toast";
-
-interface ScoreFormState {
-  score1: string;
-  score2: string;
-  forfeitTeamId?: number;
-}
 
 export function useScoreForm(match: BracketMatch | null) {
   const { showError, showSuccess } = useToast();
-  const [state, setState] = useState<ScoreFormState>({
-    score1: match ? String(match.team1Score ?? 0) : "0",
-    score2: match ? String(match.team2Score ?? 0) : "0",
-    forfeitTeamId: match?.forfeitTeamId ?? undefined,
-  });
+  const [state, setState] = useState<ScoreFormState>(() => scoreFormStateFor(match));
   const [submitting, setSubmitting] = useState(false);
+
+  // Le dialogue reste monté entre deux ouvertures : sans resynchronisation, il
+  // rouvrirait sur le score du match précédemment édité. On réaligne dès que le
+  // match change (y compris au passage par `null`, à la fermeture), pour repartir
+  // du score réel du match — 0-0 s'il n'a jamais été saisi.
+  const [syncedMatchId, setSyncedMatchId] = useState<number | null>(match?.id ?? null);
+  if ((match?.id ?? null) !== syncedMatchId) {
+    setSyncedMatchId(match?.id ?? null);
+    setState(scoreFormStateFor(match));
+  }
 
   const reset = () => {
     if (match) {
-      setState({
-        score1: String(match.team1Score ?? 0),
-        score2: String(match.team2Score ?? 0),
-        forfeitTeamId: match.forfeitTeamId ?? undefined,
-      });
+      setState(scoreFormStateFor(match));
     }
   };
 

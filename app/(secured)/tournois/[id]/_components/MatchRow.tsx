@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FormEvent } from "react";
-import type { BracketMatch } from "@/lib/shared/types";
+import type { BracketMatch, TournamentFormat } from "@/lib/shared/types";
+import { fromBracketMatch, isScoreEditLocked } from "@/lib/shared/match-lock";
 
 const CARD_W = 210;
 const BORDER = "var(--border, #444)";
@@ -16,6 +17,7 @@ interface MatchRowProps {
   onOpenAdminModal: (match: BracketMatch) => void;
   allMatches: BracketMatch[];
   roundNumber: number;
+  format: TournamentFormat;
 }
 
 export function MatchRow({
@@ -29,28 +31,19 @@ export function MatchRow({
   onOpenAdminModal,
   allMatches,
   roundNumber,
+  format,
 }: MatchRowProps) {
   const team1Win = match.winnerTeamId !== null && match.winnerTeamId === match.team1Id;
   const team2Win = match.winnerTeamId !== null && match.winnerTeamId === match.team2Id;
   const hasWinner = match.winnerTeamId !== null;
 
-  const hasDownstreamScores = (() => {
-    if (match.nextWinnerMatchId) {
-      const nextWinner = allMatches.find((m) => m.id === match.nextWinnerMatchId);
-      const isBye = !nextWinner || nextWinner.team1Id === null || nextWinner.team2Id === null;
-      if (!isBye && nextWinner!.team1Score !== null && nextWinner!.team2Score !== null && (nextWinner!.team1Score !== 0 || nextWinner!.team2Score !== 0)) {
-        return true;
-      }
-    }
-    if (match.nextLoserMatchId) {
-      const nextLoser = allMatches.find((m) => m.id === match.nextLoserMatchId);
-      const isBye = !nextLoser || nextLoser.team1Id === null || nextLoser.team2Id === null;
-      if (!isBye && nextLoser!.team1Score !== null && nextLoser!.team2Score !== null && (nextLoser!.team1Score !== 0 || nextLoser!.team2Score !== 0)) {
-        return true;
-      }
-    }
-    return false;
-  })();
+  // Même règle que le garde-fou serveur (`lib/shared/match-lock.ts`) : le score
+  // n'est plus éditable dès que la manche suivante porte une saisie.
+  const scoreLocked = isScoreEditLocked(
+    fromBracketMatch(match),
+    allMatches.map(fromBracketMatch),
+    format,
+  );
 
   const rowStyle = (win: boolean): React.CSSProperties => ({
     display: "flex",
@@ -150,7 +143,7 @@ export function MatchRow({
         </form>
       )}
 
-      {adminResolvable && !hasDownstreamScores && (
+      {adminResolvable && !scoreLocked && (
         <div
           style={{
             display: "flex",
@@ -168,6 +161,25 @@ export function MatchRow({
           >
             ✎ Éditer le score
           </button>
+        </div>
+      )}
+
+      {adminResolvable && scoreLocked && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            padding: "5px 6px",
+            borderTop: `1px solid ${BORDER}`,
+            fontSize: 11,
+            color: "var(--text-2)",
+          }}
+          title="La manche suivante a déjà des scores : le résultat de ce match ne peut plus être modifié."
+        >
+          <span aria-hidden="true">🔒</span>
+          Score verrouillé
         </div>
       )}
     </div>
