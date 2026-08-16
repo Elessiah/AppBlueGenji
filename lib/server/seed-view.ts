@@ -2,143 +2,189 @@ import "dotenv/config";
 import { getDatabase } from "./database";
 import type { RowDataPacket } from "mysql2/promise";
 
-async function viewTestData(): Promise<void> {
-  console.log("📊 Test Data Overview\n");
-  console.log("=".repeat(80));
+/**
+ * Inspection des données de test.
+ *
+ *   npm run seed:view            → vue d'ensemble (comptes, équipes, tournois)
+ *   npm run seed:view -- 1937    → détail d'un tournoi (bracket round par round)
+ *
+ * Le seed génère une cinquantaine de tournois : dumper tous les brackets à
+ * chaque exécution noierait l'information utile, d'où la vue d'ensemble par
+ * défaut et le détail à la demande.
+ */
+
+const short = (name: string | null): string =>
+  (name ?? "TBD").replace("Test - ", "").replace("Test_", "");
+
+async function overview(db: Awaited<ReturnType<typeof getDatabase>>): Promise<void> {
+  const [users] = await db.execute<(RowDataPacket & { pseudo: string; id: number; roles: string | null; is_admin: number })[]>(
+    `SELECT id, pseudo, platform_roles_json AS roles, is_admin
+     FROM bg_users
+     WHERE pseudo LIKE 'Test\\_%' AND pseudo NOT LIKE 'Test\\_BulkUser\\_%'
+     ORDER BY is_admin DESC, id`
+  );
+
+  console.log("\n👥 COMPTES DE TEST");
+  for (const u of users) {
+    const badges = [
+      u.is_admin ? "ADMIN" : null,
+      u.roles ? (Array.isArray(u.roles) ? u.roles.join("+") : String(u.roles)) : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    console.log(`   #${u.id} ${short(u.pseudo)}${badges ? `  [${badges}]` : ""}`);
+  }
+
+  const [teams] = await db.execute<(RowDataPacket & { total: number; bulk: number })[]>(
+    `SELECT COUNT(*) total, SUM(name LIKE 'Test - Bracket Team %') bulk
+     FROM bg_teams WHERE name LIKE 'Test -%'`
+  );
+  console.log(
+    `\n🏆 ÉQUIPES : ${teams[0].total} dont ${Number(teams[0].bulk)} de remplissage`
+  );
+
+  const [matrix] = await db.execute<(RowDataPacket & { state: string; format: string; c: number })[]>(
+    `SELECT state, format, COUNT(*) c FROM bg_tournaments
+     WHERE name LIKE 'Test -%' GROUP BY state, format
+     ORDER BY FIELD(state,'UPCOMING','REGISTRATION','RUNNING','FINISHED'), format`
+  );
+  console.log("\n🎮 TOURNOIS PAR ÉTAT × FORMAT");
+  for (const row of matrix) {
+    console.log(`   ${row.state.padEnd(13)} ${row.format.padEnd(9)} ${row.c}`);
+  }
+
+  const [tournaments] = await db.execute<
+    (RowDataPacket & {
+      id: number;
+      name: string;
+      format: string;
+      state: string;
+      registered: number;
+      max_teams: number;
+      matches: number;
+      awaiting: number;
+    })[]
+  >(
+    `SELECT t.id, t.name, t.format, t.state, t.max_teams,
+       (SELECT COUNT(*) FROM bg_tournament_registrations r WHERE r.tournament_id = t.id) registered,
+       (SELECT COUNT(*) FROM bg_matches m WHERE m.tournament_id = t.id) matches,
+       (SELECT COUNT(*) FROM bg_matches m WHERE m.tournament_id = t.id AND m.status = 'AWAITING_CONFIRMATION') awaiting
+     FROM bg_tournaments t
+     WHERE t.name LIKE 'Test -%'
+     ORDER BY FIELD(t.state,'RUNNING','REGISTRATION','UPCOMING','FINISHED'), t.id`
+  );
+
+  console.log("\n📋 DÉTAIL DES TOURNOIS");
+  for (const t of tournaments) {
+    const flags = Number(t.awaiting) > 0 ? `  ⏳ ${t.awaiting} en attente` : "";
+    console.log(
+      `   #${t.id} [${t.state}/${t.format}] ${short(t.name)}` +
+        ` — ${t.registered}/${t.max_teams} équipes · ${t.matches} matchs${flags}`
+    );
+  }
+
+  console.log("\n💡 Détail d'un bracket : npm run seed:view -- <id>\n");
+}
+
+async function detail(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  tournamentId: number
+): Promise<void> {
+  const [rows] = await db.execute<
+    (RowDataPacket & { id: number; name: string; format: string; state: string; max_teams: number })[]
+  >(`SELECT id, name, format, state, max_teams FROM bg_tournaments WHERE id = ? LIMIT 1`, [
+    tournamentId,
+  ]);
+
+  if (rows.length === 0) {
+    console.log(`\n❌ Tournoi #${tournamentId} introuvable.\n`);
+    return;
+  }
+
+  const t = rows[0];
+  console.log(`\n📋 #${t.id} ${short(t.name)}`);
+  console.log(`   ${t.state} · ${t.format} · max ${t.max_teams} équipes`);
+
+  const [matches] = await db.execute<
+    (RowDataPacket & {
+      bracket: string;
+      round_number: number;
+      match_number: number;
+      team1_name: string | null;
+      team2_name: string | null;
+      status: string;
+      team1_score: number | null;
+      team2_score: number | null;
+      winner_name: string | null;
+    })[]
+  >(
+    `SELECT m.bracket, m.round_number, m.match_number,
+       t1.name team1_name, t2.name team2_name, w.name winner_name,
+       m.status, m.team1_score, m.team2_score
+     FROM bg_matches m
+     LEFT JOIN bg_teams t1 ON m.team1_id = t1.id
+     LEFT JOIN bg_teams t2 ON m.team2_id = t2.id
+     LEFT JOIN bg_teams w ON m.winner_team_id = w.id
+     WHERE m.tournament_id = ?
+     ORDER BY m.bracket DESC, m.round_number, m.match_number`,
+    [tournamentId]
+  );
+
+  let currentBracket = "";
+  let currentRound = 0;
+  for (const m of matches) {
+    if (m.bracket !== currentBracket) {
+      currentBracket = m.bracket;
+      currentRound = 0;
+      console.log(`\n   ${currentBracket}`);
+    }
+    if (m.round_number !== currentRound) {
+      currentRound = m.round_number;
+      console.log(`     Round ${currentRound}`);
+    }
+    const score = m.team1_score !== null ? ` (${m.team1_score}-${m.team2_score})` : "";
+    const winner = m.winner_name ? ` → ${short(m.winner_name)}` : "";
+    console.log(
+      `       ${m.match_number}. ${short(m.team1_name)} vs ${short(m.team2_name)}` +
+        ` [${m.status}]${score}${winner}`
+    );
+  }
+
+  if (t.format === "SURVIVAL") {
+    const [standings] = await db.execute<
+      (RowDataPacket & { name: string; seed: number; wins: number; losses: number; status: string; rank: number })[]
+    >(
+      `SELECT tm.name, s.seed, s.wins, s.losses, s.status, s.\`rank\`
+       FROM bg_survival_standings s JOIN bg_teams tm ON tm.id = s.team_id
+       WHERE s.tournament_id = ? ORDER BY s.\`rank\`, s.seed`,
+      [tournamentId]
+    );
+    console.log("\n   CLASSEMENT SURVIE");
+    for (const s of standings) {
+      console.log(
+        `     ${String(s.rank).padStart(2)}. ${short(s.name).padEnd(24)} ` +
+          `seed ${String(s.seed).padStart(2)} · ${s.wins}V-${s.losses}D · ${s.status}`
+      );
+    }
+  }
+
+  console.log();
+}
+
+async function main(): Promise<void> {
+  console.log("📊 Données de test BlueGenji");
+  console.log("=".repeat(72));
 
   try {
     const db = await getDatabase();
+    const arg = process.argv[2];
+    const tournamentId = arg ? Number(arg) : NaN;
 
-    // 1. View test users
-    console.log("\n👥 TEST USERS:");
-    const [users] = await db.execute<(RowDataPacket & { id: number; pseudo: string })[]>(
-      "SELECT id, pseudo FROM bg_users WHERE pseudo LIKE 'Test_%' ORDER BY id"
-    );
-    users.forEach((u) => console.log(`   ${u.id}: ${u.pseudo}`));
-    console.log(`\n   Total: ${users.length} test users`);
-
-    // 2. View test teams
-    console.log("\n\n🏆 TEST TEAMS:");
-    const [teams] = await db.execute<
-      (RowDataPacket & {
-        id: number;
-        name: string;
-        members_count: number;
-      })[]
-    >(
-      `SELECT t.id, t.name, COUNT(tm.id) as members_count
-       FROM bg_teams t
-       LEFT JOIN bg_team_members tm ON tm.team_id = t.id AND tm.left_at IS NULL
-       WHERE t.name LIKE 'Test -%'
-       GROUP BY t.id, t.name
-       ORDER BY t.id`
-    );
-
-    teams.forEach((t) => console.log(`   ${t.id}: ${t.name} (${t.members_count} members)`));
-    console.log(`\n   Total: ${teams.length} test teams`);
-
-    // 3. View test tournaments
-    console.log("\n\n🎮 TEST TOURNAMENTS:");
-    const [tournaments] = await db.execute<
-      (RowDataPacket & {
-        id: number;
-        name: string;
-        format: string;
-        state: string;
-        registered_count: number;
-        max_teams: number;
-        match_count: number;
-      })[]
-    >(
-      `SELECT
-         t.id,
-         t.name,
-         t.format,
-         t.state,
-         COUNT(DISTINCT tr.team_id) as registered_count,
-         t.max_teams,
-         (SELECT COUNT(*) FROM bg_matches WHERE tournament_id = t.id) as match_count
-       FROM bg_tournaments t
-       LEFT JOIN bg_tournament_registrations tr ON tr.tournament_id = t.id
-       WHERE t.name LIKE 'Test -%'
-       GROUP BY t.id, t.name, t.format, t.state, t.max_teams
-       ORDER BY t.id`
-    );
-
-    if (tournaments.length === 0) {
-      console.log("   No test tournaments found. Run 'npm run seed' first.");
+    if (Number.isInteger(tournamentId) && tournamentId > 0) {
+      await detail(db, tournamentId);
     } else {
-      tournaments.forEach((t) => {
-        console.log(`   ${t.id}: ${t.name}`);
-        console.log(`      Format: ${t.format} | State: ${t.state}`);
-        console.log(`      Teams: ${t.registered_count}/${t.max_teams} | Matches: ${t.match_count}`);
-      });
-      console.log(`\n   Total: ${tournaments.length} test tournament(s)`);
-
-      // 4. Show bracket for each tournament
-      for (const tournament of tournaments) {
-        console.log("\n\n📋 TOURNAMENT BRACKET STRUCTURE:");
-        console.log(`   Tournament ID: ${tournament.id} - ${tournament.name}`);
-        console.log(`   State: ${tournament.state} | Format: ${tournament.format} | Teams: ${tournament.registered_count}/${tournament.max_teams}`);
-
-        // Group matches by bracket and round
-        const [matches] = await db.execute<
-          (RowDataPacket & {
-            bracket: string;
-            round_number: number;
-            match_number: number;
-            team1_name: string | null;
-            team2_name: string | null;
-            status: string;
-            team1_score: number | null;
-            team2_score: number | null;
-          })[]
-        >(
-          `SELECT
-             m.bracket,
-             m.round_number,
-             m.match_number,
-             t1.name as team1_name,
-             t2.name as team2_name,
-             m.status,
-             m.team1_score,
-             m.team2_score
-           FROM bg_matches m
-           LEFT JOIN bg_teams t1 ON m.team1_id = t1.id
-           LEFT JOIN bg_teams t2 ON m.team2_id = t2.id
-           WHERE m.tournament_id = ?
-           ORDER BY m.bracket DESC, m.round_number, m.match_number`,
-          [tournament.id]
-        );
-
-        if (matches.length === 0) {
-          console.log("   No matches yet");
-        } else {
-          let currentBracket = "";
-          let currentRound = 0;
-
-          matches.forEach((m) => {
-            if (m.bracket !== currentBracket) {
-              currentBracket = m.bracket;
-              currentRound = 0;
-              console.log(`\n   ${currentBracket} BRACKET:`);
-            }
-            if (m.round_number !== currentRound) {
-              currentRound = m.round_number;
-              console.log(`     Round ${currentRound}:`);
-            }
-
-            const team1 = m.team1_name ? m.team1_name.replace("Test - ", "") : "TBD";
-            const team2 = m.team2_name ? m.team2_name.replace("Test - ", "") : "TBD";
-            const score = m.team1_score !== null ? ` (${m.team1_score}-${m.team2_score})` : "";
-            console.log(`       Match ${m.match_number}: ${team1} vs ${team2} [${m.status}]${score}`);
-          });
-        }
-      }
+      await overview(db);
     }
-
-    console.log("\n" + "=".repeat(80));
-    console.log("\n✅ View complete!\n");
 
     process.exit(0);
   } catch (error) {
@@ -147,4 +193,4 @@ async function viewTestData(): Promise<void> {
   }
 }
 
-viewTestData();
+main();
