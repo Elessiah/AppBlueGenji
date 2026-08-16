@@ -12,7 +12,24 @@ interface SwissStandingsRow extends RowDataPacket {
   draws: number;
   losses: number;
   byes: number;
-  opponent_ids_json: string;
+  opponent_ids_json: string | number[];
+}
+
+// `opponent_ids_json` est une colonne JSON : mysql2 la renvoie déjà désérialisée
+// (tableau), mais un driver ou un dump peut la rendre sous forme de chaîne. On
+// accepte les deux plutôt que de faire un JSON.parse aveugle (qui échouait sur
+// le tableau, `String([])` valant "").
+function parseOpponentIds(value: string | number[] | null): number[] {
+  if (Array.isArray(value)) return value.map(Number);
+  if (typeof value === "string" && value.length > 0) {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.map(Number) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
 }
 
 interface TournamentSwissRow extends RowDataPacket {
@@ -96,7 +113,7 @@ export async function generateFirstRound(
   const participants: Participant[] = standings.map((row) => ({
     teamId: Number(row.team_id),
     points: Number(row.points),
-    opponentIds: JSON.parse(row.opponent_ids_json),
+    opponentIds: parseOpponentIds(row.opponent_ids_json),
     hasReceivedBye: false,
   }));
 
@@ -198,7 +215,7 @@ export async function generateNextRound(
   const participants: Participant[] = standings.map((row) => ({
     teamId: Number(row.team_id),
     points: Number(row.points),
-    opponentIds: JSON.parse(row.opponent_ids_json),
+    opponentIds: parseOpponentIds(row.opponent_ids_json),
     hasReceivedBye: Number(row.byes) > 0,
   }));
 
