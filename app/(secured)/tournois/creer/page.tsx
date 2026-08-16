@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { CSSProperties, FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { localDateTimeInput } from "@/lib/shared/dates";
@@ -8,6 +8,23 @@ import type { TournamentFormat, TournamentGame } from "@/lib/shared/types";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
 import { useToast } from "@/components/ui/toast";
 import { CyberCard, CyberButton } from "@/components/cyber";
+
+// Rythme vertical du formulaire : sections séparées par un filet, même gouttière
+// de grille partout, textes d'aide sur les tokens « cyber ».
+const SECTION_STACK: CSSProperties = { display: "flex", flexDirection: "column", gap: 28 };
+const SECTION_SEPARATOR: CSSProperties = {
+  paddingTop: 28,
+  borderTop: "1px solid var(--line-soft)",
+};
+const EYEBROW: CSSProperties = { margin: "0 0 16px" };
+const GRID: CSSProperties = { gap: 16 };
+const FULL_WIDTH: CSSProperties = { gridColumn: "1 / -1" };
+const HINT: CSSProperties = {
+  margin: "2px 0 0",
+  fontSize: 12.5,
+  color: "var(--ink-mute)",
+  lineHeight: 1.5,
+};
 
 export default function CreateTournamentPage() {
   const router = useRouter();
@@ -79,10 +96,22 @@ export default function CreateTournamentPage() {
       </Link>
       <section className="fade-in container">
         <div style={{ marginBottom: 28 }}>
-          <Link href="/tournois" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--ink-mute)" }}>
+          <Link
+            href="/tournois"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 13,
+              color: "var(--ink-mute)",
+            }}
+          >
             ← Tournois
           </Link>
-          <h1 className="display" style={{ fontSize: 48, margin: "12px 0 8px" }}>
+          <h1
+            className="display"
+            style={{ fontSize: "clamp(30px, 6vw, 48px)", margin: "12px 0 8px", lineHeight: 1.1 }}
+          >
             Créer un tournoi
           </h1>
           <p style={{ color: "var(--ink-mute)", margin: 0, fontSize: 14 }}>
@@ -90,139 +119,217 @@ export default function CreateTournamentPage() {
           </p>
         </div>
 
-        <CyberCard ticks>
-          <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-            <div>
-              <p className="eyebrow" style={{ margin: "0 0 14px" }}>
+        <CyberCard ticks style={{ padding: "clamp(20px, 3vw, 32px)" }}>
+          <form onSubmit={onSubmit} style={SECTION_STACK}>
+            <section>
+              <p className="eyebrow" style={EYEBROW}>
                 Identité
               </p>
-              <div className="form-grid">
+              <div className="form-grid" style={GRID}>
                 <div className="field">
-                  <label>Nom du tournoi</label>
-                  <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Mon tournoi" />
+                  <label htmlFor="tournament-name">Nom du tournoi</label>
+                  <input
+                    id="tournament-name"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Mon tournoi"
+                  />
                 </div>
                 <div className="field">
-                  <label>Jeu</label>
-                  <select value={game} onChange={(e) => setGame(e.target.value as TournamentGame)}>
+                  <label htmlFor="tournament-game">Jeu</label>
+                  <select
+                    id="tournament-game"
+                    value={game}
+                    onChange={(e) => setGame(e.target.value as TournamentGame)}
+                  >
                     <option value="OW2">Overwatch 2</option>
                     <option value="MR">Marvel Rivals</option>
                   </select>
                 </div>
+                <div className="field" style={FULL_WIDTH}>
+                  <label htmlFor="tournament-description">Description</label>
+                  <textarea
+                    id="tournament-description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Description du tournoi..."
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section style={SECTION_SEPARATOR}>
+              <p className="eyebrow" style={EYEBROW}>
+                Format
+              </p>
+              <div className="form-grid" style={GRID}>
                 <div className="field">
-                  <label>Format</label>
-                  <select value={format} onChange={(e) => { setFormat(e.target.value as TournamentFormat); setHasThirdPlaceMatch(false); }}>
+                  <label htmlFor="tournament-format">Format de bracket</label>
+                  <select
+                    id="tournament-format"
+                    value={format}
+                    onChange={(e) => {
+                      setFormat(e.target.value as TournamentFormat);
+                      setHasThirdPlaceMatch(false);
+                    }}
+                  >
                     <option value="SINGLE">Simple élimination</option>
                     <option value="DOUBLE">Double élimination</option>
                     <option value="SURVIVAL">Survie</option>
                   </select>
                 </div>
-              {format === "SURVIVAL" && (
                 <div className="field">
-                  <label htmlFor="survival-rounds">Rounds avant élimination</label>
+                  <label htmlFor="max-teams">Nombre max d&apos;équipes</label>
                   <input
-                    id="survival-rounds"
+                    id="max-teams"
                     type="number"
-                    min={1}
-                    max={50}
-                    value={survivalRoundsPerCut}
-                    onChange={(e) => setSurvivalRoundsPerCut(Number(e.target.value))}
+                    min={2}
+                    max={256}
+                    value={maxTeams}
+                    onChange={(e) => setMaxTeams(Number(e.target.value))}
                   />
-                  <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-2)", lineHeight: 1.4 }}>
-                    Toutes les équipes s&apos;affrontent par paires selon leur classement. Après ce
-                    nombre de rounds, les deux dernières équipes sont éliminées, et ainsi de suite
-                    jusqu&apos;à la championne.
-                  </p>
                 </div>
-              )}
-              {format === "SINGLE" && (
-                <div className="field" style={{ gridColumn: "1 / -1" }}>
-                  <label htmlFor="third-place" style={{ marginBottom: 12 }}>
-                    Options supplémentaires
-                  </label>
-                  <div
-                    className="checkbox-card"
-                    onClick={() => setHasThirdPlaceMatch(!hasThirdPlaceMatch)}
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 12,
-                      padding: "14px 16px",
-                      border: `1.5px solid ${hasThirdPlaceMatch ? "var(--accent-green)" : "var(--line)"}`,
-                      borderRadius: "10px",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      backgroundColor: hasThirdPlaceMatch ? "rgba(79,224,162,0.06)" : "transparent",
-                    }}
-                  >
+
+                {format === "SURVIVAL" && (
+                  <div className="field">
+                    <label htmlFor="survival-rounds">Rounds avant chaque coupe</label>
                     <input
-                      id="third-place"
-                      type="checkbox"
-                      checked={hasThirdPlaceMatch}
-                      onChange={(e) => setHasThirdPlaceMatch(e.target.checked)}
-                      style={{
-                        width: 18,
-                        height: 18,
-                        accentColor: "var(--accent-green)",
-                        cursor: "pointer",
-                        flexShrink: 0,
-                        marginTop: 2,
-                      }}
+                      id="survival-rounds"
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={survivalRoundsPerCut}
+                      onChange={(e) => setSurvivalRoundsPerCut(Number(e.target.value))}
                     />
-                    <div style={{ flex: 1 }}>
-                      <label htmlFor="third-place" style={{ margin: 0, cursor: "pointer", userSelect: "none", fontSize: 14, fontWeight: 500, color: "var(--text-0)", display: "block", marginBottom: 4 }}>
-                        Petite finale
-                      </label>
-                      <p style={{ margin: 0, fontSize: 13, color: "var(--text-2)", lineHeight: 1.4 }}>
-                        Ajoute un match pour déterminer la 3ème place entre les deux perdants des demi-finales
-                      </p>
+                    <p style={HINT}>
+                      Toutes les équipes s&apos;affrontent par paires selon leur classement. Après ce
+                      nombre de rounds, les deux dernières équipes sont éliminées, et ainsi de suite
+                      jusqu&apos;à la championne. Si le nombre d&apos;inscrites est impair, un
+                      barrage entre les deux dernières ouvre le tournoi — aucune victoire
+                      d&apos;office n&apos;est distribuée.
+                    </p>
+                  </div>
+                )}
+
+                {format === "SINGLE" && (
+                  <div className="field" style={FULL_WIDTH}>
+                    <label htmlFor="third-place" style={{ marginBottom: 6 }}>
+                      Options supplémentaires
+                    </label>
+                    <div
+                      className="checkbox-card"
+                      onClick={() => setHasThirdPlaceMatch(!hasThirdPlaceMatch)}
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 12,
+                        padding: "14px 16px",
+                        border: `1.5px solid ${
+                          hasThirdPlaceMatch ? "var(--blue-500)" : "var(--line-strong-cy)"
+                        }`,
+                        borderRadius: 10,
+                        cursor: "pointer",
+                        transition: "border-color 0.2s ease, background-color 0.2s ease",
+                        backgroundColor: hasThirdPlaceMatch
+                          ? "rgba(90, 200, 255, 0.07)"
+                          : "transparent",
+                      }}
+                    >
+                      <input
+                        id="third-place"
+                        type="checkbox"
+                        checked={hasThirdPlaceMatch}
+                        onChange={(e) => setHasThirdPlaceMatch(e.target.checked)}
+                        style={{
+                          width: 18,
+                          height: 18,
+                          accentColor: "var(--blue-500)",
+                          cursor: "pointer",
+                          flexShrink: 0,
+                          marginTop: 2,
+                        }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <label
+                          htmlFor="third-place"
+                          style={{
+                            display: "block",
+                            margin: "0 0 4px",
+                            cursor: "pointer",
+                            userSelect: "none",
+                            fontSize: 14,
+                            fontWeight: 500,
+                            color: "var(--ink)",
+                          }}
+                        >
+                          Petite finale
+                        </label>
+                        <p style={{ ...HINT, margin: 0 }}>
+                          Ajoute un match pour déterminer la 3ᵉ place entre les deux perdants des
+                          demi-finales.
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-              <div className="field" style={{ gridColumn: "1 / -1" }}>
-                <label>Description</label>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description du tournoi..." />
+                )}
               </div>
-              <div className="field">
-                <label>Nombre max d'équipes</label>
-                <input type="number" min={2} max={256} value={maxTeams} onChange={(e) => setMaxTeams(Number(e.target.value))} />
-              </div>
-            </div>
-          </div>
+            </section>
 
-          <div>
-            <p
+            <section style={SECTION_SEPARATOR}>
+              <p className="eyebrow" style={EYEBROW}>
+                Planning
+              </p>
+              <div className="form-grid" style={GRID}>
+                <div className="field">
+                  <label htmlFor="visibility-at">Début visibilité</label>
+                  <input
+                    id="visibility-at"
+                    type="datetime-local"
+                    value={startVisibilityAt}
+                    onChange={(e) => setStartVisibilityAt(e.target.value)}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="registration-open-at">Début inscriptions</label>
+                  <input
+                    id="registration-open-at"
+                    type="datetime-local"
+                    value={registrationOpenAt}
+                    onChange={(e) => setRegistrationOpenAt(e.target.value)}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="registration-close-at">Fin inscriptions</label>
+                  <input
+                    id="registration-close-at"
+                    type="datetime-local"
+                    value={registrationCloseAt}
+                    onChange={(e) => setRegistrationCloseAt(e.target.value)}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="start-at">Début tournoi</label>
+                  <input
+                    id="start-at"
+                    type="datetime-local"
+                    value={startAt}
+                    onChange={(e) => setStartAt(e.target.value)}
+                  />
+                </div>
+              </div>
+            </section>
+
+            <div
               style={{
-                fontSize: 11,
-                textTransform: "uppercase",
-                letterSpacing: "0.1em",
-                color: "var(--text-2)",
-                margin: "0 0 14px",
+                display: "flex",
+                flexWrap: "wrap",
+                justifyContent: "flex-end",
+                gap: 12,
+                paddingTop: 24,
+                borderTop: "1px solid var(--line-soft)",
               }}
             >
-              Planning
-            </p>
-            <div className="form-grid">
-              <div className="field">
-                <label>Début visibilité</label>
-                <input type="datetime-local" value={startVisibilityAt} onChange={(e) => setStartVisibilityAt(e.target.value)} />
-              </div>
-              <div className="field">
-                <label>Début inscriptions</label>
-                <input type="datetime-local" value={registrationOpenAt} onChange={(e) => setRegistrationOpenAt(e.target.value)} />
-              </div>
-              <div className="field">
-                <label>Fin inscriptions</label>
-                <input type="datetime-local" value={registrationCloseAt} onChange={(e) => setRegistrationCloseAt(e.target.value)} />
-              </div>
-              <div className="field">
-                <label>Début tournoi</label>
-                <input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} />
-              </div>
-            </div>
-          </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 12 }}>
               <CyberButton variant="ghost" asChild>
                 <Link href="/tournois">Annuler</Link>
               </CyberButton>

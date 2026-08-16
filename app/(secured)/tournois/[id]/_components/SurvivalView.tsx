@@ -133,7 +133,12 @@ export function SurvivalView({
           </div>
           <div style={{ border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
             {survival.standings.map((team, idx) => {
-              const meta = STATUS_META[team.status];
+              // Tournoi clos : la dernière équipe active est la championne, pas
+              // une équipe « en lice ».
+              const meta =
+                isFinished && team.status === "ACTIVE"
+                  ? { label: "Championne", color: ACCENT }
+                  : STATUS_META[team.status];
               const inDanger = dangerTeamIds.has(team.teamId);
               const isMine = team.teamId === myTeamId;
               return (
