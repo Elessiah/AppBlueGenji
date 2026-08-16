@@ -430,9 +430,9 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
 }
 
 .checkbox-card:hover {
-  border-color: var(--accent-green);
-  background-color: rgba(79, 224, 162, 0.08);
-  box-shadow: 0 2px 12px rgba(79, 224, 162, 0.12);
+  border-color: var(--blue-500);
+  background-color: rgba(90, 200, 255, 0.08);
+  box-shadow: 0 2px 12px rgba(90, 200, 255, 0.14);
 }
 
 .inline {

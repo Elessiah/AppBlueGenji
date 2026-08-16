@@ -6,6 +6,7 @@ import {
   planSurvivalRound,
   rankActiveTeams,
   selectEliminatedTeamIds,
+  shouldEliminateBarrageLoser,
   teamsToEliminate,
   type SurvivalStanding,
 } from "@/lib/shared/survival";
@@ -18,6 +19,7 @@ interface TournamentSurvivalRow extends RowDataPacket {
   state: string;
   survival_rounds_per_cut: number | null;
   survival_current_round: number;
+  survival_barrage_rounds: number;
 }
 
 interface StandingDbRow extends RowDataPacket {
@@ -36,7 +38,7 @@ async function loadTournament(
   forUpdate = false,
 ): Promise<TournamentSurvivalRow | null> {
   const [rows] = await conn.execute<TournamentSurvivalRow[]>(
-    `SELECT format, state, survival_rounds_per_cut, survival_current_round
+    `SELECT format, state, survival_rounds_per_cut, survival_current_round, survival_barrage_rounds
      FROM bg_tournaments WHERE id = ? LIMIT 1${forUpdate ? " FOR UPDATE" : ""}`,
     [tournamentId],
   );
@@ -167,16 +169,20 @@ export async function initializeSurvivalTournament(
   }
 
   // bracket_size sert de témoin « initialisé » (évite les re-syncs inutiles).
-  await conn.execute(`UPDATE bg_tournaments SET bracket_size = ? WHERE id = ?`, [
-    seedRows.length,
-    tournamentId,
-  ]);
+  await conn.execute(
+    `UPDATE bg_tournaments SET bracket_size = ?, survival_barrage_rounds = 0 WHERE id = ?`,
+    [seedRows.length, tournamentId],
+  );
 }
 
 /**
  * Génère le round suivant : classe les équipes actives, les apparie par paires
- * adjacentes et crée les matchs. L'éventuelle équipe impaire reçoit une victoire
- * d'office (bye). Ne fait rien s'il reste moins de deux équipes actives.
+ * adjacentes et crée les matchs. Ne fait rien s'il reste moins de deux équipes
+ * actives.
+ *
+ * Cas impair : au **premier round**, un barrage d'équilibrage oppose les deux
+ * dernières du seeding (un seul match, perdant éliminé) ; ensuite — parité
+ * cassée par un forfait — l'équipe impaire reçoit une victoire d'office.
  */
 export async function generateSurvivalRound(
   tournamentId: number,
@@ -190,7 +196,9 @@ export async function generateSurvivalRound(
   if (active.length < 2) return;
 
   const nextRound = Number(tournament.survival_current_round) + 1;
-  const { pairings, byeTeamId } = planSurvivalRound(active);
+  const { pairings, byeTeamId, isBarrage } = planSurvivalRound(active, {
+    allowBarrage: nextRound === 1,
+  });
 
   let matchNumber = 1;
   for (const pairing of pairings) {
@@ -214,10 +222,48 @@ export async function generateSurvivalRound(
     );
   }
 
-  await conn.execute(`UPDATE bg_tournaments SET survival_current_round = ? WHERE id = ?`, [
-    nextRound,
-    tournamentId,
-  ]);
+  await conn.execute(
+    `UPDATE bg_tournaments
+     SET survival_current_round = ?, survival_barrage_rounds = ?
+     WHERE id = ?`,
+    [nextRound, isBarrage ? 1 : Number(tournament.survival_barrage_rounds ?? 0), tournamentId],
+  );
+}
+
+/**
+ * Élimine le perdant du barrage d'équilibrage une fois celui-ci terminé, à la
+ * seule condition que l'effectif soit encore impair : un forfait survenu pendant
+ * le barrage a pu rétablir la parité, auquel cas personne n'est sorti en plus.
+ * Renvoie `true` si une élimination a été appliquée.
+ */
+async function applyBarrageElimination(
+  tournamentId: number,
+  conn: PoolConnection,
+  barrageRound: number,
+  standings: SurvivalStanding[],
+): Promise<boolean> {
+  const active = rankActiveTeams(standings);
+  if (!shouldEliminateBarrageLoser(active.length)) return false;
+
+  const [rows] = await conn.execute<(RowDataPacket & { loser_team_id: number | null })[]>(
+    `SELECT loser_team_id FROM bg_matches
+     WHERE tournament_id = ? AND round_number = ? AND loser_team_id IS NOT NULL
+     LIMIT 1`,
+    [tournamentId, barrageRound],
+  );
+  const loserId = rows.length === 0 ? null : Number(rows[0].loser_team_id);
+  if (loserId === null) return false;
+
+  // Perdant déjà sorti (forfait) : rien à faire, l'effectif est traité ailleurs.
+  if (!active.some((s) => s.teamId === loserId)) return false;
+
+  await conn.execute(
+    `UPDATE bg_survival_standings
+     SET status = 'ELIMINATED', eliminated_round = ?
+     WHERE tournament_id = ? AND team_id = ? AND status = 'ACTIVE'`,
+    [barrageRound, tournamentId, loserId],
+  );
+  return true;
 }
 
 /** Applique le classement final et clôt le tournoi. */
@@ -282,11 +328,27 @@ export async function reconcileSurvival(
   );
   if (Number(incomplete[0]?.c ?? 0) > 0) return;
 
+  // Barrage d'équilibrage terminé : son perdant quitte le tournoi, ce qui ramène
+  // l'effectif à un nombre pair avant le premier round complet.
+  const barrageRounds = Number(tournament.survival_barrage_rounds ?? 0);
+  if (barrageRounds > 0 && currentRound === barrageRounds) {
+    const eliminated = await applyBarrageElimination(
+      tournamentId,
+      conn,
+      currentRound,
+      standings,
+    );
+    if (eliminated) {
+      standings = await loadStandings(conn, tournamentId);
+      await updateRanks(conn, tournamentId, standings);
+    }
+  }
+
   // Coupe due à la fin de ce round ? (pas déjà appliquée)
   const alreadyCut = standings.some(
     (s) => s.status === "ELIMINATED" && s.eliminatedRound === currentRound,
   );
-  if (isCutRound(currentRound, roundsPerCut) && !alreadyCut) {
+  if (isCutRound(currentRound, roundsPerCut, barrageRounds) && !alreadyCut) {
     const active = rankActiveTeams(standings);
     const toEliminate = selectEliminatedTeamIds(active, teamsToEliminate(active.length));
     for (const teamId of toEliminate) {
@@ -422,6 +484,7 @@ export async function loadSurvivalMeta(
   return {
     roundsPerCut: Number(tournament.survival_rounds_per_cut ?? DEFAULT_ROUNDS_PER_CUT),
     currentRound: Number(tournament.survival_current_round),
+    barrageRounds: Number(tournament.survival_barrage_rounds ?? 0),
     standings: rows.map((row) => ({
       teamId: Number(row.team_id),
       teamName: row.team_name,

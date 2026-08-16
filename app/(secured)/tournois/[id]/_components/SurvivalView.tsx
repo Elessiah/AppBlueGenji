@@ -52,7 +52,11 @@ export function SurvivalView({
 }: SurvivalViewProps) {
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
   const activeCount = survival.standings.filter((s) => s.status === "ACTIVE").length;
-  const atRisk = teamsToEliminate(activeCount);
+  const barrageRounds = survival.barrageRounds ?? 0;
+  // Pendant le barrage, le danger porte sur ses deux participants (le perdant
+  // sort) et non sur la coupe à venir.
+  const inBarrage = barrageRounds > 0 && survival.currentRound <= barrageRounds;
+  const atRisk = inBarrage ? 2 : teamsToEliminate(activeCount);
 
   // Les équipes actives, classées, dont les `atRisk` dernières sont en danger.
   const activeSorted = survival.standings
@@ -88,6 +92,11 @@ export function SurvivalView({
         <span className="mono" style={{ fontSize: 13, color: "var(--text-2)" }}>
           Coupe toutes les {survival.roundsPerCut} manche{survival.roundsPerCut > 1 ? "s" : ""}
         </span>
+        {barrageRounds > 0 && (
+          <span className="mono" style={{ fontSize: 13, color: AMBER }}>
+            Barrage d&apos;équilibrage au round 1
+          </span>
+        )}
         {forfeitTeamId && !isFinished && (
           <button
             type="button"
@@ -124,7 +133,12 @@ export function SurvivalView({
           </div>
           <div style={{ border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
             {survival.standings.map((team, idx) => {
-              const meta = STATUS_META[team.status];
+              // Tournoi clos : la dernière équipe active est la championne, pas
+              // une équipe « en lice ».
+              const meta =
+                isFinished && team.status === "ACTIVE"
+                  ? { label: "Championne", color: ACCENT }
+                  : STATUS_META[team.status];
               const inDanger = dangerTeamIds.has(team.teamId);
               const isMine = team.teamId === myTeamId;
               return (
@@ -180,8 +194,14 @@ export function SurvivalView({
           </div>
           {atRisk > 0 && !isFinished && (
             <p style={{ margin: "8px 2px 0", fontSize: 12, color: AMBER }}>
-              ⚠ Bord de tableau : {atRisk} équipe{atRisk > 1 ? "s" : ""} éliminée
-              {atRisk > 1 ? "s" : ""} à la prochaine coupe.
+              {inBarrage ? (
+                <>⚖ Barrage : le perdant du match est éliminé.</>
+              ) : (
+                <>
+                  ⚠ Bord de tableau : {atRisk} équipe{atRisk > 1 ? "s" : ""} éliminée
+                  {atRisk > 1 ? "s" : ""} à la prochaine coupe.
+                </>
+              )}
             </p>
           )}
         </div>
@@ -196,7 +216,8 @@ export function SurvivalView({
                 const roundMatches = matches
                   .filter((m) => m.roundNumber === roundNum)
                   .sort((a, b) => a.matchNumber - b.matchNumber);
-                const cut = isCutRound(roundNum, survival.roundsPerCut);
+                const isBarrageRound = barrageRounds > 0 && roundNum <= barrageRounds;
+                const cut = isCutRound(roundNum, survival.roundsPerCut, barrageRounds);
                 return (
                   <div key={roundNum} style={{ flexShrink: 0, width: COL_W }}>
                     <div
@@ -219,6 +240,21 @@ export function SurvivalView({
                       >
                         Round {roundNum}
                       </span>
+                      {isBarrageRound && (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.05em",
+                            color: AMBER,
+                            border: `1px solid ${AMBER}`,
+                            borderRadius: 5,
+                            padding: "1px 6px",
+                          }}
+                        >
+                          ⚖ Barrage
+                        </span>
+                      )}
                       {cut && (
                         <span
                           style={{

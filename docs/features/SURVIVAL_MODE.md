@@ -16,11 +16,27 @@ paliers jusqu'à ce qu'il ne reste qu'une championne.
    **victoires** (décroissant), puis les **défaites** (croissant), puis le seed.
 4. **Coupe (élimination)** — après chaque bloc de `roundsPerCut` rounds (paramètre
    défini à la création), les **deux dernières équipes** du classement sont
-   éliminées. On n'en élimine qu'**une seule** quand il ne resterait sinon plus
-   personne, garantissant une championne unique. Répété jusqu'à une seule équipe.
-5. **Nombre impair** — si le nombre d'équipes actives est impair (inscriptions ou
-   forfaits), l'équipe la plus basse n'ayant pas encore eu de bye reçoit une
-   **victoire d'office** afin de ne pas la pénaliser.
+   éliminées. On n'en élimine qu'**une seule** quand l'effectif est impair
+   (*coupe d'équilibrage*, voir §5) ou quand il ne resterait sinon plus personne,
+   garantissant une championne unique. Répété jusqu'à une seule équipe.
+5. **Nombre impair — équilibrage** — un effectif impair imposerait une victoire
+   d'office à chaque round, et comme une coupe retire deux équipes la parité ne
+   se corrigerait jamais d'elle-même. Deux mécanismes ramènent l'effectif au pair :
+   - **Barrage au round 1** — quand les inscriptions sont en nombre impair, le
+     round 1 est un *barrage* : seules les **deux dernières du classement**
+     s'affrontent et le perdant est éliminé. Les autres équipes ne jouent pas ce
+     round-là et **aucune victoire d'office n'est distribuée**. Ce round ne compte
+     pas dans la cadence des coupes (elle démarre au round suivant). Si un forfait
+     a rétabli la parité pendant le barrage, son perdant n'est **pas** éliminé en
+     plus.
+   - **Coupe d'équilibrage** — si un forfait recasse la parité en cours de
+     tournoi, la coupe planifiée suivante n'élimine qu'**une** équipe au lieu de
+     deux : le reliquat redevient pair et les victoires d'office cessent. Entre le
+     forfait et cette coupe, l'équipe la plus basse n'ayant pas encore eu de bye
+     reçoit une **victoire d'office** afin de ne pas la pénaliser.
+
+   Conséquence : hors forfait, un tournoi Survie ne distribue **aucune** victoire
+   d'office, quel que soit le nombre d'inscrits.
 6. **Forfait** — une équipe peut déclarer forfait et quitter le tournoi à tout
    moment. Son match en cours est résolu en faveur de l'adversaire ; elle est
    ensuite exclue des rounds suivants.
@@ -41,8 +57,10 @@ admin, forfait).
 ## Architecture
 
 - **Logique pure** : [`lib/shared/survival.ts`](../../lib/shared/survival.ts) —
-  `compareStanding`, `rankActiveTeams`, `planSurvivalRound`, `teamsToEliminate`,
-  `isCutRound`, `selectEliminatedTeamIds`, `computeFinalRanks`. Entièrement testée
+  `compareStanding`, `rankActiveTeams`, `planSurvivalRound` (option
+  `allowBarrage`), `needsBarrage`, `shouldEliminateBarrageLoser`,
+  `teamsToEliminate`, `isCutRound` (paramètre `barrageRounds`),
+  `selectEliminatedTeamIds`, `computeFinalRanks`. Entièrement testée
   ([`tests/survival/logic.test.ts`](../../tests/survival/logic.test.ts)), y compris
   une simulation complète prouvant la convergence vers une unique championne.
 - **Orchestration serveur** :
@@ -56,7 +74,8 @@ admin, forfait).
   - `forfeitSurvivalTeam` — sortie d'une équipe.
   - `loadSurvivalMeta` — métadonnées pour l'affichage.
 - **Persistance** :
-  - Colonnes `bg_tournaments.survival_rounds_per_cut`, `survival_current_round`.
+  - Colonnes `bg_tournaments.survival_rounds_per_cut`, `survival_current_round`,
+    `survival_barrage_rounds` (0 ou 1 — décale la cadence des coupes).
   - Table `bg_survival_standings` (seed, wins, losses, status, eliminated_round,
     rank). Les victoires/défaites y sont **dérivées des matchs** à chaque
     réconciliation (jamais accumulées), ce qui rend l'ensemble idempotent.
@@ -75,7 +94,9 @@ admin, forfait).
 ## Cas limites gérés
 
 - 0 ou 1 équipe inscrite → clôture immédiate (championne éventuelle au rang 1).
-- Nombre impair persistant → byes tournants (jamais deux fois la même équipe si
-  possible).
+- Inscriptions impaires (3, 5, 7, … équipes) → barrage au round 1, puis plus
+  aucune victoire d'office jusqu'à la championne.
+- Parité cassée par un forfait → byes tournants (jamais deux fois la même équipe
+  si possible) jusqu'à la coupe d'équilibrage.
 - Toutes cadences de coupe (`roundsPerCut` = 1…N) convergent vers une championne.
 - Forfaits multiples en cours de tournoi.

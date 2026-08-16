@@ -17,6 +17,12 @@ export type SurvivalStandingRow = {
 export type SurvivalMeta = {
   roundsPerCut: number;
   currentRound: number;
+  /**
+   * Nombre de rounds de barrage d'équilibrage joués (0 ou 1). Un barrage précède
+   * le premier round complet quand les inscriptions sont en nombre impair ; il
+   * ne compte pas dans la cadence des coupes.
+   */
+  barrageRounds: number;
   standings: SurvivalStandingRow[];
 };
 
