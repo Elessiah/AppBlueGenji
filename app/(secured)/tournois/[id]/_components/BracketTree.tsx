@@ -1,7 +1,7 @@
 "use client";
 
 import { CSSProperties, FormEvent, Fragment, useEffect, useRef } from "react";
-import type { BracketMatch, BracketType } from "@/lib/shared/types";
+import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
 import { MatchRow } from "./MatchRow";
 
 export type MatchScoreDraft = Record<number, { myScore: string; opponentScore: string }>;
@@ -44,6 +44,7 @@ interface BracketTreeProps {
   onScoreChange: (matchId: number, field: "myScore" | "opponentScore", value: string) => void;
   onSubmit: (match: BracketMatch, e: FormEvent) => Promise<void>;
   onOpenAdminModal: (match: BracketMatch) => void;
+  format: TournamentFormat;
 }
 
 export function BracketTree({
@@ -63,6 +64,7 @@ export function BracketTree({
   onScoreChange,
   onSubmit,
   onOpenAdminModal,
+  format,
 }: BracketTreeProps) {
   const matchRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const didScrollRef = useRef(false);
@@ -216,6 +218,7 @@ export function BracketTree({
                           onOpenAdminModal={onOpenAdminModal}
                           allMatches={allTournamentMatches}
                           roundNumber={roundNum}
+                          format={format}
                         />
                       </div>
                     </div>

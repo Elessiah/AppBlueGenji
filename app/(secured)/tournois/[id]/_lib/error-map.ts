@@ -1,5 +1,5 @@
 const ERROR_MESSAGES: Record<string, string> = {
-  CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES: "Impossible de modifier ce match car les matchs suivants sont déjà terminés.",
+  CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES: "Score verrouillé : la manche suivante a déjà des scores saisis.",
   MATCH_NOT_FOUND: "Match introuvable.",
   MATCH_NOT_READY: "Le match n'a pas deux équipes.",
   MATCH_ALREADY_COMPLETED: "Le match est déjà terminé.",

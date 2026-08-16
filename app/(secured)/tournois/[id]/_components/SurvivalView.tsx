@@ -320,6 +320,7 @@ export function SurvivalView({
                             onOpenAdminModal={onOpenAdminModal}
                             allMatches={allTournamentMatches}
                             roundNumber={match.roundNumber}
+                            format="SURVIVAL"
                           />
                         );
                       })}
