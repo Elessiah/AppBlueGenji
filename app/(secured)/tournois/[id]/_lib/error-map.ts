@@ -15,8 +15,11 @@ const ERROR_MESSAGES: Record<string, string> = {
   REGISTRATION_CLOSED: "Les inscriptions ne sont pas ouvertes.",
   NO_ACTIVE_TEAM: "Tu dois d'abord créer ou rejoindre une équipe.",
   NOT_SURVIVAL: "Le forfait n'est disponible que pour les tournois en mode Survie.",
-  TEAM_ALREADY_OUT: "Ton équipe n'est plus en lice dans ce tournoi.",
-  TEAM_NOT_IN_TOURNAMENT: "Ton équipe n'est pas inscrite à ce tournoi.",
+  // Formulations neutres : le forfait peut aussi être déclaré par l'arbitrage
+  // pour une autre équipe que la sienne.
+  TEAM_ALREADY_OUT: "Cette équipe n'est plus en lice dans ce tournoi.",
+  TEAM_NOT_IN_TOURNAMENT: "Cette équipe n'est pas inscrite à ce tournoi.",
+  FORBIDDEN: "Tu ne peux déclarer forfait que pour ton équipe.",
   FORFEIT_FAILED: "Erreur lors de la déclaration de forfait.",
 };
 

@@ -37,9 +37,15 @@ paliers jusqu'à ce qu'il ne reste qu'une championne.
 
    Conséquence : hors forfait, un tournoi Survie ne distribue **aucune** victoire
    d'office, quel que soit le nombre d'inscrits.
-6. **Forfait** — une équipe peut déclarer forfait et quitter le tournoi à tout
+6. **Forfait (abandon)** — une équipe peut abandonner et quitter le tournoi à tout
    moment. Son match en cours est résolu en faveur de l'adversaire ; elle est
-   ensuite exclue des rounds suivants.
+   ensuite exclue des rounds suivants. L'action se déclenche depuis le bouton
+   « Abandonner » de sa ligne dans le classement : proposé aux représentants de
+   l'équipe (capitaine / propriétaire, ceux qui peuvent aussi reporter un score)
+   et à l'arbitrage, qui peut le déclarer pour n'importe quelle équipe encore en
+   lice. L'éligibilité est calculée par `canForfeitTeam()`
+   (`app/(secured)/tournois/[id]/_lib/forfeit.ts`), la route API appliquant la
+   même règle côté serveur.
 7. **Classement final** — la championne obtient le rang 1 ; les autres sont
    classées par round d'élimination décroissant (éliminées tard = mieux classées),
    puis victoires/défaites/seed.
@@ -87,9 +93,10 @@ admin, forfait).
     arbitre/admin pour n'importe quelle équipe via `teamId`).
 - **UI** :
   [`app/(secured)/tournois/[id]/_components/SurvivalView.tsx`](../../app/(secured)/tournois/[id]/_components/SurvivalView.tsx)
-  — panneau de classement (zone d'élimination surlignée) + rounds en colonnes
-  défilables, dans le même esprit que les arbres simple/double élimination. Les
-  cartes de match réutilisent `MatchRow` (report des scores identique).
+  — panneau de classement (zone d'élimination surlignée, bouton « Abandonner »
+  sur les équipes encore en lice) + rounds en colonnes défilables, dans le même
+  esprit que les arbres simple/double élimination. Les cartes de match
+  réutilisent `MatchRow` (report des scores identique).
 
 ## Cas limites gérés
 
