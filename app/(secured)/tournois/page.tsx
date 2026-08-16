@@ -14,6 +14,7 @@ import { FinishedCard } from "./cards/FinishedCard";
 import { Section } from "./Section";
 import { filterBuckets, countByGame, type GameFilter } from "./_lib/buckets";
 import { buildTickerItems } from "./_lib/ticker";
+import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import s from "./tournois.module.css";
 
 const emptyBuckets: TournamentBuckets = {
@@ -80,6 +81,7 @@ export default function TournamentsPage() {
 
   return (
     <div className={s.page}>
+      <RulesHelpFab />
       <BgCanvas mode="network" />
       <div className={s.fabric} />
       <div className={s.pageInner}>

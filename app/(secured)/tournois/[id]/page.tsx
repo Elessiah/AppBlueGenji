@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/toast";
 import { Pill, CyberButton } from "@/components/cyber";
 import { useTournamentLive } from "./_hooks/useTournamentLive";
 import { mapError } from "./_lib/error-map";
+import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { AdminScoreDialog } from "./_components/AdminScoreDialog";
 import { MatchScoreDraft } from "./_components/BracketTree";
 import { BracketSections } from "./_components/BracketSections";
@@ -143,6 +144,7 @@ export default function TournamentDetailPage() {
 
   return (
     <>
+      <RulesHelpFab format={detail.card.format} />
       <section className="fade-in">
         <div className="ds-header green">
           <div className="ds-header-body">
