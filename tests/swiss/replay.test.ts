@@ -284,6 +284,53 @@ describe("swiss — rankSwiss", () => {
     expect(ranked[2].status).toBe("FORFEIT");
   });
 
+  it("résout la confrontation directe en mini-championnat, pas par paires", () => {
+    // Cycle A bat B, B bat C, C bat A, à égalité parfaite sur tout le reste.
+    // Un comparateur par paires serait intransitif (A<B, B<C et C<A) et le tri
+    // rendrait un ordre dépendant de l'ordre d'entrée. En bilan interne, les
+    // trois sont à 0 : le seed tranche, de façon stable.
+    const matches = [match(1, 1, 2, 1), match(2, 2, 3, 2), match(3, 3, 1, 3)];
+    const standings = replay(matches, 3);
+
+    expect(new Set(standings.map((s) => s.points))).toEqual(new Set([3]));
+
+    const ranked = rankSwiss(standings, matches, ["head-to-head"]);
+    expect(ranked.map((s) => s.teamId)).toEqual([1, 2, 3]);
+
+    // Le classement ne doit pas dépendre de l'ordre d'entrée.
+    const shuffled = rankSwiss([...standings].reverse(), matches, ["head-to-head"]);
+    expect(shuffled.map((s) => s.teamId)).toEqual([1, 2, 3]);
+  });
+
+  it("départage un groupe d'ex æquo par le bilan interne", () => {
+    // 1, 2 et 3 finissent à égalité de points ; en interne 1 a battu 2 et 3.
+    const matches = [
+      match(1, 1, 2, 1),
+      match(2, 1, 3, 1),
+      match(3, 2, 3, 2),
+      match(1, 4, 5, 4),
+      match(2, 4, 5, 4),
+      match(3, 4, 5, 4),
+    ];
+    const standings = replay(matches, 5);
+    const ranked = rankSwiss(standings, matches, ["head-to-head"]);
+    const order = ranked.filter((s) => [1, 2, 3].includes(s.teamId)).map((s) => s.teamId);
+
+    // 1 (2 victoires internes) devant 2 (1) devant 3 (0).
+    expect(order).toEqual([1, 2, 3]);
+  });
+
+  it("ignore les matchs hors du groupe d'ex æquo dans la confrontation directe", () => {
+    // 1 a battu 4, mais 4 n'est pas à égalité avec 1 et 2 : ce résultat ne doit
+    // pas peser dans le départage entre 1 et 2.
+    const matches = [match(1, 1, 4, 1), match(1, 2, 3, 2), match(2, 1, 2, 2)];
+    const standings = replay(matches, 4);
+    const ranked = rankSwiss(standings, matches, ["head-to-head"]);
+
+    // 1 et 2 sont à 3 et 6 points : 2 devant, sans ambiguïté.
+    expect(ranked[0].teamId).toBe(2);
+  });
+
   it("n'applique que les départages configurés", () => {
     const matches = [
       match(1, 1, 3, 1),

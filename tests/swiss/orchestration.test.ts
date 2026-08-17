@@ -187,12 +187,12 @@ function fakeDb(options: {
       }
 
       if (q.startsWith("UPDATE bg_matches SET team1_id = ?, team2_id = NULL")) {
-        const match = matches.find((m) => m.id === Number(params[4]))!;
+        const match = matches.find((m) => m.id === Number(params[3]))!;
         match.team1Id = Number(params[0]);
         match.team2Id = null;
         match.isBye = 1;
         match.status = "COMPLETED";
-        match.winnerTeamId = Number(params[3]);
+        match.winnerTeamId = Number(params[2]);
         return [{}, []];
       }
 

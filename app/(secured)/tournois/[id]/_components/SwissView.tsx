@@ -61,7 +61,11 @@ export function SwissView({
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
   const activeCount = swiss.standings.filter((s) => s.status === "ACTIVE").length;
   const roundsLeft = Math.max(swiss.totalRounds - swiss.currentRound, 0);
-  const champion = isFinished ? swiss.standings.find((s) => s.rank === 1) : null;
+  // Le statut compte autant que le rang : si toutes les équipes ont abandonné,
+  // le rang 1 échoit à une équipe forfait — qu'il ne s'agit pas de sacrer.
+  const champion = isFinished
+    ? swiss.standings.find((s) => s.rank === 1 && s.status === "ACTIVE")
+    : null;
 
   const scoreLabel = `Victoire ${swiss.pointsForWin} pt${swiss.pointsForWin > 1 ? "s" : ""} · Nul ${swiss.pointsForDraw} · Défaite ${swiss.pointsForLoss}`;
 

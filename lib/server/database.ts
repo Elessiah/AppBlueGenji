@@ -333,6 +333,29 @@ async function runMigrations(db: Pool): Promise<void> {
     // Columns already exist
   }
 
+  // Backfill du seed : `ADD COLUMN seed ... DEFAULT 0` laisse les tournois déjà
+  // créés à 0 pour toutes leurs équipes, et `initializeSwissTournament` ne
+  // repasse jamais dessus (il ne s'exécute qu'à la bascule REGISTRATION →
+  // RUNNING). Sans ce rattrapage, le départage ultime `a.seed - b.seed` vaut
+  // toujours 0 et les ex æquo parfaits retombent sur un ordre arbitraire.
+  // Idempotent : ne touche que les lignes restées à 0.
+  try {
+    await db.execute(`
+      UPDATE bg_swiss_standings s
+      JOIN (
+        SELECT tournament_id, team_id,
+               ROW_NUMBER() OVER (
+                 PARTITION BY tournament_id ORDER BY points DESC, team_id ASC
+               ) AS rn
+        FROM bg_swiss_standings
+      ) x ON x.tournament_id = s.tournament_id AND x.team_id = s.team_id
+      SET s.seed = x.rn
+      WHERE s.seed = 0
+    `);
+  } catch {
+    // Rien à rattraper (table vide, ou backfill déjà appliqué)
+  }
+
   // Migration: Add Swiss round and bye columns to matches
   try {
     await db.execute(`

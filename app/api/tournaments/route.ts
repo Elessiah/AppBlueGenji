@@ -2,6 +2,7 @@
 import { fail, ok } from "@/lib/server/http";
 import { createTournament, listTournamentBuckets } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
+import { DEFAULT_SWISS_POINTS } from "@/lib/shared/swiss";
 import type { TournamentFormat } from "@/lib/shared/types";
 
 export async function GET(req: Request) {
@@ -91,27 +92,37 @@ export async function POST(req: Request) {
         }
       }
 
-      const points: [string, number | undefined, (v: number) => void][] = [
-        ["win", body.swissPointsWin, (v) => (swissPointsWin = v)],
-        ["draw", body.swissPointsDraw, (v) => (swissPointsDraw = v)],
-        ["loss", body.swissPointsLoss, (v) => (swissPointsLoss = v)],
+      const points: [number | undefined, number, (v: number | null) => void][] = [
+        [body.swissPointsWin, DEFAULT_SWISS_POINTS.win, (v) => (swissPointsWin = v)],
+        [body.swissPointsDraw, DEFAULT_SWISS_POINTS.draw, (v) => (swissPointsDraw = v)],
+        [body.swissPointsLoss, DEFAULT_SWISS_POINTS.loss, (v) => (swissPointsLoss = v)],
       ];
-      for (const [, raw, assign] of points) {
-        if (raw == null) continue;
+
+      // Valeurs **effectives** : un champ omis n'est pas « pas de contrainte »,
+      // c'est le défaut que `createTournament` appliquera derrière. Valider les
+      // valeurs brutes laissait passer `{swissPointsWin: 0}` seul, qui produit
+      // un barème victoire = défaite = 0.
+      const effective: number[] = [];
+      for (const [raw, fallback, assign] of points) {
+        if (raw == null) {
+          effective.push(fallback);
+          assign(null);
+          continue;
+        }
         const value = Number(raw);
         if (!Number.isInteger(value) || value < 0 || value > 99) {
           return fail("INVALID_SWISS_POINTS", 400);
         }
+        effective.push(value);
         assign(value);
       }
 
-      // Un barème où la défaite rapporte autant qu'une victoire rendrait le
-      // classement — et donc les appariements — arbitraires.
-      if (
-        swissPointsWin !== null &&
-        swissPointsLoss !== null &&
-        swissPointsWin <= swissPointsLoss
-      ) {
+      const [win, draw, loss] = effective;
+      // Le barème doit rester monotone : un nul ne peut pas rapporter plus
+      // qu'une victoire ni moins qu'une défaite, et une victoire doit valoir
+      // strictement plus qu'une défaite. Sinon le classement — et donc les
+      // appariements par groupe de points — n'a plus de sens.
+      if (win <= loss || draw > win || draw < loss) {
         return fail("INVALID_SWISS_POINTS", 400);
       }
     }

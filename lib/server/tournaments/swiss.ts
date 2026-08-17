@@ -319,7 +319,6 @@ async function writeRound(
   tournamentId: number,
   round: number,
   plan: SwissRoundPlan,
-  pointsForBye: number,
 ): Promise<void> {
   let matchNumber = 1;
   for (const pairing of plan.pairings) {
@@ -334,12 +333,16 @@ async function writeRound(
 
   if (plan.byeTeamId !== null) {
     const matchId = await createMatch(conn, tournamentId, "UPPER", round, matchNumber);
+    // `team1_score` est un score de **match** (cartes gagnées), pas un total de
+    // points : on écrit 1-0 comme en Survie. Les points du bye viennent du rejeu
+    // (`points.bye`), jamais de cette colonne — y stocker le barème afficherait
+    // un « 10 – 0 » sur un tournoi réglé à 10 points la victoire.
     await conn.execute(
       `UPDATE bg_matches SET
         team1_id = ?, team2_id = NULL, swiss_round = ?, is_bye = 1, status = 'COMPLETED',
-        team1_score = ?, team2_score = 0, winner_team_id = ?
+        team1_score = 1, team2_score = 0, winner_team_id = ?
        WHERE id = ?`,
-      [plan.byeTeamId, round, pointsForBye, plan.byeTeamId, matchId],
+      [plan.byeTeamId, round, plan.byeTeamId, matchId],
     );
   }
 }
@@ -404,14 +407,13 @@ async function ensureRound(
   tournamentId: number,
   round: number,
   state: SwissState,
-  pointsForBye: number,
 ): Promise<boolean> {
   const participants = toParticipants(state.before(round));
   const desired = round === 1 ? planFirstRound(participants) : planNextRound(participants);
   const existing = await readRoundPlan(conn, tournamentId, round);
 
   if (existing === null) {
-    await writeRound(conn, tournamentId, round, desired, pointsForBye);
+    await writeRound(conn, tournamentId, round, desired);
     return true;
   }
 
@@ -422,7 +424,7 @@ async function ensureRound(
     tournamentId,
     round,
   ]);
-  await writeRound(conn, tournamentId, round, desired, pointsForBye);
+  await writeRound(conn, tournamentId, round, desired);
   return true;
 }
 
@@ -438,7 +440,7 @@ export async function generateSwissRound(
   const state = await deriveState(conn, tournamentId, tournament);
   if (activeStandings(state.standings).length < 2) return;
 
-  await ensureRound(conn, tournamentId, 1, state, resolvePoints(tournament).bye);
+  await ensureRound(conn, tournamentId, 1, state);
   await conn.execute(`UPDATE bg_tournaments SET swiss_current_round = 1 WHERE id = ?`, [
     tournamentId,
   ]);
@@ -509,13 +511,11 @@ export async function reconcileSwiss(
     [tournamentId, currentRound],
   );
 
-  const pointsForBye = resolvePoints(tournament).bye;
-
   if (Number(incomplete[0]?.c ?? 0) > 0) {
     // La ronde courante n'a peut-être jamais été entamée : si une correction en
     // amont a changé le classement, ses appariements sont périmés.
     if (active.length >= 2) {
-      await ensureRound(conn, tournamentId, currentRound, state, pointsForBye);
+      await ensureRound(conn, tournamentId, currentRound, state);
     }
     return;
   }
@@ -526,7 +526,7 @@ export async function reconcileSwiss(
     return;
   }
 
-  const changed = await ensureRound(conn, tournamentId, currentRound + 1, state, pointsForBye);
+  const changed = await ensureRound(conn, tournamentId, currentRound + 1, state);
   if (changed) {
     await conn.execute(
       `UPDATE bg_tournaments SET swiss_current_round = ? WHERE id = ? AND swiss_current_round < ?`,

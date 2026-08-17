@@ -266,22 +266,37 @@ export function computeTiebreaks(
 }
 
 /**
- * Résultat de la confrontation directe entre deux équipes : `1` si `a` mène,
- * `-1` si `b` mène, `0` si elles ne se sont pas rencontrées ou sont à égalité.
+ * Bilan de chaque équipe d'un groupe d'ex æquo **contre les seules autres
+ * équipes du groupe** : +1 par victoire, -1 par défaite, 0 pour un nul.
+ *
+ * C'est la forme « mini-championnat » de la confrontation directe. Comparer les
+ * équipes deux à deux à l'intérieur d'un comparateur de tri serait incorrect :
+ * si A bat B, B bat C et C bat A, le comparateur annonce A<B, B<C **et** C<A —
+ * il n'est plus transitif, et `Array.prototype.sort` rend alors un ordre qui
+ * dépend de l'ordre d'entrée plutôt que des résultats. Réduire la confrontation
+ * directe à un score par équipe rétablit un ordre total.
  */
-function headToHead(aId: number, bId: number, matches: SwissMatchOutcome[]): number {
-  let balance = 0;
+function headToHeadScores(
+  group: SwissStanding[],
+  matches: SwissMatchOutcome[],
+): Map<number, number> {
+  const ids = new Set(group.map((s) => s.teamId));
+  const scores = new Map<number, number>(group.map((s) => [s.teamId, 0]));
+
   for (const match of matches) {
     if (!match.completed || match.isBye) continue;
     if (match.team1Id === null || match.team2Id === null) continue;
-    const involvesBoth =
-      (match.team1Id === aId && match.team2Id === bId) ||
-      (match.team1Id === bId && match.team2Id === aId);
-    if (!involvesBoth) continue;
-    if (match.winnerTeamId === aId) balance += 1;
-    else if (match.winnerTeamId === bId) balance -= 1;
+    if (!ids.has(match.team1Id) || !ids.has(match.team2Id)) continue;
+    if (match.winnerTeamId === null) continue;
+
+    const loserId =
+      match.loserTeamId ??
+      (match.winnerTeamId === match.team1Id ? match.team2Id : match.team1Id);
+    scores.set(match.winnerTeamId, (scores.get(match.winnerTeamId) ?? 0) + 1);
+    scores.set(loserId, (scores.get(loserId) ?? 0) - 1);
   }
-  return Math.sign(balance);
+
+  return scores;
 }
 
 /**
@@ -290,6 +305,10 @@ function headToHead(aId: number, bId: number, matches: SwissMatchOutcome[]): num
  *
  * Les équipes ayant déclaré forfait sont reléguées derrière toutes les équipes
  * encore en lice : elles n'ont pas joué le tournoi jusqu'au bout.
+ *
+ * La confrontation directe est appliquée **après** le tri, sur chaque groupe
+ * d'équipes encore parfaitement à égalité — voir {@link headToHeadScores} pour
+ * la raison (un comparateur par paires n'est pas transitif).
  */
 export function rankSwiss(
   standings: SwissStanding[],
@@ -302,43 +321,59 @@ export function rankSwiss(
     sonnebornBerger: 0,
     opponentMatchWinPercent: 0,
   };
+  const scoreOf = (s: SwissStanding): SwissTiebreakScores => scores.get(s.teamId) ?? zero;
+
+  /** Critères ordonnés, hors confrontation directe : tous des nombres. */
+  const criteria: ((s: SwissStanding) => number)[] = [
+    (s) => (s.status === "ACTIVE" ? 0 : 1),
+    (s) => -s.points,
+  ];
+  for (const tiebreaker of tiebreakers) {
+    if (tiebreaker === "buchholz") criteria.push((s) => -scoreOf(s).buchholz);
+    if (tiebreaker === "sonneborn-berger") criteria.push((s) => -scoreOf(s).sonnebornBerger);
+    if (tiebreaker === "opponent-mwp") criteria.push((s) => -scoreOf(s).opponentMatchWinPercent);
+  }
+
+  /** Vrai si les deux équipes sont indépartageables par les critères numériques. */
+  const tied = (a: SwissStanding, b: SwissStanding): boolean =>
+    criteria.every((key) => key(a) === key(b));
 
   const compare = (a: SwissStanding, b: SwissStanding): number => {
-    if (a.status !== b.status) return a.status === "ACTIVE" ? -1 : 1;
-    if (b.points !== a.points) return b.points - a.points;
-
-    const sa = scores.get(a.teamId) ?? zero;
-    const sb = scores.get(b.teamId) ?? zero;
-
-    for (const tiebreaker of tiebreakers) {
-      if (tiebreaker === "buchholz" && sb.buchholz !== sa.buchholz) {
-        return sb.buchholz - sa.buchholz;
-      }
-      if (tiebreaker === "sonneborn-berger" && sb.sonnebornBerger !== sa.sonnebornBerger) {
-        return sb.sonnebornBerger - sa.sonnebornBerger;
-      }
-      if (
-        tiebreaker === "opponent-mwp" &&
-        sb.opponentMatchWinPercent !== sa.opponentMatchWinPercent
-      ) {
-        return sb.opponentMatchWinPercent - sa.opponentMatchWinPercent;
-      }
-      if (tiebreaker === "head-to-head") {
-        const direct = headToHead(a.teamId, b.teamId, matches);
-        if (direct !== 0) return -direct;
-      }
+    for (const key of criteria) {
+      const delta = key(a) - key(b);
+      if (delta !== 0) return delta;
     }
-
     return a.seed - b.seed;
   };
 
-  return [...standings]
-    .sort(compare)
-    .map((standing, index) => ({
-      ...standing,
-      ...(scores.get(standing.teamId) ?? zero),
-      rank: index + 1,
-    }));
+  const ordered = [...standings].sort(compare);
+
+  // Confrontation directe : on repère les blocs d'ex æquo parfaits et on les
+  // réordonne sur leur bilan interne, puis sur le seed.
+  if (tiebreakers.includes("head-to-head")) {
+    for (let start = 0; start < ordered.length; ) {
+      let end = start + 1;
+      while (end < ordered.length && tied(ordered[start], ordered[end])) end += 1;
+
+      if (end - start > 1) {
+        const group = ordered.slice(start, end);
+        const direct = headToHeadScores(group, matches);
+        group.sort(
+          (a, b) =>
+            (direct.get(b.teamId) ?? 0) - (direct.get(a.teamId) ?? 0) || a.seed - b.seed,
+        );
+        ordered.splice(start, group.length, ...group);
+      }
+
+      start = end;
+    }
+  }
+
+  return ordered.map((standing, index) => ({
+    ...standing,
+    ...scoreOf(standing),
+    rank: index + 1,
+  }));
 }
 
 /**
