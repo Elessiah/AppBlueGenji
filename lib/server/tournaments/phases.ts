@@ -16,7 +16,12 @@ import { loadTournamentRow, finishTournament, getRegistrationRows } from "./repo
 import { rankingPointsSql } from "@/lib/shared/ranking";
 import { createBracketIfMissing } from "./bracket-generator";
 import { isEliminationPhaseComplete, rankEliminationPhase } from "./finalization";
-import { initializeSwissTournament, generateSwissRound, loadSwissRanking } from "./swiss";
+import {
+  initializeSwissTournament,
+  generateSwissRound,
+  loadSwissRanking,
+  reconcileSwiss,
+} from "./swiss";
 import { initializeSurvivalTournament, generateSurvivalRound } from "./survival";
 
 /**
@@ -231,31 +236,15 @@ export async function reconcilePhases(tournamentId: number, conn: PoolConnection
         .map(([teamId]) => teamId);
     }
   } else if (currentPhase.format === "SWISS") {
-    // Swiss est complète quand tous les rounds sont joués ET aucun match n'est non-COMPLETED
-    const [roundData] = await conn.execute<
-      (RowDataPacket & { current: number; total: number | null })[]
-    >(
-      `SELECT swiss_current_round AS current, swiss_total_rounds AS total FROM bg_tournament_phases WHERE id = ? LIMIT 1`,
-      [currentPhaseId],
-    );
+    // On DÉLÈGUE au moteur suisse, exactement comme la branche Survie ci-dessus :
+    // c'est `reconcileSwiss` qui apparie la ronde suivante et incrémente le
+    // compteur de la phase. Se contenter de lire `swiss_current_round` laissait
+    // la phase figée à la ronde 1 — le tournoi ne se terminait jamais.
+    const result = await reconcileSwiss(tournamentId, conn, { phaseId: currentPhaseId });
+    isDone = result.done;
 
-    const roundRow = roundData[0];
-    if (roundRow) {
-      const totalRounds = roundRow.total ?? 1;
-      const currentRound = roundRow.current ?? 0;
-
-      if (currentRound >= totalRounds) {
-        const [unfinished] = await conn.execute<(RowDataPacket & { c: number })[]>(
-          `SELECT COUNT(*) AS c FROM bg_matches WHERE tournament_id = ? AND phase_id = ? AND status != 'COMPLETED'`,
-          [tournamentId, currentPhaseId],
-        );
-
-        isDone = Number(unfinished[0]?.c ?? 0) === 0;
-
-        if (isDone) {
-          phaseFinalRanking = await loadSwissRanking(conn, tournamentId, currentPhaseId);
-        }
-      }
+    if (isDone) {
+      phaseFinalRanking = await loadSwissRanking(conn, tournamentId, currentPhaseId);
     }
   } else {
     // SINGLE ou DOUBLE : utilise isEliminationPhaseComplete
