@@ -185,6 +185,142 @@ export function selectEliminatedTeamIds(
   return orderedActive.slice(orderedActive.length - count).map((s) => s.teamId);
 }
 
+/** Résultat d'un match du tournoi, tel que rejoué par {@link replaySurvival}. */
+export type SurvivalMatchOutcome = {
+  round: number;
+  /** Vrai si le match est terminé (score validé, forfait, victoire d'office). */
+  completed: boolean;
+  winnerTeamId: number | null;
+  loserTeamId: number | null;
+  /** Victoire d'office : compte comme une victoire, mais interdit un second bye. */
+  isBye: boolean;
+};
+
+/** Abandon déclaré : événement externe, non déductible des matchs. */
+export type SurvivalForfeit = { teamId: number; round: number };
+
+export type ReplaySurvivalInput = {
+  teams: { teamId: number; seed: number }[];
+  matches: SurvivalMatchOutcome[];
+  forfeits: SurvivalForfeit[];
+  roundsPerCut: number;
+  barrageRounds: number;
+  /** Dernier round généré (`survival_current_round`). */
+  lastRound: number;
+};
+
+/**
+ * Rejoue l'intégralité du tournoi depuis les résultats des matchs et renvoie
+ * l'état complet des équipes (victoires, défaites, éliminations, abandons).
+ *
+ * **Pourquoi rejouer plutôt qu'accumuler.** Les éliminations étaient auparavant
+ * écrites au fil de l'eau et jamais reprises : corriger le score d'un round de
+ * coupe laissait éliminée l'équipe qui venait de gagner, et qualifiée celle qui
+ * venait de perdre. En dérivant tout de l'historique, une correction de score se
+ * répercute d'elle-même sur les coupes suivantes — au même titre que les
+ * victoires/défaites, déjà recalculées ainsi.
+ *
+ * Les abandons restent fournis en entrée : ce sont des décisions humaines, pas
+ * des conséquences d'un résultat.
+ */
+export function replaySurvival(input: ReplaySurvivalInput): SurvivalStanding[] {
+  const state = new Map<number, SurvivalStanding>(
+    input.teams.map((t) => [
+      t.teamId,
+      {
+        teamId: t.teamId,
+        seed: t.seed,
+        wins: 0,
+        losses: 0,
+        status: "ACTIVE" as SurvivalStatus,
+        eliminatedRound: null as number | null,
+        hasBye: false,
+      },
+    ]),
+  );
+
+  const forfeitsByRound = new Map<number, number[]>();
+  for (const forfeit of input.forfeits) {
+    const round = Math.max(1, forfeit.round);
+    forfeitsByRound.set(round, [...(forfeitsByRound.get(round) ?? []), forfeit.teamId]);
+  }
+
+  const activeStandings = (): SurvivalStanding[] =>
+    rankActiveTeams([...state.values()]);
+
+  const eliminate = (teamId: number, round: number, status: SurvivalStatus): void => {
+    const team = state.get(teamId);
+    if (!team || team.status !== "ACTIVE") return;
+    team.status = status;
+    team.eliminatedRound = round;
+  };
+
+  const lastRound = Math.max(input.lastRound, ...input.matches.map((m) => m.round), 0);
+
+  for (let round = 1; round <= lastRound; round++) {
+    const roundMatches = input.matches.filter((m) => m.round === round);
+
+    // 1. Résultats du round.
+    for (const match of roundMatches) {
+      if (!match.completed) continue;
+      if (match.winnerTeamId !== null) {
+        const winner = state.get(match.winnerTeamId);
+        if (winner) {
+          winner.wins += 1;
+          if (match.isBye) winner.hasBye = true;
+        }
+      }
+      if (match.loserTeamId !== null) {
+        const loser = state.get(match.loserTeamId);
+        if (loser) loser.losses += 1;
+      }
+    }
+
+    // 2. Abandons déclarés pendant ce round (avant la coupe, comme en production).
+    for (const teamId of forfeitsByRound.get(round) ?? []) {
+      eliminate(teamId, round, "FORFEIT");
+    }
+
+    // Une coupe ne s'applique qu'à un round entièrement joué.
+    const roundComplete = roundMatches.length > 0 && roundMatches.every((m) => m.completed);
+    if (!roundComplete) continue;
+
+    // 3. Barrage : le perdant sort, si l'effectif est encore impair.
+    if (input.barrageRounds > 0 && round <= input.barrageRounds) {
+      if (shouldEliminateBarrageLoser(activeStandings().length)) {
+        const loserId = roundMatches.find((m) => m.loserTeamId !== null)?.loserTeamId ?? null;
+        if (loserId !== null) eliminate(loserId, round, "ELIMINATED");
+      }
+      continue;
+    }
+
+    // 4. Coupe périodique.
+    if (isCutRound(round, input.roundsPerCut, input.barrageRounds)) {
+      const active = activeStandings();
+      for (const teamId of selectEliminatedTeamIds(active, teamsToEliminate(active.length))) {
+        eliminate(teamId, round, "ELIMINATED");
+      }
+    }
+  }
+
+  return [...state.values()];
+}
+
+/**
+ * Compare deux jeux d'appariements sans tenir compte de l'ordre (ni des paires,
+ * ni des équipes au sein d'une paire). Sert à décider si un round non entamé
+ * doit être régénéré après une correction de score.
+ */
+export function samePairings(a: SurvivalRoundPlan, b: SurvivalRoundPlan): boolean {
+  if (a.byeTeamId !== b.byeTeamId) return false;
+  if (a.pairings.length !== b.pairings.length) return false;
+  const key = (p: SurvivalPairing): string =>
+    [p.teamAId, p.teamBId ?? -1].sort((x, y) => x - y).join("-");
+  const left = a.pairings.map(key).sort();
+  const right = b.pairings.map(key).sort();
+  return left.every((value, index) => value === right[index]);
+}
+
 /**
  * Attribue le classement final. La championne (dernière équipe active, ou à
  * défaut la mieux classée) obtient le rang 1 ; les autres sont ordonnées par

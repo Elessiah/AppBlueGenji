@@ -13,6 +13,7 @@ import {
   type LandingTickerPayload,
 } from "@/lib/shared/landing";
 import type { BracketType, TournamentBuckets, TournamentCard } from "@/lib/shared/types";
+import { rankingPoints, rankingPointsSql } from "@/lib/shared/ranking";
 
 const DEFAULT_STATS: LandingStats = {
   players: 0,
@@ -160,7 +161,7 @@ async function loadLeaderboardRows(
       AND m.status = 'COMPLETED'
       ${where}
      GROUP BY t.id, t.name, t.logo_url
-     ORDER BY (wins * 100 - losses * 20) DESC, wins DESC, t.name ASC`,
+     ORDER BY ${rankingPointsSql("wins", "losses")} DESC, wins DESC, t.name ASC`,
   );
   return rows;
 }
@@ -178,7 +179,7 @@ export async function getLandingLeaderboard(limit = 8): Promise<LandingLeaderboa
     return currentRows.slice(0, safeLimit).map((row, index) => {
       const rank = index + 1;
       const teamId = Number(row.team_id);
-      const points = Number(row.wins ?? 0) * 100 - Number(row.losses ?? 0) * 20;
+      const points = rankingPoints(Number(row.wins ?? 0), Number(row.losses ?? 0));
       const previousRank = previousRanks.get(teamId);
       let trend: "up" | "down" | "flat" = "flat";
       let trendValue = 0;
