@@ -7,10 +7,17 @@ import { rulesHrefForFormat, ruleModeForFormat } from "@/lib/shared/tournament-r
  * joué (ou vers l'index `/regles` si le format n'est pas connu, cas de la liste
  * des tournois).
  */
-export function RulesHelpFab({ format }: { format?: TournamentFormat }) {
+export function RulesHelpFab({
+  format,
+  contextLabel,
+}: {
+  format?: TournamentFormat;
+  contextLabel?: string;
+}) {
   const href = format ? rulesHrefForFormat(format) : "/regles";
   const mode = format ? ruleModeForFormat(format) : null;
-  const label = mode ? `Règles du mode ${mode.label}` : "Règles des tournois";
+  const baseLabel = mode ? `Règles du mode ${mode.label}` : "Règles des tournois";
+  const label = contextLabel ? `${baseLabel} — ${contextLabel}` : baseLabel;
 
   return (
     <Link href={href} className="cta-float-help" aria-label={label} title={label}>
