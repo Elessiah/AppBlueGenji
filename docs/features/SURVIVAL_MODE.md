@@ -16,9 +16,10 @@ paliers jusqu'à ce qu'il ne reste qu'une championne.
    tête) et on les apparie par paires adjacentes : 1 vs 2, 3 vs 4, 5 vs 6, …
 3. **Reclassement** — après chaque round, le classement est recalculé selon les
    **victoires** (décroissant), puis les **défaites** (croissant), puis le seed.
-4. **Coupe (élimination)** — après chaque bloc de `roundsPerCut` rounds (paramètre
-   défini à la création), les **deux dernières équipes** du classement sont
-   éliminées. On n'en élimine qu'**une seule** quand l'effectif est impair
+4. **Coupe (élimination)** — la cadence se règle en deux temps à la création :
+   `survivalRoundsBeforeFirstCut` manches avant la **première** coupe, puis une
+   coupe tous les `survivalRoundsPerCut` rounds. À chaque coupe, les **deux
+   dernières équipes** du classement sont éliminées. On n'en élimine qu'**une seule** quand l'effectif est impair
    (*coupe d'équilibrage*, voir §5) ou quand il ne resterait sinon plus personne,
    garantissant une championne unique. Répété jusqu'à une seule équipe.
 5. **Nombre impair — équilibrage** — un effectif impair imposerait une victoire
@@ -60,14 +61,16 @@ admin, forfait).
 
 | Champ | Description |
 | --- | --- |
-| `survivalRoundsPerCut` | Nombre de rounds joués entre deux coupes (1–50). |
+| `survivalRoundsBeforeFirstCut` | Nombre de rounds joués avant la première coupe (1–50). Par défaut : la valeur de l'intervalle. |
+| `survivalRoundsPerCut` | Nombre de rounds joués entre deux coupes suivantes (1–50). |
 
 ## Architecture
 
 - **Logique pure** : [`lib/shared/survival.ts`](../../lib/shared/survival.ts) —
   `compareStanding`, `rankActiveTeams`, `planSurvivalRound` (option
   `allowBarrage`), `needsBarrage`, `shouldEliminateBarrageLoser`,
-  `teamsToEliminate`, `isCutRound` (paramètre `barrageRounds`),
+  `teamsToEliminate`, `isCutRound` / `nextCutRound` (calendrier
+  `SurvivalCutSchedule` : première coupe, intervalle, barrage),
   `selectEliminatedTeamIds`, `computeFinalRanks`. Entièrement testée
   ([`tests/survival/logic.test.ts`](../../tests/survival/logic.test.ts)), y compris
   une simulation complète prouvant la convergence vers une unique championne.
@@ -86,8 +89,12 @@ admin, forfait).
   - `forfeitSurvivalTeam` — sortie d'une équipe.
   - `loadSurvivalMeta` — métadonnées pour l'affichage.
 - **Persistance** :
-  - Colonnes `bg_tournaments.survival_rounds_per_cut`, `survival_current_round`,
-    `survival_barrage_rounds` (0 ou 1 — décale la cadence des coupes).
+  - Colonnes `bg_tournaments.survival_rounds_before_first_cut`,
+    `survival_rounds_per_cut`, `survival_current_round`, `survival_barrage_rounds`
+    (0 ou 1 — décale la cadence des coupes). `survival_rounds_before_first_cut`
+    est NULL sur les tournois antérieurs à l'option : la première coupe tombe
+    alors au bout d'un intervalle standard (`resolveCutSchedule`), soit le
+    comportement historique.
   - Table `bg_survival_standings` (seed, wins, losses, status, eliminated_round,
     rank). **Tout y est dérivé des matchs** à chaque réconciliation — victoires,
     défaites, mais aussi éliminations et rangs — et réécrit en une seule requête.
@@ -101,7 +108,8 @@ admin, forfait).
   - Les matchs réutilisent `bg_matches` (bracket `UPPER`, `round_number` = numéro
     de round, `is_bye` pour les victoires d'office).
 - **API** :
-  - `POST /api/tournaments` accepte `format: "SURVIVAL"` + `survivalRoundsPerCut`.
+  - `POST /api/tournaments` accepte `format: "SURVIVAL"` +
+    `survivalRoundsBeforeFirstCut` + `survivalRoundsPerCut`.
   - `POST /api/tournaments/[id]/forfeit` — forfait (membre pour sa propre équipe,
     arbitre/admin pour n'importe quelle équipe via `teamId`).
 - **UI** :
