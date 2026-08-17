@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState, useEffect } from "react";
+import { FormEvent, useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import type { BracketMatch, BracketType } from "@/lib/shared/types";
@@ -39,18 +39,25 @@ export default function TournamentDetailPage() {
   const [selectedMatchForAdmin, setSelectedMatchForAdmin] = useState<BracketMatch | null>(null);
   const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (detail?.phases) {
-      const defaultPhaseId = defaultSelectedPhaseId(detail.phases, detail.currentPhaseId);
-      setSelectedPhaseId(defaultPhaseId);
-    }
-  }, [detail?.phases, detail?.currentPhaseId]);
+  // Dernière phase courante observée. On ne resynchronise la sélection que
+  // lorsqu'elle change RÉELLEMENT (une phase vient de démarrer) : comparer
+  // directement à `selectedPhaseId` ramènerait l'affichage sur la phase en cours
+  // à chaque clic, rendant impossible la consultation d'une phase terminée.
+  const lastCurrentPhaseId = useRef<number | null>(null);
 
   useEffect(() => {
-    if (detail?.currentPhaseId && selectedPhaseId !== detail.currentPhaseId) {
-      setSelectedPhaseId(detail.currentPhaseId);
+    if (!detail?.phases) return;
+
+    const current = detail.currentPhaseId ?? null;
+
+    if (selectedPhaseId === null) {
+      setSelectedPhaseId(defaultSelectedPhaseId(detail.phases, current));
+    } else if (current !== null && current !== lastCurrentPhaseId.current) {
+      setSelectedPhaseId(current);
     }
-  }, [detail?.currentPhaseId, selectedPhaseId]);
+
+    lastCurrentPhaseId.current = current;
+  }, [detail?.phases, detail?.currentPhaseId, selectedPhaseId]);
 
   if (!detail) {
     return (
@@ -164,7 +171,7 @@ export default function TournamentDetailPage() {
   const visibleFormat = visibleRulesFormat(detail.card, selectedPhase);
   const contextLabel =
     isMulti && selectedPhase
-      ? `Phase ${detail.phases?.findIndex((p) => p.id === selectedPhase.id) ?? 0 + 1}${
+      ? `Phase ${selectedPhase.position}${
           selectedPhase.name ? ` — ${selectedPhase.name}` : ""
         }`
       : undefined;

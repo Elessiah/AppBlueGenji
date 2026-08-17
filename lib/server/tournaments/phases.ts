@@ -164,7 +164,14 @@ export async function startPhase(
     // SINGLE ou DOUBLE : crée le bracket pour le roster limité à la phase
     const tournament = await loadTournamentRow(conn, tournamentId);
     if (tournament) {
-      await createBracketIfMissing(conn, tournament, { phaseId, maxRounds: phase.max_rounds });
+      await createBracketIfMissing(conn, tournament, {
+        phaseId,
+        maxRounds: phase.max_rounds,
+        // Le tournoi porte le format « MULTI » : c'est la phase qui décide du
+        // type de bracket et de la petite finale.
+        format: phase.format as "SINGLE" | "DOUBLE",
+        hasThirdPlaceMatch: Boolean(phase.has_third_place_match),
+      });
     }
   }
 }

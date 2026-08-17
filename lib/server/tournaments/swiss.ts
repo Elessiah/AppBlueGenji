@@ -64,7 +64,7 @@ async function getSwissSettings(
 }> {
   if (phaseId !== 0) {
     const [phaseRows] = await conn.execute<PhaseSwissRow[]>(
-      `SELECT format, swiss_total_rounds FROM bg_tournament_phases WHERE id = ? LIMIT 1`,
+      `SELECT format, swiss_total_rounds, swiss_current_round FROM bg_tournament_phases WHERE id = ? LIMIT 1`,
       [phaseId],
     );
     if (phaseRows.length === 0) {
@@ -85,7 +85,10 @@ async function getSwissSettings(
     return {
       format: phase.format,
       totalRounds: phase.swiss_total_rounds,
-      currentRound: 0,
+      // Le compteur de manches d'une phase vit sur la phase. Le lire sur le
+      // tournoi (ou le figer à 0) rejouerait la ronde 1 indéfiniment et la phase
+      // ne se terminerait jamais.
+      currentRound: Number(phase.swiss_current_round ?? 0),
       pointsWin: Number(tournament.swiss_points_win),
       pointsDraw: Number(tournament.swiss_points_draw),
       pointsLoss: Number(tournament.swiss_points_loss),
@@ -113,6 +116,19 @@ async function getSwissSettings(
     pointsLoss: Number(tournament.swiss_points_loss),
     pointsBye: Number(tournament.swiss_points_bye),
   };
+}
+
+/**
+ * Table portant les compteurs de manches : le tournoi pour une ronde suisse
+ * classique, la phase pour une ronde suisse jouée dans un tournoi multi-phases.
+ */
+function swissCounterScope(
+  tournamentId: number,
+  phaseId: number,
+): { table: "bg_tournaments" | "bg_tournament_phases"; rowId: number } {
+  return phaseId === 0
+    ? { table: "bg_tournaments", rowId: tournamentId }
+    : { table: "bg_tournament_phases", rowId: phaseId };
 }
 
 export async function initializeSwissTournament(
@@ -241,9 +257,9 @@ export async function generateFirstRound(
     matchNumber++;
   }
 
-  // Update tournament current round (always on tournament, not phase)
-  await conn.execute(`UPDATE bg_tournaments SET swiss_current_round = 1 WHERE id = ?`, [
-    tournamentId,
+  const counter = swissCounterScope(tournamentId, phaseId);
+  await conn.execute(`UPDATE ${counter.table} SET swiss_current_round = 1 WHERE id = ?`, [
+    counter.rowId,
   ]);
 }
 
@@ -343,10 +359,10 @@ export async function generateNextRound(
     matchNumber++;
   }
 
-  // Update current round (always on tournament)
-  await conn.execute(`UPDATE bg_tournaments SET swiss_current_round = ? WHERE id = ?`, [
+  const counter = swissCounterScope(tournamentId, phaseId);
+  await conn.execute(`UPDATE ${counter.table} SET swiss_current_round = ? WHERE id = ?`, [
     nextRound,
-    tournamentId,
+    counter.rowId,
   ]);
 
   return { done: false };
