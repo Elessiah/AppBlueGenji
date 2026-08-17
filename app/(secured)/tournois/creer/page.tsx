@@ -5,9 +5,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { localDateTimeInput } from "@/lib/shared/dates";
 import type { TournamentFormat, TournamentGame } from "@/lib/shared/types";
+import type { PhaseConfig } from "@/lib/shared/tournament-phases";
+import { validatePhases } from "@/lib/shared/tournament-phases";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
 import { useToast } from "@/components/ui/toast";
 import { CyberCard, CyberButton } from "@/components/cyber";
+import { PhaseBuilder } from "./PhaseBuilder";
+import { createDefaultPhase, phaseErrorMessage } from "./phase-form";
 
 // Rythme vertical du formulaire : sections séparées par un filet, même gouttière
 // de grille partout, textes d'aide sur les tokens « cyber ».
@@ -38,6 +42,10 @@ export default function CreateTournamentPage() {
   const [survivalRoundsPerCut, setSurvivalRoundsPerCut] = useState(3);
   const [survivalRoundsBeforeFirstCut, setSurvivalRoundsBeforeFirstCut] = useState(3);
   const [maxTeams, setMaxTeams] = useState(16);
+  const [phases, setPhases] = useState<PhaseConfig[]>([
+    createDefaultPhase(1, "SWISS"),
+    createDefaultPhase(2, "DOUBLE"),
+  ]);
   const [startVisibilityAt, setStartVisibilityAt] = useState(localDateTimeInput(1));
   const [registrationOpenAt, setRegistrationOpenAt] = useState(localDateTimeInput(3));
   const [registrationCloseAt, setRegistrationCloseAt] = useState(localDateTimeInput(24));
@@ -62,6 +70,16 @@ export default function CreateTournamentPage() {
     event.preventDefault();
     setLoading(true);
     try {
+      // Validate phases for MULTI format
+      if (format === "MULTI") {
+        const error = validatePhases(phases);
+        if (error) {
+          showError(phaseErrorMessage(error));
+          setLoading(false);
+          return;
+        }
+      }
+
       const response = await fetch("/api/tournaments", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -79,6 +97,7 @@ export default function CreateTournamentPage() {
           survivalRoundsPerCut: format === "SURVIVAL" ? survivalRoundsPerCut : undefined,
           survivalRoundsBeforeFirstCut:
             format === "SURVIVAL" ? survivalRoundsBeforeFirstCut : undefined,
+          phases: format === "MULTI" ? phases : undefined,
         }),
       });
       const payload = (await response.json()) as { error?: string; id?: number };
@@ -179,7 +198,9 @@ export default function CreateTournamentPage() {
                   >
                     <option value="SINGLE">Simple élimination</option>
                     <option value="DOUBLE">Double élimination</option>
+                    <option value="SWISS">Ronde suisse</option>
                     <option value="SURVIVAL">Survie</option>
+                    <option value="MULTI">Multi-phases</option>
                   </select>
                 </div>
                 <div className="field">
@@ -193,6 +214,16 @@ export default function CreateTournamentPage() {
                     onChange={(e) => setMaxTeams(Number(e.target.value))}
                   />
                 </div>
+
+                {format === "MULTI" && (
+                  <div style={FULL_WIDTH}>
+                    <PhaseBuilder
+                      phases={phases}
+                      maxTeams={maxTeams}
+                      onChange={setPhases}
+                    />
+                  </div>
+                )}
 
                 {format === "SURVIVAL" && (
                   <>
