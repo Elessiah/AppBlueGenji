@@ -2,14 +2,15 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import {
   compareStanding,
   computeFinalRanks,
-  isCutRound,
   planSurvivalRound,
   rankActiveTeams,
-  selectEliminatedTeamIds,
-  shouldEliminateBarrageLoser,
-  teamsToEliminate,
+  replaySurvival,
+  samePairings,
+  type SurvivalForfeit,
+  type SurvivalMatchOutcome,
   type SurvivalStanding,
 } from "@/lib/shared/survival";
+import { rankingPointsSql } from "@/lib/shared/ranking";
 import { createMatch, finishTournament } from "./repository";
 
 const DEFAULT_ROUNDS_PER_CUT = 3;
@@ -79,41 +80,117 @@ async function loadStandings(
   }));
 }
 
-/**
- * Recalcule victoires/défaites de chaque équipe à partir des matchs terminés.
- * Idempotent : dérive tout des matchs, jamais d'accumulation d'écarts.
- */
-async function recomputeWinsLosses(conn: PoolConnection, tournamentId: number): Promise<void> {
-  await conn.execute(
-    `UPDATE bg_survival_standings s
-     SET
-       wins = (
-         SELECT COUNT(*) FROM bg_matches m
-         WHERE m.tournament_id = s.tournament_id AND m.winner_team_id = s.team_id
-       ),
-       losses = (
-         SELECT COUNT(*) FROM bg_matches m
-         WHERE m.tournament_id = s.tournament_id AND m.loser_team_id = s.team_id
-       )
-     WHERE s.tournament_id = ?`,
+/** Résultats de tous les matchs du tournoi, dans la forme attendue par le rejeu. */
+async function loadMatchOutcomes(
+  conn: PoolConnection,
+  tournamentId: number,
+): Promise<SurvivalMatchOutcome[]> {
+  const [rows] = await conn.execute<
+    (RowDataPacket & {
+      round_number: number;
+      status: string;
+      winner_team_id: number | null;
+      loser_team_id: number | null;
+      is_bye: number;
+    })[]
+  >(
+    `SELECT round_number, status, winner_team_id, loser_team_id, is_bye
+     FROM bg_matches
+     WHERE tournament_id = ?
+     ORDER BY round_number, match_number`,
     [tournamentId],
   );
+
+  return rows.map((row) => ({
+    round: Number(row.round_number),
+    completed: row.status === "COMPLETED",
+    winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
+    loserTeamId: row.loser_team_id === null ? null : Number(row.loser_team_id),
+    isBye: Number(row.is_bye) === 1,
+  }));
 }
 
-/** Met à jour le rang persisté de chaque équipe (actives en tête, puis éliminées). */
-async function updateRanks(
+/**
+ * Rejoue le tournoi depuis l'historique des matchs et écrit l'état obtenu.
+ *
+ * Les abandons sont relus depuis la base : ce sont des décisions humaines, seule
+ * partie de l'état qui ne se déduit pas des résultats. Tout le reste (victoires,
+ * défaites, éliminations, rangs) est recalculé, de sorte qu'une correction de
+ * score se répercute sur les coupes déjà appliquées.
+ */
+async function replayAndPersist(
+  conn: PoolConnection,
+  tournamentId: number,
+  options: { roundsPerCut: number; barrageRounds: number; lastRound: number },
+): Promise<SurvivalStanding[]> {
+  const stored = await loadStandings(conn, tournamentId);
+  if (stored.length === 0) return [];
+
+  const forfeits: SurvivalForfeit[] = stored
+    .filter((s) => s.status === "FORFEIT")
+    .map((s) => ({ teamId: s.teamId, round: s.eliminatedRound ?? 1 }));
+
+  const derived = replaySurvival({
+    teams: stored.map((s) => ({ teamId: s.teamId, seed: s.seed })),
+    matches: await loadMatchOutcomes(conn, tournamentId),
+    forfeits,
+    roundsPerCut: options.roundsPerCut,
+    barrageRounds: options.barrageRounds,
+    lastRound: options.lastRound,
+  });
+
+  await persistStandings(conn, tournamentId, derived);
+  return derived;
+}
+
+/** Construit un `CASE team_id WHEN … THEN …` et alimente le tableau de paramètres. */
+function caseExpression<T>(
+  standings: SurvivalStanding[],
+  params: unknown[],
+  value: (s: SurvivalStanding) => T,
+): string {
+  const branches = standings
+    .map((s) => {
+      params.push(s.teamId, value(s));
+      return "WHEN ? THEN ?";
+    })
+    .join(" ");
+  return `CASE team_id ${branches} END`;
+}
+
+/**
+ * Écrit victoires, défaites, statut, round d'élimination et rang — en **une**
+ * requête. La boucle précédente émettait un `UPDATE` par équipe à chaque score
+ * reporté, soit des centaines d'allers-retours sur un gros tournoi.
+ */
+async function persistStandings(
   conn: PoolConnection,
   tournamentId: number,
   standings: SurvivalStanding[],
 ): Promise<void> {
+  if (standings.length === 0) return;
+
   const ranks = computeFinalRanks(standings);
-  for (const [teamId, rank] of ranks) {
-    await conn.execute(
-      `UPDATE bg_survival_standings SET \`rank\` = ?
-       WHERE tournament_id = ? AND team_id = ?`,
-      [rank, tournamentId, teamId],
-    );
-  }
+  const params: unknown[] = [];
+  const wins = caseExpression(standings, params, (s) => s.wins);
+  const losses = caseExpression(standings, params, (s) => s.losses);
+  const status = caseExpression(standings, params, (s) => s.status);
+  const eliminatedRound = caseExpression(standings, params, (s) => s.eliminatedRound);
+  const rank = caseExpression(standings, params, (s) => ranks.get(s.teamId) ?? 0);
+
+  const teamIds = standings.map((s) => s.teamId);
+  params.push(tournamentId, ...teamIds);
+
+  await conn.execute(
+    `UPDATE bg_survival_standings SET
+       wins = ${wins},
+       losses = ${losses},
+       status = ${status},
+       eliminated_round = ${eliminatedRound},
+       \`rank\` = ${rank}
+     WHERE tournament_id = ? AND team_id IN (${teamIds.map(() => "?").join(", ")})`,
+    params,
+  );
 }
 
 /**
@@ -127,23 +204,25 @@ export async function initializeSurvivalTournament(
   const tournament = await loadTournament(conn, tournamentId);
   if (!tournament || tournament.format !== "SURVIVAL") return;
 
-  // Seed par le classement du site : points = victoires×3 + défaites×1 sur
-  // l'ensemble des matchs terminés, toutes compétitions confondues.
+  // Seed par le classement du site, au **même barème** que le leaderboard de la
+  // landing (`lib/shared/ranking.ts`) : les deux formules avaient divergé, et
+  // celle du seeding faisait monter une équipe à chaque défaite encaissée.
+  const WINS = "COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
+  const LOSSES = "COALESCE(SUM(CASE WHEN m.loser_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
   const [seedRows] = await conn.execute<
     (RowDataPacket & { team_id: number; wins: number; losses: number })[]
   >(
     `SELECT
       r.team_id,
-      COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0) AS wins,
-      COALESCE(SUM(CASE WHEN m.status = 'COMPLETED' AND m.loser_team_id = r.team_id THEN 1 ELSE 0 END), 0) AS losses
+      ${WINS} AS wins,
+      ${LOSSES} AS losses
      FROM bg_tournament_registrations r
      LEFT JOIN bg_matches m
        ON (m.team1_id = r.team_id OR m.team2_id = r.team_id)
+      AND m.status = 'COMPLETED'
      WHERE r.tournament_id = ?
      GROUP BY r.team_id
-     ORDER BY (COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0) * 3
-             + COALESCE(SUM(CASE WHEN m.status = 'COMPLETED' AND m.loser_team_id = r.team_id THEN 1 ELSE 0 END), 0)) DESC,
-              r.team_id ASC`,
+     ORDER BY ${rankingPointsSql(WINS, LOSSES)} DESC, ${WINS} DESC, r.team_id ASC`,
     [tournamentId],
   );
 
@@ -196,31 +275,10 @@ export async function generateSurvivalRound(
   if (active.length < 2) return;
 
   const nextRound = Number(tournament.survival_current_round) + 1;
-  const { pairings, byeTeamId, isBarrage } = planSurvivalRound(active, {
-    allowBarrage: nextRound === 1,
-  });
+  const plan = planSurvivalRound(active, { allowBarrage: nextRound === 1 });
+  const isBarrage = plan.isBarrage;
 
-  let matchNumber = 1;
-  for (const pairing of pairings) {
-    const matchId = await createMatch(conn, tournamentId, "UPPER", nextRound, matchNumber);
-    await conn.execute(
-      `UPDATE bg_matches SET team1_id = ?, team2_id = ?, status = 'READY', is_bye = 0
-       WHERE id = ?`,
-      [pairing.teamAId, pairing.teamBId, matchId],
-    );
-    matchNumber += 1;
-  }
-
-  if (byeTeamId !== null) {
-    const matchId = await createMatch(conn, tournamentId, "UPPER", nextRound, matchNumber);
-    await conn.execute(
-      `UPDATE bg_matches SET
-        team1_id = ?, team2_id = NULL, is_bye = 1, status = 'COMPLETED',
-        team1_score = 1, team2_score = 0, winner_team_id = ?
-       WHERE id = ?`,
-      [byeTeamId, byeTeamId, matchId],
-    );
-  }
+  await writeRound(conn, tournamentId, nextRound, plan);
 
   await conn.execute(
     `UPDATE bg_tournaments
@@ -230,62 +288,137 @@ export async function generateSurvivalRound(
   );
 }
 
-/**
- * Élimine le perdant du barrage d'équilibrage une fois celui-ci terminé, à la
- * seule condition que l'effectif soit encore impair : un forfait survenu pendant
- * le barrage a pu rétablir la parité, auquel cas personne n'est sorti en plus.
- * Renvoie `true` si une élimination a été appliquée.
- */
-async function applyBarrageElimination(
-  tournamentId: number,
-  conn: PoolConnection,
-  barrageRound: number,
-  standings: SurvivalStanding[],
-): Promise<boolean> {
-  const active = rankActiveTeams(standings);
-  if (!shouldEliminateBarrageLoser(active.length)) return false;
-
-  const [rows] = await conn.execute<(RowDataPacket & { loser_team_id: number | null })[]>(
-    `SELECT loser_team_id FROM bg_matches
-     WHERE tournament_id = ? AND round_number = ? AND loser_team_id IS NOT NULL
-     LIMIT 1`,
-    [tournamentId, barrageRound],
-  );
-  const loserId = rows.length === 0 ? null : Number(rows[0].loser_team_id);
-  if (loserId === null) return false;
-
-  // Perdant déjà sorti (forfait) : rien à faire, l'effectif est traité ailleurs.
-  if (!active.some((s) => s.teamId === loserId)) return false;
-
-  await conn.execute(
-    `UPDATE bg_survival_standings
-     SET status = 'ELIMINATED', eliminated_round = ?
-     WHERE tournament_id = ? AND team_id = ? AND status = 'ACTIVE'`,
-    [barrageRound, tournamentId, loserId],
-  );
-  return true;
-}
-
 /** Applique le classement final et clôt le tournoi. */
 async function finalizeSurvival(
   tournamentId: number,
   conn: PoolConnection,
   standings: SurvivalStanding[],
 ): Promise<void> {
-  const ranks = computeFinalRanks(standings);
-  for (const [teamId, rank] of ranks) {
+  if (standings.length > 0) {
+    const ranks = computeFinalRanks(standings);
+    const params: unknown[] = [];
+    const rank = caseExpression(standings, params, (s) => ranks.get(s.teamId) ?? 0);
+    const teamIds = standings.map((s) => s.teamId);
+    params.push(tournamentId, ...teamIds);
+
     await conn.execute(
-      `UPDATE bg_tournament_registrations SET final_rank = ?
-       WHERE tournament_id = ? AND team_id = ?`,
-      [rank, tournamentId, teamId],
+      `UPDATE bg_tournament_registrations SET final_rank = ${rank}
+       WHERE tournament_id = ? AND team_id IN (${teamIds.map(() => "?").join(", ")})`,
+      params,
     );
-    await conn.execute(
-      `UPDATE bg_survival_standings SET \`rank\` = ?
-       WHERE tournament_id = ? AND team_id = ?`,
-      [rank, tournamentId, teamId],
-    );
+    await persistStandings(conn, tournamentId, standings);
   }
   await finishTournament(conn, tournamentId);
+}
+
+/**
+ * Le round `round` porte-t-il déjà une saisie ? Un round généré mais non entamé
+ * peut être réapparié sans rien détruire ; dès qu'un score y a été saisi, il est
+ * figé (les byes, posés par le moteur, ne comptent pas comme une saisie).
+ */
+async function roundHasScoreInput(
+  conn: PoolConnection,
+  tournamentId: number,
+  round: number,
+): Promise<boolean> {
+  const [rows] = await conn.execute<(RowDataPacket & { c: number })[]>(
+    `SELECT COUNT(*) AS c FROM bg_matches
+     WHERE tournament_id = ? AND round_number = ? AND is_bye = 0
+       AND (team1_score IS NOT NULL OR team2_score IS NOT NULL
+            OR winner_team_id IS NOT NULL OR forfeit_team_id IS NOT NULL
+            OR team1_reported_at IS NOT NULL OR team2_reported_at IS NOT NULL)`,
+    [tournamentId, round],
+  );
+  return Number(rows[0]?.c ?? 0) > 0;
+}
+
+/** Crée les matchs d'un round à partir d'un plan d'appariement. */
+async function writeRound(
+  conn: PoolConnection,
+  tournamentId: number,
+  round: number,
+  plan: ReturnType<typeof planSurvivalRound>,
+): Promise<void> {
+  let matchNumber = 1;
+  for (const pairing of plan.pairings) {
+    const matchId = await createMatch(conn, tournamentId, "UPPER", round, matchNumber);
+    await conn.execute(
+      `UPDATE bg_matches SET team1_id = ?, team2_id = ?, status = 'READY', is_bye = 0
+       WHERE id = ?`,
+      [pairing.teamAId, pairing.teamBId, matchId],
+    );
+    matchNumber += 1;
+  }
+
+  if (plan.byeTeamId !== null) {
+    const matchId = await createMatch(conn, tournamentId, "UPPER", round, matchNumber);
+    await conn.execute(
+      `UPDATE bg_matches SET
+        team1_id = ?, team2_id = NULL, is_bye = 1, status = 'COMPLETED',
+        team1_score = 1, team2_score = 0, winner_team_id = ?
+       WHERE id = ?`,
+      [plan.byeTeamId, plan.byeTeamId, matchId],
+    );
+  }
+}
+
+/** Lit les appariements déjà en base pour un round, sous forme de plan. */
+async function readRoundPlan(
+  conn: PoolConnection,
+  tournamentId: number,
+  round: number,
+): Promise<ReturnType<typeof planSurvivalRound> | null> {
+  const [rows] = await conn.execute<
+    (RowDataPacket & { team1_id: number | null; team2_id: number | null; is_bye: number })[]
+  >(
+    `SELECT team1_id, team2_id, is_bye FROM bg_matches
+     WHERE tournament_id = ? AND round_number = ?
+     ORDER BY match_number`,
+    [tournamentId, round],
+  );
+  if (rows.length === 0) return null;
+
+  const pairings = rows
+    .filter((r) => Number(r.is_bye) === 0 && r.team1_id !== null && r.team2_id !== null)
+    .map((r) => ({ teamAId: Number(r.team1_id), teamBId: Number(r.team2_id) }));
+  const byeRow = rows.find((r) => Number(r.is_bye) === 1);
+
+  return {
+    pairings,
+    byeTeamId: byeRow?.team1_id === undefined || byeRow.team1_id === null ? null : Number(byeRow.team1_id),
+    isBarrage: false,
+  };
+}
+
+/**
+ * Garantit que le round suivant colle au classement courant : il est créé s'il
+ * n'existe pas, et **réapparié** si une correction de score en amont a changé le
+ * classement — tant qu'aucun score n'y a été saisi. Sans cela, les paires
+ * restaient celles calculées avant correction.
+ */
+async function ensureNextRound(
+  conn: PoolConnection,
+  tournamentId: number,
+  nextRound: number,
+  active: SurvivalStanding[],
+): Promise<boolean> {
+  const desired = planSurvivalRound(active, { allowBarrage: nextRound === 1 });
+  const existing = await readRoundPlan(conn, tournamentId, nextRound);
+
+  if (existing === null) {
+    await writeRound(conn, tournamentId, nextRound, desired);
+    return true;
+  }
+
+  if (samePairings(existing, desired)) return false;
+  if (await roundHasScoreInput(conn, tournamentId, nextRound)) return false;
+
+  await conn.execute(`DELETE FROM bg_matches WHERE tournament_id = ? AND round_number = ?`, [
+    tournamentId,
+    nextRound,
+  ]);
+  await writeRound(conn, tournamentId, nextRound, desired);
+  return true;
 }
 
 /**
@@ -304,13 +437,18 @@ export async function reconcileSurvival(
   if (!tournament || tournament.format !== "SURVIVAL") return;
   if (tournament.state === "FINISHED") return;
 
-  await recomputeWinsLosses(conn, tournamentId);
-
   const roundsPerCut = Number(tournament.survival_rounds_per_cut ?? DEFAULT_ROUNDS_PER_CUT);
   const currentRound = Number(tournament.survival_current_round);
+  const barrageRounds = Number(tournament.survival_barrage_rounds ?? 0);
 
-  let standings = await loadStandings(conn, tournamentId);
-  await updateRanks(conn, tournamentId, standings);
+  // Tout l'état (victoires, défaites, éliminations, rangs) est redérivé de
+  // l'historique des matchs : une correction de score en amont défait la coupe
+  // qu'elle avait provoquée au lieu de la laisser figée.
+  const standings = await replayAndPersist(conn, tournamentId, {
+    roundsPerCut,
+    barrageRounds,
+    lastRound: currentRound,
+  });
 
   // Aucun round généré (départ avec 0 ou 1 équipe) : clôture immédiate.
   if (currentRound === 0) {
@@ -320,63 +458,36 @@ export async function reconcileSurvival(
     return;
   }
 
+  const active = rankActiveTeams(standings);
+
   // Round encore en cours ?
   const [incomplete] = await conn.execute<(RowDataPacket & { c: number })[]>(
     `SELECT COUNT(*) AS c FROM bg_matches
      WHERE tournament_id = ? AND round_number = ? AND status <> 'COMPLETED'`,
     [tournamentId, currentRound],
   );
-  if (Number(incomplete[0]?.c ?? 0) > 0) return;
 
-  // Barrage d'équilibrage terminé : son perdant quitte le tournoi, ce qui ramène
-  // l'effectif à un nombre pair avant le premier round complet.
-  const barrageRounds = Number(tournament.survival_barrage_rounds ?? 0);
-  if (barrageRounds > 0 && currentRound === barrageRounds) {
-    const eliminated = await applyBarrageElimination(
-      tournamentId,
-      conn,
-      currentRound,
-      standings,
-    );
-    if (eliminated) {
-      standings = await loadStandings(conn, tournamentId);
-      await updateRanks(conn, tournamentId, standings);
+  if (Number(incomplete[0]?.c ?? 0) > 0) {
+    // Le round courant n'a peut-être jamais été entamé : si une correction de
+    // score en amont a changé le classement, ses appariements sont périmés.
+    if (active.length >= 2) {
+      await ensureNextRound(conn, tournamentId, currentRound, active);
     }
+    return;
   }
 
-  // Coupe due à la fin de ce round ? (pas déjà appliquée)
-  const alreadyCut = standings.some(
-    (s) => s.status === "ELIMINATED" && s.eliminatedRound === currentRound,
-  );
-  if (isCutRound(currentRound, roundsPerCut, barrageRounds) && !alreadyCut) {
-    const active = rankActiveTeams(standings);
-    const toEliminate = selectEliminatedTeamIds(active, teamsToEliminate(active.length));
-    for (const teamId of toEliminate) {
-      await conn.execute(
-        `UPDATE bg_survival_standings
-         SET status = 'ELIMINATED', eliminated_round = ?
-         WHERE tournament_id = ? AND team_id = ?`,
-        [currentRound, tournamentId, teamId],
-      );
-    }
-    standings = await loadStandings(conn, tournamentId);
-    await updateRanks(conn, tournamentId, standings);
-  }
-
-  const active = rankActiveTeams(standings);
   if (active.length <= 1) {
     await finalizeSurvival(tournamentId, conn, standings);
     return;
   }
 
-  // Génère le round suivant si ce n'est pas déjà fait.
-  const [nextExists] = await conn.execute<(RowDataPacket & { c: number })[]>(
-    `SELECT COUNT(*) AS c FROM bg_matches
-     WHERE tournament_id = ? AND round_number = ?`,
-    [tournamentId, currentRound + 1],
-  );
-  if (Number(nextExists[0]?.c ?? 0) === 0) {
-    await generateSurvivalRound(tournamentId, conn);
+  // Round suivant : créé s'il manque, réapparié s'il ne colle plus au classement.
+  const changed = await ensureNextRound(conn, tournamentId, currentRound + 1, active);
+  if (changed) {
+    await conn.execute(
+      `UPDATE bg_tournaments SET survival_current_round = ? WHERE id = ? AND survival_current_round < ?`,
+      [currentRound + 1, tournamentId, currentRound + 1],
+    );
     // Un round entièrement composé de byes doit enchaîner immédiatement.
     await reconcileSurvival(tournamentId, conn);
   }
