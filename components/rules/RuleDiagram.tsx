@@ -445,11 +445,115 @@ function SurvivalDiagram() {
   );
 }
 
+function MultiDiagram() {
+  type FunnelLevel = { in: number; out: number; x: number; y: number };
+
+  const FunnelBox = ({ in: inCount, out: outCount, x, y }: FunnelLevel) => (
+    <g>
+      <rect
+        x={x}
+        y={y}
+        width={160}
+        height={60}
+        rx={8}
+        fill={SURFACE}
+        stroke={LINE}
+        strokeWidth={1.2}
+      />
+      <text x={x + 80} y={y + 20} fill={INK} fontSize={18} fontWeight={600} textAnchor="middle" fontFamily={MONO}>
+        {inCount}
+      </text>
+      <text x={x + 80} y={y + 48} fill={MUTE} fontSize={10.5} textAnchor="middle" fontFamily={MONO}>
+        {`→ ${outCount}`}
+      </text>
+    </g>
+  );
+
+  return (
+    <svg
+      className={styles.svg}
+      viewBox="0 0 680 300"
+      role="img"
+      aria-label="Tournoi multi-phases : chaque phase affine l'effectif. Phase 1 : Ronde suisse 128→64, Phase 2 : Survie 64→16, Phase 3 : Double élimination 16→1."
+      style={{ color: LINE }}
+    >
+      <ArrowDefs />
+
+      {/* Phase labels */}
+      <ColumnLabel x={35} y={18}>Phase 1</ColumnLabel>
+      <ColumnLabel x={245} y={18}>Phase 2</ColumnLabel>
+      <ColumnLabel x={460} y={18}>Phase finale</ColumnLabel>
+
+      {/* Funnel boxes */}
+      <FunnelBox in={128} out={64} x={20} y={50} />
+      <FunnelBox in={64} out={16} x={220} y={50} />
+      <FunnelBox in={16} out={1} x={420} y={50} />
+
+      {/* Format labels */}
+      <text x={100} y={135} fill={BLUE} fontSize={11} fontFamily={MONO} textAnchor="middle" letterSpacing="0.05em">
+        RONDE SUISSE
+      </text>
+      <text x={300} y={135} fill={BLUE} fontSize={11} fontFamily={MONO} textAnchor="middle" letterSpacing="0.05em">
+        SURVIE
+      </text>
+      <text x={500} y={135} fill={BLUE} fontSize={11} fontFamily={MONO} textAnchor="middle" letterSpacing="0.05em">
+        DOUBLE ÉLIM.
+      </text>
+
+      {/* Flow arrows */}
+      <Elbow from={[180, 80]} to={[220, 80]} color={BLUE} />
+      <Elbow from={[380, 80]} to={[420, 80]} color={BLUE} />
+
+      {/* Legend/explanation */}
+      <text x={20} y={190} fill={MUTE} fontSize={11} fontFamily={MONO}>
+        Chaque phase joue indépendamment et ne transmet
+      </text>
+      <text x={20} y={208} fill={MUTE} fontSize={11} fontFamily={MONO}>
+        que ses qualifiées à la suivante. Formats combinables
+      </text>
+      <text x={20} y={226} fill={MUTE} fontSize={11} fontFamily={MONO}>
+        pour affiner progressivement le podium.
+      </text>
+
+      {/* Trophy for winner */}
+      <g>
+        <rect
+          x={535}
+          y={60}
+          width={120}
+          height={50}
+          rx={7}
+          fill="rgba(90,200,255,0.10)"
+          stroke={BLUE}
+          strokeWidth={1.2}
+        />
+        <text x={595} y={82} fill={INK} fontSize={14} textAnchor="middle">
+          🏆
+        </text>
+        <text
+          x={595}
+          y={103}
+          fill={BLUE}
+          fontSize={9}
+          fontFamily={MONO}
+          textAnchor="middle"
+          letterSpacing="0.1em"
+        >
+          CHAMPIONNE
+        </text>
+      </g>
+
+      <Elbow from={[545, 80]} to={[535, 85]} color={BLUE} />
+    </svg>
+  );
+}
+
 const DIAGRAMS: Record<RuleDiagram, () => React.JSX.Element> = {
   SINGLE: SingleEliminationDiagram,
   DOUBLE: DoubleEliminationDiagram,
   SWISS: SwissDiagram,
   SURVIVAL: SurvivalDiagram,
+  MULTI: MultiDiagram,
 };
 
 const LEGENDS: Record<RuleDiagram, { color: string; label: string }[]> = {
@@ -469,6 +573,10 @@ const LEGENDS: Record<RuleDiagram, { color: string; label: string }[]> = {
     { color: BLUE, label: "Appariement" },
     { color: RED, label: "Zone de coupe" },
     { color: AMBER, label: "Barrage" },
+  ],
+  MULTI: [
+    { color: BLUE, label: "Flux des qualifiées" },
+    { color: LINE, label: "Effectif d'une phase" },
   ],
 };
 
