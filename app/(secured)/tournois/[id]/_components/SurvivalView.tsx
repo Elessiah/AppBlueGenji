@@ -24,9 +24,9 @@ interface SurvivalViewProps {
   onScoreChange: (matchId: number, field: "myScore" | "opponentScore", value: string) => void;
   onSubmit: (match: BracketMatch, e: FormEvent) => Promise<void>;
   onOpenAdminModal: (match: BracketMatch) => void;
-  /** Rendu du bouton « Déclarer forfait » pour une équipe (null = pas d'action). */
-  forfeitTeamId: number | null;
-  onForfeit: () => void;
+  /** Le forfait de cette équipe peut-il être déclaré depuis le classement ? */
+  canForfeit: (teamId: number) => boolean;
+  onForfeit: (teamId: number, teamName: string) => void;
 }
 
 const STATUS_META: Record<SurvivalStandingRow["status"], { label: string; color: string }> = {
@@ -47,7 +47,7 @@ export function SurvivalView({
   onScoreChange,
   onSubmit,
   onOpenAdminModal,
-  forfeitTeamId,
+  canForfeit,
   onForfeit,
 }: SurvivalViewProps) {
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
@@ -97,28 +97,11 @@ export function SurvivalView({
             Barrage d&apos;équilibrage au round 1
           </span>
         )}
-        {forfeitTeamId && !isFinished && (
-          <button
-            type="button"
-            onClick={onForfeit}
-            className="btn"
-            style={{
-              marginLeft: "auto",
-              padding: "5px 12px",
-              fontSize: 12,
-              background: "rgba(255,157,46,0.12)",
-              borderColor: "rgba(255,157,46,0.4)",
-              color: AMBER,
-            }}
-          >
-            Déclarer forfait
-          </button>
-        )}
       </div>
 
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
         {/* Classement courant */}
-        <div style={{ flex: "0 0 300px", minWidth: 260 }}>
+        <div style={{ flex: "0 0 340px", minWidth: 280 }}>
           <div
             style={{
               fontSize: 11,
@@ -141,6 +124,10 @@ export function SurvivalView({
                   : STATUS_META[team.status];
               const inDanger = dangerTeamIds.has(team.teamId);
               const isMine = team.teamId === myTeamId;
+              // Abandon : proposé sur les équipes encore en lice, à leurs
+              // représentants comme à l'arbitrage (cf. `canForfeit` côté page).
+              const forfeitable =
+                !isFinished && team.status === "ACTIVE" && canForfeit(team.teamId);
               return (
                 <div
                   key={team.teamId}
@@ -188,6 +175,35 @@ export function SurvivalView({
                   >
                     {meta.label}
                   </span>
+                  {forfeitable && (
+                    <button
+                      type="button"
+                      onClick={() => onForfeit(team.teamId, team.teamName)}
+                      className="btn"
+                      title={
+                        isMine
+                          ? "Abandonner : votre équipe quitte définitivement le tournoi"
+                          : `Déclarer l'abandon de ${team.teamName}`
+                      }
+                      aria-label={
+                        isMine
+                          ? "Abandonner avec mon équipe"
+                          : `Déclarer l'abandon de ${team.teamName}`
+                      }
+                      style={{
+                        flexShrink: 0,
+                        padding: "3px 8px",
+                        fontSize: 10,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
+                        background: "rgba(255,157,46,0.12)",
+                        borderColor: "rgba(255,157,46,0.4)",
+                        color: AMBER,
+                      }}
+                    >
+                      Abandonner
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -320,6 +336,7 @@ export function SurvivalView({
                             onOpenAdminModal={onOpenAdminModal}
                             allMatches={allTournamentMatches}
                             roundNumber={match.roundNumber}
+                            format="SURVIVAL"
                           />
                         );
                       })}

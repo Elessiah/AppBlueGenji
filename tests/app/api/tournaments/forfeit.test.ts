@@ -54,6 +54,15 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
     expect(await res.json()).toEqual({ error: "NO_ACTIVE_TEAM" });
   });
 
+  it("accepte qu'un membre cible explicitement sa propre équipe", async () => {
+    // Le bouton du classement envoie toujours l'identifiant de l'équipe.
+    (getCurrentUser as jest.Mock).mockResolvedValue(member as never);
+    (teams.getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 77 } as never);
+    const res = await POST(req({ teamId: 77 }), params);
+    expect(res.status).toBe(200);
+    expect(service.forfeitSurvivalTeam).toHaveBeenCalledWith(5, 77);
+  });
+
   it("empêche un membre de forfaiter une autre équipe (403)", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(member as never);
     (teams.getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 77 } as never);

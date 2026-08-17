@@ -8,6 +8,8 @@ import { useToast } from "@/components/ui/toast";
 import { Pill, CyberButton } from "@/components/cyber";
 import { useTournamentLive } from "./_hooks/useTournamentLive";
 import { mapError } from "./_lib/error-map";
+import { canForfeitTeam } from "./_lib/forfeit";
+import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { AdminScoreDialog } from "./_components/AdminScoreDialog";
 import { MatchScoreDraft } from "./_components/BracketTree";
 import { BracketSections } from "./_components/BracketSections";
@@ -86,15 +88,33 @@ export default function TournamentDetailPage() {
     }
   };
 
-  const forfeitTeam = async () => {
-    if (!window.confirm("Déclarer forfait ? Votre équipe quittera définitivement le tournoi.")) {
-      return;
-    }
+  const canForfeit = (teamId: number): boolean =>
+    canForfeitTeam(
+      {
+        format: detail.card.format,
+        state: detail.card.state,
+        isAdmin: detail.isAdmin,
+        myTeamId: detail.myTeamId,
+        canCreateReportsForTeamIds: detail.canCreateReportsForTeamIds,
+      },
+      teamId,
+    );
+
+  const forfeitTeam = async (teamId: number, teamName: string) => {
+    const isMine = detail?.myTeamId === teamId;
+    const confirmation = isMine
+      ? "Abandonner ? Votre équipe quittera définitivement le tournoi."
+      : `Déclarer l'abandon de ${teamName} ? L'équipe quittera définitivement le tournoi.`;
+    if (!window.confirm(confirmation)) return;
     try {
-      const response = await fetch(`/api/tournaments/${tournamentId}/forfeit`, { method: "POST" });
+      const response = await fetch(`/api/tournaments/${tournamentId}/forfeit`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ teamId }),
+      });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "FORFEIT_FAILED");
-      showSuccess("Forfait enregistré.");
+      showSuccess(isMine ? "Forfait enregistré." : `Forfait de ${teamName} enregistré.`);
     } catch (e) {
       showError(mapError((e as Error).message));
     }
@@ -115,18 +135,6 @@ export default function TournamentDetailPage() {
 
   const stateMeta = STATE_META[detail.card.state] ?? { label: detail.card.state, chipClass: "muted" };
 
-  // Forfait possible : mon équipe est encore active dans un tournoi Survie en cours.
-  const survivalForfeitTeamId =
-    detail.card.format === "SURVIVAL" &&
-    detail.card.state === "RUNNING" &&
-    detail.myTeamId !== null &&
-    detail.canCreateReportsForTeamIds.includes(detail.myTeamId) &&
-    detail.survival?.standings.some(
-      (s) => s.teamId === detail.myTeamId && s.status === "ACTIVE",
-    )
-      ? detail.myTeamId
-      : null;
-
   const bracketOrder: BracketType[] =
     detail.card.format === "SINGLE"
       ? detail.card.hasThirdPlaceMatch ? ["UPPER", "THIRD_PLACE"] : ["UPPER"]
@@ -143,6 +151,7 @@ export default function TournamentDetailPage() {
 
   return (
     <>
+      <RulesHelpFab format={detail.card.format} />
       <section className="fade-in">
         <div className="ds-header green">
           <div className="ds-header-body">
@@ -231,7 +240,7 @@ export default function TournamentDetailPage() {
               onScoreChange={handleScoreChange}
               onSubmit={submitScore}
               onOpenAdminModal={setSelectedMatchForAdmin}
-              forfeitTeamId={survivalForfeitTeamId}
+              canForfeit={canForfeit}
               onForfeit={forfeitTeam}
             />
           ) : !detail.matches.length ? (
@@ -254,6 +263,7 @@ export default function TournamentDetailPage() {
                   onScoreChange={handleScoreChange}
                   onSubmit={submitScore}
                   onOpenAdminModal={setSelectedMatchForAdmin}
+                  format={detail.card.format}
                 />
               </div>
             ))

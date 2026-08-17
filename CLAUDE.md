@@ -14,7 +14,7 @@ npm run build        # Production build
 npm run lint         # ESLint
 npm test             # Jest test suite
 npm run test:coverage
-npm run seed         # Populate MySQL with test data (16 users, 8 teams, 4 tournaments)
+npm run seed         # Populate MySQL with test data (matrice de cas, voir ci-dessous)
 npm run seed:view    # Inspect seeded test data
 ```
 
@@ -33,6 +33,7 @@ npx jest tests/path/to/file.test.ts
 ### Route Layout
 - `/` — Landing page
 - `/connexion` — Passwordless login (Google OAuth + Discord 6-digit code via DM)
+- `/regles` + `/regles/[slug]` — Règles publiques de chaque mode de tournoi (schémas SVG inline). Contenu et mapping format → page dans `lib/shared/tournament-rules.ts` ; ajouter un mode = ajouter une entrée au registre (les pages sont pré-générées via `generateStaticParams`). Le bouton flottant « ? » des pages de tournoi (`components/rules/RulesHelpFab.tsx`) résout sa cible depuis le format du tournoi.
 - `/(secured)/*` — Auth-protected routes: `tournois`, `equipes`, `joueurs`, `profil`
 - `/api/*` — REST API routes (no tRPC, no server actions)
 
@@ -52,6 +53,7 @@ Supports single/double elimination, Swiss round and Survival formats. Key concep
 - **States:** `UPCOMING → REGISTRATION → RUNNING → FINISHED`
 - **Bracket positions:** `UPPER`, `LOWER`, `GRAND` finals
 - **Match status:** `PENDING → READY → AWAITING_CONFIRMATION → COMPLETED`
+- **Verrouillage de l'édition d'un score** (`lib/shared/match-lock.ts`) : un score n'est plus modifiable — **y compris par un admin** — dès que la manche suivante porte la moindre saisie (un score même nul, un vainqueur, un forfait, ou un report en attente de confirmation). Les matchs dépendants suivent le format : liens `next_winner_match_id` / `next_loser_match_id` en élimination, tous les rounds ultérieurs en survie et en ronde suisse (leurs appariements sont recalculés depuis le classement). Le module est pur et partagé : le serveur l'applique dans `checkDownstreamMatchesHaveNoScores` (`lib/server/tournaments/admin.ts`, erreur `CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES` → 409) et l'interface masque le bouton « Éditer le score » au profit d'un indicateur « 🔒 Score verrouillé ». Les byes et matchs fantômes sont ignorés : leur score (1-0, 0-0) est posé par le moteur, pas saisi.
 - Bye slots for non-power-of-2 participant counts (`docs/features/BYE_FUNCTIONALITY.md`)
 - Variable bracket sizing (`docs/features/VARIABLE_SIZE_TOURNAMENTS.md`)
 - Swiss rounds: fixed number of rounds, pairing by points/standing, no elimination
@@ -91,6 +93,16 @@ BOT_DOCS_PATH=                             # optional — chemin du projet blueG
 ## Preview / dev auth bypass
 
 Pour vérifier les pages protégées (`/tournois`, `/equipes`, `/joueurs`, `/profil`, etc.) sans passer par Google OAuth ni le code Discord, définir `DEV_AUTH_USER_ID=<id>` dans `.env` (par exemple `321` pour le user admin). La fonction `getCurrentUser()` dans `lib/server/auth.ts` retournera ce user **uniquement si `NODE_ENV === "development"`** (c.-à-d. `next dev`), en court-circuitant le cookie de session — toutes les routes API et le `app/(secured)/layout.tsx` s'authentifient automatiquement. **Redémarre le dev server après modification de `.env`** pour que Next.js prenne en compte la nouvelle valeur. Désactiver = supprimer/vider la var. La garde-fou est double et en **liste blanche** (`NODE_ENV === "development"` ET ID entier valide) : le bypass est donc inactif en prod, en `test`, en `staging`, ou si `NODE_ENV` n'est pas défini. Ne JAMAIS définir cette var en prod.
+
+## Jeu de test (`npm run seed`)
+
+`npm run seed` **écrase** les données de test (tout ce qui est préfixé `Test_` / `Test - `, plus la table `bg_bureau_members`) puis régénère une matrice de cas destinée à couvrir un maximum de combinaisons en une exécution :
+
+- **Comptes** (`lib/server/seed.ts` → `SPECIAL_USERS`) : admin, un compte par rôle de plateforme (`ARBITRE`, `COMMUNITY_MANAGER`, `RECRUTEUR`) + un cumul, profil tout privé / tout public, mineur, majorité inconnue, sans tags de jeu, sans équipe, compte anonymisé. L'id de l'admin est affiché en fin de seed : c'est la valeur à mettre dans `DEV_AUTH_USER_ID`.
+- **Équipes** : rosters complets avec rôles cumulés (`OWNER`/`CAPITAINE`/`TANK`/`DPS`/`HEAL`/`COACH`/`MANAGER`), plus les cas limites (équipe à un seul membre, équipe sans joueur, avec/sans logo) et ~140 équipes de remplissage pour les gros brackets.
+- **Tournois** (`lib/server/seed-cases.ts` → `TOURNAMENTS`) : la matrice **état × format × effectif × situation de match**. 4 états, 4 formats (`SINGLE` avec/sans petite finale, `DOUBLE`, `SWISS`, `SURVIVAL`), effectifs de 0 à 128 (puissances de 2 et effectifs à byes), survie impaire 3/5/7/9/11/15/21 (barrage) avec cadences 1/2/3 et forfaits, plus les états intermédiaires du cycle de report (report en attente, conflit de scores, délai dépassé).
+
+Ajouter un cas = ajouter une entrée à `TOURNAMENTS` ; `lib/server/seed-cases.ts` est volontairement sans accès base pour rester testable (`tests/lib/server/seed-cases.test.ts` garde la couverture de la matrice). Les résultats de matchs sont tirés par un LCG réamorcé par tournoi : **le seed est reproductible** d'une exécution à l'autre.
 
 ## Key Conventions
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import type { BracketMatch, BracketType } from "@/lib/shared/types";
+import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
 import { BracketTree, MatchScoreDraft, ScrollRequest } from "./BracketTree";
 import { ACCENT, buildSections, defaultOpenKey, findMyNextMatch, qualifyDestinationMatchId } from "../_lib/bracket-sections";
 
@@ -18,6 +18,7 @@ interface BracketSectionsProps {
   onScoreChange: (matchId: number, field: "myScore" | "opponentScore", value: string) => void;
   onSubmit: (match: BracketMatch, e: FormEvent) => Promise<void>;
   onOpenAdminModal: (match: BracketMatch) => void;
+  format: TournamentFormat;
 }
 
 export function BracketSections({
@@ -33,6 +34,7 @@ export function BracketSections({
   onScoreChange,
   onSubmit,
   onOpenAdminModal,
+  format,
 }: BracketSectionsProps) {
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
   const totalRounds = roundNums.length;
@@ -194,6 +196,7 @@ export function BracketSections({
                     onQualifyClick={handleQualifyClick}
                     canReport={canReport}
                     adminResolvable={adminResolvable}
+                    format={format}
                     drafts={drafts}
                     onScoreChange={onScoreChange}
                     onSubmit={onSubmit}

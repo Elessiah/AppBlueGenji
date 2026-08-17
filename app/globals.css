@@ -598,6 +598,57 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
   transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease, color 0.22s ease;
 }
 
+/* Bouton d'aide flottant des pages de tournoi : pastille ronde « ? » renvoyant
+   vers les règles du mode joué. Même ancrage que .cta-float-home (les deux ne
+   coexistent jamais sur une même page). */
+.cta-float-help {
+  position: fixed;
+  bottom: 78px;
+  right: 28px;
+  z-index: 100;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  border: 1px solid rgba(90, 200, 255, 0.38);
+  background: rgba(18, 36, 68, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: var(--blue-300);
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: transform 0.22s ease, border-color 0.22s ease, color 0.22s ease,
+    box-shadow 0.22s ease;
+}
+
+.cta-float-help:hover,
+.cta-float-help:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--blue-500);
+  color: var(--blue-100);
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.45),
+    0 0 0 4px var(--blue-glow);
+}
+
+@media (max-width: 720px) {
+  .cta-float-help {
+    bottom: 20px;
+    right: 18px;
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+  }
+}
+
 .cta-float-home::before {
   content: "";
   position: absolute;
