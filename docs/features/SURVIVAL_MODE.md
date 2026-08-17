@@ -8,8 +8,10 @@ paliers jusqu'à ce qu'il ne reste qu'une championne.
 ## Règles
 
 1. **Seeding initial** — au démarrage, le classement de départ est fixé par le
-   **classement du site** (points = victoires×3 + défaites×1, toutes compétitions
-   confondues). Seed 1 = meilleure équipe.
+   **classement du site**, au barème unique de `lib/shared/ranking.ts`
+   (`victoires × 100 − défaites × 20`, sur les matchs terminés, toutes
+   compétitions confondues). Seed 1 = meilleure équipe. Le même module sert au
+   leaderboard de la landing : les deux calculs ne peuvent plus diverger.
 2. **Appariement** — à chaque round, on classe les équipes actives (meilleure en
    tête) et on les apparie par paires adjacentes : 1 vs 2, 3 vs 4, 5 vs 6, …
 3. **Reclassement** — après chaque round, le classement est recalculé selon les
@@ -40,10 +42,10 @@ paliers jusqu'à ce qu'il ne reste qu'une championne.
 6. **Forfait (abandon)** — une équipe peut abandonner et quitter le tournoi à tout
    moment. Son match en cours est résolu en faveur de l'adversaire ; elle est
    ensuite exclue des rounds suivants. L'action se déclenche depuis le bouton
-   « Abandonner » de sa ligne dans le classement : proposé aux représentants de
-   l'équipe (capitaine / propriétaire, ceux qui peuvent aussi reporter un score)
-   et à l'arbitrage, qui peut le déclarer pour n'importe quelle équipe encore en
-   lice. L'éligibilité est calculée par `canForfeitTeam()`
+   « Abandonner » de sa ligne dans le classement : proposé aux membres de
+   l'équipe concernée (mêmes droits que le report de score) et à l'arbitrage, qui
+   peut le déclarer pour n'importe quelle équipe encore en lice.
+   L'éligibilité est calculée par `canForfeitTeam()`
    (`app/(secured)/tournois/[id]/_lib/forfeit.ts`), la route API appliquant la
    même règle côté serveur.
 7. **Classement final** — la championne obtient le rang 1 ; les autres sont
@@ -73,18 +75,29 @@ admin, forfait).
   [`lib/server/tournaments/survival.ts`](../../lib/server/tournaments/survival.ts)
   - `initializeSurvivalTournament` — seed + création des standings.
   - `generateSurvivalRound` — appariement et création des matchs du round.
-  - `reconcileSurvival` — **idempotent** : recalcule les stats depuis les matchs,
-    applique la coupe due, puis clôt ou génère le round suivant. Appelée après
-    chaque changement de score (report, résolution admin, timeout, bye) et à la
+  - `reconcileSurvival` — **idempotent** : rejoue l'intégralité du tournoi depuis
+    l'historique des matchs (`replaySurvival`, pur), écrit l'état obtenu, puis
+    clôt le tournoi ou met le round suivant à jour. Appelée après chaque
+    changement de score (report, résolution admin, timeout, bye) et à la
     transition en `RUNNING`.
+  - `ensureNextRound` — crée le round suivant, et le **réapparie** si une
+    correction de score en amont a changé le classement, tant qu'aucun score n'y
+    a été saisi.
   - `forfeitSurvivalTeam` — sortie d'une équipe.
   - `loadSurvivalMeta` — métadonnées pour l'affichage.
 - **Persistance** :
   - Colonnes `bg_tournaments.survival_rounds_per_cut`, `survival_current_round`,
     `survival_barrage_rounds` (0 ou 1 — décale la cadence des coupes).
   - Table `bg_survival_standings` (seed, wins, losses, status, eliminated_round,
-    rank). Les victoires/défaites y sont **dérivées des matchs** à chaque
-    réconciliation (jamais accumulées), ce qui rend l'ensemble idempotent.
+    rank). **Tout y est dérivé des matchs** à chaque réconciliation — victoires,
+    défaites, mais aussi éliminations et rangs — et réécrit en une seule requête.
+    Seuls les abandons sont conservés en entrée du rejeu : ce sont des décisions
+    humaines, pas des conséquences d'un résultat.
+
+    C'est ce qui rend une correction de score réversible : corriger le résultat
+    d'un round de coupe **défait** l'élimination qu'il avait provoquée (avant,
+    l'équipe qui venait de gagner restait éliminée et celle qui perdait
+    continuait), et le round suivant est réapparié s'il n'est pas entamé.
   - Les matchs réutilisent `bg_matches` (bracket `UPPER`, `round_number` = numéro
     de round, `is_bye` pour les victoires d'office).
 - **API** :
