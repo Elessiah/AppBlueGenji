@@ -450,14 +450,28 @@ export async function getTournamentDetail(
 
     const canCreateReportsForTeamIds = myTeamId ? [myTeamId] : [];
 
-    const survival =
-      card.format === "SURVIVAL"
-        ? await (await import("./survival")).loadSurvivalMeta(connection, tournamentId)
-        : null;
-
     const phasesDetail = card.format === "MULTI"
       ? await (await import("./phases")).loadPhasesForDetail(connection, tournamentId)
       : null;
+
+    // La vue Survie sert aussi à l'intérieur d'un tournoi multi-phases : sans
+    // ces métadonnées, une phase en survie retomberait sur l'affichage générique
+    // en arbre, privant les équipes du classement et du report de score.
+    const survivalPhaseId =
+      phasesDetail?.phases.find(
+        (phase) => phase.id === phasesDetail.currentPhaseId && phase.format === "SURVIVAL",
+      )?.id ?? null;
+
+    const survival =
+      card.format === "SURVIVAL"
+        ? await (await import("./survival")).loadSurvivalMeta(connection, tournamentId)
+        : survivalPhaseId !== null
+          ? await (await import("./survival")).loadSurvivalMeta(
+              connection,
+              tournamentId,
+              survivalPhaseId,
+            )
+          : null;
 
     return {
       card,
