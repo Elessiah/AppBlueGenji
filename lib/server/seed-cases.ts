@@ -24,7 +24,8 @@ export interface TournamentDef extends ReportStateCounts {
   format?: SeedFormat;
   hasThirdPlaceMatch?: boolean;
   playWaves?: number; // RUNNING : nb de vagues de matchs joués
-  survivalRoundsPerCut?: number; // SURVIVAL : nb de rounds entre chaque coupe
+  survivalRoundsPerCut?: number; // SURVIVAL : nb de rounds entre les coupes suivantes
+  survivalRoundsBeforeFirstCut?: number; // SURVIVAL : nb de rounds avant la 1re coupe
   swissTotalRounds?: number; // SWISS : nb de rondes (défaut : calculé)
   forfeits?: number; // SURVIVAL : équipes déclarant forfait après simulation
   teamOffset?: number; // décale la tranche du pool (rosters variés d'un tournoi à l'autre)
@@ -83,6 +84,9 @@ export const TOURNAMENTS: TournamentDef[] = [
   // Effectifs pairs : aucun barrage, coupe classique par deux
   { name: "Survie 8 Équipes (pair)", game: "OW2", state: "RUNNING", format: "SURVIVAL", teamCount: 8, maxTeams: 8, daysOffset: -2, survivalRoundsPerCut: 1, playWaves: 2 },
   { name: "Survie 10 Équipes (reports)", game: "MR", state: "RUNNING", format: "SURVIVAL", teamCount: 10, maxTeams: 16, daysOffset: -2, survivalRoundsPerCut: 2, playWaves: 2, pendingReports: 2, conflicts: 1, teamOffset: 30 },
+  // Cadence en deux temps : première coupe retardée, puis intervalle plus court
+  { name: "Survie 1re Coupe Tardive", game: "OW2", state: "RUNNING", format: "SURVIVAL", teamCount: 12, maxTeams: 16, daysOffset: -3, survivalRoundsBeforeFirstCut: 4, survivalRoundsPerCut: 1, playWaves: 3, teamOffset: 40 },
+  { name: "Survie 1re Coupe Immédiate", game: "MR", state: "RUNNING", format: "SURVIVAL", teamCount: 10, maxTeams: 16, daysOffset: -2, survivalRoundsBeforeFirstCut: 1, survivalRoundsPerCut: 3, playWaves: 2, teamOffset: 52 },
   // Forfaits : rééquilibrage à la coupe suivante
   { name: "Survie 12 Équipes (1 forfait)", game: "OW2", state: "RUNNING", format: "SURVIVAL", teamCount: 12, maxTeams: 16, daysOffset: -3, survivalRoundsPerCut: 2, playWaves: 2, forfeits: 1 },
   { name: "Survie 16 Équipes (2 forfaits)", game: "MR", state: "RUNNING", format: "SURVIVAL", teamCount: 16, maxTeams: 16, daysOffset: -4, survivalRoundsPerCut: 2, playWaves: 3, forfeits: 2, teamOffset: 18 },

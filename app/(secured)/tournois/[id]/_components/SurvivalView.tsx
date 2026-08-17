@@ -3,7 +3,7 @@
 import { FormEvent } from "react";
 import Link from "next/link";
 import type { BracketMatch, SurvivalMeta, SurvivalStandingRow } from "@/lib/shared/types";
-import { isCutRound, teamsToEliminate } from "@/lib/shared/survival";
+import { isCutRound, nextCutRound, teamsToEliminate } from "@/lib/shared/survival";
 import { MatchScoreDraft } from "./BracketTree";
 import { MatchRow } from "./MatchRow";
 import { ScrollArea } from "@/components/cyber";
@@ -67,6 +67,25 @@ export function SurvivalView({
     activeSorted.slice(activeSorted.length - atRisk).map((s) => s.teamId),
   );
 
+  const cutSchedule = {
+    roundsBeforeFirstCut: survival.roundsBeforeFirstCut,
+    roundsPerCut: survival.roundsPerCut,
+    barrageRounds,
+  };
+  // Échéance concrète plutôt que cadence abstraite : la première coupe peut être
+  // repoussée bien après l'intervalle courant.
+  const upcomingCut = nextCutRound(Math.max(survival.currentRound, 1), cutSchedule);
+  // « toutes les 1 manche » ne se dit pas : au rythme d'une coupe par manche,
+  // on écrit « à chaque manche ».
+  const everyRounds =
+    survival.roundsPerCut === 1
+      ? "à chaque manche"
+      : `toutes les ${survival.roundsPerCut} manches`;
+  const cadenceLabel =
+    survival.roundsBeforeFirstCut === survival.roundsPerCut
+      ? `Coupe ${everyRounds}`
+      : `1re coupe au round ${survival.roundsBeforeFirstCut + barrageRounds}, puis ${everyRounds}`;
+
   const champion = isFinished ? survival.standings.find((s) => s.rank === 1) : null;
 
   return (
@@ -91,8 +110,13 @@ export function SurvivalView({
           Round {survival.currentRound || "—"} · {activeCount} équipe{activeCount > 1 ? "s" : ""} en lice
         </span>
         <span className="mono" style={{ fontSize: 13, color: "var(--text-2)" }}>
-          Coupe toutes les {survival.roundsPerCut} manche{survival.roundsPerCut > 1 ? "s" : ""}
+          {cadenceLabel}
         </span>
+        {!isFinished && upcomingCut > 0 && (
+          <span className="mono" style={{ fontSize: 13, color: AMBER }}>
+            Prochaine coupe : round {upcomingCut}
+          </span>
+        )}
         {barrageRounds > 0 && (
           <span className="mono" style={{ fontSize: 13, color: AMBER }}>
             Barrage d&apos;équilibrage au round 1
@@ -237,7 +261,7 @@ export function SurvivalView({
                   .filter((m) => m.roundNumber === roundNum)
                   .sort((a, b) => a.matchNumber - b.matchNumber);
                 const isBarrageRound = barrageRounds > 0 && roundNum <= barrageRounds;
-                const cut = isCutRound(roundNum, survival.roundsPerCut, barrageRounds);
+                const cut = isCutRound(roundNum, cutSchedule);
                 return (
                   <div key={roundNum} style={{ flexShrink: 0, width: COL_W }}>
                     <div

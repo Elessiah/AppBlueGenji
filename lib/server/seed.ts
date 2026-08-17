@@ -770,6 +770,9 @@ async function createTournament(
 
   const hasThirdPlace = format === "SINGLE" && Boolean(def.hasThirdPlaceMatch) ? 1 : 0;
   const survivalRoundsPerCut = isSurvival ? def.survivalRoundsPerCut ?? 2 : null;
+  const survivalRoundsBeforeFirstCut = isSurvival
+    ? def.survivalRoundsBeforeFirstCut ?? survivalRoundsPerCut
+    : null;
   const swissTotalRounds = isSwiss ? def.swissTotalRounds ?? null : null;
   // Survie et suisse sont pilotés par leur orchestration (initialize → reconcile)
   // : on insère en RUNNING, puis l'orchestration bascule vers FINISHED.
@@ -780,9 +783,9 @@ async function createTournament(
   const [result] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_tournaments
      (organizer_user_id, name, game, description, format, has_third_place_match,
-      survival_rounds_per_cut, swiss_total_rounds,
+      survival_rounds_before_first_cut, survival_rounds_per_cut, swiss_total_rounds,
       max_teams, state, start_visibility_at, registration_open_at, registration_close_at, start_at, finished_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       organizerId,
       `Test - ${def.name}`,
@@ -792,6 +795,7 @@ async function createTournament(
         : def.description,
       format,
       hasThirdPlace,
+      survivalRoundsBeforeFirstCut,
       survivalRoundsPerCut,
       swissTotalRounds,
       def.maxTeams,

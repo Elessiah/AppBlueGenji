@@ -6,6 +6,7 @@ import {
   rankActiveTeams,
   replaySurvival,
   samePairings,
+  type SurvivalCutSchedule,
   type SurvivalForfeit,
   type SurvivalMatchOutcome,
   type SurvivalStanding,
@@ -15,9 +16,24 @@ import { createMatch, finishTournament } from "./repository";
 
 const DEFAULT_ROUNDS_PER_CUT = 3;
 
+/**
+ * Cadence effective d'un tournoi. `survival_rounds_before_first_cut` est NULL sur
+ * les tournois créés avant l'option : la première coupe tombe alors au bout d'un
+ * intervalle standard, soit exactement le comportement historique.
+ */
+function resolveCutSchedule(tournament: TournamentSurvivalRow): SurvivalCutSchedule {
+  const roundsPerCut = Number(tournament.survival_rounds_per_cut ?? DEFAULT_ROUNDS_PER_CUT);
+  return {
+    roundsPerCut,
+    roundsBeforeFirstCut: Number(tournament.survival_rounds_before_first_cut ?? roundsPerCut),
+    barrageRounds: Number(tournament.survival_barrage_rounds ?? 0),
+  };
+}
+
 interface TournamentSurvivalRow extends RowDataPacket {
   format: string;
   state: string;
+  survival_rounds_before_first_cut: number | null;
   survival_rounds_per_cut: number | null;
   survival_current_round: number;
   survival_barrage_rounds: number;
@@ -39,7 +55,8 @@ async function loadTournament(
   forUpdate = false,
 ): Promise<TournamentSurvivalRow | null> {
   const [rows] = await conn.execute<TournamentSurvivalRow[]>(
-    `SELECT format, state, survival_rounds_per_cut, survival_current_round, survival_barrage_rounds
+    `SELECT format, state, survival_rounds_before_first_cut, survival_rounds_per_cut,
+            survival_current_round, survival_barrage_rounds
      FROM bg_tournaments WHERE id = ? LIMIT 1${forUpdate ? " FOR UPDATE" : ""}`,
     [tournamentId],
   );
@@ -121,7 +138,7 @@ async function loadMatchOutcomes(
 async function replayAndPersist(
   conn: PoolConnection,
   tournamentId: number,
-  options: { roundsPerCut: number; barrageRounds: number; lastRound: number },
+  options: SurvivalCutSchedule & { lastRound: number },
 ): Promise<SurvivalStanding[]> {
   const stored = await loadStandings(conn, tournamentId);
   if (stored.length === 0) return [];
@@ -134,8 +151,9 @@ async function replayAndPersist(
     teams: stored.map((s) => ({ teamId: s.teamId, seed: s.seed })),
     matches: await loadMatchOutcomes(conn, tournamentId),
     forfeits,
+    roundsBeforeFirstCut: options.roundsBeforeFirstCut,
     roundsPerCut: options.roundsPerCut,
-    barrageRounds: options.barrageRounds,
+    barrageRounds: options.barrageRounds ?? 0,
     lastRound: options.lastRound,
   });
 
@@ -239,11 +257,17 @@ export async function initializeSurvivalTournament(
     seed += 1;
   }
 
-  // Défaut de sécurité si le paramètre n'a pas été fourni à la création.
+  // Défauts de sécurité si les paramètres n'ont pas été fournis à la création.
   if (tournament.survival_rounds_per_cut === null) {
     await conn.execute(
       `UPDATE bg_tournaments SET survival_rounds_per_cut = ? WHERE id = ?`,
       [DEFAULT_ROUNDS_PER_CUT, tournamentId],
+    );
+  }
+  if (tournament.survival_rounds_before_first_cut === null) {
+    await conn.execute(
+      `UPDATE bg_tournaments SET survival_rounds_before_first_cut = ? WHERE id = ?`,
+      [Number(tournament.survival_rounds_per_cut ?? DEFAULT_ROUNDS_PER_CUT), tournamentId],
     );
   }
 
@@ -437,16 +461,14 @@ export async function reconcileSurvival(
   if (!tournament || tournament.format !== "SURVIVAL") return;
   if (tournament.state === "FINISHED") return;
 
-  const roundsPerCut = Number(tournament.survival_rounds_per_cut ?? DEFAULT_ROUNDS_PER_CUT);
+  const schedule = resolveCutSchedule(tournament);
   const currentRound = Number(tournament.survival_current_round);
-  const barrageRounds = Number(tournament.survival_barrage_rounds ?? 0);
 
   // Tout l'état (victoires, défaites, éliminations, rangs) est redérivé de
   // l'historique des matchs : une correction de score en amont défait la coupe
   // qu'elle avait provoquée au lieu de la laisser figée.
   const standings = await replayAndPersist(conn, tournamentId, {
-    roundsPerCut,
-    barrageRounds,
+    ...schedule,
     lastRound: currentRound,
   });
 
@@ -592,8 +614,11 @@ export async function loadSurvivalMeta(
     [tournamentId],
   );
 
+  const schedule = resolveCutSchedule(tournament);
+
   return {
-    roundsPerCut: Number(tournament.survival_rounds_per_cut ?? DEFAULT_ROUNDS_PER_CUT),
+    roundsBeforeFirstCut: schedule.roundsBeforeFirstCut,
+    roundsPerCut: schedule.roundsPerCut,
     currentRound: Number(tournament.survival_current_round),
     barrageRounds: Number(tournament.survival_barrage_rounds ?? 0),
     standings: rows.map((row) => ({

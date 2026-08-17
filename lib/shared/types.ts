@@ -15,6 +15,9 @@ export type SurvivalStandingRow = {
 };
 
 export type SurvivalMeta = {
+  /** Manches jouées avant la première coupe. */
+  roundsBeforeFirstCut: number;
+  /** Manches entre deux coupes suivantes. */
   roundsPerCut: number;
   currentRound: number;
   /**
@@ -160,7 +163,9 @@ export type TournamentCard = {
   registrationCloseAt: string;
   startAt: string;
   hasThirdPlaceMatch: boolean;
-  /** Mode Survie : nombre de rounds joués entre chaque coupe (élimination). */
+  /** Mode Survie : nombre de rounds joués avant la première coupe. */
+  survivalRoundsBeforeFirstCut: number | null;
+  /** Mode Survie : nombre de rounds joués entre les coupes suivantes. */
   survivalRoundsPerCut: number | null;
 };
 

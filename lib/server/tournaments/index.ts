@@ -131,6 +131,7 @@ export async function createTournament(
     registrationCloseAt: string;
     startAt: string;
     hasThirdPlaceMatch?: boolean;
+    survivalRoundsBeforeFirstCut?: number | null;
     survivalRoundsPerCut?: number | null;
   },
 ): Promise<number> {
@@ -173,11 +174,19 @@ export async function createTournament(
   const hasThirdPlaceMatch = payload.format === "SINGLE" && Boolean(payload.hasThirdPlaceMatch);
   const game = payload.game ?? "OW2";
 
-  // Mode Survie : nombre de rounds joués entre chaque coupe (min. 1). Ignoré
-  // pour les autres formats.
+  // Mode Survie : cadence des coupes (min. 1 manche). Ignorée pour les autres
+  // formats. Le délai avant la première coupe retombe sur l'intervalle courant
+  // s'il n'est pas fourni.
   const survivalRoundsPerCut =
     payload.format === "SURVIVAL"
       ? Math.max(1, Math.trunc(Number(payload.survivalRoundsPerCut ?? 1)))
+      : null;
+  const survivalRoundsBeforeFirstCut =
+    payload.format === "SURVIVAL"
+      ? Math.max(
+          1,
+          Math.trunc(Number(payload.survivalRoundsBeforeFirstCut ?? survivalRoundsPerCut ?? 1)),
+        )
       : null;
 
   const [insert] = await db.execute<ResultSetHeader>(
@@ -194,8 +203,9 @@ export async function createTournament(
       registration_close_at,
       start_at,
       has_third_place_match,
+      survival_rounds_before_first_cut,
       survival_rounds_per_cut
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       organizerUserId,
       payload.name.trim(),
@@ -209,6 +219,7 @@ export async function createTournament(
       registrationCloseAt,
       startAt,
       hasThirdPlaceMatch ? 1 : 0,
+      survivalRoundsBeforeFirstCut,
       survivalRoundsPerCut,
     ],
   );
@@ -248,6 +259,7 @@ export async function listTournamentBuckets(searchTerm: string | null): Promise<
       t.organizer_user_id,
       t.finished_at,
       t.has_third_place_match,
+      t.survival_rounds_before_first_cut,
       t.survival_rounds_per_cut,
       t.survival_current_round,
       COALESCE(COUNT(r.id), 0) AS registered_teams
@@ -271,6 +283,7 @@ export async function listTournamentBuckets(searchTerm: string | null): Promise<
       t.organizer_user_id,
       t.finished_at,
       t.has_third_place_match,
+      t.survival_rounds_before_first_cut,
       t.survival_rounds_per_cut,
       t.survival_current_round
      ORDER BY t.start_at DESC`,

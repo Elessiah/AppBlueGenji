@@ -36,6 +36,7 @@ export default function CreateTournamentPage() {
   const [format, setFormat] = useState<TournamentFormat>("SINGLE");
   const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(false);
   const [survivalRoundsPerCut, setSurvivalRoundsPerCut] = useState(3);
+  const [survivalRoundsBeforeFirstCut, setSurvivalRoundsBeforeFirstCut] = useState(3);
   const [maxTeams, setMaxTeams] = useState(16);
   const [startVisibilityAt, setStartVisibilityAt] = useState(localDateTimeInput(1));
   const [registrationOpenAt, setRegistrationOpenAt] = useState(localDateTimeInput(3));
@@ -76,6 +77,8 @@ export default function CreateTournamentPage() {
           startAt: new Date(startAt).toISOString(),
           hasThirdPlaceMatch: format === "SINGLE" ? hasThirdPlaceMatch : false,
           survivalRoundsPerCut: format === "SURVIVAL" ? survivalRoundsPerCut : undefined,
+          survivalRoundsBeforeFirstCut:
+            format === "SURVIVAL" ? survivalRoundsBeforeFirstCut : undefined,
         }),
       });
       const payload = (await response.json()) as { error?: string; id?: number };
@@ -192,24 +195,47 @@ export default function CreateTournamentPage() {
                 </div>
 
                 {format === "SURVIVAL" && (
-                  <div className="field">
-                    <label htmlFor="survival-rounds">Rounds avant chaque coupe</label>
-                    <input
-                      id="survival-rounds"
-                      type="number"
-                      min={1}
-                      max={50}
-                      value={survivalRoundsPerCut}
-                      onChange={(e) => setSurvivalRoundsPerCut(Number(e.target.value))}
-                    />
-                    <p style={HINT}>
-                      Toutes les équipes s&apos;affrontent par paires selon leur classement. Après ce
-                      nombre de rounds, les deux dernières équipes sont éliminées, et ainsi de suite
-                      jusqu&apos;à la championne. Si le nombre d&apos;inscrites est impair, un
-                      barrage entre les deux dernières ouvre le tournoi — aucune victoire
-                      d&apos;office n&apos;est distribuée.
+                  <>
+                    <div className="field">
+                      <label htmlFor="survival-first-cut">Rounds avant la première coupe</label>
+                      <input
+                        id="survival-first-cut"
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={survivalRoundsBeforeFirstCut}
+                        onChange={(e) =>
+                          setSurvivalRoundsBeforeFirstCut(Number(e.target.value))
+                        }
+                      />
+                      <p style={HINT}>
+                        Laisse le classement se former avant la première élimination.
+                      </p>
+                    </div>
+
+                    <div className="field">
+                      <label htmlFor="survival-rounds">Rounds entre les coupes suivantes</label>
+                      <input
+                        id="survival-rounds"
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={survivalRoundsPerCut}
+                        onChange={(e) => setSurvivalRoundsPerCut(Number(e.target.value))}
+                      />
+                      <p style={HINT}>
+                        Cadence appliquée après la première coupe.
+                      </p>
+                    </div>
+
+                    <p style={{ ...HINT, ...FULL_WIDTH }}>
+                      Toutes les équipes s&apos;affrontent par paires selon leur classement. À
+                      chaque coupe, les deux dernières équipes sont éliminées, jusqu&apos;à la
+                      championne. Si le nombre d&apos;inscrites est impair, un barrage entre les
+                      deux dernières ouvre le tournoi — aucune victoire d&apos;office n&apos;est
+                      distribuée.
                     </p>
-                  </div>
+                  </>
                 )}
 
                 {format === "SINGLE" && (
