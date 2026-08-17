@@ -32,6 +32,7 @@ export async function POST(req: Request) {
       registrationCloseAt?: string;
       startAt?: string;
       hasThirdPlaceMatch?: boolean;
+      survivalRoundsBeforeFirstCut?: number;
       survivalRoundsPerCut?: number;
     };
 
@@ -47,10 +48,22 @@ export async function POST(req: Request) {
     }
 
     let survivalRoundsPerCut: number | null = null;
+    let survivalRoundsBeforeFirstCut: number | null = null;
     if (body.format === "SURVIVAL") {
       survivalRoundsPerCut = Number(body.survivalRoundsPerCut ?? 0);
       if (!Number.isInteger(survivalRoundsPerCut) || survivalRoundsPerCut < 1 || survivalRoundsPerCut > 50) {
         return fail("INVALID_SURVIVAL_ROUNDS", 400);
+      }
+      // Non fourni : la première coupe tombe au bout d'un intervalle standard.
+      survivalRoundsBeforeFirstCut = Number(
+        body.survivalRoundsBeforeFirstCut ?? survivalRoundsPerCut,
+      );
+      if (
+        !Number.isInteger(survivalRoundsBeforeFirstCut) ||
+        survivalRoundsBeforeFirstCut < 1 ||
+        survivalRoundsBeforeFirstCut > 50
+      ) {
+        return fail("INVALID_SURVIVAL_FIRST_CUT", 400);
       }
     }
 
@@ -65,6 +78,7 @@ export async function POST(req: Request) {
       registrationCloseAt: body.registrationCloseAt ?? "",
       startAt: body.startAt ?? "",
       hasThirdPlaceMatch: body.hasThirdPlaceMatch,
+      survivalRoundsBeforeFirstCut,
       survivalRoundsPerCut,
     });
 

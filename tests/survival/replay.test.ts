@@ -1,5 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  isCutRound,
+  nextCutRound,
   planSurvivalRound,
   rankActiveTeams,
   replaySurvival,
@@ -36,6 +38,7 @@ describe("replaySurvival — dérivation depuis l'historique", () => {
       teams: teams(4),
       matches: [match(1, 1, 2), match(1, 3, 4)],
       forfeits: [],
+      roundsBeforeFirstCut: 2,
       roundsPerCut: 2,
       barrageRounds: 0,
       lastRound: 1,
@@ -51,6 +54,7 @@ describe("replaySurvival — dérivation depuis l'historique", () => {
       teams: teams(4),
       matches: [match(1, 1, 2), match(1, 3, 4, { completed: false, winnerTeamId: 3, loserTeamId: 4 })],
       forfeits: [],
+      roundsBeforeFirstCut: 1,
       roundsPerCut: 1,
       barrageRounds: 0,
       lastRound: 1,
@@ -66,6 +70,7 @@ describe("replaySurvival — dérivation depuis l'historique", () => {
       teams: teams(3),
       matches: [match(1, 1, 2), match(1, 3, null, { isBye: true })],
       forfeits: [],
+      roundsBeforeFirstCut: 5,
       roundsPerCut: 5,
       barrageRounds: 0,
       lastRound: 1,
@@ -81,6 +86,7 @@ describe("replaySurvival — dérivation depuis l'historique", () => {
       teams: teams(6),
       matches: [match(1, 1, 6), match(1, 2, 5), match(1, 3, 4)],
       forfeits: [],
+      roundsBeforeFirstCut: 1,
       roundsPerCut: 1,
       barrageRounds: 0,
       lastRound: 1,
@@ -98,6 +104,7 @@ describe("replaySurvival — dérivation depuis l'historique", () => {
       teams: teams(5),
       matches: [match(1, 4, 5)],
       forfeits: [],
+      roundsBeforeFirstCut: 2,
       roundsPerCut: 2,
       barrageRounds: 1,
       lastRound: 1,
@@ -113,6 +120,7 @@ describe("replaySurvival — dérivation depuis l'historique", () => {
       teams: teams(4),
       matches: [match(1, 1, 2)],
       forfeits: [{ teamId: 3, round: 1 }],
+      roundsBeforeFirstCut: 5,
       roundsPerCut: 5,
       barrageRounds: 0,
       lastRound: 1,
@@ -129,6 +137,7 @@ describe("replaySurvival — correction d'un score déjà pris en compte", () =>
   const base = {
     teams: teams(6),
     forfeits: [],
+    roundsBeforeFirstCut: 2,
     roundsPerCut: 2,
     barrageRounds: 0,
     lastRound: 2,
@@ -191,6 +200,7 @@ describe("samePairings", () => {
           teams: teams(4),
           matches: [match(1, 1, 2), match(1, 3, 4)],
           forfeits: [],
+          roundsBeforeFirstCut: 5,
           roundsPerCut: 5,
           barrageRounds: 0,
           lastRound: 1,
@@ -203,6 +213,7 @@ describe("samePairings", () => {
           teams: teams(4),
           matches: [match(1, 2, 1), match(1, 3, 4)],
           forfeits: [],
+          roundsBeforeFirstCut: 5,
           roundsPerCut: 5,
           barrageRounds: 0,
           lastRound: 1,
@@ -238,5 +249,98 @@ describe("barème de classement partagé", () => {
     expect(survival).toContain("rankingPointsSql");
     // L'ancien barème (les défaites rapportaient des points) doit avoir disparu.
     expect(survival).not.toContain("* 3");
+  });
+});
+
+describe("cadence en deux temps — première coupe puis intervalle", () => {
+  const schedule = { roundsBeforeFirstCut: 4, roundsPerCut: 2 };
+
+  it("attend la première coupe le temps demandé", () => {
+    for (const round of [1, 2, 3]) {
+      expect(isCutRound(round, schedule)).toBe(false);
+    }
+    expect(isCutRound(4, schedule)).toBe(true);
+  });
+
+  it("enchaîne ensuite au rythme de l'intervalle", () => {
+    expect(isCutRound(5, schedule)).toBe(false);
+    expect(isCutRound(6, schedule)).toBe(true);
+    expect(isCutRound(8, schedule)).toBe(true);
+    expect(isCutRound(9, schedule)).toBe(false);
+  });
+
+  it("reste compatible quand les deux valeurs sont égales", () => {
+    const uniform = { roundsBeforeFirstCut: 3, roundsPerCut: 3 };
+    for (const round of [3, 6, 9]) expect(isCutRound(round, uniform)).toBe(true);
+    for (const round of [1, 2, 4, 5]) expect(isCutRound(round, uniform)).toBe(false);
+  });
+
+  it("décale tout du barrage", () => {
+    const withBarrage = { ...schedule, barrageRounds: 1 };
+    expect(isCutRound(4, withBarrage)).toBe(false);
+    expect(isCutRound(5, withBarrage)).toBe(true); // 1 barrage + 4 manches
+    expect(isCutRound(7, withBarrage)).toBe(true);
+  });
+
+  it("permet une première coupe plus tardive que l'intervalle, et l'inverse", () => {
+    const tardive = { roundsBeforeFirstCut: 5, roundsPerCut: 1 };
+    expect(isCutRound(4, tardive)).toBe(false);
+    expect(isCutRound(5, tardive)).toBe(true);
+    expect(isCutRound(6, tardive)).toBe(true);
+
+    const precoce = { roundsBeforeFirstCut: 1, roundsPerCut: 3 };
+    expect(isCutRound(1, precoce)).toBe(true);
+    expect(isCutRound(2, precoce)).toBe(false);
+    expect(isCutRound(4, precoce)).toBe(true);
+  });
+
+  it("élimine à la manche demandée, pas avant", () => {
+    const teams4 = [1, 2, 3, 4].map((teamId) => ({ teamId, seed: teamId }));
+    const rounds = [
+      match(1, 1, 2), match(1, 3, 4),
+      match(2, 1, 3), match(2, 2, 4),
+    ];
+    const input = {
+      teams: teams4,
+      forfeits: [],
+      roundsBeforeFirstCut: 3,
+      roundsPerCut: 1,
+      barrageRounds: 0,
+    };
+
+    // Round 2 : la première coupe n'est pas encore due.
+    expect(
+      replaySurvival({ ...input, matches: rounds, lastRound: 2 }).every(
+        (s) => s.status === "ACTIVE",
+      ),
+    ).toBe(true);
+
+    // Round 3 : elle tombe.
+    const after = replaySurvival({
+      ...input,
+      matches: [...rounds, match(3, 1, 4), match(3, 2, 3)],
+      lastRound: 3,
+    });
+    expect(after.filter((s) => s.status === "ELIMINATED")).toHaveLength(2);
+  });
+});
+
+describe("nextCutRound — échéance annoncée", () => {
+  const schedule = { roundsBeforeFirstCut: 4, roundsPerCut: 2 };
+
+  it("pointe la première coupe tant qu'elle n'est pas passée", () => {
+    for (const round of [1, 2, 3, 4]) {
+      expect(nextCutRound(round, schedule)).toBe(4);
+    }
+  });
+
+  it("pointe ensuite la suivante", () => {
+    expect(nextCutRound(5, schedule)).toBe(6);
+    expect(nextCutRound(6, schedule)).toBe(6);
+    expect(nextCutRound(7, schedule)).toBe(8);
+  });
+
+  it("tient compte du barrage", () => {
+    expect(nextCutRound(1, { ...schedule, barrageRounds: 1 })).toBe(5);
   });
 });

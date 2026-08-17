@@ -24,6 +24,7 @@ export async function loadTournamentRow(
       created_at,
       finished_at,
       has_third_place_match,
+      survival_rounds_before_first_cut,
       survival_rounds_per_cut,
       survival_current_round
      FROM bg_tournaments
@@ -212,6 +213,7 @@ export async function getTournamentListRow(
       t.organizer_user_id,
       t.finished_at,
       t.has_third_place_match,
+      t.survival_rounds_before_first_cut,
       t.survival_rounds_per_cut,
       t.survival_current_round,
       COALESCE(COUNT(r.id), 0) AS registered_teams
@@ -235,6 +237,7 @@ export async function getTournamentListRow(
       t.organizer_user_id,
       t.finished_at,
       t.has_third_place_match,
+      t.survival_rounds_before_first_cut,
       t.survival_rounds_per_cut,
       t.survival_current_round`,
     [tournamentId],

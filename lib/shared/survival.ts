@@ -164,13 +164,48 @@ export function shouldEliminateBarrageLoser(activeCount: number): boolean {
 }
 
 /**
- * Vrai lorsque le round courant clôt un bloc de `roundsPerCut` rounds. Les
- * `barrageRounds` rounds de barrage ne comptent pas dans la cadence : elle
- * démarre au premier round complet.
+ * Cadence des coupes d'un tournoi.
+ *
+ * Le délai avant la **première** coupe est réglable indépendamment de l'intervalle
+ * entre les suivantes : on peut laisser le classement se former sur plusieurs
+ * manches, puis éliminer à un rythme plus soutenu (ou l'inverse).
  */
-export function isCutRound(round: number, roundsPerCut: number, barrageRounds = 0): boolean {
+export type SurvivalCutSchedule = {
+  /** Manches jouées avant la première coupe (≥ 1). */
+  roundsBeforeFirstCut: number;
+  /** Manches entre deux coupes suivantes (≥ 1). */
+  roundsPerCut: number;
+  /** Manches de barrage, qui ne comptent pas dans la cadence. */
+  barrageRounds?: number;
+};
+
+/**
+ * Vrai lorsque le round donné se termine par une coupe : au round
+ * `roundsBeforeFirstCut`, puis tous les `roundsPerCut` rounds. Les rounds de
+ * barrage sont déduits — la cadence démarre au premier round complet.
+ */
+export function isCutRound(round: number, schedule: SurvivalCutSchedule): boolean {
+  const { roundsBeforeFirstCut, roundsPerCut, barrageRounds = 0 } = schedule;
+  if (roundsPerCut <= 0 || roundsBeforeFirstCut <= 0) return false;
+
   const effective = round - barrageRounds;
-  return roundsPerCut > 0 && effective > 0 && effective % roundsPerCut === 0;
+  if (effective < roundsBeforeFirstCut) return false;
+  return (effective - roundsBeforeFirstCut) % roundsPerCut === 0;
+}
+
+/**
+ * Premier round (à partir de `round` inclus) qui se termine par une coupe. Sert à
+ * annoncer l'échéance dans l'interface plutôt qu'une cadence abstraite.
+ */
+export function nextCutRound(round: number, schedule: SurvivalCutSchedule): number {
+  const { roundsBeforeFirstCut, roundsPerCut, barrageRounds = 0 } = schedule;
+  if (roundsPerCut <= 0 || roundsBeforeFirstCut <= 0) return 0;
+
+  const effective = Math.max(round - barrageRounds, 1);
+  if (effective <= roundsBeforeFirstCut) return barrageRounds + roundsBeforeFirstCut;
+
+  const blocks = Math.ceil((effective - roundsBeforeFirstCut) / roundsPerCut);
+  return barrageRounds + roundsBeforeFirstCut + blocks * roundsPerCut;
 }
 
 /**
@@ -199,11 +234,10 @@ export type SurvivalMatchOutcome = {
 /** Abandon déclaré : événement externe, non déductible des matchs. */
 export type SurvivalForfeit = { teamId: number; round: number };
 
-export type ReplaySurvivalInput = {
+export type ReplaySurvivalInput = SurvivalCutSchedule & {
   teams: { teamId: number; seed: number }[];
   matches: SurvivalMatchOutcome[];
   forfeits: SurvivalForfeit[];
-  roundsPerCut: number;
   barrageRounds: number;
   /** Dernier round généré (`survival_current_round`). */
   lastRound: number;
@@ -295,7 +329,7 @@ export function replaySurvival(input: ReplaySurvivalInput): SurvivalStanding[] {
     }
 
     // 4. Coupe périodique.
-    if (isCutRound(round, input.roundsPerCut, input.barrageRounds)) {
+    if (isCutRound(round, input)) {
       const active = activeStandings();
       for (const teamId of selectEliminatedTeamIds(active, teamsToEliminate(active.length))) {
         eliminate(teamId, round, "ELIMINATED");

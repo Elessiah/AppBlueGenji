@@ -19,6 +19,7 @@ export type TournamentRow = RowDataPacket & {
   organizer_user_id: number;
   finished_at: Date | null;
   has_third_place_match: number;
+  survival_rounds_before_first_cut: number | null;
   survival_rounds_per_cut: number | null;
   survival_current_round: number;
 };
@@ -90,6 +91,10 @@ export function mapCard(row: TournamentListRow): TournamentCard {
     registrationCloseAt: toIso(row.registration_close_at)!,
     startAt: toIso(row.start_at)!,
     hasThirdPlaceMatch: Boolean(row.has_third_place_match),
+    survivalRoundsBeforeFirstCut:
+      row.survival_rounds_before_first_cut === null
+        ? null
+        : Number(row.survival_rounds_before_first_cut),
     survivalRoundsPerCut:
       row.survival_rounds_per_cut === null ? null : Number(row.survival_rounds_per_cut),
   };

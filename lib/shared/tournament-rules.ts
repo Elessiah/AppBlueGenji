@@ -229,7 +229,7 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
       {
         title: "Coupes",
         body: [
-          "La cadence des coupes est fixée à la création du tournoi : « coupe toutes les N manches ». À la fin de chaque bloc de N rounds, les **deux dernières équipes** du classement sont éliminées.",
+          "La cadence est fixée à la création du tournoi, en deux réglages : le nombre de manches avant la **première** coupe, puis l'intervalle entre les coupes suivantes. On peut ainsi laisser le classement se former avant d'éliminer, puis accélérer. À chaque coupe, les **deux dernières équipes** du classement sortent.",
         ],
         bullets: [
           "La zone de coupe est signalée en direct dans le classement : on sait toujours qui est au bord du tableau.",

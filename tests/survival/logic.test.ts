@@ -174,21 +174,28 @@ describe("survival — needsBarrage / shouldEliminateBarrageLoser", () => {
 });
 
 describe("survival — isCutRound", () => {
+  // Cadence uniforme : première coupe au même rythme que les suivantes.
+  const every = (n: number, barrageRounds = 0) => ({
+    roundsBeforeFirstCut: n,
+    roundsPerCut: n,
+    barrageRounds,
+  });
+
   it("clôt un bloc tous les roundsPerCut rounds", () => {
-    expect(isCutRound(3, 3)).toBe(true);
-    expect(isCutRound(6, 3)).toBe(true);
-    expect(isCutRound(4, 3)).toBe(false);
-    expect(isCutRound(1, 1)).toBe(true);
-    expect(isCutRound(0, 3)).toBe(false);
+    expect(isCutRound(3, every(3))).toBe(true);
+    expect(isCutRound(6, every(3))).toBe(true);
+    expect(isCutRound(4, every(3))).toBe(false);
+    expect(isCutRound(1, every(1))).toBe(true);
+    expect(isCutRound(0, every(3))).toBe(false);
   });
 
   it("le round de barrage ne compte pas dans la cadence", () => {
     // Barrage au round 1 : la cadence démarre au round 2.
-    expect(isCutRound(1, 1, 1)).toBe(false);
-    expect(isCutRound(2, 1, 1)).toBe(true);
-    expect(isCutRound(1, 3, 1)).toBe(false);
-    expect(isCutRound(4, 3, 1)).toBe(true);
-    expect(isCutRound(3, 3, 1)).toBe(false);
+    expect(isCutRound(1, every(1, 1))).toBe(false);
+    expect(isCutRound(2, every(1, 1))).toBe(true);
+    expect(isCutRound(1, every(3, 1))).toBe(false);
+    expect(isCutRound(4, every(3, 1))).toBe(true);
+    expect(isCutRound(3, every(3, 1))).toBe(false);
   });
 });
 
@@ -285,7 +292,7 @@ function simulate(
         loser.status = "ELIMINATED";
         loser.eliminatedRound = round;
       }
-    } else if (isCutRound(round, roundsPerCut, barrageRounds)) {
+    } else if (isCutRound(round, { roundsBeforeFirstCut: roundsPerCut, roundsPerCut, barrageRounds })) {
       const ranked = rankActiveTeams(standings);
       const out = selectEliminatedTeamIds(ranked, teamsToEliminate(ranked.length));
       for (const id of out) {

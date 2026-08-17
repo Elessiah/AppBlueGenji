@@ -352,6 +352,19 @@ async function runMigrations(db: Pool): Promise<void> {
     // Columns already exist
   }
 
+  // Migration: Délai avant la première coupe, réglable indépendamment de
+  // l'intervalle entre les coupes suivantes. NULL sur les tournois créés avant
+  // l'option : la cadence s'applique alors dès la première coupe (comportement
+  // historique, cf. `resolveCutSchedule`).
+  try {
+    await db.execute(`
+      ALTER TABLE bg_tournaments
+      ADD COLUMN survival_rounds_before_first_cut INT NULL
+    `);
+  } catch {
+    // Column already exists
+  }
+
   // Migration: Add Survival barrage counter.
   // survival_barrage_rounds = nombre de rounds de barrage d'équilibrage joués
   // (0 ou 1) ; ils ne comptent pas dans la cadence des coupes.
