@@ -62,6 +62,15 @@ export {
   loadSurvivalMeta,
 } from "./survival";
 
+// Phases (Multi)
+export {
+  initializeMultiTournament,
+  startPhase,
+  reconcilePhases,
+  finalizeMultiTournament,
+  loadPhasesForDetail,
+} from "./phases";
+
 // Public API functions
 import { syncTournamentState } from "./state";
 import { registerCurrentUserTeam as registerTeamInternal } from "./registration";
@@ -133,98 +142,134 @@ export async function createTournament(
     hasThirdPlaceMatch?: boolean;
     survivalRoundsBeforeFirstCut?: number | null;
     survivalRoundsPerCut?: number | null;
+    phases?: Array<{
+      position: number;
+      format: "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL";
+      name: string | null;
+      qualifierMode: "COUNT" | "PERCENT";
+      qualifierValue: number;
+      hasThirdPlaceMatch: boolean;
+      swissTotalRounds: number | null;
+      survivalRoundsBeforeFirstCut: number | null;
+      survivalRoundsPerCut: number | null;
+    }>;
   },
 ): Promise<number> {
   const db = await getDatabase();
+  const connection = await db.getConnection();
 
-  const startVisibilityAt = new Date(payload.startVisibilityAt);
-  const registrationOpenAt = new Date(payload.registrationOpenAt);
-  const registrationCloseAt = new Date(payload.registrationCloseAt);
-  const startAt = new Date(payload.startAt);
+  try {
+    await connection.beginTransaction();
 
-  if (
-    Number.isNaN(startVisibilityAt.getTime()) ||
-    Number.isNaN(registrationOpenAt.getTime()) ||
-    Number.isNaN(registrationCloseAt.getTime()) ||
-    Number.isNaN(startAt.getTime())
-  ) {
-    throw new Error("INVALID_DATES");
+    const startVisibilityAt = new Date(payload.startVisibilityAt);
+    const registrationOpenAt = new Date(payload.registrationOpenAt);
+    const registrationCloseAt = new Date(payload.registrationCloseAt);
+    const startAt = new Date(payload.startAt);
+
+    if (
+      Number.isNaN(startVisibilityAt.getTime()) ||
+      Number.isNaN(registrationOpenAt.getTime()) ||
+      Number.isNaN(registrationCloseAt.getTime()) ||
+      Number.isNaN(startAt.getTime())
+    ) {
+      throw new Error("INVALID_DATES");
+    }
+
+    if (
+      !(
+        startVisibilityAt <= registrationOpenAt &&
+        registrationOpenAt <= registrationCloseAt &&
+        registrationCloseAt <= startAt
+      )
+    ) {
+      throw new Error("INVALID_DATE_ORDER");
+    }
+
+    const { computeTournamentState } = await import("./state");
+
+    const temporaryState: TournamentState = computeTournamentState({
+      state: "UPCOMING",
+      finished_at: null,
+      registration_open_at: registrationOpenAt,
+      registration_close_at: registrationCloseAt,
+      start_at: startAt,
+    });
+
+    const hasThirdPlaceMatch = payload.format === "SINGLE" && Boolean(payload.hasThirdPlaceMatch);
+    const game = payload.game ?? "OW2";
+
+    // Mode Survie : cadence des coupes (min. 1 manche). Ignorée pour les autres
+    // formats. Le délai avant la première coupe retombe sur l'intervalle courant
+    // s'il n'est pas fourni.
+    const survivalRoundsPerCut =
+      payload.format === "SURVIVAL"
+        ? Math.max(1, Math.trunc(Number(payload.survivalRoundsPerCut ?? 1)))
+        : null;
+    const survivalRoundsBeforeFirstCut =
+      payload.format === "SURVIVAL"
+        ? Math.max(
+            1,
+            Math.trunc(Number(payload.survivalRoundsBeforeFirstCut ?? survivalRoundsPerCut ?? 1)),
+          )
+        : null;
+
+    const [insert] = await connection.execute<ResultSetHeader>(
+      `INSERT INTO bg_tournaments (
+        organizer_user_id,
+        name,
+        description,
+        format,
+        game,
+        max_teams,
+        state,
+        start_visibility_at,
+        registration_open_at,
+        registration_close_at,
+        start_at,
+        has_third_place_match,
+        survival_rounds_before_first_cut,
+        survival_rounds_per_cut
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        organizerUserId,
+        payload.name.trim(),
+        payload.description,
+        payload.format,
+        game,
+        payload.maxTeams,
+        temporaryState,
+        startVisibilityAt,
+        registrationOpenAt,
+        registrationCloseAt,
+        startAt,
+        hasThirdPlaceMatch ? 1 : 0,
+        survivalRoundsBeforeFirstCut,
+        survivalRoundsPerCut,
+      ],
+    );
+
+    const tournamentId = Number(insert.insertId);
+
+    // Valide et insère les phases si format MULTI
+    if (payload.format === "MULTI" && payload.phases) {
+      const { validatePhases } = await import("@/lib/shared/tournament-phases");
+      const error = validatePhases(payload.phases);
+      if (error) {
+        throw new Error(error);
+      }
+
+      const { insertPhases } = await import("./phases-repository");
+      await insertPhases(connection, tournamentId, payload.phases);
+    }
+
+    await connection.commit();
+    return tournamentId;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
   }
-
-  if (
-    !(
-      startVisibilityAt <= registrationOpenAt &&
-      registrationOpenAt <= registrationCloseAt &&
-      registrationCloseAt <= startAt
-    )
-  ) {
-    throw new Error("INVALID_DATE_ORDER");
-  }
-
-  const { computeTournamentState } = await import("./state");
-
-  const temporaryState: TournamentState = computeTournamentState({
-    state: "UPCOMING",
-    finished_at: null,
-    registration_open_at: registrationOpenAt,
-    registration_close_at: registrationCloseAt,
-    start_at: startAt,
-  });
-
-  const hasThirdPlaceMatch = payload.format === "SINGLE" && Boolean(payload.hasThirdPlaceMatch);
-  const game = payload.game ?? "OW2";
-
-  // Mode Survie : cadence des coupes (min. 1 manche). Ignorée pour les autres
-  // formats. Le délai avant la première coupe retombe sur l'intervalle courant
-  // s'il n'est pas fourni.
-  const survivalRoundsPerCut =
-    payload.format === "SURVIVAL"
-      ? Math.max(1, Math.trunc(Number(payload.survivalRoundsPerCut ?? 1)))
-      : null;
-  const survivalRoundsBeforeFirstCut =
-    payload.format === "SURVIVAL"
-      ? Math.max(
-          1,
-          Math.trunc(Number(payload.survivalRoundsBeforeFirstCut ?? survivalRoundsPerCut ?? 1)),
-        )
-      : null;
-
-  const [insert] = await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_tournaments (
-      organizer_user_id,
-      name,
-      description,
-      format,
-      game,
-      max_teams,
-      state,
-      start_visibility_at,
-      registration_open_at,
-      registration_close_at,
-      start_at,
-      has_third_place_match,
-      survival_rounds_before_first_cut,
-      survival_rounds_per_cut
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      organizerUserId,
-      payload.name.trim(),
-      payload.description,
-      payload.format,
-      game,
-      payload.maxTeams,
-      temporaryState,
-      startVisibilityAt,
-      registrationOpenAt,
-      registrationCloseAt,
-      startAt,
-      hasThirdPlaceMatch ? 1 : 0,
-      survivalRoundsBeforeFirstCut,
-      survivalRoundsPerCut,
-    ],
-  );
-
-  return Number(insert.insertId);
 }
 
 export async function listTournamentBuckets(searchTerm: string | null): Promise<TournamentBuckets> {
@@ -404,6 +449,10 @@ export async function getTournamentDetail(
         ? await (await import("./survival")).loadSurvivalMeta(connection, tournamentId)
         : null;
 
+    const phasesDetail = card.format === "MULTI"
+      ? await (await import("./phases")).loadPhasesForDetail(connection, tournamentId)
+      : null;
+
     return {
       card,
       matches: matches.map(mapMatch),
@@ -420,6 +469,9 @@ export async function getTournamentDetail(
       canCreateReportsForTeamIds,
       isAdmin,
       survival,
+      phases: phasesDetail?.phases ?? null,
+      currentPhaseId: phasesDetail?.currentPhaseId ?? null,
+      phaseStandings: phasesDetail?.phaseStandings ?? {},
     };
   } finally {
     connection.release();
@@ -459,6 +511,10 @@ export async function reportMatchScorePublic(
     // Réconcilie le mode Survie (idempotent) avant la finalisation générique.
     const { reconcileSurvival } = await import("./survival");
     await reconcileSurvival(tournamentId, connection);
+
+    // Réconcilie les phases multi (idempotent)
+    const { reconcilePhases: reconcileMultiPhases } = await import("./phases");
+    await reconcileMultiPhases(tournamentId, connection);
 
     await finalizeTournamentIfDone(connection, tournamentId);
 
@@ -501,6 +557,9 @@ export async function adminSaveMatchScoresPublic(
     if (savedTournamentId !== null) {
       const { reconcileSurvival } = await import("./survival");
       await reconcileSurvival(savedTournamentId, connection);
+
+      const { reconcilePhases: reconcileMultiPhases } = await import("./phases");
+      await reconcileMultiPhases(savedTournamentId, connection);
     }
 
     await connection.commit();
@@ -571,6 +630,9 @@ export async function adminResolveMatchPublic(
 
     const { reconcileSurvival } = await import("./survival");
     await reconcileSurvival(tournamentId, connection);
+
+    const { reconcilePhases: reconcileMultiPhases } = await import("./phases");
+    await reconcileMultiPhases(tournamentId, connection);
 
     await finalizeTournamentIfDone(connection, tournamentId);
 
