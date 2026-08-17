@@ -106,19 +106,34 @@ export function resolvePhaseQualifiers(
 ): number {
   if (isLast) return 1;
 
-  let target: number;
-  if (phase.qualifierMode === "COUNT") {
-    target = Math.max(1, Math.min(phase.qualifierValue, entrants));
-  } else {
-    // PERCENT
-    target = Math.max(1, Math.min(Math.ceil((entrants * phase.qualifierValue) / 100), entrants));
-  }
+  const target = rawQualifierTarget(entrants, phase);
 
-  if (phase.format === "SINGLE") {
-    target = previousPowerOfTwo(target);
+  // Le snap est une contrainte du **format**, pas du mode de qualification : un
+  // bracket tronqué ne peut laisser qu'une puissance de deux, que la cible ait
+  // été exprimée en nombre ou en pourcentage. On ne l'applique pas quand aucune
+  // équipe n'est éliminée (cible = entrants) : la phase laisse alors tout passer.
+  if (phase.format === "SINGLE" && target < entrants) {
+    return Math.max(1, previousPowerOfTwo(target));
   }
 
   return Math.max(1, target);
+}
+
+/**
+ * Cible **demandée** par l'organisateur, clamée en [1, entrants] mais sans
+ * l'ajustement puissance de deux.
+ *
+ * C'est cette valeur — et non la cible ajustée — qui décide du saut d'une phase :
+ * si l'organisateur réclame 100 qualifiées et que 50 équipes se présentent, la
+ * phase n'élimine personne et doit être sautée. Décider après l'ajustement
+ * rendrait une phase d'élimination simple insautable (64 → 32 « coupe »
+ * toujours quelque chose).
+ */
+function rawQualifierTarget(entrants: number, phase: PhaseConfig): number {
+  if (phase.qualifierMode === "COUNT") {
+    return Math.max(1, Math.min(phase.qualifierValue, entrants));
+  }
+  return Math.max(1, Math.min(Math.ceil((entrants * phase.qualifierValue) / 100), entrants));
 }
 
 /**
@@ -157,20 +172,30 @@ export function resolvePhasePlan(
       skipReason = "TOO_FEW_TEAMS";
       qualifiers = currentEntrants;
     } else if (!isLast) {
-      // Phase non-finale : calculer les qualifiants.
-      const target = resolvePhaseQualifiers(currentEntrants, phase, false);
-      if (target >= currentEntrants) {
-        // Pas de cut : la phase est sautée.
-        skipped = true;
-        skipReason = "NO_CUT";
+      // Phase non-finale. Le saut se décide sur la cible **demandée**, avant tout
+      // ajustement puissance de deux (cf. rawQualifierTarget).
+      const requested = rawQualifierTarget(currentEntrants, phase);
+
+      if (requested >= currentEntrants) {
+        // La phase n'éliminerait personne.
+        //
+        // En mode COUNT, c'est le comportement attendu par l'organisateur : la
+        // cible fixe est un seuil, et un tournoi sous-rempli saute purement et
+        // simplement le mode. En mode PERCENT au contraire, la cible s'adapte
+        // toujours à l'effectif réel — on ne saute pas, on laisse passer tout le
+        // monde (cas limite : 100 %, que `validatePhases` refuse déjà à la
+        // création).
         qualifiers = currentEntrants;
+        if (phase.qualifierMode === "COUNT") {
+          skipped = true;
+          skipReason = "NO_CUT";
+        }
       } else {
-        qualifiers = target;
-        // Calculer maxRounds uniquement pour une SINGLE phase.
+        qualifiers = resolvePhaseQualifiers(currentEntrants, phase, false);
+        // maxRounds n'a de sens que pour un bracket tronqué d'élimination simple.
         if (phase.format === "SINGLE") {
           const entrantsPow = nextPowerOfTwo(currentEntrants);
-          const log = Math.log2(entrantsPow / qualifiers);
-          maxRounds = Math.round(log);
+          maxRounds = Math.round(Math.log2(entrantsPow / qualifiers));
         }
       }
     } else {
@@ -216,18 +241,20 @@ export function validatePhases(phases: PhaseConfig[]): string | null {
     return "INVALID_PHASE_COUNT";
   }
 
-  // Positions triées.
-  const sorted = [...phases].sort((a, b) => a.position - b.position);
-  for (let i = 0; i < sorted.length; i++) {
-    if (sorted[i].position !== i + 1) {
+  // Positions : exactement 1..n **dans l'ordre du tableau**. On ne trie pas, car
+  // l'ordre du tableau porte déjà le déroulé du tournoi (c'est lui qui décide
+  // quelle phase est la dernière) : accepter un tableau désordonné laisserait
+  // deux sources de vérité contradictoires.
+  for (let i = 0; i < phases.length; i++) {
+    if (phases[i].position !== i + 1) {
       return "INVALID_PHASE_POSITIONS";
     }
   }
 
   // Valider chaque phase.
-  for (let i = 0; i < sorted.length; i++) {
-    const phase = sorted[i];
-    const isLast = i === sorted.length - 1;
+  for (let i = 0; i < phases.length; i++) {
+    const phase = phases[i];
+    const isLast = i === phases.length - 1;
 
     // Format.
     if (!["SINGLE", "DOUBLE", "SWISS", "SURVIVAL"].includes(phase.format)) {
@@ -283,14 +310,17 @@ export function validatePhases(phases: PhaseConfig[]): string | null {
     }
   }
 
-  // Vérifier la décroissance des COUNT consécutifs.
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const current = sorted[i];
-    const next = sorted[i + 1];
+  // Décroissance stricte des COUNT consécutifs. La **dernière** phase est exclue :
+  // sa valeur de qualification n'est jamais lue (elle couronne toujours une seule
+  // championne), donc la comparer produirait un refus sur un plan parfaitement
+  // valide comme « 64 qualifiées puis finale ».
+  for (let i = 0; i + 2 < phases.length; i++) {
+    const current = phases[i];
+    const next = phases[i + 1];
     if (
       current.qualifierMode === "COUNT" &&
       next.qualifierMode === "COUNT" &&
-      current.qualifierValue >= next.qualifierValue
+      current.qualifierValue <= next.qualifierValue
     ) {
       return "NON_DECREASING_PHASE_QUALIFIERS";
     }
@@ -334,7 +364,8 @@ export function describePhasePlan(plan: ResolvedPhase[]): string[] {
       } else if (phase.skipReason === "NO_CUT") {
         reason = "pas d'élimination";
       }
-      return `${phaseLabel} — ${formatName(phase.format)} : ignorée (${reason})`;
+      const teams = `${phase.entrants} équipe${phase.entrants > 1 ? "s" : ""}`;
+      return `${phaseLabel} — ${formatName(phase.format)} : ${teams} — ignorée (${reason})`;
     }
 
     const isLast = idx === plan.length - 1;

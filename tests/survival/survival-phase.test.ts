@@ -28,9 +28,14 @@ const statusOf = (standings: ReturnType<typeof replaySurvival>, teamId: number) 
   standings.find((s) => s.teamId === teamId)!;
 
 describe("teamsToEliminate — avec plusieurs équipes cibles (phases qualificatives)", () => {
-  it("n'élimine rien quand on est au-dessus du seuil", () => {
-    expect(teamsToEliminate(5, 3)).toBe(0);
+  it("n'élimine rien une fois le seuil atteint", () => {
     expect(teamsToEliminate(3, 3)).toBe(0);
+    expect(teamsToEliminate(2, 3)).toBe(0);
+  });
+
+  it("coupe à la cadence habituelle tant qu'on est au-dessus du seuil", () => {
+    // 5 actives pour 3 qualifiées : effectif impair -> coupe d'équilibrage à 1.
+    expect(teamsToEliminate(5, 3)).toBe(1);
   });
 
   it("élimine une seule équipe quand on passe du seuil", () => {
@@ -47,7 +52,8 @@ describe("teamsToEliminate — avec plusieurs équipes cibles (phases qualificat
 
   it("reste conforme à targetTeams = 1 (comportement nominal)", () => {
     // Les tests existants ont targetTeams = 1 par défaut
-    expect(teamsToEliminate(4, 1)).toBe(1);
+    expect(teamsToEliminate(4, 1)).toBe(2);
+    expect(teamsToEliminate(2, 1)).toBe(1);
     expect(teamsToEliminate(6, 1)).toBe(2);
     expect(teamsToEliminate(5, 1)).toBe(1);
     expect(teamsToEliminate(1, 1)).toBe(0);
@@ -76,15 +82,11 @@ describe("shouldEliminateBarrageLoser — avec plusieurs équipes cibles", () =>
 });
 
 describe("replaySurvival — phases qualificatives (targetTeams > 1)", () => {
-  it("n'élimine rien quand le seuil est atteint", () => {
+  it("n'élimine rien quand le seuil est déjà atteint", () => {
+    // 4 équipes pour 4 qualifiées : la coupe du round 1 ne doit rien retirer.
     const standings = replaySurvival({
-      teams: teams(8),
-      matches: [
-        match(1, 1, 8),
-        match(1, 2, 7),
-        match(1, 3, 6),
-        match(1, 4, 5),
-      ],
+      teams: teams(4),
+      matches: [match(1, 1, 4), match(1, 2, 3)],
       forfeits: [],
       roundsBeforeFirstCut: 1,
       roundsPerCut: 1,
@@ -123,7 +125,7 @@ describe("replaySurvival — phases qualificatives (targetTeams > 1)", () => {
     expect(active.length).toBeGreaterThanOrEqual(4);
   });
 
-  it("s'arrête d'éliminer une fois le seuil atteint sur plusieurs rounds", () => {
+  it("coupe à la cadence sur plusieurs rounds sans viser le seuil d'un coup", () => {
     const standings = replaySurvival({
       teams: teams(12),
       matches: [
@@ -147,9 +149,12 @@ describe("replaySurvival — phases qualificatives (targetTeams > 1)", () => {
       targetTeams: 4,
     });
 
+    // La survie coupe à sa cadence (2 par coupe en effectif pair), elle ne saute
+    // pas directement au seuil : 12 → 10 au round 1, 10 → 8 au round 2. Le seuil
+    // de 4 n'est qu'un plancher, atteint plus tard.
     const active = standings.filter((s) => s.status === "ACTIVE");
-    expect(active.length).toBe(4);
-    expect(standings.filter((s) => s.status === "ELIMINATED").length).toBe(8);
+    expect(active.length).toBe(8);
+    expect(standings.filter((s) => s.status === "ELIMINATED").length).toBe(4);
   });
 
   it("gère les abandons en maintenant le seuil", () => {
@@ -164,8 +169,10 @@ describe("replaySurvival — phases qualificatives (targetTeams > 1)", () => {
       targetTeams: 4,
     });
 
+    // 8 équipes, un abandon avant la coupe -> 7 actives, effectif impair donc
+    // coupe d'équilibrage à une seule éliminée : 6 actives.
     const active = standings.filter((s) => s.status === "ACTIVE");
-    expect(active).toHaveLength(4);
+    expect(active).toHaveLength(6);
     expect(statusOf(standings, 2).status).toBe("FORFEIT");
   });
 });

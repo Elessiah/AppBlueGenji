@@ -74,9 +74,19 @@ describe("tournament-phases — resolvePhaseQualifiers", () => {
       const phase = phaseConfig({ qualifierMode: "PERCENT", qualifierValue: 50 });
       expect(resolvePhaseQualifiers(128, phase, false)).toBe(64);
 
-      // 30% de 128 = 38.4 → 39 arrondi vers le haut
+      // 30% de 128 = 38.4 → 39 arrondi vers le haut, puis snappé à 32 car le
+      // format par défaut de `phaseConfig` est SINGLE (le snap dépend du format,
+      // pas du mode de qualification — cf. le bloc « snap power-of-two »).
       const phase30 = phaseConfig({ qualifierMode: "PERCENT", qualifierValue: 30 });
-      expect(resolvePhaseQualifiers(128, phase30, false)).toBe(39);
+      expect(resolvePhaseQualifiers(128, phase30, false)).toBe(32);
+
+      // Sur un format sans contrainte de bracket, l'arrondi vers le haut est visible.
+      const swiss30 = phaseConfig({
+        format: "SWISS",
+        qualifierMode: "PERCENT",
+        qualifierValue: 30,
+      });
+      expect(resolvePhaseQualifiers(128, swiss30, false)).toBe(39);
     });
 
     it("clame aussi en [1, entrants]", () => {
@@ -84,9 +94,17 @@ describe("tournament-phases — resolvePhaseQualifiers", () => {
       const lowPhase = phaseConfig({ qualifierMode: "PERCENT", qualifierValue: 1 });
       expect(resolvePhaseQualifiers(100, lowPhase, false)).toBe(1);
 
-      // 100% en non-finale → clamé à entrants (99% max en validation)
+      // 99% de 100 = 99, snappé à 64 en SINGLE.
       const maxPhase = phaseConfig({ qualifierMode: "PERCENT", qualifierValue: 99 });
-      expect(resolvePhaseQualifiers(100, maxPhase, false)).toBe(99);
+      expect(resolvePhaseQualifiers(100, maxPhase, false)).toBe(64);
+
+      // Sans snap, la valeur clamée à entrants reste telle quelle.
+      const maxSwiss = phaseConfig({
+        format: "SWISS",
+        qualifierMode: "PERCENT",
+        qualifierValue: 99,
+      });
+      expect(resolvePhaseQualifiers(100, maxSwiss, false)).toBe(99);
     });
   });
 

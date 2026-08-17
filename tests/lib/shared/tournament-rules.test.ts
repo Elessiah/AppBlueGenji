@@ -14,7 +14,7 @@ import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import type { TournamentFormat } from "@/lib/shared/types";
 
 const ROOT = join(__dirname, "..", "..", "..");
-const ALL_FORMATS: TournamentFormat[] = ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL"];
+const ALL_FORMATS: TournamentFormat[] = ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL", "MULTI"];
 
 describe("tournament-rules — intégrité du registre", () => {
   it("couvre tous les formats de tournoi, sans doublon", () => {
@@ -110,9 +110,11 @@ describe("tournament-rules — câblage des pages", () => {
   });
 
   it("affiche le bouton d'aide flottant sur les pages de tournoi", () => {
-    expect(read("app/(secured)/tournois/[id]/page.tsx")).toContain(
-      "<RulesHelpFab format={detail.card.format} />",
-    );
+    const detailPage = read("app/(secured)/tournois/[id]/page.tsx");
+    // Le bouton cible le mode **affiché à l'écran** : sur un tournoi multi-phases,
+    // sélectionner une autre phase change la page de règles visée.
+    expect(detailPage).toContain("<RulesHelpFab format={visibleFormat}");
+    expect(detailPage).toContain("visibleRulesFormat(detail.card, selectedPhase)");
     expect(read("app/(secured)/tournois/page.tsx")).toContain("<RulesHelpFab />");
     expect(read("components/rules/RulesHelpFab.tsx")).toContain("cta-float-help");
   });

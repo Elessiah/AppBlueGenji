@@ -101,7 +101,10 @@ describe("swiss — opponent_ids_json renvoyé par mysql2", () => {
       totalRounds: 3,
     });
 
-    await expect(generateNextRound(1, conn)).resolves.toBeUndefined();
+    // `generateNextRound` renvoie désormais `{ done }` : l'orchestrateur multi-phases
+    // a besoin de savoir si la ronde suisse est terminée sans relire la base.
+    // Ici la ronde suivante vient d'être générée, la phase continue donc.
+    await expect(generateNextRound(1, conn)).resolves.toEqual({ done: false });
     expect(createdMatchCount(queries)).toBeGreaterThan(0);
   });
 
