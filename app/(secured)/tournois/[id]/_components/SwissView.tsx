@@ -113,8 +113,11 @@ export function SwissView({
             Classement
           </div>
 
-          {/* En-tête de colonnes : sans elle, « 9 · 3-0-1 · 24 » est illisible. */}
+          {/* En-tête de colonnes : sans elle, « 9 · 3-0-1 · 24 » est illisible. La
+              colonne de statut y est réservée elle aussi, sinon les chiffres
+              dérivent d'un cran vers la droite sous leur intitulé. */}
           <div
+            aria-hidden="true"
             style={{
               display: "flex",
               alignItems: "center",
@@ -140,9 +143,15 @@ export function SwissView({
             >
               Bch
             </span>
+            <span style={{ width: 10 }} />
+            <span style={{ minWidth: 62, textAlign: "right" }}>Statut</span>
           </div>
 
-          <div style={{ border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
+          <div
+            role="list"
+            aria-label="Classement du tournoi"
+            style={{ border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}
+          >
             {swiss.standings.map((team, idx) => {
               // Tournoi clos : la tête du classement est championne, pas « en lice ».
               const meta =
@@ -157,6 +166,8 @@ export function SwissView({
               return (
                 <div
                   key={team.teamId}
+                  role="listitem"
+                  aria-label={`${team.rank}. ${team.teamName}, ${formatPoints(team.points)} points, ${team.wins} victoires ${team.draws} nuls ${team.losses} défaites`}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -207,14 +218,15 @@ export function SwissView({
                   >
                     {formatPoints(team.buchholz)}
                   </span>
-                  {team.byes > 0 && (
-                    <span
-                      style={{ fontSize: 10, color: AMBER }}
-                      title="Victoire d'office reçue (effectif impair)"
-                    >
-                      ✓
-                    </span>
-                  )}
+                  {/* Emplacement réservé même sans bye : sinon la colonne de
+                      statut se décale d'une ligne à l'autre. */}
+                  <span
+                    aria-hidden={team.byes === 0}
+                    title={team.byes > 0 ? "Victoire d'office reçue (effectif impair)" : undefined}
+                    style={{ width: 10, fontSize: 10, color: AMBER, flexShrink: 0 }}
+                  >
+                    {team.byes > 0 ? "✓" : ""}
+                  </span>
                   <span
                     style={{
                       fontSize: 10,
