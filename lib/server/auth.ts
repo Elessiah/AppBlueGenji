@@ -143,7 +143,12 @@ async function ensureFreshTestUser(): Promise<number> {
 }
 
 async function getDevBypassUser(): Promise<AuthUser | null> {
-  if (process.env.NODE_ENV === "production") return null;
+  // Liste blanche stricte : le bypass n'est actif QUE lorsqu'on est explicitement
+  // en développement (`next dev` → NODE_ENV="development"). Toute autre valeur
+  // — "production", "test", "staging", ou NODE_ENV non défini — le désactive.
+  // Une liste noire (« tout sauf production ») laisserait le bypass ouvert sur un
+  // serveur mal configuré où NODE_ENV n'est pas positionné.
+  if (process.env.NODE_ENV !== "development") return null;
   const rawId = process.env.DEV_AUTH_USER_ID;
   if (!rawId) return null;
 
