@@ -77,13 +77,19 @@ describe("match-lock — verrouillage cross-phase", () => {
 
   it("applique les règles intra-phase pour élimination simple/double", () => {
     const match1 = match({ id: 1, phaseId: 1, winnerTeamId: 10, nextWinnerMatchId: 5 });
-    const match2 = match({ id: 5, phaseId: 1, roundNumber: 2 });
-    const match3 = match({ id: 6, phaseId: 1, roundNumber: 2, team1Score: 2, team2Score: 1 });
+    // Le match cible du vainqueur porte une saisie -> match1 est verrouillé.
+    const cible = match({ id: 5, phaseId: 1, roundNumber: 2, team1Score: 2, team2Score: 1 });
+    // Un match frère du même round, sans lien de bracket, ne doit RIEN verrouiller.
+    const frere = match({ id: 6, phaseId: 1, roundNumber: 2, team1Score: 2, team2Score: 1 });
 
-    const allMatches = [match1, match2, match3] as MatchScoreState[];
+    expect(isScoreEditLocked(match1, [match1, cible, frere] as MatchScoreState[], "SINGLE")).toBe(
+      true,
+    );
 
-    // La règle de bracket s'applique au sein de la phase 1.
-    expect(isScoreEditLocked(match1, allMatches, "SINGLE")).toBe(true);
+    const cibleVierge = match({ id: 5, phaseId: 1, roundNumber: 2 });
+    expect(
+      isScoreEditLocked(match1, [match1, cibleVierge, frere] as MatchScoreState[], "SINGLE"),
+    ).toBe(false);
   });
 
   it("applique les règles intra-phase pour survie et ronde suisse", () => {
@@ -102,13 +108,14 @@ describe("match-lock — verrouillage cross-phase", () => {
 describe("match-lock — tournois sans phases (retrocompatibilité)", () => {
   it("se comporte comme avant quand tous les matches ont la même phase", () => {
     const match1 = match({ id: 1, phaseId: 1, winnerTeamId: 10, nextWinnerMatchId: 5 });
-    const match2 = match({ id: 5, phaseId: 1, roundNumber: 2 });
+    const match2 = match({ id: 5, phaseId: 1, roundNumber: 2, team1Score: 3, team2Score: 0 });
     const match3 = match({ id: 6, phaseId: 1, roundNumber: 2, team1Score: 2, team2Score: 1 });
 
     const allMatches = [match1, match2, match3] as MatchScoreState[];
 
-    // Comportement identical à avant : verrouillage sur lien de bracket
+    // Comportement identique à avant : verrouillage par le seul lien de bracket.
     expect(isScoreEditLocked(match1, allMatches, "SINGLE")).toBe(true);
+    // match2 n'a pas de vainqueur : rien n'a été propagé, la saisie reste ouverte.
     expect(isScoreEditLocked(match2, allMatches, "SINGLE")).toBe(false);
   });
 

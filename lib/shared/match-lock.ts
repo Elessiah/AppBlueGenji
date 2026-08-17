@@ -1,4 +1,4 @@
-import type { BracketMatch, TournamentFormat } from "./types";
+import type { BracketMatch, PhaseFormat, TournamentFormat } from "./types";
 
 /**
  * Verrouillage de l'édition d'un score.
@@ -27,6 +27,25 @@ export interface MatchScoreState {
   hasPendingReport: boolean;
   nextWinnerMatchId: number | null;
   nextLoserMatchId: number | null;
+  /**
+   * Phase du match (0 = tournoi sans phases). Optionnel : les tournois à format
+   * unique n'en ont pas, et tout le monde partage alors le même rang.
+   */
+  phaseId?: number;
+  /** Position de la phase (1..n). Prioritaire sur `phaseId` pour l'ordre. */
+  phasePosition?: number | null;
+}
+
+/**
+ * Rang de la phase d'un match, utilisé pour ordonner les phases entre elles.
+ *
+ * On préfère `phasePosition` (l'ordre voulu par l'organisateur) et on retombe sur
+ * `phaseId` : les phases étant insérées dans l'ordre des positions, leurs
+ * identifiants auto-incrémentés croissent avec elles. Sans phase, tout le monde
+ * vaut 0 — le tri devient neutre et le comportement historique est préservé.
+ */
+function phaseRank(match: MatchScoreState): number {
+  return match.phasePosition ?? match.phaseId ?? 0;
 }
 
 /**
@@ -47,6 +66,8 @@ export function fromBracketMatch(match: BracketMatch): MatchScoreState {
     hasPendingReport: match.status === "AWAITING_CONFIRMATION",
     nextWinnerMatchId: match.nextWinnerMatchId,
     nextLoserMatchId: match.nextLoserMatchId,
+    phaseId: match.phaseId,
+    phasePosition: match.phasePosition,
   };
 }
 
@@ -81,16 +102,34 @@ export function dependentMatches(
   match: MatchScoreState,
   allMatches: MatchScoreState[],
   format: TournamentFormat,
+  phaseFormat?: PhaseFormat,
 ): MatchScoreState[] {
-  if (format === "SURVIVAL" || format === "SWISS") {
-    return allMatches.filter((m) => m.roundNumber > match.roundNumber);
+  const ownRank = phaseRank(match);
+
+  // Toute phase ultérieure dépend de celle-ci : son plateau est constitué des
+  // qualifiées d'ici. Corriger un score en amont réécrirait donc qui y joue.
+  // Sur un tournoi sans phases, tous les matchs partagent le rang 0 et cette
+  // liste est toujours vide — le comportement historique est intact.
+  const laterPhases = allMatches.filter((m) => phaseRank(m) > ownRank);
+
+  const samePhase = allMatches.filter((m) => phaseRank(m) === ownRank);
+
+  // Dans un tournoi multi-phases, la règle interne est celle du format de LA
+  // PHASE, pas celle du tournoi (qui vaut « MULTI » et ne décrit aucun bracket).
+  const effective: TournamentFormat | PhaseFormat =
+    format === "MULTI" ? (phaseFormat ?? "SINGLE") : format;
+
+  let intraPhase: MatchScoreState[];
+  if (effective === "SURVIVAL" || effective === "SWISS") {
+    intraPhase = samePhase.filter((m) => m.roundNumber > match.roundNumber);
+  } else {
+    const targets = [match.nextWinnerMatchId, match.nextLoserMatchId].filter(
+      (id): id is number => id !== null,
+    );
+    intraPhase = targets.length === 0 ? [] : samePhase.filter((m) => targets.includes(m.id));
   }
 
-  const targets = [match.nextWinnerMatchId, match.nextLoserMatchId].filter(
-    (id): id is number => id !== null,
-  );
-  if (targets.length === 0) return [];
-  return allMatches.filter((m) => targets.includes(m.id));
+  return [...intraPhase, ...laterPhases];
 }
 
 /**
@@ -101,7 +140,8 @@ export function isScoreEditLocked(
   match: MatchScoreState,
   allMatches: MatchScoreState[],
   format: TournamentFormat,
+  phaseFormat?: PhaseFormat,
 ): boolean {
   if (match.winnerTeamId === null) return false;
-  return dependentMatches(match, allMatches, format).some(hasScoreInput);
+  return dependentMatches(match, allMatches, format, phaseFormat).some(hasScoreInput);
 }
