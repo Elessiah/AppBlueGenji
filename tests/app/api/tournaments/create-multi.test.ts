@@ -252,6 +252,7 @@ describe("POST /api/tournaments — mode MULTI avec phases", () => {
               format: "SURVIVAL",
               qualifierMode: "COUNT",
               qualifierValue: 8,
+              survivalRoundsPerCut: 1,
             },
             {
               format: "SINGLE",

@@ -220,6 +220,28 @@ export function resolvePhasePlan(
 }
 
 /**
+ * Complète des phases brutes (payload HTTP, jeu de test) en {@link PhaseConfig}.
+ *
+ * La **position** est déduite du rang dans le tableau : c'est l'ordre du tableau
+ * qui porte le déroulé du tournoi, et le client n'a donc pas à la renseigner —
+ * ce qui évite qu'une position erronée contredise l'ordre affiché à l'écran.
+ */
+export function normalizePhaseConfigs(raw: readonly Partial<PhaseConfig>[]): PhaseConfig[] {
+  return raw.map((phase, index) => ({
+    position: index + 1,
+    format: (phase.format ?? "SINGLE") as PhaseFormat,
+    name: phase.name ?? null,
+    qualifierMode: (phase.qualifierMode ?? "COUNT") as PhaseQualifierMode,
+    qualifierValue: Number(phase.qualifierValue ?? 0),
+    hasThirdPlaceMatch: Boolean(phase.hasThirdPlaceMatch),
+    swissTotalRounds: phase.swissTotalRounds ?? null,
+    survivalRoundsBeforeFirstCut:
+      phase.survivalRoundsBeforeFirstCut ?? phase.survivalRoundsPerCut ?? null,
+    survivalRoundsPerCut: phase.survivalRoundsPerCut ?? null,
+  }));
+}
+
+/**
  * Valide une liste de configurations de phases.
  *
  * Codes d'erreur (SCREAMING_SNAKE) :

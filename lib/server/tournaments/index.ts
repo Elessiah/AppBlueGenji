@@ -252,14 +252,20 @@ export async function createTournament(
 
     // Valide et insère les phases si format MULTI
     if (payload.format === "MULTI" && payload.phases) {
-      const { validatePhases } = await import("@/lib/shared/tournament-phases");
-      const error = validatePhases(payload.phases);
+      // Le payload HTTP ne porte pas les positions (c'est l'ordre du tableau qui
+      // fait foi) : on normalise avant de valider et d'insérer.
+      const { normalizePhaseConfigs, validatePhases } = await import(
+        "@/lib/shared/tournament-phases"
+      );
+      const phases = normalizePhaseConfigs(payload.phases);
+
+      const error = validatePhases(phases);
       if (error) {
         throw new Error(error);
       }
 
       const { insertPhases } = await import("./phases-repository");
-      await insertPhases(connection, tournamentId, payload.phases);
+      await insertPhases(connection, tournamentId, phases);
     }
 
     await connection.commit();
