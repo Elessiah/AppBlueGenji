@@ -429,6 +429,7 @@ async function runMigrations(db: Pool): Promise<void> {
       qualifier_value INT NOT NULL DEFAULT 0,
       has_third_place_match BOOLEAN NOT NULL DEFAULT FALSE,
       swiss_total_rounds INT NULL,
+      swiss_current_round INT NOT NULL DEFAULT 0,
       survival_rounds_before_first_cut INT NULL,
       survival_rounds_per_cut INT NULL,
       survival_current_round INT NOT NULL DEFAULT 0,
@@ -447,6 +448,18 @@ async function runMigrations(db: Pool): Promise<void> {
         REFERENCES bg_tournaments(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  // Migration: compteur de manches suisses d'une phase. Ajouté après coup — les
+  // bases ayant déjà créé bg_tournament_phases ne l'ont pas, et `CREATE TABLE IF
+  // NOT EXISTS` ne rattrape pas une colonne manquante.
+  try {
+    await db.execute(`
+      ALTER TABLE bg_tournament_phases
+      ADD COLUMN swiss_current_round INT NOT NULL DEFAULT 0
+    `);
+  } catch {
+    // Column already exists
+  }
 
   // Migration: Create tournament phase teams table for multi-phase entrants tracking
   // Enregistre la participation des équipes dans chaque phase (seed, rank, qualified)

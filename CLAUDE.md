@@ -212,4 +212,10 @@ Ajouter le trailer avec `git commit --trailer 'Co-authored-by: Claude Opus 4.8 <
 4. **Commit tests** : `jest` — *avec Co-Authored-By*
 5. **Commit polish UI/UX** : espacements, états, accessibilité — aucun changement de logique — *avec Co-Authored-By*
 6. **Push** : `git push -u origin feature/<short-name>`
-7. **Revue de PR** : ouvrir la PR (`gh pr create`), puis lancer une revue du diff avec `/code-review --comment` pour poster les retours en **commentaires inline** sur la PR. Traiter les points bloquants, puis seulement rendre la main à l'utilisateur.
+7. **Revue de PR — en boucle jusqu'à zéro finding** : ouvrir la PR (`gh pr create`), puis lancer une revue du diff avec `/code-review --comment` pour poster les retours en **commentaires inline** sur la PR.
+
+   **Cycler la revue** : corriger les points remontés, commiter, pousser, puis **relancer une revue complète**. Répéter jusqu'à ce qu'un cycle ne remonte plus aucun finding. Une seule passe ne suffit pas : les corrections d'un cycle en révèlent d'autres, et les zones non couvertes par le premier passage doivent l'être par les suivants.
+
+   Ne rendre la main à l'utilisateur qu'une fois un cycle terminé **sans finding**, avec `npm test`, `npm run lint` et `npx tsc --noEmit` verts.
+
+   **Valider aussi en conditions réelles** : les tests simulent MySQL et ne peuvent pas détecter une colonne manquante ou une requête invalide. Lancer `npm run seed` avant de conclure — c'est le seul contrôle qui exerce réellement les migrations et le SQL. (Le worktree a besoin d'une copie du `.env` du dépôt parent ; il est déjà couvert par `.gitignore`.)
