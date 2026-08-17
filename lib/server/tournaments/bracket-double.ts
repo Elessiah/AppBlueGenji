@@ -67,7 +67,11 @@ export async function createDoubleEliminationBracket(
   connection: PoolConnection,
   tournament: TournamentRow,
   registeredTeamIds: number[],
+  options?: { phaseId?: number },
 ): Promise<void> {
+  // DOUBLE élimination n'est autorisée que comme phase finale.
+  // Les phases intermédiaires doivent filtrer les équipes via SINGLE ou SWISS.
+  const phaseId = options?.phaseId ?? 0;
   const bracketSize = nextPowerOfTwo(registeredTeamIds.length);
   const rounds = Math.ceil(Math.log2(bracketSize));
   const upper: number[][] = [];
@@ -76,7 +80,7 @@ export async function createDoubleEliminationBracket(
     const matchesCount = bracketSize / 2 ** round;
     upper[round] = [];
     for (let matchNumber = 1; matchNumber <= matchesCount; matchNumber += 1) {
-      const id = await createMatch(connection, tournament.id, "UPPER", round, matchNumber);
+      const id = await createMatch(connection, tournament.id, "UPPER", round, matchNumber, phaseId);
       upper[round].push(id);
     }
   }
@@ -93,12 +97,12 @@ export async function createDoubleEliminationBracket(
 
       lower[lbRound] = [];
       for (let matchNumber = 1; matchNumber <= matchCount; matchNumber += 1) {
-        const id = await createMatch(connection, tournament.id, "LOWER", lbRound, matchNumber);
+        const id = await createMatch(connection, tournament.id, "LOWER", lbRound, matchNumber, phaseId);
         lower[lbRound].push(id);
       }
     }
 
-    grandFinalMatchId = await createMatch(connection, tournament.id, "GRAND", 1, 1);
+    grandFinalMatchId = await createMatch(connection, tournament.id, "GRAND", 1, 1, phaseId);
   }
 
   // Upper bracket progressions
@@ -220,6 +224,21 @@ export async function createDoubleEliminationBracket(
     await setMatchParticipants(connection, upper[1][matchIndex], team1Id, team2Id, status);
   }
 
-  await updateTournamentBracketSize(connection, tournament.id, bracketSize);
-  await tryAutoResolveByes(connection, tournament.id);
+  if (phaseId > 0) {
+    await updateTournamentPhase(connection, phaseId, bracketSize);
+  } else {
+    await updateTournamentBracketSize(connection, tournament.id, bracketSize);
+  }
+  await tryAutoResolveByes(connection, tournament.id, phaseId);
+}
+
+async function updateTournamentPhase(
+  connection: PoolConnection,
+  phaseId: number,
+  bracketSize: number,
+): Promise<void> {
+  await connection.execute(
+    `UPDATE bg_tournament_phases SET bracket_size = ? WHERE id = ?`,
+    [bracketSize, phaseId],
+  );
 }

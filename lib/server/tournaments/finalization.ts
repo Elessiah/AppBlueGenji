@@ -1,6 +1,131 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { resetRegistrationRanks, finishTournament } from "./repository";
 
+export async function isEliminationPhaseComplete(
+  connection: PoolConnection,
+  tournamentId: number,
+  phaseId: number,
+): Promise<boolean> {
+  const [matchCount] = await connection.execute<(RowDataPacket & { c: number })[]>(
+    `SELECT COUNT(*) AS c FROM bg_matches WHERE tournament_id = ? AND phase_id = ?`,
+    [tournamentId, phaseId],
+  );
+
+  if (Number(matchCount[0]?.c ?? 0) === 0) {
+    return false;
+  }
+
+  const [unfinished] = await connection.execute<(RowDataPacket & { c: number })[]>(
+    `SELECT COUNT(*) AS c
+     FROM bg_matches
+     WHERE tournament_id = ? AND phase_id = ?
+       AND winner_team_id IS NULL
+       AND (team1_id IS NOT NULL OR team2_id IS NOT NULL)`,
+    [tournamentId, phaseId],
+  );
+
+  return Number(unfinished[0]?.c ?? 0) === 0;
+}
+
+export async function rankEliminationPhase(
+  connection: PoolConnection,
+  tournamentId: number,
+  phaseId: number,
+  format: "SINGLE" | "DOUBLE",
+  hasThirdPlaceMatch: boolean,
+): Promise<number[]> {
+  const rankedTeams: number[] = [];
+
+  if (format === "DOUBLE") {
+    const [grandFinalRows] = await connection.execute<
+      (RowDataPacket & { winner_team_id: number | null; loser_team_id: number | null })[]
+    >(
+      `SELECT winner_team_id, loser_team_id
+       FROM bg_matches
+       WHERE tournament_id = ? AND phase_id = ? AND bracket = 'GRAND' AND round_number = 1`,
+      [tournamentId, phaseId],
+    );
+    const grandFinal = grandFinalRows[0];
+    if (grandFinal?.winner_team_id) {
+      rankedTeams.push(Number(grandFinal.winner_team_id));
+    }
+    if (grandFinal?.loser_team_id) {
+      rankedTeams.push(Number(grandFinal.loser_team_id));
+    }
+  } else {
+    const [upperFinalRows] = await connection.execute<
+      (RowDataPacket & { winner_team_id: number | null; loser_team_id: number | null })[]
+    >(
+      `SELECT winner_team_id, loser_team_id
+       FROM bg_matches
+       WHERE tournament_id = ? AND phase_id = ? AND bracket = 'UPPER'
+       ORDER BY round_number DESC
+       LIMIT 1`,
+      [tournamentId, phaseId],
+    );
+    const upperFinal = upperFinalRows[0];
+    if (upperFinal?.winner_team_id) {
+      rankedTeams.push(Number(upperFinal.winner_team_id));
+    }
+    if (upperFinal?.loser_team_id) {
+      rankedTeams.push(Number(upperFinal.loser_team_id));
+    }
+
+    if (hasThirdPlaceMatch) {
+      const [thirdPlaceRows] = await connection.execute<
+        (RowDataPacket & { winner_team_id: number | null; loser_team_id: number | null })[]
+      >(
+        `SELECT winner_team_id, loser_team_id
+         FROM bg_matches
+         WHERE tournament_id = ? AND phase_id = ? AND bracket = 'THIRD_PLACE'
+         LIMIT 1`,
+        [tournamentId, phaseId],
+      );
+      const thirdPlace = thirdPlaceRows[0];
+      if (thirdPlace?.winner_team_id) {
+        rankedTeams.push(Number(thirdPlace.winner_team_id));
+      }
+      if (thirdPlace?.loser_team_id) {
+        rankedTeams.push(Number(thirdPlace.loser_team_id));
+      }
+    }
+  }
+
+  if (rankedTeams.length > 0) {
+    const placeholders = rankedTeams.map(() => "?").join(",");
+    const [rankingRows] = await connection.execute<
+      (RowDataPacket & {
+        team_id: number;
+        wins: number;
+        losses: number;
+        last_progress_at: Date | null;
+      })[]
+    >(
+      `SELECT
+        r.team_id,
+        COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0) AS wins,
+        COALESCE(SUM(CASE WHEN m.loser_team_id = r.team_id THEN 1 ELSE 0 END), 0) AS losses,
+        MAX(CASE
+          WHEN m.winner_team_id = r.team_id OR m.loser_team_id = r.team_id
+            THEN m.updated_at
+          ELSE NULL
+        END) AS last_progress_at
+       FROM bg_tournament_registrations r
+       LEFT JOIN bg_matches m ON m.tournament_id = r.tournament_id AND m.phase_id = ?
+       WHERE r.tournament_id = ? AND r.team_id NOT IN (${placeholders})
+       GROUP BY r.team_id
+       ORDER BY wins DESC, losses ASC, last_progress_at DESC`,
+      [phaseId, tournamentId, ...rankedTeams],
+    );
+
+    for (const row of rankingRows) {
+      rankedTeams.push(Number(row.team_id));
+    }
+  }
+
+  return rankedTeams;
+}
+
 export async function finalizeTournamentIfDone(
   connection: PoolConnection,
   tournamentId: number,
@@ -8,31 +133,17 @@ export async function finalizeTournamentIfDone(
   // Le mode Survie pilote lui-même sa clôture et son classement final
   // (ordre d'élimination) via reconcileSurvival — ne pas le finaliser ici,
   // sinon le classement générique par victoires écraserait le résultat.
+  // De même, le mode MULTI est orchestré par la phase finale — ne pas le finaliser ici.
   const [formatRows] = await connection.execute<(RowDataPacket & { format: string })[]>(
     `SELECT format FROM bg_tournaments WHERE id = ? LIMIT 1`,
     [tournamentId],
   );
-  if (formatRows[0]?.format === "SURVIVAL") return;
+  if (formatRows[0]?.format === "SURVIVAL" || formatRows[0]?.format === "MULTI") return;
 
-  const [remaining] = await connection.execute<(RowDataPacket & { c: number })[]>(
-    `SELECT COUNT(*) AS c
-     FROM bg_matches
-     WHERE tournament_id = ?
-       AND winner_team_id IS NULL
-       AND (team1_id IS NOT NULL OR team2_id IS NOT NULL)`,
-    [tournamentId],
-  );
+  const phaseId = 0;
+  const isComplete = await isEliminationPhaseComplete(connection, tournamentId, phaseId);
 
-  if (Number(remaining[0]?.c ?? 0) > 0) {
-    return;
-  }
-
-  const [allMatches] = await connection.execute<(RowDataPacket & { c: number })[]>(
-    `SELECT COUNT(*) AS c FROM bg_matches WHERE tournament_id = ?`,
-    [tournamentId],
-  );
-
-  if (Number(allMatches[0]?.c ?? 0) === 0) {
+  if (!isComplete) {
     return;
   }
 
@@ -46,114 +157,21 @@ export async function finalizeTournamentIfDone(
   ]);
   const tournamentMeta = tournamentMetaRows[0];
 
-  let fallbackStartRank = 3;
-
-  if (tournamentMeta?.format === "DOUBLE") {
-    const [grandFinalRows] = await connection.execute<
-      (RowDataPacket & { winner_team_id: number | null; loser_team_id: number | null })[]
-    >(
-      `SELECT winner_team_id, loser_team_id
-       FROM bg_matches
-       WHERE tournament_id = ? AND bracket = 'GRAND' AND round_number = 1`,
-      [tournamentId],
-    );
-    const grandFinal = grandFinalRows[0];
-    if (grandFinal?.winner_team_id) {
-      await connection.execute(
-        `UPDATE bg_tournament_registrations SET final_rank = 1 WHERE tournament_id = ? AND team_id = ?`,
-        [tournamentId, grandFinal.winner_team_id],
-      );
-    }
-    if (grandFinal?.loser_team_id) {
-      await connection.execute(
-        `UPDATE bg_tournament_registrations SET final_rank = 2 WHERE tournament_id = ? AND team_id = ?`,
-        [tournamentId, grandFinal.loser_team_id],
-      );
-    }
-  } else {
-    const [upperFinalRows] = await connection.execute<
-      (RowDataPacket & { winner_team_id: number | null; loser_team_id: number | null })[]
-    >(
-      `SELECT winner_team_id, loser_team_id
-       FROM bg_matches
-       WHERE tournament_id = ? AND bracket = 'UPPER'
-       ORDER BY round_number DESC
-       LIMIT 1`,
-      [tournamentId],
-    );
-    const upperFinal = upperFinalRows[0];
-    if (upperFinal?.winner_team_id) {
-      await connection.execute(
-        `UPDATE bg_tournament_registrations SET final_rank = 1 WHERE tournament_id = ? AND team_id = ?`,
-        [tournamentId, upperFinal.winner_team_id],
-      );
-    }
-    if (upperFinal?.loser_team_id) {
-      await connection.execute(
-        `UPDATE bg_tournament_registrations SET final_rank = 2 WHERE tournament_id = ? AND team_id = ?`,
-        [tournamentId, upperFinal.loser_team_id],
-      );
-    }
-
-    if (tournamentMeta?.has_third_place_match) {
-      const [thirdPlaceRows] = await connection.execute<
-        (RowDataPacket & { winner_team_id: number | null; loser_team_id: number | null })[]
-      >(
-        `SELECT winner_team_id, loser_team_id
-         FROM bg_matches
-         WHERE tournament_id = ? AND bracket = 'THIRD_PLACE'
-         LIMIT 1`,
-        [tournamentId],
-      );
-      const thirdPlace = thirdPlaceRows[0];
-      if (thirdPlace?.winner_team_id) {
-        await connection.execute(
-          `UPDATE bg_tournament_registrations SET final_rank = 3 WHERE tournament_id = ? AND team_id = ?`,
-          [tournamentId, thirdPlace.winner_team_id],
-        );
-      }
-      if (thirdPlace?.loser_team_id) {
-        await connection.execute(
-          `UPDATE bg_tournament_registrations SET final_rank = 4 WHERE tournament_id = ? AND team_id = ?`,
-          [tournamentId, thirdPlace.loser_team_id],
-        );
-      }
-      fallbackStartRank = 5;
-    }
-  }
-
-  const [rankingRows] = await connection.execute<
-    (RowDataPacket & {
-      team_id: number;
-      wins: number;
-      losses: number;
-      last_progress_at: Date | null;
-    })[]
-  >(
-    `SELECT
-      r.team_id,
-      COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0) AS wins,
-      COALESCE(SUM(CASE WHEN m.loser_team_id = r.team_id THEN 1 ELSE 0 END), 0) AS losses,
-      MAX(CASE
-        WHEN m.winner_team_id = r.team_id OR m.loser_team_id = r.team_id
-          THEN m.updated_at
-        ELSE NULL
-      END) AS last_progress_at
-     FROM bg_tournament_registrations r
-     LEFT JOIN bg_matches m ON m.tournament_id = r.tournament_id
-     WHERE r.tournament_id = ? AND r.final_rank IS NULL
-     GROUP BY r.team_id
-     ORDER BY wins DESC, losses ASC, last_progress_at DESC`,
-    [tournamentId],
+  const rankedTeams = await rankEliminationPhase(
+    connection,
+    tournamentId,
+    phaseId,
+    (tournamentMeta?.format === "DOUBLE" ? "DOUBLE" : "SINGLE") as "SINGLE" | "DOUBLE",
+    Boolean(tournamentMeta?.has_third_place_match),
   );
 
-  let rank = fallbackStartRank;
-  for (const row of rankingRows) {
+  let rank = 1;
+  for (const teamId of rankedTeams) {
     await connection.execute(
       `UPDATE bg_tournament_registrations
        SET final_rank = ?
        WHERE tournament_id = ? AND team_id = ?`,
-      [rank, tournamentId, Number(row.team_id)],
+      [rank, tournamentId, teamId],
     );
     rank += 1;
   }
