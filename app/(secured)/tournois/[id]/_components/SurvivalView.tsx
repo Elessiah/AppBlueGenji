@@ -6,6 +6,7 @@ import type { BracketMatch, SurvivalMeta, SurvivalStandingRow } from "@/lib/shar
 import { isCutRound, teamsToEliminate } from "@/lib/shared/survival";
 import { MatchScoreDraft } from "./BracketTree";
 import { MatchRow } from "./MatchRow";
+import { ScrollArea } from "@/components/cyber";
 
 const COL_W = 226;
 const BORDER = "var(--border, #444)";
@@ -223,7 +224,10 @@ export function SurvivalView({
         </div>
 
         {/* Rounds en colonnes (même esprit que les arbres d'élimination) */}
-        <div style={{ flex: 1, minWidth: 0, overflowX: "auto", paddingBottom: 12 }}>
+        <ScrollArea
+          ariaLabel="Rounds du tournoi — défilement horizontal"
+          style={{ flex: 1, minWidth: 0, paddingBottom: 12 }}
+        >
           {roundNums.length === 0 ? (
             <p style={{ color: "var(--text-2)", fontSize: 14 }}>Aucun match pour l&apos;instant.</p>
           ) : (
@@ -346,7 +350,7 @@ export function SurvivalView({
               })}
             </div>
           )}
-        </div>
+        </ScrollArea>
       </div>
     </div>
   );

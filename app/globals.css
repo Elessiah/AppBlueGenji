@@ -990,30 +990,89 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
-/* Bracket scroll styling */
-.bracket-scroll {
+/* ===========================================================
+   BARRES DE DÉFILEMENT
+   -----------------------------------------------------------
+   Appliquées à **tout le document** : plus aucune barre blanche
+   par défaut, ni sur la page, ni dans un conteneur défilant.
+   Le composant <ScrollArea> (components/cyber/ScrollArea.tsx)
+   s'appuie dessus pour les zones qui défilent explicitement.
+
+   Deux moteurs, deux syntaxes. Chromium 121+ donne la priorité
+   aux propriétés standard (`scrollbar-width`/`scrollbar-color`)
+   et ignore alors `::-webkit-scrollbar` : on ne déclare donc les
+   standards que là où les pseudo-éléments n'existent pas
+   (Firefox), pour garder le pouce arrondi ailleurs. Les deux
+   rendus visent le même résultat — fin, bleu glacier, piste
+   transparente.
+   =========================================================== */
+:root {
+  --scrollbar-size: 10px;
+  --scrollbar-thumb: rgba(var(--blue-rgb), 0.28);
+  --scrollbar-thumb-hover: rgba(var(--blue-rgb), 0.5);
+  --scrollbar-thumb-active: rgba(var(--blue-rgb), 0.65);
+  --scrollbar-track: transparent;
+}
+
+/* Firefox (et tout moteur sans ::-webkit-scrollbar) */
+html {
   scrollbar-width: thin;
-  scrollbar-color: rgba(89, 212, 255, 0.3) transparent;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
-.bracket-scroll::-webkit-scrollbar {
-  height: 10px;
+@supports selector(::-webkit-scrollbar) {
+  /* Chromium/WebKit : on rend la main aux pseudo-éléments. */
+  html {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+
+  ::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: var(--scrollbar-track);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    /* Bordure transparente + background-clip : le pouce paraît plus fin que
+       la gouttière, et garde de l'air autour de lui. */
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background: var(--scrollbar-thumb-active);
+    background-clip: padding-box;
+  }
 }
 
-.bracket-scroll::-webkit-scrollbar-track {
-  background: transparent;
+/* Zone défilante discrète : la barre ne se révèle qu'au survol. Réservée aux
+   conteneurs internes, jamais à la page (on ne cache pas le repère principal). */
+.scroll-subtle {
+  --scrollbar-thumb: rgba(var(--blue-rgb), 0.1);
 }
 
-.bracket-scroll::-webkit-scrollbar-thumb {
-  background: rgba(89, 212, 255, 0.25);
-  border-radius: 5px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
+.scroll-subtle:hover,
+.scroll-subtle:focus-within {
+  --scrollbar-thumb: rgba(var(--blue-rgb), 0.32);
 }
 
-.bracket-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(89, 212, 255, 0.45);
-  background-clip: padding-box;
+/* Le pointeur ne survole jamais une barre tactile : on la garde visible. */
+@media (hover: none) {
+  .scroll-subtle {
+    --scrollbar-thumb: rgba(var(--blue-rgb), 0.28);
+  }
 }
 
 /* ===========================================================

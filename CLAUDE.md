@@ -113,6 +113,7 @@ Ajouter un cas = ajouter une entrée à `TOURNAMENTS` ; `lib/server/seed-cases.t
 - `normalizePseudo()` / `slugifyPseudo()` for username normalization, `toIso()` for dates, `parseRoles()` for JSON role arrays — always use these helpers, don't re-implement.
 - User roles on teams are cumulative strings stored as JSON arrays (`OWNER`, `CAPITAINE`, `MANAGER`, `COACH`, `TANK`, `DPS`, `HEAL`).
 - Admin users have `is_admin = true` in `bg_users`; admin-only routes live under `app/api/admin/`.
+- **Zones défilantes** : toute zone qui défile passe par `<ScrollArea>` (`@/components/cyber`) — jamais un `overflowX/Y: "auto"` posé à la main. Le style des barres est global (`app/globals.css`) : plus aucune barre blanche par défaut, ni sur la page, ni dans un conteneur. `ScrollArea` y ajoute la variante discrète (barre révélée au survol), le dégradé de bord optionnel (`fade`) et l'accessibilité clavier (`tabIndex`, `role="region"` dès qu'un `ariaLabel` est fourni — à renseigner systématiquement). Les couleurs se règlent par les tokens `--scrollbar-size`, `--scrollbar-thumb`, `--scrollbar-thumb-hover`, `--scrollbar-track`, surchargeables localement.
 - **Rôles de permission de plateforme** (cumulables, distincts des rôles d'équipe) : `ADMIN`, `ARBITRE` (tournois), `COMMUNITY_MANAGER` (site vitrine + association), `RECRUTEUR` (recrutement). Toujours protéger une route avec `can(user, "<permission>")` de `@/lib/shared/permissions` (permissions : `tournaments`, `showcase`, `recruitment`, `roles`) — ne pas tester `user.isAdmin` directement pour un domaine scopé. `ADMIN` a tous les droits. Voir `docs/features/PERMISSION_ROLES.md`.
 
 ## Design System — « Cyber minimal » (Finalisé)
@@ -129,9 +130,10 @@ Primitives dans `components/cyber/` :
 - **CyberCard** — `lift`, `ticks`, `as="div|section|article"`, style personnalisé
 - **Pill** — badges inline, variantes `.pill-live`, `.pill-blue`
 - **CyberButton, TeamSigil, CountdownStrip, Ticker, MiniBracket** — composants spécialisés
+- **ScrollArea** — `orientation="x"|"y"|"both"`, `subtle`, `fade`, `ariaLabel`
 - **PublicHeader, PublicFooter** — layouts publics de landing
 
-Classes utilitaires : `.eyebrow`, `.display`, `.mono`, `.logotype`, `.num`, `.fabric`, `.card-ticks`, `.section-head`
+Classes utilitaires : `.eyebrow`, `.display`, `.mono`, `.logotype`, `.num`, `.fabric`, `.card-ticks`, `.section-head`, `.scroll-subtle`
 
 ### Typographie
 - **Sans-serif** : Inter (`var(--font-sans)`)
