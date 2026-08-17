@@ -1,7 +1,7 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import type { TournamentPhaseStanding } from "@/lib/shared/types";
-import { PhaseRow, mapPhase } from "./_internal";
+import { PhaseRow } from "./_internal";
 
 /** Insère les phases dans la base de données dans l'ordre de position. */
 export async function insertPhases(

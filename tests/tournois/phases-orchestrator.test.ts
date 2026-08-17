@@ -588,7 +588,7 @@ describe("reconcilePhases — finalization", () => {
     db.updatePhase(602, { state: "FINISHED" });
 
     const conn = db.createMockConnection();
-    await finalizeMultiTournament(6, conn, phase2Standings);
+    await finalizeMultiTournament(6, conn);
 
     const registrations = db.getRegistrations(6);
     // Team 1 (rank 1 in phase 2) should be final_rank 1

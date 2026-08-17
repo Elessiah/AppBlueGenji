@@ -1,5 +1,5 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { resolvePhasePlan, type PhaseConfig } from "@/lib/shared/tournament-phases";
+import { resolvePhasePlan } from "@/lib/shared/tournament-phases";
 import type { TournamentPhaseStanding } from "@/lib/shared/types";
 import {
   loadPhases,
@@ -17,8 +17,7 @@ import { rankingPointsSql } from "@/lib/shared/ranking";
 import { createBracketIfMissing } from "./bracket-generator";
 import { isEliminationPhaseComplete, rankEliminationPhase } from "./finalization";
 import { initializeSwissTournament, generateFirstRound } from "./swiss";
-import { initializeSurvivalTournament, generateSurvivalRound, reconcileSurvival } from "./survival";
-import type { TournamentRow } from "./_internal";
+import { initializeSurvivalTournament, generateSurvivalRound } from "./survival";
 
 /**
  * Initialise un tournoi multi-phase : seed la phase 1 depuis le classement du site,
@@ -76,10 +75,10 @@ export async function initializeMultiTournament(
 
   // Persiste les métriques de chaque phase (entrants, qualifiants, max_rounds, state=SKIPPED)
   for (const resolvedPhase of resolved) {
-    const phaseRow = phases.find((p) => p.id === (p.id ?? 0));
-    const phaseId = phaseRow?.id ?? 0;
+    const phaseRow = phases.find((p) => p.position === resolvedPhase.position);
+    if (!phaseRow) continue;
 
-    await updatePhaseResolution(conn, phaseId, {
+    await updatePhaseResolution(conn, phaseRow.id, {
       entrants: resolvedPhase.entrants,
       qualifiers: resolvedPhase.qualifiers,
       maxRounds: resolvedPhase.maxRounds,
@@ -271,23 +270,35 @@ export async function reconcilePhases(tournamentId: number, conn: PoolConnection
     return; // Phase non terminée, rien à faire
   }
 
-  // Phase terminée : sauve les résultats
+  // Phase terminée. Le classement vient du **moteur de la phase** (survie, ronde
+  // suisse ou bracket) : surtout pas de l'ordre des standings en base, qui est
+  // encore l'ordre de seeding tant que `savePhaseResults` n'a pas écrit les rangs.
+  // S'y fier qualifierait les têtes de série, pas les équipes qui ont gagné.
   const standings = await loadPhaseStandings(conn, currentPhaseId);
-  const rankedStandings = standings.map((s, i) => ({
-    teamId: s.teamId,
-    rank: i + 1,
-    qualified: i < (currentPhase.qualifiers ?? 1),
+  const ordered = [...phaseFinalRanking];
+  const alreadyRanked = new Set(ordered);
+  for (const standing of standings) {
+    if (!alreadyRanked.has(standing.teamId)) ordered.push(standing.teamId);
+  }
+
+  const qualifiersCount = currentPhase.qualifiers ?? 1;
+  const rankedStandings = ordered.map((teamId, index) => ({
+    teamId,
+    rank: index + 1,
+    qualified: index < qualifiersCount,
   }));
 
   await savePhaseResults(conn, currentPhaseId, rankedStandings);
   await setPhaseState(conn, currentPhaseId, "FINISHED", "finished_at");
 
-  // Recalcule le plan des phases avec le nombre réel de qualifiants
-  const actualQualifiers = standings.filter((s) => s.qualified).length;
-  const registrations = await getRegistrationRows(conn, tournamentId);
-  const registeredCount = registrations.length;
+  const qualifiedTeamIds = rankedStandings.filter((r) => r.qualified).map((r) => r.teamId);
+  const actualQualifiers = qualifiedTeamIds.length;
 
-  const phaseConfigs = phases.map((p) => ({
+  // Re-résout le plan **restant** à partir du nombre réel de qualifiées : des
+  // abandons en cours de phase peuvent rendre une phase suivante inutile, qui
+  // devient alors SKIPPED à la volée. Les phases déjà jouées ne sont pas touchées.
+  const remaining = phases.filter((p) => p.position > currentPhase.position);
+  const phaseConfigs = remaining.map((p) => ({
     position: p.position,
     format: p.format,
     name: p.name,
@@ -299,55 +310,39 @@ export async function reconcilePhases(tournamentId: number, conn: PoolConnection
     survivalRoundsPerCut: p.survival_rounds_per_cut,
   }));
 
-  const reresolved = resolvePhasePlan(registeredCount, phaseConfigs);
+  const reresolved = resolvePhasePlan(actualQualifiers, phaseConfigs);
 
-  // Re-persiste les métriques mises à jour (notamment les phases devenues sautées)
-  for (const phase of reresolved) {
-    const phaseRow = phases.find((p) => p.position === phase.position);
-    if (phaseRow) {
-      // Conserve l'état existant si la phase est déjà lancée ou terminée
-      const newState = phase.skipped ? "SKIPPED" : phaseRow.state === "RUNNING" || phaseRow.state === "FINISHED" ? phaseRow.state : "PENDING";
-      await updatePhaseResolution(conn, phaseRow.id, {
-        entrants: phase.entrants,
-        qualifiers: phase.qualifiers,
-        maxRounds: phase.maxRounds,
-        state: newState as "PENDING" | "RUNNING" | "FINISHED" | "SKIPPED",
-      });
-    }
+  for (let i = 0; i < remaining.length; i += 1) {
+    const phaseRow = remaining[i];
+    const resolved = reresolved[i];
+    await updatePhaseResolution(conn, phaseRow.id, {
+      entrants: resolved.entrants,
+      qualifiers: resolved.qualifiers,
+      maxRounds: resolved.maxRounds,
+      state: resolved.skipped ? "SKIPPED" : "PENDING",
+    });
   }
 
-  // Détermine la phase suivante non-sautée
-  const nextPhaseIdx = reresolved.findIndex(
-    (p) => p.position > currentPhase.position && !p.skipped,
-  );
+  const nextPhaseIdx = reresolved.findIndex((p) => !p.skipped);
 
-  if (nextPhaseIdx >= 0) {
-    const nextPhase = reresolved[nextPhaseIdx];
-    const nextPhaseRow = phases.find((p) => p.position === nextPhase.position);
+  if (nextPhaseIdx >= 0 && actualQualifiers > 0) {
+    const nextPhaseRow = remaining[nextPhaseIdx];
 
-    if (nextPhaseRow && actualQualifiers > 0) {
-      // Insère les qualifiants de cette phase en ordre de rang (seed 1 = meilleure)
-      const qualifiants = standings.filter((s) => s.qualified);
-      await insertPhaseTeams(
-        conn,
-        tournamentId,
-        nextPhaseRow.id,
-        qualifiants.map((q, i) => ({
-          teamId: q.teamId,
-          seed: i + 1,
-        })),
-      );
+    // Les qualifiées entrent seedées par leur rang dans la phase écoulée
+    // (seed 1 = meilleure), et non par leur classement de site initial.
+    await insertPhaseTeams(
+      conn,
+      tournamentId,
+      nextPhaseRow.id,
+      qualifiedTeamIds.map((teamId, index) => ({ teamId, seed: index + 1 })),
+    );
 
-      // Lance la phase suivante et récurse
-      await startPhase(tournamentId, nextPhaseRow.id, conn);
-      await reconcilePhases(tournamentId, conn);
-    } else {
-      // Pas assez de qualifiants pour la phase suivante : finalise
-      await finalizeMultiTournament(tournamentId, conn, standings);
-    }
+    await startPhase(tournamentId, nextPhaseRow.id, conn);
+    // Une phase instantanément complète (un seul qualifié, que des byes) doit
+    // enchaîner sans attendre une nouvelle saisie de score.
+    await reconcilePhases(tournamentId, conn);
   } else {
-    // Pas de phase suivante : finalise le tournoi
-    await finalizeMultiTournament(tournamentId, conn, standings);
+    await finalizeMultiTournament(tournamentId, conn);
   }
 }
 
@@ -364,7 +359,6 @@ export async function reconcilePhases(tournamentId: number, conn: PoolConnection
 export async function finalizeMultiTournament(
   tournamentId: number,
   conn: PoolConnection,
-  lastPhaseStandings: TournamentPhaseStanding[],
 ): Promise<void> {
   const phases = await loadPhases(conn, tournamentId);
   const registrations = await getRegistrationRows(conn, tournamentId);
