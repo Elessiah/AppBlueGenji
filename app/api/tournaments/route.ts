@@ -34,10 +34,19 @@ export async function POST(req: Request) {
       hasThirdPlaceMatch?: boolean;
       survivalRoundsBeforeFirstCut?: number;
       survivalRoundsPerCut?: number;
+      swissTotalRounds?: number;
+      swissPointsWin?: number;
+      swissPointsDraw?: number;
+      swissPointsLoss?: number;
     };
 
     if (!body.name?.trim()) return fail("MISSING_NAME", 400);
-    if (body.format !== "SINGLE" && body.format !== "DOUBLE" && body.format !== "SURVIVAL") {
+    if (
+      body.format !== "SINGLE" &&
+      body.format !== "DOUBLE" &&
+      body.format !== "SWISS" &&
+      body.format !== "SURVIVAL"
+    ) {
       return fail("INVALID_FORMAT", 400);
     }
     if (body.game && body.game !== "OW2" && body.game !== "MR") return fail("INVALID_GAME", 400);
@@ -67,6 +76,46 @@ export async function POST(req: Request) {
       }
     }
 
+    // Ronde suisse : nombre de rondes et barème. `null` laisse le moteur retomber
+    // sur la recommandation ⌈log₂(N)⌉ + 1, calculée au démarrage sur l'effectif
+    // réellement inscrit plutôt que sur la capacité annoncée.
+    let swissTotalRounds: number | null = null;
+    let swissPointsWin: number | null = null;
+    let swissPointsDraw: number | null = null;
+    let swissPointsLoss: number | null = null;
+    if (body.format === "SWISS") {
+      if (body.swissTotalRounds != null) {
+        swissTotalRounds = Number(body.swissTotalRounds);
+        if (!Number.isInteger(swissTotalRounds) || swissTotalRounds < 1 || swissTotalRounds > 20) {
+          return fail("INVALID_SWISS_ROUNDS", 400);
+        }
+      }
+
+      const points: [string, number | undefined, (v: number) => void][] = [
+        ["win", body.swissPointsWin, (v) => (swissPointsWin = v)],
+        ["draw", body.swissPointsDraw, (v) => (swissPointsDraw = v)],
+        ["loss", body.swissPointsLoss, (v) => (swissPointsLoss = v)],
+      ];
+      for (const [, raw, assign] of points) {
+        if (raw == null) continue;
+        const value = Number(raw);
+        if (!Number.isInteger(value) || value < 0 || value > 99) {
+          return fail("INVALID_SWISS_POINTS", 400);
+        }
+        assign(value);
+      }
+
+      // Un barème où la défaite rapporte autant qu'une victoire rendrait le
+      // classement — et donc les appariements — arbitraires.
+      if (
+        swissPointsWin !== null &&
+        swissPointsLoss !== null &&
+        swissPointsWin <= swissPointsLoss
+      ) {
+        return fail("INVALID_SWISS_POINTS", 400);
+      }
+    }
+
     const id = await createTournament(user.id, {
       name: body.name.trim(),
       description: body.description ?? null,
@@ -80,6 +129,10 @@ export async function POST(req: Request) {
       hasThirdPlaceMatch: body.hasThirdPlaceMatch,
       survivalRoundsBeforeFirstCut,
       survivalRoundsPerCut,
+      swissTotalRounds,
+      swissPointsWin,
+      swissPointsDraw,
+      swissPointsLoss,
     });
 
     return ok({ id }, 201);

@@ -319,6 +319,20 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  // Migration: seed + abandon dans les standings suisses. L'état complet est
+  // redérivé de l'historique des matchs ; seuls le seed initial et les abandons
+  // (décisions humaines) sont stockés en entrée du rejeu.
+  try {
+    await db.execute(`
+      ALTER TABLE bg_swiss_standings
+      ADD COLUMN seed INT NOT NULL DEFAULT 0,
+      ADD COLUMN status ENUM('ACTIVE', 'FORFEIT') NOT NULL DEFAULT 'ACTIVE',
+      ADD COLUMN forfeit_round INT NULL
+    `);
+  } catch {
+    // Columns already exist
+  }
+
   // Migration: Add Swiss round and bye columns to matches
   try {
     await db.execute(`

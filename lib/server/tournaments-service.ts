@@ -60,6 +60,6 @@ export {
   getTournamentDetail,
   reportMatchScorePublic,
   adminResolveMatchPublic,
-  // Survival
-  forfeitSurvivalTeamPublic as forfeitSurvivalTeam,
+  // Abandon (Survie / Ronde suisse)
+  forfeitTournamentTeamPublic as forfeitTournamentTeam,
 } from "./tournaments";

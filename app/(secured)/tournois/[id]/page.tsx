@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { formatLocalDateTime } from "@/lib/shared/dates";
-import type { BracketMatch, BracketType } from "@/lib/shared/types";
+import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { Pill, CyberButton } from "@/components/cyber";
 import { useTournamentLive } from "./_hooks/useTournamentLive";
@@ -14,6 +14,22 @@ import { AdminScoreDialog } from "./_components/AdminScoreDialog";
 import { MatchScoreDraft } from "./_components/BracketTree";
 import { BracketSections } from "./_components/BracketSections";
 import { SurvivalView } from "./_components/SurvivalView";
+import { SwissView } from "./_components/SwissView";
+
+const FORMAT_LABELS: Record<TournamentFormat, string> = {
+  SINGLE: "Simple élim.",
+  DOUBLE: "Double élim.",
+  SWISS: "Ronde suisse",
+  SURVIVAL: "Survie",
+};
+
+/** « Arbre » ne veut rien dire dans les formats à classement, qui n'en ont pas. */
+const BOARD_TITLES: Record<TournamentFormat, string> = {
+  SINGLE: "Arbre du tournoi",
+  DOUBLE: "Arbre du tournoi",
+  SWISS: "Classement et rondes",
+  SURVIVAL: "Classement et rounds",
+};
 
 const STATE_META: Record<string, { label: string; chipClass: string }> = {
   UPCOMING: { label: "Prochainement", chipClass: "teal" },
@@ -189,13 +205,7 @@ export default function TournamentDetailPage() {
               <Pill variant={detail.card.state === "RUNNING" ? "live" : "blue"}>
                 {stateMeta.label}
               </Pill>
-              <Pill variant="blue">
-                {detail.card.format === "SINGLE"
-                  ? "Simple élim."
-                  : detail.card.format === "SURVIVAL"
-                    ? "Survie"
-                    : "Double élim."}
-              </Pill>
+              <Pill variant="blue">{FORMAT_LABELS[detail.card.format]}</Pill>
               {detail.card.hasThirdPlaceMatch && (
                 <Pill variant="blue">Petite finale</Pill>
               )}
@@ -218,15 +228,33 @@ export default function TournamentDetailPage() {
 
         <div className="ds-block" style={{ marginBottom: 20 }}>
           <div className="ds-section-title green">
-            <h2>Arbre du tournoi</h2>
+            <h2>{BOARD_TITLES[detail.card.format]}</h2>
           </div>
 
           {detail.card.state === "REGISTRATION" ? (
             <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
               {detail.card.format === "SURVIVAL"
                 ? "Le classement de départ (seeding) et les rounds seront générés au démarrage du tournoi."
-                : "Le bracket sera généré automatiquement au démarrage du tournoi."}
+                : detail.card.format === "SWISS"
+                  ? "Le classement de départ (seeding) et la première ronde seront générés au démarrage du tournoi."
+                  : "Le bracket sera généré automatiquement au démarrage du tournoi."}
             </p>
+          ) : detail.card.format === "SWISS" && detail.swiss ? (
+            <SwissView
+              swiss={detail.swiss}
+              matches={detail.matches}
+              allTournamentMatches={detail.matches}
+              myTeamId={detail.myTeamId}
+              isFinished={detail.card.state === "FINISHED"}
+              canReport={canReport}
+              adminResolvable={canAdminResolve}
+              drafts={drafts}
+              onScoreChange={handleScoreChange}
+              onSubmit={submitScore}
+              onOpenAdminModal={setSelectedMatchForAdmin}
+              canForfeit={canForfeit}
+              onForfeit={forfeitTeam}
+            />
           ) : detail.card.format === "SURVIVAL" && detail.survival ? (
             <SurvivalView
               survival={detail.survival}
