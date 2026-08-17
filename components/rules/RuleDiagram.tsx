@@ -9,6 +9,7 @@
  */
 import type { RuleDiagram } from "@/lib/shared/tournament-rules";
 import styles from "./RuleDiagram.module.css";
+import { ScrollArea } from "@/components/cyber";
 
 const BLUE = "var(--blue-500)";
 const AMBER = "var(--amber)";
@@ -492,9 +493,9 @@ export function RuleDiagramFigure({
           </li>
         ))}
       </ul>
-      <div className={styles.scroll}>
+      <ScrollArea className={styles.scroll} ariaLabel={`Schéma : ${caption}`}>
         <Diagram />
-      </div>
+      </ScrollArea>
       <figcaption className={styles.caption}>{caption}</figcaption>
     </figure>
   );

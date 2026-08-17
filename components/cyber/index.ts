@@ -5,3 +5,4 @@ export { TeamSigil } from "./TeamSigil";
 export { CountdownStrip } from "./CountdownStrip";
 export { Ticker } from "./Ticker";
 export { MiniBracket } from "./MiniBracket";
+export { ScrollArea } from "./ScrollArea";

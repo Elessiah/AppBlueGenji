@@ -8,7 +8,7 @@
 /* Les schémas sont dessinés à largeur fixe : ils défilent horizontalement sur
    mobile plutôt que de se tasser jusqu'à l'illisible. */
 .scroll {
-  overflow-x: auto;
+  /* Le défilement et le style de la barre viennent de <ScrollArea>. */
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
 }

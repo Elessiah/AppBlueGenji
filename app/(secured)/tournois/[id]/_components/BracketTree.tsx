@@ -2,6 +2,7 @@
 
 import { CSSProperties, FormEvent, Fragment, useEffect, useRef } from "react";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
+import { ScrollArea } from "@/components/cyber";
 import { MatchRow } from "./MatchRow";
 
 export type MatchScoreDraft = Record<number, { myScore: string; opponentScore: string }>;
@@ -141,17 +142,15 @@ export function BracketTree({
   const roundOffset = (globalIdx: number) => (matchLabel(1, globalIdx) !== null ? LABEL_OFFSET : 0);
 
   return (
-    <div
+    <ScrollArea
+      ariaLabel="Tableau du tournoi — défilement horizontal"
       style={{
         display: "flex",
-        overflowX: "auto",
-        overflowY: "visible",
         paddingBottom: 16,
         marginBottom: 8,
         scrollBehavior: "smooth",
         minHeight: "fit-content",
       }}
-      className="bracket-scroll"
     >
       {roundNums.map((roundNum, roundIdx) => {
         const roundMatches = matchesByRound.get(roundNum)!;
@@ -373,6 +372,6 @@ export function BracketTree({
           </div>
         </div>
       )}
-    </div>
+    </ScrollArea>
   );
 }
