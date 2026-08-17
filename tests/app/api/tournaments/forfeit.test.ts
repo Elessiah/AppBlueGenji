@@ -27,7 +27,7 @@ const params = { params: Promise.resolve({ id: "5" }) };
 describe("POST /api/tournaments/[id]/forfeit", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (service.forfeitSurvivalTeam as jest.Mock).mockResolvedValue(undefined as never);
+    (service.forfeitTournamentTeam as jest.Mock).mockResolvedValue(undefined as never);
   });
   afterEach(() => jest.restoreAllMocks());
 
@@ -35,7 +35,7 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
     const res = await POST(req(), params);
     expect(res.status).toBe(401);
-    expect(service.forfeitSurvivalTeam).not.toHaveBeenCalled();
+    expect(service.forfeitTournamentTeam).not.toHaveBeenCalled();
   });
 
   it("un membre déclare le forfait de son équipe active", async () => {
@@ -43,7 +43,7 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
     (teams.getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 77 } as never);
     const res = await POST(req(), params);
     expect(res.status).toBe(200);
-    expect(service.forfeitSurvivalTeam).toHaveBeenCalledWith(5, 77);
+    expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 77);
   });
 
   it("refuse un membre sans équipe active (400)", async () => {
@@ -60,7 +60,7 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
     (teams.getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 77 } as never);
     const res = await POST(req({ teamId: 77 }), params);
     expect(res.status).toBe(200);
-    expect(service.forfeitSurvivalTeam).toHaveBeenCalledWith(5, 77);
+    expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 77);
   });
 
   it("empêche un membre de forfaiter une autre équipe (403)", async () => {
@@ -68,19 +68,19 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
     (teams.getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 77 } as never);
     const res = await POST(req({ teamId: 88 }), params);
     expect(res.status).toBe(403);
-    expect(service.forfeitSurvivalTeam).not.toHaveBeenCalled();
+    expect(service.forfeitTournamentTeam).not.toHaveBeenCalled();
   });
 
   it("un arbitre peut forcer le forfait d'une équipe ciblée", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
     const res = await POST(req({ teamId: 88 }), params);
     expect(res.status).toBe(200);
-    expect(service.forfeitSurvivalTeam).toHaveBeenCalledWith(5, 88);
+    expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 88);
   });
 
   it("remonte TEAM_ALREADY_OUT en 400", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
-    (service.forfeitSurvivalTeam as jest.Mock).mockRejectedValue(
+    (service.forfeitTournamentTeam as jest.Mock).mockRejectedValue(
       new Error("TEAM_ALREADY_OUT") as never,
     );
     const res = await POST(req({ teamId: 88 }), params);

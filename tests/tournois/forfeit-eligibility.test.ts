@@ -53,11 +53,16 @@ describe("forfait — restrictions de contexte", () => {
     }
   });
 
-  it("n'existe qu'en mode Survie", () => {
-    for (const format of ["SINGLE", "DOUBLE", "SWISS"] as const) {
+  it("n'existe que dans les formats à classement (Survie, Ronde suisse)", () => {
+    // En élimination, une équipe qui renonce perd son match : il n'y a rien à
+    // abandonner en dehors du terrain.
+    for (const format of ["SINGLE", "DOUBLE"] as const) {
       expect(canForfeitTeam(context({ format }), MY_TEAM)).toBe(false);
       expect(canForfeitTeam(context({ format, isAdmin: true }), MY_TEAM)).toBe(false);
     }
-    expect(canForfeitTeam(context({ format: "SURVIVAL" }), MY_TEAM)).toBe(true);
+    for (const format of ["SURVIVAL", "SWISS"] as const) {
+      expect(canForfeitTeam(context({ format }), MY_TEAM)).toBe(true);
+      expect(canForfeitTeam(context({ format, isAdmin: true }), OTHER_TEAM)).toBe(true);
+    }
   });
 });

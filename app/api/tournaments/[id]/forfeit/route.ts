@@ -1,11 +1,12 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { forfeitSurvivalTeam } from "@/lib/server/tournaments-service";
+import { forfeitTournamentTeam } from "@/lib/server/tournaments-service";
 import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { can } from "@/lib/shared/permissions";
 
 /**
- * Déclare le forfait d'une équipe dans un tournoi « Survie ».
+ * Déclare le forfait d'une équipe dans un tournoi « Survie » ou « Ronde suisse »
+ * — les formats où une équipe reste en lice sans être éliminée par une défaite.
  * - Un membre déclare le forfait de son équipe active.
  * - Un arbitre/admin peut forcer le forfait de n'importe quelle équipe (`teamId`).
  */
@@ -38,12 +39,14 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!Number.isInteger(teamId) || teamId <= 0) return fail("INVALID_TEAM", 400);
 
   try {
-    await forfeitSurvivalTeam(tournamentId, teamId);
+    await forfeitTournamentTeam(tournamentId, teamId);
     return ok({ success: true });
   } catch (error) {
     const message = (error as Error).message;
     if (
       message === "NOT_SURVIVAL" ||
+      message === "NOT_SWISS" ||
+      message === "FORMAT_WITHOUT_FORFEIT" ||
       message === "TOURNAMENT_NOT_RUNNING" ||
       message === "TEAM_ALREADY_OUT"
     ) {

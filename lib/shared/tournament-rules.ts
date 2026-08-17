@@ -261,11 +261,11 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
     format: "SWISS",
     label: "Ronde suisse",
     shortLabel: "Suisse",
-    status: "SOON",
+    status: "AVAILABLE",
     tagline:
       "Un nombre de rondes fixe, aucune élimination, un classement fiable en peu de matchs.",
     facts: [
-      { label: "Statut", value: "Bientôt" },
+      { label: "Équipes", value: "2 à 256" },
       { label: "Élimination", value: "Aucune" },
       { label: "Rondes", value: "⌈log₂(N)⌉ + 1" },
       { label: "Départages", value: "Buchholz & co." },
@@ -285,31 +285,56 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
           "Le système suisse produit un classement fiable avec beaucoup moins de matchs qu'un championnat complet : au lieu d'affronter tout le monde, chaque équipe affronte à chaque ronde une adversaire de niveau équivalent au tournoi.",
         ],
         bullets: [
-          "Le nombre de rondes est fixé au lancement (recommandation : ⌈log₂(nombre d'équipes)⌉ + 1).",
+          "Le nombre de rondes est fixé à la création (recommandation : ⌈log₂(nombre d'équipes)⌉ + 1, proposée par défaut).",
           "Aucune élimination : une équipe qui perd ses premiers matchs joue quand même jusqu'au bout.",
+          "Le barème est réglable à la création : 3 points la victoire, 1 le nul, 0 la défaite par défaut.",
         ],
       },
       {
-        title: "Appariements",
+        title: "Première ronde",
         body: [
-          "La première ronde suit le seeding. Ensuite, les équipes sont regroupées par nombre de points et appariées à l'intérieur de leur groupe.",
+          "Le seeding initial vient du classement du site, calculé sur l'ensemble des matchs joués toutes compétitions confondues (victoire = 3 points, défaite = 1 point). Seed 1 = meilleure équipe.",
+        ],
+        bullets: [
+          "La moitié haute du seeding affronte la moitié basse : la 1ʳᵉ rencontre la (N/2 + 1)ᵉ, et ainsi de suite.",
+          "Les têtes de série ne s'éliminent donc pas entre elles dès l'ouverture.",
+        ],
+      },
+      {
+        title: "Appariements des rondes suivantes",
+        body: [
+          "Les équipes sont regroupées par nombre de points et appariées à l'intérieur de leur groupe. Le tirage explore les combinaisons possibles pour éviter les rematchs, quitte à piocher dans le groupe voisin quand un groupe est bloqué.",
         ],
         bullets: [
           "Les invaincues jouent contre les invaincues, celles à une défaite entre elles, etc.",
-          "Deux équipes ne se rencontrent normalement jamais deux fois.",
-          "Si l'effectif est impair, une équipe reçoit une victoire d'office — jamais deux fois la même tant que c'est évitable.",
+          "Deux équipes ne se rencontrent jamais deux fois tant qu'une autre combinaison existe.",
+          "Si l'effectif est impair, une équipe reçoit une victoire d'office, qui vaut exactement une victoire — attribuée à la plus basse du classement n'en ayant pas encore reçu.",
+          "Une correction de score en amont réapparie automatiquement la ronde suivante, tant qu'aucun score n'y a été saisi.",
         ],
       },
       {
         title: "Classement et départages",
         body: [
-          "Le classement se fait aux points. À égalité, les départages mesurent la difficulté du parcours plutôt que le hasard des appariements : Buchholz (somme des points des adversaires), Sonneborn-Berger, pourcentage de victoires des adversaires, confrontation directe.",
+          "Le classement se fait aux points, recalculé après chaque match. À égalité, les départages mesurent la difficulté du parcours plutôt que le hasard des appariements ; ils s'appliquent dans cet ordre :",
+        ],
+        bullets: [
+          "Buchholz : somme des points des adversaires rencontrés.",
+          "Sonneborn-Berger : somme des points des adversaires battus (moitié pour un nul).",
+          "Pourcentage de victoires des adversaires rencontrés.",
+          "Confrontation directe entre les équipes à départager.",
+          "En dernier ressort, le seed initial — jamais un tirage au sort.",
         ],
       },
       {
-        title: "Ouverture",
+        title: "Abandon",
         body: [
-          "Le moteur d'appariement est déjà en place côté plateforme, mais le format n'est pas encore proposé à la création d'un tournoi. Il sera activé une fois la phase de test terminée.",
+          "Comme en Survie, une équipe peut quitter le tournoi en cours de route. Elle conserve les points déjà acquis mais n'est plus appariée, et passe derrière toutes les équipes encore en lice au classement final.",
+        ],
+      },
+      {
+        title: "Classement final",
+        body: [
+          "Le tournoi se termine à l'issue de la dernière ronde prévue : la tête du classement est championne. Il n'y a pas de finale — le classement fait foi.",
         ],
       },
     ],
