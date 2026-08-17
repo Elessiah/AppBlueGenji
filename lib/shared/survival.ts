@@ -7,9 +7,9 @@
  * victoires puis des défaites (la meilleure équipe en haut) et les équipes sont
  * appariées par paires adjacentes (1 vs 2, 3 vs 4, …).
  *
- * Après chaque bloc de `roundsPerCut` rounds, les deux dernières équipes encore
- * en lice sont éliminées (une seule lorsqu'il ne resterait sinon plus personne),
- * et ainsi de suite jusqu'à ce qu'il ne reste qu'une équipe championne.
+ * Après chaque bloc de `roundsPerCut` rounds, les équipes aux rangs les plus
+ * bas sont éliminées jusqu'à ce qu'il ne reste que `targetTeams` équipes
+ * (par défaut 1 pour un tournoi simple, N pour une phase qualificative).
  *
  * **Parité.** Un effectif impair impose une victoire d'office à chaque round, et
  * comme une coupe retire deux équipes elle conserve la parité : l'effectif
@@ -145,22 +145,22 @@ export function planSurvivalRound(
  * Nombre d'équipes à éliminer lors d'une coupe : deux par défaut, **une seule**
  * quand l'effectif est impair (coupe d'équilibrage : le reliquat redevient pair,
  * donc plus aucune victoire d'office) ou quand il ne resterait sinon plus aucune
- * équipe. Zéro s'il reste au plus une équipe.
+ * équipe. Zéro s'il reste au plus `targetTeams` équipes (par défaut 1).
  */
-export function teamsToEliminate(activeCount: number): number {
-  if (activeCount <= 1) return 0;
-  if (activeCount === 2) return 1;
+export function teamsToEliminate(activeCount: number, targetTeams = 1): number {
+  if (activeCount <= targetTeams) return 0;
+  if (activeCount === targetTeams + 1) return 1;
   return activeCount % 2 === 1 ? 1 : 2;
 }
 
 /**
  * Vrai lorsque le perdant du barrage doit effectivement être éliminé : seulement
- * si l'effectif est encore impair au moment de la réconciliation. Un forfait
- * survenu pendant le barrage a pu rétablir la parité de lui-même — inutile alors
- * de sortir une équipe de plus.
+ * si l'effectif est encore impair et dépasse `targetTeams` au moment de la
+ * réconciliation. Un forfait survenu pendant le barrage a pu rétablir la parité
+ * de lui-même — inutile alors de sortir une équipe de plus.
  */
-export function shouldEliminateBarrageLoser(activeCount: number): boolean {
-  return needsBarrage(activeCount);
+export function shouldEliminateBarrageLoser(activeCount: number, targetTeams = 1): boolean {
+  return activeCount > targetTeams && needsBarrage(activeCount);
 }
 
 /**
@@ -241,6 +241,8 @@ export type ReplaySurvivalInput = SurvivalCutSchedule & {
   barrageRounds: number;
   /** Dernier round généré (`survival_current_round`). */
   lastRound: number;
+  /** Nombre d'équipes cibles (défaut 1 pour un tournoi, N pour une phase qualificative). */
+  targetTeams?: number;
 };
 
 /**
@@ -258,6 +260,7 @@ export type ReplaySurvivalInput = SurvivalCutSchedule & {
  * des conséquences d'un résultat.
  */
 export function replaySurvival(input: ReplaySurvivalInput): SurvivalStanding[] {
+  const targetTeams = input.targetTeams ?? 1;
   const state = new Map<number, SurvivalStanding>(
     input.teams.map((t) => [
       t.teamId,
@@ -321,7 +324,7 @@ export function replaySurvival(input: ReplaySurvivalInput): SurvivalStanding[] {
 
     // 3. Barrage : le perdant sort, si l'effectif est encore impair.
     if (input.barrageRounds > 0 && round <= input.barrageRounds) {
-      if (shouldEliminateBarrageLoser(activeStandings().length)) {
+      if (shouldEliminateBarrageLoser(activeStandings().length, targetTeams)) {
         const loserId = roundMatches.find((m) => m.loserTeamId !== null)?.loserTeamId ?? null;
         if (loserId !== null) eliminate(loserId, round, "ELIMINATED");
       }
@@ -331,7 +334,7 @@ export function replaySurvival(input: ReplaySurvivalInput): SurvivalStanding[] {
     // 4. Coupe périodique.
     if (isCutRound(round, input)) {
       const active = activeStandings();
-      for (const teamId of selectEliminatedTeamIds(active, teamsToEliminate(active.length))) {
+      for (const teamId of selectEliminatedTeamIds(active, teamsToEliminate(active.length, targetTeams))) {
         eliminate(teamId, round, "ELIMINATED");
       }
     }
@@ -356,10 +359,12 @@ export function samePairings(a: SurvivalRoundPlan, b: SurvivalRoundPlan): boolea
 }
 
 /**
- * Attribue le classement final. La championne (dernière équipe active, ou à
- * défaut la mieux classée) obtient le rang 1 ; les autres sont ordonnées par
- * round d'élimination décroissant (éliminées tard = mieux classées), puis par
- * victoires/défaites/seed.
+ * Attribue le classement final. Les équipes actives (survivantes quand le nombre
+ * cible est atteint) obtiennent les premiers rangs, triées par standing courant
+ * (victoires décroissantes, défaites croissantes, seed croissant) ; les autres
+ * sont ordonnées par round d'élimination décroissant (éliminées tard = mieux
+ * classées), puis par victoires/défaites/seed. En mode phase qualificative,
+ * seules les équipes actives sont qualifiées.
  */
 export function computeFinalRanks(standings: SurvivalStanding[]): Map<number, number> {
   const active = standings.filter((s) => s.status === "ACTIVE").sort(compareStanding);

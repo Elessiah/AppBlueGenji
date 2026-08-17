@@ -16,6 +16,13 @@ import { createMatch, finishTournament } from "./repository";
 
 const DEFAULT_ROUNDS_PER_CUT = 3;
 
+type SurvivalScope = {
+  tournamentId: number;
+  phaseId: number;
+  table: "bg_tournaments" | "bg_tournament_phases";
+  rowId: number;
+};
+
 /**
  * Cadence effective d'un tournoi. `survival_rounds_before_first_cut` est NULL sur
  * les tournois créés avant l'option : la première coupe tombe alors au bout d'un
@@ -49,23 +56,57 @@ interface StandingDbRow extends RowDataPacket {
   has_bye: number;
 }
 
+function buildSurvivalScope(
+  tournamentId: number,
+  phaseId = 0,
+): SurvivalScope {
+  if (phaseId === 0) {
+    return {
+      tournamentId,
+      phaseId: 0,
+      table: "bg_tournaments",
+      rowId: tournamentId,
+    };
+  }
+  return {
+    tournamentId,
+    phaseId,
+    table: "bg_tournament_phases",
+    rowId: phaseId,
+  };
+}
+
 async function loadTournament(
   conn: PoolConnection,
   tournamentId: number,
   forUpdate = false,
+  phaseId = 0,
 ): Promise<TournamentSurvivalRow | null> {
-  const [rows] = await conn.execute<TournamentSurvivalRow[]>(
-    `SELECT format, state, survival_rounds_before_first_cut, survival_rounds_per_cut,
+  const scope = buildSurvivalScope(tournamentId, phaseId);
+  const suffix = forUpdate ? " FOR UPDATE" : "";
+  let sql: string;
+  let params: unknown[];
+
+  if (scope.table === "bg_tournaments") {
+    sql = `SELECT format, state, survival_rounds_before_first_cut, survival_rounds_per_cut,
             survival_current_round, survival_barrage_rounds
-     FROM bg_tournaments WHERE id = ? LIMIT 1${forUpdate ? " FOR UPDATE" : ""}`,
-    [tournamentId],
-  );
+     FROM bg_tournaments WHERE id = ? LIMIT 1${suffix}`;
+    params = [tournamentId];
+  } else {
+    sql = `SELECT format, state, survival_rounds_before_first_cut, survival_rounds_per_cut,
+            survival_current_round, survival_barrage_rounds
+     FROM bg_tournament_phases WHERE id = ? LIMIT 1${suffix}`;
+    params = [phaseId];
+  }
+
+  const [rows] = await conn.execute<TournamentSurvivalRow[]>(sql, params);
   return rows.length === 0 ? null : rows[0];
 }
 
 async function loadStandings(
   conn: PoolConnection,
   tournamentId: number,
+  phaseId = 0,
 ): Promise<SurvivalStanding[]> {
   const [rows] = await conn.execute<StandingDbRow[]>(
     `SELECT
@@ -78,12 +119,13 @@ async function loadStandings(
       EXISTS(
         SELECT 1 FROM bg_matches m
         WHERE m.tournament_id = s.tournament_id
+          AND m.phase_id = ?
           AND m.is_bye = 1
           AND m.winner_team_id = s.team_id
       ) AS has_bye
      FROM bg_survival_standings s
-     WHERE s.tournament_id = ?`,
-    [tournamentId],
+     WHERE s.tournament_id = ? AND s.phase_id = ?`,
+    [phaseId, tournamentId, phaseId],
   );
 
   return rows.map((row) => ({
@@ -101,6 +143,7 @@ async function loadStandings(
 async function loadMatchOutcomes(
   conn: PoolConnection,
   tournamentId: number,
+  phaseId = 0,
 ): Promise<SurvivalMatchOutcome[]> {
   const [rows] = await conn.execute<
     (RowDataPacket & {
@@ -113,9 +156,9 @@ async function loadMatchOutcomes(
   >(
     `SELECT round_number, status, winner_team_id, loser_team_id, is_bye
      FROM bg_matches
-     WHERE tournament_id = ?
+     WHERE tournament_id = ? AND phase_id = ?
      ORDER BY round_number, match_number`,
-    [tournamentId],
+    [tournamentId, phaseId],
   );
 
   return rows.map((row) => ({
@@ -138,9 +181,10 @@ async function loadMatchOutcomes(
 async function replayAndPersist(
   conn: PoolConnection,
   tournamentId: number,
-  options: SurvivalCutSchedule & { lastRound: number },
+  options: SurvivalCutSchedule & { lastRound: number; targetTeams?: number },
+  phaseId = 0,
 ): Promise<SurvivalStanding[]> {
-  const stored = await loadStandings(conn, tournamentId);
+  const stored = await loadStandings(conn, tournamentId, phaseId);
   if (stored.length === 0) return [];
 
   const forfeits: SurvivalForfeit[] = stored
@@ -149,15 +193,16 @@ async function replayAndPersist(
 
   const derived = replaySurvival({
     teams: stored.map((s) => ({ teamId: s.teamId, seed: s.seed })),
-    matches: await loadMatchOutcomes(conn, tournamentId),
+    matches: await loadMatchOutcomes(conn, tournamentId, phaseId),
     forfeits,
     roundsBeforeFirstCut: options.roundsBeforeFirstCut,
     roundsPerCut: options.roundsPerCut,
     barrageRounds: options.barrageRounds ?? 0,
     lastRound: options.lastRound,
+    targetTeams: options.targetTeams,
   });
 
-  await persistStandings(conn, tournamentId, derived);
+  await persistStandings(conn, tournamentId, derived, phaseId);
   return derived;
 }
 
@@ -185,6 +230,7 @@ async function persistStandings(
   conn: PoolConnection,
   tournamentId: number,
   standings: SurvivalStanding[],
+  phaseId = 0,
 ): Promise<void> {
   if (standings.length === 0) return;
 
@@ -197,7 +243,7 @@ async function persistStandings(
   const rank = caseExpression(standings, params, (s) => ranks.get(s.teamId) ?? 0);
 
   const teamIds = standings.map((s) => s.teamId);
-  params.push(tournamentId, ...teamIds);
+  params.push(tournamentId, phaseId, ...teamIds);
 
   await conn.execute(
     `UPDATE bg_survival_standings SET
@@ -206,75 +252,86 @@ async function persistStandings(
        status = ${status},
        eliminated_round = ${eliminatedRound},
        \`rank\` = ${rank}
-     WHERE tournament_id = ? AND team_id IN (${teamIds.map(() => "?").join(", ")})`,
+     WHERE tournament_id = ? AND phase_id = ? AND team_id IN (${teamIds.map(() => "?").join(", ")})`,
     params,
   );
 }
 
 /**
- * Initialise le mode Survie : seed depuis le classement du site, création des
- * lignes de standings. Ne démarre aucun round (voir {@link generateSurvivalRound}).
+ * Initialise le mode Survie : seed depuis le classement du site (ou depuis une
+ * liste fournie), création des lignes de standings. Ne démarre aucun round
+ * (voir {@link generateSurvivalRound}).
  */
 export async function initializeSurvivalTournament(
   tournamentId: number,
   conn: PoolConnection,
+  options?: { phaseId?: number; teamIds?: number[] },
 ): Promise<void> {
-  const tournament = await loadTournament(conn, tournamentId);
+  const phaseId = options?.phaseId ?? 0;
+  const tournament = await loadTournament(conn, tournamentId, false, phaseId);
   if (!tournament || tournament.format !== "SURVIVAL") return;
 
-  // Seed par le classement du site, au **même barème** que le leaderboard de la
-  // landing (`lib/shared/ranking.ts`) : les deux formules avaient divergé, et
-  // celle du seeding faisait monter une équipe à chaque défaite encaissée.
-  const WINS = "COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
-  const LOSSES = "COALESCE(SUM(CASE WHEN m.loser_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
-  const [seedRows] = await conn.execute<
-    (RowDataPacket & { team_id: number; wins: number; losses: number })[]
-  >(
-    `SELECT
-      r.team_id,
-      ${WINS} AS wins,
-      ${LOSSES} AS losses
-     FROM bg_tournament_registrations r
-     LEFT JOIN bg_matches m
-       ON (m.team1_id = r.team_id OR m.team2_id = r.team_id)
-      AND m.status = 'COMPLETED'
-     WHERE r.tournament_id = ?
-     GROUP BY r.team_id
-     ORDER BY ${rankingPointsSql(WINS, LOSSES)} DESC, ${WINS} DESC, r.team_id ASC`,
-    [tournamentId],
-  );
+  let seedRows: Array<{ team_id: number; wins: number; losses: number }>;
+
+  if (options?.teamIds) {
+    seedRows = options.teamIds.map((teamId) => ({
+      team_id: teamId,
+      wins: 0,
+      losses: 0,
+    }));
+  } else {
+    const WINS = "COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
+    const LOSSES = "COALESCE(SUM(CASE WHEN m.loser_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
+    const [rows] = await conn.execute<
+      (RowDataPacket & { team_id: number; wins: number; losses: number })[]
+    >(
+      `SELECT
+        r.team_id,
+        ${WINS} AS wins,
+        ${LOSSES} AS losses
+       FROM bg_tournament_registrations r
+       LEFT JOIN bg_matches m
+         ON (m.team1_id = r.team_id OR m.team2_id = r.team_id)
+        AND m.status = 'COMPLETED'
+       WHERE r.tournament_id = ?
+       GROUP BY r.team_id
+       ORDER BY ${rankingPointsSql(WINS, LOSSES)} DESC, ${WINS} DESC, r.team_id ASC`,
+      [tournamentId],
+    );
+    seedRows = rows;
+  }
 
   let seed = 1;
   for (const row of seedRows) {
     await conn.execute(
       `INSERT INTO bg_survival_standings
-        (tournament_id, team_id, seed, wins, losses, status, eliminated_round, \`rank\`)
-       VALUES (?, ?, ?, 0, 0, 'ACTIVE', NULL, ?)
+        (tournament_id, phase_id, team_id, seed, wins, losses, status, eliminated_round, \`rank\`)
+       VALUES (?, ?, ?, ?, 0, 0, 'ACTIVE', NULL, ?)
        ON DUPLICATE KEY UPDATE seed = VALUES(seed), wins = 0, losses = 0,
         status = 'ACTIVE', eliminated_round = NULL, \`rank\` = VALUES(\`rank\`)`,
-      [tournamentId, Number(row.team_id), seed, seed],
+      [tournamentId, phaseId, Number(row.team_id), seed, seed],
     );
     seed += 1;
   }
 
-  // Défauts de sécurité si les paramètres n'ont pas été fournis à la création.
+  const scope = buildSurvivalScope(tournamentId, phaseId);
+
   if (tournament.survival_rounds_per_cut === null) {
     await conn.execute(
-      `UPDATE bg_tournaments SET survival_rounds_per_cut = ? WHERE id = ?`,
-      [DEFAULT_ROUNDS_PER_CUT, tournamentId],
+      `UPDATE ${scope.table} SET survival_rounds_per_cut = ? WHERE id = ?`,
+      [DEFAULT_ROUNDS_PER_CUT, scope.rowId],
     );
   }
   if (tournament.survival_rounds_before_first_cut === null) {
     await conn.execute(
-      `UPDATE bg_tournaments SET survival_rounds_before_first_cut = ? WHERE id = ?`,
-      [Number(tournament.survival_rounds_per_cut ?? DEFAULT_ROUNDS_PER_CUT), tournamentId],
+      `UPDATE ${scope.table} SET survival_rounds_before_first_cut = ? WHERE id = ?`,
+      [Number(tournament.survival_rounds_per_cut ?? DEFAULT_ROUNDS_PER_CUT), scope.rowId],
     );
   }
 
-  // bracket_size sert de témoin « initialisé » (évite les re-syncs inutiles).
   await conn.execute(
-    `UPDATE bg_tournaments SET bracket_size = ?, survival_barrage_rounds = 0 WHERE id = ?`,
-    [seedRows.length, tournamentId],
+    `UPDATE ${scope.table} SET bracket_size = ?, survival_barrage_rounds = 0 WHERE id = ?`,
+    [seedRows.length, scope.rowId],
   );
 }
 
@@ -290,11 +347,12 @@ export async function initializeSurvivalTournament(
 export async function generateSurvivalRound(
   tournamentId: number,
   conn: PoolConnection,
+  phaseId = 0,
 ): Promise<void> {
-  const tournament = await loadTournament(conn, tournamentId);
+  const tournament = await loadTournament(conn, tournamentId, false, phaseId);
   if (!tournament || tournament.format !== "SURVIVAL") return;
 
-  const standings = await loadStandings(conn, tournamentId);
+  const standings = await loadStandings(conn, tournamentId, phaseId);
   const active = rankActiveTeams(standings);
   if (active.length < 2) return;
 
@@ -302,13 +360,14 @@ export async function generateSurvivalRound(
   const plan = planSurvivalRound(active, { allowBarrage: nextRound === 1 });
   const isBarrage = plan.isBarrage;
 
-  await writeRound(conn, tournamentId, nextRound, plan);
+  await writeRound(conn, tournamentId, nextRound, plan, phaseId);
 
+  const scope = buildSurvivalScope(tournamentId, phaseId);
   await conn.execute(
-    `UPDATE bg_tournaments
+    `UPDATE ${scope.table}
      SET survival_current_round = ?, survival_barrage_rounds = ?
      WHERE id = ?`,
-    [nextRound, isBarrage ? 1 : Number(tournament.survival_barrage_rounds ?? 0), tournamentId],
+    [nextRound, isBarrage ? 1 : Number(tournament.survival_barrage_rounds ?? 0), scope.rowId],
   );
 }
 
@@ -344,14 +403,15 @@ async function roundHasScoreInput(
   conn: PoolConnection,
   tournamentId: number,
   round: number,
+  phaseId = 0,
 ): Promise<boolean> {
   const [rows] = await conn.execute<(RowDataPacket & { c: number })[]>(
     `SELECT COUNT(*) AS c FROM bg_matches
-     WHERE tournament_id = ? AND round_number = ? AND is_bye = 0
+     WHERE tournament_id = ? AND phase_id = ? AND round_number = ? AND is_bye = 0
        AND (team1_score IS NOT NULL OR team2_score IS NOT NULL
             OR winner_team_id IS NOT NULL OR forfeit_team_id IS NOT NULL
             OR team1_reported_at IS NOT NULL OR team2_reported_at IS NOT NULL)`,
-    [tournamentId, round],
+    [tournamentId, phaseId, round],
   );
   return Number(rows[0]?.c ?? 0) > 0;
 }
@@ -362,10 +422,11 @@ async function writeRound(
   tournamentId: number,
   round: number,
   plan: ReturnType<typeof planSurvivalRound>,
+  phaseId = 0,
 ): Promise<void> {
   let matchNumber = 1;
   for (const pairing of plan.pairings) {
-    const matchId = await createMatch(conn, tournamentId, "UPPER", round, matchNumber);
+    const matchId = await createMatch(conn, tournamentId, "UPPER", round, matchNumber, phaseId);
     await conn.execute(
       `UPDATE bg_matches SET team1_id = ?, team2_id = ?, status = 'READY', is_bye = 0
        WHERE id = ?`,
@@ -375,7 +436,7 @@ async function writeRound(
   }
 
   if (plan.byeTeamId !== null) {
-    const matchId = await createMatch(conn, tournamentId, "UPPER", round, matchNumber);
+    const matchId = await createMatch(conn, tournamentId, "UPPER", round, matchNumber, phaseId);
     await conn.execute(
       `UPDATE bg_matches SET
         team1_id = ?, team2_id = NULL, is_bye = 1, status = 'COMPLETED',
@@ -391,14 +452,15 @@ async function readRoundPlan(
   conn: PoolConnection,
   tournamentId: number,
   round: number,
+  phaseId = 0,
 ): Promise<ReturnType<typeof planSurvivalRound> | null> {
   const [rows] = await conn.execute<
     (RowDataPacket & { team1_id: number | null; team2_id: number | null; is_bye: number })[]
   >(
     `SELECT team1_id, team2_id, is_bye FROM bg_matches
-     WHERE tournament_id = ? AND round_number = ?
+     WHERE tournament_id = ? AND phase_id = ? AND round_number = ?
      ORDER BY match_number`,
-    [tournamentId, round],
+    [tournamentId, phaseId, round],
   );
   if (rows.length === 0) return null;
 
@@ -425,59 +487,73 @@ async function ensureNextRound(
   tournamentId: number,
   nextRound: number,
   active: SurvivalStanding[],
+  phaseId = 0,
 ): Promise<boolean> {
   const desired = planSurvivalRound(active, { allowBarrage: nextRound === 1 });
-  const existing = await readRoundPlan(conn, tournamentId, nextRound);
+  const existing = await readRoundPlan(conn, tournamentId, nextRound, phaseId);
 
   if (existing === null) {
-    await writeRound(conn, tournamentId, nextRound, desired);
+    await writeRound(conn, tournamentId, nextRound, desired, phaseId);
     return true;
   }
 
   if (samePairings(existing, desired)) return false;
-  if (await roundHasScoreInput(conn, tournamentId, nextRound)) return false;
+  if (await roundHasScoreInput(conn, tournamentId, nextRound, phaseId)) return false;
 
-  await conn.execute(`DELETE FROM bg_matches WHERE tournament_id = ? AND round_number = ?`, [
-    tournamentId,
-    nextRound,
-  ]);
-  await writeRound(conn, tournamentId, nextRound, desired);
+  await conn.execute(
+    `DELETE FROM bg_matches WHERE tournament_id = ? AND phase_id = ? AND round_number = ?`,
+    [tournamentId, phaseId, nextRound],
+  );
+  await writeRound(conn, tournamentId, nextRound, desired, phaseId);
   return true;
 }
 
 /**
- * Réconcilie l'état du tournoi Survie après tout changement de score.
+ * Réconcilie l'état du tournoi/phase Survie après tout changement de score.
  * Idempotent : recalcule les stats, applique la coupe due, puis clôt ou génère
- * le round suivant. Sûr à appeler quel que soit le chemin (report, admin, bye).
+ * le round suivant. Retourne `{ done, standings }` pour que les orchestrateurs
+ * de phase puissent qualifier les équipes.
  */
 export async function reconcileSurvival(
   tournamentId: number,
   conn: PoolConnection,
-): Promise<void> {
-  // Verrou de ligne : sérialise les réconciliations concurrentes (deux reports
-  // simultanés clôturant le même round) pour éviter de générer deux fois le
-  // round suivant ou d'appliquer deux fois une coupe.
-  const tournament = await loadTournament(conn, tournamentId, true);
-  if (!tournament || tournament.format !== "SURVIVAL") return;
-  if (tournament.state === "FINISHED") return;
+  options?: { phaseId?: number; targetTeams?: number },
+): Promise<{ done: boolean; standings: SurvivalStanding[] }> {
+  const phaseId = options?.phaseId ?? 0;
+  const targetTeams = options?.targetTeams ?? 1;
+
+  const tournament = await loadTournament(conn, tournamentId, true, phaseId);
+  if (!tournament || tournament.format !== "SURVIVAL") {
+    return { done: false, standings: [] };
+  }
+  if (tournament.state === "FINISHED") {
+    return { done: false, standings: [] };
+  }
 
   const schedule = resolveCutSchedule(tournament);
   const currentRound = Number(tournament.survival_current_round);
 
-  // Tout l'état (victoires, défaites, éliminations, rangs) est redérivé de
-  // l'historique des matchs : une correction de score en amont défait la coupe
-  // qu'elle avait provoquée au lieu de la laisser figée.
-  const standings = await replayAndPersist(conn, tournamentId, {
-    ...schedule,
-    lastRound: currentRound,
-  });
+  const standings = await replayAndPersist(
+    conn,
+    tournamentId,
+    {
+      ...schedule,
+      lastRound: currentRound,
+      targetTeams,
+    },
+    phaseId,
+  );
 
-  // Aucun round généré (départ avec 0 ou 1 équipe) : clôture immédiate.
+  // Aucun round généré (départ avec 0 ou targetTeams équipes) : clôture immédiate.
   if (currentRound === 0) {
-    if (rankActiveTeams(standings).length <= 1) {
-      await finalizeSurvival(tournamentId, conn, standings);
+    const active = rankActiveTeams(standings);
+    if (active.length <= targetTeams) {
+      if (phaseId === 0) {
+        await finalizeSurvival(tournamentId, conn, standings);
+      }
+      return { done: true, standings };
     }
-    return;
+    return { done: false, standings };
   }
 
   const active = rankActiveTeams(standings);
@@ -485,34 +561,36 @@ export async function reconcileSurvival(
   // Round encore en cours ?
   const [incomplete] = await conn.execute<(RowDataPacket & { c: number })[]>(
     `SELECT COUNT(*) AS c FROM bg_matches
-     WHERE tournament_id = ? AND round_number = ? AND status <> 'COMPLETED'`,
-    [tournamentId, currentRound],
+     WHERE tournament_id = ? AND phase_id = ? AND round_number = ? AND status <> 'COMPLETED'`,
+    [tournamentId, phaseId, currentRound],
   );
 
   if (Number(incomplete[0]?.c ?? 0) > 0) {
-    // Le round courant n'a peut-être jamais été entamé : si une correction de
-    // score en amont a changé le classement, ses appariements sont périmés.
     if (active.length >= 2) {
-      await ensureNextRound(conn, tournamentId, currentRound, active);
+      await ensureNextRound(conn, tournamentId, currentRound, active, phaseId);
     }
-    return;
+    return { done: false, standings };
   }
 
-  if (active.length <= 1) {
-    await finalizeSurvival(tournamentId, conn, standings);
-    return;
+  if (active.length <= targetTeams) {
+    if (phaseId === 0) {
+      await finalizeSurvival(tournamentId, conn, standings);
+    }
+    return { done: true, standings };
   }
 
-  // Round suivant : créé s'il manque, réapparié s'il ne colle plus au classement.
-  const changed = await ensureNextRound(conn, tournamentId, currentRound + 1, active);
+  const scope = buildSurvivalScope(tournamentId, phaseId);
+  const changed = await ensureNextRound(conn, tournamentId, currentRound + 1, active, phaseId);
   if (changed) {
     await conn.execute(
-      `UPDATE bg_tournaments SET survival_current_round = ? WHERE id = ? AND survival_current_round < ?`,
-      [currentRound + 1, tournamentId, currentRound + 1],
+      `UPDATE ${scope.table} SET survival_current_round = ? WHERE id = ? AND survival_current_round < ?`,
+      [currentRound + 1, scope.rowId, currentRound + 1],
     );
-    // Un round entièrement composé de byes doit enchaîner immédiatement.
-    await reconcileSurvival(tournamentId, conn);
+    const result = await reconcileSurvival(tournamentId, conn, { phaseId, targetTeams });
+    return result;
   }
+
+  return { done: false, standings };
 }
 
 /**
@@ -524,30 +602,29 @@ export async function forfeitSurvivalTeam(
   tournamentId: number,
   teamId: number,
   conn: PoolConnection,
+  phaseId = 0,
 ): Promise<void> {
-  const tournament = await loadTournament(conn, tournamentId, true);
+  const tournament = await loadTournament(conn, tournamentId, true, phaseId);
   if (!tournament || tournament.format !== "SURVIVAL") throw new Error("NOT_SURVIVAL");
   if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
 
   const [standingRows] = await conn.execute<StandingDbRow[]>(
-    `SELECT status FROM bg_survival_standings WHERE tournament_id = ? AND team_id = ? LIMIT 1`,
-    [tournamentId, teamId],
+    `SELECT status FROM bg_survival_standings WHERE tournament_id = ? AND phase_id = ? AND team_id = ? LIMIT 1`,
+    [tournamentId, phaseId, teamId],
   );
   if (standingRows.length === 0) throw new Error("TEAM_NOT_IN_TOURNAMENT");
   if (standingRows[0].status !== "ACTIVE") throw new Error("TEAM_ALREADY_OUT");
 
   const currentRound = Number(tournament.survival_current_round);
 
-  // Résout le match non terminé du round courant impliquant l'équipe : victoire
-  // par forfait pour l'adversaire (ou match fantôme si c'était un bye).
   const [matchRows] = await conn.execute<
     (RowDataPacket & { id: number; team1_id: number | null; team2_id: number | null })[]
   >(
     `SELECT id, team1_id, team2_id FROM bg_matches
-     WHERE tournament_id = ? AND round_number = ? AND status <> 'COMPLETED'
+     WHERE tournament_id = ? AND phase_id = ? AND round_number = ? AND status <> 'COMPLETED'
        AND (team1_id = ? OR team2_id = ?)
      LIMIT 1`,
-    [tournamentId, currentRound, teamId, teamId],
+    [tournamentId, phaseId, currentRound, teamId, teamId],
   );
 
   if (matchRows.length > 0) {
@@ -583,11 +660,11 @@ export async function forfeitSurvivalTeam(
   await conn.execute(
     `UPDATE bg_survival_standings
      SET status = 'FORFEIT', eliminated_round = ?
-     WHERE tournament_id = ? AND team_id = ?`,
-    [Math.max(currentRound, 1), tournamentId, teamId],
+     WHERE tournament_id = ? AND phase_id = ? AND team_id = ?`,
+    [Math.max(currentRound, 1), tournamentId, phaseId, teamId],
   );
 
-  await reconcileSurvival(tournamentId, conn);
+  await reconcileSurvival(tournamentId, conn, { phaseId });
 }
 
 /**
@@ -597,8 +674,9 @@ export async function forfeitSurvivalTeam(
 export async function loadSurvivalMeta(
   conn: PoolConnection,
   tournamentId: number,
+  phaseId = 0,
 ): Promise<import("@/lib/shared/types").SurvivalMeta | null> {
-  const tournament = await loadTournament(conn, tournamentId);
+  const tournament = await loadTournament(conn, tournamentId, false, phaseId);
   if (!tournament || tournament.format !== "SURVIVAL") return null;
 
   const [rows] = await conn.execute<
@@ -609,9 +687,9 @@ export async function loadSurvivalMeta(
       t.name AS team_name, t.logo_url
      FROM bg_survival_standings s
      JOIN bg_teams t ON t.id = s.team_id
-     WHERE s.tournament_id = ?
+     WHERE s.tournament_id = ? AND s.phase_id = ?
      ORDER BY s.\`rank\` ASC, s.seed ASC`,
-    [tournamentId],
+    [tournamentId, phaseId],
   );
 
   const schedule = resolveCutSchedule(tournament);
