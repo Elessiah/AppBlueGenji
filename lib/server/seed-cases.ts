@@ -12,7 +12,17 @@ export interface ReportStateCounts {
   expiredReports?: number;
 }
 
-export type SeedFormat = "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL";
+export type SeedFormat = "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL" | "MULTI";
+
+export interface SeedPhase {
+  format: Exclude<SeedFormat, "MULTI">;
+  qualifierMode: "COUNT" | "PERCENT";
+  qualifierValue: number;
+  swissTotalRounds?: number;
+  survivalRoundsBeforeFirstCut?: number;
+  survivalRoundsPerCut?: number;
+  hasThirdPlaceMatch?: boolean;
+}
 
 export interface TournamentDef extends ReportStateCounts {
   name: string;
@@ -31,6 +41,7 @@ export interface TournamentDef extends ReportStateCounts {
   teamOffset?: number; // décale la tranche du pool (rosters variés d'un tournoi à l'autre)
   closesInHours?: number; // REGISTRATION : clôture imminente
   description?: string | null;
+  phases?: SeedPhase[]; // MULTI : phases successives du tournoi
 }
 
 
@@ -107,4 +118,147 @@ export const TOURNAMENTS: TournamentDef[] = [
   { name: "Survie Championnat 12", game: "OW2", state: "FINISHED", format: "SURVIVAL", teamCount: 12, maxTeams: 16, daysOffset: -40, survivalRoundsPerCut: 2 },
   { name: "Survie Last Stand 8", game: "MR", state: "FINISHED", format: "SURVIVAL", teamCount: 8, maxTeams: 8, daysOffset: -28, survivalRoundsPerCut: 1, teamOffset: 8 },
   { name: "Survie Barrage 7 (terminé)", game: "OW2", state: "FINISHED", format: "SURVIVAL", teamCount: 7, maxTeams: 8, daysOffset: -15, survivalRoundsPerCut: 2, teamOffset: 13 },
+
+  // ---- MULTI : tournois multi-phases -------------------------------------------
+  {
+    name: "Multi Inscriptions (Suisse → Survie → Double)",
+    game: "OW2",
+    state: "REGISTRATION",
+    format: "MULTI",
+    teamCount: 32,
+    maxTeams: 32,
+    daysOffset: 5,
+    teamOffset: 60,
+    phases: [
+      {
+        format: "SWISS",
+        qualifierMode: "PERCENT",
+        qualifierValue: 50,
+        swissTotalRounds: 3,
+      },
+      {
+        format: "SURVIVAL",
+        qualifierMode: "COUNT",
+        qualifierValue: 8,
+        survivalRoundsPerCut: 2,
+      },
+      {
+        format: "DOUBLE",
+        qualifierMode: "COUNT",
+        qualifierValue: 8,
+      },
+    ],
+  },
+  {
+    name: "Multi En Cours Phase 1 (Suisse)",
+    game: "MR",
+    state: "RUNNING",
+    format: "MULTI",
+    teamCount: 24,
+    maxTeams: 24,
+    daysOffset: -2,
+    playWaves: 2,
+    teamOffset: 70,
+    phases: [
+      {
+        format: "SWISS",
+        qualifierMode: "PERCENT",
+        qualifierValue: 50,
+        swissTotalRounds: 3,
+      },
+      {
+        format: "SURVIVAL",
+        qualifierMode: "COUNT",
+        qualifierValue: 8,
+        survivalRoundsPerCut: 2,
+      },
+      {
+        format: "DOUBLE",
+        qualifierMode: "COUNT",
+        qualifierValue: 8,
+      },
+    ],
+  },
+  {
+    name: "Multi En Cours Phase Finale (Double)",
+    game: "OW2",
+    state: "RUNNING",
+    format: "MULTI",
+    teamCount: 8,
+    maxTeams: 8,
+    daysOffset: -3,
+    playWaves: 1,
+    teamOffset: 80,
+    phases: [
+      {
+        format: "SWISS",
+        qualifierMode: "PERCENT",
+        qualifierValue: 50,
+        swissTotalRounds: 3,
+      },
+      {
+        format: "SURVIVAL",
+        qualifierMode: "COUNT",
+        qualifierValue: 8,
+        survivalRoundsPerCut: 2,
+      },
+      {
+        format: "DOUBLE",
+        qualifierMode: "COUNT",
+        qualifierValue: 8,
+      },
+    ],
+  },
+  {
+    name: "Multi Terminé (3 phases)",
+    game: "MR",
+    state: "FINISHED",
+    format: "MULTI",
+    teamCount: 20,
+    maxTeams: 20,
+    daysOffset: -25,
+    teamOffset: 90,
+    phases: [
+      {
+        format: "SWISS",
+        qualifierMode: "PERCENT",
+        qualifierValue: 50,
+        swissTotalRounds: 3,
+      },
+      {
+        format: "SURVIVAL",
+        qualifierMode: "COUNT",
+        qualifierValue: 10,
+        survivalRoundsPerCut: 2,
+      },
+      {
+        format: "DOUBLE",
+        qualifierMode: "COUNT",
+        qualifierValue: 10,
+      },
+    ],
+  },
+  {
+    name: "Multi Phase Zéro Sautée (COUNT > pool)",
+    game: "OW2",
+    state: "REGISTRATION",
+    format: "MULTI",
+    teamCount: 12,
+    maxTeams: 12,
+    daysOffset: 8,
+    teamOffset: 100,
+    phases: [
+      {
+        format: "SWISS",
+        qualifierMode: "COUNT",
+        qualifierValue: 64,
+        swissTotalRounds: 3,
+      },
+      {
+        format: "DOUBLE",
+        qualifierMode: "COUNT",
+        qualifierValue: 12,
+      },
+    ],
+  },
 ];
