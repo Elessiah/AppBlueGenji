@@ -133,10 +133,18 @@ export default function TournamentDetailPage() {
     }
   };
 
+  // En multi-phases, l'abandon suit le format de la phase **en cours** — et non
+  // celui du tournoi (« MULTI », qui n'a pas de notion d'abandon), ni celui
+  // d'une phase terminée qu'on serait simplement en train de consulter.
+  const forfeitFormat =
+    detail.card.format === "MULTI"
+      ? detail.phases?.find((p) => p.id === detail.currentPhaseId)?.format ?? detail.card.format
+      : detail.card.format;
+
   const canForfeit = (teamId: number): boolean =>
     canForfeitTeam(
       {
-        format: detail.card.format,
+        format: forfeitFormat,
         state: detail.card.state,
         isAdmin: detail.isAdmin,
         myTeamId: detail.myTeamId,

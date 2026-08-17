@@ -506,10 +506,20 @@ export async function getTournamentDetail(
             )
           : null;
 
+    // Même raison que pour la survie ci-dessus : la vue Suisse sert aussi à
+    // l'intérieur d'une phase, sinon une ronde suisse en `MULTI` n'afficherait
+    // ni classement ni départages.
+    const swissPhaseId =
+      phasesDetail?.phases.find(
+        (phase) => phase.id === phasesDetail.currentPhaseId && phase.format === "SWISS",
+      )?.id ?? null;
+
     const swiss =
       card.format === "SWISS"
         ? await (await import("./swiss")).loadSwissMeta(connection, tournamentId)
-        : null;
+        : swissPhaseId !== null
+          ? await (await import("./swiss")).loadSwissMeta(connection, tournamentId, swissPhaseId)
+          : null;
 
     return {
       card,
@@ -658,14 +668,39 @@ export async function forfeitTournamentTeamPublic(
     );
     const format = formatRows[0]?.format ?? null;
 
-    if (format === "SURVIVAL") {
+    // En multi-phases, c'est le format de la PHASE COURANTE qui décide : un
+    // abandon garde tout son sens pendant une phase de survie ou de ronde
+    // suisse, même si le tournoi lui-même porte le format « MULTI ».
+    let engineFormat = format;
+    let forfeitPhaseId = 0;
+
+    if (format === "MULTI") {
+      const [phaseRows] = await connection.execute<
+        (RowDataPacket & { id: number; format: string })[]
+      >(
+        `SELECT p.id, p.format
+         FROM bg_tournament_phases p
+         JOIN bg_tournaments t ON t.current_phase_id = p.id
+         WHERE t.id = ? LIMIT 1`,
+        [tournamentId],
+      );
+      engineFormat = phaseRows[0]?.format ?? null;
+      forfeitPhaseId = Number(phaseRows[0]?.id ?? 0);
+    }
+
+    if (engineFormat === "SURVIVAL") {
       const { forfeitSurvivalTeam } = await import("./survival");
-      await forfeitSurvivalTeam(tournamentId, teamId, connection);
-    } else if (format === "SWISS") {
+      await forfeitSurvivalTeam(tournamentId, teamId, connection, forfeitPhaseId);
+    } else if (engineFormat === "SWISS") {
       const { forfeitSwissTeam } = await import("./swiss");
-      await forfeitSwissTeam(tournamentId, teamId, connection);
+      await forfeitSwissTeam(tournamentId, teamId, connection, forfeitPhaseId);
     } else {
       throw new Error("FORMAT_WITHOUT_FORFEIT");
+    }
+
+    if (format === "MULTI") {
+      const { reconcilePhases } = await import("./phases");
+      await reconcilePhases(tournamentId, connection);
     }
 
     await connection.commit();

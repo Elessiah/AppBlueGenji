@@ -24,6 +24,9 @@ const FORMATS_WITH_FORFEIT: TournamentFormat[] = ["SURVIVAL", "SWISS"];
  *
  * L'appelant reste responsable de n'afficher le bouton que sur une équipe encore
  * en lice (statut `ACTIVE`).
+ *
+ * Sur un tournoi multi-phases, `format` doit porter le format de la **phase en
+ * cours**, pas `MULTI` : c'est la phase qui détermine si l'abandon a un sens.
  */
 export function canForfeitTeam(context: ForfeitContext, teamId: number): boolean {
   if (!FORMATS_WITH_FORFEIT.includes(context.format)) return false;
