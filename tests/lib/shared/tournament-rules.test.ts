@@ -47,16 +47,22 @@ describe("tournament-rules — intégrité du registre", () => {
 
   it("répartit les modes entre disponibles et à venir", () => {
     expect(availableRuleModes().length).toBeGreaterThan(0);
-    expect(upcomingRuleModes().length).toBeGreaterThan(0);
     expect(availableRuleModes().length + upcomingRuleModes().length).toBe(
       TOURNAMENT_RULE_MODES.length,
     );
     // Les modes proposés à la création d'un tournoi doivent être documentés
-    // comme disponibles (cf. app/(secured)/tournois/creer/page.tsx).
-    const creatable: TournamentFormat[] = ["SINGLE", "DOUBLE", "SURVIVAL"];
+    // comme disponibles (cf. app/(secured)/tournois/creer/page.tsx). Les quatre
+    // formats sont ouverts depuis l'activation de la ronde suisse.
+    const creatable: TournamentFormat[] = ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL"];
     for (const format of creatable) {
       expect(ruleModeForFormat(format)?.status).toBe("AVAILABLE");
     }
+  });
+
+  it("n'annonce plus aucun mode comme « bientôt disponible »", () => {
+    // Garde-fou : un mode documenté mais fermé à la création doit rester en
+    // `SOON` tant que `app/api/tournaments/route.ts` refuse son format.
+    expect(upcomingRuleModes()).toEqual([]);
   });
 });
 

@@ -3,7 +3,7 @@
 import { FormEvent, useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { formatLocalDateTime } from "@/lib/shared/dates";
-import type { BracketMatch, BracketType } from "@/lib/shared/types";
+import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { Pill, CyberButton } from "@/components/cyber";
 import { useTournamentLive } from "./_hooks/useTournamentLive";
@@ -20,6 +20,24 @@ import {
   defaultSelectedPhaseId,
   visibleRulesFormat,
 } from "./_lib/phases";
+import { SwissView } from "./_components/SwissView";
+
+const FORMAT_LABELS: Record<TournamentFormat, string> = {
+  SINGLE: "Simple élim.",
+  DOUBLE: "Double élim.",
+  SWISS: "Ronde suisse",
+  SURVIVAL: "Survie",
+  MULTI: "Multi-phases",
+};
+
+/** « Arbre » ne veut rien dire dans les formats à classement, qui n'en ont pas. */
+const BOARD_TITLES: Record<TournamentFormat, string> = {
+  SINGLE: "Arbre du tournoi",
+  DOUBLE: "Arbre du tournoi",
+  SWISS: "Classement et rondes",
+  SURVIVAL: "Classement et rounds",
+  MULTI: "Phases du tournoi",
+};
 
 const STATE_META: Record<string, { label: string; chipClass: string }> = {
   UPCOMING: { label: "Prochainement", chipClass: "teal" },
@@ -253,6 +271,7 @@ export default function TournamentDetailPage() {
                   Phase {detail.phases.findIndex((p) => p.id === detail.currentPhaseId) + 1}/{detail.phases.length}
                 </Pill>
               )}
+              <Pill variant="blue">{FORMAT_LABELS[detail.card.format]}</Pill>
               {detail.card.hasThirdPlaceMatch && (
                 <Pill variant="blue">Petite finale</Pill>
               )}
@@ -284,14 +303,16 @@ export default function TournamentDetailPage() {
           )}
 
           <div className="ds-section-title green">
-            <h2>Arbre du tournoi</h2>
+            <h2>{BOARD_TITLES[detail.card.format]}</h2>
           </div>
 
           {detail.card.state === "REGISTRATION" ? (
             <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
               {formatForBracket === "SURVIVAL"
                 ? "Le classement de départ (seeding) et les rounds seront générés au démarrage du tournoi."
-                : "Le bracket sera généré automatiquement au démarrage du tournoi."}
+                : detail.card.format === "SWISS"
+                  ? "Le classement de départ (seeding) et la première ronde seront générés au démarrage du tournoi."
+                  : "Le bracket sera généré automatiquement au démarrage du tournoi."}
             </p>
           ) : formatForBracket === "SURVIVAL" && detail.survival ? (
             <>
@@ -328,6 +349,22 @@ export default function TournamentDetailPage() {
                 </div>
               )}
             </>
+          ) : detail.card.format === "SWISS" && detail.swiss ? (
+            <SwissView
+              swiss={detail.swiss}
+              matches={detail.matches}
+              allTournamentMatches={detail.matches}
+              myTeamId={detail.myTeamId}
+              isFinished={detail.card.state === "FINISHED"}
+              canReport={canReport}
+              adminResolvable={canAdminResolve}
+              drafts={drafts}
+              onScoreChange={handleScoreChange}
+              onSubmit={submitScore}
+              onOpenAdminModal={setSelectedMatchForAdmin}
+              canForfeit={canForfeit}
+              onForfeit={forfeitTeam}
+            />
           ) : formatForBracket === "SWISS" ? (
             <>
               {brackets.length > 0 ? (

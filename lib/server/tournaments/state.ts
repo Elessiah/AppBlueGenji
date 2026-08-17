@@ -38,15 +38,16 @@ export async function syncTournamentState(
   let stateChanged = false;
 
   if (computed !== tournament.state) {
-    // Handle Swiss tournament initialization when transitioning to RUNNING
-    if (tournament.state === "REGISTRATION" && computed === "RUNNING" && tournament.format === "SWISS") {
-      const { initializeSwissTournament, generateFirstRound } = await import("./swiss");
+    const isStarting = tournament.state === "REGISTRATION" && computed === "RUNNING";
+
+    const isSwissStart = isStarting && tournament.format === "SWISS";
+    if (isSwissStart) {
+      const { initializeSwissTournament, generateSwissRound } = await import("./swiss");
       await initializeSwissTournament(tournamentId, connection);
-      await generateFirstRound(tournamentId, connection);
+      await generateSwissRound(tournamentId, connection);
     }
 
-    const isSurvivalStart =
-      tournament.state === "REGISTRATION" && computed === "RUNNING" && tournament.format === "SURVIVAL";
+    const isSurvivalStart = isStarting && tournament.format === "SURVIVAL";
     if (isSurvivalStart) {
       const { initializeSurvivalTournament, generateSurvivalRound } = await import("./survival");
       await initializeSurvivalTournament(tournamentId, connection);
@@ -68,6 +69,10 @@ export async function syncTournamentState(
     if (isSurvivalStart) {
       const { reconcileSurvival } = await import("./survival");
       await reconcileSurvival(tournamentId, connection);
+    }
+    if (isSwissStart) {
+      const { reconcileSwiss } = await import("./swiss");
+      await reconcileSwiss(tournamentId, connection);
     }
 
     if (isMultiStart) {

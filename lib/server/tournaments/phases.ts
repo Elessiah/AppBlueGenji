@@ -16,7 +16,7 @@ import { loadTournamentRow, finishTournament, getRegistrationRows } from "./repo
 import { rankingPointsSql } from "@/lib/shared/ranking";
 import { createBracketIfMissing } from "./bracket-generator";
 import { isEliminationPhaseComplete, rankEliminationPhase } from "./finalization";
-import { initializeSwissTournament, generateFirstRound } from "./swiss";
+import { initializeSwissTournament, generateSwissRound, loadSwissRanking } from "./swiss";
 import { initializeSurvivalTournament, generateSurvivalRound } from "./survival";
 
 /**
@@ -155,8 +155,8 @@ export async function startPhase(
 
   // Dispatch sur le format de la phase
   if (phase.format === "SWISS") {
-    await initializeSwissTournament(tournamentId, conn, phaseId);
-    await generateFirstRound(tournamentId, conn, phaseId);
+    await initializeSwissTournament(tournamentId, conn, { phaseId, teamIds });
+    await generateSwissRound(tournamentId, conn, phaseId);
   } else if (phase.format === "SURVIVAL") {
     await initializeSurvivalTournament(tournamentId, conn, { phaseId, teamIds });
     await generateSurvivalRound(tournamentId, conn, phaseId);
@@ -253,8 +253,7 @@ export async function reconcilePhases(tournamentId: number, conn: PoolConnection
         isDone = Number(unfinished[0]?.c ?? 0) === 0;
 
         if (isDone) {
-          const { loadSwissRanking } = await import("./swiss");
-          phaseFinalRanking = await loadSwissRanking(conn, currentPhaseId);
+          phaseFinalRanking = await loadSwissRanking(conn, tournamentId, currentPhaseId);
         }
       }
     }

@@ -1,334 +1,269 @@
-import { pairFirstRound, pairNextRound, Participant } from "@/lib/shared/swiss-pairing";
+import { describe, expect, it } from "@jest/globals";
+import {
+  compareParticipants,
+  planFirstRound,
+  planNextRound,
+  samePlan,
+  type Participant,
+} from "@/lib/shared/swiss-pairing";
 
-describe("swiss-pairing", () => {
-  describe("pairFirstRound", () => {
-    test("round 1 with 8 participants pairs upper vs lower half", () => {
-      const participants: Participant[] = [
-        { teamId: 1, points: 0, opponentIds: [], hasReceivedBye: false },
-        { teamId: 2, points: 0, opponentIds: [], hasReceivedBye: false },
-        { teamId: 3, points: 0, opponentIds: [], hasReceivedBye: false },
-        { teamId: 4, points: 0, opponentIds: [], hasReceivedBye: false },
-        { teamId: 5, points: 0, opponentIds: [], hasReceivedBye: false },
-        { teamId: 6, points: 0, opponentIds: [], hasReceivedBye: false },
-        { teamId: 7, points: 0, opponentIds: [], hasReceivedBye: false },
-        { teamId: 8, points: 0, opponentIds: [], hasReceivedBye: false },
-      ];
+function team(overrides: Partial<Participant> & { teamId: number }): Participant {
+  return {
+    points: 0,
+    opponentIds: [],
+    hasReceivedBye: false,
+    seed: overrides.teamId,
+    ...overrides,
+  };
+}
 
-      const pairings = pairFirstRound(participants, 42); // deterministic seed
-      expect(pairings).toHaveLength(4);
-      // After shuffle with seed 42, verify pairing structure (upper vs lower)
-      expect(pairings.every((p) => p.teamBId !== null)).toBe(true);
-    });
+/** Toutes les équipes sont-elles appariées exactement une fois (bye compris) ? */
+function coverage(plan: ReturnType<typeof planNextRound>): number[] {
+  const ids = plan.pairings.flatMap((p) => [p.teamAId, p.teamBId!]);
+  if (plan.byeTeamId !== null) ids.push(plan.byeTeamId);
+  return ids.sort((a, b) => a - b);
+}
 
-    test("round 1 with 7 participants gives a bye to lowest participant", () => {
-      const participants: Participant[] = [
-        { teamId: 1, points: 0, opponentIds: [], hasReceivedBye: false },
-        { teamId: 2, points: 0, opponentIds: [], hasReceivedBye: false },
-        { teamId: 3, points: 0, opponentIds: [], hasReceivedBye: false },
-        { teamId: 4, points: 0, opponentIds: [], hasReceivedBye: false },
-        { teamId: 5, points: 0, opponentIds: [], hasReceivedBye: false },
-        { teamId: 6, points: 0, opponentIds: [], hasReceivedBye: false },
-        { teamId: 7, points: 0, opponentIds: [], hasReceivedBye: false },
-      ];
+/** Y a-t-il un rematch dans le plan ? */
+function rematches(plan: ReturnType<typeof planNextRound>, participants: Participant[]): number {
+  const byId = new Map(participants.map((p) => [p.teamId, p]));
+  return plan.pairings.filter((p) =>
+    byId.get(p.teamAId)?.opponentIds.includes(p.teamBId!),
+  ).length;
+}
 
-      const pairings = pairFirstRound(participants, 42);
-      expect(pairings).toHaveLength(4); // 3 matches + 1 bye
-      expect(pairings.filter((p) => p.teamBId === null)).toHaveLength(1);
-    });
+describe("swiss-pairing — compareParticipants", () => {
+  it("classe par points décroissants, puis seed, puis identifiant", () => {
+    const a = team({ teamId: 1, seed: 3, points: 6 });
+    const b = team({ teamId: 2, seed: 1, points: 6 });
+    const c = team({ teamId: 3, seed: 2, points: 9 });
+    const d = team({ teamId: 4, seed: 5, points: 3 });
+
+    expect([a, b, c, d].sort(compareParticipants).map((p) => p.teamId)).toEqual([3, 2, 1, 4]);
   });
 
-  describe("pairNextRound", () => {
-    test("round 2 pairs winners against winners", () => {
-      // Winners: teamId 1,2,3,4 with 1 point
-      const participants: Participant[] = [
-        {
-          teamId: 1,
-          points: 1,
-          opponentIds: [5],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 2,
-          points: 1,
-          opponentIds: [6],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 3,
-          points: 1,
-          opponentIds: [7],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 4,
-          points: 1,
-          opponentIds: [8],
-          hasReceivedBye: false,
-        },
-        // Losers: teamId 5,6,7,8 with 0 points
-        {
-          teamId: 5,
-          points: 0,
-          opponentIds: [1],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 6,
-          points: 0,
-          opponentIds: [2],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 7,
-          points: 0,
-          opponentIds: [3],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 8,
-          points: 0,
-          opponentIds: [4],
-          hasReceivedBye: false,
-        },
-      ];
+  it("place les participants sans seed derrière ceux qui en ont un", () => {
+    const withSeed = team({ teamId: 9, seed: 4, points: 0 });
+    const without: Participant = {
+      teamId: 1,
+      points: 0,
+      opponentIds: [],
+      hasReceivedBye: false,
+    };
+    expect([without, withSeed].sort(compareParticipants).map((p) => p.teamId)).toEqual([9, 1]);
+  });
+});
 
-      const pairings = pairNextRound(participants);
-      expect(pairings).toHaveLength(4);
+describe("swiss-pairing — planFirstRound", () => {
+  it("oppose la moitié haute à la moitié basse du seeding", () => {
+    const participants = [1, 2, 3, 4, 5, 6, 7, 8].map((id) => team({ teamId: id, seed: id }));
+    const plan = planFirstRound(participants);
 
-      // All pairings should be valid (teamBId not null for even count)
-      expect(pairings.every((p) => p.teamBId !== null)).toBe(true);
-
-      // Verify no rematches in winners group if possible
-      const winnerMatches = pairings.filter(
-        (p) =>
-          [1, 2, 3, 4].includes(p.teamAId) &&
-          p.teamBId !== null &&
-          [1, 2, 3, 4].includes(p.teamBId),
-      );
-      // Should be at least some matches within winners
-      expect(winnerMatches.length).toBeGreaterThan(0);
-    });
-
-    test("round 3 avoids rematch if possible", () => {
-      const participants: Participant[] = [
-        {
-          teamId: 1,
-          points: 2,
-          opponentIds: [2, 3],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 2,
-          points: 2,
-          opponentIds: [1, 4],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 3,
-          points: 1,
-          opponentIds: [1, 5],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 4,
-          points: 1,
-          opponentIds: [2, 6],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 5,
-          points: 1,
-          opponentIds: [3, 7],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 6,
-          points: 0,
-          opponentIds: [4, 8],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 7,
-          points: 0,
-          opponentIds: [5],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 8,
-          points: 0,
-          opponentIds: [6],
-          hasReceivedBye: false,
-        },
-      ];
-
-      const pairings = pairNextRound(participants);
-      expect(pairings).toHaveLength(4);
-
-      // Verify pairing respects no-rematch rule where possible
-      // Check top pairing: 1 vs 2 should be avoided, but no other option at their score level
-      // So it's acceptable to have 1v2 as rematch or 1v3, etc.
-      pairings.forEach((p) => {
-        if (p.teamBId !== null) {
-          // For each pairing, check if rematch is justified (no better option)
-          const a = participants.find((x) => x.teamId === p.teamAId);
-          const b = participants.find((x) => x.teamId === p.teamBId);
-          expect(a && b).toBeTruthy();
-        }
-      });
-    });
-
-    test("bye is awarded to participant without previous bye", () => {
-      const participants: Participant[] = [
-        {
-          teamId: 1,
-          points: 2,
-          opponentIds: [2, 3],
-          hasReceivedBye: true, // already has bye
-        },
-        {
-          teamId: 2,
-          points: 2,
-          opponentIds: [1, 4],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 3,
-          points: 1,
-          opponentIds: [1, 5],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 4,
-          points: 1,
-          opponentIds: [2, 6],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 5,
-          points: 0,
-          opponentIds: [3],
-          hasReceivedBye: false,
-        },
-      ];
-
-      const pairings = pairNextRound(participants);
-      expect(pairings).toHaveLength(3); // 2 matches + 1 bye
-
-      const byePairing = pairings.find((p) => p.teamBId === null);
-      expect(byePairing).toBeDefined();
-
-      // Bye should go to someone without bye (not team 1)
-      expect(byePairing?.teamAId).not.toBe(1);
-      expect(byePairing?.teamAId).toBe(5); // lowest rank without bye
-    });
-
-    test("deterministic output for same input", () => {
-      const participants: Participant[] = [
-        {
-          teamId: 1,
-          points: 1,
-          opponentIds: [5],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 2,
-          points: 1,
-          opponentIds: [6],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 3,
-          points: 0,
-          opponentIds: [7],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 4,
-          points: 0,
-          opponentIds: [8],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 5,
-          points: 0,
-          opponentIds: [1],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 6,
-          points: 0,
-          opponentIds: [2],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 7,
-          points: 0,
-          opponentIds: [3],
-          hasReceivedBye: false,
-        },
-        {
-          teamId: 8,
-          points: 0,
-          opponentIds: [4],
-          hasReceivedBye: false,
-        },
-      ];
-
-      const pairings1 = pairNextRound(participants);
-      const pairings2 = pairNextRound(participants);
-
-      // Sort for comparison (order shouldn't matter)
-      const sorted1 = pairings1
-        .sort((a, b) => a.teamAId - b.teamAId)
-        .map((p) => `${p.teamAId}-${p.teamBId}`);
-      const sorted2 = pairings2
-        .sort((a, b) => a.teamAId - b.teamAId)
-        .map((p) => `${p.teamAId}-${p.teamBId}`);
-
-      expect(sorted1).toEqual(sorted2);
-    });
-
-    test("first round is deterministic with same seed", () => {
-      const participants: Participant[] = [
-        { teamId: 1, points: 0, opponentIds: [], hasReceivedBye: false },
-        { teamId: 2, points: 0, opponentIds: [], hasReceivedBye: false },
-        { teamId: 3, points: 0, opponentIds: [], hasReceivedBye: false },
-        { teamId: 4, points: 0, opponentIds: [], hasReceivedBye: false },
-      ];
-
-      const pairings1 = pairFirstRound(participants, 123);
-      const pairings2 = pairFirstRound(participants, 123);
-
-      expect(pairings1).toEqual(pairings2);
-    });
+    expect(plan.byeTeamId).toBeNull();
+    expect(plan.pairings).toEqual([
+      { teamAId: 1, teamBId: 5 },
+      { teamAId: 2, teamBId: 6 },
+      { teamAId: 3, teamBId: 7 },
+      { teamAId: 4, teamBId: 8 },
+    ]);
   });
 
-  test("empty participant list returns empty pairings", () => {
-    const pairings1 = pairFirstRound([]);
-    const pairings2 = pairNextRound([]);
-    expect(pairings1).toEqual([]);
-    expect(pairings2).toEqual([]);
+  it("respecte le seeding même si la liste arrive en désordre", () => {
+    const participants = [4, 1, 3, 2].map((id) => team({ teamId: id * 10, seed: id }));
+    const plan = planFirstRound(participants);
+
+    // Seeds 1,2 (ids 10,20) contre seeds 3,4 (ids 30,40).
+    expect(plan.pairings).toEqual([
+      { teamAId: 10, teamBId: 30 },
+      { teamAId: 20, teamBId: 40 },
+    ]);
   });
 
-  test("single participant gets bye in first round", () => {
-    const participants: Participant[] = [
-      { teamId: 1, points: 0, opponentIds: [], hasReceivedBye: false },
+  it("effectif impair : la dernière du seeding reçoit la victoire d'office", () => {
+    const participants = [1, 2, 3, 4, 5, 6, 7].map((id) => team({ teamId: id, seed: id }));
+    const plan = planFirstRound(participants);
+
+    expect(plan.byeTeamId).toBe(7);
+    expect(plan.pairings).toHaveLength(3);
+    expect(coverage(plan)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+  });
+
+  it("une seule équipe : elle passe la ronde d'office", () => {
+    const plan = planFirstRound([team({ teamId: 42 })]);
+    expect(plan).toEqual({ pairings: [], byeTeamId: 42 });
+  });
+
+  it("liste vide : plan vide", () => {
+    expect(planFirstRound([])).toEqual({ pairings: [], byeTeamId: null });
+  });
+});
+
+describe("swiss-pairing — planNextRound", () => {
+  it("apparie les groupes de score entre eux (gagnantes contre gagnantes)", () => {
+    const participants = [
+      team({ teamId: 1, seed: 1, points: 3, opponentIds: [5] }),
+      team({ teamId: 2, seed: 2, points: 3, opponentIds: [6] }),
+      team({ teamId: 3, seed: 3, points: 3, opponentIds: [7] }),
+      team({ teamId: 4, seed: 4, points: 3, opponentIds: [8] }),
+      team({ teamId: 5, seed: 5, points: 0, opponentIds: [1] }),
+      team({ teamId: 6, seed: 6, points: 0, opponentIds: [2] }),
+      team({ teamId: 7, seed: 7, points: 0, opponentIds: [3] }),
+      team({ teamId: 8, seed: 8, points: 0, opponentIds: [4] }),
     ];
 
-    const pairings = pairFirstRound(participants);
-    expect(pairings).toHaveLength(1);
-    expect(pairings[0].teamAId).toBe(1);
-    expect(pairings[0].teamBId).toBeNull();
+    const plan = planNextRound(participants);
+
+    expect(plan.byeTeamId).toBeNull();
+    expect(plan.pairings).toEqual([
+      { teamAId: 1, teamBId: 2 },
+      { teamAId: 3, teamBId: 4 },
+      { teamAId: 5, teamBId: 6 },
+      { teamAId: 7, teamBId: 8 },
+    ]);
   });
 
-  test("two participants get paired in first round", () => {
-    const participants: Participant[] = [
-      { teamId: 1, points: 0, opponentIds: [], hasReceivedBye: false },
-      { teamId: 2, points: 0, opponentIds: [], hasReceivedBye: false },
+  it("évite les rematchs en piochant dans le groupe voisin", () => {
+    // 1 et 2 sont à 3 points et se sont déjà rencontrées : elles doivent
+    // descendre chercher un adversaire plutôt que de rejouer.
+    const participants = [
+      team({ teamId: 1, seed: 1, points: 3, opponentIds: [2] }),
+      team({ teamId: 2, seed: 2, points: 3, opponentIds: [1] }),
+      team({ teamId: 3, seed: 3, points: 0, opponentIds: [4] }),
+      team({ teamId: 4, seed: 4, points: 0, opponentIds: [3] }),
     ];
 
-    const pairings = pairFirstRound(participants, 42);
-    expect(pairings).toHaveLength(1);
-    expect(pairings[0].teamBId).not.toBeNull();
+    const plan = planNextRound(participants);
+
+    expect(rematches(plan, participants)).toBe(0);
+    expect(coverage(plan)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("retour sur trace : trouve la solution qu'un tirage glouton manquerait", () => {
+    // 1 a déjà joué 2 ; 2 a déjà joué 1 et 4. Un tirage glouton apparie 1 avec le
+    // premier adversaire libre (3), et laisse 2 face à 4 — un rematch — alors que
+    // 1-4 / 2-3 n'en produit aucun. Seul le retour sur trace le voit.
+    const participants = [
+      team({ teamId: 1, seed: 1, points: 9, opponentIds: [2] }),
+      team({ teamId: 2, seed: 2, points: 6, opponentIds: [1, 4] }),
+      team({ teamId: 3, seed: 3, points: 3, opponentIds: [] }),
+      team({ teamId: 4, seed: 4, points: 0, opponentIds: [2] }),
+    ];
+
+    const plan = planNextRound(participants);
+
+    expect(rematches(plan, participants)).toBe(0);
+    expect(plan.pairings).toEqual([
+      { teamAId: 1, teamBId: 4 },
+      { teamAId: 2, teamBId: 3 },
+    ]);
+  });
+
+  it("accepte un rematch en dernier recours quand tout le monde s'est rencontré", () => {
+    const participants = [
+      team({ teamId: 1, seed: 1, points: 3, opponentIds: [2] }),
+      team({ teamId: 2, seed: 2, points: 3, opponentIds: [1] }),
+    ];
+
+    const plan = planNextRound(participants);
+
+    // Mieux vaut rejouer que rendre la ronde impossible.
+    expect(plan.pairings).toEqual([{ teamAId: 1, teamBId: 2 }]);
+  });
+
+  it("attribue la victoire d'office à la dernière équipe n'en ayant pas reçu", () => {
+    const participants = [
+      team({ teamId: 1, seed: 1, points: 6, hasReceivedBye: false }),
+      team({ teamId: 2, seed: 2, points: 3, hasReceivedBye: false }),
+      team({ teamId: 3, seed: 3, points: 3, hasReceivedBye: false }),
+      team({ teamId: 4, seed: 4, points: 0, hasReceivedBye: false }),
+      team({ teamId: 5, seed: 5, points: 0, hasReceivedBye: true }),
+    ];
+
+    const plan = planNextRound(participants);
+
+    // 5 est la dernière du classement mais a déjà eu son bye : il revient à 4.
+    expect(plan.byeTeamId).toBe(4);
+    expect(coverage(plan)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("retombe sur la dernière du classement si toutes ont déjà eu un bye", () => {
+    const participants = [
+      team({ teamId: 1, seed: 1, points: 3, hasReceivedBye: true }),
+      team({ teamId: 2, seed: 2, points: 3, hasReceivedBye: true }),
+      team({ teamId: 3, seed: 3, points: 0, hasReceivedBye: true }),
+    ];
+
+    expect(planNextRound(participants).byeTeamId).toBe(3);
+  });
+
+  it("est déterministe pour une même entrée", () => {
+    const participants = [
+      team({ teamId: 1, seed: 1, points: 3, opponentIds: [5] }),
+      team({ teamId: 2, seed: 2, points: 3, opponentIds: [6] }),
+      team({ teamId: 3, seed: 3, points: 0, opponentIds: [7] }),
+      team({ teamId: 4, seed: 4, points: 0, opponentIds: [8] }),
+      team({ teamId: 5, seed: 5, points: 0, opponentIds: [1] }),
+      team({ teamId: 6, seed: 6, points: 0, opponentIds: [2] }),
+    ];
+
+    expect(planNextRound(participants)).toEqual(planNextRound(participants));
+  });
+
+  it("apparie un gros effectif impair sans doublon ni oubli", () => {
+    const participants = Array.from({ length: 31 }, (_, i) =>
+      team({ teamId: i + 1, seed: i + 1, points: (i % 4) * 3 }),
+    );
+
+    const plan = planNextRound(participants);
+
+    expect(plan.byeTeamId).not.toBeNull();
+    expect(plan.pairings).toHaveLength(15);
+    expect(coverage(plan)).toEqual(Array.from({ length: 31 }, (_, i) => i + 1));
+  });
+
+  it("liste vide : plan vide", () => {
+    expect(planNextRound([])).toEqual({ pairings: [], byeTeamId: null });
+  });
+});
+
+describe("swiss-pairing — samePlan", () => {
+  const plan = {
+    pairings: [
+      { teamAId: 1, teamBId: 2 },
+      { teamAId: 3, teamBId: 4 },
+    ],
+    byeTeamId: 5,
+  };
+
+  it("ignore l'ordre des paires et des équipes au sein d'une paire", () => {
+    expect(
+      samePlan(plan, {
+        pairings: [
+          { teamAId: 4, teamBId: 3 },
+          { teamAId: 2, teamBId: 1 },
+        ],
+        byeTeamId: 5,
+      }),
+    ).toBe(true);
+  });
+
+  it("distingue un appariement différent", () => {
+    expect(
+      samePlan(plan, {
+        pairings: [
+          { teamAId: 1, teamBId: 3 },
+          { teamAId: 2, teamBId: 4 },
+        ],
+        byeTeamId: 5,
+      }),
+    ).toBe(false);
+  });
+
+  it("distingue un bye différent", () => {
+    expect(samePlan(plan, { ...plan, byeTeamId: 6 })).toBe(false);
+  });
+
+  it("distingue un nombre de paires différent", () => {
+    expect(samePlan(plan, { pairings: plan.pairings.slice(1), byeTeamId: 5 })).toBe(false);
   });
 });

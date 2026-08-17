@@ -61,38 +61,37 @@ export type SurvivalMeta = {
   standings: SurvivalStandingRow[];
 };
 
-export type SwissTournamentMeta = {
+export type SwissTiebreaker = "buchholz" | "sonneborn-berger" | "opponent-mwp" | "head-to-head";
+
+export type SwissStandingRow = {
+  teamId: number;
+  teamName: string;
+  logoUrl: string | null;
+  /** Seed initial (1 = meilleure équipe au classement du site). */
+  seed: number;
+  points: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  /** Victoires d'office reçues (effectif impair). */
+  byes: number;
+  /** Départage principal : somme des points des adversaires rencontrés. */
+  buchholz: number;
+  status: "ACTIVE" | "FORFEIT";
+  rank: number;
+};
+
+export type SwissMeta = {
+  /** Nombre de rondes prévues, fixé au lancement. */
   totalRounds: number;
   currentRound: number;
   pointsForWin: number;
   pointsForDraw: number;
   pointsForLoss: number;
   pointsForBye: number;
+  /** Ordre des départages appliqués à points égaux. */
   tiebreakers: SwissTiebreaker[];
-};
-
-export type SwissTiebreaker = "buchholz" | "sonneborn-berger" | "opponent-mwp" | "head-to-head";
-
-export type SwissParticipantStanding = {
-  teamId: number;
-  teamName: string;
-  points: number;
-  wins: number;
-  draws: number;
-  losses: number;
-  byes: number;
-  opponentIds: number[];
-  buchholz: number;
-  rank: number;
-};
-
-export type SwissPairing = {
-  round: number;
-  matches: Array<{
-    matchId: number | null;
-    teamAId: number;
-    teamBId: number | null;
-  }>;
+  standings: SwissStandingRow[];
 };
 
 export type TournamentState = "UPCOMING" | "REGISTRATION" | "RUNNING" | "FINISHED";
@@ -257,6 +256,8 @@ export type TournamentDetail = {
   isAdmin: boolean;
   /** Métadonnées du mode Survie (null pour les autres formats). */
   survival: SurvivalMeta | null;
+  /** Métadonnées du mode Ronde suisse (null pour les autres formats). */
+  swiss: SwissMeta | null;
   /** Phases du tournoi multi-mode (null pour les tournois mono-mode). */
   phases: TournamentPhase[] | null;
   /** ID de la phase actuellement en cours (null si aucune phase n'est en cours). */

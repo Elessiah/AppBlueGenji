@@ -7,6 +7,7 @@ import { localDateTimeInput } from "@/lib/shared/dates";
 import type { TournamentFormat, TournamentGame } from "@/lib/shared/types";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import { validatePhases } from "@/lib/shared/tournament-phases";
+import { computeRecommendedRounds } from "@/lib/shared/swiss";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
 import { useToast } from "@/components/ui/toast";
 import { CyberCard, CyberButton } from "@/components/cyber";
@@ -46,6 +47,14 @@ export default function CreateTournamentPage() {
     createDefaultPhase(1, "SWISS"),
     createDefaultPhase(2, "DOUBLE"),
   ]);
+  // Ronde suisse : le nombre de rondes suit la recommandation ⌈log₂(N)⌉ + 1 tant
+  // que l'organisateur n'a pas saisi la sienne — sinon un changement d'effectif
+  // écraserait son choix.
+  const [swissRoundsTouched, setSwissRoundsTouched] = useState(false);
+  const [swissTotalRounds, setSwissTotalRoundsRaw] = useState(() => computeRecommendedRounds(16));
+  const [swissPointsWin, setSwissPointsWin] = useState(3);
+  const [swissPointsDraw, setSwissPointsDraw] = useState(1);
+  const [swissPointsLoss, setSwissPointsLoss] = useState(0);
   const [startVisibilityAt, setStartVisibilityAt] = useState(localDateTimeInput(1));
   const [registrationOpenAt, setRegistrationOpenAt] = useState(localDateTimeInput(3));
   const [registrationCloseAt, setRegistrationCloseAt] = useState(localDateTimeInput(24));
@@ -65,6 +74,13 @@ export default function CreateTournamentPage() {
       })
       .catch(() => undefined);
   }, [router, showError]);
+
+  const recommendedRounds = computeRecommendedRounds(maxTeams);
+  const setSwissTotalRounds = (value: number) => {
+    setSwissRoundsTouched(true);
+    setSwissTotalRoundsRaw(value);
+  };
+  const effectiveSwissRounds = swissRoundsTouched ? swissTotalRounds : recommendedRounds;
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -98,6 +114,10 @@ export default function CreateTournamentPage() {
           survivalRoundsBeforeFirstCut:
             format === "SURVIVAL" ? survivalRoundsBeforeFirstCut : undefined,
           phases: format === "MULTI" ? phases : undefined,
+          swissTotalRounds: format === "SWISS" ? effectiveSwissRounds : undefined,
+          swissPointsWin: format === "SWISS" ? swissPointsWin : undefined,
+          swissPointsDraw: format === "SWISS" ? swissPointsDraw : undefined,
+          swissPointsLoss: format === "SWISS" ? swissPointsLoss : undefined,
         }),
       });
       const payload = (await response.json()) as { error?: string; id?: number };
@@ -265,6 +285,69 @@ export default function CreateTournamentPage() {
                       championne. Si le nombre d&apos;inscrites est impair, un barrage entre les
                       deux dernières ouvre le tournoi — aucune victoire d&apos;office n&apos;est
                       distribuée.
+                    </p>
+                  </>
+                )}
+
+                {format === "SWISS" && (
+                  <>
+                    <div className="field">
+                      <label htmlFor="swiss-rounds">Nombre de rondes</label>
+                      <input
+                        id="swiss-rounds"
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={effectiveSwissRounds}
+                        onChange={(e) => setSwissTotalRounds(Number(e.target.value))}
+                      />
+                      <p style={HINT}>
+                        Recommandé pour {maxTeams} équipes : {recommendedRounds} ronde
+                        {recommendedRounds > 1 ? "s" : ""}.
+                      </p>
+                    </div>
+
+                    <div className="field">
+                      <label htmlFor="swiss-points-win">Barème (victoire / nul / défaite)</label>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input
+                          id="swiss-points-win"
+                          type="number"
+                          min={0}
+                          max={99}
+                          aria-label="Points par victoire"
+                          value={swissPointsWin}
+                          onChange={(e) => setSwissPointsWin(Number(e.target.value))}
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          max={99}
+                          aria-label="Points par match nul"
+                          value={swissPointsDraw}
+                          onChange={(e) => setSwissPointsDraw(Number(e.target.value))}
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          max={99}
+                          aria-label="Points par défaite"
+                          value={swissPointsLoss}
+                          onChange={(e) => setSwissPointsLoss(Number(e.target.value))}
+                        />
+                      </div>
+                      <p style={HINT}>
+                        Une victoire d&apos;office rapporte autant qu&apos;une victoire.
+                      </p>
+                    </div>
+
+                    <p style={{ ...HINT, ...FULL_WIDTH }}>
+                      Aucune élimination : toutes les équipes jouent les {effectiveSwissRounds}{" "}
+                      rondes.
+                      À chaque ronde, on affronte une équipe ayant un total de points proche du
+                      sien, sans jamais rejouer le même adversaire tant que c&apos;est possible. À
+                      égalité de points, le départage se fait au Buchholz (somme des points des
+                      adversaires rencontrés).
                     </p>
                   </>
                 )}

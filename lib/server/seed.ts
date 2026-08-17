@@ -8,8 +8,8 @@ import { finalizeMatch } from "./tournaments/scoring";
 import { finalizeTournamentIfDone } from "./tournaments/finalization";
 import {
   initializeSwissTournament,
-  generateFirstRound,
-  applySwissMatchResult,
+  generateSwissRound,
+  reconcileSwiss,
 } from "./tournaments/swiss";
 import {
   initializeSurvivalTournament,
@@ -18,7 +18,7 @@ import {
   forfeitSurvivalTeam,
 } from "./tournaments/survival";
 import { insertPhases, setCurrentPhase, loadPhases } from "./tournaments/phases-repository";
-import { initializeMultiTournament, reconcilePhases } from "./tournaments/phases";
+import { initializeMultiTournament, startPhase, reconcilePhases } from "./tournaments/phases";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import {
   TOURNAMENTS,
@@ -555,9 +555,10 @@ async function generateRealBracket(
   }
 }
 
-// Génère un tournoi « Ronde suisse » via l'orchestration de production. Chaque
-// résultat est propagé par applySwissMatchResult, qui enchaîne lui-même la ronde
-// suivante quand la ronde courante est complète (et clôt le tournoi à la fin).
+// Génère un tournoi « Ronde suisse » via l'orchestration de production
+// (initialize + generate + reconcile), sur le même schéma que la Survie.
+// `reconcileSwiss` enchaîne lui-même la ronde suivante quand la ronde courante
+// est complète, et clôt le tournoi (avec classement final) à la dernière.
 async function generateSwissTournament(
   db: Pool,
   tournamentId: number,
@@ -567,13 +568,16 @@ async function generateSwissTournament(
   const connection = await db.getConnection();
   try {
     await initializeSwissTournament(tournamentId, connection);
-    await generateFirstRound(tournamentId, connection);
+    await generateSwissRound(tournamentId, connection);
+    await reconcileSwiss(tournamentId, connection);
 
     let waves = 0;
     let played = 0;
-    while (finish || waves < playWaves) {
+    while (true) {
       const ready = readyMatches(await getMatchRows(connection, tournamentId));
-      if (ready.length === 0) break;
+      if (ready.length === 0) break; // plus rien à jouer (souvent : terminé)
+      if (!finish && waves >= playWaves) break; // laisse le tournoi en cours
+
       for (const m of ready) {
         await finalizeMatch(
           connection,
@@ -581,15 +585,10 @@ async function generateSwissTournament(
           m,
           playMatch(Number(m.team1_id), Number(m.team2_id))
         );
-        await applySwissMatchResult(Number(m.id), connection);
         played++;
       }
+      await reconcileSwiss(tournamentId, connection);
       waves++;
-    }
-    if (finish) {
-      // generateNextRound bascule l'état à FINISHED mais ne classe pas les
-      // inscriptions : on complète avec le classement générique (par victoires).
-      await finalizeTournamentIfDone(connection, tournamentId);
     }
     console.log(`    ↳ suisse : ${played} matchs simulés sur ${waves} ronde(s)`);
   } finally {
@@ -702,13 +701,11 @@ async function generateMultiPhaseTournament(
       if (currentPhase.state === "PENDING") {
         await setCurrentPhase(connection, tournamentId, currentPhase.id);
 
-        if (currentPhase.format === "SWISS") {
-          await initializeSwissTournament(tournamentId, connection);
-          await generateFirstRound(tournamentId, connection);
-        } else if (currentPhase.format === "SURVIVAL") {
-          await initializeSurvivalTournament(tournamentId, connection);
-          await generateSurvivalRound(tournamentId, connection);
-          await reconcileSurvival(tournamentId, connection, { phaseId: currentPhase.id });
+        // On passe par l'orchestrateur reel plutot que de reimplementer le
+        // demarrage d'une phase : le seed teste ainsi le meme chemin que la prod.
+        if (currentPhase.format === "SWISS" || currentPhase.format === "SURVIVAL") {
+          await startPhase(tournamentId, currentPhase.id, connection);
+          await reconcilePhases(tournamentId, connection);
         } else {
           const bracket = currentPhase.format as "SINGLE" | "DOUBLE";
           const tournament = await loadTournamentRow(connection, tournamentId);
@@ -739,11 +736,7 @@ async function generateMultiPhaseTournament(
             m,
             playMatch(Number(m.team1_id), Number(m.team2_id))
           );
-          if (currentPhase.format === "SWISS") {
-            await applySwissMatchResult(Number(m.id), connection);
-          } else if (currentPhase.format === "SURVIVAL") {
-            await reconcileSurvival(tournamentId, connection, { phaseId: currentPhase.id });
-          }
+          await reconcilePhases(tournamentId, connection);
           totalPlayed++;
         }
         phaseWaves++;

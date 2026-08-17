@@ -51,7 +51,13 @@ export { tryAutoResolveByes } from "./byes";
 export { finalizeTournamentIfDone, resolveExpiredScoreReports } from "./finalization";
 
 // Swiss
-export { initializeSwissTournament, generateFirstRound, generateNextRound, applySwissMatchResult } from "./swiss";
+export {
+  initializeSwissTournament,
+  generateSwissRound,
+  reconcileSwiss,
+  forfeitSwissTeam,
+  loadSwissMeta,
+} from "./swiss";
 
 // Survival
 export {
@@ -142,6 +148,10 @@ export async function createTournament(
     hasThirdPlaceMatch?: boolean;
     survivalRoundsBeforeFirstCut?: number | null;
     survivalRoundsPerCut?: number | null;
+    swissTotalRounds?: number | null;
+    swissPointsWin?: number | null;
+    swissPointsDraw?: number | null;
+    swissPointsLoss?: number | null;
     phases?: Array<{
       position: number;
       format: "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL";
@@ -213,6 +223,17 @@ export async function createTournament(
           )
         : null;
 
+    // Mode Suisse : nombre de rondes et barème. `null` laisse le moteur retomber
+    // sur la recommandation ⌈log₂(N)⌉ + 1, calculée au démarrage quand l'effectif
+    // définitif est connu.
+    const isSwiss = payload.format === "SWISS";
+    const swissTotalRounds =
+      isSwiss && payload.swissTotalRounds != null
+        ? Math.max(1, Math.trunc(Number(payload.swissTotalRounds)))
+        : null;
+    const swissPoints = (value: number | null | undefined, fallback: number): number =>
+      isSwiss && value != null ? Math.max(0, Math.trunc(Number(value))) : fallback;
+
     const [insert] = await connection.execute<ResultSetHeader>(
       `INSERT INTO bg_tournaments (
         organizer_user_id,
@@ -228,8 +249,13 @@ export async function createTournament(
         start_at,
         has_third_place_match,
         survival_rounds_before_first_cut,
-        survival_rounds_per_cut
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        survival_rounds_per_cut,
+        swiss_total_rounds,
+        swiss_points_win,
+        swiss_points_draw,
+        swiss_points_loss,
+        swiss_points_bye
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         organizerUserId,
         payload.name.trim(),
@@ -245,6 +271,13 @@ export async function createTournament(
         hasThirdPlaceMatch ? 1 : 0,
         survivalRoundsBeforeFirstCut,
         survivalRoundsPerCut,
+        swissTotalRounds,
+        swissPoints(payload.swissPointsWin, 3),
+        swissPoints(payload.swissPointsDraw, 1),
+        swissPoints(payload.swissPointsLoss, 0),
+        // Une victoire d'office vaut exactement une victoire : sans quoi le bye
+        // deviendrait un avantage (ou une punition) selon le barème choisi.
+        swissPoints(payload.swissPointsWin, 3),
       ],
     );
 
@@ -473,6 +506,11 @@ export async function getTournamentDetail(
             )
           : null;
 
+    const swiss =
+      card.format === "SWISS"
+        ? await (await import("./swiss")).loadSwissMeta(connection, tournamentId)
+        : null;
+
     return {
       card,
       matches: matches.map(mapMatch),
@@ -489,6 +527,7 @@ export async function getTournamentDetail(
       canCreateReportsForTeamIds,
       isAdmin,
       survival,
+      swiss,
       phases: phasesDetail?.phases ?? null,
       currentPhaseId: phasesDetail?.currentPhaseId ?? null,
       phaseStandings: phasesDetail?.phaseStandings ?? {},
@@ -521,16 +560,15 @@ export async function reportMatchScorePublic(
       opponentScoreRaw,
     );
 
-    // Apply Swiss result if applicable
-    const { applySwissMatchResult } = await import("./swiss");
-    await applySwissMatchResult(matchId, connection);
-
     await resolveExpiredScoreReports(connection, tournamentId);
     await tryAutoResolveByes(connection, tournamentId);
 
-    // Réconcilie le mode Survie (idempotent) avant la finalisation générique.
+    // Réconcilie les modes à classement (idempotents) avant la finalisation
+    // générique. Chacun sort immédiatement si le format ne le concerne pas.
     const { reconcileSurvival } = await import("./survival");
     await reconcileSurvival(tournamentId, connection);
+    const { reconcileSwiss } = await import("./swiss");
+    await reconcileSwiss(tournamentId, connection);
 
     // Réconcilie les phases multi (idempotent)
     const { reconcilePhases: reconcileMultiPhases } = await import("./phases");
@@ -577,6 +615,8 @@ export async function adminSaveMatchScoresPublic(
     if (savedTournamentId !== null) {
       const { reconcileSurvival } = await import("./survival");
       await reconcileSurvival(savedTournamentId, connection);
+      const { reconcileSwiss } = await import("./swiss");
+      await reconcileSwiss(savedTournamentId, connection);
 
       const { reconcilePhases: reconcileMultiPhases } = await import("./phases");
       await reconcileMultiPhases(savedTournamentId, connection);
@@ -596,10 +636,13 @@ export async function adminSaveMatchScoresPublic(
 }
 
 /**
- * Déclare le forfait d'une équipe dans un tournoi Survie (l'équipe quitte la
- * compétition). Ouvre sa propre transaction et publie l'évènement de mise à jour.
+ * Déclare le forfait d'une équipe (elle quitte la compétition). Réservé aux
+ * formats à classement — Survie et Ronde suisse : en élimination, le match perdu
+ * suffit à sortir une équipe, il n'y a rien à abandonner.
+ *
+ * Ouvre sa propre transaction et publie l'évènement de mise à jour.
  */
-export async function forfeitSurvivalTeamPublic(
+export async function forfeitTournamentTeamPublic(
   tournamentId: number,
   teamId: number,
 ): Promise<void> {
@@ -609,8 +652,21 @@ export async function forfeitSurvivalTeamPublic(
   try {
     await connection.beginTransaction();
 
-    const { forfeitSurvivalTeam } = await import("./survival");
-    await forfeitSurvivalTeam(tournamentId, teamId, connection);
+    const [formatRows] = await connection.execute<(RowDataPacket & { format: string })[]>(
+      `SELECT format FROM bg_tournaments WHERE id = ? LIMIT 1`,
+      [tournamentId],
+    );
+    const format = formatRows[0]?.format ?? null;
+
+    if (format === "SURVIVAL") {
+      const { forfeitSurvivalTeam } = await import("./survival");
+      await forfeitSurvivalTeam(tournamentId, teamId, connection);
+    } else if (format === "SWISS") {
+      const { forfeitSwissTeam } = await import("./swiss");
+      await forfeitSwissTeam(tournamentId, teamId, connection);
+    } else {
+      throw new Error("FORMAT_WITHOUT_FORFEIT");
+    }
 
     await connection.commit();
     publishUpdatedEvent(tournamentId);
@@ -650,6 +706,8 @@ export async function adminResolveMatchPublic(
 
     const { reconcileSurvival } = await import("./survival");
     await reconcileSurvival(tournamentId, connection);
+    const { reconcileSwiss } = await import("./swiss");
+    await reconcileSwiss(tournamentId, connection);
 
     const { reconcilePhases: reconcileMultiPhases } = await import("./phases");
     await reconcileMultiPhases(tournamentId, connection);
