@@ -13,6 +13,7 @@ interface SwissStandingsRow extends RowDataPacket {
   losses: number;
   byes: number;
   opponent_ids_json: string | number[];
+  buchholz?: number;
 }
 
 // `opponent_ids_json` est une colonne JSON : mysql2 la renvoie déjà désérialisée
@@ -42,12 +43,58 @@ interface TournamentSwissRow extends RowDataPacket {
   swiss_points_bye: number;
 }
 
-export async function initializeSwissTournament(
-  tournamentId: number,
+interface PhaseSwissRow extends RowDataPacket {
+  format: string;
+  swiss_total_rounds: number | null;
+  swiss_current_round?: number;
+}
+
+async function getSwissSettings(
   conn: PoolConnection,
-): Promise<void> {
+  tournamentId: number,
+  phaseId: number,
+): Promise<{
+  format: string;
+  totalRounds: number | null;
+  currentRound: number;
+  pointsWin: number;
+  pointsDraw: number;
+  pointsLoss: number;
+  pointsBye: number;
+}> {
+  if (phaseId !== 0) {
+    const [phaseRows] = await conn.execute<PhaseSwissRow[]>(
+      `SELECT format, swiss_total_rounds FROM bg_tournament_phases WHERE id = ? LIMIT 1`,
+      [phaseId],
+    );
+    if (phaseRows.length === 0) {
+      throw new Error("PHASE_NOT_FOUND");
+    }
+    const phase = phaseRows[0];
+
+    const [tournamentRows] = await conn.execute<TournamentSwissRow[]>(
+      `SELECT swiss_current_round, swiss_points_win, swiss_points_draw, swiss_points_loss, swiss_points_bye
+       FROM bg_tournaments WHERE id = ? LIMIT 1`,
+      [tournamentId],
+    );
+    if (tournamentRows.length === 0) {
+      throw new Error("TOURNAMENT_NOT_FOUND");
+    }
+    const tournament = tournamentRows[0];
+
+    return {
+      format: phase.format,
+      totalRounds: phase.swiss_total_rounds,
+      currentRound: 0,
+      pointsWin: Number(tournament.swiss_points_win),
+      pointsDraw: Number(tournament.swiss_points_draw),
+      pointsLoss: Number(tournament.swiss_points_loss),
+      pointsBye: Number(tournament.swiss_points_bye),
+    };
+  }
+
   const [tournamentRows] = await conn.execute<TournamentSwissRow[]>(
-    `SELECT format, swiss_total_rounds, swiss_points_win, swiss_points_draw, swiss_points_loss, swiss_points_bye
+    `SELECT format, swiss_total_rounds, swiss_current_round, swiss_points_win, swiss_points_draw, swiss_points_loss, swiss_points_bye
      FROM bg_tournaments WHERE id = ? LIMIT 1`,
     [tournamentId],
   );
@@ -57,35 +104,68 @@ export async function initializeSwissTournament(
   }
 
   const tournament = tournamentRows[0];
-  if (tournament.format !== "SWISS") {
+  return {
+    format: tournament.format,
+    totalRounds: tournament.swiss_total_rounds,
+    currentRound: Number(tournament.swiss_current_round),
+    pointsWin: Number(tournament.swiss_points_win),
+    pointsDraw: Number(tournament.swiss_points_draw),
+    pointsLoss: Number(tournament.swiss_points_loss),
+    pointsBye: Number(tournament.swiss_points_bye),
+  };
+}
+
+export async function initializeSwissTournament(
+  tournamentId: number,
+  conn: PoolConnection,
+  phaseId = 0,
+): Promise<void> {
+  const settings = await getSwissSettings(conn, tournamentId, phaseId);
+
+  if (settings.format !== "SWISS") {
     return;
   }
 
   // Get registered teams
-  const [registrations] = await conn.execute<RowDataPacket[]>(
-    `SELECT team_id FROM bg_tournament_registrations WHERE tournament_id = ?`,
-    [tournamentId],
-  );
-
-  const teamIds = registrations.map((r) => Number(r.team_id));
+  let teamIds: number[];
+  if (phaseId !== 0) {
+    const [phaseTeams] = await conn.execute<RowDataPacket[]>(
+      `SELECT team_id FROM bg_tournament_phase_teams WHERE phase_id = ?`,
+      [phaseId],
+    );
+    teamIds = phaseTeams.map((r) => Number(r.team_id));
+  } else {
+    const [registrations] = await conn.execute<RowDataPacket[]>(
+      `SELECT team_id FROM bg_tournament_registrations WHERE tournament_id = ?`,
+      [tournamentId],
+    );
+    teamIds = registrations.map((r) => Number(r.team_id));
+  }
 
   // Compute total rounds if not already set
-  let totalRounds = tournament.swiss_total_rounds;
+  let totalRounds = settings.totalRounds;
   if (totalRounds === null) {
     totalRounds = computeRecommendedRounds(teamIds.length);
-    await conn.execute(
-      `UPDATE bg_tournaments SET swiss_total_rounds = ? WHERE id = ?`,
-      [totalRounds, tournamentId],
-    );
+    if (phaseId !== 0) {
+      await conn.execute(
+        `UPDATE bg_tournament_phases SET swiss_total_rounds = ? WHERE id = ?`,
+        [totalRounds, phaseId],
+      );
+    } else {
+      await conn.execute(
+        `UPDATE bg_tournaments SET swiss_total_rounds = ? WHERE id = ?`,
+        [totalRounds, tournamentId],
+      );
+    }
   }
 
   // Initialize bg_swiss_standings for each team
   for (const teamId of teamIds) {
     await conn.execute(
-      `INSERT INTO bg_swiss_standings (tournament_id, team_id, points, wins, draws, losses, byes, opponent_ids_json)
-       VALUES (?, ?, 0, 0, 0, 0, 0, '[]')
+      `INSERT INTO bg_swiss_standings (tournament_id, team_id, phase_id, points, wins, draws, losses, byes, opponent_ids_json)
+       VALUES (?, ?, ?, 0, 0, 0, 0, 0, '[]')
        ON DUPLICATE KEY UPDATE points = 0, wins = 0, draws = 0, losses = 0, byes = 0, opponent_ids_json = '[]'`,
-      [tournamentId, teamId],
+      [tournamentId, teamId, phaseId],
     );
   }
 }
@@ -93,21 +173,19 @@ export async function initializeSwissTournament(
 export async function generateFirstRound(
   tournamentId: number,
   conn: PoolConnection,
+  phaseId = 0,
 ): Promise<void> {
-  const [tournamentRows] = await conn.execute<TournamentSwissRow[]>(
-    `SELECT format FROM bg_tournaments WHERE id = ? LIMIT 1`,
-    [tournamentId],
-  );
+  const settings = await getSwissSettings(conn, tournamentId, phaseId);
 
-  if (tournamentRows.length === 0 || tournamentRows[0].format !== "SWISS") {
+  if (settings.format !== "SWISS") {
     return;
   }
 
   // Get current standings (should all be at 0 points)
   const [standings] = await conn.execute<SwissStandingsRow[]>(
     `SELECT team_id, points, opponent_ids_json FROM bg_swiss_standings
-     WHERE tournament_id = ? ORDER BY team_id`,
-    [tournamentId],
+     WHERE tournament_id = ? AND phase_id = ? ORDER BY team_id`,
+    [tournamentId, phaseId],
   );
 
   const participants: Participant[] = standings.map((row) => ({
@@ -125,7 +203,7 @@ export async function generateFirstRound(
   for (const pairing of pairings) {
     const isBye = pairing.teamBId === null;
 
-    const matchId = await createMatch(conn, tournamentId, "UPPER", 1, matchNumber);
+    const matchId = await createMatch(conn, tournamentId, "UPPER", 1, matchNumber, phaseId);
 
     // Set participants and Swiss metadata
     await conn.execute(
@@ -155,15 +233,15 @@ export async function generateFirstRound(
       // Update standings for bye
       await conn.execute(
         `UPDATE bg_swiss_standings SET byes = byes + 1, points = points + ?
-         WHERE tournament_id = ? AND team_id = ?`,
-        [POINTS_FOR_BYE, tournamentId, pairing.teamAId],
+         WHERE tournament_id = ? AND phase_id = ? AND team_id = ?`,
+        [POINTS_FOR_BYE, tournamentId, phaseId, pairing.teamAId],
       );
     }
 
     matchNumber++;
   }
 
-  // Update tournament current round
+  // Update tournament current round (always on tournament, not phase)
   await conn.execute(`UPDATE bg_tournaments SET swiss_current_round = 1 WHERE id = ?`, [
     tournamentId,
   ]);
@@ -172,44 +250,43 @@ export async function generateFirstRound(
 export async function generateNextRound(
   tournamentId: number,
   conn: PoolConnection,
-): Promise<void> {
-  const [tournamentRows] = await conn.execute<TournamentSwissRow[]>(
-    `SELECT format, swiss_current_round, swiss_total_rounds FROM bg_tournaments WHERE id = ? LIMIT 1`,
-    [tournamentId],
-  );
+  phaseId = 0,
+): Promise<{ done: boolean }> {
+  const settings = await getSwissSettings(conn, tournamentId, phaseId);
 
-  if (tournamentRows.length === 0 || tournamentRows[0].format !== "SWISS") {
-    return;
+  if (settings.format !== "SWISS") {
+    return { done: false };
   }
 
-  const tournament = tournamentRows[0];
-  const currentRound = Number(tournament.swiss_current_round);
-  const totalRounds = Number(tournament.swiss_total_rounds);
+  const currentRound = settings.currentRound;
+  const totalRounds = Number(settings.totalRounds);
 
   // Verify all matches from current round are completed
   const [incompleteMatches] = await conn.execute<RowDataPacket[]>(
     `SELECT COUNT(*) as count FROM bg_matches
-     WHERE tournament_id = ? AND swiss_round = ? AND status != 'COMPLETED'`,
-    [tournamentId, currentRound],
+     WHERE tournament_id = ? AND phase_id = ? AND swiss_round = ? AND status != 'COMPLETED'`,
+    [tournamentId, phaseId, currentRound],
   );
 
   if (Number(incompleteMatches[0].count) > 0) {
     throw new Error("NOT_ALL_MATCHES_COMPLETED");
   }
 
-  // If we've completed all rounds, mark tournament as finished
+  // If we've completed all rounds, mark tournament as finished (only for plain SWISS)
   if (currentRound >= totalRounds) {
-    await conn.execute(`UPDATE bg_tournaments SET state = 'FINISHED' WHERE id = ?`, [
-      tournamentId,
-    ]);
-    return;
+    if (phaseId === 0) {
+      await conn.execute(`UPDATE bg_tournaments SET state = 'FINISHED' WHERE id = ?`, [
+        tournamentId,
+      ]);
+    }
+    return { done: true };
   }
 
   // Load standings
   const [standings] = await conn.execute<SwissStandingsRow[]>(
     `SELECT team_id, points, opponent_ids_json, byes FROM bg_swiss_standings
-     WHERE tournament_id = ? ORDER BY points DESC, team_id ASC`,
-    [tournamentId],
+     WHERE tournament_id = ? AND phase_id = ? ORDER BY points DESC, team_id ASC`,
+    [tournamentId, phaseId],
   );
 
   const participants: Participant[] = standings.map((row) => ({
@@ -228,7 +305,7 @@ export async function generateNextRound(
   for (const pairing of pairings) {
     const isBye = pairing.teamBId === null;
 
-    const matchId = await createMatch(conn, tournamentId, "UPPER", nextRound, matchNumber);
+    const matchId = await createMatch(conn, tournamentId, "UPPER", nextRound, matchNumber, phaseId);
 
     // Set participants and Swiss metadata
     await conn.execute(
@@ -258,19 +335,21 @@ export async function generateNextRound(
       // Update standings for bye
       await conn.execute(
         `UPDATE bg_swiss_standings SET byes = byes + 1, points = points + ?
-         WHERE tournament_id = ? AND team_id = ?`,
-        [POINTS_FOR_BYE, tournamentId, pairing.teamAId],
+         WHERE tournament_id = ? AND phase_id = ? AND team_id = ?`,
+        [POINTS_FOR_BYE, tournamentId, phaseId, pairing.teamAId],
       );
     }
 
     matchNumber++;
   }
 
-  // Update current round
+  // Update current round (always on tournament)
   await conn.execute(`UPDATE bg_tournaments SET swiss_current_round = ? WHERE id = ?`, [
     nextRound,
     tournamentId,
   ]);
+
+  return { done: false };
 }
 
 export async function applySwissMatchResult(
@@ -279,7 +358,7 @@ export async function applySwissMatchResult(
 ): Promise<void> {
   // Get match and tournament info
   const [matchRows] = await conn.execute<RowDataPacket[]>(
-    `SELECT tournament_id, team1_id, team2_id, team1_score, team2_score, swiss_round, is_bye
+    `SELECT tournament_id, team1_id, team2_id, team1_score, team2_score, swiss_round, is_bye, phase_id
      FROM bg_matches WHERE id = ? LIMIT 1`,
     [matchId],
   );
@@ -290,6 +369,7 @@ export async function applySwissMatchResult(
 
   const match = matchRows[0];
   const tournamentId = Number(match.tournament_id);
+  const phaseId = Number(match.phase_id ?? 0);
   const team1Id = Number(match.team1_id);
   const team2Id = match.team2_id ? Number(match.team2_id) : null;
   const team1Score = Number(match.team1_score);
@@ -299,6 +379,25 @@ export async function applySwissMatchResult(
 
   if (swissRound === null || isBye) {
     return;
+  }
+
+  // Verify format is SWISS
+  if (phaseId !== 0) {
+    const [phaseRows] = await conn.execute<RowDataPacket[]>(
+      `SELECT format FROM bg_tournament_phases WHERE id = ? LIMIT 1`,
+      [phaseId],
+    );
+    if (phaseRows.length === 0 || phaseRows[0].format !== "SWISS") {
+      return;
+    }
+  } else {
+    const [tournamentRows] = await conn.execute<TournamentSwissRow[]>(
+      `SELECT format FROM bg_tournaments WHERE id = ? LIMIT 1`,
+      [tournamentId],
+    );
+    if (tournamentRows.length === 0 || tournamentRows[0].format !== "SWISS") {
+      return;
+    }
   }
 
   // Get tournament settings
@@ -348,8 +447,8 @@ export async function applySwissMatchResult(
       `UPDATE bg_swiss_standings SET
        points = points + ?, wins = wins + ?, losses = losses + ?,
        opponent_ids_json = JSON_ARRAY_APPEND(opponent_ids_json, '$', ?)
-       WHERE tournament_id = ? AND team_id = ?`,
-      [team1Points, team1Wins, team1Losses, team2Id, tournamentId, team1Id],
+       WHERE tournament_id = ? AND phase_id = ? AND team_id = ?`,
+      [team1Points, team1Wins, team1Losses, team2Id, tournamentId, phaseId, team1Id],
     );
 
     // Update team2
@@ -357,20 +456,70 @@ export async function applySwissMatchResult(
       `UPDATE bg_swiss_standings SET
        points = points + ?, wins = wins + ?, losses = losses + ?,
        opponent_ids_json = JSON_ARRAY_APPEND(opponent_ids_json, '$', ?)
-       WHERE tournament_id = ? AND team_id = ?`,
-      [team2Points, team2Wins, team2Losses, team1Id, tournamentId, team2Id],
+       WHERE tournament_id = ? AND phase_id = ? AND team_id = ?`,
+      [team2Points, team2Wins, team2Losses, team1Id, tournamentId, phaseId, team2Id],
     );
   }
 
   // Check if all matches of this round are completed
   const [incompleteMatches] = await conn.execute<RowDataPacket[]>(
     `SELECT COUNT(*) as count FROM bg_matches
-     WHERE tournament_id = ? AND swiss_round = ? AND status != 'COMPLETED'`,
-    [tournamentId, swissRound],
+     WHERE tournament_id = ? AND phase_id = ? AND swiss_round = ? AND status != 'COMPLETED'`,
+    [tournamentId, phaseId, swissRound],
   );
 
   if (Number(incompleteMatches[0].count) === 0) {
     // All matches completed, generate next round
-    await generateNextRound(tournamentId, conn);
+    await generateNextRound(tournamentId, conn, phaseId);
   }
+}
+
+export async function loadSwissRanking(
+  conn: PoolConnection,
+  tournamentId: number,
+  phaseId = 0,
+): Promise<number[]> {
+  // Load all standings with their wins
+  const [standings] = await conn.execute<SwissStandingsRow[]>(
+    `SELECT team_id, points, wins, opponent_ids_json, losses FROM bg_swiss_standings
+     WHERE tournament_id = ? AND phase_id = ?
+     ORDER BY points DESC, wins DESC, losses ASC, team_id ASC`,
+    [tournamentId, phaseId],
+  );
+
+  if (standings.length === 0) {
+    return [];
+  }
+
+  // Build a map of team_id -> wins for buchholz calculation
+  const winsMap = new Map<number, number>();
+  for (const standing of standings) {
+    winsMap.set(Number(standing.team_id), Number(standing.wins));
+  }
+
+  // Calculate buchholz for each team and sort
+  const withBuchholz = standings.map((standing) => {
+    const teamId = Number(standing.team_id);
+    const opponentIds = parseOpponentIds(standing.opponent_ids_json);
+    const buchholz = opponentIds.reduce((sum, oppId) => sum + (winsMap.get(oppId) ?? 0), 0);
+
+    return {
+      teamId,
+      points: Number(standing.points),
+      wins: Number(standing.wins),
+      buchholz,
+      losses: Number(standing.losses),
+    };
+  });
+
+  // Sort by points DESC, wins DESC, buchholz DESC, losses ASC, team_id ASC
+  withBuchholz.sort((a, b) => {
+    if (a.points !== b.points) return b.points - a.points;
+    if (a.wins !== b.wins) return b.wins - a.wins;
+    if (a.buchholz !== b.buchholz) return b.buchholz - a.buchholz;
+    if (a.losses !== b.losses) return a.losses - b.losses;
+    return a.teamId - b.teamId;
+  });
+
+  return withBuchholz.map((item) => item.teamId);
 }
