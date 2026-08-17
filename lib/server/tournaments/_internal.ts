@@ -1,12 +1,12 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { toIso } from "@/lib/server/serialization";
-import type { BracketMatch, TournamentCard } from "@/lib/shared/types";
+import type { BracketMatch, TournamentCard, TournamentPhase } from "@/lib/shared/types";
 
 export type TournamentRow = RowDataPacket & {
   id: number;
   name: string;
   description: string | null;
-  format: "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL";
+  format: "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL" | "MULTI";
   game: "OW2" | "MR";
   max_teams: number;
   state: "UPCOMING" | "REGISTRATION" | "RUNNING" | "FINISHED";
@@ -22,6 +22,7 @@ export type TournamentRow = RowDataPacket & {
   survival_rounds_before_first_cut: number | null;
   survival_rounds_per_cut: number | null;
   survival_current_round: number;
+  current_phase_id: number | null;
 };
 
 export type RegistrationRow = RowDataPacket & {
@@ -63,11 +64,60 @@ export type MatchRow = RowDataPacket & {
   team2_reported_at: Date | null;
   score_deadline_at: Date | null;
   updated_at: Date;
+  phase_id: number;
+  phase_position: number | null;
 };
 
 export type TournamentListRow = TournamentRow & {
   registered_teams: number;
 };
+
+export type PhaseRow = RowDataPacket & {
+  id: number;
+  tournament_id: number;
+  position: number;
+  name: string | null;
+  format: "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL";
+  qualifier_mode: "COUNT" | "PERCENT";
+  qualifier_value: number;
+  has_third_place_match: number;
+  swiss_total_rounds: number | null;
+  survival_rounds_before_first_cut: number | null;
+  survival_rounds_per_cut: number | null;
+  survival_current_round: number;
+  survival_barrage_rounds: number;
+  state: "PENDING" | "RUNNING" | "FINISHED" | "SKIPPED";
+  entrants: number | null;
+  qualifiers: number | null;
+  max_rounds: number | null;
+  bracket_size: number | null;
+  started_at: Date | null;
+  finished_at: Date | null;
+  created_at: Date;
+};
+
+export function mapPhase(row: PhaseRow): TournamentPhase {
+  return {
+    id: Number(row.id),
+    position: Number(row.position),
+    name: row.name,
+    format: row.format,
+    qualifierMode: row.qualifier_mode,
+    qualifierValue: Number(row.qualifier_value),
+    hasThirdPlaceMatch: Boolean(row.has_third_place_match),
+    swissTotalRounds: row.swiss_total_rounds === null ? null : Number(row.swiss_total_rounds),
+    survivalRoundsBeforeFirstCut:
+      row.survival_rounds_before_first_cut === null ? null : Number(row.survival_rounds_before_first_cut),
+    survivalRoundsPerCut:
+      row.survival_rounds_per_cut === null ? null : Number(row.survival_rounds_per_cut),
+    state: row.state,
+    entrants: row.entrants === null ? null : Number(row.entrants),
+    qualifiers: row.qualifiers === null ? null : Number(row.qualifiers),
+    maxRounds: row.max_rounds === null ? null : Number(row.max_rounds),
+    startedAt: toIso(row.started_at),
+    finishedAt: toIso(row.finished_at),
+  };
+}
 
 export function statusFromTeams(
   team1Id: number | null,
@@ -97,6 +147,7 @@ export function mapCard(row: TournamentListRow): TournamentCard {
         : Number(row.survival_rounds_before_first_cut),
     survivalRoundsPerCut:
       row.survival_rounds_per_cut === null ? null : Number(row.survival_rounds_per_cut),
+    phases: null,
   };
 }
 
@@ -125,5 +176,7 @@ export function mapMatch(row: MatchRow): BracketMatch {
     nextLoserSlot: row.next_loser_slot === null ? null : Number(row.next_loser_slot),
     scoreDeadlineAt: toIso(row.score_deadline_at),
     updatedAt: toIso(row.updated_at)!,
+    phaseId: Number(row.phase_id ?? 0),
+    phasePosition: row.phase_position == null ? null : Number(row.phase_position),
   };
 }

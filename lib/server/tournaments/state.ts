@@ -54,6 +54,13 @@ export async function syncTournamentState(
       await generateSurvivalRound(tournamentId, connection);
     }
 
+    const isMultiStart =
+      tournament.state === "REGISTRATION" && computed === "RUNNING" && tournament.format === "MULTI";
+    if (isMultiStart) {
+      const { initializeMultiTournament } = await import("./phases");
+      await initializeMultiTournament(tournamentId, connection);
+    }
+
     await updateTournamentState(connection, tournamentId, computed);
     tournament.state = computed;
     stateChanged = true;
@@ -66,6 +73,11 @@ export async function syncTournamentState(
     if (isSwissStart) {
       const { reconcileSwiss } = await import("./swiss");
       await reconcileSwiss(tournamentId, connection);
+    }
+
+    if (isMultiStart) {
+      const { reconcilePhases } = await import("./phases");
+      await reconcilePhases(tournamentId, connection);
     }
   }
 

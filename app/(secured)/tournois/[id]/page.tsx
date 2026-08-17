@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
@@ -14,6 +14,12 @@ import { AdminScoreDialog } from "./_components/AdminScoreDialog";
 import { MatchScoreDraft } from "./_components/BracketTree";
 import { BracketSections } from "./_components/BracketSections";
 import { SurvivalView } from "./_components/SurvivalView";
+import { PhaseTimeline } from "./_components/PhaseTimeline";
+import { PhaseStandingsTable } from "./_components/PhaseStandingsTable";
+import {
+  defaultSelectedPhaseId,
+  visibleRulesFormat,
+} from "./_lib/phases";
 import { SwissView } from "./_components/SwissView";
 
 const FORMAT_LABELS: Record<TournamentFormat, string> = {
@@ -21,6 +27,7 @@ const FORMAT_LABELS: Record<TournamentFormat, string> = {
   DOUBLE: "Double élim.",
   SWISS: "Ronde suisse",
   SURVIVAL: "Survie",
+  MULTI: "Multi-phases",
 };
 
 /** « Arbre » ne veut rien dire dans les formats à classement, qui n'en ont pas. */
@@ -29,6 +36,7 @@ const BOARD_TITLES: Record<TournamentFormat, string> = {
   DOUBLE: "Arbre du tournoi",
   SWISS: "Classement et rondes",
   SURVIVAL: "Classement et rounds",
+  MULTI: "Phases du tournoi",
 };
 
 const STATE_META: Record<string, { label: string; chipClass: string }> = {
@@ -47,6 +55,27 @@ export default function TournamentDetailPage() {
   const { tournament: detail } = useTournamentLive(tournamentId);
   const [drafts, setDrafts] = useState<MatchScoreDraft>({});
   const [selectedMatchForAdmin, setSelectedMatchForAdmin] = useState<BracketMatch | null>(null);
+  const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
+
+  // Dernière phase courante observée. On ne resynchronise la sélection que
+  // lorsqu'elle change RÉELLEMENT (une phase vient de démarrer) : comparer
+  // directement à `selectedPhaseId` ramènerait l'affichage sur la phase en cours
+  // à chaque clic, rendant impossible la consultation d'une phase terminée.
+  const lastCurrentPhaseId = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!detail?.phases) return;
+
+    const current = detail.currentPhaseId ?? null;
+
+    if (selectedPhaseId === null) {
+      setSelectedPhaseId(defaultSelectedPhaseId(detail.phases, current));
+    } else if (current !== null && current !== lastCurrentPhaseId.current) {
+      setSelectedPhaseId(current);
+    }
+
+    lastCurrentPhaseId.current = current;
+  }, [detail?.phases, detail?.currentPhaseId, selectedPhaseId]);
 
   if (!detail) {
     return (
@@ -104,10 +133,18 @@ export default function TournamentDetailPage() {
     }
   };
 
+  // En multi-phases, l'abandon suit le format de la phase **en cours** — et non
+  // celui du tournoi (« MULTI », qui n'a pas de notion d'abandon), ni celui
+  // d'une phase terminée qu'on serait simplement en train de consulter.
+  const forfeitFormat =
+    detail.card.format === "MULTI"
+      ? detail.phases?.find((p) => p.id === detail.currentPhaseId)?.format ?? detail.card.format
+      : detail.card.format;
+
   const canForfeit = (teamId: number): boolean =>
     canForfeitTeam(
       {
-        format: detail.card.format,
+        format: forfeitFormat,
         state: detail.card.state,
         isAdmin: detail.isAdmin,
         myTeamId: detail.myTeamId,
@@ -151,9 +188,30 @@ export default function TournamentDetailPage() {
 
   const stateMeta = STATE_META[detail.card.state] ?? { label: detail.card.state, chipClass: "muted" };
 
+  const isMulti = detail.card.format === "MULTI";
+  const selectedPhase =
+    isMulti && selectedPhaseId && detail.phases
+      ? detail.phases.find((p) => p.id === selectedPhaseId) || null
+      : null;
+
+  const visibleFormat = visibleRulesFormat(detail.card, selectedPhase);
+  const contextLabel =
+    isMulti && selectedPhase
+      ? `Phase ${selectedPhase.position}${
+          selectedPhase.name ? ` — ${selectedPhase.name}` : ""
+        }`
+      : undefined;
+
+  const filteredMatches = isMulti && selectedPhase
+    ? detail.matches.filter((m) => m.phaseId === selectedPhase.id)
+    : detail.matches;
+
+  const formatForBracket = isMulti && selectedPhase ? selectedPhase.format : detail.card.format;
+  const hasThirdPlaceForPhase = isMulti && selectedPhase ? selectedPhase.hasThirdPlaceMatch : detail.card.hasThirdPlaceMatch;
+
   const bracketOrder: BracketType[] =
-    detail.card.format === "SINGLE"
-      ? detail.card.hasThirdPlaceMatch ? ["UPPER", "THIRD_PLACE"] : ["UPPER"]
+    formatForBracket === "SINGLE"
+      ? hasThirdPlaceForPhase ? ["UPPER", "THIRD_PLACE"] : ["UPPER"]
       : ["UPPER", "LOWER", "GRAND"];
   const bracketLabels: Record<BracketType, string> = {
     UPPER: "Tableau principal",
@@ -162,12 +220,12 @@ export default function TournamentDetailPage() {
     THIRD_PLACE: "Petite Finale",
   };
   const brackets = bracketOrder
-    .map((b) => ({ type: b, matches: detail.matches.filter((m) => m.bracket === b) }))
+    .map((b) => ({ type: b, matches: filteredMatches.filter((m) => m.bracket === b) }))
     .filter((b) => b.matches.length > 0);
 
   return (
     <>
-      <RulesHelpFab format={detail.card.format} />
+      <RulesHelpFab format={visibleFormat} contextLabel={contextLabel} />
       <section className="fade-in">
         <div className="ds-header green">
           <div className="ds-header-body">
@@ -205,6 +263,22 @@ export default function TournamentDetailPage() {
               <Pill variant={detail.card.state === "RUNNING" ? "live" : "blue"}>
                 {stateMeta.label}
               </Pill>
+              <Pill variant="blue">
+                {detail.card.format === "SINGLE"
+                  ? "Simple élim."
+                  : detail.card.format === "SURVIVAL"
+                    ? "Survie"
+                    : detail.card.format === "SWISS"
+                      ? "Suisse"
+                      : detail.card.format === "MULTI"
+                        ? "Multi-phases"
+                        : "Double élim."}
+              </Pill>
+              {detail.card.format === "MULTI" && detail.card.state === "RUNNING" && detail.phases && (
+                <Pill variant="blue">
+                  Phase {detail.phases.findIndex((p) => p.id === detail.currentPhaseId) + 1}/{detail.phases.length}
+                </Pill>
+              )}
               <Pill variant="blue">{FORMAT_LABELS[detail.card.format]}</Pill>
               {detail.card.hasThirdPlaceMatch && (
                 <Pill variant="blue">Petite finale</Pill>
@@ -227,18 +301,62 @@ export default function TournamentDetailPage() {
         </div>
 
         <div className="ds-block" style={{ marginBottom: 20 }}>
+          {isMulti && detail.phases && (
+            <PhaseTimeline
+              phases={detail.phases}
+              selectedPhaseId={selectedPhaseId}
+              currentPhaseId={detail.currentPhaseId}
+              onSelect={setSelectedPhaseId}
+            />
+          )}
+
           <div className="ds-section-title green">
             <h2>{BOARD_TITLES[detail.card.format]}</h2>
           </div>
 
           {detail.card.state === "REGISTRATION" ? (
             <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-              {detail.card.format === "SURVIVAL"
+              {formatForBracket === "SURVIVAL"
                 ? "Le classement de départ (seeding) et les rounds seront générés au démarrage du tournoi."
                 : detail.card.format === "SWISS"
                   ? "Le classement de départ (seeding) et la première ronde seront générés au démarrage du tournoi."
                   : "Le bracket sera généré automatiquement au démarrage du tournoi."}
             </p>
+          ) : formatForBracket === "SURVIVAL" && detail.survival ? (
+            <>
+              <SurvivalView
+                survival={detail.survival}
+                matches={filteredMatches}
+                allTournamentMatches={detail.matches}
+                myTeamId={detail.myTeamId}
+                isFinished={detail.card.state === "FINISHED"}
+                canReport={canReport}
+                adminResolvable={canAdminResolve}
+                drafts={drafts}
+                onScoreChange={handleScoreChange}
+                onSubmit={submitScore}
+                onOpenAdminModal={setSelectedMatchForAdmin}
+                canForfeit={canForfeit}
+                onForfeit={forfeitTeam}
+              />
+              {isMulti && selectedPhase?.state === "FINISHED" && detail.phaseStandings && detail.phaseStandings[selectedPhase.id] && (
+                <div style={{ marginTop: 24 }}>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      color: "var(--text-2)",
+                      fontWeight: 600,
+                      marginBottom: 10,
+                    }}
+                  >
+                    Qualifiées
+                  </div>
+                  <PhaseStandingsTable standings={detail.phaseStandings[selectedPhase.id]} />
+                </div>
+              )}
+            </>
           ) : detail.card.format === "SWISS" && detail.swiss ? (
             <SwissView
               swiss={detail.swiss}
@@ -255,46 +373,94 @@ export default function TournamentDetailPage() {
               canForfeit={canForfeit}
               onForfeit={forfeitTeam}
             />
-          ) : detail.card.format === "SURVIVAL" && detail.survival ? (
-            <SurvivalView
-              survival={detail.survival}
-              matches={detail.matches}
-              allTournamentMatches={detail.matches}
-              myTeamId={detail.myTeamId}
-              isFinished={detail.card.state === "FINISHED"}
-              canReport={canReport}
-              adminResolvable={canAdminResolve}
-              drafts={drafts}
-              onScoreChange={handleScoreChange}
-              onSubmit={submitScore}
-              onOpenAdminModal={setSelectedMatchForAdmin}
-              canForfeit={canForfeit}
-              onForfeit={forfeitTeam}
-            />
-          ) : !detail.matches.length ? (
+          ) : formatForBracket === "SWISS" ? (
+            <>
+              {brackets.length > 0 ? (
+                brackets.map(({ type, matches }) => (
+                  <div key={type} style={{ marginBottom: type !== brackets[brackets.length - 1].type ? 32 : 0, minHeight: 0, overflow: "visible" }}>
+                    <BracketSections
+                      bracketType={type}
+                      bracketLabel={bracketLabels[type]}
+                      showBracketLabel={brackets.length > 1}
+                      matches={matches}
+                      allTournamentMatches={detail.matches}
+                      myTeamId={detail.myTeamId}
+                      canReport={canReport}
+                      adminResolvable={canAdminResolve}
+                      drafts={drafts}
+                      onScoreChange={handleScoreChange}
+                      onSubmit={submitScore}
+                      onOpenAdminModal={setSelectedMatchForAdmin}
+                      format={formatForBracket}
+                    />
+                  </div>
+                ))
+              ) : (
+                <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
+                  Aucun match disponible pour l&apos;instant.
+                </p>
+              )}
+              {isMulti && selectedPhase?.state === "FINISHED" && detail.phaseStandings && detail.phaseStandings[selectedPhase.id] && (
+                <div style={{ marginTop: 24 }}>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      color: "var(--text-2)",
+                      fontWeight: 600,
+                      marginBottom: 10,
+                    }}
+                  >
+                    Classement
+                  </div>
+                  <PhaseStandingsTable standings={detail.phaseStandings[selectedPhase.id]} />
+                </div>
+              )}
+            </>
+          ) : !filteredMatches.length ? (
             <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
               Aucun match disponible pour l&apos;instant.
             </p>
           ) : (
-            brackets.map(({ type, matches }) => (
-              <div key={type} style={{ marginBottom: type !== brackets[brackets.length - 1].type ? 32 : 0, minHeight: 0, overflow: "visible" }}>
-                <BracketSections
-                  bracketType={type}
-                  bracketLabel={bracketLabels[type]}
-                  showBracketLabel={brackets.length > 1}
-                  matches={matches}
-                  allTournamentMatches={detail.matches}
-                  myTeamId={detail.myTeamId}
-                  canReport={canReport}
-                  adminResolvable={canAdminResolve}
-                  drafts={drafts}
-                  onScoreChange={handleScoreChange}
-                  onSubmit={submitScore}
-                  onOpenAdminModal={setSelectedMatchForAdmin}
-                  format={detail.card.format}
-                />
-              </div>
-            ))
+            <>
+              {brackets.map(({ type, matches }) => (
+                <div key={type} style={{ marginBottom: type !== brackets[brackets.length - 1].type ? 32 : 0, minHeight: 0, overflow: "visible" }}>
+                  <BracketSections
+                    bracketType={type}
+                    bracketLabel={bracketLabels[type]}
+                    showBracketLabel={brackets.length > 1}
+                    matches={matches}
+                    allTournamentMatches={detail.matches}
+                    myTeamId={detail.myTeamId}
+                    canReport={canReport}
+                    adminResolvable={canAdminResolve}
+                    drafts={drafts}
+                    onScoreChange={handleScoreChange}
+                    onSubmit={submitScore}
+                    onOpenAdminModal={setSelectedMatchForAdmin}
+                    format={formatForBracket}
+                  />
+                </div>
+              ))}
+              {isMulti && selectedPhase?.state === "FINISHED" && detail.phaseStandings && detail.phaseStandings[selectedPhase.id] && (
+                <div style={{ marginTop: 24 }}>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      color: "var(--text-2)",
+                      fontWeight: 600,
+                      marginBottom: 10,
+                    }}
+                  >
+                    Qualifiées
+                  </div>
+                  <PhaseStandingsTable standings={detail.phaseStandings[selectedPhase.id]} />
+                </div>
+              )}
+            </>
           )}
         </div>
 

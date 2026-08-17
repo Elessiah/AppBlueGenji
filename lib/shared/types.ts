@@ -1,6 +1,38 @@
 ﻿import type { PlatformRole } from "./permissions";
 
-export type TournamentFormat = "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL";
+export type TournamentFormat = "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL" | "MULTI";
+
+export type PhaseFormat = "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL";
+export type PhaseQualifierMode = "COUNT" | "PERCENT";
+export type PhaseState = "PENDING" | "RUNNING" | "FINISHED" | "SKIPPED";
+
+export type TournamentPhase = {
+  id: number;
+  position: number;
+  name: string | null;
+  format: PhaseFormat;
+  qualifierMode: PhaseQualifierMode;
+  qualifierValue: number;
+  hasThirdPlaceMatch: boolean;
+  swissTotalRounds: number | null;
+  survivalRoundsBeforeFirstCut: number | null;
+  survivalRoundsPerCut: number | null;
+  state: PhaseState;
+  entrants: number | null;
+  qualifiers: number | null;
+  maxRounds: number | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
+export type TournamentPhaseStanding = {
+  teamId: number;
+  teamName: string;
+  logoUrl: string | null;
+  seed: number;
+  rank: number | null;
+  qualified: boolean;
+};
 
 export type SurvivalStandingRow = {
   teamId: number;
@@ -166,6 +198,8 @@ export type TournamentCard = {
   survivalRoundsBeforeFirstCut: number | null;
   /** Mode Survie : nombre de rounds joués entre les coupes suivantes. */
   survivalRoundsPerCut: number | null;
+  /** Phases du tournoi multi-mode (null pour les tournois mono-mode). */
+  phases: TournamentPhase[] | null;
 };
 
 export type TournamentBuckets = {
@@ -199,6 +233,10 @@ export type BracketMatch = {
   nextLoserSlot: number | null;
   scoreDeadlineAt: string | null;
   updatedAt: string;
+  /** ID de la phase du tournoi (0 pour un tournoi sans phases). */
+  phaseId: number;
+  /** Position de la manche au sein de la phase (null pour les tournois sans phases). */
+  phasePosition: number | null;
 };
 
 export type TournamentDetail = {
@@ -220,6 +258,12 @@ export type TournamentDetail = {
   survival: SurvivalMeta | null;
   /** Métadonnées du mode Ronde suisse (null pour les autres formats). */
   swiss: SwissMeta | null;
+  /** Phases du tournoi multi-mode (null pour les tournois mono-mode). */
+  phases: TournamentPhase[] | null;
+  /** ID de la phase actuellement en cours (null si aucune phase n'est en cours). */
+  currentPhaseId: number | null;
+  /** Classements par phase (null pour les tournois mono-mode). */
+  phaseStandings: Record<number, TournamentPhaseStanding[]> | null;
 };
 
 export type BotStats = {

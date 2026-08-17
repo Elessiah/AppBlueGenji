@@ -26,7 +26,8 @@ export async function loadTournamentRow(
       has_third_place_match,
       survival_rounds_before_first_cut,
       survival_rounds_per_cut,
-      survival_current_round
+      survival_current_round,
+      current_phase_id
      FROM bg_tournaments
      WHERE id = ?
      LIMIT 1`,
@@ -59,11 +60,12 @@ export async function createMatch(
   bracket: "UPPER" | "LOWER" | "GRAND" | "THIRD_PLACE",
   roundNumber: number,
   matchNumber: number,
+  phaseId = 0,
 ): Promise<number> {
   const [insert] = await connection.execute<ResultSetHeader>(
-    `INSERT INTO bg_matches (tournament_id, bracket, round_number, match_number)
-     VALUES (?, ?, ?, ?)`,
-    [tournamentId, bracket, roundNumber, matchNumber],
+    `INSERT INTO bg_matches (tournament_id, bracket, round_number, match_number, phase_id)
+     VALUES (?, ?, ?, ?, ?)`,
+    [tournamentId, bracket, roundNumber, matchNumber, phaseId],
   );
 
   return Number(insert.insertId);
@@ -176,12 +178,16 @@ export async function getMatchRows(
       m.team2_report_opponent_score,
       m.team2_reported_at,
       m.score_deadline_at,
-      m.updated_at
+      m.updated_at,
+      m.phase_id,
+      p.position AS phase_position
      FROM bg_matches m
      LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
      LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
+     LEFT JOIN bg_tournament_phases p ON p.id = m.phase_id
      WHERE m.tournament_id = ?
      ORDER BY
+      COALESCE(p.position, 0) ASC,
       FIELD(m.bracket, 'UPPER', 'LOWER', 'GRAND', 'THIRD_PLACE') ASC,
       m.round_number ASC,
       m.match_number ASC`,
@@ -216,6 +222,7 @@ export async function getTournamentListRow(
       t.survival_rounds_before_first_cut,
       t.survival_rounds_per_cut,
       t.survival_current_round,
+      t.current_phase_id,
       COALESCE(COUNT(r.id), 0) AS registered_teams
      FROM bg_tournaments t
      LEFT JOIN bg_tournament_registrations r ON r.tournament_id = t.id
@@ -239,7 +246,8 @@ export async function getTournamentListRow(
       t.has_third_place_match,
       t.survival_rounds_before_first_cut,
       t.survival_rounds_per_cut,
-      t.survival_current_round`,
+      t.survival_current_round,
+      t.current_phase_id`,
     [tournamentId],
   );
 
@@ -263,6 +271,17 @@ export async function deleteAllMatches(
   tournamentId: number,
 ): Promise<void> {
   await connection.execute(`DELETE FROM bg_matches WHERE tournament_id = ?`, [tournamentId]);
+}
+
+export async function deletePhaseMatches(
+  connection: PoolConnection,
+  tournamentId: number,
+  phaseId: number,
+): Promise<void> {
+  await connection.execute(
+    `DELETE FROM bg_matches WHERE tournament_id = ? AND phase_id = ?`,
+    [tournamentId, phaseId],
+  );
 }
 
 export async function resetRegistrationRanks(

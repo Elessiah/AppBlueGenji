@@ -103,6 +103,7 @@ async function finalizeMatch(
 export async function tryAutoResolveByes(
   connection: PoolConnection,
   tournamentId: number,
+  phaseId = 0,
 ): Promise<void> {
   let hasProgress = true;
 
@@ -110,6 +111,7 @@ export async function tryAutoResolveByes(
     hasProgress = false;
 
     // Cas 1 : exactement une équipe présente, le slot vide n'a plus de feeder en attente → BYE win
+    // Les byes ne doivent jamais s'échapper d'une phase vers une autre.
     const [candidates] = await connection.execute<MatchRow[]>(
       `SELECT
         id,
@@ -121,10 +123,11 @@ export async function tryAutoResolveByes(
         next_loser_slot
       FROM bg_matches
       WHERE tournament_id = ?
+        AND phase_id = ?
         AND status <> 'COMPLETED'
         AND winner_team_id IS NULL
         AND ((team1_id IS NULL AND team2_id IS NOT NULL) OR (team1_id IS NOT NULL AND team2_id IS NULL))`,
-      [tournamentId],
+      [tournamentId, phaseId],
     );
 
     for (const candidate of candidates) {
@@ -133,13 +136,14 @@ export async function tryAutoResolveByes(
         `SELECT COUNT(*) AS c
          FROM bg_matches
          WHERE tournament_id = ?
+           AND phase_id = ?
            AND status <> 'COMPLETED'
            AND (
              (next_winner_match_id = ? AND next_winner_slot = ?)
              OR
              (next_loser_match_id = ? AND next_loser_slot = ?)
            )`,
-        [tournamentId, candidate.id, missingSlot, candidate.id, missingSlot],
+        [tournamentId, phaseId, candidate.id, missingSlot, candidate.id, missingSlot],
       );
 
       if (Number(feeders[0]?.c ?? 0) > 0) {
@@ -166,11 +170,12 @@ export async function tryAutoResolveByes(
       `SELECT id
        FROM bg_matches
        WHERE tournament_id = ?
+         AND phase_id = ?
          AND status <> 'COMPLETED'
          AND winner_team_id IS NULL
          AND team1_id IS NULL
          AND team2_id IS NULL`,
-      [tournamentId],
+      [tournamentId, phaseId],
     );
 
     for (const ghost of ghosts) {
@@ -178,9 +183,10 @@ export async function tryAutoResolveByes(
         `SELECT COUNT(*) AS c
          FROM bg_matches
          WHERE tournament_id = ?
+           AND phase_id = ?
            AND status <> 'COMPLETED'
            AND (next_winner_match_id = ? OR next_loser_match_id = ?)`,
-        [tournamentId, ghost.id, ghost.id],
+        [tournamentId, phaseId, ghost.id, ghost.id],
       );
 
       if (Number(feeders[0]?.c ?? 0) > 0) {

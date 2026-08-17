@@ -1,6 +1,6 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import type { TournamentFormat } from "@/lib/shared/types";
-import { hasScoreInput, type MatchScoreState } from "@/lib/shared/match-lock";
+import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
+import { dependentMatches, hasScoreInput, type MatchScoreState } from "@/lib/shared/match-lock";
 import { MatchRow } from "./_internal";
 import { finalizeMatch } from "./scoring";
 import { tryAutoResolveByes } from "./byes";
@@ -20,6 +20,11 @@ interface DependentMatchRow extends RowDataPacket {
 
 const DEPENDENT_COLUMNS = `id, round_number, team1_id, team2_id, team1_score, team2_score,
    winner_team_id, forfeit_team_id, team1_reported_at, team2_reported_at`;
+
+/** Mêmes colonnes, qualifiées par l'alias `m` (requêtes avec jointure). */
+const DEPENDENT_COLUMNS_M = DEPENDENT_COLUMNS.split(",")
+  .map((column) => `m.${column.trim()}`)
+  .join(", ");
 
 function toMatchScoreState(row: DependentMatchRow): MatchScoreState {
   return {
@@ -59,11 +64,12 @@ export async function checkDownstreamMatchesHaveNoScores(
       next_winner_match_id: number | null;
       next_loser_match_id: number | null;
       tournament_id: number;
+      phase_id: number | null;
       format: TournamentFormat;
     })[]
   >(
     `SELECT m.round_number, m.winner_team_id, m.next_winner_match_id, m.next_loser_match_id,
-            m.tournament_id, t.format
+            m.tournament_id, m.phase_id, t.format
      FROM bg_matches m
      JOIN bg_tournaments t ON t.id = m.tournament_id
      WHERE m.id = ?
@@ -76,6 +82,51 @@ export async function checkDownstreamMatchesHaveNoScores(
   if (!current || current.winner_team_id === null) return;
 
   let dependents: DependentMatchRow[];
+
+  if (current.format === "MULTI") {
+    // Multi-phases : la règle dépend du format de CHAQUE phase et une phase
+    // ultérieure dépend toujours de celle-ci. On délègue au module partagé
+    // (`lib/shared/match-lock.ts`) pour que serveur et interface appliquent
+    // exactement le même verrou, plutôt que de réécrire la règle en SQL.
+    const [rows] = await connection.execute<
+      (DependentMatchRow & {
+        phase_id: number;
+        phase_position: number | null;
+        next_winner_match_id: number | null;
+        next_loser_match_id: number | null;
+      })[]
+    >(
+      `SELECT ${DEPENDENT_COLUMNS_M}, m.phase_id, p.position AS phase_position,
+              m.next_winner_match_id, m.next_loser_match_id
+       FROM bg_matches m
+       LEFT JOIN bg_tournament_phases p ON p.id = m.phase_id
+       WHERE m.tournament_id = ?`,
+      [Number(current.tournament_id)],
+    );
+
+    const [phaseRows] = await connection.execute<
+      (RowDataPacket & { format: PhaseFormat })[]
+    >(`SELECT format FROM bg_tournament_phases WHERE id = ? LIMIT 1`, [
+      Number(current.phase_id ?? 0),
+    ]);
+
+    const states = rows.map((row) => ({
+      ...toMatchScoreState(row),
+      phaseId: Number(row.phase_id ?? 0),
+      phasePosition: row.phase_position === null ? null : Number(row.phase_position),
+      nextWinnerMatchId:
+        row.next_winner_match_id === null ? null : Number(row.next_winner_match_id),
+      nextLoserMatchId: row.next_loser_match_id === null ? null : Number(row.next_loser_match_id),
+    }));
+
+    const self = states.find((s) => s.id === Number(match.id));
+    if (!self) return;
+
+    if (dependentMatches(self, states, "MULTI", phaseRows[0]?.format).some(hasScoreInput)) {
+      throw new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES");
+    }
+    return;
+  }
 
   if (current.format === "SURVIVAL" || current.format === "SWISS") {
     const [rows] = await connection.execute<DependentMatchRow[]>(

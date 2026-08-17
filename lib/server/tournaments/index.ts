@@ -68,6 +68,15 @@ export {
   loadSurvivalMeta,
 } from "./survival";
 
+// Phases (Multi)
+export {
+  initializeMultiTournament,
+  startPhase,
+  reconcilePhases,
+  finalizeMultiTournament,
+  loadPhasesForDetail,
+} from "./phases";
+
 // Public API functions
 import { syncTournamentState } from "./state";
 import { registerCurrentUserTeam as registerTeamInternal } from "./registration";
@@ -143,121 +152,163 @@ export async function createTournament(
     swissPointsWin?: number | null;
     swissPointsDraw?: number | null;
     swissPointsLoss?: number | null;
+    phases?: Array<{
+      position: number;
+      format: "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL";
+      name: string | null;
+      qualifierMode: "COUNT" | "PERCENT";
+      qualifierValue: number;
+      hasThirdPlaceMatch: boolean;
+      swissTotalRounds: number | null;
+      survivalRoundsBeforeFirstCut: number | null;
+      survivalRoundsPerCut: number | null;
+    }>;
   },
 ): Promise<number> {
   const db = await getDatabase();
+  const connection = await db.getConnection();
 
-  const startVisibilityAt = new Date(payload.startVisibilityAt);
-  const registrationOpenAt = new Date(payload.registrationOpenAt);
-  const registrationCloseAt = new Date(payload.registrationCloseAt);
-  const startAt = new Date(payload.startAt);
+  try {
+    await connection.beginTransaction();
 
-  if (
-    Number.isNaN(startVisibilityAt.getTime()) ||
-    Number.isNaN(registrationOpenAt.getTime()) ||
-    Number.isNaN(registrationCloseAt.getTime()) ||
-    Number.isNaN(startAt.getTime())
-  ) {
-    throw new Error("INVALID_DATES");
+    const startVisibilityAt = new Date(payload.startVisibilityAt);
+    const registrationOpenAt = new Date(payload.registrationOpenAt);
+    const registrationCloseAt = new Date(payload.registrationCloseAt);
+    const startAt = new Date(payload.startAt);
+
+    if (
+      Number.isNaN(startVisibilityAt.getTime()) ||
+      Number.isNaN(registrationOpenAt.getTime()) ||
+      Number.isNaN(registrationCloseAt.getTime()) ||
+      Number.isNaN(startAt.getTime())
+    ) {
+      throw new Error("INVALID_DATES");
+    }
+
+    if (
+      !(
+        startVisibilityAt <= registrationOpenAt &&
+        registrationOpenAt <= registrationCloseAt &&
+        registrationCloseAt <= startAt
+      )
+    ) {
+      throw new Error("INVALID_DATE_ORDER");
+    }
+
+    const { computeTournamentState } = await import("./state");
+
+    const temporaryState: TournamentState = computeTournamentState({
+      state: "UPCOMING",
+      finished_at: null,
+      registration_open_at: registrationOpenAt,
+      registration_close_at: registrationCloseAt,
+      start_at: startAt,
+    });
+
+    const hasThirdPlaceMatch = payload.format === "SINGLE" && Boolean(payload.hasThirdPlaceMatch);
+    const game = payload.game ?? "OW2";
+
+    // Mode Survie : cadence des coupes (min. 1 manche). Ignorée pour les autres
+    // formats. Le délai avant la première coupe retombe sur l'intervalle courant
+    // s'il n'est pas fourni.
+    const survivalRoundsPerCut =
+      payload.format === "SURVIVAL"
+        ? Math.max(1, Math.trunc(Number(payload.survivalRoundsPerCut ?? 1)))
+        : null;
+    const survivalRoundsBeforeFirstCut =
+      payload.format === "SURVIVAL"
+        ? Math.max(
+            1,
+            Math.trunc(Number(payload.survivalRoundsBeforeFirstCut ?? survivalRoundsPerCut ?? 1)),
+          )
+        : null;
+
+    // Mode Suisse : nombre de rondes et barème. `null` laisse le moteur retomber
+    // sur la recommandation ⌈log₂(N)⌉ + 1, calculée au démarrage quand l'effectif
+    // définitif est connu.
+    const isSwiss = payload.format === "SWISS";
+    const swissTotalRounds =
+      isSwiss && payload.swissTotalRounds != null
+        ? Math.max(1, Math.trunc(Number(payload.swissTotalRounds)))
+        : null;
+    const swissPoints = (value: number | null | undefined, fallback: number): number =>
+      isSwiss && value != null ? Math.max(0, Math.trunc(Number(value))) : fallback;
+
+    const [insert] = await connection.execute<ResultSetHeader>(
+      `INSERT INTO bg_tournaments (
+        organizer_user_id,
+        name,
+        description,
+        format,
+        game,
+        max_teams,
+        state,
+        start_visibility_at,
+        registration_open_at,
+        registration_close_at,
+        start_at,
+        has_third_place_match,
+        survival_rounds_before_first_cut,
+        survival_rounds_per_cut,
+        swiss_total_rounds,
+        swiss_points_win,
+        swiss_points_draw,
+        swiss_points_loss,
+        swiss_points_bye
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        organizerUserId,
+        payload.name.trim(),
+        payload.description,
+        payload.format,
+        game,
+        payload.maxTeams,
+        temporaryState,
+        startVisibilityAt,
+        registrationOpenAt,
+        registrationCloseAt,
+        startAt,
+        hasThirdPlaceMatch ? 1 : 0,
+        survivalRoundsBeforeFirstCut,
+        survivalRoundsPerCut,
+        swissTotalRounds,
+        swissPoints(payload.swissPointsWin, 3),
+        swissPoints(payload.swissPointsDraw, 1),
+        swissPoints(payload.swissPointsLoss, 0),
+        // Une victoire d'office vaut exactement une victoire : sans quoi le bye
+        // deviendrait un avantage (ou une punition) selon le barème choisi.
+        swissPoints(payload.swissPointsWin, 3),
+      ],
+    );
+
+    const tournamentId = Number(insert.insertId);
+
+    // Valide et insère les phases si format MULTI
+    if (payload.format === "MULTI" && payload.phases) {
+      // Le payload HTTP ne porte pas les positions (c'est l'ordre du tableau qui
+      // fait foi) : on normalise avant de valider et d'insérer.
+      const { normalizePhaseConfigs, validatePhases } = await import(
+        "@/lib/shared/tournament-phases"
+      );
+      const phases = normalizePhaseConfigs(payload.phases);
+
+      const error = validatePhases(phases);
+      if (error) {
+        throw new Error(error);
+      }
+
+      const { insertPhases } = await import("./phases-repository");
+      await insertPhases(connection, tournamentId, phases);
+    }
+
+    await connection.commit();
+    return tournamentId;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
   }
-
-  if (
-    !(
-      startVisibilityAt <= registrationOpenAt &&
-      registrationOpenAt <= registrationCloseAt &&
-      registrationCloseAt <= startAt
-    )
-  ) {
-    throw new Error("INVALID_DATE_ORDER");
-  }
-
-  const { computeTournamentState } = await import("./state");
-
-  const temporaryState: TournamentState = computeTournamentState({
-    state: "UPCOMING",
-    finished_at: null,
-    registration_open_at: registrationOpenAt,
-    registration_close_at: registrationCloseAt,
-    start_at: startAt,
-  });
-
-  const hasThirdPlaceMatch = payload.format === "SINGLE" && Boolean(payload.hasThirdPlaceMatch);
-  const game = payload.game ?? "OW2";
-
-  // Mode Survie : cadence des coupes (min. 1 manche). Ignorée pour les autres
-  // formats. Le délai avant la première coupe retombe sur l'intervalle courant
-  // s'il n'est pas fourni.
-  const survivalRoundsPerCut =
-    payload.format === "SURVIVAL"
-      ? Math.max(1, Math.trunc(Number(payload.survivalRoundsPerCut ?? 1)))
-      : null;
-  const survivalRoundsBeforeFirstCut =
-    payload.format === "SURVIVAL"
-      ? Math.max(
-          1,
-          Math.trunc(Number(payload.survivalRoundsBeforeFirstCut ?? survivalRoundsPerCut ?? 1)),
-        )
-      : null;
-
-  // Mode Suisse : nombre de rondes et barème. `null` laisse le moteur retomber
-  // sur la recommandation ⌈log₂(N)⌉ + 1, calculée au démarrage quand l'effectif
-  // définitif est connu.
-  const isSwiss = payload.format === "SWISS";
-  const swissTotalRounds =
-    isSwiss && payload.swissTotalRounds != null
-      ? Math.max(1, Math.trunc(Number(payload.swissTotalRounds)))
-      : null;
-  const swissPoints = (value: number | null | undefined, fallback: number): number =>
-    isSwiss && value != null ? Math.max(0, Math.trunc(Number(value))) : fallback;
-
-  const [insert] = await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_tournaments (
-      organizer_user_id,
-      name,
-      description,
-      format,
-      game,
-      max_teams,
-      state,
-      start_visibility_at,
-      registration_open_at,
-      registration_close_at,
-      start_at,
-      has_third_place_match,
-      survival_rounds_before_first_cut,
-      survival_rounds_per_cut,
-      swiss_total_rounds,
-      swiss_points_win,
-      swiss_points_draw,
-      swiss_points_loss,
-      swiss_points_bye
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      organizerUserId,
-      payload.name.trim(),
-      payload.description,
-      payload.format,
-      game,
-      payload.maxTeams,
-      temporaryState,
-      startVisibilityAt,
-      registrationOpenAt,
-      registrationCloseAt,
-      startAt,
-      hasThirdPlaceMatch ? 1 : 0,
-      survivalRoundsBeforeFirstCut,
-      survivalRoundsPerCut,
-      swissTotalRounds,
-      swissPoints(payload.swissPointsWin, 3),
-      swissPoints(payload.swissPointsDraw, 1),
-      swissPoints(payload.swissPointsLoss, 0),
-      // Une victoire d'office vaut exactement une victoire : sans quoi le bye
-      // deviendrait un avantage (ou une punition) selon le barème choisi.
-      swissPoints(payload.swissPointsWin, 3),
-    ],
-  );
-
-  return Number(insert.insertId);
 }
 
 export async function listTournamentBuckets(searchTerm: string | null): Promise<TournamentBuckets> {
@@ -432,15 +483,43 @@ export async function getTournamentDetail(
 
     const canCreateReportsForTeamIds = myTeamId ? [myTeamId] : [];
 
+    const phasesDetail = card.format === "MULTI"
+      ? await (await import("./phases")).loadPhasesForDetail(connection, tournamentId)
+      : null;
+
+    // La vue Survie sert aussi à l'intérieur d'un tournoi multi-phases : sans
+    // ces métadonnées, une phase en survie retomberait sur l'affichage générique
+    // en arbre, privant les équipes du classement et du report de score.
+    const survivalPhaseId =
+      phasesDetail?.phases.find(
+        (phase) => phase.id === phasesDetail.currentPhaseId && phase.format === "SURVIVAL",
+      )?.id ?? null;
+
     const survival =
       card.format === "SURVIVAL"
         ? await (await import("./survival")).loadSurvivalMeta(connection, tournamentId)
-        : null;
+        : survivalPhaseId !== null
+          ? await (await import("./survival")).loadSurvivalMeta(
+              connection,
+              tournamentId,
+              survivalPhaseId,
+            )
+          : null;
+
+    // Même raison que pour la survie ci-dessus : la vue Suisse sert aussi à
+    // l'intérieur d'une phase, sinon une ronde suisse en `MULTI` n'afficherait
+    // ni classement ni départages.
+    const swissPhaseId =
+      phasesDetail?.phases.find(
+        (phase) => phase.id === phasesDetail.currentPhaseId && phase.format === "SWISS",
+      )?.id ?? null;
 
     const swiss =
       card.format === "SWISS"
         ? await (await import("./swiss")).loadSwissMeta(connection, tournamentId)
-        : null;
+        : swissPhaseId !== null
+          ? await (await import("./swiss")).loadSwissMeta(connection, tournamentId, swissPhaseId)
+          : null;
 
     return {
       card,
@@ -459,6 +538,9 @@ export async function getTournamentDetail(
       isAdmin,
       survival,
       swiss,
+      phases: phasesDetail?.phases ?? null,
+      currentPhaseId: phasesDetail?.currentPhaseId ?? null,
+      phaseStandings: phasesDetail?.phaseStandings ?? {},
     };
   } finally {
     connection.release();
@@ -497,6 +579,10 @@ export async function reportMatchScorePublic(
     await reconcileSurvival(tournamentId, connection);
     const { reconcileSwiss } = await import("./swiss");
     await reconcileSwiss(tournamentId, connection);
+
+    // Réconcilie les phases multi (idempotent)
+    const { reconcilePhases: reconcileMultiPhases } = await import("./phases");
+    await reconcileMultiPhases(tournamentId, connection);
 
     await finalizeTournamentIfDone(connection, tournamentId);
 
@@ -541,6 +627,9 @@ export async function adminSaveMatchScoresPublic(
       await reconcileSurvival(savedTournamentId, connection);
       const { reconcileSwiss } = await import("./swiss");
       await reconcileSwiss(savedTournamentId, connection);
+
+      const { reconcilePhases: reconcileMultiPhases } = await import("./phases");
+      await reconcileMultiPhases(savedTournamentId, connection);
     }
 
     await connection.commit();
@@ -579,14 +668,39 @@ export async function forfeitTournamentTeamPublic(
     );
     const format = formatRows[0]?.format ?? null;
 
-    if (format === "SURVIVAL") {
+    // En multi-phases, c'est le format de la PHASE COURANTE qui décide : un
+    // abandon garde tout son sens pendant une phase de survie ou de ronde
+    // suisse, même si le tournoi lui-même porte le format « MULTI ».
+    let engineFormat = format;
+    let forfeitPhaseId = 0;
+
+    if (format === "MULTI") {
+      const [phaseRows] = await connection.execute<
+        (RowDataPacket & { id: number; format: string })[]
+      >(
+        `SELECT p.id, p.format
+         FROM bg_tournament_phases p
+         JOIN bg_tournaments t ON t.current_phase_id = p.id
+         WHERE t.id = ? LIMIT 1`,
+        [tournamentId],
+      );
+      engineFormat = phaseRows[0]?.format ?? null;
+      forfeitPhaseId = Number(phaseRows[0]?.id ?? 0);
+    }
+
+    if (engineFormat === "SURVIVAL") {
       const { forfeitSurvivalTeam } = await import("./survival");
-      await forfeitSurvivalTeam(tournamentId, teamId, connection);
-    } else if (format === "SWISS") {
+      await forfeitSurvivalTeam(tournamentId, teamId, connection, forfeitPhaseId);
+    } else if (engineFormat === "SWISS") {
       const { forfeitSwissTeam } = await import("./swiss");
-      await forfeitSwissTeam(tournamentId, teamId, connection);
+      await forfeitSwissTeam(tournamentId, teamId, connection, forfeitPhaseId);
     } else {
       throw new Error("FORMAT_WITHOUT_FORFEIT");
+    }
+
+    if (format === "MULTI") {
+      const { reconcilePhases } = await import("./phases");
+      await reconcilePhases(tournamentId, connection);
     }
 
     await connection.commit();
@@ -629,6 +743,9 @@ export async function adminResolveMatchPublic(
     await reconcileSurvival(tournamentId, connection);
     const { reconcileSwiss } = await import("./swiss");
     await reconcileSwiss(tournamentId, connection);
+
+    const { reconcilePhases: reconcileMultiPhases } = await import("./phases");
+    await reconcileMultiPhases(tournamentId, connection);
 
     await finalizeTournamentIfDone(connection, tournamentId);
 

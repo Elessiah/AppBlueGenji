@@ -17,7 +17,7 @@ import type { TournamentFormat } from "./types";
 export type RuleStatus = "AVAILABLE" | "SOON";
 
 /** Identifiant du schéma illustrant le mode (rendu par `components/rules`). */
-export type RuleDiagram = "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL";
+export type RuleDiagram = "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL" | "MULTI";
 
 export type RuleFact = { label: string; value: string };
 
@@ -335,6 +335,73 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
         title: "Classement final",
         body: [
           "Le tournoi se termine à l'issue de la dernière ronde prévue : la tête du classement est championne. Il n'y a pas de finale — le classement fait foi.",
+        ],
+      },
+    ],
+  },
+  {
+    slug: "multi-phases",
+    format: "MULTI",
+    label: "Tournoi multi-phases",
+    shortLabel: "Multi-phases",
+    status: "AVAILABLE",
+    tagline: "Plusieurs phases enchaînées, chacune éliminant les plus faibles, jusqu'à la championne.",
+    facts: [
+      { label: "Phases", value: "2 à 8" },
+      { label: "Qualification", value: "Nombre ou %" },
+      { label: "Formats", value: "Combinables" },
+      { label: "Finalité", value: "Une championne" },
+    ],
+    principles: [
+      "Chaque phase se joue dans son propre format et ne transmet que ses qualifiées à la suivante.",
+      "La qualification peut être fixe (un nombre d'équipes) ou adaptative (un pourcentage de l'effectif réel).",
+      "La dernière phase désigne la championne ; les autres équipes sont classées par la phase la plus avancée qu'elles ont atteinte, puis par leur rang dans cette phase.",
+    ],
+    diagram: "MULTI",
+    diagramCaption:
+      "Exemple : ronde suisse (128 → 64), survie (64 → 16), double élimination (16 → 1). Chaque phase affine le podium.",
+    sections: [
+      {
+        title: "Enchaînement des phases",
+        body: [
+          "Le tournoi se divise en une succession de phases numérotées. Chaque phase joue indépendamment dans son format (simple élimination, double élimination, suisse, survie) et établit son propre classement.",
+        ],
+        bullets: [
+          "Seules les qualifiées de la phase N accèdent à la phase N+1.",
+          "Les équipes non qualifiées quittent le tournoi, leur rang final fixé par la dernière phase qu'elles ont atteinte.",
+          "La dernière phase désigne la championne et tout le podium final.",
+        ],
+      },
+      {
+        title: "Qualification : nombre fixe ou pourcentage",
+        body: [
+          "Chaque phase définit le nombre d'équipes qui avancent vers la suivante. Deux réglages sont possibles :",
+        ],
+        bullets: [
+          "**Nombre fixe** (ex. 64 équipes) : la phase cherche à éliminer jusqu'à ce qu'il en reste 64. Si l'effectif réel est déjà ≤ 64, la phase saute et tout le groupe avance. Un effectif fixe sur une élimination simple est arrondi à la puissance de 2 inférieure ou égale.",
+          "**Pourcentage** (ex. 50%) : la phase adapte dynamiquement — si 128 équipes entrent, 64 sortent ; si 100 entrent, 50 sortent.",
+        ],
+      },
+      {
+        title: "Combinaisons possibles",
+        body: [
+          "La ronde suisse et la survie coupent naturellement l'effectif et peuvent commencer une cascade. La double élimination est autorisée uniquement en phase finale (elle demande trop de matchs pour être utilisée en amont).",
+        ],
+        bullets: [
+          "Exemple viable : ronde suisse → survie → simple élimination.",
+          "Exemple viable : simple élimination → double élimination (dernière phase).",
+          "Non viable : ronde suisse → double élimination (sauf si c'est la dernière phase).",
+        ],
+      },
+      {
+        title: "Classement final",
+        body: [
+          "Le classement se construit du haut vers le bas : d'abord par la phase atteinte (plus tard = mieux), puis par le rang dans cette phase.",
+        ],
+        bullets: [
+          "La gagnante de la dernière phase = classement 1ʳ.",
+          "Une équipe éliminée en phase 3 rank 2 devance une équipe éliminée en phase 2 rank 1.",
+          "À égalité de phase et rang, les départages se font sur les victoires et défaites au sein de la phase.",
         ],
       },
     ],

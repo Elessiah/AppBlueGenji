@@ -17,12 +17,15 @@ import {
   reconcileSurvival,
   forfeitSurvivalTeam,
 } from "./tournaments/survival";
+import { insertPhases, setCurrentPhase, loadPhases } from "./tournaments/phases-repository";
+import { initializeMultiTournament, startPhase, reconcilePhases } from "./tournaments/phases";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import {
   TOURNAMENTS,
   type ReportStateCounts,
   type SeedFormat,
   type TournamentDef,
+  type SeedPhase,
 } from "./seed-cases";
 
 // ---------------------------------------------------------------------------
@@ -659,6 +662,116 @@ async function generateSurvivalTournament(
   }
 }
 
+// Génère un tournoi multi-phase. Persiste les phases dans la base, initialise
+// le tournoi, puis joue les matchs à travers les phases en utilisant
+// l'orchestration réelle (reconcilePhases pour l'avancement).
+async function generateMultiPhaseTournament(
+  db: Pool,
+  tournamentId: number,
+  phases: SeedPhase[],
+  finish: boolean,
+  playWaves: number
+): Promise<void> {
+  const connection = await db.getConnection();
+  try {
+    const phaseConfigs = phases.map((p, idx) => ({
+      position: idx + 1,
+      format: p.format,
+      name: null,
+      qualifierMode: p.qualifierMode,
+      qualifierValue: p.qualifierValue,
+      swissTotalRounds: p.swissTotalRounds ?? null,
+      survivalRoundsBeforeFirstCut: p.survivalRoundsBeforeFirstCut ?? null,
+      survivalRoundsPerCut: p.survivalRoundsPerCut ?? null,
+      hasThirdPlaceMatch: p.hasThirdPlaceMatch ?? false,
+    }));
+
+    await insertPhases(connection, tournamentId, phaseConfigs);
+    await initializeMultiTournament(tournamentId, connection);
+
+    let totalPlayed = 0;
+    let currentWaves = 0;
+
+    while (true) {
+      const loadedPhases = await loadPhases(connection, tournamentId);
+      const currentPhase = loadedPhases.find((p) => p.state === "PENDING" || p.state === "RUNNING");
+
+      if (!currentPhase) break;
+
+      if (currentPhase.state === "PENDING") {
+        await setCurrentPhase(connection, tournamentId, currentPhase.id);
+
+        // On passe par l'orchestrateur reel plutot que de reimplementer le
+        // demarrage d'une phase : le seed teste ainsi le meme chemin que la prod.
+        if (currentPhase.format === "SWISS" || currentPhase.format === "SURVIVAL") {
+          await startPhase(tournamentId, currentPhase.id, connection);
+          await reconcilePhases(tournamentId, connection);
+        } else {
+          const bracket = currentPhase.format as "SINGLE" | "DOUBLE";
+          const tournament = await loadTournamentRow(connection, tournamentId);
+          if (!tournament) break;
+          const teamIds = await loadPhaseTeamIds(connection, currentPhase.id);
+
+          if (bracket === "DOUBLE") {
+            await createDoubleEliminationBracket(connection, tournament, teamIds, { phaseId: currentPhase.id });
+          } else {
+            await createSingleEliminationBracket(connection, tournament, teamIds, { phaseId: currentPhase.id });
+          }
+        }
+      }
+
+      let phaseWaves = 0;
+
+      while (true) {
+        const allMatches = await getMatchRows(connection, tournamentId);
+        const phaseMatches = allMatches.filter((m) => Number(m.phase_id) === currentPhase.id);
+        const phaseReady = readyMatches(phaseMatches);
+        if (phaseReady.length === 0) break;
+        if (!finish && phaseWaves >= playWaves) break;
+
+        for (const m of phaseReady) {
+          await finalizeMatch(
+            connection,
+            tournamentId,
+            m,
+            playMatch(Number(m.team1_id), Number(m.team2_id))
+          );
+          await reconcilePhases(tournamentId, connection);
+          totalPlayed++;
+        }
+        phaseWaves++;
+        currentWaves++;
+      }
+
+      await reconcilePhases(tournamentId, connection);
+
+      if (!finish && currentWaves >= playWaves) break;
+
+      const [rows] = await connection.execute<(RowDataPacket & { state: string })[]>(
+        `SELECT state FROM bg_tournaments WHERE id = ? LIMIT 1`,
+        [tournamentId]
+      );
+      if (rows[0]?.state === "FINISHED") break;
+    }
+
+    console.log(`    ↳ multi-phase : ${totalPlayed} matchs simulés`);
+  } finally {
+    connection.release();
+  }
+}
+
+// Helper pour récupérer les team IDs d'une phase
+async function loadPhaseTeamIds(
+  connection: PoolConnection,
+  phaseId: number
+): Promise<number[]> {
+  const [rows] = await connection.execute<(RowDataPacket & { team_id: number })[]>(
+    `SELECT team_id FROM bg_tournament_phase_teams WHERE phase_id = ? ORDER BY seed ASC`,
+    [phaseId]
+  );
+  return rows.map((r) => Number(r.team_id));
+}
+
 // ---------------------------------------------------------------------------
 // États intermédiaires de report de score
 // ---------------------------------------------------------------------------
@@ -749,6 +862,7 @@ async function createTournament(
   const format = def.format ?? "DOUBLE";
   const isSurvival = format === "SURVIVAL";
   const isSwiss = format === "SWISS";
+  const isMulti = format === "MULTI";
 
   // Les états sont dérivés des dates par computeTournamentState() : on les
   // calibre pour que l'état voulu soit stable après resynchronisation.
@@ -773,9 +887,9 @@ async function createTournament(
     ? def.survivalRoundsBeforeFirstCut ?? survivalRoundsPerCut
     : null;
   const swissTotalRounds = isSwiss ? def.swissTotalRounds ?? null : null;
-  // Survie et suisse sont pilotés par leur orchestration (initialize → reconcile)
+  // Survie, suisse et multi sont pilotés par leur orchestration (initialize → reconcile)
   // : on insère en RUNNING, puis l'orchestration bascule vers FINISHED.
-  const orchestrated = isSurvival || isSwiss;
+  const orchestrated = isSurvival || isSwiss || isMulti;
   const insertState = orchestrated && def.state === "FINISHED" ? "RUNNING" : def.state;
   const finishedAt = !orchestrated && def.state === "FINISHED" ? startAt : null;
 
@@ -823,7 +937,9 @@ async function createTournament(
   const finish = def.state === "FINISHED";
 
   if (def.state !== "UPCOMING" && def.state !== "REGISTRATION" && teamsToUse.length >= 2) {
-    if (isSurvival) {
+    if (isMulti && def.phases) {
+      await generateMultiPhaseTournament(db, tournamentId, def.phases, finish, def.playWaves ?? 2);
+    } else if (isSurvival) {
       await generateSurvivalTournament(db, tournamentId, finish, def.playWaves ?? 3, def.forfeits ?? 0);
     } else if (isSwiss) {
       await generateSwissTournament(db, tournamentId, finish, def.playWaves ?? 2);
@@ -906,7 +1022,7 @@ async function main(): Promise<void> {
     console.log(`  · ${FICTIONAL_SPONSORS.length} sponsors (dont 1 inactif) · ${FICTIONAL_BUREAU.length} membres du bureau`);
     console.log(`  · ${TOURNAMENTS.length} tournois :`);
     console.log(`    - états : ${byState("UPCOMING")} à venir · ${byState("REGISTRATION")} inscriptions · ${byState("RUNNING")} en cours · ${byState("FINISHED")} terminés`);
-    console.log(`    - formats : ${byFormat("SINGLE")} simple · ${byFormat("DOUBLE")} double · ${byFormat("SWISS")} suisse · ${byFormat("SURVIVAL")} survie`);
+    console.log(`    - formats : ${byFormat("SINGLE")} simple · ${byFormat("DOUBLE")} double · ${byFormat("SWISS")} suisse · ${byFormat("SURVIVAL")} survie · ${byFormat("MULTI")} multi-phase`);
     console.log(`    - effectifs : 0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 17, 21, 64, 128`);
     console.log(`    - survie : barrage impair (3/5/7/9/11/15/21), cadences 1/2/3, forfaits`);
     console.log(`    - matchs : reports en attente, conflits de score, délais expirés`);

@@ -87,7 +87,7 @@ function fakeDb(options: {
 
       if (q.startsWith("SELECT format, state")) return [[{ ...tournament }], []];
 
-      if (q.includes("FROM bg_swiss_standings WHERE tournament_id = ? ORDER BY seed")) {
+      if (q.includes("FROM bg_swiss_standings WHERE tournament_id = ?") && q.includes("ORDER BY seed")) {
         return [
           standings.map((s) => ({
             team_id: s.teamId,
@@ -100,7 +100,8 @@ function fakeDb(options: {
       }
 
       if (q.startsWith("SELECT status FROM bg_swiss_standings")) {
-        const found = standings.find((s) => s.teamId === Number(params[1]));
+        // (tournament_id, phase_id, team_id)
+        const found = standings.find((s) => s.teamId === Number(params[2]));
         return [found ? [{ status: found.status }] : [], []];
       }
 
@@ -124,7 +125,8 @@ function fakeDb(options: {
       }
 
       if (q.startsWith("SELECT team1_id, team2_id, is_bye FROM bg_matches")) {
-        const round = Number(params[1]);
+        // (tournament_id, phase_id, round_number)
+        const round = Number(params[2]);
         return [
           matches
             .filter((m) => m.round === round)
@@ -136,21 +138,22 @@ function fakeDb(options: {
 
       // roundHasScoreInput
       if (q.includes("AND is_bye = 0 AND (team1_score IS NOT NULL")) {
-        const round = Number(params[1]);
+        const round = Number(params[2]);
         const c = matches.filter((m) => m.round === round && !m.isBye && m.hasScoreInput).length;
         return [[{ c }], []];
       }
 
       // Matchs non terminés de la ronde courante
       if (q.includes("AND status <> 'COMPLETED'") && q.startsWith("SELECT COUNT(*)")) {
-        const round = Number(params[1]);
+        const round = Number(params[2]);
         const c = matches.filter((m) => m.round === round && m.status !== "COMPLETED").length;
         return [[{ c }], []];
       }
 
       // Match en cours d'une équipe (forfait)
       if (q.startsWith("SELECT id, team1_id, team2_id FROM bg_matches")) {
-        const [, round, teamId] = params.map(Number);
+        // (tournament_id, phase_id, round_number, team_id, team_id)
+        const [, , round, teamId] = params.map(Number);
         const found = matches.find(
           (m) =>
             m.round === round &&
@@ -207,7 +210,7 @@ function fakeDb(options: {
       }
 
       if (q.startsWith("DELETE FROM bg_matches")) {
-        const round = Number(params[1]);
+        const round = Number(params[2]);
         for (let i = matches.length - 1; i >= 0; i--) {
           if (matches[i].round === round) matches.splice(i, 1);
         }
@@ -215,7 +218,8 @@ function fakeDb(options: {
       }
 
       if (q.startsWith("INSERT INTO bg_swiss_standings")) {
-        const [, teamId, seed] = params.map(Number);
+        // (tournament_id, phase_id, team_id, seed, rank)
+        const [, , teamId, seed] = params.map(Number);
         const existing = standings.find((s) => s.teamId === teamId);
         if (existing) {
           existing.seed = seed;
@@ -228,7 +232,8 @@ function fakeDb(options: {
       }
 
       if (q.startsWith("UPDATE bg_swiss_standings SET status = 'FORFEIT'")) {
-        const found = standings.find((s) => s.teamId === Number(params[2]))!;
+        // (forfeit_round, tournament_id, phase_id, team_id)
+        const found = standings.find((s) => s.teamId === Number(params[3]))!;
         found.status = "FORFEIT";
         found.forfeitRound = Number(params[0]);
         return [{}, []];
