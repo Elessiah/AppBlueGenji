@@ -1,6 +1,6 @@
 ﻿# AppBlueGenji (Next.js)
 
-Plateforme BlueGenji Arena:
+Plateforme BlueGenji Esport:
 - Landing 3 cartes (Bot / Association / Tournois)
 - Auth sans mot de passe (Google OAuth + code Discord envoyé par bot)
 - Profils joueurs (confidentialité + stats)

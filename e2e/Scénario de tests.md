@@ -1,4 +1,4 @@
-# Scénario de tests — BlueGenji Arena
+# Scénario de tests — BlueGenji Esport
 
 > Document de référence pour les tests E2E (Playwright, `e2e/*.spec.ts`).
 > Corrigé et aligné sur l'implémentation réelle + périmètre de développement validé.
