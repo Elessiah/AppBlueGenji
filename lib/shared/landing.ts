@@ -63,6 +63,11 @@ export function inferGameCode(value: string | null | undefined): "ow2" | "mr" {
   return inferGameLabel(value) === "Marvel Rivals" ? "mr" : "ow2";
 }
 
+/** Abréviation du jeu, pour les pastilles trop étroites pour le libellé complet. */
+export function inferGameShortLabel(value: string | null | undefined): "OW" | "MR" {
+  return inferGameLabel(value) === "Marvel Rivals" ? "MR" : "OW";
+}
+
 export function inferPhaseLabel(match: LandingLiveMatch | null): string {
   if (!match) {
     return "EN ATTENTE";
