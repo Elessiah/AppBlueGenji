@@ -108,6 +108,15 @@ inchangés.
 5. Sans phase suivante, `finalizeMultiTournament` écrit `final_rank` pour **toutes**
    les inscrites (§7 des règles) et clôt le tournoi.
 
+Une phase `SINGLE`/`DOUBLE` fait **résoudre ses byes avant** d'être testée pour
+complétude, et cette résolution est **portée par la phase** : les appels du reste
+du moteur (`reportMatchScore`, résolution admin, synchronisation d'état) opèrent
+sur `phase_id = 0`, où un tournoi `MULTI` n'a aucun match. Sans cela, un match
+d'exemption — qui n'a pas de perdant — laissait le match de lower qu'il alimentait
+avec une seule équipe et plus aucun feeder à attendre : le plateau se figeait sur
+des matchs `PENDING` sans adversaire, la phase n'était jamais complète et le
+tournoi ne se terminait jamais.
+
 Le classement d'une phase provient **toujours du moteur** de cette phase
 (`computeFinalRanks` en survie, `loadSwissRanking` en suisse,
 `rankEliminationPhase` en bracket) — jamais de l'ordre des standings en base, qui

@@ -804,12 +804,27 @@ async function generateMultiPhaseTournament(
 
     let totalPlayed = 0;
     let currentWaves = 0;
+    // Garde-fou anti-blocage : une phase qui n'avance plus (aucun match joué et
+    // aucun changement d'état) ferait tourner cette boucle à l'infini quand
+    // `finish` est vrai, puisque plus rien ne la fait sortir. On préfère un
+    // avertissement visible et un tournoi laissé en l'état à un seed suspendu.
+    let lastSignature = "";
 
     while (true) {
       const loadedPhases = await loadPhases(connection, tournamentId);
       const currentPhase = loadedPhases.find((p) => p.state === "PENDING" || p.state === "RUNNING");
 
       if (!currentPhase) break;
+
+      const signature = `${totalPlayed}|${loadedPhases.map((p) => `${p.id}:${p.state}`).join(",")}`;
+      if (signature === lastSignature) {
+        console.warn(
+          `    ⚠ multi-phase : phase ${currentPhase.position} (${currentPhase.format}) bloquée, ` +
+            `tournoi #${tournamentId} laissé en l'état`
+        );
+        break;
+      }
+      lastSignature = signature;
 
       if (currentPhase.state === "PENDING") {
         await setCurrentPhase(connection, tournamentId, currentPhase.id);

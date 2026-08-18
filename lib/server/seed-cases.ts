@@ -91,7 +91,7 @@ export const TOURNAMENTS: TournamentDef[] = [
   // Capital réduit pour que des éliminations tombent vite, et petit plateau de
   // play-offs pour atteindre la phase finale en quelques vagues.
   { name: "BG Survie 12 Équipes", game: "OW2", state: "RUNNING", format: "BG_SURVIE", teamCount: 12, maxTeams: 16, daysOffset: -3, endurancePoints: 3, endurancePlayoffSize: 8, playWaves: 2, teamOffset: 9 },
-  { name: "BG Survie Play-offs", game: "MR", state: "RUNNING", format: "BG_SURVIE", teamCount: 10, maxTeams: 16, daysOffset: -5, endurancePoints: 2, endurancePlayoffSize: 8, playWaves: 6, teamOffset: 21 },
+  { name: "BG Survie Play-offs", game: "MR", state: "RUNNING", format: "BG_SURVIE", teamCount: 10, maxTeams: 16, daysOffset: -5, endurancePoints: 2, endurancePlayoffSize: 8, playWaves: 4, teamOffset: 21 },
   { name: "BG Survie Impaire + Forfait", game: "OW2", state: "RUNNING", format: "BG_SURVIE", teamCount: 11, maxTeams: 16, daysOffset: -4, endurancePoints: 3, endurancePlayoffSize: 8, playWaves: 2, forfeits: 1, teamOffset: 33 },
   { name: "BG Survie Terminée", game: "MR", state: "FINISHED", format: "BG_SURVIE", teamCount: 9, maxTeams: 16, daysOffset: -20, endurancePoints: 2, endurancePlayoffSize: 8, teamOffset: 45 },
 

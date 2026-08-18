@@ -15,6 +15,7 @@ import {
 import { loadTournamentRow, finishTournament, getRegistrationRows } from "./repository";
 import { rankingPointsSql } from "@/lib/shared/ranking";
 import { createBracketIfMissing } from "./bracket-generator";
+import { tryAutoResolveByes } from "./byes";
 import { isEliminationPhaseComplete, rankEliminationPhase } from "./finalization";
 import {
   initializeSwissTournament,
@@ -256,7 +257,15 @@ export async function reconcilePhases(tournamentId: number, conn: PoolConnection
       phaseFinalRanking = await loadSwissRanking(conn, tournamentId, currentPhaseId);
     }
   } else {
-    // SINGLE ou DOUBLE : utilise isEliminationPhaseComplete
+    // SINGLE ou DOUBLE : les byes de la phase d'abord, la complétude ensuite.
+    // Un match d'exemption n'a pas de perdant : le match de lower qu'il
+    // alimentait reste à une seule équipe, sans plus aucun feeder à attendre.
+    // Sans cette résolution **portée par la phase** (les appels du reste du
+    // moteur travaillent sur `phase_id = 0`, où il n'y a rien à résoudre en
+    // MULTI), le plateau se fige sur des matchs PENDING sans adversaire et la
+    // phase n'est jamais complète — le tournoi ne se termine donc jamais.
+    await tryAutoResolveByes(conn, tournamentId, currentPhaseId);
+
     isDone = await isEliminationPhaseComplete(conn, tournamentId, currentPhaseId);
 
     if (isDone) {
