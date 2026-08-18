@@ -158,8 +158,17 @@ describe("seed — cohérence des définitions", () => {
       if (t.hasThirdPlaceMatch) {
         expect(formatOf(t)).toBe("SINGLE");
       }
+      // L'abandon existe dans les deux modes à classement qui gardent les
+      // équipes en lice sans les éliminer par une défaite.
       if ((t.forfeits ?? 0) > 0) {
-        expect(formatOf(t)).toBe("SURVIVAL");
+        expect(["SURVIVAL", "BG_SURVIE"]).toContain(formatOf(t));
+      }
+      if (t.endurancePoints !== undefined || t.endurancePlayoffSize !== undefined) {
+        expect(formatOf(t)).toBe("BG_SURVIE");
+        if (t.endurancePoints !== undefined) expect(t.endurancePoints).toBeGreaterThan(0);
+        if (t.endurancePlayoffSize !== undefined) {
+          expect(t.endurancePlayoffSize).toBeGreaterThanOrEqual(2);
+        }
       }
     }
   });
