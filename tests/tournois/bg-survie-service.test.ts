@@ -345,6 +345,8 @@ describe("forfeitEnduranceTeam", () => {
     const conn = makeConn([
       [[tournamentRow({ endurance_current_round: 3 })]],
       [[{ status: "ACTIVE" }]],
+      [{ affectedRows: 1 }], // passage du classement en FORFEIT
+      [[]], // aucun match en cours pour cette équipe
     ]);
 
     await forfeitEnduranceTeam(5, 42, conn);
@@ -353,6 +355,39 @@ describe("forfeitEnduranceTeam", () => {
       String(sql).includes("SET status = 'FORFEIT'"),
     );
     expect(update?.[1]).toEqual([3, 5, 42]);
+  });
+
+  it("clôt le match en cours pour que la manche puisse se terminer", async () => {
+    const conn = makeConn([
+      [[tournamentRow({ endurance_current_round: 3 })]],
+      [[{ status: "ACTIVE" }]],
+      [{ affectedRows: 1 }], // passage du classement en FORFEIT
+      [[{ id: 900, team1_id: 42, team2_id: 7 }]], // match pendant de l'équipe partie
+    ]);
+
+    await forfeitEnduranceTeam(5, 42, conn);
+
+    const closed = conn.execute.mock.calls.find(([sql]) =>
+      String(sql).includes("status = 'COMPLETED'"),
+    );
+    // Vainqueur = adversaire, forfait tracé, score 0-1 côté équipe partie.
+    expect(closed?.[1]).toEqual([7, 42, 42, 0, 1, 900]);
+  });
+
+  it("clôt aussi quand l'équipe partie était à droite", async () => {
+    const conn = makeConn([
+      [[tournamentRow({ endurance_current_round: 2 })]],
+      [[{ status: "ACTIVE" }]],
+      [{ affectedRows: 1 }],
+      [[{ id: 901, team1_id: 7, team2_id: 42 }]],
+    ]);
+
+    await forfeitEnduranceTeam(5, 42, conn);
+
+    const closed = conn.execute.mock.calls.find(([sql]) =>
+      String(sql).includes("status = 'COMPLETED'"),
+    );
+    expect(closed?.[1]).toEqual([7, 42, 42, 1, 0, 901]);
   });
 
   it("refuse une équipe déjà sortie", async () => {

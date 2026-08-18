@@ -97,6 +97,11 @@ ultérieure portant une saisie verrouille les précédentes, play-offs compris.
 Pris en charge comme en Survie et en Ronde suisse : le capital tombe à 0,
 l'équipe sort, le classement est rejoué et la manche suivante réappariée.
 
+Le match en cours de l'équipe partie est **clos** au passage, attribué à son
+adversaire avec `forfeit_team_id` — sans quoi la manche ne pourrait jamais se
+terminer et la suivante ne serait jamais appariée. Ce match reste ignoré par le
+rejeu pour le calcul des points : un forfait n'est pas une map jouée.
+
 ## Tests
 
 - `tests/tournois/bg-survie.test.ts` — logique pure : barème, endurance,

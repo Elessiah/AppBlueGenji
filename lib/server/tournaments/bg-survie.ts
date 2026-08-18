@@ -653,12 +653,53 @@ export async function forfeitEnduranceTeam(
   if (rows.length === 0) throw new Error("TEAM_NOT_IN_TOURNAMENT");
   if (rows[0].status !== "ACTIVE") throw new Error("TEAM_ALREADY_OUT");
 
+  const currentRound = Math.max(Number(tournament.endurance_current_round), 1);
+
   await conn.execute(
     `UPDATE bg_endurance_standings
      SET status = 'FORFEIT', points = 0, eliminated_round = ?
      WHERE tournament_id = ? AND team_id = ?`,
-    [Math.max(Number(tournament.endurance_current_round), 1), tournamentId, teamId],
+    [currentRound, tournamentId, teamId],
   );
+
+  // Clôt le match en cours de l'équipe partie, sans quoi la manche ne pourrait
+  // plus se terminer et la suivante ne serait jamais appariée. Le match est
+  // marqué forfait : le rejeu l'ignore pour les points — un forfait n'est pas
+  // une map jouée — mais la manche, elle, est complète.
+  const [pending] = await conn.execute<
+    (RowDataPacket & { id: number; team1_id: number | null; team2_id: number | null })[]
+  >(
+    `SELECT id, team1_id, team2_id FROM bg_matches
+     WHERE tournament_id = ? AND phase_id = 0 AND round_number = ?
+       AND status <> 'COMPLETED' AND (team1_id = ? OR team2_id = ?)
+     LIMIT 1`,
+    [tournamentId, currentRound, teamId, teamId],
+  );
+
+  if (pending.length > 0) {
+    const match = pending[0];
+    const opponentId = Number(match.team1_id) === teamId ? match.team2_id : match.team1_id;
+    const team1IsForfeit = Number(match.team1_id) === teamId;
+
+    await conn.execute(
+      `UPDATE bg_matches SET
+        status = 'COMPLETED',
+        winner_team_id = ?,
+        loser_team_id = ?,
+        forfeit_team_id = ?,
+        team1_score = ?,
+        team2_score = ?
+       WHERE id = ?`,
+      [
+        opponentId,
+        teamId,
+        teamId,
+        team1IsForfeit ? 0 : 1,
+        team1IsForfeit ? 1 : 0,
+        match.id,
+      ],
+    );
+  }
 
   await reconcileEndurance(tournamentId, conn);
 }
