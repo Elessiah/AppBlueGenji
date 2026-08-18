@@ -53,12 +53,23 @@ describe("POST /api/visits", () => {
     expect(lastCall().userId).toBe(42);
   });
 
-  it("prend la première IP de X-Forwarded-For et le user-agent", async () => {
+  it("retient l'IP ajoutée par le proxy, pas celle annoncée par le client", async () => {
     await POST(
-      visitReq({ path: "/" }, { "x-forwarded-for": "203.0.113.7, 70.41.3.18", "user-agent": "Firefox/130" }),
+      visitReq({ path: "/" }, { "x-forwarded-for": "1.1.1.1, 203.0.113.7", "user-agent": "Firefox/130" }),
     );
 
+    // `1.1.1.1` est falsifiable : seule la dernière entrée vient du proxy.
     expect(lastCall()).toMatchObject({ ip: "203.0.113.7", userAgent: "Firefox/130" });
+  });
+
+  it("suit le nombre de relais configuré", async () => {
+    process.env.TRUSTED_PROXY_HOPS = "2";
+    try {
+      await POST(visitReq({ path: "/" }, { "x-forwarded-for": "1.1.1.1, 203.0.113.7, 70.41.3.18" }));
+      expect(lastCall().ip).toBe("203.0.113.7");
+    } finally {
+      delete process.env.TRUSTED_PROXY_HOPS;
+    }
   });
 
   it("retombe sur X-Real-IP quand X-Forwarded-For manque", async () => {

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  clientIpFromForwardedFor,
+  DEFAULT_TRUSTED_PROXY_HOPS,
   MAX_VISIT_PATH_LENGTH,
   normalizeVisitPath,
-  parseForwardedIp,
+  parseTrustedProxyHops,
   SITE_VISIT_WINDOW_MINUTES,
   visitorIdentitySource,
 } from "@/lib/shared/site-visits";
@@ -86,20 +88,51 @@ describe("visitorIdentitySource", () => {
   });
 });
 
-describe("parseForwardedIp", () => {
-  it("prend la première IP de la chaîne de proxys", () => {
-    expect(parseForwardedIp("203.0.113.7, 70.41.3.18, 150.172.238.178")).toBe("203.0.113.7");
+describe("clientIpFromForwardedFor", () => {
+  it("prend l'entrée ajoutée par le proxy de confiance, pas celle du client", () => {
+    // Un client malveillant préfixe sa propre valeur ; nginx ajoute la vraie à droite.
+    expect(clientIpFromForwardedFor("1.1.1.1, 203.0.113.7")).toBe("203.0.113.7");
   });
 
   it("gère une IP seule et les espaces", () => {
-    expect(parseForwardedIp("  203.0.113.7  ")).toBe("203.0.113.7");
+    expect(clientIpFromForwardedFor("  203.0.113.7  ")).toBe("203.0.113.7");
+  });
+
+  it("remonte d'autant d'entrées qu'il y a de relais de confiance", () => {
+    const chain = "1.1.1.1, 203.0.113.7, 70.41.3.18, 150.172.238.178";
+    expect(clientIpFromForwardedFor(chain, 1)).toBe("150.172.238.178");
+    expect(clientIpFromForwardedFor(chain, 2)).toBe("70.41.3.18");
+    expect(clientIpFromForwardedFor(chain, 3)).toBe("203.0.113.7");
+  });
+
+  it("ne sort jamais des bornes si la chaîne est plus courte qu'annoncé", () => {
+    expect(clientIpFromForwardedFor("203.0.113.7", 4)).toBe("203.0.113.7");
+  });
+
+  it("ramène un nombre de relais aberrant à au moins un", () => {
+    const chain = "1.1.1.1, 203.0.113.7";
+    for (const hops of [0, -3, Number.NaN]) {
+      expect(clientIpFromForwardedFor(chain, hops)).toBe("203.0.113.7");
+    }
   });
 
   it("renvoie null pour un en-tête absent ou vide", () => {
-    expect(parseForwardedIp(null)).toBeNull();
-    expect(parseForwardedIp(undefined)).toBeNull();
-    expect(parseForwardedIp("")).toBeNull();
-    expect(parseForwardedIp(" , , ")).toBeNull();
+    expect(clientIpFromForwardedFor(null)).toBeNull();
+    expect(clientIpFromForwardedFor(undefined)).toBeNull();
+    expect(clientIpFromForwardedFor("")).toBeNull();
+    expect(clientIpFromForwardedFor(" , , ")).toBeNull();
+  });
+});
+
+describe("parseTrustedProxyHops", () => {
+  it("lit une valeur configurée", () => {
+    expect(parseTrustedProxyHops("2")).toBe(2);
+  });
+
+  it("retombe sur le défaut pour une valeur absente ou aberrante", () => {
+    for (const raw of [undefined, null, "", "  ", "zéro", "0", "-2"]) {
+      expect(parseTrustedProxyHops(raw)).toBe(DEFAULT_TRUSTED_PROXY_HOPS);
+    }
   });
 });
 

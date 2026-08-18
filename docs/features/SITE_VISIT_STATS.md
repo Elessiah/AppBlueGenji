@@ -58,21 +58,60 @@ déjà partagé avec le bot, à défaut d'une constante (dev local). **Renseigne
 `VISIT_HASH_SALT` en production** : sans sel secret, une empreinte serait
 théoriquement rejouable depuis une IP connue.
 
+L'IP transite en mémoire le temps de la requête — pour le hachage et le plafond
+de débit — et n'est écrite nulle part.
+
 Aucun cookie n'est posé pour le comptage, et aucun chemin n'est conservé au-delà
 de sa partie « page » (query string et fragment sont retirés, donc aucun
 paramètre d'URL n'est archivé).
 
+### Identité du visiteur et abus
+
+L'empreinte étant dérivée d'en-têtes fournis par le client, la fenêtre de session
+ne protège **pas** d'un client qui en change à chaque requête : chaque empreinte
+neuve échapperait à la fenêtre et insérerait une ligne. Deux garde-fous :
+
+- **IP retenue = celle qu'ajoute le proxy**, pas celle qu'annonce le client.
+  `X-Forwarded-For` se lit `client, proxy1, proxy2` et chaque relais ajoute à
+  droite l'adresse dont il a reçu la requête : on compte donc depuis la droite,
+  sur `TRUSTED_PROXY_HOPS` relais (défaut 1 = un nginx devant l'app). Un
+  `X-Forwarded-For` fabriqué par le visiteur est ainsi sans effet. **Ajuster
+  cette variable si la chaîne de proxys est plus longue** (CDN + nginx = 2),
+  faute de quoi c'est l'IP du CDN qui serait retenue et tous les visiteurs
+  seraient regroupés.
+- **Plafond de 30 enregistrements par IP et par minute**, en mémoire du
+  processus. Un visiteur réel en produit au plus deux par heure ; le plafond ne
+  gêne donc qu'un client qui fabrique des empreintes en boucle. C'est le seul
+  rempart contre une croissance illimitée de la table — aucune déduplication par
+  empreinte ne peut jouer ce rôle, l'empreinte venant du client.
+
+Les lignes ne sont **pas** purgées : « visites totales » est un total depuis la
+mise en service, qu'une rétention tronquerait.
+
 ### Concurrence
 
 L'insertion est conditionnelle **en une seule requête** (`INSERT … SELECT …
-WHERE NOT EXISTS`) : deux onglets ouverts en même temps ne peuvent pas créer deux
-visites, là où un « lire puis insérer » laisserait passer la course.
+WHERE NOT EXISTS`) plutôt qu'en « lire puis insérer » : la fenêtre de course se
+réduit à l'exécution d'une requête, et disparaît tout à fait tant que MySQL
+verrouille la lecture (isolation `REPEATABLE READ`, celle par défaut). En
+`READ COMMITTED`, la lecture est cohérente mais non verrouillée : deux
+chargements rigoureusement simultanés peuvent alors compter deux visites.
+L'écart est d'une unité, sans effet sur le nombre de visiteurs uniques — et
+aucun invariant de schéma ne peut de toute façon exprimer « une seule ligne par
+fenêtre glissante ».
 
 ### Cadence de synchronisation
 
 L'app ne pousse au bot que lorsqu'une visite a **réellement** été créée, et au
 plus une fois toutes les 5 minutes. Tant que personne ne visite, les chiffres ne
 bougent pas : l'instantané du bot reste donc juste sans aucune tâche périodique.
+
+Une lecture impossible **n'envoie rien** : `getSiteVisitStats()` renvoie `null`
+en cas d'erreur de base, là où une table réellement vide renvoie des zéros. La
+distinction est essentielle — sans elle, une panne passagère écraserait le
+dernier bon instantané du bot par des zéros, et `/stats-site` afficherait « 0
+visite » jusqu'à la visite suivante. La cadence n'est pas consommée dans ce cas,
+pour que la visite d'après retente aussitôt.
 
 ## Côté bot
 

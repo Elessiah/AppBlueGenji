@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { ok } from "@/lib/server/http";
 import { recordSiteVisit, syncSiteVisitStatsToBot } from "@/lib/server/site-visits-service";
-import { parseForwardedIp } from "@/lib/shared/site-visits";
+import { clientIpFromForwardedFor, parseTrustedProxyHops } from "@/lib/shared/site-visits";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +28,11 @@ export async function POST(req: Request) {
     const user = await getCurrentUser();
     const { recorded } = await recordSiteVisit({
       userId: user?.id ?? null,
-      ip: parseForwardedIp(req.headers.get("x-forwarded-for")) ?? req.headers.get("x-real-ip"),
+      ip:
+        clientIpFromForwardedFor(
+          req.headers.get("x-forwarded-for"),
+          parseTrustedProxyHops(process.env.TRUSTED_PROXY_HOPS),
+        ) ?? req.headers.get("x-real-ip"),
       userAgent: req.headers.get("user-agent"),
       path,
     });

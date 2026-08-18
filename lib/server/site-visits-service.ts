@@ -29,7 +29,21 @@ import type { SiteVisitStats } from "@/lib/shared/types";
 /** Cadence maximale de synchronisation vers le bot (le snapshot ne bouge qu'à l'insertion). */
 const BOT_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 
+/**
+ * Garde-fou de débit : nombre maximal d'enregistrements acceptés par IP et par
+ * minute. Un visiteur réel en produit au plus deux par heure (fenêtre de
+ * session) ; le plafond ne gêne donc qu'un client qui fabrique des empreintes en
+ * boucle pour gonfler les compteurs — chaque empreinte neuve échappant par
+ * construction à la fenêtre de session, c'est le seul rempart contre une
+ * croissance illimitée de la table.
+ */
+const VISIT_RATE_LIMIT_PER_MINUTE = 30;
+const VISIT_RATE_WINDOW_MS = 60 * 1000;
+/** Plafond d'IP suivies simultanément, pour que le limiteur reste borné en mémoire. */
+const VISIT_RATE_MAX_TRACKED_IPS = 10_000;
+
 let lastBotSyncAt = 0;
+const visitRateBuckets = new Map<string, { count: number; resetAt: number }>();
 
 interface VisitStatsRow extends RowDataPacket {
   total_visits: number | string | null;
@@ -60,6 +74,44 @@ function hashVisitorIdentity(source: string): string {
   return createHash("sha256").update(`${visitHashSalt()}:${source}`).digest("hex");
 }
 
+/**
+ * Autorise ou non un nouvel enregistrement pour cette IP.
+ *
+ * Fenêtre fixe d'une minute, en mémoire du processus : c'est volontairement
+ * approximatif (plusieurs instances comptent chacune de leur côté), mais cela
+ * suffit à borner la croissance de la table, ce qu'aucune déduplication par
+ * empreinte ne peut faire puisque l'empreinte est fournie par le client.
+ */
+function allowVisitFromIp(ip: string | null | undefined): boolean {
+  const key = (ip ?? "").trim() || "unknown-ip";
+  const now = Date.now();
+
+  const bucket = visitRateBuckets.get(key);
+  if (!bucket || now >= bucket.resetAt) {
+    // Purge opportuniste : on ne balaie la table qu'au moment où elle déborde,
+    // pour ne pas payer un parcours à chaque visite.
+    if (visitRateBuckets.size >= VISIT_RATE_MAX_TRACKED_IPS) {
+      for (const [trackedKey, tracked] of visitRateBuckets) {
+        if (now >= tracked.resetAt) visitRateBuckets.delete(trackedKey);
+      }
+      // Toujours plein de fenêtres actives : on repart de zéro plutôt que de
+      // laisser la mémoire filer.
+      if (visitRateBuckets.size >= VISIT_RATE_MAX_TRACKED_IPS) visitRateBuckets.clear();
+    }
+    visitRateBuckets.set(key, { count: 1, resetAt: now + VISIT_RATE_WINDOW_MS });
+    return true;
+  }
+
+  if (bucket.count >= VISIT_RATE_LIMIT_PER_MINUTE) return false;
+  bucket.count += 1;
+  return true;
+}
+
+/** Vide le limiteur de débit (tests). */
+export function resetVisitRateLimit(): void {
+  visitRateBuckets.clear();
+}
+
 function count(value: number | string | null | undefined): number {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -87,8 +139,14 @@ export function emptySiteVisitStats(): SiteVisitStats {
  * session courante.
  *
  * L'insertion conditionnelle est faite en une seule requête (`INSERT … SELECT …
- * WHERE NOT EXISTS`) : deux onglets ouverts simultanément ne peuvent pas créer
- * deux visites, là où un « lire puis insérer » laisserait passer la course.
+ * WHERE NOT EXISTS`) plutôt qu'en « lire puis insérer » : la fenêtre de course
+ * se réduit à l'exécution d'une requête, et disparaît tout à fait tant que
+ * MySQL verrouille la lecture (isolation `REPEATABLE READ`, celle par défaut).
+ * En `READ COMMITTED`, la lecture est cohérente mais non verrouillée : deux
+ * chargements rigoureusement simultanés peuvent alors compter deux visites.
+ * L'écart est d'une unité et sans effet sur le nombre de visiteurs uniques —
+ * aucun invariant de schéma ne peut de toute façon exprimer « une seule ligne
+ * par fenêtre glissante ».
  *
  * @returns `recorded = true` si une visite a bien été créée (donc si les
  * compteurs ont changé), `false` si elle a été absorbée par la fenêtre.
@@ -99,6 +157,11 @@ export async function recordSiteVisit(input: {
   userAgent?: string | null;
   path?: unknown;
 }): Promise<{ recorded: boolean }> {
+  // L'empreinte étant dérivée d'en-têtes fournis par le client, la fenêtre de
+  // session ne protège pas d'un client qui en change à chaque requête : le
+  // plafond par IP, lui, tient.
+  if (!allowVisitFromIp(input.ip)) return { recorded: false };
+
   const visitorKey = hashVisitorIdentity(visitorIdentitySource(input));
   const path = normalizeVisitPath(input.path);
   const userId =
@@ -125,8 +188,15 @@ export async function recordSiteVisit(input: {
   return { recorded: result.affectedRows > 0 };
 }
 
-/** Fréquentation agrégée : totaux, uniques et fenêtres glissantes. */
-export async function getSiteVisitStats(): Promise<SiteVisitStats> {
+/**
+ * Fréquentation agrégée : totaux, uniques et fenêtres glissantes.
+ *
+ * @returns Les compteurs, ou `null` si la base est injoignable. La distinction
+ * compte : une table réellement vide vaut des zéros légitimes, tandis qu'une
+ * lecture impossible ne doit **pas** en produire — sinon la synchronisation
+ * écraserait le dernier bon instantané du bot avec des zéros.
+ */
+export async function getSiteVisitStats(): Promise<SiteVisitStats | null> {
   try {
     const db = await getDatabase();
     const [rows] = await db.execute<VisitStatsRow[]>(
@@ -162,8 +232,9 @@ export async function getSiteVisitStats(): Promise<SiteVisitStats> {
       lastVisitAt: toIso(row.last_visit_at as string | null),
     };
   } catch {
-    // Fréquentation = agrément, jamais un motif d'erreur pour l'appelant.
-    return emptySiteVisitStats();
+    // Fréquentation = agrément, jamais un motif d'erreur pour l'appelant : on
+    // signale l'échec par `null` plutôt que par une exception.
+    return null;
   }
 }
 
@@ -175,15 +246,22 @@ export async function getSiteVisitStats(): Promise<SiteVisitStats> {
  * les chiffres ne bougent pas et le snapshot du bot reste juste. L'envoi est en
  * meilleur effort — `bot-integration` dégrade déjà (timeout + coupe-circuit).
  *
+ * Une lecture impossible **n'envoie rien** : mieux vaut un instantané un peu
+ * vieux chez le bot que des zéros. La cadence n'est alors pas consommée, pour
+ * que la visite suivante retente aussitôt.
+ *
  * @param force Ignore la cadence (utilisé par les tests et un appel manuel).
- * @returns `true` si une synchronisation a été tentée.
+ * @returns `true` si une synchronisation a bien eu lieu.
  */
 export async function syncSiteVisitStatsToBot(force = false): Promise<boolean> {
   const now = Date.now();
   if (!force && now - lastBotSyncAt < BOT_SYNC_INTERVAL_MS) return false;
-  lastBotSyncAt = now;
 
-  await pushSiteVisitStats(await getSiteVisitStats());
+  const stats = await getSiteVisitStats();
+  if (!stats) return false;
+
+  lastBotSyncAt = now;
+  await pushSiteVisitStats(stats);
   return true;
 }
 

@@ -4,6 +4,7 @@ import {
   getSiteVisitStats,
   recordSiteVisit,
   resetSiteVisitSyncThrottle,
+  resetVisitRateLimit,
   syncSiteVisitStatsToBot,
 } from "@/lib/server/site-visits-service";
 import { SITE_VISIT_WINDOW_MINUTES } from "@/lib/shared/site-visits";
@@ -31,7 +32,10 @@ const FULL_ROW = {
 };
 
 describe("recordSiteVisit", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetVisitRateLimit();
+  });
   afterEach(() => jest.restoreAllMocks());
 
   it("enregistre une visite et le signale", async () => {
@@ -154,11 +158,12 @@ describe("getSiteVisitStats", () => {
     await expect(getSiteVisitStats()).resolves.toEqual(emptySiteVisitStats());
   });
 
-  it("dégrade en statistiques vides si la base est injoignable", async () => {
+  it("signale une lecture impossible par null, pas par des zéros", async () => {
     const execute = jest.fn().mockRejectedValue(new Error("DB_DOWN"));
     await mockDb(execute);
 
-    await expect(getSiteVisitStats()).resolves.toEqual(emptySiteVisitStats());
+    // Distinction essentielle : des zéros écraseraient l'instantané du bot.
+    await expect(getSiteVisitStats()).resolves.toBeNull();
   });
 
   it("dégrade en statistiques vides si aucune ligne n'est renvoyée", async () => {
@@ -166,6 +171,56 @@ describe("getSiteVisitStats", () => {
     await mockDb(execute);
 
     await expect(getSiteVisitStats()).resolves.toEqual(emptySiteVisitStats());
+  });
+});
+
+describe("plafond de débit par IP", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetVisitRateLimit();
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  it("coupe un client qui fabrique une empreinte neuve à chaque requête", async () => {
+    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }]);
+    await mockDb(execute);
+
+    const results: boolean[] = [];
+    for (let i = 0; i < 40; i += 1) {
+      // Empreinte neuve à chaque coup : la fenêtre de session ne l'arrête pas.
+      const { recorded } = await recordSiteVisit({ ip: "203.0.113.7", userAgent: `UA-${i}` });
+      results.push(recorded);
+    }
+
+    expect(results.filter(Boolean)).toHaveLength(30);
+    expect(execute).toHaveBeenCalledTimes(30);
+  });
+
+  it("compte les IP séparément", async () => {
+    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }]);
+    await mockDb(execute);
+
+    for (let i = 0; i < 30; i += 1) {
+      await recordSiteVisit({ ip: "203.0.113.7", userAgent: `UA-${i}` });
+    }
+
+    // Le plafond de la première IP ne pénalise pas la seconde.
+    await expect(recordSiteVisit({ ip: "198.51.100.4", userAgent: "UA" })).resolves.toEqual({
+      recorded: true,
+    });
+  });
+
+  it("regroupe les requêtes sans IP sous une même clé plutôt que de les ignorer", async () => {
+    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }]);
+    await mockDb(execute);
+
+    const results: boolean[] = [];
+    for (let i = 0; i < 35; i += 1) {
+      const { recorded } = await recordSiteVisit({ ip: null, userAgent: `UA-${i}` });
+      results.push(recorded);
+    }
+
+    expect(results.filter(Boolean)).toHaveLength(30);
   });
 });
 
@@ -201,5 +256,32 @@ describe("syncSiteVisitStatsToBot", () => {
     await syncSiteVisitStatsToBot();
     await expect(syncSiteVisitStatsToBot(true)).resolves.toBe(true);
     expect(pushSiteVisitStats).toHaveBeenCalledTimes(2);
+  });
+
+  it("n'écrase jamais l'instantané du bot avec des zéros si la lecture échoue", async () => {
+    const { pushSiteVisitStats } = await import("@/lib/server/bot-integration");
+    await mockDb(jest.fn().mockRejectedValue(new Error("DB_DOWN")));
+
+    await expect(syncSiteVisitStatsToBot()).resolves.toBe(false);
+    expect(pushSiteVisitStats).not.toHaveBeenCalled();
+  });
+
+  it("ne consomme pas la cadence après un échec de lecture", async () => {
+    const { pushSiteVisitStats } = await import("@/lib/server/bot-integration");
+    await mockDb(jest.fn().mockRejectedValue(new Error("DB_DOWN")));
+    await syncSiteVisitStatsToBot();
+
+    // La base revient : la visite suivante doit pouvoir synchroniser aussitôt.
+    await mockDb(jest.fn().mockResolvedValue([[FULL_ROW]]));
+    await expect(syncSiteVisitStatsToBot()).resolves.toBe(true);
+    expect(pushSiteVisitStats).toHaveBeenCalledTimes(1);
+  });
+
+  it("pousse bien des zéros quand la table est réellement vide", async () => {
+    const { pushSiteVisitStats } = await import("@/lib/server/bot-integration");
+    await mockDb(jest.fn().mockResolvedValue([[]]));
+
+    await expect(syncSiteVisitStatsToBot()).resolves.toBe(true);
+    expect(pushSiteVisitStats).toHaveBeenCalledWith(emptySiteVisitStats());
   });
 });

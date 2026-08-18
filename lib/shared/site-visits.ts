@@ -80,17 +80,49 @@ export function visitorIdentitySource(input: {
   return `a:${ip}|${userAgent}`;
 }
 
+/** Nombre de proxys de confiance devant l'application (nginx seul = 1). */
+export const DEFAULT_TRUSTED_PROXY_HOPS = 1;
+
 /**
- * Première IP d'un en-tête `X-Forwarded-For` (`client, proxy1, proxy2`).
+ * IP du client d'après `X-Forwarded-For`, en ne faisant confiance qu'aux proxys
+ * qu'on héberge.
  *
- * Renvoie `null` si l'en-tête est absent ou vide : l'empreinte retombe alors sur
- * `unknown-ip`, ce qui regroupe ces visiteurs mais ne fait planter aucun report.
+ * L'en-tête se lit `client, proxy1, proxy2` : chaque relais **ajoute** à droite
+ * l'adresse dont il a reçu la requête. La partie gauche est donc écrite par le
+ * client et falsifiable à volonté — un visiteur qui envoie son propre
+ * `X-Forwarded-For` obtiendrait une identité neuve à chaque requête. On compte
+ * donc depuis la droite : avec `hops = 1` (un nginx devant l'app), la bonne
+ * valeur est la dernière, celle que le proxy vient d'ajouter.
+ *
+ * @param value En-tête `X-Forwarded-For` brut.
+ * @param hops Nombre de relais de confiance ; ramené à au moins 1.
+ * @returns L'IP retenue, ou `null` si l'en-tête est absent ou vide — l'empreinte
+ * retombe alors sur `unknown-ip`, ce qui regroupe ces visiteurs sans rien casser.
  */
-export function parseForwardedIp(value: string | null | undefined): string | null {
+export function clientIpFromForwardedFor(
+  value: string | null | undefined,
+  hops: number = DEFAULT_TRUSTED_PROXY_HOPS,
+): string | null {
   if (typeof value !== "string") return null;
-  for (const candidate of value.split(",")) {
-    const ip = candidate.trim();
-    if (ip) return ip;
-  }
-  return null;
+
+  const entries = value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  if (entries.length === 0) return null;
+
+  const trusted = Number.isFinite(hops) ? Math.max(1, Math.floor(hops)) : DEFAULT_TRUSTED_PROXY_HOPS;
+  // Moins d'entrées que de relais annoncés : la chaîne est plus courte que
+  // prévu, on prend la plus à gauche qui reste — jamais hors bornes.
+  const index = Math.max(0, entries.length - trusted);
+  return entries[index];
+}
+
+/**
+ * Nombre de proxys de confiance configuré (`TRUSTED_PROXY_HOPS`), replié sur
+ * {@link DEFAULT_TRUSTED_PROXY_HOPS} si la valeur est absente ou aberrante.
+ */
+export function parseTrustedProxyHops(raw: string | undefined | null): number {
+  const parsed = Number.parseInt((raw ?? "").trim(), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TRUSTED_PROXY_HOPS;
 }
