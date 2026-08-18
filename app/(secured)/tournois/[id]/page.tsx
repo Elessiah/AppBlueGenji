@@ -1,10 +1,11 @@
 "use client";
 
 import { FormEvent, useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
-import { participantWording } from "@/lib/shared/participants";
+import { entrantHref, participantWording } from "@/lib/shared/participants";
 import { useToast } from "@/components/ui/toast";
 import { Pill, CyberButton } from "@/components/cyber";
 import { useTournamentLive } from "./_hooks/useTournamentLive";
@@ -530,7 +531,12 @@ export default function TournamentDetailPage() {
             </div>
             {detail.registrations.map((reg) => (
               <div key={reg.teamId} className="table-row">
-                <span>{reg.teamName}</span>
+                <Link
+                  href={entrantHref(reg.teamId, detail.soloUserIds)}
+                  style={{ color: "inherit", textDecoration: "none" }}
+                >
+                  {reg.teamName}
+                </Link>
                 <span>{reg.seed ?? "-"}</span>
                 <span>{formatLocalDateTime(reg.registeredAt)}</span>
                 <span>{reg.finalRank ?? "-"}</span>

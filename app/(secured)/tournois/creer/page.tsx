@@ -243,13 +243,14 @@ export default function CreateTournamentPage() {
                   <label htmlFor="participant-type">Type de participants</label>
                   <select
                     id="participant-type"
+                    aria-describedby="participant-type-hint"
                     value={participantType}
                     onChange={(e) => setParticipantType(e.target.value as ParticipantType)}
                   >
                     <option value="TEAM">Équipes</option>
                     <option value="SOLO">Joueurs (individuel)</option>
                   </select>
-                  <p style={HINT}>
+                  <p id="participant-type-hint" style={HINT}>
                     En individuel, chaque joueur s&apos;inscrit lui-même, sans passer par une
                     équipe.
                   </p>
