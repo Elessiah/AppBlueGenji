@@ -60,6 +60,21 @@ const matchRow = (overrides: Partial<MatchRow> = {}): MatchRow =>
     ...overrides,
   }) as unknown as MatchRow;
 
+describe("mapCard — type de participant", () => {
+  it("reporte le type de participant du tournoi", () => {
+    expect(mapCard(cardRow({ participant_type: "SOLO" })).participantType).toBe("SOLO");
+  });
+
+  // Les tournois créés avant l'option n'ont pas la colonne renseignée : ils
+  // doivent rester des tournois par équipes.
+  it("retombe sur TEAM quand la colonne est absente", () => {
+    expect(mapCard(cardRow()).participantType).toBe("TEAM");
+    expect(
+      mapCard(cardRow({ participant_type: null as unknown as "TEAM" })).participantType,
+    ).toBe("TEAM");
+  });
+});
+
 describe("mapCard — dates", () => {
   it("sérialise des objets Date en ISO 8601 exact", () => {
     const card = mapCard(cardRow());

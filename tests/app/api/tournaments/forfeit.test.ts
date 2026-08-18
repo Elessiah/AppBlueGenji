@@ -2,12 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/tournaments-service");
-jest.mock("@/lib/server/teams-service");
 
 import { POST } from "@/app/api/tournaments/[id]/forfeit/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/tournaments-service";
-import * as teams from "@/lib/server/teams-service";
 
 const member = { id: 2, isAdmin: false, roles: [] } as unknown as Awaited<
   ReturnType<typeof getCurrentUser>
@@ -28,6 +26,7 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (service.forfeitTournamentTeam as jest.Mock).mockResolvedValue(undefined as never);
+    (service.getUserEntrantTeamId as jest.Mock).mockResolvedValue(null as never);
   });
   afterEach(() => jest.restoreAllMocks());
 
@@ -38,17 +37,17 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
     expect(service.forfeitTournamentTeam).not.toHaveBeenCalled();
   });
 
-  it("un membre déclare le forfait de son équipe active", async () => {
+  it("un membre déclare le forfait de son engagé (équipe active ou entrée solo)", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(member as never);
-    (teams.getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 77 } as never);
+    (service.getUserEntrantTeamId as jest.Mock).mockResolvedValue(77 as never);
     const res = await POST(req(), params);
     expect(res.status).toBe(200);
     expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 77);
   });
 
-  it("refuse un membre sans équipe active (400)", async () => {
+  it("refuse un membre sans engagé dans ce tournoi (400)", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(member as never);
-    (teams.getUserActiveTeam as jest.Mock).mockResolvedValue(null as never);
+    (service.getUserEntrantTeamId as jest.Mock).mockResolvedValue(null as never);
     const res = await POST(req(), params);
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "NO_ACTIVE_TEAM" });
@@ -57,7 +56,7 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
   it("accepte qu'un membre cible explicitement sa propre équipe", async () => {
     // Le bouton du classement envoie toujours l'identifiant de l'équipe.
     (getCurrentUser as jest.Mock).mockResolvedValue(member as never);
-    (teams.getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 77 } as never);
+    (service.getUserEntrantTeamId as jest.Mock).mockResolvedValue(77 as never);
     const res = await POST(req({ teamId: 77 }), params);
     expect(res.status).toBe(200);
     expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 77);
@@ -65,7 +64,7 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
 
   it("empêche un membre de forfaiter une autre équipe (403)", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(member as never);
-    (teams.getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 77 } as never);
+    (service.getUserEntrantTeamId as jest.Mock).mockResolvedValue(77 as never);
     const res = await POST(req({ teamId: 88 }), params);
     expect(res.status).toBe(403);
     expect(service.forfeitTournamentTeam).not.toHaveBeenCalled();
