@@ -5,11 +5,11 @@ import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
 import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
 import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
+import { getPlayerEntityStats } from "@/lib/server/stats-service";
 import type {
   FullProfileResponse,
   PersonalDataExport,
   PublicUserProfile,
-  TeamHistoryRow,
   TeamRole,
   UserTeamTimeline,
 } from "@/lib/shared/types";
@@ -79,16 +79,6 @@ type TeamTimelineRow = RowDataPacket & {
   roles_json: string;
 };
 
-type TournamentHistoryRow = RowDataPacket & {
-  tournament_id: number;
-  tournament_name: string;
-  tournament_state: "UPCOMING" | "REGISTRATION" | "RUNNING" | "FINISHED";
-  final_rank: number | null;
-  wins: number;
-  losses: number;
-  played_at: Date;
-};
-
 function mapPublicUser(row: UserRow): PublicUserProfile {
   return {
     id: Number(row.id),
@@ -134,18 +124,6 @@ function hashCode(code: string): string {
 function randomCode(): string {
   const randomInt = crypto.randomInt(100000, 1000000);
   return String(randomInt);
-}
-
-function mapHistoryRow(row: TournamentHistoryRow): TeamHistoryRow {
-  return {
-    tournamentId: Number(row.tournament_id),
-    tournamentName: row.tournament_name,
-    state: row.tournament_state,
-    finalRank: row.final_rank === null ? null : Number(row.final_rank),
-    wins: Number(row.wins ?? 0),
-    losses: Number(row.losses ?? 0),
-    playedAt: toIso(row.played_at) ?? new Date().toISOString(),
-  };
 }
 
 export async function getUserById(userId: number): Promise<PublicUserProfile | null> {
@@ -624,63 +602,15 @@ export async function getFullProfile(
     roles: parseRoles(row.roles_json),
   }));
 
-  const [historyRows] = await db.execute<TournamentHistoryRow[]>(
-    `SELECT
-      t.id AS tournament_id,
-      t.name AS tournament_name,
-      t.state AS tournament_state,
-      r.final_rank,
-      COALESCE(SUM(CASE WHEN m.winner_team_id = tm.team_id THEN 1 ELSE 0 END), 0) AS wins,
-      COALESCE(SUM(CASE WHEN m.loser_team_id = tm.team_id THEN 1 ELSE 0 END), 0) AS losses,
-      COALESCE(t.finished_at, t.start_at) AS played_at
-    FROM ${userEntriesSql("?")} tm
-    JOIN bg_tournament_registrations r ON r.team_id = tm.team_id
-    JOIN bg_tournaments t ON t.id = r.tournament_id
-    LEFT JOIN bg_matches m ON m.tournament_id = t.id
-      AND (m.winner_team_id = tm.team_id OR m.loser_team_id = tm.team_id)
-    GROUP BY t.id, t.name, t.state, r.final_rank, played_at
-    ORDER BY played_at DESC`,
-    [targetUserId, targetUserId],
-  );
-
-  const tournaments = historyRows.map(mapHistoryRow);
-
-  const [statRows] = await db.execute<
-    (RowDataPacket & {
-      tournaments_played: number;
-      tournaments_won: number;
-      matches_won: number;
-      matches_lost: number;
-      best_rank: number | null;
-      avg_rank: number | null;
-    })[]
-  >(
-    `SELECT
-      COUNT(DISTINCT r.tournament_id) AS tournaments_played,
-      COALESCE(SUM(CASE WHEN r.final_rank = 1 THEN 1 ELSE 0 END), 0) AS tournaments_won,
-      COALESCE(SUM(CASE WHEN m.winner_team_id = tm.team_id THEN 1 ELSE 0 END), 0) AS matches_won,
-      COALESCE(SUM(CASE WHEN m.loser_team_id = tm.team_id THEN 1 ELSE 0 END), 0) AS matches_lost,
-      MIN(r.final_rank) AS best_rank,
-      AVG(r.final_rank) AS avg_rank
-    FROM ${userEntriesSql("?")} tm
-    LEFT JOIN bg_tournament_registrations r ON r.team_id = tm.team_id
-    LEFT JOIN bg_matches m ON m.tournament_id = r.tournament_id
-      AND (m.winner_team_id = tm.team_id OR m.loser_team_id = tm.team_id)`,
-    [targetUserId, targetUserId],
-  );
-
-  const statsRow = statRows[0];
+  // Statistiques et palmarès viennent de la même collecte (`stats-service`) :
+  // mêmes définitions que côté équipe, et surtout mêmes bornes d'appartenance.
+  // L'ancienne requête, jointe sans condition de date, listait aussi le même
+  // tournoi une fois par équipe du joueur.
+  const { stats, tournaments } = await getPlayerEntityStats(targetUserId);
 
   return {
     profile,
-    stats: {
-      tournamentsPlayed: Number(statsRow?.tournaments_played ?? 0),
-      tournamentsWon: Number(statsRow?.tournaments_won ?? 0),
-      matchesWon: Number(statsRow?.matches_won ?? 0),
-      matchesLost: Number(statsRow?.matches_lost ?? 0),
-      bestRank: statsRow?.best_rank === null ? null : Number(statsRow?.best_rank),
-      averageRank: statsRow?.avg_rank === null ? null : Number(Number(statsRow?.avg_rank).toFixed(2)),
-    },
+    stats,
     teamsTimeline: timeline,
     tournaments,
     // Ne pas divulguer qui est admin / quels rôles aux non-admins : réservé au viewer admin.
