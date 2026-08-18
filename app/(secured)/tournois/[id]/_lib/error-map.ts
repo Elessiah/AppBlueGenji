@@ -4,6 +4,11 @@ const ERROR_MESSAGES: Record<string, string> = {
   MATCH_NOT_READY: "Le match n'a pas deux équipes.",
   MATCH_ALREADY_COMPLETED: "Le match est déjà terminé.",
   DRAW_NOT_ALLOWED: "Les scores ne peuvent pas être égaux.",
+  // Formulations de repli : l'interface connaît le format du tournoi et
+  // remplace ces messages par une version chiffrée (`matchScoreViolationMessage`).
+  SCORE_EXCEEDS_MATCH_FORMAT: "Score impossible pour le format de match du tournoi.",
+  SCORE_BELOW_MATCH_FORMAT: "Le vainqueur doit atteindre le nombre de manches du format.",
+  INVALID_MATCH_FORMAT: "Format de match invalide.",
   TOURNAMENT_NOT_FOUND: "Tournoi introuvable.",
   TOURNAMENT_NOT_RUNNING: "Le tournoi n'est pas en cours.",
   ADMIN_SAVE_SCORES_FAILED: "Erreur lors de la sauvegarde des scores.",

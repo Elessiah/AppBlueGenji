@@ -1,4 +1,5 @@
 ﻿import type { PlatformRole } from "./permissions";
+import type { MatchFormat } from "./match-format";
 import type { DeepStats, TeamRankingPosition } from "./stats";
 
 export type TournamentFormat =
@@ -254,6 +255,11 @@ export type TournamentCard = {
   survivalRoundsPerCut: number | null;
   /** Phases du tournoi multi-mode (null pour les tournois mono-mode). */
   phases: TournamentPhase[] | null;
+  /**
+   * Format des matchs (BO5, FT3…) appliqué à la saisie des scores. `null` =
+   * score libre, comme les tournois créés avant cette fonctionnalité.
+   */
+  matchFormat: MatchFormat | null;
 };
 
 export type TournamentBuckets = {
