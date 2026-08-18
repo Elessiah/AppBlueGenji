@@ -1,6 +1,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { toIso } from "@/lib/server/serialization";
 import type { BracketMatch, TournamentCard, TournamentPhase } from "@/lib/shared/types";
+import { parseMatchFormat } from "@/lib/shared/match-format";
 
 export type TournamentRow = RowDataPacket & {
   id: number;
@@ -25,6 +26,9 @@ export type TournamentRow = RowDataPacket & {
   current_phase_id: number | null;
   /** 1 = l'ordre de seeding a été fixé à la main par le staff. */
   manual_seeding: number;
+  /** Format des matchs (`BO`/`FT`) ; NULL = saisie de score libre. */
+  match_format_type: "BO" | "FT" | null;
+  match_format_value: number | null;
 };
 
 export type RegistrationRow = RowDataPacket & {
@@ -150,6 +154,7 @@ export function mapCard(row: TournamentListRow): TournamentCard {
     survivalRoundsPerCut:
       row.survival_rounds_per_cut === null ? null : Number(row.survival_rounds_per_cut),
     phases: null,
+    matchFormat: parseMatchFormat(row.match_format_type, row.match_format_value),
   };
 }
 

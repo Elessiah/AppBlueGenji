@@ -8,6 +8,14 @@ import type { TournamentFormat, TournamentGame } from "@/lib/shared/types";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import { validatePhases } from "@/lib/shared/tournament-phases";
 import { computeRecommendedRounds } from "@/lib/shared/swiss";
+import {
+  DEFAULT_MATCH_FORMAT,
+  MATCH_FORMAT_BOUNDS,
+  isValidMatchFormat,
+  matchFormatDescription,
+  matchFormatLabel,
+  type MatchFormatType,
+} from "@/lib/shared/match-format";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
 import { useToast } from "@/components/ui/toast";
 import { CyberCard, CyberButton } from "@/components/cyber";
@@ -48,6 +56,12 @@ export default function CreateTournamentPage() {
   const [endurancePlayoffSize, setEndurancePlayoffSize] = useState(8);
   const [survivalRoundsBeforeFirstCut, setSurvivalRoundsBeforeFirstCut] = useState(3);
   const [maxTeams, setMaxTeams] = useState(16);
+  // Format des matchs : « LIBRE » conserve la saisie de score sans contrainte,
+  // comme les tournois créés avant la fonctionnalité.
+  const [matchFormatType, setMatchFormatType] = useState<MatchFormatType | "LIBRE">(
+    DEFAULT_MATCH_FORMAT.type,
+  );
+  const [matchFormatValue, setMatchFormatValue] = useState(DEFAULT_MATCH_FORMAT.value);
   const [phases, setPhases] = useState<PhaseConfig[]>([
     createDefaultPhase(1, "SWISS"),
     createDefaultPhase(2, "DOUBLE"),
@@ -80,6 +94,10 @@ export default function CreateTournamentPage() {
       .catch(() => undefined);
   }, [router, showError]);
 
+  const isLibre = matchFormatType === "LIBRE";
+  const matchFormat = isLibre ? null : { type: matchFormatType, value: matchFormatValue };
+  const matchFormatValid = isLibre || isValidMatchFormat(matchFormatType, matchFormatValue);
+
   const recommendedRounds = computeRecommendedRounds(maxTeams);
   const setSwissTotalRounds = (value: number) => {
     setSwissRoundsTouched(true);
@@ -91,6 +109,16 @@ export default function CreateTournamentPage() {
     event.preventDefault();
     setLoading(true);
     try {
+      if (!matchFormatValid) {
+        showError(
+          matchFormatType === "BO"
+            ? "Un Best of doit se jouer en nombre impair de manches (BO1, BO3, BO5…)."
+            : "Nombre de manches du format de match invalide.",
+        );
+        setLoading(false);
+        return;
+      }
+
       // Validate phases for MULTI format
       if (format === "MULTI") {
         const error = validatePhases(phases);
@@ -127,6 +155,8 @@ export default function CreateTournamentPage() {
           enduranceWinDelta: format === "BG_SURVIE" ? enduranceWinDelta : undefined,
           enduranceLossDelta: format === "BG_SURVIE" ? enduranceLossDelta : undefined,
           endurancePlayoffSize: format === "BG_SURVIE" ? endurancePlayoffSize : undefined,
+          matchFormatType: matchFormat?.type ?? null,
+          matchFormatValue: matchFormat?.value ?? null,
         }),
       });
       const payload = (await response.json()) as { error?: string; id?: number };
@@ -244,6 +274,62 @@ export default function CreateTournamentPage() {
                     onChange={(e) => setMaxTeams(Number(e.target.value))}
                   />
                 </div>
+
+                <div className="field">
+                  <label htmlFor="match-format-type">Format de match</label>
+                  <select
+                    id="match-format-type"
+                    value={matchFormatType}
+                    onChange={(e) => {
+                      const next = e.target.value as MatchFormatType | "LIBRE";
+                      setMatchFormatType(next);
+                      if (next === "LIBRE") return;
+                      // Les deux notations n'ont ni les mêmes bornes ni la même
+                      // parité : on ramène la valeur héritée dans le domaine du
+                      // nouveau type plutôt que de laisser un état invalide que
+                      // l'organisateur devrait corriger à la main.
+                      const bounds = MATCH_FORMAT_BOUNDS[next];
+                      let value = Math.min(Math.max(matchFormatValue, bounds.min), bounds.max);
+                      if (next === "BO" && value % 2 === 0) value -= 1;
+                      if (value !== matchFormatValue) setMatchFormatValue(value);
+                    }}
+                  >
+                    <option value="BO">Best of (BO)</option>
+                    <option value="FT">First to (FT)</option>
+                    <option value="LIBRE">Libre (aucune limite)</option>
+                  </select>
+                  <p style={HINT}>
+                    {isLibre
+                      ? "Les scores sont saisis sans contrainte."
+                      : matchFormatValid
+                        ? `${matchFormatLabel(matchFormat)} — ${matchFormatDescription(matchFormat)}`
+                        : matchFormatType === "BO"
+                          ? "Un Best of se joue en nombre impair de manches (BO1, BO3, BO5…)."
+                          : "Saisis le nombre de manches à gagner."}
+                  </p>
+                </div>
+
+                {!isLibre && (
+                  <div className="field">
+                    <label htmlFor="match-format-value">
+                      {matchFormatType === "BO" ? "Manches jouées (impair)" : "Manches à gagner"}
+                    </label>
+                    <input
+                      id="match-format-value"
+                      type="number"
+                      min={MATCH_FORMAT_BOUNDS[matchFormatType].min}
+                      max={MATCH_FORMAT_BOUNDS[matchFormatType].max}
+                      step={matchFormatType === "BO" ? 2 : 1}
+                      value={matchFormatValue}
+                      onChange={(e) => setMatchFormatValue(Number(e.target.value))}
+                    />
+                    <p style={HINT}>
+                      {matchFormatType === "BO"
+                        ? "Le score d'une équipe ne peut pas dépasser la moitié supérieure : 3 en BO5."
+                        : "Objectif à atteindre pour remporter le match : 3 en FT3."}
+                    </p>
+                  </div>
+                )}
 
                 {format === "MULTI" && (
                   <div style={FULL_WIDTH}>
