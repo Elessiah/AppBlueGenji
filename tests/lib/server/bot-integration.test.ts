@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { fetchBotStats, resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
+import {
+  fetchBotStats,
+  pushSiteVisitStats,
+  resolveDiscordUser,
+  sendDiscordLoginCode,
+} from "@/lib/server/bot-integration";
+import type { SiteVisitStats } from "@/lib/shared/types";
 
 const originalEnv = { ...process.env };
 
@@ -129,6 +135,59 @@ describe("bot-integration", () => {
       messagesLast30Days: 0,
       relayedMessagesLast30Days: 0,
       uniqueUsersLast30Days: 0,
+    });
+  });
+  describe("pushSiteVisitStats", () => {
+    const stats: SiteVisitStats = {
+      totalVisits: 1240,
+      uniqueVisitors: 310,
+      visitsLast24h: 42,
+      uniqueVisitorsLast24h: 20,
+      visitsLast7Days: 260,
+      uniqueVisitorsLast7Days: 95,
+      visitsLast30Days: 900,
+      uniqueVisitorsLast30Days: 240,
+      identifiedVisitors: 58,
+      firstVisitAt: "2026-01-05T10:00:00.000Z",
+      lastVisitAt: "2026-08-18T09:30:00.000Z",
+    };
+
+    it("poste la fréquentation sur le canal interne du bot", async () => {
+      const fetchMock = jest
+        .spyOn(global, "fetch")
+        .mockResolvedValue(new Response(null, { status: 200 }));
+
+      await pushSiteVisitStats(stats);
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:4400/internal/site-visits",
+        expect.objectContaining({ method: "POST", body: JSON.stringify(stats) }),
+      );
+    });
+
+    it("joint le jeton interne partagé", async () => {
+      process.env.BOT_INTERNAL_TOKEN = "secret-token";
+      const fetchMock = jest
+        .spyOn(global, "fetch")
+        .mockResolvedValue(new Response(null, { status: 200 }));
+
+      await pushSiteVisitStats(stats);
+
+      expect(fetchMock.mock.calls[0][1]).toMatchObject({
+        headers: expect.objectContaining({ "x-internal-token": "secret-token" }),
+      });
+    });
+
+    it("avale une erreur réseau : la fréquentation ne casse jamais une visite", async () => {
+      jest.spyOn(global, "fetch").mockRejectedValue(new Error("ECONNREFUSED"));
+
+      await expect(pushSiteVisitStats(stats)).resolves.toBeUndefined();
+    });
+
+    it("avale une réponse en erreur du bot", async () => {
+      jest.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 500 }));
+
+      await expect(pushSiteVisitStats(stats)).resolves.toBeUndefined();
     });
   });
 });

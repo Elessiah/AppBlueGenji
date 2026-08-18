@@ -978,6 +978,25 @@ async function runMigrations(db: Pool): Promise<void> {
   } catch {
     // Index already exists
   }
+
+  // Fréquentation du site. Une ligne = une visite (arrivée d'un visiteur, les
+  // chargements suivants d'une même fenêtre de session étant regroupés côté
+  // service). `visitor_key` est un SHA-256 salé : ni IP ni user-agent ne sont
+  // stockés en clair. Pas de clé étrangère sur `user_id` — une suppression de
+  // compte ne doit pas réécrire l'historique de fréquentation, qui n'est qu'un
+  // comptage.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS bg_site_visits (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      visitor_key CHAR(64) NOT NULL,
+      user_id BIGINT NULL,
+      path VARCHAR(191) NOT NULL DEFAULT '/',
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_bg_site_visits_created_at (created_at),
+      INDEX idx_bg_site_visits_visitor (visitor_key, created_at),
+      INDEX idx_bg_site_visits_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
 }
 
 async function ensureMigrations(db: Pool): Promise<void> {

@@ -342,6 +342,28 @@ export type TournamentDetail = {
   soloUserIds: Record<number, number>;
 };
 
+/**
+ * Fréquentation du site, telle que servie à la commande Discord `/stats-site`.
+ *
+ * `visits*` compte les visites (une arrivée d'un visiteur, fenêtre de session de
+ * 30 min) ; `uniqueVisitors*` compte les empreintes de visiteur distinctes.
+ * `identifiedVisitors` isole les comptes connectés — le sous-ensemble sûrement
+ * dédoublonné « par utilisateur ».
+ */
+export type SiteVisitStats = {
+  totalVisits: number;
+  uniqueVisitors: number;
+  visitsLast24h: number;
+  uniqueVisitorsLast24h: number;
+  visitsLast7Days: number;
+  uniqueVisitorsLast7Days: number;
+  visitsLast30Days: number;
+  uniqueVisitorsLast30Days: number;
+  identifiedVisitors: number;
+  firstVisitAt: string | null;
+  lastVisitAt: string | null;
+};
+
 export type BotStats = {
   affiliatedServers: number;
   affiliatedChannels: number;

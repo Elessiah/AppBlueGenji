@@ -6,6 +6,7 @@ import type {
   BotActivity,
   BotModuleKey,
   BotModulesPayload,
+  SiteVisitStats,
 } from "@/lib/shared/types";
 
 const DEFAULT_BOT_INTERNAL_HOST = "127.0.0.1";
@@ -213,6 +214,39 @@ export async function sendBotLog(message: string): Promise<void> {
   } catch {
     recordFailure();
     // Best-effort : on ne propage pas l'erreur.
+  }
+}
+
+/**
+ * Pousse la fréquentation du site au bot Discord, qui la conserve et la sert à
+ * sa commande `/stats-site`.
+ *
+ * Passe par le canal interne déjà en place (même URL, même `x-internal-token`,
+ * même coupe-circuit) : le bot n'a donc jamais besoin d'appeler le site en
+ * retour ni d'accéder à MySQL. Meilleur effort — un bot injoignable laisse
+ * simplement le dernier instantané en place.
+ */
+export async function pushSiteVisitStats(stats: SiteVisitStats): Promise<void> {
+  if (isCircuitOpen()) return;
+
+  const baseUrl = resolveBotInternalUrl();
+
+  try {
+    const response = await fetch(`${baseUrl}/internal/site-visits`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...getInternalHeaders(),
+      },
+      body: JSON.stringify(stats),
+      cache: "no-store",
+      signal: AbortSignal.timeout(BOT_FETCH_TIMEOUT_MS),
+    });
+    if (response.ok) recordSuccess();
+    else recordFailure();
+  } catch {
+    recordFailure();
+    // Best-effort : la fréquentation ne doit jamais faire échouer une visite.
   }
 }
 
