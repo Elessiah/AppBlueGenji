@@ -79,11 +79,15 @@ neuve échapperait à la fenêtre et insérerait une ligne. Deux garde-fous :
   cette variable si la chaîne de proxys est plus longue** (CDN + nginx = 2),
   faute de quoi c'est l'IP du CDN qui serait retenue et tous les visiteurs
   seraient regroupés.
-- **Plafond de 30 enregistrements par IP et par minute**, en mémoire du
-  processus. Un visiteur réel en produit au plus deux par heure ; le plafond ne
-  gêne donc qu'un client qui fabrique des empreintes en boucle. C'est le seul
-  rempart contre une croissance illimitée de la table — aucune déduplication par
-  empreinte ne peut jouer ce rôle, l'empreinte venant du client.
+- **Plafond de 30 lignes insérées par IP et par minute**, en mémoire du
+  processus. Ce sont bien les *insertions* qu'on plafonne, pas les requêtes : un
+  chargement absorbé par la fenêtre de session ne consomme rien, sans quoi
+  plusieurs vrais visiteurs partageant une sortie NAT (école, entreprise, réseau
+  mobile) s'épuiseraient mutuellement leur quota et seraient sous-comptés. Le
+  client qui fabrique une empreinte neuve à chaque requête, lui, insère à chaque
+  fois et atteint le plafond immédiatement. C'est le seul rempart contre une
+  croissance illimitée de la table — aucune déduplication par empreinte ne peut
+  jouer ce rôle, l'empreinte venant du client.
 
 Les lignes ne sont **pas** purgées : « visites totales » est un total depuis la
 mise en service, qu'une rétention tronquerait.

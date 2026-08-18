@@ -74,37 +74,56 @@ function hashVisitorIdentity(source: string): string {
   return createHash("sha256").update(`${visitHashSalt()}:${source}`).digest("hex");
 }
 
+function rateLimitKey(ip: string | null | undefined): string {
+  return (ip ?? "").trim() || "unknown-ip";
+}
+
 /**
- * Autorise ou non un nouvel enregistrement pour cette IP.
+ * Le quota de cette IP est-il déjà épuisé ?
  *
- * Fenêtre fixe d'une minute, en mémoire du processus : c'est volontairement
+ * Fenêtre fixe d'une minute, en mémoire du processus : volontairement
  * approximatif (plusieurs instances comptent chacune de leur côté), mais cela
- * suffit à borner la croissance de la table, ce qu'aucune déduplication par
- * empreinte ne peut faire puisque l'empreinte est fournie par le client.
+ * borne la croissance de la table — ce qu'aucune déduplication par empreinte ne
+ * peut faire, l'empreinte étant fournie par le client.
  */
-function allowVisitFromIp(ip: string | null | undefined): boolean {
-  const key = (ip ?? "").trim() || "unknown-ip";
+function isVisitRateExceeded(ip: string | null | undefined): boolean {
+  const bucket = visitRateBuckets.get(rateLimitKey(ip));
+  if (!bucket || Date.now() >= bucket.resetAt) return false;
+  return bucket.count >= VISIT_RATE_LIMIT_PER_MINUTE;
+}
+
+/**
+ * Décompte une **ligne réellement insérée** du quota de l'IP.
+ *
+ * C'est l'insertion qu'on plafonne, pas la requête : un visiteur dont le
+ * chargement est absorbé par la fenêtre de session ne consomme rien. Sans cette
+ * nuance, plusieurs vrais visiteurs partageant une sortie NAT (école,
+ * entreprise, réseau mobile) s'épuiseraient mutuellement leur quota et seraient
+ * sous-comptés — alors que le client qui fabrique une empreinte neuve à chaque
+ * requête, lui, insère à chaque fois et atteint donc le plafond tout de suite.
+ */
+function chargeVisitToRateLimit(ip: string | null | undefined): void {
+  const key = rateLimitKey(ip);
   const now = Date.now();
 
   const bucket = visitRateBuckets.get(key);
-  if (!bucket || now >= bucket.resetAt) {
-    // Purge opportuniste : on ne balaie la table qu'au moment où elle déborde,
-    // pour ne pas payer un parcours à chaque visite.
-    if (visitRateBuckets.size >= VISIT_RATE_MAX_TRACKED_IPS) {
-      for (const [trackedKey, tracked] of visitRateBuckets) {
-        if (now >= tracked.resetAt) visitRateBuckets.delete(trackedKey);
-      }
-      // Toujours plein de fenêtres actives : on repart de zéro plutôt que de
-      // laisser la mémoire filer.
-      if (visitRateBuckets.size >= VISIT_RATE_MAX_TRACKED_IPS) visitRateBuckets.clear();
-    }
-    visitRateBuckets.set(key, { count: 1, resetAt: now + VISIT_RATE_WINDOW_MS });
-    return true;
+  if (bucket && now < bucket.resetAt) {
+    bucket.count += 1;
+    return;
   }
 
-  if (bucket.count >= VISIT_RATE_LIMIT_PER_MINUTE) return false;
-  bucket.count += 1;
-  return true;
+  // Purge opportuniste : on ne balaie la table qu'au moment où elle déborde,
+  // pour ne pas payer un parcours à chaque visite.
+  if (visitRateBuckets.size >= VISIT_RATE_MAX_TRACKED_IPS) {
+    for (const [trackedKey, tracked] of visitRateBuckets) {
+      if (now >= tracked.resetAt) visitRateBuckets.delete(trackedKey);
+    }
+    // Toujours plein de fenêtres actives : on repart de zéro plutôt que de
+    // laisser la mémoire filer.
+    if (visitRateBuckets.size >= VISIT_RATE_MAX_TRACKED_IPS) visitRateBuckets.clear();
+  }
+
+  visitRateBuckets.set(key, { count: 1, resetAt: now + VISIT_RATE_WINDOW_MS });
 }
 
 /** Vide le limiteur de débit (tests). */
@@ -117,7 +136,13 @@ function count(value: number | string | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-/** Statistiques vides — base injoignable ou table encore vierge. */
+/**
+ * Statistiques vides — celles d'une table encore vierge.
+ *
+ * À ne pas confondre avec une lecture impossible, que {@link getSiteVisitStats}
+ * signale par `null` : ces zéros-là sont un résultat légitime, et sont poussés
+ * au bot comme tels.
+ */
 export function emptySiteVisitStats(): SiteVisitStats {
   return {
     totalVisits: 0,
@@ -159,8 +184,8 @@ export async function recordSiteVisit(input: {
 }): Promise<{ recorded: boolean }> {
   // L'empreinte étant dérivée d'en-têtes fournis par le client, la fenêtre de
   // session ne protège pas d'un client qui en change à chaque requête : le
-  // plafond par IP, lui, tient.
-  if (!allowVisitFromIp(input.ip)) return { recorded: false };
+  // plafond d'insertions par IP, lui, tient.
+  if (isVisitRateExceeded(input.ip)) return { recorded: false };
 
   const visitorKey = hashVisitorIdentity(visitorIdentitySource(input));
   const path = normalizeVisitPath(input.path);
@@ -185,7 +210,10 @@ export async function recordSiteVisit(input: {
     [visitorKey, userId, path, visitorKey, SITE_VISIT_WINDOW_MINUTES],
   );
 
-  return { recorded: result.affectedRows > 0 };
+  const recorded = result.affectedRows > 0;
+  if (recorded) chargeVisitToRateLimit(input.ip);
+
+  return { recorded };
 }
 
 /**

@@ -222,6 +222,22 @@ describe("plafond de débit par IP", () => {
 
     expect(results.filter(Boolean)).toHaveLength(30);
   });
+
+  it("ne décompte que les insertions, pas les chargements absorbés par la fenêtre", async () => {
+    // Sortie NAT partagée : beaucoup de requêtes, peu d'insertions.
+    const execute = jest.fn().mockResolvedValue([{ affectedRows: 0 }]);
+    await mockDb(execute);
+
+    for (let i = 0; i < 200; i += 1) {
+      await recordSiteVisit({ ip: "203.0.113.7", userAgent: `UA-${i}` });
+    }
+
+    // Le quota est intact : un vrai nouveau visiteur derrière la même IP passe.
+    execute.mockResolvedValue([{ affectedRows: 1 }]);
+    await expect(recordSiteVisit({ ip: "203.0.113.7", userAgent: "Nouveau" })).resolves.toEqual({
+      recorded: true,
+    });
+  });
 });
 
 describe("syncSiteVisitStatsToBot", () => {
