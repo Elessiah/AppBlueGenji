@@ -51,7 +51,7 @@ export function LiveCard({ initialLive, nextUpcomingISO }: LiveCardProps) {
           const raw = payload.live ?? null;
           if (raw) {
             const text = (raw.tournament.name ?? "").toLowerCase();
-            const game = text.includes("marvel") || text.includes("rivals") ? "Marvel Rivals" : "Overwatch 2";
+            const game = text.includes("marvel") || text.includes("rivals") ? "Marvel Rivals" : "Overwatch";
             const phase = raw.currentMatch
               ? raw.currentMatch.roundLabel?.toUpperCase?.() ?? "EN ATTENTE"
               : "EN ATTENTE";

@@ -31,7 +31,7 @@ test.describe("Filtres des annuaires (authentifié)", () => {
 
     await expect(page.getByPlaceholder(/Rechercher une équipe/)).toBeVisible();
 
-    await page.getByRole("button", { name: /Overwatch 2/ }).click();
+    await page.getByRole("button", { name: /Overwatch/ }).click();
     await page.getByRole("button", { name: /Marvel Rivals/ }).click();
     await page.getByRole("button", { name: /^Toutes/ }).click();
 
@@ -49,7 +49,7 @@ test.describe("Filtres des annuaires (authentifié)", () => {
     await expect(page.getByText(/Aucun tournoi/).first()).toBeVisible();
     await search.clear();
 
-    await page.getByRole("button", { name: /Overwatch 2/ }).click();
+    await page.getByRole("button", { name: /Overwatch/ }).click();
     await page.getByRole("button", { name: /Marvel Rivals/ }).click();
     await page.getByRole("button", { name: /^Tous/ }).click();
   });

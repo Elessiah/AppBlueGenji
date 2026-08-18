@@ -224,7 +224,7 @@ export default function CreateTournamentPage() {
                     value={game}
                     onChange={(e) => setGame(e.target.value as TournamentGame)}
                   >
-                    <option value="OW2">Overwatch 2</option>
+                    <option value="OW2">Overwatch</option>
                     <option value="MR">Marvel Rivals</option>
                   </select>
                 </div>

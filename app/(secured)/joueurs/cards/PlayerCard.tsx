@@ -87,7 +87,7 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
         <div className={s.plTags}>
           {(player.games || []).map((g) => (
             <span key={g} className={`${s.plTag} ${g === "OW2" ? s.ow : s.mr}`}>
-              {g}
+              {g === "OW2" ? "OW" : g}
             </span>
           ))}
         </div>

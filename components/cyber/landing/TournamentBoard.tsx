@@ -36,12 +36,12 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
             <>
               <div className={styles.badgeRow}>
                 <Pill variant={featured.state === "RUNNING" ? "live" : "blue"}>
-                  {featured.state === "RUNNING" ? "LIVE" : "OW2"}
+                  {featured.state === "RUNNING" ? "LIVE" : "OW"}
                 </Pill>
                 <span className="mono">{inferGameLabel(featured.name).toUpperCase()}</span>
               </div>
 
-              <div className={styles.gameEyebrow}>OVERWATCH 2</div>
+              <div className={styles.gameEyebrow}>OVERWATCH</div>
               <h3 className={styles.featuredTitle}>{makeTitle(featured)}</h3>
               <div className={styles.phase}>{featured.state} · BRACKET LIVE</div>
               <MiniBracket matches={miniBracket} />

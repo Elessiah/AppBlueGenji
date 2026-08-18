@@ -109,7 +109,7 @@ export default function PlayersPage() {
             </div>
             <div className={s.metric}>
               <div className={s.metricNum}>{ow2Count}</div>
-              <div className={s.metricLbl}>Joueurs Overwatch 2</div>
+              <div className={s.metricLbl}>Joueurs Overwatch</div>
             </div>
             <div className={s.metric}>
               <div className={s.metricNum}>{mrCount}</div>

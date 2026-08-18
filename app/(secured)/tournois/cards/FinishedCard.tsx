@@ -9,7 +9,7 @@ interface FinishedCardProps {
 }
 
 export function FinishedCard({ t }: FinishedCardProps) {
-  const gameLabel = t.game === "OW2" ? "OVERWATCH 2" : "MARVEL RIVALS";
+  const gameLabel = t.game === "OW2" ? "OVERWATCH" : "MARVEL RIVALS";
   const formatLabel = t.format === "DOUBLE" ? "Double élimination" : "Élimination simple";
 
   const finishDate = new Date(t.startAt).toLocaleDateString("fr-FR", {

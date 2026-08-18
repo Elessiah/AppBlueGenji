@@ -62,7 +62,7 @@ export const SITE_COPY_FIELDS: readonly SiteCopyField[] = [
     page: "Accueil",
     label: "Hero — accroche",
     defaultValue:
-      "BlueGenji fédère une scène amateur francophone avec des tournois lisibles, des brackets en direct, des arbitres bénévoles et une communauté Discord active autour d'Overwatch 2 et Marvel Rivals.",
+      "BlueGenji fédère une scène amateur francophone avec des tournois lisibles, des brackets en direct, des arbitres bénévoles et une communauté Discord active autour d'Overwatch et Marvel Rivals.",
     multiline: true,
     maxLength: 600,
   },

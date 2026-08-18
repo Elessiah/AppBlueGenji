@@ -14,10 +14,10 @@ function dayLabel(date: Date): string {
   return date.toLocaleDateString("fr-FR", { day: "2-digit" });
 }
 
-function gameLabel(name: string): "OW2" | "MR" {
+function gameLabel(name: string): "OW" | "MR" {
   const lower = name.toLowerCase();
   if (lower.includes("marvel") || lower.includes("rivals")) return "MR";
-  return "OW2";
+  return "OW";
 }
 
 function tagLabel(state: LandingCalendarEvent["state"]): string {

@@ -155,7 +155,7 @@ export function TeamCard({ team }: { team: TeamListItem }) {
         <div className={s.games}>
           {team.games.map((g) => (
             <span key={g} className={`${s.gamePill} ${g === "OW2" ? s.ow : s.mr}`}>
-              {g === "OW2" ? "Overwatch 2" : "Marvel Rivals"}
+              {g === "OW2" ? "Overwatch" : "Marvel Rivals"}
             </span>
           ))}
         </div>
@@ -330,7 +330,7 @@ export default function TeamsPage() {
             </div>
             <div className={s.metric}>
               <div className={s.metricNum}>{countOw2}</div>
-              <div className={s.metricLbl}>Équipes Overwatch 2</div>
+              <div className={s.metricLbl}>Équipes Overwatch</div>
             </div>
             <div className={s.metric}>
               <div className={s.metricNum}>{countMr}</div>
@@ -356,7 +356,7 @@ export default function TeamsPage() {
             <div className={s.filters}>
               {([
                 ["all", "Toutes", teams.length],
-                ["ow2", "Overwatch 2", countOw2],
+                ["ow2", "Overwatch", countOw2],
                 ["mr", "Marvel Rivals", countMr],
               ] as const).map(([k, label, n]) => (
                 <button
@@ -443,7 +443,7 @@ Pas de modification structurelle — la page existe. Vérifier juste qu'elle hé
 - L'API `/api/teams` retourne pour chaque équipe : `rank`, `points`, `wins`, `losses`, `form`, `games`, `rosterPreview`. La forme de la réponse doit valider à la compilation TS.
 - La page `/equipes` affiche :
   - Hero avec titre + 4 métriques
-  - Recherche + 3 filtres jeu (Toutes / Overwatch 2 / Marvel Rivals)
+  - Recherche + 3 filtres jeu (Toutes / Overwatch / Marvel Rivals)
   - Sortie de tri (Classement, Nom, Victoires, Effectif)
   - Highlight strip top 3 quand sort = rank
   - Grille 3 colonnes de cartes équipes (responsive : 2 colonnes < 1080px, 1 colonne < 720px)

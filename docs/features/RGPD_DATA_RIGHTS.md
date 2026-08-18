@@ -14,10 +14,10 @@ affichées dans le tableau « Données collectées ») :
 
 - **`DONNEES_PROFIL`** — données de profil, base légale *Consentement*, durée
   « Durée du compte » :
-  - Pseudo site, Pseudo Discord, Pseudo Overwatch 2, Pseudo Marvel Rivals, Avatar
+  - Pseudo site, Pseudo Discord, Pseudo Overwatch, Pseudo Marvel Rivals, Avatar
   - **ID Discord** — stocké **uniquement** en cas de connexion via Discord
     (envoi du code d'authentification en DM).
-  - Les pseudos Overwatch 2 / Marvel Rivals servent **seulement** à la mise en
+  - Les pseudos Overwatch / Marvel Rivals servent **seulement** à la mise en
     relation entre joueurs (s'ajouter en jeu), **jamais** à des statistiques.
 - **`DONNEE_TOURNOIS`** — résultats de tournois, base légale *Intérêt légitime*,
   conservation indéfinie (palmarès sportif).

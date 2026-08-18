@@ -9,7 +9,7 @@ const TOURNAMENTS_LIVE = [
   {
     id: 1,
     name: "Genji Clash #14",
-    game: "Overwatch 2",
+    game: "Overwatch",
     teams: 16, maxTeams: 16,
     phase: "Quarts de finale",
     currentMatch: { a: "Neon Drift", b: "Static Wolves", scoreA: 2, scoreB: 1, map: "King's Row" },
@@ -19,8 +19,8 @@ const TOURNAMENTS_LIVE = [
 
 const TOURNAMENTS_UPCOMING = [
   { id: 2, name: "Rivals Showdown #03", game: "Marvel Rivals", start: "02 Mai 2026 · 20:00", teams: 11, maxTeams: 16, prize: "€600" },
-  { id: 3, name: "Monthly Cup — Mai", game: "Overwatch 2", start: "10 Mai 2026 · 19:30", teams: 7, maxTeams: 8, prize: "€300" },
-  { id: 4, name: "Genji Summer Open", game: "Overwatch 2", start: "07 Juin 2026 · 18:00", teams: 4, maxTeams: 32, prize: "€1 500" },
+  { id: 3, name: "Monthly Cup — Mai", game: "Overwatch", start: "10 Mai 2026 · 19:30", teams: 7, maxTeams: 8, prize: "€300" },
+  { id: 4, name: "Genji Summer Open", game: "Overwatch", start: "07 Juin 2026 · 18:00", teams: 4, maxTeams: 32, prize: "€1 500" },
 ];
 
 const LEADERBOARD = [
@@ -122,7 +122,7 @@ function Hero() {
           </h1>
           <p className="hero-lede">
             BlueGenji est une association française qui fédère joueurs compétitifs
-            et casuals autour de tournois <strong>Overwatch&nbsp;2</strong> et <strong>Marvel&nbsp;Rivals</strong>.
+            et casuals autour de tournois <strong>Overwatch</strong> et <strong>Marvel&nbsp;Rivals</strong>.
             Cash prizes, brackets en direct, communauté Discord active.
           </p>
 
@@ -252,7 +252,7 @@ function TournamentBoard() {
         {/* LIVE card — bigger */}
         <div className="card card-lift tourney-card tourney-live">
           <div className="tc-badge"><span className="pill pill-live"><span className="dot"/>LIVE</span></div>
-          <div className="tc-game mono">OVERWATCH 2</div>
+          <div className="tc-game mono">OVERWATCH</div>
           <div className="tc-title">Genji Clash #14</div>
           <div className="tc-phase mono">QUARTS DE FINALE · MATCH 3 / 4</div>
 
@@ -282,7 +282,7 @@ function TournamentBoard() {
         {/* Upcoming cards */}
         {TOURNAMENTS_UPCOMING.map(t => (
           <div key={t.id} className="card card-lift tourney-card">
-            <div className="tc-badge"><span className="pill pill-blue">{t.game === "Overwatch 2" ? "OW2" : "MR"}</span></div>
+            <div className="tc-badge"><span className="pill pill-blue">{t.game === "Overwatch" ? "OW" : "MR"}</span></div>
             <div className="tc-game mono">{t.game.toUpperCase()}</div>
             <div className="tc-title" style={{fontSize: 22}}>{t.name}</div>
 
@@ -337,7 +337,7 @@ function LeaderCal() {
             <span className="mono" style={{fontSize: 11, letterSpacing: "0.2em", color: "var(--fg-mute)"}}>TOP ÉQUIPES</span>
             <div className="row gap-2">
               <button className="chip chip-on">Général</button>
-              <button className="chip">Overwatch 2</button>
+              <button className="chip">Overwatch</button>
               <button className="chip">Marvel Rivals</button>
             </div>
           </div>
@@ -536,7 +536,7 @@ function FooterBar() {
             <span className="logotype">BlueGenji</span>
           </div>
           <p style={{color:"var(--fg-mute)", fontSize: 13}}>
-            Association loi 1901. Tournois Overwatch 2 & Marvel Rivals pour la scène amateur francophone.
+            Association loi 1901. Tournois Overwatch & Marvel Rivals pour la scène amateur francophone.
           </p>
           <div className="mono" style={{fontSize: 11, letterSpacing: "0.14em", color:"var(--fg-dim)"}}>
             SIRET 912 345 678 00017 · RNA W691234567

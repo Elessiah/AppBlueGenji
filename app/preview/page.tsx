@@ -47,7 +47,7 @@ export default function CyberPreview() {
           <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
             <Pill>BETA</Pill>
             <Pill variant="live">LIVE EN COURS</Pill>
-            <Pill variant="blue">OW2</Pill>
+            <Pill variant="blue">OW</Pill>
           </div>
         </section>
 

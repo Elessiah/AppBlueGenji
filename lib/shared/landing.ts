@@ -51,12 +51,12 @@ export type LandingTickerPayload = {
   items: string[];
 };
 
-export function inferGameLabel(value: string | null | undefined): "Overwatch 2" | "Marvel Rivals" {
+export function inferGameLabel(value: string | null | undefined): "Overwatch" | "Marvel Rivals" {
   const text = (value ?? "").toLowerCase();
   if (text.includes("marvel") || text.includes("rivals")) {
     return "Marvel Rivals";
   }
-  return "Overwatch 2";
+  return "Overwatch";
 }
 
 export function inferGameCode(value: string | null | undefined): "ow2" | "mr" {

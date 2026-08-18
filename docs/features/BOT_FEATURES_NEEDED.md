@@ -181,5 +181,5 @@ Pour faciliter le debug et nourrir le dashboard :
 
 - Refonte de l'interface admin du bot (web ou CLI)
 - Système de modération
-- Intégration de jeux autres qu'Overwatch 2 et Marvel Rivals
+- Intégration de jeux autres qu'Overwatch et Marvel Rivals
 - Multi-langue (le bot reste FR comme le site)

@@ -20,7 +20,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     duree: "Durée du compte",
   },
   {
-    donnee: "Pseudo Overwatch 2",
+    donnee: "Pseudo Overwatch",
     finalite: "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique",
     base: "Consentement",
     duree: "Durée du compte",

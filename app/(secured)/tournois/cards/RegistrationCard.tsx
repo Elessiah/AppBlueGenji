@@ -9,7 +9,7 @@ interface RegistrationCardProps {
 }
 
 export function RegistrationCard({ t }: RegistrationCardProps) {
-  const gameLabel = t.game === "OW2" ? "OVERWATCH 2" : "MARVEL RIVALS";
+  const gameLabel = t.game === "OW2" ? "OVERWATCH" : "MARVEL RIVALS";
   const formatLabel = t.format === "DOUBLE" ? "Double élimination" : "Élimination simple";
 
   const startDate = new Date(t.startAt).toLocaleDateString("fr-FR", {

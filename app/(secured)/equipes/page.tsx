@@ -138,7 +138,7 @@ export default function TeamsPage() {
             </div>
             <div className={s.metric}>
               <div className={s.metricNum}>{countOw2}</div>
-              <div className={s.metricLbl}>Équipes Overwatch 2</div>
+              <div className={s.metricLbl}>Équipes Overwatch</div>
             </div>
             <div className={s.metric}>
               <div className={s.metricNum}>{countMr}</div>
@@ -156,7 +156,7 @@ export default function TeamsPage() {
               {(
                 [
                   ["all", "Toutes", teams.length],
-                  ["ow2", "Overwatch 2", countOw2],
+                  ["ow2", "Overwatch", countOw2],
                   ["mr", "Marvel Rivals", countMr],
                 ] as const
               ).map(([k, label, n]) => (

@@ -64,7 +64,7 @@ export const TOURNAMENTS: TournamentDef[] = [
   // ---- REGISTRATION : remplissage de 0 à complet --------------------------
   { name: "Inscriptions Vides", game: "OW2", state: "REGISTRATION", format: "DOUBLE", teamCount: 0, maxTeams: 16, daysOffset: 21 },
   { name: "Inscriptions Une Seule", game: "MR", state: "REGISTRATION", format: "SINGLE", teamCount: 1, maxTeams: 8, daysOffset: 12 },
-  { name: "OW2 Open Cup S1", game: "OW2", state: "REGISTRATION", format: "SINGLE", teamCount: 5, maxTeams: 8, daysOffset: 10, teamOffset: 2 },
+  { name: "OW Open Cup S1", game: "OW2", state: "REGISTRATION", format: "SINGLE", teamCount: 5, maxTeams: 8, daysOffset: 10, teamOffset: 2 },
   { name: "Marvel Rivals Cup S1", game: "MR", state: "REGISTRATION", format: "DOUBLE", teamCount: 3, maxTeams: 8, daysOffset: 14, teamOffset: 5 },
   { name: "Inscriptions Complètes 8/8", game: "OW2", state: "REGISTRATION", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: 9, teamOffset: 3 },
   { name: "Clôture Imminente", game: "MR", state: "REGISTRATION", format: "DOUBLE", teamCount: 7, maxTeams: 8, daysOffset: 2, closesInHours: 3, teamOffset: 7 },
@@ -85,7 +85,7 @@ export const TOURNAMENTS: TournamentDef[] = [
   { name: "6 Équipes Double", game: "MR", state: "RUNNING", format: "DOUBLE", teamCount: 6, maxTeams: 8, daysOffset: -2, playWaves: 2, teamOffset: 9 },
   { name: "11 Équipes Double", game: "OW2", state: "RUNNING", format: "DOUBLE", teamCount: 11, maxTeams: 16, daysOffset: -3, playWaves: 3 },
   { name: "12 Équipes Double (reports)", game: "MR", state: "RUNNING", format: "DOUBLE", teamCount: 12, maxTeams: 16, daysOffset: -4, playWaves: 2, pendingReports: 3, teamOffset: 12 },
-  { name: "OW2 Champions League", game: "OW2", state: "RUNNING", format: "DOUBLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1 },
+  { name: "OW Champions League", game: "OW2", state: "RUNNING", format: "DOUBLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1 },
 
   // ---- RUNNING · BlueGenji Survie (endurance puis play-offs) ---------------
   // Capital réduit pour que des éliminations tombent vite, et petit plateau de
@@ -125,9 +125,9 @@ export const TOURNAMENTS: TournamentDef[] = [
   { name: "128 Équipes Double (en cours)", game: "MR", state: "RUNNING", format: "DOUBLE", teamCount: 128, maxTeams: 128, daysOffset: -3, playWaves: 5 },
 
   // ---- FINISHED : palmarès, leaderboard, ticker ---------------------------
-  { name: "OW2 Spring Clash", game: "OW2", state: "FINISHED", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -30 },
+  { name: "OW Spring Clash", game: "OW2", state: "FINISHED", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -30 },
   { name: "Marvel Rivals Open", game: "MR", state: "FINISHED", format: "SINGLE", hasThirdPlaceMatch: true, teamCount: 4, maxTeams: 4, daysOffset: -20, teamOffset: 4 },
-  { name: "OW2 Winter Cup", game: "OW2", state: "FINISHED", format: "DOUBLE", teamCount: 8, maxTeams: 8, daysOffset: -60, teamOffset: 6 },
+  { name: "OW Winter Cup", game: "OW2", state: "FINISHED", format: "DOUBLE", teamCount: 8, maxTeams: 8, daysOffset: -60, teamOffset: 6 },
   { name: "Marvel Rivals Pro Series", game: "MR", state: "FINISHED", format: "DOUBLE", teamCount: 16, maxTeams: 16, daysOffset: -45 },
   { name: "Legacy 11 Équipes (byes)", game: "OW2", state: "FINISHED", format: "SINGLE", teamCount: 11, maxTeams: 16, daysOffset: -75, teamOffset: 10 },
   { name: "Suisse Finale 8", game: "MR", state: "FINISHED", format: "SWISS", teamCount: 8, maxTeams: 8, daysOffset: -35, swissTotalRounds: 3, teamOffset: 2 },

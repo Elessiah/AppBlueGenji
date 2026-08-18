@@ -46,7 +46,7 @@ Structure :
         <p style={{fontSize: 17, color: "var(--ink-mute)", maxWidth: 520, margin: "20px 0 32px"}}>
           Un bot Discord qui relaie les annonces entre serveurs
           affiliés. Scrims, recrutement staff, cast, coaching — la
-          communauté Overwatch 2 francophone, unifiée.
+          communauté Overwatch francophone, unifiée.
         </p>
         <CyberButton variant="primary" asChild>
           <a href="https://discord.com/api/oauth2/authorize?..." target="_blank" rel="noreferrer">

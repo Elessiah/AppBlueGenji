@@ -24,7 +24,7 @@ export async function PublicFooter() {
             <span className="logotype">BlueGenji</span>
           </div>
           <p>
-            Association loi 1901. Tournois Overwatch 2 et Marvel Rivals pour la
+            Association loi 1901. Tournois Overwatch et Marvel Rivals pour la
             scène amateur francophone.
           </p>
         </div>
