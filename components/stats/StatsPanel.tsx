@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { formatLocalDate } from "@/lib/shared/dates";
 import {
@@ -27,6 +28,18 @@ const MONTH_SHORT = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", 
 function monthLabel(month: string): string {
   const index = Number(month.slice(5, 7)) - 1;
   return MONTH_SHORT[index] ?? month;
+}
+
+/** Groupe titré : le sous-titre visible sert d'étiquette accessible au bloc. */
+function Group({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  return (
+    <section aria-labelledby={id}>
+      <h3 className={s.subhead} id={id}>
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
 }
 
 function Tile({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
@@ -121,6 +134,11 @@ function ActivityChart({ stats }: { stats: DeepStats }) {
           const x = index * slot + (slot - barWidth) / 2;
           return (
             <g key={point.month}>
+              <title>
+                {`${monthLabel(point.month)} ${point.month.slice(0, 4)} : ${point.played} match${
+                  point.played > 1 ? "s" : ""
+                }, ${point.won} victoire${point.won > 1 ? "s" : ""}`}
+              </title>
               <rect
                 x={x}
                 y={usable - playedHeight}
@@ -173,8 +191,7 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
 
   return (
     <div className={`${s.panel} ${accent === "orange" ? s.orange : ""}`}>
-      <div>
-        <div className={s.subhead}>Palmarès</div>
+      <Group id="stats-palmares" title="Palmarès">
         <div className={s.grid}>
           <Tile label="Tournois joués" value={stats.tournamentsPlayed} />
           <Tile label="Tournois gagnés" value={stats.tournamentsWon} />
@@ -189,10 +206,9 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
             />
           ) : null}
         </div>
-      </div>
+      </Group>
 
-      <div>
-        <div className={s.subhead}>Bilan des matchs</div>
+      <Group id="stats-bilan" title="Bilan des matchs">
         <div className={s.grid}>
           <Tile label="Matchs joués" value={stats.matchesPlayed} />
           <Tile label="Victoires" value={stats.matchesWon} />
@@ -205,20 +221,25 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
           />
           <Tile label="Points de classement" value={stats.rankingPoints} hint="100 par victoire, −20 par défaite" />
         </div>
-      </div>
+      </Group>
 
       <div className={s.columns}>
-        <div>
-          <div className={s.subhead}>Forme récente</div>
+        <Group id="stats-forme" title="Forme récente">
           {stats.form.length > 0 ? (
-            <div className={s.form} aria-label="Cinq derniers résultats, du plus récent au plus ancien">
+            <div
+              className={s.form}
+              role="list"
+              aria-label={`${stats.form.length} derniers résultats, du plus récent au plus ancien`}
+            >
               {stats.form.map((result, index) => (
                 <span
                   key={`${result}-${index}`}
+                  role="listitem"
                   className={`${s.formBadge} ${result === "W" ? s.formWin : s.formLoss}`}
+                  aria-label={result === "W" ? "Victoire" : "Défaite"}
                   title={result === "W" ? "Victoire" : "Défaite"}
                 >
-                  {result === "W" ? "V" : "D"}
+                  <span aria-hidden="true">{result === "W" ? "V" : "D"}</span>
                 </span>
               ))}
               <span className={s.splitValue} style={{ marginLeft: 6 }}>
@@ -237,20 +258,21 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
               hint="donnés / reçus"
             />
           </div>
-        </div>
+        </Group>
 
         <div>
-          <div className={s.subhead}>Répartition par jeu</div>
-          <SplitBars splits={stats.byGame} emptyLabel="Aucun match terminé pour le moment." />
-          <div className={s.subhead} style={{ marginTop: 22 }}>
-            Répartition par format
+          <Group id="stats-jeux" title="Répartition par jeu">
+            <SplitBars splits={stats.byGame} emptyLabel="Aucun match terminé pour le moment." />
+          </Group>
+          <div style={{ marginTop: 22 }}>
+            <Group id="stats-formats" title="Répartition par format">
+              <SplitBars splits={stats.byFormat} emptyLabel="Aucun match terminé pour le moment." />
+            </Group>
           </div>
-          <SplitBars splits={stats.byFormat} emptyLabel="Aucun match terminé pour le moment." />
         </div>
       </div>
 
-      <div>
-        <div className={s.subhead}>Adversaires</div>
+      <Group id="stats-adversaires" title="Adversaires">
         <div className={s.opponents}>
           <OpponentCard
             title="Adversaire favori"
@@ -263,10 +285,9 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
             emptyLabel="Aucune défaite enregistrée."
           />
         </div>
-      </div>
+      </Group>
 
-      <div>
-        <div className={s.subhead}>Activité des 12 derniers mois</div>
+      <Group id="stats-activite" title="Activité des 12 derniers mois">
         <ActivityChart stats={stats} />
         {hasPlayed && stats.firstMatchAt && stats.lastMatchAt ? (
           <p className={s.tileHint} style={{ marginTop: 10 }}>
@@ -274,7 +295,7 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
             {formatLocalDate(stats.lastMatchAt)}
           </p>
         ) : null}
-      </div>
+      </Group>
     </div>
   );
 }
