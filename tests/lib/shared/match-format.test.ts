@@ -86,10 +86,11 @@ describe("match-format — grandeurs dérivées", () => {
     expect(matchFormatLabel(null)).toBe("Score libre");
   });
 
-  it("décrit le format en clair", () => {
-    expect(matchFormatDescription(BO5)).toContain("Best of 5");
+  it("décrit la course sans répéter la notation — identique en BO5 et FT3", () => {
     expect(matchFormatDescription(BO5)).toContain("3 manches");
-    expect(matchFormatDescription(FT3)).toContain("First to 3");
+    expect(matchFormatDescription(BO5)).toContain("5 au maximum");
+    expect(matchFormatDescription(FT3)).toBe(matchFormatDescription(BO5));
+    expect(matchFormatDescription({ type: "BO", value: 1 })).toContain("1 manche gagnée");
     expect(matchFormatDescription(null)).toBe("Aucune limite de score.");
   });
 });

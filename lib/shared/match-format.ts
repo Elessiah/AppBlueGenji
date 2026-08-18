@@ -93,16 +93,17 @@ export function matchFormatLabel(format: MatchFormat | null): string {
   return format ? `${format.type}${format.value}` : "Score libre";
 }
 
-/** Phrase d'aide affichée à côté des champs de score. */
+/**
+ * Phrase d'aide affichée à côté des champs de score. Elle ne répète pas la
+ * notation — les appelants la préfixent de `matchFormatLabel` — et dit la même
+ * chose pour un BO5 et un FT3, qui décrivent la même course.
+ */
 export function matchFormatDescription(format: MatchFormat | null): string {
   if (!format) return "Aucune limite de score.";
 
   const wins = matchWinsRequired(format);
-  const manches = `${wins} manche${wins > 1 ? "s" : ""}`;
 
-  return format.type === "BO"
-    ? `Best of ${format.value} — premier à ${manches} gagnée${wins > 1 ? "s" : ""}, ${format.value} au maximum.`
-    : `First to ${format.value} — premier à ${manches} gagnée${wins > 1 ? "s" : ""}, ${matchMaxMaps(format)} au maximum.`;
+  return `premier à ${wins} manche${wins > 1 ? "s" : ""} gagnée${wins > 1 ? "s" : ""}, ${matchMaxMaps(format)} au maximum.`;
 }
 
 export type MatchScoreViolation = "SCORE_EXCEEDS_MATCH_FORMAT" | "SCORE_BELOW_MATCH_FORMAT";
