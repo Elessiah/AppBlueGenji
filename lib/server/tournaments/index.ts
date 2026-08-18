@@ -1,6 +1,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { TournamentBuckets, TournamentDetail, TournamentFormat, TournamentState } from "@/lib/shared/types";
 import { getDatabase } from "@/lib/server/database";
+import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { toIso } from "@/lib/server/serialization";
 import { getUserActiveTeam } from "@/lib/server/teams-service";
 import type { TournamentRow, TournamentListRow } from "./_internal";
@@ -165,6 +166,8 @@ export async function createTournament(
     swissPointsWin?: number | null;
     swissPointsDraw?: number | null;
     swissPointsLoss?: number | null;
+    /** Format des matchs (BO5, FT3…) ; `null` = saisie de score libre. */
+    matchFormat?: MatchFormat | null;
     /** BlueGenji Survie : capital d'endurance et barème (null = défauts). */
     endurancePoints?: number | null;
     enduranceWinDelta?: number | null;
@@ -252,6 +255,14 @@ export async function createTournament(
     const swissPoints = (value: number | null | undefined, fallback: number): number =>
       isSwiss && value != null ? Math.max(0, Math.trunc(Number(value))) : fallback;
 
+    // Format des matchs : revalidé ici pour que le service reste sûr même
+    // appelé hors de la route HTTP (seed, scripts). Un format bancal retombe
+    // sur la saisie libre plutôt que d'être écrit en base.
+    const matchFormat = parseMatchFormat(
+      payload.matchFormat?.type ?? null,
+      payload.matchFormat?.value ?? null,
+    );
+
     const [insert] = await connection.execute<ResultSetHeader>(
       `INSERT INTO bg_tournaments (
         organizer_user_id,
@@ -276,8 +287,10 @@ export async function createTournament(
         endurance_start_points,
         endurance_win_delta,
         endurance_loss_delta,
-        endurance_playoff_size
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        endurance_playoff_size,
+        match_format_type,
+        match_format_value
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         organizerUserId,
         payload.name.trim(),
@@ -306,6 +319,10 @@ export async function createTournament(
         payload.enduranceWinDelta ?? null,
         payload.enduranceLossDelta ?? null,
         payload.endurancePlayoffSize ?? null,
+        // Les deux colonnes vont par paire : une seule renseignée décrirait un
+        // format incomplet, que `parseMatchFormat` relirait comme « libre ».
+        matchFormat?.type ?? null,
+        matchFormat?.value ?? null,
       ],
     );
 
@@ -374,6 +391,8 @@ export async function listTournamentBuckets(searchTerm: string | null): Promise<
       t.survival_rounds_before_first_cut,
       t.survival_rounds_per_cut,
       t.survival_current_round,
+      t.match_format_type,
+      t.match_format_value,
       COALESCE(COUNT(r.id), 0) AS registered_teams
      FROM bg_tournaments t
      LEFT JOIN bg_tournament_registrations r ON r.tournament_id = t.id
@@ -397,7 +416,9 @@ export async function listTournamentBuckets(searchTerm: string | null): Promise<
       t.has_third_place_match,
       t.survival_rounds_before_first_cut,
       t.survival_rounds_per_cut,
-      t.survival_current_round
+      t.survival_current_round,
+      t.match_format_type,
+      t.match_format_value
      ORDER BY t.start_at DESC`,
     params,
   );

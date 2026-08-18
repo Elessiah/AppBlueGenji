@@ -1,5 +1,12 @@
 import type { BracketMatch } from "@/lib/shared/types";
+import {
+  checkMatchScores,
+  matchFormatDescription,
+  matchFormatLabel,
+  matchWinsRequired,
+} from "@/lib/shared/match-format";
 import { useScoreForm } from "../_hooks/useScoreForm";
+import { useMatchFormat } from "../_lib/match-format-context";
 
 interface AdminScoreDialogProps {
   match: BracketMatch | null;
@@ -10,8 +17,13 @@ interface AdminScoreDialogProps {
 
 export function AdminScoreDialog({ match, open, onClose, onSubmitted }: AdminScoreDialogProps) {
   const form = useScoreForm(match);
+  const matchFormat = useMatchFormat();
 
   if (!open || !match) return null;
+
+  // Borne haute de la saisie : l'objectif du format (3 en BO5 comme en FT3),
+  // ou 99 quand le tournoi laisse le score libre.
+  const maxScore = matchFormat ? matchWinsRequired(matchFormat) : 99;
 
   const handleSaveScores = async () => {
     const ok = await form.submit("save");
@@ -32,8 +44,17 @@ export function AdminScoreDialog({ match, open, onClose, onSubmitted }: AdminSco
   const s1Num = Number(form.score1);
   const s2Num = Number(form.score2);
   const scoresAreFiniteNumbers = Number.isFinite(s1Num) && Number.isFinite(s2Num);
-  const canSaveScores = form.forfeitTeamId ? true : scoresAreFiniteNumbers;
-  const canDeclareWinner = form.forfeitTeamId ? true : scoresAreFiniteNumbers && s1Num !== s2Num;
+  // Le format ne bride la sauvegarde que sur son plafond : l'arbitrage doit
+  // pouvoir noter un 1-0 en cours de rencontre. Désigner un vainqueur, en
+  // revanche, exige un score complet.
+  const respectsCap =
+    scoresAreFiniteNumbers && !checkMatchScores(matchFormat, s1Num, s2Num, { decisive: false });
+  const respectsFormat =
+    scoresAreFiniteNumbers && !checkMatchScores(matchFormat, s1Num, s2Num, { decisive: true });
+  const canSaveScores = form.forfeitTeamId ? true : respectsCap;
+  const canDeclareWinner = form.forfeitTeamId
+    ? true
+    : respectsFormat && s1Num !== s2Num;
 
   return (
     <>
@@ -65,9 +86,15 @@ export function AdminScoreDialog({ match, open, onClose, onSubmitted }: AdminSco
           backdropFilter: "blur(4px)",
         }}
       >
-        <h2 style={{ margin: "0 0 24px", fontSize: 18, fontWeight: 700, color: "var(--text-0)" }}>
+        <h2 style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 700, color: "var(--text-0)" }}>
           Éditer le score du match
         </h2>
+
+        <p style={{ margin: "0 0 24px", fontSize: 12.5, color: "var(--text-2)", lineHeight: 1.5 }}>
+          <strong style={{ color: "rgba(89,212,255,0.9)" }}>{matchFormatLabel(matchFormat)}</strong>
+          {" — "}
+          {matchFormatDescription(matchFormat)}
+        </p>
 
         {form.forfeitTeamId && (
           <div
@@ -138,7 +165,7 @@ export function AdminScoreDialog({ match, open, onClose, onSubmitted }: AdminSco
                 <input
                   type="number"
                   min={0}
-                  max={99}
+                  max={maxScore}
                   value={form.score1}
                   onChange={(e) => form.setScore1(e.target.value)}
                   autoFocus
@@ -160,7 +187,7 @@ export function AdminScoreDialog({ match, open, onClose, onSubmitted }: AdminSco
                 <button
                   type="button"
                   onClick={() => {
-                    const val = Math.min(99, Number(form.score1 || 0) + 1);
+                    const val = Math.min(maxScore, Number(form.score1 || 0) + 1);
                     form.setScore1(String(val));
                   }}
                   style={{
@@ -248,7 +275,7 @@ export function AdminScoreDialog({ match, open, onClose, onSubmitted }: AdminSco
                 <input
                   type="number"
                   min={0}
-                  max={99}
+                  max={maxScore}
                   value={form.score2}
                   onChange={(e) => form.setScore2(e.target.value)}
                   style={{
@@ -269,7 +296,7 @@ export function AdminScoreDialog({ match, open, onClose, onSubmitted }: AdminSco
                 <button
                   type="button"
                   onClick={() => {
-                    const val = Math.min(99, Number(form.score2 || 0) + 1);
+                    const val = Math.min(maxScore, Number(form.score2 || 0) + 1);
                     form.setScore2(String(val));
                   }}
                   style={{

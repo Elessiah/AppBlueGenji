@@ -6,6 +6,8 @@
  * est volontairement sans effet de bord ni accès base pour rester testable.
  */
 
+import type { MatchFormat } from "@/lib/shared/match-format";
+
 export interface ReportStateCounts {
   pendingReports?: number;
   conflicts?: number;
@@ -46,6 +48,7 @@ export interface TournamentDef extends ReportStateCounts {
   closesInHours?: number; // REGISTRATION : clôture imminente
   description?: string | null;
   phases?: SeedPhase[]; // MULTI : phases successives du tournoi
+  matchFormat?: MatchFormat; // format de match (BO5, FT3…) ; absent = score libre
 }
 
 
@@ -274,4 +277,12 @@ export const TOURNAMENTS: TournamentDef[] = [
       },
     ],
   },
+
+  // ---- Formats de match (BO / FT) -----------------------------------------
+  // Trois tournois pour vérifier que la contrainte de score suit le tournoi et
+  // pas le format de bracket : elle s'applique aussi bien à un arbre qu'à une
+  // ronde suisse ou à la survie, et cohabite avec les tournois en score libre.
+  { name: "BO5 Élimination", game: "OW2", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -2, playWaves: 2, teamOffset: 30, matchFormat: { type: "BO", value: 5 } },
+  { name: "FT3 Ronde Suisse", game: "MR", state: "RUNNING", format: "SWISS", teamCount: 8, maxTeams: 8, daysOffset: -3, playWaves: 2, swissTotalRounds: 3, teamOffset: 44, matchFormat: { type: "FT", value: 3 } },
+  { name: "BO3 Survie (terminé)", game: "OW2", state: "FINISHED", format: "SURVIVAL", teamCount: 8, maxTeams: 8, daysOffset: -20, survivalRoundsPerCut: 2, teamOffset: 58, matchFormat: { type: "BO", value: 3 } },
 ];

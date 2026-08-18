@@ -2,6 +2,8 @@ import Link from "next/link";
 import { FormEvent } from "react";
 import type { BracketMatch, TournamentFormat } from "@/lib/shared/types";
 import { fromBracketMatch, isScoreEditLocked } from "@/lib/shared/match-lock";
+import { matchFormatLabel, matchWinsRequired } from "@/lib/shared/match-format";
+import { useMatchFormat } from "../_lib/match-format-context";
 
 const CARD_W = 210;
 const BORDER = "var(--border, #444)";
@@ -33,6 +35,11 @@ export function MatchRow({
   roundNumber,
   format,
 }: MatchRowProps) {
+  // Format du tournoi (BO5, FT3…) : rappelé au-dessus des champs et appliqué
+  // comme borne haute, pour que la saisie ne parte pas hors format.
+  const matchFormat = useMatchFormat();
+  const maxScore = matchFormat ? matchWinsRequired(matchFormat) : 99;
+
   const team1Win = match.winnerTeamId !== null && match.winnerTeamId === match.team1Id;
   const team2Win = match.winnerTeamId !== null && match.winnerTeamId === match.team2Id;
   const hasWinner = match.winnerTeamId !== null;
@@ -113,17 +120,33 @@ export function MatchRow({
           onSubmit={(e) => onSubmit(match, e)}
           style={{
             display: "flex",
+            flexWrap: "wrap",
             gap: 4,
             padding: "5px 6px",
             background: "rgba(79,224,162,0.06)",
             borderTop: `1px solid ${BORDER}`,
           }}
         >
+          {matchFormat && (
+            <p
+              style={{
+                width: "100%",
+                margin: 0,
+                fontSize: 10,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: "var(--text-2)",
+              }}
+            >
+              {matchFormatLabel(matchFormat)} · premier à {maxScore}
+            </p>
+          )}
           <input
             type="number"
             min={0}
-            max={99}
+            max={maxScore}
             placeholder="Moi"
+            aria-label="Mon score"
             value={myScore}
             onChange={(e) => onScoreChange(match.id, "myScore", e.target.value)}
             style={{ width: 52, fontSize: 12 }}
@@ -131,8 +154,9 @@ export function MatchRow({
           <input
             type="number"
             min={0}
-            max={99}
+            max={maxScore}
             placeholder="Eux"
+            aria-label="Score adverse"
             value={opponentScore}
             onChange={(e) => onScoreChange(match.id, "opponentScore", e.target.value)}
             style={{ width: 52, fontSize: 12 }}
