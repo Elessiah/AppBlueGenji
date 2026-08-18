@@ -942,6 +942,42 @@ async function runMigrations(db: Pool): Promise<void> {
   } catch {
     // Colonne déjà absente (cas nominal).
   }
+
+  // Migration: tournois individuels. `participant_type = 'SOLO'` fait inscrire
+  // les joueurs eux-mêmes plutôt que leur équipe ; le moteur, lui, continue de
+  // raisonner en engagés (`team_id`), si bien que tous les formats existants
+  // fonctionnent à l'identique. Défaut `TEAM` : les tournois déjà créés ne
+  // changent pas de comportement.
+  try {
+    await db.execute(`
+      ALTER TABLE bg_tournaments
+      ADD COLUMN participant_type ENUM('TEAM', 'SOLO') NOT NULL DEFAULT 'TEAM'
+    `);
+  } catch {
+    // Column already exists
+  }
+
+  // Migration: entrée solo d'un joueur — une ligne `bg_teams` qui le représente
+  // en tournoi individuel, sans aucun membre (comme une équipe fantôme). Pas de
+  // clé étrangère volontairement : une suppression de compte en cascade
+  // effacerait l'engagé, et avec lui l'historique des matchs qui le référencent.
+  // L'unicité garantit « un joueur = au plus une entrée solo ».
+  try {
+    await db.execute(`
+      ALTER TABLE bg_teams
+      ADD COLUMN solo_user_id BIGINT NULL
+    `);
+  } catch {
+    // Column already exists
+  }
+  try {
+    await db.execute(`
+      ALTER TABLE bg_teams
+      ADD UNIQUE INDEX uniq_bg_teams_solo_user (solo_user_id)
+    `);
+  } catch {
+    // Index already exists
+  }
 }
 
 async function ensureMigrations(db: Pool): Promise<void> {

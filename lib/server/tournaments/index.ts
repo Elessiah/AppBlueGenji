@@ -3,7 +3,8 @@ import type { TournamentBuckets, TournamentDetail, TournamentFormat, TournamentS
 import { getDatabase } from "@/lib/server/database";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { toIso } from "@/lib/server/serialization";
-import { getUserActiveTeam } from "@/lib/server/teams-service";
+import { loadSoloUserIds } from "@/lib/server/solo-entries-service";
+import { isSoloTournament, toParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import type { TournamentRow, TournamentListRow } from "./_internal";
 
 // Internal types
@@ -14,7 +15,7 @@ export { mapCard, mapMatch, statusFromTeams } from "./_internal";
 export { computeTournamentState, syncTournamentState, hasPendingStateTransition } from "./state";
 
 // Registration (registerCurrentUserTeam is wrapped as public API function)
-export { canUserRegister } from "./registration";
+export { canUserRegister, resolveUserEntrantTeamId } from "./registration";
 
 // Bracket generation
 export { createBracketIfMissing } from "./bracket-generator";
@@ -93,6 +94,7 @@ import { syncTournamentState } from "./state";
 import {
   registerCurrentUserTeam as registerTeamInternal,
   registerTeamById as registerTeamByIdInternal,
+  resolveUserEntrantTeamId,
 } from "./registration";
 import { resolveExpiredScoreReports, finalizeTournamentIfDone } from "./finalization";
 import { tryAutoResolveByes } from "./byes";
@@ -154,6 +156,8 @@ export async function createTournament(
     description: string | null;
     format: TournamentFormat;
     game?: "OW2" | "MR";
+    /** `SOLO` = tournoi individuel (défaut `TEAM`). */
+    participantType?: ParticipantType;
     maxTeams: number;
     startVisibilityAt: string;
     registrationOpenAt: string;
@@ -228,6 +232,7 @@ export async function createTournament(
 
     const hasThirdPlaceMatch = payload.format === "SINGLE" && Boolean(payload.hasThirdPlaceMatch);
     const game = payload.game ?? "OW2";
+    const participantType = toParticipantType(payload.participantType);
 
     // Mode Survie : cadence des coupes (min. 1 manche). Ignorée pour les autres
     // formats. Le délai avant la première coupe retombe sur l'intervalle courant
@@ -270,6 +275,7 @@ export async function createTournament(
         description,
         format,
         game,
+        participant_type,
         max_teams,
         state,
         start_visibility_at,
@@ -290,13 +296,14 @@ export async function createTournament(
         endurance_playoff_size,
         match_format_type,
         match_format_value
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         organizerUserId,
         payload.name.trim(),
         payload.description,
         payload.format,
         game,
+        participantType,
         payload.maxTeams,
         temporaryState,
         startVisibilityAt,
@@ -391,6 +398,7 @@ export async function listTournamentBuckets(searchTerm: string | null): Promise<
       t.survival_rounds_before_first_cut,
       t.survival_rounds_per_cut,
       t.survival_current_round,
+      t.participant_type,
       t.match_format_type,
       t.match_format_value,
       COALESCE(COUNT(r.id), 0) AS registered_teams
@@ -417,6 +425,7 @@ export async function listTournamentBuckets(searchTerm: string | null): Promise<
       t.survival_rounds_before_first_cut,
       t.survival_rounds_per_cut,
       t.survival_current_round,
+      t.participant_type,
       t.match_format_type,
       t.match_format_value
      ORDER BY t.start_at DESC`,
@@ -454,6 +463,29 @@ export async function registerCurrentUserTeam(tournamentId: number, userId: numb
   } catch (error) {
     await connection.rollback();
     throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+/**
+ * Engagé du joueur dans un tournoi, vu de l'extérieur du module (routes API) :
+ * son équipe active, ou son entrée solo si le tournoi est individuel. `null`
+ * signifie « rien à engager » — un tournoi inconnu lève, pour que l'appelant
+ * puisse répondre 404 plutôt que de parler d'équipe manquante.
+ *
+ * @throws TOURNAMENT_NOT_FOUND
+ */
+export async function getUserEntrantTeamId(
+  tournamentId: number,
+  userId: number,
+): Promise<number | null> {
+  const db = await getDatabase();
+  const connection = await db.getConnection();
+  try {
+    const tournament = await loadTournamentRow(connection, tournamentId);
+    if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
+    return await resolveUserEntrantTeamId(connection, tournament, userId);
   } finally {
     connection.release();
   }
@@ -498,7 +530,6 @@ export async function getTournamentDetail(
   isAdmin = false,
 ): Promise<TournamentDetail | null> {
   const db = await getDatabase();
-  const activeTeam = await getUserActiveTeam(userId);
 
   let tournamentRow: TournamentRow | null;
   const detailConnection = await db.getConnection();
@@ -546,13 +577,27 @@ export async function getTournamentDetail(
     const registrations = await getRegistrationRows(connection, tournamentId);
     const matches = await getMatchRows(connection, tournamentId);
 
-    const myTeamId = activeTeam?.teamId ?? null;
+    // Engagé du viewer : son équipe active, ou son entrée solo en individuel.
+    const myTeamId = await resolveUserEntrantTeamId(connection, tournament, userId);
+    const isSolo = isSoloTournament(tournament.participant_type);
+    const alreadyRegistered =
+      myTeamId !== null && registrations.some((row) => Number(row.team_id) === myTeamId);
     const canRegister =
-      Boolean(myTeamId) &&
       card.state === "REGISTRATION" &&
-      !registrations.some((row) => Number(row.team_id) === myTeamId);
+      !alreadyRegistered &&
+      // En individuel, un joueur sans entrée solo peut s'inscrire : elle sera
+      // créée à ce moment-là.
+      (isSolo || myTeamId !== null);
 
     const canCreateReportsForTeamIds = myTeamId ? [myTeamId] : [];
+
+    // Engagés qui sont des joueurs : l'interface lie alors vers leur profil.
+    const soloUserIds = isSolo
+      ? await loadSoloUserIds(
+          connection,
+          registrations.map((row) => Number(row.team_id)),
+        )
+      : {};
 
     const phasesDetail = card.format === "MULTI"
       ? await (await import("./phases")).loadPhasesForDetail(connection, tournamentId)
@@ -618,6 +663,7 @@ export async function getTournamentDetail(
       phases: phasesDetail?.phases ?? null,
       currentPhaseId: phasesDetail?.currentPhaseId ?? null,
       phaseStandings: phasesDetail?.phaseStandings ?? {},
+      soloUserIds,
     };
   } finally {
     connection.release();

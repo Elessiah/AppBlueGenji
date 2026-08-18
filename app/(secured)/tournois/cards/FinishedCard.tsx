@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { participantWording } from "@/lib/shared/participants";
 import type { TournamentCard } from "@/lib/shared/types";
 import s from "../tournois.module.css";
 
@@ -9,6 +10,7 @@ interface FinishedCardProps {
 }
 
 export function FinishedCard({ t }: FinishedCardProps) {
+  const wording = participantWording(t.participantType);
   const gameLabel = t.game === "OW2" ? "OVERWATCH" : "MARVEL RIVALS";
   const formatLabel = t.format === "DOUBLE" ? "Double élimination" : "Élimination simple";
 
@@ -46,7 +48,7 @@ export function FinishedCard({ t }: FinishedCardProps) {
             <div className={s.cardMetaVal}>{formatLabel}</div>
           </div>
           <div>
-            <div className={s.cardMetaLbl}>Équipes participantes</div>
+            <div className={s.cardMetaLbl}>{wording.manyParticipating}</div>
             <div className={`${s.cardMetaVal} ${s.num}`}>
               {t.registeredTeams}/{t.maxTeams}
             </div>

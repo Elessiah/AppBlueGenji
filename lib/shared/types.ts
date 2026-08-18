@@ -1,5 +1,6 @@
-﻿import type { PlatformRole } from "./permissions";
-import type { MatchFormat } from "./match-format";
+﻿import type { MatchFormat } from "./match-format";
+import type { ParticipantType } from "./participants";
+import type { PlatformRole } from "./permissions";
 import type { DeepStats, TeamRankingPosition } from "./stats";
 
 export type TournamentFormat =
@@ -241,6 +242,8 @@ export type TournamentCard = {
   description: string | null;
   format: TournamentFormat;
   game: TournamentGame;
+  /** `SOLO` = tournoi individuel : les joueurs s'inscrivent sans équipe. */
+  participantType: ParticipantType;
   maxTeams: number;
   registeredTeams: number;
   state: TournamentState;
@@ -311,6 +314,11 @@ export type TournamentDetail = {
     finalRank: number | null;
   }[];
   canRegister: boolean;
+  /**
+   * Engagé du viewer dans **ce** tournoi : son équipe active en tournoi par
+   * équipes, son entrée solo en tournoi individuel (null s'il n'est pas
+   * inscrit).
+   */
   myTeamId: number | null;
   canCreateReportsForTeamIds: number[];
   isAdmin: boolean;
@@ -326,6 +334,12 @@ export type TournamentDetail = {
   currentPhaseId: number | null;
   /** Classements par phase (null pour les tournois mono-mode). */
   phaseStandings: Record<number, TournamentPhaseStanding[]> | null;
+  /**
+   * Engagés qui sont en réalité des joueurs : `team_id → user_id`. Vide pour un
+   * tournoi par équipes ; sert à lier vers `/joueurs/[id]` plutôt que
+   * `/equipes/[id]`.
+   */
+  soloUserIds: Record<number, number>;
 };
 
 export type BotStats = {

@@ -7,6 +7,7 @@ import { formatPoints } from "@/lib/shared/swiss";
 import { MatchScoreDraft } from "./BracketTree";
 import { MatchRow } from "./MatchRow";
 import { ScrollArea } from "@/components/cyber";
+import { useEntrantLink } from "../_lib/entrant-link";
 
 const COL_W = 226;
 const BORDER = "var(--border, #444)";
@@ -58,6 +59,7 @@ export function SwissView({
   canForfeit,
   onForfeit,
 }: SwissViewProps) {
+  const entrantLink = useEntrantLink();
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
   const activeCount = swiss.standings.filter((s) => s.status === "ACTIVE").length;
   const roundsLeft = Math.max(swiss.totalRounds - swiss.currentRound, 0);
@@ -190,7 +192,7 @@ export function SwissView({
                     {team.rank}
                   </span>
                   <Link
-                    href={`/equipes/${team.teamId}`}
+                    href={entrantLink(team.teamId)}
                     style={{
                       flex: 1,
                       overflow: "hidden",
@@ -337,8 +339,10 @@ export function SwissView({
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       {roundMatches.map((match) => {
-                        const isBye = match.team2Id === null && match.team1Id !== null;
-                        if (isBye) {
+                        // L'exempté est la seule équipe posée sur la manche ;
+                        // le lier demande un identifiant non nul.
+                        const byeTeamId = match.team2Id === null ? match.team1Id : null;
+                        if (byeTeamId !== null) {
                           return (
                             <div
                               key={match.id}
@@ -351,7 +355,7 @@ export function SwissView({
                               }}
                             >
                               <Link
-                                href={`/equipes/${match.team1Id}`}
+                                href={entrantLink(byeTeamId)}
                                 style={{
                                   color: "var(--text-0)",
                                   textDecoration: "none",

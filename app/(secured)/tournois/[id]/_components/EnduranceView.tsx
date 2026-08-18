@@ -1,6 +1,7 @@
 "use client";
 
 import type { BracketMatch, EnduranceMeta } from "@/lib/shared/types";
+import { useParticipantWording } from "../_lib/entrant-link";
 
 interface EnduranceViewProps {
   endurance: EnduranceMeta;
@@ -23,6 +24,7 @@ const STATUS_LABELS: Record<EnduranceMeta["standings"][number]["status"], string
  * lancés.
  */
 export function EnduranceView({ endurance, matches, renderMatch }: EnduranceViewProps) {
+  const wording = useParticipantWording();
   const qualification = matches.filter((match) => match.roundNumber < PLAYOFF_ROUND_OFFSET);
   const playoffs = matches.filter((match) => match.roundNumber >= PLAYOFF_ROUND_OFFSET);
   const visible = endurance.playoffsStarted ? playoffs : qualification;
@@ -37,13 +39,13 @@ export function EnduranceView({ endurance, matches, renderMatch }: EnduranceView
         {endurance.lossDelta} PAR DÉFAITE ·{" "}
         {endurance.playoffsStarted
           ? `PLAY-OFFS À ${endurance.playoffSize}`
-          : `MANCHE ${endurance.currentRound} · ${activeCount} ÉQUIPES EN LICE → ${endurance.playoffSize}`}
+          : `MANCHE ${endurance.currentRound} · ${activeCount} ${wording.manyCapitalized.toUpperCase()} EN LICE → ${endurance.playoffSize}`}
       </p>
 
       <div className="table-like" style={{ marginBottom: 24 }}>
         <div className="table-row table-header">
           <span>#</span>
-          <span>Équipe</span>
+          <span>{wording.oneCapitalized}</span>
           <span>Endurance</span>
           <span>V / D</span>
           <span>Statut</span>

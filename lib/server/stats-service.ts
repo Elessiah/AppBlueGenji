@@ -318,6 +318,7 @@ export async function getTeamRankingPosition(teamId: number): Promise<TeamRankin
      JOIN bg_matches m
        ON (m.team1_id = t.id OR m.team2_id = t.id)
       AND ${PLAYED_MATCH_SQL}
+     WHERE t.solo_user_id IS NULL
      GROUP BY t.id`,
   );
 
@@ -342,10 +343,19 @@ async function loadMemberships(
   userId: number,
 ): Promise<Membership[]> {
   const [rows] = await db.execute<MembershipRow[]>(
+    // L'entrée solo du joueur (tournois individuels, voir
+    // `docs/features/SOLO_TOURNAMENTS.md`) compte comme une appartenance
+    // ouverte : il « est » cet engagé depuis sa création et ne le quitte
+    // jamais. Sans elle, un tournoi joué en individuel disparaîtrait du
+    // palmarès et du bilan du joueur.
     `SELECT team_id, joined_at, left_at
      FROM bg_team_members
-     WHERE user_id = ?`,
-    [userId],
+     WHERE user_id = ?
+     UNION ALL
+     SELECT id AS team_id, created_at AS joined_at, NULL AS left_at
+     FROM bg_teams
+     WHERE solo_user_id = ?`,
+    [userId, userId],
   );
 
   return rows.map((row) => ({

@@ -118,6 +118,7 @@ export async function listTeams(): Promise<TeamListItem[]> {
      LEFT JOIN bg_team_members tm ON tm.team_id = t.id AND tm.left_at IS NULL
      LEFT JOIN bg_matches m ON (m.team1_id = t.id OR m.team2_id = t.id)
      WHERE t.deleted_at IS NULL
+       AND t.solo_user_id IS NULL
      GROUP BY t.id, t.name, t.logo_url, t.created_at, t.is_ghost`,
   );
 
@@ -332,15 +333,17 @@ export async function getTeamDetail(
 ): Promise<TeamDetailResponse | null> {
   const db = await getDatabase();
 
-  const [teams] = await db.execute<(RowDataPacket & { id: number; name: string; logo_url: string | null; description: string | null; created_at: Date; deleted_at: Date | null; is_ghost: 0 | 1 })[]>(
-    `SELECT id, name, logo_url, description, created_at, deleted_at, is_ghost
+  const [teams] = await db.execute<(RowDataPacket & { id: number; name: string; logo_url: string | null; description: string | null; created_at: Date; deleted_at: Date | null; is_ghost: 0 | 1; solo_user_id: number | null })[]>(
+    `SELECT id, name, logo_url, description, created_at, deleted_at, is_ghost, solo_user_id
      FROM bg_teams
      WHERE id = ?
      LIMIT 1`,
     [teamId],
   );
 
-  if (teams.length === 0) return null;
+  // Une entrée solo occupe une ligne de `bg_teams` mais représente un joueur :
+  // elle n'a pas de fiche d'équipe, son identité publique est son profil.
+  if (teams.length === 0 || teams[0].solo_user_id !== null) return null;
 
   const isDeleted = teams[0].deleted_at !== null;
 

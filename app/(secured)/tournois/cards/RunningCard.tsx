@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { participantWording } from "@/lib/shared/participants";
 import type { TournamentCard } from "@/lib/shared/types";
 import s from "../tournois.module.css";
 
@@ -9,6 +10,7 @@ interface RunningCardProps {
 }
 
 export function RunningCard({ t }: RunningCardProps) {
+  const wording = participantWording(t.participantType);
   const gameLabel = t.game === "OW2" ? "OVERWATCH" : "MARVEL RIVALS";
   const formatLabel = t.format === "DOUBLE" ? "Double élimination" : "Élimination simple";
   const startDate = new Date(t.startAt).toLocaleDateString("fr-FR", {
@@ -48,7 +50,7 @@ export function RunningCard({ t }: RunningCardProps) {
             <div className={s.cardMetaVal}>{formatLabel}</div>
           </div>
           <div>
-            <div className={s.cardMetaLbl}>Équipes</div>
+            <div className={s.cardMetaLbl}>{wording.manyCapitalized}</div>
             <div className={`${s.cardMetaVal} ${s.num}`}>
               {t.registeredTeams}/{t.maxTeams}
             </div>

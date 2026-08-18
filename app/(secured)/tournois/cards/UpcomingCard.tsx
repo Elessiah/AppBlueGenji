@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { participantWording } from "@/lib/shared/participants";
 import type { TournamentCard } from "@/lib/shared/types";
 import s from "../tournois.module.css";
 
@@ -9,6 +10,7 @@ interface UpcomingCardProps {
 }
 
 export function UpcomingCard({ t }: UpcomingCardProps) {
+  const wording = participantWording(t.participantType);
   const gameLabel = t.game === "OW2" ? "OVERWATCH" : "MARVEL RIVALS";
   const formatLabel = t.format === "DOUBLE" ? "Double élimination" : "Élimination simple";
 
@@ -58,7 +60,7 @@ export function UpcomingCard({ t }: UpcomingCardProps) {
             <div className={s.cardMetaVal}>{registrationOpenDate}</div>
           </div>
           <div>
-            <div className={s.cardMetaLbl}>Équipes</div>
+            <div className={s.cardMetaLbl}>{wording.manyCapitalized}</div>
             <div className={`${s.cardMetaVal} ${s.num}`}>
               {t.registeredTeams}/{t.maxTeams}
             </div>

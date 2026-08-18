@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useToast } from "@/components/ui/toast";
+import { useParticipantWording } from "../_lib/entrant-link";
 
 type GhostTeamOption = { id: number; name: string; logoUrl: string | null };
 
@@ -12,7 +13,9 @@ interface GhostRegistrationDialogProps {
 }
 
 /**
- * Inscription d'une équipe fantôme à un tournoi par le staff (`tournaments`).
+ * Inscription par le staff (`tournaments`) d'un engagé sans compte sur le site :
+ * une équipe fantôme, ou un joueur invité si le tournoi est individuel — c'est
+ * la même ligne `bg_teams` dans les deux cas, seul le vocabulaire change.
  *
  * Deux chemins : choisir une fantôme existante, ou en créer une à la volée —
  * le cas courant quand il faut compléter un bracket juste avant le départ.
@@ -23,6 +26,7 @@ export function GhostRegistrationDialog({
   onRegistered,
 }: GhostRegistrationDialogProps) {
   const { showError, showSuccess } = useToast();
+  const wording = useParticipantWording();
   const [teams, setTeams] = useState<GhostTeamOption[]>([]);
   const [mode, setMode] = useState<"existing" | "new">("existing");
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -77,7 +81,7 @@ export function GhostRegistrationDialog({
       if (!teamId) throw new Error("INVALID_TEAM_ID");
 
       await register(teamId);
-      showSuccess("Équipe fantôme inscrite.");
+      showSuccess(wording.guestSuccess);
       onRegistered();
       onClose();
     } catch (e) {
@@ -120,10 +124,10 @@ export function GhostRegistrationDialog({
         }}
       >
         <h3 id="ghost-registration-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
-          Inscrire une équipe fantôme
+          {wording.guestTitle}
         </h3>
         <p style={{ marginTop: 6, fontSize: 13, color: "var(--text-2, #9aa4b2)" }}>
-          Réservé aux équipes fantômes : une équipe de joueurs s&apos;inscrit toujours elle-même.
+          {wording.guestHint}
         </p>
 
         <div style={{ display: "flex", gap: 8, margin: "16px 0" }}>
@@ -148,7 +152,7 @@ export function GhostRegistrationDialog({
 
         {mode === "existing" ? (
           <div className="field">
-            <label htmlFor="ghost-team-select">Équipe fantôme</label>
+            <label htmlFor="ghost-team-select">{wording.guestSelectLabel}</label>
             <select
               id="ghost-team-select"
               value={selectedId ?? ""}
@@ -164,7 +168,7 @@ export function GhostRegistrationDialog({
           </div>
         ) : (
           <div className="field">
-            <label htmlFor="ghost-team-new-name">Nom de la nouvelle équipe</label>
+            <label htmlFor="ghost-team-new-name">{wording.guestNewNameLabel}</label>
             <input
               id="ghost-team-new-name"
               value={newName}

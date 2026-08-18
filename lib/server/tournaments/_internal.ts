@@ -1,5 +1,6 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { toIso } from "@/lib/server/serialization";
+import { toParticipantType } from "@/lib/shared/participants";
 import type { BracketMatch, TournamentCard, TournamentPhase } from "@/lib/shared/types";
 import { parseMatchFormat } from "@/lib/shared/match-format";
 
@@ -26,6 +27,8 @@ export type TournamentRow = RowDataPacket & {
   current_phase_id: number | null;
   /** 1 = l'ordre de seeding a été fixé à la main par le staff. */
   manual_seeding: number;
+  /** `SOLO` = tournoi individuel : les joueurs s'inscrivent eux-mêmes. */
+  participant_type: "TEAM" | "SOLO";
   /** Format des matchs (`BO`/`FT`) ; NULL = saisie de score libre. */
   match_format_type: "BO" | "FT" | null;
   match_format_value: number | null;
@@ -139,6 +142,7 @@ export function mapCard(row: TournamentListRow): TournamentCard {
     description: row.description,
     format: row.format,
     game: row.game,
+    participantType: toParticipantType(row.participant_type),
     maxTeams: Number(row.max_teams),
     registeredTeams: Number(row.registered_teams),
     state: row.state,
