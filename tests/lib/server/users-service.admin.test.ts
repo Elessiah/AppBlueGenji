@@ -38,8 +38,8 @@ describe("users-service admin management", () => {
         .fn()
         .mockResolvedValueOnce([[userRow({ id: 7, is_admin: 1 })]]) // user row
         .mockResolvedValueOnce([[]]) // timeline
-        .mockResolvedValueOnce([[]]) // history
-        .mockResolvedValueOnce([[{}]]); // stats
+        .mockResolvedValueOnce([[]]) // stats: appartenances (aucune)
+        .mockResolvedValueOnce([[]]); // (inutilisé : le joueur n'a aucune équipe)
       await mockDb(execute);
 
       const profile = await getFullProfile(1, 7, true);
@@ -56,7 +56,7 @@ describe("users-service admin management", () => {
         .mockResolvedValueOnce([[userRow({ id: 7, is_admin: 1 })]])
         .mockResolvedValueOnce([[]])
         .mockResolvedValueOnce([[]])
-        .mockResolvedValueOnce([[{}]]);
+        .mockResolvedValueOnce([[]]);
       await mockDb(execute);
 
       const profile = await getFullProfile(1, 7);
@@ -73,7 +73,7 @@ describe("users-service admin management", () => {
         ])
         .mockResolvedValueOnce([[]])
         .mockResolvedValueOnce([[]])
-        .mockResolvedValueOnce([[{}]]);
+        .mockResolvedValueOnce([[]]);
       await mockDb(execute);
 
       const profile = await getFullProfile(1, 7);
@@ -89,7 +89,7 @@ describe("users-service admin management", () => {
         .mockResolvedValueOnce([[userRow({ id: 7, is_admin: 1 })]])
         .mockResolvedValueOnce([[]])
         .mockResolvedValueOnce([[]])
-        .mockResolvedValueOnce([[{}]]);
+        .mockResolvedValueOnce([[]]);
       await mockDb(execute);
 
       const profile = await getFullProfile(1, 7);
