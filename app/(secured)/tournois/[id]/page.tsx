@@ -1,9 +1,11 @@
 "use client";
 
 import { FormEvent, useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
+import { entrantHref, participantWording } from "@/lib/shared/participants";
 import { useToast } from "@/components/ui/toast";
 import { Pill, CyberButton } from "@/components/cyber";
 import { useTournamentLive } from "./_hooks/useTournamentLive";
@@ -31,6 +33,7 @@ import {
 import { SwissView } from "./_components/SwissView";
 import { EnduranceView } from "./_components/EnduranceView";
 import { MatchRow } from "./_components/MatchRow";
+import { EntrantProvider } from "./_lib/entrant-link";
 
 const FORMAT_LABELS: Record<TournamentFormat, string> = {
   SINGLE: "Simple élim.",
@@ -97,6 +100,10 @@ export default function TournamentDetailPage() {
       </section>
     );
   }
+
+  // Vocabulaire de l'affichage : un tournoi individuel parle de joueurs, pas
+  // d'équipes (`lib/shared/participants.ts`).
+  const wording = participantWording(detail.card.participantType);
 
   const handleScoreChange = (matchId: number, field: "myScore" | "opponentScore", value: string) => {
     setDrafts((prev) => ({
@@ -184,8 +191,8 @@ export default function TournamentDetailPage() {
   const forfeitTeam = async (teamId: number, teamName: string) => {
     const isMine = detail?.myTeamId === teamId;
     const confirmation = isMine
-      ? "Abandonner ? Votre équipe quittera définitivement le tournoi."
-      : `Déclarer l'abandon de ${teamName} ? L'équipe quittera définitivement le tournoi.`;
+      ? wording.forfeitSelfConfirm
+      : `Déclarer l'abandon de ${teamName} ? ${wording.subject} quittera définitivement le tournoi.`;
     if (!window.confirm(confirmation)) return;
     try {
       const response = await fetch(`/api/tournaments/${tournamentId}/forfeit`, {
@@ -252,7 +259,11 @@ export default function TournamentDetailPage() {
     .filter((b) => b.matches.length > 0);
 
   return (
-    <MatchFormatProvider format={detail.card.matchFormat}>
+    <EntrantProvider
+      participantType={detail.card.participantType}
+      soloUserIds={detail.soloUserIds}
+    >
+      <MatchFormatProvider format={detail.card.matchFormat}>
       <RulesHelpFab format={visibleFormat} contextLabel={contextLabel} />
       <section className="fade-in">
         <div className="ds-header green">
@@ -308,6 +319,7 @@ export default function TournamentDetailPage() {
                 </Pill>
               )}
               <Pill variant="blue">{FORMAT_LABELS[detail.card.format]}</Pill>
+              {wording.badge && <Pill variant="blue">{wording.badge}</Pill>}
               {detail.card.matchFormat && (
                 <Pill variant="blue">{matchFormatLabel(detail.card.matchFormat)}</Pill>
               )}
@@ -324,7 +336,7 @@ export default function TournamentDetailPage() {
                   onClick={registerTeam}
                   style={{ fontSize: 13, padding: "6px 16px" }}
                 >
-                  Inscrire mon équipe
+                  {wording.registerCta}
                 </CyberButton>
               )}
               {detail.isAdmin && detail.card.state === "REGISTRATION" && (
@@ -333,7 +345,7 @@ export default function TournamentDetailPage() {
                   onClick={() => setGhostRegistrationOpen(true)}
                   style={{ fontSize: 13, padding: "6px 16px" }}
                 >
-                  + Équipe fantôme
+                  {wording.guestCta}
                 </CyberButton>
               )}
             </div>
@@ -537,14 +549,19 @@ export default function TournamentDetailPage() {
           </div>
           <div className="table-like">
             <div className="table-row table-header">
-              <span>Équipe</span>
+              <span>{wording.oneCapitalized}</span>
               <span>Seed</span>
               <span>Inscription</span>
               <span>Classement final</span>
             </div>
             {detail.registrations.map((reg) => (
               <div key={reg.teamId} className="table-row">
-                <span>{reg.teamName}</span>
+                <Link
+                  href={entrantHref(reg.teamId, detail.soloUserIds)}
+                  style={{ color: "inherit", textDecoration: "none" }}
+                >
+                  {reg.teamName}
+                </Link>
                 <span>{reg.seed ?? "-"}</span>
                 <span>{formatLocalDateTime(reg.registeredAt)}</span>
                 <span>{reg.finalRank ?? "-"}</span>
@@ -568,6 +585,7 @@ export default function TournamentDetailPage() {
           onRegistered={() => router.refresh()}
         />
       )}
-    </MatchFormatProvider>
+      </MatchFormatProvider>
+    </EntrantProvider>
   );
 }

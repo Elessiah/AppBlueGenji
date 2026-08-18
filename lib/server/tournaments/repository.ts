@@ -29,6 +29,7 @@ export async function loadTournamentRow(
       survival_current_round,
       current_phase_id,
       manual_seeding,
+      participant_type,
       match_format_type,
       match_format_value
      FROM bg_tournaments
@@ -226,6 +227,7 @@ export async function getTournamentListRow(
       t.survival_rounds_per_cut,
       t.survival_current_round,
       t.current_phase_id,
+      t.participant_type,
       t.match_format_type,
       t.match_format_value,
       COALESCE(COUNT(r.id), 0) AS registered_teams
@@ -253,6 +255,7 @@ export async function getTournamentListRow(
       t.survival_rounds_per_cut,
       t.survival_current_round,
       t.current_phase_id,
+      t.participant_type,
       t.match_format_type,
       t.match_format_value`,
     [tournamentId],

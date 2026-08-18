@@ -3,23 +3,27 @@
 import Link from "next/link";
 import type { TournamentPhaseStanding } from "@/lib/shared/types";
 import { Pill } from "@/components/cyber";
+import { useEntrantLink, useParticipantWording } from "../_lib/entrant-link";
 
 interface PhaseStandingsTableProps {
   standings: TournamentPhaseStanding[];
 }
 
 export function PhaseStandingsTable({ standings }: PhaseStandingsTableProps) {
+  const entrantLink = useEntrantLink();
+  const wording = useParticipantWording();
+
   return (
     <div className="table-like">
       <div className="table-row table-header">
-        <span>Équipe</span>
+        <span>{wording.oneCapitalized}</span>
         <span>Rang</span>
         <span>Qualifiée</span>
       </div>
       {standings.map((standing) => (
         <div key={standing.teamId} className="table-row">
           <Link
-            href={`/equipes/${standing.teamId}`}
+            href={entrantLink(standing.teamId)}
             style={{
               textDecoration: "none",
               color: "inherit",

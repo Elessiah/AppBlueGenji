@@ -1,8 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import { FormEvent } from "react";
 import type { BracketMatch, TournamentFormat } from "@/lib/shared/types";
 import { fromBracketMatch, isScoreEditLocked } from "@/lib/shared/match-lock";
 import { matchFormatLabel, matchWinsRequired } from "@/lib/shared/match-format";
+import { useEntrantLink } from "../_lib/entrant-link";
 import { useMatchFormat } from "../_lib/match-format-context";
 
 const CARD_W = 210;
@@ -35,6 +38,7 @@ export function MatchRow({
   roundNumber,
   format,
 }: MatchRowProps) {
+  const entrantLink = useEntrantLink();
   // Format du tournoi (BO5, FT3…) : rappelé au-dessus des champs et appliqué
   // comme borne haute, pour que la saisie ne parte pas hors format.
   const matchFormat = useMatchFormat();
@@ -83,7 +87,7 @@ export function MatchRow({
       <div style={{ ...rowStyle(team1Win), borderBottom: `1px solid ${BORDER}` }}>
         {match.team1Id ? (
           <Link
-            href={`/equipes/${match.team1Id}`}
+            href={entrantLink(match.team1Id)}
             style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, display: "block", textDecoration: "none", color: "inherit" }}
           >
             {team1Display}
@@ -100,7 +104,7 @@ export function MatchRow({
       <div style={rowStyle(team2Win)}>
         {match.team2Id ? (
           <Link
-            href={`/equipes/${match.team2Id}`}
+            href={entrantLink(match.team2Id)}
             style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, display: "block", textDecoration: "none", color: "inherit" }}
           >
             {team2Display}

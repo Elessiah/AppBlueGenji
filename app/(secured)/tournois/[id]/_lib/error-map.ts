@@ -16,9 +16,14 @@ const ERROR_MESSAGES: Record<string, string> = {
   INVALID_FORFEIT_TEAM_ID: "ID d'équipe forfait invalide.",
   MISSING_SCORES_OR_FORFEIT: "Scores ou forfait requis.",
   TOURNAMENT_FULL: "Ce tournoi est complet.",
-  TEAM_ALREADY_REGISTERED: "Ton équipe est déjà inscrite.",
+  // Formulation neutre : l'inscrit est une équipe ou un joueur selon le tournoi.
+  ALREADY_REGISTERED: "Inscription déjà enregistrée pour ce tournoi.",
   REGISTRATION_CLOSED: "Les inscriptions ne sont pas ouvertes.",
   NO_ACTIVE_TEAM: "Tu dois d'abord créer ou rejoindre une équipe.",
+  // Tournoi individuel : le nom d'inscription du joueur est déjà pris.
+  SOLO_ENTRY_NAME_UNAVAILABLE:
+    "Ton pseudo est déjà utilisé comme nom d'équipe : change-le avant de t'inscrire.",
+  USER_NOT_FOUND: "Compte introuvable.",
   NOT_SURVIVAL: "Le forfait n'est disponible que pour les tournois en mode Survie.",
   // Formulations neutres : le forfait peut aussi être déclaré par l'arbitrage
   // pour une autre équipe que la sienne.

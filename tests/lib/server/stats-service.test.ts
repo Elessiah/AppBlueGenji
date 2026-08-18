@@ -228,6 +228,42 @@ describe("historique dérivé des mêmes matchs", () => {
     expect(tournaments.map((entry) => entry.tournamentId)).toEqual([11, 10]);
   });
 
+  // Tournois individuels : l'engagé du joueur est son entrée solo, pas une
+  // équipe. Sans elle dans les engagements, ces tournois sortiraient du bilan.
+  it("compte l'entrée solo du joueur parmi ses engagements", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    await getPlayerEntityStats(42);
+
+    const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
+    expect(sql).toMatch(/FROM bg_team_members/);
+    expect(sql).toMatch(/UNION ALL/);
+    expect(sql).toMatch(/WHERE solo_user_id = \?/);
+    // Appartenance ouverte : le joueur « est » son entrée solo pour toujours.
+    expect(sql).toMatch(/NULL AS left_at/);
+    expect(params).toEqual([42, 42]);
+  });
+
+  it("crédite un tournoi joué en individuel via l'entrée solo", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([
+        [{ team_id: 77, joined_at: new Date("2026-01-01T00:00:00Z"), left_at: null }],
+      ])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[registrationRow({ team_id: 77, tournament_id: 12 })]]);
+    await mockDb(execute);
+
+    const { tournaments } = await getPlayerEntityStats(42);
+
+    expect(tournaments.map((entry) => entry.tournamentId)).toEqual([12]);
+  });
+
   it("ne liste qu'une fois un tournoi disputé par deux équipes du joueur", async () => {
     const execute = jest
       .fn()
@@ -321,6 +357,18 @@ describe("getTeamRankingPosition", () => {
     const [sql] = execute.mock.calls[0] as [string];
     expect(sql).toContain("m.winner_team_id <> t.id");
     expect(sql).not.toContain("m.loser_team_id");
+  });
+
+  // Une entrée solo n'est pas une équipe : la laisser dans le classement
+  // décalerait le rang de toutes les équipes et gonflerait le total.
+  it("exclut les entrées solo du classement des équipes", async () => {
+    const execute = jest.fn().mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    await getTeamRankingPosition(1);
+
+    const [sql] = execute.mock.calls[0] as [string];
+    expect(sql).toMatch(/WHERE t\.solo_user_id IS NULL/);
   });
 
   it("ne classe pas une équipe sans aucun match joué", async () => {

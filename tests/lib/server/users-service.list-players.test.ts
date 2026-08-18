@@ -72,6 +72,29 @@ describe("listPlayers visibility", () => {
     expect(closed[0].openToRecruitment).toBe(false);
   });
 
+  // Les engagements du joueur (équipes + entrée solo des tournois individuels)
+  // sont une union : le filtre doit vivre DANS chaque branche, sinon la table
+  // dérivée perd l'index `user_id` et fait scanner toutes les adhésions.
+  it("filtre les engagements dans les deux branches de l'union", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([[userRow({ id: 7 }), userRow({ id: 9, pseudo: "Other" })]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    await listPlayers(999);
+
+    for (const call of execute.mock.calls.slice(2)) {
+      const [sql, params] = call as [string, unknown[]];
+      expect(sql).toMatch(/FROM bg_team_members\s+WHERE user_id IN \(\?,\?\)/);
+      expect(sql).toMatch(/FROM bg_teams\s+WHERE solo_user_id IN \(\?,\?\)/);
+      // Une liste d'identifiants par branche.
+      expect(params).toEqual([7, 9, 7, 9]);
+    }
+  });
+
   it("masks the battletag string but keeps the game badge visible", async () => {
     const players = await runList(
       [userRow({ visible_overwatch: 0, visible_marvel: 1 })],
