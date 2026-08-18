@@ -36,17 +36,6 @@ export const MATCH_FORMAT_BOUNDS: Record<MatchFormatType, { min: number; max: nu
 /** Format proposé par défaut à la création d'un tournoi. */
 export const DEFAULT_MATCH_FORMAT: MatchFormat = { type: "BO", value: 5 };
 
-/** Choix pré-remplis du formulaire de création (les plus courants). */
-export const MATCH_FORMAT_PRESETS: MatchFormat[] = [
-  { type: "BO", value: 1 },
-  { type: "BO", value: 3 },
-  { type: "BO", value: 5 },
-  { type: "BO", value: 7 },
-  { type: "FT", value: 2 },
-  { type: "FT", value: 3 },
-  { type: "FT", value: 4 },
-];
-
 export function isMatchFormatType(value: unknown): value is MatchFormatType {
   return value === "BO" || value === "FT";
 }
@@ -57,6 +46,12 @@ export function isMatchFormatType(value: unknown): value is MatchFormatType {
  */
 export function isValidMatchFormat(type: unknown, value: unknown): boolean {
   if (!isMatchFormatType(type)) return false;
+
+  // Coercer d'abord laisserait passer `true` (→ 1) ou `[3]` (→ 3) : on n'accepte
+  // qu'un nombre, ou la chaîne que renvoie la colonne d'une base.
+  if (typeof value !== "number" && typeof value !== "string") return false;
+  if (typeof value === "string" && value.trim() === "") return false;
+
   const parsed = Number(value);
   if (!Number.isInteger(parsed)) return false;
 

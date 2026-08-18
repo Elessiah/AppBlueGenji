@@ -297,7 +297,11 @@ export default function CreateTournamentPage() {
                   <p style={HINT}>
                     {isLibre
                       ? "Les scores sont saisis sans contrainte."
-                      : `${matchFormatLabel(matchFormat)} — ${matchFormatDescription(matchFormat)}`}
+                      : matchFormatValid
+                        ? `${matchFormatLabel(matchFormat)} — ${matchFormatDescription(matchFormat)}`
+                        : matchFormatType === "BO"
+                          ? "Un Best of se joue en nombre impair de manches (BO1, BO3, BO5…)."
+                          : "Saisis le nombre de manches à gagner."}
                   </p>
                 </div>
 

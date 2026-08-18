@@ -1,7 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   DEFAULT_MATCH_FORMAT,
-  MATCH_FORMAT_PRESETS,
   checkMatchScores,
   isValidMatchFormat,
   matchFormatDescription,
@@ -37,10 +36,18 @@ describe("match-format — validation d'un format", () => {
     expect(isValidMatchFormat("RACE", 3)).toBe(false);
   });
 
-  it("valide chacun des choix pré-remplis du formulaire", () => {
-    for (const preset of [...MATCH_FORMAT_PRESETS, DEFAULT_MATCH_FORMAT]) {
-      expect(isValidMatchFormat(preset.type, preset.value)).toBe(true);
-    }
+  it("valide le format proposé par défaut à la création", () => {
+    expect(isValidMatchFormat(DEFAULT_MATCH_FORMAT.type, DEFAULT_MATCH_FORMAT.value)).toBe(true);
+  });
+
+  it("refuse ce qui n'est pas un nombre, sans le coercer", () => {
+    expect(isValidMatchFormat("BO", true)).toBe(false);
+    expect(isValidMatchFormat("BO", [3])).toBe(false);
+    expect(isValidMatchFormat("BO", {})).toBe(false);
+    expect(isValidMatchFormat("BO", "")).toBe(false);
+    expect(isValidMatchFormat("BO", "  ")).toBe(false);
+    // Une colonne de base peut renvoyer la valeur en chaîne : elle reste valide.
+    expect(isValidMatchFormat("BO", "5")).toBe(true);
   });
 });
 
