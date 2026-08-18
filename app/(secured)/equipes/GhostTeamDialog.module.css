@@ -1,0 +1,42 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(3, 5, 8, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.panel {
+  width: min(460px, 100%);
+  padding: 28px;
+  background: var(--cyber-bg-1, #0c0f14);
+  border: 1px solid var(--line-strong-cy, var(--line-soft));
+  border-radius: var(--r-cy-lg, 14px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+}
+
+.title {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+}
+
+.lede {
+  color: var(--ink-mute);
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0 0 20px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}

@@ -1,0 +1,80 @@
+/* Le wrapper doit rester neutre : le texte de la vitrine garde sa mise en page,
+   seul le crayon s'ajoute à côté. */
+.wrap {
+  display: contents;
+}
+
+.pencil {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  margin-left: 8px;
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--ink-mute);
+  background: rgba(90, 200, 255, 0.08);
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.pencil:hover {
+  color: var(--ink);
+  border-color: var(--blue-500, rgba(90, 200, 255, 0.8));
+  background: rgba(90, 200, 255, 0.16);
+}
+
+.pencil:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: var(--cyber-bg-1, #0c0f14);
+  border: 1px solid var(--line-strong-cy, var(--line-soft));
+  border-radius: var(--r-cy-md, 10px);
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--cyber-bg, #06080c);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-sm, 8px);
+  resize: vertical;
+}
+
+.input:focus-visible {
+  outline: none;
+  border-color: var(--blue-500, rgba(90, 200, 255, 0.8));
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spacer {
+  flex: 1;
+}

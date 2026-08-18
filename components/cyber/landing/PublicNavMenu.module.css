@@ -3,30 +3,53 @@
   display: inline-flex;
 }
 
-/* ---- Bouton burger ---- */
+/* ---- Bouton burger ----
+   Icône + libellé « MENU » : les trois barres seules se confondaient avec les
+   CTA voisins. Bordure et fond bleutés pour le détacher du fond de l'en-tête. */
 .burger {
   display: inline-flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 5px;
-  width: 42px;
+  align-items: center;
+  gap: 10px;
   height: 42px;
-  padding: 0 10px;
-  background: rgba(90, 200, 255, 0.05);
-  border: 1px solid var(--line-soft);
+  padding: 0 14px;
+  background: rgba(90, 200, 255, 0.1);
+  border: 1px solid rgba(90, 200, 255, 0.42);
   border-radius: var(--r-cy-sm, 8px);
+  box-shadow: 0 0 14px rgba(90, 200, 255, calc(0.16 * var(--glow, 1)));
   cursor: pointer;
-  transition: border-color 0.16s ease, background 0.16s ease;
+  transition: border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
 }
 
 .burger:hover {
-  border-color: var(--blue-500);
-  background: rgba(90, 200, 255, 0.1);
+  border-color: var(--blue-500, rgba(90, 200, 255, 0.9));
+  background: rgba(90, 200, 255, 0.18);
+  box-shadow: 0 0 20px rgba(90, 200, 255, calc(0.3 * var(--glow, 1)));
 }
 
 .burger:focus-visible {
   outline: 2px solid var(--blue-500);
   outline-offset: 2px;
+}
+
+.burgerOpen {
+  border-color: var(--blue-500, rgba(90, 200, 255, 0.9));
+  background: rgba(90, 200, 255, 0.18);
+}
+
+.bars {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 18px;
+  flex: 0 0 auto;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--ink);
 }
 
 .bar {
@@ -54,7 +77,7 @@
 .panel {
   position: absolute;
   top: calc(100% + 12px);
-  right: 0;
+  left: 0;
   z-index: 50;
   min-width: 220px;
   display: flex;

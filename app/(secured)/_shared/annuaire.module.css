@@ -60,6 +60,29 @@
   transform: translateY(-1px);
 }
 
+/* Action réservée au staff (équipe fantôme) : même gabarit que .cta mais en
+   secondaire, pour ne pas concurrencer l'action principale du joueur. */
+.ctaGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  background: transparent;
+  color: var(--ink-mute);
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 13px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-md);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, transform 0.15s;
+}
+.ctaGhost:hover {
+  color: var(--ink);
+  border-color: var(--line-strong-cy, var(--line-soft));
+  transform: translateY(-1px);
+}
+
 /* ---------- METRIC STRIP ---------- */
 .metrics {
   display: grid;
