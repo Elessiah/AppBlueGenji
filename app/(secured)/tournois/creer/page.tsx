@@ -283,11 +283,15 @@ export default function CreateTournamentPage() {
                     onChange={(e) => {
                       const next = e.target.value as MatchFormatType | "LIBRE";
                       setMatchFormatType(next);
-                      // Un BO se joue en nombre impair : on ramène une valeur
-                      // paire héritée du FT sur l'impair supérieur.
-                      if (next === "BO" && matchFormatValue % 2 === 0) {
-                        setMatchFormatValue(matchFormatValue + 1);
-                      }
+                      if (next === "LIBRE") return;
+                      // Les deux notations n'ont ni les mêmes bornes ni la même
+                      // parité : on ramène la valeur héritée dans le domaine du
+                      // nouveau type plutôt que de laisser un état invalide que
+                      // l'organisateur devrait corriger à la main.
+                      const bounds = MATCH_FORMAT_BOUNDS[next];
+                      let value = Math.min(Math.max(matchFormatValue, bounds.min), bounds.max);
+                      if (next === "BO" && value % 2 === 0) value -= 1;
+                      if (value !== matchFormatValue) setMatchFormatValue(value);
                     }}
                   >
                     <option value="BO">Best of (BO)</option>
