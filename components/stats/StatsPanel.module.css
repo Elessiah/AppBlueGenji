@@ -1,0 +1,212 @@
+.panel {
+  --stats-accent: var(--blue-rgb);
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.panel.orange {
+  --stats-accent: var(--orange-rgb);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 14px;
+}
+
+.tile {
+  border: 1px solid var(--line-soft);
+  border-left: 2px solid rgba(var(--stats-accent), 0.45);
+  border-radius: var(--r-cy-md);
+  background: linear-gradient(180deg, var(--cyber-bg-1), var(--cyber-bg));
+  padding: 12px 14px;
+}
+
+.tileLabel {
+  color: var(--text-2);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.tileValue {
+  margin-top: 6px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tileHint {
+  margin-top: 4px;
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.subhead {
+  color: var(--text-2);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 22px;
+}
+
+/* — Forme récente — */
+
+.form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.formBadge {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.formWin {
+  background: rgba(var(--green-rgb), 0.16);
+  border-color: rgba(var(--green-rgb), 0.45);
+  color: var(--accent-green);
+}
+
+.formLoss {
+  background: rgba(var(--danger-rgb), 0.14);
+  border-color: rgba(var(--danger-rgb), 0.4);
+  color: var(--danger);
+}
+
+.empty {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+/* — Barres de répartition — */
+
+.splits {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.splitRow {
+  display: grid;
+  grid-template-columns: minmax(96px, 1fr) 2fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.splitLabel {
+  font-size: 13px;
+  color: var(--text-1);
+}
+
+.splitTrack {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  display: flex;
+}
+
+.splitWin {
+  background: rgba(var(--green-rgb), 0.7);
+}
+
+.splitLoss {
+  background: rgba(var(--danger-rgb), 0.5);
+}
+
+.splitValue {
+  font-size: 12px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* — Adversaires — */
+
+.opponents {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.opponentCard {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-md);
+  padding: 14px;
+  background: var(--cyber-bg-1);
+}
+
+.opponentName {
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.opponentName a {
+  color: var(--text-0);
+  text-decoration: none;
+}
+
+.opponentName a:hover {
+  color: rgb(var(--stats-accent));
+}
+
+.opponentMeta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* — Activité — */
+
+.chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legendSwatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+@media (max-width: 560px) {
+  .splitRow {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}

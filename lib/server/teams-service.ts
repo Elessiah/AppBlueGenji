@@ -3,6 +3,7 @@ import { getDatabase } from "@/lib/server/database";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import type { TeamDetailResponse, TeamListItem, TeamMember, TeamRole } from "@/lib/shared/types";
 import { getUserIdByPseudo, sanitizeRoles } from "@/lib/server/users-service";
+import { getTeamEntityStats, getTeamRankingPosition } from "@/lib/server/stats-service";
 
 type TeamMemberRow = RowDataPacket & {
   membership_id: number;
@@ -11,16 +12,6 @@ type TeamMemberRow = RowDataPacket & {
   avatar_url: string | null;
   roles_json: string;
   joined_at: Date;
-};
-
-type TeamHistoryRow = RowDataPacket & {
-  tournament_id: number;
-  tournament_name: string;
-  tournament_state: "UPCOMING" | "REGISTRATION" | "RUNNING" | "FINISHED";
-  final_rank: number | null;
-  wins: number;
-  losses: number;
-  played_at: Date;
 };
 
 function mapMember(row: TeamMemberRow): TeamMember {
@@ -361,24 +352,12 @@ export async function getTeamDetail(
     [teamId],
   );
 
-  const [historyRows] = await db.execute<TeamHistoryRow[]>(
-    `SELECT
-      t.id AS tournament_id,
-      t.name AS tournament_name,
-      t.state AS tournament_state,
-      r.final_rank,
-      COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0) AS wins,
-      COALESCE(SUM(CASE WHEN m.loser_team_id = r.team_id THEN 1 ELSE 0 END), 0) AS losses,
-      COALESCE(t.finished_at, t.start_at) AS played_at
-    FROM bg_tournament_registrations r
-    JOIN bg_tournaments t ON t.id = r.tournament_id
-    LEFT JOIN bg_matches m ON m.tournament_id = t.id
-      AND (m.winner_team_id = r.team_id OR m.loser_team_id = r.team_id)
-    WHERE r.team_id = ?
-    GROUP BY t.id, t.name, t.state, r.final_rank, played_at
-    ORDER BY played_at DESC`,
-    [teamId],
-  );
+  // Statistiques et historique proviennent de la même collecte : le bilan de
+  // chaque ligne ne peut donc pas contredire l'agrégat affiché au-dessus.
+  const [{ stats, tournaments }, ranking] = await Promise.all([
+    getTeamEntityStats(teamId),
+    getTeamRankingPosition(teamId),
+  ]);
 
   const isGhost = teams[0].is_ghost === 1;
 
@@ -419,15 +398,9 @@ export async function getTeamDetail(
       isGhost,
     },
     members: membersRows.map(mapMember),
-    tournaments: historyRows.map((row) => ({
-      tournamentId: Number(row.tournament_id),
-      tournamentName: row.tournament_name,
-      state: row.tournament_state,
-      finalRank: row.final_rank === null ? null : Number(row.final_rank),
-      wins: Number(row.wins),
-      losses: Number(row.losses),
-      playedAt: toIso(row.played_at) ?? new Date().toISOString(),
-    })),
+    tournaments,
+    stats,
+    ranking,
     canManage,
     managedAsGhost,
     viewerMembership,

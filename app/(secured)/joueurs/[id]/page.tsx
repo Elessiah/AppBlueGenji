@@ -14,6 +14,8 @@ import {
 } from "@/lib/shared/permissions";
 import { useToast } from "@/components/ui/toast";
 import { useResourceLoader } from "@/lib/shared/hooks/useResourceLoader";
+import { StatsPanel } from "@/components/stats/StatsPanel";
+import { formatRate } from "@/lib/shared/stats";
 
 export default function PlayerDetailPage() {
   const params = useParams<{ id: string }>();
@@ -137,8 +139,10 @@ export default function PlayerDetailPage() {
             {[
               { label: "Tournois joués", value: data.stats.tournamentsPlayed },
               { label: "Tournois gagnés", value: data.stats.tournamentsWon },
+              { label: "Podiums", value: data.stats.podiums },
               { label: "Victoires", value: data.stats.matchesWon },
               { label: "Défaites", value: data.stats.matchesLost },
+              { label: "Ratio de victoires", value: formatRate(data.stats.winRate) },
             ].map((stat) => (
               <div key={stat.label} className="ds-stat">
                 <div className="ds-stat-label">{stat.label}</div>
@@ -147,6 +151,13 @@ export default function PlayerDetailPage() {
             ))}
           </div>
         </div>
+      </div>
+
+      <div className="ds-block" style={{ marginBottom: 20 }}>
+        <div className="ds-section-title blue">
+          <h2>Statistiques</h2>
+        </div>
+        <StatsPanel stats={data.stats} accent="blue" />
       </div>
 
       <div className="ds-block" style={{ marginBottom: 20 }}>

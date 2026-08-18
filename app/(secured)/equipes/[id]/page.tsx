@@ -7,6 +7,7 @@ import { useTeamDetail } from "./_hooks/useTeamDetail";
 import { TeamHeader } from "./_components/TeamHeader";
 import { MembersSection } from "./_components/MembersSection";
 import { MembershipActions } from "./_components/MembershipActions";
+import { StatsPanel } from "@/components/stats/StatsPanel";
 
 export default function TeamDetailPage() {
   const params = useParams<{ id: string }>();
@@ -60,6 +61,13 @@ export default function TeamDetailPage() {
         viewerUserId={viewerUserId}
         onChanged={refresh}
       />
+
+      <div className="ds-block" style={{ marginBottom: 20 }}>
+        <div className="ds-section-title orange">
+          <h2>Statistiques</h2>
+        </div>
+        <StatsPanel stats={team.stats} accent="orange" ranking={team.ranking} />
+      </div>
 
       <div className="ds-block">
         <div className="ds-section-title orange">

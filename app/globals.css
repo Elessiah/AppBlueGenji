@@ -969,6 +969,10 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
   --stat-rgb: var(--purple-rgb);
 }
 
+.ds-stat.orange {
+  --stat-rgb: var(--orange-rgb);
+}
+
 /* Number input sans flèches */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
