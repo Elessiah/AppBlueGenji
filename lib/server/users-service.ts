@@ -19,13 +19,25 @@ import type {
  * son entrée solo, s'il en a une (tournois individuels — voir
  * `lib/server/solo-entries-service.ts`). Un tournoi joué en individuel compte
  * donc dans son palmarès au même titre qu'un tournoi joué en équipe.
+ *
+ * Le filtre sur les joueurs est appliqué **dans chaque branche** de l'union :
+ * une table dérivée n'a pas d'index, et filtrer à l'extérieur ferait scanner
+ * toute la table d'adhésions à chaque affichage de `/joueurs` ou de profil.
+ * L'appelant doit donc passer la liste d'identifiants **deux fois**.
+ *
+ * @param placeholders liste de `?` séparés par des virgules (un par joueur).
  */
-const USER_ENTRIES_SQL = `(
-       SELECT user_id, team_id, left_at FROM bg_team_members
+function userEntriesSql(placeholders: string): string {
+  return `(
+       SELECT user_id, team_id, left_at
+       FROM bg_team_members
+       WHERE user_id IN (${placeholders})
        UNION ALL
        SELECT solo_user_id AS user_id, id AS team_id, NULL AS left_at
-       FROM bg_teams WHERE solo_user_id IS NOT NULL
+       FROM bg_teams
+       WHERE solo_user_id IN (${placeholders})
      )`;
+}
 
 export type GoogleProfilePayload = {
   sub: string;
@@ -230,11 +242,10 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
     })[]
   >(
     `SELECT tm.user_id, COUNT(DISTINCT tr.tournament_id) AS tournament_count
-     FROM ${USER_ENTRIES_SQL} tm
+     FROM ${userEntriesSql(userIds.map(() => "?").join(","))} tm
      JOIN bg_tournament_registrations tr ON tr.team_id = tm.team_id
-     WHERE tm.user_id IN (${userIds.map(() => "?").join(",")})
      GROUP BY tm.user_id`,
-    userIds,
+    [...userIds, ...userIds],
   );
 
   const tournamentsCountByUserId = new Map(
@@ -252,14 +263,13 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
     `SELECT tm.user_id,
             COALESCE(SUM(CASE WHEN m.winner_team_id = tm.team_id THEN 1 ELSE 0 END), 0) AS wins,
             COALESCE(SUM(CASE WHEN m.loser_team_id = tm.team_id THEN 1 ELSE 0 END), 0) AS losses
-     FROM ${USER_ENTRIES_SQL} tm
+     FROM ${userEntriesSql(userIds.map(() => "?").join(","))} tm
      LEFT JOIN bg_tournament_registrations tr ON tr.team_id = tm.team_id
      LEFT JOIN bg_matches m ON m.tournament_id = tr.tournament_id
        AND (m.winner_team_id = tm.team_id OR m.loser_team_id = tm.team_id)
-     WHERE tm.user_id IN (${userIds.map(() => "?").join(",")})
-       AND tm.left_at IS NULL
+     WHERE tm.left_at IS NULL
      GROUP BY tm.user_id`,
-    userIds,
+    [...userIds, ...userIds],
   );
 
   const winsLossesByUserId = new Map(
@@ -623,15 +633,14 @@ export async function getFullProfile(
       COALESCE(SUM(CASE WHEN m.winner_team_id = tm.team_id THEN 1 ELSE 0 END), 0) AS wins,
       COALESCE(SUM(CASE WHEN m.loser_team_id = tm.team_id THEN 1 ELSE 0 END), 0) AS losses,
       COALESCE(t.finished_at, t.start_at) AS played_at
-    FROM ${USER_ENTRIES_SQL} tm
+    FROM ${userEntriesSql("?")} tm
     JOIN bg_tournament_registrations r ON r.team_id = tm.team_id
     JOIN bg_tournaments t ON t.id = r.tournament_id
     LEFT JOIN bg_matches m ON m.tournament_id = t.id
       AND (m.winner_team_id = tm.team_id OR m.loser_team_id = tm.team_id)
-    WHERE tm.user_id = ?
     GROUP BY t.id, t.name, t.state, r.final_rank, played_at
     ORDER BY played_at DESC`,
-    [targetUserId],
+    [targetUserId, targetUserId],
   );
 
   const tournaments = historyRows.map(mapHistoryRow);
@@ -653,12 +662,11 @@ export async function getFullProfile(
       COALESCE(SUM(CASE WHEN m.loser_team_id = tm.team_id THEN 1 ELSE 0 END), 0) AS matches_lost,
       MIN(r.final_rank) AS best_rank,
       AVG(r.final_rank) AS avg_rank
-    FROM ${USER_ENTRIES_SQL} tm
+    FROM ${userEntriesSql("?")} tm
     LEFT JOIN bg_tournament_registrations r ON r.team_id = tm.team_id
     LEFT JOIN bg_matches m ON m.tournament_id = r.tournament_id
-      AND (m.winner_team_id = tm.team_id OR m.loser_team_id = tm.team_id)
-    WHERE tm.user_id = ?`,
-    [targetUserId],
+      AND (m.winner_team_id = tm.team_id OR m.loser_team_id = tm.team_id)`,
+    [targetUserId, targetUserId],
   );
 
   const statsRow = statRows[0];

@@ -77,6 +77,19 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
     expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 88);
   });
 
+  // Un tournoi inconnu ne doit pas être maquillé en problème d'équipe : le
+  // joueur a bien un engagé, c'est la cible qui n'existe pas.
+  it("répond 404 quand le tournoi n'existe pas", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(member as never);
+    (service.getUserEntrantTeamId as jest.Mock).mockRejectedValue(
+      new Error("TOURNAMENT_NOT_FOUND") as never,
+    );
+    const res = await POST(req(), params);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "TOURNAMENT_NOT_FOUND" });
+    expect(service.forfeitTournamentTeam).not.toHaveBeenCalled();
+  });
+
   it("remonte TEAM_ALREADY_OUT en 400", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
     (service.forfeitTournamentTeam as jest.Mock).mockRejectedValue(

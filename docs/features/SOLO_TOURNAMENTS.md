@@ -47,6 +47,13 @@ un joueur qui n'en a jamais joué n'a aucune ligne parasite.
 2. `<pseudo> #<id du compte>` si le pseudo est déjà pris ;
 3. `Joueur #<id du compte>` en dernier recours.
 
+**Conséquence assumée** : le pseudo est ainsi réservé dans l'espace de noms des
+équipes. Créer une équipe portant le pseudo d'un joueur déjà engagé en
+individuel échoue (`TEAM_NAME_TAKEN`) alors qu'aucune équipe visible ne porte ce
+nom. C'est le prix d'un bracket lisible — l'alternative, suffixer
+systématiquement (`Karma #42`), dégrade l'affichage de tous les tournois
+individuels pour un cas de collision rare.
+
 Le logo de l'entrée est l'avatar du joueur. Nom et logo sont resynchronisés à
 chaque inscription, à chaque changement de pseudo ou d'avatar, et lors de
 l'anonymisation du compte — un renommage se voit donc immédiatement dans les

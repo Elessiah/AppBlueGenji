@@ -27,7 +27,16 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (isReferee && body.teamId) {
     teamId = Number(body.teamId);
   } else {
-    const entrantTeamId = await getUserEntrantTeamId(tournamentId, user.id);
+    let entrantTeamId: number | null;
+    try {
+      entrantTeamId = await getUserEntrantTeamId(tournamentId, user.id);
+    } catch (error) {
+      // Tournoi inconnu : ne pas le maquiller en problème d'équipe.
+      if ((error as Error).message === "TOURNAMENT_NOT_FOUND") {
+        return fail("TOURNAMENT_NOT_FOUND", 404);
+      }
+      throw error;
+    }
     if (entrantTeamId === null) return fail("NO_ACTIVE_TEAM", 400);
     teamId = entrantTeamId;
     // Un non-arbitre ne peut forfaiter que son propre engagé.

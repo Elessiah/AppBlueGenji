@@ -470,7 +470,11 @@ export async function registerCurrentUserTeam(tournamentId: number, userId: numb
 
 /**
  * Engagé du joueur dans un tournoi, vu de l'extérieur du module (routes API) :
- * son équipe active, ou son entrée solo si le tournoi est individuel.
+ * son équipe active, ou son entrée solo si le tournoi est individuel. `null`
+ * signifie « rien à engager » — un tournoi inconnu lève, pour que l'appelant
+ * puisse répondre 404 plutôt que de parler d'équipe manquante.
+ *
+ * @throws TOURNAMENT_NOT_FOUND
  */
 export async function getUserEntrantTeamId(
   tournamentId: number,
@@ -480,7 +484,7 @@ export async function getUserEntrantTeamId(
   const connection = await db.getConnection();
   try {
     const tournament = await loadTournamentRow(connection, tournamentId);
-    if (!tournament) return null;
+    if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
     return await resolveUserEntrantTeamId(connection, tournament, userId);
   } finally {
     connection.release();

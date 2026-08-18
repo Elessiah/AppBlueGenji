@@ -296,8 +296,11 @@ async function clearDatabase(db: Pool): Promise<void> {
     { label: "membres d'équipe", sql: "DELETE FROM bg_team_members WHERE team_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Test -%')" },
     { label: "équipes", sql: "DELETE FROM bg_teams WHERE name LIKE 'Test -%'" },
     // Entrées solo (tournois individuels) : nommées d'après le pseudo du joueur,
-    // elles ne portent pas le préfixe « Test - » des équipes.
-    { label: "entrées solo", sql: "DELETE FROM bg_teams WHERE solo_user_id IN (SELECT id FROM bg_users WHERE pseudo LIKE 'Test%')" },
+    // elles ne portent pas le préfixe « Test - » des équipes. On vise aussi
+    // celles dont le compte a déjà disparu (exécution précédente interrompue) :
+    // sans ça elles resteraient à jamais, en réservant leur pseudo dans l'espace
+    // de noms unique des équipes.
+    { label: "entrées solo", sql: "DELETE t FROM bg_teams t LEFT JOIN bg_users u ON u.id = t.solo_user_id WHERE t.solo_user_id IS NOT NULL AND (u.id IS NULL OR u.pseudo LIKE 'Test%')" },
     { label: "sessions", sql: "DELETE FROM bg_user_sessions WHERE user_id IN (SELECT id FROM bg_users WHERE pseudo LIKE 'Test_%')" },
     { label: "joueurs", sql: "DELETE FROM bg_users WHERE pseudo LIKE 'Test_%'" },
     { label: "sponsors", sql: "DELETE FROM bg_sponsors WHERE name LIKE 'Test -%'" },
