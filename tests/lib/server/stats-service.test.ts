@@ -295,6 +295,20 @@ describe("getTeamRankingPosition", () => {
     expect(second.position).toBe(2);
   });
 
+  it("classe sur la même assiette de matchs que le bilan de la fiche", async () => {
+    const execute = jest.fn().mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    await getTeamRankingPosition(1);
+
+    // Sans ces filtres, les byes gonfleraient le rang sans toucher aux points
+    // affichés juste à côté.
+    const [sql] = execute.mock.calls[0] as [string];
+    expect(sql).toMatch(/m\.is_bye = 0/);
+    expect(sql).toMatch(/m\.team2_id IS NOT NULL/);
+    expect(sql).toMatch(/m\.winner_team_id IS NOT NULL/);
+  });
+
   it("ne classe pas une équipe sans aucun match joué", async () => {
     const execute = jest.fn().mockResolvedValueOnce([[{ team_id: 1, points: 100 }]]);
     await mockDb(execute);

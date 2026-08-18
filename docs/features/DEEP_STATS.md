@@ -29,9 +29,15 @@ tâche de reconstruction.
 
 ### Palmarès
 `tournamentsPlayed`, `tournamentsWon` (rang 1), `podiums` (rang ≤ 3),
-`bestRank`, `averageRank` (deux décimales). Les tournois en cours comptent dans
-les participations mais, faute de `final_rank`, ne pèsent ni sur le rang moyen
-ni sur les podiums.
+`bestRank`, `averageRank` (deux décimales).
+
+Un tournoi n'est « joué » que s'il est `RUNNING` ou `FINISHED` : une simple
+inscription à un tournoi `UPCOMING` / `REGISTRATION` est comptée à part dans
+`tournamentsUpcoming` et affichée en légende de la tuile. Sans cette
+distinction, s'inscrire suffisait à faire monter le palmarès.
+
+Les tournois en cours comptent dans les participations mais, faute de
+`final_rank`, ne pèsent ni sur le rang moyen ni sur les podiums.
 
 ### Bilan des matchs
 `matchesPlayed` / `matchesWon` / `matchesLost` / `winRate`, plus le détail des
@@ -70,6 +76,11 @@ différentiel de maps. C'est la même règle que celle appliquée par
 `lib/shared/match-lock.ts`.
 
 Seuls les matchs `COMPLETED` avec un vainqueur désigné entrent dans le calcul.
+
+Ce filtre vit dans **une seule constante**, `PLAYED_MATCH_SQL`, partagée par le
+bilan et par le classement. Il avait d'abord été écrit deux fois : le classement
+comptait alors les byes et la fiche affichait une place calculée sur un total de
+points différent de celui posé juste à côté.
 
 Les **forfaits**, eux, comptent comme des matchs (ils décident réellement d'une
 rencontre) mais sont isolés dans `forfeitsGiven` / `forfeitsReceived`, selon que
@@ -113,18 +124,30 @@ Trois conséquences voulues :
 
 ## Classement du site
 
-`getTeamRankingPosition` situe l'équipe dans le classement général : même
-assiette de matchs et même barème que le leaderboard de la landing, donc pas de
-divergence possible. Les équipes à égalité de points partagent le même rang, et
-une équipe sans match n'est pas classée (`position: null`). Cette place n'est
-affichée que sur la fiche équipe.
+`getTeamRankingPosition` situe l'équipe dans le classement général, avec le
+barème partagé (`lib/shared/ranking.ts`) appliqué à **la même assiette de matchs
+que le bilan de la fiche**. Les équipes à égalité de points partagent le même
+rang, et une équipe sans match n'est pas classée (`position: null`) — `total`
+compte donc les équipes ayant réellement joué.
+
+Le leaderboard de la landing part, lui, de **toutes** les équipes et de tous les
+matchs terminés : une équipe sans match y figure à 0 point. Les deux vues n'ont
+pas le même dénominateur, c'est assumé — ce qui compte est que la place affichée
+sur la fiche découle du total de points affiché sur cette même fiche.
+
+Le classement n'est calculé que pour la **consultation** de la fiche : il exige
+une agrégation sur toutes les équipes, hors de propos pour un ajout de membre.
+`getTeamDetail` ne le produit que si `includeRanking` est demandé, et
+`TeamDetailResponse.ranking` vaut `null` sur les réponses des routes de
+mutation — l'interface masque alors la tuile.
 
 ## Coût
 
-Une fiche équipe déclenche trois requêtes supplémentaires (matchs, inscriptions,
-classement), une fiche joueur trois également (appartenances, matchs,
-inscriptions). Le volume reste celui d'une entité : quelques dizaines de lignes.
-`getPlayerStats` court-circuite tout dès qu'un joueur n'a aucune équipe.
+Une fiche équipe déclenche deux requêtes bornées à l'équipe (matchs,
+inscriptions), plus l'agrégation de classement **uniquement en consultation**.
+Une fiche joueur en déclenche trois (appartenances, matchs, inscriptions), toutes
+bornées à ses équipes. `getPlayerEntityStats` court-circuite tout dès qu'un
+joueur n'a aucune équipe.
 
 ## Tests
 

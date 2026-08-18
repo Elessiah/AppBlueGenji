@@ -357,6 +357,32 @@ describe("computeDeepStats", () => {
       expect(stats.averageRank).toBe(2);
     });
 
+    it("ne compte pas comme joué un tournoi pas encore lancé", () => {
+      const stats = computeDeepStats(
+        [],
+        [
+          tournament({ tournamentId: 1, state: "REGISTRATION", finalRank: null }),
+          tournament({ tournamentId: 2, state: "UPCOMING", finalRank: null }),
+          tournament({ tournamentId: 3, state: "FINISHED", finalRank: 2 }),
+        ],
+        NOW,
+      );
+
+      expect(stats.tournamentsPlayed).toBe(1);
+      expect(stats.tournamentsUpcoming).toBe(2);
+    });
+
+    it("compte un tournoi en cours comme joué", () => {
+      const stats = computeDeepStats(
+        [],
+        [tournament({ state: "RUNNING", finalRank: null })],
+        NOW,
+      );
+
+      expect(stats.tournamentsPlayed).toBe(1);
+      expect(stats.tournamentsUpcoming).toBe(0);
+    });
+
     it("laisse rang moyen et meilleur rang vides sans classement final", () => {
       const stats = computeDeepStats(
         [],

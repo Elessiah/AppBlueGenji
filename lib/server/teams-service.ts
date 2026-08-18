@@ -317,10 +317,18 @@ export async function createTeam(
  * Il administre alors les équipes **fantômes** (sans joueur rattaché) sans en
  * être membre ; ça ne lui donne aucun droit sur les équipes réelles.
  */
+/**
+ * Fiche complète d'une équipe.
+ *
+ * @param includeRanking calcule la place au classement du site. Coûteux — il
+ *   faut agréger toutes les équipes — donc réservé à la consultation de la
+ *   fiche : les routes de mutation reconstruisent la réponse sans classement.
+ */
 export async function getTeamDetail(
   teamId: number,
   viewerUserId: number,
   viewerManagesGhostTeams = false,
+  includeRanking = false,
 ): Promise<TeamDetailResponse | null> {
   const db = await getDatabase();
 
@@ -356,7 +364,7 @@ export async function getTeamDetail(
   // chaque ligne ne peut donc pas contredire l'agrégat affiché au-dessus.
   const [{ stats, tournaments }, ranking] = await Promise.all([
     getTeamEntityStats(teamId),
-    getTeamRankingPosition(teamId),
+    includeRanking ? getTeamRankingPosition(teamId) : Promise.resolve(null),
   ]);
 
   const isGhost = teams[0].is_ghost === 1;

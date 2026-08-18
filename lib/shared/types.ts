@@ -480,8 +480,12 @@ export type TeamDetailResponse = {
   tournaments: TeamHistoryRow[];
   /** Statistiques approfondies de l'équipe (mêmes définitions que le joueur). */
   stats: DeepStats;
-  /** Place de l'équipe au classement du site. */
-  ranking: TeamRankingPosition;
+  /**
+   * Place de l'équipe au classement du site. `null` sur les réponses des
+   * routes de mutation, qui ne la calculent pas : le classement demande une
+   * agrégation sur toutes les équipes, hors de propos pour un ajout de membre.
+   */
+  ranking: TeamRankingPosition | null;
   canManage: boolean;
   /**
    * Vrai si le viewer administre cette équipe au titre de la permission

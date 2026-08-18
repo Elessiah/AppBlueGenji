@@ -188,10 +188,13 @@ export function TeamHeader({ team, onChanged, canManage, viewerIsOwner }: TeamHe
               { label: "Victoires", value: team.stats.matchesWon },
               { label: "Défaites", value: team.stats.matchesLost },
               { label: "Ratio de victoires", value: formatRate(team.stats.winRate) },
-              {
-                label: "Classement du site",
-                value: team.ranking.position ? `#${team.ranking.position}` : "—",
-              },
+              // Absent des réponses de mutation, qui ne calculent pas le classement.
+              ...(team.ranking
+                ? [{
+                    label: "Classement du site",
+                    value: team.ranking.position ? `#${team.ranking.position}` : "—",
+                  }]
+                : []),
             ].map((stat) => (
               <div key={stat.label} className="ds-stat orange">
                 <div className="ds-stat-label">{stat.label}</div>

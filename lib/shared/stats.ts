@@ -95,9 +95,15 @@ export type TeamRankingPosition = {
   points: number;
 };
 
+/** États d'un tournoi effectivement disputé : un plateau existe. */
+const PLAYED_STATES: ReadonlySet<TournamentState> = new Set(["RUNNING", "FINISHED"]);
+
 export type DeepStats = {
   // — Palmarès
+  /** Tournois **disputés** : une simple inscription n'en fait pas partie. */
   tournamentsPlayed: number;
+  /** Inscriptions en cours à des tournois pas encore lancés. */
+  tournamentsUpcoming: number;
   tournamentsWon: number;
   /** Tournois terminés dans les trois premiers. */
   podiums: number;
@@ -182,6 +188,7 @@ function buildActivitySkeleton(now: Date): StatsActivityPoint[] {
 export function emptyDeepStats(now: Date = new Date()): DeepStats {
   return {
     tournamentsPlayed: 0,
+    tournamentsUpcoming: 0,
     tournamentsWon: 0,
     podiums: 0,
     bestRank: null,
@@ -381,6 +388,12 @@ export function computeDeepStats(
 
   const ranks: number[] = [];
   for (const tournament of tournaments) {
+    // Une inscription à un tournoi qui n'a pas commencé n'est pas un tournoi
+    // joué : la compter afficherait un palmarès que rien n'a encore rempli.
+    if (!PLAYED_STATES.has(tournament.state)) {
+      stats.tournamentsUpcoming += 1;
+      continue;
+    }
     stats.tournamentsPlayed += 1;
     if (tournament.finalRank === null) continue;
     ranks.push(tournament.finalRank);

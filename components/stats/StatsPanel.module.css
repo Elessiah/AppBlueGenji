@@ -67,6 +67,13 @@
 
 /* — Forme récente — */
 
+.formRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .form {
   display: flex;
   align-items: center;

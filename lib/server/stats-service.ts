@@ -129,6 +129,21 @@ type Membership = {
 };
 
 /**
+ * Matchs qui comptent dans un bilan : terminés, avec un vainqueur et deux
+ * équipes réelles. Byes (`is_bye`) et matchs fantômes (une équipe manquante)
+ * sont écartés — leur score est posé par le moteur de tournoi, pas joué.
+ *
+ * Constante partagée par le bilan et par le classement : sans elle, les deux
+ * requêtes avaient divergé et la fiche affichait un total de points calculé
+ * autrement que la place au classement posée juste à côté.
+ */
+const PLAYED_MATCH_SQL = `m.status = 'COMPLETED'
+       AND m.is_bye = 0
+       AND m.team1_id IS NOT NULL
+       AND m.team2_id IS NOT NULL
+       AND m.winner_team_id IS NOT NULL`;
+
+/**
  * Liste de placeholders `?,?,?` pour un `IN (...)`. `db.execute` ne développe
  * pas les tableaux : les identifiants restent passés en paramètres liés, jamais
  * interpolés dans le SQL.
@@ -181,11 +196,7 @@ async function loadMatchRows(
      JOIN bg_tournaments t ON t.id = m.tournament_id
      LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
      LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
-     WHERE m.status = 'COMPLETED'
-       AND m.is_bye = 0
-       AND m.team1_id IS NOT NULL
-       AND m.team2_id IS NOT NULL
-       AND m.winner_team_id IS NOT NULL
+     WHERE ${PLAYED_MATCH_SQL}
        AND (m.team1_id IN (${list}) OR m.team2_id IN (${list}))
      ORDER BY played_at ASC, m.id ASC`,
     [...teamIds, ...teamIds],
@@ -278,9 +289,15 @@ export async function getTeamStats(teamId: number): Promise<DeepStats> {
 }
 
 /**
- * Place de l'équipe au classement du site. Utilise le barème partagé
- * (`lib/shared/ranking.ts`) et la même assiette de matchs que le leaderboard de
- * la landing, pour que les deux affichages ne puissent pas diverger.
+ * Place de l'équipe au classement du site : barème partagé
+ * (`lib/shared/ranking.ts`) appliqué à la **même assiette de matchs que le
+ * bilan de la fiche** (`PLAYED_MATCH_SQL`), pour que le total de points affiché
+ * et la place ne puissent pas se contredire.
+ *
+ * Le leaderboard de la landing, lui, part de toutes les équipes et de tous les
+ * matchs terminés : une équipe sans match y figure à 0 point alors qu'elle
+ * n'est pas classée ici. Les deux vues n'ont donc pas le même dénominateur —
+ * `total` compte les équipes ayant réellement joué.
  */
 export async function getTeamRankingPosition(teamId: number): Promise<TeamRankingPosition> {
   const db = await getDatabase();
@@ -296,7 +313,7 @@ export async function getTeamRankingPosition(teamId: number): Promise<TeamRankin
      FROM bg_teams t
      JOIN bg_matches m
        ON (m.team1_id = t.id OR m.team2_id = t.id)
-      AND m.status = 'COMPLETED'
+      AND ${PLAYED_MATCH_SQL}
      GROUP BY t.id`,
   );
 

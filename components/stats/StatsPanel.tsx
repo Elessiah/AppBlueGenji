@@ -193,7 +193,15 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
     <div className={`${s.panel} ${accent === "orange" ? s.orange : ""}`}>
       <Group id="stats-palmares" title="Palmarès">
         <div className={s.grid}>
-          <Tile label="Tournois joués" value={stats.tournamentsPlayed} />
+          <Tile
+            label="Tournois joués"
+            value={stats.tournamentsPlayed}
+            hint={
+              stats.tournamentsUpcoming > 0
+                ? `+ ${stats.tournamentsUpcoming} inscription${stats.tournamentsUpcoming > 1 ? "s" : ""} à venir`
+                : undefined
+            }
+          />
           <Tile label="Tournois gagnés" value={stats.tournamentsWon} />
           <Tile label="Podiums" value={stats.podiums} hint="Top 3" />
           <Tile label="Meilleur rang" value={stats.bestRank ?? "—"} />
@@ -226,25 +234,25 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
       <div className={s.columns}>
         <Group id="stats-forme" title="Forme récente">
           {stats.form.length > 0 ? (
-            <div
-              className={s.form}
-              role="list"
-              aria-label={`${stats.form.length} derniers résultats, du plus récent au plus ancien`}
-            >
-              {stats.form.map((result, index) => (
-                <span
-                  key={`${result}-${index}`}
-                  role="listitem"
-                  className={`${s.formBadge} ${result === "W" ? s.formWin : s.formLoss}`}
-                  aria-label={result === "W" ? "Victoire" : "Défaite"}
-                  title={result === "W" ? "Victoire" : "Défaite"}
-                >
-                  <span aria-hidden="true">{result === "W" ? "V" : "D"}</span>
-                </span>
-              ))}
-              <span className={s.splitValue} style={{ marginLeft: 6 }}>
-                {formatStreak(stats.currentStreak)}
-              </span>
+            <div className={s.formRow}>
+              <div
+                className={s.form}
+                role="list"
+                aria-label={`${stats.form.length} derniers résultats, du plus récent au plus ancien`}
+              >
+                {stats.form.map((result, index) => (
+                  <span
+                    key={`${result}-${index}`}
+                    role="listitem"
+                    className={`${s.formBadge} ${result === "W" ? s.formWin : s.formLoss}`}
+                    aria-label={result === "W" ? "Victoire" : "Défaite"}
+                    title={result === "W" ? "Victoire" : "Défaite"}
+                  >
+                    <span aria-hidden="true">{result === "W" ? "V" : "D"}</span>
+                  </span>
+                ))}
+              </div>
+              <span className={s.splitValue}>{formatStreak(stats.currentStreak)}</span>
             </div>
           ) : (
             <p className={s.empty}>Aucun match terminé pour le moment.</p>

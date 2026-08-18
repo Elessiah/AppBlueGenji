@@ -13,7 +13,8 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     return fail("INVALID_TEAM_ID", 400);
   }
 
-  const detail = await getTeamDetail(teamId, user.id, can(user, "tournaments"));
+  // Consultation de la fiche : seul appel qui calcule la place au classement.
+  const detail = await getTeamDetail(teamId, user.id, can(user, "tournaments"), true);
   if (!detail) return fail("TEAM_NOT_FOUND", 404);
 
   return ok(detail);
