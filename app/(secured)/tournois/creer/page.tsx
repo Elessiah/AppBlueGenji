@@ -8,6 +8,7 @@ import type { TournamentFormat, TournamentGame } from "@/lib/shared/types";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import { validatePhases } from "@/lib/shared/tournament-phases";
 import { computeRecommendedRounds } from "@/lib/shared/swiss";
+import { participantWording, type ParticipantType } from "@/lib/shared/participants";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
 import { useToast } from "@/components/ui/toast";
 import { CyberCard, CyberButton } from "@/components/cyber";
@@ -39,6 +40,9 @@ export default function CreateTournamentPage() {
   const [description, setDescription] = useState("");
   const [game, setGame] = useState<TournamentGame>("OW2");
   const [format, setFormat] = useState<TournamentFormat>("SINGLE");
+  // Équipes (défaut) ou joueurs inscrits individuellement. Le format de bracket
+  // est indépendant : tous fonctionnent dans les deux cas.
+  const [participantType, setParticipantType] = useState<ParticipantType>("TEAM");
   const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(false);
   const [survivalRoundsPerCut, setSurvivalRoundsPerCut] = useState(3);
   // BlueGenji Survie : capital d'endurance et barème (défauts du règlement).
@@ -80,6 +84,7 @@ export default function CreateTournamentPage() {
       .catch(() => undefined);
   }, [router, showError]);
 
+  const wording = participantWording(participantType);
   const recommendedRounds = computeRecommendedRounds(maxTeams);
   const setSwissTotalRounds = (value: number) => {
     setSwissRoundsTouched(true);
@@ -109,6 +114,7 @@ export default function CreateTournamentPage() {
           description,
           game,
           format,
+          participantType,
           maxTeams,
           startVisibilityAt: new Date(startVisibilityAt).toISOString(),
           registrationOpenAt: new Date(registrationOpenAt).toISOString(),
@@ -234,7 +240,22 @@ export default function CreateTournamentPage() {
                   </select>
                 </div>
                 <div className="field">
-                  <label htmlFor="max-teams">Nombre max d&apos;équipes</label>
+                  <label htmlFor="participant-type">Type de participants</label>
+                  <select
+                    id="participant-type"
+                    value={participantType}
+                    onChange={(e) => setParticipantType(e.target.value as ParticipantType)}
+                  >
+                    <option value="TEAM">Équipes</option>
+                    <option value="SOLO">Joueurs (individuel)</option>
+                  </select>
+                  <p style={HINT}>
+                    En individuel, chaque joueur s&apos;inscrit lui-même, sans passer par une
+                    équipe.
+                  </p>
+                </div>
+                <div className="field">
+                  <label htmlFor="max-teams">{wording.maxLabel}</label>
                   <input
                     id="max-teams"
                     type="number"
@@ -371,7 +392,7 @@ export default function CreateTournamentPage() {
                         onChange={(e) => setSwissTotalRounds(Number(e.target.value))}
                       />
                       <p style={HINT}>
-                        Recommandé pour {maxTeams} équipes : {recommendedRounds} ronde
+                        Recommandé pour {maxTeams} {wording.many} : {recommendedRounds} ronde
                         {recommendedRounds > 1 ? "s" : ""}.
                       </p>
                     </div>

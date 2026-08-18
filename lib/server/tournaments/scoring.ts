@@ -1,7 +1,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { MatchRow } from "./_internal";
-import { getUserActiveTeam } from "@/lib/server/teams-service";
+import { resolveUserEntrantTeamId } from "./registration";
 import { syncTournamentState } from "./state";
 import { tryAutoResolveByes } from "./byes";
 
@@ -126,14 +126,16 @@ export async function reportMatchScore(
     throw new Error("DRAW_NOT_ALLOWED");
   }
 
-  const activeTeam = await getUserActiveTeam(userId);
-  if (!activeTeam) {
-    throw new Error("NO_ACTIVE_TEAM");
-  }
-
   const { row: tournament } = await syncTournamentState(connection, tournamentId);
   if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
   if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
+
+  // L'engagé dépend du tournoi : l'équipe active du joueur, ou lui-même en
+  // tournoi individuel.
+  const reporterTeamId = await resolveUserEntrantTeamId(connection, tournament, userId);
+  if (reporterTeamId === null) {
+    throw new Error("NO_ACTIVE_TEAM");
+  }
 
   const [matches] = await connection.execute<MatchRow[]>(
     `SELECT
@@ -172,8 +174,8 @@ export async function reportMatchScore(
     throw new Error("MATCH_NOT_READY");
   }
 
-  const isTeam1Reporter = Number(match.team1_id) === activeTeam.teamId;
-  const isTeam2Reporter = Number(match.team2_id) === activeTeam.teamId;
+  const isTeam1Reporter = Number(match.team1_id) === reporterTeamId;
+  const isTeam2Reporter = Number(match.team2_id) === reporterTeamId;
 
   if (!isTeam1Reporter && !isTeam2Reporter) {
     throw new Error("NOT_IN_MATCH");

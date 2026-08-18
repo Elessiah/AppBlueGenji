@@ -26,6 +26,7 @@ import {
 import { insertPhases, setCurrentPhase, loadPhases } from "./tournaments/phases-repository";
 import { initializeMultiTournament, startPhase, reconcilePhases } from "./tournaments/phases";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
+import { soloEntryNameCandidates } from "@/lib/shared/participants";
 import {
   TOURNAMENTS,
   type ReportStateCounts,
@@ -290,6 +291,9 @@ async function clearDatabase(db: Pool): Promise<void> {
     { label: "tournois", sql: "DELETE FROM bg_tournaments WHERE name LIKE 'Test -%'" },
     { label: "membres d'équipe", sql: "DELETE FROM bg_team_members WHERE team_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Test -%')" },
     { label: "équipes", sql: "DELETE FROM bg_teams WHERE name LIKE 'Test -%'" },
+    // Entrées solo (tournois individuels) : nommées d'après le pseudo du joueur,
+    // elles ne portent pas le préfixe « Test - » des équipes.
+    { label: "entrées solo", sql: "DELETE FROM bg_teams WHERE solo_user_id IN (SELECT id FROM bg_users WHERE pseudo LIKE 'Test%')" },
     { label: "sessions", sql: "DELETE FROM bg_user_sessions WHERE user_id IN (SELECT id FROM bg_users WHERE pseudo LIKE 'Test_%')" },
     { label: "joueurs", sql: "DELETE FROM bg_users WHERE pseudo LIKE 'Test_%'" },
     { label: "sponsors", sql: "DELETE FROM bg_sponsors WHERE name LIKE 'Test -%'" },
@@ -450,6 +454,39 @@ async function createGhostTeams(db: Pool): Promise<number[]> {
   }
   console.log(`  ✓ ${teamIds.length} équipes fantômes créées`);
   return teamIds;
+}
+
+// Entrées solo : la ligne `bg_teams` qui représente un joueur en tournoi
+// individuel (voir `docs/features/SOLO_TOURNAMENTS.md`). Sans membre, nommée
+// d'après le pseudo, elle sert d'engagé aux tournois `participantType: "SOLO"`.
+async function createSoloEntries(db: Pool, userIds: number[]): Promise<number[]> {
+  console.log("🙋 Création des entrées solo (tournois individuels)...");
+  const entryIds: number[] = [];
+
+  for (const userId of userIds) {
+    const [users] = await db.execute<(RowDataPacket & { pseudo: string; avatar_url: string | null })[]>(
+      `SELECT pseudo, avatar_url FROM bg_users WHERE id = ? LIMIT 1`,
+      [userId],
+    );
+    if (users.length === 0) continue;
+
+    for (const name of soloEntryNameCandidates(users[0].pseudo, userId)) {
+      try {
+        const [result] = await db.execute<ResultSetHeader>(
+          `INSERT INTO bg_teams (name, logo_url, description, is_ghost, solo_user_id)
+           VALUES (?, ?, NULL, 0, ?)`,
+          [name, users[0].avatar_url, userId],
+        );
+        entryIds.push(result.insertId as number);
+        break;
+      } catch {
+        // Nom déjà pris par une équipe : on essaie le candidat suivant.
+      }
+    }
+  }
+
+  console.log(`  ✓ ${entryIds.length} entrées solo créées`);
+  return entryIds;
 }
 
 // Génère en masse des équipes « remplissage » (chacune avec un seul owner) pour
@@ -955,6 +992,7 @@ async function createTournament(
   db: Pool,
   organizerId: number,
   teamIds: number[],
+  soloEntryIds: number[],
   def: TournamentDef,
   index: number
 ): Promise<number> {
@@ -967,6 +1005,10 @@ async function createTournament(
   const isSwiss = format === "SWISS";
   const isMulti = format === "MULTI";
   const isEndurance = format === "BG_SURVIE";
+  // Tournoi individuel : les engagés sont les entrées solo des joueurs, pas
+  // les équipes.
+  const participantType = def.participantType ?? "TEAM";
+  const entrantPool = participantType === "SOLO" ? soloEntryIds : teamIds;
 
   // Les états sont dérivés des dates par computeTournamentState() : on les
   // calibre pour que l'état voulu soit stable après resynchronisation.
@@ -999,11 +1041,11 @@ async function createTournament(
 
   const [result] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_tournaments
-     (organizer_user_id, name, game, description, format, has_third_place_match,
+     (organizer_user_id, name, game, description, format, participant_type, has_third_place_match,
       survival_rounds_before_first_cut, survival_rounds_per_cut, swiss_total_rounds,
       endurance_start_points, endurance_playoff_size,
       max_teams, state, start_visibility_at, registration_open_at, registration_close_at, start_at, finished_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       organizerId,
       `Test - ${def.name}`,
@@ -1012,6 +1054,7 @@ async function createTournament(
         ? `Tournoi test ${def.game} — ${def.state} — ${format}`
         : def.description,
       format,
+      participantType,
       hasThirdPlace,
       survivalRoundsBeforeFirstCut,
       survivalRoundsPerCut,
@@ -1031,8 +1074,8 @@ async function createTournament(
 
   // Inscriptions — la tranche d'équipes varie d'un tournoi à l'autre pour que
   // les mêmes équipes ne finissent pas systématiquement au même rang.
-  const offset = (def.teamOffset ?? 0) % Math.max(teamIds.length, 1);
-  const pool = [...teamIds.slice(offset), ...teamIds.slice(0, offset)];
+  const offset = (def.teamOffset ?? 0) % Math.max(entrantPool.length, 1);
+  const pool = [...entrantPool.slice(offset), ...entrantPool.slice(0, offset)];
   const teamsToUse = pool.slice(0, Math.min(def.teamCount, pool.length));
   for (let i = 0; i < teamsToUse.length; i++) {
     await db.execute(
@@ -1111,6 +1154,10 @@ async function main(): Promise<void> {
     const teamIds = [...namedTeamIds, ...bulkTeamIds];
     console.log();
 
+    // Engagés des tournois individuels : une entrée solo par joueur nommé.
+    const soloEntryIds = await createSoloEntries(db, userIds);
+    console.log();
+
     await createSponsors(db);
     console.log();
 
@@ -1121,7 +1168,7 @@ async function main(): Promise<void> {
 
     console.log("🎮 Création des tournois...");
     for (let i = 0; i < TOURNAMENTS.length; i++) {
-      await createTournament(db, organizerId, teamIds, TOURNAMENTS[i], i);
+      await createTournament(db, organizerId, teamIds, soloEntryIds, TOURNAMENTS[i], i);
     }
 
     const byState = (state: TournamentDef["state"]) =>
@@ -1138,6 +1185,7 @@ async function main(): Promise<void> {
     console.log(`    - états : ${byState("UPCOMING")} à venir · ${byState("REGISTRATION")} inscriptions · ${byState("RUNNING")} en cours · ${byState("FINISHED")} terminés`);
     console.log(`    - formats : ${byFormat("SINGLE")} simple · ${byFormat("DOUBLE")} double · ${byFormat("SWISS")} suisse · ${byFormat("SURVIVAL")} survie · ${byFormat("MULTI")} multi-phase · ${byFormat("BG_SURVIE")} BG Survie`);
     console.log(`    - effectifs : 0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 17, 21, 64, 128`);
+    console.log(`    - individuel : ${TOURNAMENTS.filter((t) => t.participantType === "SOLO").length} tournois solo (${soloEntryIds.length} entrées disponibles)`);
     console.log(`    - survie : barrage impair (3/5/7/9/11/15/21), cadences 1/2/3, forfaits`);
     console.log(`    - matchs : reports en attente, conflits de score, délais expirés`);
     console.log(`\n  Admin de test : DEV_AUTH_USER_ID=${organizerId}\n`);

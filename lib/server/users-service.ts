@@ -3,6 +3,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
+import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
 import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 import type {
   FullProfileResponse,
@@ -12,6 +13,19 @@ import type {
   TeamRole,
   UserTeamTimeline,
 } from "@/lib/shared/types";
+
+/**
+ * Engagements d'un joueur en tournoi : ses équipes (passées et présentes) et
+ * son entrée solo, s'il en a une (tournois individuels — voir
+ * `lib/server/solo-entries-service.ts`). Un tournoi joué en individuel compte
+ * donc dans son palmarès au même titre qu'un tournoi joué en équipe.
+ */
+const USER_ENTRIES_SQL = `(
+       SELECT user_id, team_id, left_at FROM bg_team_members
+       UNION ALL
+       SELECT solo_user_id AS user_id, id AS team_id, NULL AS left_at
+       FROM bg_teams WHERE solo_user_id IS NOT NULL
+     )`;
 
 export type GoogleProfilePayload = {
   sub: string;
@@ -216,7 +230,7 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
     })[]
   >(
     `SELECT tm.user_id, COUNT(DISTINCT tr.tournament_id) AS tournament_count
-     FROM bg_team_members tm
+     FROM ${USER_ENTRIES_SQL} tm
      JOIN bg_tournament_registrations tr ON tr.team_id = tm.team_id
      WHERE tm.user_id IN (${userIds.map(() => "?").join(",")})
      GROUP BY tm.user_id`,
@@ -238,7 +252,7 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
     `SELECT tm.user_id,
             COALESCE(SUM(CASE WHEN m.winner_team_id = tm.team_id THEN 1 ELSE 0 END), 0) AS wins,
             COALESCE(SUM(CASE WHEN m.loser_team_id = tm.team_id THEN 1 ELSE 0 END), 0) AS losses
-     FROM bg_team_members tm
+     FROM ${USER_ENTRIES_SQL} tm
      LEFT JOIN bg_tournament_registrations tr ON tr.team_id = tm.team_id
      LEFT JOIN bg_matches m ON m.tournament_id = tr.tournament_id
        AND (m.winner_team_id = tm.team_id OR m.loser_team_id = tm.team_id)
@@ -484,6 +498,12 @@ export async function updateOwnProfile(
       userId,
     ],
   );
+
+  // L'entrée solo (tournois individuels) affiche le pseudo du joueur dans les
+  // brackets : elle suit le renommage.
+  if (patch.pseudo) {
+    await syncSoloEntryIdentity(userId);
+  }
 }
 
 /**
@@ -515,6 +535,8 @@ export async function anonymizeOwnAccount(userId: number): Promise<void> {
     [userId],
   );
   await db.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
+  // Le pseudo anonymisé doit aussi remplacer le nom affiché en tournoi.
+  await syncSoloEntryIdentity(userId);
 }
 
 export async function updateUserAvatar(userId: number, avatarPath: string | null): Promise<void> {
@@ -523,6 +545,8 @@ export async function updateUserAvatar(userId: number, avatarPath: string | null
     `UPDATE bg_users SET avatar_url = ? WHERE id = ?`,
     [avatarPath, userId],
   );
+  // Le logo de l'entrée solo est l'avatar du joueur.
+  await syncSoloEntryIdentity(userId);
 }
 
 export async function getFullProfile(
@@ -599,7 +623,7 @@ export async function getFullProfile(
       COALESCE(SUM(CASE WHEN m.winner_team_id = tm.team_id THEN 1 ELSE 0 END), 0) AS wins,
       COALESCE(SUM(CASE WHEN m.loser_team_id = tm.team_id THEN 1 ELSE 0 END), 0) AS losses,
       COALESCE(t.finished_at, t.start_at) AS played_at
-    FROM bg_team_members tm
+    FROM ${USER_ENTRIES_SQL} tm
     JOIN bg_tournament_registrations r ON r.team_id = tm.team_id
     JOIN bg_tournaments t ON t.id = r.tournament_id
     LEFT JOIN bg_matches m ON m.tournament_id = t.id
@@ -629,7 +653,7 @@ export async function getFullProfile(
       COALESCE(SUM(CASE WHEN m.loser_team_id = tm.team_id THEN 1 ELSE 0 END), 0) AS matches_lost,
       MIN(r.final_rank) AS best_rank,
       AVG(r.final_rank) AS avg_rank
-    FROM bg_team_members tm
+    FROM ${USER_ENTRIES_SQL} tm
     LEFT JOIN bg_tournament_registrations r ON r.team_id = tm.team_id
     LEFT JOIN bg_matches m ON m.tournament_id = r.tournament_id
       AND (m.winner_team_id = tm.team_id OR m.loser_team_id = tm.team_id)

@@ -1,5 +1,8 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getUserActiveTeam } from "@/lib/server/teams-service";
+import { ensureSoloEntry, findSoloEntry } from "@/lib/server/solo-entries-service";
+import { isSoloTournament } from "@/lib/shared/participants";
+import type { TournamentRow } from "./_internal";
 import { syncTournamentState } from "./state";
 import { loadTournamentRow } from "./repository";
 
@@ -53,18 +56,52 @@ async function registerTeam(
   );
 }
 
+/**
+ * Engagé d'un joueur dans un tournoi donné : son équipe active en tournoi par
+ * équipes, son entrée solo en tournoi individuel. `null` quand il n'a rien à
+ * engager (aucune équipe, ou aucune entrée solo encore créée).
+ *
+ * C'est la résolution à utiliser partout où l'on demandait « l'équipe du
+ * joueur » à propos d'un tournoi : inscription, report de score, forfait.
+ */
+export async function resolveUserEntrantTeamId(
+  connection: PoolConnection,
+  tournament: Pick<TournamentRow, "participant_type">,
+  userId: number,
+): Promise<number | null> {
+  if (isSoloTournament(tournament.participant_type)) {
+    return findSoloEntry(connection, userId);
+  }
+
+  const activeTeam = await getUserActiveTeam(userId);
+  return activeTeam?.teamId ?? null;
+}
+
+/**
+ * Inscription à l'initiative du joueur : son équipe active, ou lui-même via son
+ * entrée solo si le tournoi est individuel.
+ */
 export async function registerCurrentUserTeam(
   connection: PoolConnection,
   tournamentId: number,
   userId: number,
 ): Promise<void> {
-  const activeTeam = await getUserActiveTeam(userId);
+  const tournament = await loadTournamentRow(connection, tournamentId);
+  if (!tournament) {
+    throw new Error("TOURNAMENT_NOT_FOUND");
+  }
 
-  if (!activeTeam) {
+  // L'entrée solo n'est créée qu'ici : un joueur qui n'a jamais participé à un
+  // tournoi individuel n'a pas de ligne parasite dans `bg_teams`.
+  const teamId = isSoloTournament(tournament.participant_type)
+    ? await ensureSoloEntry(connection, userId)
+    : (await getUserActiveTeam(userId))?.teamId ?? null;
+
+  if (teamId === null) {
     throw new Error("NO_ACTIVE_TEAM");
   }
 
-  await registerTeam(connection, tournamentId, activeTeam.teamId);
+  await registerTeam(connection, tournamentId, teamId);
 }
 
 /**
@@ -93,17 +130,21 @@ export async function canUserRegister(
   tournamentId: number,
   userId: number,
 ): Promise<boolean> {
-  const activeTeam = await getUserActiveTeam(userId);
-  if (!activeTeam) return false;
-
   const tournament = await loadTournamentRow(connection, tournamentId);
   if (!tournament || tournament.state !== "REGISTRATION") return false;
+
+  const solo = isSoloTournament(tournament.participant_type);
+  const teamId = await resolveUserEntrantTeamId(connection, tournament, userId);
+
+  // En individuel, l'absence d'entrée solo n'est pas un obstacle : elle sera
+  // créée à l'inscription. En tournoi par équipes, il faut une équipe active.
+  if (teamId === null) return solo;
 
   const [count] = await connection.execute<(RowDataPacket & { c: number })[]>(
     `SELECT COUNT(*) AS c
      FROM bg_tournament_registrations
      WHERE tournament_id = ? AND team_id = ?`,
-    [tournamentId, activeTeam.teamId],
+    [tournamentId, teamId],
   );
 
   return Number(count[0]?.c ?? 0) === 0;

@@ -1,14 +1,14 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { forfeitTournamentTeam } from "@/lib/server/tournaments-service";
-import { getUserActiveTeam } from "@/lib/server/teams-service";
+import { forfeitTournamentTeam, getUserEntrantTeamId } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
 
 /**
- * Déclare le forfait d'une équipe dans un tournoi « Survie » ou « Ronde suisse »
- * — les formats où une équipe reste en lice sans être éliminée par une défaite.
- * - Un membre déclare le forfait de son équipe active.
- * - Un arbitre/admin peut forcer le forfait de n'importe quelle équipe (`teamId`).
+ * Déclare le forfait d'un engagé dans un tournoi « Survie » ou « Ronde suisse »
+ * — les formats où l'on reste en lice sans être éliminé par une défaite.
+ * - Un joueur déclare le forfait de son engagé : son équipe active, ou lui-même
+ *   si le tournoi est individuel.
+ * - Un arbitre/admin peut forcer le forfait de n'importe quel engagé (`teamId`).
  */
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -27,10 +27,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (isReferee && body.teamId) {
     teamId = Number(body.teamId);
   } else {
-    const activeTeam = await getUserActiveTeam(user.id);
-    if (!activeTeam) return fail("NO_ACTIVE_TEAM", 400);
-    teamId = activeTeam.teamId;
-    // Un non-arbitre ne peut forfaiter que sa propre équipe.
+    const entrantTeamId = await getUserEntrantTeamId(tournamentId, user.id);
+    if (entrantTeamId === null) return fail("NO_ACTIVE_TEAM", 400);
+    teamId = entrantTeamId;
+    // Un non-arbitre ne peut forfaiter que son propre engagé.
     if (body.teamId && Number(body.teamId) !== teamId) {
       return fail("FORBIDDEN", 403);
     }

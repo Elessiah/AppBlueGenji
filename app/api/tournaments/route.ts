@@ -1,6 +1,7 @@
 ﻿import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { createTournament, listTournamentBuckets } from "@/lib/server/tournaments-service";
+import { isParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import { can } from "@/lib/shared/permissions";
 import { DEFAULT_SWISS_POINTS } from "@/lib/shared/swiss";
 import type { TournamentFormat } from "@/lib/shared/types";
@@ -127,6 +128,7 @@ export async function POST(req: Request) {
       description?: string | null;
       format?: TournamentFormat;
       game?: "OW2" | "MR";
+      participantType?: ParticipantType;
       maxTeams?: number;
       startVisibilityAt?: string;
       registrationOpenAt?: string;
@@ -163,6 +165,10 @@ export async function POST(req: Request) {
       if (phaseError) return fail(phaseError, 400);
     }
     if (body.game && body.game !== "OW2" && body.game !== "MR") return fail("INVALID_GAME", 400);
+    // Type de participant : équipes (défaut) ou joueurs inscrits individuellement.
+    if (body.participantType !== undefined && !isParticipantType(body.participantType)) {
+      return fail("INVALID_PARTICIPANT_TYPE", 400);
+    }
 
     const maxTeams = Number(body.maxTeams ?? 0);
     if (!Number.isInteger(maxTeams) || maxTeams < 2 || maxTeams > 256) {
@@ -268,6 +274,7 @@ export async function POST(req: Request) {
       description: body.description ?? null,
       format: body.format,
       game: body.game ?? "OW2",
+      participantType: body.participantType ?? "TEAM",
       maxTeams,
       startVisibilityAt: body.startVisibilityAt ?? "",
       registrationOpenAt: body.registrationOpenAt ?? "",

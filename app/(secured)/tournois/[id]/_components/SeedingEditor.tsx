@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ui/toast";
+import { useParticipantWording } from "../_lib/entrant-link";
 import { moveInOrder, type SeedingEntry, type SeedingLockReason } from "@/lib/shared/seeding";
 
 interface SeedingEditorProps {
@@ -24,6 +25,7 @@ const LOCK_MESSAGES: Record<NonNullable<SeedingLockReason>, string> = {
  */
 export function SeedingEditor({ tournamentId, onReordered }: SeedingEditorProps) {
   const { showError, showSuccess } = useToast();
+  const wording = useParticipantWording();
   const [entries, setEntries] = useState<SeedingEntry[]>([]);
   const [lockReason, setLockReason] = useState<SeedingLockReason>(null);
   const [manualSeeding, setManualSeeding] = useState(false);
@@ -92,7 +94,7 @@ export function SeedingEditor({ tournamentId, onReordered }: SeedingEditorProps)
   return (
     <div className="ds-block" style={{ marginBottom: 20 }}>
       <div className="ds-section-title green">
-        <h2>Seeding {locked ? "(figé)" : "· ordre des équipes"}</h2>
+        <h2>Seeding {locked ? "(figé)" : `· ordre des ${wording.many}`}</h2>
       </div>
 
       <p style={{ margin: "0 0 14px", fontSize: 12, color: "var(--text-2)" }}>

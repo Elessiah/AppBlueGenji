@@ -29,6 +29,8 @@ export interface SeedPhase {
 export interface TournamentDef extends ReportStateCounts {
   name: string;
   game: "OW2" | "MR";
+  /** « SOLO » = tournoi individuel : les engagés sont des joueurs (défaut « TEAM »). */
+  participantType?: "TEAM" | "SOLO";
   state: "UPCOMING" | "REGISTRATION" | "RUNNING" | "FINISHED";
   teamCount: number;
   maxTeams: number;
@@ -131,6 +133,11 @@ export const TOURNAMENTS: TournamentDef[] = [
   { name: "Survie Championnat 12", game: "OW2", state: "FINISHED", format: "SURVIVAL", teamCount: 12, maxTeams: 16, daysOffset: -40, survivalRoundsPerCut: 2 },
   { name: "Survie Last Stand 8", game: "MR", state: "FINISHED", format: "SURVIVAL", teamCount: 8, maxTeams: 8, daysOffset: -28, survivalRoundsPerCut: 1, teamOffset: 8 },
   { name: "Survie Barrage 7 (terminé)", game: "OW2", state: "FINISHED", format: "SURVIVAL", teamCount: 7, maxTeams: 8, daysOffset: -15, survivalRoundsPerCut: 2, teamOffset: 13 },
+
+  // ---- SOLO : tournois individuels (les joueurs s'inscrivent eux-mêmes) ---
+  { name: "Solo Inscriptions Ouvertes", game: "OW2", state: "REGISTRATION", participantType: "SOLO", format: "SINGLE", teamCount: 6, maxTeams: 16, daysOffset: 11 },
+  { name: "Solo 8 Joueurs (simple élim.)", game: "MR", state: "RUNNING", participantType: "SOLO", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -2, playWaves: 2, teamOffset: 8 },
+  { name: "Solo Suisse Terminé", game: "OW2", state: "FINISHED", participantType: "SOLO", format: "SWISS", teamCount: 8, maxTeams: 8, daysOffset: -18, swissTotalRounds: 3, teamOffset: 16 },
 
   // ---- MULTI : tournois multi-phases -------------------------------------------
   {

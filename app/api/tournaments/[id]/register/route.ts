@@ -22,11 +22,12 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
       || message === "REGISTRATION_CLOSED"
       || message === "TOURNAMENT_FULL"
       || message === "ALREADY_REGISTERED"
+      || message === "SOLO_ENTRY_NAME_UNAVAILABLE"
     ) {
       return fail(message, 400);
     }
 
-    if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);
+    if (message === "TOURNAMENT_NOT_FOUND" || message === "USER_NOT_FOUND") return fail(message, 404);
     return fail(message || "REGISTRATION_FAILED", 500);
   }
 }

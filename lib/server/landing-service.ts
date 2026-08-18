@@ -41,7 +41,7 @@ export async function getLandingStats(): Promise<LandingStats> {
     const [rows] = await db.execute<StatsRow[]>(`
       SELECT
         (SELECT COUNT(*) FROM bg_users) AS players,
-        (SELECT COUNT(*) FROM bg_teams) AS teams,
+        (SELECT COUNT(*) FROM bg_teams WHERE solo_user_id IS NULL) AS teams,
         (SELECT COUNT(*) FROM bg_tournaments) AS tournaments
     `);
     const row = rows[0];
@@ -160,6 +160,7 @@ async function loadLeaderboardRows(
        ON (m.team1_id = t.id OR m.team2_id = t.id)
       AND m.status = 'COMPLETED'
       ${where}
+     WHERE t.solo_user_id IS NULL
      GROUP BY t.id, t.name, t.logo_url
      ORDER BY ${rankingPointsSql("wins", "losses")} DESC, wins DESC, t.name ASC`,
   );
