@@ -27,7 +27,8 @@ export async function loadTournamentRow(
       survival_rounds_before_first_cut,
       survival_rounds_per_cut,
       survival_current_round,
-      current_phase_id
+      current_phase_id,
+      manual_seeding
      FROM bg_tournaments
      WHERE id = ?
      LIMIT 1`,

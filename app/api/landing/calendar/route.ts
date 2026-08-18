@@ -37,7 +37,7 @@ function buildIcs(events: LandingCalendarEvent[]): string {
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//BlueGenji//Arena//FR",
+    "PRODID:-//BlueGenji//Esport//FR",
     "CALSCALE:GREGORIAN",
   ];
 

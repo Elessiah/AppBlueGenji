@@ -1,6 +1,13 @@
 ﻿import type { PlatformRole } from "./permissions";
 
-export type TournamentFormat = "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL" | "MULTI";
+export type TournamentFormat =
+  | "SINGLE"
+  | "DOUBLE"
+  | "SWISS"
+  | "SURVIVAL"
+  | "MULTI"
+  /** « BlueGenji Survie » : endurance puis play-offs à 8 (`docs/features/BG_SURVIE_MODE.md`). */
+  | "BG_SURVIE";
 
 export type PhaseFormat = "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL";
 export type PhaseQualifierMode = "COUNT" | "PERCENT";
@@ -61,6 +68,38 @@ export type SurvivalMeta = {
   standings: SurvivalStandingRow[];
 };
 
+/** Ligne du classement d'endurance (mode « BlueGenji Survie »). */
+export type EnduranceStandingRow = {
+  teamId: number;
+  teamName: string;
+  logoUrl: string | null;
+  /** Rang de départ, fixé par l'ordre de seeding. */
+  seed: number;
+  /** Capital d'endurance restant. */
+  points: number;
+  wins: number;
+  losses: number;
+  status: "ACTIVE" | "ELIMINATED" | "FORFEIT";
+  eliminatedRound: number | null;
+  rank: number;
+};
+
+export type EnduranceMeta = {
+  /** Capital de départ (défaut 9). */
+  startPoints: number;
+  /** Points gagnés par victoire de map. */
+  winDelta: number;
+  /** Points perdus par défaite de map. */
+  lossDelta: number;
+  /** Effectif de la phase éliminatoire (8 par le règlement). */
+  playoffSize: number;
+  /** Dernière manche générée en phase qualificative. */
+  currentRound: number;
+  /** Vrai dès que l'arbre des play-offs a été construit. */
+  playoffsStarted: boolean;
+  standings: EnduranceStandingRow[];
+};
+
 export type SwissTiebreaker = "buchholz" | "sonneborn-berger" | "opponent-mwp" | "head-to-head";
 
 export type SwissStandingRow = {
@@ -111,9 +150,15 @@ export type TeamRole =
   | "MANAGER"
   | "OWNER";
 
+/**
+ * Réglages de confidentialité d'un profil.
+ *
+ * Le **pseudo n'y figure pas** : c'est l'identité de base du joueur sur la
+ * plateforme (brackets, rosters, feuilles de match), il reste toujours visible.
+ * Seules les données de contact et d'état civil peuvent être masquées.
+ */
 export type VisibilitySettings = {
   avatar: boolean;
-  pseudo: boolean;
   overwatch: boolean;
   marvel: boolean;
   major: boolean;
@@ -129,6 +174,12 @@ export type PublicUserProfile = {
   marvelRivalsTag: string | null;
   isAdult: boolean | null;
   visibility: VisibilitySettings;
+  /**
+   * Ouvert au recrutement : le joueur accepte d'être démarché par les équipes.
+   * À `false`, il n'apparaît plus dans le filtre « Free agents » de `/joueurs`
+   * même s'il n'a pas d'équipe.
+   */
+  openToRecruitment: boolean;
   createdAt: string;
   // Privé — uniquement renseigné quand le viewer consulte son propre profil.
   discordPseudo?: string | null;
@@ -159,6 +210,8 @@ export type TeamListItem = {
   games: ("OW2" | "MR")[];
   rosterPreview: { userId: number; pseudo: string; avatarUrl: string | null }[];
   region: string | null;
+  /** Équipe fantôme : créée par le staff, sans joueur rattaché. */
+  isGhost: boolean;
 };
 
 export type TeamMember = {
@@ -258,6 +311,8 @@ export type TournamentDetail = {
   survival: SurvivalMeta | null;
   /** Métadonnées du mode Ronde suisse (null pour les autres formats). */
   swiss: SwissMeta | null;
+  /** Métadonnées du mode BlueGenji Survie (null pour les autres formats). */
+  endurance: EnduranceMeta | null;
   /** Phases du tournoi multi-mode (null pour les tournois mono-mode). */
   phases: TournamentPhase[] | null;
   /** ID de la phase actuellement en cours (null si aucune phase n'est en cours). */
@@ -405,6 +460,7 @@ export type PersonalDataExport = {
     overwatchBattletag: string | null;
     marvelRivalsTag: string | null;
     visibility: VisibilitySettings;
+    openToRecruitment: boolean;
   };
   stats: ProfileStats;
   teamsTimeline: UserTeamTimeline[];
@@ -419,10 +475,17 @@ export type TeamDetailResponse = {
     description: string | null;
     createdAt: string;
     deletedAt: string | null;
+    /** Équipe fantôme : créée par le staff, sans joueur rattaché. */
+    isGhost: boolean;
   };
   members: TeamMember[];
   tournaments: TeamHistoryRow[];
   canManage: boolean;
+  /**
+   * Vrai si le viewer administre cette équipe au titre de la permission
+   * `tournaments` (équipe fantôme) et non parce qu'il en est membre.
+   */
+  managedAsGhost: boolean;
   // Relation du viewer à l'équipe (self-service / invitations).
   viewerMembership: "MEMBER" | "OWNER" | "NONE";
   viewerInvitation: "INVITED" | "REQUESTED" | "NONE";

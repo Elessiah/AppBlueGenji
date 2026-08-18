@@ -5,33 +5,43 @@ import { CountdownStrip, CyberButton } from "@/components/cyber";
 import type { LandingLive, LandingStats } from "@/lib/shared/landing";
 import type { TournamentCard } from "@/lib/shared/types";
 import { LiveCard } from "./LiveCard";
+import { EditableCopy } from "./EditableCopy";
+import type { SiteCopy } from "@/lib/shared/site-copy";
 import styles from "./Hero.module.css";
 
 type HeroProps = {
   stats: LandingStats;
   live: LandingLive | null;
   nextUpcoming: TournamentCard | null;
+  /** Textes éditables de la vitrine (défauts compris). */
+  copy: SiteCopy;
+  /** Le viewer peut-il éditer les textes (permission `showcase`) ? */
+  canEditCopy: boolean;
 };
 
-export function Hero({ stats, live, nextUpcoming }: HeroProps) {
+export function Hero({ stats, live, nextUpcoming, copy, canEditCopy }: HeroProps) {
   return (
     <section className={styles.root}>
       <div className="fabric" />
       <div className={styles.inner}>
         <div className={styles.left}>
-          <span className="eyebrow">ASSOCIATION ESPORT · LOI 1901</span>
-          <h1 className="display" style={{ fontSize: "clamp(38px, 7vw, 82px)" }}>
-            Organiser,
-            <br />
-            jouer,
-            <br />
-            <span className={styles.accent}>gagner ensemble.</span>
-          </h1>
-          <p className={styles.lede}>
-            BlueGenji fédère une scène amateur francophone avec des tournois
-            lisibles, des brackets en direct, des arbitres bénévoles et une
-            communauté Discord active autour d&apos;Overwatch 2 et Marvel Rivals.
-          </p>
+          <EditableCopy copyKey="home.hero.eyebrow" value={copy["home.hero.eyebrow"]} canEdit={canEditCopy}>
+            <span className="eyebrow">{copy["home.hero.eyebrow"]}</span>
+          </EditableCopy>
+          <EditableCopy copyKey="home.hero.title" value={copy["home.hero.title"]} canEdit={canEditCopy}>
+            <h1 className="display" style={{ fontSize: "clamp(38px, 7vw, 82px)" }}>
+              {/* Dernière ligne du titre accentuée : c'est la chute du slogan. */}
+              {copy["home.hero.title"].split("\n").map((line, index, lines) => (
+                <span key={line + index} className={index === lines.length - 1 ? styles.accent : undefined}>
+                  {line}
+                  {index < lines.length - 1 ? <br /> : null}
+                </span>
+              ))}
+            </h1>
+          </EditableCopy>
+          <EditableCopy copyKey="home.hero.lede" value={copy["home.hero.lede"]} canEdit={canEditCopy}>
+            <p className={styles.lede}>{copy["home.hero.lede"]}</p>
+          </EditableCopy>
 
           <div className={styles.actions}>
             <CyberButton variant="primary" asChild>

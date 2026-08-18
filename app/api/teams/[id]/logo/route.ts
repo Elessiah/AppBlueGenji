@@ -1,8 +1,9 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
-import { canManageTeam, getTeamLogoUrl, updateTeamLogo } from "@/lib/server/teams-service";
+import { canManageTeam, getTeamLogoUrl, isGhostTeam, updateTeamLogo } from "@/lib/server/teams-service";
 import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
+import { can } from "@/lib/shared/permissions";
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -14,7 +15,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return fail("INVALID_TEAM_ID", 400);
   }
 
-  if (!(await canManageTeam(teamId, user.id))) {
+  const managesGhostTeams = can(user, "tournaments");
+  if (!(await canManageTeam(teamId, user.id)) && !(managesGhostTeams && (await isGhostTeam(teamId)))) {
     return fail("FORBIDDEN", 403);
   }
 
@@ -32,7 +34,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     const currentLogo = await getTeamLogoUrl(teamId);
     const diskPath = await processAndStoreImage(file, "team-logo", teamId);
     const servedUrl = toServedUploadUrl(diskPath);
-    await updateTeamLogo(user.id, teamId, servedUrl);
+    await updateTeamLogo(user.id, teamId, servedUrl, managesGhostTeams);
     await deleteStoredImage(toDiskUploadPath(currentLogo));
     return ok({ logoUrl: servedUrl });
   } catch (error) {
@@ -54,7 +56,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
 
   try {
     const currentLogo = await getTeamLogoUrl(teamId);
-    await updateTeamLogo(user.id, teamId, null);
+    await updateTeamLogo(user.id, teamId, null, can(user, "tournaments"));
     await deleteStoredImage(toDiskUploadPath(currentLogo));
     return ok({ logoUrl: null });
   } catch (error) {

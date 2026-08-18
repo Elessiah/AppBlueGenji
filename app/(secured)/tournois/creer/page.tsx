@@ -41,6 +41,11 @@ export default function CreateTournamentPage() {
   const [format, setFormat] = useState<TournamentFormat>("SINGLE");
   const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(false);
   const [survivalRoundsPerCut, setSurvivalRoundsPerCut] = useState(3);
+  // BlueGenji Survie : capital d'endurance et barème (défauts du règlement).
+  const [endurancePoints, setEndurancePoints] = useState(9);
+  const [enduranceWinDelta, setEnduranceWinDelta] = useState(1);
+  const [enduranceLossDelta, setEnduranceLossDelta] = useState(1);
+  const [endurancePlayoffSize, setEndurancePlayoffSize] = useState(8);
   const [survivalRoundsBeforeFirstCut, setSurvivalRoundsBeforeFirstCut] = useState(3);
   const [maxTeams, setMaxTeams] = useState(16);
   const [phases, setPhases] = useState<PhaseConfig[]>([
@@ -118,6 +123,10 @@ export default function CreateTournamentPage() {
           swissPointsWin: format === "SWISS" ? swissPointsWin : undefined,
           swissPointsDraw: format === "SWISS" ? swissPointsDraw : undefined,
           swissPointsLoss: format === "SWISS" ? swissPointsLoss : undefined,
+          endurancePoints: format === "BG_SURVIE" ? endurancePoints : undefined,
+          enduranceWinDelta: format === "BG_SURVIE" ? enduranceWinDelta : undefined,
+          enduranceLossDelta: format === "BG_SURVIE" ? enduranceLossDelta : undefined,
+          endurancePlayoffSize: format === "BG_SURVIE" ? endurancePlayoffSize : undefined,
         }),
       });
       const payload = (await response.json()) as { error?: string; id?: number };
@@ -220,6 +229,7 @@ export default function CreateTournamentPage() {
                     <option value="DOUBLE">Double élimination</option>
                     <option value="SWISS">Ronde suisse</option>
                     <option value="SURVIVAL">Survie</option>
+                    <option value="BG_SURVIE">BlueGenji Survie (endurance)</option>
                     <option value="MULTI">Multi-phases</option>
                   </select>
                 </div>
@@ -243,6 +253,65 @@ export default function CreateTournamentPage() {
                       onChange={setPhases}
                     />
                   </div>
+                )}
+
+                {format === "BG_SURVIE" && (
+                  <>
+                    <div className="field">
+                      <label htmlFor="endurance-points">Capital d&apos;endurance</label>
+                      <input
+                        id="endurance-points"
+                        type="number"
+                        min={1}
+                        max={99}
+                        value={endurancePoints}
+                        onChange={(e) => setEndurancePoints(Number(e.target.value))}
+                      />
+                      <p style={HINT}>
+                        Points de départ de chaque équipe. À 0, elle est éliminée.
+                      </p>
+                    </div>
+
+                    <div className="field">
+                      <label htmlFor="endurance-win">Points par victoire de map</label>
+                      <input
+                        id="endurance-win"
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={enduranceWinDelta}
+                        onChange={(e) => setEnduranceWinDelta(Number(e.target.value))}
+                      />
+                    </div>
+
+                    <div className="field">
+                      <label htmlFor="endurance-loss">Points par défaite de map</label>
+                      <input
+                        id="endurance-loss"
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={enduranceLossDelta}
+                        onChange={(e) => setEnduranceLossDelta(Number(e.target.value))}
+                      />
+                    </div>
+
+                    <div className="field">
+                      <label htmlFor="endurance-playoff">Équipes en play-offs</label>
+                      <input
+                        id="endurance-playoff"
+                        type="number"
+                        min={2}
+                        max={32}
+                        value={endurancePlayoffSize}
+                        onChange={(e) => setEndurancePlayoffSize(Number(e.target.value))}
+                      />
+                      <p style={HINT}>
+                        La phase d&apos;endurance s&apos;arrête à cet effectif. À 8, l&apos;arbre
+                        suit le tableau du règlement (8v4, 6v2, 1v5, 3v7) avec petite finale.
+                      </p>
+                    </div>
+                  </>
                 )}
 
                 {format === "SURVIVAL" && (

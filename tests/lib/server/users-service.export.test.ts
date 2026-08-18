@@ -22,10 +22,10 @@ function exportRow(overrides: Record<string, unknown> = {}) {
     is_adult: 1,
     is_admin: 0,
     visible_avatar: 0,
-    visible_pseudo: 1,
     visible_overwatch: 0,
     visible_marvel: 0,
     visible_major: 0,
+    open_to_recruitment: 1,
     created_at: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
   };
@@ -42,10 +42,10 @@ function fullProfileRow(overrides: Record<string, unknown> = {}) {
     discord_pseudo: "player#0001",
     is_adult: 1,
     visible_avatar: 0,
-    visible_pseudo: 1,
     visible_overwatch: 0,
     visible_marvel: 0,
     visible_major: 0,
+    open_to_recruitment: 1,
     is_admin: 0,
     created_at: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
@@ -76,7 +76,15 @@ describe("exportOwnData", () => {
       isAdmin: false,
     });
     expect(data.profile.overwatchBattletag).toBe("Player#1234");
-    expect(data.profile.visibility.pseudo).toBe(true);
+    // Le pseudo n'est plus un réglage de visibilité ; l'ouverture au
+    // recrutement, elle, fait partie des données exportées.
+    expect(data.profile.visibility).toEqual({
+      avatar: false,
+      overwatch: false,
+      marvel: false,
+      major: false,
+    });
+    expect(data.profile.openToRecruitment).toBe(true);
     expect(data.exportedAt).toEqual(expect.any(String));
     // La requête d'identité exclut les comptes supprimés.
     const [selectSql, params] = execute.mock.calls[0] as [string, unknown[]];
@@ -84,11 +92,11 @@ describe("exportOwnData", () => {
     expect(params).toEqual([42]);
   });
 
-  it("does not mask self data (pseudo kept, not replaced by 'Joueur #id')", async () => {
+  it("exporte le pseudo tel quel, tous réglages coupés", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce([[exportRow({ visible_pseudo: 0 })]])
-      .mockResolvedValueOnce([[fullProfileRow({ visible_pseudo: 0 })]])
+      .mockResolvedValueOnce([[exportRow({ visible_avatar: 0, open_to_recruitment: 0 })]])
+      .mockResolvedValueOnce([[fullProfileRow({ visible_avatar: 0, open_to_recruitment: 0 })]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[{}]]);

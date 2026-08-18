@@ -16,7 +16,7 @@ const REGLEMENT_URL =
 export const metadata: Metadata = {
   title: "BlueGenji - Mentions légales",
   description:
-    "Mentions légales de la plateforme BlueGenji Arena, éditée par l'association Bluegenji Esport (loi 1901).",
+    "Mentions légales de la plateforme BlueGenji Esport, éditée par l'association Bluegenji Esport (loi 1901).",
   openGraph: {
     title: "BlueGenji - Mentions légales",
     description: "Éditeur, hébergement, propriété intellectuelle et données personnelles.",
@@ -141,7 +141,7 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
     body: (
       <>
         <p>
-          La plateforme BlueGenji Arena est éditée par l&apos;association{" "}
+          La plateforme est éditée par l&apos;association{" "}
           <strong>Bluegenji Esport</strong>, association à but non lucratif régie par la loi du
           1<sup>er</sup> juillet 1901 et le décret du 16 août 1901.
         </p>

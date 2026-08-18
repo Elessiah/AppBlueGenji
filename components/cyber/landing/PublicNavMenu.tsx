@@ -22,6 +22,10 @@ const LINKS: NavLink[] = [
  * Menu de navigation principal des pages vitrine, présenté sous forme de menu
  * burger : un bouton ouvre un panneau listant tous les liens. Se ferme au clic
  * en dehors, sur un lien, ou avec la touche Échap.
+ *
+ * Le bouton porte un libellé « MENU » en plus des trois barres : l'icône seule
+ * passait inaperçue à côté des CTA de l'en-tête. Il est rendu en tête de
+ * l'en-tête (avant la marque) pour la même raison.
  */
 export function PublicNavMenu() {
   const pathname = usePathname();
@@ -56,9 +60,12 @@ export function PublicNavMenu() {
         aria-haspopup="true"
         onClick={() => setOpen((v) => !v)}
       >
-        <span className={styles.bar} />
-        <span className={styles.bar} />
-        <span className={styles.bar} />
+        <span className={styles.bars} aria-hidden="true">
+          <span className={styles.bar} />
+          <span className={styles.bar} />
+          <span className={styles.bar} />
+        </span>
+        <span className={styles.label}>MENU</span>
       </button>
 
       {open && (

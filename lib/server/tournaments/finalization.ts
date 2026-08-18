@@ -136,13 +136,23 @@ export async function finalizeTournamentIfDone(
   // écraserait le résultat. En suisse, une ronde terminée ne clôt d'ailleurs
   // rien tant que le compte de rondes prévues n'est pas atteint.
   // Le mode MULTI est, lui, orchestré par `reconcilePhases` : c'est la phase
-  // finale qui décide de la clôture et du classement global.
+  // finale qui décide de la clôture et du classement global. « BlueGenji
+  // Survie » suit la même règle via `reconcileEndurance` / `finalizeEndurance` :
+  // sans cette garde, un instant où tous les matchs sont terminés (entre deux
+  // manches) suffirait à clore le tournoi et à écraser le podium d'endurance.
   const [formatRows] = await connection.execute<(RowDataPacket & { format: string })[]>(
     `SELECT format FROM bg_tournaments WHERE id = ? LIMIT 1`,
     [tournamentId],
   );
   const format = formatRows[0]?.format;
-  if (format === "SURVIVAL" || format === "SWISS" || format === "MULTI") return;
+  if (
+    format === "SURVIVAL" ||
+    format === "SWISS" ||
+    format === "MULTI" ||
+    format === "BG_SURVIE"
+  ) {
+    return;
+  }
 
   const phaseId = 0;
   const isComplete = await isEliminationPhaseComplete(connection, tournamentId, phaseId);

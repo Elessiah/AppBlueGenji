@@ -7,6 +7,12 @@ import { createDoubleEliminationBracket } from "./tournaments/bracket-double";
 import { finalizeMatch } from "./tournaments/scoring";
 import { finalizeTournamentIfDone } from "./tournaments/finalization";
 import {
+  initializeEnduranceTournament,
+  generateEnduranceRound,
+  reconcileEndurance,
+  forfeitEnduranceTeam,
+} from "./tournaments/bg-survie";
+import {
   initializeSwissTournament,
   generateSwissRound,
   reconcileSwiss,
@@ -116,11 +122,12 @@ interface SpecialUserDef {
   isDeleted?: boolean;
   visibility?: Partial<{
     avatar: 0 | 1;
-    pseudo: 0 | 1;
     overwatch: 0 | 1;
     marvel: 0 | 1;
     major: 0 | 1;
   }>;
+  /** Ouvert au recrutement (défaut 1) — 0 = ne veut pas être démarché. */
+  openToRecruitment?: 0 | 1;
   withGameTags?: boolean;
   email?: string;
   discordId?: string;
@@ -164,13 +171,13 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     pseudo: "ProfilPrive",
     purpose: "toutes les visibilités coupées",
     isAdult: 1,
-    visibility: { avatar: 0, pseudo: 0, overwatch: 0, marvel: 0, major: 0 },
+    visibility: { avatar: 0, overwatch: 0, marvel: 0, major: 0 },
   },
   {
     pseudo: "ProfilPublic",
     purpose: "toutes les visibilités actives, majorité affichée",
     isAdult: 1,
-    visibility: { avatar: 1, pseudo: 1, overwatch: 1, marvel: 1, major: 1 },
+    visibility: { avatar: 1, overwatch: 1, marvel: 1, major: 1 },
   },
   { pseudo: "Mineur", purpose: "compte mineur (is_adult = 0)", isAdult: 0 },
   { pseudo: "AgeInconnu", purpose: "majorité non renseignée (is_adult NULL)", isAdult: null },
@@ -181,6 +188,12 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     withGameTags: false,
   },
   { pseudo: "SansEquipe", purpose: "joueur libre, aucune équipe", isAdult: 1 },
+  {
+    pseudo: "PasDeRecrutement",
+    purpose: "sans équipe mais fermé au recrutement (hors filtre free agents)",
+    isAdult: 1,
+    openToRecruitment: 0,
+  },
   {
     pseudo: "CompteSupprime",
     purpose: "compte anonymisé (is_deleted = 1)",
@@ -343,7 +356,6 @@ async function createSpecialUsers(db: Pool): Promise<Map<string, number>> {
     const pseudo = `Test_${def.pseudo}`;
     const visibility = {
       avatar: def.visibility?.avatar ?? 1,
-      pseudo: def.visibility?.pseudo ?? 1,
       overwatch: def.visibility?.overwatch ?? 1,
       marvel: def.visibility?.marvel ?? 1,
       major: def.visibility?.major ?? 0,
@@ -354,8 +366,8 @@ async function createSpecialUsers(db: Pool): Promise<Map<string, number>> {
       const [result] = await db.execute<ResultSetHeader>(
         `INSERT INTO bg_users
          (pseudo, email, discord_id, overwatch_battletag, marvel_rivals_tag,
-          visible_avatar, visible_pseudo, visible_overwatch, visible_marvel, visible_major,
-          is_adult, is_admin, is_deleted, platform_roles_json)
+          visible_avatar, visible_overwatch, visible_marvel, visible_major,
+          open_to_recruitment, is_adult, is_admin, is_deleted, platform_roles_json)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           pseudo,
@@ -364,10 +376,10 @@ async function createSpecialUsers(db: Pool): Promise<Map<string, number>> {
           withTags ? `${def.pseudo}#1000` : null,
           withTags ? `${def.pseudo}#2023` : null,
           visibility.avatar,
-          visibility.pseudo,
           visibility.overwatch,
           visibility.marvel,
           visibility.major,
+          def.openToRecruitment ?? 1,
           def.isAdult === undefined ? 1 : def.isAdult,
           def.isAdmin ? 1 : 0,
           def.isDeleted ? 1 : 0,
@@ -411,6 +423,32 @@ async function createTeams(db: Pool, userIds: number[]): Promise<number[]> {
     }
   }
   console.log(`  ✓ ${teamIds.length} équipes créées`);
+  return teamIds;
+}
+
+// Équipes fantômes : créées par le staff, sans aucun membre (voir
+// `docs/features/GHOST_TEAMS.md`). Présentes dans le jeu de test pour couvrir
+// l'affichage du badge, l'attribution à un joueur et l'inscription en tournoi.
+const GHOST_TEAMS = [
+  { name: "Test - Fantôme Invitée", description: "Équipe invitée, inscrite hors plateforme." },
+  { name: "Test - Fantôme Remplissage", description: null },
+] as const;
+
+async function createGhostTeams(db: Pool): Promise<number[]> {
+  console.log("👻 Création des équipes fantômes...");
+  const teamIds: number[] = [];
+  for (const team of GHOST_TEAMS) {
+    try {
+      const [result] = await db.execute<ResultSetHeader>(
+        `INSERT INTO bg_teams (name, logo_url, description, is_ghost) VALUES (?, NULL, ?, 1)`,
+        [team.name, team.description],
+      );
+      teamIds.push(result.insertId as number);
+    } catch (error) {
+      console.error(`  ✗ ${team.name}:`, (error as Error).message);
+    }
+  }
+  console.log(`  ✓ ${teamIds.length} équipes fantômes créées`);
   return teamIds;
 }
 
@@ -601,6 +639,71 @@ async function generateSwissTournament(
 // après `playWaves` vagues (des matchs restent READY) ; pour un FINISHED, on
 // joue jusqu'au sacre de la championne. `forfeits` équipes encore en lice
 // déclarent forfait à la fin de la simulation (couvre le rééquilibrage).
+/**
+ * Simule un tournoi « BlueGenji Survie » : manches d'endurance jusqu'à la
+ * bascule en play-offs, puis l'arbre final. Même schéma que la Survie —
+ * initialize → generate → reconcile, puis vagues de matchs joués.
+ */
+async function generateEnduranceTournament(
+  db: Pool,
+  tournamentId: number,
+  finish: boolean,
+  playWaves: number,
+  forfeits: number
+): Promise<void> {
+  const connection = await db.getConnection();
+  try {
+    await initializeEnduranceTournament(tournamentId, connection);
+    await generateEnduranceRound(tournamentId, connection);
+    await reconcileEndurance(tournamentId, connection);
+
+    let waves = 0;
+    let played = 0;
+    while (true) {
+      const ready = readyMatches(await getMatchRows(connection, tournamentId));
+      if (ready.length === 0) break;
+      if (!finish && waves >= playWaves) break;
+
+      for (const m of ready) {
+        await finalizeMatch(
+          connection,
+          tournamentId,
+          m,
+          playMatch(Number(m.team1_id), Number(m.team2_id))
+        );
+        played++;
+      }
+      await reconcileEndurance(tournamentId, connection);
+      waves++;
+    }
+
+    let forfeited = 0;
+    for (let i = 0; i < forfeits; i++) {
+      const [rows] = await connection.execute<(RowDataPacket & { team_id: number })[]>(
+        `SELECT team_id FROM bg_endurance_standings
+         WHERE tournament_id = ? AND status = 'ACTIVE'
+         ORDER BY \`rank\` DESC, seed DESC
+         LIMIT 1`,
+        [tournamentId]
+      );
+      if (rows.length === 0) break;
+      try {
+        await forfeitEnduranceTeam(tournamentId, Number(rows[0].team_id), connection);
+        forfeited++;
+      } catch {
+        break;
+      }
+    }
+
+    console.log(
+      `    ↳ endurance : ${played} matchs simulés sur ${waves} manche(s)` +
+        (forfeited > 0 ? ` · ${forfeited} forfait(s)` : "")
+    );
+  } finally {
+    connection.release();
+  }
+}
+
 async function generateSurvivalTournament(
   db: Pool,
   tournamentId: number,
@@ -863,6 +966,7 @@ async function createTournament(
   const isSurvival = format === "SURVIVAL";
   const isSwiss = format === "SWISS";
   const isMulti = format === "MULTI";
+  const isEndurance = format === "BG_SURVIE";
 
   // Les états sont dérivés des dates par computeTournamentState() : on les
   // calibre pour que l'état voulu soit stable après resynchronisation.
@@ -889,7 +993,7 @@ async function createTournament(
   const swissTotalRounds = isSwiss ? def.swissTotalRounds ?? null : null;
   // Survie, suisse et multi sont pilotés par leur orchestration (initialize → reconcile)
   // : on insère en RUNNING, puis l'orchestration bascule vers FINISHED.
-  const orchestrated = isSurvival || isSwiss || isMulti;
+  const orchestrated = isSurvival || isSwiss || isMulti || isEndurance;
   const insertState = orchestrated && def.state === "FINISHED" ? "RUNNING" : def.state;
   const finishedAt = !orchestrated && def.state === "FINISHED" ? startAt : null;
 
@@ -897,8 +1001,9 @@ async function createTournament(
     `INSERT INTO bg_tournaments
      (organizer_user_id, name, game, description, format, has_third_place_match,
       survival_rounds_before_first_cut, survival_rounds_per_cut, swiss_total_rounds,
+      endurance_start_points, endurance_playoff_size,
       max_teams, state, start_visibility_at, registration_open_at, registration_close_at, start_at, finished_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       organizerId,
       `Test - ${def.name}`,
@@ -911,6 +1016,8 @@ async function createTournament(
       survivalRoundsBeforeFirstCut,
       survivalRoundsPerCut,
       swissTotalRounds,
+      isEndurance ? def.endurancePoints ?? null : null,
+      isEndurance ? def.endurancePlayoffSize ?? null : null,
       def.maxTeams,
       insertState,
       regOpenAt,
@@ -939,6 +1046,8 @@ async function createTournament(
   if (def.state !== "UPCOMING" && def.state !== "REGISTRATION" && teamsToUse.length >= 2) {
     if (isMulti && def.phases) {
       await generateMultiPhaseTournament(db, tournamentId, def.phases, finish, def.playWaves ?? 2);
+    } else if (isEndurance) {
+      await generateEnduranceTournament(db, tournamentId, finish, def.playWaves ?? 3, def.forfeits ?? 0);
     } else if (isSurvival) {
       await generateSurvivalTournament(db, tournamentId, finish, def.playWaves ?? 3, def.forfeits ?? 0);
     } else if (isSwiss) {
@@ -970,7 +1079,7 @@ async function createTournament(
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
-  console.log("🚀 Seed BlueGenji Arena\n");
+  console.log("🚀 Seed BlueGenji Esport\n");
 
   try {
     const db = await getDatabase();
@@ -985,6 +1094,11 @@ async function main(): Promise<void> {
     console.log();
 
     const namedTeamIds = await createTeams(db, userIds);
+    console.log();
+
+    // Hors du pool de tournois : elles servent à exercer l'administration des
+    // équipes fantômes (badge, attribution, inscription manuelle par le staff).
+    await createGhostTeams(db);
     console.log();
 
     // Pool d'équipes étendu pour alimenter les gros brackets (jusqu'à 128) avec
@@ -1022,7 +1136,7 @@ async function main(): Promise<void> {
     console.log(`  · ${FICTIONAL_SPONSORS.length} sponsors (dont 1 inactif) · ${FICTIONAL_BUREAU.length} membres du bureau`);
     console.log(`  · ${TOURNAMENTS.length} tournois :`);
     console.log(`    - états : ${byState("UPCOMING")} à venir · ${byState("REGISTRATION")} inscriptions · ${byState("RUNNING")} en cours · ${byState("FINISHED")} terminés`);
-    console.log(`    - formats : ${byFormat("SINGLE")} simple · ${byFormat("DOUBLE")} double · ${byFormat("SWISS")} suisse · ${byFormat("SURVIVAL")} survie · ${byFormat("MULTI")} multi-phase`);
+    console.log(`    - formats : ${byFormat("SINGLE")} simple · ${byFormat("DOUBLE")} double · ${byFormat("SWISS")} suisse · ${byFormat("SURVIVAL")} survie · ${byFormat("MULTI")} multi-phase · ${byFormat("BG_SURVIE")} BG Survie`);
     console.log(`    - effectifs : 0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 17, 21, 64, 128`);
     console.log(`    - survie : barrage impair (3/5/7/9/11/15/21), cadences 1/2/3, forfaits`);
     console.log(`    - matchs : reports en attente, conflits de score, délais expirés`);

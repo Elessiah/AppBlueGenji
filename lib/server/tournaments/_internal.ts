@@ -6,7 +6,7 @@ export type TournamentRow = RowDataPacket & {
   id: number;
   name: string;
   description: string | null;
-  format: "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL" | "MULTI";
+  format: "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL" | "MULTI" | "BG_SURVIE";
   game: "OW2" | "MR";
   max_teams: number;
   state: "UPCOMING" | "REGISTRATION" | "RUNNING" | "FINISHED";
@@ -23,6 +23,8 @@ export type TournamentRow = RowDataPacket & {
   survival_rounds_per_cut: number | null;
   survival_current_round: number;
   current_phase_id: number | null;
+  /** 1 = l'ordre de seeding a été fixé à la main par le staff. */
+  manual_seeding: number;
 };
 
 export type RegistrationRow = RowDataPacket & {

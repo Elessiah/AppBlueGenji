@@ -8,11 +8,14 @@ import styles from "./PublicHeader.module.css";
 /**
  * En-tête public des pages vitrine (landing, asso, bot…).
  *
+ * À gauche : le menu burger (`PublicNavMenu`) puis la marque — le menu est placé
+ * avant le logo pour rester repérable au lieu d'être noyé parmi les CTA.
+ *
  * Actions à droite selon l'état de session :
  * - **Connecté** : bouton « Accéder à la partie compétitive » (→ `/tournois`,
  *   l'espace sécurisé) suivi de l'avatar cliquable menant au profil.
- * - **Déconnecté** : « Connexion » (ghost) + « Rejoindre » (primary), tous deux
- *   vers `/connexion`.
+ * - **Déconnecté** : un seul bouton « Rejoindre » (primary) vers `/connexion`,
+ *   qui sert aussi de page de connexion.
  *
  * Server component : lit la session via `getCurrentUser()` (retombe sur `null`
  * si la session est absente ou invalide).
@@ -23,15 +26,18 @@ export async function PublicHeader() {
   return (
     <header className={styles.root}>
       <div className={styles.inner}>
-        <Link href="/" className={styles.brand} aria-label="BlueGenji Arena">
-          <span className={styles.logo}>
-            <Image src="/logo_bg.webp" alt="BlueGenji" width={28} height={28} />
-          </span>
-          <span className={styles.brandText}>
-            <span className="logotype">BlueGenji</span>
-            <span className="mono">ARENA</span>
-          </span>
-        </Link>
+        <div className={styles.left}>
+          <PublicNavMenu />
+          <Link href="/" className={styles.brand} aria-label="BlueGenji Esport">
+            <span className={styles.logo}>
+              <Image src="/logo_bg.webp" alt="BlueGenji" width={28} height={28} />
+            </span>
+            <span className={styles.brandText}>
+              <span className="logotype">BlueGenji</span>
+              <span className="mono">ESPORT</span>
+            </span>
+          </Link>
+        </div>
 
         <div className={styles.actions}>
           {user ? (
@@ -60,16 +66,10 @@ export async function PublicHeader() {
               </Link>
             </>
           ) : (
-            <>
-              <CyberButton variant="ghost" asChild>
-                <Link href="/connexion">Connexion</Link>
-              </CyberButton>
-              <CyberButton variant="primary" asChild>
-                <Link href="/connexion">Rejoindre →</Link>
-              </CyberButton>
-            </>
+            <CyberButton variant="primary" asChild>
+              <Link href="/connexion">Rejoindre →</Link>
+            </CyberButton>
           )}
-          <PublicNavMenu />
         </div>
       </div>
     </header>

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { POST } from "@/app/api/auth/discord/request/route";
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
-import { createDiscordLoginChallenge } from "@/lib/server/users-service";
+import { createDiscordLoginChallenge, discordAccountExists } from "@/lib/server/users-service";
 
 jest.mock("@/lib/server/bot-integration", () => ({
   resolveDiscordUser: jest.fn(),
@@ -10,12 +10,14 @@ jest.mock("@/lib/server/bot-integration", () => ({
 
 jest.mock("@/lib/server/users-service", () => ({
   createDiscordLoginChallenge: jest.fn(),
+  discordAccountExists: jest.fn(),
 }));
 
 const resolveDiscordUserMock = resolveDiscordUser as jest.MockedFunction<typeof resolveDiscordUser>;
 const sendDiscordLoginCodeMock = sendDiscordLoginCode as jest.MockedFunction<typeof sendDiscordLoginCode>;
 const createDiscordLoginChallengeMock =
   createDiscordLoginChallenge as jest.MockedFunction<typeof createDiscordLoginChallenge>;
+const discordAccountExistsMock = discordAccountExists as jest.MockedFunction<typeof discordAccountExists>;
 
 function buildRequest(body: Record<string, unknown>): Request {
   return new Request("http://localhost:3000/api/auth/discord/request", {
@@ -30,6 +32,8 @@ describe("POST /api/auth/discord/request", () => {
     resolveDiscordUserMock.mockReset();
     sendDiscordLoginCodeMock.mockReset();
     createDiscordLoginChallengeMock.mockReset();
+    discordAccountExistsMock.mockReset();
+    discordAccountExistsMock.mockResolvedValue(false);
     // Par défaut, resolve renvoie l'identifiant tel quel (cas ID numérique).
     resolveDiscordUserMock.mockImplementation(async (handle: string) => handle);
   });
@@ -54,13 +58,38 @@ describe("POST /api/auth/discord/request", () => {
     sendDiscordLoginCodeMock.mockResolvedValue();
 
     const response = await POST(buildRequest({ discordId: "123456789012345678" }));
-    const payload = (await response.json()) as { success: boolean; expiresAt: string; discordId: string };
+    const payload = (await response.json()) as {
+      success: boolean;
+      expiresAt: string;
+      discordId: string;
+      isNewAccount: boolean;
+    };
 
     expect(response.status).toBe(200);
     expect(payload.success).toBe(true);
     expect(payload.discordId).toBe("123456789012345678");
     expect(payload.expiresAt).toBe("2030-01-01T10:00:00.000Z");
+    expect(payload.isNewAccount).toBe(true);
     expect(sendDiscordLoginCodeMock).toHaveBeenCalledWith("123456789012345678", "123456");
+  });
+
+  it("signale isNewAccount=false quand un compte est déjà rattaché au Discord", async () => {
+    discordAccountExistsMock.mockResolvedValue(true);
+    createDiscordLoginChallengeMock.mockResolvedValue({
+      challengeId: 3,
+      code: "111222",
+      expiresAt: new Date("2030-01-01T10:00:00.000Z"),
+    });
+    sendDiscordLoginCodeMock.mockResolvedValue();
+
+    const response = await POST(buildRequest({ discordId: "123456789012345678" }));
+    const payload = (await response.json()) as { isNewAccount: boolean };
+
+    expect(response.status).toBe(200);
+    expect(payload.isNewAccount).toBe(false);
+    expect(discordAccountExistsMock).toHaveBeenCalledWith("123456789012345678");
+    // Le code est envoyé dans les deux cas : la connexion suit le même chemin.
+    expect(sendDiscordLoginCodeMock).toHaveBeenCalledWith("123456789012345678", "111222");
   });
 
   it("resolves a discord tag to an id before sending the code", async () => {

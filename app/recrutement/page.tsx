@@ -11,7 +11,7 @@ import styles from "./page.module.css";
 export const metadata: Metadata = {
   title: "BlueGenji - Recrutement",
   description:
-    "Rejoins le staff bénévole de BlueGenji Arena : arbitrage, casting, développement, communication, design, modération et plus.",
+    "Rejoins le staff bénévole de BlueGenji Esport : arbitrage, casting, développement, communication, design, modération et plus.",
   openGraph: {
     title: "BlueGenji - Recrutement",
     description: "L'association recrute ses bénévoles pour faire vivre la scène esport francophone.",

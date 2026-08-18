@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { TeamListItem } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { Ticker } from "@/components/cyber/Ticker";
@@ -9,6 +9,7 @@ import { BgCanvas } from "../_shared/BgCanvas";
 import { AnnuaireSearchField } from "../_shared/AnnuaireSearchField";
 import { TeamCard } from "./cards/TeamCard";
 import { HighlightStrip } from "./cards/HighlightStrip";
+import { GhostTeamDialog } from "./GhostTeamDialog";
 import s from "../_shared/annuaire.module.css";
 
 const ACCENT_RGB = "255, 157, 46";
@@ -31,23 +32,32 @@ export default function TeamsPage() {
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState<GameFilter>("all");
   const [sort, setSort] = useState<SortKey>("rank");
+  // Staff `tournaments` : peut créer et administrer les équipes fantômes.
+  const [canManageGhostTeams, setCanManageGhostTeams] = useState(false);
+  const [ghostDialogOpen, setGhostDialogOpen] = useState(false);
 
-  useEffect(() => {
+  const loadTeams = useCallback(() => {
     fetch("/api/teams", { cache: "no-store" })
       .then(async (response) => {
         const payload = (await response.json()) as {
           error?: string;
           teams?: TeamListItem[];
           activeTeam?: { teamId: number; teamName: string } | null;
+          canManageGhostTeams?: boolean;
         };
         if (!response.ok || !payload.teams) {
           throw new Error(payload.error || "TEAMS_LOAD_FAILED");
         }
         setTeams(payload.teams);
         setActiveTeam(payload.activeTeam || null);
+        setCanManageGhostTeams(payload.canManageGhostTeams === true);
       })
       .catch((e) => showError((e as Error).message));
   }, [showError]);
+
+  useEffect(() => {
+    loadTeams();
+  }, [loadTeams]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -91,14 +101,28 @@ export default function TeamsPage() {
               </h1>
               <div className={s.subtitle}>ANNUAIRE · ROSTERS · CLASSEMENT GÉNÉRAL</div>
             </div>
-            {!activeTeam && (
-              <Link href="/equipes/creer" className={s.cta}>
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                  <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                </svg>
-                Créer une équipe
-              </Link>
-            )}
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              {canManageGhostTeams && (
+                <button
+                  type="button"
+                  className={s.ctaGhost}
+                  onClick={() => setGhostDialogOpen(true)}
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+                  Équipe fantôme
+                </button>
+              )}
+              {!activeTeam && (
+                <Link href="/equipes/creer" className={s.cta}>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+                  Créer une équipe
+                </Link>
+              )}
+            </div>
           </div>
 
           <div className={s.metrics}>
@@ -196,6 +220,10 @@ export default function TeamsPage() {
           </div>
         </div>
       </section>
+
+      {ghostDialogOpen && (
+        <GhostTeamDialog onClose={() => setGhostDialogOpen(false)} onCreated={loadTeams} />
+      )}
     </div>
   );
 }

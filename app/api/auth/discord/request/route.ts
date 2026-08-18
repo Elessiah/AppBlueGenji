@@ -1,6 +1,6 @@
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
 import { fail, ok } from "@/lib/server/http";
-import { createDiscordLoginChallenge } from "@/lib/server/users-service";
+import { createDiscordLoginChallenge, discordAccountExists } from "@/lib/server/users-service";
 
 function mapRequestError(message: string): { code: string; status: number } {
   if (message === "BOT_INTERNAL_UNREACHABLE") {
@@ -34,12 +34,17 @@ export async function POST(req: Request) {
 
     const discordId = await resolveDiscordUser(handle);
 
+    // Un compte déjà rattaché à ce Discord a forcément un pseudo : le client
+    // masque alors le champ « pseudo site », réservé à la première connexion.
+    const isNewAccount = !(await discordAccountExists(discordId));
+
     const challenge = await createDiscordLoginChallenge(discordId);
     await sendDiscordLoginCode(discordId, challenge.code);
 
     return ok({
       success: true,
       discordId,
+      isNewAccount,
       expiresAt: challenge.expiresAt.toISOString(),
     });
   } catch (error) {

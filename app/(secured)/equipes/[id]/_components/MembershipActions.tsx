@@ -106,6 +106,19 @@ export function MembershipActions({ team, onChanged }: MembershipActionsProps) {
     );
   }
 
+  // Équipe fantôme : aucun joueur à qui adresser une demande d'adhésion. Le
+  // seul chemin vers un roster réel est l'attribution par le staff.
+  if (team.team.isGhost) {
+    return (
+      <div className="ds-block" style={{ marginBottom: 20 }}>
+        <p style={{ margin: 0, color: "var(--text-2)", fontSize: 14 }}>
+          👻 Équipe fantôme — créée par le staff pour les tournois, sans joueur rattaché. Elle ne
+          peut pas être rejointe&nbsp;: seul le staff peut l&apos;attribuer à un joueur.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <>
       {team.viewerMembership === "NONE" && (

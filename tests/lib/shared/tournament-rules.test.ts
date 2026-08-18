@@ -14,7 +14,7 @@ import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import type { TournamentFormat } from "@/lib/shared/types";
 
 const ROOT = join(__dirname, "..", "..", "..");
-const ALL_FORMATS: TournamentFormat[] = ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL", "MULTI"];
+const ALL_FORMATS: TournamentFormat[] = ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL", "MULTI", "BG_SURVIE"];
 
 describe("tournament-rules — intégrité du registre", () => {
   it("couvre tous les formats de tournoi, sans doublon", () => {

@@ -39,6 +39,7 @@ type UserRow = RowDataPacket & {
   visible_overwatch: 0 | 1;
   visible_marvel: 0 | 1;
   visible_major: 0 | 1;
+  open_to_recruitment: 0 | 1;
   is_admin?: 0 | 1;
   platform_roles_json?: string | null;
   created_at: Date;
@@ -72,25 +73,27 @@ function mapPublicUser(row: UserRow): PublicUserProfile {
     isAdult: row.is_adult === null ? null : Boolean(row.is_adult),
     visibility: {
       avatar: Boolean(row.visible_avatar),
-      pseudo: Boolean(row.visible_pseudo),
       overwatch: Boolean(row.visible_overwatch),
       marvel: Boolean(row.visible_marvel),
       major: Boolean(row.visible_major),
     },
+    openToRecruitment: Boolean(row.open_to_recruitment),
     createdAt: toIso(row.created_at)!,
   };
 }
 
 /**
  * Applique les réglages de visibilité d'un profil pour un spectateur tiers :
- * chaque champ non public est masqué. Le pseudo masqué devient « Joueur #id »,
- * l'avatar masqué devient `null`. Aucun effet lorsque le spectateur consulte
- * son propre profil (`isSelf`). Centralise la logique de masquage pour que
- * l'annuaire `/joueurs` et la fiche profil `/joueurs/[id]` restent cohérents.
+ * chaque champ non public est masqué (l'avatar masqué devient `null`). Aucun
+ * effet lorsque le spectateur consulte son propre profil (`isSelf`). Centralise
+ * la logique de masquage pour que l'annuaire `/joueurs` et la fiche profil
+ * `/joueurs/[id]` restent cohérents.
+ *
+ * Le **pseudo n'est jamais masqué** : il identifie le joueur dans les brackets,
+ * les rosters et les feuilles de match, où l'anonymat n'a pas de sens.
  */
 function applyVisibility<T extends PublicUserProfile>(profile: T, isSelf: boolean): T {
   if (isSelf) return profile;
-  if (!profile.visibility.pseudo) profile.pseudo = `Joueur #${profile.id}`;
   if (!profile.visibility.avatar) profile.avatarUrl = null;
   if (!profile.visibility.overwatch) profile.overwatchBattletag = null;
   if (!profile.visibility.marvel) profile.marvelRivalsTag = null;
@@ -131,10 +134,10 @@ export async function getUserById(userId: number): Promise<PublicUserProfile | n
       discord_pseudo,
       is_adult,
       visible_avatar,
-      visible_pseudo,
       visible_overwatch,
       visible_marvel,
       visible_major,
+      open_to_recruitment,
       created_at
      FROM bg_users
      WHERE id = ?
@@ -158,10 +161,10 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
       discord_pseudo,
       is_adult,
       visible_avatar,
-      visible_pseudo,
       visible_overwatch,
       visible_marvel,
       visible_major,
+      open_to_recruitment,
       created_at
      FROM bg_users
      ORDER BY is_deleted ASC, pseudo ASC`,
@@ -340,6 +343,23 @@ export async function createOrGetDiscordUser(discordId: string, pseudoInput?: st
   return Number(created.insertId);
 }
 
+/**
+ * Indique si un compte du site est déjà rattaché à cet identifiant Discord.
+ *
+ * Sert au formulaire de connexion : le champ « pseudo site » n'a de sens qu'à
+ * la création du compte, il est donc masqué lors des connexions suivantes.
+ */
+export async function discordAccountExists(discordId: string): Promise<boolean> {
+  const db = await getDatabase();
+
+  const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_users WHERE discord_id = ? LIMIT 1`,
+    [discordId],
+  );
+
+  return rows.length > 0;
+}
+
 export async function createDiscordLoginChallenge(discordId: string): Promise<DiscordChallenge> {
   const db = await getDatabase();
   const code = randomCode();
@@ -417,11 +437,11 @@ export async function updateOwnProfile(
     isAdult?: boolean | null;
     visibility?: {
       avatar?: boolean;
-      pseudo?: boolean;
       overwatch?: boolean;
       marvel?: boolean;
       major?: boolean;
     };
+    openToRecruitment?: boolean;
   },
 ): Promise<void> {
   const db = await getDatabase();
@@ -445,10 +465,10 @@ export async function updateOwnProfile(
          discord_pseudo = ?,
          is_adult = ?,
          visible_avatar = COALESCE(?, visible_avatar),
-         visible_pseudo = COALESCE(?, visible_pseudo),
          visible_overwatch = COALESCE(?, visible_overwatch),
          visible_marvel = COALESCE(?, visible_marvel),
-         visible_major = COALESCE(?, visible_major)
+         visible_major = COALESCE(?, visible_major),
+         open_to_recruitment = COALESCE(?, open_to_recruitment)
      WHERE id = ?`,
     [
       patch.pseudo ? normalizePseudo(patch.pseudo) : null,
@@ -457,10 +477,10 @@ export async function updateOwnProfile(
       patch.discordPseudo === undefined ? null : patch.discordPseudo,
       patch.isAdult === undefined ? null : patch.isAdult,
       patch.visibility?.avatar ?? null,
-      patch.visibility?.pseudo ?? null,
       patch.visibility?.overwatch ?? null,
       patch.visibility?.marvel ?? null,
       patch.visibility?.major ?? null,
+      patch.openToRecruitment ?? null,
       userId,
     ],
   );
@@ -486,10 +506,10 @@ export async function anonymizeOwnAccount(userId: number): Promise<void> {
          google_sub = NULL,
          email = NULL,
          visible_avatar = 0,
-         visible_pseudo = 0,
          visible_overwatch = 0,
          visible_marvel = 0,
          visible_major = 0,
+         open_to_recruitment = 0,
          is_deleted = 1
      WHERE id = ?`,
     [userId],
@@ -522,10 +542,10 @@ export async function getFullProfile(
       discord_pseudo,
       is_adult,
       visible_avatar,
-      visible_pseudo,
       visible_overwatch,
       visible_marvel,
       visible_major,
+      open_to_recruitment,
       is_admin,
       platform_roles_json,
       created_at
@@ -663,17 +683,17 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       is_adult: 0 | 1 | null;
       is_admin: 0 | 1;
       visible_avatar: 0 | 1;
-      visible_pseudo: 0 | 1;
       visible_overwatch: 0 | 1;
       visible_marvel: 0 | 1;
       visible_major: 0 | 1;
+      open_to_recruitment: 0 | 1;
       created_at: Date;
     })[]
   >(
     `SELECT id, pseudo, avatar_url, overwatch_battletag, marvel_rivals_tag,
             discord_pseudo, discord_id, google_sub, email, is_adult, is_admin,
-            visible_avatar, visible_pseudo, visible_overwatch, visible_marvel, visible_major,
-            created_at
+            visible_avatar, visible_overwatch, visible_marvel, visible_major,
+            open_to_recruitment, created_at
      FROM bg_users
      WHERE id = ? AND is_deleted = 0
      LIMIT 1`,
@@ -707,11 +727,11 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       marvelRivalsTag: row.marvel_rivals_tag,
       visibility: {
         avatar: Boolean(row.visible_avatar),
-        pseudo: Boolean(row.visible_pseudo),
         overwatch: Boolean(row.visible_overwatch),
         marvel: Boolean(row.visible_marvel),
         major: Boolean(row.visible_major),
       },
+      openToRecruitment: Boolean(row.open_to_recruitment),
     },
     stats: full.stats,
     teamsTimeline: full.teamsTimeline,

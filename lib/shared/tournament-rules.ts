@@ -17,7 +17,7 @@ import type { TournamentFormat } from "./types";
 export type RuleStatus = "AVAILABLE" | "SOON";
 
 /** Identifiant du schéma illustrant le mode (rendu par `components/rules`). */
-export type RuleDiagram = "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL" | "MULTI";
+export type RuleDiagram = "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL" | "MULTI" | "BG_SURVIE";
 
 export type RuleFact = { label: string; value: string };
 
@@ -184,6 +184,75 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
         title: "Classement final",
         body: [
           "La championne et la finaliste sortent de la grande finale ; les autres sont classées selon le round du bracket bas où elles ont été éliminées — plus une équipe tient, mieux elle est classée.",
+        ],
+      },
+    ],
+  },
+  {
+    slug: "bluegenji-survie",
+    format: "BG_SURVIE",
+    label: "BlueGenji Survie",
+    shortLabel: "BG Survie",
+    status: "AVAILABLE",
+    tagline: "Un capital d'endurance qui fond à chaque défaite, puis un arbre à huit.",
+    facts: [
+      { label: "Capital", value: "9 points" },
+      { label: "Barème", value: "+1 / −1 par map" },
+      { label: "Élimination", value: "À 0 point" },
+      { label: "Play-offs", value: "8 équipes" },
+    ],
+    principles: [
+      "Chaque équipe démarre avec un capital d'endurance : une map gagnée le fait monter, une map perdue le fait descendre.",
+      "Tomber à zéro élimine immédiatement — personne n'est éliminé par une coupe, seulement par ses propres résultats.",
+      "Quand il ne reste que huit équipes, la phase qualificative s'arrête et laisse place à un arbre à élimination directe.",
+    ],
+    diagram: "BG_SURVIE",
+    diagramCaption:
+      "L'endurance monte et descend à chaque map ; à zéro l'équipe sort. Les huit dernières se rencontrent selon un tableau fixe.",
+    sections: [
+      {
+        title: "Classement de départ",
+        body: [
+          "Contrairement aux autres modes, le classement initial n'est pas calculé : il est **fixé par l'arbitre** avant le lancement, dans l'ordre de son choix. C'est lui qui décide des premiers appariements.",
+        ],
+      },
+      {
+        title: "Phase qualificative — l'endurance",
+        body: [
+          "Chaque équipe reçoit le même capital de départ (9 points par défaut, réglable à la création). Une victoire de map rapporte un point, une défaite en retire un.",
+        ],
+        bullets: [
+          "Une équipe dont le capital atteint zéro est éliminée sur-le-champ.",
+          "Le classement est relu avant chaque manche : endurance décroissante, puis — à égalité — l'ordre du classement précédent.",
+          "Les équipes s'affrontent par couples adjacents : 1ʳᵉ contre 2ᵉ, 3ᵉ contre 4ᵉ, et ainsi de suite.",
+          "La mieux classée du couple prend le side gauche, l'autre le side droite.",
+          "Sur un effectif impair, la dernière du classement ne joue pas cette manche : son capital reste intact, sans victoire d'office.",
+        ],
+      },
+      {
+        title: "Fin de la phase qualificative",
+        body: [
+          "La phase s'arrête dès qu'il ne reste plus que huit équipes (ou moins). Aucune durée maximale n'est imposée : c'est l'endurance qui fait le tri.",
+        ],
+      },
+      {
+        title: "Phase éliminatoire",
+        body: [
+          "Les huit qualifiées jouent un arbre à élimination directe. Les affrontements ne suivent pas le seeding classique mais un tableau fixe, dans cet ordre d'affichage :",
+        ],
+        bullets: [
+          "Match 1 : 8ᵉ contre 4ᵉ",
+          "Match 2 : 6ᵉ contre 2ᵉ",
+          "Match 3 : 1ʳᵉ contre 5ᵉ",
+          "Match 4 : 3ᵉ contre 7ᵉ",
+          "L'équipe affichée au-dessus prend le side gauche, celle du dessous le side droite.",
+          "Une petite finale départage la 3ᵉ place, jouée en parallèle de la finale.",
+        ],
+      },
+      {
+        title: "Abandon",
+        body: [
+          "Une équipe peut se retirer en cours de route : son capital tombe à zéro et elle quitte le tournoi. Le classement est aussitôt recalculé, et la manche suivante réappariée en conséquence.",
         ],
       },
     ],

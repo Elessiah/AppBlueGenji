@@ -262,6 +262,18 @@ async function persistStandings(
  * liste fournie), création des lignes de standings. Ne démarre aucun round
  * (voir {@link generateSurvivalRound}).
  */
+/**
+ * Le staff a-t-il fixé l'ordre de seeding à la main ? (`bg_tournaments.manual_seeding`)
+ * Dans ce cas l'ordre des inscriptions prime sur le classement du site.
+ */
+async function usesManualSeeding(conn: PoolConnection, tournamentId: number): Promise<boolean> {
+  const [rows] = await conn.execute<(RowDataPacket & { manual_seeding: number })[]>(
+    `SELECT manual_seeding FROM bg_tournaments WHERE id = ? LIMIT 1`,
+    [tournamentId],
+  );
+  return Number(rows[0]?.manual_seeding ?? 0) === 1;
+}
+
 export async function initializeSurvivalTournament(
   tournamentId: number,
   conn: PoolConnection,
@@ -279,6 +291,16 @@ export async function initializeSurvivalTournament(
       wins: 0,
       losses: 0,
     }));
+  } else if (await usesManualSeeding(conn, tournamentId)) {
+    // Ordre fixé à la main par le staff : il prime sur le classement du site.
+    const [rows] = await conn.execute<(RowDataPacket & { team_id: number })[]>(
+      `SELECT team_id
+       FROM bg_tournament_registrations
+       WHERE tournament_id = ?
+       ORDER BY COALESCE(seed, 1000000), registered_at ASC`,
+      [tournamentId],
+    );
+    seedRows = rows.map((row) => ({ team_id: Number(row.team_id), wins: 0, losses: 0 }));
   } else {
     const WINS = "COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
     const LOSSES = "COALESCE(SUM(CASE WHEN m.loser_team_id = r.team_id THEN 1 ELSE 0 END), 0)";

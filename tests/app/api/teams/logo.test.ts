@@ -62,7 +62,9 @@ describe("POST /api/teams/[id]/logo", () => {
     // Servi via `/api/uploads/...` (le static Turbopack ne sert pas les fichiers
     // écrits après démarrage → 404) : c'est cette URL qui est persistée/rendue.
     expect(await res.json()).toEqual({ logoUrl: "/api/uploads/teams/3-abc.webp" });
-    expect(updateTeamLogo).toHaveBeenCalledWith(7, 3, "/api/uploads/teams/3-abc.webp");
+    // Le dernier argument = « le viewer administre les équipes fantômes »
+    // (permission `tournaments`) ; faux pour un simple membre.
+    expect(updateTeamLogo).toHaveBeenCalledWith(7, 3, "/api/uploads/teams/3-abc.webp", false);
     expect(processAndStoreImage).toHaveBeenCalledWith(expect.any(File), "team-logo", 3);
   });
 
@@ -116,6 +118,6 @@ describe("DELETE /api/teams/[id]/logo", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ logoUrl: null });
     expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/teams/old.webp");
-    expect(updateTeamLogo).toHaveBeenCalledWith(7, 3, null);
+    expect(updateTeamLogo).toHaveBeenCalledWith(7, 3, null, false);
   });
 });

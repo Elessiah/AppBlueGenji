@@ -1,6 +1,7 @@
 ﻿import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { getTeamDetail, softDeleteTeam, updateTeamMeta } from "@/lib/server/teams-service";
+import { can } from "@/lib/shared/permissions";
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -12,7 +13,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     return fail("INVALID_TEAM_ID", 400);
   }
 
-  const detail = await getTeamDetail(teamId, user.id);
+  const detail = await getTeamDetail(teamId, user.id, can(user, "tournaments"));
   if (!detail) return fail("TEAM_NOT_FOUND", 404);
 
   return ok(detail);
@@ -30,12 +31,15 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
 
   try {
     const body = (await req.json()) as { name?: string; description?: string | null };
-    await updateTeamMeta(user.id, teamId, {
-      name: body.name,
-      description: body.description,
-    });
+    const managesGhostTeams = can(user, "tournaments");
+    await updateTeamMeta(
+      user.id,
+      teamId,
+      { name: body.name, description: body.description },
+      managesGhostTeams,
+    );
 
-    const detail = await getTeamDetail(teamId, user.id);
+    const detail = await getTeamDetail(teamId, user.id, managesGhostTeams);
     return ok(detail);
   } catch (error) {
     const message = (error as Error).message;
@@ -55,7 +59,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   }
 
   try {
-    await softDeleteTeam(user.id, teamId);
+    await softDeleteTeam(user.id, teamId, can(user, "tournaments"));
     return ok({ deleted: true });
   } catch (error) {
     const message = (error as Error).message;

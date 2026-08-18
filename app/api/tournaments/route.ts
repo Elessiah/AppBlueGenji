@@ -140,6 +140,10 @@ export async function POST(req: Request) {
       swissPointsWin?: number;
       swissPointsDraw?: number;
       swissPointsLoss?: number;
+      endurancePoints?: number;
+      enduranceWinDelta?: number;
+      enduranceLossDelta?: number;
+      endurancePlayoffSize?: number;
     };
 
     if (!body.name?.trim()) return fail("MISSING_NAME", 400);
@@ -148,7 +152,8 @@ export async function POST(req: Request) {
       body.format !== "DOUBLE" &&
       body.format !== "SURVIVAL" &&
       body.format !== "SWISS" &&
-      body.format !== "MULTI"
+      body.format !== "MULTI" &&
+      body.format !== "BG_SURVIE"
     ) {
       return fail("INVALID_FORMAT", 400);
     }
@@ -181,6 +186,30 @@ export async function POST(req: Request) {
         survivalRoundsBeforeFirstCut > 50
       ) {
         return fail("INVALID_SURVIVAL_FIRST_CUT", 400);
+      }
+    }
+
+    // BlueGenji Survie : barème d'endurance. Tout est facultatif — le moteur
+    // retombe sur 9 points, ±1 et des play-offs à 8.
+    let endurancePoints: number | null = null;
+    let enduranceWinDelta: number | null = null;
+    let enduranceLossDelta: number | null = null;
+    let endurancePlayoffSize: number | null = null;
+    if (body.format === "BG_SURVIE") {
+      const settings: [unknown, number, number, (v: number) => void][] = [
+        [body.endurancePoints, 1, 99, (v) => (endurancePoints = v)],
+        [body.enduranceWinDelta, 1, 20, (v) => (enduranceWinDelta = v)],
+        [body.enduranceLossDelta, 1, 20, (v) => (enduranceLossDelta = v)],
+        [body.endurancePlayoffSize, 2, 32, (v) => (endurancePlayoffSize = v)],
+      ];
+
+      for (const [raw, min, max, assign] of settings) {
+        if (raw == null) continue;
+        const value = Number(raw);
+        if (!Number.isInteger(value) || value < min || value > max) {
+          return fail("INVALID_ENDURANCE_SETTINGS", 400);
+        }
+        assign(value);
       }
     }
 
@@ -251,6 +280,10 @@ export async function POST(req: Request) {
       swissPointsWin,
       swissPointsDraw,
       swissPointsLoss,
+      endurancePoints,
+      enduranceWinDelta,
+      enduranceLossDelta,
+      endurancePlayoffSize,
       // Les phases ne concernent que le format MULTI : on ne les transmet pas
       // aux autres formats, même si le client en a envoyé.
       ...(body.format === "MULTI" ? { phases: body.phases as never } : {}),

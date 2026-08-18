@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Configuration Playwright pour les tests E2E navigateur de BlueGenji Arena.
+ * Configuration Playwright pour les tests E2E navigateur de BlueGenji Esport.
  *
  * Le serveur dev Next.js est démarré automatiquement sur un port dédié (3100 par
  * défaut, surchargeable via `E2E_PORT`) afin de NE PAS réutiliser un éventuel

@@ -59,24 +59,33 @@ export async function initializeMultiTournament(
 
   const resolved = resolvePhasePlan(registeredCount, phaseConfigs);
 
-  // Seed la phase 1 depuis le classement du site (exactement comme Survie)
+  // Seed la phase 1 depuis le classement du site (exactement comme Survie) —
+  // sauf si le staff a ordonné le seeding à la main, auquel cas l'ordre des
+  // inscriptions fait autorité.
   const WINS = "COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
   const LOSSES = "COALESCE(SUM(CASE WHEN m.loser_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
 
-  const [seededRows] = await conn.execute<
-    (RowDataPacket & { team_id: number; seed: number })[]
-  >(
-    `SELECT
-      r.team_id,
-      ROW_NUMBER() OVER (ORDER BY ${rankingPointsSql(WINS, LOSSES)} DESC, ${WINS} DESC, r.team_id ASC) AS seed
-     FROM bg_tournament_registrations r
-     LEFT JOIN bg_matches m
-       ON (m.team1_id = r.team_id OR m.team2_id = r.team_id)
-      AND m.status = 'COMPLETED'
-     WHERE r.tournament_id = ?
-     GROUP BY r.team_id`,
-    [tournamentId],
-  );
+  const [seededRows] = Number(tournament.manual_seeding ?? 0) === 1
+    ? await conn.execute<(RowDataPacket & { team_id: number; seed: number })[]>(
+        `SELECT
+          team_id,
+          ROW_NUMBER() OVER (ORDER BY COALESCE(seed, 1000000), registered_at ASC) AS seed
+         FROM bg_tournament_registrations
+         WHERE tournament_id = ?`,
+        [tournamentId],
+      )
+    : await conn.execute<(RowDataPacket & { team_id: number; seed: number })[]>(
+        `SELECT
+          r.team_id,
+          ROW_NUMBER() OVER (ORDER BY ${rankingPointsSql(WINS, LOSSES)} DESC, ${WINS} DESC, r.team_id ASC) AS seed
+         FROM bg_tournament_registrations r
+         LEFT JOIN bg_matches m
+           ON (m.team1_id = r.team_id OR m.team2_id = r.team_id)
+          AND m.status = 'COMPLETED'
+         WHERE r.tournament_id = ?
+         GROUP BY r.team_id`,
+        [tournamentId],
+      );
 
   // Persiste les métriques de chaque phase (entrants, qualifiants, max_rounds, state=SKIPPED)
   for (const resolvedPhase of resolved) {
