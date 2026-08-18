@@ -308,7 +308,11 @@ export async function getTeamRankingPosition(teamId: number): Promise<TeamRankin
       t.id AS team_id,
       ${rankingPointsSql(
         "SUM(CASE WHEN m.winner_team_id = t.id THEN 1 ELSE 0 END)",
-        "SUM(CASE WHEN m.loser_team_id = t.id THEN 1 ELSE 0 END)",
+        // Défaite = avoir joué le match sans le gagner. Compter `loser_team_id`
+        // à la place laisserait filer les matchs où le moteur a posé un
+        // vainqueur sans renseigner le perdant : le rang se calculerait alors
+        // sur un total différent des points affichés sur la même fiche.
+        "SUM(CASE WHEN m.winner_team_id <> t.id THEN 1 ELSE 0 END)",
       )} AS points
      FROM bg_teams t
      JOIN bg_matches m

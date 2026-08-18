@@ -130,6 +130,11 @@ que le bilan de la fiche**. Les équipes à égalité de points partagent le mê
 rang, et une équipe sans match n'est pas classée (`position: null`) — `total`
 compte donc les équipes ayant réellement joué.
 
+Une défaite s'y compte comme « avoir joué le match sans le gagner », et non via
+`bg_matches.loser_team_id` : le moteur pose parfois un vainqueur sans renseigner
+le perdant (9 lignes sur le jeu de test), ce qui suffisait à faire diverger le
+rang du total de points affiché sur la même fiche.
+
 Le leaderboard de la landing part, lui, de **toutes** les équipes et de tous les
 matchs terminés : une équipe sans match y figure à 0 point. Les deux vues n'ont
 pas le même dénominateur, c'est assumé — ce qui compte est que la place affichée

@@ -309,6 +309,20 @@ describe("getTeamRankingPosition", () => {
     expect(sql).toMatch(/m\.winner_team_id IS NOT NULL/);
   });
 
+  it("compte une défaite dès que l'équipe n'est pas la gagnante", async () => {
+    const execute = jest.fn().mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    await getTeamRankingPosition(1);
+
+    // S'appuyer sur `loser_team_id` laissait filer les matchs où le moteur pose
+    // un vainqueur sans renseigner le perdant : le rang divergeait alors des
+    // points affichés sur la même fiche.
+    const [sql] = execute.mock.calls[0] as [string];
+    expect(sql).toContain("m.winner_team_id <> t.id");
+    expect(sql).not.toContain("m.loser_team_id");
+  });
+
   it("ne classe pas une équipe sans aucun match joué", async () => {
     const execute = jest.fn().mockResolvedValueOnce([[{ team_id: 1, points: 100 }]]);
     await mockDb(execute);
