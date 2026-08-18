@@ -248,7 +248,17 @@ describe("reconcileEndurance", () => {
     const conn = makeConn([
       [[tournamentRow({ endurance_current_round: 1, endurance_playoff_size: 2 })]],
       [[standingRow(1), standingRow(2), standingRow(3), standingRow(4)]], // classement stocké
-      [[{ round_number: 1, status: "COMPLETED", winner_team_id: 1, loser_team_id: 2 }]], // matchs
+      [
+        [
+          {
+            round_number: 1,
+            status: "COMPLETED",
+            winner_team_id: 1,
+            loser_team_id: 2,
+            forfeit_team_id: null,
+          },
+        ],
+      ], // matchs
       [[]], // forfaits
     ]);
 
@@ -285,8 +295,20 @@ describe("reconcileEndurance — réappariement après correction", () => {
       [[standingRow(1), standingRow(2), standingRow(3), standingRow(4)]],
       [
         [
-          { round_number: 1, status: "COMPLETED", winner_team_id: 2, loser_team_id: 1 },
-          { round_number: 1, status: "COMPLETED", winner_team_id: 4, loser_team_id: 3 },
+          {
+            round_number: 1,
+            status: "COMPLETED",
+            winner_team_id: 2,
+            loser_team_id: 1,
+            forfeit_team_id: null,
+          },
+          {
+            round_number: 1,
+            status: "COMPLETED",
+            winner_team_id: 4,
+            loser_team_id: 3,
+            forfeit_team_id: null,
+          },
         ],
       ],
       [[]], // forfaits

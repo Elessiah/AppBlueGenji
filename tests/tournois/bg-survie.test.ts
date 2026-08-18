@@ -209,6 +209,21 @@ describe("replayEndurance — endurance et éliminations", () => {
     expect(after.find((s) => s.teamId === 2)).toMatchObject({ status: "ACTIVE", points: 2 });
   });
 
+  it("n'accorde aucun point pour un match gagné sur forfait", () => {
+    // Le match est clos côté base (la manche peut se terminer) mais aucune map
+    // n'a été jouée : le barème se compte par map gagnée.
+    const standings = replayEndurance({
+      teams: teams(2),
+      matches: [{ round: 1, completed: true, winnerTeamId: 1, loserTeamId: 2, isForfeit: true }],
+      forfeits: [{ teamId: 2, round: 1 }],
+      config: CONFIG,
+      lastRound: 1,
+    });
+    const byId = new Map(standings.map((s) => [s.teamId, s]));
+    expect(byId.get(1)).toMatchObject({ points: 9, wins: 0, losses: 0 });
+    expect(byId.get(2)).toMatchObject({ status: "FORFEIT", points: 0 });
+  });
+
   it("prend en compte un abandon comme une sortie", () => {
     const standings = replayEndurance({
       teams: teams(4),

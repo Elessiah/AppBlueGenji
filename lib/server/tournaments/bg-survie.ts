@@ -256,9 +256,10 @@ async function loadQualificationOutcomes(
       status: string;
       winner_team_id: number | null;
       loser_team_id: number | null;
+      forfeit_team_id: number | null;
     })[]
   >(
-    `SELECT round_number, status, winner_team_id, loser_team_id
+    `SELECT round_number, status, winner_team_id, loser_team_id, forfeit_team_id
      FROM bg_matches
      WHERE tournament_id = ? AND phase_id = 0 AND round_number < ?
      ORDER BY round_number ASC, match_number ASC`,
@@ -270,6 +271,9 @@ async function loadQualificationOutcomes(
     completed: row.status === "COMPLETED",
     winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
     loserTeamId: row.loser_team_id === null ? null : Number(row.loser_team_id),
+    // `!= null` couvre aussi une colonne absente : un forfait doit être une
+    // information positive, jamais un défaut.
+    isForfeit: row.forfeit_team_id != null,
   }));
 }
 

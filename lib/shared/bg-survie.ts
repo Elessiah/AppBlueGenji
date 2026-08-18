@@ -81,6 +81,12 @@ export type EnduranceMatchOutcome = {
   completed: boolean;
   winnerTeamId: number | null;
   loserTeamId: number | null;
+  /**
+   * Match clos par forfait : il compte pour l'achèvement de la manche, mais pas
+   * pour l'endurance — le barème se compte **par map gagnée**, et une map non
+   * disputée n'en est pas une.
+   */
+  isForfeit?: boolean;
 };
 
 /** Abandon déclaré : décision humaine, non déductible des matchs. */
@@ -198,6 +204,8 @@ export function replayEndurance(input: ReplayEnduranceInput): EnduranceStanding[
   for (let round = 1; round <= maxRound; round += 1) {
     for (const match of matches) {
       if (match.round !== round || !match.completed) continue;
+      // Walkover : aucune map jouée, donc aucun point échangé.
+      if (match.isForfeit) continue;
 
       const winner = match.winnerTeamId === null ? null : standings.get(match.winnerTeamId);
       const loser = match.loserTeamId === null ? null : standings.get(match.loserTeamId);
