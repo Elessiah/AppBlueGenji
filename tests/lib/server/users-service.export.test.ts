@@ -62,8 +62,8 @@ describe("exportOwnData", () => {
       .mockResolvedValueOnce([[exportRow()]]) // identifiants bruts
       .mockResolvedValueOnce([[fullProfileRow()]]) // getFullProfile: user row
       .mockResolvedValueOnce([[]]) // timeline
-      .mockResolvedValueOnce([[]]) // history
-      .mockResolvedValueOnce([[{}]]); // stats
+      .mockResolvedValueOnce([[]]) // stats: appartenances (aucune)
+      .mockResolvedValueOnce([[]]); // (inutilisé : le joueur n'a aucune équipe)
     await mockDb(execute);
 
     const data = await exportOwnData(42);
@@ -99,7 +99,7 @@ describe("exportOwnData", () => {
       .mockResolvedValueOnce([[fullProfileRow({ visible_avatar: 0, open_to_recruitment: 0 })]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])
-      .mockResolvedValueOnce([[{}]]);
+      .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     const data = await exportOwnData(42);

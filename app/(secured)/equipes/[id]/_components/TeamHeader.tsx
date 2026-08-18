@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogoWithGlow } from "@/components/logo-with-glow";
 import type { TeamDetailResponse } from "@/lib/shared/types";
+import { formatRate } from "@/lib/shared/stats";
 import { useToast } from "@/components/ui/toast";
 import { TransferOwnershipDialog } from "./TransferOwnershipDialog";
 import { ClaimGhostTeamDialog } from "./ClaimGhostTeamDialog";
@@ -178,6 +179,28 @@ export function TeamHeader({ team, onChanged, canManage, viewerIsOwner }: TeamHe
             <Link href="/equipes" className="btn ghost" style={{ padding: "9px 18px", fontSize: 13, flexShrink: 0 }}>
               ← Équipes
             </Link>
+          </div>
+
+          <div className="ds-stats" style={{ marginTop: 28 }}>
+            {[
+              { label: "Tournois joués", value: team.stats.tournamentsPlayed },
+              { label: "Podiums", value: team.stats.podiums },
+              { label: "Victoires", value: team.stats.matchesWon },
+              { label: "Défaites", value: team.stats.matchesLost },
+              { label: "Ratio de victoires", value: formatRate(team.stats.winRate) },
+              // Absent des réponses de mutation, qui ne calculent pas le classement.
+              ...(team.ranking
+                ? [{
+                    label: "Classement du site",
+                    value: team.ranking.position ? `#${team.ranking.position}` : "—",
+                  }]
+                : []),
+            ].map((stat) => (
+              <div key={stat.label} className="ds-stat orange">
+                <div className="ds-stat-label">{stat.label}</div>
+                <div className="ds-stat-value">{stat.value}</div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

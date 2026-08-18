@@ -1,5 +1,6 @@
 ﻿import type { PlatformRole } from "./permissions";
 import type { MatchFormat } from "./match-format";
+import type { DeepStats, TeamRankingPosition } from "./stats";
 
 export type TournamentFormat =
   | "SINGLE"
@@ -409,14 +410,11 @@ export type BotFeedEvent = {
   userId?: string;
 };
 
-export type ProfileStats = {
-  tournamentsPlayed: number;
-  tournamentsWon: number;
-  matchesWon: number;
-  matchesLost: number;
-  bestRank: number | null;
-  averageRank: number | null;
-};
+/**
+ * Statistiques d'un joueur. Alias de `DeepStats` : joueurs et équipes exposent
+ * exactement le même bloc, calculé par `lib/shared/stats.ts`.
+ */
+export type ProfileStats = DeepStats;
 
 export type UserTeamTimeline = {
   teamId: number;
@@ -486,6 +484,14 @@ export type TeamDetailResponse = {
   };
   members: TeamMember[];
   tournaments: TeamHistoryRow[];
+  /** Statistiques approfondies de l'équipe (mêmes définitions que le joueur). */
+  stats: DeepStats;
+  /**
+   * Place de l'équipe au classement du site. `null` sur les réponses des
+   * routes de mutation, qui ne la calculent pas : le classement demande une
+   * agrégation sur toutes les équipes, hors de propos pour un ajout de membre.
+   */
+  ranking: TeamRankingPosition | null;
   canManage: boolean;
   /**
    * Vrai si le viewer administre cette équipe au titre de la permission
