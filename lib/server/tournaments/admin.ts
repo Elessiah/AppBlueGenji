@@ -1,6 +1,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { dependentMatches, hasScoreInput, type MatchScoreState } from "@/lib/shared/match-lock";
+import { checkMatchScores, parseMatchFormat } from "@/lib/shared/match-format";
 import { MatchRow } from "./_internal";
 import { finalizeMatch } from "./scoring";
 import { tryAutoResolveByes } from "./byes";
@@ -156,6 +157,44 @@ export async function checkDownstreamMatchesHaveNoScores(
   }
 }
 
+/**
+ * Contrôle une saisie d'arbitrage contre le format de matchs du tournoi (BO5,
+ * FT3…). `decisive` vaut faux pour une simple sauvegarde — l'arbitrage peut
+ * noter un 1-0 en cours de rencontre — et vrai dès qu'on désigne un vainqueur.
+ *
+ * Le format est relu depuis la base plutôt que passé en paramètre : la route
+ * HTTP ne connaît que l'identifiant du match, et le garde-fou doit valoir pour
+ * tous les appelants du service.
+ */
+async function checkScoresAgainstMatchFormat(
+  connection: PoolConnection,
+  tournamentId: number,
+  team1Score: number,
+  team2Score: number,
+  decisive: boolean,
+): Promise<void> {
+  const [rows] = await connection.execute<
+    (RowDataPacket & { match_format_type: "BO" | "FT" | null; match_format_value: number | null })[]
+  >(
+    `SELECT match_format_type, match_format_value
+     FROM bg_tournaments
+     WHERE id = ?
+     LIMIT 1`,
+    [tournamentId],
+  );
+
+  const row = rows[0];
+  if (!row) return;
+
+  const violation = checkMatchScores(
+    parseMatchFormat(row.match_format_type, row.match_format_value),
+    team1Score,
+    team2Score,
+    { decisive },
+  );
+  if (violation) throw new Error(violation);
+}
+
 export async function adminSaveMatchScores(
   connection: PoolConnection,
   matchId: number,
@@ -194,6 +233,14 @@ export async function adminSaveMatchScores(
       [forfeitTeamId, matchId],
     );
   } else if (team1Score !== undefined && team2Score !== undefined) {
+    await checkScoresAgainstMatchFormat(
+      connection,
+      Number(match.tournament_id),
+      team1Score,
+      team2Score,
+      false,
+    );
+
     await connection.execute(
       `UPDATE bg_matches
        SET team1_score = ?,
@@ -252,6 +299,8 @@ export async function adminResolveMatch(
     resultTeam1Score = null;
     resultTeam2Score = null;
   } else if (team1Score !== undefined && team2Score !== undefined) {
+    await checkScoresAgainstMatchFormat(connection, tournamentId, team1Score, team2Score, true);
+
     winnerTeamId = team1Score > team2Score ? Number(match.team1_id) : Number(match.team2_id);
     loserTeamId =
       winnerTeamId === Number(match.team1_id) ? Number(match.team2_id) : Number(match.team1_id);

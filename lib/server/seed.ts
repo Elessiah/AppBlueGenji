@@ -26,6 +26,7 @@ import {
 import { insertPhases, setCurrentPhase, loadPhases } from "./tournaments/phases-repository";
 import { initializeMultiTournament, startPhase, reconcilePhases } from "./tournaments/phases";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
+import { matchWinsRequired } from "@/lib/shared/match-format";
 import { soloEntryNameCandidates } from "@/lib/shared/participants";
 import {
   TOURNAMENTS,
@@ -54,7 +55,10 @@ function rng(): number {
 
 // Le mieux classé (team1) l'emporte 7 fois sur 10 : assez de « upsets » pour que
 // les classements et le leaderboard soient variés, sans les rendre absurdes.
-function playMatch(team1Id: number, team2Id: number): {
+// `winsRequired` = nombre de manches à gagner, dicté par le format de match du
+// tournoi (3 en BO5/FT3, 2 par défaut). Sans ça, un tournoi seedé en BO5
+// afficherait des scores impossibles à saisir dans l'interface.
+function playMatch(team1Id: number, team2Id: number, winsRequired = 2): {
   team1Score: number;
   team2Score: number;
   winnerTeamId: number;
@@ -62,8 +66,8 @@ function playMatch(team1Id: number, team2Id: number): {
 } {
   const team1Wins = rng() < 0.7;
   const tight = rng() < 0.5;
-  const winnerScore = 2;
-  const loserScore = tight ? 1 : 0;
+  const winnerScore = winsRequired;
+  const loserScore = tight ? winsRequired - 1 : 0;
   return {
     team1Score: team1Wins ? winnerScore : loserScore,
     team2Score: team1Wins ? loserScore : winnerScore,
@@ -580,7 +584,8 @@ function readyMatches(matches: MatchRowLike[]): MatchRowLike[] {
 async function playBracket(
   connection: PoolConnection,
   tournamentId: number,
-  waves: number
+  waves: number,
+  winsRequired: number
 ): Promise<number> {
   let played = 0;
   for (let wave = 0; wave < waves; wave++) {
@@ -591,7 +596,7 @@ async function playBracket(
         connection,
         tournamentId,
         m,
-        playMatch(Number(m.team1_id), Number(m.team2_id))
+        playMatch(Number(m.team1_id), Number(m.team2_id), winsRequired)
       );
       played++;
     }
@@ -606,7 +611,8 @@ async function generateRealBracket(
   tournamentId: number,
   format: "SINGLE" | "DOUBLE",
   playWaves: number,
-  finish: boolean
+  finish: boolean,
+  winsRequired: number
 ): Promise<void> {
   const connection = await db.getConnection();
   try {
@@ -620,7 +626,7 @@ async function generateRealBracket(
       await createSingleEliminationBracket(connection, tournament, teamIds);
     }
 
-    const played = await playBracket(connection, tournamentId, finish ? Infinity : playWaves);
+    const played = await playBracket(connection, tournamentId, finish ? Infinity : playWaves, winsRequired);
     if (finish) {
       await finalizeTournamentIfDone(connection, tournamentId);
     }
@@ -638,7 +644,8 @@ async function generateSwissTournament(
   db: Pool,
   tournamentId: number,
   finish: boolean,
-  playWaves: number
+  playWaves: number,
+  winsRequired: number
 ): Promise<void> {
   const connection = await db.getConnection();
   try {
@@ -658,7 +665,7 @@ async function generateSwissTournament(
           connection,
           tournamentId,
           m,
-          playMatch(Number(m.team1_id), Number(m.team2_id))
+          playMatch(Number(m.team1_id), Number(m.team2_id), winsRequired)
         );
         played++;
       }
@@ -686,7 +693,8 @@ async function generateEnduranceTournament(
   tournamentId: number,
   finish: boolean,
   playWaves: number,
-  forfeits: number
+  forfeits: number,
+  winsRequired: number
 ): Promise<void> {
   const connection = await db.getConnection();
   try {
@@ -706,7 +714,7 @@ async function generateEnduranceTournament(
           connection,
           tournamentId,
           m,
-          playMatch(Number(m.team1_id), Number(m.team2_id))
+          playMatch(Number(m.team1_id), Number(m.team2_id), winsRequired)
         );
         played++;
       }
@@ -746,7 +754,8 @@ async function generateSurvivalTournament(
   tournamentId: number,
   finish: boolean,
   playWaves: number,
-  forfeits: number
+  forfeits: number,
+  winsRequired: number
 ): Promise<void> {
   const connection = await db.getConnection();
   try {
@@ -766,7 +775,7 @@ async function generateSurvivalTournament(
           connection,
           tournamentId,
           m,
-          playMatch(Number(m.team1_id), Number(m.team2_id))
+          playMatch(Number(m.team1_id), Number(m.team2_id), winsRequired)
         );
         played++;
       }
@@ -810,7 +819,8 @@ async function generateMultiPhaseTournament(
   tournamentId: number,
   phases: SeedPhase[],
   finish: boolean,
-  playWaves: number
+  playWaves: number,
+  winsRequired: number
 ): Promise<void> {
   const connection = await db.getConnection();
   try {
@@ -831,12 +841,27 @@ async function generateMultiPhaseTournament(
 
     let totalPlayed = 0;
     let currentWaves = 0;
+    // Garde-fou anti-blocage : une phase qui n'avance plus (aucun match joué et
+    // aucun changement d'état) ferait tourner cette boucle à l'infini quand
+    // `finish` est vrai, puisque plus rien ne la fait sortir. On préfère un
+    // avertissement visible et un tournoi laissé en l'état à un seed suspendu.
+    let lastSignature = "";
 
     while (true) {
       const loadedPhases = await loadPhases(connection, tournamentId);
       const currentPhase = loadedPhases.find((p) => p.state === "PENDING" || p.state === "RUNNING");
 
       if (!currentPhase) break;
+
+      const signature = `${totalPlayed}|${loadedPhases.map((p) => `${p.id}:${p.state}`).join(",")}`;
+      if (signature === lastSignature) {
+        console.warn(
+          `    ⚠ multi-phase : phase ${currentPhase.position} (${currentPhase.format}) bloquée, ` +
+            `tournoi #${tournamentId} laissé en l'état`
+        );
+        break;
+      }
+      lastSignature = signature;
 
       if (currentPhase.state === "PENDING") {
         await setCurrentPhase(connection, tournamentId, currentPhase.id);
@@ -874,7 +899,7 @@ async function generateMultiPhaseTournament(
             connection,
             tournamentId,
             m,
-            playMatch(Number(m.team1_id), Number(m.team2_id))
+            playMatch(Number(m.team1_id), Number(m.team2_id), winsRequired)
           );
           await reconcilePhases(tournamentId, connection);
           totalPlayed++;
@@ -1039,13 +1064,18 @@ async function createTournament(
   const insertState = orchestrated && def.state === "FINISHED" ? "RUNNING" : def.state;
   const finishedAt = !orchestrated && def.state === "FINISHED" ? startAt : null;
 
+  // Format de match du tournoi (BO5, FT3…) : il pilote aussi les scores simulés,
+  // pour que le jeu de test reste cohérent avec ce que l'interface autorise.
+  const matchFormat = def.matchFormat ?? null;
+  const winsRequired = matchFormat ? matchWinsRequired(matchFormat) : 2;
+
   const [result] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_tournaments
      (organizer_user_id, name, game, description, format, participant_type, has_third_place_match,
       survival_rounds_before_first_cut, survival_rounds_per_cut, swiss_total_rounds,
-      endurance_start_points, endurance_playoff_size,
+      endurance_start_points, endurance_playoff_size, match_format_type, match_format_value,
       max_teams, state, start_visibility_at, registration_open_at, registration_close_at, start_at, finished_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       organizerId,
       `Test - ${def.name}`,
@@ -1061,6 +1091,8 @@ async function createTournament(
       swissTotalRounds,
       isEndurance ? def.endurancePoints ?? null : null,
       isEndurance ? def.endurancePlayoffSize ?? null : null,
+      matchFormat?.type ?? null,
+      matchFormat?.value ?? null,
       def.maxTeams,
       insertState,
       regOpenAt,
@@ -1088,15 +1120,15 @@ async function createTournament(
 
   if (def.state !== "UPCOMING" && def.state !== "REGISTRATION" && teamsToUse.length >= 2) {
     if (isMulti && def.phases) {
-      await generateMultiPhaseTournament(db, tournamentId, def.phases, finish, def.playWaves ?? 2);
+      await generateMultiPhaseTournament(db, tournamentId, def.phases, finish, def.playWaves ?? 2, winsRequired);
     } else if (isEndurance) {
-      await generateEnduranceTournament(db, tournamentId, finish, def.playWaves ?? 3, def.forfeits ?? 0);
+      await generateEnduranceTournament(db, tournamentId, finish, def.playWaves ?? 3, def.forfeits ?? 0, winsRequired);
     } else if (isSurvival) {
-      await generateSurvivalTournament(db, tournamentId, finish, def.playWaves ?? 3, def.forfeits ?? 0);
+      await generateSurvivalTournament(db, tournamentId, finish, def.playWaves ?? 3, def.forfeits ?? 0, winsRequired);
     } else if (isSwiss) {
-      await generateSwissTournament(db, tournamentId, finish, def.playWaves ?? 2);
+      await generateSwissTournament(db, tournamentId, finish, def.playWaves ?? 2, winsRequired);
     } else {
-      await generateRealBracket(db, tournamentId, format as "SINGLE" | "DOUBLE", def.playWaves ?? 2, finish);
+      await generateRealBracket(db, tournamentId, format as "SINGLE" | "DOUBLE", def.playWaves ?? 2, finish, winsRequired);
     }
 
     if (finish) {

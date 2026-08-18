@@ -4,6 +4,7 @@ import { createTournament, listTournamentBuckets } from "@/lib/server/tournament
 import { isParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import { can } from "@/lib/shared/permissions";
 import { DEFAULT_SWISS_POINTS } from "@/lib/shared/swiss";
+import { isValidMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import type { TournamentFormat } from "@/lib/shared/types";
 
 export async function GET(req: Request) {
@@ -146,6 +147,8 @@ export async function POST(req: Request) {
       enduranceWinDelta?: number;
       enduranceLossDelta?: number;
       endurancePlayoffSize?: number;
+      matchFormatType?: string | null;
+      matchFormatValue?: number | null;
     };
 
     if (!body.name?.trim()) return fail("MISSING_NAME", 400);
@@ -173,6 +176,25 @@ export async function POST(req: Request) {
     const maxTeams = Number(body.maxTeams ?? 0);
     if (!Number.isInteger(maxTeams) || maxTeams < 2 || maxTeams > 256) {
       return fail("INVALID_MAX_TEAMS", 400);
+    }
+
+    // Format des matchs (BO5, FT3…) — commun à tous les formats de tournoi.
+    // Les deux champs vont ensemble : omettre les deux laisse la saisie libre,
+    // n'en envoyer qu'un est une erreur du client plutôt qu'un demi-réglage.
+    let matchFormat: MatchFormat | null = null;
+    const hasMatchFormatType = body.matchFormatType != null;
+    const hasMatchFormatValue = body.matchFormatValue != null;
+    if (hasMatchFormatType !== hasMatchFormatValue) {
+      return fail("INVALID_MATCH_FORMAT", 400);
+    }
+    if (hasMatchFormatType && hasMatchFormatValue) {
+      if (!isValidMatchFormat(body.matchFormatType, body.matchFormatValue)) {
+        return fail("INVALID_MATCH_FORMAT", 400);
+      }
+      matchFormat = {
+        type: body.matchFormatType as MatchFormat["type"],
+        value: Number(body.matchFormatValue),
+      };
     }
 
     let survivalRoundsPerCut: number | null = null;
@@ -291,6 +313,7 @@ export async function POST(req: Request) {
       enduranceWinDelta,
       enduranceLossDelta,
       endurancePlayoffSize,
+      matchFormat,
       // Les phases ne concernent que le format MULTI : on ne les transmet pas
       // aux autres formats, même si le client en a envoyé.
       ...(body.format === "MULTI" ? { phases: body.phases as never } : {}),

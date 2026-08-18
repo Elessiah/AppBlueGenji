@@ -37,6 +37,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       || message === "MATCH_NOT_READY"
       || message === "NOT_IN_MATCH"
       || message === "MATCH_ALREADY_COMPLETED"
+      || message === "SCORE_EXCEEDS_MATCH_FORMAT"
+      || message === "SCORE_BELOW_MATCH_FORMAT"
     ) {
       return fail(message, 400);
     }

@@ -708,6 +708,20 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  // Migration: format de match du tournoi (BO5, FT3…). Les deux colonnes vont
+  // par paire : tant que l'une est NULL, la saisie des scores reste libre —
+  // c'est l'état des tournois créés avant la fonctionnalité.
+  for (const [column, definition] of [
+    ["match_format_type", "ENUM('BO', 'FT') NULL"],
+    ["match_format_value", "INT NULL"],
+  ] as const) {
+    try {
+      await db.execute(`ALTER TABLE bg_tournaments ADD COLUMN ${column} ${definition}`);
+    } catch {
+      // Column already exists
+    }
+  }
+
   // Migration: seeding ordonné à la main par le staff. Tant que le drapeau vaut
   // 0, chaque format seede comme avant (classement du site) ; dès qu'un arbitre
   // réordonne, l'ordre de `bg_tournament_registrations.seed` fait autorité.

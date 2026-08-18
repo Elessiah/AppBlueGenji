@@ -1,5 +1,6 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
+import { checkMatchScores, parseMatchFormat } from "@/lib/shared/match-format";
 import { MatchRow } from "./_internal";
 import { resolveUserEntrantTeamId } from "./registration";
 import { syncTournamentState } from "./state";
@@ -136,6 +137,17 @@ export async function reportMatchScore(
   if (reporterTeamId === null) {
     throw new Error("NO_ACTIVE_TEAM");
   }
+
+  // Un report d'équipe désigne toujours un vainqueur (l'égalité est déjà
+  // refusée) : le score doit donc respecter l'objectif du format — 3 manches en
+  // BO5 comme en FT3 — et non seulement son plafond.
+  const matchFormatViolation = checkMatchScores(
+    parseMatchFormat(tournament.match_format_type, tournament.match_format_value),
+    myScore,
+    opponentScore,
+    { decisive: true },
+  );
+  if (matchFormatViolation) throw new Error(matchFormatViolation);
 
   const [matches] = await connection.execute<MatchRow[]>(
     `SELECT

@@ -10,6 +10,12 @@ import { useToast } from "@/components/ui/toast";
 import { Pill, CyberButton } from "@/components/cyber";
 import { useTournamentLive } from "./_hooks/useTournamentLive";
 import { mapError } from "./_lib/error-map";
+import {
+  checkMatchScores,
+  matchFormatLabel,
+  matchScoreViolationMessage,
+} from "@/lib/shared/match-format";
+import { MatchFormatProvider } from "./_lib/match-format-context";
 import { canForfeitTeam } from "./_lib/forfeit";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { AdminScoreDialog } from "./_components/AdminScoreDialog";
@@ -125,6 +131,21 @@ export default function TournamentDetailPage() {
   const submitScore = async (match: BracketMatch, event: FormEvent) => {
     event.preventDefault();
     const draft = drafts[match.id] || { myScore: "", opponentScore: "" };
+
+    // Contrôle local contre le format du tournoi : évite un aller-retour pour
+    // un score que le serveur refusera de toute façon, et permet un message
+    // chiffré (« le vainqueur doit atteindre 3 manches »).
+    const violation = checkMatchScores(
+      detail.card.matchFormat,
+      Number(draft.myScore),
+      Number(draft.opponentScore),
+      { decisive: true },
+    );
+    if (violation) {
+      showError(matchScoreViolationMessage(detail.card.matchFormat, violation));
+      return;
+    }
+
     try {
       const response = await fetch(`/api/tournaments/${tournamentId}/matches/${match.id}/report`, {
         method: "POST",
@@ -242,6 +263,7 @@ export default function TournamentDetailPage() {
       participantType={detail.card.participantType}
       soloUserIds={detail.soloUserIds}
     >
+      <MatchFormatProvider format={detail.card.matchFormat}>
       <RulesHelpFab format={visibleFormat} contextLabel={contextLabel} />
       <section className="fade-in">
         <div className="ds-header green">
@@ -298,6 +320,9 @@ export default function TournamentDetailPage() {
               )}
               <Pill variant="blue">{FORMAT_LABELS[detail.card.format]}</Pill>
               {wording.badge && <Pill variant="blue">{wording.badge}</Pill>}
+              {detail.card.matchFormat && (
+                <Pill variant="blue">{matchFormatLabel(detail.card.matchFormat)}</Pill>
+              )}
               {detail.card.hasThirdPlaceMatch && (
                 <Pill variant="blue">Petite finale</Pill>
               )}
@@ -560,6 +585,7 @@ export default function TournamentDetailPage() {
           onRegistered={() => router.refresh()}
         />
       )}
+      </MatchFormatProvider>
     </EntrantProvider>
   );
 }
