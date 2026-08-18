@@ -177,11 +177,11 @@ vainqueur (fait avancer le tournoi, irréversible).
 ## 4.2 Équipes (`/equipes`) ✅🧪
 
 - Recherche par nom / région.
-- Filtre par **jeu** : Toutes, Overwatch 2, Marvel Rivals.
+- Filtre par **jeu** : Toutes, Overwatch, Marvel Rivals.
 - Tri : Classement, Nom, Victoires, Effectif.
 
 ## 4.3 Tournois (`/tournois`) ✅🧪
 
 - Recherche (raccourci ⌘K / Ctrl+K).
-- Filtre par **jeu** : Tous, Overwatch 2, Marvel Rivals.
+- Filtre par **jeu** : Tous, Overwatch, Marvel Rivals.
 - Sections par statut : En cours, Inscriptions ouvertes, Prochainement, Terminés.

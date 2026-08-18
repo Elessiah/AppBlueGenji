@@ -75,7 +75,7 @@ export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) 
             <strong>identifiant Discord</strong> est aussi conservé pour l&apos;authentification.
           </li>
           <li>
-            Tes pseudos <strong>Overwatch 2</strong> et <strong>Marvel Rivals</strong> servent
+            Tes pseudos <strong>Overwatch</strong> et <strong>Marvel Rivals</strong> servent
             seulement à permettre aux autres joueurs de t&apos;ajouter en jeu, jamais à
             établir des statistiques.
           </li>

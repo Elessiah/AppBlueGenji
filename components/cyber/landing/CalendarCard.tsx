@@ -1,5 +1,5 @@
 import { formatLocalDateTime } from "@/lib/shared/dates";
-import type { LandingCalendarEvent } from "@/lib/shared/landing";
+import { inferGameShortLabel, type LandingCalendarEvent } from "@/lib/shared/landing";
 import styles from "./CalendarCard.module.css";
 
 type CalendarCardProps = {
@@ -12,12 +12,6 @@ function monthLabel(date: Date): string {
 
 function dayLabel(date: Date): string {
   return date.toLocaleDateString("fr-FR", { day: "2-digit" });
-}
-
-function gameLabel(name: string): "OW2" | "MR" {
-  const lower = name.toLowerCase();
-  if (lower.includes("marvel") || lower.includes("rivals")) return "MR";
-  return "OW2";
 }
 
 function tagLabel(state: LandingCalendarEvent["state"]): string {
@@ -49,7 +43,7 @@ export function CalendarCard({ events }: CalendarCardProps) {
               <div className={styles.bar} />
               <div className={styles.body}>
                 <div className={styles.pills}>
-                  <span className={styles.pill}>{gameLabel(event.name)}</span>
+                  <span className={styles.pill}>{inferGameShortLabel(event.name)}</span>
                   <span className={styles.tag}>{tagLabel(event.state)}</span>
                 </div>
                 <div className={styles.title} title={formatLocalDateTime(date)}>

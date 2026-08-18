@@ -120,7 +120,7 @@ SPÉCIFICATIONS PAR SECTION
    - Première carte (span 2 lignes) : tournoi RUNNING si existe,
      sinon premier UPCOMING :
        * <Pill variant="live"> ou <Pill variant="blue">
-       * eyebrow "OVERWATCH 2" (placeholder, brancher en Phase 6)
+       * eyebrow "OVERWATCH" (placeholder, brancher en Phase 6)
        * Titre 26px
        * Sous-titre phase (mono 10px var(--blue-300))
        * <MiniBracket matches={4 matchs} /> (depuis bg_matches du
@@ -269,7 +269,7 @@ CRITÈRES D'ACCEPTATION
 - Hero responsive (colonne unique sous 900px).
 - LiveCard met à jour les viewers toutes les 10s (ouvrir devtools
   Network pour vérifier).
-- Leaderboard : cliquer sur "Overwatch 2" change l'URL de fetch en
+- Leaderboard : cliquer sur "Overwatch" change l'URL de fetch en
   ?game=ow2 (visible Network).
 - CalendarCard : cliquer sur "ICS →" télécharge bluegenji.ics.
 - Tous les composants cyber préexistants (Phase 2) sont utilisés

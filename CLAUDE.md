@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BlueGenji Esport is a French esports platform for amateur Marvel Rivals and Overwatch 2 tournaments. It manages tournaments, team/player profiles, and integrates with a Discord bot.
+BlueGenji Esport is a French esports platform for amateur Marvel Rivals and Overwatch tournaments. It manages tournaments, team/player profiles, and integrates with a Discord bot.
 
 ## Commands
 

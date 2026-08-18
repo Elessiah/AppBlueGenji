@@ -10,7 +10,7 @@ describe("DONNEES_PROFIL", () => {
   it("covers all profile data types", () => {
     const names = DONNEES_PROFIL.map((d) => d.donnee);
     expect(names).toContain("Pseudo site");
-    expect(names).toContain("Pseudo Overwatch 2");
+    expect(names).toContain("Pseudo Overwatch");
     expect(names).toContain("Pseudo Discord");
     expect(names).toContain("ID Discord");
     expect(names).toContain("Pseudo Marvel Rivals");

@@ -18,7 +18,7 @@ const REGLEMENT_URL =
 
 export const metadata: Metadata = {
   title: "BlueGenji - L'Association Esport",
-  description: "BlueGenji, association loi 1901 au service de la scène amateur française pour Overwatch 2 et Marvel Rivals.",
+  description: "BlueGenji, association loi 1901 au service de la scène amateur française pour Overwatch et Marvel Rivals.",
   openGraph: {
     title: "BlueGenji - L'Association",
     description: "Structure associative compétitive et inclusive pour la scène esport francophone.",

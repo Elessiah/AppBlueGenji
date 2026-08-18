@@ -42,7 +42,7 @@ export function Leaderboard({ initialRows }: LeaderboardProps) {
 
   const chips = [
     { id: "all" as const, label: "Général" },
-    { id: "ow2" as const, label: "Overwatch 2" },
+    { id: "ow2" as const, label: "Overwatch" },
     { id: "mr" as const, label: "Marvel Rivals" },
   ];
 

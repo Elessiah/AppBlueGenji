@@ -1146,7 +1146,7 @@ async function createTournament(
     }
   }
 
-  const gameLabel = def.game === "OW2" ? "Overwatch 2" : "Marvel Rivals";
+  const gameLabel = def.game === "OW2" ? "Overwatch" : "Marvel Rivals";
   console.log(
     `  ✓ #${tournamentId} [${def.state}/${format}] ${gameLabel} · ${def.name} (${teamsToUse.length}/${def.maxTeams})`
   );

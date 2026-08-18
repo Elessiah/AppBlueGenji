@@ -206,7 +206,7 @@ describe("computeDeepStats", () => {
 
       expect(stats.byGame.map((split) => split.key)).toEqual(["OW2", "MR"]);
       expect(stats.byGame[0]).toMatchObject({ played: 3, won: 2, lost: 1 });
-      expect(stats.byGame[0].label).toBe("Overwatch 2");
+      expect(stats.byGame[0].label).toBe("Overwatch");
       expect(stats.byGame[1].winRate).toBe(1);
     });
 

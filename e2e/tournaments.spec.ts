@@ -44,7 +44,7 @@ test.describe("Dashboard tournois (authentifié)", () => {
     await search.clear();
 
     // Bascule sur un filtre de jeu sans erreur.
-    await page.getByRole("button", { name: /Overwatch 2/ }).click();
+    await page.getByRole("button", { name: /Overwatch/ }).click();
     await page.getByRole("button", { name: /Marvel Rivals/ }).click();
     await page.getByRole("button", { name: /^Tous/ }).click();
   });

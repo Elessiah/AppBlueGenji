@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CyberButton, CyberCard, MiniBracket, Pill } from "@/components/cyber";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
-import { inferGameCode, inferGameLabel } from "@/lib/shared/landing";
+import { inferGameCode, inferGameLabel, inferGameShortLabel } from "@/lib/shared/landing";
 import styles from "./TournamentBoard.module.css";
 
 type TournamentBoardProps = {
@@ -36,12 +36,12 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
             <>
               <div className={styles.badgeRow}>
                 <Pill variant={featured.state === "RUNNING" ? "live" : "blue"}>
-                  {featured.state === "RUNNING" ? "LIVE" : "OW2"}
+                  {featured.state === "RUNNING" ? "LIVE" : inferGameShortLabel(featured.name)}
                 </Pill>
                 <span className="mono">{inferGameLabel(featured.name).toUpperCase()}</span>
               </div>
 
-              <div className={styles.gameEyebrow}>OVERWATCH 2</div>
+              <div className={styles.gameEyebrow}>{inferGameLabel(featured.name).toUpperCase()}</div>
               <h3 className={styles.featuredTitle}>{makeTitle(featured)}</h3>
               <div className={styles.phase}>{featured.state} · BRACKET LIVE</div>
               <MiniBracket matches={miniBracket} />
