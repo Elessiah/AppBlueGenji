@@ -168,6 +168,7 @@ export function AdminScoreDialog({ match, open, onClose, onSubmitted }: AdminSco
                   max={maxScore}
                   value={form.score1}
                   onChange={(e) => form.setScore1(e.target.value)}
+                  aria-label={`Score de ${match.team1Name || "l'équipe 1"}`}
                   autoFocus
                   style={{
                     flex: 1,
@@ -278,6 +279,7 @@ export function AdminScoreDialog({ match, open, onClose, onSubmitted }: AdminSco
                   max={maxScore}
                   value={form.score2}
                   onChange={(e) => form.setScore2(e.target.value)}
+                  aria-label={`Score de ${match.team2Name || "l'équipe 2"}`}
                   style={{
                     flex: 1,
                     minWidth: 0,
@@ -462,6 +464,13 @@ export function AdminScoreDialog({ match, open, onClose, onSubmitted }: AdminSco
               transition: "all 0.2s",
             }}
             disabled={!canDeclareWinner || form.submitting}
+            title={
+              canDeclareWinner
+                ? undefined
+                : matchFormat
+                  ? `Le vainqueur doit atteindre ${maxScore} manche${maxScore > 1 ? "s" : ""} (${matchFormatLabel(matchFormat)}).`
+                  : "Les scores ne peuvent pas être égaux."
+            }
           >
             {form.submitting ? "..." : "✓ Gagnant"}
           </button>
