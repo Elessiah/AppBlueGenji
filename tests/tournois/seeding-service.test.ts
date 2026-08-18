@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/repository");
 jest.mock("@/lib/server/tournaments/notifications");
+jest.mock("@/lib/server/tournaments/bg-survie");
+jest.mock("@/lib/server/tournaments/swiss");
+jest.mock("@/lib/server/tournaments/survival");
+jest.mock("@/lib/server/tournaments/phases");
 
 import { loadSeedingBoard, reorderSeeding } from "@/lib/server/tournaments/seeding";
 import {
@@ -12,6 +16,10 @@ import {
   resetRegistrationRanks,
 } from "@/lib/server/tournaments/repository";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { initializeEnduranceTournament } from "@/lib/server/tournaments/bg-survie";
+import { initializeSwissTournament } from "@/lib/server/tournaments/swiss";
+import { initializeSurvivalTournament } from "@/lib/server/tournaments/survival";
+import { initializeMultiTournament } from "@/lib/server/tournaments/phases";
 
 type Row = Record<string, unknown>;
 
@@ -143,6 +151,39 @@ describe("reorderSeeding", () => {
     expect(
       connection.execute.mock.calls.some(([sql]) => String(sql).includes("bracket_size = NULL")),
     ).toBe(true);
+  });
+
+  it.each([
+    ["BG_SURVIE", () => initializeEnduranceTournament],
+    ["SWISS", () => initializeSwissTournament],
+    ["SURVIVAL", () => initializeSurvivalTournament],
+    ["MULTI", () => initializeMultiTournament],
+  ])("réamorce le moteur d'un tournoi %s déjà lancé", async (format, initializer) => {
+    (loadTournamentRow as jest.Mock).mockResolvedValue(
+      tournament({ state: "RUNNING", format }) as never,
+    );
+    (getMatchRows as jest.Mock).mockResolvedValue([matchRow()] as never);
+
+    await reorderSeeding(5, [2, 1]);
+
+    // Le plateau est détruit ET le moteur du format est réamorcé : sans cela le
+    // tournoi resterait indéfiniment sans aucun match.
+    expect(deleteAllMatches).toHaveBeenCalledWith(connection, 5);
+    expect(initializer()).toHaveBeenCalledWith(5, connection);
+  });
+
+  it("purge l'état des phases avant de réamorcer un MULTI", async () => {
+    (loadTournamentRow as jest.Mock).mockResolvedValue(
+      tournament({ state: "RUNNING", format: "MULTI" }) as never,
+    );
+    (getMatchRows as jest.Mock).mockResolvedValue([matchRow()] as never);
+
+    await reorderSeeding(5, [2, 1]);
+
+    const sqls = connection.execute.mock.calls.map(([sql]) => String(sql));
+    expect(sqls.some((sql) => /DELETE FROM bg_tournament_phase_teams/.test(sql))).toBe(true);
+    expect(sqls.some((sql) => /UPDATE bg_tournament_phases[\s\S]*state = 'PENDING'/.test(sql))).toBe(true);
+    expect(sqls.some((sql) => /current_phase_id = NULL/.test(sql))).toBe(true);
   });
 
   it("refuse dès qu'un score est saisi", async () => {

@@ -94,9 +94,9 @@ export function hasScoreInput(match: MatchScoreState): boolean {
  * Matchs dont le contenu dépend du résultat de `match`.
  *
  * · Élimination simple / double : les matchs cibles du vainqueur et du perdant.
- * · Survie / ronde suisse : pas de liens de bracket — les appariements du round
- *   suivant sont recalculés à partir du classement, donc tout round ultérieur
- *   dépend du résultat.
+ * · Survie / ronde suisse / BlueGenji Survie : pas de liens de bracket — les
+ *   appariements du round suivant sont recalculés à partir du classement, donc
+ *   tout round ultérieur dépend du résultat.
  */
 export function dependentMatches(
   match: MatchScoreState,
@@ -120,7 +120,7 @@ export function dependentMatches(
     format === "MULTI" ? (phaseFormat ?? "SINGLE") : format;
 
   let intraPhase: MatchScoreState[];
-  if (effective === "SURVIVAL" || effective === "SWISS") {
+  if (effective === "SURVIVAL" || effective === "SWISS" || effective === "BG_SURVIE") {
     intraPhase = samePhase.filter((m) => m.roundNumber > match.roundNumber);
   } else {
     const targets = [match.nextWinnerMatchId, match.nextLoserMatchId].filter(

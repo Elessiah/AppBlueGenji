@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
+import { dependentMatches, isScoreEditLocked, type MatchScoreState } from "@/lib/shared/match-lock";
 import {
   assignRanks,
   buildPlayoffPairings,
@@ -309,5 +310,51 @@ describe("qualificationComplete", () => {
     [3, true],
   ])("%i équipes actives → %s", (activeCount, expected) => {
     expect(qualificationComplete(activeCount, CONFIG)).toBe(expected);
+  });
+});
+
+describe("verrouillage des scores en BlueGenji Survie", () => {
+  /** Deux manches successives, sans lien de bracket (le mode n'en pose aucun). */
+  function match(overrides: Partial<MatchScoreState> & { id: number; roundNumber: number }): MatchScoreState {
+    return {
+      team1Id: 1,
+      team2Id: 2,
+      team1Score: null,
+      team2Score: null,
+      winnerTeamId: null,
+      forfeitTeamId: null,
+      hasPendingReport: false,
+      nextWinnerMatchId: null,
+      nextLoserMatchId: null,
+      ...overrides,
+    };
+  }
+
+  it("considère toute manche ultérieure comme dépendante", () => {
+    const first = match({ id: 1, roundNumber: 1, winnerTeamId: 1 });
+    const second = match({ id: 2, roundNumber: 2 });
+
+    expect(dependentMatches(first, [first, second], "BG_SURVIE").map((m) => m.id)).toEqual([2]);
+  });
+
+  it("verrouille un score dès que la manche suivante porte une saisie", () => {
+    const first = match({ id: 1, roundNumber: 1, winnerTeamId: 1 });
+    const played = match({ id: 2, roundNumber: 2, team1Score: 2, team2Score: 1, winnerTeamId: 1 });
+
+    expect(isScoreEditLocked(first, [first, played], "BG_SURVIE")).toBe(true);
+  });
+
+  it("verrouille aussi depuis un tour de play-offs", () => {
+    const qualification = match({ id: 1, roundNumber: 3, winnerTeamId: 1 });
+    const playoff = match({ id: 2, roundNumber: 1000, winnerTeamId: 2, team1Score: 3, team2Score: 0 });
+
+    expect(isScoreEditLocked(qualification, [qualification, playoff], "BG_SURVIE")).toBe(true);
+  });
+
+  it("laisse modifiable tant que la manche suivante est vierge", () => {
+    const first = match({ id: 1, roundNumber: 1, winnerTeamId: 1 });
+    const pending = match({ id: 2, roundNumber: 2 });
+
+    expect(isScoreEditLocked(first, [first, pending], "BG_SURVIE")).toBe(false);
   });
 });

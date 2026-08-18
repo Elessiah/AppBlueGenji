@@ -176,6 +176,62 @@ describe("startEndurancePlayoffs", () => {
   });
 });
 
+describe("enchaînement des tours de play-offs", () => {
+  beforeEach(() => jest.clearAllMocks());
+  afterEach(() => jest.restoreAllMocks());
+
+  /** Dernier tour de play-offs, avec `count` matchs décisifs terminés. */
+  function playoffRound(count: number, round = 1000) {
+    return [
+      [[tournamentRow({ endurance_playoffs_started: 1 })]], // loadTournament (reconcile)
+      [[standingRow(1)]], // classement stocké
+      [[]], // matchs de qualification
+      [[]], // forfaits
+      [{ affectedRows: 1 }], // persistStandings : une écriture pour l'unique équipe
+      [[{ round_number: round }]], // derniers tours
+      [
+        Array.from({ length: count }, (_, index) => ({
+          id: 500 + index,
+          match_number: index + 1,
+          status: "COMPLETED",
+          winner_team_id: 10 + index,
+          loser_team_id: 90 + index,
+          bracket: "UPPER",
+        })),
+      ],
+    ];
+  }
+
+  it("fait passer le tour au dernier vainqueur quand ils sont en nombre impair", async () => {
+    (createMatch as jest.Mock).mockResolvedValue(77 as never);
+    const conn = makeConn(playoffRound(3));
+
+    await reconcileEndurance(5, conn);
+
+    const created = conn.execute.mock.calls.filter(([sql]) =>
+      String(sql).includes("SET team1_id = ?, team2_id = ?, status = ?"),
+    );
+    // Deux matchs : 10 vs 11, puis 12 seul (bye) — aucun vainqueur perdu.
+    expect(created).toHaveLength(2);
+    expect((created[0][1] as unknown[]).slice(0, 2)).toEqual([10, 11]);
+    expect((created[1][1] as unknown[]).slice(0, 4)).toEqual([12, null, "COMPLETED", 1]);
+  });
+
+  it("apparie normalement un nombre pair de vainqueurs", async () => {
+    (createMatch as jest.Mock).mockResolvedValue(77 as never);
+    const conn = makeConn(playoffRound(4));
+
+    await reconcileEndurance(5, conn);
+
+    const created = conn.execute.mock.calls.filter(([sql]) =>
+      String(sql).includes("SET team1_id = ?, team2_id = ?, status = ?"),
+    );
+    expect(created).toHaveLength(2);
+    expect((created[0][1] as unknown[]).slice(0, 3)).toEqual([10, 11, "READY"]);
+    expect((created[1][1] as unknown[]).slice(0, 3)).toEqual([12, 13, "READY"]);
+  });
+});
+
 describe("reconcileEndurance", () => {
   beforeEach(() => jest.clearAllMocks());
   afterEach(() => jest.restoreAllMocks());
@@ -212,6 +268,72 @@ describe("reconcileEndurance", () => {
     expect(byTeam.get(2)).toEqual({ points: 8, wins: 0, losses: 1 });
     // Les équipes sans match gardent leur capital.
     expect(byTeam.get(3)).toEqual({ points: 9, wins: 0, losses: 0 });
+  });
+});
+
+describe("reconcileEndurance — réappariement après correction", () => {
+  beforeEach(() => jest.clearAllMocks());
+  afterEach(() => jest.restoreAllMocks());
+
+  /**
+   * Manche 1 jouée (2 bat 1), manche 2 posée mais vierge. Le classement rejoué
+   * met donc 2 devant 1 : les appariements de la manche 2 doivent suivre.
+   */
+  function stateWithStaleRound(pairings: { team1_id: number; team2_id: number }[]) {
+    return [
+      [[tournamentRow({ endurance_current_round: 2, endurance_playoff_size: 2 })]],
+      [[standingRow(1), standingRow(2), standingRow(3), standingRow(4)]],
+      [
+        [
+          { round_number: 1, status: "COMPLETED", winner_team_id: 2, loser_team_id: 1 },
+          { round_number: 1, status: "COMPLETED", winner_team_id: 4, loser_team_id: 3 },
+        ],
+      ],
+      [[]], // forfaits
+      [{ affectedRows: 1 }], // persistStandings ×4 (absorbés par le fallback)
+      [{ affectedRows: 1 }],
+      [{ affectedRows: 1 }],
+      [{ affectedRows: 1 }],
+      [[{ c: 0 }]], // la manche 2 ne porte aucune saisie
+      [pairings], // appariements actuellement en base
+    ];
+  }
+
+  it("défait et régénère la manche courante quand ses couples sont périmés", async () => {
+    (createMatch as jest.Mock).mockResolvedValue(77 as never);
+    // En base : 1 vs 2 et 3 vs 4, alors que le classement rejoué attend 2 vs 4.
+    const conn = makeConn(
+      stateWithStaleRound([
+        { team1_id: 1, team2_id: 2 },
+        { team1_id: 3, team2_id: 4 },
+      ]),
+    );
+
+    await reconcileEndurance(5, conn);
+
+    const sqls = conn.execute.mock.calls.map(([sql]) => String(sql));
+    expect(sqls.some((sql) => /DELETE FROM bg_matches/.test(sql))).toBe(true);
+    // La manche est reculée d'un cran avant d'être régénérée.
+    const rollback = conn.execute.mock.calls.find(([sql]) =>
+      String(sql).includes("SET endurance_current_round = ?"),
+    );
+    expect((rollback?.[1] as unknown[])[0]).toBe(1);
+  });
+
+  it("laisse la manche en place quand ses couples sont toujours valides", async () => {
+    (createMatch as jest.Mock).mockResolvedValue(77 as never);
+    // 2 vs 4 puis 1 vs 3 : exactement ce que le classement rejoué produit.
+    const conn = makeConn(
+      stateWithStaleRound([
+        { team1_id: 2, team2_id: 4 },
+        { team1_id: 1, team2_id: 3 },
+      ]),
+    );
+
+    await reconcileEndurance(5, conn);
+
+    const sqls = conn.execute.mock.calls.map(([sql]) => String(sql));
+    expect(sqls.some((sql) => /DELETE FROM bg_matches/.test(sql))).toBe(false);
   });
 });
 

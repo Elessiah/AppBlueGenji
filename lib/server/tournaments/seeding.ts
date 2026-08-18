@@ -156,6 +156,17 @@ async function rebuildStartedTournament(
   tournamentId: number,
   format: string,
 ): Promise<void> {
+  if (format === "BG_SURVIE") {
+    // Le classement d'endurance porte les seeds : il doit être resemé depuis le
+    // nouvel ordre, sans quoi le tournoi resterait figé sur l'ancien.
+    const { initializeEnduranceTournament, generateEnduranceRound, reconcileEndurance } =
+      await import("./bg-survie");
+    await initializeEnduranceTournament(tournamentId, connection);
+    await generateEnduranceRound(tournamentId, connection);
+    await reconcileEndurance(tournamentId, connection);
+    return;
+  }
+
   if (format === "SWISS") {
     const { initializeSwissTournament, generateSwissRound, reconcileSwiss } = await import("./swiss");
     await initializeSwissTournament(tournamentId, connection);
@@ -175,6 +186,36 @@ async function rebuildStartedTournament(
   }
 
   if (format === "MULTI") {
+    // `initializeMultiTournament` réamorce la phase 1, mais ne nettoie pas ce
+    // que la précédente exécution a laissé : sans cette purge, les équipes de
+    // phase de l'ancien ordre subsistent et `startPhase` serait rejoué sur une
+    // phase déjà marquée RUNNING.
+    await connection.execute(
+      `DELETE FROM bg_tournament_phase_teams
+       WHERE phase_id IN (SELECT id FROM bg_tournament_phases WHERE tournament_id = ?)`,
+      [tournamentId],
+    );
+    await connection.execute(
+      `UPDATE bg_tournament_phases
+       SET state = 'PENDING', started_at = NULL, finished_at = NULL,
+           entrants = NULL, qualifiers = NULL, max_rounds = NULL, bracket_size = NULL,
+           swiss_current_round = 0, survival_current_round = 0, survival_barrage_rounds = 0
+       WHERE tournament_id = ?`,
+      [tournamentId],
+    );
+    await connection.execute(
+      `DELETE FROM bg_swiss_standings WHERE tournament_id = ?`,
+      [tournamentId],
+    );
+    await connection.execute(
+      `DELETE FROM bg_survival_standings WHERE tournament_id = ?`,
+      [tournamentId],
+    );
+    await connection.execute(
+      `UPDATE bg_tournaments SET current_phase_id = NULL WHERE id = ?`,
+      [tournamentId],
+    );
+
     const { initializeMultiTournament, reconcilePhases } = await import("./phases");
     await initializeMultiTournament(tournamentId, connection);
     await reconcilePhases(tournamentId, connection);

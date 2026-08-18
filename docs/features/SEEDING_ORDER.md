@@ -37,6 +37,7 @@ Deux raisons de verrouillage, exposées à l'interface :
 | `SINGLE` / `DOUBLE` | ordre des seeds (déjà le cas avant) | idem |
 | `SWISS` | classement du site (`lib/shared/ranking.ts`) | ordre des seeds |
 | `SURVIVAL` | classement du site | ordre des seeds |
+| `BG_SURVIE` | ordre des seeds (toujours) | ordre des seeds |
 | `MULTI` (phase 1) | classement du site | ordre des seeds |
 
 Tant que personne n'a réordonné, chaque format garde donc exactement le
@@ -50,8 +51,11 @@ et réamorce le format.
 
 - `SINGLE` / `DOUBLE` : `bracket_size` repasse à `NULL`, et l'entretien de
   `syncTournamentState` régénère le plateau.
-- `SWISS` / `SURVIVAL` / `MULTI` : réinitialisation explicite (leur amorçage
-  n'a lieu qu'à la transition REGISTRATION → RUNNING, déjà passée).
+- `SWISS` / `SURVIVAL` / `BG_SURVIE` / `MULTI` : réinitialisation explicite
+  (leur amorçage n'a lieu qu'à la transition REGISTRATION → RUNNING, déjà
+  passée). Pour `MULTI`, l'état des phases est d'abord purgé — équipes de phase,
+  états, compteurs et `current_phase_id` — sans quoi `startPhase` serait rejoué
+  sur une phase déjà marquée RUNNING avec un plateau mélangé.
 
 ## Surfaces
 

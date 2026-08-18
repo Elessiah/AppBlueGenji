@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/tournaments/repository");
@@ -111,6 +113,20 @@ describe("syncTournamentState — entretien d'un tournoi en cours", () => {
     expect(createBracketIfMissing).not.toHaveBeenCalled();
     expect(tryAutoResolveByes).not.toHaveBeenCalled();
     expect(finalizeTournamentIfDone).not.toHaveBeenCalled();
+  });
+
+  it("laisse les modes auto-pilotés clore eux-mêmes leur tournoi", () => {
+    // Régression : la finalisation générique doit refuser de trancher pour les
+    // formats qui écrivent leur propre classement final — sinon un instant où
+    // tous les matchs sont terminés suffirait à clore le tournoi et à écraser
+    // leur classement.
+    const source = readFileSync(
+      join(__dirname, "..", "..", "lib", "server", "tournaments", "finalization.ts"),
+      "utf8",
+    );
+    for (const format of ["SURVIVAL", "SWISS", "MULTI", "BG_SURVIE"]) {
+      expect(source).toMatch(new RegExp(`format === "${format}"`));
+    }
   });
 
   it("renvoie null pour un tournoi inconnu", async () => {

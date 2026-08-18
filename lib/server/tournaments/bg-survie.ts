@@ -334,10 +334,80 @@ export async function reconcileEndurance(
     return;
   }
 
+  const currentRound = Number(tournament.endurance_current_round);
+
+  // Une correction de score en amont réécrit le classement : la manche courante,
+  // si elle est déjà posée mais pas entamée, décrit alors des appariements
+  // périmés (voire une équipe éliminée entre-temps). On la défait pour la
+  // reformer depuis le classement rejoué — c'est ce que font déjà la Survie et
+  // la Ronde suisse.
+  if (currentRound > 0 && !(await roundHasScoreInput(conn, tournamentId, currentRound))) {
+    if (await roundPairingsAreStale(conn, tournamentId, currentRound, replayed)) {
+      await conn.execute(
+        `DELETE FROM bg_matches WHERE tournament_id = ? AND phase_id = 0 AND round_number = ?`,
+        [tournamentId, currentRound],
+      );
+      await conn.execute(`UPDATE bg_tournaments SET endurance_current_round = ? WHERE id = ?`, [
+        currentRound - 1,
+        tournamentId,
+      ]);
+      await generateEnduranceRound(tournamentId, conn);
+      return;
+    }
+  }
+
   // Manche courante terminée → on apparie la suivante.
-  if (await roundIsComplete(conn, tournamentId, Number(tournament.endurance_current_round))) {
+  if (await roundIsComplete(conn, tournamentId, currentRound)) {
     await generateEnduranceRound(tournamentId, conn);
   }
+}
+
+/** Un match de la manche porte-t-il déjà une saisie ? */
+async function roundHasScoreInput(
+  conn: PoolConnection,
+  tournamentId: number,
+  round: number,
+): Promise<boolean> {
+  const [rows] = await conn.execute<(RowDataPacket & { c: number })[]>(
+    `SELECT COUNT(*) AS c FROM bg_matches
+     WHERE tournament_id = ? AND phase_id = 0 AND round_number = ?
+       AND (team1_score IS NOT NULL OR team2_score IS NOT NULL
+            OR winner_team_id IS NOT NULL OR forfeit_team_id IS NOT NULL
+            OR status = 'AWAITING_CONFIRMATION')`,
+    [tournamentId, round],
+  );
+  return Number(rows[0]?.c ?? 0) > 0;
+}
+
+/**
+ * Les appariements posés pour cette manche correspondent-ils encore au
+ * classement rejoué ? Comparaison sur les couples, l'ordre des sides étant
+ * lui aussi dérivé du classement.
+ */
+async function roundPairingsAreStale(
+  conn: PoolConnection,
+  tournamentId: number,
+  round: number,
+  standings: EnduranceStanding[],
+): Promise<boolean> {
+  const [rows] = await conn.execute<
+    (RowDataPacket & { team1_id: number | null; team2_id: number | null })[]
+  >(
+    `SELECT team1_id, team2_id FROM bg_matches
+     WHERE tournament_id = ? AND phase_id = 0 AND round_number = ?
+     ORDER BY match_number ASC`,
+    [tournamentId, round],
+  );
+  if (rows.length === 0) return false;
+
+  const expected = planEnduranceRound(standings).filter((pairing) => pairing.teamBId !== null);
+  if (expected.length !== rows.length) return true;
+
+  return expected.some(
+    (pairing, index) =>
+      Number(rows[index].team1_id) !== pairing.teamAId ||
+      Number(rows[index].team2_id) !== pairing.teamBId,
+  );
 }
 
 /** Vrai si tous les matchs de la manche sont terminés (0 match = manche vide). */
@@ -484,12 +554,28 @@ async function finalizePlayoffsIfDone(conn: PoolConnection, tournamentId: number
   const nextRound = lastRound + 1;
 
   let matchNumber = 1;
-  for (let index = 0; index + 1 < winners.length; index += 2) {
+  for (let index = 0; index < winners.length; index += 2) {
     const matchId = await createMatch(conn, tournamentId, "UPPER", nextRound, matchNumber, 0);
+
+    // Nombre impair de vainqueurs (plateau qui n'est pas une puissance de deux) :
+    // le dernier passe le tour au lieu d'être oublié en route.
+    const isBye = index + 1 >= winners.length;
     await conn.execute(
-      `UPDATE bg_matches SET team1_id = ?, team2_id = ?, status = 'READY', is_bye = 0 WHERE id = ?`,
-      [winners[index], winners[index + 1], matchId],
+      `UPDATE bg_matches SET team1_id = ?, team2_id = ?, status = ?, is_bye = ? WHERE id = ?`,
+      [
+        winners[index],
+        isBye ? null : winners[index + 1],
+        isBye ? "COMPLETED" : "READY",
+        isBye ? 1 : 0,
+        matchId,
+      ],
     );
+    if (isBye) {
+      await conn.execute(
+        `UPDATE bg_matches SET team1_score = 1, team2_score = 0, winner_team_id = ? WHERE id = ?`,
+        [winners[index], matchId],
+      );
+    }
     matchNumber += 1;
   }
 

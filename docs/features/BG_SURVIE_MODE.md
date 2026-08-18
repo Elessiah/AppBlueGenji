@@ -53,8 +53,11 @@ Les manches de play-offs sont numérotées à partir de `1000`
 (`PLAYOFF_ROUND_OFFSET`) pour rester distinguables des manches d'endurance dans
 l'historique des matchs, sans table supplémentaire.
 
-Un plateau autre que huit (tournoi sous-rempli) retombe sur un appariement
-classique haut contre bas — le tableau du règlement n'est défini que pour huit.
+Un plateau autre que huit (tournoi sous-rempli, ou `endurance_playoff_size`
+réglé autrement) retombe sur un appariement classique haut contre bas — le
+tableau du règlement n'est défini que pour huit. Sur un effectif qui n'est pas
+une puissance de deux, un tour peut compter un nombre impair de vainqueurs :
+le dernier **passe le tour** (bye) au lieu d'être écarté.
 
 ## Classement de départ
 
@@ -71,6 +74,7 @@ décision humaine.
 | Orchestration | `lib/server/tournaments/bg-survie.ts` |
 | Classement | table `bg_endurance_standings` |
 | Vue | `app/(secured)/tournois/[id]/_components/EnduranceView.tsx` |
+| Verrouillage | `lib/shared/match-lock.ts` (format traité comme la Survie) |
 | Règles publiques | `/regles/bluegenji-survie` |
 
 Comme la Survie et la Ronde suisse, **tout est rejoué** depuis l'historique des
@@ -81,6 +85,12 @@ provoquée. Seuls le classement initial et les abandons sont stockés en entrée
 `reconcileEndurance` est idempotent et appelé après chaque saisie de score
 (report joueur, sauvegarde admin, résolution admin) : il persiste le classement,
 puis enchaîne la manche suivante ou bascule en play-offs.
+
+Si une correction de score change le classement alors que la manche courante est
+posée mais **pas encore entamée**, ses appariements sont périmés : ils sont
+détruits et reformés depuis le classement rejoué — comme le font déjà la Survie
+et la Ronde suisse. Au-delà, `match-lock` interdit la correction : toute manche
+ultérieure portant une saisie verrouille les précédentes, play-offs compris.
 
 ## Abandon
 
@@ -94,3 +104,15 @@ l'équipe sort, le classement est rejoué et la manche suivante réappariée.
   une élimination, départage par le classement précédent, tableau des play-offs.
 - `tests/tournois/bg-survie-service.test.ts` — orchestration : seeding initial,
   génération des manches, tableau imposé, réconciliation, abandon.
+
+## Interactions avec le reste du moteur
+
+- **Verrouillage des scores** — `dependentMatches` range `BG_SURVIE` avec la
+  Survie et la Ronde suisse : sans lien de bracket, toute manche ultérieure
+  dépend des précédentes.
+- **Finalisation générique** — `finalizeTournamentIfDone` ignore ce format, qui
+  écrit lui-même son podium ; sinon un instant où tous les matchs sont terminés
+  (entre deux manches) clôturerait le tournoi avec un classement d'élimination.
+- **Réordonnancement du seeding** — `reorderSeeding` réamorce explicitement le
+  mode (classement resemé, première manche régénérée) : les seeds vivent dans
+  `bg_endurance_standings`, ils ne se recalculent pas tout seuls.
