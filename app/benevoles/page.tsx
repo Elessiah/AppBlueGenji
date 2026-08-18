@@ -9,7 +9,7 @@ import styles from "./page.module.css";
 
 export const metadata: Metadata = {
   title: "BlueGenji - Bénévoles",
-  description: "Découvrez les bénévoles qui font vivre BlueGenji Arena au quotidien.",
+  description: "Découvrez les bénévoles qui font vivre BlueGenji Esport au quotidien.",
   openGraph: {
     title: "BlueGenji - Bénévoles",
     description: "Les passionné·es qui organisent, animent et développent la scène esport francophone.",

@@ -11,6 +11,8 @@ import { mapError } from "./_lib/error-map";
 import { canForfeitTeam } from "./_lib/forfeit";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { AdminScoreDialog } from "./_components/AdminScoreDialog";
+import { GhostRegistrationDialog } from "./_components/GhostRegistrationDialog";
+import { SeedingEditor } from "./_components/SeedingEditor";
 import { MatchScoreDraft } from "./_components/BracketTree";
 import { BracketSections } from "./_components/BracketSections";
 import { SurvivalView } from "./_components/SurvivalView";
@@ -21,6 +23,8 @@ import {
   visibleRulesFormat,
 } from "./_lib/phases";
 import { SwissView } from "./_components/SwissView";
+import { EnduranceView } from "./_components/EnduranceView";
+import { MatchRow } from "./_components/MatchRow";
 
 const FORMAT_LABELS: Record<TournamentFormat, string> = {
   SINGLE: "Simple élim.",
@@ -28,6 +32,7 @@ const FORMAT_LABELS: Record<TournamentFormat, string> = {
   SWISS: "Ronde suisse",
   SURVIVAL: "Survie",
   MULTI: "Multi-phases",
+  BG_SURVIE: "BlueGenji Survie",
 };
 
 /** « Arbre » ne veut rien dire dans les formats à classement, qui n'en ont pas. */
@@ -37,6 +42,7 @@ const BOARD_TITLES: Record<TournamentFormat, string> = {
   SWISS: "Classement et rondes",
   SURVIVAL: "Classement et rounds",
   MULTI: "Phases du tournoi",
+  BG_SURVIE: "Endurance et manches",
 };
 
 const STATE_META: Record<string, { label: string; chipClass: string }> = {
@@ -55,6 +61,7 @@ export default function TournamentDetailPage() {
   const { tournament: detail } = useTournamentLive(tournamentId);
   const [drafts, setDrafts] = useState<MatchScoreDraft>({});
   const [selectedMatchForAdmin, setSelectedMatchForAdmin] = useState<BracketMatch | null>(null);
+  const [ghostRegistrationOpen, setGhostRegistrationOpen] = useState(false);
   const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
 
   // Dernière phase courante observée. On ne resynchronise la sélection que
@@ -296,6 +303,15 @@ export default function TournamentDetailPage() {
                   Inscrire mon équipe
                 </CyberButton>
               )}
+              {detail.isAdmin && detail.card.state === "REGISTRATION" && (
+                <CyberButton
+                  variant="ghost"
+                  onClick={() => setGhostRegistrationOpen(true)}
+                  style={{ fontSize: 13, padding: "6px 16px" }}
+                >
+                  + Équipe fantôme
+                </CyberButton>
+              )}
             </div>
           </div>
         </div>
@@ -318,6 +334,8 @@ export default function TournamentDetailPage() {
             <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
               {formatForBracket === "SURVIVAL"
                 ? "Le classement de départ (seeding) et les rounds seront générés au démarrage du tournoi."
+                : detail.card.format === "BG_SURVIE"
+                  ? "Le classement de départ est celui du seeding ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi."
                 : detail.card.format === "SWISS"
                   ? "Le classement de départ (seeding) et la première ronde seront générés au démarrage du tournoi."
                   : "Le bracket sera généré automatiquement au démarrage du tournoi."}
@@ -357,6 +375,27 @@ export default function TournamentDetailPage() {
                 </div>
               )}
             </>
+          ) : detail.card.format === "BG_SURVIE" && detail.endurance ? (
+            <EnduranceView
+              endurance={detail.endurance}
+              matches={detail.matches}
+              renderMatch={(match) => (
+                <MatchRow
+                  key={match.id}
+                  match={match}
+                  reportable={canReport(match)}
+                  adminResolvable={canAdminResolve(match)}
+                  onScoreChange={handleScoreChange}
+                  myScore={drafts[match.id]?.myScore || ""}
+                  opponentScore={drafts[match.id]?.opponentScore || ""}
+                  onSubmit={submitScore}
+                  onOpenAdminModal={setSelectedMatchForAdmin}
+                  allMatches={detail.matches}
+                  roundNumber={match.roundNumber}
+                  format="SURVIVAL"
+                />
+              )}
+            />
           ) : detail.card.format === "SWISS" && detail.swiss ? (
             <SwissView
               swiss={detail.swiss}
@@ -464,6 +503,10 @@ export default function TournamentDetailPage() {
           )}
         </div>
 
+        {detail.isAdmin && (
+          <SeedingEditor tournamentId={tournamentId} onReordered={() => router.refresh()} />
+        )}
+
         <div className="ds-block">
           <div className="ds-section-title green">
             <h2>Inscriptions</h2>
@@ -493,6 +536,14 @@ export default function TournamentDetailPage() {
         onClose={() => setSelectedMatchForAdmin(null)}
         onSubmitted={() => setSelectedMatchForAdmin(null)}
       />
+
+      {ghostRegistrationOpen && (
+        <GhostRegistrationDialog
+          tournamentId={tournamentId}
+          onClose={() => setGhostRegistrationOpen(false)}
+          onRegistered={() => router.refresh()}
+        />
+      )}
     </>
   );
 }

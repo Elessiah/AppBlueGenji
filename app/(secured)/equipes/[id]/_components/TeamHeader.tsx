@@ -7,6 +7,7 @@ import { LogoWithGlow } from "@/components/logo-with-glow";
 import type { TeamDetailResponse } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { TransferOwnershipDialog } from "./TransferOwnershipDialog";
+import { ClaimGhostTeamDialog } from "./ClaimGhostTeamDialog";
 
 interface TeamHeaderProps {
   team: TeamDetailResponse;
@@ -26,7 +27,12 @@ export function TeamHeader({ team, onChanged, canManage, viewerIsOwner }: TeamHe
   const [logoBusy, setLogoBusy] = useState(false);
   const logoFileRef = useRef<HTMLInputElement | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [claimOpen, setClaimOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
+
+  // Équipe fantôme administrée au titre de la permission `tournaments` : le
+  // staff n'en est pas propriétaire, mais dispose des mêmes actions destructives.
+  const managedAsGhost = team.managedAsGhost;
 
   const deleteTeam = async () => {
     if (!window.confirm(
@@ -145,6 +151,24 @@ export function TeamHeader({ team, onChanged, canManage, viewerIsOwner }: TeamHe
               <div>
                 <h1 className="ds-title orange" style={{ fontSize: "clamp(26px, 3vw, 40px)", marginBottom: 6 }}>
                   {team.team.name}
+                  {team.team.isGhost && (
+                    <span
+                      className="mono"
+                      title="Équipe fantôme, créée par le staff"
+                      style={{
+                        marginLeft: 12,
+                        verticalAlign: "middle",
+                        fontSize: 10,
+                        letterSpacing: "0.18em",
+                        color: "var(--ink-mute)",
+                        border: "1px solid var(--line-soft)",
+                        borderRadius: 999,
+                        padding: "3px 9px",
+                      }}
+                    >
+                      FANTÔME
+                    </span>
+                  )}
                 </h1>
                 <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14, maxWidth: 560 }}>
                   {team.team.description || "Historique compétitif et gestion du roster"}
@@ -234,16 +258,27 @@ export function TeamHeader({ team, onChanged, canManage, viewerIsOwner }: TeamHe
                 flexWrap: "wrap",
               }}
             >
-              {viewerIsOwner ? (
+              {viewerIsOwner || managedAsGhost ? (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    onClick={() => setTransferOpen(true)}
-                    style={{ padding: "10px 18px", fontSize: 12, borderColor: "rgba(255,157,46,0.35)" }}
-                  >
-                    Transférer la propriété
-                  </button>
+                  {managedAsGhost ? (
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => setClaimOpen(true)}
+                      style={{ padding: "10px 18px", fontSize: 12, borderColor: "rgba(255,157,46,0.35)" }}
+                    >
+                      Attribuer à un joueur
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => setTransferOpen(true)}
+                      style={{ padding: "10px 18px", fontSize: 12, borderColor: "rgba(255,157,46,0.35)" }}
+                    >
+                      Transférer la propriété
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="btn ghost"
@@ -258,7 +293,7 @@ export function TeamHeader({ team, onChanged, canManage, viewerIsOwner }: TeamHe
                       cursor: deleteBusy ? "not-allowed" : "pointer",
                     }}
                   >
-                    {deleteBusy ? "Dissolution…" : "Dissoudre l'équipe"}
+                    {deleteBusy ? "Dissolution…" : managedAsGhost ? "Supprimer l'équipe fantôme" : "Dissoudre l'équipe"}
                   </button>
                 </div>
               ) : (
@@ -281,6 +316,15 @@ export function TeamHeader({ team, onChanged, canManage, viewerIsOwner }: TeamHe
           teamId={team.team.id}
           members={team.members}
           onClose={() => setTransferOpen(false)}
+          onChanged={onChanged}
+        />
+      )}
+
+      {claimOpen && (
+        <ClaimGhostTeamDialog
+          teamId={team.team.id}
+          teamName={team.team.name}
+          onClose={() => setClaimOpen(false)}
           onChanged={onChanged}
         />
       )}

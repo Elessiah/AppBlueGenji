@@ -68,6 +68,16 @@ export {
   loadSurvivalMeta,
 } from "./survival";
 
+// BlueGenji Survie (endurance)
+export {
+  initializeEnduranceTournament,
+  generateEnduranceRound,
+  reconcileEndurance,
+  startEndurancePlayoffs,
+  forfeitEnduranceTeam,
+  loadEnduranceMeta,
+} from "./bg-survie";
+
 // Phases (Multi)
 export {
   initializeMultiTournament,
@@ -79,7 +89,10 @@ export {
 
 // Public API functions
 import { syncTournamentState } from "./state";
-import { registerCurrentUserTeam as registerTeamInternal } from "./registration";
+import {
+  registerCurrentUserTeam as registerTeamInternal,
+  registerTeamById as registerTeamByIdInternal,
+} from "./registration";
 import { resolveExpiredScoreReports, finalizeTournamentIfDone } from "./finalization";
 import { tryAutoResolveByes } from "./byes";
 import { mapCard, mapMatch } from "./_internal";
@@ -152,6 +165,11 @@ export async function createTournament(
     swissPointsWin?: number | null;
     swissPointsDraw?: number | null;
     swissPointsLoss?: number | null;
+    /** BlueGenji Survie : capital d'endurance et barème (null = défauts). */
+    endurancePoints?: number | null;
+    enduranceWinDelta?: number | null;
+    enduranceLossDelta?: number | null;
+    endurancePlayoffSize?: number | null;
     phases?: Array<{
       position: number;
       format: "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL";
@@ -254,8 +272,12 @@ export async function createTournament(
         swiss_points_win,
         swiss_points_draw,
         swiss_points_loss,
-        swiss_points_bye
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        swiss_points_bye,
+        endurance_start_points,
+        endurance_win_delta,
+        endurance_loss_delta,
+        endurance_playoff_size
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         organizerUserId,
         payload.name.trim(),
@@ -278,6 +300,12 @@ export async function createTournament(
         // Une victoire d'office vaut exactement une victoire : sans quoi le bye
         // deviendrait un avantage (ou une punition) selon le barème choisi.
         swissPoints(payload.swissPointsWin, 3),
+        // BlueGenji Survie : `null` laisse le moteur appliquer 9 / ±1 / 8 au
+        // démarrage, puis fige les valeurs effectives sur le tournoi.
+        payload.endurancePoints ?? null,
+        payload.enduranceWinDelta ?? null,
+        payload.enduranceLossDelta ?? null,
+        payload.endurancePlayoffSize ?? null,
       ],
     );
 
@@ -410,6 +438,28 @@ export async function registerCurrentUserTeam(tournamentId: number, userId: numb
   }
 }
 
+/**
+ * Inscrit une équipe fantôme au nom du staff. L'appelant (route API) vérifie la
+ * permission `tournaments` et le caractère fantôme de l'équipe.
+ */
+export async function registerGhostTeam(tournamentId: number, teamId: number): Promise<void> {
+  const db = await getDatabase();
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+    await registerTeamByIdInternal(connection, tournamentId, teamId);
+    await connection.commit();
+
+    publishUpdatedEvent(tournamentId);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 async function hasExpiredScoreReports(
   db: Awaited<ReturnType<typeof getDatabase>>,
   tournamentId: number,
@@ -514,6 +564,11 @@ export async function getTournamentDetail(
         (phase) => phase.id === phasesDetail.currentPhaseId && phase.format === "SWISS",
       )?.id ?? null;
 
+    const endurance =
+      card.format === "BG_SURVIE"
+        ? await (await import("./bg-survie")).loadEnduranceMeta(connection, tournamentId)
+        : null;
+
     const swiss =
       card.format === "SWISS"
         ? await (await import("./swiss")).loadSwissMeta(connection, tournamentId)
@@ -538,6 +593,7 @@ export async function getTournamentDetail(
       isAdmin,
       survival,
       swiss,
+      endurance,
       phases: phasesDetail?.phases ?? null,
       currentPhaseId: phasesDetail?.currentPhaseId ?? null,
       phaseStandings: phasesDetail?.phaseStandings ?? {},
@@ -579,6 +635,8 @@ export async function reportMatchScorePublic(
     await reconcileSurvival(tournamentId, connection);
     const { reconcileSwiss } = await import("./swiss");
     await reconcileSwiss(tournamentId, connection);
+    const { reconcileEndurance } = await import("./bg-survie");
+    await reconcileEndurance(tournamentId, connection);
 
     // Réconcilie les phases multi (idempotent)
     const { reconcilePhases: reconcileMultiPhases } = await import("./phases");
@@ -627,6 +685,8 @@ export async function adminSaveMatchScoresPublic(
       await reconcileSurvival(savedTournamentId, connection);
       const { reconcileSwiss } = await import("./swiss");
       await reconcileSwiss(savedTournamentId, connection);
+      const { reconcileEndurance } = await import("./bg-survie");
+      await reconcileEndurance(savedTournamentId, connection);
 
       const { reconcilePhases: reconcileMultiPhases } = await import("./phases");
       await reconcileMultiPhases(savedTournamentId, connection);
@@ -694,6 +754,9 @@ export async function forfeitTournamentTeamPublic(
     } else if (engineFormat === "SWISS") {
       const { forfeitSwissTeam } = await import("./swiss");
       await forfeitSwissTeam(tournamentId, teamId, connection, forfeitPhaseId);
+    } else if (engineFormat === "BG_SURVIE") {
+      const { forfeitEnduranceTeam } = await import("./bg-survie");
+      await forfeitEnduranceTeam(tournamentId, teamId, connection);
     } else {
       throw new Error("FORMAT_WITHOUT_FORFEIT");
     }
@@ -743,6 +806,8 @@ export async function adminResolveMatchPublic(
     await reconcileSurvival(tournamentId, connection);
     const { reconcileSwiss } = await import("./swiss");
     await reconcileSwiss(tournamentId, connection);
+    const { reconcileEndurance } = await import("./bg-survie");
+    await reconcileEndurance(tournamentId, connection);
 
     const { reconcilePhases: reconcileMultiPhases } = await import("./phases");
     await reconcileMultiPhases(tournamentId, connection);

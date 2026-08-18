@@ -12,10 +12,12 @@ export interface ReportStateCounts {
   expiredReports?: number;
 }
 
-export type SeedFormat = "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL" | "MULTI";
+export type SeedFormat = "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL" | "MULTI" | "BG_SURVIE";
 
 export interface SeedPhase {
-  format: Exclude<SeedFormat, "MULTI">;
+  // Une phase ne peut pas être un tournoi « BlueGenji Survie » : ce mode porte
+  // lui-même ses deux phases (endurance puis play-offs).
+  format: Exclude<SeedFormat, "MULTI" | "BG_SURVIE">;
   qualifierMode: "COUNT" | "PERCENT";
   qualifierValue: number;
   swissTotalRounds?: number;
@@ -37,7 +39,9 @@ export interface TournamentDef extends ReportStateCounts {
   survivalRoundsPerCut?: number; // SURVIVAL : nb de rounds entre les coupes suivantes
   survivalRoundsBeforeFirstCut?: number; // SURVIVAL : nb de rounds avant la 1re coupe
   swissTotalRounds?: number; // SWISS : nb de rondes (défaut : calculé)
-  forfeits?: number; // SURVIVAL : équipes déclarant forfait après simulation
+  forfeits?: number; // SURVIVAL / BG_SURVIE : équipes déclarant forfait après simulation
+  endurancePoints?: number; // BG_SURVIE : capital de départ (défaut 9)
+  endurancePlayoffSize?: number; // BG_SURVIE : effectif des play-offs (défaut 8)
   teamOffset?: number; // décale la tranche du pool (rosters variés d'un tournoi à l'autre)
   closesInHours?: number; // REGISTRATION : clôture imminente
   description?: string | null;
@@ -64,6 +68,7 @@ export const TOURNAMENTS: TournamentDef[] = [
   { name: "11 Équipes + Petite Finale", game: "OW2", state: "REGISTRATION", format: "SINGLE", hasThirdPlaceMatch: true, teamCount: 11, maxTeams: 16, daysOffset: 18 },
   { name: "Survie Inscriptions Impaires", game: "MR", state: "REGISTRATION", format: "SURVIVAL", teamCount: 9, maxTeams: 16, daysOffset: 16, survivalRoundsPerCut: 2 },
   { name: "Suisse Inscriptions", game: "OW2", state: "REGISTRATION", format: "SWISS", teamCount: 10, maxTeams: 16, daysOffset: 20, swissTotalRounds: 4 },
+  { name: "BG Survie Inscriptions", game: "MR", state: "REGISTRATION", format: "BG_SURVIE", teamCount: 12, maxTeams: 16, daysOffset: 22 },
 
   // ---- RUNNING · élimination simple (couverture des byes) ------------------
   { name: "Finale Sèche (2 équipes)", game: "OW2", state: "RUNNING", format: "SINGLE", teamCount: 2, maxTeams: 2, daysOffset: -1, playWaves: 0 },
@@ -78,6 +83,14 @@ export const TOURNAMENTS: TournamentDef[] = [
   { name: "11 Équipes Double", game: "OW2", state: "RUNNING", format: "DOUBLE", teamCount: 11, maxTeams: 16, daysOffset: -3, playWaves: 3 },
   { name: "12 Équipes Double (reports)", game: "MR", state: "RUNNING", format: "DOUBLE", teamCount: 12, maxTeams: 16, daysOffset: -4, playWaves: 2, pendingReports: 3, teamOffset: 12 },
   { name: "OW2 Champions League", game: "OW2", state: "RUNNING", format: "DOUBLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1 },
+
+  // ---- RUNNING · BlueGenji Survie (endurance puis play-offs) ---------------
+  // Capital réduit pour que des éliminations tombent vite, et petit plateau de
+  // play-offs pour atteindre la phase finale en quelques vagues.
+  { name: "BG Survie 12 Équipes", game: "OW2", state: "RUNNING", format: "BG_SURVIE", teamCount: 12, maxTeams: 16, daysOffset: -3, endurancePoints: 3, endurancePlayoffSize: 8, playWaves: 2, teamOffset: 9 },
+  { name: "BG Survie Play-offs", game: "MR", state: "RUNNING", format: "BG_SURVIE", teamCount: 10, maxTeams: 16, daysOffset: -5, endurancePoints: 2, endurancePlayoffSize: 8, playWaves: 6, teamOffset: 21 },
+  { name: "BG Survie Impaire + Forfait", game: "OW2", state: "RUNNING", format: "BG_SURVIE", teamCount: 11, maxTeams: 16, daysOffset: -4, endurancePoints: 3, endurancePlayoffSize: 8, playWaves: 2, forfeits: 1, teamOffset: 33 },
+  { name: "BG Survie Terminée", game: "MR", state: "FINISHED", format: "BG_SURVIE", teamCount: 9, maxTeams: 16, daysOffset: -20, endurancePoints: 2, endurancePlayoffSize: 8, teamOffset: 45 },
 
   // ---- RUNNING · ronde suisse ---------------------------------------------
   { name: "Suisse 8 Équipes", game: "OW2", state: "RUNNING", format: "SWISS", teamCount: 8, maxTeams: 8, daysOffset: -2, swissTotalRounds: 3, playWaves: 1 },

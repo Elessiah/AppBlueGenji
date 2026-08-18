@@ -608,6 +608,26 @@ async function runMigrations(db: Pool): Promise<void> {
     // Default already applied
   }
 
+  // Migration: le pseudo n'est plus masquable — c'est l'identité de base du
+  // joueur (brackets, rosters, feuilles de match). La colonne est conservée
+  // pour ne pas casser les installs, mais forcée à 1 une bonne fois.
+  try {
+    await db.execute(`UPDATE bg_users SET visible_pseudo = 1 WHERE visible_pseudo = 0`);
+  } catch {
+    // Colonne absente sur une install neuve : rien à reprendre.
+  }
+
+  // Migration: ouverture au recrutement. Un joueur sans équipe est « free
+  // agent » par défaut ; il peut se retirer pour ne plus être démarché.
+  try {
+    await db.execute(`
+      ALTER TABLE bg_users
+      ADD COLUMN open_to_recruitment TINYINT(1) NOT NULL DEFAULT 1
+    `);
+  } catch {
+    // Column already exists
+  }
+
   // Migration: Rôles de permission cumulables (ARBITRE, COMMUNITY_MANAGER,
   // RECRUTEUR). Le rôle ADMIN reste porté par la colonne `is_admin`.
   try {
@@ -634,6 +654,79 @@ async function runMigrations(db: Pool): Promise<void> {
     await db.execute(`
       ALTER TABLE bg_teams
       ADD COLUMN deleted_at DATETIME NULL
+    `);
+  } catch {
+    // Column already exists
+  }
+
+  // Migration: format « BlueGenji Survie » (endurance + play-offs à 8).
+  try {
+    await db.execute(`
+      ALTER TABLE bg_tournaments
+      MODIFY COLUMN format ENUM('SINGLE', 'DOUBLE', 'SWISS', 'SURVIVAL', 'MULTI', 'BG_SURVIE') NOT NULL
+    `);
+  } catch {
+    // Already done
+  }
+
+  // Migration: barème d'endurance (capital de départ, gains/pertes, effectif
+  // des play-offs) + manche courante de la phase qualificative.
+  for (const [column, definition] of [
+    ["endurance_start_points", "INT NULL"],
+    ["endurance_win_delta", "INT NULL"],
+    ["endurance_loss_delta", "INT NULL"],
+    ["endurance_playoff_size", "INT NULL"],
+    ["endurance_current_round", "INT NOT NULL DEFAULT 0"],
+    // 1 dès que la phase éliminatoire a été générée : la phase qualificative
+    // ne produit alors plus de manche.
+    ["endurance_playoffs_started", "TINYINT(1) NOT NULL DEFAULT 0"],
+  ] as const) {
+    try {
+      await db.execute(`ALTER TABLE bg_tournaments ADD COLUMN ${column} ${definition}`);
+    } catch {
+      // Column already exists
+    }
+  }
+
+  // Migration: classement d'endurance (mode BlueGenji Survie).
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS bg_endurance_standings (
+      tournament_id BIGINT NOT NULL,
+      team_id BIGINT NOT NULL,
+      seed INT NOT NULL DEFAULT 0,
+      points INT NOT NULL DEFAULT 0,
+      wins INT NOT NULL DEFAULT 0,
+      losses INT NOT NULL DEFAULT 0,
+      status ENUM('ACTIVE', 'ELIMINATED', 'FORFEIT') NOT NULL DEFAULT 'ACTIVE',
+      eliminated_round INT NULL,
+      \`rank\` INT NOT NULL DEFAULT 0,
+      PRIMARY KEY (tournament_id, team_id),
+      CONSTRAINT fk_endurance_standings_tournament FOREIGN KEY (tournament_id)
+        REFERENCES bg_tournaments(id) ON DELETE CASCADE,
+      CONSTRAINT fk_endurance_standings_team FOREIGN KEY (team_id)
+        REFERENCES bg_teams(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // Migration: seeding ordonné à la main par le staff. Tant que le drapeau vaut
+  // 0, chaque format seede comme avant (classement du site) ; dès qu'un arbitre
+  // réordonne, l'ordre de `bg_tournament_registrations.seed` fait autorité.
+  try {
+    await db.execute(`
+      ALTER TABLE bg_tournaments
+      ADD COLUMN manual_seeding TINYINT(1) NOT NULL DEFAULT 0
+    `);
+  } catch {
+    // Column already exists
+  }
+
+  // Migration: Équipes fantômes — créées par le staff (permission `tournaments`)
+  // pour représenter une équipe sans compte joueur sur le site (remplissage de
+  // bracket, équipe invitée). Aucun membre : le drapeau suffit à les distinguer.
+  try {
+    await db.execute(`
+      ALTER TABLE bg_teams
+      ADD COLUMN is_ghost TINYINT(1) NOT NULL DEFAULT 0
     `);
   } catch {
     // Column already exists

@@ -8,8 +8,8 @@ import { Coche } from "@/components/Coche";
 import type { FullProfileResponse } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 
+// Le pseudo n'est plus masquable : identité de base du joueur sur la plateforme.
 const VISIBILITY_LABELS: Record<string, string> = {
-  pseudo: "Pseudo",
   avatar: "Avatar",
   overwatch: "BattleTag OW",
   marvel: "Tag Marvel",
@@ -30,8 +30,8 @@ export default function ProfilePage() {
   const [discordPseudo, setDiscordPseudo] = useState("");
   const [isAdult, setIsAdult] = useState<string>("unknown");
   const [deleting, setDeleting] = useState(false);
+  const [openToRecruitment, setOpenToRecruitment] = useState(true);
   const [visibility, setVisibility] = useState({
-    pseudo: false,
     avatar: false,
     overwatch: false,
     marvel: false,
@@ -92,8 +92,8 @@ export default function ProfilePage() {
       setDiscordPseudo(payload.profile.discordPseudo || "");
       setIsAdult(payload.profile.isAdult === null ? "unknown" : payload.profile.isAdult ? "yes" : "no");
       const v = payload.profile.visibility;
+      setOpenToRecruitment(payload.profile.openToRecruitment !== false);
       setVisibility({
-        pseudo: !!v.pseudo,
         avatar: !!v.avatar,
         overwatch: !!v.overwatch,
         marvel: !!v.marvel,
@@ -116,6 +116,7 @@ export default function ProfilePage() {
           discordPseudo: discordPseudo.trim() ? discordPseudo.trim() : null,
           isAdult: isAdult === "unknown" ? null : isAdult === "yes",
           visibility,
+          openToRecruitment,
         }),
       });
       const payload = (await response.json()) as FullProfileResponse & { error?: string };
@@ -332,6 +333,34 @@ export default function ProfilePage() {
                 />
               ))}
             </div>
+            <p style={{ fontSize: 11, color: "var(--text-2)", margin: "10px 0 0" }}>
+              Ton pseudo reste toujours visible : c&apos;est lui qui t&apos;identifie dans les
+              brackets, les rosters et les feuilles de match.
+            </p>
+          </div>
+
+          <div>
+            <p
+              style={{
+                fontSize: 11,
+                textTransform: "uppercase",
+                letterSpacing: "0.09em",
+                color: "var(--text-2)",
+                margin: "0 0 12px",
+              }}
+            >
+              Recrutement
+            </p>
+            <Coche
+              label="Ouvert aux propositions d'équipe"
+              checked={openToRecruitment}
+              theme="joueur"
+              onChange={() => setOpenToRecruitment((v) => !v)}
+            />
+            <p style={{ fontSize: 11, color: "var(--text-2)", margin: "10px 0 0" }}>
+              Décoché, tu n&apos;apparais plus dans le filtre « Free agents » de l&apos;annuaire et
+              les équipes savent que tu ne souhaites pas être contacté.
+            </p>
           </div>
 
           <div style={{ display: "flex", justifyContent: "flex-end" }}>

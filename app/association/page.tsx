@@ -8,6 +8,8 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
 import { listBureauMembers } from "@/lib/server/bureau-service";
 import { listAboutStats } from "@/lib/server/about-stats-service";
+import { getSiteCopy } from "@/lib/server/site-copy-service";
+import { EditableCopy } from "@/components/cyber/landing/EditableCopy";
 import { BureauSection } from "./BureauSection";
 import styles from "./page.module.css";
 
@@ -26,10 +28,11 @@ export const metadata: Metadata = {
 };
 
 export default async function AssociationPage() {
-  const [user, bureauMembers, aboutStats] = await Promise.all([
+  const [user, bureauMembers, aboutStats, copy] = await Promise.all([
     getCurrentUser(),
     listBureauMembers(),
     listAboutStats(),
+    getSiteCopy(),
   ]);
   // Gestion de l'association : administrateurs + Community Managers.
   const isAdmin = can(user, "showcase");
@@ -41,13 +44,29 @@ export default async function AssociationPage() {
         {/* HERO */}
         <section className={`${styles.section} ${styles.heroSection}`}>
           <div className="fabric" />
-          <span className="eyebrow">L'ASSOCIATION · LOI 1901</span>
+          <EditableCopy
+            copyKey="association.hero.eyebrow"
+            value={copy["association.hero.eyebrow"]}
+            canEdit={isAdmin}
+          >
+            <span className="eyebrow">{copy["association.hero.eyebrow"]}</span>
+          </EditableCopy>
           <div className={styles.heroGrid}>
             <div>
-              <h1 className={`display ${styles.heroTitle}`}>
-                Au service de la scène<br />
-                amateur française.
-              </h1>
+              <EditableCopy
+                copyKey="association.hero.title"
+                value={copy["association.hero.title"]}
+                canEdit={isAdmin}
+              >
+                <h1 className={`display ${styles.heroTitle}`}>
+                  {copy["association.hero.title"].split("\n").map((line, index, lines) => (
+                    <span key={line + index}>
+                      {line}
+                      {index < lines.length - 1 ? <br /> : null}
+                    </span>
+                  ))}
+                </h1>
+              </EditableCopy>
             </div>
             <aside className={styles.heroSide}>
               <div className={styles.heroFact}>
@@ -60,7 +79,7 @@ export default async function AssociationPage() {
                 <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 10, letterSpacing: "0.2em" }}>
                   SIÈGE
                 </span>
-                <span style={{ fontSize: 17 }}>Strasbourg</span>
+                <span style={{ fontSize: 17 }}>Janvilliers</span>
               </div>
               <div className={styles.heroFact}>
                 <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 10, letterSpacing: "0.2em" }}>
@@ -73,7 +92,7 @@ export default async function AssociationPage() {
         </section>
 
         {/* ABOUT SECTION */}
-        <AboutSection stats={aboutStats} isAdmin={isAdmin} />
+        <AboutSection stats={aboutStats} isAdmin={isAdmin} copy={copy} />
 
         {/* MANIFESTE */}
         <section id="manifeste" className={styles.section}>
@@ -85,9 +104,13 @@ export default async function AssociationPage() {
             <span className={styles.meta}>CE QUI NOUS DÉFINIT</span>
           </header>
           <div className={styles.manifesteGrid}>
-            <p className={styles.lede}>
-              BlueGenji est née de la conviction que l&apos;esport amateur mérite une scène fiable, ouverte et sérieuse — où chacun trouve sa place, quel que soit son niveau.
-            </p>
+            <EditableCopy
+              copyKey="association.manifesto.lede"
+              value={copy["association.manifesto.lede"]}
+              canEdit={isAdmin}
+            >
+              <p className={styles.lede}>{copy["association.manifesto.lede"]}</p>
+            </EditableCopy>
             <ol className={styles.principles}>
               {MANIFESTE.map((item, index) => (
                 <li key={item.title} className={styles.principle}>
@@ -116,11 +139,17 @@ export default async function AssociationPage() {
           </header>
           <div className={styles.adhererGrid}>
             <div className={styles.adhererText}>
-              <p className={styles.lede}>
-                L&apos;adhésion vous ouvre l&apos;accès complet à tous nos tournois, événements et ressources communautaires.
-              </p>
+              <EditableCopy
+                copyKey="association.membership.lede"
+                value={copy["association.membership.lede"]}
+                canEdit={isAdmin}
+              >
+                <p className={styles.lede}>{copy["association.membership.lede"]}</p>
+              </EditableCopy>
               <p className={styles.adhererBody}>
-                Gratuit, sans engagement, sans limite de durée. Il suffit de créer un compte pour commencer.
+                {user
+                  ? "Gratuit, sans engagement, sans limite de durée. Ton compte est déjà actif : il ne reste qu'à inscrire ton équipe."
+                  : "Gratuit, sans engagement, sans limite de durée. Il suffit de créer un compte pour commencer."}
               </p>
             </div>
             <aside className={styles.adhererSide}>
@@ -137,8 +166,14 @@ export default async function AssociationPage() {
                 ))}
               </div>
               <div className={styles.ctaRow}>
+                {/* Déjà connecté = déjà adhérent : on envoie vers les tournois
+                    plutôt que de reboucler sur la page de connexion. */}
                 <CyberButton variant="primary" asChild>
-                  <Link href="/connexion">Créer un compte →</Link>
+                  {user ? (
+                    <Link href="/tournois">Voir les tournois →</Link>
+                  ) : (
+                    <Link href="/connexion">Créer un compte →</Link>
+                  )}
                 </CyberButton>
                 <CyberButton variant="ghost" asChild>
                   <a href="https://discord.gg/bluegenji" target="_blank" rel="noreferrer">

@@ -23,13 +23,15 @@ export async function PATCH(req: Request) {
       marvelRivalsTag?: string | null;
       discordPseudo?: string | null;
       isAdult?: boolean | null;
+      // Le pseudo n'est pas masquable : il identifie le joueur partout où il
+      // joue (brackets, rosters, feuilles de match).
       visibility?: {
         avatar?: boolean;
-        pseudo?: boolean;
         overwatch?: boolean;
         marvel?: boolean;
         major?: boolean;
       };
+      openToRecruitment?: boolean;
     };
 
     await updateOwnProfile(user.id, body);

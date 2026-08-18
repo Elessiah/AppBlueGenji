@@ -35,7 +35,7 @@ const displayFont = Orbitron({
 });
 
 export const metadata: Metadata = {
-  title: "BlueGenji Arena",
+  title: "BlueGenji Esport",
   description:
     "Plateforme BlueGenji pour l'esport amateur Marvel Rivals: bot Discord, association et gestion de tournois.",
   icons: {

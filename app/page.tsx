@@ -18,6 +18,7 @@ import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import { listSponsors } from "@/lib/server/sponsors-service";
 import { listAboutStats } from "@/lib/server/about-stats-service";
 import { getCurrentUser } from "@/lib/server/auth";
+import { getSiteCopy } from "@/lib/server/site-copy-service";
 import { can } from "@/lib/shared/permissions";
 import { loadMiniBracket } from "@/lib/server/tournaments/bracket-loader";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
@@ -37,7 +38,7 @@ export default async function HomePage() {
   }));
 
   const featured = chooseNextTournament(buckets);
-  const [stats, live, leaderboard, events, ticker, sponsors, aboutStats, miniBracket, user] = await Promise.all([
+  const [stats, live, leaderboard, events, ticker, sponsors, aboutStats, miniBracket, user, copy] = await Promise.all([
     getLandingStats(),
     getLandingLive(buckets),
     getLandingLeaderboard(),
@@ -47,6 +48,7 @@ export default async function HomePage() {
     listAboutStats(),
     featured ? loadMiniBracket(featured.id) : Promise.resolve([]),
     getCurrentUser().catch(() => null),
+    getSiteCopy(),
   ]);
   // Gestion du site vitrine : administrateurs + Community Managers.
   const isAdmin = can(user, "showcase");
@@ -54,13 +56,13 @@ export default async function HomePage() {
   return (
     <main style={{ position: "relative", zIndex: 1 }}>
       <PublicHeader />
-      <Hero stats={stats} live={live} nextUpcoming={featured} />
+      <Hero stats={stats} live={live} nextUpcoming={featured} copy={copy} canEditCopy={isAdmin} />
       <Ticker items={ticker.items} />
       <TournamentBoard buckets={buckets} featured={featured} miniBracket={miniBracket} />
       <LeaderCal leaderboard={leaderboard} events={events} />
-      <AboutSection stats={aboutStats} isAdmin={isAdmin} />
+      <AboutSection stats={aboutStats} isAdmin={isAdmin} copy={copy} />
       <SponsorsGrid sponsors={sponsors} isAdmin={isAdmin} />
-      <JoinCTA />
+      <JoinCTA isAuthenticated={!!user} copy={copy} canEditCopy={isAdmin} />
       <PublicFooter />
     </main>
   );

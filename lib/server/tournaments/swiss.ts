@@ -287,6 +287,18 @@ async function persistStandings(
  * lignes de standings, calcul du nombre de rondes si l'organisateur ne l'a pas
  * fixé. Ne démarre aucune ronde (voir {@link generateSwissRound}).
  */
+/**
+ * Le staff a-t-il fixé l'ordre de seeding à la main ? (`bg_tournaments.manual_seeding`)
+ * Dans ce cas l'ordre des inscriptions prime sur le classement du site.
+ */
+async function usesManualSeeding(conn: PoolConnection, tournamentId: number): Promise<boolean> {
+  const [rows] = await conn.execute<(RowDataPacket & { manual_seeding: number })[]>(
+    `SELECT manual_seeding FROM bg_tournaments WHERE id = ? LIMIT 1`,
+    [tournamentId],
+  );
+  return Number(rows[0]?.manual_seeding ?? 0) === 1;
+}
+
 export async function initializeSwissTournament(
   tournamentId: number,
   conn: PoolConnection,
@@ -306,6 +318,16 @@ export async function initializeSwissTournament(
   if (options?.teamIds) {
     // Phase : le plateau et son ordre viennent de la phase precedente.
     seedRows = options.teamIds.map((teamId) => ({ team_id: teamId }));
+  } else if (await usesManualSeeding(conn, tournamentId)) {
+    // Le staff a ordonné le seeding à la main : cet ordre prime sur le classement.
+    const [rows] = await conn.execute<(RowDataPacket & { team_id: number })[]>(
+      `SELECT team_id
+       FROM bg_tournament_registrations
+       WHERE tournament_id = ?
+       ORDER BY COALESCE(seed, 1000000), registered_at ASC`,
+      [tournamentId],
+    );
+    seedRows = rows;
   } else {
   const [rows] = await conn.execute<(RowDataPacket & { team_id: number })[]>(
     `SELECT
@@ -739,7 +761,7 @@ export async function loadSwissMeta(
      JOIN bg_teams t ON t.id = s.team_id
      WHERE s.tournament_id = ? AND s.phase_id = ?
      ORDER BY s.\`rank\` ASC, s.seed ASC`,
-    [tournamentId],
+    [tournamentId, phaseId],
   );
 
   const points = resolvePoints(tournament);

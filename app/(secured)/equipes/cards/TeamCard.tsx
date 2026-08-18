@@ -21,7 +21,14 @@ export function TeamCard({ team }: { team: TeamListItem }) {
           {team.name[0].toUpperCase()}
         </div>
         <div>
-          <div className={s.name}>{team.name}</div>
+          <div className={s.name}>
+            {team.name}
+            {team.isGhost && (
+              <span className={s.ghostBadge} title="Équipe fantôme, créée par le staff">
+                FANTÔME
+              </span>
+            )}
+          </div>
           <div className={s.tag}>
             {team.name.slice(0, 3).toUpperCase()}
             {team.region && ` · ${team.region}`}

@@ -548,12 +548,142 @@ function MultiDiagram() {
   );
 }
 
+/**
+ * Mode « BlueGenji Survie » : capital d'endurance qui monte et descend, puis
+ * arbre à 8 dont les affrontements suivent le tableau imposé.
+ */
+function BgSurvieDiagram() {
+  const teams = ["A", "B", "C", "D", "E"];
+  const points = [11, 9, 9, 5, 0];
+
+  return (
+    <svg
+      className={styles.svg}
+      viewBox="0 0 700 330"
+      role="img"
+      aria-label="Mode BlueGenji Survie : capital d'endurance par équipe, élimination à zéro, puis play-offs à huit."
+      style={{ color: LINE }}
+    >
+      <ArrowDefs />
+
+      <ColumnLabel x={20} y={18}>Endurance</ColumnLabel>
+      {teams.map((team, index) => {
+        const out = points[index] === 0;
+        return (
+          <g key={team}>
+            <rect
+              x={20}
+              y={30 + index * 32}
+              width={200}
+              height={26}
+              rx={5}
+              fill={out ? "rgba(255,77,94,0.10)" : SURFACE}
+              stroke={out ? RED : LINE}
+              strokeWidth={1.1}
+            />
+            <text x={30} y={48 + index * 32} fill={MUTE} fontSize={10.5} fontFamily={MONO}>
+              {index + 1}
+            </text>
+            <text x={48} y={48 + index * 32} fill={out ? RED : INK} fontSize={11} fontFamily={MONO}>
+              {`Équipe ${team}`}
+            </text>
+            <text
+              x={196}
+              y={48 + index * 32}
+              fill={out ? RED : BLUE}
+              fontSize={12}
+              fontFamily={MONO}
+              textAnchor="end"
+            >
+              {out ? "0 ✕" : `${points[index]} pts`}
+            </text>
+          </g>
+        );
+      })}
+
+      <text x={20} y={214} fill={MUTE} fontSize={11} fontFamily={MONO}>
+        +1 par map gagnée · −1 par map perdue
+      </text>
+      <text x={20} y={232} fill={RED} fontSize={11} fontFamily={MONO}>
+        à 0 : éliminée sur-le-champ
+      </text>
+      <text x={20} y={256} fill={MUTE} fontSize={11} fontFamily={MONO}>
+        Appariement : 1 vs 2, 3 vs 4…
+      </text>
+      <text x={20} y={274} fill={MUTE} fontSize={11} fontFamily={MONO}>
+        égalité de points : ordre du
+      </text>
+      <text x={20} y={292} fill={MUTE} fontSize={11} fontFamily={MONO}>
+        classement précédent conservé
+      </text>
+
+      <Elbow from={[228, 120]} to={[288, 120]} color={BLUE} />
+
+      <ColumnLabel x={300} y={18}>Play-offs à 8</ColumnLabel>
+      {[
+        ["8", "4"],
+        ["6", "2"],
+        ["1", "5"],
+        ["3", "7"],
+      ].map(([top, bottom], index) => (
+        <g key={top}>
+          <rect
+            x={300}
+            y={30 + index * 62}
+            width={150}
+            height={52}
+            rx={6}
+            fill={SURFACE}
+            stroke={LINE}
+            strokeWidth={1.1}
+          />
+          <text x={314} y={50 + index * 62} fill={INK} fontSize={11.5} fontFamily={MONO}>
+            {`Seed ${top}`}
+          </text>
+          <text x={314} y={70 + index * 62} fill={INK} fontSize={11.5} fontFamily={MONO}>
+            {`Seed ${bottom}`}
+          </text>
+          <text x={436} y={60 + index * 62} fill={MUTE} fontSize={10} fontFamily={MONO} textAnchor="end">
+            {index === 0 ? "gauche / droite" : ""}
+          </text>
+        </g>
+      ))}
+
+      <Elbow from={[458, 150]} to={[510, 150]} color={BLUE} />
+
+      <text x={520} y={60} fill={MUTE} fontSize={11} fontFamily={MONO}>
+        Demi-finales
+      </text>
+      <text x={520} y={82} fill={INK} fontSize={11} fontFamily={MONO}>
+        puis finale
+      </text>
+      <rect
+        x={520}
+        y={100}
+        width={158}
+        height={58}
+        rx={8}
+        fill="rgba(245,165,36,0.08)"
+        stroke={AMBER}
+        strokeWidth={1.2}
+      />
+      <text x={534} y={122} fill={AMBER} fontSize={11} fontFamily={MONO} letterSpacing="0.08em">
+        🥉 PETITE FINALE
+      </text>
+      <text x={534} y={142} fill={MUTE} fontSize={10.5} fontFamily={MONO}>
+        jouée avec la finale
+      </text>
+    </svg>
+  );
+}
+
 const DIAGRAMS: Record<RuleDiagram, () => React.JSX.Element> = {
   SINGLE: SingleEliminationDiagram,
   DOUBLE: DoubleEliminationDiagram,
   SWISS: SwissDiagram,
   SURVIVAL: SurvivalDiagram,
   MULTI: MultiDiagram,
+  BG_SURVIE: BgSurvieDiagram,
 };
 
 const LEGENDS: Record<RuleDiagram, { color: string; label: string }[]> = {
@@ -577,6 +707,11 @@ const LEGENDS: Record<RuleDiagram, { color: string; label: string }[]> = {
   MULTI: [
     { color: BLUE, label: "Flux des qualifiées" },
     { color: LINE, label: "Effectif d'une phase" },
+  ],
+  BG_SURVIE: [
+    { color: BLUE, label: "Endurance restante" },
+    { color: RED, label: "Capital épuisé" },
+    { color: AMBER, label: "Petite finale" },
   ],
 };
 

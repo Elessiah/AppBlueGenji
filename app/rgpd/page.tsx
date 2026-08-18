@@ -46,7 +46,7 @@ export default function RgpdPage() {
         </header>
         <div className={styles.prose}>
           <p>
-            <strong>BlueGenji</strong> — association loi 1901, siège social à Strasbourg.
+            <strong>BlueGenji</strong> — association loi 1901, siège social à Janvilliers.
           </p>
           <p>
             Pour toute question relative à vos données personnelles, contactez-nous

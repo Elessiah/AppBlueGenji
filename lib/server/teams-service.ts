@@ -72,6 +72,32 @@ async function userCanManageTeam(teamId: number, userId: number): Promise<boolea
   return roles.includes("OWNER") || roles.includes("MANAGER");
 }
 
+/**
+ * Vrai si l'équipe est une équipe fantôme (créée par le staff, sans joueur).
+ * Une équipe dissoute n'est plus administrable, fantôme ou non.
+ */
+export async function isGhostTeam(teamId: number): Promise<boolean> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { is_ghost: 0 | 1; deleted_at: Date | null })[]>(
+    `SELECT is_ghost, deleted_at FROM bg_teams WHERE id = ? LIMIT 1`,
+    [teamId],
+  );
+  return rows.length > 0 && rows[0].is_ghost === 1 && rows[0].deleted_at === null;
+}
+
+/**
+ * Autorisation d'administration d'une équipe. Deux voies :
+ * - être OWNER (ou MANAGER selon l'action) de l'équipe ;
+ * - disposer de la permission `tournaments` **et** viser une équipe fantôme.
+ *
+ * `viewerManagesGhostTeams` est fourni par la route API, seule à connaître les
+ * rôles de plateforme du viewer.
+ */
+async function ghostAdminOverride(teamId: number, viewerManagesGhostTeams: boolean): Promise<boolean> {
+  if (!viewerManagesGhostTeams) return false;
+  return isGhostTeam(teamId);
+}
+
 export async function listTeams(): Promise<TeamListItem[]> {
   const db = await getDatabase();
 
@@ -85,6 +111,7 @@ export async function listTeams(): Promise<TeamListItem[]> {
       members_count: number;
       wins: number;
       losses: number;
+      is_ghost: 0 | 1;
     })[]
   >(
     `SELECT
@@ -92,6 +119,7 @@ export async function listTeams(): Promise<TeamListItem[]> {
       t.name,
       t.logo_url,
       t.created_at,
+      t.is_ghost,
       COALESCE(COUNT(DISTINCT tm.id), 0) AS members_count,
       COALESCE(SUM(CASE WHEN m.winner_team_id = t.id THEN 1 ELSE 0 END), 0) AS wins,
       COALESCE(SUM(CASE WHEN m.status = 'COMPLETED' AND m.winner_team_id IS NOT NULL AND m.winner_team_id != t.id AND (m.team1_id = t.id OR m.team2_id = t.id) THEN 1 ELSE 0 END), 0) AS losses
@@ -99,7 +127,7 @@ export async function listTeams(): Promise<TeamListItem[]> {
      LEFT JOIN bg_team_members tm ON tm.team_id = t.id AND tm.left_at IS NULL
      LEFT JOIN bg_matches m ON (m.team1_id = t.id OR m.team2_id = t.id)
      WHERE t.deleted_at IS NULL
-     GROUP BY t.id, t.name, t.logo_url, t.created_at`,
+     GROUP BY t.id, t.name, t.logo_url, t.created_at, t.is_ghost`,
   );
 
   // Get form data (last 10 matches per team) - simplified approach
@@ -225,6 +253,7 @@ export async function listTeams(): Promise<TeamListItem[]> {
     games: gamesByTeam.get(Number(row.id)) || [],
     rosterPreview: rosterByTeam.get(Number(row.id)) || [],
     region: null,
+    isGhost: row.is_ghost === 1,
   }));
 
   // Sort and assign rank
@@ -290,11 +319,22 @@ export async function createTeam(
   }
 }
 
-export async function getTeamDetail(teamId: number, viewerUserId: number): Promise<TeamDetailResponse | null> {
+/**
+ * Détail d'une équipe.
+ *
+ * `viewerManagesGhostTeams` = le viewer dispose de la permission `tournaments`.
+ * Il administre alors les équipes **fantômes** (sans joueur rattaché) sans en
+ * être membre ; ça ne lui donne aucun droit sur les équipes réelles.
+ */
+export async function getTeamDetail(
+  teamId: number,
+  viewerUserId: number,
+  viewerManagesGhostTeams = false,
+): Promise<TeamDetailResponse | null> {
   const db = await getDatabase();
 
-  const [teams] = await db.execute<(RowDataPacket & { id: number; name: string; logo_url: string | null; description: string | null; created_at: Date; deleted_at: Date | null })[]>(
-    `SELECT id, name, logo_url, description, created_at, deleted_at
+  const [teams] = await db.execute<(RowDataPacket & { id: number; name: string; logo_url: string | null; description: string | null; created_at: Date; deleted_at: Date | null; is_ghost: 0 | 1 })[]>(
+    `SELECT id, name, logo_url, description, created_at, deleted_at, is_ghost
      FROM bg_teams
      WHERE id = ?
      LIMIT 1`,
@@ -340,9 +380,12 @@ export async function getTeamDetail(teamId: number, viewerUserId: number): Promi
     [teamId],
   );
 
+  const isGhost = teams[0].is_ghost === 1;
+
   // Une équipe dissoute reste consultable (stats) mais n'est plus administrable
   // ni rejoignable.
-  const canManage = !isDeleted && (await userCanManageTeam(teamId, viewerUserId));
+  const managedAsGhost = !isDeleted && isGhost && viewerManagesGhostTeams;
+  const canManage = !isDeleted && (managedAsGhost || (await userCanManageTeam(teamId, viewerUserId)));
 
   const viewerRoles = isDeleted ? null : await getMemberRoles(teamId, viewerUserId);
   let viewerMembership: TeamDetailResponse["viewerMembership"] = "NONE";
@@ -373,6 +416,7 @@ export async function getTeamDetail(teamId: number, viewerUserId: number): Promi
       description: teams[0].description,
       createdAt: toIso(teams[0].created_at)!,
       deletedAt: toIso(teams[0].deleted_at),
+      isGhost,
     },
     members: membersRows.map(mapMember),
     tournaments: historyRows.map((row) => ({
@@ -385,6 +429,7 @@ export async function getTeamDetail(teamId: number, viewerUserId: number): Promi
       playedAt: toIso(row.played_at) ?? new Date().toISOString(),
     })),
     canManage,
+    managedAsGhost,
     viewerMembership,
     viewerInvitation,
   };
@@ -394,9 +439,13 @@ export async function updateTeamMeta(
   requesterId: number,
   teamId: number,
   patch: { name?: string; description?: string | null },
+  viewerManagesGhostTeams = false,
 ): Promise<void> {
   const db = await getDatabase();
-  if (!(await userOwnsTeam(teamId, requesterId))) {
+  if (
+    !(await userOwnsTeam(teamId, requesterId))
+    && !(await ghostAdminOverride(teamId, viewerManagesGhostTeams))
+  ) {
     throw new Error("FORBIDDEN");
   }
 
@@ -423,8 +472,12 @@ export async function updateTeamLogo(
   requesterId: number,
   teamId: number,
   logoPath: string | null,
+  viewerManagesGhostTeams = false,
 ): Promise<void> {
-  if (!(await userCanManageTeam(teamId, requesterId))) {
+  if (
+    !(await userCanManageTeam(teamId, requesterId))
+    && !(await ghostAdminOverride(teamId, viewerManagesGhostTeams))
+  ) {
     throw new Error("FORBIDDEN");
   }
   const db = await getDatabase();
@@ -683,10 +736,19 @@ async function teamIsDeleted(teamId: number): Promise<boolean> {
  * et les membres détachés, mais la ligne et tout l'historique généré par la
  * plateforme (inscriptions, matchs, classements) sont conservés à jamais.
  */
-export async function softDeleteTeam(requesterId: number, teamId: number): Promise<void> {
+export async function softDeleteTeam(
+  requesterId: number,
+  teamId: number,
+  viewerManagesGhostTeams = false,
+): Promise<void> {
   const db = await getDatabase();
   if (await teamIsDeleted(teamId)) throw new Error("TEAM_ALREADY_DELETED");
-  if (!(await userOwnsTeam(teamId, requesterId))) throw new Error("FORBIDDEN");
+  if (
+    !(await userOwnsTeam(teamId, requesterId))
+    && !(await ghostAdminOverride(teamId, viewerManagesGhostTeams))
+  ) {
+    throw new Error("FORBIDDEN");
+  }
 
   const connection = await db.getConnection();
   try {

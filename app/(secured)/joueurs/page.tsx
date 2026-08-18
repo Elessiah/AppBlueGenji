@@ -47,7 +47,9 @@ export default function PlayersPage() {
     let r = players.filter((p) => {
       if (q && !`${p.pseudo} ${p.team?.name || ""}`.toLowerCase().includes(q)) return false;
       if (roleFilter !== "all" && !(p.roles || []).includes(roleFilter as PlayerRole)) return false;
-      if (statusFilter === "free" && p.team) return false;
+      // Free agent = sans roster ET ouvert au recrutement : un joueur qui a
+      // décoché « ouvert aux propositions » ne veut pas être démarché.
+      if (statusFilter === "free" && (p.team || p.openToRecruitment === false)) return false;
       return true;
     });
     r = [...r];
@@ -56,7 +58,7 @@ export default function PlayersPage() {
     return r;
   }, [players, query, roleFilter, statusFilter, sort]);
 
-  const freeAgents = players.filter((p) => !p.team).length;
+  const freeAgents = players.filter((p) => !p.team && p.openToRecruitment !== false).length;
   const ow2Count = players.filter((p) => (p.games || []).includes("OW2")).length;
   const mrCount = players.filter((p) => (p.games || []).includes("MR")).length;
 

@@ -18,6 +18,7 @@ export {
   hasPendingStateTransition,
   // Registration
   registerCurrentUserTeam,
+  registerGhostTeam,
   canUserRegister,
   // Bracket
   createBracketIfMissing,
