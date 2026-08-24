@@ -48,13 +48,13 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
-  const firstNameRef = useRef<HTMLInputElement>(null);
+  const pseudoRef = useRef<HTMLInputElement>(null);
   const photoFileRef = useRef<HTMLInputElement>(null);
 
   // Focus + Escape
   useEffect(() => {
     if (!open) return;
-    firstNameRef.current?.focus();
+    pseudoRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !busy) close();
     };
@@ -94,8 +94,15 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
   }
 
   async function submit() {
-    if (!form.firstName.trim()) { showError("Le prénom est requis."); return; }
-    if (!form.lastName.trim()) { showError("Le nom est requis."); return; }
+    const firstName = form.firstName.trim();
+    const lastName = form.lastName.trim();
+    const pseudo = form.pseudo.trim();
+    if (!firstName && !lastName && !pseudo) {
+      showError("Renseigne au moins un pseudo, ou un prénom et un nom.");
+      return;
+    }
+    if (firstName && !lastName) { showError("Le nom est requis."); return; }
+    if (lastName && !firstName) { showError("Le prénom est requis."); return; }
     if (!form.category.trim()) { showError("La catégorie est requise."); return; }
     if (!form.joinedAt) { showError("La date d'arrivée est requise."); return; }
 
@@ -305,7 +312,9 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
                           />
                         ) : (
                           <div className={styles.avatarFallback}>
-                            {b.firstName[0]}{b.lastName[0]}
+                            {b.firstName && b.lastName
+                              ? `${b.firstName[0]}${b.lastName[0]}`
+                              : (b.pseudo?.[0]?.toUpperCase() ?? "?")}
                           </div>
                         )}
                       </div>
@@ -374,19 +383,37 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
                 />
               ) : (
                 <div className={styles.avatarFallback} style={{ width: 56, height: 56, fontSize: 20 }}>
-                  {(form.firstName[0] ?? "?").toUpperCase()}{(form.lastName[0] ?? "").toUpperCase()}
+                  {form.firstName || form.lastName
+                    ? `${(form.firstName[0] ?? "?").toUpperCase()}${(form.lastName[0] ?? "").toUpperCase()}`
+                    : (form.pseudo[0]?.toUpperCase() ?? "?")}
                 </div>
               )}
               <div className={styles.modalPreviewName}>
-                {form.firstName || "Prénom"}{form.pseudo ? ` "${form.pseudo}"` : ""} {form.lastName ? form.lastName.toUpperCase() : "NOM"}
+                {form.firstName || form.lastName
+                  ? `${form.firstName || "Prénom"}${form.pseudo ? ` "${form.pseudo}"` : ""} ${form.lastName ? form.lastName.toUpperCase() : "NOM"}`
+                  : (form.pseudo || "Pseudo, ou prénom et nom")}
               </div>
             </div>
 
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Pseudo</span>
+              <input
+                ref={pseudoRef}
+                className={styles.modalInput}
+                value={form.pseudo}
+                maxLength={80}
+                placeholder="MarieD"
+                onChange={(e) => set("pseudo", e.target.value)}
+              />
+              <span className={styles.photoHint}>
+                Pseudo seul, ou prénom + nom ci-dessous (au moins l'un des deux).
+              </span>
+            </label>
+
             <div className={styles.modalRow}>
               <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Prénom *</span>
+                <span className={styles.modalLabel}>Prénom</span>
                 <input
-                  ref={firstNameRef}
                   className={styles.modalInput}
                   value={form.firstName}
                   maxLength={80}
@@ -395,7 +422,7 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
                 />
               </label>
               <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Nom *</span>
+                <span className={styles.modalLabel}>Nom</span>
                 <input
                   className={styles.modalInput}
                   value={form.lastName}
@@ -405,17 +432,6 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
                 />
               </label>
             </div>
-
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Pseudo (optionnel)</span>
-              <input
-                className={styles.modalInput}
-                value={form.pseudo}
-                maxLength={80}
-                placeholder="MarieD"
-                onChange={(e) => set("pseudo", e.target.value)}
-              />
-            </label>
 
             <label className={styles.modalField}>
               <span className={styles.modalLabel}>Catégorie *</span>

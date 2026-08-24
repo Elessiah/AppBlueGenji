@@ -44,10 +44,13 @@ export function validateBenevoleInput(input: BenevoleInput): BenevoleValidationR
   const photoUrl = typeof input.photoUrl === "string" ? input.photoUrl.trim() : "";
   const joinedAt = typeof input.joinedAt === "string" ? input.joinedAt.trim() : "";
 
-  if (!firstName) return { ok: false, error: "FIRST_NAME_REQUIRED" };
   if (firstName.length > BENEVOLE_FIRST_NAME_MAX) return { ok: false, error: "FIRST_NAME_TOO_LONG" };
-  if (!lastName) return { ok: false, error: "LAST_NAME_REQUIRED" };
   if (lastName.length > BENEVOLE_LAST_NAME_MAX) return { ok: false, error: "LAST_NAME_TOO_LONG" };
+  // Prénom/nom civil facultatif : un pseudo seul suffit à identifier le bénévole.
+  // Mais un prénom/nom partiel (l'un sans l'autre) reste invalide.
+  if (!firstName && !lastName && !pseudo) return { ok: false, error: "NAME_REQUIRED" };
+  if (firstName && !lastName) return { ok: false, error: "LAST_NAME_REQUIRED" };
+  if (lastName && !firstName) return { ok: false, error: "FIRST_NAME_REQUIRED" };
   if (!category) return { ok: false, error: "CATEGORY_REQUIRED" };
   if (category.length > BENEVOLE_CATEGORY_MAX) return { ok: false, error: "CATEGORY_TOO_LONG" };
   if (!joinedAt) return { ok: false, error: "JOINED_AT_REQUIRED" };
@@ -105,8 +108,9 @@ export function groupByCategory(benevoles: Benevole[]): { category: string; memb
   return Array.from(map.entries()).map(([category, members]) => ({ category, members }));
 }
 
-/** Formate le nom d'affichage : Prénom "Pseudo" NOM */
+/** Formate le nom d'affichage : Prénom "Pseudo" NOM, ou le pseudo seul si aucun nom civil. */
 export function formatDisplayName(b: Pick<Benevole, "firstName" | "pseudo" | "lastName">): string {
+  if (!b.firstName || !b.lastName) return b.pseudo ?? "";
   const parts: string[] = [b.firstName];
   if (b.pseudo) parts.push(`"${b.pseudo}"`);
   parts.push(b.lastName.toUpperCase());
