@@ -1,16 +1,19 @@
+import type { AboutPillar } from "@/lib/shared/about-pillars";
 import type { AboutStat } from "@/lib/shared/about-stats";
 import type { SiteCopy } from "@/lib/shared/site-copy";
+import { AboutPillars } from "./AboutPillars";
 import { AboutStats } from "./AboutStats";
 import { EditableCopy } from "./EditableCopy";
 import styles from "./AboutSection.module.css";
 
 interface AboutSectionProps {
   stats: AboutStat[];
+  pillars: AboutPillar[];
   isAdmin: boolean;
   copy: SiteCopy;
 }
 
-export function AboutSection({ stats, isAdmin, copy }: AboutSectionProps) {
+export function AboutSection({ stats, pillars, isAdmin, copy }: AboutSectionProps) {
   return (
     <section id="assoc" className={styles.root}>
       <div className={styles.head}>
@@ -33,19 +36,7 @@ export function AboutSection({ stats, isAdmin, copy }: AboutSectionProps) {
         </div>
 
         <div className={styles.right}>
-          {[
-            ["Accessible", "Inscription gratuite, matchmaking par niveau et support francophone sur Discord."],
-            ["Compétitif", "Brackets arbitrés, admins formés et rulebook versionné. On prend le jeu au sérieux."],
-            ["Communautaire", "Watch parties, coaching ouvert et entraide entre équipes. L'asso avant le scoreboard."],
-          ].map(([title, text], index) => (
-            <article key={title} className={styles.pillar}>
-              <span className="mono">{String(index + 1).padStart(2, "0")}</span>
-              <div>
-                <h3>{title}</h3>
-                <p>{text}</p>
-              </div>
-            </article>
-          ))}
+          <AboutPillars initialPillars={pillars} isAdmin={isAdmin} />
         </div>
       </div>
     </section>

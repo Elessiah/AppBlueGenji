@@ -798,6 +798,19 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  // Migration: Piliers « L'association » (titre + texte, gérables par les admins)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS bg_about_pillars (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      title VARCHAR(60) NOT NULL,
+      text VARCHAR(240) NOT NULL,
+      display_order INT NOT NULL DEFAULT 100,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_bg_about_pillars_order (display_order)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
   // Migration: Réglages clé/valeur de l'association (ex. email contact presse)
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_settings (
