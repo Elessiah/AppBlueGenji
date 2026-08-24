@@ -29,6 +29,33 @@ describe("validateBenevoleInput", () => {
     }
   });
 
+  it("accepts a pseudo alone, without firstName/lastName", () => {
+    const result = validateBenevoleInput({
+      firstName: "",
+      lastName: "",
+      pseudo: "MarieD",
+      category: "Développeur",
+      joinedAt: "2024-03-15",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.firstName).toBe("");
+      expect(result.value.lastName).toBe("");
+      expect(result.value.pseudo).toBe("MarieD");
+    }
+  });
+
+  it("rejects no name at all (no pseudo, no firstName/lastName)", () => {
+    expect(
+      validateBenevoleInput({
+        firstName: "",
+        lastName: "",
+        category: "Développeur",
+        joinedAt: "2024-03-15",
+      }),
+    ).toEqual({ ok: false, error: "NAME_REQUIRED" });
+  });
+
   it("accepts optional pseudo and photoUrl", () => {
     const result = validateBenevoleInput({
       ...valid,
@@ -209,6 +236,11 @@ describe("formatDisplayName", () => {
   it("uppercases the last name", () => {
     expect(formatDisplayName({ firstName: "Jean", pseudo: null, lastName: "martin" }))
       .toBe("Jean MARTIN");
+  });
+
+  it("returns the pseudo alone when there is no firstName/lastName", () => {
+    expect(formatDisplayName({ firstName: "", pseudo: "MarieD", lastName: "" }))
+      .toBe("MarieD");
   });
 });
 
