@@ -21,6 +21,7 @@
   font-family: var(--font-sans);
   font-size: 17px;
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .pillar p {
@@ -28,11 +29,13 @@
   color: var(--ink-mute);
   line-height: 1.7;
   font-size: 14px;
+  overflow-wrap: anywhere;
 }
 
 .pillarActions {
   grid-column: 1 / -1;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
 }
