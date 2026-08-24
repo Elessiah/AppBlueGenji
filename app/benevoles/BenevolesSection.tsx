@@ -403,9 +403,10 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
                 value={form.pseudo}
                 maxLength={80}
                 placeholder="MarieD"
+                aria-describedby="benevole-pseudo-hint"
                 onChange={(e) => set("pseudo", e.target.value)}
               />
-              <span className={styles.photoHint}>
+              <span id="benevole-pseudo-hint" className={styles.photoHint}>
                 Pseudo seul, ou prénom + nom ci-dessous (au moins l'un des deux).
               </span>
             </label>
