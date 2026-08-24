@@ -10,8 +10,10 @@ depuis la page, sans déploiement.
 
 Cette section (`AboutSection`) est **partagée** entre la page d'accueil `/` et la
 page `/association` : les cartes proviennent de la même source et toute
-modification est reflétée aux deux endroits. Les 3 piliers à droite (Accessible /
-Compétitif / Communautaire) et le texte d'intro restent statiques.
+modification est reflétée aux deux endroits. Les piliers à droite (Accessible /
+Compétitif / Communautaire par défaut) sont eux aussi éditables — voir
+`docs/features/ABOUT_PILLARS_MANAGEMENT.md`. Seul le texte d'intro reste
+statique.
 
 Pour les visiteurs non-admins (et anonymes), la section reste en lecture seule.
 

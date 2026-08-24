@@ -8,6 +8,7 @@ gérables de la page, directement depuis l'interface et sans déploiement :
 
 - **Bureau** (`SECTION 05`, `BureauSection`) — membres du bureau ;
 - **L'association** (`SECTION 03`, `AboutStats`) — cartes chiffrées ;
+- **L'association** (`SECTION 03`, `AboutPillars`) — piliers (colonne droite) ;
 - **Partenaires et soutiens** (`SECTION 04`, `SponsorsGrid`) — sponsors.
 
 Chaque carte gérable expose deux flèches **↑ / ↓** à côté de « Modifier » /
@@ -22,9 +23,10 @@ ne sont pas réordonnables.
 ## Modèle de données
 
 Aucune nouvelle table : le réordonnancement s'appuie sur la colonne
-`display_order` déjà présente sur `bg_bureau_members`, `bg_about_stats` et
-`bg_sponsors`. La liste est renvoyée triée par `display_order ASC` (pour les
-partenaires, le tri par palier `tier` reste prioritaire).
+`display_order` déjà présente sur `bg_bureau_members`, `bg_about_stats`,
+`bg_about_pillars` et `bg_sponsors`. La liste est renvoyée triée par
+`display_order ASC` (pour les partenaires, le tri par palier `tier` reste
+prioritaire).
 
 `applyDisplayOrder(table, ids)` (`lib/server/reorder.ts`) réécrit la colonne dans
 une **transaction** : le premier `id` reçoit `10`, le suivant `20`, etc. Le nom de
@@ -48,6 +50,7 @@ Une route `PUT .../reorder` par section, réservée aux admins, corps
 | ------------------------------------------------- | ----- | ------------------------ |
 | `PUT /api/association/bureau/reorder`             | admin | Réordonne le bureau      |
 | `PUT /api/association/about-stats/reorder`        | admin | Réordonne les cartes     |
+| `PUT /api/association/about-pillars/reorder`      | admin | Réordonne les piliers    |
 | `PUT /api/landing/sponsors/reorder`               | admin | Réordonne les partenaires|
 
 Codes d'erreur : `UNAUTHORIZED` (401), `FORBIDDEN` (403), `INVALID_BODY` +
@@ -55,7 +58,7 @@ erreurs de `validateReorderIds` (400).
 
 ## Interface
 
-Les trois composants clients ajoutent une fonction `move(index, direction)` qui
+Les quatre composants clients ajoutent une fonction `move(index, direction)` qui
 permute la carte avec son voisin, applique l'ordre localement, puis appelle la
 route `reorder`. Particularité **partenaires** : l'affichage regroupe d'abord par
 palier (`tier`), donc les flèches ne sont actives qu'entre deux partenaires du
@@ -69,5 +72,6 @@ désactivées. Tous les retours passent par les **toasts** bottom-left
   doublons, coercition).
 - `tests/app/api/association/bureau-reorder.test.ts`,
   `tests/app/api/association/about-stats-reorder.test.ts`,
+  `tests/app/api/association/about-pillars-reorder.test.ts`,
   `tests/app/api/landing/sponsors-reorder.test.ts` — gardes d'auth, validation du
   corps, appel du service, codes HTTP.
