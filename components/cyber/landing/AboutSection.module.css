@@ -50,38 +50,6 @@
   gap: 14px;
 }
 
-.pillar {
-  display: grid;
-  grid-template-columns: 34px 1fr;
-  gap: 14px;
-  padding: 18px 0;
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.pillar:last-child {
-  border-bottom: none;
-}
-
-.pillar :global(.mono) {
-  color: var(--blue-300);
-  letter-spacing: 0.16em;
-  font-size: 11px;
-}
-
-.pillar h3 {
-  margin: 0 0 6px;
-  font-family: var(--font-sans);
-  font-size: 17px;
-  font-weight: 500;
-}
-
-.pillar p {
-  margin: 0;
-  color: var(--ink-mute);
-  line-height: 1.7;
-  font-size: 14px;
-}
-
 @media (max-width: 900px) {
   .grid {
     grid-template-columns: 1fr;

@@ -17,6 +17,7 @@ import {
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import { listSponsors } from "@/lib/server/sponsors-service";
 import { listAboutStats } from "@/lib/server/about-stats-service";
+import { listAboutPillars } from "@/lib/server/about-pillars-service";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getSiteCopy } from "@/lib/server/site-copy-service";
 import { can } from "@/lib/shared/permissions";
@@ -38,18 +39,20 @@ export default async function HomePage() {
   }));
 
   const featured = chooseNextTournament(buckets);
-  const [stats, live, leaderboard, events, ticker, sponsors, aboutStats, miniBracket, user, copy] = await Promise.all([
-    getLandingStats(),
-    getLandingLive(buckets),
-    getLandingLeaderboard(),
-    getLandingCalendar(buckets, 5),
-    getLandingTicker(),
-    listSponsors().catch(() => []),
-    listAboutStats(),
-    featured ? loadMiniBracket(featured.id) : Promise.resolve([]),
-    getCurrentUser().catch(() => null),
-    getSiteCopy(),
-  ]);
+  const [stats, live, leaderboard, events, ticker, sponsors, aboutStats, aboutPillars, miniBracket, user, copy] =
+    await Promise.all([
+      getLandingStats(),
+      getLandingLive(buckets),
+      getLandingLeaderboard(),
+      getLandingCalendar(buckets, 5),
+      getLandingTicker(),
+      listSponsors().catch(() => []),
+      listAboutStats(),
+      listAboutPillars(),
+      featured ? loadMiniBracket(featured.id) : Promise.resolve([]),
+      getCurrentUser().catch(() => null),
+      getSiteCopy(),
+    ]);
   // Gestion du site vitrine : administrateurs + Community Managers.
   const isAdmin = can(user, "showcase");
 
@@ -60,7 +63,7 @@ export default async function HomePage() {
       <Ticker items={ticker.items} />
       <TournamentBoard buckets={buckets} featured={featured} miniBracket={miniBracket} />
       <LeaderCal leaderboard={leaderboard} events={events} />
-      <AboutSection stats={aboutStats} isAdmin={isAdmin} copy={copy} />
+      <AboutSection stats={aboutStats} pillars={aboutPillars} isAdmin={isAdmin} copy={copy} />
       <SponsorsGrid sponsors={sponsors} isAdmin={isAdmin} />
       <JoinCTA isAuthenticated={!!user} copy={copy} canEditCopy={isAdmin} />
       <PublicFooter />

@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
 import { listBureauMembers } from "@/lib/server/bureau-service";
 import { listAboutStats } from "@/lib/server/about-stats-service";
+import { listAboutPillars } from "@/lib/server/about-pillars-service";
 import { getSiteCopy } from "@/lib/server/site-copy-service";
 import { EditableCopy } from "@/components/cyber/landing/EditableCopy";
 import { BureauSection } from "./BureauSection";
@@ -28,10 +29,11 @@ export const metadata: Metadata = {
 };
 
 export default async function AssociationPage() {
-  const [user, bureauMembers, aboutStats, copy] = await Promise.all([
+  const [user, bureauMembers, aboutStats, aboutPillars, copy] = await Promise.all([
     getCurrentUser(),
     listBureauMembers(),
     listAboutStats(),
+    listAboutPillars(),
     getSiteCopy(),
   ]);
   // Gestion de l'association : administrateurs + Community Managers.
@@ -92,7 +94,7 @@ export default async function AssociationPage() {
         </section>
 
         {/* ABOUT SECTION */}
-        <AboutSection stats={aboutStats} isAdmin={isAdmin} copy={copy} />
+        <AboutSection stats={aboutStats} pillars={aboutPillars} isAdmin={isAdmin} copy={copy} />
 
         {/* MANIFESTE */}
         <section id="manifeste" className={styles.section}>
