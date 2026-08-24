@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  benevoleInitials,
   formatDisplayName,
   formatJoinedAt,
   groupByCategory,
@@ -241,6 +242,38 @@ describe("formatDisplayName", () => {
   it("returns the pseudo alone when there is no firstName/lastName", () => {
     expect(formatDisplayName({ firstName: "", pseudo: "MarieD", lastName: "" }))
       .toBe("MarieD");
+  });
+
+  it("falls back to firstName alone on a partial legacy name with no pseudo", () => {
+    expect(formatDisplayName({ firstName: "Marie", pseudo: null, lastName: "" }))
+      .toBe("Marie");
+  });
+
+  it("falls back to lastName alone on a partial legacy name with no pseudo", () => {
+    expect(formatDisplayName({ firstName: "", pseudo: null, lastName: "dupont" }))
+      .toBe("DUPONT");
+  });
+
+  it("returns an empty string when nothing at all is set", () => {
+    expect(formatDisplayName({ firstName: "", pseudo: null, lastName: "" })).toBe("");
+  });
+});
+
+describe("benevoleInitials", () => {
+  it("uses firstName+lastName initials when both are set", () => {
+    expect(benevoleInitials({ firstName: "marie", pseudo: null, lastName: "dupont" })).toBe("MD");
+  });
+
+  it("falls back to the pseudo's first letter when there is no full name", () => {
+    expect(benevoleInitials({ firstName: "", pseudo: "ghost", lastName: "" })).toBe("G");
+  });
+
+  it("falls back to the pseudo even with a partial legacy name", () => {
+    expect(benevoleInitials({ firstName: "Marie", pseudo: "ghost", lastName: "" })).toBe("G");
+  });
+
+  it("returns a placeholder when nothing is set", () => {
+    expect(benevoleInitials({ firstName: "", pseudo: null, lastName: "" })).toBe("?");
   });
 });
 
