@@ -16,11 +16,17 @@ tableau vide (dégradation silencieuse).
 
 ## Modèle de données — `bg_benevoles`
 
-Colonnes : `first_name`, `pseudo` (optionnel), `last_name`, `category`,
-`photo_url` (optionnel), `joined_at`, `display_order` (ordre au sein d'une
-catégorie) et **`category_order`** (ordre d'affichage des catégories entre
-elles). La colonne `category_order` est ajoutée via une migration `ALTER TABLE`
-idempotente pour les bases existantes.
+Colonnes : `first_name`, `pseudo`, `last_name`, `category`, `photo_url`
+(optionnel), `joined_at`, `display_order` (ordre au sein d'une catégorie) et
+**`category_order`** (ordre d'affichage des catégories entre elles). La colonne
+`category_order` est ajoutée via une migration `ALTER TABLE` idempotente pour
+les bases existantes.
+
+Le prénom et le nom civils sont **facultatifs** : un pseudo seul suffit à
+identifier un bénévole (`validateBenevoleInput` exige soit un pseudo, soit la
+paire prénom + nom complète — pas l'un des deux sans l'autre). Sans prénom/nom,
+`formatDisplayName` affiche le pseudo seul, sans texte de substitution
+« Prénom »/« NOM ».
 
 Tri d'affichage : `category_order ASC, category ASC, display_order ASC, id ASC`.
 À la création / mise à jour d'un bénévole, `category_order` est aligné sur la
