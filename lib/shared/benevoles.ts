@@ -44,10 +44,13 @@ export function validateBenevoleInput(input: BenevoleInput): BenevoleValidationR
   const photoUrl = typeof input.photoUrl === "string" ? input.photoUrl.trim() : "";
   const joinedAt = typeof input.joinedAt === "string" ? input.joinedAt.trim() : "";
 
-  if (!firstName) return { ok: false, error: "FIRST_NAME_REQUIRED" };
   if (firstName.length > BENEVOLE_FIRST_NAME_MAX) return { ok: false, error: "FIRST_NAME_TOO_LONG" };
-  if (!lastName) return { ok: false, error: "LAST_NAME_REQUIRED" };
   if (lastName.length > BENEVOLE_LAST_NAME_MAX) return { ok: false, error: "LAST_NAME_TOO_LONG" };
+  // Prénom/nom civil facultatif : un pseudo seul suffit à identifier le bénévole.
+  // Mais un prénom/nom partiel (l'un sans l'autre) reste invalide.
+  if (!firstName && !lastName && !pseudo) return { ok: false, error: "NAME_REQUIRED" };
+  if (firstName && !lastName) return { ok: false, error: "LAST_NAME_REQUIRED" };
+  if (lastName && !firstName) return { ok: false, error: "FIRST_NAME_REQUIRED" };
   if (!category) return { ok: false, error: "CATEGORY_REQUIRED" };
   if (category.length > BENEVOLE_CATEGORY_MAX) return { ok: false, error: "CATEGORY_TOO_LONG" };
   if (!joinedAt) return { ok: false, error: "JOINED_AT_REQUIRED" };
@@ -105,12 +108,25 @@ export function groupByCategory(benevoles: Benevole[]): { category: string; memb
   return Array.from(map.entries()).map(([category, members]) => ({ category, members }));
 }
 
-/** Formate le nom d'affichage : Prénom "Pseudo" NOM */
+/**
+ * Formate le nom d'affichage : Prénom "Pseudo" NOM. Sans prénom/nom complet,
+ * retombe sur le pseudo seul, puis sur le prénom ou le nom isolé le cas
+ * échéant (donnée historique/partielle) plutôt que de renvoyer une chaîne vide.
+ */
 export function formatDisplayName(b: Pick<Benevole, "firstName" | "pseudo" | "lastName">): string {
-  const parts: string[] = [b.firstName];
-  if (b.pseudo) parts.push(`"${b.pseudo}"`);
-  parts.push(b.lastName.toUpperCase());
-  return parts.join(" ");
+  if (b.firstName && b.lastName) {
+    const parts: string[] = [b.firstName];
+    if (b.pseudo) parts.push(`"${b.pseudo}"`);
+    parts.push(b.lastName.toUpperCase());
+    return parts.join(" ");
+  }
+  return b.pseudo || b.firstName || b.lastName.toUpperCase();
+}
+
+/** Initiales d'avatar : Prénom+Nom si les deux sont renseignés, sinon la première lettre du pseudo. */
+export function benevoleInitials(b: Pick<Benevole, "firstName" | "pseudo" | "lastName">): string {
+  if (b.firstName && b.lastName) return `${b.firstName[0]}${b.lastName[0]}`.toUpperCase();
+  return b.pseudo ? b.pseudo[0].toUpperCase() : "?";
 }
 
 /** Formate une date ISO (YYYY-MM-DD) en date française (dd/mm/yyyy). */
