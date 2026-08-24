@@ -24,9 +24,12 @@ les bases existantes.
 
 Le prénom et le nom civils sont **facultatifs** : un pseudo seul suffit à
 identifier un bénévole (`validateBenevoleInput` exige soit un pseudo, soit la
-paire prénom + nom complète — pas l'un des deux sans l'autre). Sans prénom/nom,
-`formatDisplayName` affiche le pseudo seul, sans texte de substitution
-« Prénom »/« NOM ».
+paire prénom + nom complète — pas l'un des deux sans l'autre). Sans prénom/nom
+complet, `formatDisplayName` affiche le pseudo seul (ou, à défaut, le prénom
+ou le nom isolé sur une donnée historique/partielle), sans texte de
+substitution « Prénom »/« NOM ». `benevoleInitials` applique la même
+dégradation pour les initiales de l'avatar — les deux sont à réutiliser plutôt
+que redupliquer cette logique.
 
 Tri d'affichage : `category_order ASC, category ASC, display_order ASC, id ASC`.
 À la création / mise à jour d'un bénévole, `category_order` est aligné sur la
@@ -60,7 +63,8 @@ toutes les lignes de chaque catégorie dans une transaction atomique.
 Importable côté client et serveur :
 
 - `Benevole`, `BenevoleInput`, `validateBenevoleInput(input)`.
-- `groupByCategory(benevoles)`, `formatDisplayName(b)`, `formatJoinedAt(iso)`.
+- `groupByCategory(benevoles)`, `formatDisplayName(b)`, `benevoleInitials(b)`,
+  `formatJoinedAt(iso)`.
 - `validateCategoryReorder(raw)` — refuse une liste vide, une entrée non-string /
   vide, ou un doublon (après trim).
 
