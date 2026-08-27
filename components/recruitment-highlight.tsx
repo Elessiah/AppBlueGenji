@@ -57,16 +57,24 @@ export function RecruitmentHighlight() {
       .then((data: { ad: RecruitmentAd | null }) => {
         if (cancelled || !data.ad) return;
         const found = data.ad;
-        setAd(found);
+        // La décision de masquer est prise **avant** de publier l'annonce, dans
+        // le même lot de mises à jour : un aller-retour par effet laisserait la
+        // modale peindre une image avant de se refermer.
+        let hidden = false;
         try {
-          // La banderole se referme pour la session ; la modale a sa propre
-          // fenêtre hebdomadaire, arbitrée à l'affichage (effet ci-dessous).
-          if (found.highlight === "BANNER" && sessionStorage.getItem(dismissKey(found.id)) === "1") {
-            setDismissed(true);
+          if (found.highlight === "MODAL") {
+            // Fenêtre hebdomadaire : horodatage du dernier affichage.
+            const raw = localStorage.getItem(seenKey(found.id));
+            hidden = !shouldShowRecruitmentModal(raw === null ? null : Number(raw), Date.now());
+          } else {
+            // La banderole se referme pour la seule session courante.
+            hidden = sessionStorage.getItem(dismissKey(found.id)) === "1";
           }
         } catch {
           // Stockage indisponible (mode privé) : on affiche l'annonce.
         }
+        setAd(found);
+        if (hidden) setDismissed(true);
       })
       .catch(() => {
         // Réseau indisponible : pas de mise en avant, sans bloquer la page.
@@ -75,34 +83,6 @@ export function RecruitmentHighlight() {
       cancelled = true;
     };
   }, []);
-
-  // Annonce dont la fenêtre hebdomadaire a déjà été arbitrée. Sans ce garde-fou,
-  // l'effet relirait l'horodatage qu'il vient d'écrire et refermerait aussitôt
-  // la modale qu'il vient d'ouvrir.
-  const decidedFor = useRef<number | null>(null);
-
-  // Décision d'affichage de la modale, prise au moment où elle deviendrait
-  // visible — et donc pas sur la page de recrutement, où elle est tue : une
-  // simple visite ne doit pas brûler la fenêtre de 7 jours sans rien montrer.
-  useEffect(() => {
-    if (!ad || ad.highlight !== "MODAL" || onAdPage || dismissed) return;
-    if (decidedFor.current === ad.id) return;
-    decidedFor.current = ad.id;
-    try {
-      // On lit l'horodatage du dernier affichage…
-      const raw = localStorage.getItem(seenKey(ad.id));
-      const seenAt = raw === null ? null : Number(raw);
-      if (!shouldShowRecruitmentModal(seenAt, Date.now())) {
-        setDismissed(true);
-      } else {
-        // …et on l'enregistre tout de suite : la modale « compte » comme vue
-        // même si l'utilisateur quitte la page sans la fermer.
-        localStorage.setItem(seenKey(ad.id), String(Date.now()));
-      }
-    } catch {
-      // Stockage indisponible (mode privé) : on affiche l'annonce.
-    }
-  }, [ad, onAdPage, dismissed]);
 
   function dismiss() {
     if (ad) {
@@ -122,6 +102,23 @@ export function RecruitmentHighlight() {
   const visible = Boolean(ad) && !dismissed && ad?.highlight === "MODAL" && !onAdPage;
   // Le hook doit être appelé à chaque rendu : il ne s'active que si `open`.
   const dialogRef = useDialogBehavior({ open: visible, onClose: dismiss });
+
+  // Annonce déjà comptée comme vue pendant cette page.
+  const recordedFor = useRef<number | null>(null);
+
+  // La modale « compte » comme vue dès qu'elle est affichée, même si le visiteur
+  // quitte la page sans la fermer. L'horodatage n'est donc posé qu'ici, à
+  // l'affichage réel : traverser la page de recrutement, où elle est tue, ne
+  // doit pas brûler la fenêtre de 7 jours sans que rien n'ait été montré.
+  useEffect(() => {
+    if (!visible || !ad || recordedFor.current === ad.id) return;
+    recordedFor.current = ad.id;
+    try {
+      localStorage.setItem(seenKey(ad.id), String(Date.now()));
+    } catch {
+      // Stockage indisponible : l'affichage reste correct, la fenêtre non tenue.
+    }
+  }, [visible, ad]);
 
   if (!ad || dismissed || ad.highlight === "NONE") return null;
   // La modale se tait sur la page de recrutement (voir `AD_PAGE_PATH`).
