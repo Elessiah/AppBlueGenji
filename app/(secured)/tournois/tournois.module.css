@@ -88,7 +88,9 @@
   display: flex;
   gap: 4px;
   margin-top: 28px;
-  border-bottom: 1px solid var(--line-soft);
+  /* Le filet supérieur de la bande de métriques sert de ligne de base aux
+     onglets : la marge négative les fait s'y poser, sans doubler le trait. */
+  margin-bottom: -8px;
 }
 
 .tab {

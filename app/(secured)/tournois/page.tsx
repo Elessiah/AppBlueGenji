@@ -61,13 +61,21 @@ export default function TournamentsPage() {
     const load = async () => {
       // Les deux listes partent ensemble : celle de l'onglet « Mes tournois »
       // est la seule à porter les tournois pas encore visibles, et c'est elle
-      // qui dit si l'onglet doit exister.
-      const [all, mine] = await Promise.all([
+      // qui dit si l'onglet doit exister. Elles se règlent en revanche
+      // séparément — l'onglet est un complément, son échec ne doit pas emporter
+      // la liste que tout le monde vient voir.
+      const [all, mine] = await Promise.allSettled([
         fetchBuckets("/api/tournaments"),
         fetchBuckets("/api/tournaments?scope=mine"),
       ]);
-      setBuckets(all);
-      setMyBuckets(mine);
+      if (all.status === "fulfilled") setBuckets(all.value);
+      if (mine.status === "fulfilled") setMyBuckets(mine.value);
+
+      // Une seule notification : les deux listes sortent de la même route, un
+      // incident les touche presque toujours ensemble.
+      const failure =
+        all.status === "rejected" ? all.reason : mine.status === "rejected" ? mine.reason : null;
+      if (failure) showError((failure as Error).message);
     };
     load().catch((e) => showError((e as Error).message));
   }, [showError]);

@@ -18,6 +18,14 @@ describe("page tournois — onglet « Mes tournois »", () => {
     expect(page).toContain('fetchBuckets("/api/tournaments?scope=mine")');
   });
 
+  it("règle les deux chargements séparément", () => {
+    // L'échec de la liste personnelle ne doit pas vider la liste publique :
+    // au pire l'onglet n'apparaît pas.
+    expect(page).toContain("Promise.allSettled");
+    expect(page).toMatch(/if \(all\.status === "fulfilled"\) setBuckets\(all\.value\)/);
+    expect(page).toMatch(/if \(mine\.status === "fulfilled"\) setMyBuckets\(mine\.value\)/);
+  });
+
   it("n'affiche l'onglet que si l'utilisateur a créé un tournoi", () => {
     expect(page).toMatch(/const hasOwnTournaments = ownedCount > 0/);
     expect(page).toMatch(/\{hasOwnTournaments && \(\s*<div\s+className=\{s\.tabs\}/);
