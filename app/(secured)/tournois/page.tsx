@@ -257,6 +257,7 @@ export default function TournamentsPage() {
             <Section
               ix="01"
               title="PAS ENCORE VISIBLES"
+              accent="· VOUS SEUL"
               count={totalHidden}
               defaultOpen={true}
               emptyMsg="Tous vos tournois sont visibles par les joueurs."

@@ -735,6 +735,14 @@
 }
 
 @media (max-width: 720px) {
+  .tabs {
+    gap: 0;
+  }
+  .tab {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    padding: 12px 10px;
+  }
   .sectionBody,
   .section[data-cols="2"] .sectionBody,
   .section[data-cols="1"] .sectionBody {
