@@ -13,8 +13,15 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const search = url.searchParams.get("search");
+  // `scope=mine` : les tournois créés par l'utilisateur, y compris ceux qui ne
+  // sont pas encore visibles. La portée est déduite de la session, jamais d'un
+  // identifiant fourni par le client — on ne peut donc lire que les siens.
+  const mine = url.searchParams.get("scope") === "mine";
 
-  const buckets = await listTournamentBuckets(search);
+  const buckets = await listTournamentBuckets(
+    search,
+    mine ? { organizerUserId: user.id } : {},
+  );
   return ok({ buckets });
 }
 
