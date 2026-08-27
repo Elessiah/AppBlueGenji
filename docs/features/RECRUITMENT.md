@@ -23,7 +23,7 @@ Table `bg_recruitment_ads` (migration auto dans `lib/server/database.ts`) :
 | `team_name`     | `VARCHAR(120)` nullable                | Référent / contact (pôle, personne) |
 | `domain`        | `ENUM(ARBITRAGE, CASTING, DEV, COMMUNICATION, DESIGN, MODERATION, EVENEMENTIEL, ADMIN, AUTRE)` | Pôle de bénévolat visé (défaut `AUTRE`) |
 | `roles`         | `VARCHAR(200)` nullable                | Missions / profil recherché (texte libre) |
-| `body`          | `TEXT` nullable                        | Description |
+| `body`          | `TEXT` nullable                        | Description (jusqu'à 6 000 signes) |
 | `contact_url`   | `VARCHAR(2048)` nullable               | Lien de candidature — idéalement un ticket SpiceWorks (bouton « Postuler → ») |
 | `contact_discord` | `VARCHAR(120)` nullable              | Contact Discord : pseudo (copiable) ou lien d'invitation |
 | `contact_discord_id` | `VARCHAR(32)` nullable            | ID Discord (snowflake) pour le deep-link « Ouvrir » |
@@ -68,16 +68,85 @@ pré-remplissage : on affiche les valeurs enregistrées.
 > risquait de publier une adresse personnelle. Le contact passe désormais par le
 > lien de candidature (ticket SpiceWorks) et Discord.
 
+## Aperçu de la description et lecture en grand
+
+Les annonces réelles font plusieurs milliers de signes (missions détaillées,
+outils, modalités de candidature). Affichées en entier, elles étiraient leur
+carte et déséquilibraient toute la grille. La carte n'en montre donc qu'un
+**aperçu** :
+
+- `buildRecruitmentPreview(body, max = 240)` (`lib/shared/recruitment.ts`, pure)
+  aplatit les blancs, coupe **sur une frontière de mot** et suffixe « … ». Un mot
+  plus long que la moitié de la limite (URL) est tranché net plutôt que de
+  réduire l'aperçu à quelques signes. La fonction renvoie aussi `truncated`, qui
+  décide de l'affichage du lien « Lire l'annonce complète → ».
+- Le titre de la carte **est un bouton** : il ouvre la même modale de lecture.
+- `AdDetailModal` (`app/recrutement/AdDetailModal.tsx`) affiche l'annonce en
+  grand : en-tête et actions fixes, **seule la description défile**, dans une
+  `<ScrollArea>` étiquetée.
+
+**Mise en forme de la description.** Le texte est saisi en brut dans un
+`<textarea>` ; `formatRecruitmentBody()` (pure, testée) en dérive des blocs
+affichés par `components/recruitment/RecruitmentBody.tsx`. Rien n'est interprété
+comme du Markdown, seules trois conventions déjà utilisées par les annonces le
+sont :
+
+| Saisie | Rendu |
+| ------ | ----- |
+| Ligne courte (≤ 80 signes) finissant par `:` | Intertitre (mono, bleu glacier) |
+| Ligne commençant par `-`, `–`, `—`, `•` ou `*` | Puce (les lignes vides entre puces ne coupent pas la liste) |
+| Reste | Paragraphe (sauts de ligne conservés) |
+
+**Lien profond.** Chaque carte porte l'ancre `annonce-<id>`
+(`recruitmentAdAnchor`). Charger `/recrutement#annonce-12` ouvre directement
+l'annonce en grand (`parseRecruitmentAdAnchor`, qui refuse tout fragment forgé) ;
+ouvrir une annonce met l'URL à jour en `replaceState`, la fermer la nettoie. La
+banderole et la modale de mise en avant pointent vers ce lien.
+
+**Comportement modal.** Les trois modales de la fonctionnalité (lecture,
+formulaire de gestion, mise en avant) partagent
+`useDialogBehavior` (`lib/shared/hooks/useDialogBehavior.ts`) : fermeture par
+`Échap`, piège à focus, défilement de l'arrière-plan gelé, focus rendu au
+déclencheur à la fermeture.
+
+**Filtre par pôle.** Au-delà de 3 annonces couvrant au moins deux pôles, une
+rangée de pastilles filtre la liste. Le réordonnancement admin est désactivé tant
+qu'un filtre est actif : les flèches portent sur l'ordre réel, pas sur la vue.
+
 ## Mise en avant urgente (`highlight`)
 
 - `NONE` — annonce visible uniquement sur `/recrutement`.
 - `BANNER` — banderole discrète sticky en haut de **toutes** les pages.
 - `MODAL` — fenêtre modale affichée à l'arrivée du visiteur.
 
+### Plusieurs annonces urgentes ?
+
 Une **seule** annonce est mise en avant à la fois : la première annonce active
 dont `highlight <> 'NONE'`, selon `display_order`
-(`getHighlightedAd()`). Le composant client `RecruitmentHighlight`, monté dans
-le layout racine, récupère cette annonce via `GET /api/recruitment/highlight`.
+(`getHighlightedAd()`, `LIMIT 1`). Le composant client `RecruitmentHighlight`,
+monté dans le layout racine, récupère cette annonce via
+`GET /api/recruitment/highlight`.
+
+Marquer trois annonces « Modale à l'arrivée » n'empile donc pas trois modales :
+la plus haute gagne, les autres **attendent leur tour**. Le mode ne joue aucun
+rôle dans l'arbitrage — une `BANNER` placée au-dessus d'une `MODAL` prend la
+place et la modale ne s'affiche pas. Remonter une annonce dans la liste suffit à
+la faire passer devant.
+
+Rien ne le montrait côté gestion : on pouvait cocher « Modale à l'arrivée » sur
+trois annonces et croire les trois affichées. `resolveHighlightStates(ads)`
+(pure, testée) rend maintenant l'état réel de chaque annonce, affiché en badge
+sur les cartes pour le staff :
+
+| État | Badge | Signification |
+| ---- | ----- | ------------- |
+| `LIVE` | « Modale en ligne » | C'est elle qui est servie au site |
+| `QUEUED` | « Modale en attente » | Une annonce plus haute occupe la place |
+| `DRAFT` | « Modale (brouillon) » | Annonce inactive : jamais mise en avant |
+| `NONE` | *(aucun badge)* | L'annonce ne demande pas de mise en avant |
+
+Le formulaire avertit en plus, à la volée, quand la mise en avant choisie est
+déjà occupée par une autre annonce.
 
 La mémorisation de l'affichage dépend du mode :
 
@@ -128,5 +197,17 @@ barre d'actions de l'en-tête.
 - `lib/server/recruitment-service.ts` — accès base (CRUD, reorder, highlight)
 - `app/api/recruitment/**` — routes REST
 - `app/recrutement/page.tsx` + `RecruitmentSection.tsx` — page publique + gestion admin
-- `components/recruitment-highlight.tsx` — banderole / modale site-wide
+- `components/recruitment-highlight.tsx` — banderole / modale site-wide (aperçu + lien profond)
+- `app/recrutement/AdDetailModal.tsx` — lecture d'une annonce en grand
+- `components/recruitment/RecruitmentBody.tsx` — rendu des blocs de description
+- `components/recruitment/ContactTags.tsx` — tags de contact partagés carte / modale
+- `lib/shared/hooks/useDialogBehavior.ts` — Échap, piège à focus, verrou de défilement
 - `components/cyber/landing/PublicNavMenu.tsx` — menu burger
+
+## Jeu de test
+
+`npm run seed` crée cinq annonces `Test - *` couvrant la matrice :
+deux longues descriptions (aperçu tronqué + modale de lecture), une description
+courte (affichée en entier, sans lien « lire la suite »), trois mises en avant
+concurrentes — une `LIVE`, une `QUEUED`, une banderole `QUEUED` — et un
+brouillon urgent (`DRAFT`). Les pôles couverts font apparaître le filtre.
