@@ -83,6 +83,9 @@
   flex-direction: column;
   gap: 10px;
   padding: 22px;
+  /* Cible d'un lien profond `#annonce-<id>` : la carte ne doit pas se retrouver
+     collée sous l'en-tête collant quand le navigateur saute à l'ancre. */
+  scroll-margin-top: 96px;
 }
 
 .cardHead {
@@ -136,6 +139,7 @@
 
 .cardTeam {
   margin: 0;
+  overflow-wrap: anywhere;
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.14em;
@@ -145,6 +149,7 @@
 
 .cardRoles {
   margin: 4px 0 0;
+  overflow-wrap: anywhere;
   font-family: var(--font-sans);
   font-size: 13px;
   color: var(--ink-mute);
@@ -370,7 +375,7 @@ select.modalInput {
 
 .modalTextarea {
   resize: vertical;
-  min-height: 88px;
+  min-height: 150px;
   font-family: var(--font-sans);
   line-height: 1.5;
 }
@@ -516,6 +521,10 @@ select.modalInput {
 
   .list {
     grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 18px;
   }
 
   .modalRow {
