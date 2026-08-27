@@ -79,7 +79,7 @@ export default function PlayersPage() {
             <div>
               <span className="eyebrow">COMMUNAUTÉ · ANNUAIRE</span>
               <h1 className={s.title}>
-                Joueurs <em>BlueGenji</em>
+                Joueurs <em>inscrits</em>
               </h1>
               <div className={s.subtitle}>PROFILS · STATISTIQUES · DISPONIBILITÉ</div>
             </div>

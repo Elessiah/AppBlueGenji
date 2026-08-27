@@ -90,6 +90,9 @@ export default function PlayerDetailPage() {
 
   if (!data) return null;
 
+  // Équipe courante = seule ligne de timeline encore ouverte (leftAt === null).
+  const activeTeam = data.teamsTimeline.find((entry) => entry.leftAt === null) ?? null;
+
   return (
     <section className="fade-in">
       <div className="ds-header">
@@ -111,12 +114,23 @@ export default function PlayerDetailPage() {
                   {data.profile.pseudo}
                 </h1>
                 <div
-                  aria-label="Rôles du joueur"
+                  aria-label="Équipe et rôles du joueur"
                   style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 2 }}
                 >
-                  <span className="badge" style={{ fontSize: 11 }}>
-                    Joueur BlueGenji
-                  </span>
+                  {activeTeam ? (
+                    <Link
+                      href={`/equipes/${activeTeam.teamId}`}
+                      className="badge"
+                      style={{ fontSize: 11 }}
+                      title={`Voir la fiche de ${activeTeam.teamName}`}
+                    >
+                      {activeTeam.teamName}
+                    </Link>
+                  ) : (
+                    <span className="badge" style={{ fontSize: 11, opacity: 0.7 }} title="Ce joueur n'est dans aucune équipe">
+                      Sans équipe
+                    </span>
+                  )}
                   {data.displayRoles.map((role) => (
                     <span
                       key={role}

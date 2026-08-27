@@ -97,7 +97,7 @@ export default function TeamsPage() {
             <div>
               <span className="eyebrow">COMMUNAUTÉ · ROSTERS</span>
               <h1 className={s.title}>
-                Équipes <em>BlueGenji</em>
+                Équipes <em>inscrites</em>
               </h1>
               <div className={s.subtitle}>ANNUAIRE · ROSTERS · CLASSEMENT GÉNÉRAL</div>
             </div>
