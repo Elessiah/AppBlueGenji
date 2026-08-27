@@ -126,6 +126,19 @@
   border-top: 1px solid var(--line-soft);
 }
 
+/* Repli quand l'annonce n'a pas de description : même filet que la zone de
+   lecture, mais sans cadre vide. */
+.noBody {
+  flex: 1 1 auto;
+  margin: 10px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-style: italic;
+  color: var(--ink-dim);
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;

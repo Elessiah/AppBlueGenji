@@ -128,7 +128,8 @@ export function RecruitmentHighlight() {
     .filter(Boolean)
     .join(" · ");
   // Lien profond : la page de recrutement ouvre directement l'annonce en grand.
-  const adHref = `/recrutement#${recruitmentAdAnchor(ad.id)}`;
+  const anchor = recruitmentAdAnchor(ad.id);
+  const adHref = `${AD_PAGE_PATH}#${anchor}`;
 
   if (ad.highlight === "BANNER") {
     return (
@@ -139,9 +140,19 @@ export function RecruitmentHighlight() {
           <span className={styles.bannerTitle}>{ad.title}</span>
           {meta && <span className={styles.bannerMeta}>{meta}</span>}
         </span>
-        <Link href={adHref} className={styles.bannerLink}>
-          Voir →
-        </Link>
+        {onAdPage ? (
+          // Déjà sur la page : un `<Link>` vers la même route ne changerait le
+          // fragment que par `pushState`, qui n'émet aucun événement — la modale
+          // de lecture ne s'ouvrirait pas. L'ancre native, elle, déclenche bien
+          // `hashchange`.
+          <a href={`#${anchor}`} className={styles.bannerLink}>
+            Voir →
+          </a>
+        ) : (
+          <Link href={adHref} className={styles.bannerLink}>
+            Voir →
+          </Link>
+        )}
         <button
           type="button"
           className={styles.bannerClose}

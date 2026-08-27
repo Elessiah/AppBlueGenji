@@ -4,7 +4,11 @@ import { CyberButton, Pill, ScrollArea } from "@/components/cyber";
 import { ContactTags } from "@/components/recruitment/ContactTags";
 import { RecruitmentBody } from "@/components/recruitment/RecruitmentBody";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
-import { RECRUITMENT_DOMAIN_LABELS, type RecruitmentAd } from "@/lib/shared/recruitment";
+import {
+  RECRUITMENT_DOMAIN_LABELS,
+  type RecruitmentAd,
+  formatRecruitmentBody,
+} from "@/lib/shared/recruitment";
 import styles from "./AdDetailModal.module.css";
 
 interface AdDetailModalProps {
@@ -24,6 +28,9 @@ interface AdDetailModalProps {
 export function AdDetailModal({ ad, onClose }: AdDetailModalProps) {
   const dialogRef = useDialogBehavior({ open: true, onClose });
   const titleId = `annonce-titre-${ad.id}`;
+  // Même source de vérité que le rendu : une description faite d'une seule puce
+  // vide se trime en « non vide » mais ne produit aucun bloc affichable.
+  const hasBody = formatRecruitmentBody(ad.body).length > 0;
 
   return (
     <div className={styles.overlay} role="presentation" onClick={onClose}>
@@ -59,13 +66,19 @@ export function AdDetailModal({ ad, onClose }: AdDetailModalProps) {
         {ad.teamName && <p className={styles.team}>{ad.teamName}</p>}
         {ad.roles && <p className={styles.roles}>Missions : {ad.roles}</p>}
 
-        <ScrollArea
-          orientation="y"
-          className={styles.bodyScroll}
-          ariaLabel={`Description de l'annonce ${ad.title}`}
-        >
-          <RecruitmentBody body={ad.body} />
-        </ScrollArea>
+        {hasBody ? (
+          <ScrollArea
+            orientation="y"
+            className={styles.bodyScroll}
+            ariaLabel={`Description de l'annonce ${ad.title}`}
+          >
+            <RecruitmentBody body={ad.body} />
+          </ScrollArea>
+        ) : (
+          // Sans description, une zone défilante vide ne serait qu'un cadre de
+          // 28 px sous un filet : on dit plutôt qu'il n'y a rien à lire.
+          <p className={styles.noBody}>Pas de description pour cette annonce.</p>
+        )}
 
         <ContactTags ad={ad} />
 
