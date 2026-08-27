@@ -275,6 +275,82 @@ const FICTIONAL_SPONSORS = [
   { name: "Test - Discord", slug: "test-discord", tier: "PARTNER" as const, website_url: "https://example.com/discord", description: "La plateforme officielle de la communauté" },
 ];
 
+// Annonces de recrutement : couvre l'aperçu tronqué des longues descriptions
+// (le cas qui a motivé la modale de lecture), les deux modes de mise en avant,
+// le cas « plusieurs annonces urgentes » — une seule est servie, les autres
+// attendent leur tour — et le brouillon inactif.
+const FICTIONAL_RECRUITMENT_ADS = [
+  {
+    title: "Test - BlueGenji recrute des Admins",
+    team_name: "Pôle administration",
+    domain: "ADMIN" as const,
+    roles: "Modération, tickets, check-ins de tournoi",
+    body: "Suite à une pause dans nos activités, nous recherchons de nouvelles têtes pour le poste d'Admin.\n\nCe que nous offrons:\nUne structure claire et un encadrement professionnel. L'association existe depuis 2020 et est sous loi 1901, ce qui nous donne l'expérience nécessaire pour connaître les besoins de ce rôle.\n\nEn quoi consiste le rôle:\n\n- Surveiller les salons textuels pour repérer comportements toxiques, conflits ou spam.\n\n- Intervenir immédiatement en cas de problème (rappel des règles, mute, kick si nécessaire).\n\n- Répondre rapidement aux signalements des membres.\n\n- Ouvrir, trier et gérer les tickets selon leur catégorie.\n\n- Effectuer les check-ins en tournoi et gérer les problèmes pendant les matchs.\n\n- Aider au brainstorm et à la conception des évènements ainsi que leur mise en place.\n\n- Relayer ou faire appliquer les décisions urgentes des directeurs de pôles.\n\nLes outils à disposition:\nTrois serveurs Discord (principal, Marvel Rivals, équipes), ainsi qu'un outil de ticketing externe permettant le suivi de vos tâches et la collaboration avec le reste du staff.\n\nSi le rôle t'intéresse:\nPostule directement via le bouton ci-dessous, ou contacte-nous sur Discord en message privé pour qu'on puisse discuter, échanger, et pourquoi pas planifier un entretien vocal.",
+    contact_url: "https://example.com/ticket/admin",
+    contact_discord: "recrutement_bg",
+    contact_discord_id: "123456789012345678",
+    contact_preferred: "DISCORD" as const,
+    highlight: "MODAL" as const,
+    active: 1,
+  },
+  {
+    title: "Test - BlueGenji recrute un Graphiste",
+    team_name: "Pôle communication",
+    domain: "DESIGN" as const,
+    roles: "Identité visuelle, affiches, overlays",
+    body: "Suite à une reprise de nos événements, nous recherchons un graphiste pour assurer nos besoins visuels.\n\nCe que nous offrons:\nUn cadre bienveillant, des projets variés et une vraie liberté créative sur la direction artistique de la saison.\n\nEn quoi consiste le rôle:\n\n- Collaborer avec le pôle communication pour définir les besoins visuels.\n\n- Élaborer un cahier des normes graphiques pour l'association.\n\n- Créer les éléments de communication visuelle : logos, affiches, brochures.\n\n- Pouvoir effectuer des modifications de dernière minute sur un visuel.\n\n- Mettre en place et tenir un espace de travail partagé bien organisé.\n\nLes outils à disposition:\nUn outil de ticketing externe pour le suivi des tâches, et des points réguliers avec le pôle communication.\n\nSi le rôle t'intéresse:\nPostule via le lien, ou viens en parler sur Discord.",
+    contact_url: "https://example.com/ticket/design",
+    contact_discord: "https://discord.gg/bluegenji",
+    contact_discord_id: null,
+    contact_preferred: "LINK" as const,
+    // Deuxième « modale à l'arrivée » : masquée par celle du dessus.
+    highlight: "MODAL" as const,
+    active: 1,
+  },
+  {
+    title: "Test - Arbitres pour les tournois du dimanche",
+    team_name: "Pôle arbitrage",
+    domain: "ARBITRAGE" as const,
+    roles: "Arbitrer les matchs, gérer les litiges",
+    body: "Deux tournois par mois, le dimanche après-midi. Formation assurée par le pôle : aucune expérience préalable n'est demandée, seulement de la rigueur et de la disponibilité.",
+    contact_url: null,
+    contact_discord: "arbitrage_bg",
+    contact_discord_id: null,
+    contact_preferred: "AUTO" as const,
+    // Troisième mise en avant, en banderole : masquée elle aussi.
+    highlight: "BANNER" as const,
+    active: 1,
+  },
+  {
+    title: "Test - Caster pour les finales",
+    team_name: null,
+    domain: "CASTING" as const,
+    roles: null,
+    // Description courte : la carte l'affiche en entier, sans « lire la suite ».
+    body: "Commenter les finales en direct, une soirée par mois.",
+    contact_url: "https://example.com/ticket/casting",
+    contact_discord: null,
+    contact_discord_id: null,
+    contact_preferred: "AUTO" as const,
+    highlight: "NONE" as const,
+    active: 1,
+  },
+  {
+    title: "Test - Développeur (brouillon)",
+    team_name: "Pôle dev",
+    domain: "DEV" as const,
+    roles: null,
+    body: null,
+    contact_url: null,
+    contact_discord: null,
+    contact_discord_id: null,
+    contact_preferred: "AUTO" as const,
+    // Brouillon urgent : inactif, donc jamais mis en avant.
+    highlight: "MODAL" as const,
+    active: 0,
+  },
+];
+
 // ---------------------------------------------------------------------------
 // Nettoyage
 // ---------------------------------------------------------------------------
@@ -304,6 +380,7 @@ async function clearDatabase(db: Pool): Promise<void> {
     { label: "sessions", sql: "DELETE FROM bg_user_sessions WHERE user_id IN (SELECT id FROM bg_users WHERE pseudo LIKE 'Test_%')" },
     { label: "joueurs", sql: "DELETE FROM bg_users WHERE pseudo LIKE 'Test_%'" },
     { label: "sponsors", sql: "DELETE FROM bg_sponsors WHERE name LIKE 'Test -%'" },
+    { label: "annonces de recrutement", sql: "DELETE FROM bg_recruitment_ads WHERE title LIKE 'Test -%'" },
     { label: "membres du bureau", sql: "DELETE FROM bg_bureau_members" },
     // Équipes héritées préfixées « Team_ » (underscore échappé pour LIKE).
     { label: "matchs (équipes Team_)", sql: "DELETE FROM bg_matches WHERE team1_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\\_%') OR team2_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\\_%')" },
@@ -547,6 +624,41 @@ async function createSponsors(db: Pool): Promise<void> {
     }
   }
   console.log(`  ✓ ${FICTIONAL_SPONSORS.length} sponsors créés (dont 1 inactif)`);
+}
+
+async function createRecruitmentAds(db: Pool): Promise<void> {
+  console.log("📣 Création des annonces de recrutement...");
+  for (let i = 0; i < FICTIONAL_RECRUITMENT_ADS.length; i++) {
+    const ad = FICTIONAL_RECRUITMENT_ADS[i];
+    try {
+      await db.execute(
+        `INSERT INTO bg_recruitment_ads
+           (title, team_name, domain, roles, body, contact_url, contact_discord,
+            contact_discord_id, contact_preferred, highlight, active, display_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          ad.title,
+          ad.team_name,
+          ad.domain,
+          ad.roles,
+          ad.body,
+          ad.contact_url,
+          ad.contact_discord,
+          ad.contact_discord_id,
+          ad.contact_preferred,
+          ad.highlight,
+          ad.active,
+          (i + 1) * 10,
+        ]
+      );
+    } catch (error) {
+      console.error(`  \u2717 ${ad.title}:`, (error as Error).message);
+    }
+  }
+  const urgent = FICTIONAL_RECRUITMENT_ADS.filter((a) => a.active === 1 && a.highlight !== "NONE");
+  console.log(
+    `  \u2713 ${FICTIONAL_RECRUITMENT_ADS.length} annonces créées (dont 1 brouillon · ${urgent.length} urgentes, 1 seule réellement mise en avant)`
+  );
 }
 
 async function createBureau(db: Pool): Promise<void> {
@@ -1199,6 +1311,9 @@ async function main(): Promise<void> {
     await createBureau(db);
     console.log();
 
+    await createRecruitmentAds(db);
+    console.log();
+
     const organizerId = specialUserIds.get("Admin") ?? userIds[0];
 
     console.log("🎮 Création des tournois...");
@@ -1216,6 +1331,7 @@ async function main(): Promise<void> {
     console.log(`  · ${userIds.length} joueurs + ${specialUserIds.size} comptes de test (Test_*)`);
     console.log(`  · ${teamIds.length} équipes (Test - *), dont solo / staff / roster complet`);
     console.log(`  · ${FICTIONAL_SPONSORS.length} sponsors (dont 1 inactif) · ${FICTIONAL_BUREAU.length} membres du bureau`);
+    console.log(`  · ${FICTIONAL_RECRUITMENT_ADS.length} annonces de recrutement (longues descriptions, mises en avant concurrentes, brouillon)`);
     console.log(`  · ${TOURNAMENTS.length} tournois :`);
     console.log(`    - états : ${byState("UPCOMING")} à venir · ${byState("REGISTRATION")} inscriptions · ${byState("RUNNING")} en cours · ${byState("FINISHED")} terminés`);
     console.log(`    - formats : ${byFormat("SINGLE")} simple · ${byFormat("DOUBLE")} double · ${byFormat("SWISS")} suisse · ${byFormat("SURVIVAL")} survie · ${byFormat("MULTI")} multi-phase · ${byFormat("BG_SURVIE")} BG Survie`);
