@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  RECRUITMENT_BODY_MAX,
   RECRUITMENT_CONTACT_CHANNELS,
   RECRUITMENT_DOMAINS,
   RECRUITMENT_HIGHLIGHTS,
@@ -79,9 +80,12 @@ describe("validateRecruitmentAdInput", () => {
   });
 
   it("truncates an over-long body to the max length", () => {
-    const result = validateRecruitmentAdInput({ title: "X", body: "a".repeat(2500) });
+    const result = validateRecruitmentAdInput({
+      title: "X",
+      body: "a".repeat(RECRUITMENT_BODY_MAX + 500),
+    });
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value.body).toHaveLength(2000);
+    if (result.ok) expect(result.value.body).toHaveLength(RECRUITMENT_BODY_MAX);
   });
 
   it("rejects a missing title", () => {

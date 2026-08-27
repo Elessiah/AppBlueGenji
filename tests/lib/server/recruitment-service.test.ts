@@ -6,6 +6,7 @@ import {
   listRecruitmentAds,
   updateRecruitmentAd,
 } from "@/lib/server/recruitment-service";
+import { selectHighlightedAd } from "@/lib/shared/recruitment";
 
 jest.mock("@/lib/server/database");
 
@@ -13,6 +14,22 @@ async function mockDb(execute: jest.Mock) {
   const { getDatabase } = await import("@/lib/server/database");
   (getDatabase as jest.Mock).mockResolvedValue({ execute });
 }
+
+/** Ligne minimale d'annonce mise en avant, telle que la remonte la requête. */
+const HIGHLIGHT_ROW = {
+  id: 5,
+  title: "URGENT",
+  team_name: null,
+  domain: "AUTRE",
+  roles: null,
+  body: null,
+  contact_url: null,
+  contact_discord: null,
+  contact_discord_id: null,
+  contact_preferred: "AUTO",
+  highlight: "BANNER",
+  active: 1,
+};
 
 describe("recruitment-service", () => {
   beforeEach(() => jest.clearAllMocks());
@@ -100,6 +117,34 @@ describe("recruitment-service", () => {
     it("returns null when there is nothing to highlight", async () => {
       await mockDb(jest.fn().mockResolvedValue([[]]));
       expect(await getHighlightedAd()).toBeNull();
+    });
+
+    it("serves a single ad when several ask for a modal, the highest one winning", async () => {
+      // Le tri est fait par la requête ; c'est `selectHighlightedAd` qui tranche.
+      const execute = jest.fn().mockResolvedValue([
+        [
+          { ...HIGHLIGHT_ROW, id: 7, highlight: "MODAL" },
+          { ...HIGHLIGHT_ROW, id: 8, highlight: "MODAL" },
+          { ...HIGHLIGHT_ROW, id: 9, highlight: "BANNER" },
+        ],
+      ]);
+      await mockDb(execute);
+      expect((await getHighlightedAd())?.id).toBe(7);
+    });
+
+    it("agrees with the shared selector the admin badges use", async () => {
+      // Garde-fou anti-divergence : la route et les badges de gestion doivent
+      // désigner la même annonce, sur exactement les mêmes données.
+      const rows = [
+        { ...HIGHLIGHT_ROW, id: 3, highlight: "BANNER" },
+        { ...HIGHLIGHT_ROW, id: 4, highlight: "MODAL" },
+      ];
+      await mockDb(jest.fn().mockResolvedValue([rows]));
+      const served = await getHighlightedAd();
+      const expected = selectHighlightedAd(
+        rows.map((r) => ({ ...r, active: Boolean(r.active), id: r.id })),
+      );
+      expect(served?.id).toBe(expected?.id);
     });
   });
 

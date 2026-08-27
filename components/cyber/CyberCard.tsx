@@ -10,6 +10,8 @@ interface CyberCardProps {
   className?: string;
   children: ReactNode;
   style?: CSSProperties;
+  /** Ancre DOM de la carte (cible d'un lien profond `#...`). */
+  id?: string;
 }
 
 export function CyberCard({
@@ -19,6 +21,7 @@ export function CyberCard({
   className = "",
   children,
   style,
+  id,
 }: CyberCardProps) {
   const classes = [
     styles.root,
@@ -29,5 +32,5 @@ export function CyberCard({
     .filter(Boolean)
     .join(" ");
 
-  return createElement(as, { className: classes, style }, children);
+  return createElement(as, { className: classes, style, id }, children);
 }
