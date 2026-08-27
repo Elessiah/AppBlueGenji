@@ -108,6 +108,32 @@
   color: var(--ink);
 }
 
+/* Le titre ouvre l'annonce en grand : c'est un bouton, habillé en titre. */
+.cardTitleButton {
+  display: block;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  transition: color 0.16s ease;
+}
+
+.cardTitleButton:hover {
+  color: var(--blue-100, #d6f0ff);
+}
+
+.cardTitleButton:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 3px;
+  border-radius: var(--r-cy-sm);
+}
+
 .cardTeam {
   margin: 0;
   font-family: var(--font-mono);
@@ -124,82 +150,46 @@
   color: var(--ink-mute);
 }
 
+/* Aperçu seulement : la description complète s'ouvre en modale. La coupe est
+   déjà faite en amont (`buildRecruitmentPreview`) ; le `line-clamp` n'est qu'un
+   garde-fou d'affichage pour que toutes les cartes gardent la même allure. */
 .cardBody {
   margin: 4px 0 0;
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.55;
   color: var(--ink-mute);
-  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  line-clamp: 5;
+  overflow: hidden;
 }
 
-/* Tags de contact (Discord / lien) */
-.contactTags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.contactTag {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  max-width: 100%;
+.readMore {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 0;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--ink-mute);
-  text-decoration: none;
-  background: var(--cyber-bg-2, rgba(90, 200, 255, 0.03));
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-cy-sm);
-  padding: 5px 10px;
-  cursor: pointer;
-  transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
-}
-
-.contactTag:hover {
-  color: var(--ink);
-  border-color: var(--blue-500);
-  background: rgba(90, 200, 255, 0.06);
-}
-
-.contactTag:focus-visible {
-  outline: 2px solid var(--blue-500);
-  outline-offset: 2px;
-}
-
-.contactTagIcon {
-  flex-shrink: 0;
-  opacity: 0.9;
-}
-
-.contactTagKey {
-  flex-shrink: 0;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--blue-300);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: color 0.16s ease;
 }
 
-.contactTagVal {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Canal préféré : tag mis en avant en bleu glacier. */
-.contactTagPrimary {
+.readMore:hover {
   color: var(--ink);
-  border-color: var(--blue-500);
-  background: rgba(90, 200, 255, 0.1);
 }
 
-.contactTagPrimary .contactTagKey {
-  color: var(--blue-100);
-}
-
-.contactTagPrimary:hover {
-  background: rgba(90, 200, 255, 0.16);
+.readMore:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 3px;
+  border-radius: var(--r-cy-sm);
 }
 
 .cardFooter {
@@ -414,6 +404,101 @@ select.modalInput {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 4px;
+}
+
+/* Filtre par pôle — n'apparaît qu'au-delà de quelques annonces. */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -8px 0 22px;
+}
+
+.filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  background: transparent;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.filter:hover {
+  color: var(--ink);
+  border-color: var(--blue-500);
+}
+
+.filter:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+.filterOn {
+  color: var(--blue-100);
+  border-color: var(--blue-500);
+  background: rgba(90, 200, 255, 0.1);
+}
+
+.filterCount {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+}
+
+.filterOn .filterCount {
+  color: var(--blue-300);
+}
+
+/* Badge de gestion : état réel de la mise en avant d'une annonce. */
+.highlightBadge {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--blue-300);
+  border: 1px solid rgba(90, 200, 255, 0.35);
+  border-radius: 999px;
+  padding: 3px 9px;
+  cursor: help;
+}
+
+/* Mise en avant demandée mais non servie : une autre annonce l'emporte. */
+.highlightBadgeOff {
+  color: var(--amber, #ffb45c);
+  border-color: rgba(255, 180, 92, 0.4);
+}
+
+/* Compteur de signes de la description. */
+.counter {
+  align-self: flex-end;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+}
+
+.counterWarn {
+  color: var(--amber, #ffb45c);
+}
+
+/* Avertissement en ligne du formulaire (mise en avant déjà occupée). */
+.modalWarn {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--amber, #ffb45c);
+  border-left: 2px solid rgba(255, 180, 92, 0.5);
+  padding-left: 10px;
 }
 
 /* Responsive */

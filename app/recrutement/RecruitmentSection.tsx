@@ -1,14 +1,22 @@
 "use client";
 
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CyberButton, CyberCard, Pill } from "@/components/cyber";
+import { ContactTags } from "@/components/recruitment/ContactTags";
 import { useToast } from "@/components/ui/toast";
+import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   type RecruiterContactDefaults,
   type RecruitmentAd,
   type RecruitmentContactChannel,
   type RecruitmentDomain,
   type RecruitmentHighlight,
+  type RecruitmentHighlightState,
+  buildRecruitmentPreview,
+  parseRecruitmentAdAnchor,
+  recruitmentAdAnchor,
+  resolveHighlightStates,
+  RECRUITMENT_BODY_MAX,
   RECRUITMENT_CONTACT_CHANNELS,
   RECRUITMENT_CONTACT_CHANNEL_LABELS,
   RECRUITMENT_DISCORD_MAX,
@@ -16,7 +24,10 @@ import {
   RECRUITMENT_DOMAIN_LABELS,
   RECRUITMENT_HIGHLIGHTS,
   RECRUITMENT_HIGHLIGHT_LABELS,
+  RECRUITMENT_HIGHLIGHT_SHORT_LABELS,
+  selectHighlightedAd,
 } from "@/lib/shared/recruitment";
+import { AdDetailModal } from "./AdDetailModal";
 import styles from "./page.module.css";
 
 interface RecruitmentSectionProps {
@@ -51,62 +62,35 @@ const EMPTY_FORM: FormState = {
   active: true,
 };
 
-// Un contact Discord fourni sous forme d'URL (invitation, lien profil) devient un
-// lien ; sinon c'est un pseudo à copier.
-function isUrl(value: string): boolean {
-  return /^(https?:\/\/|discord\.gg\/)/i.test(value.trim());
-}
+/** Filtre « tous les pôles » — valeur sentinelle hors de `RecruitmentDomain`. */
+const ALL_DOMAINS = "ALL" as const;
+type DomainFilter = RecruitmentDomain | typeof ALL_DOMAINS;
 
-// Normalise une URL Discord/lien pour l'attribut href (préfixe le schéma si absent).
-function toHref(value: string): string {
-  const v = value.trim();
-  return v.startsWith("http") ? v : `https://${v}`;
-}
+/**
+ * En deçà de ce nombre d'annonces, le filtre par pôle n'apporte rien : il
+ * encombrerait l'en-tête pour trier deux cartes déjà visibles d'un coup d'œil.
+ */
+const FILTER_MIN_ADS = 3;
 
-/* Icônes de canal — Discord en glyphe de marque (fill), le reste en trait (stroke)
-   pour rester cohérent avec l'iconographie « cyber minimal » du site. */
-function DiscordGlyph() {
-  return (
-    <svg className={styles.contactTagIcon} viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
-      <path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.011c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
-    </svg>
-  );
-}
+/**
+ * Suffixe du badge de mise en avant, côté gestion. `NONE` n'est jamais rendu
+ * (le badge n'apparaît pas), mais la table reste exhaustive pour rester juste
+ * si un état s'ajoute.
+ */
+const HIGHLIGHT_STATE_SUFFIX: Record<RecruitmentHighlightState, string> = {
+  NONE: "",
+  LIVE: " en ligne",
+  QUEUED: " en attente",
+  DRAFT: " (brouillon)",
+};
 
-function strokeIcon(children: ReactNode) {
-  return (
-    <svg
-      className={styles.contactTagIcon}
-      viewBox="0 0 24 24"
-      width="14"
-      height="14"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {children}
-    </svg>
-  );
-}
-
-const CopyGlyph = () =>
-  strokeIcon(
-    <>
-      <rect x="9" y="9" width="13" height="13" rx="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-    </>,
-  );
-const OpenGlyph = () =>
-  strokeIcon(
-    <>
-      <path d="M15 3h6v6" />
-      <path d="M10 14 21 3" />
-      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-    </>,
-  );
+const HIGHLIGHT_STATE_HINTS: Record<RecruitmentHighlightState, (winner?: string) => string> = {
+  NONE: () => "",
+  LIVE: () => "Mise en avant actuellement affichée sur tout le site.",
+  QUEUED: (winner) =>
+    `Sans effet pour l'instant : « ${winner ?? "une autre annonce"} » occupe la mise en avant. Une seule annonce est affichée à la fois — remonte celle-ci au-dessus pour la faire passer.`,
+  DRAFT: () => "Annonce inactive : aucune mise en avant tant qu'elle n'est pas publiée.",
+};
 
 export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: RecruitmentSectionProps) {
   const { showError, showSuccess } = useToast();
@@ -115,22 +99,57 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const titleRef = useRef<HTMLInputElement>(null);
+  // Annonce ouverte en lecture (modale « grand format »). Mémorisée par id pour
+  // rester juste après une modification : la modale relit toujours la version
+  // courante de la liste.
+  const [detailId, setDetailId] = useState<number | null>(null);
+  const [domainFilter, setDomainFilter] = useState<DomainFilter>(ALL_DOMAINS);
   // Couple (pseudo, id Discord) cohérent connu au moment de l'ouverture du
   // formulaire. On ne renvoie l'`id` (deep-link) que si le pseudo n'a pas été
   // remplacé, pour éviter d'associer l'id d'un recruteur à un pseudo tiers.
   const discordSnapshot = useRef<{ pseudo: string; id: string | null }>({ pseudo: "", id: null });
 
+  // Comportement modal du formulaire de gestion : Échap, piège à focus,
+  // arrière-plan figé. Le focus initial tombe sur le champ « Titre », premier
+  // élément focalisable de la modale.
+  const formRef = useDialogBehavior({ open, onClose: close, locked: busy });
+
+  // Lien profond `/recrutement#annonce-<id>` : ouvre directement l'annonce en
+  // lecture (partage d'une annonce, bouton « Voir l'annonce » de la mise en
+  // avant site). `hashchange` couvre les liens internes à la page.
   useEffect(() => {
-    if (!open) return;
-    titleRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) close();
+    const syncFromHash = () => {
+      const id = parseRecruitmentAdAnchor(window.location.hash);
+      if (id !== null) setDetailId(id);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, busy]);
+    syncFromHash();
+    window.addEventListener("hashchange", syncFromHash);
+    return () => window.removeEventListener("hashchange", syncFromHash);
+  }, []);
+
+  // Annonce visée par le lien profond : `null` si elle n'existe pas (ou plus).
+  const detailAd = detailId === null ? null : (ads.find((a) => a.id === detailId) ?? null);
+
+  function openDetail(ad: RecruitmentAd) {
+    setDetailId(ad.id);
+    try {
+      // URL partageable, sans entrée d'historique supplémentaire.
+      window.history.replaceState(null, "", `#${recruitmentAdAnchor(ad.id)}`);
+    } catch {
+      // Historique indisponible : la modale s'ouvre quand même.
+    }
+  }
+
+  function closeDetail() {
+    setDetailId(null);
+    try {
+      if (parseRecruitmentAdAnchor(window.location.hash) !== null) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+    } catch {
+      // Ignore : la fermeture reste effective.
+    }
+  }
 
   function openCreate() {
     setEditing(null);
@@ -236,6 +255,8 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
         return;
       }
       setAds((prev) => prev.filter((a) => a.id !== ad.id));
+      // Une annonce supprimée ne doit pas rester ouverte en lecture derrière.
+      if (detailId === ad.id) closeDetail();
       showSuccess("Annonce supprimée.");
     } catch {
       showError("Erreur réseau, réessaye.");
@@ -276,17 +297,38 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
     }
   }
 
-  // Copie une valeur dans le presse-papiers. Toast de confirmation, jamais inline.
-  async function copyContact(value: string, label: string) {
-    try {
-      await navigator.clipboard.writeText(value);
-      showSuccess(`${label} copié : ${value}`);
-    } catch {
-      showError("Impossible de copier, copie manuellement.");
-    }
-  }
+  // Pôles réellement représentés, dans l'ordre canonique du registre.
+  const presentDomains = useMemo(
+    () => RECRUITMENT_DOMAINS.filter((d) => ads.some((ad) => ad.domain === d)),
+    [ads],
+  );
+  const showFilter = ads.length >= FILTER_MIN_ADS && presentDomains.length > 1;
 
-  const count = ads.length;
+  // Un filtre sur un pôle vidé par une suppression laisserait une liste vide
+  // sans raison visible : on retombe sur « Tous ».
+  useEffect(() => {
+    if (domainFilter !== ALL_DOMAINS && !presentDomains.includes(domainFilter)) {
+      setDomainFilter(ALL_DOMAINS);
+    }
+  }, [domainFilter, presentDomains]);
+
+  const filterActive = showFilter && domainFilter !== ALL_DOMAINS;
+  const visibleAds = filterActive ? ads.filter((ad) => ad.domain === domainFilter) : ads;
+
+  // Une seule mise en avant est servie à la fois (la plus haute active). On dit
+  // au staff laquelle est réellement en ligne, plutôt que de le laisser croire
+  // que ses trois « modales à l'arrivée » s'affichent toutes.
+  const highlightStates = useMemo(() => resolveHighlightStates(ads), [ads]);
+  // Annonce actuellement mise en avant sur le site, pour l'avertissement du formulaire.
+  const highlightedAd = useMemo(() => selectHighlightedAd(ads), [ads]);
+  // Annonce qui « prend la place » de celle en cours d'édition, le cas échéant.
+  const conflictingAd =
+    form.highlight !== "NONE" && form.active && highlightedAd && highlightedAd.id !== editing?.id
+      ? highlightedAd
+      : null;
+
+  const total = ads.length;
+  const shown = visibleAds.length;
 
   return (
     <>
@@ -298,7 +340,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
           </div>
           <div className={styles.headActions}>
             <span className={styles.meta}>
-              {count} ANNONCE{count > 1 ? "S" : ""}
+              {filterActive ? `${shown} / ${total}` : total} ANNONCE{total > 1 ? "S" : ""}
             </span>
             {isAdmin && (
               <CyberButton variant="primary" onClick={openCreate}>
@@ -308,7 +350,34 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
           </div>
         </header>
 
-        {count === 0 ? (
+        {showFilter && (
+          <div className={styles.filters} role="group" aria-label="Filtrer par pôle">
+            <button
+              type="button"
+              className={`${styles.filter} ${domainFilter === ALL_DOMAINS ? styles.filterOn : ""}`}
+              onClick={() => setDomainFilter(ALL_DOMAINS)}
+              aria-pressed={domainFilter === ALL_DOMAINS}
+            >
+              Tous les pôles
+            </button>
+            {presentDomains.map((d) => (
+              <button
+                key={d}
+                type="button"
+                className={`${styles.filter} ${domainFilter === d ? styles.filterOn : ""}`}
+                onClick={() => setDomainFilter(d)}
+                aria-pressed={domainFilter === d}
+              >
+                {RECRUITMENT_DOMAIN_LABELS[d]}
+                <span className={styles.filterCount}>
+                  {ads.filter((ad) => ad.domain === d).length}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {total === 0 ? (
           <div className={styles.empty}>
             <p>Aucun poste à pourvoir dans le staff pour le moment.</p>
             {isAdmin && (
@@ -319,135 +388,138 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
           </div>
         ) : (
           <div className={styles.list}>
-            {ads.map((ad, index) => (
-              <CyberCard key={ad.id} lift className={styles.card}>
-                <div className={styles.cardHead}>
-                  <div className={styles.cardTags}>
-                    <Pill variant="blue">{RECRUITMENT_DOMAIN_LABELS[ad.domain]}</Pill>
-                    {ad.highlight !== "NONE" && <Pill variant="live">Urgent</Pill>}
-                    {!ad.active && <Pill>Inactif</Pill>}
-                  </div>
-                  {isAdmin && (
-                    <div className={styles.moveActions}>
-                      <button
-                        type="button"
-                        className={styles.move}
-                        onClick={() => move(index, -1)}
-                        disabled={busy || index === 0}
-                        aria-label={`Monter l'annonce ${ad.title}`}
-                        title="Monter"
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.move}
-                        onClick={() => move(index, 1)}
-                        disabled={busy || index === ads.length - 1}
-                        aria-label={`Descendre l'annonce ${ad.title}`}
-                        title="Descendre"
-                      >
-                        ↓
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <h3 className={styles.cardTitle}>{ad.title}</h3>
-                {ad.teamName && <p className={styles.cardTeam}>{ad.teamName}</p>}
-                {ad.roles && <p className={styles.cardRoles}>Missions : {ad.roles}</p>}
-                {ad.body && <p className={styles.cardBody}>{ad.body}</p>}
-
-                {(ad.contactDiscord || ad.contactDiscordId) && (
-                  <div className={styles.contactTags} aria-label="Contacts">
-                    {ad.contactDiscord &&
-                      (isUrl(ad.contactDiscord) ? (
-                        <a
-                          className={`${styles.contactTag} ${ad.contactPreferred === "DISCORD" ? styles.contactTagPrimary : ""}`}
-                          href={toHref(ad.contactDiscord)}
-                          target="_blank"
-                          rel="noopener noreferrer"
+            {visibleAds.map((ad) => {
+              // Index dans la liste complète : le réordonnancement porte toujours
+              // sur l'ordre réel, jamais sur la vue filtrée.
+              const index = ads.indexOf(ad);
+              const preview = buildRecruitmentPreview(ad.body);
+              const highlightState = highlightStates.get(ad.id) ?? "NONE";
+              return (
+                <CyberCard
+                  key={ad.id}
+                  as="article"
+                  lift
+                  className={styles.card}
+                  id={recruitmentAdAnchor(ad.id)}
+                >
+                  <div className={styles.cardHead}>
+                    <div className={styles.cardTags}>
+                      <Pill variant="blue">{RECRUITMENT_DOMAIN_LABELS[ad.domain]}</Pill>
+                      {ad.highlight !== "NONE" && <Pill variant="live">Urgent</Pill>}
+                      {!ad.active && <Pill>Inactif</Pill>}
+                      {isAdmin && highlightState !== "NONE" && (
+                        <span
+                          className={`${styles.highlightBadge} ${highlightState === "LIVE" ? "" : styles.highlightBadgeOff}`}
+                          title={HIGHLIGHT_STATE_HINTS[highlightState](highlightedAd?.title)}
                         >
-                          <DiscordGlyph />
-                          <span className={styles.contactTagKey}>Discord</span>
-                          <span className={styles.contactTagVal}>Rejoindre</span>
-                          <OpenGlyph />
-                        </a>
-                      ) : (
+                          {RECRUITMENT_HIGHLIGHT_SHORT_LABELS[ad.highlight]}
+                          {HIGHLIGHT_STATE_SUFFIX[highlightState]}
+                        </span>
+                      )}
+                    </div>
+                    {isAdmin && (
+                      <div className={styles.moveActions}>
                         <button
                           type="button"
-                          className={`${styles.contactTag} ${ad.contactPreferred === "DISCORD" ? styles.contactTagPrimary : ""}`}
-                          onClick={() => copyContact(ad.contactDiscord!, "Pseudo Discord")}
-                          title="Copier le pseudo Discord"
+                          className={styles.move}
+                          onClick={() => move(index, -1)}
+                          disabled={busy || filterActive || index === 0}
+                          aria-label={`Monter l'annonce ${ad.title}`}
+                          title={filterActive ? "Retire le filtre pour réordonner" : "Monter"}
                         >
-                          <DiscordGlyph />
-                          <span className={styles.contactTagKey}>Discord</span>
-                          <span className={styles.contactTagVal}>{ad.contactDiscord}</span>
-                          <CopyGlyph />
+                          ↑
                         </button>
-                      ))}
-                    {ad.contactDiscordId && (
-                      <a
-                        className={styles.contactTag}
-                        href={`https://discord.com/users/${ad.contactDiscordId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Ouvrir la conversation Discord"
-                      >
-                        <DiscordGlyph />
-                        <span className={styles.contactTagVal}>Ouvrir</span>
-                        <OpenGlyph />
-                      </a>
+                        <button
+                          type="button"
+                          className={styles.move}
+                          onClick={() => move(index, 1)}
+                          disabled={busy || filterActive || index === ads.length - 1}
+                          aria-label={`Descendre l'annonce ${ad.title}`}
+                          title={filterActive ? "Retire le filtre pour réordonner" : "Descendre"}
+                        >
+                          ↓
+                        </button>
+                      </div>
                     )}
                   </div>
-                )}
 
-                <div className={styles.cardFooter}>
-                  {ad.contactUrl && (
-                    <CyberButton variant={ad.contactPreferred === "LINK" ? "primary" : "ghost"} asChild>
-                      <a href={ad.contactUrl} target="_blank" rel="noopener noreferrer">
-                        Postuler →
-                      </a>
-                    </CyberButton>
+                  <h3 className={styles.cardTitle}>
+                    <button
+                      type="button"
+                      className={styles.cardTitleButton}
+                      onClick={() => openDetail(ad)}
+                      aria-haspopup="dialog"
+                    >
+                      {ad.title}
+                    </button>
+                  </h3>
+                  {ad.teamName && <p className={styles.cardTeam}>{ad.teamName}</p>}
+                  {ad.roles && <p className={styles.cardRoles}>Missions : {ad.roles}</p>}
+                  {preview.text && <p className={styles.cardBody}>{preview.text}</p>}
+                  {preview.truncated && (
+                    <button
+                      type="button"
+                      className={styles.readMore}
+                      onClick={() => openDetail(ad)}
+                      aria-haspopup="dialog"
+                    >
+                      Lire l&apos;annonce complète →
+                    </button>
                   )}
-                  {isAdmin && (
-                    <div className={styles.cardActions}>
-                      <button
-                        type="button"
-                        className={styles.action}
-                        onClick={() => openEdit(ad)}
-                        disabled={busy}
-                        aria-label={`Modifier ${ad.title}`}
-                      >
-                        Modifier
-                      </button>
-                      <button
-                        type="button"
-                        className={`${styles.action} ${styles.actionDanger}`}
-                        onClick={() => remove(ad)}
-                        disabled={busy}
-                        aria-label={`Supprimer ${ad.title}`}
-                      >
-                        Supprimer
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </CyberCard>
-            ))}
+
+                  <ContactTags ad={ad} />
+
+                  <div className={styles.cardFooter}>
+                    {ad.contactUrl && (
+                      <CyberButton variant={ad.contactPreferred === "LINK" ? "primary" : "ghost"} asChild>
+                        <a href={ad.contactUrl} target="_blank" rel="noopener noreferrer">
+                          Postuler →
+                        </a>
+                      </CyberButton>
+                    )}
+                    {isAdmin && (
+                      <div className={styles.cardActions}>
+                        <button
+                          type="button"
+                          className={styles.action}
+                          onClick={() => openEdit(ad)}
+                          disabled={busy}
+                          aria-label={`Modifier ${ad.title}`}
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.action} ${styles.actionDanger}`}
+                          onClick={() => remove(ad)}
+                          disabled={busy}
+                          aria-label={`Supprimer ${ad.title}`}
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </CyberCard>
+              );
+            })}
           </div>
         )}
       </section>
 
+      {detailAd && <AdDetailModal ad={detailAd} onClose={closeDetail} />}
+
       {open && (
         <div className={styles.modalOverlay} onClick={close} role="presentation">
           <div
+            ref={formRef}
             className={styles.modal}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
             aria-busy={busy}
             aria-label={editing ? "Modifier une annonce" : "Nouvelle annonce"}
+            tabIndex={-1}
           >
             <h3 className={styles.modalTitle}>
               {editing ? "Modifier l'annonce" : "Nouvelle annonce"}
@@ -456,7 +528,6 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
             <label className={styles.modalField}>
               <span className={styles.modalLabel}>Titre *</span>
               <input
-                ref={titleRef}
                 className={styles.modalInput}
                 value={form.title}
                 maxLength={140}
@@ -509,11 +580,23 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
               <textarea
                 className={`${styles.modalInput} ${styles.modalTextarea}`}
                 value={form.body}
-                maxLength={2000}
-                rows={4}
-                placeholder="Disponibilités attendues, compétences, ambiance de l'équipe…"
+                maxLength={RECRUITMENT_BODY_MAX}
+                rows={8}
+                placeholder={
+                  "Disponibilités attendues, compétences, ambiance de l'équipe…\n\nEn quoi consiste le rôle :\n- une mission par ligne commençant par un tiret"
+                }
                 onChange={(e) => set("body", e.target.value)}
               />
+              <span className={styles.modalHint}>
+                Une ligne courte finissant par « : » devient un intertitre, une ligne commençant
+                par un tiret devient une puce. Les cartes n&apos;affichent qu&apos;un aperçu :
+                l&apos;annonce complète s&apos;ouvre en grand.
+              </span>
+              <span
+                className={`${styles.counter} ${form.body.length > RECRUITMENT_BODY_MAX * 0.9 ? styles.counterWarn : ""}`}
+              >
+                {form.body.length} / {RECRUITMENT_BODY_MAX}
+              </span>
             </label>
 
             <label className={styles.modalField}>
@@ -579,6 +662,12 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
               <span className={styles.modalHint}>
                 Une seule annonce est mise en avant à la fois (la plus haute dans la liste).
               </span>
+              {conflictingAd && (
+                <span className={styles.modalWarn} role="status">
+                  « {conflictingAd.title} » occupe déjà la mise en avant. Celle-ci restera en
+                  attente tant qu&apos;elle n&apos;aura pas été remontée au-dessus.
+                </span>
+              )}
             </label>
 
             <label className={styles.checkRow}>
