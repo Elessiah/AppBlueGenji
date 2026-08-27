@@ -83,6 +83,56 @@
   stroke: currentColor;
 }
 
+/* ---------- TABS (tous / mes tournois) ---------- */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 28px;
+  /* Le filet supérieur de la bande de métriques sert de ligne de base aux
+     onglets : la marge négative les fait s'y poser, sans doubler le trait. */
+  margin-bottom: -8px;
+}
+
+.tab {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 12px 16px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--ink-mute);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab .num {
+  font-size: 10px;
+  color: var(--ink-dim);
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tab:focus-visible {
+  outline: 2px solid rgba(90, 200, 255, 0.6);
+  outline-offset: -2px;
+}
+
+.tabOn {
+  color: var(--blue-300);
+  border-bottom-color: var(--blue-500);
+}
+
+.tabOn .num {
+  color: var(--blue-300);
+}
+
 /* ---------- METRICS STRIP ---------- */
 .metrics {
   display: grid;
@@ -687,6 +737,14 @@
 }
 
 @media (max-width: 720px) {
+  .tabs {
+    gap: 0;
+  }
+  .tab {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    padding: 12px 10px;
+  }
   .sectionBody,
   .section[data-cols="2"] .sectionBody,
   .section[data-cols="1"] .sectionBody {

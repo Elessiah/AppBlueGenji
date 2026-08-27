@@ -363,14 +363,38 @@ export async function createTournament(
   }
 }
 
-export async function listTournamentBuckets(searchTerm: string | null): Promise<TournamentBuckets> {
+/**
+ * Portée de la liste des tournois.
+ *
+ * Par défaut la liste ne montre que les tournois **déjà visibles**. Renseigner
+ * `organizerUserId` la restreint aux tournois créés par cet utilisateur, et
+ * lève alors le filtre de visibilité : c'est le seul endroit d'où un
+ * organisateur peut retrouver un tournoi qu'il a programmé mais que personne
+ * ne voit encore (onglet « Mes tournois »).
+ */
+export type TournamentListScope = {
+  organizerUserId?: number;
+};
+
+export async function listTournamentBuckets(
+  searchTerm: string | null,
+  scope: TournamentListScope = {},
+): Promise<TournamentBuckets> {
   await syncVisibleTournaments();
 
   const db = await getDatabase();
   const now = new Date();
 
-  const where: string[] = [`t.start_visibility_at <= ?`];
-  const params: unknown[] = [now];
+  const where: string[] = [];
+  const params: unknown[] = [];
+
+  if (scope.organizerUserId !== undefined) {
+    where.push(`t.organizer_user_id = ?`);
+    params.push(scope.organizerUserId);
+  } else {
+    where.push(`t.start_visibility_at <= ?`);
+    params.push(now);
+  }
 
   if (searchTerm && searchTerm.trim()) {
     where.push(`LOWER(t.name) LIKE ?`);
