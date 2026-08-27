@@ -72,6 +72,9 @@ type DomainFilter = RecruitmentDomain | typeof ALL_DOMAINS;
  */
 const FILTER_MIN_ADS = 3;
 
+/** Table d'états vide, réutilisée pour les visiteurs (aucun badge à rendre). */
+const EMPTY_HIGHLIGHT_STATES: ReadonlyMap<number, RecruitmentHighlightState> = new Map();
+
 /**
  * Suffixe du badge de mise en avant, côté gestion. `NONE` n'est jamais rendu
  * (le badge n'apparaît pas), mais la table reste exhaustive pour rester juste
@@ -116,12 +119,12 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
 
   // Lien profond `/recrutement#annonce-<id>` : ouvre directement l'annonce en
   // lecture (partage d'une annonce, bouton « Voir l'annonce » de la mise en
-  // avant site). `hashchange` couvre les liens internes à la page.
+  // avant site). `hashchange` couvre les liens internes à la page. Le fragment
+  // fait foi dans les deux sens : s'il ne désigne plus d'annonce, la lecture se
+  // referme — sinon un lien interne vers une autre ancre laisserait le lecteur
+  // enfermé sur une annonce que l'URL ne nomme plus.
   useEffect(() => {
-    const syncFromHash = () => {
-      const id = parseRecruitmentAdAnchor(window.location.hash);
-      if (id !== null) setDetailId(id);
-    };
+    const syncFromHash = () => setDetailId(parseRecruitmentAdAnchor(window.location.hash));
     syncFromHash();
     window.addEventListener("hashchange", syncFromHash);
     return () => window.removeEventListener("hashchange", syncFromHash);
@@ -129,6 +132,14 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
 
   // Annonce visée par le lien profond : `null` si elle n'existe pas (ou plus).
   const detailAd = detailId === null ? null : (ads.find((a) => a.id === detailId) ?? null);
+
+  // Lien partagé vers une annonce supprimée ou dépubliée : on le dit, plutôt que
+  // d'ouvrir une page muette avec un fragment qui ne mène nulle part.
+  useEffect(() => {
+    if (detailId === null || ads.some((a) => a.id === detailId)) return;
+    showError("Cette annonce n'est plus disponible.");
+    setDetailId(null);
+  }, [detailId, ads, showError]);
 
   function openDetail(ad: RecruitmentAd) {
     setDetailId(ad.id);
@@ -297,11 +308,16 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
     }
   }
 
-  // Pôles réellement représentés, dans l'ordre canonique du registre.
-  const presentDomains = useMemo(
-    () => RECRUITMENT_DOMAINS.filter((d) => ads.some((ad) => ad.domain === d)),
-    [ads],
-  );
+  // Un seul parcours de la liste pour les pôles représentés et leurs effectifs,
+  // dans l'ordre canonique du registre.
+  const { presentDomains, domainCounts } = useMemo(() => {
+    const counts = new Map<RecruitmentDomain, number>();
+    for (const ad of ads) counts.set(ad.domain, (counts.get(ad.domain) ?? 0) + 1);
+    return {
+      presentDomains: RECRUITMENT_DOMAINS.filter((d) => counts.has(d)),
+      domainCounts: counts,
+    };
+  }, [ads]);
   const showFilter = ads.length >= FILTER_MIN_ADS && presentDomains.length > 1;
 
   // Un filtre sur un pôle vidé par une suppression laisserait une liste vide
@@ -317,10 +333,16 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
 
   // Une seule mise en avant est servie à la fois (la plus haute active). On dit
   // au staff laquelle est réellement en ligne, plutôt que de le laisser croire
-  // que ses trois « modales à l'arrivée » s'affichent toutes.
-  const highlightStates = useMemo(() => resolveHighlightStates(ads), [ads]);
-  // Annonce actuellement mise en avant sur le site, pour l'avertissement du formulaire.
-  const highlightedAd = useMemo(() => selectHighlightedAd(ads), [ads]);
+  // que ses trois « modales à l'arrivée » s'affichent toutes. Les badges et
+  // l'avertissement du formulaire étant réservés à la gestion, rien n'est
+  // calculé pour un visiteur ordinaire.
+  const { highlightStates, highlightedAd } = useMemo(
+    () =>
+      isAdmin
+        ? { highlightStates: resolveHighlightStates(ads), highlightedAd: selectHighlightedAd(ads) }
+        : { highlightStates: EMPTY_HIGHLIGHT_STATES, highlightedAd: null },
+    [ads, isAdmin],
+  );
   // Annonce qui « prend la place » de celle en cours d'édition, le cas échéant.
   const conflictingAd =
     form.highlight !== "NONE" && form.active && highlightedAd && highlightedAd.id !== editing?.id
@@ -369,9 +391,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
                 aria-pressed={domainFilter === d}
               >
                 {RECRUITMENT_DOMAIN_LABELS[d]}
-                <span className={styles.filterCount}>
-                  {ads.filter((ad) => ad.domain === d).length}
-                </span>
+                <span className={styles.filterCount}>{domainCounts.get(d) ?? 0}</span>
               </button>
             ))}
           </div>
@@ -507,7 +527,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
         )}
       </section>
 
-      {detailAd && <AdDetailModal ad={detailAd} onClose={closeDetail} />}
+      {detailAd && <AdDetailModal key={detailAd.id} ad={detailAd} onClose={closeDetail} />}
 
       {open && (
         <div className={styles.modalOverlay} onClick={close} role="presentation">

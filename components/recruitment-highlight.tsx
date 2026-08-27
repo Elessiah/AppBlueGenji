@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { CyberButton } from "@/components/cyber";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
@@ -15,6 +16,16 @@ import styles from "./recruitment-highlight.module.css";
 
 /** Aperçu plus généreux qu'en carte : la modale a la place, mais pas un mur de texte. */
 const MODAL_PREVIEW_MAX = 320;
+
+/**
+ * Page où la modale d'accueil n'a plus lieu d'être : le visiteur y lit déjà les
+ * annonces. La lui imposer serait doublement fautif — elle relance quelqu'un de
+ * déjà venu, et elle se superpose à la modale de lecture d'une annonce ouverte
+ * par lien profond, deux boîtes de dialogue empilées dont l'ordre visuel et
+ * l'ordre d'ouverture ne coïncident pas. La banderole, non modale, reste
+ * affichée.
+ */
+const AD_PAGE_PATH = "/recrutement";
 
 /**
  * Met en avant, sur l'ensemble du site, l'annonce de recrutement urgente
@@ -37,6 +48,7 @@ const MODAL_PREVIEW_MAX = 320;
 export function RecruitmentHighlight() {
   const [ad, setAd] = useState<RecruitmentAd | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const onAdPage = usePathname() === AD_PAGE_PATH;
 
   useEffect(() => {
     let cancelled = false;
@@ -47,19 +59,9 @@ export function RecruitmentHighlight() {
         const found = data.ad;
         setAd(found);
         try {
-          if (found.highlight === "MODAL") {
-            // Modale prioritaire : une seule apparition par fenêtre de 7 jours et
-            // par utilisateur. On lit l'horodatage du dernier affichage…
-            const raw = localStorage.getItem(seenKey(found.id));
-            const seenAt = raw === null ? null : Number(raw);
-            if (!shouldShowRecruitmentModal(seenAt, Date.now())) {
-              setDismissed(true);
-            } else {
-              // …et on l'enregistre tout de suite : la modale « compte » comme vue
-              // même si l'utilisateur quitte la page sans la fermer.
-              localStorage.setItem(seenKey(found.id), String(Date.now()));
-            }
-          } else if (sessionStorage.getItem(dismissKey(found.id)) === "1") {
+          // La banderole se referme pour la session ; la modale a sa propre
+          // fenêtre hebdomadaire, arbitrée à l'affichage (effet ci-dessous).
+          if (found.highlight === "BANNER" && sessionStorage.getItem(dismissKey(found.id)) === "1") {
             setDismissed(true);
           }
         } catch {
@@ -73,6 +75,34 @@ export function RecruitmentHighlight() {
       cancelled = true;
     };
   }, []);
+
+  // Annonce dont la fenêtre hebdomadaire a déjà été arbitrée. Sans ce garde-fou,
+  // l'effet relirait l'horodatage qu'il vient d'écrire et refermerait aussitôt
+  // la modale qu'il vient d'ouvrir.
+  const decidedFor = useRef<number | null>(null);
+
+  // Décision d'affichage de la modale, prise au moment où elle deviendrait
+  // visible — et donc pas sur la page de recrutement, où elle est tue : une
+  // simple visite ne doit pas brûler la fenêtre de 7 jours sans rien montrer.
+  useEffect(() => {
+    if (!ad || ad.highlight !== "MODAL" || onAdPage || dismissed) return;
+    if (decidedFor.current === ad.id) return;
+    decidedFor.current = ad.id;
+    try {
+      // On lit l'horodatage du dernier affichage…
+      const raw = localStorage.getItem(seenKey(ad.id));
+      const seenAt = raw === null ? null : Number(raw);
+      if (!shouldShowRecruitmentModal(seenAt, Date.now())) {
+        setDismissed(true);
+      } else {
+        // …et on l'enregistre tout de suite : la modale « compte » comme vue
+        // même si l'utilisateur quitte la page sans la fermer.
+        localStorage.setItem(seenKey(ad.id), String(Date.now()));
+      }
+    } catch {
+      // Stockage indisponible (mode privé) : on affiche l'annonce.
+    }
+  }, [ad, onAdPage, dismissed]);
 
   function dismiss() {
     if (ad) {
@@ -89,11 +119,13 @@ export function RecruitmentHighlight() {
     setDismissed(true);
   }
 
-  const visible = Boolean(ad) && !dismissed && ad?.highlight === "MODAL";
+  const visible = Boolean(ad) && !dismissed && ad?.highlight === "MODAL" && !onAdPage;
   // Le hook doit être appelé à chaque rendu : il ne s'active que si `open`.
   const dialogRef = useDialogBehavior({ open: visible, onClose: dismiss });
 
   if (!ad || dismissed || ad.highlight === "NONE") return null;
+  // La modale se tait sur la page de recrutement (voir `AD_PAGE_PATH`).
+  if (ad.highlight === "MODAL" && onAdPage) return null;
 
   const meta = [ad.teamName, RECRUITMENT_DOMAIN_LABELS[ad.domain], ad.roles]
     .filter(Boolean)

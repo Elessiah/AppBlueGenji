@@ -375,7 +375,7 @@ export function formatRecruitmentBody(body: string | null | undefined): Recruitm
 
     if (line.length <= HEADING_MAX && /[:：]$/u.test(line)) {
       flushParagraph();
-      // L'intertitre est stocké sans son deux-points : l'affichage le remet.
+      // Le deux-points est retiré : l'intertitre est rendu en eyebrow, où il jurerait.
       blocks.push({ kind: "heading", text: line.replace(/\s*[:：]$/u, "") });
       continue;
     }

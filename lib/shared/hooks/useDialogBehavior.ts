@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { createDialogStack, type ScrollLockTarget } from "@/lib/shared/dialog-stack";
 
 interface DialogBehaviorOptions {
   /** La boîte de dialogue est-elle montée / visible ? */
@@ -15,8 +16,29 @@ interface DialogBehaviorOptions {
 }
 
 /**
+ * Verrou de défilement de la page. Les accesseurs ne touchent au DOM qu'à
+ * l'appel, jamais à l'import : le module reste chargeable côté serveur.
+ */
+const bodyScrollLock: ScrollLockTarget = {
+  get: () => document.body.style.overflow,
+  set: (value) => {
+    document.body.style.overflow = value;
+  },
+};
+
+/**
+ * Pile partagée par **toutes** les boîtes de dialogue de l'application : c'est
+ * elle qui décide quand poser et lever le verrou de défilement, et laquelle des
+ * couches ouvertes traite `Échap` (voir `lib/shared/dialog-stack.ts`).
+ */
+const dialogStack = createDialogStack(bodyScrollLock);
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
  * Comportement commun des boîtes de dialogue modales : fermeture par `Échap`,
- * verrouillage du défilement de l'arrière-plan tant que la modale est ouverte,
+ * verrouillage du défilement de l'arrière-plan tant qu'une modale est ouverte,
  * et restitution du focus à l'élément qui l'avait avant l'ouverture.
  *
  * Renvoie une `ref` à poser sur le conteneur de la modale : le focus y est
@@ -24,9 +46,9 @@ interface DialogBehaviorOptions {
  * conteneur lui-même), et le focus clavier y est **piégé** — `Tab` et
  * `Maj+Tab` bouclent à l'intérieur au lieu de repartir dans la page derrière.
  *
- * Le verrouillage du défilement restaure la valeur exacte trouvée sur
- * `document.body` plutôt que de la vider : si plusieurs couches la manipulent,
- * on ne veut pas effacer le réglage de la couche précédente.
+ * Plusieurs modales peuvent se superposer (la mise en avant urgente par-dessus
+ * une annonce ouverte en lecture, par exemple) : seule celle du dessus répond au
+ * clavier, et le défilement n'est rendu qu'à la fermeture de la dernière.
  */
 export function useDialogBehavior({ open, onClose, locked = false }: DialogBehaviorOptions) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -40,25 +62,24 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
   useEffect(() => {
     if (!open) return;
 
+    const token = Symbol("dialog");
     const previouslyFocused = document.activeElement as HTMLElement | null;
-
-    // Défilement de l'arrière-plan gelé le temps de la lecture.
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    dialogStack.push(token);
 
     // Focus initial : premier élément focalisable de la modale, sinon le
     // conteneur (rendu focalisable par `tabIndex={-1}` côté appelant).
     const focusables = () =>
-      Array.from(
-        containerRef.current?.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ) ?? [],
-      ).filter((el) => el.offsetParent !== null || el === document.activeElement);
+      Array.from(containerRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []).filter(
+        (el) => el.offsetParent !== null || el === document.activeElement,
+      );
 
-    const first = focusables()[0];
-    (first ?? containerRef.current)?.focus();
+    (focusables()[0] ?? containerRef.current)?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
+      // Les écouteurs de toutes les couches vivent sur `window` : seule celle du
+      // dessus doit réagir, sinon un `Échap` les fermerait toutes d'un coup.
+      if (!dialogStack.isTop(token)) return;
+
       if (event.key === "Escape") {
         if (lockedRef.current) return;
         event.stopPropagation();
@@ -97,7 +118,7 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
     window.addEventListener("keydown", onKeyDown, true);
     return () => {
       window.removeEventListener("keydown", onKeyDown, true);
-      document.body.style.overflow = previousOverflow;
+      dialogStack.pop(token);
       // Retour au déclencheur : sans ça, le focus repart en tête de document.
       previouslyFocused?.focus?.();
     };

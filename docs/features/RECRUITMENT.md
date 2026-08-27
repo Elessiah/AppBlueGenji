@@ -97,17 +97,40 @@ sont :
 | Ligne commençant par `-`, `–`, `—`, `•` ou `*` | Puce (les lignes vides entre puces ne coupent pas la liste) |
 | Reste | Paragraphe (sauts de ligne conservés) |
 
+> Le `line-clamp` de la carte est un simple garde-fou d'affichage : il doit
+> rester **au-dessus** de ce que l'aperçu occupe réellement (240 signes ≈ 7
+> lignes dans la carte la plus étroite). Réglé plus bas, il tranche du texte que
+> `buildRecruitmentPreview` avait jugé complet — et fait disparaître l'ellipse
+> elle-même — sans qu'aucun lien « lire la suite » ne s'affiche.
+
 **Lien profond.** Chaque carte porte l'ancre `annonce-<id>`
 (`recruitmentAdAnchor`). Charger `/recrutement#annonce-12` ouvre directement
 l'annonce en grand (`parseRecruitmentAdAnchor`, qui refuse tout fragment forgé) ;
-ouvrir une annonce met l'URL à jour en `replaceState`, la fermer la nettoie. La
-banderole et la modale de mise en avant pointent vers ce lien.
+ouvrir une annonce met l'URL à jour en `replaceState`, la fermer la nettoie. Le
+fragment fait foi **dans les deux sens** : s'il cesse de désigner une annonce, la
+lecture se referme. Un lien partagé vers une annonce supprimée ou dépubliée est
+signalé par un toast plutôt que par une page muette. La banderole et la modale de
+mise en avant pointent vers ce lien.
 
 **Comportement modal.** Les trois modales de la fonctionnalité (lecture,
 formulaire de gestion, mise en avant) partagent
 `useDialogBehavior` (`lib/shared/hooks/useDialogBehavior.ts`) : fermeture par
 `Échap`, piège à focus, défilement de l'arrière-plan gelé, focus rendu au
 déclencheur à la fermeture.
+
+Elles peuvent se **superposer** (la mise en avant urgente par-dessus une annonce
+ouverte en lecture), ce qui impose de les arbitrer globalement plutôt que couche
+par couche. C'est le rôle de `createDialogStack` (`lib/shared/dialog-stack.ts`,
+pure et testée) :
+
+- le verrou de défilement est posé à l'entrée de la **première** couche et levé à
+  la sortie de la **dernière**. Une restauration couche par couche dépendrait de
+  l'ordre de démontage — React nettoie dans l'ordre de l'arbre, pas dans l'ordre
+  d'ouverture — et pouvait laisser `overflow: hidden` en place, page bloquée ;
+- seule la couche du dessus (`isTop`) traite `Échap`. Les écouteurs vivent tous
+  sur `window`, où `stopPropagation()` ne coupe pas les voisins attachés au même
+  nœud : sans cet arbitrage, une seule touche fermait aussi la mise en avant
+  urgente — et grillait sa fenêtre d'anti-répétition de 7 jours.
 
 **Filtre par pôle.** Au-delà de 3 annonces couvrant au moins deux pôles, une
 rangée de pastilles filtre la liste. Le réordonnancement admin est désactivé tant
@@ -122,10 +145,12 @@ qu'un filtre est actif : les flèches portent sur l'ordre réel, pas sur la vue.
 ### Plusieurs annonces urgentes ?
 
 Une **seule** annonce est mise en avant à la fois : la première annonce active
-dont `highlight <> 'NONE'`, selon `display_order`
-(`getHighlightedAd()`, `LIMIT 1`). Le composant client `RecruitmentHighlight`,
-monté dans le layout racine, récupère cette annonce via
-`GET /api/recruitment/highlight`.
+dont `highlight <> 'NONE'`, selon `display_order`. `getHighlightedAd()` ne refait
+pas ce choix — sa requête remonte les candidates dans l'ordre d'affichage et
+délègue l'arbitrage à `selectHighlightedAd()`, **la même fonction pure** que les
+badges de gestion : les deux ne peuvent donc pas désigner des annonces
+différentes. Le composant client `RecruitmentHighlight`, monté dans le layout
+racine, récupère le résultat via `GET /api/recruitment/highlight`.
 
 Marquer trois annonces « Modale à l'arrivée » n'empile donc pas trois modales :
 la plus haute gagne, les autres **attendent leur tour**. Le mode ne joue aucun
@@ -202,6 +227,7 @@ barre d'actions de l'en-tête.
 - `components/recruitment/RecruitmentBody.tsx` — rendu des blocs de description
 - `components/recruitment/ContactTags.tsx` — tags de contact partagés carte / modale
 - `lib/shared/hooks/useDialogBehavior.ts` — Échap, piège à focus, verrou de défilement
+- `lib/shared/dialog-stack.ts` — pile des modales ouvertes (verrou global, arbitrage d'`Échap`)
 - `components/cyber/landing/PublicNavMenu.tsx` — menu burger
 
 ## Jeu de test

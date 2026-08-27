@@ -5,6 +5,7 @@ import {
   type RecruiterContactDefaults,
   type RecruitmentAd,
   type RecruitmentAdInput,
+  selectHighlightedAd,
   validateRecruitmentAdInput,
 } from "@/lib/shared/recruitment";
 
@@ -74,6 +75,12 @@ export async function listRecruitmentAds(includeInactive = false): Promise<Recru
  * la première annonce active dont le mode de mise en avant n'est pas `NONE`,
  * selon l'ordre d'affichage. Retourne `null` si aucune ou si la base est
  * injoignable.
+ *
+ * Le choix lui-même n'est pas refait ici : la requête ne fait que remonter les
+ * candidates dans l'ordre d'affichage, et c'est `selectHighlightedAd` — la même
+ * fonction pure que l'interface de gestion utilise pour ses badges — qui désigne
+ * la gagnante. Sans ça, un jour où l'un des deux tris change, les badges
+ * annonceraient « en ligne » une autre annonce que celle réellement servie.
  */
 export async function getHighlightedAd(): Promise<RecruitmentAd | null> {
   try {
@@ -82,10 +89,9 @@ export async function getHighlightedAd(): Promise<RecruitmentAd | null> {
       `SELECT ${SELECT_COLUMNS}
        FROM bg_recruitment_ads
        WHERE active = 1 AND highlight <> 'NONE'
-       ORDER BY display_order ASC, id ASC
-       LIMIT 1`,
+       ORDER BY display_order ASC, id ASC`,
     );
-    return rows.length > 0 ? fromRow(rows[0]) : null;
+    return selectHighlightedAd((rows ?? []).map(fromRow));
   } catch {
     return null;
   }

@@ -157,7 +157,10 @@
 
 /* Aperçu seulement : la description complète s'ouvre en modale. La coupe est
    déjà faite en amont (`buildRecruitmentPreview`) ; le `line-clamp` n'est qu'un
-   garde-fou d'affichage pour que toutes les cartes gardent la même allure. */
+   garde-fou d'affichage. Il doit rester au-dessus de ce que l'aperçu occupe
+   réellement (240 signes ≈ 7 lignes dans la carte la plus étroite, 276 px de
+   contenu) : plus bas, il tranche du texte que la coupe avait jugé complet, et
+   l'ellipse elle-même disparaît. */
 .cardBody {
   margin: 4px 0 0;
   font-family: var(--font-sans);
@@ -167,8 +170,8 @@
   overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 5;
-  line-clamp: 5;
+  -webkit-line-clamp: 7;
+  line-clamp: 7;
   overflow: hidden;
 }
 
