@@ -16,8 +16,11 @@ interface BracketPreviewProps {
 }
 
 /**
- * Ce que devient la ligne quand elle n'est pas un affrontement ordinaire.
- * Formulations neutres : l'engagé est une équipe ou un joueur selon le tournoi.
+ * Ce qu'affiche la place de l'adversaire quand il n'y en a pas. Formulations
+ * neutres : l'engagé est une équipe ou un joueur selon le tournoi.
+ *
+ * `BARRAGE` complète le tableau — un barrage oppose toujours deux engagés, sa
+ * place vide n'existe donc pas en pratique, et le libellé du round le dit déjà.
  */
 const KIND_LABELS: Record<Exclude<PreviewPairingKind, "MATCH">, string> = {
   BYE: "Passe le tour",
@@ -25,12 +28,26 @@ const KIND_LABELS: Record<Exclude<PreviewPairingKind, "MATCH">, string> = {
   REST: "Ne joue pas",
 };
 
+/**
+ * Quatre colonnes fixes : rang, engagé, séparateur, engagé. Les colonnes de
+ * `.table-row` (1.6fr 1fr 1fr 1fr) donneraient au rang la part la plus large.
+ *
+ * La nature de la ligne (exemption, repos) occupe la place de l'adversaire
+ * absent plutôt qu'une cinquième colonne : sur mobile, une colonne de plus
+ * écraserait les deux noms à quelques pixels.
+ */
+const ROW_GRID = "28px minmax(0, 1fr) 24px minmax(0, 1fr)";
+
 function EntrantCell({ pairing, side }: { pairing: PreviewPairing; side: "A" | "B" }) {
   const entrant = side === "A" ? pairing.teamA : pairing.teamB;
 
-  // Emplacement vide : la nature de la ligne est portée par sa pastille, pas ici.
+  // Emplacement vide : dire ce qui se passe vaut mieux qu'un tiret muet.
   if (!entrant) {
-    return <span style={{ color: "var(--text-2)" }}>—</span>;
+    return (
+      <span style={{ color: "var(--text-2)", fontStyle: "italic" }}>
+        {pairing.kind === "MATCH" ? "—" : KIND_LABELS[pairing.kind]}
+      </span>
+    );
   }
 
   return (
@@ -55,7 +72,8 @@ export function BracketPreview({ preview, canReorder }: BracketPreviewProps) {
   const wording = useParticipantWording();
 
   return (
-    <div
+    <section
+      aria-label="Aperçu du plateau avant lancement"
       style={{
         border: "1px dashed var(--line-strong-cy, rgba(90,200,255,0.35))",
         borderRadius: "var(--r-cy-md, 10px)",
@@ -90,11 +108,19 @@ export function BracketPreview({ preview, canReorder }: BracketPreviewProps) {
         </Pill>
       </div>
 
-      <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--text-2)", lineHeight: 1.6 }}>
+      <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--text-2)", lineHeight: 1.6 }}>
         Voici les appariements qu&apos;un lancement immédiat produirait. Ils se recalculent à
         chaque inscription et à chaque changement de seeding
         {canReorder ? ", que vous pouvez ajuster dans le bloc « Seeding » ci-dessous" : ""}.
       </p>
+
+      {canReorder && preview.seedingSource === "RANKING" && (
+        <p style={{ margin: "0 0 14px", fontSize: 12, color: "var(--text-2)", lineHeight: 1.6 }}>
+          Ce format se seede sur le classement du site : l&apos;ordre affiché dans le bloc
+          « Seeding » est celui des inscriptions et ne prendra effet qu&apos;au premier
+          réordonnancement.
+        </p>
+      )}
 
       {preview.phasePlan && preview.phasePlan.length > 0 && (
         <ul
@@ -154,7 +180,13 @@ export function BracketPreview({ preview, canReorder }: BracketPreviewProps) {
                 <div
                   key={pairing.position}
                   className="table-row"
-                  style={{ alignItems: "center", gap: 10 }}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: ROW_GRID,
+                    alignItems: "center",
+                    gap: 10,
+                    fontSize: 13,
+                  }}
                 >
                   <span className="num" style={{ minWidth: 28, color: "var(--text-2)" }}>
                     {pairing.position}
@@ -171,11 +203,6 @@ export function BracketPreview({ preview, canReorder }: BracketPreviewProps) {
                     {pairing.kind === "MATCH" || pairing.kind === "BARRAGE" ? "vs" : "·"}
                   </span>
                   <EntrantCell pairing={pairing} side="B" />
-                  {pairing.kind !== "MATCH" && (
-                    <span style={{ justifySelf: "end" }}>
-                      <Pill variant="blue">{KIND_LABELS[pairing.kind]}</Pill>
-                    </span>
-                  )}
                 </div>
               ))}
             </div>
@@ -188,6 +215,6 @@ export function BracketPreview({ preview, canReorder }: BracketPreviewProps) {
           Aucun appariement à afficher pour l&apos;instant : il faut au moins deux inscriptions.
         </p>
       )}
-    </div>
+    </section>
   );
 }
