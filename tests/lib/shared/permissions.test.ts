@@ -17,6 +17,7 @@ describe("permissions", () => {
       expect(isPlatformRole("ARBITRE")).toBe(true);
       expect(isPlatformRole("COMMUNITY_MANAGER")).toBe(true);
       expect(isPlatformRole("RECRUTEUR")).toBe(true);
+      expect(isPlatformRole("CASTER")).toBe(true);
       expect(isPlatformRole("OWNER")).toBe(false);
       expect(isPlatformRole("admin")).toBe(false);
       expect(isPlatformRole(42)).toBe(false);
@@ -55,19 +56,22 @@ describe("permissions", () => {
 
   describe("permissionsForRoles", () => {
     it("maps each role to its scope", () => {
-      expect([...permissionsForRoles(["ARBITRE"])]).toEqual(["tournaments"]);
+      // L'arbitre pilote le tournoi : il ouvre aussi l'antenne.
+      expect([...permissionsForRoles(["ARBITRE"])]).toEqual(["tournaments", "live"]);
       expect([...permissionsForRoles(["COMMUNITY_MANAGER"])]).toEqual(["showcase"]);
       expect([...permissionsForRoles(["RECRUTEUR"])]).toEqual(["recruitment"]);
+      // Le caster ne peut QUE diffuser : ni scores, ni tournois.
+      expect([...permissionsForRoles(["CASTER"])]).toEqual(["live"]);
     });
 
     it("grants every scope to ADMIN", () => {
       const perms = permissionsForRoles(["ADMIN"]);
-      expect(perms).toEqual(new Set(["tournaments", "showcase", "recruitment", "roles"]));
+      expect(perms).toEqual(new Set(["tournaments", "showcase", "recruitment", "live", "roles"]));
     });
 
     it("cumulates permissions across roles", () => {
       const perms = permissionsForRoles(["ARBITRE", "RECRUTEUR"]);
-      expect(perms).toEqual(new Set(["tournaments", "recruitment"]));
+      expect(perms).toEqual(new Set(["tournaments", "live", "recruitment"]));
     });
 
     it("returns an empty set for no roles", () => {
