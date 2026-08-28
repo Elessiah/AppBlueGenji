@@ -229,6 +229,31 @@ function seedingOrderOf(registrations: TournamentSnapshot["registrations"]): str
   return registrations.map((row) => `${row.teamId}:${row.seed ?? ""}`).join("|");
 }
 
+/**
+ * La charge utile relue en REST apporte-t-elle quelque chose ?
+ *
+ * Sans déduplication, chaque sondage de secours redessinerait l'arbre entier —
+ * 254 matchs sur un gros plateau — alors que rien n'a bougé. La version de
+ * l'instantané suffit à le dire.
+ *
+ * Mais la charge porte **deux moitiés qui ne changent pas ensemble** :
+ * l'instantané, partagé, et le contexte du lecteur — droits, aperçu du plateau —
+ * qui n'a pas de version à lui. Quand c'est la seconde qu'on vient chercher
+ * (`wantsViewerContext`), la première est presque toujours identique : le flux
+ * vient de pousser cette version-là, c'est même ce qui a déclenché la relecture.
+ * Déduire de l'égalité des versions qu'il n'y a rien à prendre jetterait alors
+ * systématiquement ce qu'on était venu chercher — un ordre de tirage réorganisé
+ * par l'arbitre resterait figé sur l'écran du caster jusqu'au rechargement.
+ */
+export function shouldCommitFetched(
+  current: TournamentDetail | null,
+  payload: TournamentDetail,
+  wantsViewerContext: boolean,
+): boolean {
+  if (wantsViewerContext || !current) return true;
+  return !payload.version || payload.version !== current.version;
+}
+
 /** Plafond exponentiel de départ, en millisecondes. */
 export const RECONNECT_BASE_MS = 1_000;
 /** Plafond de l'attente. Au-delà, on retente simplement toutes les minutes. */

@@ -10,6 +10,7 @@ import {
   INITIAL_LIVE_STATE,
   parseLiveMessage,
   reconnectDelayMs,
+  shouldCommitFetched,
   shouldPlayScoreReady,
   shouldRefreshViewerContext,
   type LiveFailure,
@@ -70,9 +71,13 @@ export function useTournamentLive(tournamentId: number) {
    * Lecture REST. Chemin de secours uniquement : le flux se suffit à lui-même.
    * `silent` tait la notification d'erreur des rafraîchissements automatiques —
    * un incident réseau passager n'a pas à couvrir l'écran d'alertes.
+   *
+   * `force` dit qu'on vient chercher le **contexte du lecteur**, dont la charge
+   * peut parfaitement porter une version d'instantané déjà connue — c'est même
+   * le cas nominal. `shouldCommitFetched` tranche.
    */
   const load = useCallback(
-    async (silent = false): Promise<LiveFailure | null> => {
+    async (silent = false, force = false): Promise<LiveFailure | null> => {
       lastFetchAtRef.current = Date.now();
       try {
         const response = await fetch(`/api/tournaments/${tournamentId}`, { cache: "no-store" });
@@ -86,10 +91,7 @@ export function useTournamentLive(tournamentId: number) {
           throw new Error(payload.error || "TOURNAMENT_LOAD_FAILED");
         }
 
-        // Même déduplication que le chemin SSE : sans elle, chaque sondage de
-        // secours redessinerait l'arbre entier — 254 matchs sur un gros
-        // plateau — alors que rien n'a bougé.
-        if (payload.version && payload.version === stateRef.current.detail?.version) return null;
+        if (!shouldCommitFetched(stateRef.current.detail, payload, force)) return null;
         commit({ tier: stateRef.current.tier, detail: payload });
         return null;
       } catch (e) {
@@ -111,7 +113,10 @@ export function useTournamentLive(tournamentId: number) {
    */
   const refresh = useCallback(async () => {
     const before = stateRef.current.detail?.myTeamId ?? null;
-    await load(true);
+    // `force` : l'instantané poussé par le flux peut avoir devancé cette
+    // lecture, et c'est le contexte du lecteur — droits de report, aperçu —
+    // qu'on vient rafraîchir.
+    await load(true, true);
 
     if ((stateRef.current.detail?.myTeamId ?? null) !== before) {
       reconnectRef.current?.();
@@ -230,7 +235,9 @@ export function useTournamentLive(tournamentId: number) {
           shouldRefreshViewerContext(previous, message.snapshot);
 
         commit(applyLiveMessage(stateRef.current, message));
-        if (stalePreview) void load(true);
+        // `force` : on vient de commiter cette version, la déduplication par
+        // version rejetterait la relecture avant d'en avoir pris l'aperçu.
+        if (stalePreview) void load(true, true);
       };
 
       source.onerror = () => {

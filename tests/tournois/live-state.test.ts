@@ -13,6 +13,7 @@ import {
   applyLiveMessage,
   fatalFailure,
   parseLiveMessage,
+  shouldCommitFetched,
   shouldRefreshViewerContext,
   reconnectDelayMs,
   shouldPlayScoreReady,
@@ -461,5 +462,39 @@ describe("reconnectDelayMs", () => {
     expect(reconnectDelayMs(1, () => 0)).toBe(RECONNECT_MIN_MS);
     expect(reconnectDelayMs(0, () => 0)).toBe(RECONNECT_MIN_MS);
     expect(reconnectDelayMs(-3, () => 0)).toBe(RECONNECT_MIN_MS);
+  });
+});
+describe("shouldCommitFetched", () => {
+  const detail = (version: string, preview: unknown = null) =>
+    ({ ...snapshot(), ...viewer(), version, preview }) as unknown as TournamentDetail;
+
+  it("prend la charge quand rien n'est encore affiché", () => {
+    expect(shouldCommitFetched(null, detail("v1"), false)).toBe(true);
+  });
+
+  it("prend la charge quand l'instantané a changé", () => {
+    expect(shouldCommitFetched(detail("v1"), detail("v2"), false)).toBe(true);
+  });
+
+  it("écarte une version déjà affichée", () => {
+    // Sans cette déduplication, chaque sondage de secours redessinerait
+    // l'arbre entier — 254 matchs sur un gros plateau — alors que rien n'a
+    // bougé.
+    expect(shouldCommitFetched(detail("v1"), detail("v1"), false)).toBe(false);
+  });
+
+  it("prend la charge malgré une version identique quand on vient chercher le contexte", () => {
+    // Le cas nominal de la relecture d'aperçu : le flux vient de pousser cette
+    // version — c'est même ce qui a déclenché la relecture. Se fier à l'égalité
+    // des versions jetterait systématiquement le contexte du lecteur, et un
+    // ordre de tirage réorganisé resterait figé sur l'écran du caster.
+    expect(shouldCommitFetched(detail("v1", { entrants: [] }), detail("v1"), true)).toBe(true);
+  });
+
+  it("prend la charge quand le serveur ne date pas son instantané", () => {
+    // Une charge sans version ne prouve rien : la déduire identique laisserait
+    // la page sur une donnée périmée sans moyen d'en sortir.
+    const stale = { ...detail("v1"), version: "" } as TournamentDetail;
+    expect(shouldCommitFetched(detail("v1"), stale, false)).toBe(true);
   });
 });
