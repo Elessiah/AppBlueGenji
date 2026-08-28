@@ -70,6 +70,12 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
 
   const lastIndex = progress.stages.length - 1;
 
+  // Le champion nomme mieux la fin qu'une paraphrase de l'étape courante, déjà
+  // écrite en tête du bloc.
+  const champion = isFinished
+    ? (detail.registrations.find((reg) => reg.finalRank === 1)?.teamName ?? null)
+    : null;
+
   return (
     <div className="ds-block">
       <div className="ds-section-title green">
@@ -81,10 +87,8 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
           <span className={styles.headLabel}>{currentStage.label}</span>
           <span className={styles.headHint}>{currentStage.hint}</span>
         </div>
-        <span
-          className={styles.percent}
-          aria-hidden="true"
-        >
+        {/* Doublon de l'`aria-valuetext` de la barre : muet au lecteur d'écran. */}
+        <span className={styles.percent} aria-hidden="true">
           {percent}%
         </span>
       </div>
@@ -92,6 +96,7 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
       <ScrollArea
         orientation="x"
         subtle
+        fade
         ariaLabel="Frise de progression du tournoi — défilement horizontal"
       >
         <div
@@ -151,15 +156,26 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
 
       <p className={styles.foot}>
         {isFinished ? (
-          <span className={styles.footStrong}>Tournoi terminé — classement final figé.</span>
-        ) : progress.next ? (
+          champion ? (
+            <>
+              <span>Vainqueur :</span>
+              <span className={styles.footStrong}>{champion}</span>
+            </>
+          ) : (
+            <span>Le tournoi est clos.</span>
+          )
+        ) : progress.next?.at ? (
           <>
             <span>Prochaine étape :</span>
             <span className={styles.footStrong}>{progress.next.label}</span>
-            {progress.next.at && <span>· {shortDateTime(progress.next.at)}</span>}
+            <span>· {shortDateTime(progress.next.at)}</span>
             {countdown && <span>· {countdown}</span>}
           </>
-        ) : null}
+        ) : (
+          // Reste le seul jalon sans horaire annoncé : la fin, qui dépend du
+          // dernier match joué.
+          <span>Le tournoi se clôturera une fois tous les matchs joués.</span>
+        )}
       </p>
     </div>
   );
