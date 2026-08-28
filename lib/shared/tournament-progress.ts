@@ -85,9 +85,10 @@ type ProgressCard = Pick<
 export type TournamentProgressOptions = {
   now?: number;
   /**
-   * Avancement interne d'un tournoi en cours, de 0 à 1 (proportion de matchs
-   * joués). Le déroulement n'a pas de date de fin annoncée : sans cette valeur
-   * la barre stagne au seuil « En cours » jusqu'à la clôture.
+   * Avancement interne d'un tournoi en cours, de 0 à 1 — typiquement le retour
+   * de `computeRunningRatio`, dont la mesure dépend du format. Le déroulement
+   * n'a pas de date de fin annoncée : sans cette valeur la barre stagne au
+   * seuil « En cours » jusqu'à la clôture.
    */
   playedRatio?: number;
 };
