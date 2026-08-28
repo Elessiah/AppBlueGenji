@@ -170,10 +170,12 @@ function eliminationRounds(
   format: "SINGLE" | "DOUBLE",
   bracketSize: number,
   maxRounds: number | null | undefined,
-): number | null {
-  if (format === "DOUBLE") return null;
+): { rounds: number | null; truncated: boolean } {
   const fullRounds = Math.round(Math.log2(bracketSize));
-  return maxRounds ? Math.min(fullRounds, maxRounds) : fullRounds;
+  if (format === "DOUBLE") return { rounds: null, truncated: false };
+
+  const rounds = maxRounds ? Math.min(fullRounds, maxRounds) : fullRounds;
+  return { rounds, truncated: rounds < fullRounds };
 }
 
 /** Élimination simple ou double : placement des têtes de série au premier tour. */
@@ -206,8 +208,8 @@ function previewElimination(
       `Plateau de ${bracketSize} : ${plural(byeCount, "exemption")} de premier tour (bye).`,
     );
   }
-  const rounds = eliminationRounds(format, bracketSize, input.maxRounds);
-  if (rounds !== null && rounds < Math.round(Math.log2(bracketSize))) {
+  const { rounds, truncated } = eliminationRounds(format, bracketSize, input.maxRounds);
+  if (truncated && rounds !== null) {
     notes.push(
       `Plateau tronqué : ${plural(rounds, "tour")} joué${rounds > 1 ? "s" : ""}, le reste des engagés étant qualifié pour la phase suivante.`,
     );
@@ -226,7 +228,7 @@ function previewElimination(
     roundsUnit: "tour",
     pairings,
     bracketSize,
-    rounds: eliminationRounds(format, bracketSize, input.maxRounds),
+    rounds,
     byeCount,
     notes,
     phasePlan: null,
