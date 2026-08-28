@@ -277,6 +277,16 @@ main dans `site-visits-service.ts`, s'appuie maintenant sur le même module.
   données viennent du hook. Remplacé par le vrai rafraîchissement.
 - **Le battement de cœur SSE** est une ligne de commentaire (`: ping`) et non un
   message JSON : elle traverse les proxys sans réveiller le client.
+- **Un tournoi disparu ferme les flux.** Un instantané introuvable ne veut pas
+  dire « rien de neuf » : il veut dire qu'il n'y a plus rien à suivre. La salle
+  distingue ce cas d'un simple incident de lecture (où se taire et retenter est
+  correct) et termine les connexions — sans quoi chaque spectateur garderait une
+  pastille « Direct » devant un plateau figé, son chemin d'échec définitif ne se
+  déclenchant que si le flux tombe.
+- **La place de flux est rendue par trois portes** : l'abandon détecté avant
+  construction, le signal de la requête, et l'annulation du corps de la réponse
+  (`cancel`). N'en brancher que certaines laissait la place prise — et quatre
+  occurrences valent un 429 permanent sur son propre tournoi.
 - **Un signal déjà avorté ne déclenche jamais son écouteur** : la route de flux
   teste `req.signal.aborted` avant de s'y abonner. Sans ce contrôle, un client
   qui abandonne pendant les attentes qui précèdent (session, instantané,

@@ -16,7 +16,7 @@
  * (`tournaments/snapshot`), l'encode une fois, et écrit la même trame à tous
  * les abonnés. Le coût en base devient indépendant du nombre de spectateurs.
  *
- * Trois réglages complètent le dispositif :
+ * Quatre réglages complètent le dispositif :
  *
  * - **Regroupement par palier** — les abonnés prioritaires (staff, engagés)
  *   reçoivent la mise à jour dans la seconde ; les spectateurs, par fenêtres
@@ -81,14 +81,17 @@ export const MAX_BUDGET_DELAY_MS = 60_000;
  * Attente imposée par le budget pour écrire `frameBytes` à `subscribers`
  * abonnés. Exportée pour être vérifiable directement.
  *
- * Elle se calcule sur **toute la salle**, jamais palier par palier. Un budget
- * par palier produisait une inversion : dans un tournoi à 128 équipes (154 ko
- * d'instantané), les 128 inscrits — tous prioritaires — héritaient d'une
- * fenêtre de 38 s quand la vingtaine de spectateurs était servie toutes les
- * 20 s. Les équipes qui jouent recevaient leur plateau deux fois moins souvent
- * que ceux qui les regardent, et ce dans les tournois où la promesse compte le
- * plus. Un plancher commun conserve l'ordre des paliers : prioritaire n'attend
- * jamais plus longtemps que spectateur.
+ L'appelant lui passe les abonnés **réellement dus**, tous paliers confondus,
+ * et applique le résultat comme plancher commun.
+ *
+ * Commun, parce qu'un plancher par palier renversait leur ordre : dans un
+ * tournoi à 128 équipes (154 ko d'instantané), les 128 inscrits — tous
+ * prioritaires — héritaient d'une fenêtre de 38 s quand la vingtaine de
+ * spectateurs était servie toutes les 20 s. Les équipes qui jouent recevaient
+ * leur plateau deux fois moins souvent que ceux qui les regardent.
+ *
+ * Sur les seuls abonnés dus, parce que réserver du budget pour des spectateurs
+ * qui ne recevront rien lors de cet envoi retarderait les joueurs pour rien.
  */
 export function budgetDelayMs(frameBytes: number, subscribers: number): number {
   if (subscribers <= 0 || frameBytes <= 0) return 0;
@@ -101,6 +104,12 @@ export type TournamentSubscriber = {
   tier: RefreshTier;
   /** Écrit une trame déjà encodée. Doit lever si la connexion est fermée. */
   send: (frame: Uint8Array) => void;
+  /**
+   * Termine la connexion. Appelé quand le tournoi a disparu : sans cela le flux
+   * resterait ouvert et sain, et le spectateur garderait une pastille
+   * « Direct » devant un plateau qui ne bougera plus jamais.
+   */
+  close?: () => void;
 };
 
 type TierState = { lastSentAt: number; lastVersion: string | null };
@@ -185,16 +194,41 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
 
   room.flushing = true;
   try {
-    const frame = await getTournamentSnapshotFrame(tournamentId).catch(() => null);
-    if (!frame || room.subscribers.size === 0) return;
+    // Une lecture en échec et un tournoi disparu rendaient tous deux `null` :
+    // dans le premier cas se taire et retenter est exactement ce qu'il faut,
+    // dans le second la salle battait indéfiniment devant un plateau mort,
+    // pendant que chaque spectateur gardait une pastille « Direct ». Le chemin
+    // d'échec définitif du client ne se déclenche que si le flux tombe : c'est
+    // donc à la salle de le faire tomber.
+    let frame: Awaited<ReturnType<typeof getTournamentSnapshotFrame>>;
+    try {
+      frame = await getTournamentSnapshotFrame(tournamentId);
+    } catch {
+      return; // Incident passager : le battement d'entretien réessaiera.
+    }
+
+    if (frame === null) {
+      closeGoneRoom(tournamentId, room);
+      return;
+    }
+    if (room.subscribers.size === 0) return;
 
     const now = Date.now();
     let nextDelay = Number.POSITIVE_INFINITY;
 
-    // Plancher commun à toute la salle : c'est le lien qu'on ménage, et il est
-    // partagé. Le calculer par palier ferait attendre les 128 inscrits d'un gros
+    // Plancher commun à toute la salle, calculé sur les seuls abonnés que la
+    // cadence de leur palier rend dus : réserver du budget pour des spectateurs
+    // qui ne recevront rien retarderait les joueurs pour rien. Commun, parce
+    // qu'un plancher par palier ferait attendre les 128 inscrits d'un gros
     // tournoi plus longtemps que la poignée de spectateurs qui les regarde.
-    const roomFloor = budgetDelayMs(frame.frame.byteLength, room.subscribers.size);
+    const dueAudience = [...room.subscribers].filter((subscriber) => {
+      const state = tierState(room, subscriber.tier);
+      return (
+        state.lastVersion !== frame.version &&
+        now - state.lastSentAt >= REFRESH_CADENCE[subscriber.tier].pushCoalesceMs
+      );
+    });
+    const roomFloor = budgetDelayMs(frame.frame.byteLength, dueAudience.length);
 
     for (const tier of activeTiers(room)) {
       const state = tierState(room, tier);
@@ -252,6 +286,26 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
       if (room.subscribers.size > 0) scheduleFlush(tournamentId, room, 0);
     }
   }
+}
+
+/**
+ * Le tournoi n'existe plus : on termine les flux et on ferme la salle.
+ *
+ * Fermer la connexion est ce qui remet le client sur son chemin d'échec
+ * définitif — sa lecture de secours verra le 404 et affichera « Tournoi
+ * introuvable » plutôt que de laisser un plateau figé se faire passer pour du
+ * direct.
+ */
+function closeGoneRoom(tournamentId: number, room: Room): void {
+  for (const subscriber of [...room.subscribers]) {
+    room.subscribers.delete(subscriber);
+    try {
+      subscriber.close?.();
+    } catch {
+      // Connexion déjà tombée : il n'y a plus rien à fermer.
+    }
+  }
+  closeRoom(tournamentId, room);
 }
 
 function openRoom(tournamentId: number): Room {

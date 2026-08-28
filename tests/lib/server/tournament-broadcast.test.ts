@@ -70,12 +70,19 @@ async function advance(ms: number): Promise<void> {
 
 function subscriber(tier: "PRIORITY" | "STANDARD" = "PRIORITY") {
   const received: string[] = [];
+  let closedTimes = 0;
   return {
     received,
+    get closedTimes() {
+      return closedTimes;
+    },
     handle: {
       tier,
       send: (frame: Uint8Array) => {
         received.push(new TextDecoder().decode(frame).trim());
+      },
+      close: () => {
+        closedTimes += 1;
       },
     },
   };
@@ -160,15 +167,34 @@ describe("tournament-broadcast — diffusion", () => {
     expect(getFrame).not.toHaveBeenCalled();
   });
 
-  it("survit à un instantané introuvable", async () => {
+  it("termine les flux quand le tournoi a disparu", async () => {
+    // Un instantané introuvable ne veut pas dire « rien de neuf » : il veut dire
+    // qu'il n'y a plus rien à suivre. Se taire laisserait chaque spectateur
+    // devant une pastille « Direct » et un plateau qui ne bougera plus jamais —
+    // et son chemin d'échec définitif ne se déclenche que si le flux tombe.
+    const viewer = subscriber();
+    joinTournamentRoom(1, viewer.handle);
+
     getFrame.mockResolvedValue(null);
+    publish();
+    await advance(0);
+
+    expect(viewer.closedTimes).toBe(1);
+    expect(tournamentAudience(1)).toBe(0);
+  });
+
+  it("ne ferme rien sur un simple incident de lecture", async () => {
+    // Une base momentanément indisponible n'est pas un tournoi supprimé : on se
+    // tait et on retentera au battement suivant.
+    getFrame.mockRejectedValue(new Error("DB_DOWN"));
     const viewer = subscriber();
     joinTournamentRoom(1, viewer.handle);
 
     publish();
     await advance(0);
 
-    expect(viewer.received).toEqual([]);
+    expect(viewer.closedTimes).toBe(0);
+    expect(tournamentAudience(1)).toBe(1);
   });
 
   it("survit à un échec de lecture", async () => {

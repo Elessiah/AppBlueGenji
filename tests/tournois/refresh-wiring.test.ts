@@ -17,9 +17,11 @@ const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
  * définitifs), `tournament-broadcast.test.ts` (mutualisation, paliers, budget,
  * cycle de vie des salles), `cache.test.ts` (vol unique, invalidation),
  * `tournament-schedule.test.ts` (reclassement, comparaison des paniers),
- * `tournament-snapshot-frame.test.ts` (trame SSE), `state-running-maintenance.test.ts`
- * (`stateChanged`). Recopier ici l'expression exacte que ces tests exercent déjà
- * ne protégerait rien et casserait au premier remaniement.
+ * `tournament-snapshot-frame.test.ts` (trame SSE), `tournament-snapshot.test.ts`
+ * (mutualisation, entretien à la lecture), `state-running-maintenance.test.ts`
+ * (`stateChanged`) et `app/api/tournaments/stream.test.ts` (accès, palier,
+ * plafonds, place de flux rendue). Recopier ici l'expression exacte que ces
+ * tests exercent déjà ne protégerait rien et casserait au premier remaniement.
  */
 const stream = read("app/api/tournaments/[id]/stream/route.ts");
 const hook = read("app/(secured)/tournois/[id]/_hooks/useTournamentLive.ts");
@@ -42,27 +44,12 @@ describe("flux SSE — le contrat de la route", () => {
     expect(stream).toMatch(/const isParticipant =[\s\S]*?registrations\.some/);
   });
 
-  it("passe par la salle partagée plutôt que par un abonnement direct", () => {
-    // Sinon chaque spectateur recalculerait le détail pour lui-même.
-    expect(stream).toContain("joinTournamentRoom(tournamentId, { tier, send: write })");
-  });
-
   it("plafonne les flux simultanés et leur rythme d'ouverture", () => {
     // Le second plafond n'est pas redondant : une fermeture libère aussitôt la
     // place, si bien qu'une boucle ouverture/fermeture échappe au premier.
     expect(stream).toContain("acquireStreamSlot(user.id)");
     expect(stream).toContain("enforceRateLimit(STREAM_OPEN_RULE, user.id)");
     expect(stream).toMatch(/status: 429/);
-  });
-
-  it("rend la place de flux par toutes les sorties", () => {
-    // Une place jamais rendue vaut, au bout de quatre fois, un 429 permanent sur
-    // son propre tournoi. Trois portes : l'abandon avant construction, le signal
-    // déjà avorté, et l'exception.
-    expect(stream).toMatch(/if \(req\.signal\.aborted\) \{\s*releaseSlot\(\);/);
-    expect(stream).toMatch(/if \(req\.signal\.aborted\) \{\s*cleanup\(\);\s*return;/);
-    expect(stream).toMatch(/\} catch \(error\) \{[\s\S]{0,600}?cleanup\(\);/);
-    expect(stream).toMatch(/const cleanup = \(\): void => \{[\s\S]*?releaseSlot\(\);/);
   });
 
   it("journalise une ouverture de flux impossible", () => {

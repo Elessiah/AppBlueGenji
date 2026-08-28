@@ -91,19 +91,27 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
 
   const encoder = new TextEncoder();
 
+  /**
+   * Nettoyage de la connexion, hissé hors de `start` pour que `cancel` puisse
+   * l'appeler.
+   *
+   * Le flux se termine par deux portes distinctes : le signal de la requête,
+   * quand le client se déconnecte, et l'annulation du corps de la réponse, quand
+   * c'est le runtime qui le referme. Ne brancher que la première laisse la place
+   * de flux prise par la seconde — et quatre occurrences valent un 429 permanent
+   * sur son propre tournoi.
+   */
+  let cleanup: () => void = () => undefined;
+
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       let closed = false;
       let leaveRoom: (() => void) | null = null;
       let heartbeat: ReturnType<typeof setInterval> | null = null;
 
-      /**
-       * Rend tout ce qui a été pris. Défini **avant** la première écriture : la
-       * place de flux ne doit survivre à aucune sortie, pas même celle d'une
-       * exception. Une place jamais rendue vaut, au bout de quatre fois, un 429
-       * permanent sur son propre tournoi.
-       */
-      const cleanup = (): void => {
+      // Renseigné **avant** la première écriture : la place de flux ne doit
+      // survivre à aucune sortie, pas même celle d'une exception.
+      cleanup = (): void => {
         if (closed) return;
         closed = true;
         if (heartbeat !== null) clearInterval(heartbeat);
@@ -137,7 +145,10 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
           ),
         );
 
-        leaveRoom = joinTournamentRoom(tournamentId, { tier, send: write });
+        // `close` sert au cas où le tournoi disparaît : la salle termine alors
+        // le flux, et le client bascule sur son écran « Tournoi introuvable »
+        // au lieu de contempler un plateau figé annoncé « Direct ».
+        leaveRoom = joinTournamentRoom(tournamentId, { tier, send: write, close: cleanup });
 
         heartbeat = setInterval(() => {
           try {
@@ -169,6 +180,9 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
         }
         cleanup();
       }
+    },
+    cancel() {
+      cleanup();
     },
   });
 
