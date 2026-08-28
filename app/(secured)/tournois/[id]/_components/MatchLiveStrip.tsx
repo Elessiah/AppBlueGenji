@@ -30,6 +30,10 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
   const state = resolveMatchLiveState(match);
   const platform = streamPlatform(match.liveUrl);
   const showToggle = canManage && canToggleOnAir(match);
+  // Les libellés visibles sont ultra-courts (la carte fait 210 px) : sortis de
+  // leur contexte visuel, « ⚙ Live » ou « Twitch » ne disent pas de quel match
+  // il s'agit. Chaque contrôle porte donc le nom du match.
+  const matchLabel = `${match.team1Name ?? "TBD"} contre ${match.team2Name ?? "TBD"}`;
 
   // Rien à montrer : match non casté et viewer sans droit de diffusion.
   if (state === "OFF" && !canManage) return null;
@@ -72,6 +76,7 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
     >
       {state !== "OFF" && (
         <span
+          role="status"
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -92,6 +97,9 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
           href={match.liveUrl}
           target="_blank"
           rel="noopener noreferrer"
+          aria-label={`Regarder ${matchLabel}${
+            platform ? ` sur ${PLATFORM_LABELS[platform]}` : ""
+          } (nouvel onglet)`}
           style={{ color: "var(--accent-blue, #59d4ff)", textDecoration: "underline" }}
         >
           {platform ? PLATFORM_LABELS[platform] : "Chaîne"}
@@ -104,6 +112,11 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
           className="btn"
           disabled={busy}
           onClick={() => void toggleOnAir(state !== "LIVE")}
+          aria-label={
+            state === "LIVE"
+              ? `Couper le direct de ${matchLabel}`
+              : `Lancer le direct de ${matchLabel}`
+          }
           style={{
             marginLeft: "auto",
             padding: "2px 8px",
@@ -112,7 +125,7 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
             borderColor: state === "LIVE" ? "rgba(255,74,92,0.45)" : "rgba(79,224,162,0.4)",
           }}
         >
-          {state === "LIVE" ? "■ Couper" : "▶ Antenne"}
+          {busy ? "…" : state === "LIVE" ? "■ Couper" : "▶ Antenne"}
         </button>
       )}
 
@@ -121,6 +134,11 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
           type="button"
           className="btn ghost"
           onClick={() => openConfig(match)}
+          aria-label={
+            match.liveTrigger === null
+              ? `Caster ${matchLabel}`
+              : `Configurer la diffusion de ${matchLabel}`
+          }
           style={{
             marginLeft: showToggle ? undefined : "auto",
             padding: "2px 8px",
