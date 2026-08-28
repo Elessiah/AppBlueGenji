@@ -676,14 +676,23 @@ export async function getTournamentDetail(
  * peuvent clore (élimination, survie, suisse, endurance, phases), on relit
  * l'état : une lecture indexée, sur un chemin d'écriture rare.
  *
+ * **Ne lève jamais.** Elle s'exécute après le commit : une erreur ici ferait
+ * répondre 500 pour un score pourtant enregistré, l'équipe le ressaisirait et
+ * se heurterait à `MATCH_ALREADY_COMPLETED`. Au pire, la liste garde son entrée
+ * quinze secondes de plus.
+ *
  * @param before État lu **avant** la transaction.
  */
 async function invalidateListsIfStateChanged(
   tournamentId: number,
   before: TournamentState | null,
 ): Promise<void> {
-  const after = await readTournamentState(tournamentId);
-  if (after !== before) invalidateTournamentLists();
+  try {
+    const after = await readTournamentState(tournamentId);
+    if (after !== before) invalidateTournamentLists();
+  } catch {
+    // Le cache expirera de lui-même : rien ne justifie de perdre l'écriture.
+  }
 }
 
 /** État courant d'un tournoi, ou `null` s'il n'existe pas / plus. */

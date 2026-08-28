@@ -157,8 +157,17 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
         }
         req.signal.addEventListener("abort", cleanup);
       } catch (error) {
+        // Signaler AVANT de nettoyer : `cleanup()` ferme le flux, et
+        // `controller.error()` est un no-op silencieux sur un flux déjà fermé —
+        // le client croirait à une fermeture propre, et rien ne resterait dans
+        // les journaux d'une panne pourtant systématique.
+        console.error(`[tournaments/${tournamentId}/stream] ouverture impossible`, error);
+        try {
+          controller.error(error);
+        } catch {
+          // Flux déjà en erreur : rien à signaler de plus.
+        }
         cleanup();
-        controller.error(error);
       }
     },
   });

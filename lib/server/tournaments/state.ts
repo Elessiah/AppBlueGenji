@@ -37,6 +37,10 @@ export async function syncTournamentState(
   const tournament = await loadTournamentRow(connection, tournamentId);
   if (!tournament) return { row: null, stateChanged: false };
 
+  // Retenu pour la comparaison finale : l'entretien qui suit peut clore le
+  // tournoi de son côté, et ses appelants s'appuient sur `stateChanged` pour
+  // rafraîchir la liste publique.
+  const stateAtEntry = tournament.state;
   const computed = computeTournamentState(tournament);
   let stateChanged = false;
 
@@ -117,8 +121,16 @@ export async function syncTournamentState(
     await tryAutoResolveByes(connection, tournamentId);
     await finalizeTournamentIfDone(connection, tournamentId);
 
+    // `finalizeTournamentIfDone` a pu passer le tournoi à `FINISHED` : le
+    // drapeau posé plus haut ne le sait pas. Sans cette comparaison, un tournoi
+    // clos par un bye résolu à la lecture resterait annoncé « En cours » dans la
+    // liste en cache — et le reclassement client ne rattrape pas ce cas-là, une
+    // clôture ne se déduisant d'aucune date.
     const refreshed = await loadTournamentRow(connection, tournamentId);
-    return { row: refreshed, stateChanged };
+    return {
+      row: refreshed,
+      stateChanged: stateChanged || (refreshed !== null && refreshed.state !== stateAtEntry),
+    };
   }
 
   return { row: tournament, stateChanged };

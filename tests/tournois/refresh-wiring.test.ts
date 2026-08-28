@@ -45,12 +45,20 @@ describe("flux SSE — ce qui part à la connexion", () => {
     expect(stream).toContain('req.signal.addEventListener("abort", cleanup)');
   });
 
+  it("journalise une ouverture de flux impossible", () => {
+    // `controller.error()` est un no-op sur un flux déjà fermé : sans trace, une
+    // panne systématique ne se verrait que par des reconnexions perpétuelles.
+    expect(stream).toMatch(/console\.error\([\s\S]{0,120}ouverture impossible/);
+  });
+
   it("ne laisse aucune place de flux survivre à une exception", () => {
     // `cleanup` est défini avant la première écriture, et le corps de `start()`
     // est enveloppé : une exception à l'encodage ne doit pas laisser la place
     // prise pour la durée de vie du processus.
     expect(stream).toMatch(/const cleanup = \(\): void => \{[\s\S]*?releaseSlot\(\);/);
-    expect(stream).toMatch(/\} catch \(error\) \{\s*cleanup\(\);\s*controller\.error\(error\);/);
+    // Le nettoyage suit la journalisation et la mise en erreur, mais rend la
+    // place dans tous les cas.
+    expect(stream).toMatch(/\} catch \(error\) \{[\s\S]{0,600}?cleanup\(\);/);
   });
 
   it("nettoie aussi quand la requête est déjà abandonnée", () => {
@@ -244,6 +252,16 @@ describe("instantané partagé", () => {
     const index = read("lib/server/tournaments/index.ts");
     expect(index).toMatch(
       /await connection\.commit\(\);[\s\S]{0,400}invalidateTournamentLists\(\);\s*return tournamentId;/,
+    );
+  });
+
+  it("ne laisse pas le rafraîchissement de cache faire échouer une écriture", () => {
+    // Ce travail s'exécute après le commit : une erreur ferait répondre 500 pour
+    // un score pourtant enregistré, et l'équipe se heurterait ensuite à
+    // `MATCH_ALREADY_COMPLETED` en le ressaisissant.
+    const index = read("lib/server/tournaments/index.ts");
+    expect(index).toMatch(
+      /async function invalidateListsIfStateChanged\([\s\S]{0,600}?try \{[\s\S]{0,300}?\} catch \{/,
     );
   });
 
