@@ -140,13 +140,23 @@ juste après l'écriture qui l'a rendue fausse.
 | Clé | Durée de vie | Invalidée par |
 | --- | --- | --- |
 | `tournament-snapshot:<id>` | 3 s | toute publication d'événement du tournoi |
-| `tournaments-list:public` | 15 s | toute publication d'événement |
+| `tournaments-list:public` | 15 s | `updated` (plateau, inscrites, état), la création d'un tournoi, et une clôture détectée autour d'un score |
 | `landing:stats`, `landing:ticker`, `landing:leaderboard:<n>` | 60 s | — |
 | `landing:live` | 5 s | — |
 
 Toute écriture passe par `tournaments/notifications.ts`, qui est donc le point
 unique où caches et abonnés sont prévenus ensemble. C'est ce qui permet des
 durées de vie confortables sans jamais afficher un score périmé.
+
+**Un score ne vide pas les listes.** Il ne touche ni les colonnes de
+`bg_tournaments` ni le nombre d'inscrites : les invalider garderait froid le
+cache le plus rentable du site pendant toute une soirée de tournois, quand les
+scores tombent en rafales. Le seul cas où un score déplace un tournoi dans la
+liste est celui qui le clôt : les écritures de score comparent donc l'état
+autour de leur transaction (`invalidateListsIfStateChanged`) plutôt que de faire
+remonter un « ça a fini » à travers les cinq orchestrations qui peuvent clore.
+La bascule d'état déclenchée par une simple lecture (`snapshot.ts`) rafraîchit
+les listes de la même façon.
 
 ### Étranglement de la synchronisation d'états
 

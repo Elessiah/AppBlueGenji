@@ -44,16 +44,21 @@ describe("notifications — invalidation des caches", () => {
     expect(invalidateLists).toHaveBeenCalledTimes(1);
   });
 
-  it("oublie l'instantané et les listes à un score rapporté", () => {
+  it("n'oublie que l'instantané à un score rapporté", () => {
+    // Un score ne touche ni les colonnes de `bg_tournaments` ni le nombre
+    // d'inscrites : vider les listes ici les garderait froides toute une soirée
+    // de tournois, quand les scores tombent en rafales — précisément la charge
+    // que le cache existe pour absorber. La clôture, elle, est traitée par
+    // l'appelant, qui compare l'état autour de sa transaction.
     publishScoreReportedEvent(7, 42);
     expect(invalidateSnapshot).toHaveBeenCalledWith(7);
-    expect(invalidateLists).toHaveBeenCalledTimes(1);
+    expect(invalidateLists).not.toHaveBeenCalled();
   });
 
-  it("oublie l'instantané et les listes à un score arbitré", () => {
+  it("n'oublie que l'instantané à un score arbitré", () => {
     publishScoreResolvedEvent(7, 42);
     expect(invalidateSnapshot).toHaveBeenCalledWith(7);
-    expect(invalidateLists).toHaveBeenCalledTimes(1);
+    expect(invalidateLists).not.toHaveBeenCalled();
   });
 
   it("invalide avant de réveiller les abonnés", () => {

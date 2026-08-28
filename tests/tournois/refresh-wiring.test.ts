@@ -40,9 +40,17 @@ describe("flux SSE — ce qui part à la connexion", () => {
   });
 
   it("libère la place et quitte la salle à la fermeture", () => {
-    expect(stream).toContain("leaveRoom()");
-    expect(stream).toContain("releaseSlot?.()");
+    expect(stream).toContain("leaveRoom?.();");
+    expect(stream).toContain("releaseSlot();");
     expect(stream).toContain('req.signal.addEventListener("abort", cleanup)');
+  });
+
+  it("ne laisse aucune place de flux survivre à une exception", () => {
+    // `cleanup` est défini avant la première écriture, et le corps de `start()`
+    // est enveloppé : une exception à l'encodage ne doit pas laisser la place
+    // prise pour la durée de vie du processus.
+    expect(stream).toMatch(/const cleanup = \(\): void => \{[\s\S]*?releaseSlot\(\);/);
+    expect(stream).toMatch(/\} catch \(error\) \{\s*cleanup\(\);\s*controller\.error\(error\);/);
   });
 
   it("nettoie aussi quand la requête est déjà abandonnée", () => {
@@ -142,7 +150,10 @@ describe("page de tournoi", () => {
     // Une équipe qui saisit son score en fin de manche n'a aucun moyen de
     // deviner que son plateau date de plusieurs minutes.
     expect(detailPage).toContain("const frozen = fatal !== null;");
-    expect(detailPage.match(/!frozen/g)?.length).toBeGreaterThanOrEqual(5);
+    expect(detailPage.match(/!frozen/g)?.length).toBeGreaterThanOrEqual(4);
+    // Report de score, abandon **et** édition par l'arbitrage.
+    expect(detailPage).toMatch(/const canReport = [\s\S]{0,80}if \(frozen\) return false;/);
+    expect(detailPage).toMatch(/const canAdminResolve = [\s\S]{0,80}if \(frozen\) return false;/);
   });
 
   it("n'appelle plus router.refresh() sur une page cliente", () => {
@@ -188,6 +199,13 @@ describe("liste des tournois", () => {
 });
 
 describe("instantané partagé", () => {
+  it("fait connaître aux listes une bascule déclenchée à la lecture", () => {
+    // La même bascule déclenchée depuis la liste publie un événement ; sans ce
+    // pendant, un tournoi démarré parce qu'un spectateur a ouvert sa page
+    // resterait annoncé « Inscriptions » dans la liste en cache.
+    expect(snapshot).toContain("if (syncResult.stateChanged) invalidateTournamentLists();");
+  });
+
   it("déclenche la bascule d'état à la lecture, quel que soit l'état courant", () => {
     // Avant, l'entretien était réservé aux tournois déjà RUNNING : la page d'un
     // tournoi dont l'heure de début était passée restait aux inscriptions
@@ -218,6 +236,23 @@ describe("instantané partagé", () => {
     const index = read("lib/server/tournaments/index.ts");
     expect(index).toContain("const myTeamId = isSolo");
     expect(index).toContain("(await getUserActiveTeam(userId))?.teamId ?? null;");
+  });
+
+  it("fait apparaître un tournoi créé sans attendre le cache", () => {
+    // Sans cela, l'auteur du tournoi revient sur la liste, ne le voit pas, et
+    // rafraîchit — au moment précis où il cherche une confirmation.
+    const index = read("lib/server/tournaments/index.ts");
+    expect(index).toMatch(
+      /await connection\.commit\(\);[\s\S]{0,400}invalidateTournamentLists\(\);\s*return tournamentId;/,
+    );
+  });
+
+  it("rafraîchit les listes quand un score change l'état du tournoi", () => {
+    // Les événements de score n'y touchent plus : c'est la comparaison autour de
+    // la transaction qui rattrape la clôture.
+    const index = read("lib/server/tournaments/index.ts");
+    expect(index).toContain("async function invalidateListsIfStateChanged(");
+    expect(index).toContain("await invalidateListsIfStateChanged(tournamentId, stateBefore);");
   });
 
   it("ne laisse pas l'entretien conditionner la lecture", () => {

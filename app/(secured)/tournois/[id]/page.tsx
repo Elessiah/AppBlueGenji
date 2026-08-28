@@ -164,6 +164,7 @@ export default function TournamentDetailPage() {
   };
 
   const canAdminResolve = (match: BracketMatch): boolean => {
+    if (frozen) return false;
     if (!detail?.isAdmin) return false;
     if (match.team1Id === null || match.team2Id === null) return false;
     return true;

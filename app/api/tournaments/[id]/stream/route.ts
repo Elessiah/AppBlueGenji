@@ -94,61 +94,72 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       let closed = false;
+      let leaveRoom: (() => void) | null = null;
+      let heartbeat: ReturnType<typeof setInterval> | null = null;
+
+      /**
+       * Rend tout ce qui a été pris. Défini **avant** la première écriture : la
+       * place de flux ne doit survivre à aucune sortie, pas même celle d'une
+       * exception. Une place jamais rendue vaut, au bout de quatre fois, un 429
+       * permanent sur son propre tournoi.
+       */
+      const cleanup = (): void => {
+        if (closed) return;
+        closed = true;
+        if (heartbeat !== null) clearInterval(heartbeat);
+        leaveRoom?.();
+        releaseSlot();
+        try {
+          controller.close();
+        } catch {
+          // Déjà fermé par le client.
+        }
+      };
 
       const write = (frame: Uint8Array): void => {
         if (closed) throw new Error("STREAM_CLOSED");
         controller.enqueue(frame);
       };
 
-      // Tout ce dont la page a besoin pour s'afficher, dès la connexion : aucun
-      // appel REST supplémentaire dans le cas nominal.
-      write(
-        encoder.encode(
-          `data: ${JSON.stringify({
-            type: "connected",
-            tournamentId,
-            tier,
-            viewer,
-            snapshot,
-            emittedAt: new Date().toISOString(),
-          })}\n\n`,
-        ),
-      );
+      try {
+        // Tout ce dont la page a besoin pour s'afficher, dès la connexion :
+        // aucun appel REST supplémentaire dans le cas nominal.
+        write(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "connected",
+              tournamentId,
+              tier,
+              viewer,
+              snapshot,
+              emittedAt: new Date().toISOString(),
+            })}\n\n`,
+          ),
+        );
 
-      const leaveRoom = joinTournamentRoom(tournamentId, { tier, send: write });
+        leaveRoom = joinTournamentRoom(tournamentId, { tier, send: write });
 
-      const heartbeat = setInterval(() => {
-        try {
-          write(encoder.encode(`: ping\n\n`));
-        } catch {
+        heartbeat = setInterval(() => {
+          try {
+            write(encoder.encode(`: ping\n\n`));
+          } catch {
+            cleanup();
+          }
+        }, HEARTBEAT_MS);
+        heartbeat.unref?.();
+
+        // Course résiduelle : le contrôle plus haut a pu passer juste avant que
+        // le client ne parte. Un signal DÉJÀ avorté ne déclenche jamais son
+        // écouteur.
+        if (req.signal.aborted) {
           cleanup();
+          return;
         }
-      }, HEARTBEAT_MS);
-      heartbeat.unref?.();
-
-      function cleanup(): void {
-        if (closed) return;
-        closed = true;
-        clearInterval(heartbeat);
-        leaveRoom();
-        releaseSlot?.();
-        try {
-          controller.close();
-        } catch {
-          // Déjà fermé par le client.
-        }
-      }
-
-      // Course résiduelle : le contrôle ci-dessus a pu passer juste avant que le
-      // client ne parte. Un signal DÉJÀ avorté ne déclenche jamais son écouteur,
-      // et la place de flux resterait alors prise pour la durée de vie du
-      // processus — quatre fois, et l'utilisateur se voit refuser son propre
-      // tournoi.
-      if (req.signal.aborted) {
+        req.signal.addEventListener("abort", cleanup);
+      } catch (error) {
         cleanup();
-        return;
+        controller.error(error);
       }
-      req.signal.addEventListener("abort", cleanup);
     },
   });
 

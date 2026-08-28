@@ -121,7 +121,7 @@ import { loadTournamentRow } from "./repository";
 import { reportMatchScore } from "./scoring";
 import { publishUpdatedEvent, publishScoreReportedEvent, publishScoreResolvedEvent, sendBotLogAsync } from "./notifications";
 import { getTournamentSnapshot } from "./snapshot";
-import { cachedTournamentList } from "./list-cache";
+import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
 
 let pendingSync: Promise<void> | null = null;
 let lastSyncAt = 0;
@@ -385,6 +385,11 @@ export async function createTournament(
     }
 
     await connection.commit();
+
+    // Sans cela, le tournoi qu'on vient de créer resterait absent de la liste
+    // publique et de l'accueil pendant toute la durée de vie du cache — au
+    // moment précis où son auteur cherche une confirmation.
+    invalidateTournamentLists();
     return tournamentId;
   } catch (error) {
     await connection.rollback();
@@ -661,6 +666,36 @@ export async function getTournamentDetail(
   return { ...snapshot, ...viewer };
 }
 
+/**
+ * Rafraîchit la liste publique si — et seulement si — l'écriture qui vient
+ * d'aboutir a changé l'état du tournoi.
+ *
+ * Les événements de score n'y touchent plus (voir `./notifications`), mais un
+ * score peut clore un tournoi, et une clôture le déplace dans la liste. Plutôt
+ * que de faire remonter un « ça a fini » à travers les cinq orchestrations qui
+ * peuvent clore (élimination, survie, suisse, endurance, phases), on relit
+ * l'état : une lecture indexée, sur un chemin d'écriture rare.
+ *
+ * @param before État lu **avant** la transaction.
+ */
+async function invalidateListsIfStateChanged(
+  tournamentId: number,
+  before: TournamentState | null,
+): Promise<void> {
+  const after = await readTournamentState(tournamentId);
+  if (after !== before) invalidateTournamentLists();
+}
+
+/** État courant d'un tournoi, ou `null` s'il n'existe pas / plus. */
+async function readTournamentState(tournamentId: number): Promise<TournamentState | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { state: TournamentState })[]>(
+    `SELECT state FROM bg_tournaments WHERE id = ? LIMIT 1`,
+    [tournamentId],
+  );
+  return rows[0]?.state ?? null;
+}
+
 export async function reportMatchScorePublic(
   tournamentId: number,
   matchId: number,
@@ -668,6 +703,7 @@ export async function reportMatchScorePublic(
   myScoreRaw: number,
   opponentScoreRaw: number,
 ): Promise<void> {
+  const stateBefore = await readTournamentState(tournamentId);
   const db = await getDatabase();
   const connection = await db.getConnection();
   let pendingBotLog: string | null = null;
@@ -705,6 +741,7 @@ export async function reportMatchScorePublic(
     await connection.commit();
 
     publishScoreReportedEvent(tournamentId, matchId);
+    await invalidateListsIfStateChanged(tournamentId, stateBefore);
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -754,6 +791,10 @@ export async function adminSaveMatchScoresPublic(
 
     if (savedTournamentId !== null) {
       publishScoreResolvedEvent(savedTournamentId, matchId);
+      // L'état d'avant n'a pas pu être lu (l'id du tournoi ne se découvre qu'en
+      // cours de transaction) : on rafraîchit donc la liste sans condition. Un
+      // arbitrage reste rare, contrairement au report de score.
+      invalidateTournamentLists();
     }
   } catch (error) {
     await connection.rollback();
@@ -875,6 +916,10 @@ export async function adminResolveMatchPublic(
     await connection.commit();
 
     publishScoreReportedEvent(tournamentId, matchId);
+    // Même raison que pour la sauvegarde de scores : l'état d'avant n'a pas pu
+    // être lu, l'id du tournoi ne se découvrant qu'en cours de transaction. Un
+    // arbitrage reste rare, contrairement au report de score.
+    invalidateTournamentLists();
   } catch (error) {
     await connection.rollback();
     throw error;

@@ -39,6 +39,7 @@ import {
   getTournamentListRow,
   loadTournamentRow,
 } from "./repository";
+import { invalidateTournamentLists } from "./list-cache";
 import { hasPendingStateTransition, syncTournamentState } from "./state";
 
 /**
@@ -118,6 +119,13 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
     await connection.beginTransaction();
     const syncResult = await syncTournamentState(connection, tournamentId);
     await connection.commit();
+
+    // La même bascule déclenchée depuis la liste publie un événement ; ici, non
+    // — le tournoi qui démarre parce qu'un spectateur a ouvert sa page laisserait
+    // sinon la liste en cache l'annoncer « Inscriptions ». On n'oublie que les
+    // listes : l'instantané, lui, est précisément en train d'être reconstruit.
+    if (syncResult.stateChanged) invalidateTournamentLists();
+
     return syncResult.row;
   } catch (error) {
     await connection.rollback();
