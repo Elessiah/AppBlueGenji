@@ -34,6 +34,7 @@ import { SwissView } from "./_components/SwissView";
 import { EnduranceView } from "./_components/EnduranceView";
 import { MatchRow } from "./_components/MatchRow";
 import { EntrantProvider } from "./_lib/entrant-link";
+import { TournamentProgress } from "./_components/TournamentProgress";
 
 const FORMAT_LABELS: Record<TournamentFormat, string> = {
   SINGLE: "Simple élim.",
@@ -569,6 +570,8 @@ export default function TournamentDetailPage() {
             ))}
           </div>
         </div>
+
+        <TournamentProgress detail={detail} />
       </section>
 
       <AdminScoreDialog
