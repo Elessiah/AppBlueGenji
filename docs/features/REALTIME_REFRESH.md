@@ -113,8 +113,11 @@ côté.
    Une session expirée ou un tournoi supprimé, eux, ne passeront pas tout
    seuls : le flux SSE ne dit jamais pourquoi il tombe, mais la lecture REST de
    secours voit le 401/404. La boucle s'arrête alors, la pastille passe à
-   « Hors ligne » et une notification invite à se reconnecter — plutôt que
-   d'afficher « Reconnexion… » pour l'éternité. 429 et 5xx restent retentés.
+   « Hors ligne », une notification invite à se reconnecter, et **les actions
+   sont retirées** — ce qui est affiché ne bouge plus, une équipe ne doit pas
+   saisir un score en croyant son plateau à jour. Si l'échec précède la première
+   donnée, la page affiche un écran dédié avec un lien vers `/connexion` plutôt
+   qu'un « Chargement… » sans fin. 429 et 5xx restent retentés.
 5. **La salle se réveille à l'heure exacte** de la prochaine bascule d'état,
    pour toute la salle d'un coup — plutôt que de laisser cent clients se
    réveiller chacun de leur côté à la même seconde.
@@ -152,6 +155,11 @@ tournois non terminés. Son étranglement passe de **1 s à 15 s** : à une seco
 une poignée de visiteurs suffisait à la faire tourner en continu. L'affichage ne
 l'attend plus (points 3 et 5 ci-dessus), et la page d'un tournoi déclenche
 désormais sa propre bascule à la lecture.
+
+Elle est appelée **hors** du chargeur mis en cache — dedans, les événements
+qu'elle publie invalideraient la liste qu'elle vient de rendre correcte — et son
+échec est avalé : c'est un entretien d'arrière-plan, pas une condition pour
+servir une liste que le cache tient peut-être déjà prête.
 
 ### Plafonds de débit — `lib/server/rate-limit.ts` + `lib/server/api-guard.ts`
 
@@ -259,7 +267,9 @@ main dans `site-visits-service.ts`, s'appuie maintenant sur le même module.
 - **Le retour sur l'onglet ne relit que si le flux est coupé.** Relire par-dessus
   un flux vivant relancerait, à la fin d'une manche, la centaine de requêtes que
   ce flux existe pour éviter. Les deux chemins (SSE et REST) sautent par ailleurs
-  une mise à jour dont la `version` est déjà connue.
+  une mise à jour dont la `version` est déjà connue — et la liste, qui n'a pas de
+  version, compare la réponse à la précédente (`sameBuckets`) pour ne pas
+  redessiner 68 cartes toutes les minutes pour rien.
 - **`X-Accel-Buffering: no`** neutralise la mise en tampon d'un reverse proxy,
   qui retiendrait les messages et ferait croire à un flux mort.
 

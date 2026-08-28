@@ -1,6 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
-import { nextBucketsChangeAt, rescheduleBuckets } from "@/lib/shared/tournament-schedule";
+import {
+  nextBucketsChangeAt,
+  rescheduleBuckets,
+  sameBuckets,
+} from "@/lib/shared/tournament-schedule";
 
 const OPEN = Date.parse("2026-06-01T18:00:00Z");
 const CLOSE = Date.parse("2026-06-01T19:00:00Z");
@@ -113,6 +117,53 @@ describe("rescheduleBuckets", () => {
 
   it("accepte des paniers vides", () => {
     expect(rescheduleBuckets(buckets(), OPEN)).toEqual(buckets());
+  });
+});
+
+describe("sameBuckets", () => {
+  it("reconnaît deux réponses identiques", () => {
+    // Le rafraîchissement de fond rend un objet neuf à chaque fois : sans cette
+    // comparaison, les 68 cartes seraient redessinées toutes les minutes pour
+    // un contenu inchangé.
+    expect(sameBuckets(buckets({ upcoming: [card()] }), buckets({ upcoming: [card()] }))).toBe(true);
+  });
+
+  it("court-circuite sur la même référence", () => {
+    const same = buckets({ running: [card({ state: "RUNNING" })] });
+    expect(sameBuckets(same, same)).toBe(true);
+  });
+
+  it("repère un compteur d'inscrites qui bouge", () => {
+    // Le piège d'une comparaison par liste de champs : oublier celui-ci ferait
+    // silencieusement figer le nombre d'équipes affiché.
+    expect(
+      sameBuckets(
+        buckets({ registration: [card({ registeredTeams: 3 })] }),
+        buckets({ registration: [card({ registeredTeams: 4 })] }),
+      ),
+    ).toBe(false);
+  });
+
+  it("repère un tournoi ajouté, retiré ou déplacé", () => {
+    expect(sameBuckets(buckets(), buckets({ upcoming: [card()] }))).toBe(false);
+    expect(
+      sameBuckets(buckets({ upcoming: [card()] }), buckets({ running: [card()] })),
+    ).toBe(false);
+    expect(
+      sameBuckets(
+        buckets({ upcoming: [card({ id: 1 }), card({ id: 2 })] }),
+        buckets({ upcoming: [card({ id: 2 }), card({ id: 1 })] }),
+      ),
+    ).toBe(false);
+  });
+
+  it("repère un renommage", () => {
+    expect(
+      sameBuckets(
+        buckets({ upcoming: [card({ name: "Avant" })] }),
+        buckets({ upcoming: [card({ name: "Après" })] }),
+      ),
+    ).toBe(false);
   });
 });
 

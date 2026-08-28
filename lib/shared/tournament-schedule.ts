@@ -17,6 +17,25 @@
 import type { TournamentBuckets, TournamentCard } from "./types";
 import { computeTournamentState, nextTournamentStateChangeAt } from "./tournament-state";
 
+/**
+ * Les deux réponses portent-elles la même chose ?
+ *
+ * La liste se relit toute seule en fond (une fois par minute pour le staff) et
+ * la réponse est presque toujours identique — mais c'est un objet neuf, qui
+ * ferait redessiner les 68 cartes, recaler l'horloge de `useScheduledBuckets`
+ * et réarmer son minuteur, pour rien.
+ *
+ * La comparaison passe par la sérialisation plutôt que par une liste de champs :
+ * quelques dizaines de kilo-octets de texte une fois par minute ne pèsent rien
+ * devant un rendu complet, et surtout aucun champ ne peut être oublié — un
+ * `registeredTeams` omis de la comparaison ferait silencieusement figer le
+ * compteur d'inscrites.
+ */
+export function sameBuckets(left: TournamentBuckets, right: TournamentBuckets): boolean {
+  if (left === right) return true;
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 /** Tous les tournois des paniers, dans l'ordre du serveur (début décroissant). */
 function flatten(buckets: TournamentBuckets): TournamentCard[] {
   return [

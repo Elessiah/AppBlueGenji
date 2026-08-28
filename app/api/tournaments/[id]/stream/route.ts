@@ -83,7 +83,10 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   // inutile coûte le plus cher.
   if (req.signal.aborted) {
     releaseSlot();
-    return new Response(null, { status: 499 });
+    // 204 plutôt que le 499 d'nginx : ce dernier est un code de journal, pas un
+    // statut HTTP, et un mandataire ou une supervision le compterait comme une
+    // famille d'erreurs inventée.
+    return new Response(null, { status: 204 });
   }
 
   const encoder = new TextEncoder();

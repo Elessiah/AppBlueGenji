@@ -22,8 +22,9 @@ describe("page tournois — onglet « Mes tournois »", () => {
     // L'échec de la liste personnelle ne doit pas vider la liste publique :
     // au pire l'onglet n'apparaît pas.
     expect(page).toContain("Promise.allSettled");
-    expect(page).toMatch(/if \(all\.status === "fulfilled"\) setBuckets\(all\.value\)/);
-    expect(page).toMatch(/if \(mine\.status === "fulfilled"\) setMyBuckets\(mine\.value\)/);
+    // Chacune n'écrase son panier que si le contenu a réellement changé.
+    expect(page).toMatch(/if \(all\.status === "fulfilled"\) \{[\s\S]*?setBuckets\(/);
+    expect(page).toMatch(/if \(mine\.status === "fulfilled"\) \{[\s\S]*?setMyBuckets\(/);
   });
 
   it("n'affiche l'onglet que si l'utilisateur a créé un tournoi", () => {

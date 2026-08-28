@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKe
 import type { TournamentBuckets } from "@/lib/shared/types";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
 import { splitHiddenTournaments } from "@/lib/shared/tournament-visibility";
+import { sameBuckets } from "@/lib/shared/tournament-schedule";
 import { REFRESH_CADENCE, resolveRefreshTier } from "@/lib/shared/refresh-tiers";
 import { useAutoRefresh } from "@/lib/shared/hooks/useAutoRefresh";
 import { useScheduledBuckets } from "@/lib/shared/hooks/useScheduledBuckets";
@@ -74,8 +75,15 @@ export default function TournamentsPage() {
         fetchBuckets("/api/tournaments", signal),
         fetchBuckets("/api/tournaments?scope=mine", signal),
       ]);
-      if (all.status === "fulfilled") setBuckets(all.value);
-      if (mine.status === "fulfilled") setMyBuckets(mine.value);
+      // On garde la référence précédente quand rien n'a changé : sinon chaque
+      // relecture de fond redessinerait toute la liste et réarmerait les
+      // minuteurs de bascule, pour un contenu identique.
+      if (all.status === "fulfilled") {
+        setBuckets((previous) => (sameBuckets(previous, all.value) ? previous : all.value));
+      }
+      if (mine.status === "fulfilled") {
+        setMyBuckets((previous) => (sameBuckets(previous, mine.value) ? previous : mine.value));
+      }
 
       // Une seule notification : les deux listes sortent de la même route, un
       // incident les touche presque toujours ensemble.

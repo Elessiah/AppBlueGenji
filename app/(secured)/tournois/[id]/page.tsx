@@ -94,6 +94,29 @@ export default function TournamentDetailPage() {
     lastCurrentPhaseId.current = current;
   }, [detail?.phases, detail?.currentPhaseId, selectedPhaseId]);
 
+  // Échec définitif avant même d'avoir reçu quoi que ce soit : sans ce cas, la
+  // page resterait sur « Chargement… » pour toujours — le seul état où il ne
+  // reste que le F5, et où il ne sert à rien.
+  if (fatal && !detail) {
+    return (
+      <section className="ds-block" style={{ color: "var(--text-2)" }} role="alert">
+        <h1 className="ds-title green" style={{ fontSize: 24, marginBottom: 12 }}>
+          {fatal === "UNAUTHORIZED" ? "Session expirée" : "Tournoi introuvable"}
+        </h1>
+        <p style={{ margin: "0 0 20px", lineHeight: 1.6 }}>
+          {fatal === "UNAUTHORIZED"
+            ? "Ta session a expiré : le suivi en direct est arrêté. Reconnecte-toi pour le reprendre."
+            : "Ce tournoi n'existe plus. Il a pu être supprimé pendant que tu le consultais."}
+        </p>
+        <CyberButton asChild variant="primary">
+          <Link href={fatal === "UNAUTHORIZED" ? "/connexion" : "/tournois"}>
+            {fatal === "UNAUTHORIZED" ? "Se reconnecter" : "Retour aux tournois"}
+          </Link>
+        </CyberButton>
+      </section>
+    );
+  }
+
   if (!detail) {
     // Le premier affichage attend l'ouverture du flux, qui apporte le plateau
     // et le contexte du lecteur d'un seul coup. `aria-busy` annonce l'attente
@@ -110,6 +133,14 @@ export default function TournamentDetailPage() {
     );
   }
 
+  /**
+   * Le suivi est arrêté : ce qui est affiché ne bouge plus. On retire donc les
+   * actions plutôt que de les laisser échouer une par une — une équipe qui
+   * saisit son score en fin de manche n'a aucun moyen de deviner que son
+   * plateau date de plusieurs minutes.
+   */
+  const frozen = fatal !== null;
+
   // Vocabulaire de l'affichage : un tournoi individuel parle de joueurs, pas
   // d'équipes (`lib/shared/participants.ts`).
   const wording = participantWording(detail.card.participantType);
@@ -122,6 +153,7 @@ export default function TournamentDetailPage() {
   };
 
   const canReport = (match: BracketMatch): boolean => {
+    if (frozen) return false;
     if (!detail?.myTeamId) return false;
     if (match.winnerTeamId !== null) return false;
     if (match.team1Id === null || match.team2Id === null) return false;
@@ -189,6 +221,7 @@ export default function TournamentDetailPage() {
       : detail.card.format;
 
   const canForfeit = (teamId: number): boolean =>
+    !frozen &&
     canForfeitTeam(
       {
         format: forfeitFormat,
@@ -344,10 +377,10 @@ export default function TournamentDetailPage() {
                 <Pill variant="blue">Petite finale</Pill>
               )}
               <Pill variant="blue">{detail.card.registeredTeams}/{detail.card.maxTeams}</Pill>
-              {detail.isAdmin && (
+              {detail.isAdmin && !frozen && (
                 <Pill variant="blue">⚙ Admin</Pill>
               )}
-              {detail.canRegister && (
+              {detail.canRegister && !frozen && (
                 <CyberButton
                   variant="primary"
                   onClick={registerTeam}
@@ -356,7 +389,7 @@ export default function TournamentDetailPage() {
                   {wording.registerCta}
                 </CyberButton>
               )}
-              {detail.isAdmin && detail.card.state === "REGISTRATION" && (
+              {detail.isAdmin && !frozen && detail.card.state === "REGISTRATION" && (
                 <CyberButton
                   variant="ghost"
                   onClick={() => setGhostRegistrationOpen(true)}
@@ -556,7 +589,7 @@ export default function TournamentDetailPage() {
           )}
         </div>
 
-        {detail.isAdmin && (
+        {detail.isAdmin && !frozen && (
           <SeedingEditor tournamentId={tournamentId} onReordered={() => void refresh()} />
         )}
 

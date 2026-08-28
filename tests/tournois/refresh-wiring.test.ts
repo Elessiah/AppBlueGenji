@@ -131,6 +131,20 @@ describe("page de tournoi", () => {
     expect(detailPage.match(/void refresh\(\)/g)?.length).toBeGreaterThanOrEqual(6);
   });
 
+  it("sort de l'attente quand l'échec précède la donnée", () => {
+    // Sans ce cas, la page resterait sur « Chargement… » pour toujours : le seul
+    // état où il ne reste que le F5, et où il ne sert à rien.
+    expect(detailPage).toContain("if (fatal && !detail) {");
+    expect(detailPage).toContain('href={fatal === "UNAUTHORIZED" ? "/connexion" : "/tournois"}');
+  });
+
+  it("retire les actions quand le suivi est arrêté", () => {
+    // Une équipe qui saisit son score en fin de manche n'a aucun moyen de
+    // deviner que son plateau date de plusieurs minutes.
+    expect(detailPage).toContain("const frozen = fatal !== null;");
+    expect(detailPage.match(/!frozen/g)?.length).toBeGreaterThanOrEqual(5);
+  });
+
   it("n'appelle plus router.refresh() sur une page cliente", () => {
     // Sans effet ici : les données viennent du hook, pas du rendu serveur.
     expect(detailPage).not.toContain("router.refresh()");
@@ -157,6 +171,13 @@ describe("liste des tournois", () => {
   it("fait basculer les états sans requête", () => {
     expect(listPage).toContain("useScheduledBuckets(buckets)");
     expect(listPage).toContain("useScheduledBuckets(myBuckets)");
+  });
+
+  it("ne se redessine pas pour une réponse identique", () => {
+    // Sinon chaque relecture de fond redessine les 68 cartes et réarme les
+    // minuteurs de bascule, pour un contenu inchangé.
+    expect(listPage).toContain("sameBuckets(previous, all.value) ? previous : all.value");
+    expect(listPage).toContain("sameBuckets(previous, mine.value) ? previous : mine.value");
   });
 
   it("fait suivre le bandeau au reclassement local", () => {
@@ -199,11 +220,19 @@ describe("instantané partagé", () => {
     expect(index).toContain("(await getUserActiveTeam(userId))?.teamId ?? null;");
   });
 
+  it("ne laisse pas l'entretien conditionner la lecture", () => {
+    // La synchronisation est une transaction sur tous les tournois en cours :
+    // son échec ne doit pas vider `/tournois` alors que le cache tenait une
+    // liste parfaitement servable.
+    const index = read("lib/server/tournaments/index.ts");
+    expect(index).toContain("await syncVisibleTournaments().catch(() => undefined);");
+  });
+
   it("synchronise les états en dehors du cache de liste", () => {
     // Dedans, les événements publiés par la synchronisation invalideraient la
     // liste qu'elle vient de rendre correcte.
     const index = read("lib/server/tournaments/index.ts");
-    const sync = index.indexOf("await syncVisibleTournaments();");
+    const sync = index.indexOf("await syncVisibleTournaments().catch(");
     const cachedCall = index.indexOf('cachedTournamentList("public"');
     expect(sync).toBeGreaterThan(-1);
     expect(sync).toBeLessThan(cachedCall);

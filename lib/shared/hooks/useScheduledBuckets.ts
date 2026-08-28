@@ -32,7 +32,13 @@ export function useScheduledBuckets(buckets: TournamentBuckets): TournamentBucke
     // `setTimeout` sature au-delà de ~24,8 jours et se déclencherait alors
     // immédiatement, en boucle : on plafonne, quitte à se réveiller pour rien.
     const delay = Math.min(Math.max(0, at - Date.now()), 2_147_483_647);
-    const timer = setTimeout(() => setNow(Date.now()), delay);
+
+    // `Math.max(at, …)` garantit de dépasser la frontière. Une horloge encore en
+    // deçà au réveil — minuteur déclenché tôt, recalage NTP en arrière, sortie
+    // de veille — redonnerait sinon la même frontière, avec un délai nul : le
+    // couple minuteur/rendu tournerait en boucle serrée jusqu'à ce que l'heure
+    // rattrape.
+    const timer = setTimeout(() => setNow(Math.max(at, Date.now())), delay);
     return () => clearTimeout(timer);
   }, [buckets, now]);
 

@@ -7,8 +7,7 @@ import type {
   TournamentState,
   TournamentViewerContext,
 } from "@/lib/shared/types";
-import type { PoolConnection } from "mysql2/promise";
-import { getDatabase } from "@/lib/server/database";
+import { getDatabase, withConnection } from "@/lib/server/database";
 import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { isSoloTournament, toParticipantType, type ParticipantType } from "@/lib/shared/participants";
@@ -426,7 +425,13 @@ export async function listTournamentBuckets(
   // événement pour chaque état qui bascule, ce qui invalide justement la liste.
   // À l'intérieur, elle jetterait le résultat qu'elle vient de rendre correct,
   // et l'agrégat repartirait pour rien à chaque bascule.
-  await syncVisibleTournaments();
+  //
+  // Son échec, lui, n'emporte pas la lecture : c'est un entretien d'arrière-plan
+  // (une transaction sur tous les tournois en cours), pas une condition pour
+  // servir une liste que le cache tient peut-être déjà prête. Un verrou ou une
+  // panne passagère de MySQL viderait sinon `/tournois` alors qu'il n'y avait
+  // rien à en faire.
+  await syncVisibleTournaments().catch(() => undefined);
 
   const isSharedList = scope.organizerUserId === undefined && !searchTerm?.trim();
   if (!isSharedList) return loadTournamentBuckets(searchTerm, scope);
@@ -637,19 +642,6 @@ export async function getTournamentViewerContext(
     canCreateReportsForTeamIds: myTeamId ? [myTeamId] : [],
     isAdmin,
   };
-}
-
-/** Emprunte une connexion du pool le temps d'une lecture, puis la rend. */
-async function withConnection<T>(
-  run: (connection: PoolConnection) => Promise<T>,
-): Promise<T> {
-  const db = await getDatabase();
-  const connection = await db.getConnection();
-  try {
-    return await run(connection);
-  } finally {
-    connection.release();
-  }
 }
 
 /**
