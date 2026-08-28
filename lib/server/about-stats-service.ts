@@ -7,6 +7,7 @@ import {
   FALLBACK_ABOUT_STATS,
   validateAboutStatInput,
 } from "@/lib/shared/about-stats";
+import { cachedShowcase, invalidateShowcase } from "./showcase-cache";
 
 export type { AboutStat, AboutStatInput } from "@/lib/shared/about-stats";
 export { FALLBACK_ABOUT_STATS } from "@/lib/shared/about-stats";
@@ -26,7 +27,16 @@ function fromRow(row: AboutStatRow): AboutStat {
  * cartes de secours si la base ne contient aucune ligne ou est injoignable, afin
  * que la section reste toujours peuplée.
  */
+/**
+ * Lecture mutualisée : l'accueil est rendu à chaque visite et cette requête y
+ * revient à chaque fois, pour un contenu que le staff modifie quelques fois par
+ * mois. Toute écriture invalide (voir `./showcase-cache`).
+ */
 export async function listAboutStats(): Promise<AboutStat[]> {
+  return cachedShowcase("about-stats", loadListAboutStats);
+}
+
+async function loadListAboutStats(): Promise<AboutStat[]> {
   try {
     const db = await getDatabase();
     const [rows] = await db.execute<AboutStatRow[]>(
@@ -54,6 +64,8 @@ export async function createAboutStat(input: AboutStatInput): Promise<AboutStat>
     [value, label],
   );
 
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
   return { id: Number(res.insertId), value, label };
 }
 
@@ -70,6 +82,8 @@ export async function updateAboutStat(id: number, input: AboutStatInput): Promis
   );
   if (res.affectedRows === 0) throw new Error("ABOUT_STAT_NOT_FOUND");
 
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
   return { id, value, label };
 }
 
@@ -79,6 +93,8 @@ export async function updateAboutStat(id: number, input: AboutStatInput): Promis
  */
 export async function reorderAboutStats(ids: number[]): Promise<void> {
   await applyDisplayOrder("bg_about_stats", ids);
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
 }
 
 /** Supprime une carte. Lève `ABOUT_STAT_NOT_FOUND` si l'id n'existe pas. */
@@ -89,4 +105,6 @@ export async function deleteAboutStat(id: number): Promise<void> {
     [id],
   );
   if (res.affectedRows === 0) throw new Error("ABOUT_STAT_NOT_FOUND");
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
 }

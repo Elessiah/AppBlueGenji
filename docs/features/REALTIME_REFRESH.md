@@ -156,6 +156,8 @@ juste après l'écriture qui l'a rendue fausse.
 | `tournaments-list:public` | 15 s | `updated` (plateau, inscrites, état), la création d'un tournoi, et une clôture détectée autour d'un score |
 | `landing:stats`, `landing:ticker`, `landing:leaderboard:<n>` | 60 s | — |
 | `landing:live` | 5 s | — |
+| `showcase:sponsors`, `:about-stats`, `:about-pillars`, `:site-copy` | 60 s | toute écriture du staff |
+| `mini-bracket:<id>` | 15 s | — |
 
 Toute écriture passe par `tournaments/notifications.ts`, qui est donc le point
 unique où caches et abonnés sont prévenus ensemble. C'est ce qui permet des
@@ -324,15 +326,27 @@ main dans `site-visits-service.ts`, s'appuie maintenant sur le même module.
 Le calcul client de l'avancement du tournoi a en revanche été retenu **là où il
 est sans risque** : la bascule d'état à partir de dates publiques (point 3).
 
+## La page d'accueil
+
+C'est la porte d'entrée du site, et la seule surface où un plafond de débit ne
+peut rien : ce n'est pas une route API mais le rendu d'un Server Component, qui
+ne peut pas répondre 429. La mutualisation y est donc le seul garde-fou.
+
+Les agrégats de tournois passaient déjà par le cache ; les cinq lectures qui
+restaient — sponsors, statistiques et piliers de l'association, textes
+éditables, mini-arbre — le font désormais aussi
+(`lib/server/showcase-cache.ts`). Cent visiteurs arrivant ensemble ne coûtent
+plus qu'une lecture de chaque, et une modification du staff se voit tout de
+suite : chaque écriture invalide.
+
 ## Pistes restantes
 
 - `/api/bot/feed/stream` ouvre une connexion vers le bot **par spectateur** de
   la page `/bot`. Sans conséquence sur la base, mais une salle partagée y ferait
   le même bien. `BotLiveFeed` recrée par ailleurs son `EventSource` à chaque
   bascule de pause (`useEffect(..., [paused])`).
-- La page d'accueil charge encore sponsors, bureau, piliers et textes éditables
-  à chaque rendu. Requêtes légères, mais leur mise en cache demanderait une
-  invalidation à l'édition — à faire si le besoin s'en fait sentir.
+- `/api/recruitment/highlight`, appelé depuis l'accueil, n'a ni cache ni
+  plafond.
 - Les compteurs vivent en mémoire d'un processus. C'est le bon choix pour un
   Raspberry Pi mono-processus ; passer à plusieurs instances demanderait un
   magasin partagé (et le cache d'instantanés deviendrait par instance).

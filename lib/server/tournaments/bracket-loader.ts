@@ -1,5 +1,13 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { cached } from "@/lib/server/cache";
+
+/**
+ * Durée de vie du mini-arbre de l'accueil. Il n'accompagne qu'une vignette :
+ * quelques secondes de retard n'y changent rien, et la page est rendue à chaque
+ * visite — sans cela, cent arrivées simultanées font cent requêtes.
+ */
+const MINI_BRACKET_TTL_MS = 15_000;
 
 type MatchRow = {
   id: number;
@@ -11,7 +19,17 @@ type MatchRow = {
   team2_score: number | null;
 };
 
-export async function loadMiniBracket(tournamentId: number): Promise<{ a: string; b: string; sa: number | string; sb: number | string }[]> {
+export async function loadMiniBracket(
+  tournamentId: number,
+): Promise<{ a: string; b: string; sa: number | string; sb: number | string }[]> {
+  return cached(`mini-bracket:${tournamentId}`, MINI_BRACKET_TTL_MS, () =>
+    loadMiniBracketRows(tournamentId),
+  );
+}
+
+async function loadMiniBracketRows(
+  tournamentId: number,
+): Promise<{ a: string; b: string; sa: number | string; sb: number | string }[]> {
   try {
     const db = await getDatabase();
     const [rows] = await db.execute<(RowDataPacket & MatchRow)[]>(

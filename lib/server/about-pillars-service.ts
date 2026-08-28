@@ -7,6 +7,7 @@ import {
   FALLBACK_ABOUT_PILLARS,
   validateAboutPillarInput,
 } from "@/lib/shared/about-pillars";
+import { cachedShowcase, invalidateShowcase } from "./showcase-cache";
 
 export type { AboutPillar, AboutPillarInput } from "@/lib/shared/about-pillars";
 export { FALLBACK_ABOUT_PILLARS } from "@/lib/shared/about-pillars";
@@ -26,7 +27,16 @@ function fromRow(row: AboutPillarRow): AboutPillar {
  * piliers de secours si la base ne contient aucune ligne ou est injoignable,
  * afin que la section reste toujours peuplée.
  */
+/**
+ * Lecture mutualisée : l'accueil est rendu à chaque visite et cette requête y
+ * revient à chaque fois, pour un contenu que le staff modifie quelques fois par
+ * mois. Toute écriture invalide (voir `./showcase-cache`).
+ */
 export async function listAboutPillars(): Promise<AboutPillar[]> {
+  return cachedShowcase("about-pillars", loadListAboutPillars);
+}
+
+async function loadListAboutPillars(): Promise<AboutPillar[]> {
   try {
     const db = await getDatabase();
     const [rows] = await db.execute<AboutPillarRow[]>(
@@ -79,6 +89,8 @@ export async function updateAboutPillar(id: number, input: AboutPillarInput): Pr
  */
 export async function reorderAboutPillars(ids: number[]): Promise<void> {
   await applyDisplayOrder("bg_about_pillars", ids);
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
 }
 
 /** Supprime un pilier. Lève `ABOUT_PILLAR_NOT_FOUND` si l'id n'existe pas. */
@@ -89,4 +101,6 @@ export async function deleteAboutPillar(id: number): Promise<void> {
     [id],
   );
   if (res.affectedRows === 0) throw new Error("ABOUT_PILLAR_NOT_FOUND");
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
 }

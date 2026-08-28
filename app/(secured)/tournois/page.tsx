@@ -144,8 +144,7 @@ export default function TournamentsPage() {
   // Les cartes portent leur horaire : le client fait basculer « Prochainement »
   // → « Inscriptions » → « En cours » à la seconde dite, sans rien demander au
   // serveur (`lib/shared/tournament-schedule.ts`).
-  const scheduledBuckets = useScheduledBuckets(buckets);
-  const scheduledMyBuckets = useScheduledBuckets(myBuckets);
+  const [scheduledBuckets, scheduledMyBuckets] = useScheduledBuckets(buckets, myBuckets);
 
   const sourceBuckets = isMine ? scheduledMyBuckets : scheduledBuckets;
   const filteredBuckets = filterBuckets(sourceBuckets, query, gameFilter);

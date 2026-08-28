@@ -7,6 +7,7 @@ import {
   listSponsors,
   updateSponsor,
 } from "@/lib/server/sponsors-service";
+import { clearCache } from "@/lib/server/cache";
 
 jest.mock("@/lib/server/database");
 
@@ -16,7 +17,12 @@ async function mockDb(execute: jest.Mock) {
 }
 
 describe("sponsors-service", () => {
-  beforeEach(() => jest.clearAllMocks());
+  // La vitrine est mutualisée (`lib/server/showcase-cache.ts`) : sans cette
+  // remise à zéro, chaque cas resservirait la valeur du précédent.
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
   afterEach(() => jest.restoreAllMocks());
 
   describe("listSponsors", () => {

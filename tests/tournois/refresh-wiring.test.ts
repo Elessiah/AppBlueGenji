@@ -156,8 +156,9 @@ describe("liste des tournois — sans flux SSE", () => {
   it("fait basculer les états sans requête, bandeau compris", () => {
     // Sinon le bandeau annoncerait « À VENIR » un tournoi affiché juste dessous
     // en « INSCRIPTIONS ».
-    expect(listPage).toContain("useScheduledBuckets(buckets)");
-    expect(listPage).toContain("useScheduledBuckets(myBuckets)");
+    // Une seule horloge, un seul minuteur : les deux jeux se recouvrent presque
+    // entièrement.
+    expect(listPage).toContain("useScheduledBuckets(buckets, myBuckets)");
     expect(listPage).toContain("buildTickerItems(scheduledBuckets)");
   });
 

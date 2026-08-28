@@ -8,6 +8,7 @@ import {
   slugifySponsor,
   validateSponsorInput,
 } from "@/lib/shared/sponsors";
+import { cachedShowcase, invalidateShowcase } from "./showcase-cache";
 
 export type { Sponsor, SponsorInput, SponsorTier } from "@/lib/shared/sponsors";
 export { FALLBACK_SPONSORS } from "@/lib/shared/sponsors";
@@ -34,7 +35,16 @@ function fromRow(row: SponsorRow): Sponsor {
   };
 }
 
+/**
+ * Lecture mutualisée : l'accueil est rendu à chaque visite et cette requête y
+ * revient à chaque fois, pour un contenu que le staff modifie quelques fois par
+ * mois. Toute écriture invalide (voir `./showcase-cache`).
+ */
 export async function listSponsors(): Promise<Sponsor[]> {
+  return cachedShowcase("sponsors", loadListSponsors);
+}
+
+async function loadListSponsors(): Promise<Sponsor[]> {
   let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
   try {
     const dbPromise = getDatabase();
@@ -110,6 +120,8 @@ export async function createSponsor(input: SponsorInput): Promise<Sponsor> {
     [name, slug, tier, logoUrl, websiteUrl, description, active ? 1 : 0]
   );
 
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
   return { id: Number(res.insertId), name, slug, tier, logoUrl, websiteUrl, description };
 }
 
@@ -134,6 +146,8 @@ export async function updateSponsor(id: number, input: SponsorInput): Promise<Sp
     [name, tier, logoUrl, websiteUrl, description, active ? 1 : 0, id]
   );
 
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
   return { id, name, slug, tier, logoUrl, websiteUrl, description };
 }
 
@@ -145,6 +159,8 @@ export async function updateSponsor(id: number, input: SponsorInput): Promise<Sp
  */
 export async function reorderSponsors(ids: number[]): Promise<void> {
   await applyDisplayOrder("bg_sponsors", ids);
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
 }
 
 /** Supprime un sponsor. Lève `SPONSOR_NOT_FOUND` si l'id n'existe pas. */
@@ -155,4 +171,6 @@ export async function deleteSponsor(id: number): Promise<void> {
     [id]
   );
   if (res.affectedRows === 0) throw new Error("SPONSOR_NOT_FOUND");
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
 }
