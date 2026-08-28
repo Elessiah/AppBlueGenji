@@ -21,6 +21,7 @@ import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { AdminScoreDialog } from "./_components/AdminScoreDialog";
 import { GhostRegistrationDialog } from "./_components/GhostRegistrationDialog";
 import { SeedingEditor } from "./_components/SeedingEditor";
+import { BracketPreview } from "./_components/BracketPreview";
 import { MatchScoreDraft } from "./_components/BracketTree";
 import { BracketSections } from "./_components/BracketSections";
 import { SurvivalView } from "./_components/SurvivalView";
@@ -367,15 +368,24 @@ export default function TournamentDetailPage() {
           </div>
 
           {detail.card.state === "REGISTRATION" ? (
-            <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-              {formatForBracket === "SURVIVAL"
-                ? "Le classement de départ (seeding) et les rounds seront générés au démarrage du tournoi."
-                : detail.card.format === "BG_SURVIE"
-                  ? "Le classement de départ est celui du seeding ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi."
-                : detail.card.format === "SWISS"
-                  ? "Le classement de départ (seeding) et la première ronde seront générés au démarrage du tournoi."
-                  : "Le bracket sera généré automatiquement au démarrage du tournoi."}
-            </p>
+            <>
+              <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
+                {formatForBracket === "SURVIVAL"
+                  ? "Le classement de départ (seeding) et les rounds seront générés au démarrage du tournoi."
+                  : detail.card.format === "BG_SURVIE"
+                    ? "Le classement de départ est celui du seeding ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi."
+                  : detail.card.format === "SWISS"
+                    ? "Le classement de départ (seeding) et la première ronde seront générés au démarrage du tournoi."
+                    : "Le bracket sera généré automatiquement au démarrage du tournoi."}
+              </p>
+              {/* Aperçu réservé au staff et au cast : il n'existe pas pour les
+                  équipes, à qui le tirage ne doit rien révéler d'avance. */}
+              {detail.preview && (
+                <div style={{ marginTop: 18 }}>
+                  <BracketPreview preview={detail.preview} canReorder={detail.isAdmin} />
+                </div>
+              )}
+            </>
           ) : formatForBracket === "SURVIVAL" && detail.survival ? (
             <>
               <SurvivalView
@@ -494,9 +504,19 @@ export default function TournamentDetailPage() {
               )}
             </>
           ) : !filteredMatches.length ? (
-            <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-              Aucun match disponible pour l&apos;instant.
-            </p>
+            <>
+              <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
+                Aucun match disponible pour l&apos;instant.
+              </p>
+              {/* Tournoi pas encore ouvert aux inscriptions : l'aperçu montre au
+                  staff ce que donnerait le plateau (vide tant que personne n'est
+                  engagé). Il vaut `null` dès que le tournoi est lancé. */}
+              {detail.preview && (
+                <div style={{ marginTop: 18 }}>
+                  <BracketPreview preview={detail.preview} canReorder={detail.isAdmin} />
+                </div>
+              )}
+            </>
           ) : (
             <>
               {brackets.map(({ type, matches }) => (
