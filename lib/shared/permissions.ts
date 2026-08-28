@@ -11,16 +11,19 @@
  */
 
 /** Rôles attribuables à un utilisateur. Cumulables. */
-export type PlatformRole = "ADMIN" | "ARBITRE" | "COMMUNITY_MANAGER" | "RECRUTEUR";
+export type PlatformRole = "ADMIN" | "ARBITRE" | "COMMUNITY_MANAGER" | "RECRUTEUR" | "CASTER";
 
 /**
  * Domaines d'action protégés :
  * - `tournaments` — création et gestion des tournois / matchs.
  * - `showcase` — site vitrine (sponsors) + association (bureau, stats, bénévoles, contact).
  * - `recruitment` — page recrutement.
+ * - `live` — diffusion : marquer un match comme casté, sa chaîne, son antenne.
+ *   Volontairement séparée de `tournaments` : un streamer doit pouvoir ouvrir
+ *   l'antenne sans pouvoir toucher aux scores ni aux tournois.
  * - `roles` — attribution des rôles de permission aux utilisateurs (réservé ADMIN).
  */
-export type Permission = "tournaments" | "showcase" | "recruitment" | "roles";
+export type Permission = "tournaments" | "showcase" | "recruitment" | "live" | "roles";
 
 /** Tous les rôles, dans un ordre d'affichage stable (ADMIN en tête). */
 export const PLATFORM_ROLES: readonly PlatformRole[] = [
@@ -28,6 +31,7 @@ export const PLATFORM_ROLES: readonly PlatformRole[] = [
   "ARBITRE",
   "COMMUNITY_MANAGER",
   "RECRUTEUR",
+  "CASTER",
 ];
 
 /** Libellés FR pour l'UI. */
@@ -36,6 +40,7 @@ export const ROLE_LABELS: Record<PlatformRole, string> = {
   ARBITRE: "Arbitre",
   COMMUNITY_MANAGER: "Community Manager",
   RECRUTEUR: "Recruteur",
+  CASTER: "Caster",
 };
 
 /** Description courte du périmètre de chaque rôle (UI). */
@@ -44,13 +49,17 @@ export const ROLE_DESCRIPTIONS: Record<PlatformRole, string> = {
   ARBITRE: "Créer et gérer les tournois.",
   COMMUNITY_MANAGER: "Gérer le site vitrine et l'association.",
   RECRUTEUR: "Gérer la page recrutement.",
+  CASTER: "Diffuser les matchs en direct.",
 };
 
 const ROLE_PERMISSIONS: Record<PlatformRole, readonly Permission[]> = {
-  ADMIN: ["tournaments", "showcase", "recruitment", "roles"],
-  ARBITRE: ["tournaments"],
+  ADMIN: ["tournaments", "showcase", "recruitment", "live", "roles"],
+  // L'arbitre pilote le tournoi : il ouvre aussi l'antenne, sans quoi il
+  // faudrait deux personnes pour lancer un match casté.
+  ARBITRE: ["tournaments", "live"],
   COMMUNITY_MANAGER: ["showcase"],
   RECRUTEUR: ["recruitment"],
+  CASTER: ["live"],
 };
 
 /** Vrai si `value` est un `PlatformRole` connu. */

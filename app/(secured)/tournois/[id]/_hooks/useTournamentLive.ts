@@ -83,5 +83,11 @@ export function useTournamentLive(tournamentId: number) {
     tournament: detail,
     matches: detail?.matches ?? [],
     isLive,
+    /**
+     * Recharge à la demande. Le flux SSE couvre déjà le cas nominal, mais une
+     * connexion coupée laisserait l'écran sur un état périmé juste après une
+     * action du viewer.
+     */
+    reload: load,
   };
 }

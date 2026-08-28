@@ -20,6 +20,9 @@ import { canForfeitTeam } from "./_lib/forfeit";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { AdminScoreDialog } from "./_components/AdminScoreDialog";
 import { GhostRegistrationDialog } from "./_components/GhostRegistrationDialog";
+import { MatchLiveDialog } from "./_components/MatchLiveDialog";
+import { TournamentLiveLink } from "./_components/TournamentLiveLink";
+import { LiveProvider } from "./_lib/live-context";
 import { SeedingEditor } from "./_components/SeedingEditor";
 import { MatchScoreDraft } from "./_components/BracketTree";
 import { BracketSections } from "./_components/BracketSections";
@@ -67,10 +70,11 @@ export default function TournamentDetailPage() {
   const tournamentId = Number(params.id);
   const { showError, showSuccess } = useToast();
 
-  const { tournament: detail } = useTournamentLive(tournamentId);
+  const { tournament: detail, reload } = useTournamentLive(tournamentId);
   const [drafts, setDrafts] = useState<MatchScoreDraft>({});
   const [selectedMatchForAdmin, setSelectedMatchForAdmin] = useState<BracketMatch | null>(null);
   const [ghostRegistrationOpen, setGhostRegistrationOpen] = useState(false);
+  const [matchForLive, setMatchForLive] = useState<BracketMatch | null>(null);
   const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
 
   // Dernière phase courante observée. On ne resynchronise la sélection que
@@ -264,6 +268,7 @@ export default function TournamentDetailPage() {
       soloUserIds={detail.soloUserIds}
     >
       <MatchFormatProvider format={detail.card.matchFormat}>
+      <LiveProvider canManage={detail.canManageLive} openConfig={setMatchForLive}>
       <RulesHelpFab format={visibleFormat} contextLabel={contextLabel} />
       <section className="fade-in">
         <div className="ds-header green">
@@ -348,6 +353,17 @@ export default function TournamentDetailPage() {
                   {wording.guestCta}
                 </CyberButton>
               )}
+            </div>
+
+            {/* Chaîne officielle : antenne permanente du tournoi, distincte de
+                l'état « en direct » qui, lui, se joue au niveau des matchs. */}
+            <div style={{ marginTop: 14 }}>
+              <TournamentLiveLink
+                tournamentId={tournamentId}
+                liveUrl={detail.card.liveUrl}
+                canEdit={detail.isAdmin}
+                onSaved={() => void reload().catch(() => undefined)}
+              />
             </div>
           </div>
         </div>
@@ -578,6 +594,14 @@ export default function TournamentDetailPage() {
         onSubmitted={() => setSelectedMatchForAdmin(null)}
       />
 
+      {matchForLive && (
+        <MatchLiveDialog
+          match={matchForLive}
+          onClose={() => setMatchForLive(null)}
+          onSaved={() => void reload().catch(() => undefined)}
+        />
+      )}
+
       {ghostRegistrationOpen && (
         <GhostRegistrationDialog
           tournamentId={tournamentId}
@@ -585,6 +609,7 @@ export default function TournamentDetailPage() {
           onRegistered={() => router.refresh()}
         />
       )}
+      </LiveProvider>
       </MatchFormatProvider>
     </EntrantProvider>
   );

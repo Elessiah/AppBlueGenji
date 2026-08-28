@@ -167,6 +167,12 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     isAdult: 1,
   },
   {
+    pseudo: "Caster",
+    purpose: "permission live seule (diffusion des matchs)",
+    platformRoles: ["CASTER"],
+    isAdult: 1,
+  },
+  {
     pseudo: "MultiRole",
     purpose: "rôles cumulés arbitre + recruteur",
     platformRoles: ["ARBITRE", "RECRUTEUR"],
@@ -1128,6 +1134,39 @@ async function applyReportStates(
 // Tournois
 // ---------------------------------------------------------------------------
 
+/**
+ * Diffusion en direct d'un tournoi seedé.
+ *
+ * La chaîne officielle est posée sur le tournoi ; le mode de diffusion est
+ * appliqué aux seules manches encore jouables (`READY`), c'est-à-dire celles
+ * que la simulation n'a pas résolues. Poser un mode sur une manche déjà notée
+ * ne produirait rien de visible : l'état est dérivé, et un score saisi éteint
+ * le direct (`lib/shared/live-streams.ts`).
+ */
+async function applyLiveStreams(
+  db: Pool,
+  tournamentId: number,
+  def: TournamentDef
+): Promise<void> {
+  if (!def.live) return;
+
+  await db.execute(`UPDATE bg_tournaments SET live_url = ? WHERE id = ?`, [
+    def.live.url,
+    tournamentId,
+  ]);
+
+  const startedAt = def.live.trigger === "MANUAL" && def.live.onAir ? new Date() : null;
+  await db.execute(
+    `UPDATE bg_matches
+     SET live_trigger = ?, live_url = ?, live_started_at = ?
+     WHERE tournament_id = ?
+       AND status = 'READY'
+       AND team1_id IS NOT NULL
+       AND team2_id IS NOT NULL`,
+    [def.live.trigger, def.live.matchUrl ?? null, startedAt, tournamentId]
+  );
+}
+
 async function createTournament(
   db: Pool,
   organizerId: number,
@@ -1257,6 +1296,8 @@ async function createTournament(
       await applyReportStates(db, tournamentId, def);
     }
   }
+
+  await applyLiveStreams(db, tournamentId, def);
 
   const gameLabel = def.game === "OW2" ? "Overwatch" : "Marvel Rivals";
   console.log(

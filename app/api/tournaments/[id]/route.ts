@@ -13,7 +13,12 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     return fail("INVALID_TOURNAMENT_ID", 400);
   }
 
-  const detail = await getTournamentDetail(tournamentId, user.id, can(user, "tournaments"));
+  const detail = await getTournamentDetail(
+    tournamentId,
+    user.id,
+    can(user, "tournaments"),
+    can(user, "live"),
+  );
   if (!detail) return fail("TOURNAMENT_NOT_FOUND", 404);
 
   return ok(detail);

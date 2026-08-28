@@ -1010,6 +1010,43 @@ async function runMigrations(db: Pool): Promise<void> {
       INDEX idx_bg_site_visits_user (user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  // Migration: diffusion en direct. Le tournoi porte sa chaîne officielle ; le
+  // match porte, lui, son propre mode de déclenchement et sa propre chaîne — il
+  // n'hérite jamais de celle du tournoi (cf. `lib/shared/live-streams.ts`).
+  // `live_trigger IS NULL` est le marqueur « ce match n'est pas casté ».
+  try {
+    await db.execute(`
+      ALTER TABLE bg_tournaments
+      ADD COLUMN live_url VARCHAR(255) NULL
+    `);
+  } catch {
+    // Column already exists
+  }
+
+  for (const [column, definition] of [
+    ["live_trigger", "ENUM('AUTO', 'MANUAL') NULL"],
+    ["live_url", "VARCHAR(255) NULL"],
+    ["live_started_at", "DATETIME NULL"],
+  ] as const) {
+    try {
+      await db.execute(`ALTER TABLE bg_matches ADD COLUMN ${column} ${definition}`);
+    } catch {
+      // Column already exists
+    }
+  }
+
+  // Le bouton « Regarder le live » de l'accueil balaye les matchs castés de tous
+  // les tournois en cours : sans index, ce balayage lit toute la table de matchs
+  // à chaque chargement de la page d'accueil.
+  try {
+    await db.execute(`
+      ALTER TABLE bg_matches
+      ADD INDEX idx_bg_matches_live (live_trigger, status)
+    `);
+  } catch {
+    // Index already exists
+  }
 }
 
 async function ensureMigrations(db: Pool): Promise<void> {

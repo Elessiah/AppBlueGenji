@@ -51,6 +51,25 @@ export interface TournamentDef extends ReportStateCounts {
   description?: string | null;
   phases?: SeedPhase[]; // MULTI : phases successives du tournoi
   matchFormat?: MatchFormat; // format de match (BO5, FT3…) ; absent = score libre
+  live?: SeedLive; // diffusion en direct ; absent = aucune chaîne annoncée
+}
+
+/**
+ * Diffusion en direct d'un tournoi seedé.
+ *
+ * `trigger` s'applique aux manches restées jouables après simulation : c'est ce
+ * qui produit un match « en direct » (`AUTO`, ou `MANUAL` + `onAir`) ou
+ * seulement « programmé » (`MANUAL` seul). `matchUrl` reste distinct de `url`
+ * pour couvrir le cas d'un streamer indépendant.
+ */
+export interface SeedLive {
+  /** Chaîne officielle du tournoi. */
+  url: string;
+  trigger: "AUTO" | "MANUAL";
+  /** `MANUAL` : ouvre l'antenne d'office. Sans effet en `AUTO`. */
+  onAir?: boolean;
+  /** Chaîne portée par les matchs castés ; absente = badge sans lien. */
+  matchUrl?: string;
 }
 
 
@@ -88,6 +107,17 @@ export const TOURNAMENTS: TournamentDef[] = [
   { name: "11 Équipes Double", game: "OW2", state: "RUNNING", format: "DOUBLE", teamCount: 11, maxTeams: 16, daysOffset: -3, playWaves: 3 },
   { name: "12 Équipes Double (reports)", game: "MR", state: "RUNNING", format: "DOUBLE", teamCount: 12, maxTeams: 16, daysOffset: -4, playWaves: 2, pendingReports: 3, teamOffset: 12 },
   { name: "OW Champions League", game: "OW2", state: "RUNNING", format: "DOUBLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1 },
+
+  // ---- RUNNING · diffusion en direct ---------------------------------------
+  // Le cas nominal du bouton « Regarder le live » de l'accueil : chaîne
+  // officielle + manches castées en automatique, donc réellement à l'antenne.
+  { name: "Live Auto (à l'antenne)", game: "OW2", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 60, live: { url: "https://www.twitch.tv/bluegenji", trigger: "AUTO", matchUrl: "https://www.twitch.tv/bluegenji" } },
+  // Chaîne renseignée mais antenne fermée : les matchs restent « programmés »
+  // et ce tournoi ne doit PAS faire apparaître le bouton d'accueil.
+  { name: "Live Manuel (hors antenne)", game: "MR", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -2, playWaves: 1, teamOffset: 68, live: { url: "https://www.youtube.com/@bluegenji", trigger: "MANUAL" } },
+  // Antenne ouverte à la main, sans lien sur les matchs : badge « en direct »
+  // seul, le spectateur passe par la chaîne officielle.
+  { name: "Live Manuel (antenne ouverte)", game: "OW2", state: "RUNNING", format: "DOUBLE", teamCount: 8, maxTeams: 8, daysOffset: -3, playWaves: 1, teamOffset: 76, live: { url: "https://kick.com/bluegenji", trigger: "MANUAL", onAir: true } },
 
   // ---- RUNNING · BlueGenji Survie (endurance puis play-offs) ---------------
   // Capital réduit pour que des éliminations tombent vite, et petit plateau de

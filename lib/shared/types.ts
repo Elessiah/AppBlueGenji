@@ -1,4 +1,5 @@
 ﻿import type { MatchFormat } from "./match-format";
+import type { MatchLiveTrigger } from "./live-streams";
 import type { ParticipantType } from "./participants";
 import type { PlatformRole } from "./permissions";
 import type { DeepStats, TeamRankingPosition } from "./stats";
@@ -263,6 +264,11 @@ export type TournamentCard = {
    * score libre, comme les tournois créés avant cette fonctionnalité.
    */
   matchFormat: MatchFormat | null;
+  /**
+   * Chaîne officielle du tournoi (Twitch, YouTube, Kick). `null` = pas de
+   * diffusion annoncée. Les matchs n'en héritent jamais (`lib/shared/live-streams.ts`).
+   */
+  liveUrl: string | null;
 };
 
 export type TournamentBuckets = {
@@ -300,6 +306,12 @@ export type BracketMatch = {
   phaseId: number;
   /** Position de la manche au sein de la phase (null pour les tournois sans phases). */
   phasePosition: number | null;
+  /** Mode de passage à l'antenne ; `null` = match non casté. */
+  liveTrigger: MatchLiveTrigger | null;
+  /** Chaîne diffusant ce match ; `null` = casté sans lien public. */
+  liveUrl: string | null;
+  /** Ouverture d'antenne (mode `MANUAL`) ; `null` = antenne fermée. */
+  liveStartedAt: string | null;
 };
 
 export type TournamentDetail = {
@@ -322,6 +334,11 @@ export type TournamentDetail = {
   myTeamId: number | null;
   canCreateReportsForTeamIds: number[];
   isAdmin: boolean;
+  /**
+   * Le viewer porte-t-il la permission `live` (ADMIN, ARBITRE, CASTER) ? Ouvre
+   * les contrôles de diffusion des matchs, distincts des droits d'arbitrage.
+   */
+  canManageLive: boolean;
   /** Métadonnées du mode Survie (null pour les autres formats). */
   survival: SurvivalMeta | null;
   /** Métadonnées du mode Ronde suisse (null pour les autres formats). */
