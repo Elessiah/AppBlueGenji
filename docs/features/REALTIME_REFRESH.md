@@ -28,7 +28,13 @@ Il est donc scindé en deux :
 - **`TournamentSnapshot`** — plateau, inscrites, classements, phases. Identique
   pour tous, calculé **une seule fois**.
 - **`TournamentViewerContext`** — ce que *ce* lecteur peut faire (son engagement,
-  ses droits). Ne change qu'à l'inscription.
+  ses droits), **et ce qu'il a le droit de voir**. Ne change qu'à l'inscription.
+
+  L'aperçu du plateau avant lancement (`TOURNAMENT_PREVIEW.md`) vit ici, et non
+  dans l'instantané : celui-ci part tel quel à tous les abonnés du flux, alors
+  que l'aperçu est réservé aux permissions `tournaments` et `casting`. C'est la
+  règle générale de la scission — tout ce qui dépend d'un droit reste hors de ce
+  qui est diffusé.
 
 `TournamentDetail = TournamentSnapshot & TournamentViewerContext` : les
 appelants existants ne voient aucune différence.
