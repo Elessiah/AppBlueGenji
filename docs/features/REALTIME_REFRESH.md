@@ -103,9 +103,11 @@ côté.
    de « Prochainement » à « Inscriptions » **à la seconde dite**, sans aucune
    requête. L'horaire est public et déjà présent dans la carte ; le serveur
    reste seul juge de ce qu'il autorise.
-4. **La reconnexion n'abandonne jamais** : attente exponentielle plafonnée à
-   60 s, avec une gigue de ±25 % pour que tous les onglets ne reviennent pas à
-   la même milliseconde après un redémarrage.
+4. **La reconnexion n'abandonne jamais** : plafond exponentiel jusqu'à 60 s,
+   avec une attente **tirée au hasard dans tout l'intervalle** (« full jitter »)
+   et un plancher de 250 ms. Au redémarrage du serveur, toutes les pages
+   ouvertes tombent à la même seconde : une gigue étroite les ferait revenir
+   dans la même demi-seconde, et chaque reconnexion prend une connexion du pool.
 5. **La salle se réveille à l'heure exacte** de la prochaine bascule d'état,
    pour toute la salle d'un coup — plutôt que de laisser cent clients se
    réveiller chacun de leur côté à la même seconde.
@@ -154,11 +156,25 @@ Fenêtre fixe, en mémoire, volontairement approximative. Les plafonds sont
 | `GET /api/tournaments`, `GET /api/tournaments/:id` | 90 / min | utilisateur |
 | `GET /api/landing/*` | 180 / min | IP (via le proxy de confiance) |
 | `POST /api/visits` | 60 / min | IP |
+| `GET /api/tournaments/:id/stream` (ouvertures) | 30 / min | utilisateur |
 | Flux SSE simultanés | 4 | utilisateur |
+
+Le plafond d'**ouvertures** du flux est distinct de celui des flux
+*simultanés* : une fermeture libère aussitôt la place, si bien qu'une boucle
+ouverture/fermeture échapperait au second tout en refaisant à chaque tour le
+travail le plus cher de la route.
 
 L'IP retenue est celle **ajoutée par le proxy** (`X-Forwarded-For` lu depuis la
 droite sur `TRUSTED_PROXY_HOPS` relais) : un en-tête forgé ne permet pas de se
 fabriquer une identité neuve à chaque requête.
+
+**Une identité absente n'est pas plafonnée.** Sans en-tête de proxy — `next
+start` exposé directement, reverse-proxy déployé sans `proxy_set_header
+X-Forwarded-For`, banc d'essai local — *tous* les visiteurs partageraient sinon
+le même seau, et cent joueurs se verraient refuser la page d'accueil au bout de
+180 requêtes cumulées : le garde-fou provoquerait la panne qu'il doit éviter. On
+préfère ne pas compter que compter faux ; la croissance de la table de
+fréquentation, elle, reste bornée par le plafond d'**insertions** du service.
 
 Le limiteur d'insertions du compteur de fréquentation, jusqu'ici écrit à la
 main dans `site-visits-service.ts`, s'appuie maintenant sur le même module.
@@ -223,6 +239,20 @@ main dans `site-visits-service.ts`, s'appuie maintenant sur le même module.
   données viennent du hook. Remplacé par le vrai rafraîchissement.
 - **Le battement de cœur SSE** est une ligne de commentaire (`: ping`) et non un
   message JSON : elle traverse les proxys sans réveiller le client.
+- **Un signal déjà avorté ne déclenche jamais son écouteur** : la route de flux
+  teste `req.signal.aborted` avant de s'y abonner. Sans ce contrôle, un client
+  qui abandonne pendant les attentes qui précèdent (session, instantané,
+  contexte du lecteur) laisserait sa place de flux prise pour la durée de vie du
+  processus — et au bout de quatre F5 rapides, se verrait refuser son propre
+  tournoi.
+- **La trame SSE est assemblée sans re-sérialiser l'instantané** : l'empreinte
+  et l'enveloppe partagent le même JSON. Le raccourci n'assemble que des valeurs
+  passées par `JSON.stringify`, et `tests/lib/server/tournament-snapshot-frame.test.ts`
+  vérifie que la trame se relit bien en l'instantané de départ.
+- **Le retour sur l'onglet ne relit que si le flux est coupé.** Relire par-dessus
+  un flux vivant relancerait, à la fin d'une manche, la centaine de requêtes que
+  ce flux existe pour éviter. Les deux chemins (SSE et REST) sautent par ailleurs
+  une mise à jour dont la `version` est déjà connue.
 - **`X-Accel-Buffering: no`** neutralise la mise en tampon d'un reverse proxy,
   qui retiendrait les messages et ferait croire à un flux mort.
 

@@ -128,8 +128,37 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
 }
 
 /** Empreinte stable du contenu, pour n'envoyer que ce qui a réellement changé. */
-function snapshotVersion(payload: Omit<TournamentSnapshot, "version">): string {
-  return createHash("sha1").update(JSON.stringify(payload)).digest("base64url").slice(0, 16);
+function snapshotVersion(payloadJson: string): string {
+  return createHash("sha1").update(payloadJson).digest("base64url").slice(0, 16);
+}
+
+/**
+ * Assemble la trame SSE **sans re-sérialiser l'instantané**.
+ *
+ * L'empreinte se calcule déjà sur le JSON du contenu ; le repasser dans un
+ * `JSON.stringify` d'enveloppe referait le même travail sur les mêmes 150 ko
+ * (mesure faite sur un tournoi à 128 équipes, 254 matchs) à chaque
+ * construction, sur une machine qui n'en a pas les moyens. On referme donc
+ * l'objet déjà sérialisé après y avoir glissé sa version.
+ *
+ * Assembler du JSON à la main mérite ses garde-fous, et il y en a trois :
+ * chaque valeur insérée passe par `JSON.stringify` (rien n'est concaténé sans
+ * échappement), le cas de l'objet vide est traité à part, et
+ * `tests/lib/server/tournament-snapshot-frame.test.ts` vérifie que la trame se
+ * relit bien en l'instantané de départ. Exportée pour ce test.
+ */
+export function buildFrame(
+  tournamentId: number,
+  payloadJson: string,
+  version: string,
+): Uint8Array {
+  const encodedVersion = JSON.stringify(version);
+  const body = payloadJson.slice(1, -1);
+  const snapshotJson = body ? `{${body},"version":${encodedVersion}}` : `{"version":${encodedVersion}}`;
+  return encoder.encode(
+    `data: {"type":"snapshot","tournamentId":${JSON.stringify(tournamentId)},` +
+      `"version":${encodedVersion},"snapshot":${snapshotJson}}\n\n`,
+  );
 }
 
 async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFrame | null> {
@@ -218,13 +247,11 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
       soloUserIds,
     };
 
-    const version = snapshotVersion(payload);
+    const payloadJson = JSON.stringify(payload);
+    const version = snapshotVersion(payloadJson);
     const snapshot: TournamentSnapshot = { ...payload, version };
-    const frame = encoder.encode(
-      `data: ${JSON.stringify({ type: "snapshot", tournamentId, version, snapshot })}\n\n`,
-    );
 
-    return { snapshot, version, frame };
+    return { snapshot, version, frame: buildFrame(tournamentId, payloadJson, version) };
   } finally {
     connection.release();
   }

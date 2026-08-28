@@ -1,22 +1,9 @@
 import { getCurrentUser } from "@/lib/server/auth";
-import { enforceRateLimit, requestClientIp } from "@/lib/server/api-guard";
+import { enforceRateLimit, requestClientIp, VISIT_REQUEST_RULE } from "@/lib/server/api-guard";
 import { ok } from "@/lib/server/http";
 import { recordSiteVisit, syncSiteVisitStatsToBot } from "@/lib/server/site-visits-service";
-import type { RateLimitRule } from "@/lib/server/rate-limit";
 
 export const dynamic = "force-dynamic";
-
-/**
- * Plafond de **requêtes** par IP, distinct du plafond d'**insertions** appliqué
- * par le service. Celui-ci borne le travail fait avant même de savoir s'il y a
- * une visite à enregistrer : résolution de session et lecture de la fenêtre. Il
- * est large — un visiteur normal envoie deux pings par heure.
- */
-const VISIT_REQUEST_RULE: RateLimitRule = {
-  name: "site-visits-request",
-  limit: 60,
-  windowMs: 60_000,
-};
 
 /**
  * Enregistre une visite du site. Appelé par `<VisitTracker />` à chaque

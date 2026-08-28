@@ -48,10 +48,17 @@ function bucketOf(rule: RateLimitRule): Map<string, Counter> {
   return bucket;
 }
 
-/** Clé d'identité normalisée : une identité vide reste comptée, toutes ensemble. */
+/**
+ * Clé rendue pour une identité absente ou vide. Les appelants qui ne peuvent
+ * pas distinguer leurs clients doivent la reconnaître plutôt que de tout
+ * compter ensemble — voir `api-guard.enforceRateLimit`.
+ */
+export const ANONYMOUS_IDENTITY = "anonymous";
+
+/** Clé d'identité normalisée. */
 export function rateLimitIdentity(value: string | number | null | undefined): string {
   const text = typeof value === "number" ? String(value) : (value ?? "").trim();
-  return text || "anonymous";
+  return text || ANONYMOUS_IDENTITY;
 }
 
 /** État courant d'une clé, sans rien décompter. */

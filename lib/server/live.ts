@@ -39,8 +39,4 @@ export function subscribeTournament(
   return () => emitter.off(key(tournamentId), listener);
 }
 
-export function getSubscribersCount(tournamentId: number): number {
-  return getEmitter().listenerCount(key(tournamentId));
-}
-
 export type { TournamentLiveEvent };

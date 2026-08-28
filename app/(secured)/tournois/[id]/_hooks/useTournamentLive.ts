@@ -70,6 +70,10 @@ export function useTournamentLive(tournamentId: number) {
         const payload = (await response.json()) as TournamentDetail & { error?: string };
         if (!response.ok) throw new Error(payload.error || "TOURNAMENT_LOAD_FAILED");
 
+        // Même déduplication que le chemin SSE : sans elle, chaque sondage de
+        // secours redessinerait l'arbre entier — 254 matchs sur un gros
+        // plateau — alors que rien n'a bougé.
+        if (payload.version && payload.version === stateRef.current.detail?.version) return;
         commit({ tier: stateRef.current.tier, detail: payload });
       } catch (e) {
         if (!silent) showError(mapError((e as Error).message));
@@ -178,10 +182,14 @@ export function useTournamentLive(tournamentId: number) {
     const onVisible = () => {
       if (cancelled || document.visibilityState !== "visible") return;
 
+      // Tant que le flux tient, la donnée est déjà à jour : la relire ferait
+      // repartir, à la fin d'une manche, la centaine de requêtes simultanées
+      // que ce flux existe précisément pour éviter. On ne relit donc que
+      // lorsqu'il est coupé.
       const now = Date.now();
       const stale = now - lastUpdateAtRef.current > FOCUS_REFRESH_MIN_INTERVAL_MS;
       const recentlyFetched = now - lastFetchAtRef.current < FOCUS_REFRESH_MIN_INTERVAL_MS;
-      if (stale && !recentlyFetched) void load(true);
+      if (!source && stale && !recentlyFetched) void load(true);
 
       if (!source && reconnectTimer !== null) {
         clearTimeout(reconnectTimer);

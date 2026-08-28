@@ -8,8 +8,8 @@ import type {
 } from "@/lib/shared/types";
 import {
   INITIAL_LIVE_STATE,
-  RECONNECT_BASE_MS,
   RECONNECT_MAX_MS,
+  RECONNECT_MIN_MS,
   applyLiveMessage,
   parseLiveMessage,
   reconnectDelayMs,
@@ -346,32 +346,35 @@ describe("shouldPlayScoreReady", () => {
 });
 
 describe("reconnectDelayMs", () => {
-  const noJitter = () => 0.5;
+  const top = () => 1;
 
-  it("croît exponentiellement", () => {
-    expect(reconnectDelayMs(1, noJitter)).toBe(1_000);
-    expect(reconnectDelayMs(2, noJitter)).toBe(2_000);
-    expect(reconnectDelayMs(3, noJitter)).toBe(4_000);
+  it("relève exponentiellement le plafond de tirage", () => {
+    expect(reconnectDelayMs(1, top)).toBe(1_000);
+    expect(reconnectDelayMs(2, top)).toBe(2_000);
+    expect(reconnectDelayMs(3, top)).toBe(4_000);
   });
 
   it("plafonne l'attente", () => {
     // Sans plafond, quelques dizaines d'échecs mèneraient à des attentes de
     // plusieurs jours — page morte jusqu'au F5, ce qu'on cherche à éviter.
-    expect(reconnectDelayMs(50, noJitter)).toBe(RECONNECT_MAX_MS);
-    expect(reconnectDelayMs(500, noJitter)).toBe(RECONNECT_MAX_MS);
+    expect(reconnectDelayMs(50, top)).toBe(RECONNECT_MAX_MS);
+    expect(reconnectDelayMs(500, top)).toBe(RECONNECT_MAX_MS);
   });
 
-  it("étale les reconnexions", () => {
-    // Après un redémarrage du serveur, tous les onglets reviennent en même
-    // temps : la gigue évite qu'ils refassent tomber ce qui vient de se lever.
-    const low = reconnectDelayMs(5, () => 0);
-    const high = reconnectDelayMs(5, () => 1);
-    expect(low).toBeLessThan(high);
+  it("tire dans TOUT l'intervalle dès la première tentative", () => {
+    // Au redémarrage du serveur, toutes les pages ouvertes tombent à la même
+    // seconde. Une gigue étroite les ferait revenir dans la même demi-seconde,
+    // et chaque reconnexion prend une connexion du pool : la reprise doit
+    // s'étaler sur toute la fenêtre, pas se resserrer autour de sa borne haute.
+    expect(reconnectDelayMs(1, () => 0.4)).toBe(400);
+    expect(reconnectDelayMs(1, () => 0.9)).toBe(900);
   });
 
-  it("ne descend jamais sous l'attente de base", () => {
-    expect(reconnectDelayMs(1, () => 0)).toBeGreaterThanOrEqual(RECONNECT_BASE_MS);
-    expect(reconnectDelayMs(0, () => 0)).toBeGreaterThanOrEqual(RECONNECT_BASE_MS);
-    expect(reconnectDelayMs(-3, () => 0)).toBeGreaterThanOrEqual(RECONNECT_BASE_MS);
+  it("garde un plancher pour ne pas boucler à vide", () => {
+    // Une erreur immédiate (401, 429) ne doit pas produire une rafale de
+    // reconnexions à zéro milliseconde.
+    expect(reconnectDelayMs(1, () => 0)).toBe(RECONNECT_MIN_MS);
+    expect(reconnectDelayMs(0, () => 0)).toBe(RECONNECT_MIN_MS);
+    expect(reconnectDelayMs(-3, () => 0)).toBe(RECONNECT_MIN_MS);
   });
 });

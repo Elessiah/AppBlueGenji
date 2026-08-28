@@ -11,6 +11,7 @@
  * quel que soit le nombre de spectateurs.
  */
 import { getCurrentUser } from "@/lib/server/auth";
+import { enforceRateLimit, STREAM_OPEN_RULE } from "@/lib/server/api-guard";
 import {
   acquireStreamSlot,
   joinTournamentRoom,
@@ -37,6 +38,13 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   if (!user) {
     return new Response("Unauthorized", { status: 401 });
   }
+
+  // Le plafond de flux simultanés ne borne pas le *rythme* d'ouverture : un
+  // client qui ouvre et referme en boucle libère sa place à chaque fermeture et
+  // y échapperait, tout en refaisant à chaque tour le travail le plus cher de
+  // la route (session, instantané, contexte du lecteur).
+  const throttled = enforceRateLimit(STREAM_OPEN_RULE, user.id);
+  if (throttled) return throttled;
 
   const { id } = await context.params;
   const tournamentId = Number(id);
@@ -119,6 +127,16 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
         }
       }
 
+      // Un signal DÉJÀ avorté ne déclenche jamais son écouteur. Or la place de
+      // flux est réservée après plusieurs attentes (session, instantané,
+      // contexte du lecteur) : un client qui martèle F5 abandonne pendant
+      // celles-ci, et sans ce contrôle sa place — comme son abonnement à la
+      // salle — resterait prise pour la durée de vie du processus. Quatre fois,
+      // et l'utilisateur se retrouve en 429 sur son propre tournoi.
+      if (req.signal.aborted) {
+        cleanup();
+        return;
+      }
       req.signal.addEventListener("abort", cleanup);
     },
   });

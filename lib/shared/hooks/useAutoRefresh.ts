@@ -28,14 +28,15 @@ type AutoRefreshOptions = {
  * 3. **une période de fond**, ajustée au palier du lecteur
  *    (`lib/shared/refresh-tiers.ts`).
  *
- * Deux garde-fous qui comptent autant que le reste : rien ne part quand
- * l'onglet est caché — cent onglets oubliés ne doivent rien coûter — et les
- * déclenchements par focus sont étranglés.
+ * Trois garde-fous qui comptent autant que le reste : rien ne part quand
+ * l'onglet est caché — cent onglets oubliés ne doivent rien coûter —, les
+ * déclenchements par focus sont étranglés, et le rappel reçoit un
+ * `AbortSignal` qui lui permet d'abandonner sa requête au démontage.
  */
 export function useAutoRefresh(
-  refresh: () => void | Promise<void>,
+  refresh: (signal: AbortSignal) => void | Promise<void>,
   { intervalMs, enabled = true, focusMinIntervalMs = FOCUS_REFRESH_MIN_INTERVAL_MS }: AutoRefreshOptions,
-) {
+): void {
   // `refresh` est relu à chaque déclenchement : une fonction recréée à chaque
   // rendu ne doit pas relancer le minuteur.
   const refreshRef = useRef(refresh);
@@ -45,9 +46,17 @@ export function useAutoRefresh(
   useEffect(() => {
     if (!enabled || intervalMs <= 0) return;
 
+    // Un rafraîchissement en vol est abandonné au démontage — et par le
+    // suivant : sans cela, une réponse tardive écraserait une plus fraîche, et
+    // continuerait de consommer un lien déjà contraint pour une page que
+    // personne ne regarde plus.
+    let controller: AbortController | null = null;
+
     const run = () => {
+      controller?.abort();
+      controller = new AbortController();
       lastRunAtRef.current = Date.now();
-      void refreshRef.current();
+      void refreshRef.current(controller.signal);
     };
 
     const interval = setInterval(() => {
@@ -65,16 +74,10 @@ export function useAutoRefresh(
     window.addEventListener("online", onWake);
 
     return () => {
+      controller?.abort();
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onWake);
       window.removeEventListener("online", onWake);
     };
   }, [enabled, intervalMs, focusMinIntervalMs]);
-
-  /** À appeler après un chargement manuel, pour ne pas en réarmer un aussitôt. */
-  return {
-    markRefreshed: () => {
-      lastRunAtRef.current = Date.now();
-    },
-  };
 }

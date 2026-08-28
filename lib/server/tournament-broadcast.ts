@@ -132,7 +132,13 @@ function closeRoom(tournamentId: number, room: Room): void {
   room.unsubscribe();
   clearInterval(room.maintenance);
   if (room.flushTimer) clearTimeout(room.flushTimer);
-  rooms.delete(tournamentId);
+
+  // Une salle peut se vider pendant qu'un envoi est en attente : le temps que
+  // celui-ci reprenne, une salle NEUVE a pu prendre sa place dans le registre.
+  // La retirer serait la condamner à vivre hors du registre — son écouteur et
+  // son battement continueraient, un prochain abonné en ouvrirait une
+  // troisième, et les instantanés partiraient en double.
+  if (rooms.get(tournamentId) === room) rooms.delete(tournamentId);
 }
 
 /**

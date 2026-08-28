@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
 import {
   LANDING_READ_RULE,
+  STREAM_OPEN_RULE,
   TOURNAMENT_READ_RULE,
+  VISIT_REQUEST_RULE,
   enforceRateLimit,
   requestClientIp,
 } from "@/lib/server/api-guard";
@@ -77,11 +79,20 @@ describe("enforceRateLimit", () => {
     expect(response.headers.get("Cache-Control")).toBe("no-store");
   });
 
-  it("range les clients non identifiés ensemble", () => {
-    // Sans identité, un client pourrait sinon échapper à tout plafond.
-    expect(enforceRateLimit(RULE, null)).toBeNull();
-    expect(enforceRateLimit(RULE, undefined)).toBeNull();
-    expect(enforceRateLimit(RULE, "")).not.toBeNull();
+  it("ne plafonne pas ce qu'il ne sait pas distinguer", () => {
+    // Sans en-tête de proxy, TOUS les visiteurs partagent la même identité : les
+    // plafonner ensemble refuserait la page d'accueil à cent joueurs au bout de
+    // 180 requêtes cumulées. On préfère ne pas compter que compter faux.
+    for (let i = 0; i < 20; i += 1) {
+      expect(enforceRateLimit(RULE, null)).toBeNull();
+      expect(enforceRateLimit(RULE, undefined)).toBeNull();
+      expect(enforceRateLimit(RULE, "   ")).toBeNull();
+    }
+
+    // Une identité connue reste plafonnée normalement.
+    enforceRateLimit(RULE, "1.2.3.4");
+    enforceRateLimit(RULE, "1.2.3.4");
+    expect(enforceRateLimit(RULE, "1.2.3.4")).not.toBeNull();
   });
 });
 
@@ -95,6 +106,27 @@ describe("plafonds des routes", () => {
   });
 
   it("garde des seaux distincts par route", () => {
-    expect(TOURNAMENT_READ_RULE.name).not.toBe(LANDING_READ_RULE.name);
+    const names = [
+      TOURNAMENT_READ_RULE,
+      LANDING_READ_RULE,
+      STREAM_OPEN_RULE,
+      VISIT_REQUEST_RULE,
+    ].map((rule) => rule.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("rassemble tous les plafonds au même endroit", () => {
+    // Un plafond déclaré dans son fichier de route échapperait à cet inventaire
+    // — et donc à toute vérification de cohérence.
+    for (const rule of [TOURNAMENT_READ_RULE, LANDING_READ_RULE, STREAM_OPEN_RULE, VISIT_REQUEST_RULE]) {
+      expect(rule.limit).toBeGreaterThan(0);
+      expect(rule.windowMs).toBeGreaterThan(0);
+    }
+  });
+
+  it("borne le rythme d'ouverture des flux, que le plafond de flux simultanés laisse passer", () => {
+    // Une fermeture libère aussitôt la place : sans ce seau, une boucle
+    // ouverture/fermeture referait indéfiniment le travail le plus cher.
+    expect(STREAM_OPEN_RULE.limit).toBeLessThan(TOURNAMENT_READ_RULE.limit);
   });
 });

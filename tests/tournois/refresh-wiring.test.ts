@@ -45,6 +45,17 @@ describe("flux SSE — ce qui part à la connexion", () => {
     expect(stream).toContain('req.signal.addEventListener("abort", cleanup)');
   });
 
+  it("nettoie aussi quand la requête est déjà abandonnée", () => {
+    // Un signal déjà avorté ne déclenche jamais son écouteur : sans ce
+    // contrôle, la place de flux resterait prise pour toujours — et au bout de
+    // quatre F5 rapides, l'utilisateur se verrait refuser son propre tournoi.
+    expect(stream).toMatch(/if \(req\.signal\.aborted\) \{\s*cleanup\(\);\s*return;/);
+  });
+
+  it("borne aussi le rythme d'ouverture", () => {
+    expect(stream).toContain("enforceRateLimit(STREAM_OPEN_RULE, user.id)");
+  });
+
   it("garde la connexion ouverte sans réveiller le client", () => {
     // Une ligne de commentaire SSE n'est pas remise à `onmessage`.
     expect(stream).toContain("`: ping\\n\\n`");
@@ -78,6 +89,18 @@ describe("hook temps réel", () => {
     expect(hook).toContain('document.visibilityState === "hidden"');
     // Et le sondage s'arrête dès que le flux revient.
     expect(hook).toMatch(/source\.onopen[\s\S]*?stopFallback\(\)/);
+  });
+
+  it("ne relit pas par-dessus un flux vivant", () => {
+    // Sinon, à la fin d'une manche, cent spectateurs revenant sur leur onglet
+    // relancent la centaine de requêtes que le flux existe pour éviter.
+    expect(hook).toContain("if (!source && stale && !recentlyFetched) void load(true)");
+  });
+
+  it("ignore une lecture qui n'apporte rien", () => {
+    expect(hook).toContain(
+      "if (payload.version && payload.version === stateRef.current.detail?.version) return;",
+    );
   });
 
   it("libère tout au démontage", () => {
@@ -118,7 +141,7 @@ describe("liste des tournois", () => {
   it("tait l'échec des rafraîchissements de fond", () => {
     // Un incident réseau passager ne doit pas couvrir l'écran de notifications.
     expect(listPage).toContain("if (failure && !silent) showError");
-    expect(listPage).toContain("useAutoRefresh(() => load(true)");
+    expect(listPage).toContain("useAutoRefresh((signal) => load(true, signal)");
   });
 
   it("fait basculer les états sans requête", () => {
@@ -137,12 +160,14 @@ describe("instantané partagé", () => {
 
   it("porte une empreinte du contenu", () => {
     expect(snapshot).toContain("function snapshotVersion");
-    expect(snapshot).toContain("const version = snapshotVersion(payload);");
+    expect(snapshot).toContain("const version = snapshotVersion(payloadJson);");
   });
 
-  it("encode la trame une seule fois", () => {
-    // Elle part telle quelle à tous les abonnés de la salle.
-    expect(snapshot).toContain("const frame = encoder.encode(");
+  it("ne sérialise l'instantané qu'une fois", () => {
+    // Le hachage et la trame partagent le même JSON : sur un plateau de 254
+    // matchs (~150 ko), le sérialiser deux fois se paie à chaque construction.
+    expect(snapshot).toContain("const payloadJson = JSON.stringify(payload);");
+    expect(snapshot.match(/JSON\.stringify\(payload\)/g)).toHaveLength(1);
   });
 
   it("mutualise la construction", () => {

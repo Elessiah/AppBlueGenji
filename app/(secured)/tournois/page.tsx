@@ -37,8 +37,8 @@ const TABS: { key: Tab; id: string; label: string }[] = [
   { key: "mine", id: "tournaments-tab-mine", label: "Mes tournois" },
 ];
 
-async function fetchBuckets(url: string): Promise<TournamentBuckets> {
-  const response = await fetch(url, { cache: "no-store" });
+async function fetchBuckets(url: string, signal?: AbortSignal): Promise<TournamentBuckets> {
+  const response = await fetch(url, { cache: "no-store", signal });
   const payload = (await response.json()) as {
     error?: string;
     buckets?: TournamentBuckets;
@@ -64,15 +64,15 @@ export default function TournamentsPage() {
   // notifications pour un incident réseau passager. Seul le premier chargement,
   // celui que l'utilisateur attend, signale son échec.
   const load = useCallback(
-    async (silent = false) => {
+    async (silent = false, signal?: AbortSignal) => {
       // Les deux listes partent ensemble : celle de l'onglet « Mes tournois »
       // est la seule à porter les tournois pas encore visibles, et c'est elle
       // qui dit si l'onglet doit exister. Elles se règlent en revanche
       // séparément — l'onglet est un complément, son échec ne doit pas emporter
       // la liste que tout le monde vient voir.
       const [all, mine] = await Promise.allSettled([
-        fetchBuckets("/api/tournaments"),
-        fetchBuckets("/api/tournaments?scope=mine"),
+        fetchBuckets("/api/tournaments", signal),
+        fetchBuckets("/api/tournaments?scope=mine", signal),
       ]);
       if (all.status === "fulfilled") setBuckets(all.value);
       if (mine.status === "fulfilled") setMyBuckets(mine.value);
@@ -81,13 +81,18 @@ export default function TournamentsPage() {
       // incident les touche presque toujours ensemble.
       const failure =
         all.status === "rejected" ? all.reason : mine.status === "rejected" ? mine.reason : null;
+      // Une requête abandonnée (démontage, rafraîchissement suivant) n'est pas
+      // un incident : la page n'a plus rien à afficher de toute façon.
+      if (signal?.aborted) return;
       if (failure && !silent) showError((failure as Error).message);
     },
     [showError],
   );
 
   useEffect(() => {
-    void load();
+    const controller = new AbortController();
+    void load(false, controller.signal);
+    return () => controller.abort();
   }, [load]);
 
   // Aucun flux SSE sur cette page : elle se tient à jour toute seule par le
@@ -95,7 +100,7 @@ export default function TournamentsPage() {
   // fond, rare pour les spectateurs, plus fréquente pour le staff. Côté
   // serveur, la liste publique est mutualisée : ces relectures ne coûtent
   // presque rien (`lib/server/tournaments/list-cache.ts`).
-  useAutoRefresh(() => load(true), {
+  useAutoRefresh((signal) => load(true, signal), {
     intervalMs: REFRESH_CADENCE[resolveRefreshTier({ isStaff: isAdmin })].listIntervalMs,
   });
 

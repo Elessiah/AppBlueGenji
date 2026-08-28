@@ -53,7 +53,6 @@ export function VisitTracker() {
 
     const send = () => {
       if (pingedRecently()) return;
-      rememberPing();
 
       fetch("/api/visits", {
         method: "POST",
@@ -61,9 +60,15 @@ export function VisitTracker() {
         body: JSON.stringify({ path: window.location.pathname }),
         keepalive: true,
         signal: controller.signal,
-      }).catch(() => {
-        // Fréquentation = agrément : jamais de bruit dans la console du visiteur.
-      });
+      })
+        // Marqué seulement une fois l'envoi abouti : poser la marque avant
+        // ferait perdre la visite pour toute la fenêtre si la requête échoue
+        // (réseau coupé, serveur en redémarrage) alors que rien n'a été
+        // enregistré côté serveur.
+        .then(() => rememberPing())
+        .catch(() => {
+          // Fréquentation = agrément : jamais de bruit dans la console du visiteur.
+        });
     };
 
     // `requestIdleCallback` n'existe pas partout (Safari historique) : le repli

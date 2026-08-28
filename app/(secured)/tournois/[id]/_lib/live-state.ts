@@ -170,22 +170,27 @@ export function shouldPlayScoreReady(
   return false;
 }
 
-/** Première attente de reconnexion, en millisecondes. */
+/** Plafond exponentiel de départ, en millisecondes. */
 export const RECONNECT_BASE_MS = 1_000;
 /** Plafond de l'attente. Au-delà, on retente simplement toutes les minutes. */
 export const RECONNECT_MAX_MS = 60_000;
+/** Plancher, pour ne jamais boucler à vide sur une erreur immédiate. */
+export const RECONNECT_MIN_MS = 250;
 
 /**
  * Attente avant la `attempt`-ième reconnexion (1 = première).
  *
- * Croissance exponentielle plafonnée, plus une gigue de ±25 %. La gigue n'est
- * pas cosmétique : quand le serveur redémarre, tous les onglets ouverts se
- * reconnectent en même temps — sans elle, ils reviennent tous à la même
- * milliseconde et refont tomber ce qui vient de se relever.
+ * Croissance exponentielle plafonnée, tirée **au hasard dans tout
+ * l'intervalle** (« full jitter ») plutôt qu'autour de la borne haute.
+ *
+ * Ce n'est pas cosmétique : au redémarrage du serveur, toutes les pages
+ * ouvertes voient leur flux tomber à la même seconde. Une gigue étroite les
+ * ferait toutes revenir dans la même demi-seconde, et chaque reconnexion prend
+ * une connexion du pool (25) — de quoi refaire tomber ce qui vient de se
+ * relever. Tirer dans tout l'intervalle étale la reprise, pour un coût nul.
  */
 export function reconnectDelayMs(attempt: number, random: () => number = Math.random): number {
   const exponent = Math.max(0, Math.trunc(attempt) - 1);
-  const base = Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * 2 ** exponent);
-  const jitter = base * 0.25 * (random() * 2 - 1);
-  return Math.max(RECONNECT_BASE_MS, Math.round(base + jitter));
+  const ceiling = Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * 2 ** exponent);
+  return Math.max(RECONNECT_MIN_MS, Math.round(random() * ceiling));
 }

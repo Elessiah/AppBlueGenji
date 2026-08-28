@@ -41,9 +41,9 @@ export function LiveCard({ initialLive, nextUpcomingISO }: LiveCardProps) {
   // l'onglet est caché. Sans cela, cent visiteurs sur l'accueil produisaient à
   // eux seuls dix requêtes par seconde sur une agrégation de tous les tournois.
   useAutoRefresh(
-    async () => {
+    async (signal) => {
       try {
-        const response = await fetch("/api/landing/live", { cache: "no-store" });
+        const response = await fetch("/api/landing/live", { cache: "no-store", signal });
         if (!response.ok) return;
 
         const payload = (await response.json()) as LiveResponse;
@@ -60,7 +60,8 @@ export function LiveCard({ initialLive, nextUpcomingISO }: LiveCardProps) {
           : "EN ATTENTE";
         setLive({ ...raw, game, phase });
       } catch {
-        // Incident réseau passager : la carte garde la dernière valeur connue.
+        // Requête abandonnée, ou incident réseau passager : la carte garde la
+        // dernière valeur connue.
       }
     },
     { intervalMs: REFRESH_CADENCE.STANDARD.landingLiveMs },

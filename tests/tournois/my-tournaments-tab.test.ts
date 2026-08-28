@@ -14,8 +14,8 @@ const css = read("app/(secured)/tournois/tournois.module.css");
 
 describe("page tournois — onglet « Mes tournois »", () => {
   it("charge la liste publique et celle de l'organisateur", () => {
-    expect(page).toContain('fetchBuckets("/api/tournaments")');
-    expect(page).toContain('fetchBuckets("/api/tournaments?scope=mine")');
+    expect(page).toContain('fetchBuckets("/api/tournaments", signal)');
+    expect(page).toContain('fetchBuckets("/api/tournaments?scope=mine", signal)');
   });
 
   it("règle les deux chargements séparément", () => {

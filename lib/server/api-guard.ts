@@ -13,7 +13,12 @@
  * Ils bornent l'anormal, ils ne disciplinent pas l'usage.
  */
 import { NextResponse } from "next/server";
-import { consumeRateLimit, rateLimitIdentity, type RateLimitRule } from "./rate-limit";
+import {
+  ANONYMOUS_IDENTITY,
+  consumeRateLimit,
+  rateLimitIdentity,
+  type RateLimitRule,
+} from "./rate-limit";
 import { clientIpFromForwardedFor, parseTrustedProxyHops } from "@/lib/shared/site-visits";
 
 /**
@@ -48,8 +53,45 @@ export const LANDING_READ_RULE: RateLimitRule = {
 };
 
 /**
+ * Ouvertures du flux temps réel, par utilisateur.
+ *
+ * Distinct du plafond de flux *simultanés* (`MAX_STREAMS_PER_USER`) : celui-ci
+ * borne le rythme d'ouverture, que le premier laisse passer puisqu'une
+ * fermeture libère aussitôt la place. Large : un onglet ouvre un flux et le
+ * garde, une reconnexion en rafale est plafonnée par l'attente exponentielle.
+ */
+export const STREAM_OPEN_RULE: RateLimitRule = {
+  name: "tournament-stream-open",
+  limit: 30,
+  windowMs: 60_000,
+};
+
+/**
+ * Enregistrement d'une visite, par IP.
+ *
+ * Plafond de **requêtes**, distinct du plafond d'**insertions** appliqué par
+ * `site-visits-service` : celui-ci borne le travail fait avant même de savoir
+ * s'il y a une visite à enregistrer (résolution de session, lecture de la
+ * fenêtre). Large — un visiteur normal envoie deux pings par heure.
+ */
+export const VISIT_REQUEST_RULE: RateLimitRule = {
+  name: "site-visits-request",
+  limit: 60,
+  windowMs: 60_000,
+};
+
+/**
  * Applique un plafond. Renvoie la réponse 429 à retourner tel quel, ou `null`
  * si la requête peut continuer.
+ *
+ * **Une identité absente n'est pas plafonnée.** C'est délibéré : sans en-tête
+ * de proxy — `next start` exposé directement, reverse-proxy déployé sans
+ * `proxy_set_header X-Forwarded-For`, banc d'essai local — *tous* les visiteurs
+ * partageraient sinon le même seau, et cent joueurs se verraient refuser la
+ * page d'accueil au bout de 180 requêtes cumulées. Le garde-fou provoquerait la
+ * panne qu'il doit éviter. On préfère ne pas compter que compter faux : la
+ * borne de croissance de la table de fréquentation, elle, reste assurée côté
+ * `site-visits-service`, qui plafonne les **insertions**.
  *
  * `Retry-After` est renseigné : un client correct saura attendre plutôt que
  * réessayer aussitôt.
@@ -58,7 +100,10 @@ export function enforceRateLimit(
   rule: RateLimitRule,
   identity: string | number | null | undefined,
 ): NextResponse | null {
-  const state = consumeRateLimit(rule, rateLimitIdentity(identity));
+  const key = rateLimitIdentity(identity);
+  if (key === ANONYMOUS_IDENTITY) return null;
+
+  const state = consumeRateLimit(rule, key);
   if (state.allowed) return null;
 
   return NextResponse.json(
