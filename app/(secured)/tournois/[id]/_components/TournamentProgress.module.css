@@ -48,7 +48,9 @@
 .rail {
   position: relative;
   padding: 10px 58px 8px;
-  min-width: 700px;
+  /* Bornes incluses (box-sizing: border-box) : laisse ~132 px entre deux jalons,
+     de quoi ne pas faire se toucher deux libellés de 116 px. */
+  min-width: 780px;
 }
 
 .trackWrap {

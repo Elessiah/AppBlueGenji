@@ -110,6 +110,8 @@ que l'afficher à l'envers.
   `aria-hidden`, il n'en serait qu'un doublon. Les jalons sont une vraie liste
   ordonnée, l'étape courante marquée `aria-current="step"`.
 - Une horloge interne réveille le composant toutes les 30 s : le compte à rebours
-  descend et la barre avance sans recharger la page.
+  descend et la barre avance sans recharger la page. Elle ne bat **pas** sur un
+  tournoi terminé — plus rien ne peut y bouger, et la laisser tourner ferait
+  re-parcourir tout le plateau indéfiniment pour un affichage figé.
 - Les animations (pulsation du jalon courant, liseré de tête) s'éteignent sous
   `prefers-reduced-motion`.

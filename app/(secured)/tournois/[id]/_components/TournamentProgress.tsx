@@ -41,10 +41,16 @@ function shortDateTime(iso: string): string {
 export function TournamentProgress({ detail }: TournamentProgressProps) {
   const [now, setNow] = useState(() => Date.now());
 
+  // Un tournoi terminé ne bouge plus : ni jalon à franchir, ni compte à rebours,
+  // ni matchs à rejouer. Laisser battre l'horloge y ferait re-parcourir tous les
+  // matchs du plateau toutes les 30 s, indéfiniment, pour un affichage figé.
+  const isFinished = detail.card.state === "FINISHED";
+
   useEffect(() => {
+    if (isFinished) return;
     const timer = setInterval(() => setNow(Date.now()), TICK_MS);
     return () => clearInterval(timer);
-  }, []);
+  }, [isFinished]);
 
   const playedRatio = computeRunningRatio({
     format: detail.card.format,
@@ -62,7 +68,9 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
   });
 
   const currentStage = progress.stages[progress.currentIndex];
-  const isFinished = progress.current === "FINISHED";
+  // `progress` peut conclure « terminé » là où l'état stocké dit encore autre
+  // chose ; c'est lui qui décide de l'affichage, l'état ne pilote que l'horloge.
+  const showsFinished = progress.current === "FINISHED";
   const percent = Math.round(progress.ratio * 100);
   const countdown = progress.next?.at
     ? formatStageCountdown(now, new Date(progress.next.at).getTime())
@@ -72,7 +80,7 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
 
   // Le champion nomme mieux la fin qu'une paraphrase de l'étape courante, déjà
   // écrite en tête du bloc.
-  const champion = isFinished
+  const champion = showsFinished
     ? (detail.registrations.find((reg) => reg.finalRank === 1)?.teamName ?? null)
     : null;
 
@@ -116,7 +124,7 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
               aria-valuetext={`${currentStage.label} — ${percent}%`}
             />
             <div
-              className={`${styles.fill}${isFinished ? "" : ` ${styles.fillLive}`}`}
+              className={`${styles.fill}${showsFinished ? "" : ` ${styles.fillLive}`}`}
               style={{ width: `${percent}%` }}
             />
 
@@ -163,7 +171,7 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
       </ScrollArea>
 
       <p className={styles.foot}>
-        {isFinished ? (
+        {showsFinished ? (
           champion ? (
             <>
               <span>Vainqueur :</span>
