@@ -67,7 +67,8 @@ describe("page tournois — onglet « Mes tournois »", () => {
   });
 
   it("garde le bandeau d'actualité sur la vue globale", () => {
-    expect(page).toContain("buildTickerItems(buckets)");
+    // Les paniers reclassés à l'heure du client, comme les sections.
+    expect(page).toContain("buildTickerItems(scheduledBuckets)");
   });
 
   it("expose des onglets accessibles", () => {

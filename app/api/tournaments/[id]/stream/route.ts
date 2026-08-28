@@ -77,6 +77,15 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     });
   }
 
+  // Rien à servir si le client est déjà parti : ni encoder l'instantané (jusqu'à
+  // 154 ko sur un gros plateau), ni ouvrir de salle, ni armer de battement.
+  // C'est sous spam F5 que ce cas se présente — précisément quand ce travail
+  // inutile coûte le plus cher.
+  if (req.signal.aborted) {
+    releaseSlot();
+    return new Response(null, { status: 499 });
+  }
+
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({
@@ -127,12 +136,11 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
         }
       }
 
-      // Un signal DÉJÀ avorté ne déclenche jamais son écouteur. Or la place de
-      // flux est réservée après plusieurs attentes (session, instantané,
-      // contexte du lecteur) : un client qui martèle F5 abandonne pendant
-      // celles-ci, et sans ce contrôle sa place — comme son abonnement à la
-      // salle — resterait prise pour la durée de vie du processus. Quatre fois,
-      // et l'utilisateur se retrouve en 429 sur son propre tournoi.
+      // Course résiduelle : le contrôle ci-dessus a pu passer juste avant que le
+      // client ne parte. Un signal DÉJÀ avorté ne déclenche jamais son écouteur,
+      // et la place de flux resterait alors prise pour la durée de vie du
+      // processus — quatre fois, et l'utilisateur se voit refuser son propre
+      // tournoi.
       if (req.signal.aborted) {
         cleanup();
         return;

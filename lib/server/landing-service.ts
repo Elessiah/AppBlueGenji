@@ -94,13 +94,23 @@ function roundLabelFor(bracket: BracketType, roundNumber: number, matchCount: nu
   return `Round ${roundNumber}`;
 }
 
-export async function getLandingLive(buckets?: TournamentBuckets): Promise<LandingLive | null> {
-  return cached("landing:live", LANDING_LIVE_TTL_MS, () => loadLandingLive(buckets));
+/**
+ * Direct de la vitrine : le tournoi en cours et son match du moment.
+ *
+ * Sans argument, il part de la liste publique — mutualisée elle aussi. On ne
+ * prend volontairement plus de paniers en entrée : le résultat en dépendrait
+ * alors que la clé de cache, elle, ne peut pas les représenter, et un appelant
+ * passant une liste filtrée recevrait silencieusement le direct de quelqu'un
+ * d'autre. Les appelants qui ont déjà la liste publique sous la main n'y
+ * perdent rien : `listTournamentBuckets` la leur resert depuis le cache.
+ */
+export async function getLandingLive(): Promise<LandingLive | null> {
+  return cached("landing:live", LANDING_LIVE_TTL_MS, () => loadLandingLive());
 }
 
-async function loadLandingLive(buckets?: TournamentBuckets): Promise<LandingLive | null> {
+async function loadLandingLive(): Promise<LandingLive | null> {
   try {
-    const tournamentBuckets = buckets ?? await listTournamentBuckets(null);
+    const tournamentBuckets = await listTournamentBuckets(null);
     const tournament = tournamentBuckets.running[0] ?? null;
     if (!tournament) return null;
 

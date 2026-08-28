@@ -6,10 +6,12 @@ import { mapError } from "../_lib/error-map";
 import { playScoreReady } from "../_lib/sounds";
 import {
   applyLiveMessage,
+  fatalFailure,
   INITIAL_LIVE_STATE,
   parseLiveMessage,
   reconnectDelayMs,
   shouldPlayScoreReady,
+  type LiveFailure,
   type LiveState,
 } from "../_lib/live-state";
 
@@ -22,19 +24,25 @@ import {
  * qui permet à cent spectateurs de suivre un plateau sans que le serveur ne
  * calcule cent fois la même chose.
  *
- * Trois filets de sécurité, dans cet ordre :
+ * Quatre filets de sécurité, dans cet ordre :
  * 1. **reconnexion sans abandon** — attente exponentielle plafonnée avec gigue,
  *    indéfiniment. L'ancienne version renonçait après cinq essais et laissait la
  *    page figée : il ne restait que le F5 ;
- * 2. **retour sur l'onglet** — reprendre la main relit la donnée si elle a
+ * 2. **sauf échec définitif** — une session expirée ou un tournoi supprimé ne
+ *    passeront pas tout seuls. Réessayer indéfiniment laisserait la page sur
+ *    « Reconnexion… » pour l'éternité, sans jamais dire quoi faire : la boucle
+ *    s'arrête alors et l'utilisateur est prévenu ;
+ * 3. **retour sur l'onglet** — reprendre la main relit la donnée si elle a
  *    vieilli, ce qui remplace le réflexe de recharger ;
- * 3. **sondage de secours** — uniquement tant que le flux est coupé, à la
+ * 4. **sondage de secours** — uniquement tant que le flux est coupé, à la
  *    cadence du palier accordé par le serveur.
  */
 export function useTournamentLive(tournamentId: number) {
   const { showError } = useToast();
   const [state, setState] = useState<LiveState>(INITIAL_LIVE_STATE);
   const [isLive, setIsLive] = useState(false);
+  /** Échec dont on ne se relèvera pas seul (session expirée, tournoi supprimé). */
+  const [fatal, setFatal] = useState<LiveFailure | null>(null);
 
   // Refs plutôt qu'états : ces valeurs pilotent les minuteurs, elles ne doivent
   // pas provoquer de rendu ni relancer l'effet.
@@ -63,20 +71,29 @@ export function useTournamentLive(tournamentId: number) {
    * un incident réseau passager n'a pas à couvrir l'écran d'alertes.
    */
   const load = useCallback(
-    async (silent = false) => {
+    async (silent = false): Promise<LiveFailure | null> => {
       lastFetchAtRef.current = Date.now();
       try {
         const response = await fetch(`/api/tournaments/${tournamentId}`, { cache: "no-store" });
         const payload = (await response.json()) as TournamentDetail & { error?: string };
-        if (!response.ok) throw new Error(payload.error || "TOURNAMENT_LOAD_FAILED");
+
+        if (!response.ok) {
+          // Le flux SSE, lui, ne dit jamais pourquoi il tombe : c'est cette
+          // lecture qui distingue l'incident passager de l'échec définitif.
+          const failure = fatalFailure(response.status);
+          if (failure) return failure;
+          throw new Error(payload.error || "TOURNAMENT_LOAD_FAILED");
+        }
 
         // Même déduplication que le chemin SSE : sans elle, chaque sondage de
         // secours redessinerait l'arbre entier — 254 matchs sur un gros
         // plateau — alors que rien n'a bougé.
-        if (payload.version && payload.version === stateRef.current.detail?.version) return;
+        if (payload.version && payload.version === stateRef.current.detail?.version) return null;
         commit({ tier: stateRef.current.tier, detail: payload });
+        return null;
       } catch (e) {
         if (!silent) showError(mapError((e as Error).message));
+        return null;
       }
     },
     [tournamentId, commit, showError],
@@ -94,6 +111,7 @@ export function useTournamentLive(tournamentId: number) {
   const refresh = useCallback(async () => {
     const before = stateRef.current.detail?.myTeamId ?? null;
     await load(true);
+
     if ((stateRef.current.detail?.myTeamId ?? null) !== before) {
       reconnectRef.current?.();
     }
@@ -107,6 +125,27 @@ export function useTournamentLive(tournamentId: number) {
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let fallbackTimer: ReturnType<typeof setInterval> | null = null;
     let attempts = 0;
+    let stopped = false;
+
+    /**
+     * Un échec dont on ne se relèvera pas : on cesse de réessayer et on le dit.
+     * Sans cela la page resterait indéfiniment sur « Reconnexion… », à ouvrir un
+     * flux qui refusera toujours, sans jamais orienter vers `/connexion`.
+     */
+    const giveUp = (failure: LiveFailure) => {
+      if (stopped) return;
+      stopped = true;
+      stopFallback();
+      if (reconnectTimer !== null) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      source?.close();
+      source = null;
+      setIsLive(false);
+      setFatal(failure);
+      showError(mapError(failure));
+    };
 
     const stopFallback = () => {
       if (fallbackTimer !== null) {
@@ -117,16 +156,18 @@ export function useTournamentLive(tournamentId: number) {
 
     /** Sondage de secours, tant que le flux est coupé. */
     const startFallback = () => {
-      if (fallbackTimer !== null) return;
+      if (fallbackTimer !== null || stopped) return;
       const period = REFRESH_CADENCE[stateRef.current.tier].detailFallbackMs;
       fallbackTimer = setInterval(() => {
-        if (cancelled || document.visibilityState === "hidden") return;
-        void load(true);
+        if (cancelled || stopped || document.visibilityState === "hidden") return;
+        void load(true).then((failure) => {
+          if (failure && !cancelled) giveUp(failure);
+        });
       }, period);
     };
 
     const scheduleReconnect = () => {
-      if (cancelled || reconnectTimer !== null) return;
+      if (cancelled || stopped || reconnectTimer !== null) return;
       attempts += 1;
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null;
@@ -135,7 +176,7 @@ export function useTournamentLive(tournamentId: number) {
     };
 
     const connect = () => {
-      if (cancelled) return;
+      if (cancelled || stopped) return;
 
       try {
         source = new EventSource(`/api/tournaments/${tournamentId}/stream`);
@@ -168,7 +209,11 @@ export function useTournamentLive(tournamentId: number) {
         setIsLive(false);
         // La page ne doit pas rester vide si le flux échoue d'entrée (session
         // expirée, tournoi introuvable, plafond de flux atteint).
-        if (!stateRef.current.detail) void load(attempts > 0);
+        if (!stateRef.current.detail) {
+          void load(attempts > 0).then((failure) => {
+            if (failure && !cancelled) giveUp(failure);
+          });
+        }
         startFallback();
         scheduleReconnect();
       };
@@ -180,7 +225,7 @@ export function useTournamentLive(tournamentId: number) {
      * connexion plutôt que d'attendre la fin de l'attente en cours.
      */
     const onVisible = () => {
-      if (cancelled || document.visibilityState !== "visible") return;
+      if (cancelled || stopped || document.visibilityState !== "visible") return;
 
       // Tant que le flux tient, la donnée est déjà à jour : la relire ferait
       // repartir, à la fin d'une manche, la centaine de requêtes simultanées
@@ -200,7 +245,7 @@ export function useTournamentLive(tournamentId: number) {
     };
 
     reconnectRef.current = () => {
-      if (cancelled) return;
+      if (cancelled || stopped) return;
       if (reconnectTimer !== null) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
@@ -225,12 +270,17 @@ export function useTournamentLive(tournamentId: number) {
       source?.close();
       setIsLive(false);
     };
-  }, [tournamentId, load, commit]);
+  }, [tournamentId, load, commit, showError]);
 
   return {
     tournament: state.detail,
     matches: state.detail?.matches ?? [],
     isLive,
+    /**
+     * Échec définitif : la page a cessé de réessayer. `UNAUTHORIZED` invite à se
+     * reconnecter, `TOURNAMENT_NOT_FOUND` dit que le tournoi n'existe plus.
+     */
+    fatal,
     /** Palier de fraîcheur accordé par le serveur (`lib/shared/refresh-tiers`). */
     tier: state.tier,
     /** À appeler après une action de l'utilisateur, pour un retour immédiat. */

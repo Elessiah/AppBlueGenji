@@ -68,7 +68,7 @@ export default function TournamentDetailPage() {
   const tournamentId = Number(params.id);
   const { showError, showSuccess } = useToast();
 
-  const { tournament: detail, refresh, isLive, tier } = useTournamentLive(tournamentId);
+  const { tournament: detail, refresh, isLive, tier, fatal } = useTournamentLive(tournamentId);
   const [drafts, setDrafts] = useState<MatchScoreDraft>({});
   const [selectedMatchForAdmin, setSelectedMatchForAdmin] = useState<BracketMatch | null>(null);
   const [ghostRegistrationOpen, setGhostRegistrationOpen] = useState(false);
@@ -314,7 +314,7 @@ export default function TournamentDetailPage() {
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               {/* Dit que la page se tient à jour seule : sans ce repère, on
                   recharge par précaution même quand tout arrive tout seul. */}
-              <LiveIndicator isLive={isLive} tier={tier} />
+              <LiveIndicator isLive={isLive} tier={tier} fatal={fatal} />
               <Pill variant="blue">{detail.card.game}</Pill>
               <Pill variant={detail.card.state === "RUNNING" ? "live" : "blue"}>
                 {stateMeta.label}

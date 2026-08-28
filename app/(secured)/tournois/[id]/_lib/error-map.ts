@@ -31,6 +31,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   TEAM_NOT_IN_TOURNAMENT: "Cette équipe n'est pas inscrite à ce tournoi.",
   FORBIDDEN: "Tu ne peux déclarer forfait que pour ton équipe.",
   FORFEIT_FAILED: "Erreur lors de la déclaration de forfait.",
+  // Session expirée : le suivi en direct s'arrête, il faut se reconnecter.
+  UNAUTHORIZED: "Ta session a expiré. Reconnecte-toi pour suivre le tournoi en direct.",
 };
 
 export function mapError(errorCode: string): string {

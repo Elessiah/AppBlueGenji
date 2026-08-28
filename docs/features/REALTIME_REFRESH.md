@@ -103,11 +103,18 @@ côté.
    de « Prochainement » à « Inscriptions » **à la seconde dite**, sans aucune
    requête. L'horaire est public et déjà présent dans la carte ; le serveur
    reste seul juge de ce qu'il autorise.
-4. **La reconnexion n'abandonne jamais** : plafond exponentiel jusqu'à 60 s,
-   avec une attente **tirée au hasard dans tout l'intervalle** (« full jitter »)
-   et un plancher de 250 ms. Au redémarrage du serveur, toutes les pages
-   ouvertes tombent à la même seconde : une gigue étroite les ferait revenir
-   dans la même demi-seconde, et chaque reconnexion prend une connexion du pool.
+4. **La reconnexion n'abandonne jamais** — sauf échec définitif : plafond
+   exponentiel jusqu'à 60 s, avec une attente **tirée au hasard dans tout
+   l'intervalle** (« full jitter ») et un plancher de 250 ms. Au redémarrage du
+   serveur, toutes les pages ouvertes tombent à la même seconde : une gigue
+   étroite les ferait revenir dans la même demi-seconde, et chaque reconnexion
+   prend une connexion du pool.
+
+   Une session expirée ou un tournoi supprimé, eux, ne passeront pas tout
+   seuls : le flux SSE ne dit jamais pourquoi il tombe, mais la lecture REST de
+   secours voit le 401/404. La boucle s'arrête alors, la pastille passe à
+   « Hors ligne » et une notification invite à se reconnecter — plutôt que
+   d'afficher « Reconnexion… » pour l'éternité. 429 et 5xx restent retentés.
 5. **La salle se réveille à l'heure exacte** de la prochaine bascule d'état,
    pour toute la salle d'un coup — plutôt que de laisser cent clients se
    réveiller chacun de leur côté à la même seconde.

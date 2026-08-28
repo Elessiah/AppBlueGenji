@@ -48,6 +48,15 @@ function frameOf(version: string, bytes = 32): TournamentSnapshotFrame {
   };
 }
 
+/** Promesse dont le test décide du moment de résolution. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 /** Laisse tourner les promesses en attente (le flush est asynchrone). */
 async function settle(): Promise<void> {
   for (let i = 0; i < 5; i += 1) await Promise.resolve();
@@ -298,6 +307,38 @@ describe("tournament-broadcast — cycle de vie", () => {
 
     expect(tournamentAudience(1)).toBe(1);
     expect(alive.received).toEqual(["data: v1"]);
+  });
+
+  it("ne retire pas du registre une salle plus récente", async () => {
+    // Une salle peut se vider pendant qu'un envoi est en attente. Le temps que
+    // celui-ci reprenne, une salle NEUVE a pu prendre sa place : la retirer la
+    // condamnerait à vivre hors registre — son écouteur et son battement
+    // continueraient, un prochain abonné en ouvrirait une troisième, et les
+    // instantanés partiraient en double.
+    const gate = deferred<TournamentSnapshotFrame>();
+    getFrame.mockReturnValue(gate.promise);
+
+    const first = subscriber();
+    const leaveFirst = joinTournamentRoom(1, first.handle);
+
+    publish();
+    await settle(); // l'envoi part et reste bloqué sur `getFrame`
+
+    leaveFirst(); // la salle se vide et se ferme
+    const second = subscriber();
+    joinTournamentRoom(1, second.handle); // une salle neuve prend sa place
+
+    gate.resolve(frameOf("v1"));
+    await settle();
+
+    // La salle neuve est toujours celle du registre, avec son unique abonné.
+    expect(tournamentAudience(1)).toBe(1);
+
+    // Et elle continue de servir : un seul exemplaire de chaque instantané.
+    getFrame.mockResolvedValue(frameOf("v2"));
+    publish();
+    await advance(REFRESH_CADENCE.PRIORITY.pushCoalesceMs + 10);
+    expect(second.received).toEqual(["data: v2"]);
   });
 
   it("supporte un désabonnement appelé deux fois", () => {

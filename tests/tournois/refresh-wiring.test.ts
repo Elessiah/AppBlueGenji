@@ -99,8 +99,18 @@ describe("hook temps réel", () => {
 
   it("ignore une lecture qui n'apporte rien", () => {
     expect(hook).toContain(
-      "if (payload.version && payload.version === stateRef.current.detail?.version) return;",
+      "if (payload.version && payload.version === stateRef.current.detail?.version) return null;",
     );
+  });
+
+  it("cesse de réessayer sur un échec définitif", () => {
+    // Une session expirée ne passera pas toute seule : réessayer indéfiniment
+    // laisserait la page sur « Reconnexion… » pour l'éternité, sans jamais
+    // orienter vers la page de connexion.
+    expect(hook).toContain("const giveUp = (failure: LiveFailure)");
+    expect(hook).toContain("showError(mapError(failure))");
+    expect(hook).toMatch(/if \(cancelled \|\| stopped \|\| reconnectTimer !== null\) return;/);
+    expect(hook).toContain("if (fallbackTimer !== null || stopped) return;");
   });
 
   it("libère tout au démontage", () => {
@@ -115,7 +125,7 @@ describe("page de tournoi", () => {
   it("relit immédiatement après une action de l'utilisateur", () => {
     // Celui qui agit mérite un retour instantané, quel que soit son palier.
     expect(detailPage).toContain(
-      "const { tournament: detail, refresh, isLive, tier } = useTournamentLive",
+      "const { tournament: detail, refresh, isLive, tier, fatal } = useTournamentLive",
     );
     // Score, abandon, inscription, arbitrage, seeding, équipe fantôme.
     expect(detailPage.match(/void refresh\(\)/g)?.length).toBeGreaterThanOrEqual(6);
@@ -128,7 +138,7 @@ describe("page de tournoi", () => {
 
   it("dit au lecteur que la page se tient à jour seule", () => {
     // Sans repère visible, on recharge par précaution même quand tout arrive.
-    expect(detailPage).toContain("<LiveIndicator isLive={isLive} tier={tier} />");
+    expect(detailPage).toContain("<LiveIndicator isLive={isLive} tier={tier} fatal={fatal} />");
   });
 });
 
@@ -147,6 +157,12 @@ describe("liste des tournois", () => {
   it("fait basculer les états sans requête", () => {
     expect(listPage).toContain("useScheduledBuckets(buckets)");
     expect(listPage).toContain("useScheduledBuckets(myBuckets)");
+  });
+
+  it("fait suivre le bandeau au reclassement local", () => {
+    // Sinon le bandeau annoncerait « À VENIR » un tournoi affiché juste dessous
+    // en « INSCRIPTIONS ».
+    expect(listPage).toContain("buildTickerItems(scheduledBuckets)");
   });
 });
 
@@ -172,5 +188,24 @@ describe("instantané partagé", () => {
 
   it("mutualise la construction", () => {
     expect(snapshot).toContain("cached(cacheKey(tournamentId), SNAPSHOT_TTL_MS,");
+  });
+
+  it("ne réserve une connexion que là où elle sert", () => {
+    // En tournoi par équipes, `getUserActiveTeam` ouvre sa propre requête :
+    // réserver une place d'un pool de 25 pour ne rien en faire doublerait la
+    // pression à chaque connexion SSE.
+    const index = read("lib/server/tournaments/index.ts");
+    expect(index).toContain("const myTeamId = isSolo");
+    expect(index).toContain("(await getUserActiveTeam(userId))?.teamId ?? null;");
+  });
+
+  it("synchronise les états en dehors du cache de liste", () => {
+    // Dedans, les événements publiés par la synchronisation invalideraient la
+    // liste qu'elle vient de rendre correcte.
+    const index = read("lib/server/tournaments/index.ts");
+    const sync = index.indexOf("await syncVisibleTournaments();");
+    const cachedCall = index.indexOf('cachedTournamentList("public"');
+    expect(sync).toBeGreaterThan(-1);
+    expect(sync).toBeLessThan(cachedCall);
   });
 });

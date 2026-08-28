@@ -281,7 +281,10 @@ export default function TournamentsPage() {
           </div>
         </div>
 
-        <Ticker items={buildTickerItems(buckets)} />
+        {/* Les paniers reclassés, comme les sections : sinon le bandeau
+            annoncerait « À VENIR » un tournoi affiché juste dessous en
+            « INSCRIPTIONS » — le genre de doute qui fait recharger la page. */}
+        <Ticker items={buildTickerItems(scheduledBuckets)} />
 
         <div
           className={s.sections}

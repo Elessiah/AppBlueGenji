@@ -170,6 +170,28 @@ export function shouldPlayScoreReady(
   return false;
 }
 
+/**
+ * Échec dont une reconnexion ne viendra jamais à bout.
+ *
+ * Le flux SSE ne dit pas pourquoi il tombe — `onerror` n'expose aucun statut :
+ * c'est la lecture REST de secours qui tranche. Sans cette distinction, une
+ * session expirée laisserait la page réessayer pour l'éternité en affichant
+ * « Reconnexion… », sans jamais orienter vers la page de connexion.
+ */
+export type LiveFailure = "UNAUTHORIZED" | "TOURNAMENT_NOT_FOUND";
+
+/**
+ * Traduit un statut HTTP en échec définitif, ou `null` si réessayer a un sens.
+ *
+ * Volontairement restreint : 429 (plafond de débit) et 5xx sont passagers et
+ * doivent continuer d'être retentés.
+ */
+export function fatalFailure(status: number): LiveFailure | null {
+  if (status === 401 || status === 403) return "UNAUTHORIZED";
+  if (status === 404) return "TOURNAMENT_NOT_FOUND";
+  return null;
+}
+
 /** Plafond exponentiel de départ, en millisecondes. */
 export const RECONNECT_BASE_MS = 1_000;
 /** Plafond de l'attente. Au-delà, on retente simplement toutes les minutes. */

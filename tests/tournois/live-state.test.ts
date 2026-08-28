@@ -11,6 +11,7 @@ import {
   RECONNECT_MAX_MS,
   RECONNECT_MIN_MS,
   applyLiveMessage,
+  fatalFailure,
   parseLiveMessage,
   reconnectDelayMs,
   shouldPlayScoreReady,
@@ -342,6 +343,29 @@ describe("shouldPlayScoreReady", () => {
       match({ id: 2, status: "AWAITING_CONFIRMATION" }),
     ]);
     expect(shouldPlayScoreReady(before, after)).toBe(true);
+  });
+});
+
+describe("fatalFailure", () => {
+  it("arrête la boucle sur une session perdue", () => {
+    // Le flux SSE ne dit jamais pourquoi il tombe : sans cette distinction, une
+    // session expirée laisserait la page réessayer pour l'éternité.
+    expect(fatalFailure(401)).toBe("UNAUTHORIZED");
+    expect(fatalFailure(403)).toBe("UNAUTHORIZED");
+  });
+
+  it("arrête la boucle sur un tournoi disparu", () => {
+    expect(fatalFailure(404)).toBe("TOURNAMENT_NOT_FOUND");
+  });
+
+  it("laisse réessayer ce qui est passager", () => {
+    // 429 (plafond de débit) et 5xx se résolvent d'eux-mêmes : abandonner
+    // laisserait la page figée alors qu'elle allait se reconnecter.
+    expect(fatalFailure(429)).toBeNull();
+    expect(fatalFailure(500)).toBeNull();
+    expect(fatalFailure(502)).toBeNull();
+    expect(fatalFailure(503)).toBeNull();
+    expect(fatalFailure(200)).toBeNull();
   });
 });
 

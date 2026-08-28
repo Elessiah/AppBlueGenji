@@ -42,7 +42,7 @@ export default async function HomePage() {
   const [stats, live, leaderboard, events, ticker, sponsors, aboutStats, aboutPillars, miniBracket, user, copy] =
     await Promise.all([
       getLandingStats(),
-      getLandingLive(buckets),
+      getLandingLive(),
       getLandingLeaderboard(),
       getLandingCalendar(buckets, 5),
       getLandingTicker(),

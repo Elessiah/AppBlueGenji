@@ -7,7 +7,9 @@ import type {
   TournamentState,
   TournamentViewerContext,
 } from "@/lib/shared/types";
+import type { PoolConnection } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { isSoloTournament, toParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import type { TournamentListRow } from "./_internal";
@@ -420,6 +422,12 @@ export async function listTournamentBuckets(
   searchTerm: string | null,
   scope: TournamentListScope = {},
 ): Promise<TournamentBuckets> {
+  // La synchronisation reste EN DEHORS du chargeur mis en cache : elle publie un
+  // événement pour chaque état qui bascule, ce qui invalide justement la liste.
+  // À l'intérieur, elle jetterait le résultat qu'elle vient de rendre correct,
+  // et l'agrégat repartirait pour rien à chaque bascule.
+  await syncVisibleTournaments();
+
   const isSharedList = scope.organizerUserId === undefined && !searchTerm?.trim();
   if (!isSharedList) return loadTournamentBuckets(searchTerm, scope);
 
@@ -430,8 +438,6 @@ async function loadTournamentBuckets(
   searchTerm: string | null,
   scope: TournamentListScope,
 ): Promise<TournamentBuckets> {
-  await syncVisibleTournaments();
-
   const db = await getDatabase();
   const now = new Date();
 
@@ -599,30 +605,48 @@ export async function getTournamentViewerContext(
   userId: number,
   isAdmin = false,
 ): Promise<TournamentViewerContext> {
+  const isSolo = isSoloTournament(snapshot.card.participantType);
+
+  // Engagé du viewer : son équipe active, ou son entrée solo en individuel.
+  //
+  // La connexion n'est prise que dans le second cas — le seul où
+  // `resolveUserEntrantTeamId` s'en serve : en tournoi par équipes,
+  // `getUserActiveTeam` ouvre sa propre requête, et réserver une place du pool
+  // (25) pour ne rien en faire doublerait la pression à chaque connexion SSE.
+  const myTeamId = isSolo
+    ? await withConnection((connection) =>
+        resolveUserEntrantTeamId(
+          connection,
+          { participant_type: snapshot.card.participantType },
+          userId,
+        ),
+      )
+    : (await getUserActiveTeam(userId))?.teamId ?? null;
+
+  const alreadyRegistered =
+    myTeamId !== null && snapshot.registrations.some((row) => row.teamId === myTeamId);
+
+  return {
+    canRegister:
+      snapshot.card.state === "REGISTRATION" &&
+      !alreadyRegistered &&
+      // En individuel, un joueur sans entrée solo peut s'inscrire : elle sera
+      // créée à ce moment-là.
+      (isSolo || myTeamId !== null),
+    myTeamId,
+    canCreateReportsForTeamIds: myTeamId ? [myTeamId] : [],
+    isAdmin,
+  };
+}
+
+/** Emprunte une connexion du pool le temps d'une lecture, puis la rend. */
+async function withConnection<T>(
+  run: (connection: PoolConnection) => Promise<T>,
+): Promise<T> {
   const db = await getDatabase();
   const connection = await db.getConnection();
   try {
-    // Engagé du viewer : son équipe active, ou son entrée solo en individuel.
-    const myTeamId = await resolveUserEntrantTeamId(
-      connection,
-      { participant_type: snapshot.card.participantType },
-      userId,
-    );
-    const isSolo = isSoloTournament(snapshot.card.participantType);
-    const alreadyRegistered =
-      myTeamId !== null && snapshot.registrations.some((row) => row.teamId === myTeamId);
-
-    return {
-      canRegister:
-        snapshot.card.state === "REGISTRATION" &&
-        !alreadyRegistered &&
-        // En individuel, un joueur sans entrée solo peut s'inscrire : elle sera
-        // créée à ce moment-là.
-        (isSolo || myTeamId !== null),
-      myTeamId,
-      canCreateReportsForTeamIds: myTeamId ? [myTeamId] : [],
-      isAdmin,
-    };
+    return await run(connection);
   } finally {
     connection.release();
   }
