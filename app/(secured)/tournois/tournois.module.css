@@ -655,6 +655,18 @@
   opacity: 0.65;
 }
 
+/* Cartes de la section « tournois invisibles » : cadre pointillé, pour que la
+   carte elle-même rappelle que rien de tout cela n'est encore publié. Placé
+   après les variantes `data-state`, de même spécificité, pour l'emporter. */
+.hiddenCard .card {
+  border-style: dashed;
+  border-color: rgba(90, 200, 255, 0.28);
+}
+
+.hiddenCard .card:hover {
+  border-color: rgba(90, 200, 255, 0.45);
+}
+
 /* utility classes */
 .dot {
   color: var(--blue-500);

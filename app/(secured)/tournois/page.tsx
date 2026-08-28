@@ -222,7 +222,9 @@ export default function TournamentsPage() {
               emptyMsg="Aucun tournoi invisible ne correspond à cette recherche."
             >
               {filteredHidden.map((t) => (
-                <StateCard key={t.id} t={t} />
+                <div key={t.id} className={s.hiddenCard}>
+                  <StateCard t={t} />
+                </div>
               ))}
             </Section>
           )}
