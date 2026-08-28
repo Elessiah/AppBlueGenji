@@ -95,6 +95,15 @@ describe("hook temps réel — les garde-fous de dégradation", () => {
     expect(hook).toContain("if (fallbackTimer !== null || stopped) return;");
   });
 
+  it("repart de zéro quand on change de tournoi", () => {
+    // L'App Router réutilise le composant d'un paramètre à l'autre : sans cette
+    // remise à zéro, l'échec définitif du tournoi précédent condamnerait le
+    // suivant, et son plateau s'afficherait un instant sous la mauvaise URL.
+    expect(hook).toMatch(
+      /useEffect\(\(\) => \{[\s\S]{0,300}?setFatal\(null\);[\s\S]{0,40}?\}, \[tournamentId\]\);/,
+    );
+  });
+
   it("libère tout au démontage", () => {
     expect(hook).toContain('document.removeEventListener("visibilitychange", onVisible)');
     expect(hook).toContain('window.removeEventListener("online", onVisible)');

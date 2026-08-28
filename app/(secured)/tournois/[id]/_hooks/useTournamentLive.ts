@@ -117,6 +117,25 @@ export function useTournamentLive(tournamentId: number) {
     }
   }, [load]);
 
+  /**
+   * Repart de zéro quand on change de tournoi.
+   *
+   * L'App Router réutilise ce composant d'un paramètre à l'autre : passer de
+   * `/tournois/1` à `/tournois/2` ne le remonte pas. Sans cette remise à zéro,
+   * l'échec définitif du tournoi précédent condamnerait le suivant, son plateau
+   * s'afficherait un instant sous la mauvaise URL — pastille « Direct »
+   * comprise — et la comparaison des deux détails ferait sonner le signal
+   * « score à confirmer » sur une simple navigation.
+   */
+  useEffect(() => {
+    stateRef.current = INITIAL_LIVE_STATE;
+    lastUpdateAtRef.current = 0;
+    lastFetchAtRef.current = 0;
+    setState(INITIAL_LIVE_STATE);
+    setIsLive(false);
+    setFatal(null);
+  }, [tournamentId]);
+
   useEffect(() => {
     if (!tournamentId) return;
 
