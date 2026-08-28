@@ -18,7 +18,8 @@ export function MembershipActions({ team, onChanged }: MembershipActionsProps) {
   const [requests, setRequests] = useState<JoinRequest[]>([]);
 
   const loadRequests = useCallback(async () => {
-    if (!team.canManage) return;
+    // Une fantôme n'a ni membre ni demande d'adhésion : la route refuse (403).
+    if (!team.canManage || team.team.isGhost) return;
     try {
       const res = await fetch(`/api/teams/${teamId}/invitations`, { cache: "no-store" });
       if (!res.ok) return;
@@ -27,7 +28,7 @@ export function MembershipActions({ team, onChanged }: MembershipActionsProps) {
     } catch {
       // silencieux
     }
-  }, [teamId, team.canManage]);
+  }, [teamId, team.canManage, team.team.isGhost]);
 
   useEffect(() => {
     loadRequests();
