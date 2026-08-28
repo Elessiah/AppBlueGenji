@@ -20,6 +20,9 @@ export { canUserRegister, resolveUserEntrantTeamId } from "./registration";
 // Bracket generation
 export { createBracketIfMissing } from "./bracket-generator";
 
+// Aperçu du plateau avant le lancement (staff + cast)
+export { loadTournamentPreview, isPreviewableState } from "./preview";
+
 // Scoring
 export { reportMatchScore, finalizeMatch } from "./scoring";
 
@@ -552,6 +555,12 @@ export async function getTournamentDetail(
   tournamentId: number,
   userId: number,
   isAdmin = false,
+  /**
+   * Droit de voir l'aperçu du plateau avant le lancement : permission
+   * `tournaments` **ou** `casting`. Le staff l'a par construction, le cast l'a
+   * sans aucun droit d'écriture.
+   */
+  canPreview = isAdmin,
 ): Promise<TournamentDetail | null> {
   const db = await getDatabase();
 
@@ -666,6 +675,10 @@ export async function getTournamentDetail(
           ? await (await import("./swiss")).loadSwissMeta(connection, tournamentId, swissPhaseId)
           : null;
 
+    const preview = canPreview
+      ? await (await import("./preview")).loadTournamentPreview(connection, tournament)
+      : null;
+
     return {
       card,
       matches: matches.map(mapMatch),
@@ -688,6 +701,7 @@ export async function getTournamentDetail(
       currentPhaseId: phasesDetail?.currentPhaseId ?? null,
       phaseStandings: phasesDetail?.phaseStandings ?? {},
       soloUserIds,
+      preview,
     };
   } finally {
     connection.release();
