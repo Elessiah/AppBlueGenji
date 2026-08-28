@@ -13,8 +13,11 @@ jest.mock("@/lib/server/tournaments/snapshot", () => ({
 }));
 
 import {
+  MAX_BUDGET_DELAY_MS,
   MAX_STREAMS_PER_USER,
+  ROOM_BYTES_PER_SECOND,
   acquireStreamSlot,
+  budgetDelayMs,
   joinTournamentRoom,
   resetTournamentBroadcast,
   tournamentAudience,
@@ -24,7 +27,7 @@ import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
 
 const FAR_FUTURE = "2099-01-01T00:00:00.000Z";
 
-function frameOf(version: string): TournamentSnapshotFrame {
+function frameOf(version: string, bytes = 32): TournamentSnapshotFrame {
   const snapshot = {
     card: {
       id: 1,
@@ -36,10 +39,12 @@ function frameOf(version: string): TournamentSnapshotFrame {
     version,
   } as unknown as TournamentSnapshot;
 
+  // Le poids compte : c'est lui qui déclenche le budget de sortie de la salle.
+  const body = `data: ${version}`.padEnd(Math.max(bytes - 2, 1), " ");
   return {
     snapshot,
     version,
-    frame: new TextEncoder().encode(`data: ${version}\n\n`),
+    frame: new TextEncoder().encode(`${body}\n\n`),
   };
 }
 
@@ -334,5 +339,59 @@ describe("tournament-broadcast — plafond de flux par utilisateur", () => {
   it("compte chaque utilisateur séparément", () => {
     for (let i = 0; i < MAX_STREAMS_PER_USER; i += 1) acquireStreamSlot(42);
     expect(acquireStreamSlot(43)).not.toBeNull();
+  });
+});
+
+describe("tournament-broadcast — budget de sortie", () => {
+  it("n'impose rien à une petite salle", () => {
+    // 6 ko vers 20 abonnés : absorbé bien avant la fenêtre du palier.
+    expect(budgetDelayMs(6 * 1024, 20)).toBeLessThan(
+      REFRESH_CADENCE.PRIORITY.pushCoalesceMs,
+    );
+  });
+
+  it("espace les envois d'une salle lourde", () => {
+    // Le cas réel qui motive ce budget : un tournoi à 128 équipes en double
+    // élimination pèse ~150 ko, et ses 128 inscrits sont tous prioritaires.
+    // Sans budget, un score rapporté écrirait 19 Mo d'un coup.
+    const delay = budgetDelayMs(150 * 1024, 128);
+    expect(delay).toBeGreaterThan(REFRESH_CADENCE.PRIORITY.pushCoalesceMs);
+    expect(delay).toBe(
+      Math.min(
+        MAX_BUDGET_DELAY_MS,
+        Math.ceil((150 * 1024 * 128 * 1000) / ROOM_BYTES_PER_SECOND),
+      ),
+    );
+  });
+
+  it("plafonne l'attente plutôt que de laisser une salle muette", () => {
+    expect(budgetDelayMs(10 * 1024 * 1024, 1_000)).toBe(MAX_BUDGET_DELAY_MS);
+  });
+
+  it("n'attend rien sans abonné ni contenu", () => {
+    expect(budgetDelayMs(0, 10)).toBe(0);
+    expect(budgetDelayMs(1024, 0)).toBe(0);
+    expect(budgetDelayMs(1024, -1)).toBe(0);
+  });
+
+  it("retarde effectivement l'envoi d'une salle lourde", async () => {
+    const heavy = 256 * 1024;
+    getFrame.mockResolvedValue(frameOf("v1", heavy));
+
+    const viewers = Array.from({ length: 8 }, () => subscriber("PRIORITY"));
+    for (const viewer of viewers) joinTournamentRoom(1, viewer.handle);
+
+    publish();
+    await advance(0);
+    expect(viewers[0].received).toHaveLength(1);
+
+    getFrame.mockResolvedValue(frameOf("v2", heavy));
+    publish();
+    await advance(REFRESH_CADENCE.PRIORITY.pushCoalesceMs + 10);
+    // La fenêtre du palier est écoulée, mais pas celle du budget.
+    expect(viewers[0].received).toHaveLength(1);
+
+    await advance(budgetDelayMs(heavy, 8));
+    expect(viewers[0].received).toHaveLength(2);
   });
 });

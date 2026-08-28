@@ -23,6 +23,9 @@
  *   plus larges. Ce n'est pas la base qu'on ménage ici mais la bande passante :
  *   l'instantané d'un gros tournoi pèse quelques dizaines de kilo-octets, et il
  *   part vers tout le monde d'un coup.
+ * - **Budget de sortie** — la fenêtre s'élargit d'elle-même quand la salle est
+ *   lourde ({@link ROOM_BYTES_PER_SECOND}). Une salle de 128 inscrits sur un
+ *   plateau de 254 matchs ralentit au lieu de saturer le lien.
  * - **Comparaison de version** — rien n'est envoyé si le contenu n'a pas bougé.
  * - **Battement d'entretien** — la salle relit l'instantané périodiquement,
  *   ce qui fait avancer ce qui dépend de l'heure et non d'une action : ouverture
@@ -49,6 +52,40 @@ export const ROOM_MAINTENANCE_MS = 30_000;
  * onglets oubliés, ne mobilisent pas la machine à eux seuls.
  */
 export const MAX_STREAMS_PER_USER = 4;
+
+/**
+ * Budget de sortie d'une salle, en octets par seconde.
+ *
+ * Le regroupement par palier borne la *fréquence* des envois, pas leur poids.
+ * Or l'instantané d'un tournoi à 128 équipes en double élimination pèse ~150 ko
+ * (254 matchs) — et dans un tournoi de cette taille, les inscrits, tous
+ * prioritaires, sont 128. Un score rapporté produirait donc près de 20 Mo à
+ * écrire d'un coup : le lien du Raspberry Pi ne suit pas, et la mémoire des
+ * tampons de socket monte d'autant.
+ *
+ * Le budget convertit ce poids en attente : plus la salle est lourde, plus les
+ * envois s'espacent. Une petite salle n'est jamais concernée (son poids est
+ * absorbé bien avant la fenêtre du palier) ; une grosse salle ralentit au lieu
+ * de saturer. Celui qui vient d'agir, lui, ne subit pas cette attente : sa page
+ * relit immédiatement de son côté.
+ */
+export const ROOM_BYTES_PER_SECOND = 512 * 1024;
+
+/**
+ * Plafond de l'attente induite par le budget. Au-delà, on préfère dépasser un
+ * peu le budget plutôt que de laisser une salle muette trop longtemps.
+ */
+export const MAX_BUDGET_DELAY_MS = 60_000;
+
+/**
+ * Attente imposée par le budget pour écrire `frameBytes` à `subscribers`
+ * abonnés. Exportée pour être vérifiable directement.
+ */
+export function budgetDelayMs(frameBytes: number, subscribers: number): number {
+  if (subscribers <= 0 || frameBytes <= 0) return 0;
+  const totalBytes = frameBytes * subscribers;
+  return Math.min(MAX_BUDGET_DELAY_MS, Math.ceil((totalBytes * 1000) / ROOM_BYTES_PER_SECOND));
+}
 
 /** Un abonné : son palier de fraîcheur et par où lui écrire. */
 export type TournamentSubscriber = {
@@ -143,15 +180,21 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
       const state = tierState(room, tier);
       if (state.lastVersion === frame.version) continue;
 
+      const audience = [...room.subscribers].filter((subscriber) => subscriber.tier === tier);
+
+      // La fenêtre effective est la plus large des deux : celle du palier, et
+      // celle qu'impose le poids de ce qu'on s'apprête à écrire.
       const elapsed = now - state.lastSentAt;
-      const coalesceWindow = REFRESH_CADENCE[tier].pushCoalesceMs;
+      const coalesceWindow = Math.max(
+        REFRESH_CADENCE[tier].pushCoalesceMs,
+        budgetDelayMs(frame.frame.byteLength, audience.length),
+      );
       if (elapsed < coalesceWindow) {
         nextDelay = Math.min(nextDelay, coalesceWindow - elapsed);
         continue;
       }
 
-      for (const subscriber of [...room.subscribers]) {
-        if (subscriber.tier !== tier) continue;
+      for (const subscriber of audience) {
         try {
           subscriber.send(frame.frame);
         } catch {

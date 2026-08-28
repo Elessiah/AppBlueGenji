@@ -69,6 +69,25 @@ cadences ; serveur et client y lisent les mêmes nombres.
 Le palier est décidé **par le serveur** à la connexion du flux et annoncé au
 client : il ne se déclare pas.
 
+### Budget de sortie
+
+Le regroupement borne la *fréquence* des envois, pas leur *poids*. Mesure faite
+sur le jeu de test : l'instantané d'un tournoi à 128 équipes en double
+élimination (254 matchs) pèse **154 ko** — et dans un tournoi de cette taille,
+les inscrits, tous prioritaires, sont 128. Un score rapporté écrirait donc près
+de **20 Mo d'un coup**. Le lien du Raspberry Pi ne suit pas, et les tampons de
+socket montent d'autant.
+
+Chaque salle a donc un budget de sortie (`ROOM_BYTES_PER_SECOND`, 512 ko/s) :
+la fenêtre effective est la plus large des deux, celle du palier et celle
+qu'impose le poids à écrire. Une petite salle n'est jamais concernée (6 ko vers
+20 abonnés = 0,2 s, absorbé par la fenêtre du palier) ; une grosse salle
+ralentit au lieu de saturer. L'attente est plafonnée à 60 s pour qu'aucune salle
+ne devienne muette.
+
+Celui qui vient d'agir ne la subit pas : sa page relit immédiatement de son
+côté.
+
 > Il n'existe pas encore de rôle « caster » sur la plateforme
 > (`PlatformRole` = `ADMIN | ARBITRE | COMMUNITY_MANAGER | RECRUTEUR`). Le jour
 > où il apparaît, il suffira de le faire entrer dans `isStaff` au point d'appel
@@ -174,7 +193,7 @@ main dans `site-visits-service.ts`, s'appuie maintenant sur le même module.
 | `cache.ts` | Cache mémoire à vol unique. |
 | `rate-limit.ts` | Seaux à fenêtre fixe (contrôle et débit séparés). |
 | `api-guard.ts` | Plafonds des routes + IP client. |
-| `tournament-broadcast.ts` | Salles SSE : un calcul par tournoi, regroupement par palier, battement d'entretien. |
+| `tournament-broadcast.ts` | Salles SSE : un calcul par tournoi, regroupement par palier, budget de sortie, battement d'entretien. |
 | `tournaments/snapshot.ts` | Construction et mise en cache de l'instantané. |
 | `tournaments/list-cache.ts` | Cache de la liste publique. |
 | `tournaments/notifications.ts` | Publication d'événement **et** invalidation des caches. |
