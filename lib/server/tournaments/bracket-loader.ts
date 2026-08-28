@@ -22,41 +22,44 @@ type MatchRow = {
 export async function loadMiniBracket(
   tournamentId: number,
 ): Promise<{ a: string; b: string; sa: number | string; sb: number | string }[]> {
-  return cached(`mini-bracket:${tournamentId}`, MINI_BRACKET_TTL_MS, () =>
-    loadMiniBracketRows(tournamentId),
-  );
+  // Un incident de lecture n'est pas mis en cache : `cached` ne mémorise jamais
+  // un rejet, et la visite suivante retentera plutôt que de servir une vignette
+  // vide pendant quinze secondes.
+  try {
+    return await cached(`mini-bracket:${tournamentId}`, MINI_BRACKET_TTL_MS, () =>
+      loadMiniBracketRows(tournamentId),
+    );
+  } catch {
+    return [];
+  }
 }
 
 async function loadMiniBracketRows(
   tournamentId: number,
 ): Promise<{ a: string; b: string; sa: number | string; sb: number | string }[]> {
-  try {
-    const db = await getDatabase();
-    const [rows] = await db.execute<(RowDataPacket & MatchRow)[]>(
-      `SELECT
-        id,
-        team1_name,
-        team2_name,
-        team1_placeholder,
-        team2_placeholder,
-        team1_score,
-        team2_score
-       FROM bg_matches
-       WHERE tournament_id = ?
-       ORDER BY FIELD(bracket, 'UPPER', 'LOWER', 'GRAND', 'THIRD_PLACE') ASC,
-                round_number ASC,
-                match_number ASC
-       LIMIT 4`,
-      [tournamentId],
-    );
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & MatchRow)[]>(
+    `SELECT
+      id,
+      team1_name,
+      team2_name,
+      team1_placeholder,
+      team2_placeholder,
+      team1_score,
+      team2_score
+     FROM bg_matches
+     WHERE tournament_id = ?
+     ORDER BY FIELD(bracket, 'UPPER', 'LOWER', 'GRAND', 'THIRD_PLACE') ASC,
+              round_number ASC,
+              match_number ASC
+     LIMIT 4`,
+    [tournamentId],
+  );
 
-    return rows.map((row) => ({
-      a: row.team1_name ?? row.team1_placeholder ?? "À venir",
-      b: row.team2_name ?? row.team2_placeholder ?? "À venir",
-      sa: row.team1_score ?? "—",
-      sb: row.team2_score ?? "—",
-    }));
-  } catch {
-    return [];
-  }
+  return rows.map((row) => ({
+    a: row.team1_name ?? row.team1_placeholder ?? "À venir",
+    b: row.team2_name ?? row.team2_placeholder ?? "À venir",
+    sa: row.team1_score ?? "—",
+    sb: row.team2_score ?? "—",
+  }));
 }

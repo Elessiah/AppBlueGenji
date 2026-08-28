@@ -32,23 +32,32 @@ function fromRow(row: AboutPillarRow): AboutPillar {
  * revient à chaque fois, pour un contenu que le staff modifie quelques fois par
  * mois. Toute écriture invalide (voir `./showcase-cache`).
  */
+/**
+ * Repli servi quand la base est injoignable.
+ *
+ * Renvoyé **hors** du chargeur mis en cache, à dessein : `cached` ne mémorise
+ * jamais un rejet, si bien qu'une coupure d'une seconde ne fige pas du contenu
+ * de substitution sur l'accueil pendant toute une minute — la visite suivante
+ * retente. Le repli d'une table vide, lui, est un résultat légitime : il passe
+ * par le chargeur et se met en cache normalement.
+ */
 export async function listAboutPillars(): Promise<AboutPillar[]> {
-  return cachedShowcase("about-pillars", loadListAboutPillars);
-}
-
-async function loadListAboutPillars(): Promise<AboutPillar[]> {
   try {
-    const db = await getDatabase();
-    const [rows] = await db.execute<AboutPillarRow[]>(
-      `SELECT id, title, text
-       FROM bg_about_pillars
-       ORDER BY display_order ASC, id ASC`,
-    );
-    if (!rows || rows.length === 0) return FALLBACK_ABOUT_PILLARS;
-    return rows.map(fromRow);
+    return await cachedShowcase("about-pillars", loadListAboutPillars);
   } catch {
     return FALLBACK_ABOUT_PILLARS;
   }
+}
+
+async function loadListAboutPillars(): Promise<AboutPillar[]> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<AboutPillarRow[]>(
+    `SELECT id, title, text
+     FROM bg_about_pillars
+     ORDER BY display_order ASC, id ASC`,
+  );
+  if (!rows || rows.length === 0) return FALLBACK_ABOUT_PILLARS;
+  return rows.map(fromRow);
 }
 
 /** Crée un pilier et le renvoie. Place le nouveau pilier en fin de liste. */
@@ -64,6 +73,8 @@ export async function createAboutPillar(input: AboutPillarInput): Promise<AboutP
     [title, text],
   );
 
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
   return { id: Number(res.insertId), title, text };
 }
 
@@ -80,6 +91,8 @@ export async function updateAboutPillar(id: number, input: AboutPillarInput): Pr
   );
   if (res.affectedRows === 0) throw new Error("ABOUT_PILLAR_NOT_FOUND");
 
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
   return { id, title, text };
 }
 
