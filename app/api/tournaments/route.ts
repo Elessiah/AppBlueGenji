@@ -13,15 +13,13 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const search = url.searchParams.get("search");
-  // `scope=mine` : les tournois créés par l'utilisateur, y compris ceux qui ne
-  // sont pas encore visibles. La portée est déduite de la session, jamais d'un
-  // identifiant fourni par le client — on ne peut donc lire que les siens.
-  const mine = url.searchParams.get("scope") === "mine";
+  // `scope=hidden` : les tournois programmés que personne ne voit encore.
+  // Réservé au staff `tournaments` (ADMIN, ARBITRE) — sans quoi la date de
+  // visibilité ne protégerait plus rien.
+  const hiddenOnly = url.searchParams.get("scope") === "hidden";
+  if (hiddenOnly && !can(user, "tournaments")) return fail("FORBIDDEN", 403);
 
-  const buckets = await listTournamentBuckets(
-    search,
-    mine ? { organizerUserId: user.id } : {},
-  );
+  const buckets = await listTournamentBuckets(search, hiddenOnly ? { hiddenOnly: true } : {});
   return ok({ buckets });
 }
 
