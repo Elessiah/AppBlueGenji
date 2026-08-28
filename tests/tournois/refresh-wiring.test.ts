@@ -211,6 +211,10 @@ describe("lectures serveur — ce qui garde le cache utile", () => {
     expect(index).toContain("const preview = canPreview ? await getTournamentPreview(");
     const notifications = read("lib/server/tournaments/notifications.ts");
     expect(notifications).toContain("invalidateTournamentPreview(tournamentId);");
+
+    // Et il ne sort pas du module : sa signature ne porte aucun droit, le seul
+    // chemin public passe par `getTournamentViewerContext`, qui l'exige.
+    expect(index).not.toContain("export { getTournamentPreview");
   });
 
   it("ne réserve une connexion que là où elle sert", () => {

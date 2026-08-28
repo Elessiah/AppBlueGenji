@@ -58,8 +58,14 @@ export {
 // Cache de la liste publique (voir ./list-cache)
 export { invalidateTournamentLists, TOURNAMENT_LIST_TTL_MS } from "./list-cache";
 
-// Cache de l'aperçu du plateau (voir ./preview-cache)
-export { getTournamentPreview, invalidateTournamentPreview } from "./preview-cache";
+// Cache de l'aperçu du plateau (voir ./preview-cache).
+//
+// `getTournamentPreview` n'est **pas** réexporté : il rend un contenu réservé
+// aux permissions `tournaments` et `casting`, sans rien qui le rappelle dans sa
+// signature. Le seul chemin vers l'aperçu passe donc par
+// `getTournamentViewerContext`, qui exige ce droit — un appelant ne peut pas
+// l'oublier.
+export { invalidateTournamentPreview } from "./preview-cache";
 
 // Instantané partagé (voir ./snapshot)
 export {

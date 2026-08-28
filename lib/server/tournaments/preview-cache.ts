@@ -40,6 +40,11 @@ export function invalidateTournamentPreview(tournamentId: number): void {
 /**
  * Aperçu du tournoi, mutualisé entre tous les lecteurs autorisés.
  *
+ * **Ne contrôle aucun droit** : l'appelant doit avoir vérifié `tournaments` ou
+ * `casting` avant d'appeler. C'est pourquoi cette fonction n'est pas réexportée
+ * par `./index` — le seul chemin public vers l'aperçu est
+ * `getTournamentViewerContext`, qui exige ce droit en paramètre.
+ *
  * Renvoie `null` quand le tournoi n'existe pas ou qu'il n'est plus prévisible
  * (déjà lancé) — c'est `loadTournamentPreview` qui en décide.
  */
