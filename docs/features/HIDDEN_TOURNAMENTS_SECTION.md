@@ -1,14 +1,15 @@
-# Onglet « Mes tournois »
+# Section « Tournois invisibles »
 
 La page `/tournois` ne montre que les tournois **déjà visibles** :
 `listTournamentBuckets` filtre sur `bg_tournaments.start_visibility_at <= NOW()`.
-Un tournoi programmé à l'avance n'apparaît donc nulle part — pas même pour
-celui qui vient de le créer, qui n'avait aucun moyen de le relire ou d'en
-vérifier les dates sans connaître son identifiant.
+Un tournoi programmé à l'avance n'apparaît donc nulle part — pas même pour le
+staff qui doit le relire, en vérifier les dates ou corriger sa fiche avant
+publication.
 
-L'onglet « Mes tournois » est ce chemin de retour : il liste les tournois dont
-l'utilisateur est l'organisateur (`bg_tournaments.organizer_user_id`),
-**visibles ou non**.
+La section « Tournois invisibles » est ce chemin de retour. Elle est
+**réservée au staff `tournaments`** (`ADMIN`, `ARBITRE` — voir
+`PERMISSION_ROLES.md`) et contient **tous** les tournois pas encore visibles,
+quel que soit leur organisateur.
 
 ## Portée
 
@@ -17,46 +18,46 @@ l'utilisateur est l'organisateur (`bg_tournaments.organizer_user_id`),
 | Portée | Filtre appliqué |
 | --- | --- |
 | `{}` (défaut) | `t.start_visibility_at <= NOW()` — la vue publique, inchangée |
-| `{ organizerUserId }` | `t.organizer_user_id = ?` — **sans** filtre de visibilité |
+| `{ hiddenOnly: true }` | `t.start_visibility_at > NOW()` |
 
-Les deux portées partagent la même requête, le même `mapCard` et le même
-`syncVisibleTournaments()` : l'onglet ne voit pas des tournois « d'un autre
-genre », il voit les mêmes cartes avec un filtre différent.
+Les deux portées sont **disjointes et complémentaires** : leur réunion est
+l'ensemble des tournois, et aucun ne peut figurer dans les deux. Elles
+partagent la même requête et le même `mapCard` — la section ne voit pas des
+tournois « d'un autre genre », elle voit les mêmes cartes avec le filtre
+inversé.
 
-L'identifiant d'organisateur vient **de la session**, jamais d'un paramètre du
-client : `GET /api/tournaments?scope=mine` ne peut retourner que les tournois de
-l'appelant. Il n'existe pas de portée « les tournois d'un autre ».
+La fonction ne connaît aucune permission : c'est `GET /api/tournaments?scope=hidden`
+qui garde la porte, en refusant `FORBIDDEN` (403) à qui n'a pas `can(user, "tournaments")`.
+Le refus tombe **avant** la requête, donc rien n'est lu.
 
 ## Interface
 
-`app/(secured)/tournois/page.tsx` charge les deux listes en parallèle au
-montage. La seconde décide de tout :
+`app/(secured)/tournois/page.tsx` charge la liste publique au montage, et la
+liste invisible dans un **effet séparé**, conditionné à la permission :
 
-- **l'onglet n'existe que si elle n'est pas vide** — un joueur qui n'a jamais
-  créé de tournoi ne voit aucun changement sur la page ;
-- l'onglet actif pilote les sections, les compteurs de la barre de métriques et
-  les pastilles de filtre par jeu. Le bandeau défilant reste sur la vue globale :
-  c'est une actualité de plateau, pas une vue personnelle.
+- un joueur ne déclenche même pas la requête — elle lui serait refusée ;
+- l'échec de la liste invisible n'emporte pas la liste publique, et
+  réciproquement.
 
-Dans l'onglet « Mes tournois », `splitHiddenTournaments`
-(`lib/shared/tournament-visibility.ts`, pur) sort les tournois masqués des
-paniers d'état et les regroupe dans une section « PAS ENCORE VISIBLES » placée
-en tête — la raison d'être de l'onglet est de les trouver, pas de les chercher.
-Ils ne sont donc **pas** répétés dans leur section d'état, et les sections
-suivantes se renumérotent (`02` à `05`).
+La section est rendue **en tête** et seulement s'il y a quelque chose à
+montrer (`isAdmin && hiddenTournaments.length > 0`) : pas de tiroir vide quand
+aucun tournoi n'est programmé. Les sections d'état se renumérotent alors de
+`02` à `05`. La recherche et le filtre par jeu s'y appliquent comme partout
+ailleurs, et les pastilles de jeu comptent les invisibles pour le staff — elles
+décrivent ce que la page montre.
 
-Un tournoi masqué est en pratique toujours « à venir » — la création impose
+`flattenBuckets` (`app/(secured)/tournois/_lib/buckets.ts`) remet les quatre
+paniers renvoyés par l'API à plat, dans l'ordre de lecture de la page. La
+section rassemble en effet des tournois de **n'importe quel état** : `StateCard`
+(`cards/StateCard.tsx`) aiguille chacun vers la carte de son état.
+
+En pratique un tournoi invisible est toujours « à venir » — la création impose
 `start_visibility_at <= registration_open_at`, et l'état reste `UPCOMING` tant
-que les inscriptions ne sont pas ouvertes. La séparation ne s'y fie pas pour
-autant : `StateCard` (`cards/StateCard.tsx`) aiguille vers la carte de l'état
-réel, de sorte qu'une date reprise à la main sur un tournoi déjà lancé reste
-correctement rendue.
-
-Une date de visibilité illisible compte comme visible : mieux vaut afficher le
-tournoi dans sa section d'état que le faire disparaître dans un tiroir.
+que les inscriptions ne sont pas ouvertes. Rien ne s'y fie pour autant : une
+date reprise à la main sur un tournoi déjà lancé reste correctement rendue.
 
 ## Accès à la fiche
 
-L'onglet ne change rien aux droits : la fiche `/tournois/[id]` d'un tournoi non
-visible était déjà accessible à tout utilisateur connecté qui en connaissait
+La section ne change rien aux droits : la fiche `/tournois/[id]` d'un tournoi
+invisible était déjà accessible à tout utilisateur connecté qui en connaissait
 l'identifiant. La visibilité gouverne le **listage**, pas la lecture.
