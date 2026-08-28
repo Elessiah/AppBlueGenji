@@ -59,7 +59,10 @@ export async function claimGhostTeam(teamId: number, newOwnerUserId: number): Pr
   if (teams[0].is_ghost !== 1) throw new Error("NOT_A_GHOST_TEAM");
 
   const [users] = await db.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_users WHERE id = ? AND deleted_at IS NULL LIMIT 1`,
+    // `bg_users` marque l'anonymisation avec `is_deleted` (pas `deleted_at`,
+    // qui n'existe que sur `bg_teams`) : un compte anonymisé ne peut pas
+    // récupérer une équipe fantôme.
+    `SELECT id FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
     [newOwnerUserId],
   );
   if (users.length === 0) throw new Error("USER_NOT_FOUND");

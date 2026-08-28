@@ -13,7 +13,7 @@ tête, quatre dates nulle part, et rien qui dise *ce qu'on attend maintenant*.
 
 | Étape | Clé | Ce qui la distingue |
 | --- | --- | --- |
-| Masqué | `HIDDEN` | `start_visibility_at` n'est pas passée : le tournoi n'existe pour personne d'autre que son organisateur (cf. [MY_TOURNAMENTS_TAB](MY_TOURNAMENTS_TAB.md)) |
+| Masqué | `HIDDEN` | `start_visibility_at` n'est pas passée : le tournoi n'existe que pour le staff `tournaments` (cf. [HIDDEN_TOURNAMENTS_SECTION](HIDDEN_TOURNAMENTS_SECTION.md)) |
 | Annoncé | `ANNOUNCED` | Visible, inscriptions pas encore ouvertes |
 | Inscriptions | `REGISTRATION` | Entre `registration_open_at` et `registration_close_at` |
 | Clôture | `LOCKED` | Inscriptions fermées, coup d'envoi pas encore atteint |

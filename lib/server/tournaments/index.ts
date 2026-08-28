@@ -20,6 +20,9 @@ export { canUserRegister, resolveUserEntrantTeamId } from "./registration";
 // Bracket generation
 export { createBracketIfMissing } from "./bracket-generator";
 
+// Aperçu du plateau avant le lancement (staff + cast)
+export { loadTournamentPreview, isPreviewableState } from "./preview";
+
 // Scoring
 export { reportMatchScore, finalizeMatch } from "./scoring";
 
@@ -366,14 +369,16 @@ export async function createTournament(
 /**
  * Portée de la liste des tournois.
  *
- * Par défaut la liste ne montre que les tournois **déjà visibles**. Renseigner
- * `organizerUserId` la restreint aux tournois créés par cet utilisateur, et
- * lève alors le filtre de visibilité : c'est le seul endroit d'où un
- * organisateur peut retrouver un tournoi qu'il a programmé mais que personne
- * ne voit encore (onglet « Mes tournois »).
+ * Par défaut la liste ne montre que les tournois **déjà visibles**. `hiddenOnly`
+ * prend exactement le complément : les tournois programmés que personne ne voit
+ * encore. Les deux portées sont disjointes et se réunissent sur l'ensemble des
+ * tournois — aucun ne peut se retrouver dans les deux, ni dans aucune.
+ *
+ * La portée `hiddenOnly` est réservée au staff `tournaments` : c'est la route
+ * API qui garde la permission, jamais cette fonction.
  */
 export type TournamentListScope = {
-  organizerUserId?: number;
+  hiddenOnly?: boolean;
 };
 
 export async function listTournamentBuckets(
@@ -385,16 +390,8 @@ export async function listTournamentBuckets(
   const db = await getDatabase();
   const now = new Date();
 
-  const where: string[] = [];
-  const params: unknown[] = [];
-
-  if (scope.organizerUserId !== undefined) {
-    where.push(`t.organizer_user_id = ?`);
-    params.push(scope.organizerUserId);
-  } else {
-    where.push(`t.start_visibility_at <= ?`);
-    params.push(now);
-  }
+  const where: string[] = [scope.hiddenOnly ? `t.start_visibility_at > ?` : `t.start_visibility_at <= ?`];
+  const params: unknown[] = [now];
 
   if (searchTerm && searchTerm.trim()) {
     where.push(`LOWER(t.name) LIKE ?`);
@@ -552,6 +549,12 @@ export async function getTournamentDetail(
   tournamentId: number,
   userId: number,
   isAdmin = false,
+  /**
+   * Droit de voir l'aperçu du plateau avant le lancement : permission
+   * `tournaments` **ou** `casting`. Le staff l'a par construction, le cast l'a
+   * sans aucun droit d'écriture.
+   */
+  canPreview = isAdmin,
 ): Promise<TournamentDetail | null> {
   const db = await getDatabase();
 
@@ -666,6 +669,10 @@ export async function getTournamentDetail(
           ? await (await import("./swiss")).loadSwissMeta(connection, tournamentId, swissPhaseId)
           : null;
 
+    const preview = canPreview
+      ? await (await import("./preview")).loadTournamentPreview(connection, tournament)
+      : null;
+
     return {
       card,
       matches: matches.map(mapMatch),
@@ -688,6 +695,7 @@ export async function getTournamentDetail(
       currentPhaseId: phasesDetail?.currentPhaseId ?? null,
       phaseStandings: phasesDetail?.phaseStandings ?? {},
       soloUserIds,
+      preview,
     };
   } finally {
     connection.release();

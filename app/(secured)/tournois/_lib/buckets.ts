@@ -35,8 +35,17 @@ export function filterBuckets(
   };
 }
 
+/**
+ * Remet les quatre paniers à plat, dans l'ordre de lecture de la page (en
+ * cours, inscriptions, à venir, terminés). Sert à la section « invisibles »,
+ * qui rassemble des tournois de n'importe quel état.
+ */
+export function flattenBuckets(buckets: TournamentBuckets): TournamentCard[] {
+  return [...buckets.running, ...buckets.registration, ...buckets.upcoming, ...buckets.finished];
+}
+
 export function countByGame(buckets: TournamentBuckets, gameFilter: GameFilter): number {
-  const allTournaments = [...buckets.upcoming, ...buckets.registration, ...buckets.running, ...buckets.finished];
+  const allTournaments = flattenBuckets(buckets);
   if (gameFilter === "all") return allTournaments.length;
   if (gameFilter === "ow2") return allTournaments.filter((t) => t.game === "OW2").length;
   if (gameFilter === "mr") return allTournaments.filter((t) => t.game === "MR").length;

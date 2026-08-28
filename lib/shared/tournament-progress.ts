@@ -44,7 +44,7 @@ export const TOURNAMENT_STAGE_META: Record<
   TournamentStageKey,
   { label: string; hint: string }
 > = {
-  HIDDEN: { label: "Masqué", hint: "Visible du seul organisateur" },
+  HIDDEN: { label: "Masqué", hint: "Visible du seul staff tournois" },
   ANNOUNCED: { label: "Annoncé", hint: "En attente d'ouverture des inscriptions" },
   REGISTRATION: { label: "Inscriptions", hint: "Les engagements sont ouverts" },
   LOCKED: { label: "Clôture", hint: "Inscriptions fermées, en attente du coup d'envoi" },

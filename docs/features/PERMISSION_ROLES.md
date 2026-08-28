@@ -10,6 +10,7 @@ s'additionnent.
 | ------------------- | -------------------------------------------------------- |
 | `ADMIN`             | **Tous les droits**, dont l'attribution des rôles.       |
 | `ARBITRE`           | Création et gestion des tournois / matchs (`tournaments`).|
+| `CASTER`            | Aperçu du plateau avant lancement, en lecture seule (`casting`).|
 | `COMMUNITY_MANAGER` | Site vitrine (sponsors) + association (`showcase`).       |
 | `RECRUTEUR`         | Page recrutement (`recruitment`).                         |
 
@@ -20,6 +21,9 @@ s'additionnent.
 
 - `tournaments` — `POST /api/tournaments`, `PATCH /api/admin/matches/[id]/scores`,
   `POST /api/admin/matches/[id]/resolve`, gestion via `GET /api/tournaments/[id]`.
+- `casting` — `TournamentDetail.preview`, l'aperçu du plateau avant le lancement
+  (`docs/features/TOURNAMENT_PREVIEW.md`). Permission de **lecture seule** :
+  elle n'ouvre aucune écriture. `ARBITRE` l'obtient avec `tournaments`.
 - `showcase` — `/api/landing/sponsors/*`, `/api/association/*`, `/api/benevoles/*`.
 - `recruitment` — `/api/recruitment/*`.
 - `roles` — `POST /api/admin/users/[id]/roles` (réservé `ADMIN`).
@@ -50,6 +54,13 @@ if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
 
 `can(user, permission)` renvoie `true` pour tout administrateur (invariant
 « admin = tous les droits »), sinon vérifie le cumul des rôles de l'utilisateur.
+
+`canAny(user, [...])` couvre le cas d'un accès ouvert à **plusieurs** domaines —
+l'aperçu du plateau, par exemple, que `tournaments` comme `casting` débloquent :
+
+```ts
+const canPreview = canAny(user, ["tournaments", "casting"]);
+```
 
 ## UI
 

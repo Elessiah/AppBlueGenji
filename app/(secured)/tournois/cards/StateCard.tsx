@@ -14,9 +14,9 @@ interface StateCardProps {
  * Rend la carte correspondant à l'état du tournoi.
  *
  * Les sections de la page choisissent déjà leur carte, puisqu'elles ne
- * contiennent qu'un seul état. La section « non visibles » de l'onglet « Mes
- * tournois », elle, regroupe des tournois de n'importe quel état : c'est le
- * seul endroit qui a besoin d'aiguiller.
+ * contiennent qu'un seul état. La section « tournois invisibles », elle,
+ * regroupe des tournois de n'importe quel état : c'est le seul endroit qui a
+ * besoin d'aiguiller.
  */
 export function StateCard({ t }: StateCardProps) {
   if (t.state === "RUNNING") return <RunningCard t={t} />;
