@@ -58,7 +58,9 @@ describe("page tournois — onglet « Mes tournois »", () => {
   });
 
   it("fait suivre l'onglet aux filtres et aux compteurs", () => {
-    expect(page).toMatch(/const sourceBuckets = isMine \? myBuckets : buckets/);
+    // Les deux listes passent par le reclassement local à l'heure du client
+    // (`useScheduledBuckets`) avant d'être filtrées.
+    expect(page).toMatch(/const sourceBuckets = isMine \? scheduledMyBuckets : scheduledBuckets/);
     expect(page).toContain("countByGame(sourceBuckets, key as GameFilter)");
     // La pagination des tournois terminés repart de zéro au changement d'onglet.
     expect(page).toMatch(/\[query, gameFilter, tab\]/);
