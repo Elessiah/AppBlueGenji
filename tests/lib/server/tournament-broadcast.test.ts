@@ -405,6 +405,36 @@ describe("tournament-broadcast — budget de sortie", () => {
     );
   });
 
+  it("ne renverse jamais l'ordre des paliers", async () => {
+    // Le budget se calcule sur TOUTE la salle, jamais palier par palier. Calculé
+    // par palier, un tournoi à 128 équipes (154 ko d'instantané) donnait 38 s aux
+    // 128 inscrits — tous prioritaires — contre 20 s à la vingtaine de
+    // spectateurs : les équipes qui jouent recevaient leur plateau deux fois
+    // moins souvent que ceux qui les regardent.
+    const heavy = 154 * 1024;
+    getFrame.mockResolvedValue(frameOf("v1", heavy));
+
+    const players = Array.from({ length: 128 }, () => subscriber("PRIORITY"));
+    const watchers = Array.from({ length: 20 }, () => subscriber("STANDARD"));
+    for (const viewer of [...players, ...watchers]) joinTournamentRoom(1, viewer.handle);
+
+    publish();
+    await advance(0);
+
+    getFrame.mockResolvedValue(frameOf("v2", heavy));
+    publish();
+
+    // On avance par pas jusqu'à ce que quelqu'un reçoive la nouvelle version, et
+    // on relève qui l'a eue en premier.
+    for (let elapsed = 0; elapsed < MAX_BUDGET_DELAY_MS + 5_000; elapsed += 1_000) {
+      await advance(1_000);
+      if (players[0].received.length > 1 || watchers[0].received.length > 1) break;
+    }
+
+    // Le prioritaire est servi au plus tard en même temps que le spectateur.
+    expect(players[0].received).toEqual(["data: v1", "data: v2"]);
+  });
+
   it("plafonne l'attente plutôt que de laisser une salle muette", () => {
     expect(budgetDelayMs(10 * 1024 * 1024, 1_000)).toBe(MAX_BUDGET_DELAY_MS);
   });

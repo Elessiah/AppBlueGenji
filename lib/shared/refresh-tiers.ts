@@ -52,22 +52,28 @@ export type RefreshCadence = {
   detailFallbackMs: number;
   /** Sondage de la liste des tournois (aucun flux SSE sur cette page). */
   listIntervalMs: number;
-  /** Sondage du bandeau « en direct » de la page d'accueil. */
-  landingLiveMs: number;
 };
+
+/**
+ * Sondage du bandeau « en direct » de la page d'accueil.
+ *
+ * Hors de {@link RefreshCadence} à dessein : l'accueil est public et anonyme, il
+ * n'y a personne dont résoudre le palier. Y déclarer deux valeurs laisserait
+ * croire qu'on peut servir le staff plus vite — on changerait le nombre sans
+ * rien observer.
+ */
+export const LANDING_LIVE_INTERVAL_MS = 300_000;
 
 export const REFRESH_CADENCE: Record<RefreshTier, RefreshCadence> = {
   PRIORITY: {
     pushCoalesceMs: 1_000,
     detailFallbackMs: 15_000,
     listIntervalMs: 60_000,
-    landingLiveMs: 30_000,
   },
   STANDARD: {
     pushCoalesceMs: 20_000,
     detailFallbackMs: 120_000,
     listIntervalMs: 300_000,
-    landingLiveMs: 300_000,
   },
 };
 

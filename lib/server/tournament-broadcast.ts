@@ -80,6 +80,15 @@ export const MAX_BUDGET_DELAY_MS = 60_000;
 /**
  * Attente imposée par le budget pour écrire `frameBytes` à `subscribers`
  * abonnés. Exportée pour être vérifiable directement.
+ *
+ * Elle se calcule sur **toute la salle**, jamais palier par palier. Un budget
+ * par palier produisait une inversion : dans un tournoi à 128 équipes (154 ko
+ * d'instantané), les 128 inscrits — tous prioritaires — héritaient d'une
+ * fenêtre de 38 s quand la vingtaine de spectateurs était servie toutes les
+ * 20 s. Les équipes qui jouent recevaient leur plateau deux fois moins souvent
+ * que ceux qui les regardent, et ce dans les tournois où la promesse compte le
+ * plus. Un plancher commun conserve l'ordre des paliers : prioritaire n'attend
+ * jamais plus longtemps que spectateur.
  */
 export function budgetDelayMs(frameBytes: number, subscribers: number): number {
   if (subscribers <= 0 || frameBytes <= 0) return 0;
@@ -182,6 +191,11 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
     const now = Date.now();
     let nextDelay = Number.POSITIVE_INFINITY;
 
+    // Plancher commun à toute la salle : c'est le lien qu'on ménage, et il est
+    // partagé. Le calculer par palier ferait attendre les 128 inscrits d'un gros
+    // tournoi plus longtemps que la poignée de spectateurs qui les regarde.
+    const roomFloor = budgetDelayMs(frame.frame.byteLength, room.subscribers.size);
+
     for (const tier of activeTiers(room)) {
       const state = tierState(room, tier);
       if (state.lastVersion === frame.version) continue;
@@ -189,12 +203,9 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
       const audience = [...room.subscribers].filter((subscriber) => subscriber.tier === tier);
 
       // La fenêtre effective est la plus large des deux : celle du palier, et
-      // celle qu'impose le poids de ce qu'on s'apprête à écrire.
+      // celle qu'impose le poids de ce que la salle entière écrit.
       const elapsed = now - state.lastSentAt;
-      const coalesceWindow = Math.max(
-        REFRESH_CADENCE[tier].pushCoalesceMs,
-        budgetDelayMs(frame.frame.byteLength, audience.length),
-      );
+      const coalesceWindow = Math.max(REFRESH_CADENCE[tier].pushCoalesceMs, roomFloor);
       if (elapsed < coalesceWindow) {
         nextDelay = Math.min(nextDelay, coalesceWindow - elapsed);
         continue;

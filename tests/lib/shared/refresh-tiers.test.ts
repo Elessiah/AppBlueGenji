@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   FOCUS_REFRESH_MIN_INTERVAL_MS,
+  LANDING_LIVE_INTERVAL_MS,
   REFRESH_CADENCE,
   isRefreshTier,
   refreshCadenceFor,
@@ -41,13 +42,22 @@ describe("refresh-tiers — cohérence des cadences", () => {
     expect(priority.pushCoalesceMs).toBeLessThan(standard.pushCoalesceMs);
     expect(priority.detailFallbackMs).toBeLessThan(standard.detailFallbackMs);
     expect(priority.listIntervalMs).toBeLessThan(standard.listIntervalMs);
-    expect(priority.landingLiveMs).toBeLessThan(standard.landingLiveMs);
+  });
+
+  it("garde hors de la table ce qui ne dépend d'aucun palier", () => {
+    // L'accueil est public et anonyme : il n'y a personne dont résoudre le
+    // palier. Une entrée `landingLiveMs` par palier laisserait croire qu'on peut
+    // servir le staff plus vite — on changerait le nombre sans rien observer.
+    for (const cadence of Object.values(REFRESH_CADENCE)) {
+      expect(cadence).not.toHaveProperty("landingLiveMs");
+    }
+    expect(LANDING_LIVE_INTERVAL_MS).toBeGreaterThanOrEqual(300_000);
   });
 
   it("garde le spectateur dans la fenêtre de 5 à 10 minutes demandée", () => {
     expect(REFRESH_CADENCE.STANDARD.listIntervalMs).toBeGreaterThanOrEqual(300_000);
     expect(REFRESH_CADENCE.STANDARD.listIntervalMs).toBeLessThanOrEqual(600_000);
-    expect(REFRESH_CADENCE.STANDARD.landingLiveMs).toBeGreaterThanOrEqual(300_000);
+    expect(LANDING_LIVE_INTERVAL_MS).toBeLessThanOrEqual(600_000);
   });
 
   it("n'accepte aucune cadence nulle ou négative", () => {

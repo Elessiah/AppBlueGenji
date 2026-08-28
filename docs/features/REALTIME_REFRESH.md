@@ -64,7 +64,11 @@ cadences ; serveur et client y lisent les mêmes nombres.
 | Regroupement des envois SSE | 1 s | 20 s |
 | Sondage de secours du détail (flux coupé) | 15 s | 120 s |
 | Liste `/tournois` | 60 s | 300 s |
-| Bandeau « en direct » de l'accueil | 30 s | 300 s |
+
+Le bandeau « en direct » de l'accueil ne figure pas dans cette table : la page
+est publique et anonyme, il n'y a personne dont résoudre le palier. Sa cadence
+vit à part (`LANDING_LIVE_INTERVAL_MS`, 5 min) plutôt que d'annoncer une
+distinction qui n'aurait aucun effet.
 
 Le palier est décidé **par le serveur** à la connexion du flux et annoncé au
 client : il ne se déclare pas.
@@ -84,6 +88,15 @@ qu'impose le poids à écrire. Une petite salle n'est jamais concernée (6 ko ve
 20 abonnés = 0,2 s, absorbé par la fenêtre du palier) ; une grosse salle
 ralentit au lieu de saturer. L'attente est plafonnée à 60 s pour qu'aucune salle
 ne devienne muette.
+
+Le budget se calcule sur **toute la salle**, jamais palier par palier, et
+s'applique comme plancher commun. Par palier, il renversait l'ordre : dans un
+tournoi à 128 équipes, les 128 inscrits — tous prioritaires — héritaient d'une
+fenêtre de 38 s quand la vingtaine de spectateurs était servie toutes les 20 s.
+Les équipes qui jouent recevaient leur plateau deux fois moins souvent que ceux
+qui les regardent, et ce dans les tournois où la promesse compte le plus. Le
+plancher commun garantit que le prioritaire n'attend jamais plus longtemps que
+le spectateur.
 
 Celui qui vient d'agir ne la subit pas : sa page relit immédiatement de son
 côté.

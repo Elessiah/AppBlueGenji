@@ -5,17 +5,29 @@ import { join } from "node:path";
 const ROOT = join(__dirname, "..", "..");
 const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
 
-// Le flux SSE, le hook et les pages sont du câblage : pas de rendu testable ici
-// (composants clients, pas de DOM en test). On vérifie donc au niveau source,
-// comme pour les autres pages du projet — la logique, elle, est couverte par
-// `live-state.test.ts`, `tournament-broadcast.test.ts` et `cache.test.ts`.
+/**
+ * Le flux SSE, le hook et les pages sont du câblage : pas de rendu testable ici
+ * (composants clients, pas de DOM en test). Ce fichier vérifie donc au niveau
+ * source — comme les autres pages du projet — mais **uniquement des invariants
+ * qu'aucun test de comportement ne peut tenir** : le point de décision d'un
+ * palier, un plafond appliqué, un garde-fou de dégradation.
+ *
+ * Ce qui a une logique propre est couvert ailleurs, et doit le rester :
+ * `live-state.test.ts` (analyse et fusion des messages, reconnexion, échecs
+ * définitifs), `tournament-broadcast.test.ts` (mutualisation, paliers, budget,
+ * cycle de vie des salles), `cache.test.ts` (vol unique, invalidation),
+ * `tournament-schedule.test.ts` (reclassement, comparaison des paniers),
+ * `tournament-snapshot-frame.test.ts` (trame SSE), `state-running-maintenance.test.ts`
+ * (`stateChanged`). Recopier ici l'expression exacte que ces tests exercent déjà
+ * ne protégerait rien et casserait au premier remaniement.
+ */
 const stream = read("app/api/tournaments/[id]/stream/route.ts");
 const hook = read("app/(secured)/tournois/[id]/_hooks/useTournamentLive.ts");
 const detailPage = read("app/(secured)/tournois/[id]/page.tsx");
 const listPage = read("app/(secured)/tournois/page.tsx");
-const snapshot = read("lib/server/tournaments/snapshot.ts");
+const index = read("lib/server/tournaments/index.ts");
 
-describe("flux SSE — ce qui part à la connexion", () => {
+describe("flux SSE — le contrat de la route", () => {
   it("envoie l'instantané et le contexte du lecteur d'emblée", () => {
     // C'est ce qui supprime le `GET /api/tournaments/:id` du cas nominal.
     expect(stream).toContain('type: "connected"');
@@ -31,18 +43,26 @@ describe("flux SSE — ce qui part à la connexion", () => {
   });
 
   it("passe par la salle partagée plutôt que par un abonnement direct", () => {
+    // Sinon chaque spectateur recalculerait le détail pour lui-même.
     expect(stream).toContain("joinTournamentRoom(tournamentId, { tier, send: write })");
   });
 
-  it("plafonne les flux d'un même utilisateur", () => {
+  it("plafonne les flux simultanés et leur rythme d'ouverture", () => {
+    // Le second plafond n'est pas redondant : une fermeture libère aussitôt la
+    // place, si bien qu'une boucle ouverture/fermeture échappe au premier.
     expect(stream).toContain("acquireStreamSlot(user.id)");
+    expect(stream).toContain("enforceRateLimit(STREAM_OPEN_RULE, user.id)");
     expect(stream).toMatch(/status: 429/);
   });
 
-  it("libère la place et quitte la salle à la fermeture", () => {
-    expect(stream).toContain("leaveRoom?.();");
-    expect(stream).toContain("releaseSlot();");
-    expect(stream).toContain('req.signal.addEventListener("abort", cleanup)');
+  it("rend la place de flux par toutes les sorties", () => {
+    // Une place jamais rendue vaut, au bout de quatre fois, un 429 permanent sur
+    // son propre tournoi. Trois portes : l'abandon avant construction, le signal
+    // déjà avorté, et l'exception.
+    expect(stream).toMatch(/if \(req\.signal\.aborted\) \{\s*releaseSlot\(\);/);
+    expect(stream).toMatch(/if \(req\.signal\.aborted\) \{\s*cleanup\(\);\s*return;/);
+    expect(stream).toMatch(/\} catch \(error\) \{[\s\S]{0,600}?cleanup\(\);/);
+    expect(stream).toMatch(/const cleanup = \(\): void => \{[\s\S]*?releaseSlot\(\);/);
   });
 
   it("journalise une ouverture de flux impossible", () => {
@@ -51,81 +71,40 @@ describe("flux SSE — ce qui part à la connexion", () => {
     expect(stream).toMatch(/console\.error\([\s\S]{0,120}ouverture impossible/);
   });
 
-  it("ne laisse aucune place de flux survivre à une exception", () => {
-    // `cleanup` est défini avant la première écriture, et le corps de `start()`
-    // est enveloppé : une exception à l'encodage ne doit pas laisser la place
-    // prise pour la durée de vie du processus.
-    expect(stream).toMatch(/const cleanup = \(\): void => \{[\s\S]*?releaseSlot\(\);/);
-    // Le nettoyage suit la journalisation et la mise en erreur, mais rend la
-    // place dans tous les cas.
-    expect(stream).toMatch(/\} catch \(error\) \{[\s\S]{0,600}?cleanup\(\);/);
-  });
-
-  it("nettoie aussi quand la requête est déjà abandonnée", () => {
-    // Un signal déjà avorté ne déclenche jamais son écouteur : sans ce
-    // contrôle, la place de flux resterait prise pour toujours — et au bout de
-    // quatre F5 rapides, l'utilisateur se verrait refuser son propre tournoi.
-    expect(stream).toMatch(/if \(req\.signal\.aborted\) \{\s*cleanup\(\);\s*return;/);
-  });
-
-  it("borne aussi le rythme d'ouverture", () => {
-    expect(stream).toContain("enforceRateLimit(STREAM_OPEN_RULE, user.id)");
-  });
-
   it("garde la connexion ouverte sans réveiller le client", () => {
-    // Une ligne de commentaire SSE n'est pas remise à `onmessage`.
+    // Une ligne de commentaire SSE n'est pas remise à `onmessage`, et le proxy
+    // ne doit pas mettre le flux en tampon.
     expect(stream).toContain("`: ping\\n\\n`");
-    // Et le proxy ne doit pas mettre le flux en tampon.
     expect(stream).toContain('"X-Accel-Buffering": "no"');
-  });
-
-  it("répond 404 sur un tournoi inconnu plutôt que d'ouvrir un flux vide", () => {
-    expect(stream).toMatch(/if \(!snapshot\) \{\s*return new Response\("Tournament not found", \{ status: 404 \}\)/);
   });
 });
 
-describe("hook temps réel", () => {
-  it("n'abandonne jamais la reconnexion", () => {
+describe("hook temps réel — les garde-fous de dégradation", () => {
+  it("n'abandonne jamais la reconnexion, sauf échec définitif", () => {
     // L'ancienne version renonçait après cinq essais : la page restait figée
-    // jusqu'au F5, exactement ce qu'on cherche à supprimer.
+    // jusqu'au F5. À l'inverse, réessayer sur une session expirée laisserait
+    // « Reconnexion… » à l'écran pour l'éternité.
     expect(hook).not.toContain("maxReconnectAttempts");
-    expect(hook).toContain("reconnectDelayMs(attempts)");
     expect(hook).toMatch(/source\.onopen = \(\) => \{[\s\S]*?attempts = 0;/);
+    expect(hook).toContain("const giveUp = (failure: LiveFailure)");
+    expect(hook).toContain("showError(mapError(failure))");
   });
 
-  it("rafraîchit au retour sur l'onglet", () => {
+  it("rafraîchit au retour sur l'onglet, mais pas par-dessus un flux vivant", () => {
+    // Relire alors que le flux tient relancerait, à la fin d'une manche, la
+    // centaine de requêtes que ce flux existe pour éviter.
     expect(hook).toContain('document.addEventListener("visibilitychange", onVisible)');
     expect(hook).toContain('window.addEventListener("online", onVisible)');
     expect(hook).toContain("FOCUS_REFRESH_MIN_INTERVAL_MS");
+    expect(hook).toContain("if (!source && stale && !recentlyFetched) void load(true)");
   });
 
   it("ne sonde qu'en secours, à la cadence du palier", () => {
     expect(hook).toContain("REFRESH_CADENCE[stateRef.current.tier].detailFallbackMs");
-    // Rien ne part quand l'onglet est caché.
+    // Rien ne part quand l'onglet est caché, et le sondage cesse dès le retour
+    // du flux comme après un échec définitif.
     expect(hook).toContain('document.visibilityState === "hidden"');
-    // Et le sondage s'arrête dès que le flux revient.
     expect(hook).toMatch(/source\.onopen[\s\S]*?stopFallback\(\)/);
-  });
-
-  it("ne relit pas par-dessus un flux vivant", () => {
-    // Sinon, à la fin d'une manche, cent spectateurs revenant sur leur onglet
-    // relancent la centaine de requêtes que le flux existe pour éviter.
-    expect(hook).toContain("if (!source && stale && !recentlyFetched) void load(true)");
-  });
-
-  it("ignore une lecture qui n'apporte rien", () => {
-    expect(hook).toContain(
-      "if (payload.version && payload.version === stateRef.current.detail?.version) return null;",
-    );
-  });
-
-  it("cesse de réessayer sur un échec définitif", () => {
-    // Une session expirée ne passera pas toute seule : réessayer indéfiniment
-    // laisserait la page sur « Reconnexion… » pour l'éternité, sans jamais
-    // orienter vers la page de connexion.
-    expect(hook).toContain("const giveUp = (failure: LiveFailure)");
-    expect(hook).toContain("showError(mapError(failure))");
-    expect(hook).toMatch(/if \(cancelled \|\| stopped \|\| reconnectTimer !== null\) return;/);
     expect(hook).toContain("if (fallbackTimer !== null || stopped) return;");
   });
 
@@ -137,14 +116,13 @@ describe("hook temps réel", () => {
   });
 });
 
-describe("page de tournoi", () => {
+describe("page de tournoi — ce que voit le lecteur", () => {
   it("relit immédiatement après une action de l'utilisateur", () => {
-    // Celui qui agit mérite un retour instantané, quel que soit son palier.
-    expect(detailPage).toContain(
-      "const { tournament: detail, refresh, isLive, tier, fatal } = useTournamentLive",
-    );
-    // Score, abandon, inscription, arbitrage, seeding, équipe fantôme.
+    // Celui qui agit mérite un retour instantané, quel que soit son palier :
+    // score, abandon, inscription, arbitrage, seeding, équipe fantôme.
     expect(detailPage.match(/void refresh\(\)/g)?.length).toBeGreaterThanOrEqual(6);
+    // `router.refresh()` n'a aucun effet ici : les données viennent du hook.
+    expect(detailPage).not.toContain("router.refresh()");
   });
 
   it("sort de l'attente quand l'échec précède la donnée", () => {
@@ -156,17 +134,11 @@ describe("page de tournoi", () => {
 
   it("retire les actions quand le suivi est arrêté", () => {
     // Une équipe qui saisit son score en fin de manche n'a aucun moyen de
-    // deviner que son plateau date de plusieurs minutes.
+    // deviner que son plateau date de plusieurs minutes — l'arbitrage non plus.
     expect(detailPage).toContain("const frozen = fatal !== null;");
-    expect(detailPage.match(/!frozen/g)?.length).toBeGreaterThanOrEqual(4);
-    // Report de score, abandon **et** édition par l'arbitrage.
     expect(detailPage).toMatch(/const canReport = [\s\S]{0,80}if \(frozen\) return false;/);
     expect(detailPage).toMatch(/const canAdminResolve = [\s\S]{0,80}if \(frozen\) return false;/);
-  });
-
-  it("n'appelle plus router.refresh() sur une page cliente", () => {
-    // Sans effet ici : les données viennent du hook, pas du rendu serveur.
-    expect(detailPage).not.toContain("router.refresh()");
+    expect(detailPage).toMatch(/canForfeit = [\s\S]{0,40}!frozen/);
   });
 
   it("dit au lecteur que la page se tient à jour seule", () => {
@@ -175,119 +147,63 @@ describe("page de tournoi", () => {
   });
 });
 
-describe("liste des tournois", () => {
+describe("liste des tournois — sans flux SSE", () => {
   it("se rafraîchit d'elle-même à la cadence du palier", () => {
     expect(listPage).toContain("useAutoRefresh");
-    expect(listPage).toContain("REFRESH_CADENCE[resolveRefreshTier({ isStaff: isAdmin })].listIntervalMs");
-  });
-
-  it("tait l'échec des rafraîchissements de fond", () => {
+    expect(listPage).toContain(
+      "REFRESH_CADENCE[resolveRefreshTier({ isStaff: isAdmin })].listIntervalMs",
+    );
     // Un incident réseau passager ne doit pas couvrir l'écran de notifications.
     expect(listPage).toContain("if (failure && !silent) showError");
-    expect(listPage).toContain("useAutoRefresh((signal) => load(true, signal)");
   });
 
-  it("fait basculer les états sans requête", () => {
+  it("fait basculer les états sans requête, bandeau compris", () => {
+    // Sinon le bandeau annoncerait « À VENIR » un tournoi affiché juste dessous
+    // en « INSCRIPTIONS ».
     expect(listPage).toContain("useScheduledBuckets(buckets)");
     expect(listPage).toContain("useScheduledBuckets(myBuckets)");
+    expect(listPage).toContain("buildTickerItems(scheduledBuckets)");
   });
 
   it("ne se redessine pas pour une réponse identique", () => {
-    // Sinon chaque relecture de fond redessine les 68 cartes et réarme les
-    // minuteurs de bascule, pour un contenu inchangé.
     expect(listPage).toContain("sameBuckets(previous, all.value) ? previous : all.value");
     expect(listPage).toContain("sameBuckets(previous, mine.value) ? previous : mine.value");
   });
-
-  it("fait suivre le bandeau au reclassement local", () => {
-    // Sinon le bandeau annoncerait « À VENIR » un tournoi affiché juste dessous
-    // en « INSCRIPTIONS ».
-    expect(listPage).toContain("buildTickerItems(scheduledBuckets)");
-  });
 });
 
-describe("instantané partagé", () => {
-  it("fait connaître aux listes une bascule déclenchée à la lecture", () => {
-    // La même bascule déclenchée depuis la liste publie un événement ; sans ce
-    // pendant, un tournoi démarré parce qu'un spectateur a ouvert sa page
-    // resterait annoncé « Inscriptions » dans la liste en cache.
-    expect(snapshot).toContain("if (syncResult.stateChanged) invalidateTournamentLists();");
+describe("lectures serveur — ce qui garde le cache utile", () => {
+  it("synchronise les états hors du cache, sans en faire une condition", () => {
+    // Dedans, les événements publiés par la synchronisation invalideraient la
+    // liste qu'elle vient de rendre correcte ; et son échec ne doit pas vider
+    // `/tournois` alors que le cache tenait une liste servable.
+    expect(index).toContain("await syncVisibleTournaments().catch(() => undefined);");
+    expect(index.indexOf("await syncVisibleTournaments().catch(")).toBeLessThan(
+      index.indexOf('cachedTournamentList("public"'),
+    );
   });
 
-  it("déclenche la bascule d'état à la lecture, quel que soit l'état courant", () => {
-    // Avant, l'entretien était réservé aux tournois déjà RUNNING : la page d'un
-    // tournoi dont l'heure de début était passée restait aux inscriptions
-    // jusqu'à ce que quelqu'un charge la liste.
-    expect(snapshot).toContain("(await hasPendingStateTransition(tournamentRow)) ||");
+  it("fait apparaître un tournoi créé sans attendre le cache", () => {
+    // Sans cela, l'auteur revient sur la liste, ne le voit pas, et rafraîchit —
+    // au moment précis où il cherche une confirmation.
+    expect(index).toMatch(
+      /await connection\.commit\(\);[\s\S]{0,400}invalidateTournamentLists\(\);\s*return tournamentId;/,
+    );
   });
 
-  it("porte une empreinte du contenu", () => {
-    expect(snapshot).toContain("function snapshotVersion");
-    expect(snapshot).toContain("const version = snapshotVersion(payloadJson);");
-  });
-
-  it("ne sérialise l'instantané qu'une fois", () => {
-    // Le hachage et la trame partagent le même JSON : sur un plateau de 254
-    // matchs (~150 ko), le sérialiser deux fois se paie à chaque construction.
-    expect(snapshot).toContain("const payloadJson = JSON.stringify(payload);");
-    expect(snapshot.match(/JSON\.stringify\(payload\)/g)).toHaveLength(1);
-  });
-
-  it("mutualise la construction", () => {
-    expect(snapshot).toContain("cached(cacheKey(tournamentId), SNAPSHOT_TTL_MS,");
+  it("rattrape la clôture qu'un score provoque, sans risquer l'écriture", () => {
+    // Les événements de score ne touchent plus aux listes ; la comparaison
+    // d'état s'en charge — et n'a pas le droit de lever après le commit.
+    expect(index).toContain("await invalidateListsIfStateChanged(tournamentId, stateBefore);");
+    expect(index).toMatch(
+      /async function invalidateListsIfStateChanged\([\s\S]{0,700}?try \{[\s\S]{0,300}?\} catch \{/,
+    );
   });
 
   it("ne réserve une connexion que là où elle sert", () => {
     // En tournoi par équipes, `getUserActiveTeam` ouvre sa propre requête :
     // réserver une place d'un pool de 25 pour ne rien en faire doublerait la
     // pression à chaque connexion SSE.
-    const index = read("lib/server/tournaments/index.ts");
     expect(index).toContain("const myTeamId = isSolo");
     expect(index).toContain("(await getUserActiveTeam(userId))?.teamId ?? null;");
-  });
-
-  it("fait apparaître un tournoi créé sans attendre le cache", () => {
-    // Sans cela, l'auteur du tournoi revient sur la liste, ne le voit pas, et
-    // rafraîchit — au moment précis où il cherche une confirmation.
-    const index = read("lib/server/tournaments/index.ts");
-    expect(index).toMatch(
-      /await connection\.commit\(\);[\s\S]{0,400}invalidateTournamentLists\(\);\s*return tournamentId;/,
-    );
-  });
-
-  it("ne laisse pas le rafraîchissement de cache faire échouer une écriture", () => {
-    // Ce travail s'exécute après le commit : une erreur ferait répondre 500 pour
-    // un score pourtant enregistré, et l'équipe se heurterait ensuite à
-    // `MATCH_ALREADY_COMPLETED` en le ressaisissant.
-    const index = read("lib/server/tournaments/index.ts");
-    expect(index).toMatch(
-      /async function invalidateListsIfStateChanged\([\s\S]{0,600}?try \{[\s\S]{0,300}?\} catch \{/,
-    );
-  });
-
-  it("rafraîchit les listes quand un score change l'état du tournoi", () => {
-    // Les événements de score n'y touchent plus : c'est la comparaison autour de
-    // la transaction qui rattrape la clôture.
-    const index = read("lib/server/tournaments/index.ts");
-    expect(index).toContain("async function invalidateListsIfStateChanged(");
-    expect(index).toContain("await invalidateListsIfStateChanged(tournamentId, stateBefore);");
-  });
-
-  it("ne laisse pas l'entretien conditionner la lecture", () => {
-    // La synchronisation est une transaction sur tous les tournois en cours :
-    // son échec ne doit pas vider `/tournois` alors que le cache tenait une
-    // liste parfaitement servable.
-    const index = read("lib/server/tournaments/index.ts");
-    expect(index).toContain("await syncVisibleTournaments().catch(() => undefined);");
-  });
-
-  it("synchronise les états en dehors du cache de liste", () => {
-    // Dedans, les événements publiés par la synchronisation invalideraient la
-    // liste qu'elle vient de rendre correcte.
-    const index = read("lib/server/tournaments/index.ts");
-    const sync = index.indexOf("await syncVisibleTournaments().catch(");
-    const cachedCall = index.indexOf('cachedTournamentList("public"');
-    expect(sync).toBeGreaterThan(-1);
-    expect(sync).toBeLessThan(cachedCall);
   });
 });

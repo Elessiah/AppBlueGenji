@@ -5,7 +5,7 @@ import { Eye } from "lucide-react";
 import { CyberCard, Pill, TeamSigil } from "@/components/cyber";
 import type { LandingLive } from "@/lib/shared/landing";
 import { inferPhaseLabel, toBestOfLabel } from "@/lib/shared/landing";
-import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
+import { LANDING_LIVE_INTERVAL_MS } from "@/lib/shared/refresh-tiers";
 import { useAutoRefresh } from "@/lib/shared/hooks/useAutoRefresh";
 import styles from "./LiveCard.module.css";
 
@@ -64,7 +64,7 @@ export function LiveCard({ initialLive, nextUpcomingISO }: LiveCardProps) {
         // dernière valeur connue.
       }
     },
-    { intervalMs: REFRESH_CADENCE.STANDARD.landingLiveMs },
+    { intervalMs: LANDING_LIVE_INTERVAL_MS },
   );
 
   if (!live) {
