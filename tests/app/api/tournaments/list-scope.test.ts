@@ -9,10 +9,19 @@ import * as service from "@/lib/server/tournaments-service";
 
 const emptyBuckets = { upcoming: [], registration: [], running: [], finished: [] };
 
-const player = { id: 42, isAdmin: false } as Awaited<ReturnType<typeof getCurrentUser>>;
+type User = Awaited<ReturnType<typeof getCurrentUser>>;
+
+const admin = { id: 1, isAdmin: true, roles: ["ADMIN"] } as unknown as User;
+const arbitre = { id: 2, isAdmin: false, roles: ["ARBITRE"] } as unknown as User;
+const communityManager = { id: 3, isAdmin: false, roles: ["COMMUNITY_MANAGER"] } as unknown as User;
+const player = { id: 4, isAdmin: false, roles: [] } as unknown as User;
 
 function get(url: string) {
   return GET(new Request(`http://localhost${url}`));
+}
+
+async function errorOf(response: Response): Promise<string> {
+  return ((await response.json()) as { error?: string }).error ?? "";
 }
 
 describe("GET /api/tournaments — portée", () => {
@@ -30,36 +39,67 @@ describe("GET /api/tournaments — portée", () => {
     expect(service.listTournamentBuckets).toHaveBeenCalledWith(null, {});
   });
 
-  it("restreint à l'utilisateur connecté avec scope=mine", async () => {
-    const res = await get("/api/tournaments?scope=mine");
+  it("sert les invisibles à un administrateur", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+
+    const res = await get("/api/tournaments?scope=hidden");
 
     expect(res.status).toBe(200);
-    expect(service.listTournamentBuckets).toHaveBeenCalledWith(null, { organizerUserId: 42 });
+    expect(service.listTournamentBuckets).toHaveBeenCalledWith(null, { hiddenOnly: true });
   });
 
-  it("ignore un identifiant d'organisateur fourni par le client", async () => {
-    await get("/api/tournaments?scope=mine&organizerUserId=1&userId=1");
+  it("sert les invisibles à un arbitre", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
 
-    // La portée vient de la session : impossible de lire les tournois d'un autre.
-    expect(service.listTournamentBuckets).toHaveBeenCalledWith(null, { organizerUserId: 42 });
+    const res = await get("/api/tournaments?scope=hidden");
+
+    expect(res.status).toBe(200);
+    expect(service.listTournamentBuckets).toHaveBeenCalledWith(null, { hiddenOnly: true });
+  });
+
+  it("refuse les invisibles à un joueur", async () => {
+    const res = await get("/api/tournaments?scope=hidden");
+
+    expect(res.status).toBe(403);
+    expect(await errorOf(res)).toBe("FORBIDDEN");
+    // Rien ne doit être lu : le refus tombe avant la requête.
+    expect(service.listTournamentBuckets).not.toHaveBeenCalled();
+  });
+
+  it("refuse les invisibles à un rôle d'un autre domaine", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(communityManager as never);
+
+    const res = await get("/api/tournaments?scope=hidden");
+
+    expect(res.status).toBe(403);
+    expect(service.listTournamentBuckets).not.toHaveBeenCalled();
+  });
+
+  it("laisse la vue publique ouverte au joueur malgré le refus sur hidden", async () => {
+    const res = await get("/api/tournaments");
+
+    expect(res.status).toBe(200);
+    expect(service.listTournamentBuckets).toHaveBeenCalledWith(null, {});
   });
 
   it("retombe sur la vue publique pour une portée inconnue", async () => {
-    await get("/api/tournaments?scope=all");
+    await get("/api/tournaments?scope=mine");
 
     expect(service.listTournamentBuckets).toHaveBeenCalledWith(null, {});
   });
 
   it("combine portée et recherche", async () => {
-    await get("/api/tournaments?scope=mine&search=Marvel");
+    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
 
-    expect(service.listTournamentBuckets).toHaveBeenCalledWith("Marvel", { organizerUserId: 42 });
+    await get("/api/tournaments?scope=hidden&search=Marvel");
+
+    expect(service.listTournamentBuckets).toHaveBeenCalledWith("Marvel", { hiddenOnly: true });
   });
 
   it("refuse un visiteur non connecté", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
 
-    const res = await get("/api/tournaments?scope=mine");
+    const res = await get("/api/tournaments?scope=hidden");
 
     expect(res.status).toBe(401);
     expect(service.listTournamentBuckets).not.toHaveBeenCalled();
