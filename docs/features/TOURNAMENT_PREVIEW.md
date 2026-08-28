@@ -58,6 +58,24 @@ inaccessible depuis le navigateur. Ils sont déplacés dans
 les deux chemins partagent désormais une seule implémentation — c'est ce que
 vérifie `tests/lib/shared/bracket-seeds.test.ts`.
 
+### Nombre de manches annoncé
+
+`rounds` ne se déduit pas toujours de la taille du plateau :
+
+- `SINGLE` complet — la profondeur du plateau ;
+- `SINGLE` **tronqué** (phase qualificative d'un multi-phases) — les tours
+  réellement joués, ceux que `resolvePhasePlan` a résolus en `maxRounds` ;
+- `DOUBLE` — **`null`** : tableau principal, tableau des perdants et grande
+  finale s'enchaînent, annoncer la seule profondeur du tableau principal
+  reviendrait à en promettre la moitié ;
+- `SWISS` — `swiss_total_rounds`, ou le nombre recommandé que le moteur
+  écrirait lui-même à l'initialisation ;
+- `SURVIVAL` / `BG_SURVIE` — `null`, le nombre de manches dépend des résultats.
+
+Même principe pour les réglages : le barème d'endurance passe par
+`resolveEnduranceConfig`, comme `loadEnduranceMeta`, pour qu'une valeur absurde
+en base soit corrigée des deux côtés de la même façon.
+
 ## Ordre de seeding affiché
 
 L'aperçu applique la règle du moteur, pas la sienne (cf.

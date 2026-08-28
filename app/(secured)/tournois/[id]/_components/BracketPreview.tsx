@@ -171,7 +171,6 @@ export function BracketPreview({ preview, canReorder }: BracketPreviewProps) {
 
           <ScrollArea
             orientation="y"
-            fade
             ariaLabel={`Appariements prévus — ${preview.roundLabel}`}
             style={{ maxHeight: 420 }}
           >

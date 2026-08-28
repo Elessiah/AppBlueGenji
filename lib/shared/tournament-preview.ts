@@ -16,7 +16,11 @@
  * BlueGenji Survie et `resolvePhasePlan` pour le multi-phases.
  */
 import { nextPowerOfTwo, seedSlots } from "./bracket-seeds";
-import { planEnduranceRound, type EnduranceStanding } from "./bg-survie";
+import {
+  planEnduranceRound,
+  resolveEnduranceConfig,
+  type EnduranceStanding,
+} from "./bg-survie";
 import { planSurvivalRound, type SurvivalStanding } from "./survival";
 import { computeRecommendedRounds } from "./swiss";
 import { planFirstRound, type Participant } from "./swiss-pairing";
@@ -70,6 +74,12 @@ export const SEEDING_SOURCE_LABELS: Record<PreviewSeedingSource, string> = {
 
 export type TournamentPreviewInput = {
   format: TournamentFormat;
+  /**
+   * Élimination simple **tronquée** : nombre de tours réellement joués, quand
+   * le plateau ne sert qu'à qualifier (phase intermédiaire d'un multi-phases).
+   * `null` = plateau complet, joué jusqu'à la championne.
+   */
+  maxRounds?: number | null;
   /** Engagés **déjà triés** dans l'ordre de seeding effectif. */
   entrants: readonly PreviewEntrant[];
   seedingSource: PreviewSeedingSource;
@@ -108,7 +118,6 @@ export type TournamentPreview = {
 };
 
 const DEFAULT_SURVIVAL_ROUNDS_PER_CUT = 3;
-const DEFAULT_ENDURANCE_PLAYOFF_SIZE = 8;
 
 /** Accord en nombre : « 1 équipe », « 4 équipes ». */
 function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
@@ -138,6 +147,26 @@ function emptyPreview(
     notes,
     phasePlan,
   };
+}
+
+/**
+ * Nombre de manches annoncé pour un plateau d'élimination.
+ *
+ * - `SINGLE` complet : la profondeur du plateau ;
+ * - `SINGLE` tronqué (phase qualificative d'un multi-phases) : les tours
+ *   réellement joués, tels que les a résolus `resolvePhasePlan` ;
+ * - `DOUBLE` : **inconnu d'avance** — tableau principal, tableau des perdants
+ *   et grande finale s'enchaînent, annoncer la seule profondeur du tableau
+ *   principal reviendrait à en promettre la moitié.
+ */
+function eliminationRounds(
+  format: "SINGLE" | "DOUBLE",
+  bracketSize: number,
+  maxRounds: number | null | undefined,
+): number | null {
+  if (format === "DOUBLE") return null;
+  const fullRounds = Math.round(Math.log2(bracketSize));
+  return maxRounds ? Math.min(fullRounds, maxRounds) : fullRounds;
 }
 
 /** Élimination simple ou double : placement des têtes de série au premier tour. */
@@ -170,6 +199,12 @@ function previewElimination(
       `Plateau de ${bracketSize} : ${plural(byeCount, "exemption")} de premier tour (bye).`,
     );
   }
+  const rounds = eliminationRounds(format, bracketSize, input.maxRounds);
+  if (rounds !== null && rounds < Math.round(Math.log2(bracketSize))) {
+    notes.push(
+      `Plateau tronqué : ${plural(rounds, "tour")} joué${rounds > 1 ? "s" : ""}, le reste des engagés étant qualifié pour la phase suivante.`,
+    );
+  }
   if (format === "DOUBLE") {
     notes.push(
       "Le tableau des perdants se remplit au fil des éliminations : il n'a pas d'appariement d'avance.",
@@ -183,7 +218,7 @@ function previewElimination(
     roundLabel: "1er tour",
     pairings,
     bracketSize,
-    rounds: Math.round(Math.log2(bracketSize)),
+    rounds: eliminationRounds(format, bracketSize, input.maxRounds),
     byeCount,
     notes,
     phasePlan: null,
@@ -326,7 +361,11 @@ function previewEndurance(input: TournamentPreviewInput): TournamentPreview {
     );
   }
 
-  const playoffSize = input.endurancePlayoffSize ?? DEFAULT_ENDURANCE_PLAYOFF_SIZE;
+  // Même normalisation que `loadEnduranceMeta` : une valeur absurde en base
+  // (< 2, nulle) retombe sur le défaut côté moteur, l'aperçu doit suivre.
+  const { playoffSize } = resolveEnduranceConfig({
+    playoffSize: input.endurancePlayoffSize ?? undefined,
+  });
   notes.push(
     `La phase qualificative s'arrête à ${plural(playoffSize, "équipe")}, puis l'arbre imposé prend le relais.`,
   );
@@ -377,6 +416,7 @@ function previewMulti(input: TournamentPreviewInput): TournamentPreview {
   const inner = buildTournamentPreview({
     ...input,
     format: first.format,
+    maxRounds: first.maxRounds,
     swissTotalRounds: first.swissTotalRounds,
     survivalRoundsBeforeFirstCut: first.survivalRoundsBeforeFirstCut,
     survivalRoundsPerCut: first.survivalRoundsPerCut,

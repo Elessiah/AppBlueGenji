@@ -130,6 +130,28 @@ describe("buildTournamentPreview — élimination", () => {
     expect(preview.bracketSize).toBe(4);
     expect(preview.notes.join(" ")).toContain("tableau des perdants");
   });
+
+  it("n'annonce aucun nombre de manches en double élimination", () => {
+    // Tableau principal + tableau des perdants + grande finale : la profondeur
+    // du seul tableau principal en promettrait la moitié.
+    expect(build({ format: "DOUBLE", entrants: entrants(8) }).rounds).toBeNull();
+    expect(build({ format: "SINGLE", entrants: entrants(8) }).rounds).toBe(3);
+  });
+
+  it("compte les tours réellement joués d'un plateau tronqué", () => {
+    const preview = build({ format: "SINGLE", entrants: entrants(32), maxRounds: 2 });
+
+    expect(preview.bracketSize).toBe(32);
+    expect(preview.rounds).toBe(2);
+    expect(preview.notes.join(" ")).toContain("Plateau tronqué : 2 tours joués");
+  });
+
+  it("ignore un plafond de tours plus large que le plateau", () => {
+    const preview = build({ format: "SINGLE", entrants: entrants(8), maxRounds: 9 });
+
+    expect(preview.rounds).toBe(3);
+    expect(preview.notes.join(" ")).not.toContain("tronqué");
+  });
 });
 
 describe("buildTournamentPreview — ronde suisse", () => {
@@ -229,6 +251,17 @@ describe("buildTournamentPreview — BlueGenji Survie", () => {
       "s'arrête à 8 équipes",
     );
   });
+
+  it("normalise un effectif de play-offs absurde comme le fait le moteur", () => {
+    // `resolveEnduranceConfig` refuse tout ce qui est < 2 : l'aperçu doit
+    // annoncer la valeur que le moteur appliquera, pas celle de la colonne.
+    for (const playoffSize of [1, 0, -4]) {
+      expect(
+        build({ format: "BG_SURVIE", entrants: entrants(4), endurancePlayoffSize: playoffSize })
+          .notes.join(" "),
+      ).toContain("s'arrête à 8 équipes");
+    }
+  });
 });
 
 describe("buildTournamentPreview — multi-phases", () => {
@@ -259,6 +292,20 @@ describe("buildTournamentPreview — multi-phases", () => {
     expect(preview.bracketSize).toBe(4);
     expect(preview.notes[0]).toBe("Aperçu de la phase 2.");
     expect(preview.notes[1]).toContain("La phase 1 serait sautée");
+  });
+
+  it("compte les tours d'une phase d'élimination tronquée", () => {
+    const phases = [
+      phase({ position: 1, format: "SINGLE", qualifierMode: "COUNT", qualifierValue: 8 }),
+      phase({ position: 2, format: "DOUBLE", qualifierValue: 1 }),
+    ];
+    const preview = build({ format: "MULTI", entrants: entrants(32), phases });
+
+    expect(preview.format).toBe("SINGLE");
+    expect(preview.bracketSize).toBe(32);
+    // 32 → 8 qualifiées : deux tours joués, pas les cinq du plateau complet.
+    expect(preview.rounds).toBe(2);
+    expect(preview.notes.join(" ")).toContain("Plateau tronqué");
   });
 
   it("reprend les réglages de la phase prévisualisée", () => {
