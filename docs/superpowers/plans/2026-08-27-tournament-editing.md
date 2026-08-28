@@ -1002,12 +1002,15 @@ describe("updateTournament", () => {
   });
 
   it("laisse intacts les champs absents du patch", async () => {
+    rowToReturn = hiddenRow({ description: "Description d'origine", max_teams: 24 });
     await updateTournament(1, { name: "Nouveau nom" });
     const update = executed.find((q) => /UPDATE bg_tournaments/i.test(q.sql))!;
-    // La description d'origine (null) est réécrite telle quelle, pas effacée
-    // par une valeur du patch qui n'existe pas.
-    expect(update.params).toContain(null);
-    expect(update.params).toContain(16);
+    // Ordre des colonnes de l'UPDATE : name, description, game, format,
+    // participant_type, max_teams, … Les champs absents du patch sont réécrits
+    // à leur valeur d'origine, pas effacés.
+    expect(update.params[0]).toBe("Nouveau nom");
+    expect(update.params[1]).toBe("Description d'origine");
+    expect(update.params[5]).toBe(24);
   });
 
   it("remplace les phases d'un tournoi MULTI", async () => {
