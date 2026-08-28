@@ -75,7 +75,7 @@ Le coût en base devient **indépendant du nombre de spectateurs**.
 `lib/shared/refresh-tiers.ts` — module pur, seul endroit où se décident les
 cadences ; serveur et client y lisent les mêmes nombres.
 
-| | `PRIORITY` (staff `tournaments` + engagés du tournoi) | `STANDARD` (spectateurs, visiteurs) |
+| | `PRIORITY` (staff `tournaments`, cast `casting`, engagés du tournoi) | `STANDARD` (spectateurs, visiteurs) |
 | --- | --- | --- |
 | Regroupement des envois SSE | 1 s | 20 s |
 | Sondage de secours du détail (flux coupé) | 15 s | 120 s |
@@ -117,10 +117,12 @@ le spectateur.
 Celui qui vient d'agir ne la subit pas : sa page relit immédiatement de son
 côté.
 
-> Il n'existe pas encore de rôle « caster » sur la plateforme
-> (`PlatformRole` = `ADMIN | ARBITRE | COMMUNITY_MANAGER | RECRUTEUR`). Le jour
-> où il apparaît, il suffira de le faire entrer dans `isStaff` au point d'appel
-> — `refresh-tiers.ts` n'a pas à le connaître.
+> Le **cast** (`CASTER`, permission `casting`) est prioritaire au même titre que
+> le staff : il commente le match pendant qu'il se joue, et le laisser au palier
+> spectateur lui ferait décrire un plateau vieux de vingt secondes. C'est la
+> route du flux qui l'y fait entrer — `resolveRefreshTier({ isStaff: canAny(user,
+> ["tournaments", "casting"]), … })` —, jamais `refresh-tiers.ts`, qui ne connaît
+> aucun rôle. Un palier propre au cast n'aurait rien à dire de plus.
 
 ## Ce qui remplace le F5
 

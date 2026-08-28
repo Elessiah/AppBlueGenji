@@ -9,15 +9,15 @@
  * client raisonnent sur les mêmes nombres.
  *
  * Deux paliers seulement, volontairement :
- * - `PRIORITY` — staff tournois (`can(user, "tournaments")`) et engagés du
- *   tournoi consulté. Ce sont les seuls à agir sur la donnée ; ils la reçoivent
- *   quasi instantanément.
+ * - `PRIORITY` — ceux qui font le tournoi : staff (`tournaments`), cast
+ *   (`casting`) et engagés du tournoi consulté. Les uns agissent sur la donnée,
+ *   les autres la commentent en direct ; tous la reçoivent quasi instantanément.
  * - `STANDARD` — tout le reste (spectateurs, visiteurs). Ils voient la même
  *   chose, avec un retard borné et sans jamais avoir à recharger la page.
  *
- * Un troisième palier « caster » n'existe pas encore faute de rôle
- * correspondant : le jour où `PlatformRole` en gagne un, il suffira de le faire
- * entrer dans `isStaff` au point d'appel — ce module n'a pas à le connaître.
+ * Un palier propre au cast n'existe pas et n'a pas lieu d'être : sa cadence est
+ * celle du staff. Qui entre dans `isStaff` se décide **au point d'appel**, à
+ * partir des permissions — ce module ne connaît aucun rôle.
  *
  * Module pur : aucune dépendance serveur, importable partout.
  */
@@ -27,7 +27,11 @@ export type RefreshTier = "PRIORITY" | "STANDARD";
 
 /** Ce qui distingue un utilisateur prioritaire d'un spectateur. */
 export type RefreshTierInput = {
-  /** Staff tournois : administrateurs et arbitres (`can(user, "tournaments")`). */
+  /**
+   * Prioritaire par son rôle : staff tournois **ou** cast
+   * (`canAny(user, ["tournaments", "casting"])`). Le nom dit le palier, pas la
+   * permission : ce module n'en connaît aucune.
+   */
   isStaff?: boolean;
   /** Engagé du tournoi consulté (équipe inscrite, ou entrée solo). */
   isParticipant?: boolean;

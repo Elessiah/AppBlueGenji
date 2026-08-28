@@ -136,6 +136,27 @@ describe("cache — invalidation", () => {
     expect(await cached("autre:c", 60_000, async () => 30)).toBe(3);
   });
 
+  it("ne ressuscite pas une lecture invalidée quand la purge efface son compteur", async () => {
+    // Le compteur d'invalidation d'une clé encore en vol ne doit pas être
+    // effacé : le ramener à zéro le rendrait égal à la génération de départ du
+    // chargeur, qui rangerait alors en cache la valeur lue AVANT l'écriture.
+    let release!: (value: string) => void;
+    const inFlight = cached("k", 60_000, () => new Promise<string>((r) => (release = r)));
+
+    invalidateCached("k");
+
+    // Amène la purge des compteurs à se déclencher : elle exige à la fois cinq
+    // cents compteurs suivis et un cache déjà plein — d'où plus de clés écrites
+    // que le plafond, la purge n'ayant lieu qu'une fois celui-ci atteint.
+    for (let i = 0; i < 500; i += 1) invalidateCached(`g${i}`);
+    for (let i = 0; i < 600; i += 1) await cached(`f${i}`, 60_000, async () => i);
+
+    release("avant l'écriture");
+    await inFlight;
+
+    expect(await cached("k", 60_000, async () => "après l'écriture")).toBe("après l'écriture");
+  });
+
   it("laisse une clé inconnue tranquille", () => {
     expect(() => invalidateCached("jamais-vue")).not.toThrow();
     expect(() => invalidateCachedPrefix("rien:")).not.toThrow();

@@ -101,11 +101,30 @@ describe("GET /api/tournaments/[id]/stream — palier décidé par le serveur", 
   });
 
   it("passe le staff tournois en prioritaire", async () => {
+    // Le palier se lit sur les permissions de l'utilisateur, pas sur le contexte
+    // du lecteur : c'est le serveur qui décide, à partir du rôle.
+    (getCurrentUser as jest.Mock).mockResolvedValue(
+      { id: 1, isAdmin: false, roles: ["ARBITRE"] } as never,
+    );
     (getTournamentViewerContext as jest.Mock).mockResolvedValue(
       viewerWith({ isAdmin: true }) as never,
     );
     const message = await firstMessage(await GET(new Request("http://t/"), params("5")));
     expect(message.tier).toBe("PRIORITY");
+  });
+
+  it("passe un caster en prioritaire", async () => {
+    // Le caster commente le match pendant qu'il se joue : le laisser au palier
+    // spectateur lui ferait décrire un plateau vieux de vingt secondes. Il n'a
+    // pourtant pas la permission `tournaments` — son palier se lit sur son rôle,
+    // pas sur `viewer.isAdmin`.
+    (getCurrentUser as jest.Mock).mockResolvedValue(
+      { id: 1, isAdmin: false, roles: ["CASTER"] } as never,
+    );
+    const message = await firstMessage(await GET(new Request("http://t/"), params("5")));
+    expect(message.tier).toBe("PRIORITY");
+    // Et il reste sans droit d'écriture : le palier n'accorde rien d'autre.
+    expect(message.viewer).toMatchObject({ isAdmin: false });
   });
 
   it("passe un engagé du tournoi en prioritaire", async () => {

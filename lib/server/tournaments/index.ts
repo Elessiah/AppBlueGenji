@@ -434,8 +434,9 @@ export type TournamentListScope = {
  * loin la lecture la plus sollicitée du site — accueil rendu dynamiquement,
  * page `/tournois`, bandeau « en direct » —, elle agrège tous les tournois et
  * toutes les inscriptions, et elle est la même pour tout le monde. Les
- * variantes personnelles (`scope=mine`) ou filtrées passent directement en
- * base : elles sont rares et propres à un lecteur.
+ * variantes — liste filtrée par une recherche, ou portée `hiddenOnly` réservée
+ * au staff — passent directement en base : elles sont courtes et bien plus
+ * rarement lues.
  */
 export async function listTournamentBuckets(
   searchTerm: string | null,

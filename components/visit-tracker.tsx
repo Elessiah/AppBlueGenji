@@ -61,11 +61,15 @@ export function VisitTracker() {
         keepalive: true,
         signal: controller.signal,
       })
-        // Marqué seulement une fois l'envoi abouti : poser la marque avant
-        // ferait perdre la visite pour toute la fenêtre si la requête échoue
-        // (réseau coupé, serveur en redémarrage) alors que rien n'a été
-        // enregistré côté serveur.
-        .then(() => rememberPing())
+        // Marqué seulement une fois la visite **acceptée** : poser la marque
+        // avant, ou sur n'importe quelle réponse, ferait perdre la visite pour
+        // toute la fenêtre alors que rien n'a été enregistré côté serveur.
+        // `fetch` ne rejette que sur incident réseau : un 500 arrive ici comme
+        // un succès, et c'est justement le cas d'un serveur qui redémarre, où
+        // toutes les visites en cours tombent ensemble.
+        .then((response) => {
+          if (response.ok) rememberPing();
+        })
         .catch(() => {
           // Fréquentation = agrément : jamais de bruit dans la console du visiteur.
         });

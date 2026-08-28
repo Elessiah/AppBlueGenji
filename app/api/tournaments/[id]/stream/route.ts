@@ -59,20 +59,26 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
 
   // L'aperçu du plateau va plus loin que la gestion : le cast y a droit sans
   // pouvoir rien modifier (`docs/features/TOURNAMENT_PREVIEW.md`).
+  const narratesLive = canAny(user, ["tournaments", "casting"]);
   const viewer = await getTournamentViewerContext(
     snapshot,
     user.id,
     can(user, "tournaments"),
-    canAny(user, ["tournaments", "casting"]),
+    narratesLive,
   );
 
-  // Palier de fraîcheur : le staff et les engagés du tournoi sont servis à la
-  // seconde, les spectateurs par fenêtres plus larges — même donnée, moins de
-  // trafic (`lib/shared/refresh-tiers.ts`).
+  // Palier de fraîcheur : ceux qui font le tournoi — staff, cast, engagés — sont
+  // servis à la seconde, les spectateurs par fenêtres plus larges : même donnée,
+  // moins de trafic (`lib/shared/refresh-tiers.ts`).
+  //
+  // Le cast compte parmi les prioritaires, et pas seulement le staff : un caster
+  // commente le match pendant qu'il se joue. Le laisser au palier spectateur lui
+  // ferait décrire un plateau vieux de vingt secondes, alors même qu'on vient de
+  // lui accorder l'aperçu du tirage.
   const isParticipant =
     viewer.myTeamId !== null &&
     snapshot.registrations.some((row) => row.teamId === viewer.myTeamId);
-  const tier = resolveRefreshTier({ isStaff: viewer.isAdmin, isParticipant });
+  const tier = resolveRefreshTier({ isStaff: narratesLive, isParticipant });
 
   // Un onglet ouvre un flux. Le plafond ne gêne personne d'ordinaire ; il évite
   // qu'un client en boucle de reconnexion accapare la machine.

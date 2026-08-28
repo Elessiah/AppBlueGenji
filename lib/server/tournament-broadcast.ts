@@ -81,7 +81,7 @@ export const MAX_BUDGET_DELAY_MS = 60_000;
  * Attente imposée par le budget pour écrire `frameBytes` à `subscribers`
  * abonnés. Exportée pour être vérifiable directement.
  *
- L'appelant lui passe les abonnés **réellement dus**, tous paliers confondus,
+ * L'appelant lui passe les abonnés **réellement dus**, tous paliers confondus,
  * et applique le résultat comme plancher commun.
  *
  * Commun, parce qu'un plancher par palier renversait leur ordre : dans un

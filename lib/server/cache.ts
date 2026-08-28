@@ -44,6 +44,28 @@ function generationOf(key: string): number {
   return generations.get(key) ?? 0;
 }
 
+/**
+ * Chargeurs encore en vol, par clé.
+ *
+ * `inflight` ne peut pas en tenir lieu : `invalidateCached` l'en retire
+ * justement pour que les lecteurs suivants repartent sur un calcul neuf. Sans
+ * ce compte, la purge des compteurs ci-dessous supprimerait celui d'une clé
+ * encore en vol et le ramènerait ainsi à zéro — soit la génération de départ du
+ * chargeur, qui rangerait alors en cache la valeur lue **avant** l'écriture,
+ * exactement ce que le compteur existe pour empêcher.
+ */
+const pending = new Map<string, number>();
+
+function retainPending(key: string): void {
+  pending.set(key, (pending.get(key) ?? 0) + 1);
+}
+
+function releasePending(key: string): void {
+  const current = pending.get(key) ?? 0;
+  if (current <= 1) pending.delete(key);
+  else pending.set(key, current - 1);
+}
+
 /** Évince les entrées expirées, puis les plus anciennes si le plafond tient encore. */
 function evictIfNeeded(now: number): void {
   if (store.size < MAX_ENTRIES) return;
@@ -62,9 +84,12 @@ function evictIfNeeded(now: number): void {
 
   // Un compteur d'invalidation ne sert plus dès que la clé n'est ni en cache ni
   // en vol : le remettre à zéro à ce moment-là ne peut plus fausser personne.
+  // `pending` en plus de `inflight` : une clé invalidée pendant sa lecture a
+  // quitté `inflight` alors que son chargeur, lui, va encore comparer son
+  // compteur au retour.
   if (generations.size >= MAX_ENTRIES) {
     for (const key of [...generations.keys()]) {
-      if (!store.has(key) && !inflight.has(key)) generations.delete(key);
+      if (!store.has(key) && !inflight.has(key) && !pending.has(key)) generations.delete(key);
     }
   }
 }
@@ -89,6 +114,7 @@ export async function cached<T>(key: string, ttlMs: number, loader: () => Promis
   if (running) return running as Promise<T>;
 
   const generationAtStart = generationOf(key);
+  retainPending(key);
   const promise = (async () => {
     const value = await loader();
     if (ttlMs > 0 && generationOf(key) === generationAtStart) {
@@ -104,6 +130,9 @@ export async function cached<T>(key: string, ttlMs: number, loader: () => Promis
   } finally {
     // Retiré dans tous les cas : un échec ne doit pas condamner la clé.
     if (inflight.get(key) === promise) inflight.delete(key);
+    // Après `inflight` : le compteur doit rester protégé tant que le chargeur
+    // peut encore le lire, c'est-à-dire jusqu'ici.
+    releasePending(key);
   }
 }
 
@@ -134,4 +163,5 @@ export function clearCache(): void {
   store.clear();
   inflight.clear();
   generations.clear();
+  pending.clear();
 }

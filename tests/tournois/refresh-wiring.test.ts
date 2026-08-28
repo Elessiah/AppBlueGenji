@@ -28,6 +28,7 @@ const hook = read("app/(secured)/tournois/[id]/_hooks/useTournamentLive.ts");
 const detailPage = read("app/(secured)/tournois/[id]/page.tsx");
 const listPage = read("app/(secured)/tournois/page.tsx");
 const index = read("lib/server/tournaments/index.ts");
+const visitTracker = read("components/visit-tracker.tsx");
 
 describe("flux SSE — le contrat de la route", () => {
   it("envoie l'instantané et le contexte du lecteur d'emblée", () => {
@@ -39,8 +40,10 @@ describe("flux SSE — le contrat de la route", () => {
   });
 
   it("laisse le serveur décider du palier", () => {
-    // Un client ne doit pas pouvoir se déclarer prioritaire.
-    expect(stream).toContain("resolveRefreshTier({ isStaff: viewer.isAdmin, isParticipant })");
+    // Un client ne doit pas pouvoir se déclarer prioritaire : le palier se lit
+    // sur la session et sur l'instantané, jamais sur la requête. Qui y entre est
+    // vérifié par le comportement (`app/api/tournaments/stream.test.ts`).
+    expect(stream).toMatch(/const tier = resolveRefreshTier\(/);
     expect(stream).toMatch(/const isParticipant =[\s\S]*?registrations\.some/);
   });
 
@@ -223,5 +226,15 @@ describe("lectures serveur — ce qui garde le cache utile", () => {
     // pression à chaque connexion SSE.
     expect(index).toContain("const myTeamId = isSolo");
     expect(index).toContain("(await getUserActiveTeam(userId))?.teamId ?? null;");
+  });
+});
+describe("compteur de visites — déduplication dans l'onglet", () => {
+  it("ne pose la marque qu'après une réponse acceptée", () => {
+    // `fetch` ne rejette que sur incident réseau : un 500 (serveur en
+    // redémarrage) ou un 429 arrive dans le `then`. Marquer là ferait perdre la
+    // visite pour toute la fenêtre alors que rien n'a été enregistré — et c'est
+    // au redémarrage que toutes les visites en cours tombent ensemble.
+    expect(visitTracker).toMatch(/response\.ok\s*\)\s*rememberPing\(\)/);
+    expect(visitTracker).not.toContain(".then(() => rememberPing())");
   });
 });
