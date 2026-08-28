@@ -93,7 +93,10 @@ export default function TournamentsPage() {
   const loadHidden = useCallback(
     async (silent = false, signal?: AbortSignal) => {
       if (!isAdmin) {
-        setHiddenTournaments([]);
+        // Un tableau neuf ne serait jamais égal au précédent : la page se
+        // redessinerait à chaque passage, pour tous ceux qui n'ont même pas
+        // cette section.
+        setHiddenTournaments((previous) => (previous.length === 0 ? previous : []));
         return;
       }
       try {

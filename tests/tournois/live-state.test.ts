@@ -390,6 +390,17 @@ describe("shouldRefreshViewerContext", () => {
     ).toBe(false);
   });
 
+  it("relit quand le seeding est réordonné à effectif constant", () => {
+    // `SeedingEditor` existe pour cela : le staff réorganise le tirage avant le
+    // lancement, sans qu'aucune inscription n'arrive ni ne parte. Compter les
+    // inscrites laisserait le caster sur l'ancien ordre.
+    const previous = detailWith({ entrants: [] });
+    const reordered = snapshot({
+      registrations: snapshot().registrations.map((row) => ({ ...row, seed: 7 })),
+    });
+    expect(shouldRefreshViewerContext(previous, reordered)).toBe(true);
+  });
+
   it("ne relit pas quand rien de pertinent n'a bougé", () => {
     const previous = detailWith({ entrants: [] });
     expect(shouldRefreshViewerContext(previous, snapshot({ version: "v2" }))).toBe(false);

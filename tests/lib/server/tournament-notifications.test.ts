@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 // la durée de vie du cache — sans aucun autre symptôme.
 const invalidateSnapshot = jest.fn();
 const invalidateLists = jest.fn();
+const invalidatePreview = jest.fn();
 const publishEvent = jest.fn();
 
 jest.mock("@/lib/server/tournaments/snapshot", () => ({
@@ -15,6 +16,10 @@ jest.mock("@/lib/server/tournaments/snapshot", () => ({
 
 jest.mock("@/lib/server/tournaments/list-cache", () => ({
   invalidateTournamentLists: () => invalidateLists(),
+}));
+
+jest.mock("@/lib/server/tournaments/preview-cache", () => ({
+  invalidateTournamentPreview: (id: number) => invalidatePreview(id),
 }));
 
 jest.mock("@/lib/server/live", () => ({
@@ -30,6 +35,7 @@ import {
 beforeEach(() => {
   invalidateSnapshot.mockReset();
   invalidateLists.mockReset();
+  invalidatePreview.mockReset();
   publishEvent.mockReset();
 });
 
@@ -38,10 +44,12 @@ afterEach(() => {
 });
 
 describe("notifications — invalidation des caches", () => {
-  it("oublie l'instantané et les listes à une mise à jour", () => {
+  it("oublie l'instantané, les listes et l'aperçu à une mise à jour", () => {
     publishUpdatedEvent(7);
     expect(invalidateSnapshot).toHaveBeenCalledWith(7);
     expect(invalidateLists).toHaveBeenCalledTimes(1);
+    // Une inscription ou un seeding réordonné change le tirage prévisible.
+    expect(invalidatePreview).toHaveBeenCalledWith(7);
   });
 
   it("n'oublie que l'instantané à un score rapporté", () => {
@@ -53,12 +61,15 @@ describe("notifications — invalidation des caches", () => {
     publishScoreReportedEvent(7, 42);
     expect(invalidateSnapshot).toHaveBeenCalledWith(7);
     expect(invalidateLists).not.toHaveBeenCalled();
+    // Un aperçu n'existe qu'avant le lancement : aucun score ne peut le périmer.
+    expect(invalidatePreview).not.toHaveBeenCalled();
   });
 
   it("n'oublie que l'instantané à un score arbitré", () => {
     publishScoreResolvedEvent(7, 42);
     expect(invalidateSnapshot).toHaveBeenCalledWith(7);
     expect(invalidateLists).not.toHaveBeenCalled();
+    expect(invalidatePreview).not.toHaveBeenCalled();
   });
 
   it("invalide avant de réveiller les abonnés", () => {

@@ -207,8 +207,13 @@ export function fatalFailure(status: number): LiveFailure | null {
  * d'il y a dix minutes.
  *
  * On ne relit que pour ceux qui ont un aperçu à tenir à jour, et seulement
- * quand quelque chose le périme : une inscription, ou le passage à un état où
- * l'aperçu n'a plus lieu d'être.
+ * quand quelque chose le périme : le passage à un état où l'aperçu n'a plus
+ * lieu d'être, ou un changement de l'ordre de tirage.
+ *
+ * L'**ordre**, et non le nombre d'inscrites : `SeedingEditor` existe justement
+ * pour que le staff réorganise ce tirage avant le lancement, à effectif
+ * constant. Compter les inscrites laisserait le caster sur l'ancien ordre
+ * pendant que l'arbitre voit le nouveau — le cas le plus probable de tous.
  */
 export function shouldRefreshViewerContext(
   previous: TournamentDetail,
@@ -216,7 +221,12 @@ export function shouldRefreshViewerContext(
 ): boolean {
   if (previous.preview === null) return false;
   if (previous.card.state !== next.card.state) return true;
-  return previous.registrations.length !== next.registrations.length;
+  return seedingOrderOf(previous.registrations) !== seedingOrderOf(next.registrations);
+}
+
+/** Empreinte de l'ordre de tirage : les engagées et leur rang, dans l'ordre. */
+function seedingOrderOf(registrations: TournamentSnapshot["registrations"]): string {
+  return registrations.map((row) => `${row.teamId}:${row.seed ?? ""}`).join("|");
 }
 
 /** Plafond exponentiel de départ, en millisecondes. */

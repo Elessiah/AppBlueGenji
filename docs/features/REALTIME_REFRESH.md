@@ -42,7 +42,9 @@ Il est donc scindé en deux :
   plutôt qu'à chaque connexion. Et parce qu'il se périme à chaque inscription
   alors que le flux ne le transporte pas, le client redemande son contexte quand
   l'ensemble des inscrites change — uniquement pour ceux qui ont un aperçu à
-  tenir à jour (`shouldRefreshViewerContext`).
+  tenir à jour (`shouldRefreshViewerContext`). La comparaison porte sur l'**ordre
+  de tirage** — les engagées et leur rang — et non sur leur nombre : le staff
+  réorganise ce tirage à effectif constant, et c'est le cas le plus fréquent.
 
 `TournamentDetail = TournamentSnapshot & TournamentViewerContext` : les
 appelants existants ne voient aucune différence.

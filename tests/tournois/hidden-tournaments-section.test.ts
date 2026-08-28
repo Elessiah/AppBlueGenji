@@ -16,7 +16,10 @@ describe("page tournois — section « Tournois invisibles »", () => {
   it("ne demande les invisibles qu'au staff tournois", () => {
     expect(page).toContain('fetchBuckets("/api/tournaments?scope=hidden", signal)');
     // Un joueur ne déclenche même pas la requête : elle lui serait refusée.
-    expect(page).toMatch(/if \(!isAdmin\) \{\s*setHiddenTournaments\(\[\]\);\s*return;\s*\}/);
+    // Sans permission : la section est vidée et la requête n'est pas envoyée.
+    // Le tableau vide n'est réécrit que s'il ne l'est pas déjà, pour ne pas
+    // redessiner la page à chaque rafraîchissement de fond.
+    expect(page).toMatch(/if \(!isAdmin\) \{[\s\S]{0,400}?setHiddenTournaments\([\s\S]{0,120}?return;\s*\}/);
     // La permission commande le chargement : elle est dans ses dépendances.
     expect(page).toMatch(/\[isAdmin, showError\],\s*\);/);
   });
