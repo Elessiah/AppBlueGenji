@@ -2,7 +2,7 @@
 import { enforceRateLimit, TOURNAMENT_READ_RULE } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { getTournamentDetail } from "@/lib/server/tournaments-service";
-import { can } from "@/lib/shared/permissions";
+import { can, canAny } from "@/lib/shared/permissions";
 
 /**
  * Détail d'un tournoi. Chemin de **secours** : en marche normale la page reçoit
@@ -23,7 +23,14 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     return fail("INVALID_TOURNAMENT_ID", 400);
   }
 
-  const detail = await getTournamentDetail(tournamentId, user.id, can(user, "tournaments"));
+  // L'aperçu du plateau va plus loin que la gestion : le cast y a droit sans
+  // pouvoir rien modifier (`docs/features/TOURNAMENT_PREVIEW.md`).
+  const detail = await getTournamentDetail(
+    tournamentId,
+    user.id,
+    can(user, "tournaments"),
+    canAny(user, ["tournaments", "casting"]),
+  );
   if (!detail) return fail("TOURNAMENT_NOT_FOUND", 404);
 
   return ok(detail);

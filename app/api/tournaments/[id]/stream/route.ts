@@ -20,7 +20,7 @@ import {
   getTournamentSnapshot,
   getTournamentViewerContext,
 } from "@/lib/server/tournaments-service";
-import { can } from "@/lib/shared/permissions";
+import { can, canAny } from "@/lib/shared/permissions";
 import { resolveRefreshTier } from "@/lib/shared/refresh-tiers";
 
 export const runtime = "nodejs";
@@ -57,7 +57,14 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     return new Response("Tournament not found", { status: 404 });
   }
 
-  const viewer = await getTournamentViewerContext(snapshot, user.id, can(user, "tournaments"));
+  // L'aperçu du plateau va plus loin que la gestion : le cast y a droit sans
+  // pouvoir rien modifier (`docs/features/TOURNAMENT_PREVIEW.md`).
+  const viewer = await getTournamentViewerContext(
+    snapshot,
+    user.id,
+    can(user, "tournaments"),
+    canAny(user, ["tournaments", "casting"]),
+  );
 
   // Palier de fraîcheur : le staff et les engagés du tournoi sont servis à la
   // seconde, les spectateurs par fenêtres plus larges — même donnée, moins de

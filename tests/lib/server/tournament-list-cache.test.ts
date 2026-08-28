@@ -63,10 +63,11 @@ describe("listTournamentBuckets — portée mutualisée", () => {
   const index = read("lib/server/tournaments/index.ts");
 
   it("ne partage que la liste publique sans recherche", () => {
-    // Une liste personnelle (`scope=mine`) ou filtrée est propre à un lecteur :
-    // la mutualiser servirait la liste de quelqu'un d'autre.
+    // La liste des tournois pas encore visibles est réservée au staff, et une
+    // liste filtrée est propre à son lecteur : les mutualiser servirait la
+    // liste de quelqu'un d'autre.
     expect(index).toContain(
-      "const isSharedList = scope.organizerUserId === undefined && !searchTerm?.trim();",
+      "const isSharedList = !scope.hiddenOnly && !searchTerm?.trim();",
     );
     expect(index).toContain("if (!isSharedList) return loadTournamentBuckets(searchTerm, scope);");
     expect(index).toContain('cachedTournamentList("public"');

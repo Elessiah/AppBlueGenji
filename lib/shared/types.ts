@@ -1,6 +1,7 @@
 ﻿import type { MatchFormat } from "./match-format";
 import type { ParticipantType } from "./participants";
 import type { PlatformRole } from "./permissions";
+import type { TournamentPreview } from "./tournament-preview";
 import type { DeepStats, TeamRankingPosition } from "./stats";
 
 export type TournamentFormat =
@@ -351,6 +352,15 @@ export type TournamentSnapshot = {
 
 /** Partie du détail qui dépend de **qui regarde**. Change rarement. */
 export type TournamentViewerContext = {
+  /**
+   * Aperçu du plateau avant le lancement (`docs/features/TOURNAMENT_PREVIEW.md`).
+   * `null` pour qui n'a ni la permission `tournaments` ni `casting`, et pour un
+   * tournoi déjà lancé — le plateau réel fait alors foi.
+   *
+   * Ici, et non dans l'instantané : l'instantané est **diffusé tel quel à tous
+   * les abonnés du flux**, et cet aperçu est réservé au staff et au cast.
+   */
+  preview: TournamentPreview | null;
   canRegister: boolean;
   /**
    * Engagé du viewer dans **ce** tournoi : son équipe active en tournoi par

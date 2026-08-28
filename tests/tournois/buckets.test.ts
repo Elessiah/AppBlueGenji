@@ -4,6 +4,7 @@ import {
   filterTournamentsByQuery,
   filterTournamentsByGame,
   filterBuckets,
+  flattenBuckets,
   countByGame,
 } from "@/app/(secured)/tournois/_lib/buckets";
 
@@ -156,5 +157,32 @@ describe("buckets", () => {
       const result = countByGame(buckets, "all");
       expect(result).toBe(0);
     });
+  });
+});
+
+describe("flattenBuckets", () => {
+  it("remet les quatre paniers à plat dans l'ordre de lecture de la page", () => {
+    const result = flattenBuckets(
+      mockBuckets({
+        upcoming: [mockCard({ id: "3" })],
+        registration: [mockCard({ id: "2" })],
+        running: [mockCard({ id: "1" })],
+        finished: [mockCard({ id: "4" })],
+      }),
+    );
+
+    expect(result.map((t) => t.id)).toEqual(["1", "2", "3", "4"]);
+  });
+
+  it("préserve l'ordre interne de chaque panier", () => {
+    const result = flattenBuckets(
+      mockBuckets({ finished: [mockCard({ id: "9" }), mockCard({ id: "5" })] }),
+    );
+
+    expect(result.map((t) => t.id)).toEqual(["9", "5"]);
+  });
+
+  it("renvoie une liste vide pour des paniers vides", () => {
+    expect(flattenBuckets(mockBuckets())).toEqual([]);
   });
 });

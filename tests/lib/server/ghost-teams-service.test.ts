@@ -117,6 +117,29 @@ describe("claimGhostTeam", () => {
     await expect(claimGhostTeam(3, 9)).rejects.toThrow("USER_NOT_FOUND");
   });
 
+  // Régression : la recherche du futur propriétaire filtrait sur `deleted_at`,
+  // colonne qui n'existe que sur `bg_teams`. `bg_users` marque l'anonymisation
+  // avec `is_deleted`, si bien que MySQL rejetait la requête
+  // (ER_BAD_FIELD_ERROR) et que l'attribution échouait systématiquement en 400.
+  // Le mock de la base ne peut pas détecter une colonne absente : on vérifie
+  // donc la forme de la requête.
+  it("cherche le futur propriétaire sur is_deleted, jamais sur deleted_at", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]])
+      .mockResolvedValueOnce([[{ id: 9 }]])
+      .mockResolvedValueOnce([[]]);
+    const connectionExecute = jest.fn().mockResolvedValue([{ affectedRows: 1 }]);
+    await mockDb(execute, connectionExecute);
+
+    await claimGhostTeam(3, 9);
+
+    const [userSql] = execute.mock.calls[1] as [string];
+    expect(userSql).toMatch(/FROM bg_users/);
+    expect(userSql).toMatch(/is_deleted = 0/);
+    expect(userSql).not.toMatch(/deleted_at/);
+  });
+
   it("refuse un joueur déjà engagé dans une équipe", async () => {
     const execute = jest
       .fn()

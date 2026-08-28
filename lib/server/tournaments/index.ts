@@ -26,6 +26,9 @@ export { canUserRegister, resolveUserEntrantTeamId } from "./registration";
 // Bracket generation
 export { createBracketIfMissing } from "./bracket-generator";
 
+// Aperçu du plateau avant le lancement (staff + cast)
+export { loadTournamentPreview, isPreviewableState } from "./preview";
+
 // Scoring
 export { reportMatchScore, finalizeMatch } from "./scoring";
 
@@ -402,14 +405,16 @@ export async function createTournament(
 /**
  * Portée de la liste des tournois.
  *
- * Par défaut la liste ne montre que les tournois **déjà visibles**. Renseigner
- * `organizerUserId` la restreint aux tournois créés par cet utilisateur, et
- * lève alors le filtre de visibilité : c'est le seul endroit d'où un
- * organisateur peut retrouver un tournoi qu'il a programmé mais que personne
- * ne voit encore (onglet « Mes tournois »).
+ * Par défaut la liste ne montre que les tournois **déjà visibles**. `hiddenOnly`
+ * prend exactement le complément : les tournois programmés que personne ne voit
+ * encore. Les deux portées sont disjointes et se réunissent sur l'ensemble des
+ * tournois — aucun ne peut se retrouver dans les deux, ni dans aucune.
+ *
+ * La portée `hiddenOnly` est réservée au staff `tournaments` : c'est la route
+ * API qui garde la permission, jamais cette fonction.
  */
 export type TournamentListScope = {
-  organizerUserId?: number;
+  hiddenOnly?: boolean;
 };
 
 /**
@@ -438,7 +443,9 @@ export async function listTournamentBuckets(
   // rien à en faire.
   await syncVisibleTournaments().catch(() => undefined);
 
-  const isSharedList = scope.organizerUserId === undefined && !searchTerm?.trim();
+  // Seule la liste publique est mutualisée : celle des tournois pas encore
+  // visibles est réservée au staff, elle est courte et bien plus rarement lue.
+  const isSharedList = !scope.hiddenOnly && !searchTerm?.trim();
   if (!isSharedList) return loadTournamentBuckets(searchTerm, scope);
 
   return cachedTournamentList("public", () => loadTournamentBuckets(searchTerm, scope));
@@ -451,16 +458,8 @@ async function loadTournamentBuckets(
   const db = await getDatabase();
   const now = new Date();
 
-  const where: string[] = [];
-  const params: unknown[] = [];
-
-  if (scope.organizerUserId !== undefined) {
-    where.push(`t.organizer_user_id = ?`);
-    params.push(scope.organizerUserId);
-  } else {
-    where.push(`t.start_visibility_at <= ?`);
-    params.push(now);
-  }
+  const where: string[] = [scope.hiddenOnly ? `t.start_visibility_at > ?` : `t.start_visibility_at <= ?`];
+  const params: unknown[] = [now];
 
   if (searchTerm && searchTerm.trim()) {
     where.push(`LOWER(t.name) LIKE ?`);
@@ -614,6 +613,12 @@ export async function getTournamentViewerContext(
   snapshot: TournamentSnapshot,
   userId: number,
   isAdmin = false,
+  /**
+   * Droit de voir l'aperçu du plateau avant le lancement : permission
+   * `tournaments` **ou** `casting`. Le staff l'a par construction, le cast l'a
+   * sans aucun droit d'écriture.
+   */
+  canPreview = isAdmin,
 ): Promise<TournamentViewerContext> {
   const isSolo = isSoloTournament(snapshot.card.participantType);
 
@@ -636,7 +641,20 @@ export async function getTournamentViewerContext(
   const alreadyRegistered =
     myTeamId !== null && snapshot.registrations.some((row) => row.teamId === myTeamId);
 
+  // L'aperçu se calcule ici, et non dans l'instantané : celui-ci part tel quel à
+  // tous les abonnés du flux, alors que l'aperçu est réservé au staff et au
+  // cast. Il n'est lu que pour eux — les spectateurs n'en paient pas la requête.
+  const preview = canPreview
+    ? await withConnection(async (connection) => {
+        const row = await loadTournamentRow(connection, snapshot.card.id);
+        if (!row) return null;
+        const { loadTournamentPreview } = await import("./preview");
+        return loadTournamentPreview(connection, row);
+      })
+    : null;
+
   return {
+    preview,
     canRegister:
       snapshot.card.state === "REGISTRATION" &&
       !alreadyRegistered &&
@@ -658,11 +676,17 @@ export async function getTournamentDetail(
   tournamentId: number,
   userId: number,
   isAdmin = false,
+  /**
+   * Droit de voir l'aperçu du plateau avant le lancement : permission
+   * `tournaments` **ou** `casting`. Le staff l'a par construction, le cast l'a
+   * sans aucun droit d'écriture.
+   */
+  canPreview = isAdmin,
 ): Promise<TournamentDetail | null> {
   const snapshot = await getTournamentSnapshot(tournamentId);
   if (!snapshot) return null;
 
-  const viewer = await getTournamentViewerContext(snapshot, userId, isAdmin);
+  const viewer = await getTournamentViewerContext(snapshot, userId, isAdmin, canPreview);
   return { ...snapshot, ...viewer };
 }
 

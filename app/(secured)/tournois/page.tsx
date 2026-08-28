@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import type { TournamentBuckets } from "@/lib/shared/types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
-import { splitHiddenTournaments } from "@/lib/shared/tournament-visibility";
 import { sameBuckets } from "@/lib/shared/tournament-schedule";
 import { REFRESH_CADENCE, resolveRefreshTier } from "@/lib/shared/refresh-tiers";
 import { useAutoRefresh } from "@/lib/shared/hooks/useAutoRefresh";
@@ -18,7 +17,14 @@ import { UpcomingCard } from "./cards/UpcomingCard";
 import { FinishedCard } from "./cards/FinishedCard";
 import { StateCard } from "./cards/StateCard";
 import { Section } from "./Section";
-import { filterBuckets, countByGame, type GameFilter } from "./_lib/buckets";
+import {
+  filterBuckets,
+  filterTournamentsByGame,
+  filterTournamentsByQuery,
+  flattenBuckets,
+  countByGame,
+  type GameFilter,
+} from "./_lib/buckets";
 import { buildTickerItems } from "./_lib/ticker";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import s from "./tournois.module.css";
@@ -29,14 +35,6 @@ const emptyBuckets: TournamentBuckets = {
   running: [],
   finished: [],
 };
-
-/** Onglet actif : tout le plateau, ou les seuls tournois créés par l'utilisateur. */
-type Tab = "all" | "mine";
-
-const TABS: { key: Tab; id: string; label: string }[] = [
-  { key: "all", id: "tournaments-tab-all", label: "Tous les tournois" },
-  { key: "mine", id: "tournaments-tab-mine", label: "Mes tournois" },
-];
 
 async function fetchBuckets(url: string, signal?: AbortSignal): Promise<TournamentBuckets> {
   const response = await fetch(url, { cache: "no-store", signal });
@@ -56,8 +54,7 @@ export default function TournamentsPage() {
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState<GameFilter>("all");
   const [buckets, setBuckets] = useState<TournamentBuckets>(emptyBuckets);
-  const [myBuckets, setMyBuckets] = useState<TournamentBuckets>(emptyBuckets);
-  const [tab, setTab] = useState<Tab>("all");
+  const [hiddenTournaments, setHiddenTournaments] = useState<TournamentCard[]>([]);
   const [finishedDisplayLimit, setFinishedDisplayLimit] = useState(12);
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -66,33 +63,18 @@ export default function TournamentsPage() {
   // celui que l'utilisateur attend, signale son échec.
   const load = useCallback(
     async (silent = false, signal?: AbortSignal) => {
-      // Les deux listes partent ensemble : celle de l'onglet « Mes tournois »
-      // est la seule à porter les tournois pas encore visibles, et c'est elle
-      // qui dit si l'onglet doit exister. Elles se règlent en revanche
-      // séparément — l'onglet est un complément, son échec ne doit pas emporter
-      // la liste que tout le monde vient voir.
-      const [all, mine] = await Promise.allSettled([
-        fetchBuckets("/api/tournaments", signal),
-        fetchBuckets("/api/tournaments?scope=mine", signal),
-      ]);
-      // On garde la référence précédente quand rien n'a changé : sinon chaque
-      // relecture de fond redessinerait toute la liste et réarmerait les
-      // minuteurs de bascule, pour un contenu identique.
-      if (all.status === "fulfilled") {
-        setBuckets((previous) => (sameBuckets(previous, all.value) ? previous : all.value));
+      try {
+        const all = await fetchBuckets("/api/tournaments", signal);
+        // On garde la référence précédente quand rien n'a changé : sinon chaque
+        // relecture de fond redessinerait toute la liste et réarmerait le
+        // minuteur de bascule, pour un contenu identique.
+        setBuckets((previous) => (sameBuckets(previous, all) ? previous : all));
+      } catch (e) {
+        // Une requête abandonnée (démontage, rafraîchissement suivant) n'est pas
+        // un incident : la page n'a plus rien à afficher de toute façon.
+        if (signal?.aborted || silent) return;
+        showError((e as Error).message);
       }
-      if (mine.status === "fulfilled") {
-        setMyBuckets((previous) => (sameBuckets(previous, mine.value) ? previous : mine.value));
-      }
-
-      // Une seule notification : les deux listes sortent de la même route, un
-      // incident les touche presque toujours ensemble.
-      const failure =
-        all.status === "rejected" ? all.reason : mine.status === "rejected" ? mine.reason : null;
-      // Une requête abandonnée (démontage, rafraîchissement suivant) n'est pas
-      // un incident : la page n'a plus rien à afficher de toute façon.
-      if (signal?.aborted) return;
-      if (failure && !silent) showError((failure as Error).message);
     },
     [showError],
   );
@@ -122,6 +104,19 @@ export default function TournamentsPage() {
   }, []);
 
   useEffect(() => {
+    // Les tournois pas encore visibles ne sont servis qu'au staff `tournaments` :
+    // inutile d'aller les demander pour se faire répondre 403. Leur échec ne doit
+    // pas emporter la liste publique, d'où un chargement à part.
+    if (!isAdmin) {
+      setHiddenTournaments([]);
+      return;
+    }
+    fetchBuckets("/api/tournaments?scope=hidden")
+      .then((hidden) => setHiddenTournaments(flattenBuckets(hidden)))
+      .catch((e) => showError((e as Error).message));
+  }, [isAdmin, showError]);
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
@@ -134,43 +129,35 @@ export default function TournamentsPage() {
 
   useEffect(() => {
     setFinishedDisplayLimit(12);
-  }, [query, gameFilter, tab]);
-
-  const ownedCount = countByGame(myBuckets, "all");
-  // L'onglet n'existe que pour qui a créé au moins un tournoi.
-  const hasOwnTournaments = ownedCount > 0;
-  const isMine = tab === "mine" && hasOwnTournaments;
+  }, [query, gameFilter]);
 
   // Les cartes portent leur horaire : le client fait basculer « Prochainement »
   // → « Inscriptions » → « En cours » à la seconde dite, sans rien demander au
   // serveur (`lib/shared/tournament-schedule.ts`).
-  const [scheduledBuckets, scheduledMyBuckets] = useScheduledBuckets(buckets, myBuckets);
+  const scheduledBuckets = useScheduledBuckets(buckets);
 
-  const sourceBuckets = isMine ? scheduledMyBuckets : scheduledBuckets;
-  const filteredBuckets = filterBuckets(sourceBuckets, query, gameFilter);
+  const filteredBuckets = filterBuckets(scheduledBuckets, query, gameFilter);
+  const filteredHidden = filterTournamentsByGame(
+    filterTournamentsByQuery(hiddenTournaments, query),
+    gameFilter,
+  );
 
-  // Hors de « Mes tournois », le serveur a déjà écarté les tournois masqués :
-  // on n'ouvre le tiroir que là où il peut contenir quelque chose.
-  const { hidden, visible } = splitHiddenTournaments(filteredBuckets);
-  const shownBuckets = isMine ? visible : filteredBuckets;
+  const totalHidden = filteredHidden.length;
+  const totalRunning = filteredBuckets.running.length;
+  const totalRegistration = filteredBuckets.registration.length;
+  const totalUpcoming = filteredBuckets.upcoming.length;
+  const totalFinished = filteredBuckets.finished.length;
 
-  const totalHidden = isMine ? hidden.length : 0;
-  const totalRunning = shownBuckets.running.length;
-  const totalRegistration = shownBuckets.registration.length;
-  const totalUpcoming = shownBuckets.upcoming.length;
-  const totalFinished = shownBuckets.finished.length;
+  // La section des invisibles prend la première place quand elle est affichée :
+  // les suivantes se décalent pour garder une numérotation continue.
+  const showHidden = isAdmin && hiddenTournaments.length > 0;
+  const ix = (position: number) => String(position + (showHidden ? 1 : 0)).padStart(2, "0");
 
-  // Les sections gardent une numérotation continue : le tiroir des masqués
-  // prend la première place quand il est affiché.
-  const ix = (position: number) => String(position + (isMine ? 1 : 0)).padStart(2, "0");
-
-  const onTabKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-    e.preventDefault();
-    const next = TABS[(TABS.findIndex((t) => t.key === tab) + 1) % TABS.length];
-    setTab(next.key);
-    document.getElementById(next.id)?.focus();
-  };
+  // Les pastilles comptent ce que la page montre : pour le staff, les invisibles
+  // en font partie.
+  const countGame = (key: GameFilter) =>
+    countByGame(buckets, key) +
+    (showHidden ? filterTournamentsByGame(hiddenTournaments, key).length : 0);
 
   return (
     <div className={s.page}>
@@ -204,35 +191,6 @@ export default function TournamentsPage() {
           )}
         </header>
 
-        {hasOwnTournaments && (
-          <div
-            className={s.tabs}
-            role="tablist"
-            aria-label="Vue des tournois"
-            onKeyDown={onTabKeyDown}
-          >
-            {TABS.map((t) => {
-              const selected = t.key === "mine" ? isMine : !isMine;
-              return (
-                <button
-                  key={t.key}
-                  id={t.id}
-                  role="tab"
-                  type="button"
-                  aria-selected={selected}
-                  aria-controls="tournaments-panel"
-                  tabIndex={selected ? 0 : -1}
-                  className={`${s.tab} ${selected ? s.tabOn : ""}`}
-                  onClick={() => setTab(t.key)}
-                >
-                  {t.label}
-                  {t.key === "mine" && <span className={s.num}>{ownedCount}</span>}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
         <div className={s.metrics}>
           <div className={s.metric}>
             <div className={s.metricNum}>
@@ -249,8 +207,8 @@ export default function TournamentsPage() {
             <div className={s.metricLbl}>Programmés à venir</div>
           </div>
           <div className={s.metric}>
-            <div className={s.metricNum}>{isMine ? totalHidden : "—"}</div>
-            <div className={s.metricLbl}>{isMine ? "Pas encore visibles" : "Prizepool · à venir"}</div>
+            <div className={s.metricNum}>{isAdmin ? totalHidden : "—"}</div>
+            <div className={s.metricLbl}>{isAdmin ? "Invisibles · staff" : "Prizepool · à venir"}</div>
           </div>
         </div>
 
@@ -282,7 +240,7 @@ export default function TournamentsPage() {
                 onClick={() => setGameFilter(key as GameFilter)}
               >
                 {label}
-                <span className={s.num}>{countByGame(sourceBuckets, key as GameFilter)}</span>
+                <span className={s.num}>{countGame(key as GameFilter)}</span>
               </button>
             ))}
           </div>
@@ -293,25 +251,20 @@ export default function TournamentsPage() {
             « INSCRIPTIONS » — le genre de doute qui fait recharger la page. */}
         <Ticker items={buildTickerItems(scheduledBuckets)} />
 
-        <div
-          className={s.sections}
-          id="tournaments-panel"
-          role={hasOwnTournaments ? "tabpanel" : undefined}
-          aria-labelledby={
-            hasOwnTournaments ? (isMine ? "tournaments-tab-mine" : "tournaments-tab-all") : undefined
-          }
-        >
-          {isMine && (
+        <div className={s.sections}>
+          {showHidden && (
             <Section
               ix="01"
-              title="PAS ENCORE VISIBLES"
-              accent="· VOUS SEUL"
+              title="TOURNOIS INVISIBLES"
+              accent="· STAFF"
               count={totalHidden}
               defaultOpen={true}
-              emptyMsg="Tous vos tournois sont visibles par les joueurs."
+              emptyMsg="Aucun tournoi invisible ne correspond à cette recherche."
             >
-              {hidden.map((t) => (
-                <StateCard key={t.id} t={t} />
+              {filteredHidden.map((t) => (
+                <div key={t.id} className={s.hiddenCard}>
+                  <StateCard t={t} />
+                </div>
               ))}
             </Section>
           )}
@@ -324,7 +277,7 @@ export default function TournamentsPage() {
             emptyMsg="Aucun tournoi en cours actuellement."
             dataCols="2"
           >
-            {shownBuckets.running.map((t) => (
+            {filteredBuckets.running.map((t) => (
               <RunningCard key={t.id} t={t} />
             ))}
           </Section>
@@ -336,7 +289,7 @@ export default function TournamentsPage() {
             defaultOpen={true}
             emptyMsg="Aucun tournoi en phase d'inscription pour le moment."
           >
-            {shownBuckets.registration.map((t) => (
+            {filteredBuckets.registration.map((t) => (
               <RegistrationCard key={t.id} t={t} />
             ))}
           </Section>
@@ -348,7 +301,7 @@ export default function TournamentsPage() {
             defaultOpen={true}
             emptyMsg="Aucun tournoi prévu pour les prochains jours."
           >
-            {shownBuckets.upcoming.map((t) => (
+            {filteredBuckets.upcoming.map((t) => (
               <UpcomingCard key={t.id} t={t} />
             ))}
           </Section>
@@ -361,17 +314,17 @@ export default function TournamentsPage() {
             emptyMsg="Aucun tournoi terminé pour le moment."
           >
             <div>
-              {shownBuckets.finished.slice(0, finishedDisplayLimit).map((t) => (
+              {filteredBuckets.finished.slice(0, finishedDisplayLimit).map((t) => (
                 <FinishedCard key={t.id} t={t} />
               ))}
-              {shownBuckets.finished.length > 12 && finishedDisplayLimit === 12 && (
+              {filteredBuckets.finished.length > 12 && finishedDisplayLimit === 12 && (
                 <div style={{ display: "flex", justifyContent: "center", marginTop: 20 }}>
                   <button
-                    onClick={() => setFinishedDisplayLimit(shownBuckets.finished.length)}
+                    onClick={() => setFinishedDisplayLimit(filteredBuckets.finished.length)}
                     className={s.cardCta}
                     style={{ padding: "10px 18px" }}
                   >
-                    Voir tout ({shownBuckets.finished.length})
+                    Voir tout ({filteredBuckets.finished.length})
                   </button>
                 </div>
               )}

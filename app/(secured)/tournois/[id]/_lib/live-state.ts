@@ -103,6 +103,10 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
     myTeamId: state.detail.myTeamId,
     canCreateReportsForTeamIds: state.detail.canCreateReportsForTeamIds,
     isAdmin: state.detail.isAdmin,
+    // L'aperçu du plateau n'arrive qu'à la connexion, comme le reste du contexte
+    // du lecteur : le flux ne le transporte pas, il est réservé au staff et au
+    // cast (`docs/features/TOURNAMENT_PREVIEW.md`).
+    preview: state.detail.preview,
   };
 
   return {

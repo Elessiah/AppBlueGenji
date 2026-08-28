@@ -149,8 +149,9 @@ describe("liste des tournois — sans flux SSE", () => {
     expect(listPage).toContain(
       "REFRESH_CADENCE[resolveRefreshTier({ isStaff: isAdmin })].listIntervalMs",
     );
-    // Un incident réseau passager ne doit pas couvrir l'écran de notifications.
-    expect(listPage).toContain("if (failure && !silent) showError");
+    // Un incident réseau passager ne doit pas couvrir l'écran de notifications,
+    // pas plus qu'une requête abandonnée par le rafraîchissement suivant.
+    expect(listPage).toContain("if (signal?.aborted || silent) return;");
   });
 
   it("fait basculer les états sans requête, bandeau compris", () => {
@@ -158,13 +159,12 @@ describe("liste des tournois — sans flux SSE", () => {
     // en « INSCRIPTIONS ».
     // Une seule horloge, un seul minuteur : les deux jeux se recouvrent presque
     // entièrement.
-    expect(listPage).toContain("useScheduledBuckets(buckets, myBuckets)");
+    expect(listPage).toContain("useScheduledBuckets(buckets)");
     expect(listPage).toContain("buildTickerItems(scheduledBuckets)");
   });
 
   it("ne se redessine pas pour une réponse identique", () => {
-    expect(listPage).toContain("sameBuckets(previous, all.value) ? previous : all.value");
-    expect(listPage).toContain("sameBuckets(previous, mine.value) ? previous : mine.value");
+    expect(listPage).toContain("sameBuckets(previous, all) ? previous : all");
   });
 });
 

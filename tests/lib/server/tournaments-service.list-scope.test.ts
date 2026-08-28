@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
+import { clearCache } from "@/lib/server/cache";
 
 jest.mock("@/lib/server/database");
+
+// La liste publique est mutualisée (`lib/server/tournaments/list-cache.ts`) :
+// sans cette remise à zéro, le deuxième cas serait servi depuis le cache du
+// premier et ne toucherait jamais la base.
+beforeEach(() => clearCache());
+afterEach(() => clearCache());
 
 type ExecuteMock = jest.Mock;
 
@@ -33,6 +40,11 @@ function listQuery(execute: ExecuteMock): [string, unknown[]] {
   return call as [string, unknown[]];
 }
 
+/** Clause WHERE seule : la liste des colonnes sélectionnées n'y participe pas. */
+function whereClause(sql: string): string {
+  return sql.slice(sql.indexOf("WHERE "), sql.indexOf("GROUP BY"));
+}
+
 describe("listTournamentBuckets — portée", () => {
   beforeEach(() => jest.clearAllMocks());
   afterEach(() => jest.restoreAllMocks());
@@ -45,47 +57,57 @@ describe("listTournamentBuckets — portée", () => {
 
     const [sql, params] = listQuery(execute);
     expect(sql).toMatch(/WHERE t\.start_visibility_at <= \?/);
-    expect(sql).not.toMatch(/organizer_user_id = \?/);
     expect(params).toHaveLength(1);
     expect(params[0]).toBeInstanceOf(Date);
   });
 
-  it("restreint à l'organisateur et lève le filtre de visibilité", async () => {
+  it("prend exactement le complément avec hiddenOnly", async () => {
     const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined]);
     await mockDb(execute);
 
-    await listTournamentBuckets(null, { organizerUserId: 321 });
+    await listTournamentBuckets(null, { hiddenOnly: true });
 
     const [sql, params] = listQuery(execute);
-    expect(sql).toMatch(/WHERE t\.organizer_user_id = \?/);
-    // C'est tout l'intérêt de l'onglet : voir ce que personne d'autre ne voit.
+    expect(sql).toMatch(/WHERE t\.start_visibility_at > \?/);
+    // Complément strict : pas de « <= » qui traînerait, sinon un tournoi
+    // pourrait manquer aux deux portées ou figurer dans les deux.
     expect(sql).not.toMatch(/start_visibility_at <= \?/);
-    expect(params).toEqual([321]);
+    expect(params).toHaveLength(1);
+    expect(params[0]).toBeInstanceOf(Date);
   });
 
-  it("garde la recherche par nom dans la portée organisateur", async () => {
+  it("ne filtre pas par organisateur : le staff voit tous les invisibles", async () => {
     const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined]);
     await mockDb(execute);
 
-    await listTournamentBuckets("  Marvel  ", { organizerUserId: 7 });
+    await listTournamentBuckets(null, { hiddenOnly: true });
 
-    const [sql, params] = listQuery(execute);
-    expect(sql).toMatch(/t\.organizer_user_id = \? AND LOWER\(t\.name\) LIKE \?/);
-    expect(params).toEqual([7, "%marvel%"]);
+    const [sql] = listQuery(execute);
+    expect(whereClause(sql)).not.toMatch(/organizer_user_id/);
   });
 
-  it("accepte l'organisateur 0 sans retomber sur la vue publique", async () => {
+  it("retombe sur la vue publique quand hiddenOnly est faux", async () => {
     const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined]);
     await mockDb(execute);
 
-    await listTournamentBuckets(null, { organizerUserId: 0 });
+    await listTournamentBuckets(null, { hiddenOnly: false });
 
-    const [sql, params] = listQuery(execute);
-    expect(sql).toMatch(/WHERE t\.organizer_user_id = \?/);
-    expect(params).toEqual([0]);
+    const [sql] = listQuery(execute);
+    expect(sql).toMatch(/WHERE t\.start_visibility_at <= \?/);
   });
 
-  it("range les tournois de l'organisateur dans le panier de leur état", async () => {
+  it("garde la recherche par nom dans la portée invisible", async () => {
+    const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined]);
+    await mockDb(execute);
+
+    await listTournamentBuckets("  Marvel  ", { hiddenOnly: true });
+
+    const [sql, params] = listQuery(execute);
+    expect(sql).toMatch(/t\.start_visibility_at > \? AND LOWER\(t\.name\) LIKE \?/);
+    expect(params[1]).toBe("%marvel%");
+  });
+
+  it("range les tournois invisibles dans le panier de leur état", async () => {
     const row = (id: number, state: string) => ({
       id,
       name: `Tournoi ${id}`,
@@ -119,14 +141,13 @@ describe("listTournamentBuckets — portée", () => {
     );
     await mockDb(execute);
 
-    const buckets = await listTournamentBuckets(null, { organizerUserId: 321 });
+    const buckets = await listTournamentBuckets(null, { hiddenOnly: true });
 
+    // La page remet ces paniers à plat : un tournoi invisible n'est pas
+    // forcément « à venir », l'état doit donc rester lisible.
     expect(buckets.upcoming.map((t) => t.id)).toEqual([1]);
     expect(buckets.running.map((t) => t.id)).toEqual([2]);
     expect(buckets.registration).toEqual([]);
     expect(buckets.finished).toEqual([]);
-    // Un tournoi encore masqué garde sa date de visibilité : c'est elle qui
-    // permet à l'interface de le ranger dans « pas encore visibles ».
-    expect(buckets.upcoming[0].startVisibilityAt).toContain("2030-01-01");
   });
 });
