@@ -91,7 +91,9 @@ describe("hook temps réel", () => {
 describe("page de tournoi", () => {
   it("relit immédiatement après une action de l'utilisateur", () => {
     // Celui qui agit mérite un retour instantané, quel que soit son palier.
-    expect(detailPage).toContain("const { tournament: detail, refresh } = useTournamentLive");
+    expect(detailPage).toContain(
+      "const { tournament: detail, refresh, isLive, tier } = useTournamentLive",
+    );
     // Score, abandon, inscription, arbitrage, seeding, équipe fantôme.
     expect(detailPage.match(/void refresh\(\)/g)?.length).toBeGreaterThanOrEqual(6);
   });
@@ -99,6 +101,11 @@ describe("page de tournoi", () => {
   it("n'appelle plus router.refresh() sur une page cliente", () => {
     // Sans effet ici : les données viennent du hook, pas du rendu serveur.
     expect(detailPage).not.toContain("router.refresh()");
+  });
+
+  it("dit au lecteur que la page se tient à jour seule", () => {
+    // Sans repère visible, on recharge par précaution même quand tout arrive.
+    expect(detailPage).toContain("<LiveIndicator isLive={isLive} tier={tier} />");
   });
 });
 

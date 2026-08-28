@@ -19,6 +19,7 @@ import { MatchFormatProvider } from "./_lib/match-format-context";
 import { canForfeitTeam } from "./_lib/forfeit";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { AdminScoreDialog } from "./_components/AdminScoreDialog";
+import { LiveIndicator } from "./_components/LiveIndicator";
 import { GhostRegistrationDialog } from "./_components/GhostRegistrationDialog";
 import { SeedingEditor } from "./_components/SeedingEditor";
 import { MatchScoreDraft } from "./_components/BracketTree";
@@ -67,7 +68,7 @@ export default function TournamentDetailPage() {
   const tournamentId = Number(params.id);
   const { showError, showSuccess } = useToast();
 
-  const { tournament: detail, refresh } = useTournamentLive(tournamentId);
+  const { tournament: detail, refresh, isLive, tier } = useTournamentLive(tournamentId);
   const [drafts, setDrafts] = useState<MatchScoreDraft>({});
   const [selectedMatchForAdmin, setSelectedMatchForAdmin] = useState<BracketMatch | null>(null);
   const [ghostRegistrationOpen, setGhostRegistrationOpen] = useState(false);
@@ -94,9 +95,17 @@ export default function TournamentDetailPage() {
   }, [detail?.phases, detail?.currentPhaseId, selectedPhaseId]);
 
   if (!detail) {
+    // Le premier affichage attend l'ouverture du flux, qui apporte le plateau
+    // et le contexte du lecteur d'un seul coup. `aria-busy` annonce l'attente
+    // aux lecteurs d'écran plutôt que de leur laisser une page muette.
     return (
-      <section className="ds-block" style={{ color: "var(--text-2)" }}>
-        Chargement du tournoi...
+      <section
+        className="ds-block"
+        style={{ color: "var(--text-2)" }}
+        role="status"
+        aria-busy="true"
+      >
+        Chargement du tournoi…
       </section>
     );
   }
@@ -303,6 +312,9 @@ export default function TournamentDetailPage() {
               </p>
             )}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              {/* Dit que la page se tient à jour seule : sans ce repère, on
+                  recharge par précaution même quand tout arrive tout seul. */}
+              <LiveIndicator isLive={isLive} tier={tier} />
               <Pill variant="blue">{detail.card.game}</Pill>
               <Pill variant={detail.card.state === "RUNNING" ? "live" : "blue"}>
                 {stateMeta.label}
