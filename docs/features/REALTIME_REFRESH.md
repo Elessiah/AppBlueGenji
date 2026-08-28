@@ -36,6 +36,14 @@ Il est donc scindé en deux :
   règle générale de la scission — tout ce qui dépend d'un droit reste hors de ce
   qui est diffusé.
 
+  Il est **gaté par une permission, pas propre à une personne** : son contenu
+  est le même pour tous ceux qui y ont droit. Il est donc calculé une fois par
+  tournoi (`tournaments/preview-cache.ts`, invalidé par `publishUpdatedEvent`)
+  plutôt qu'à chaque connexion. Et parce qu'il se périme à chaque inscription
+  alors que le flux ne le transporte pas, le client redemande son contexte quand
+  l'ensemble des inscrites change — uniquement pour ceux qui ont un aperçu à
+  tenir à jour (`shouldRefreshViewerContext`).
+
 `TournamentDetail = TournamentSnapshot & TournamentViewerContext` : les
 appelants existants ne voient aucune différence.
 
@@ -162,6 +170,7 @@ juste après l'écriture qui l'a rendue fausse.
 | `tournaments-list:public` | 15 s | `updated` (plateau, inscrites, état), la création d'un tournoi, et une clôture détectée autour d'un score |
 | `landing:stats`, `landing:ticker`, `landing:leaderboard:<n>` | 60 s | — |
 | `landing:live` | 5 s | — |
+| `tournament-preview:<id>` | 3 s | toute publication d'événement du tournoi |
 | `showcase:sponsors`, `:about-stats`, `:about-pillars`, `:site-copy` | 60 s | toute écriture du staff |
 | `mini-bracket:<id>` | 15 s | — |
 

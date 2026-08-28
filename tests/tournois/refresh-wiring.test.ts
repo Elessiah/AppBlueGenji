@@ -163,6 +163,14 @@ describe("liste des tournois — sans flux SSE", () => {
     expect(listPage).toContain("buildTickerItems(scheduledBuckets)");
   });
 
+  it("rafraîchit aussi la section des invisibles", () => {
+    // La seule section réservée à ceux qui vivent sur cette page ne doit pas
+    // être la seule à exiger un F5.
+    expect(listPage).toContain("const loadHidden = useCallback(");
+    expect(listPage).toContain("loadHidden(true, signal)");
+    expect(listPage).toContain("sameTournaments(previous, hidden) ? previous : hidden");
+  });
+
   it("ne se redessine pas pour une réponse identique", () => {
     expect(listPage).toContain("sameBuckets(previous, all) ? previous : all");
   });
@@ -194,6 +202,15 @@ describe("lectures serveur — ce qui garde le cache utile", () => {
     expect(index).toMatch(
       /async function invalidateListsIfStateChanged\([\s\S]{0,700}?try \{[\s\S]{0,300}?\} catch \{/,
     );
+  });
+
+  it("mutualise l'aperçu du plateau entre lecteurs autorisés", () => {
+    // Gaté par une permission, mais identique pour tous ceux qui y ont droit :
+    // le recalculer par lecteur referait la requête de classement du site à
+    // chaque connexion SSE.
+    expect(index).toContain("const preview = canPreview ? await getTournamentPreview(");
+    const notifications = read("lib/server/tournaments/notifications.ts");
+    expect(notifications).toContain("invalidateTournamentPreview(tournamentId);");
   });
 
   it("ne réserve une connexion que là où elle sert", () => {

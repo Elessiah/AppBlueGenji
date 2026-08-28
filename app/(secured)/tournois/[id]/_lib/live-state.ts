@@ -196,6 +196,29 @@ export function fatalFailure(status: number): LiveFailure | null {
   return null;
 }
 
+/**
+ * Faut-il redemander le contexte du lecteur ?
+ *
+ * Le flux ne transporte que l'instantané, partagé par tous. Le contexte, lui,
+ * n'arrive qu'à la connexion — ce qui convient à ses droits, qui ne bougent
+ * pas, mais **pas à l'aperçu du plateau** qu'il porte : celui-ci se recalcule à
+ * chaque inscription. Sans cette relecture, un caster verrait la liste des
+ * inscrites grandir sous ses yeux pendant que le tirage prévu resterait celui
+ * d'il y a dix minutes.
+ *
+ * On ne relit que pour ceux qui ont un aperçu à tenir à jour, et seulement
+ * quand quelque chose le périme : une inscription, ou le passage à un état où
+ * l'aperçu n'a plus lieu d'être.
+ */
+export function shouldRefreshViewerContext(
+  previous: TournamentDetail,
+  next: TournamentSnapshot,
+): boolean {
+  if (previous.preview === null) return false;
+  if (previous.card.state !== next.card.state) return true;
+  return previous.registrations.length !== next.registrations.length;
+}
+
 /** Plafond exponentiel de départ, en millisecondes. */
 export const RECONNECT_BASE_MS = 1_000;
 /** Plafond de l'attente. Au-delà, on retente simplement toutes les minutes. */

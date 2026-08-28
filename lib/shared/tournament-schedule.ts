@@ -36,6 +36,17 @@ export function sameBuckets(left: TournamentBuckets, right: TournamentBuckets): 
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+/**
+ * Même question pour une liste plate — celle des tournois pas encore visibles.
+ *
+ * Mêmes raisons que {@link sameBuckets} : la relecture de fond rend un tableau
+ * neuf à chaque fois, et le redessiner pour un contenu identique ne sert à rien.
+ */
+export function sameTournaments(left: TournamentCard[], right: TournamentCard[]): boolean {
+  if (left === right) return true;
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 /** Tous les tournois des paniers, dans l'ordre du serveur (début décroissant). */
 function flatten(buckets: TournamentBuckets): TournamentCard[] {
   return [

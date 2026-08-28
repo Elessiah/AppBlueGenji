@@ -11,6 +11,7 @@ import {
   parseLiveMessage,
   reconnectDelayMs,
   shouldPlayScoreReady,
+  shouldRefreshViewerContext,
   type LiveFailure,
   type LiveState,
 } from "../_lib/live-state";
@@ -218,7 +219,18 @@ export function useTournamentLive(tournamentId: number) {
         if (!message) return;
         // Le premier message porte déjà tout : la connexion vaut chargement.
         setIsLive(true);
+
+        // Le contexte du lecteur n'arrive qu'à la connexion — sauf l'aperçu du
+        // plateau, qui se périme à chaque inscription. On ne le redemande que
+        // pour ceux qui en ont un, et seulement quand il a bougé.
+        const previous = stateRef.current.detail;
+        const stalePreview =
+          message.type === "snapshot" &&
+          previous !== null &&
+          shouldRefreshViewerContext(previous, message.snapshot);
+
         commit(applyLiveMessage(stateRef.current, message));
+        if (stalePreview) void load(true);
       };
 
       source.onerror = () => {

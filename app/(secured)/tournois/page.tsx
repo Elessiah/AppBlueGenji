@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
-import { sameBuckets } from "@/lib/shared/tournament-schedule";
+import { sameBuckets, sameTournaments } from "@/lib/shared/tournament-schedule";
 import { REFRESH_CADENCE, resolveRefreshTier } from "@/lib/shared/refresh-tiers";
 import { useAutoRefresh } from "@/lib/shared/hooks/useAutoRefresh";
 import { useScheduledBuckets } from "@/lib/shared/hooks/useScheduledBuckets";
@@ -85,14 +85,45 @@ export default function TournamentsPage() {
     return () => controller.abort();
   }, [load]);
 
+  // Les tournois pas encore visibles ne sont servis qu'au staff `tournaments` :
+  // inutile d'aller les demander pour se faire répondre 403. Leur échec ne doit
+  // pas emporter la liste publique, d'où un chargement à part — mais qui suit la
+  // même cadence, sans quoi la seule section réservée à ceux qui vivent sur
+  // cette page serait aussi la seule à exiger un F5.
+  const loadHidden = useCallback(
+    async (silent = false, signal?: AbortSignal) => {
+      if (!isAdmin) {
+        setHiddenTournaments([]);
+        return;
+      }
+      try {
+        const hidden = flattenBuckets(await fetchBuckets("/api/tournaments?scope=hidden", signal));
+        setHiddenTournaments((previous) =>
+          sameTournaments(previous, hidden) ? previous : hidden,
+        );
+      } catch (e) {
+        if (signal?.aborted || silent) return;
+        showError((e as Error).message);
+      }
+    },
+    [isAdmin, showError],
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadHidden(false, controller.signal);
+    return () => controller.abort();
+  }, [loadHidden]);
+
   // Aucun flux SSE sur cette page : elle se tient à jour toute seule par le
   // retour sur l'onglet — ce qui remplace le F5 — doublé d'une relecture de
   // fond, rare pour les spectateurs, plus fréquente pour le staff. Côté
   // serveur, la liste publique est mutualisée : ces relectures ne coûtent
   // presque rien (`lib/server/tournaments/list-cache.ts`).
-  useAutoRefresh((signal) => load(true, signal), {
-    intervalMs: REFRESH_CADENCE[resolveRefreshTier({ isStaff: isAdmin })].listIntervalMs,
-  });
+  useAutoRefresh(
+    (signal) => Promise.all([load(true, signal), loadHidden(true, signal)]).then(() => undefined),
+    { intervalMs: REFRESH_CADENCE[resolveRefreshTier({ isStaff: isAdmin })].listIntervalMs },
+  );
 
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store" })
@@ -103,18 +134,6 @@ export default function TournamentsPage() {
       .catch(() => setIsAdmin(false));
   }, []);
 
-  useEffect(() => {
-    // Les tournois pas encore visibles ne sont servis qu'au staff `tournaments` :
-    // inutile d'aller les demander pour se faire répondre 403. Leur échec ne doit
-    // pas emporter la liste publique, d'où un chargement à part.
-    if (!isAdmin) {
-      setHiddenTournaments([]);
-      return;
-    }
-    fetchBuckets("/api/tournaments?scope=hidden")
-      .then((hidden) => setHiddenTournaments(flattenBuckets(hidden)))
-      .catch((e) => showError((e as Error).message));
-  }, [isAdmin, showError]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

@@ -14,10 +14,11 @@ const route = read("app/api/tournaments/route.ts");
 
 describe("page tournois — section « Tournois invisibles »", () => {
   it("ne demande les invisibles qu'au staff tournois", () => {
-    expect(page).toContain('fetchBuckets("/api/tournaments?scope=hidden")');
+    expect(page).toContain('fetchBuckets("/api/tournaments?scope=hidden", signal)');
     // Un joueur ne déclenche même pas la requête : elle lui serait refusée.
     expect(page).toMatch(/if \(!isAdmin\) \{\s*setHiddenTournaments\(\[\]\);\s*return;\s*\}/);
-    expect(page).toMatch(/\}, \[isAdmin, showError\]\)/);
+    // La permission commande le chargement : elle est dans ses dépendances.
+    expect(page).toMatch(/\[isAdmin, showError\],\s*\);/);
   });
 
   it("charge les invisibles à part de la liste publique", () => {
@@ -40,7 +41,10 @@ describe("page tournois — section « Tournois invisibles »", () => {
   });
 
   it("aplatit les paniers reçus pour la section", () => {
-    expect(page).toContain("setHiddenTournaments(flattenBuckets(hidden))");
+    // La réponse est aplatie avant d'être comparée à la précédente : la section
+    // suit désormais la même cadence de rafraîchissement que la liste publique.
+    expect(page).toContain("flattenBuckets(await fetchBuckets(");
+    expect(page).toContain("sameTournaments(previous, hidden) ? previous : hidden");
   });
 
   it("applique la recherche et le filtre de jeu aux invisibles", () => {

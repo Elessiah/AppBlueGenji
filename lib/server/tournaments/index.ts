@@ -58,6 +58,9 @@ export {
 // Cache de la liste publique (voir ./list-cache)
 export { invalidateTournamentLists, TOURNAMENT_LIST_TTL_MS } from "./list-cache";
 
+// Cache de l'aperçu du plateau (voir ./preview-cache)
+export { getTournamentPreview, invalidateTournamentPreview } from "./preview-cache";
+
 // Instantané partagé (voir ./snapshot)
 export {
   getTournamentSnapshot,
@@ -125,6 +128,7 @@ import { reportMatchScore } from "./scoring";
 import { publishUpdatedEvent, publishScoreReportedEvent, publishScoreResolvedEvent, sendBotLogAsync } from "./notifications";
 import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
+import { getTournamentPreview } from "./preview-cache";
 
 let pendingSync: Promise<void> | null = null;
 let lastSyncAt = 0;
@@ -641,17 +645,12 @@ export async function getTournamentViewerContext(
   const alreadyRegistered =
     myTeamId !== null && snapshot.registrations.some((row) => row.teamId === myTeamId);
 
-  // L'aperçu se calcule ici, et non dans l'instantané : celui-ci part tel quel à
-  // tous les abonnés du flux, alors que l'aperçu est réservé au staff et au
-  // cast. Il n'est lu que pour eux — les spectateurs n'en paient pas la requête.
-  const preview = canPreview
-    ? await withConnection(async (connection) => {
-        const row = await loadTournamentRow(connection, snapshot.card.id);
-        if (!row) return null;
-        const { loadTournamentPreview } = await import("./preview");
-        return loadTournamentPreview(connection, row);
-      })
-    : null;
+  // L'aperçu vit dans le contexte du lecteur, et non dans l'instantané : celui-ci
+  // part tel quel à tous les abonnés du flux, alors que l'aperçu est réservé au
+  // staff et au cast. Son contenu, lui, est le même pour tous ceux qui y ont
+  // droit : il est donc calculé une fois par tournoi (`./preview-cache`), pas
+  // une fois par lecteur.
+  const preview = canPreview ? await getTournamentPreview(snapshot.card.id) : null;
 
   return {
     preview,

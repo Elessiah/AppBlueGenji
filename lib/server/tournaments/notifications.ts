@@ -11,6 +11,7 @@
 import { publishTournamentEvent } from "@/lib/server/live";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { invalidateTournamentLists } from "./list-cache";
+import { invalidateTournamentPreview } from "./preview-cache";
 import { invalidateTournamentSnapshot } from "./snapshot";
 
 /**
@@ -21,6 +22,8 @@ import { invalidateTournamentSnapshot } from "./snapshot";
  */
 export function publishUpdatedEvent(tournamentId: number): void {
   invalidateTournamentSnapshot(tournamentId);
+  // Une inscription change le tirage prévisible : l'aperçu suit.
+  invalidateTournamentPreview(tournamentId);
   invalidateTournamentLists();
   publishTournamentEvent({
     type: "updated",

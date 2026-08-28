@@ -13,6 +13,7 @@ import {
   applyLiveMessage,
   fatalFailure,
   parseLiveMessage,
+  shouldRefreshViewerContext,
   reconnectDelayMs,
   shouldPlayScoreReady,
   type LiveState,
@@ -343,6 +344,55 @@ describe("shouldPlayScoreReady", () => {
       match({ id: 2, status: "AWAITING_CONFIRMATION" }),
     ]);
     expect(shouldPlayScoreReady(before, after)).toBe(true);
+  });
+});
+
+describe("shouldRefreshViewerContext", () => {
+  const detailWith = (preview: unknown, over: Partial<TournamentSnapshot> = {}) =>
+    ({ ...snapshot(over), ...viewer(), preview }) as unknown as TournamentDetail;
+
+  it("relit quand une inscription périme l'aperçu", () => {
+    // L'aperçu se recalcule à chaque inscription, mais le flux ne transporte que
+    // l'instantané : sans relecture, un caster verrait la liste grandir pendant
+    // que le tirage prévu resterait celui d'il y a dix minutes.
+    const previous = detailWith({ entrants: [] });
+    const next = snapshot({
+      registrations: [
+        ...snapshot().registrations,
+        {
+          teamId: 11,
+          teamName: "B",
+          logoUrl: null,
+          seed: 2,
+          registeredAt: "2026-05-02T14:00:00Z",
+          finalRank: null,
+        },
+      ],
+    });
+    expect(shouldRefreshViewerContext(previous, next)).toBe(true);
+  });
+
+  it("relit quand le tournoi quitte un état prévisible", () => {
+    // L'aperçu n'a plus lieu d'être une fois le tournoi lancé : le garder
+    // afficherait un tirage que le plateau réel a déjà démenti.
+    const previous = detailWith({ entrants: [] });
+    expect(
+      shouldRefreshViewerContext(previous, snapshot({ card: card({ state: "RUNNING" }) })),
+    ).toBe(true);
+  });
+
+  it("ne relit pas pour un lecteur sans aperçu", () => {
+    // La grande majorité des spectateurs : rien à tenir à jour, donc aucune
+    // requête — c'est tout l'intérêt du modèle « pousser ».
+    const previous = detailWith(null);
+    expect(
+      shouldRefreshViewerContext(previous, snapshot({ card: card({ state: "RUNNING" }) })),
+    ).toBe(false);
+  });
+
+  it("ne relit pas quand rien de pertinent n'a bougé", () => {
+    const previous = detailWith({ entrants: [] });
+    expect(shouldRefreshViewerContext(previous, snapshot({ version: "v2" }))).toBe(false);
   });
 });
 
