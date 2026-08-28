@@ -1,7 +1,36 @@
-﻿import { getCurrentUser } from "@/lib/server/auth";
-import { subscribeTournament } from "@/lib/server/live";
+/**
+ * Flux temps réel d'un tournoi (SSE).
+ *
+ * Le flux **transporte la donnée** au lieu de se contenter de la signaler : à
+ * la connexion il envoie l'instantané complet du tournoi et le contexte du
+ * lecteur, puis chaque nouvelle version. Le client n'a donc plus rien à
+ * recharger — ni au fil du tournoi, ni au retour sur l'onglet.
+ *
+ * Le calcul de l'instantané et le regroupement des envois vivent dans
+ * `lib/server/tournament-broadcast.ts` : une seule passe en base par tournoi,
+ * quel que soit le nombre de spectateurs.
+ */
+import { getCurrentUser } from "@/lib/server/auth";
+import {
+  acquireStreamSlot,
+  joinTournamentRoom,
+} from "@/lib/server/tournament-broadcast";
+import {
+  getTournamentSnapshot,
+  getTournamentViewerContext,
+} from "@/lib/server/tournaments-service";
+import { can } from "@/lib/shared/permissions";
+import { resolveRefreshTier } from "@/lib/shared/refresh-tiers";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/**
+ * Battement de cœur. Une ligne de commentaire SSE (` : `) suffit à garder la
+ * connexion ouverte au travers des proxys, sans réveiller le client : elle
+ * n'est pas remise à `onmessage`.
+ */
+const HEARTBEAT_MS = 25_000;
 
 export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -15,36 +44,82 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     return new Response("Invalid tournament id", { status: 400 });
   }
 
+  const snapshot = await getTournamentSnapshot(tournamentId);
+  if (!snapshot) {
+    return new Response("Tournament not found", { status: 404 });
+  }
+
+  const viewer = await getTournamentViewerContext(snapshot, user.id, can(user, "tournaments"));
+
+  // Palier de fraîcheur : le staff et les engagés du tournoi sont servis à la
+  // seconde, les spectateurs par fenêtres plus larges — même donnée, moins de
+  // trafic (`lib/shared/refresh-tiers.ts`).
+  const isParticipant =
+    viewer.myTeamId !== null &&
+    snapshot.registrations.some((row) => row.teamId === viewer.myTeamId);
+  const tier = resolveRefreshTier({ isStaff: viewer.isAdmin, isParticipant });
+
+  // Un onglet ouvre un flux. Le plafond ne gêne personne d'ordinaire ; il évite
+  // qu'un client en boucle de reconnexion accapare la machine.
+  const releaseSlot = acquireStreamSlot(user.id);
+  if (!releaseSlot) {
+    return new Response("Too many streams", {
+      status: 429,
+      headers: { "Retry-After": "30" },
+    });
+  }
+
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      const send = (payload: unknown): void => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+      let closed = false;
+
+      const write = (frame: Uint8Array): void => {
+        if (closed) throw new Error("STREAM_CLOSED");
+        controller.enqueue(frame);
       };
 
-      send({
-        type: "connected",
-        tournamentId,
-        emittedAt: new Date().toISOString(),
-      });
+      // Tout ce dont la page a besoin pour s'afficher, dès la connexion : aucun
+      // appel REST supplémentaire dans le cas nominal.
+      write(
+        encoder.encode(
+          `data: ${JSON.stringify({
+            type: "connected",
+            tournamentId,
+            tier,
+            viewer,
+            snapshot,
+            emittedAt: new Date().toISOString(),
+          })}\n\n`,
+        ),
+      );
 
-      const unsubscribe = subscribeTournament(tournamentId, (event) => {
-        send(event);
-      });
+      const leaveRoom = joinTournamentRoom(tournamentId, { tier, send: write });
 
       const heartbeat = setInterval(() => {
-        send({
-          type: "heartbeat",
-          emittedAt: new Date().toISOString(),
-        });
-      }, 15000);
+        try {
+          write(encoder.encode(`: ping\n\n`));
+        } catch {
+          cleanup();
+        }
+      }, HEARTBEAT_MS);
+      heartbeat.unref?.();
 
-      req.signal.addEventListener("abort", () => {
+      function cleanup(): void {
+        if (closed) return;
+        closed = true;
         clearInterval(heartbeat);
-        unsubscribe();
-        controller.close();
-      });
+        leaveRoom();
+        releaseSlot?.();
+        try {
+          controller.close();
+        } catch {
+          // Déjà fermé par le client.
+        }
+      }
+
+      req.signal.addEventListener("abort", cleanup);
     },
   });
 
@@ -53,6 +128,9 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      // Neutralise la mise en tampon d'un reverse proxy, qui retiendrait les
+      // messages et ferait croire à un flux mort.
+      "X-Accel-Buffering": "no",
     },
   });
 }

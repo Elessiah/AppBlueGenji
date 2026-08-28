@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { TournamentBuckets } from "@/lib/shared/types";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
 import { splitHiddenTournaments } from "@/lib/shared/tournament-visibility";
+import { REFRESH_CADENCE, resolveRefreshTier } from "@/lib/shared/refresh-tiers";
+import { useAutoRefresh } from "@/lib/shared/hooks/useAutoRefresh";
+import { useScheduledBuckets } from "@/lib/shared/hooks/useScheduledBuckets";
 import { useToast } from "@/components/ui/toast";
 import { BgCanvas } from "../_shared/BgCanvas";
 import { Ticker } from "@/components/cyber/Ticker";
@@ -57,8 +60,11 @@ export default function TournamentsPage() {
   const [finishedDisplayLimit, setFinishedDisplayLimit] = useState(12);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
+  // `silent` : les rafraîchissements de fond ne doivent pas couvrir l'écran de
+  // notifications pour un incident réseau passager. Seul le premier chargement,
+  // celui que l'utilisateur attend, signale son échec.
+  const load = useCallback(
+    async (silent = false) => {
       // Les deux listes partent ensemble : celle de l'onglet « Mes tournois »
       // est la seule à porter les tournois pas encore visibles, et c'est elle
       // qui dit si l'onglet doit exister. Elles se règlent en revanche
@@ -75,10 +81,23 @@ export default function TournamentsPage() {
       // incident les touche presque toujours ensemble.
       const failure =
         all.status === "rejected" ? all.reason : mine.status === "rejected" ? mine.reason : null;
-      if (failure) showError((failure as Error).message);
-    };
-    load().catch((e) => showError((e as Error).message));
-  }, [showError]);
+      if (failure && !silent) showError((failure as Error).message);
+    },
+    [showError],
+  );
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Aucun flux SSE sur cette page : elle se tient à jour toute seule par le
+  // retour sur l'onglet — ce qui remplace le F5 — doublé d'une relecture de
+  // fond, rare pour les spectateurs, plus fréquente pour le staff. Côté
+  // serveur, la liste publique est mutualisée : ces relectures ne coûtent
+  // presque rien (`lib/server/tournaments/list-cache.ts`).
+  useAutoRefresh(() => load(true), {
+    intervalMs: REFRESH_CADENCE[resolveRefreshTier({ isStaff: isAdmin })].listIntervalMs,
+  });
 
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store" })
@@ -109,7 +128,13 @@ export default function TournamentsPage() {
   const hasOwnTournaments = ownedCount > 0;
   const isMine = tab === "mine" && hasOwnTournaments;
 
-  const sourceBuckets = isMine ? myBuckets : buckets;
+  // Les cartes portent leur horaire : le client fait basculer « Prochainement »
+  // → « Inscriptions » → « En cours » à la seconde dite, sans rien demander au
+  // serveur (`lib/shared/tournament-schedule.ts`).
+  const scheduledBuckets = useScheduledBuckets(buckets);
+  const scheduledMyBuckets = useScheduledBuckets(myBuckets);
+
+  const sourceBuckets = isMine ? scheduledMyBuckets : scheduledBuckets;
   const filteredBuckets = filterBuckets(sourceBuckets, query, gameFilter);
 
   // Hors de « Mes tournois », le serveur a déjà écarté les tournois masqués :

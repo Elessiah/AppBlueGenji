@@ -1,11 +1,16 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import type { TournamentBuckets, TournamentDetail, TournamentFormat, TournamentState } from "@/lib/shared/types";
+import type {
+  TournamentBuckets,
+  TournamentDetail,
+  TournamentFormat,
+  TournamentSnapshot,
+  TournamentState,
+  TournamentViewerContext,
+} from "@/lib/shared/types";
 import { getDatabase } from "@/lib/server/database";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
-import { toIso } from "@/lib/server/serialization";
-import { loadSoloUserIds } from "@/lib/server/solo-entries-service";
 import { isSoloTournament, toParticipantType, type ParticipantType } from "@/lib/shared/participants";
-import type { TournamentRow, TournamentListRow } from "./_internal";
+import type { TournamentListRow } from "./_internal";
 
 // Internal types
 export type { TournamentRow, RegistrationRow, MatchRow, TournamentListRow } from "./_internal";
@@ -45,6 +50,18 @@ export {
   deleteAllMatches,
   resetRegistrationRanks,
 } from "./repository";
+
+// Cache de la liste publique (voir ./list-cache)
+export { invalidateTournamentLists, TOURNAMENT_LIST_TTL_MS } from "./list-cache";
+
+// Instantané partagé (voir ./snapshot)
+export {
+  getTournamentSnapshot,
+  getTournamentSnapshotFrame,
+  invalidateTournamentSnapshot,
+  SNAPSHOT_TTL_MS,
+} from "./snapshot";
+export type { TournamentSnapshotFrame } from "./snapshot";
 
 // Byes
 export { tryAutoResolveByes } from "./byes";
@@ -98,14 +115,27 @@ import {
 } from "./registration";
 import { resolveExpiredScoreReports, finalizeTournamentIfDone } from "./finalization";
 import { tryAutoResolveByes } from "./byes";
-import { mapCard, mapMatch } from "./_internal";
-import { getTournamentListRow, getRegistrationRows, getMatchRows, loadTournamentRow } from "./repository";
+import { mapCard } from "./_internal";
+import { loadTournamentRow } from "./repository";
 import { reportMatchScore } from "./scoring";
 import { publishUpdatedEvent, publishScoreReportedEvent, publishScoreResolvedEvent, sendBotLogAsync } from "./notifications";
+import { getTournamentSnapshot } from "./snapshot";
+import { cachedTournamentList } from "./list-cache";
 
 let pendingSync: Promise<void> | null = null;
 let lastSyncAt = 0;
-const SYNC_THROTTLE_MS = 1000;
+/**
+ * Étranglement de la synchronisation d'états.
+ *
+ * Chaque passe ouvre une transaction et repasse sur **tous** les tournois non
+ * terminés (plateau manquant, byes, reports expirés, finalisation) : à une
+ * seconde d'intervalle, une poignée de visiteurs suffisait à la faire tourner
+ * en continu. Quinze secondes suffisent largement — l'affichage, lui, ne
+ * l'attend plus : le client fait basculer l'état à l'heure exacte tout seul
+ * (`lib/shared/tournament-state.ts`), et la page d'un tournoi déclenche sa
+ * propre bascule à la lecture (`./snapshot`).
+ */
+const SYNC_THROTTLE_MS = 15_000;
 
 async function syncVisibleTournaments(): Promise<void> {
   if (pendingSync) return pendingSync;
@@ -376,9 +406,29 @@ export type TournamentListScope = {
   organizerUserId?: number;
 };
 
+/**
+ * Paniers de tournois, par état.
+ *
+ * La liste publique (sans portée ni recherche) est **mutualisée** : c'est de
+ * loin la lecture la plus sollicitée du site — accueil rendu dynamiquement,
+ * page `/tournois`, bandeau « en direct » —, elle agrège tous les tournois et
+ * toutes les inscriptions, et elle est la même pour tout le monde. Les
+ * variantes personnelles (`scope=mine`) ou filtrées passent directement en
+ * base : elles sont rares et propres à un lecteur.
+ */
 export async function listTournamentBuckets(
   searchTerm: string | null,
   scope: TournamentListScope = {},
+): Promise<TournamentBuckets> {
+  const isSharedList = scope.organizerUserId === undefined && !searchTerm?.trim();
+  if (!isSharedList) return loadTournamentBuckets(searchTerm, scope);
+
+  return cachedTournamentList("public", () => loadTournamentBuckets(searchTerm, scope));
+}
+
+async function loadTournamentBuckets(
+  searchTerm: string | null,
+  scope: TournamentListScope,
 ): Promise<TournamentBuckets> {
   await syncVisibleTournaments();
 
@@ -537,161 +587,62 @@ export async function registerGhostTeam(tournamentId: number, teamId: number): P
   }
 }
 
-async function hasExpiredScoreReports(
-  db: Awaited<ReturnType<typeof getDatabase>>,
-  tournamentId: number,
-): Promise<boolean> {
-  const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_matches WHERE tournament_id = ? AND status = 'AWAITING_CONFIRMATION' AND score_deadline_at <= NOW() LIMIT 1`,
-    [tournamentId],
-  );
-  return rows.length > 0;
+/**
+ * Contexte propre au lecteur : ce qu'il a le droit de faire ici.
+ *
+ * Séparé de l'instantané partagé parce qu'il ne bouge presque jamais (il change
+ * à l'inscription, pas à chaque score) et qu'il est le seul morceau du détail
+ * qu'on ne puisse pas mutualiser entre spectateurs.
+ */
+export async function getTournamentViewerContext(
+  snapshot: TournamentSnapshot,
+  userId: number,
+  isAdmin = false,
+): Promise<TournamentViewerContext> {
+  const db = await getDatabase();
+  const connection = await db.getConnection();
+  try {
+    // Engagé du viewer : son équipe active, ou son entrée solo en individuel.
+    const myTeamId = await resolveUserEntrantTeamId(
+      connection,
+      { participant_type: snapshot.card.participantType },
+      userId,
+    );
+    const isSolo = isSoloTournament(snapshot.card.participantType);
+    const alreadyRegistered =
+      myTeamId !== null && snapshot.registrations.some((row) => row.teamId === myTeamId);
+
+    return {
+      canRegister:
+        snapshot.card.state === "REGISTRATION" &&
+        !alreadyRegistered &&
+        // En individuel, un joueur sans entrée solo peut s'inscrire : elle sera
+        // créée à ce moment-là.
+        (isSolo || myTeamId !== null),
+      myTeamId,
+      canCreateReportsForTeamIds: myTeamId ? [myTeamId] : [],
+      isAdmin,
+    };
+  } finally {
+    connection.release();
+  }
 }
 
+/**
+ * Détail complet du tournoi pour un lecteur donné : l'instantané partagé
+ * (mutualisé entre tous les spectateurs, voir `./snapshot`) complété de son
+ * contexte personnel.
+ */
 export async function getTournamentDetail(
   tournamentId: number,
   userId: number,
   isAdmin = false,
 ): Promise<TournamentDetail | null> {
-  const db = await getDatabase();
+  const snapshot = await getTournamentSnapshot(tournamentId);
+  if (!snapshot) return null;
 
-  let tournamentRow: TournamentRow | null;
-  const detailConnection = await db.getConnection();
-  try {
-    tournamentRow = await loadTournamentRow(detailConnection, tournamentId);
-  } finally {
-    detailConnection.release();
-  }
-  if (!tournamentRow) return null;
-
-  const { hasPendingStateTransition } = await import("./state");
-
-  const needsSync =
-    tournamentRow.state === "RUNNING" &&
-    (tournamentRow.bracket_size === null ||
-      (await hasExpiredScoreReports(db, tournamentId)) ||
-      (await hasPendingStateTransition(tournamentRow)));
-
-  let tournament: TournamentRow | null = tournamentRow;
-  if (needsSync) {
-    const connection = await db.getConnection();
-    try {
-      await connection.beginTransaction();
-      const syncResult = await syncTournamentState(connection, tournamentId);
-      tournament = syncResult.row;
-      await connection.commit();
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-  }
-
-  if (!tournament) {
-    return null;
-  }
-
-  const connection = await db.getConnection();
-  try {
-    const cardRow = await getTournamentListRow(connection, tournamentId);
-    if (!cardRow) return null;
-
-    const card = mapCard(cardRow);
-    const registrations = await getRegistrationRows(connection, tournamentId);
-    const matches = await getMatchRows(connection, tournamentId);
-
-    // Engagé du viewer : son équipe active, ou son entrée solo en individuel.
-    const myTeamId = await resolveUserEntrantTeamId(connection, tournament, userId);
-    const isSolo = isSoloTournament(tournament.participant_type);
-    const alreadyRegistered =
-      myTeamId !== null && registrations.some((row) => Number(row.team_id) === myTeamId);
-    const canRegister =
-      card.state === "REGISTRATION" &&
-      !alreadyRegistered &&
-      // En individuel, un joueur sans entrée solo peut s'inscrire : elle sera
-      // créée à ce moment-là.
-      (isSolo || myTeamId !== null);
-
-    const canCreateReportsForTeamIds = myTeamId ? [myTeamId] : [];
-
-    // Engagés qui sont des joueurs : l'interface lie alors vers leur profil.
-    const soloUserIds = isSolo
-      ? await loadSoloUserIds(
-          connection,
-          registrations.map((row) => Number(row.team_id)),
-        )
-      : {};
-
-    const phasesDetail = card.format === "MULTI"
-      ? await (await import("./phases")).loadPhasesForDetail(connection, tournamentId)
-      : null;
-
-    // La vue Survie sert aussi à l'intérieur d'un tournoi multi-phases : sans
-    // ces métadonnées, une phase en survie retomberait sur l'affichage générique
-    // en arbre, privant les équipes du classement et du report de score.
-    const survivalPhaseId =
-      phasesDetail?.phases.find(
-        (phase) => phase.id === phasesDetail.currentPhaseId && phase.format === "SURVIVAL",
-      )?.id ?? null;
-
-    const survival =
-      card.format === "SURVIVAL"
-        ? await (await import("./survival")).loadSurvivalMeta(connection, tournamentId)
-        : survivalPhaseId !== null
-          ? await (await import("./survival")).loadSurvivalMeta(
-              connection,
-              tournamentId,
-              survivalPhaseId,
-            )
-          : null;
-
-    // Même raison que pour la survie ci-dessus : la vue Suisse sert aussi à
-    // l'intérieur d'une phase, sinon une ronde suisse en `MULTI` n'afficherait
-    // ni classement ni départages.
-    const swissPhaseId =
-      phasesDetail?.phases.find(
-        (phase) => phase.id === phasesDetail.currentPhaseId && phase.format === "SWISS",
-      )?.id ?? null;
-
-    const endurance =
-      card.format === "BG_SURVIE"
-        ? await (await import("./bg-survie")).loadEnduranceMeta(connection, tournamentId)
-        : null;
-
-    const swiss =
-      card.format === "SWISS"
-        ? await (await import("./swiss")).loadSwissMeta(connection, tournamentId)
-        : swissPhaseId !== null
-          ? await (await import("./swiss")).loadSwissMeta(connection, tournamentId, swissPhaseId)
-          : null;
-
-    return {
-      card,
-      matches: matches.map(mapMatch),
-      registrations: registrations.map((row) => ({
-        teamId: Number(row.team_id),
-        teamName: row.team_name,
-        logoUrl: row.logo_url,
-        seed: row.seed === null ? null : Number(row.seed),
-        registeredAt: toIso(row.registered_at)!,
-        finalRank: row.final_rank === null ? null : Number(row.final_rank),
-      })),
-      canRegister,
-      myTeamId,
-      canCreateReportsForTeamIds,
-      isAdmin,
-      survival,
-      swiss,
-      endurance,
-      phases: phasesDetail?.phases ?? null,
-      currentPhaseId: phasesDetail?.currentPhaseId ?? null,
-      phaseStandings: phasesDetail?.phaseStandings ?? {},
-      soloUserIds,
-    };
-  } finally {
-    connection.release();
-  }
+  const viewer = await getTournamentViewerContext(snapshot, userId, isAdmin);
+  return { ...snapshot, ...viewer };
 }
 
 export async function reportMatchScorePublic(

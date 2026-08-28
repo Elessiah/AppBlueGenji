@@ -1,30 +1,33 @@
 import type { PoolConnection } from "mysql2/promise";
 import type { TournamentState } from "@/lib/shared/types";
+import { computeTournamentState as sharedComputeTournamentState } from "@/lib/shared/tournament-state";
 import { TournamentRow } from "./_internal";
 import {
   loadTournamentRow,
   updateTournamentState,
 } from "./repository";
 
+/**
+ * État réel du tournoi d'après ses dates, à partir d'une ligne SQL.
+ *
+ * Simple adaptation de {@link sharedComputeTournamentState} (`lib/shared`) au
+ * nommage `snake_case` des lignes : le calcul lui-même est partagé avec le
+ * client, qui s'en sert pour faire basculer l'affichage à l'heure dite sans
+ * requête.
+ */
 export function computeTournamentState(
   row: Pick<
     TournamentRow,
     "state" | "finished_at" | "registration_open_at" | "registration_close_at" | "start_at"
   >,
 ): TournamentState {
-  if (row.state === "FINISHED" || row.finished_at) {
-    return "FINISHED";
-  }
-
-  const now = Date.now();
-  const openAt = new Date(row.registration_open_at).getTime();
-  const closeAt = new Date(row.registration_close_at).getTime();
-  const startAt = new Date(row.start_at).getTime();
-
-  if (now < openAt) return "UPCOMING";
-  if (now >= openAt && now <= closeAt) return "REGISTRATION";
-  if (now >= startAt) return "RUNNING";
-  return "UPCOMING";
+  return sharedComputeTournamentState({
+    state: row.state,
+    finishedAt: row.finished_at,
+    registrationOpenAt: row.registration_open_at,
+    registrationCloseAt: row.registration_close_at,
+    startAt: row.start_at,
+  });
 }
 
 export async function syncTournamentState(

@@ -1,6 +1,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { getSubscribersCount } from "@/lib/server/live";
+import { tournamentAudience } from "@/lib/server/tournament-broadcast";
+import { cached } from "@/lib/server/cache";
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import {
   inferGameLabel,
@@ -35,7 +36,24 @@ type StatsRow = RowDataPacket & {
   tournaments: number;
 };
 
+/**
+ * Durées de vie des agrégats de la vitrine.
+ *
+ * La page d'accueil est rendue à chaque visite (`force-dynamic`) et lance une
+ * dizaine d'agrégations : sans mutualisation, cent visiteurs — ou un seul qui
+ * garde le doigt sur F5 — les relancent cent fois. Le cache à vol unique les
+ * ramène à une, et ces chiffres-là n'ont aucun besoin d'être à la seconde.
+ *
+ * Le direct fait exception : il porte le score en cours, on le garde court.
+ */
+const LANDING_TTL_MS = 60_000;
+const LANDING_LIVE_TTL_MS = 5_000;
+
 export async function getLandingStats(): Promise<LandingStats> {
+  return cached("landing:stats", LANDING_TTL_MS, loadLandingStats);
+}
+
+async function loadLandingStats(): Promise<LandingStats> {
   try {
     const db = await getDatabase();
     const [rows] = await db.execute<StatsRow[]>(`
@@ -77,6 +95,10 @@ function roundLabelFor(bracket: BracketType, roundNumber: number, matchCount: nu
 }
 
 export async function getLandingLive(buckets?: TournamentBuckets): Promise<LandingLive | null> {
+  return cached("landing:live", LANDING_LIVE_TTL_MS, () => loadLandingLive(buckets));
+}
+
+async function loadLandingLive(buckets?: TournamentBuckets): Promise<LandingLive | null> {
   try {
     const tournamentBuckets = buckets ?? await listTournamentBuckets(null);
     const tournament = tournamentBuckets.running[0] ?? null;
@@ -124,7 +146,7 @@ export async function getLandingLive(buckets?: TournamentBuckets): Promise<Landi
     return {
       tournament,
       currentMatch,
-      viewers: getSubscribersCount(tournament.id),
+      viewers: tournamentAudience(tournament.id),
       game: inferGameLabel(tournament.name),
       phase: inferPhaseLabel(currentMatch),
     };
@@ -169,6 +191,12 @@ async function loadLeaderboardRows(
 
 export async function getLandingLeaderboard(limit = 8): Promise<LandingLeaderboardRow[]> {
   const safeLimit = Math.min(50, Math.max(1, Math.trunc(limit)));
+  return cached(`landing:leaderboard:${safeLimit}`, LANDING_TTL_MS, () =>
+    loadLandingLeaderboard(safeLimit),
+  );
+}
+
+async function loadLandingLeaderboard(safeLimit: number): Promise<LandingLeaderboardRow[]> {
   try {
     const db = await getDatabase();
     const [currentRows, previousRows] = await Promise.all([
@@ -297,6 +325,10 @@ async function loadNewsEntries(db: Awaited<ReturnType<typeof getDatabase>>): Pro
 }
 
 export async function getLandingTicker(): Promise<LandingTickerPayload> {
+  return cached("landing:ticker", LANDING_TTL_MS, loadLandingTicker);
+}
+
+async function loadLandingTicker(): Promise<LandingTickerPayload> {
   try {
     const db = await getDatabase();
     const entries: TickerEntry[] = [];

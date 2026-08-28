@@ -67,7 +67,7 @@ export default function TournamentDetailPage() {
   const tournamentId = Number(params.id);
   const { showError, showSuccess } = useToast();
 
-  const { tournament: detail } = useTournamentLive(tournamentId);
+  const { tournament: detail, refresh } = useTournamentLive(tournamentId);
   const [drafts, setDrafts] = useState<MatchScoreDraft>({});
   const [selectedMatchForAdmin, setSelectedMatchForAdmin] = useState<BracketMatch | null>(null);
   const [ghostRegistrationOpen, setGhostRegistrationOpen] = useState(false);
@@ -158,6 +158,9 @@ export default function TournamentDetailPage() {
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
       showSuccess(`Score transmis pour le match #${match.id}.`);
+      // Retour immédiat pour qui agit : le flux, lui, sert tout le monde à la
+      // cadence de son palier.
+      void refresh();
       setDrafts((prev) => {
         const next = { ...prev };
         delete next[match.id];
@@ -203,6 +206,7 @@ export default function TournamentDetailPage() {
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "FORFEIT_FAILED");
       showSuccess(isMine ? "Forfait enregistré." : `Forfait de ${teamName} enregistré.`);
+      void refresh();
     } catch (e) {
       showError(mapError((e as Error).message));
     }
@@ -216,6 +220,7 @@ export default function TournamentDetailPage() {
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "REGISTRATION_FAILED");
       showSuccess("Inscription validée.");
+      void refresh();
     } catch (e) {
       showError(mapError((e as Error).message));
     }
@@ -540,7 +545,7 @@ export default function TournamentDetailPage() {
         </div>
 
         {detail.isAdmin && (
-          <SeedingEditor tournamentId={tournamentId} onReordered={() => router.refresh()} />
+          <SeedingEditor tournamentId={tournamentId} onReordered={() => void refresh()} />
         )}
 
         <div className="ds-block">
@@ -575,14 +580,17 @@ export default function TournamentDetailPage() {
         match={selectedMatchForAdmin}
         open={!!selectedMatchForAdmin}
         onClose={() => setSelectedMatchForAdmin(null)}
-        onSubmitted={() => setSelectedMatchForAdmin(null)}
+        onSubmitted={() => {
+          setSelectedMatchForAdmin(null);
+          void refresh();
+        }}
       />
 
       {ghostRegistrationOpen && (
         <GhostRegistrationDialog
           tournamentId={tournamentId}
           onClose={() => setGhostRegistrationOpen(false)}
-          onRegistered={() => router.refresh()}
+          onRegistered={() => void refresh()}
         />
       )}
       </MatchFormatProvider>

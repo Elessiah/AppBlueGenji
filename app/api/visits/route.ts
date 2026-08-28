@@ -1,9 +1,22 @@
 import { getCurrentUser } from "@/lib/server/auth";
+import { enforceRateLimit, requestClientIp } from "@/lib/server/api-guard";
 import { ok } from "@/lib/server/http";
 import { recordSiteVisit, syncSiteVisitStatsToBot } from "@/lib/server/site-visits-service";
-import { clientIpFromForwardedFor, parseTrustedProxyHops } from "@/lib/shared/site-visits";
+import type { RateLimitRule } from "@/lib/server/rate-limit";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Plafond de **requêtes** par IP, distinct du plafond d'**insertions** appliqué
+ * par le service. Celui-ci borne le travail fait avant même de savoir s'il y a
+ * une visite à enregistrer : résolution de session et lecture de la fenêtre. Il
+ * est large — un visiteur normal envoie deux pings par heure.
+ */
+const VISIT_REQUEST_RULE: RateLimitRule = {
+  name: "site-visits-request",
+  limit: 60,
+  windowMs: 60_000,
+};
 
 /**
  * Enregistre une visite du site. Appelé par `<VisitTracker />` à chaque
@@ -16,6 +29,10 @@ export const dynamic = "force-dynamic";
  * d'un visiteur.
  */
 export async function POST(req: Request) {
+  const ip = requestClientIp(req);
+  const throttled = enforceRateLimit(VISIT_REQUEST_RULE, ip);
+  if (throttled) return throttled;
+
   let path: unknown = "/";
   try {
     const body = (await req.json()) as { path?: unknown };
@@ -28,11 +45,7 @@ export async function POST(req: Request) {
     const user = await getCurrentUser();
     const { recorded } = await recordSiteVisit({
       userId: user?.id ?? null,
-      ip:
-        clientIpFromForwardedFor(
-          req.headers.get("x-forwarded-for"),
-          parseTrustedProxyHops(process.env.TRUSTED_PROXY_HOPS),
-        ) ?? req.headers.get("x-real-ip"),
+      ip,
       userAgent: req.headers.get("user-agent"),
       path,
     });

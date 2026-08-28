@@ -302,7 +302,17 @@ export type BracketMatch = {
   phasePosition: number | null;
 };
 
-export type TournamentDetail = {
+/**
+ * Partie du détail d'un tournoi **identique pour tout le monde** : le plateau,
+ * les inscrites, les classements.
+ *
+ * C'est la scission qui rend le temps réel tenable. Auparavant, un score
+ * rapporté réveillait chaque spectateur, qui rechargeait alors *son* détail
+ * complet : cent spectateurs, cent calculs identiques. Le serveur n'en fait plus
+ * qu'un, qu'il pousse tel quel dans le flux SSE ; ce qui dépend du lecteur vit
+ * à part dans {@link TournamentViewerContext} et ne change presque jamais.
+ */
+export type TournamentSnapshot = {
   card: TournamentCard;
   matches: BracketMatch[];
   registrations: {
@@ -313,15 +323,6 @@ export type TournamentDetail = {
     registeredAt: string;
     finalRank: number | null;
   }[];
-  canRegister: boolean;
-  /**
-   * Engagé du viewer dans **ce** tournoi : son équipe active en tournoi par
-   * équipes, son entrée solo en tournoi individuel (null s'il n'est pas
-   * inscrit).
-   */
-  myTeamId: number | null;
-  canCreateReportsForTeamIds: number[];
-  isAdmin: boolean;
   /** Métadonnées du mode Survie (null pour les autres formats). */
   survival: SurvivalMeta | null;
   /** Métadonnées du mode Ronde suisse (null pour les autres formats). */
@@ -340,8 +341,29 @@ export type TournamentDetail = {
    * `/equipes/[id]`.
    */
   soloUserIds: Record<number, number>;
+  /**
+   * Empreinte du contenu ci-dessus. Deux instantanés de même version portent la
+   * même information : le serveur s'abstient alors de les envoyer, et le client
+   * de se redessiner.
+   */
+  version: string;
 };
 
+/** Partie du détail qui dépend de **qui regarde**. Change rarement. */
+export type TournamentViewerContext = {
+  canRegister: boolean;
+  /**
+   * Engagé du viewer dans **ce** tournoi : son équipe active en tournoi par
+   * équipes, son entrée solo en tournoi individuel (null s'il n'est pas
+   * inscrit).
+   */
+  myTeamId: number | null;
+  canCreateReportsForTeamIds: number[];
+  isAdmin: boolean;
+};
+
+/** Détail complet d'un tournoi pour un lecteur donné. */
+export type TournamentDetail = TournamentSnapshot & TournamentViewerContext;
 /**
  * Fréquentation du site, telle que servie à la commande Discord `/stats-site`.
  *

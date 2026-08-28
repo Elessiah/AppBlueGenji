@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { SITE_VISIT_WINDOW_MINUTES } from "@/lib/shared/site-visits";
 
 /**
  * Signale une visite du site au serveur, une fois par chargement de page.
@@ -15,12 +16,45 @@ import { useEffect } from "react";
  * disputer la bande passante aux requêtes de la page, `keepalive` pour survivre
  * à une navigation immédiate, et toute erreur ignorée pour ne rien casser à
  * l'affichage.
+ *
+ * Il est aussi **dédupliqué dans l'onglet** sur la même fenêtre que le serveur.
+ * Le comptage ne change pas — le serveur regroupait déjà ces chargements — mais
+ * un visiteur qui recharge en boucle ne fait plus payer à chaque fois une
+ * résolution de session et une lecture en base. C'est un confort de serveur, pas
+ * une mesure d'exactitude : un onglet neuf, ou un stockage indisponible,
+ * renvoient simplement l'appel.
  */
+const VISIT_SENT_KEY = "bg:last-visit-ping";
+
+/** Un ping a-t-il déjà été envoyé dans cet onglet, sur la fenêtre en cours ? */
+function pingedRecently(): boolean {
+  try {
+    const raw = window.sessionStorage.getItem(VISIT_SENT_KEY);
+    if (!raw) return false;
+    const sentAt = Number(raw);
+    if (!Number.isFinite(sentAt)) return false;
+    return Date.now() - sentAt < SITE_VISIT_WINDOW_MINUTES * 60_000;
+  } catch {
+    // Navigation privée, stockage bloqué : on envoie, comme avant.
+    return false;
+  }
+}
+
+function rememberPing(): void {
+  try {
+    window.sessionStorage.setItem(VISIT_SENT_KEY, String(Date.now()));
+  } catch {
+    // Sans stockage, la déduplication est simplement inactive.
+  }
+}
 export function VisitTracker() {
   useEffect(() => {
     const controller = new AbortController();
 
     const send = () => {
+      if (pingedRecently()) return;
+      rememberPing();
+
       fetch("/api/visits", {
         method: "POST",
         headers: { "content-type": "application/json" },

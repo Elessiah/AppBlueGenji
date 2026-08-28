@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Eye } from "lucide-react";
 import { CyberCard, Pill, TeamSigil } from "@/components/cyber";
 import type { LandingLive } from "@/lib/shared/landing";
 import { inferPhaseLabel, toBestOfLabel } from "@/lib/shared/landing";
+import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
+import { useAutoRefresh } from "@/lib/shared/hooks/useAutoRefresh";
 import styles from "./LiveCard.module.css";
 
 type LiveCardProps = {
@@ -33,49 +35,36 @@ function nextDaysLabel(iso: string | null | undefined): string {
 export function LiveCard({ initialLive, nextUpcomingISO }: LiveCardProps) {
   const [live, setLive] = useState<LandingLive | null>(initialLive);
 
-  useEffect(() => {
-    let mounted = true;
-    const controller = new AbortController();
-
-    async function loadLive() {
+  // La carte est rendue côté serveur avec une valeur fraîche : le premier
+  // chargement n'a donc rien à redemander. Ensuite, la vitrine est publique et
+  // anonyme — palier « spectateur » : quelques minutes, et rien du tout quand
+  // l'onglet est caché. Sans cela, cent visiteurs sur l'accueil produisaient à
+  // eux seuls dix requêtes par seconde sur une agrégation de tous les tournois.
+  useAutoRefresh(
+    async () => {
       try {
-        const response = await fetch("/api/landing/live", {
-          signal: controller.signal,
-          cache: "no-store",
-        });
-        if (!response.ok) {
+        const response = await fetch("/api/landing/live", { cache: "no-store" });
+        if (!response.ok) return;
+
+        const payload = (await response.json()) as LiveResponse;
+        const raw = payload.live ?? null;
+        if (!raw) {
+          setLive(null);
           return;
         }
-        const payload = (await response.json()) as LiveResponse;
-        if (mounted) {
-          const raw = payload.live ?? null;
-          if (raw) {
-            const text = (raw.tournament.name ?? "").toLowerCase();
-            const game = text.includes("marvel") || text.includes("rivals") ? "Marvel Rivals" : "Overwatch";
-            const phase = raw.currentMatch
-              ? raw.currentMatch.roundLabel?.toUpperCase?.() ?? "EN ATTENTE"
-              : "EN ATTENTE";
-            setLive({ ...raw, game, phase });
-          } else {
-            setLive(null);
-          }
-        }
+
+        const text = (raw.tournament.name ?? "").toLowerCase();
+        const game = text.includes("marvel") || text.includes("rivals") ? "Marvel Rivals" : "Overwatch";
+        const phase = raw.currentMatch
+          ? raw.currentMatch.roundLabel?.toUpperCase?.() ?? "EN ATTENTE"
+          : "EN ATTENTE";
+        setLive({ ...raw, game, phase });
       } catch {
-        if (!mounted) return;
+        // Incident réseau passager : la carte garde la dernière valeur connue.
       }
-    }
-
-    void loadLive();
-    const interval = window.setInterval(() => {
-      void loadLive();
-    }, 10_000);
-
-    return () => {
-      mounted = false;
-      controller.abort();
-      window.clearInterval(interval);
-    };
-  }, []);
+    },
+    { intervalMs: REFRESH_CADENCE.STANDARD.landingLiveMs },
+  );
 
   if (!live) {
     return (
