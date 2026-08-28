@@ -64,6 +64,11 @@ L'avancement interne est la part de temps parcourue entre les deux jalons qui
 bornent l'étape. Deux exceptions : `HIDDEN` n'a pas de début connu (il reste à
 zéro), et `RUNNING` n'a pas de fin annoncée — d'où `playedRatio`.
 
+**La barre pleine est réservée au tournoi terminé.** Hors `FINISHED`, le
+remplissage est plafonné à 99 % : l'état ne bascule qu'à la finalisation, au
+prochain accès, et une survie tombée à une seule engagée afficherait sinon « En
+cours · 100 % » à côté d'un jalon « Terminé » encore à venir.
+
 ### `computeRunningRatio(input)`
 
 Situe un tournoi **en cours**, de 0 à 1, ou `null` si rien ne le permet. Chaque
@@ -74,12 +79,19 @@ famille de formats a sa propre mesure, faute d'une commune honnête :
 | `SINGLE`, `DOUBLE` | matchs joués / matchs du plateau | — (le plateau est connu dès le départ) |
 | `SWISS` | rondes jouées / `totalRounds` | une seule ronde est générée à la fois |
 | `SURVIVAL`, `BG_SURVIE` | éliminés / (effectif − 1) | ni le nombre de manches ni leur contenu ne sont connus d'avance (il dépend des coupes) |
-| `MULTI` | phases réglées / phases, affinées par les matchs de la phase en cours | idem, phase par phase |
+| `MULTI` | phases réglées / phases, affinées par la phase en cours **selon son propre format** | idem, phase par phase |
 
 Compter les matchs partout afficherait un tournoi de survie à **100 %** dès sa
-première manche : sa seule manche générée est intégralement jouée. Une phase
-`SKIPPED` compte comme franchie — l'effectif était déjà sous la cible, il n'y
-avait rien à jouer (cf. [MULTI_PHASE_TOURNAMENTS](MULTI_PHASE_TOURNAMENTS.md)).
+première manche : sa seule manche générée est intégralement jouée. La même règle
+vaut à l'intérieur d'un `MULTI` : la phase en cours est mesurée au format **de
+la phase** — matchs pour une phase d'élimination, rondes pour une phase suisse
+(`swissTotalRounds`, dont la numérotation repart à 1 à chaque phase), et rien du
+tout pour une phase de survie, qui n'expose à ce niveau ni nombre de manches ni
+classement : elle ne compte qu'une fois réglée.
+
+Une phase `SKIPPED` compte comme franchie — l'effectif était déjà sous la cible,
+il n'y avait rien à jouer (cf.
+[MULTI_PHASE_TOURNAMENTS](MULTI_PHASE_TOURNAMENTS.md)).
 
 ### `formatStageCountdown(from, to)`
 
@@ -91,9 +103,12 @@ que l'afficher à l'envers.
 
 - La frise est une zone défilante (`<ScrollArea orientation="x">`) : elle garde
   ses six jalons lisibles sur mobile plutôt que de les empiler.
-- `role="progressbar"` porte `aria-valuenow` et un `aria-valuetext` parlant
-  (« En cours — 84 % ») ; le pourcentage affiché est `aria-hidden`, il ne serait
-  qu'un doublon à la lecture d'écran.
+- `role="progressbar"` ne porte **que la piste**, un élément sans enfant :
+  `progressbar` est un rôle à enfants présentationnels, et posé sur le conteneur
+  il rendrait muets les six jalons et leurs dates. Il expose `aria-valuenow` et
+  un `aria-valuetext` parlant (« En cours — 84 % ») ; le pourcentage affiché est
+  `aria-hidden`, il n'en serait qu'un doublon. Les jalons sont une vraie liste
+  ordonnée, l'étape courante marquée `aria-current="step"`.
 - Une horloge interne réveille le composant toutes les 30 s : le compte à rebours
   descend et la barre avance sans recharger la page.
 - Les animations (pulsation du jalon courant, liseré de tête) s'éteignent sous

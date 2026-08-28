@@ -99,56 +99,64 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
         fade
         ariaLabel="Frise de progression du tournoi — défilement horizontal"
       >
-        <div
-          className={styles.rail}
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
-          aria-valuetext={`${currentStage.label} — ${percent}%`}
-        >
+        <div className={styles.rail}>
           <div className={styles.trackWrap}>
-            <div className={styles.track} />
+            {/*
+              `progressbar` est un rôle à enfants présentationnels : posé sur le
+              conteneur, il rendrait muets les six jalons et leurs dates. Il ne
+              porte donc que la piste, qui n'a pas d'enfant.
+            */}
+            <div
+              className={styles.track}
+              role="progressbar"
+              aria-label="Avancement du tournoi"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={percent}
+              aria-valuetext={`${currentStage.label} — ${percent}%`}
+            />
             <div
               className={`${styles.fill}${isFinished ? "" : ` ${styles.fillLive}`}`}
               style={{ width: `${percent}%` }}
             />
 
-            {progress.stages.map((stage, index) => {
-              const dotClass = [
-                styles.dot,
-                stage.status === "DONE" && styles.dotDone,
-                stage.status === "CURRENT" && styles.dotCurrent,
-              ]
-                .filter(Boolean)
-                .join(" ");
+            <ol className={styles.nodes} aria-label="Étapes du tournoi">
+              {progress.stages.map((stage, index) => {
+                const dotClass = [
+                  styles.dot,
+                  stage.status === "DONE" && styles.dotDone,
+                  stage.status === "CURRENT" && styles.dotCurrent,
+                ]
+                  .filter(Boolean)
+                  .join(" ");
 
-              const labelClass = [
-                styles.captionLabel,
-                stage.status === "DONE" && styles.captionLabelDone,
-                stage.status === "CURRENT" && styles.captionLabelCurrent,
-              ]
-                .filter(Boolean)
-                .join(" ");
+                const labelClass = [
+                  styles.captionLabel,
+                  stage.status === "DONE" && styles.captionLabelDone,
+                  stage.status === "CURRENT" && styles.captionLabelCurrent,
+                ]
+                  .filter(Boolean)
+                  .join(" ");
 
-              return (
-                <div
-                  key={stage.key}
-                  className={styles.node}
-                  style={{ left: `${(index / lastIndex) * 100}%` }}
-                  aria-current={stage.status === "CURRENT" ? "step" : undefined}
-                  title={stage.hint}
-                >
-                  <span className={dotClass} />
-                  <span className={styles.caption}>
-                    <span className={labelClass}>{stage.label}</span>
-                    {stage.at && (
-                      <span className={styles.captionDate}>{shortDateTime(stage.at)}</span>
-                    )}
-                  </span>
-                </div>
-              );
-            })}
+                return (
+                  <li
+                    key={stage.key}
+                    className={styles.node}
+                    style={{ left: `${(index / lastIndex) * 100}%` }}
+                    aria-current={stage.status === "CURRENT" ? "step" : undefined}
+                    title={stage.hint}
+                  >
+                    <span className={dotClass} aria-hidden="true" />
+                    <span className={styles.caption}>
+                      <span className={labelClass}>{stage.label}</span>
+                      {stage.at && (
+                        <span className={styles.captionDate}>{shortDateTime(stage.at)}</span>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
           </div>
           <div className={styles.railSpacer} />
         </div>

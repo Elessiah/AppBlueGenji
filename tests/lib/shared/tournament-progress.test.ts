@@ -252,8 +252,21 @@ describe("computeTournamentProgress — remplissage", () => {
       playedRatio: -2,
     });
 
-    expect(over.ratio).toBe(1);
+    expect(over.ratio).toBeLessThan(1);
     expect(under.ratio).toBeCloseTo(4 / 5, 5);
+  });
+
+  it("réserve la barre pleine au tournoi terminé", () => {
+    // Survie tombée à une seule engagée, ou multi-phases dont toutes les phases
+    // sont closes : l'état ne bascule qu'à la finalisation suivante, et « En
+    // cours · 100 % » se contredirait lui-même.
+    const running = computeTournamentProgress(card({ state: "RUNNING" }), {
+      now: at(START_AT, 30 * DAY),
+      playedRatio: 1,
+    });
+
+    expect(running.ratio).toBeLessThan(1);
+    expect(Math.round(running.ratio * 100)).toBeLessThan(100);
   });
 
   it("remplit la barre entièrement sur un tournoi terminé", () => {
@@ -397,7 +410,7 @@ describe("computeRunningRatio", () => {
       format: "MULTI",
       phases: [
         phase({ id: 10, state: "FINISHED" }),
-        phase({ id: 11, state: "RUNNING" }),
+        phase({ id: 11, state: "RUNNING", format: "SINGLE" }),
         phase({ id: 12, state: "PENDING" }),
       ],
       currentPhaseId: 11,
@@ -409,6 +422,70 @@ describe("computeRunningRatio", () => {
 
     // Une phase close + un quart de la suivante, sur trois.
     expect(ratio).toBeCloseTo(1.25 / 3, 5);
+  });
+
+  it("mesure la phase en cours à son propre format, pas à celui du tournoi", () => {
+    // Phase de survie : une seule manche est générée à la fois, et elle vient
+    // d'être intégralement jouée. La compter aux matchs annoncerait la phase
+    // finie alors qu'il lui reste toutes ses coupes.
+    const ratio = computeRunningRatio({
+      format: "MULTI",
+      phases: [
+        phase({ id: 10, state: "FINISHED" }),
+        phase({ id: 11, state: "RUNNING", format: "SURVIVAL" }),
+        phase({ id: 12, state: "PENDING" }),
+      ],
+      currentPhaseId: 11,
+      matches: matches(["COMPLETED", "COMPLETED", "COMPLETED"], { phaseId: 11 }),
+    });
+
+    expect(ratio).toBeCloseTo(1 / 3, 5);
+  });
+
+  it("compte les rondes d'une phase suisse, dont la numérotation repart à 1", () => {
+    const ratio = computeRunningRatio({
+      format: "MULTI",
+      phases: [phase({ id: 10, state: "RUNNING", format: "SWISS", swissTotalRounds: 4 })],
+      currentPhaseId: 10,
+      matches: [
+        ...matches(["COMPLETED", "COMPLETED"], { phaseId: 10, roundNumber: 1 }),
+        ...matches(["COMPLETED", "PENDING"], { phaseId: 10, roundNumber: 2 }),
+      ],
+    });
+
+    // Une ronde close + la moitié de la deuxième, sur quatre.
+    expect(ratio).toBeCloseTo(1.5 / 4, 5);
+  });
+
+  it("n'avance pas dans une phase suisse dont le nombre de rondes manque", () => {
+    const ratio = computeRunningRatio({
+      format: "MULTI",
+      phases: [
+        phase({ id: 10, state: "RUNNING", format: "SWISS", swissTotalRounds: null }),
+        phase({ id: 11, state: "PENDING" }),
+      ],
+      currentPhaseId: 10,
+      matches: matches(["COMPLETED", "COMPLETED"], { phaseId: 10 }),
+    });
+
+    expect(ratio).toBe(0);
+  });
+
+  it("ignore les matchs des autres phases", () => {
+    const ratio = computeRunningRatio({
+      format: "MULTI",
+      phases: [
+        phase({ id: 10, state: "FINISHED" }),
+        phase({ id: 11, state: "RUNNING", format: "SINGLE" }),
+      ],
+      currentPhaseId: 11,
+      matches: [
+        ...matches(["COMPLETED", "COMPLETED", "COMPLETED"], { phaseId: 10 }),
+        ...matches(["COMPLETED", "PENDING"], { phaseId: 11 }),
+      ],
+    });
+
+    expect(ratio).toBeCloseTo(1.5 / 2, 5);
   });
 
   it("compte une phase sautée comme franchie", () => {

@@ -94,6 +94,16 @@
 
 /* --- Jalons ---------------------------------------------- */
 
+/* Recouvre exactement la piste : les jalons se positionnent en pourcentage de
+   sa largeur. */
+.nodes {
+  position: absolute;
+  inset: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
 .node {
   position: absolute;
   top: 2px;

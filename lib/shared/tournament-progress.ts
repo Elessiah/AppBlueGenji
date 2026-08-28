@@ -156,6 +156,17 @@ function stageFloorFromState(state: TournamentState): TournamentStageKey | null 
   return null;
 }
 
+/**
+ * Plafond du remplissage tant que le tournoi n'est pas terminé.
+ *
+ * Une barre pleine doit vouloir dire « terminé », et rien d'autre. Sans ce
+ * plafond, une survie tombée à une seule engagée ou un multi-phases dont toutes
+ * les phases sont closes afficheraient « En cours · 100 % » — l'état ne bascule
+ * qu'à la finalisation, au prochain accès. Choisi pour que l'arrondi au pour
+ * cent reste sous 100.
+ */
+const MAX_UNFINISHED_RATIO = 0.99;
+
 /** Part parcourue d'un segment borné par deux jalons, ramenée dans [0, 1]. */
 function segmentRatio(from: number, to: number, now: number): number {
   if (!(to > from)) return 0;
@@ -221,7 +232,9 @@ export function computeTournamentProgress(
 
   const segments = TOURNAMENT_STAGE_ORDER.length - 1;
   const ratio =
-    current === "FINISHED" ? 1 : clamp01((currentIndex + inner) / segments);
+    current === "FINISHED"
+      ? 1
+      : Math.min(clamp01((currentIndex + inner) / segments), MAX_UNFINISHED_RATIO);
 
   const nextKey = TOURNAMENT_STAGE_ORDER[currentIndex + 1] ?? null;
 
@@ -248,7 +261,7 @@ export type RunningProgressInput = {
   swiss?: Pick<SwissMeta, "totalRounds" | "currentRound"> | null;
   survivalStandings?: Pick<SurvivalStandingRow, "status">[] | null;
   enduranceStandings?: Pick<EnduranceStandingRow, "status">[] | null;
-  phases?: Pick<TournamentPhase, "id" | "state">[] | null;
+  phases?: Pick<TournamentPhase, "id" | "state" | "format" | "swissTotalRounds">[] | null;
   currentPhaseId?: number | null;
 };
 
@@ -256,6 +269,48 @@ function completedRatio(matches: { status: MatchStatus }[]): number | null {
   if (!matches.length) return null;
   const done = matches.filter((match) => match.status === "COMPLETED").length;
   return clamp01(done / matches.length);
+}
+
+/**
+ * Part de rondes jouées, la ronde en cours comptant pour sa fraction de matchs
+ * joués. Zéro si le nombre de rondes prévu manque : sans dénominateur, mieux
+ * vaut ne rien avancer que compter les matchs de l'unique ronde générée.
+ */
+function roundsRatio(
+  matches: Pick<BracketMatch, "status" | "roundNumber">[],
+  currentRound: number,
+  totalRounds: number,
+): number {
+  if (!(totalRounds > 0) || currentRound < 1) return 0;
+  const inner = completedRatio(matches.filter((match) => match.roundNumber === currentRound)) ?? 0;
+  return clamp01((currentRound - 1 + inner) / totalRounds);
+}
+
+/**
+ * Avancement d'une phase en cours, mesuré selon **son** format et non celui du
+ * tournoi.
+ *
+ * Une phase à plateau (élimination) est connue d'avance : ses matchs joués
+ * suffisent. Une phase suisse compte ses rondes, dont le nombre est fixé au
+ * lancement (`swissTotalRounds`) et dont la numérotation repart à 1 à chaque
+ * phase. Une phase de survie ne donne ici ni nombre de manches ni classement :
+ * elle ne compte donc qu'une fois réglée, plutôt que d'être annoncée finie dès
+ * sa première manche jouée — l'erreur que tout ce module cherche à éviter.
+ */
+function phaseInnerRatio(
+  phase: Pick<TournamentPhase, "format" | "swissTotalRounds">,
+  matches: Pick<BracketMatch, "status" | "roundNumber">[],
+): number {
+  if (phase.format === "SINGLE" || phase.format === "DOUBLE") {
+    return completedRatio(matches) ?? 0;
+  }
+
+  if (phase.format === "SWISS") {
+    const currentRound = matches.reduce((max, match) => Math.max(max, match.roundNumber), 0);
+    return roundsRatio(matches, currentRound, phase.swissTotalRounds ?? 0);
+  }
+
+  return 0;
 }
 
 /** Part d'engagés déjà sortis, sur les éliminations possibles (effectif − 1). */
@@ -289,20 +344,19 @@ export function computeRunningRatio(input: RunningProgressInput): number | null 
       (phase) => phase.state === "FINISHED" || phase.state === "SKIPPED",
     ).length;
 
-    const currentId = input.currentPhaseId ?? null;
-    const inner =
-      currentId === null
-        ? 0
-        : completedRatio(input.matches.filter((match) => match.phaseId === currentId)) ?? 0;
+    const current = phases.find((phase) => phase.id === input.currentPhaseId) ?? null;
+    const inner = current
+      ? phaseInnerRatio(
+          current,
+          input.matches.filter((match) => match.phaseId === current.id),
+        )
+      : 0;
 
     return clamp01((settled + inner) / phases.length);
   }
 
   if (input.format === "SWISS" && input.swiss && input.swiss.totalRounds > 0) {
-    const { totalRounds, currentRound } = input.swiss;
-    const inner =
-      completedRatio(input.matches.filter((match) => match.roundNumber === currentRound)) ?? 0;
-    return clamp01((Math.max(0, currentRound - 1) + inner) / totalRounds);
+    return roundsRatio(input.matches, input.swiss.currentRound, input.swiss.totalRounds);
   }
 
   if (input.format === "SURVIVAL") {
