@@ -372,6 +372,26 @@ describe("buildTournamentPreview — multi-phases", () => {
 });
 
 describe("métadonnées", () => {
+  it("compte chaque format dans son propre vocabulaire", () => {
+    // Le libellé de manche et l'unité doivent parler de la même chose : « 2
+    // manches » sous un « 1er tour » ferait douter d'une seconde quantité.
+    expect(build({ format: "SINGLE", entrants: entrants(4) }).roundsUnit).toBe("tour");
+    expect(build({ format: "SWISS", entrants: entrants(4) }).roundsUnit).toBe("ronde");
+    expect(build({ format: "SURVIVAL", entrants: entrants(4) }).roundsUnit).toBe("round");
+    expect(build({ format: "BG_SURVIE", entrants: entrants(4) }).roundsUnit).toBe("manche");
+    // Une phase de multi-phases prend l'unité de son propre format.
+    expect(
+      build({
+        format: "MULTI",
+        entrants: entrants(8),
+        phases: [
+          phase({ position: 1, format: "SWISS", qualifierValue: 4 }),
+          phase({ position: 2, format: "SINGLE", qualifierValue: 1 }),
+        ],
+      }).roundsUnit,
+    ).toBe("ronde");
+  });
+
   it("a un libellé pour chaque provenance d'ordre", () => {
     expect(Object.keys(SEEDING_SOURCE_LABELS).sort()).toEqual([
       "MANUAL",

@@ -109,6 +109,12 @@ export type TournamentPreview = {
   bracketSize: number | null;
   /** Nombre de manches connu d'avance (élimination, suisse), sinon `null`. */
   rounds: number | null;
+  /**
+   * Le mot qui compte ces manches, au singulier — « tour » en élimination,
+   * « ronde » en suisse. L'interface n'a ainsi pas à retrouver le vocabulaire
+   * du format, ni à en contredire le libellé de manche.
+   */
+  roundsUnit: string;
   /** Nombre d'exemptions de premier tour. */
   byeCount: number;
   /** Remarques à afficher au staff (effectif impair, plateau incomplet…). */
@@ -143,6 +149,7 @@ function emptyPreview(
     pairings: [],
     bracketSize: null,
     rounds: null,
+    roundsUnit: "manche",
     byeCount: 0,
     notes,
     phasePlan,
@@ -216,6 +223,7 @@ function previewElimination(
     seedingSource: input.seedingSource,
     entrants,
     roundLabel: "1er tour",
+    roundsUnit: "tour",
     pairings,
     bracketSize,
     rounds: eliminationRounds(format, bracketSize, input.maxRounds),
@@ -263,6 +271,7 @@ function previewSwiss(input: TournamentPreviewInput): TournamentPreview {
     seedingSource: input.seedingSource,
     entrants,
     roundLabel: "Ronde 1",
+    roundsUnit: "ronde",
     pairings,
     bracketSize: null,
     rounds,
@@ -319,6 +328,7 @@ function previewSurvival(input: TournamentPreviewInput): TournamentPreview {
     seedingSource: input.seedingSource,
     entrants,
     roundLabel: plan.isBarrage ? "Barrage (round 1)" : "Round 1",
+    roundsUnit: "round",
     pairings,
     bracketSize: null,
     rounds: null,
@@ -375,6 +385,7 @@ function previewEndurance(input: TournamentPreviewInput): TournamentPreview {
     seedingSource: input.seedingSource,
     entrants,
     roundLabel: "Manche 1",
+    roundsUnit: "manche",
     pairings,
     bracketSize: null,
     rounds: null,

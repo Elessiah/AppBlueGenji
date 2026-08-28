@@ -72,6 +72,10 @@ vérifie `tests/lib/shared/bracket-seeds.test.ts`.
   écrirait lui-même à l'initialisation ;
 - `SURVIVAL` / `BG_SURVIE` — `null`, le nombre de manches dépend des résultats.
 
+`roundsUnit` accompagne ce nombre du mot qui le compte (« tour », « ronde »,
+« round », « manche ») : l'interface ne redevient pas experte des formats, et ne
+peut pas contredire le libellé de manche affiché juste en dessous.
+
 Même principe pour les réglages : le barème d'endurance passe par
 `resolveEnduranceConfig`, comme `loadEnduranceMeta`, pour qu'une valeur absurde
 en base soit corrigée des deux côtés de la même façon.

@@ -259,6 +259,17 @@ export default function TournamentDetailPage() {
     .map((b) => ({ type: b, matches: filteredMatches.filter((m) => m.bracket === b) }))
     .filter((b) => b.matches.length > 0);
 
+  // Aperçu du plateau avant lancement, réservé au staff et au cast : le serveur
+  // le laisse à `null` pour les autres, à qui le tirage ne doit rien révéler
+  // d'avance, et pour un tournoi déjà lancé. Deux endroits l'affichent — pendant
+  // les inscriptions et sur un tournoi encore sans match — d'où ce fragment
+  // unique plutôt que deux copies à faire évoluer de front.
+  const previewBlock = detail.preview ? (
+    <div style={{ marginTop: 18 }}>
+      <BracketPreview preview={detail.preview} canReorder={detail.isAdmin} />
+    </div>
+  ) : null;
+
   return (
     <EntrantProvider
       participantType={detail.card.participantType}
@@ -378,13 +389,7 @@ export default function TournamentDetailPage() {
                     ? "Le classement de départ (seeding) et la première ronde seront générés au démarrage du tournoi."
                     : "Le bracket sera généré automatiquement au démarrage du tournoi."}
               </p>
-              {/* Aperçu réservé au staff et au cast : il n'existe pas pour les
-                  équipes, à qui le tirage ne doit rien révéler d'avance. */}
-              {detail.preview && (
-                <div style={{ marginTop: 18 }}>
-                  <BracketPreview preview={detail.preview} canReorder={detail.isAdmin} />
-                </div>
-              )}
+              {previewBlock}
             </>
           ) : formatForBracket === "SURVIVAL" && detail.survival ? (
             <>
@@ -508,14 +513,7 @@ export default function TournamentDetailPage() {
               <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
                 Aucun match disponible pour l&apos;instant.
               </p>
-              {/* Tournoi pas encore ouvert aux inscriptions : l'aperçu montre au
-                  staff ce que donnerait le plateau (vide tant que personne n'est
-                  engagé). Il vaut `null` dès que le tournoi est lancé. */}
-              {detail.preview && (
-                <div style={{ marginTop: 18 }}>
-                  <BracketPreview preview={detail.preview} canReorder={detail.isAdmin} />
-                </div>
-              )}
+              {previewBlock}
             </>
           ) : (
             <>

@@ -55,7 +55,9 @@ function EntrantCell({ pairing, side }: { pairing: PreviewPairing; side: "A" | "
       <span className="num" style={{ fontSize: 11, color: "var(--text-2)" }}>
         #{entrant.seed}
       </span>
-      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{entrant.teamName}</span>
+      {/* Pas d'ellipse : sur une colonne étroite, un nom d'équipe qui passe à
+          la ligne reste lisible là où un nom tronqué ne l'est plus. */}
+      <span style={{ overflowWrap: "anywhere" }}>{entrant.teamName}</span>
     </span>
   );
 }
@@ -100,7 +102,8 @@ export function BracketPreview({ preview, canReorder }: BracketPreviewProps) {
         {preview.bracketSize !== null && <Pill variant="blue">Plateau de {preview.bracketSize}</Pill>}
         {preview.rounds !== null && (
           <Pill variant="blue">
-            {preview.rounds} manche{preview.rounds > 1 ? "s" : ""}
+            {preview.rounds} {preview.roundsUnit}
+            {preview.rounds > 1 ? "s" : ""}
           </Pill>
         )}
         <Pill variant="blue">
