@@ -78,6 +78,8 @@ export type MatchRow = RowDataPacket & {
   updated_at: Date;
   phase_id: number;
   phase_position: number | null;
+  /** NULL = pas d'horaire annoncé (cf. `lib/shared/match-schedule.ts`). */
+  start_at: Date | null;
   /** NULL = match non casté (cf. `lib/shared/live-streams.ts`). */
   live_trigger: MatchLiveTrigger | null;
   live_url: string | null;
@@ -201,6 +203,7 @@ export function mapMatch(row: MatchRow): BracketMatch {
     updatedAt: toIso(row.updated_at)!,
     phaseId: Number(row.phase_id ?? 0),
     phasePosition: row.phase_position == null ? null : Number(row.phase_position),
+    startAt: toIso(row.start_at ?? null),
     liveTrigger: row.live_trigger ?? null,
     liveUrl: normalizeStreamUrl(row.live_url),
     liveStartedAt: toIso(row.live_started_at),

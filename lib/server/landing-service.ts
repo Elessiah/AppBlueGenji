@@ -90,6 +90,7 @@ type LiveMatchRow = RowDataPacket & {
   team2_name: string | null;
   team1_score: number | null;
   team2_score: number | null;
+  start_at: Date | string | null;
   live_trigger: MatchLiveTrigger | null;
   live_url: string | null;
   live_started_at: Date | string | null;
@@ -101,6 +102,7 @@ function toLiveInput(row: LiveMatchRow) {
     status: row.status,
     liveTrigger: row.live_trigger,
     liveStartedAt: row.live_started_at,
+    startAt: row.start_at,
   };
 }
 
@@ -157,6 +159,7 @@ async function loadLandingLive(): Promise<LandingLive | null> {
         t2.name AS team2_name,
         m.team1_score,
         m.team2_score,
+        m.start_at,
         m.live_trigger,
         m.live_url,
         m.live_started_at

@@ -44,7 +44,12 @@ const ERROR_MESSAGES: Record<string, string> = {
     "Ce match passe à l'antenne automatiquement : il n'y a rien à basculer.",
   MATCH_NOT_LIVE_READY:
     "L'antenne ne s'ouvre que sur un match jouable dont le score n'est pas saisi.",
+  MATCH_START_AT_REQUIRED:
+    "Fixe d'abord la date de début du match pour le faire passer à l'antenne à l'heure dite.",
   MATCH_LIVE_UPDATE_FAILED: "Erreur lors de la mise à jour de la diffusion.",
+  // Calendrier des matchs (`lib/shared/match-schedule.ts`).
+  INVALID_MATCH_START_AT: "Date de début non reconnue.",
+  MATCH_SCHEDULE_UPDATE_FAILED: "Erreur lors de la mise à jour de la date de début.",
   TOURNAMENT_LIVE_UPDATE_FAILED: "Erreur lors de la mise à jour de la chaîne officielle.",
 };
 

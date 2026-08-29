@@ -1136,6 +1136,35 @@ async function applyReportStates(
 // ---------------------------------------------------------------------------
 
 /**
+ * Dates de début des manches d'un tournoi seedé
+ * (`lib/shared/match-schedule.ts`).
+ *
+ * Un horaire par numéro de manche, décalé de `hoursPerRound` : c'est ainsi que
+ * le staff programme un plateau étalé sur la journée, et cela suffit à couvrir
+ * les deux côtés de la frontière (manches passées, manches à venir) dans un
+ * même tournoi.
+ *
+ * Posé **avant** la diffusion, parce que le mode `START_TIME` en dépend.
+ */
+async function applyMatchSchedule(
+  db: Pool,
+  tournamentId: number,
+  def: TournamentDef
+): Promise<void> {
+  if (!def.matchSchedule) return;
+
+  const { firstRoundHours, hoursPerRound } = def.matchSchedule;
+  const base = Date.now() + firstRoundHours * 3600000;
+
+  await db.execute(
+    `UPDATE bg_matches
+     SET start_at = DATE_ADD(?, INTERVAL (round_number - 1) * ? HOUR)
+     WHERE tournament_id = ?`,
+    [new Date(base), hoursPerRound, tournamentId]
+  );
+}
+
+/**
  * Diffusion en direct d'un tournoi seedé.
  *
  * La chaîne officielle est posée sur le tournoi ; le mode de diffusion est
@@ -1327,6 +1356,7 @@ async function createTournament(
     }
   }
 
+  await applyMatchSchedule(db, tournamentId, def);
   await applyLiveStreams(db, tournamentId, def);
 
   const gameLabel = def.game === "OW2" ? "Overwatch" : "Marvel Rivals";

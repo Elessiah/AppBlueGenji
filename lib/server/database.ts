@@ -1025,7 +1025,7 @@ async function runMigrations(db: Pool): Promise<void> {
   }
 
   for (const [column, definition] of [
-    ["live_trigger", "ENUM('AUTO', 'MANUAL') NULL"],
+    ["live_trigger", "ENUM('AUTO', 'START_TIME', 'MANUAL') NULL"],
     ["live_url", "VARCHAR(255) NULL"],
     ["live_started_at", "DATETIME NULL"],
   ] as const) {
@@ -1046,6 +1046,27 @@ async function runMigrations(db: Pool): Promise<void> {
     `);
   } catch {
     // Index already exists
+  }
+
+  // Migration: date de début d'un match (`lib/shared/match-schedule.ts`). Fixée
+  // par le staff `tournaments`, elle annonce l'horaire de la manche et sert de
+  // frontière au mode de diffusion `START_TIME`.
+  try {
+    await db.execute(`ALTER TABLE bg_matches ADD COLUMN start_at DATETIME NULL`);
+  } catch {
+    // Column already exists
+  }
+
+  // `START_TIME` s'ajoute aux deux modes d'antenne existants. Le `MODIFY` est
+  // séparé de la création de la colonne : sur une base antérieure, celle-ci
+  // existe déjà avec l'ancien ENUM et l'`ADD COLUMN` échoue sans rien changer.
+  try {
+    await db.execute(`
+      ALTER TABLE bg_matches
+      MODIFY COLUMN live_trigger ENUM('AUTO', 'START_TIME', 'MANUAL') NULL
+    `);
+  } catch {
+    // Already migrated
   }
 }
 

@@ -185,6 +185,7 @@ export async function getMatchRows(
       m.score_deadline_at,
       m.updated_at,
       m.phase_id,
+      m.start_at,
       m.live_trigger,
       m.live_url,
       m.live_started_at,

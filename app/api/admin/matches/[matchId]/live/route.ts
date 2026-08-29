@@ -16,13 +16,15 @@ function mapLiveError(error: unknown) {
   if (message === "INVALID_LIVE_TRIGGER") return fail(message, 400);
   if (message === "LIVE_TRIGGER_NOT_MANUAL") return fail(message, 409);
   if (message === "MATCH_NOT_LIVE_READY") return fail(message, 409);
+  if (message === "MATCH_START_AT_REQUIRED") return fail(message, 409);
   return fail(message || "MATCH_LIVE_UPDATE_FAILED", 500);
 }
 
 /**
  * Configure la diffusion d'un match.
- * Corps : `{ trigger: "AUTO" | "MANUAL" | null, liveUrl?: string | null }`.
- * `trigger: null` démarque le match (et efface lien et antenne).
+ * Corps : `{ trigger: "AUTO" | "START_TIME" | "MANUAL" | null, liveUrl?: string | null }`.
+ * `trigger: null` démarque le match (et efface lien et antenne) ; `START_TIME`
+ * exige une date de début déjà posée sur le match (409 sinon).
  */
 export async function PUT(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();

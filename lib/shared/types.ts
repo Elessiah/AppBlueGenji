@@ -307,6 +307,13 @@ export type BracketMatch = {
   phaseId: number;
   /** Position de la manche au sein de la phase (null pour les tournois sans phases). */
   phasePosition: number | null;
+  /**
+   * Date de début programmée du match (ISO), fixée par le staff `tournaments` ;
+   * `null` = aucun horaire annoncé. Purement descriptive côté moteur — elle
+   * n'avance ni ne bloque le match — mais elle déclenche l'antenne des matchs
+   * castés en mode `START_TIME` (`lib/shared/match-schedule.ts`).
+   */
+  startAt: string | null;
   /** Mode de passage à l'antenne ; `null` = match non casté. */
   liveTrigger: MatchLiveTrigger | null;
   /** Chaîne diffusant ce match ; `null` = casté sans lien public. */

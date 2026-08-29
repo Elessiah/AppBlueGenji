@@ -6,9 +6,11 @@ import {
   canConfigureLive,
   canToggleOnAir,
   PLATFORM_LABELS,
-  resolveMatchLiveState,
+  requiresMatchStartAt,
   streamPlatform,
 } from "@/lib/shared/live-streams";
+import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
+import { formatMatchStartAt, formatMatchStartAtFull } from "@/lib/shared/match-schedule";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useLiveControls } from "../_lib/live-context";
 import { mapError } from "../_lib/error-map";
@@ -16,20 +18,34 @@ import { mapError } from "../_lib/error-map";
 const BORDER = "var(--border, #444)";
 
 /**
- * Bandeau de diffusion d'un match, sous la feuille de score.
+ * Bandeau d'horaire et de diffusion d'un match, sous la feuille de score.
  *
- * Trois publics dans un même bloc, du plus large au plus restreint :
- * tout le monde voit l'état (annoncé / en direct) et le lien s'il existe ; la
+ * Les deux vivent ensemble parce qu'ils se répondent : la date de début annonce
+ * la manche, et c'est elle qui ouvre l'antenne des matchs castés en mode
+ * `START_TIME`. Les séparer en deux bandeaux ajouterait une ligne à une carte
+ * de 210 px pour montrer deux moitiés de la même information.
+ *
+ * Trois publics dans un même bloc, du plus large au plus restreint : tout le
+ * monde voit l'horaire, l'état (annoncé / en direct) et le lien s'il existe ; la
  * permission `live` y ajoute le bouton d'antenne (mode `MANUAL` seulement) et
- * l'accès à la configuration.
+ * l'accès à la configuration ; la permission `tournaments` y ajoute l'édition de
+ * l'horaire.
  */
 export function MatchLiveStrip({ match }: { match: BracketMatch }) {
-  const { canManage, openConfig } = useLiveControls();
+  const { canManage, canSchedule, openConfig, openSchedule } = useLiveControls();
   const { showError, showSuccess } = useToast();
   const [busy, setBusy] = useState(false);
 
-  const state = resolveMatchLiveState(match);
+  // État recalculé à l'horaire du match en mode `START_TIME` : le flux ne peut
+  // pas pousser une bascule que seule l'horloge provoque.
+  const state = useMatchLiveState(match);
   const platform = streamPlatform(match.liveUrl);
+  const startAtLabel = formatMatchStartAt(match.startAt);
+  const startAtTitle = formatMatchStartAtFull(match.startAt);
+  // Impasse à signaler à ceux qui peuvent la défaire : casté « à la date de
+  // début », mais sans date, le match ne passera jamais à l'antenne.
+  const missingStartAt =
+    requiresMatchStartAt(match.liveTrigger) && startAtLabel === null && (canManage || canSchedule);
   const showToggle = canManage && canToggleOnAir(match);
   // Les libellés visibles sont ultra-courts (la carte fait 210 px) : sortis de
   // leur contexte visuel, « ⚙ Live » ou « Twitch » ne disent pas de quel match
@@ -40,8 +56,8 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
   // configure : la règle vit dans le module pur, partagée et testée seule.
   const showConfig = canManage && canConfigureLive(match);
 
-  // Rien à montrer : aucun état de diffusion et aucun contrôle à offrir.
-  if (state === "OFF" && !showConfig) return null;
+  // Rien à montrer : ni horaire, ni état de diffusion, ni contrôle à offrir.
+  if (state === "OFF" && !showConfig && !canSchedule && startAtLabel === null) return null;
 
   const toggleOnAir = async (onAir: boolean) => {
     setBusy(true);
@@ -79,6 +95,32 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
         fontSize: 11,
       }}
     >
+      {startAtLabel && (
+        <span
+          title={startAtTitle ?? undefined}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            color: "var(--text-2, #9aa4b2)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <span aria-hidden="true">🕑</span>
+          <span className="sr-only">Début programmé : </span>
+          {startAtLabel}
+        </span>
+      )}
+
+      {missingStartAt && (
+        <span
+          title="Ce match passe à l'antenne à sa date de début, mais aucune date n'est fixée."
+          style={{ color: "rgba(255,157,46,0.95)", whiteSpace: "nowrap" }}
+        >
+          ⚠ sans date
+        </span>
+      )}
+
       {state !== "OFF" && (
         <span
           style={{
@@ -133,6 +175,27 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
         </button>
       )}
 
+      {canSchedule && (
+        <button
+          type="button"
+          className="btn ghost"
+          onClick={() => openSchedule(match)}
+          aria-label={
+            startAtLabel === null
+              ? `Programmer ${matchLabel}`
+              : `Modifier la date de début de ${matchLabel}`
+          }
+          style={{
+            marginLeft: showToggle || startAtLabel ? undefined : "auto",
+            whiteSpace: "nowrap",
+            padding: "2px 8px",
+            fontSize: 11,
+          }}
+        >
+          {startAtLabel === null ? "＋ Date" : "🗓 Date"}
+        </button>
+      )}
+
       {showConfig && (
         <button
           type="button"
@@ -144,7 +207,7 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
               : `Configurer la diffusion de ${matchLabel}`
           }
           style={{
-            marginLeft: showToggle ? undefined : "auto",
+            marginLeft: showToggle || canSchedule || startAtLabel ? undefined : "auto",
             whiteSpace: "nowrap",
             padding: "2px 8px",
             fontSize: 11,
