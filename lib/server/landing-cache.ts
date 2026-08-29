@@ -1,9 +1,10 @@
 /**
  * Cache des agrégats de la vitrine.
  *
- * Même principe que `tournaments/list-cache.ts` : la page d'accueil relance une
- * dizaine d'agrégations à chaque visite, elles sont identiques pour tout le
- * monde, on les mutualise.
+ * La page d'accueil est rendue à chaque visite (`force-dynamic`) et lance une
+ * dizaine d'agrégations : sans mutualisation, cent visiteurs — ou un seul qui
+ * garde le doigt sur F5 — les relancent cent fois. Le cache à vol unique les
+ * ramène à une, et ces chiffres-là n'ont aucun besoin d'être à la seconde.
  *
  * Module séparé de `landing-service.ts` pour la même raison que le cache des
  * listes : `tournaments/notifications.ts` doit pouvoir invalider ces entrées
@@ -21,7 +22,7 @@ const PREFIX = "landing:";
  */
 export const LANDING_TTL_MS = 60_000;
 
-/** Le direct porte le score en cours : on le garde court. */
+/** Le direct fait exception : il porte le score en cours, on le garde court. */
 export const LANDING_LIVE_TTL_MS = 5_000;
 
 /** Sert un agrégat de la vitrine, mutualisé entre tous les appels concurrents. */

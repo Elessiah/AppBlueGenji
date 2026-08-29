@@ -75,4 +75,7 @@ package-lock.json
 # Playwright E2E
 /test-results/
 /playwright-report/
-/playwright/.cache/.review/
+/playwright/.cache/
+
+# Revue de code (scripts jetables)
+.review/

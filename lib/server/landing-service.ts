@@ -47,21 +47,7 @@ type StatsRow = RowDataPacket & {
   tournaments: number;
 };
 
-/**
- * Durées de vie des agrégats de la vitrine.
- *
- * La page d'accueil est rendue à chaque visite (`force-dynamic`) et lance une
- * dizaine d'agrégations : sans mutualisation, cent visiteurs — ou un seul qui
- * garde le doigt sur F5 — les relancent cent fois. Le cache à vol unique les
- * ramène à une, et ces chiffres-là n'ont aucun besoin d'être à la seconde.
- *
- * Le direct fait exception : il porte le score en cours, on le garde court.
- *
- * Les durées de vie et l'invalidation vivent dans `landing-cache.ts`, hors de
- * ce module : toute écriture de tournoi vide ces entrées, et l'invalidateur ne
- * peut donc pas dépendre d'un service qui importe `tournaments-service`.
- */
-
+/** Compteurs de la vitrine. Mutualisés et invalidés par `landing-cache.ts`. */
 export async function getLandingStats(): Promise<LandingStats> {
   return cachedLanding("stats", LANDING_TTL_MS, loadLandingStats);
 }
