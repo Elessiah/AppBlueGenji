@@ -5,6 +5,7 @@ import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { toIso } from "@/lib/server/serialization";
 import { loadSoloUserIds } from "@/lib/server/solo-entries-service";
 import { isSoloTournament, toParticipantType, type ParticipantType } from "@/lib/shared/participants";
+import { validateDateOrder } from "./validation";
 import type { TournamentRow, TournamentListRow } from "./_internal";
 
 // Internal types
@@ -196,29 +197,18 @@ export async function createTournament(
   try {
     await connection.beginTransaction();
 
+    const dateError = validateDateOrder({
+      startVisibilityAt: payload.startVisibilityAt,
+      registrationOpenAt: payload.registrationOpenAt,
+      registrationCloseAt: payload.registrationCloseAt,
+      startAt: payload.startAt,
+    });
+    if (dateError) throw new Error(dateError);
+
     const startVisibilityAt = new Date(payload.startVisibilityAt);
     const registrationOpenAt = new Date(payload.registrationOpenAt);
     const registrationCloseAt = new Date(payload.registrationCloseAt);
     const startAt = new Date(payload.startAt);
-
-    if (
-      Number.isNaN(startVisibilityAt.getTime()) ||
-      Number.isNaN(registrationOpenAt.getTime()) ||
-      Number.isNaN(registrationCloseAt.getTime()) ||
-      Number.isNaN(startAt.getTime())
-    ) {
-      throw new Error("INVALID_DATES");
-    }
-
-    if (
-      !(
-        startVisibilityAt <= registrationOpenAt &&
-        registrationOpenAt <= registrationCloseAt &&
-        registrationCloseAt <= startAt
-      )
-    ) {
-      throw new Error("INVALID_DATE_ORDER");
-    }
 
     const { computeTournamentState } = await import("./state");
 
