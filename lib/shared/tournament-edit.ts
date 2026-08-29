@@ -135,7 +135,10 @@ export function editableFieldsFor(
       return new Set(ALL_TOURNAMENT_FIELDS);
     case "RESTRICTED":
       return new Set(RESTRICTED_FIELDS);
-    default:
+    case "LOCKED":
+      // Fenêtre verrouillée : aucun champ n'est modifiable. L'exhaustivité est
+      // vérifiée à la compilation : ajouter une valeur à EditWindow déclenchera
+      // une erreur TypeScript plutôt qu'une logique silencieuse.
       return new Set();
   }
 }

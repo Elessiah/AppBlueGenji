@@ -23,7 +23,9 @@ function parseId(raw: string): number | null {
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
-async function guard(idRaw: string) {
+async function guard(
+  idRaw: string,
+): Promise<{ error: NextResponse; id?: never } | { error?: never; id: number }> {
   const user = await getCurrentUser();
   if (!user) return { error: fail("UNAUTHORIZED", 401) };
   if (!can(user, "tournaments")) return { error: fail("FORBIDDEN", 403) };
@@ -39,7 +41,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   const checked = await guard(id);
   if (checked.error) return checked.error;
 
-  const loaded = await loadEditableTournament(checked.id!);
+  const loaded = await loadEditableTournament(checked.id);
   if (!loaded) return fail("TOURNAMENT_NOT_FOUND", 404);
 
   return ok(loaded);
@@ -65,7 +67,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   if (Object.keys(patch).length === 0) return fail("EMPTY_PATCH", 400);
 
   try {
-    await updateTournament(checked.id!, patch);
+    await updateTournament(checked.id, patch);
     return ok({ success: true });
   } catch (error) {
     const message = (error as Error).message;

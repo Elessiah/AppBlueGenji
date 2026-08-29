@@ -305,9 +305,14 @@ export async function updateTournament(
       ],
     );
 
-    // Les phases sont toujours reposées à neuf : en fenêtre FULL aucun match
-    // n'existe, le tournoi n'étant pas même ouvert aux inscriptions. Un format
-    // qui quitte MULTI voit donc simplement les siennes disparaître.
+    // Les phases sont toujours reposées à neuf : l'invariant qui rend cela sûr
+    // repose sur l'état du tournoi. Seules les fonctions de démarrage
+    // (initializeMultiTournament, startPhase) et le recalcul du seeding écrivent
+    // une phase_id, et toutes exigent state === "RUNNING". Or, on a jeté
+    // TOURNAMENT_LOCKED plus haut si l'état était RUNNING : donc aucune phase
+    // n'existe au moment de ce DELETE. Il n'y a pas de clé étrangère pour
+    // protéger cet invariant — une réduction future du verrou sur l'édition
+    // pourrait le briser silencieusement.
     await connection.execute(`DELETE FROM bg_tournament_phases WHERE tournament_id = ?`, [
       tournamentId,
     ]);
