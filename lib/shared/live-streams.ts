@@ -199,13 +199,17 @@ export function canToggleOnAir(match: MatchLiveInput): boolean {
 /**
  * Ce match peut-il encore passer à l'antenne un jour ?
  *
- * Un bye (un seul engagé), un match fantôme (aucun) ou un match dont le score
- * est déjà saisi dérivera `OFF` quoi qu'on configure : lui proposer une
- * diffusion serait une impasse, la case se cochant et s'enregistrant sans
- * jamais rien produire.
+ * Seul un score déjà saisi ferme définitivement la porte : le match dérivera
+ * `OFF` quoi qu'on configure, et lui proposer une diffusion serait une impasse
+ * — la case se cocherait, s'enregistrerait, et ne produirait jamais rien. Cela
+ * écarte du même coup les byes, que le moteur crée directement en `COMPLETED`.
+ *
+ * Un match **pas encore appariné** reste castable, lui : c'est tout l'objet de
+ * l'état `SCHEDULED`. On doit pouvoir annoncer la finale comme castée avant de
+ * savoir qui la jouera — c'est même le cas le plus courant d'une diffusion
+ * préparée à l'avance.
  */
 export function isMatchCastable(match: MatchCastableInput): boolean {
-  if (match.team1Id === null || match.team2Id === null) return false;
   return match.status !== "COMPLETED" && match.status !== "AWAITING_CONFIRMATION";
 }
 

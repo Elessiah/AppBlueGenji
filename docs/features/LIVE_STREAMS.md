@@ -75,10 +75,13 @@ sens dans ce mode. Démarquer un match efface aussi son lien et son antenne,
 sinon une ouverture fantôme reprendrait effet à la moindre remise en `MANUAL`.
 
 Les contrôles ne sont proposés que sur un match qui peut réellement passer à
-l'antenne (`isMatchCastable`) : un bye, un match fantôme ou un match déjà noté
-dérivera `OFF` quoi qu'on configure, et lui offrir « ＋ Caster » serait une
-impasse. `canConfigureLive` rouvre toutefois la configuration d'un match déjà
-marqué, sans quoi une diffusion posée par erreur deviendrait ineffaçable.
+l'antenne (`isMatchCastable`) : un match déjà noté — un bye compris, que le
+moteur crée directement en `COMPLETED` — dérivera `OFF` quoi qu'on configure, et
+lui offrir « ＋ Caster » serait une impasse. Un match **pas encore apparié**
+reste castable : annoncer la finale avant de savoir qui la jouera est le cas
+courant d'une diffusion préparée à l'avance, et c'est l'objet de l'état
+`SCHEDULED`. `canConfigureLive` rouvre par ailleurs la configuration d'un match
+déjà marqué, sans quoi une diffusion posée par erreur deviendrait ineffaçable.
 
 ## Le bouton « Regarder le live » de l'accueil
 
