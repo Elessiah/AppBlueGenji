@@ -1,4 +1,5 @@
 ﻿import { getCurrentUser } from "@/lib/server/auth";
+import { enforceRateLimit, TOURNAMENT_READ_RULE } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { createTournament, listTournamentBuckets } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
@@ -12,10 +13,20 @@ export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
 
+  // Plafond large : la page se rafraîchit d'elle-même à la minute au plus vite
+  // (`lib/shared/refresh-tiers.ts`). Seul un client parti en boucle l'atteint.
+  const throttled = enforceRateLimit(TOURNAMENT_READ_RULE, user.id);
+  if (throttled) return throttled;
+
   const url = new URL(req.url);
   const search = url.searchParams.get("search");
+  // `scope=hidden` : les tournois programmés que personne ne voit encore.
+  // Réservé au staff `tournaments` (ADMIN, ARBITRE) — sans quoi la date de
+  // visibilité ne protégerait plus rien.
+  const hiddenOnly = url.searchParams.get("scope") === "hidden";
+  if (hiddenOnly && !can(user, "tournaments")) return fail("FORBIDDEN", 403);
 
-  const buckets = await listTournamentBuckets(search);
+  const buckets = await listTournamentBuckets(search, hiddenOnly ? { hiddenOnly: true } : {});
   return ok({ buckets });
 }
 

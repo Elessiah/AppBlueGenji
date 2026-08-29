@@ -1,6 +1,8 @@
 ﻿import type { MatchFormat } from "./match-format";
+import type { MatchLiveTrigger } from "./live-streams";
 import type { ParticipantType } from "./participants";
 import type { PlatformRole } from "./permissions";
+import type { TournamentPreview } from "./tournament-preview";
 import type { DeepStats, TeamRankingPosition } from "./stats";
 
 export type TournamentFormat =
@@ -263,6 +265,11 @@ export type TournamentCard = {
    * score libre, comme les tournois créés avant cette fonctionnalité.
    */
   matchFormat: MatchFormat | null;
+  /**
+   * Chaîne officielle du tournoi (Twitch, YouTube, Kick). `null` = pas de
+   * diffusion annoncée. Les matchs n'en héritent jamais (`lib/shared/live-streams.ts`).
+   */
+  liveUrl: string | null;
 };
 
 export type TournamentBuckets = {
@@ -300,9 +307,25 @@ export type BracketMatch = {
   phaseId: number;
   /** Position de la manche au sein de la phase (null pour les tournois sans phases). */
   phasePosition: number | null;
+  /** Mode de passage à l'antenne ; `null` = match non casté. */
+  liveTrigger: MatchLiveTrigger | null;
+  /** Chaîne diffusant ce match ; `null` = casté sans lien public. */
+  liveUrl: string | null;
+  /** Ouverture d'antenne (mode `MANUAL`) ; `null` = antenne fermée. */
+  liveStartedAt: string | null;
 };
 
-export type TournamentDetail = {
+/**
+ * Partie du détail d'un tournoi **identique pour tout le monde** : le plateau,
+ * les inscrites, les classements.
+ *
+ * C'est la scission qui rend le temps réel tenable. Auparavant, un score
+ * rapporté réveillait chaque spectateur, qui rechargeait alors *son* détail
+ * complet : cent spectateurs, cent calculs identiques. Le serveur n'en fait plus
+ * qu'un, qu'il pousse tel quel dans le flux SSE ; ce qui dépend du lecteur vit
+ * à part dans {@link TournamentViewerContext} et ne change presque jamais.
+ */
+export type TournamentSnapshot = {
   card: TournamentCard;
   matches: BracketMatch[];
   registrations: {
@@ -313,15 +336,6 @@ export type TournamentDetail = {
     registeredAt: string;
     finalRank: number | null;
   }[];
-  canRegister: boolean;
-  /**
-   * Engagé du viewer dans **ce** tournoi : son équipe active en tournoi par
-   * équipes, son entrée solo en tournoi individuel (null s'il n'est pas
-   * inscrit).
-   */
-  myTeamId: number | null;
-  canCreateReportsForTeamIds: number[];
-  isAdmin: boolean;
   /** Métadonnées du mode Survie (null pour les autres formats). */
   survival: SurvivalMeta | null;
   /** Métadonnées du mode Ronde suisse (null pour les autres formats). */
@@ -340,7 +354,43 @@ export type TournamentDetail = {
    * `/equipes/[id]`.
    */
   soloUserIds: Record<number, number>;
+  /**
+   * Empreinte du contenu ci-dessus. Deux instantanés de même version portent la
+   * même information : le serveur s'abstient alors de les envoyer, et le client
+   * de se redessiner.
+   */
+  version: string;
 };
+
+/** Partie du détail qui dépend de **qui regarde**. Change rarement. */
+export type TournamentViewerContext = {
+  /**
+   * Aperçu du plateau avant le lancement (`docs/features/TOURNAMENT_PREVIEW.md`).
+   * `null` pour qui n'a ni la permission `tournaments` ni `casting`, et pour un
+   * tournoi déjà lancé — le plateau réel fait alors foi.
+   *
+   * Ici, et non dans l'instantané : l'instantané est **diffusé tel quel à tous
+   * les abonnés du flux**, et cet aperçu est réservé au staff et au cast.
+   */
+  preview: TournamentPreview | null;
+  canRegister: boolean;
+  /**
+   * Engagé du viewer dans **ce** tournoi : son équipe active en tournoi par
+   * équipes, son entrée solo en tournoi individuel (null s'il n'est pas
+   * inscrit).
+   */
+  myTeamId: number | null;
+  canCreateReportsForTeamIds: number[];
+  isAdmin: boolean;
+  /**
+   * Le viewer porte-t-il la permission `live` (ADMIN, ARBITRE, CASTER) ? Ouvre
+   * les contrôles de diffusion des matchs, distincts des droits d'arbitrage.
+   */
+  canManageLive: boolean;
+};
+
+/** Détail complet d'un tournoi pour un lecteur donné. */
+export type TournamentDetail = TournamentSnapshot & TournamentViewerContext;
 
 /**
  * Fréquentation du site, telle que servie à la commande Discord `/stats-site`.

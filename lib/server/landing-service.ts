@@ -1,6 +1,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { getSubscribersCount } from "@/lib/server/live";
+import { tournamentAudience } from "@/lib/server/tournament-broadcast";
+import { cached } from "@/lib/server/cache";
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import {
   inferGameLabel,
@@ -12,7 +13,14 @@ import {
   type LandingStats,
   type LandingTickerPayload,
 } from "@/lib/shared/landing";
-import type { BracketType, TournamentBuckets, TournamentCard } from "@/lib/shared/types";
+import type { BracketType, MatchStatus, TournamentBuckets, TournamentCard } from "@/lib/shared/types";
+import { findBroadcastingTournament } from "@/lib/server/tournaments/live-streams";
+import {
+  isMatchLive,
+  normalizeStreamUrl,
+  resolveMatchLiveState,
+  type MatchLiveTrigger,
+} from "@/lib/shared/live-streams";
 import { rankingPoints, rankingPointsSql } from "@/lib/shared/ranking";
 
 const DEFAULT_STATS: LandingStats = {
@@ -35,7 +43,24 @@ type StatsRow = RowDataPacket & {
   tournaments: number;
 };
 
+/**
+ * Durées de vie des agrégats de la vitrine.
+ *
+ * La page d'accueil est rendue à chaque visite (`force-dynamic`) et lance une
+ * dizaine d'agrégations : sans mutualisation, cent visiteurs — ou un seul qui
+ * garde le doigt sur F5 — les relancent cent fois. Le cache à vol unique les
+ * ramène à une, et ces chiffres-là n'ont aucun besoin d'être à la seconde.
+ *
+ * Le direct fait exception : il porte le score en cours, on le garde court.
+ */
+const LANDING_TTL_MS = 60_000;
+const LANDING_LIVE_TTL_MS = 5_000;
+
 export async function getLandingStats(): Promise<LandingStats> {
+  return cached("landing:stats", LANDING_TTL_MS, loadLandingStats);
+}
+
+async function loadLandingStats(): Promise<LandingStats> {
   try {
     const db = await getDatabase();
     const [rows] = await db.execute<StatsRow[]>(`
@@ -60,12 +85,24 @@ type LiveMatchRow = RowDataPacket & {
   bracket: BracketType;
   round_number: number;
   match_number: number;
-  status: "READY" | "AWAITING_CONFIRMATION" | "COMPLETED" | "PENDING";
+  status: MatchStatus;
   team1_name: string | null;
   team2_name: string | null;
   team1_score: number | null;
   team2_score: number | null;
+  live_trigger: MatchLiveTrigger | null;
+  live_url: string | null;
+  live_started_at: Date | string | null;
 };
+
+/** Vue « diffusion » d'une ligne de match, pour le module pur partagé. */
+function toLiveInput(row: LiveMatchRow) {
+  return {
+    status: row.status,
+    liveTrigger: row.live_trigger,
+    liveStartedAt: row.live_started_at,
+  };
+}
 
 function roundLabelFor(bracket: BracketType, roundNumber: number, matchCount: number): string {
   if ((bracket === "UPPER" || bracket === "GRAND") && matchCount === 1) {
@@ -76,11 +113,37 @@ function roundLabelFor(bracket: BracketType, roundNumber: number, matchCount: nu
   return `Round ${roundNumber}`;
 }
 
-export async function getLandingLive(buckets?: TournamentBuckets): Promise<LandingLive | null> {
+/**
+ * Direct de la vitrine : le tournoi en cours et son match du moment.
+ *
+ * Sans argument, il part de la liste publique — mutualisée elle aussi. On ne
+ * prend volontairement plus de paniers en entrée : le résultat en dépendrait
+ * alors que la clé de cache, elle, ne peut pas les représenter, et un appelant
+ * passant une liste filtrée recevrait silencieusement le direct de quelqu'un
+ * d'autre. Les appelants qui ont déjà la liste publique sous la main n'y
+ * perdent rien : `listTournamentBuckets` la leur resert depuis le cache.
+ */
+export async function getLandingLive(): Promise<LandingLive | null> {
+  return cached("landing:live", LANDING_LIVE_TTL_MS, () => loadLandingLive());
+}
+
+async function loadLandingLive(): Promise<LandingLive | null> {
   try {
-    const tournamentBuckets = buckets ?? await listTournamentBuckets(null);
-    const tournament = tournamentBuckets.running[0] ?? null;
-    if (!tournament) return null;
+    // Toujours la liste publique, jamais des paniers reçus en argument : le
+    // résultat en dépendrait alors que la clé de cache ne peut pas les
+    // représenter, et un appelant passant une liste filtrée recevrait
+    // silencieusement le direct de quelqu'un d'autre.
+    const tournamentBuckets = await listTournamentBuckets(null);
+    if (tournamentBuckets.running.length === 0) return null;
+
+    // Le tournoi réellement à l'antenne prime sur le plus récent : sans cela, la
+    // carte live et le bouton « Regarder le live » pourraient désigner deux
+    // tournois différents quand plusieurs tournent en parallèle.
+    const broadcasting = await findBroadcastingTournament().catch(() => null);
+    const tournament =
+      (broadcasting
+        ? tournamentBuckets.running.find((card) => card.id === broadcasting.tournamentId)
+        : null) ?? tournamentBuckets.running[0];
 
     const db = await getDatabase();
     const [rows] = await db.execute<LiveMatchRow[]>(
@@ -93,7 +156,10 @@ export async function getLandingLive(buckets?: TournamentBuckets): Promise<Landi
         t1.name AS team1_name,
         t2.name AS team2_name,
         m.team1_score,
-        m.team2_score
+        m.team2_score,
+        m.live_trigger,
+        m.live_url,
+        m.live_started_at
        FROM bg_matches m
        LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
        LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
@@ -104,7 +170,12 @@ export async function getLandingLive(buckets?: TournamentBuckets): Promise<Landi
       [tournament.id],
     );
 
-    const currentRow = rows.find((row) => row.status === "READY" || row.status === "AWAITING_CONFIRMATION") ?? null;
+    // Un match à l'antenne est la mise en avant recherchée ; à défaut on retombe
+    // sur le premier match jouable ou en attente de confirmation.
+    const currentRow =
+      rows.find((row) => isMatchLive(toLiveInput(row))) ??
+      rows.find((row) => row.status === "READY" || row.status === "AWAITING_CONFIRMATION") ??
+      null;
     const currentMatch: LandingLiveMatch | null = currentRow
       ? {
           id: Number(currentRow.id),
@@ -118,15 +189,25 @@ export async function getLandingLive(buckets?: TournamentBuckets): Promise<Landi
             Number(currentRow.round_number),
             rows.filter((row) => row.bracket === currentRow.bracket).length,
           ),
+          liveState: resolveMatchLiveState(toLiveInput(currentRow)),
+          liveUrl: normalizeStreamUrl(currentRow.live_url),
         }
       : null;
 
     return {
       tournament,
       currentMatch,
-      viewers: getSubscribersCount(tournament.id),
+      viewers: tournamentAudience(tournament.id),
       game: inferGameLabel(tournament.name),
       phase: inferPhaseLabel(currentMatch),
+      stream:
+        broadcasting && broadcasting.tournamentId === tournament.id
+          ? {
+              tournamentId: tournament.id,
+              tournamentName: tournament.name,
+              url: broadcasting.url,
+            }
+          : null,
     };
   } catch {
     return null;
@@ -169,6 +250,12 @@ async function loadLeaderboardRows(
 
 export async function getLandingLeaderboard(limit = 8): Promise<LandingLeaderboardRow[]> {
   const safeLimit = Math.min(50, Math.max(1, Math.trunc(limit)));
+  return cached(`landing:leaderboard:${safeLimit}`, LANDING_TTL_MS, () =>
+    loadLandingLeaderboard(safeLimit),
+  );
+}
+
+async function loadLandingLeaderboard(safeLimit: number): Promise<LandingLeaderboardRow[]> {
   try {
     const db = await getDatabase();
     const [currentRows, previousRows] = await Promise.all([
@@ -297,6 +384,10 @@ async function loadNewsEntries(db: Awaited<ReturnType<typeof getDatabase>>): Pro
 }
 
 export async function getLandingTicker(): Promise<LandingTickerPayload> {
+  return cached("landing:ticker", LANDING_TTL_MS, loadLandingTicker);
+}
+
+async function loadLandingTicker(): Promise<LandingTickerPayload> {
   try {
     const db = await getDatabase();
     const entries: TickerEntry[] = [];

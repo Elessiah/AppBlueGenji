@@ -20,8 +20,13 @@ import { canForfeitTeam } from "./_lib/forfeit";
 import { canShowEditButton } from "./_lib/edit-entry";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { AdminScoreDialog } from "./_components/AdminScoreDialog";
+import { LiveIndicator } from "./_components/LiveIndicator";
 import { GhostRegistrationDialog } from "./_components/GhostRegistrationDialog";
+import { MatchLiveDialog } from "./_components/MatchLiveDialog";
+import { TournamentLiveLink } from "./_components/TournamentLiveLink";
+import { LiveProvider } from "./_lib/live-context";
 import { SeedingEditor } from "./_components/SeedingEditor";
+import { BracketPreview } from "./_components/BracketPreview";
 import { MatchScoreDraft } from "./_components/BracketTree";
 import { BracketSections } from "./_components/BracketSections";
 import { SurvivalView } from "./_components/SurvivalView";
@@ -35,6 +40,7 @@ import { SwissView } from "./_components/SwissView";
 import { EnduranceView } from "./_components/EnduranceView";
 import { MatchRow } from "./_components/MatchRow";
 import { EntrantProvider } from "./_lib/entrant-link";
+import { TournamentProgress } from "./_components/TournamentProgress";
 
 const FORMAT_LABELS: Record<TournamentFormat, string> = {
   SINGLE: "Simple élim.",
@@ -68,10 +74,15 @@ export default function TournamentDetailPage() {
   const tournamentId = Number(params.id);
   const { showError, showSuccess } = useToast();
 
-  const { tournament: detail } = useTournamentLive(tournamentId);
+  const { tournament: detail, refresh, isLive, tier, fatal } = useTournamentLive(tournamentId);
   const [drafts, setDrafts] = useState<MatchScoreDraft>({});
   const [selectedMatchForAdmin, setSelectedMatchForAdmin] = useState<BracketMatch | null>(null);
   const [ghostRegistrationOpen, setGhostRegistrationOpen] = useState(false);
+  // On retient l'**identifiant** du match en cours de configuration, pas l'objet :
+  // la page se recharge par SSE, et un objet capturé à l'ouverture deviendrait
+  // périmé — le dialogue rejouerait alors une configuration dépassée par-dessus
+  // celle d'un autre membre du staff.
+  const [matchForLiveId, setMatchForLiveId] = useState<number | null>(null);
   const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
 
   // Dernière phase courante observée. On ne resynchronise la sélection que
@@ -94,13 +105,52 @@ export default function TournamentDetailPage() {
     lastCurrentPhaseId.current = current;
   }, [detail?.phases, detail?.currentPhaseId, selectedPhaseId]);
 
-  if (!detail) {
+  // Échec définitif avant même d'avoir reçu quoi que ce soit : sans ce cas, la
+  // page resterait sur « Chargement… » pour toujours — le seul état où il ne
+  // reste que le F5, et où il ne sert à rien.
+  if (fatal && !detail) {
     return (
-      <section className="ds-block" style={{ color: "var(--text-2)" }}>
-        Chargement du tournoi...
+      <section className="ds-block" style={{ color: "var(--text-2)" }} role="alert">
+        <h1 className="ds-title green" style={{ fontSize: 24, marginBottom: 12 }}>
+          {fatal === "UNAUTHORIZED" ? "Session expirée" : "Tournoi introuvable"}
+        </h1>
+        <p style={{ margin: "0 0 20px", lineHeight: 1.6 }}>
+          {fatal === "UNAUTHORIZED"
+            ? "Ta session a expiré : le suivi en direct est arrêté. Reconnecte-toi pour le reprendre."
+            : "Ce tournoi n'existe plus. Il a pu être supprimé pendant que tu le consultais."}
+        </p>
+        <CyberButton asChild variant="primary">
+          <Link href={fatal === "UNAUTHORIZED" ? "/connexion" : "/tournois"}>
+            {fatal === "UNAUTHORIZED" ? "Se reconnecter" : "Retour aux tournois"}
+          </Link>
+        </CyberButton>
       </section>
     );
   }
+
+  if (!detail) {
+    // Le premier affichage attend l'ouverture du flux, qui apporte le plateau
+    // et le contexte du lecteur d'un seul coup. `aria-busy` annonce l'attente
+    // aux lecteurs d'écran plutôt que de leur laisser une page muette.
+    return (
+      <section
+        className="ds-block"
+        style={{ color: "var(--text-2)" }}
+        role="status"
+        aria-busy="true"
+      >
+        Chargement du tournoi…
+      </section>
+    );
+  }
+
+  /**
+   * Le suivi est arrêté : ce qui est affiché ne bouge plus. On retire donc les
+   * actions plutôt que de les laisser échouer une par une — une équipe qui
+   * saisit son score en fin de manche n'a aucun moyen de deviner que son
+   * plateau date de plusieurs minutes.
+   */
+  const frozen = fatal !== null;
 
   // Vocabulaire de l'affichage : un tournoi individuel parle de joueurs, pas
   // d'équipes (`lib/shared/participants.ts`).
@@ -114,6 +164,7 @@ export default function TournamentDetailPage() {
   };
 
   const canReport = (match: BracketMatch): boolean => {
+    if (frozen) return false;
     if (!detail?.myTeamId) return false;
     if (match.winnerTeamId !== null) return false;
     if (match.team1Id === null || match.team2Id === null) return false;
@@ -124,6 +175,7 @@ export default function TournamentDetailPage() {
   };
 
   const canAdminResolve = (match: BracketMatch): boolean => {
+    if (frozen) return false;
     if (!detail?.isAdmin) return false;
     if (match.team1Id === null || match.team2Id === null) return false;
     return true;
@@ -159,6 +211,9 @@ export default function TournamentDetailPage() {
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
       showSuccess(`Score transmis pour le match #${match.id}.`);
+      // Retour immédiat pour qui agit : le flux, lui, sert tout le monde à la
+      // cadence de son palier.
+      void refresh();
       setDrafts((prev) => {
         const next = { ...prev };
         delete next[match.id];
@@ -178,6 +233,7 @@ export default function TournamentDetailPage() {
       : detail.card.format;
 
   const canForfeit = (teamId: number): boolean =>
+    !frozen &&
     canForfeitTeam(
       {
         format: forfeitFormat,
@@ -204,6 +260,7 @@ export default function TournamentDetailPage() {
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "FORFEIT_FAILED");
       showSuccess(isMine ? "Forfait enregistré." : `Forfait de ${teamName} enregistré.`);
+      void refresh();
     } catch (e) {
       showError(mapError((e as Error).message));
     }
@@ -217,6 +274,7 @@ export default function TournamentDetailPage() {
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "REGISTRATION_FAILED");
       showSuccess("Inscription validée.");
+      void refresh();
     } catch (e) {
       showError(mapError((e as Error).message));
     }
@@ -255,9 +313,28 @@ export default function TournamentDetailPage() {
     GRAND: "Grande Finale",
     THIRD_PLACE: "Petite Finale",
   };
+  // Résolu à chaque rendu depuis la liste fraîche : le dialogue de diffusion
+  // travaille toujours sur l'état courant du match, et se ferme de lui-même si
+  // le match disparaît (plateau régénéré).
+  const matchForLive =
+    matchForLiveId === null
+      ? null
+      : detail.matches.find((match) => match.id === matchForLiveId) ?? null;
+
   const brackets = bracketOrder
     .map((b) => ({ type: b, matches: filteredMatches.filter((m) => m.bracket === b) }))
     .filter((b) => b.matches.length > 0);
+
+  // Aperçu du plateau avant lancement, réservé au staff et au cast : le serveur
+  // le laisse à `null` pour les autres, à qui le tirage ne doit rien révéler
+  // d'avance, et pour un tournoi déjà lancé. Deux endroits l'affichent — pendant
+  // les inscriptions et sur un tournoi encore sans match — d'où ce fragment
+  // unique plutôt que deux copies à faire évoluer de front.
+  const previewBlock = detail.preview ? (
+    <div style={{ marginTop: 18 }}>
+      <BracketPreview preview={detail.preview} canReorder={detail.isAdmin} />
+    </div>
+  ) : null;
 
   return (
     <EntrantProvider
@@ -265,6 +342,7 @@ export default function TournamentDetailPage() {
       soloUserIds={detail.soloUserIds}
     >
       <MatchFormatProvider format={detail.card.matchFormat}>
+      <LiveProvider canManage={detail.canManageLive} openConfig={(match) => setMatchForLiveId(match.id)}>
       <RulesHelpFab format={visibleFormat} contextLabel={contextLabel} />
       <section className="fade-in">
         <div className="ds-header green">
@@ -306,6 +384,9 @@ export default function TournamentDetailPage() {
               </p>
             )}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              {/* Dit que la page se tient à jour seule : sans ce repère, on
+                  recharge par précaution même quand tout arrive tout seul. */}
+              <LiveIndicator isLive={isLive} tier={tier} fatal={fatal} />
               <Pill variant="blue">{detail.card.game}</Pill>
               <Pill variant={detail.card.state === "RUNNING" ? "live" : "blue"}>
                 {stateMeta.label}
@@ -335,10 +416,10 @@ export default function TournamentDetailPage() {
                 <Pill variant="blue">Petite finale</Pill>
               )}
               <Pill variant="blue">{detail.card.registeredTeams}/{detail.card.maxTeams}</Pill>
-              {detail.isAdmin && (
+              {detail.isAdmin && !frozen && (
                 <Pill variant="blue">⚙ Admin</Pill>
               )}
-              {detail.canRegister && (
+              {detail.canRegister && !frozen && (
                 <CyberButton
                   variant="primary"
                   onClick={registerTeam}
@@ -347,7 +428,7 @@ export default function TournamentDetailPage() {
                   {wording.registerCta}
                 </CyberButton>
               )}
-              {detail.isAdmin && detail.card.state === "REGISTRATION" && (
+              {detail.isAdmin && !frozen && detail.card.state === "REGISTRATION" && (
                 <CyberButton
                   variant="ghost"
                   onClick={() => setGhostRegistrationOpen(true)}
@@ -357,6 +438,15 @@ export default function TournamentDetailPage() {
                 </CyberButton>
               )}
             </div>
+
+            {/* Chaîne officielle : antenne permanente du tournoi, distincte de
+                l'état « en direct » qui, lui, se joue au niveau des matchs. */}
+            <TournamentLiveLink
+              tournamentId={tournamentId}
+              liveUrl={detail.card.liveUrl}
+              canEdit={detail.isAdmin}
+              onSaved={() => void refresh()}
+            />
           </div>
         </div>
 
@@ -375,15 +465,18 @@ export default function TournamentDetailPage() {
           </div>
 
           {detail.card.state === "REGISTRATION" ? (
-            <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-              {formatForBracket === "SURVIVAL"
-                ? "Le classement de départ (seeding) et les rounds seront générés au démarrage du tournoi."
-                : detail.card.format === "BG_SURVIE"
-                  ? "Le classement de départ est celui du seeding ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi."
-                : detail.card.format === "SWISS"
-                  ? "Le classement de départ (seeding) et la première ronde seront générés au démarrage du tournoi."
-                  : "Le bracket sera généré automatiquement au démarrage du tournoi."}
-            </p>
+            <>
+              <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
+                {formatForBracket === "SURVIVAL"
+                  ? "Le classement de départ (seeding) et les rounds seront générés au démarrage du tournoi."
+                  : detail.card.format === "BG_SURVIE"
+                    ? "Le classement de départ est celui du seeding ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi."
+                  : detail.card.format === "SWISS"
+                    ? "Le classement de départ (seeding) et la première ronde seront générés au démarrage du tournoi."
+                    : "Le bracket sera généré automatiquement au démarrage du tournoi."}
+              </p>
+              {previewBlock}
+            </>
           ) : formatForBracket === "SURVIVAL" && detail.survival ? (
             <>
               <SurvivalView
@@ -502,9 +595,12 @@ export default function TournamentDetailPage() {
               )}
             </>
           ) : !filteredMatches.length ? (
-            <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-              Aucun match disponible pour l&apos;instant.
-            </p>
+            <>
+              <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
+                Aucun match disponible pour l&apos;instant.
+              </p>
+              {previewBlock}
+            </>
           ) : (
             <>
               {brackets.map(({ type, matches }) => (
@@ -547,8 +643,8 @@ export default function TournamentDetailPage() {
           )}
         </div>
 
-        {detail.isAdmin && (
-          <SeedingEditor tournamentId={tournamentId} onReordered={() => router.refresh()} />
+        {detail.isAdmin && !frozen && (
+          <SeedingEditor tournamentId={tournamentId} onReordered={() => void refresh()} />
         )}
 
         <div className="ds-block">
@@ -577,22 +673,37 @@ export default function TournamentDetailPage() {
             ))}
           </div>
         </div>
+
+        <TournamentProgress detail={detail} />
       </section>
 
       <AdminScoreDialog
         match={selectedMatchForAdmin}
         open={!!selectedMatchForAdmin}
         onClose={() => setSelectedMatchForAdmin(null)}
-        onSubmitted={() => setSelectedMatchForAdmin(null)}
+        onSubmitted={() => {
+          setSelectedMatchForAdmin(null);
+          void refresh();
+        }}
       />
+
+      {matchForLive && (
+        <MatchLiveDialog
+          key={matchForLive.id}
+          match={matchForLive}
+          onClose={() => setMatchForLiveId(null)}
+          onSaved={() => void refresh()}
+        />
+      )}
 
       {ghostRegistrationOpen && (
         <GhostRegistrationDialog
           tournamentId={tournamentId}
           onClose={() => setGhostRegistrationOpen(false)}
-          onRegistered={() => router.refresh()}
+          onRegistered={() => void refresh()}
         />
       )}
+      </LiveProvider>
       </MatchFormatProvider>
     </EntrantProvider>
   );

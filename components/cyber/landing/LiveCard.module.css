@@ -101,3 +101,68 @@
   padding: 24px;
 }
 
+
+/* Bandeau de diffusion du match courant : rouge quand l'antenne est ouverte,
+   bleu discret quand le match est seulement annoncé comme casté. */
+.streamBanner,
+.streamBannerScheduled {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-radius: var(--r-cy-sm);
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.streamBanner {
+  border: 1px solid rgba(255, 74, 92, 0.45);
+  background: rgba(255, 74, 92, 0.1);
+  color: var(--red-live);
+}
+
+.streamBannerScheduled {
+  border: 1px dashed rgba(90, 200, 255, 0.32);
+  background: rgba(90, 200, 255, 0.05);
+  color: var(--blue-300);
+}
+
+.streamLabel {
+  font-weight: 600;
+}
+
+.streamBanner .streamLabel {
+  animation: liveCardPulse 2s ease-in-out infinite;
+}
+
+.streamLink {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+
+.streamLink:hover,
+.streamLink:focus-visible {
+  opacity: 0.8;
+}
+
+@keyframes liveCardPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .streamBanner .streamLabel {
+    animation: none;
+  }
+}

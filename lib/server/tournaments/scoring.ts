@@ -14,6 +14,15 @@ async function pushTeamToTarget(
 ): Promise<void> {
   if (!targetMatchId || !targetSlot || !teamId) return;
 
+  const [beforeRows] = await connection.execute<
+    (RowDataPacket & { team1_id: number | null; team2_id: number | null })[]
+  >(
+    `SELECT team1_id, team2_id FROM bg_matches WHERE id = ? LIMIT 1`,
+    [targetMatchId],
+  );
+  const previousTeamId =
+    targetSlot === 1 ? beforeRows[0]?.team1_id ?? null : beforeRows[0]?.team2_id ?? null;
+
   if (targetSlot === 1) {
     await connection.execute(`UPDATE bg_matches SET team1_id = ? WHERE id = ?`, [
       teamId,
@@ -22,6 +31,18 @@ async function pushTeamToTarget(
   } else {
     await connection.execute(`UPDATE bg_matches SET team2_id = ? WHERE id = ?`, [
       teamId,
+      targetMatchId,
+    ]);
+  }
+
+  // Remplacer un engagé par un **autre** (correction d'un score amont) fait de
+  // cette ligne une autre affiche : l'antenne ouverte sur l'ancienne ne vaut
+  // plus, et la laisser ouverte rallumerait le bouton « Regarder le live » de
+  // l'accueil vers une chaîne qui ne montre pas cette rencontre.
+  // Remplir un créneau encore vide, en revanche, ne fait que matérialiser le
+  // match prévu : une diffusion programmée à l'avance doit lui survivre.
+  if (previousTeamId !== null && Number(previousTeamId) !== teamId) {
+    await connection.execute(`UPDATE bg_matches SET live_started_at = NULL WHERE id = ?`, [
       targetMatchId,
     ]);
   }

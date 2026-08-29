@@ -24,6 +24,7 @@ import {
   forfeitSurvivalTeam,
 } from "./tournaments/survival";
 import { insertPhases, setCurrentPhase, loadPhases } from "./tournaments/phases-repository";
+import { normalizeStreamUrl } from "@/lib/shared/live-streams";
 import { initializeMultiTournament, startPhase, reconcilePhases } from "./tournaments/phases";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { matchWinsRequired } from "@/lib/shared/match-format";
@@ -153,6 +154,12 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     platformRoles: ["ARBITRE"],
     isAdult: 1,
     discordId: "900000000000000002",
+  },
+  {
+    pseudo: "Caster",
+    purpose: "rôle CASTER : aperçu du plateau (lecture seule) + diffusion des matchs",
+    platformRoles: ["CASTER"],
+    isAdult: 1,
   },
   {
     pseudo: "CommunityManager",
@@ -1128,6 +1135,41 @@ async function applyReportStates(
 // Tournois
 // ---------------------------------------------------------------------------
 
+/**
+ * Diffusion en direct d'un tournoi seedé.
+ *
+ * La chaîne officielle est posée sur le tournoi ; le mode de diffusion est
+ * appliqué aux seules manches encore jouables (`READY`), c'est-à-dire celles
+ * que la simulation n'a pas résolues. Poser un mode sur une manche déjà notée
+ * ne produirait rien de visible : l'état est dérivé, et un score saisi éteint
+ * le direct (`lib/shared/live-streams.ts`).
+ */
+async function applyLiveStreams(
+  db: Pool,
+  tournamentId: number,
+  def: TournamentDef
+): Promise<void> {
+  if (!def.live) return;
+
+  // Normalisé comme le ferait la route de production : le jeu de test doit
+  // contenir exactement ce qu'un enregistrement réel produit.
+  await db.execute(`UPDATE bg_tournaments SET live_url = ? WHERE id = ?`, [
+    normalizeStreamUrl(def.live.url),
+    tournamentId,
+  ]);
+
+  const startedAt = def.live.trigger === "MANUAL" && def.live.onAir ? new Date() : null;
+  await db.execute(
+    `UPDATE bg_matches
+     SET live_trigger = ?, live_url = ?, live_started_at = ?
+     WHERE tournament_id = ?
+       AND status = 'READY'
+       AND team1_id IS NOT NULL
+       AND team2_id IS NOT NULL`,
+    [def.live.trigger, normalizeStreamUrl(def.live.matchUrl), startedAt, tournamentId]
+  );
+}
+
 async function createTournament(
   db: Pool,
   organizerId: number,
@@ -1233,6 +1275,33 @@ async function createTournament(
 
   const finish = def.state === "FINISHED";
 
+  // Les phases d'un tournoi multi-mode sont écrites dès sa création par
+  // `createTournament` : un tournoi encore en inscriptions en a donc déjà.
+  // Sans cela, le cas seedé serait le seul de la base à ne pas en avoir, et
+  // l'aperçu du plateau n'aurait rien à prévisualiser.
+  if (isMulti && def.phases && (def.state === "UPCOMING" || def.state === "REGISTRATION")) {
+    const connection = await db.getConnection();
+    try {
+      await insertPhases(
+        connection,
+        tournamentId,
+        def.phases.map((phase, index) => ({
+          position: index + 1,
+          format: phase.format,
+          name: null,
+          qualifierMode: phase.qualifierMode,
+          qualifierValue: phase.qualifierValue,
+          swissTotalRounds: phase.swissTotalRounds ?? null,
+          survivalRoundsBeforeFirstCut: phase.survivalRoundsBeforeFirstCut ?? null,
+          survivalRoundsPerCut: phase.survivalRoundsPerCut ?? null,
+          hasThirdPlaceMatch: phase.hasThirdPlaceMatch ?? false,
+        })),
+      );
+    } finally {
+      connection.release();
+    }
+  }
+
   if (def.state !== "UPCOMING" && def.state !== "REGISTRATION" && teamsToUse.length >= 2) {
     if (isMulti && def.phases) {
       await generateMultiPhaseTournament(db, tournamentId, def.phases, finish, def.playWaves ?? 2, winsRequired);
@@ -1257,6 +1326,8 @@ async function createTournament(
       await applyReportStates(db, tournamentId, def);
     }
   }
+
+  await applyLiveStreams(db, tournamentId, def);
 
   const gameLabel = def.game === "OW2" ? "Overwatch" : "Marvel Rivals";
   console.log(

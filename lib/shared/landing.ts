@@ -1,3 +1,4 @@
+import type { MatchLiveState } from "@/lib/shared/live-streams";
 import type { TournamentCard } from "@/lib/shared/types";
 
 export type LandingStats = {
@@ -14,6 +15,24 @@ export type LandingLiveMatch = {
   team2Score: number | null;
   bracket: string;
   roundLabel: string;
+  /** État de diffusion du match, dérivé (`lib/shared/live-streams.ts`). */
+  liveState: MatchLiveState;
+  /** Chaîne diffusant ce match ; `null` = casté sans lien, ou non casté. */
+  liveUrl: string | null;
+};
+
+/**
+ * Cible du bouton « Regarder le live » de l'accueil.
+ *
+ * Résolue côté serveur et volontairement absente tant qu'aucun match n'est
+ * réellement à l'antenne : un bouton qui mène vers une chaîne hors ligne est
+ * pire que pas de bouton du tout.
+ */
+export type LandingLiveStream = {
+  tournamentId: number;
+  tournamentName: string;
+  /** Chaîne officielle du tournoi, déjà normalisée. */
+  url: string;
 };
 
 export type LandingLive = {
@@ -22,6 +41,11 @@ export type LandingLive = {
   viewers: number;
   game: string;
   phase: string;
+  /**
+   * Cible du bouton « Regarder le live ». `null` tant qu'aucun match n'est à
+   * l'antenne — le bouton disparaît alors plutôt que de mener nulle part.
+   */
+  stream: LandingLiveStream | null;
 };
 
 export type LandingLeaderboardRow = {

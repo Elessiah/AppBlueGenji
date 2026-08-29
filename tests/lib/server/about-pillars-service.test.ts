@@ -6,6 +6,7 @@ import {
   listAboutPillars,
   updateAboutPillar,
 } from "@/lib/server/about-pillars-service";
+import { clearCache } from "@/lib/server/cache";
 
 jest.mock("@/lib/server/database");
 
@@ -15,7 +16,12 @@ async function mockDb(execute: jest.Mock) {
 }
 
 describe("about-pillars-service", () => {
-  beforeEach(() => jest.clearAllMocks());
+  // La vitrine est mutualisée (`lib/server/showcase-cache.ts`) : sans cette
+  // remise à zéro, chaque cas resservirait la valeur du précédent.
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
   afterEach(() => jest.restoreAllMocks());
 
   describe("listAboutPillars", () => {

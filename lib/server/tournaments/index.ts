@@ -1,13 +1,19 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import type { TournamentBuckets, TournamentDetail, TournamentFormat, TournamentState } from "@/lib/shared/types";
-import { getDatabase } from "@/lib/server/database";
+import type {
+  TournamentBuckets,
+  TournamentDetail,
+  TournamentFormat,
+  TournamentSnapshot,
+  TournamentState,
+  TournamentViewerContext,
+} from "@/lib/shared/types";
+import { getDatabase, withConnection } from "@/lib/server/database";
+import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
-import { toIso } from "@/lib/server/serialization";
-import { loadSoloUserIds } from "@/lib/server/solo-entries-service";
 import { isSoloTournament, toParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import { validateDateOrder } from "./validation";
-import type { TournamentRow, TournamentListRow } from "./_internal";
+import type { TournamentListRow } from "./_internal";
 
 // Internal types
 export type { TournamentRow, RegistrationRow, MatchRow, TournamentListRow } from "./_internal";
@@ -21,6 +27,9 @@ export { canUserRegister, resolveUserEntrantTeamId } from "./registration";
 
 // Bracket generation
 export { createBracketIfMissing } from "./bracket-generator";
+
+// Aperçu du plateau avant le lancement (staff + cast)
+export { loadTournamentPreview, isPreviewableState } from "./preview";
 
 // Scoring
 export { reportMatchScore, finalizeMatch } from "./scoring";
@@ -47,6 +56,27 @@ export {
   deleteAllMatches,
   resetRegistrationRanks,
 } from "./repository";
+
+// Cache de la liste publique (voir ./list-cache)
+export { invalidateTournamentLists, TOURNAMENT_LIST_TTL_MS } from "./list-cache";
+
+// Cache de l'aperçu du plateau (voir ./preview-cache).
+//
+// `getTournamentPreview` n'est **pas** réexporté : il rend un contenu réservé
+// aux permissions `tournaments` et `casting`, sans rien qui le rappelle dans sa
+// signature. Le seul chemin vers l'aperçu passe donc par
+// `getTournamentViewerContext`, qui exige ce droit — un appelant ne peut pas
+// l'oublier.
+export { invalidateTournamentPreview } from "./preview-cache";
+
+// Instantané partagé (voir ./snapshot)
+export {
+  getTournamentSnapshot,
+  getTournamentSnapshotFrame,
+  invalidateTournamentSnapshot,
+  SNAPSHOT_TTL_MS,
+} from "./snapshot";
+export type { TournamentSnapshotFrame } from "./snapshot";
 
 // Byes
 export { tryAutoResolveByes } from "./byes";
@@ -104,14 +134,28 @@ import {
 } from "./registration";
 import { resolveExpiredScoreReports, finalizeTournamentIfDone } from "./finalization";
 import { tryAutoResolveByes } from "./byes";
-import { mapCard, mapMatch } from "./_internal";
-import { getTournamentListRow, getRegistrationRows, getMatchRows, loadTournamentRow } from "./repository";
+import { mapCard } from "./_internal";
+import { loadTournamentRow } from "./repository";
 import { reportMatchScore } from "./scoring";
 import { publishUpdatedEvent, publishScoreReportedEvent, publishScoreResolvedEvent, sendBotLogAsync } from "./notifications";
+import { getTournamentSnapshot } from "./snapshot";
+import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
+import { getTournamentPreview } from "./preview-cache";
 
 let pendingSync: Promise<void> | null = null;
 let lastSyncAt = 0;
-const SYNC_THROTTLE_MS = 1000;
+/**
+ * Étranglement de la synchronisation d'états.
+ *
+ * Chaque passe ouvre une transaction et repasse sur **tous** les tournois non
+ * terminés (plateau manquant, byes, reports expirés, finalisation) : à une
+ * seconde d'intervalle, une poignée de visiteurs suffisait à la faire tourner
+ * en continu. Quinze secondes suffisent largement — l'affichage, lui, ne
+ * l'attend plus : le client fait basculer l'état à l'heure exacte tout seul
+ * (`lib/shared/tournament-state.ts`), et la page d'un tournoi déclenche sa
+ * propre bascule à la lecture (`./snapshot`).
+ */
+const SYNC_THROTTLE_MS = 15_000;
 
 async function syncVisibleTournaments(): Promise<void> {
   if (pendingSync) return pendingSync;
@@ -344,6 +388,11 @@ export async function createTournament(
     }
 
     await connection.commit();
+
+    // Sans cela, le tournoi qu'on vient de créer resterait absent de la liste
+    // publique et de l'accueil pendant toute la durée de vie du cache — au
+    // moment précis où son auteur cherche une confirmation.
+    invalidateTournamentLists();
     return tournamentId;
   } catch (error) {
     await connection.rollback();
@@ -353,13 +402,64 @@ export async function createTournament(
   }
 }
 
-export async function listTournamentBuckets(searchTerm: string | null): Promise<TournamentBuckets> {
-  await syncVisibleTournaments();
+/**
+ * Portée de la liste des tournois.
+ *
+ * Par défaut la liste ne montre que les tournois **déjà visibles**. `hiddenOnly`
+ * prend exactement le complément : les tournois programmés que personne ne voit
+ * encore. Les deux portées sont disjointes et se réunissent sur l'ensemble des
+ * tournois — aucun ne peut se retrouver dans les deux, ni dans aucune.
+ *
+ * La portée `hiddenOnly` est réservée au staff `tournaments` : c'est la route
+ * API qui garde la permission, jamais cette fonction.
+ */
+export type TournamentListScope = {
+  hiddenOnly?: boolean;
+};
 
+/**
+ * Paniers de tournois, par état.
+ *
+ * La liste publique (sans portée ni recherche) est **mutualisée** : c'est de
+ * loin la lecture la plus sollicitée du site — accueil rendu dynamiquement,
+ * page `/tournois`, bandeau « en direct » —, elle agrège tous les tournois et
+ * toutes les inscriptions, et elle est la même pour tout le monde. Les
+ * variantes — liste filtrée par une recherche, ou portée `hiddenOnly` réservée
+ * au staff — passent directement en base : elles sont courtes et bien plus
+ * rarement lues.
+ */
+export async function listTournamentBuckets(
+  searchTerm: string | null,
+  scope: TournamentListScope = {},
+): Promise<TournamentBuckets> {
+  // La synchronisation reste EN DEHORS du chargeur mis en cache : elle publie un
+  // événement pour chaque état qui bascule, ce qui invalide justement la liste.
+  // À l'intérieur, elle jetterait le résultat qu'elle vient de rendre correct,
+  // et l'agrégat repartirait pour rien à chaque bascule.
+  //
+  // Son échec, lui, n'emporte pas la lecture : c'est un entretien d'arrière-plan
+  // (une transaction sur tous les tournois en cours), pas une condition pour
+  // servir une liste que le cache tient peut-être déjà prête. Un verrou ou une
+  // panne passagère de MySQL viderait sinon `/tournois` alors qu'il n'y avait
+  // rien à en faire.
+  await syncVisibleTournaments().catch(() => undefined);
+
+  // Seule la liste publique est mutualisée : celle des tournois pas encore
+  // visibles est réservée au staff, elle est courte et bien plus rarement lue.
+  const isSharedList = !scope.hiddenOnly && !searchTerm?.trim();
+  if (!isSharedList) return loadTournamentBuckets(searchTerm, scope);
+
+  return cachedTournamentList("public", () => loadTournamentBuckets(searchTerm, scope));
+}
+
+async function loadTournamentBuckets(
+  searchTerm: string | null,
+  scope: TournamentListScope,
+): Promise<TournamentBuckets> {
   const db = await getDatabase();
   const now = new Date();
 
-  const where: string[] = [`t.start_visibility_at <= ?`];
+  const where: string[] = [scope.hiddenOnly ? `t.start_visibility_at > ?` : `t.start_visibility_at <= ?`];
   const params: unknown[] = [now];
 
   if (searchTerm && searchTerm.trim()) {
@@ -391,6 +491,7 @@ export async function listTournamentBuckets(searchTerm: string | null): Promise<
       t.participant_type,
       t.match_format_type,
       t.match_format_value,
+      t.live_url,
       COALESCE(COUNT(r.id), 0) AS registered_teams
      FROM bg_tournaments t
      LEFT JOIN bg_tournament_registrations r ON r.tournament_id = t.id
@@ -417,7 +518,8 @@ export async function listTournamentBuckets(searchTerm: string | null): Promise<
       t.survival_current_round,
       t.participant_type,
       t.match_format_type,
-      t.match_format_value
+      t.match_format_value,
+      t.live_url
      ORDER BY t.start_at DESC`,
     params,
   );
@@ -503,161 +605,144 @@ export async function registerGhostTeam(tournamentId: number, teamId: number): P
   }
 }
 
-async function hasExpiredScoreReports(
-  db: Awaited<ReturnType<typeof getDatabase>>,
-  tournamentId: number,
-): Promise<boolean> {
-  const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_matches WHERE tournament_id = ? AND status = 'AWAITING_CONFIRMATION' AND score_deadline_at <= NOW() LIMIT 1`,
-    [tournamentId],
-  );
-  return rows.length > 0;
+/**
+ * Contexte propre au lecteur : ce qu'il a le droit de faire ici.
+ *
+ * Séparé de l'instantané partagé parce qu'il ne bouge presque jamais (il change
+ * à l'inscription, pas à chaque score) et qu'il est le seul morceau du détail
+ * qu'on ne puisse pas mutualiser entre spectateurs.
+ */
+export async function getTournamentViewerContext(
+  snapshot: TournamentSnapshot,
+  userId: number,
+  isAdmin = false,
+  /**
+   * Droit de voir l'aperçu du plateau avant le lancement : permission
+   * `tournaments` **ou** `casting`. Le staff l'a par construction, le cast l'a
+   * sans aucun droit d'écriture.
+   */
+  canPreview = isAdmin,
+  /**
+   * Droit d'écrire l'état de diffusion des matchs : permission `live`. Distinct
+   * de `canPreview`, qui ne donne que la lecture de l'aperçu — un caster lit le
+   * tirage **et** ouvre l'antenne, sans pour autant arbitrer.
+   */
+  canManageLive = isAdmin,
+): Promise<TournamentViewerContext> {
+  const isSolo = isSoloTournament(snapshot.card.participantType);
+
+  // Engagé du viewer : son équipe active, ou son entrée solo en individuel.
+  //
+  // La connexion n'est prise que dans le second cas — le seul où
+  // `resolveUserEntrantTeamId` s'en serve : en tournoi par équipes,
+  // `getUserActiveTeam` ouvre sa propre requête, et réserver une place du pool
+  // (25) pour ne rien en faire doublerait la pression à chaque connexion SSE.
+  const myTeamId = isSolo
+    ? await withConnection((connection) =>
+        resolveUserEntrantTeamId(
+          connection,
+          { participant_type: snapshot.card.participantType },
+          userId,
+        ),
+      )
+    : (await getUserActiveTeam(userId))?.teamId ?? null;
+
+  const alreadyRegistered =
+    myTeamId !== null && snapshot.registrations.some((row) => row.teamId === myTeamId);
+
+  // L'aperçu vit dans le contexte du lecteur, et non dans l'instantané : celui-ci
+  // part tel quel à tous les abonnés du flux, alors que l'aperçu est réservé au
+  // staff et au cast. Son contenu, lui, est le même pour tous ceux qui y ont
+  // droit : il est donc calculé une fois par tournoi (`./preview-cache`), pas
+  // une fois par lecteur.
+  const preview = canPreview ? await getTournamentPreview(snapshot.card.id) : null;
+
+  return {
+    preview,
+    canRegister:
+      snapshot.card.state === "REGISTRATION" &&
+      !alreadyRegistered &&
+      // En individuel, un joueur sans entrée solo peut s'inscrire : elle sera
+      // créée à ce moment-là.
+      (isSolo || myTeamId !== null),
+    myTeamId,
+    canCreateReportsForTeamIds: myTeamId ? [myTeamId] : [],
+    isAdmin,
+    canManageLive,
+  };
 }
 
+/**
+ * Détail complet du tournoi pour un lecteur donné : l'instantané partagé
+ * (mutualisé entre tous les spectateurs, voir `./snapshot`) complété de son
+ * contexte personnel.
+ */
 export async function getTournamentDetail(
   tournamentId: number,
   userId: number,
   isAdmin = false,
+  /**
+   * Droit de voir l'aperçu du plateau avant le lancement : permission
+   * `tournaments` **ou** `casting`. Le staff l'a par construction, le cast l'a
+   * sans aucun droit d'écriture.
+   */
+  canPreview = isAdmin,
+  /**
+   * Droit d'écrire l'état de diffusion des matchs : permission `live`. Distinct
+   * de `canPreview`, qui ne donne que la lecture de l'aperçu.
+   */
+  canManageLive = isAdmin,
 ): Promise<TournamentDetail | null> {
+  const snapshot = await getTournamentSnapshot(tournamentId);
+  if (!snapshot) return null;
+
+  const viewer = await getTournamentViewerContext(
+    snapshot,
+    userId,
+    isAdmin,
+    canPreview,
+    canManageLive,
+  );
+  return { ...snapshot, ...viewer };
+}
+
+/**
+ * Rafraîchit la liste publique si — et seulement si — l'écriture qui vient
+ * d'aboutir a changé l'état du tournoi.
+ *
+ * Les événements de score n'y touchent plus (voir `./notifications`), mais un
+ * score peut clore un tournoi, et une clôture le déplace dans la liste. Plutôt
+ * que de faire remonter un « ça a fini » à travers les cinq orchestrations qui
+ * peuvent clore (élimination, survie, suisse, endurance, phases), on relit
+ * l'état : une lecture indexée, sur un chemin d'écriture rare.
+ *
+ * **Ne lève jamais.** Elle s'exécute après le commit : une erreur ici ferait
+ * répondre 500 pour un score pourtant enregistré, l'équipe le ressaisirait et
+ * se heurterait à `MATCH_ALREADY_COMPLETED`. Au pire, la liste garde son entrée
+ * quinze secondes de plus.
+ *
+ * @param before État lu **avant** la transaction.
+ */
+async function invalidateListsIfStateChanged(
+  tournamentId: number,
+  before: TournamentState | null,
+): Promise<void> {
+  try {
+    const after = await readTournamentState(tournamentId);
+    if (after !== before) invalidateTournamentLists();
+  } catch {
+    // Le cache expirera de lui-même : rien ne justifie de perdre l'écriture.
+  }
+}
+
+/** État courant d'un tournoi, ou `null` s'il n'existe pas / plus. */
+async function readTournamentState(tournamentId: number): Promise<TournamentState | null> {
   const db = await getDatabase();
-
-  let tournamentRow: TournamentRow | null;
-  const detailConnection = await db.getConnection();
-  try {
-    tournamentRow = await loadTournamentRow(detailConnection, tournamentId);
-  } finally {
-    detailConnection.release();
-  }
-  if (!tournamentRow) return null;
-
-  const { hasPendingStateTransition } = await import("./state");
-
-  const needsSync =
-    tournamentRow.state === "RUNNING" &&
-    (tournamentRow.bracket_size === null ||
-      (await hasExpiredScoreReports(db, tournamentId)) ||
-      (await hasPendingStateTransition(tournamentRow)));
-
-  let tournament: TournamentRow | null = tournamentRow;
-  if (needsSync) {
-    const connection = await db.getConnection();
-    try {
-      await connection.beginTransaction();
-      const syncResult = await syncTournamentState(connection, tournamentId);
-      tournament = syncResult.row;
-      await connection.commit();
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-  }
-
-  if (!tournament) {
-    return null;
-  }
-
-  const connection = await db.getConnection();
-  try {
-    const cardRow = await getTournamentListRow(connection, tournamentId);
-    if (!cardRow) return null;
-
-    const card = mapCard(cardRow);
-    const registrations = await getRegistrationRows(connection, tournamentId);
-    const matches = await getMatchRows(connection, tournamentId);
-
-    // Engagé du viewer : son équipe active, ou son entrée solo en individuel.
-    const myTeamId = await resolveUserEntrantTeamId(connection, tournament, userId);
-    const isSolo = isSoloTournament(tournament.participant_type);
-    const alreadyRegistered =
-      myTeamId !== null && registrations.some((row) => Number(row.team_id) === myTeamId);
-    const canRegister =
-      card.state === "REGISTRATION" &&
-      !alreadyRegistered &&
-      // En individuel, un joueur sans entrée solo peut s'inscrire : elle sera
-      // créée à ce moment-là.
-      (isSolo || myTeamId !== null);
-
-    const canCreateReportsForTeamIds = myTeamId ? [myTeamId] : [];
-
-    // Engagés qui sont des joueurs : l'interface lie alors vers leur profil.
-    const soloUserIds = isSolo
-      ? await loadSoloUserIds(
-          connection,
-          registrations.map((row) => Number(row.team_id)),
-        )
-      : {};
-
-    const phasesDetail = card.format === "MULTI"
-      ? await (await import("./phases")).loadPhasesForDetail(connection, tournamentId)
-      : null;
-
-    // La vue Survie sert aussi à l'intérieur d'un tournoi multi-phases : sans
-    // ces métadonnées, une phase en survie retomberait sur l'affichage générique
-    // en arbre, privant les équipes du classement et du report de score.
-    const survivalPhaseId =
-      phasesDetail?.phases.find(
-        (phase) => phase.id === phasesDetail.currentPhaseId && phase.format === "SURVIVAL",
-      )?.id ?? null;
-
-    const survival =
-      card.format === "SURVIVAL"
-        ? await (await import("./survival")).loadSurvivalMeta(connection, tournamentId)
-        : survivalPhaseId !== null
-          ? await (await import("./survival")).loadSurvivalMeta(
-              connection,
-              tournamentId,
-              survivalPhaseId,
-            )
-          : null;
-
-    // Même raison que pour la survie ci-dessus : la vue Suisse sert aussi à
-    // l'intérieur d'une phase, sinon une ronde suisse en `MULTI` n'afficherait
-    // ni classement ni départages.
-    const swissPhaseId =
-      phasesDetail?.phases.find(
-        (phase) => phase.id === phasesDetail.currentPhaseId && phase.format === "SWISS",
-      )?.id ?? null;
-
-    const endurance =
-      card.format === "BG_SURVIE"
-        ? await (await import("./bg-survie")).loadEnduranceMeta(connection, tournamentId)
-        : null;
-
-    const swiss =
-      card.format === "SWISS"
-        ? await (await import("./swiss")).loadSwissMeta(connection, tournamentId)
-        : swissPhaseId !== null
-          ? await (await import("./swiss")).loadSwissMeta(connection, tournamentId, swissPhaseId)
-          : null;
-
-    return {
-      card,
-      matches: matches.map(mapMatch),
-      registrations: registrations.map((row) => ({
-        teamId: Number(row.team_id),
-        teamName: row.team_name,
-        logoUrl: row.logo_url,
-        seed: row.seed === null ? null : Number(row.seed),
-        registeredAt: toIso(row.registered_at)!,
-        finalRank: row.final_rank === null ? null : Number(row.final_rank),
-      })),
-      canRegister,
-      myTeamId,
-      canCreateReportsForTeamIds,
-      isAdmin,
-      survival,
-      swiss,
-      endurance,
-      phases: phasesDetail?.phases ?? null,
-      currentPhaseId: phasesDetail?.currentPhaseId ?? null,
-      phaseStandings: phasesDetail?.phaseStandings ?? {},
-      soloUserIds,
-    };
-  } finally {
-    connection.release();
-  }
+  const [rows] = await db.execute<(RowDataPacket & { state: TournamentState })[]>(
+    `SELECT state FROM bg_tournaments WHERE id = ? LIMIT 1`,
+    [tournamentId],
+  );
+  return rows[0]?.state ?? null;
 }
 
 export async function reportMatchScorePublic(
@@ -667,6 +752,7 @@ export async function reportMatchScorePublic(
   myScoreRaw: number,
   opponentScoreRaw: number,
 ): Promise<void> {
+  const stateBefore = await readTournamentState(tournamentId);
   const db = await getDatabase();
   const connection = await db.getConnection();
   let pendingBotLog: string | null = null;
@@ -704,6 +790,7 @@ export async function reportMatchScorePublic(
     await connection.commit();
 
     publishScoreReportedEvent(tournamentId, matchId);
+    await invalidateListsIfStateChanged(tournamentId, stateBefore);
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -753,6 +840,10 @@ export async function adminSaveMatchScoresPublic(
 
     if (savedTournamentId !== null) {
       publishScoreResolvedEvent(savedTournamentId, matchId);
+      // L'état d'avant n'a pas pu être lu (l'id du tournoi ne se découvre qu'en
+      // cours de transaction) : on rafraîchit donc la liste sans condition. Un
+      // arbitrage reste rare, contrairement au report de score.
+      invalidateTournamentLists();
     }
   } catch (error) {
     await connection.rollback();
@@ -874,6 +965,10 @@ export async function adminResolveMatchPublic(
     await connection.commit();
 
     publishScoreReportedEvent(tournamentId, matchId);
+    // Même raison que pour la sauvegarde de scores : l'état d'avant n'a pas pu
+    // être lu, l'id du tournoi ne se découvrant qu'en cours de transaction. Un
+    // arbitrage reste rare, contrairement au report de score.
+    invalidateTournamentLists();
   } catch (error) {
     await connection.rollback();
     throw error;

@@ -138,3 +138,53 @@ describe("syncTournamentState — entretien d'un tournoi en cours", () => {
     expect(createBracketIfMissing).not.toHaveBeenCalled();
   });
 });
+
+describe("syncTournamentState — ce que `stateChanged` doit rapporter", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (createBracketIfMissing as jest.Mock).mockResolvedValue({ finished: false } as never);
+    (resolveExpiredScoreReports as jest.Mock).mockResolvedValue(undefined as never);
+    (tryAutoResolveByes as jest.Mock).mockResolvedValue(undefined as never);
+    (finalizeTournamentIfDone as jest.Mock).mockResolvedValue(undefined as never);
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  it("signale la clôture décidée par l'entretien lui-même", async () => {
+    // `finalizeTournamentIfDone` peut passer le tournoi à FINISHED bien après la
+    // comparaison d'entrée. Ses appelants s'appuient sur ce drapeau pour
+    // rafraîchir la liste publique : sans lui, un tournoi clos par un bye résolu
+    // à la lecture resterait annoncé « En cours » — et le reclassement client ne
+    // rattrape pas ce cas, une clôture ne se déduisant d'aucune date.
+    const before = runningRow();
+    (loadTournamentRow as jest.Mock)
+      .mockResolvedValueOnce(before as never)
+      .mockResolvedValueOnce({ ...before, state: "FINISHED" } as never);
+
+    const result = await syncTournamentState(connection, 5);
+
+    expect(result.stateChanged).toBe(true);
+    expect(result.row?.state).toBe("FINISHED");
+  });
+
+  it("ne signale rien quand l'entretien n'a rien changé", async () => {
+    const row = runningRow();
+    (loadTournamentRow as jest.Mock)
+      .mockResolvedValueOnce(row as never)
+      .mockResolvedValueOnce(row as never);
+
+    expect((await syncTournamentState(connection, 5)).stateChanged).toBe(false);
+  });
+
+  it("supporte un tournoi disparu pendant l'entretien", async () => {
+    // La relecture peut ne rien rendre (suppression concurrente) : on ne doit ni
+    // lever, ni annoncer un changement d'état imaginaire.
+    (loadTournamentRow as jest.Mock)
+      .mockResolvedValueOnce(runningRow() as never)
+      .mockResolvedValueOnce(null as never);
+
+    const result = await syncTournamentState(connection, 5);
+
+    expect(result.row).toBeNull();
+    expect(result.stateChanged).toBe(false);
+  });
+});

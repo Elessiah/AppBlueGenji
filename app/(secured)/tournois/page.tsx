@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import type { TournamentBuckets } from "@/lib/shared/types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
+import { sameBuckets, sameTournaments } from "@/lib/shared/tournament-schedule";
+import { refreshCadenceFor } from "@/lib/shared/refresh-tiers";
+import { useAutoRefresh } from "@/lib/shared/hooks/useAutoRefresh";
+import { useScheduledBuckets } from "@/lib/shared/hooks/useScheduledBuckets";
 import { useToast } from "@/components/ui/toast";
 import { BgCanvas } from "../_shared/BgCanvas";
 import { Ticker } from "@/components/cyber/Ticker";
@@ -11,8 +15,16 @@ import { RunningCard } from "./cards/RunningCard";
 import { RegistrationCard } from "./cards/RegistrationCard";
 import { UpcomingCard } from "./cards/UpcomingCard";
 import { FinishedCard } from "./cards/FinishedCard";
+import { StateCard } from "./cards/StateCard";
 import { Section } from "./Section";
-import { filterBuckets, countByGame, type GameFilter } from "./_lib/buckets";
+import {
+  filterBuckets,
+  filterTournamentsByGame,
+  filterTournamentsByQuery,
+  flattenBuckets,
+  countByGame,
+  type GameFilter,
+} from "./_lib/buckets";
 import { buildTickerItems } from "./_lib/ticker";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import s from "./tournois.module.css";
@@ -24,29 +36,97 @@ const emptyBuckets: TournamentBuckets = {
   finished: [],
 };
 
+async function fetchBuckets(url: string, signal?: AbortSignal): Promise<TournamentBuckets> {
+  const response = await fetch(url, { cache: "no-store", signal });
+  const payload = (await response.json()) as {
+    error?: string;
+    buckets?: TournamentBuckets;
+  };
+  if (!response.ok || !payload.buckets) {
+    throw new Error(payload.error || "TOURNAMENT_LIST_FAILED");
+  }
+  return payload.buckets;
+}
+
 export default function TournamentsPage() {
   const { showError } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState<GameFilter>("all");
   const [buckets, setBuckets] = useState<TournamentBuckets>(emptyBuckets);
+  const [hiddenTournaments, setHiddenTournaments] = useState<TournamentCard[]>([]);
   const [finishedDisplayLimit, setFinishedDisplayLimit] = useState(12);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
-      const response = await fetch("/api/tournaments", { cache: "no-store" });
-      const payload = (await response.json()) as {
-        error?: string;
-        buckets?: TournamentBuckets;
-      };
-      if (!response.ok || !payload.buckets) {
-        throw new Error(payload.error || "TOURNAMENT_LIST_FAILED");
+  // `silent` : les rafraîchissements de fond ne doivent pas couvrir l'écran de
+  // notifications pour un incident réseau passager. Seul le premier chargement,
+  // celui que l'utilisateur attend, signale son échec.
+  const load = useCallback(
+    async (silent = false, signal?: AbortSignal) => {
+      try {
+        const all = await fetchBuckets("/api/tournaments", signal);
+        // On garde la référence précédente quand rien n'a changé : sinon chaque
+        // relecture de fond redessinerait toute la liste et réarmerait le
+        // minuteur de bascule, pour un contenu identique.
+        setBuckets((previous) => (sameBuckets(previous, all) ? previous : all));
+      } catch (e) {
+        // Une requête abandonnée (démontage, rafraîchissement suivant) n'est pas
+        // un incident : la page n'a plus rien à afficher de toute façon.
+        if (signal?.aborted || silent) return;
+        showError((e as Error).message);
       }
-      setBuckets(payload.buckets);
-    };
-    load().catch((e) => showError((e as Error).message));
-  }, [showError]);
+    },
+    [showError],
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void load(false, controller.signal);
+    return () => controller.abort();
+  }, [load]);
+
+  // Les tournois pas encore visibles ne sont servis qu'au staff `tournaments` :
+  // inutile d'aller les demander pour se faire répondre 403. Leur échec ne doit
+  // pas emporter la liste publique, d'où un chargement à part — mais qui suit la
+  // même cadence, sans quoi la seule section réservée à ceux qui vivent sur
+  // cette page serait aussi la seule à exiger un F5.
+  const loadHidden = useCallback(
+    async (silent = false, signal?: AbortSignal) => {
+      if (!isAdmin) {
+        // Un tableau neuf ne serait jamais égal au précédent : la page se
+        // redessinerait à chaque passage, pour tous ceux qui n'ont même pas
+        // cette section.
+        setHiddenTournaments((previous) => (previous.length === 0 ? previous : []));
+        return;
+      }
+      try {
+        const hidden = flattenBuckets(await fetchBuckets("/api/tournaments?scope=hidden", signal));
+        setHiddenTournaments((previous) =>
+          sameTournaments(previous, hidden) ? previous : hidden,
+        );
+      } catch (e) {
+        if (signal?.aborted || silent) return;
+        showError((e as Error).message);
+      }
+    },
+    [isAdmin, showError],
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadHidden(false, controller.signal);
+    return () => controller.abort();
+  }, [loadHidden]);
+
+  // Aucun flux SSE sur cette page : elle se tient à jour toute seule par le
+  // retour sur l'onglet — ce qui remplace le F5 — doublé d'une relecture de
+  // fond, rare pour les spectateurs, plus fréquente pour le staff. Côté
+  // serveur, la liste publique est mutualisée : ces relectures ne coûtent
+  // presque rien (`lib/server/tournaments/list-cache.ts`).
+  useAutoRefresh(
+    (signal) => Promise.all([load(true, signal), loadHidden(true, signal)]).then(() => undefined),
+    { intervalMs: refreshCadenceFor({ isStaff: isAdmin }).listIntervalMs },
+  );
 
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store" })
@@ -56,6 +136,7 @@ export default function TournamentsPage() {
       .then((p) => setIsAdmin(can(p?.user, "tournaments")))
       .catch(() => setIsAdmin(false));
   }, []);
+
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -72,12 +153,33 @@ export default function TournamentsPage() {
     setFinishedDisplayLimit(12);
   }, [query, gameFilter]);
 
-  const filteredBuckets = filterBuckets(buckets, query, gameFilter);
+  // Les cartes portent leur horaire : le client fait basculer « Prochainement »
+  // → « Inscriptions » → « En cours » à la seconde dite, sans rien demander au
+  // serveur (`lib/shared/tournament-schedule.ts`).
+  const scheduledBuckets = useScheduledBuckets(buckets);
 
+  const filteredBuckets = filterBuckets(scheduledBuckets, query, gameFilter);
+  const filteredHidden = filterTournamentsByGame(
+    filterTournamentsByQuery(hiddenTournaments, query),
+    gameFilter,
+  );
+
+  const totalHidden = filteredHidden.length;
   const totalRunning = filteredBuckets.running.length;
   const totalRegistration = filteredBuckets.registration.length;
   const totalUpcoming = filteredBuckets.upcoming.length;
   const totalFinished = filteredBuckets.finished.length;
+
+  // La section des invisibles prend la première place quand elle est affichée :
+  // les suivantes se décalent pour garder une numérotation continue.
+  const showHidden = isAdmin && hiddenTournaments.length > 0;
+  const ix = (position: number) => String(position + (showHidden ? 1 : 0)).padStart(2, "0");
+
+  // Les pastilles comptent ce que la page montre : pour le staff, les invisibles
+  // en font partie.
+  const countGame = (key: GameFilter) =>
+    countByGame(buckets, key) +
+    (showHidden ? filterTournamentsByGame(hiddenTournaments, key).length : 0);
 
   return (
     <div className={s.page}>
@@ -127,8 +229,8 @@ export default function TournamentsPage() {
             <div className={s.metricLbl}>Programmés à venir</div>
           </div>
           <div className={s.metric}>
-            <div className={s.metricNum}>—</div>
-            <div className={s.metricLbl}>Prizepool · à venir</div>
+            <div className={s.metricNum}>{isAdmin ? totalHidden : "—"}</div>
+            <div className={s.metricLbl}>{isAdmin ? "Invisibles · staff" : "Prizepool · à venir"}</div>
           </div>
         </div>
 
@@ -160,17 +262,37 @@ export default function TournamentsPage() {
                 onClick={() => setGameFilter(key as GameFilter)}
               >
                 {label}
-                <span className={s.num}>{countByGame(buckets, key as GameFilter)}</span>
+                <span className={s.num}>{countGame(key as GameFilter)}</span>
               </button>
             ))}
           </div>
         </div>
 
-        <Ticker items={buildTickerItems(buckets)} />
+        {/* Les paniers reclassés, comme les sections : sinon le bandeau
+            annoncerait « À VENIR » un tournoi affiché juste dessous en
+            « INSCRIPTIONS » — le genre de doute qui fait recharger la page. */}
+        <Ticker items={buildTickerItems(scheduledBuckets)} />
 
         <div className={s.sections}>
+          {showHidden && (
+            <Section
+              ix="01"
+              title="TOURNOIS INVISIBLES"
+              accent="· STAFF"
+              count={totalHidden}
+              defaultOpen={true}
+              emptyMsg="Aucun tournoi invisible ne correspond à cette recherche."
+            >
+              {filteredHidden.map((t) => (
+                <div key={t.id} className={s.hiddenCard}>
+                  <StateCard t={t} />
+                </div>
+              ))}
+            </Section>
+          )}
+
           <Section
-            ix="01"
+            ix={ix(1)}
             title="EN COURS"
             count={totalRunning}
             defaultOpen={true}
@@ -183,7 +305,7 @@ export default function TournamentsPage() {
           </Section>
 
           <Section
-            ix="02"
+            ix={ix(2)}
             title="INSCRIPTIONS OUVERTES"
             count={totalRegistration}
             defaultOpen={true}
@@ -195,7 +317,7 @@ export default function TournamentsPage() {
           </Section>
 
           <Section
-            ix="03"
+            ix={ix(3)}
             title="PROCHAINEMENT"
             count={totalUpcoming}
             defaultOpen={true}
@@ -207,7 +329,7 @@ export default function TournamentsPage() {
           </Section>
 
           <Section
-            ix="04"
+            ix={ix(4)}
             title="TERMINÉS"
             count={totalFinished}
             defaultOpen={false}
