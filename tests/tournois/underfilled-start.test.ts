@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/tournaments/repository");
@@ -150,5 +152,32 @@ describe("syncTournamentState — coup d'envoi sans adversaires", () => {
     await syncTournamentState(connection, 7);
 
     expect(finalizeUnderfilledTournament).not.toHaveBeenCalled();
+  });
+});
+
+describe("page du tournoi — ce que dit la zone des matchs vide", () => {
+  // Même approche que `refresh-wiring` : la page est un composant client bardé
+  // de contextes, et ce qu'on veut garantir tient au câblage, pas au rendu.
+  const source = readFileSync(
+    join(__dirname, "..", "..", "app", "(secured)", "tournois", "[id]", "page.tsx"),
+    "utf8",
+  );
+
+  it("distingue le tournoi clos sans match du plateau encore à venir", () => {
+    expect(source).toContain("const noMatchesLabel =");
+    expect(source).toMatch(/detail\.card\.state === "FINISHED" && detail\.matches\.length === 0/);
+    expect(source).toContain("Tournoi clos sans être joué");
+  });
+
+  it("emploie le vocabulaire du type de participant", () => {
+    // « moins de deux équipes engagées » / « moins de deux joueurs engagés ».
+    expect(source).toContain("${wording.manyEngaged}");
+  });
+
+  it("ne laisse plus le libellé d'attente en dur dans le JSX", () => {
+    // Les deux emplacements passent par le libellé calculé : sans cela, l'un
+    // des deux annoncerait encore des matchs « pour l'instant » absents.
+    expect(source).not.toContain("Aucun match disponible pour l&apos;instant.");
+    expect(source.match(/\{noMatchesLabel\}/g)).toHaveLength(2);
   });
 });
