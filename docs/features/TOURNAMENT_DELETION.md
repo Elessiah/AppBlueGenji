@@ -109,6 +109,14 @@ La zone de danger est isolée en bas de page, sous la frise de progression, loin
 des actions courantes. Elle est retirée quand le suivi est arrêté (`frozen`),
 comme toutes les autres actions.
 
+Le dialogue est rendu dans un **portail** sur `document.body`. La page vit dans
+`.page-shell`, qui pose `position: relative; z-index: 1` : tout ce qu'elle
+contient est enfermé sous la barre de navigation (`z-index: 50`), quelle que
+soit la valeur déclarée sur la modale. Sans le portail, l'en-tête recouvrait le
+titre du dialogue. Conséquence à retenir : `useDialogBehavior` reçoit
+`open: mounted` et non `open: true` — déclenché avant le montage du portail, il
+ne trouverait rien à focaliser.
+
 ## Ce que voient les autres lecteurs
 
 **Aucun événement dédié n'a été ajouté.** La suppression passe par le point de

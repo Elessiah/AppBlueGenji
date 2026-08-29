@@ -1,7 +1,9 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/toast";
+import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { isDeletionConfirmed } from "@/lib/shared/tournament-deletion";
 import { mapError } from "../_lib/error-map";
 
@@ -19,6 +21,14 @@ interface DeleteTournamentDialogProps {
  * (`lib/shared/tournament-deletion.ts`) : l'action détruit les matchs, les
  * inscriptions et les classements, elle ne doit pas pouvoir se déclencher d'un
  * clic distrait. Le dialogue liste explicitement ce qui part et ce qui reste.
+ *
+ * Comportement modal complet via `useDialogBehavior` : `Échap`, piège à focus,
+ * arrière-plan figé, focus rendu au déclencheur à la fermeture.
+ *
+ * Rendu dans un portail sur `document.body` : la page vit dans `.page-shell`,
+ * qui pose `position: relative; z-index: 1` et **enferme** donc tout ce qu'elle
+ * contient sous la barre de navigation (`z-index: 50`) — quelle que soit la
+ * valeur déclarée ici. Sans le portail, l'en-tête recouvre le titre du dialogue.
  */
 export function DeleteTournamentDialog({
   tournamentId,
@@ -29,6 +39,16 @@ export function DeleteTournamentDialog({
   const { showError } = useToast();
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
+  // Le portail vise `document.body` : rien à rendre tant qu'on est côté serveur.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  // `open: mounted` et non `true` : le contenu n'existe qu'après le montage du
+  // portail. Déclenché avant, le hook ne trouverait rien à focaliser et la
+  // saisie n'aurait pas le curseur à l'ouverture.
+  //
+  // `locked` pendant l'envoi : `Échap` ne doit pas refermer une modale en train
+  // d'écrire — la suppression, elle, partirait quand même.
+  const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: busy });
 
   const armed = isDeletionConfirmed(tournamentName, confirmation);
 
@@ -48,16 +68,13 @@ export function DeleteTournamentDialog({
     }
   };
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="delete-tournament-title"
+      role="presentation"
       onClick={() => {
         if (!busy) onClose();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Escape" && !busy) onClose();
       }}
       style={{
         position: "fixed",
@@ -70,9 +87,13 @@ export function DeleteTournamentDialog({
         padding: 16,
       }}
     >
-      <form
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-tournament-title"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        onSubmit={submit}
         style={{
           width: "100%",
           maxWidth: 480,
@@ -101,53 +122,58 @@ export function DeleteTournamentDialog({
           sont.
         </p>
 
-        <div className="field" style={{ marginTop: 18 }}>
-          <label htmlFor="delete-tournament-confirmation">
-            Recopie le nom du tournoi pour confirmer
-          </label>
-          <input
-            id="delete-tournament-confirmation"
-            value={confirmation}
-            onChange={(e) => setConfirmation(e.target.value)}
-            placeholder={tournamentName}
-            autoComplete="off"
-            autoFocus
-            disabled={busy}
-            aria-describedby="delete-tournament-hint"
-          />
-          <p
-            id="delete-tournament-hint"
-            style={{ marginTop: 6, fontSize: 12, color: "var(--ink-dim, #6b7480)" }}
-          >
-            {armed ? "Nom confirmé." : "La suppression restera bloquée tant que le nom ne correspond pas."}
-          </p>
-        </div>
+        <form onSubmit={submit}>
+          <div className="field" style={{ marginTop: 18 }}>
+            <label htmlFor="delete-tournament-confirmation">
+              Recopie le nom du tournoi pour confirmer
+            </label>
+            <input
+              id="delete-tournament-confirmation"
+              value={confirmation}
+              onChange={(e) => setConfirmation(e.target.value)}
+              placeholder={tournamentName}
+              autoComplete="off"
+              disabled={busy}
+              aria-describedby="delete-tournament-hint"
+            />
+            <p
+              id="delete-tournament-hint"
+              aria-live="polite"
+              style={{ marginTop: 6, fontSize: 12, color: "var(--ink-dim, #6b7480)" }}
+            >
+              {armed
+                ? "Nom confirmé."
+                : "La suppression restera bloquée tant que le nom ne correspond pas."}
+            </p>
+          </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-          <button
-            type="button"
-            className="btn ghost"
-            onClick={onClose}
-            disabled={busy}
-            style={{ padding: "8px 18px", fontSize: 13 }}
-          >
-            Annuler
-          </button>
-          <button
-            type="submit"
-            className="btn"
-            disabled={!armed || busy}
-            style={{
-              padding: "8px 20px",
-              fontSize: 13,
-              borderColor: "var(--red-live, #ff4d4d)",
-              color: armed && !busy ? "var(--red-live, #ff4d4d)" : undefined,
-            }}
-          >
-            {busy ? "Suppression…" : "Supprimer définitivement"}
-          </button>
-        </div>
-      </form>
-    </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={onClose}
+              disabled={busy}
+              style={{ padding: "8px 18px", fontSize: 13 }}
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              className="btn"
+              disabled={!armed || busy}
+              style={{
+                padding: "8px 20px",
+                fontSize: 13,
+                borderColor: "var(--red-live, #ff4d4d)",
+                color: armed && !busy ? "var(--red-live, #ff4d4d)" : undefined,
+              }}
+            >
+              {busy ? "Suppression…" : "Supprimer définitivement"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body,
   );
 }
