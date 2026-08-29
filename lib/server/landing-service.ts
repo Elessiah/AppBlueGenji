@@ -12,7 +12,14 @@ import {
   type LandingStats,
   type LandingTickerPayload,
 } from "@/lib/shared/landing";
-import type { BracketType, TournamentBuckets, TournamentCard } from "@/lib/shared/types";
+import type { BracketType, MatchStatus, TournamentBuckets, TournamentCard } from "@/lib/shared/types";
+import { findBroadcastingTournament } from "@/lib/server/tournaments/live-streams";
+import {
+  isMatchLive,
+  normalizeStreamUrl,
+  resolveMatchLiveState,
+  type MatchLiveTrigger,
+} from "@/lib/shared/live-streams";
 import { rankingPoints, rankingPointsSql } from "@/lib/shared/ranking";
 
 const DEFAULT_STATS: LandingStats = {
@@ -60,12 +67,24 @@ type LiveMatchRow = RowDataPacket & {
   bracket: BracketType;
   round_number: number;
   match_number: number;
-  status: "READY" | "AWAITING_CONFIRMATION" | "COMPLETED" | "PENDING";
+  status: MatchStatus;
   team1_name: string | null;
   team2_name: string | null;
   team1_score: number | null;
   team2_score: number | null;
+  live_trigger: MatchLiveTrigger | null;
+  live_url: string | null;
+  live_started_at: Date | string | null;
 };
+
+/** Vue « diffusion » d'une ligne de match, pour le module pur partagé. */
+function toLiveInput(row: LiveMatchRow) {
+  return {
+    status: row.status,
+    liveTrigger: row.live_trigger,
+    liveStartedAt: row.live_started_at,
+  };
+}
 
 function roundLabelFor(bracket: BracketType, roundNumber: number, matchCount: number): string {
   if ((bracket === "UPPER" || bracket === "GRAND") && matchCount === 1) {
@@ -79,8 +98,16 @@ function roundLabelFor(bracket: BracketType, roundNumber: number, matchCount: nu
 export async function getLandingLive(buckets?: TournamentBuckets): Promise<LandingLive | null> {
   try {
     const tournamentBuckets = buckets ?? await listTournamentBuckets(null);
-    const tournament = tournamentBuckets.running[0] ?? null;
-    if (!tournament) return null;
+    if (tournamentBuckets.running.length === 0) return null;
+
+    // Le tournoi réellement à l'antenne prime sur le plus récent : sans cela, la
+    // carte live et le bouton « Regarder le live » pourraient désigner deux
+    // tournois différents quand plusieurs tournent en parallèle.
+    const broadcasting = await findBroadcastingTournament().catch(() => null);
+    const tournament =
+      (broadcasting
+        ? tournamentBuckets.running.find((card) => card.id === broadcasting.tournamentId)
+        : null) ?? tournamentBuckets.running[0];
 
     const db = await getDatabase();
     const [rows] = await db.execute<LiveMatchRow[]>(
@@ -93,7 +120,10 @@ export async function getLandingLive(buckets?: TournamentBuckets): Promise<Landi
         t1.name AS team1_name,
         t2.name AS team2_name,
         m.team1_score,
-        m.team2_score
+        m.team2_score,
+        m.live_trigger,
+        m.live_url,
+        m.live_started_at
        FROM bg_matches m
        LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
        LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
@@ -104,7 +134,12 @@ export async function getLandingLive(buckets?: TournamentBuckets): Promise<Landi
       [tournament.id],
     );
 
-    const currentRow = rows.find((row) => row.status === "READY" || row.status === "AWAITING_CONFIRMATION") ?? null;
+    // Un match à l'antenne est la mise en avant recherchée ; à défaut on retombe
+    // sur le premier match jouable ou en attente de confirmation.
+    const currentRow =
+      rows.find((row) => isMatchLive(toLiveInput(row))) ??
+      rows.find((row) => row.status === "READY" || row.status === "AWAITING_CONFIRMATION") ??
+      null;
     const currentMatch: LandingLiveMatch | null = currentRow
       ? {
           id: Number(currentRow.id),
@@ -118,6 +153,8 @@ export async function getLandingLive(buckets?: TournamentBuckets): Promise<Landi
             Number(currentRow.round_number),
             rows.filter((row) => row.bracket === currentRow.bracket).length,
           ),
+          liveState: resolveMatchLiveState(toLiveInput(currentRow)),
+          liveUrl: normalizeStreamUrl(currentRow.live_url),
         }
       : null;
 
@@ -127,6 +164,14 @@ export async function getLandingLive(buckets?: TournamentBuckets): Promise<Landi
       viewers: getSubscribersCount(tournament.id),
       game: inferGameLabel(tournament.name),
       phase: inferPhaseLabel(currentMatch),
+      stream:
+        broadcasting && broadcasting.tournamentId === tournament.id
+          ? {
+              tournamentId: tournament.id,
+              tournamentName: tournament.name,
+              url: broadcasting.url,
+            }
+          : null,
     };
   } catch {
     return null;

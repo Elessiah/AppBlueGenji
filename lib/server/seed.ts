@@ -24,6 +24,7 @@ import {
   forfeitSurvivalTeam,
 } from "./tournaments/survival";
 import { insertPhases, setCurrentPhase, loadPhases } from "./tournaments/phases-repository";
+import { normalizeStreamUrl } from "@/lib/shared/live-streams";
 import { initializeMultiTournament, startPhase, reconcilePhases } from "./tournaments/phases";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { matchWinsRequired } from "@/lib/shared/match-format";
@@ -156,7 +157,7 @@ const SPECIAL_USERS: SpecialUserDef[] = [
   },
   {
     pseudo: "Caster",
-    purpose: "permission casting seule (aperçu du plateau, lecture seule)",
+    purpose: "rôle CASTER : aperçu du plateau (lecture seule) + diffusion des matchs",
     platformRoles: ["CASTER"],
     isAdult: 1,
   },
@@ -1134,6 +1135,41 @@ async function applyReportStates(
 // Tournois
 // ---------------------------------------------------------------------------
 
+/**
+ * Diffusion en direct d'un tournoi seedé.
+ *
+ * La chaîne officielle est posée sur le tournoi ; le mode de diffusion est
+ * appliqué aux seules manches encore jouables (`READY`), c'est-à-dire celles
+ * que la simulation n'a pas résolues. Poser un mode sur une manche déjà notée
+ * ne produirait rien de visible : l'état est dérivé, et un score saisi éteint
+ * le direct (`lib/shared/live-streams.ts`).
+ */
+async function applyLiveStreams(
+  db: Pool,
+  tournamentId: number,
+  def: TournamentDef
+): Promise<void> {
+  if (!def.live) return;
+
+  // Normalisé comme le ferait la route de production : le jeu de test doit
+  // contenir exactement ce qu'un enregistrement réel produit.
+  await db.execute(`UPDATE bg_tournaments SET live_url = ? WHERE id = ?`, [
+    normalizeStreamUrl(def.live.url),
+    tournamentId,
+  ]);
+
+  const startedAt = def.live.trigger === "MANUAL" && def.live.onAir ? new Date() : null;
+  await db.execute(
+    `UPDATE bg_matches
+     SET live_trigger = ?, live_url = ?, live_started_at = ?
+     WHERE tournament_id = ?
+       AND status = 'READY'
+       AND team1_id IS NOT NULL
+       AND team2_id IS NOT NULL`,
+    [def.live.trigger, normalizeStreamUrl(def.live.matchUrl), startedAt, tournamentId]
+  );
+}
+
 async function createTournament(
   db: Pool,
   organizerId: number,
@@ -1290,6 +1326,8 @@ async function createTournament(
       await applyReportStates(db, tournamentId, def);
     }
   }
+
+  await applyLiveStreams(db, tournamentId, def);
 
   const gameLabel = def.game === "OW2" ? "Overwatch" : "Marvel Rivals";
   console.log(

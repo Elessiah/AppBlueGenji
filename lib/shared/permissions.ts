@@ -18,11 +18,21 @@ export type PlatformRole = "ADMIN" | "ARBITRE" | "CASTER" | "COMMUNITY_MANAGER" 
  * - `tournaments` — création et gestion des tournois / matchs.
  * - `casting` — consultation de l'aperçu du plateau avant le lancement, pour
  *   préparer la diffusion (lecture seule : ne donne aucun droit d'écriture).
+ * - `live` — diffusion proprement dite : marquer un match comme casté, sa
+ *   chaîne, l'ouverture de son antenne. Volontairement distincte de `casting`
+ *   (qui ne lit que l'aperçu) et de `tournaments` : un streamer doit pouvoir
+ *   ouvrir l'antenne sans toucher aux scores ni aux tournois.
  * - `showcase` — site vitrine (sponsors) + association (bureau, stats, bénévoles, contact).
  * - `recruitment` — page recrutement.
  * - `roles` — attribution des rôles de permission aux utilisateurs (réservé ADMIN).
  */
-export type Permission = "tournaments" | "casting" | "showcase" | "recruitment" | "roles";
+export type Permission =
+  | "tournaments"
+  | "casting"
+  | "live"
+  | "showcase"
+  | "recruitment"
+  | "roles";
 
 /** Tous les rôles, dans un ordre d'affichage stable (ADMIN en tête). */
 export const PLATFORM_ROLES: readonly PlatformRole[] = [
@@ -46,16 +56,20 @@ export const ROLE_LABELS: Record<PlatformRole, string> = {
 export const ROLE_DESCRIPTIONS: Record<PlatformRole, string> = {
   ADMIN: "Tous les droits, dont l'attribution des rôles.",
   ARBITRE: "Créer et gérer les tournois.",
-  CASTER: "Consulter l'aperçu du plateau avant le lancement (lecture seule).",
+  CASTER: "Préparer et diffuser les matchs en direct (aperçu du plateau, antenne).",
   COMMUNITY_MANAGER: "Gérer le site vitrine et l'association.",
   RECRUTEUR: "Gérer la page recrutement.",
 };
 
 const ROLE_PERMISSIONS: Record<PlatformRole, readonly Permission[]> = {
-  ADMIN: ["tournaments", "casting", "showcase", "recruitment", "roles"],
-  // L'arbitre gère le tournoi : l'aperçu lui est acquis, sans rôle en plus.
-  ARBITRE: ["tournaments", "casting"],
-  CASTER: ["casting"],
+  ADMIN: ["tournaments", "casting", "live", "showcase", "recruitment", "roles"],
+  // L'arbitre gère le tournoi : l'aperçu lui est acquis, sans rôle en plus, et
+  // il ouvre aussi l'antenne — sans quoi il faudrait deux personnes pour lancer
+  // un match casté.
+  ARBITRE: ["tournaments", "casting", "live"],
+  // Les deux faces du métier de caster : préparer (lecture de l'aperçu) et
+  // diffuser (écriture sur l'état de direct des matchs, et rien d'autre).
+  CASTER: ["casting", "live"],
   COMMUNITY_MANAGER: ["showcase"],
   RECRUTEUR: ["recruitment"],
 };

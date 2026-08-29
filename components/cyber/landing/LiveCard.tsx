@@ -1,19 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Eye } from "lucide-react";
 import { CyberCard, Pill, TeamSigil } from "@/components/cyber";
 import type { LandingLive } from "@/lib/shared/landing";
 import { inferPhaseLabel, toBestOfLabel } from "@/lib/shared/landing";
+import { PLATFORM_LABELS, streamPlatform } from "@/lib/shared/live-streams";
 import styles from "./LiveCard.module.css";
 
 type LiveCardProps = {
-  initialLive: LandingLive | null;
-  nextUpcomingISO?: string | null;
-};
-
-type LiveResponse = {
+  /**
+   * État du direct, tenu par le `Hero` (`useLandingLive`). La carte est
+   * volontairement contrôlée : elle partage sa source avec le bouton
+   * « Regarder le live », qui doit apparaître et disparaître en même temps
+   * qu'elle annonce un match à l'antenne.
+   */
   live: LandingLive | null;
+  nextUpcomingISO?: string | null;
 };
 
 function sigilFor(name: string | null): string {
@@ -30,53 +32,7 @@ function nextDaysLabel(iso: string | null | undefined): string {
   return `${days} jours`;
 }
 
-export function LiveCard({ initialLive, nextUpcomingISO }: LiveCardProps) {
-  const [live, setLive] = useState<LandingLive | null>(initialLive);
-
-  useEffect(() => {
-    let mounted = true;
-    const controller = new AbortController();
-
-    async function loadLive() {
-      try {
-        const response = await fetch("/api/landing/live", {
-          signal: controller.signal,
-          cache: "no-store",
-        });
-        if (!response.ok) {
-          return;
-        }
-        const payload = (await response.json()) as LiveResponse;
-        if (mounted) {
-          const raw = payload.live ?? null;
-          if (raw) {
-            const text = (raw.tournament.name ?? "").toLowerCase();
-            const game = text.includes("marvel") || text.includes("rivals") ? "Marvel Rivals" : "Overwatch";
-            const phase = raw.currentMatch
-              ? raw.currentMatch.roundLabel?.toUpperCase?.() ?? "EN ATTENTE"
-              : "EN ATTENTE";
-            setLive({ ...raw, game, phase });
-          } else {
-            setLive(null);
-          }
-        }
-      } catch {
-        if (!mounted) return;
-      }
-    }
-
-    void loadLive();
-    const interval = window.setInterval(() => {
-      void loadLive();
-    }, 10_000);
-
-    return () => {
-      mounted = false;
-      controller.abort();
-      window.clearInterval(interval);
-    };
-  }, []);
-
+export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
   if (!live) {
     return (
       <CyberCard ticks className={styles.root}>
@@ -91,6 +47,9 @@ export function LiveCard({ initialLive, nextUpcomingISO }: LiveCardProps) {
   const currentMatch = live.currentMatch;
   const bestOf = toBestOfLabel(currentMatch);
   const title = live.tournament.name.toUpperCase();
+  const matchIsLive = currentMatch?.liveState === "LIVE";
+  const matchIsScheduled = currentMatch?.liveState === "SCHEDULED";
+  const matchPlatform = streamPlatform(currentMatch?.liveUrl);
 
   return (
     <CyberCard ticks className={styles.root}>
@@ -107,6 +66,24 @@ export function LiveCard({ initialLive, nextUpcomingISO }: LiveCardProps) {
 
       {currentMatch ? (
         <div className={styles.match}>
+          {(matchIsLive || matchIsScheduled) && (
+            <div className={matchIsLive ? styles.streamBanner : styles.streamBannerScheduled}>
+              <span className={styles.streamLabel}>
+                {matchIsLive ? "● CE MATCH EST EN DIRECT" : "○ MATCH PROGRAMMÉ EN DIRECT"}
+              </span>
+              {currentMatch.liveUrl && (
+                <a
+                  className={styles.streamLink}
+                  href={currentMatch.liveUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {matchPlatform ? `Voir sur ${PLATFORM_LABELS[matchPlatform]}` : "Voir la chaîne"}
+                </a>
+              )}
+            </div>
+          )}
+
           <div className={styles.team}>
             <TeamSigil letter={sigilFor(currentMatch.team1Name)} size={40} />
             <div className={styles.teamText}>

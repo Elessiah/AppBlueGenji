@@ -29,8 +29,21 @@ const ERROR_MESSAGES: Record<string, string> = {
   // pour une autre équipe que la sienne.
   TEAM_ALREADY_OUT: "Cette équipe n'est plus en lice dans ce tournoi.",
   TEAM_NOT_IN_TOURNAMENT: "Cette équipe n'est pas inscrite à ce tournoi.",
-  FORBIDDEN: "Tu ne peux déclarer forfait que pour ton équipe.",
+  // Volontairement neutre : le même code remonte du forfait, de la diffusion et
+  // de toute route protégée. Un message parlant de forfait sur un refus
+  // d'antenne enverrait le lecteur chercher un bug là où il n'y en a pas.
+  FORBIDDEN: "Tu n'as pas les droits nécessaires pour cette action.",
   FORFEIT_FAILED: "Erreur lors de la déclaration de forfait.",
+  // Diffusion en direct (`lib/shared/live-streams.ts`).
+  INVALID_STREAM_URL:
+    "Lien de diffusion non reconnu (Twitch, YouTube ou Kick attendu).",
+  INVALID_LIVE_TRIGGER: "Mode de passage à l'antenne invalide.",
+  LIVE_TRIGGER_NOT_MANUAL:
+    "Ce match passe à l'antenne automatiquement : il n'y a rien à basculer.",
+  MATCH_NOT_LIVE_READY:
+    "L'antenne ne s'ouvre que sur un match jouable dont le score n'est pas saisi.",
+  MATCH_LIVE_UPDATE_FAILED: "Erreur lors de la mise à jour de la diffusion.",
+  TOURNAMENT_LIVE_UPDATE_FAILED: "Erreur lors de la mise à jour de la chaîne officielle.",
 };
 
 export function mapError(errorCode: string): string {

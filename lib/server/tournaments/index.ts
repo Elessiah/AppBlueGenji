@@ -422,6 +422,7 @@ export async function listTournamentBuckets(
       t.participant_type,
       t.match_format_type,
       t.match_format_value,
+      t.live_url,
       COALESCE(COUNT(r.id), 0) AS registered_teams
      FROM bg_tournaments t
      LEFT JOIN bg_tournament_registrations r ON r.tournament_id = t.id
@@ -448,7 +449,8 @@ export async function listTournamentBuckets(
       t.survival_current_round,
       t.participant_type,
       t.match_format_type,
-      t.match_format_value
+      t.match_format_value,
+      t.live_url
      ORDER BY t.start_at DESC`,
     params,
   );
@@ -555,6 +557,11 @@ export async function getTournamentDetail(
    * sans aucun droit d'écriture.
    */
   canPreview = isAdmin,
+  /**
+   * Droit d'écrire l'état de diffusion des matchs : permission `live`. Distinct
+   * de `canPreview`, qui ne donne que la lecture de l'aperçu.
+   */
+  canManageLive = isAdmin,
 ): Promise<TournamentDetail | null> {
   const db = await getDatabase();
 
@@ -688,6 +695,7 @@ export async function getTournamentDetail(
       myTeamId,
       canCreateReportsForTeamIds,
       isAdmin,
+      canManageLive,
       survival,
       swiss,
       endurance,

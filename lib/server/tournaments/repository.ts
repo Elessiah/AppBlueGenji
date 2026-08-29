@@ -31,7 +31,8 @@ export async function loadTournamentRow(
       manual_seeding,
       participant_type,
       match_format_type,
-      match_format_value
+      match_format_value,
+      live_url
      FROM bg_tournaments
      WHERE id = ?
      LIMIT 1`,
@@ -184,6 +185,9 @@ export async function getMatchRows(
       m.score_deadline_at,
       m.updated_at,
       m.phase_id,
+      m.live_trigger,
+      m.live_url,
+      m.live_started_at,
       p.position AS phase_position
      FROM bg_matches m
      LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
@@ -230,6 +234,7 @@ export async function getTournamentListRow(
       t.participant_type,
       t.match_format_type,
       t.match_format_value,
+      t.live_url,
       COALESCE(COUNT(r.id), 0) AS registered_teams
      FROM bg_tournaments t
      LEFT JOIN bg_tournament_registrations r ON r.tournament_id = t.id
@@ -257,7 +262,8 @@ export async function getTournamentListRow(
       t.current_phase_id,
       t.participant_type,
       t.match_format_type,
-      t.match_format_value`,
+      t.match_format_value,
+      t.live_url`,
     [tournamentId],
   );
 

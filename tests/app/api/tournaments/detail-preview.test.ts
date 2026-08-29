@@ -20,12 +20,12 @@ function login(user: User | null) {
   (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
 }
 
-/** Arguments du dernier appel : [id, userId, canManage, canPreview]. */
+/** Arguments du dernier appel : [id, userId, canManage, canPreview, canManageLive]. */
 function detailCall() {
   return (service.getTournamentDetail as jest.Mock).mock.calls[0];
 }
 
-describe("GET /api/tournaments/[id] — droit à l'aperçu", () => {
+describe("GET /api/tournaments/[id] — droits d'aperçu et de diffusion", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (service.getTournamentDetail as jest.Mock).mockResolvedValue({ card: {} } as never);
@@ -38,7 +38,7 @@ describe("GET /api/tournaments/[id] — droit à l'aperçu", () => {
     const res = await get("7");
 
     expect(res.status).toBe(200);
-    expect(detailCall()).toEqual([7, 1, true, true]);
+    expect(detailCall()).toEqual([7, 1, true, true, true]);
   });
 
   it("accorde gestion et aperçu à un arbitre", async () => {
@@ -46,15 +46,15 @@ describe("GET /api/tournaments/[id] — droit à l'aperçu", () => {
 
     await get("7");
 
-    expect(detailCall()).toEqual([7, 2, true, true]);
+    expect(detailCall()).toEqual([7, 2, true, true, true]);
   });
 
-  it("accorde l'aperçu au cast, mais aucun droit de gestion", async () => {
+  it("accorde au cast l'aperçu et la diffusion, mais aucun droit de gestion", async () => {
     login({ id: 3, isAdmin: false, roles: ["CASTER"] });
 
     await get("7");
 
-    expect(detailCall()).toEqual([7, 3, false, true]);
+    expect(detailCall()).toEqual([7, 3, false, true, true]);
   });
 
   it("refuse l'aperçu à un joueur ordinaire", async () => {
@@ -62,7 +62,7 @@ describe("GET /api/tournaments/[id] — droit à l'aperçu", () => {
 
     await get("7");
 
-    expect(detailCall()).toEqual([7, 4, false, false]);
+    expect(detailCall()).toEqual([7, 4, false, false, false]);
   });
 
   it("refuse l'aperçu à un rôle d'un autre domaine", async () => {
@@ -70,7 +70,7 @@ describe("GET /api/tournaments/[id] — droit à l'aperçu", () => {
 
     await get("7");
 
-    expect(detailCall()).toEqual([7, 5, false, false]);
+    expect(detailCall()).toEqual([7, 5, false, false, false]);
   });
 
   it("refuse un visiteur non connecté", async () => {
