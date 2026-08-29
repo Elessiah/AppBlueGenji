@@ -85,7 +85,13 @@ export function TournamentLiveLink({
     return (
       <form
         onSubmit={submit}
-        style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "flex-start" }}
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 8,
+          alignItems: "flex-start",
+          marginTop: 14,
+        }}
       >
         <div style={{ minWidth: 240, flex: "1 1 240px" }}>
           <input
@@ -137,7 +143,15 @@ export function TournamentLiveLink({
   }
 
   return (
-    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+    <div
+      style={{
+        display: "flex",
+        gap: 8,
+        alignItems: "center",
+        flexWrap: "wrap",
+        marginTop: 14,
+      }}
+    >
       {liveUrl && (
         <CyberButton variant="ghost" asChild>
           <a

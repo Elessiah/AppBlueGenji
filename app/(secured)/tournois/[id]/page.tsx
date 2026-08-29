@@ -369,14 +369,12 @@ export default function TournamentDetailPage() {
 
             {/* Chaîne officielle : antenne permanente du tournoi, distincte de
                 l'état « en direct » qui, lui, se joue au niveau des matchs. */}
-            <div style={{ marginTop: 14 }}>
-              <TournamentLiveLink
-                tournamentId={tournamentId}
-                liveUrl={detail.card.liveUrl}
-                canEdit={detail.isAdmin}
-                onSaved={() => void reload().catch(() => undefined)}
-              />
-            </div>
+            <TournamentLiveLink
+              tournamentId={tournamentId}
+              liveUrl={detail.card.liveUrl}
+              canEdit={detail.isAdmin}
+              onSaved={() => void reload().catch(() => undefined)}
+            />
           </div>
         </div>
 
