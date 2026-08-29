@@ -1,7 +1,11 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { tournamentAudience } from "@/lib/server/tournament-broadcast";
-import { cached } from "@/lib/server/cache";
+import {
+  cachedLanding,
+  LANDING_LIVE_TTL_MS,
+  LANDING_TTL_MS,
+} from "@/lib/server/landing-cache";
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import {
   inferGameLabel,
@@ -52,12 +56,14 @@ type StatsRow = RowDataPacket & {
  * ramène à une, et ces chiffres-là n'ont aucun besoin d'être à la seconde.
  *
  * Le direct fait exception : il porte le score en cours, on le garde court.
+ *
+ * Les durées de vie et l'invalidation vivent dans `landing-cache.ts`, hors de
+ * ce module : toute écriture de tournoi vide ces entrées, et l'invalidateur ne
+ * peut donc pas dépendre d'un service qui importe `tournaments-service`.
  */
-const LANDING_TTL_MS = 60_000;
-const LANDING_LIVE_TTL_MS = 5_000;
 
 export async function getLandingStats(): Promise<LandingStats> {
-  return cached("landing:stats", LANDING_TTL_MS, loadLandingStats);
+  return cachedLanding("stats", LANDING_TTL_MS, loadLandingStats);
 }
 
 async function loadLandingStats(): Promise<LandingStats> {
@@ -124,7 +130,7 @@ function roundLabelFor(bracket: BracketType, roundNumber: number, matchCount: nu
  * perdent rien : `listTournamentBuckets` la leur resert depuis le cache.
  */
 export async function getLandingLive(): Promise<LandingLive | null> {
-  return cached("landing:live", LANDING_LIVE_TTL_MS, () => loadLandingLive());
+  return cachedLanding("live", LANDING_LIVE_TTL_MS, () => loadLandingLive());
 }
 
 async function loadLandingLive(): Promise<LandingLive | null> {
@@ -250,7 +256,7 @@ async function loadLeaderboardRows(
 
 export async function getLandingLeaderboard(limit = 8): Promise<LandingLeaderboardRow[]> {
   const safeLimit = Math.min(50, Math.max(1, Math.trunc(limit)));
-  return cached(`landing:leaderboard:${safeLimit}`, LANDING_TTL_MS, () =>
+  return cachedLanding(`leaderboard:${safeLimit}`, LANDING_TTL_MS, () =>
     loadLandingLeaderboard(safeLimit),
   );
 }
@@ -384,7 +390,7 @@ async function loadNewsEntries(db: Awaited<ReturnType<typeof getDatabase>>): Pro
 }
 
 export async function getLandingTicker(): Promise<LandingTickerPayload> {
-  return cached("landing:ticker", LANDING_TTL_MS, loadLandingTicker);
+  return cachedLanding("ticker", LANDING_TTL_MS, loadLandingTicker);
 }
 
 async function loadLandingTicker(): Promise<LandingTickerPayload> {

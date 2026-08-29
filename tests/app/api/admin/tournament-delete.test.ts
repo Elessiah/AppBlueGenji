@@ -84,14 +84,18 @@ describe("DELETE /api/admin/tournaments/[id]", () => {
     expect(await res.json()).toEqual({ error: "TOURNAMENT_NOT_FOUND" });
   });
 
-  it("répond 500 sur un échec inattendu", async () => {
+  it("répond 500 sans laisser fuir le message du moteur", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
     (deleteTournament as jest.Mock).mockRejectedValue(new Error("ER_LOCK_DEADLOCK") as never);
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
     const res = await del("7");
 
     expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ error: "ER_LOCK_DEADLOCK" });
+    // Le texte de mysql2 est anglais et parle du moteur : l'interface est
+    // entièrement en français, il reste donc au journal du serveur.
+    expect(await res.json()).toEqual({ error: "TOURNAMENT_DELETE_FAILED" });
+    expect(logged).toHaveBeenCalled();
   });
 
   it("journalise la suppression auprès du bot — seule trace restante", async () => {

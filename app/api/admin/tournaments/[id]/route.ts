@@ -38,6 +38,12 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   } catch (error) {
     const message = (error as Error).message;
     if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);
-    return fail(message || "TOURNAMENT_DELETE_FAILED", 500);
+
+    // Le message d'une erreur mysql2 n'est jamais vide : le renvoyer tel quel
+    // afficherait « Deadlock found when trying to get lock » dans une interface
+    // entièrement en français, et exposerait le moteur. Il reste dans les
+    // journaux du serveur, où il sert à quelque chose.
+    console.error(`[tournaments] suppression du tournoi ${tournamentId} échouée :`, error);
+    return fail("TOURNAMENT_DELETE_FAILED", 500);
   }
 }

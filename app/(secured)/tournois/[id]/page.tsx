@@ -86,6 +86,12 @@ export default function TournamentDetailPage() {
   const [matchForLiveId, setMatchForLiveId] = useState<number | null>(null);
   const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
 
+  // L'App Router réutilise ce composant d'un paramètre à l'autre : passer de
+  // `/tournois/1` à `/tournois/2` ne le remonte pas (`useTournamentLive` remet
+  // son état à zéro pour la même raison). Une modale destructrice ne doit pas
+  // survivre au changement de cible.
+  useEffect(() => setDeleteDialogOpen(false), [tournamentId]);
+
   // Dernière phase courante observée. On ne resynchronise la sélection que
   // lorsqu'elle change RÉELLEMENT (une phase vient de démarrer) : comparer
   // directement à `selectedPhaseId` ramènerait l'affichage sur la phase en cours
@@ -735,7 +741,7 @@ export default function TournamentDetailPage() {
         />
       )}
 
-      {deleteDialogOpen && detail.canDelete && (
+      {deleteDialogOpen && detail.canDelete && !frozen && (
         <DeleteTournamentDialog
           tournamentId={tournamentId}
           tournamentName={detail.card.name}

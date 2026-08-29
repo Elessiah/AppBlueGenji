@@ -14,11 +14,23 @@
  * touchées — les effacer briserait les autres tournois qui s'y réfèrent. La
  * purge ne connaît que des tables portant un `tournament_id`.
  *
- * Les suppressions sont écrites explicitement plutôt que laissées aux cascades
- * `ON DELETE CASCADE` du schéma : c'est la liste exhaustive de ce qui part, elle
- * est relisible, et elle ne dépend pas de l'ordre dans lequel MySQL propage une
- * cascade en chaîne (`bg_tournament_phase_teams` n'a d'ailleurs pas de clé
- * étrangère vers le tournoi — elle passe par la phase).
+ * Les suppressions sont écrites explicitement alors que le schéma cascaderait
+ * seul depuis `bg_tournaments` — un seul `DELETE` suffirait donc. Deux raisons
+ * de ne pas s'en remettre à lui :
+ *
+ * 1. **Le schéma peut avoir dérivé.** Les migrations créent les tables en
+ *    `CREATE TABLE IF NOT EXISTS` (`lib/server/database.ts`) : les clés
+ *    étrangères ne sont posées qu'à la **création**. Une base installée avant
+ *    l'ajout d'une contrainte ne la gagnera jamais, et une cascade absente
+ *    laisserait des lignes orphelines pointant sur un tournoi disparu.
+ * 2. **C'est la liste relisible de ce qui part.** La garantie donnée à
+ *    l'utilisateur — aucune équipe, aucun joueur — se vérifie ici d'un coup
+ *    d'œil, au lieu de se déduire de six contraintes réparties dans le schéma.
+ *
+ * Le prix est de huit requêtes en trop dans le cas nominal, sur une action qui
+ * arrive quelques fois par saison. Une table de tournoi ajoutée plus tard et
+ * oubliée ici reste rattrapée par sa cascade : la liste ne peut pas faire pire
+ * que le schéma seul.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
@@ -34,10 +46,10 @@ interface TournamentIdentityRow extends RowDataPacket {
 
 /**
  * Efface toutes les lignes rattachées au tournoi, de la feuille vers la racine.
- * Exportée pour les tests : l'ordre des requêtes est la garantie qu'aucune clé
- * étrangère ne bloque la suppression.
+ * L'ordre garantit qu'aucune clé étrangère ne bloque la suppression, y compris
+ * sur une base dont une cascade manquerait (voir l'en-tête du module).
  */
-export async function purgeTournamentRows(
+async function purgeTournamentRows(
   connection: PoolConnection,
   tournamentId: number,
 ): Promise<void> {
@@ -50,6 +62,10 @@ export async function purgeTournamentRows(
     [tournamentId],
   );
 
+  // Sa clé étrangère passe par la phase, pas par le tournoi : la suppression des
+  // phases (plus bas) l'emporterait donc déjà par cascade. On l'écrit quand même,
+  // pour la même raison que le reste — c'est la seule requête qui nomme cette
+  // table, et une base dont la contrainte manquerait garderait ses lignes.
   await connection.execute(
     `DELETE FROM bg_tournament_phase_teams WHERE tournament_id = ?`,
     [tournamentId],

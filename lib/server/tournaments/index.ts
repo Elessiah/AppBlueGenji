@@ -36,7 +36,7 @@ export { reportMatchScore, finalizeMatch } from "./scoring";
 export { adminSaveMatchScores, checkDownstreamMatchesHaveNoScores } from "./admin";
 
 // Suppression définitive (administrateurs)
-export { deleteTournament, purgeTournamentRows } from "./deletion";
+export { deleteTournament } from "./deletion";
 export type { DeletedTournament } from "./deletion";
 
 // Notifications
@@ -620,6 +620,41 @@ export async function registerGhostTeam(tournamentId: number, teamId: number): P
 }
 
 /**
+ * Droits du lecteur sur **ce** tournoi, tels que la route les a résolus depuis
+ * ses permissions.
+ *
+ * Objet nommé et non une suite de booléens positionnels : ils sont quatre, tous
+ * du même type, et deux d'entre eux ouvrent des pouvoirs très différents. Une
+ * inversion d'arguments accorderait silencieusement la suppression d'un tournoi
+ * à un caster, sans qu'aucun type ne bronche.
+ *
+ * Tout champ omis vaut `false` : un appelant qui ne se pose pas la question
+ * n'accorde rien.
+ */
+export type TournamentViewerRights = {
+  /** Permission `tournaments` : création et arbitrage. */
+  canManage?: boolean;
+  /**
+   * Droit de voir l'aperçu du plateau avant le lancement : permission
+   * `tournaments` **ou** `casting`. Le staff l'a par construction, le cast l'a
+   * sans aucun droit d'écriture.
+   */
+  canPreview?: boolean;
+  /**
+   * Droit d'écrire l'état de diffusion des matchs : permission `live`. Distinct
+   * de `canPreview`, qui ne donne que la lecture de l'aperçu — un caster lit le
+   * tirage **et** ouvre l'antenne, sans pour autant arbitrer.
+   */
+  canManageLive?: boolean;
+  /**
+   * Droit de supprimer définitivement le tournoi : administrateur strict, et
+   * non simple porteur de la permission `tournaments` — un arbitre gère un
+   * tournoi, il ne l'efface pas (`docs/features/TOURNAMENT_DELETION.md`).
+   */
+  canDelete?: boolean;
+};
+
+/**
  * Contexte propre au lecteur : ce qu'il a le droit de faire ici.
  *
  * Séparé de l'instantané partagé parce qu'il ne bouge presque jamais (il change
@@ -629,28 +664,16 @@ export async function registerGhostTeam(tournamentId: number, teamId: number): P
 export async function getTournamentViewerContext(
   snapshot: TournamentSnapshot,
   userId: number,
-  isAdmin = false,
-  /**
-   * Droit de voir l'aperçu du plateau avant le lancement : permission
-   * `tournaments` **ou** `casting`. Le staff l'a par construction, le cast l'a
-   * sans aucun droit d'écriture.
-   */
-  canPreview = isAdmin,
-  /**
-   * Droit d'écrire l'état de diffusion des matchs : permission `live`. Distinct
-   * de `canPreview`, qui ne donne que la lecture de l'aperçu — un caster lit le
-   * tirage **et** ouvre l'antenne, sans pour autant arbitrer.
-   */
-  canManageLive = isAdmin,
-  /**
-   * Droit de supprimer définitivement le tournoi : administrateur strict, et
-   * non simple porteur de la permission `tournaments` — un arbitre gère un
-   * tournoi, il ne l'efface pas (`docs/features/TOURNAMENT_DELETION.md`).
-   * Défaut `false` : un appelant qui ne se pose pas la question n'ouvre pas la
-   * zone de danger.
-   */
-  canDelete = false,
+  rights: TournamentViewerRights = {},
 ): Promise<TournamentViewerContext> {
+  const {
+    canManage = false,
+    // L'arbitrage donne l'aperçu et l'antenne par construction : qui gère le
+    // tournoi n'a pas à porter un rôle de plus pour le lire ou le caster.
+    canPreview = canManage,
+    canManageLive = canManage,
+    canDelete = false,
+  } = rights;
   const isSolo = isSoloTournament(snapshot.card.participantType);
 
   // Engagé du viewer : son équipe active, ou son entrée solo en individuel.
@@ -689,7 +712,7 @@ export async function getTournamentViewerContext(
       (isSolo || myTeamId !== null),
     myTeamId,
     canCreateReportsForTeamIds: myTeamId ? [myTeamId] : [],
-    isAdmin,
+    isAdmin: canManage,
     canDelete,
     canManageLive,
   };
@@ -703,36 +726,12 @@ export async function getTournamentViewerContext(
 export async function getTournamentDetail(
   tournamentId: number,
   userId: number,
-  isAdmin = false,
-  /**
-   * Droit de voir l'aperçu du plateau avant le lancement : permission
-   * `tournaments` **ou** `casting`. Le staff l'a par construction, le cast l'a
-   * sans aucun droit d'écriture.
-   */
-  canPreview = isAdmin,
-  /**
-   * Droit d'écrire l'état de diffusion des matchs : permission `live`. Distinct
-   * de `canPreview`, qui ne donne que la lecture de l'aperçu.
-   */
-  canManageLive = isAdmin,
-  /**
-   * Droit de supprimer définitivement le tournoi : administrateur strict, et
-   * non simple porteur de la permission `tournaments`. Défaut `false` — un
-   * appelant qui ne se pose pas la question n'ouvre pas la zone de danger.
-   */
-  canDelete = false,
+  rights: TournamentViewerRights = {},
 ): Promise<TournamentDetail | null> {
   const snapshot = await getTournamentSnapshot(tournamentId);
   if (!snapshot) return null;
 
-  const viewer = await getTournamentViewerContext(
-    snapshot,
-    userId,
-    isAdmin,
-    canPreview,
-    canManageLive,
-    canDelete,
-  );
+  const viewer = await getTournamentViewerContext(snapshot, userId, rights);
   return { ...snapshot, ...viewer };
 }
 

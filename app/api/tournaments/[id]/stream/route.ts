@@ -64,17 +64,15 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   // nominal : sans lui, un arbitre n'aurait ses commandes d'antenne qu'après
   // une coupure du direct.
   const narratesLive = canAny(user, ["tournaments", "casting"]);
-  const viewer = await getTournamentViewerContext(
-    snapshot,
-    user.id,
-    can(user, "tournaments"),
-    narratesLive,
-    can(user, "live"),
+  const viewer = await getTournamentViewerContext(snapshot, user.id, {
+    canManage: can(user, "tournaments"),
+    canPreview: narratesLive,
+    canManageLive: can(user, "live"),
     // Suppression définitive : administrateur strict. Ce droit doit voyager par
     // les deux portes — ici et par la lecture REST de secours —, faute de quoi
     // la zone de danger n'apparaîtrait qu'après une coupure du direct.
-    user.isAdmin === true,
-  );
+    canDelete: user.isAdmin === true,
+  });
 
   // Palier de fraîcheur : ceux qui font le tournoi — staff, cast, engagés — sont
   // servis à la seconde, les spectateurs par fenêtres plus larges : même donnée,

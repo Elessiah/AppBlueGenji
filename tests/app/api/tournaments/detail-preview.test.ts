@@ -20,7 +20,7 @@ function login(user: User | null) {
   (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
 }
 
-/** Arguments du dernier appel : [id, userId, canManage, canPreview, canManageLive, canDelete]. */
+/** Arguments du dernier appel : [id, userId, droits du lecteur]. */
 function detailCall() {
   return (service.getTournamentDetail as jest.Mock).mock.calls[0];
 }
@@ -38,7 +38,11 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
     const res = await get("7");
 
     expect(res.status).toBe(200);
-    expect(detailCall()).toEqual([7, 1, true, true, true, true]);
+    expect(detailCall()).toEqual([
+      7,
+      1,
+      { canManage: true, canPreview: true, canManageLive: true, canDelete: true },
+    ]);
   });
 
   // L'arbitre gère le tournoi mais ne l'efface pas : `canDelete` reste faux.
@@ -47,7 +51,11 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
 
     await get("7");
 
-    expect(detailCall()).toEqual([7, 2, true, true, true, false]);
+    expect(detailCall()).toEqual([
+      7,
+      2,
+      { canManage: true, canPreview: true, canManageLive: true, canDelete: false },
+    ]);
   });
 
   it("accorde au cast l'aperçu et la diffusion, mais aucun droit de gestion", async () => {
@@ -55,7 +63,11 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
 
     await get("7");
 
-    expect(detailCall()).toEqual([7, 3, false, true, true, false]);
+    expect(detailCall()).toEqual([
+      7,
+      3,
+      { canManage: false, canPreview: true, canManageLive: true, canDelete: false },
+    ]);
   });
 
   it("refuse l'aperçu à un joueur ordinaire", async () => {
@@ -63,7 +75,11 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
 
     await get("7");
 
-    expect(detailCall()).toEqual([7, 4, false, false, false, false]);
+    expect(detailCall()).toEqual([
+      7,
+      4,
+      { canManage: false, canPreview: false, canManageLive: false, canDelete: false },
+    ]);
   });
 
   it("refuse l'aperçu à un rôle d'un autre domaine", async () => {
@@ -71,7 +87,11 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
 
     await get("7");
 
-    expect(detailCall()).toEqual([7, 5, false, false, false, false]);
+    expect(detailCall()).toEqual([
+      7,
+      5,
+      { canManage: false, canPreview: false, canManageLive: false, canDelete: false },
+    ]);
   });
 
   it("refuse un visiteur non connecté", async () => {

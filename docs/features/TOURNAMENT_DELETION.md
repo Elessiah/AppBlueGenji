@@ -22,6 +22,11 @@ Le drapeau `TournamentDetail.isAdmin` porte donc mal son nom (il vaut en réalit
 `can(user, "tournaments")`). Un champ distinct, `canDelete`, transporte le droit
 de suppression et n'est vrai que pour un administrateur.
 
+Les routes le résolvent dans un objet nommé, `TournamentViewerRights`
+(`{ canManage, canPreview, canManageLive, canDelete }`), et non par une suite de
+booléens positionnels : ils sont quatre, tous du même type, et une inversion
+d'arguments accorderait silencieusement la suppression d'un tournoi à un caster.
+
 Il vit dans le **contexte du lecteur** (`TournamentViewerContext`) et non dans
 l'instantané partagé : celui-ci est diffusé tel quel à toute la salle du flux,
 un droit n'y a pas sa place (`REALTIME_REFRESH.md`). Il voyage donc par les
@@ -46,7 +51,7 @@ ordre et en une transaction, **les seules tables portant un `tournament_id`** :
 | Étape | Table | Raison de l'ordre |
 | --- | --- | --- |
 | 1 | `bg_matches` (UPDATE) | désarme `next_winner_match_id` / `next_loser_match_id`, les matchs se pointant entre eux |
-| 2 | `bg_tournament_phase_teams` | sa clé étrangère passe par `phase_id`, pas par le tournoi |
+| 2 | `bg_tournament_phase_teams` | sa clé étrangère passe par `phase_id` : l'étape 7 l'emporterait déjà, on la nomme quand même |
 | 3 | `bg_swiss_standings` | |
 | 4 | `bg_survival_standings` | |
 | 5 | `bg_endurance_standings` | |
@@ -55,10 +60,21 @@ ordre et en une transaction, **les seules tables portant un `tournament_id`** :
 | 8 | `bg_tournament_registrations` | |
 | 9 | `bg_tournaments` | la racine |
 
-Les suppressions sont **écrites explicitement** plutôt que laissées aux cascades
-`ON DELETE CASCADE` du schéma. Le schéma les couvrirait presque toutes, mais la
-liste explicite est la spécification relisible de ce qui part, et elle ne dépend
-pas de l'ordre dans lequel MySQL propage une cascade en chaîne.
+Les suppressions sont **écrites explicitement** alors que le schéma cascaderait
+seul depuis `bg_tournaments` — un seul `DELETE` suffirait. Deux raisons de ne pas
+s'en remettre à lui :
+
+1. **Le schéma peut avoir dérivé.** Les migrations créent les tables en
+   `CREATE TABLE IF NOT EXISTS` : les clés étrangères ne sont posées qu'à la
+   **création**. Une base installée avant l'ajout d'une contrainte ne la gagnera
+   jamais, et une cascade absente laisserait des lignes orphelines.
+2. **C'est la liste relisible de ce qui part.** La garantie donnée plus bas —
+   aucune équipe, aucun joueur — se vérifie d'un coup d'œil, au lieu de se
+   déduire de six contraintes réparties dans le schéma.
+
+Le prix est de huit requêtes en trop sur une action qui arrive quelques fois par
+saison. Une table de tournoi ajoutée plus tard et oubliée dans la liste reste
+rattrapée par sa cascade : la liste ne peut pas faire pire que le schéma seul.
 
 ## Ce qui n'est jamais supprimé
 
@@ -68,13 +84,22 @@ pas de l'ordre dans lequel MySQL propage une cascade en chaîne.
 | Équipes fantômes (`is_ghost`) | entités gérées par le staff, réutilisées d'un tournoi à l'autre (`GHOST_TEAMS.md`) |
 | Entrées solo (`solo_user_id`) | **une seule ligne par joueur**, partagée par tous ses tournois individuels (`SOLO_TOURNAMENTS.md`) — l'effacer casserait les autres |
 
-## Disparition « de partout », sans code de propagation
+## Disparition « de partout »
 
-Rien n'est à nettoyer ailleurs : palmarès, bilan de maps, séries, adversaire
-favori, place au classement du site, leaderboard, calendrier, ticker et
-`findBroadcastingTournament` se recalculent **tous** depuis `bg_matches` et
+Aucune donnée n'est à nettoyer ailleurs : palmarès, bilan de maps, séries,
+adversaire favori, place au classement du site, leaderboard, calendrier, ticker
+et `findBroadcastingTournament` se recalculent **tous** depuis `bg_matches` et
 `bg_tournament_registrations` (`DEEP_STATS.md`, `LIVE_STREAMS.md`). Effacer ces
 lignes efface le tournoi de chacune de ces vues.
+
+Les **caches**, eux, demandent une ligne de code. `publishUpdatedEvent` vide
+l'instantané, l'aperçu et les listes ; il vide désormais aussi les agrégats de la
+vitrine (`lib/server/landing-cache.ts`, préfixe `landing:`), qui interrogent
+`bg_tournaments` et `bg_matches` par leurs propres requêtes et ne descendent donc
+pas du cache des listes. Sans cette invalidation, l'accueil gardait une minute
+durant un compteur de tournois surévalué, un classement incluant les résultats du
+tournoi effacé, et un ticker le nommant encore — avec un lien vers une page
+introuvable.
 
 ## Confirmation
 
@@ -146,7 +171,8 @@ renvoie vers `/tournois` dès la réponse.
 | Logique pure (confirmation) | `lib/shared/tournament-deletion.ts` |
 | Service (purge transactionnelle) | `lib/server/tournaments/deletion.ts` |
 | Route | `app/api/admin/tournaments/[id]/route.ts` (`DELETE`) |
-| Droit exposé au client | `TournamentDetail.canDelete` (`lib/shared/types.ts`) |
+| Droit exposé au client | `TournamentDetail.canDelete` (`lib/shared/types.ts`), résolu via `TournamentViewerRights` |
+| Invalidation de la vitrine | `lib/server/landing-cache.ts` |
 | Interface | `app/(secured)/tournois/[id]/_components/DeleteTournamentDialog.tsx` + zone de danger dans `page.tsx` |
 | Report du droit dans le flux | `app/(secured)/tournois/[id]/_lib/live-state.ts` (`applyLiveMessage`) |
 

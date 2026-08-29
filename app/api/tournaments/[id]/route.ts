@@ -26,16 +26,14 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   // L'aperçu du plateau va plus loin que la gestion : le cast y a droit sans
   // pouvoir rien modifier (`docs/features/TOURNAMENT_PREVIEW.md`). La diffusion
   // est, elle, un droit d'écriture à part (`docs/features/LIVE_STREAMS.md`).
-  const detail = await getTournamentDetail(
-    tournamentId,
-    user.id,
-    can(user, "tournaments"),
-    canAny(user, ["tournaments", "casting"]),
-    can(user, "live"),
+  const detail = await getTournamentDetail(tournamentId, user.id, {
+    canManage: can(user, "tournaments"),
+    canPreview: canAny(user, ["tournaments", "casting"]),
+    canManageLive: can(user, "live"),
     // Suppression définitive : administrateur strict. `can(user, "tournaments")`
     // ne convient pas — un arbitre gère le tournoi, il ne l'efface pas.
-    user.isAdmin === true,
-  );
+    canDelete: user.isAdmin === true,
+  });
   if (!detail) return fail("TOURNAMENT_NOT_FOUND", 404);
 
   return ok(detail);

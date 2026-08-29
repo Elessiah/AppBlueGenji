@@ -25,6 +25,20 @@ import {
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
+/**
+ * Droits que la route a résolus pour le lecteur. Objet nommé côté production :
+ * on le lit par ses clés, et non par une position que le moindre paramètre
+ * ajouté décalerait.
+ */
+function rightsPassedToViewerContext(): {
+  canManage?: boolean;
+  canPreview?: boolean;
+  canManageLive?: boolean;
+  canDelete?: boolean;
+} {
+  return (getTournamentViewerContext as jest.Mock).mock.calls[0][2] as Record<string, boolean>;
+}
+
 function snapshotWith(registrations: { teamId: number }[]): TournamentSnapshot {
   return {
     card: { id: 5, participantType: "TEAM", state: "RUNNING" },
@@ -159,13 +173,12 @@ describe("GET /api/tournaments/[id]/stream — palier décidé par le serveur", 
     );
     await firstMessage(await GET(new Request("http://t/"), params("5")));
 
-    // 5e argument de `getTournamentViewerContext` : `canManageLive`.
-    expect((getTournamentViewerContext as jest.Mock).mock.calls[0][4]).toBe(true);
+    expect(rightsPassedToViewerContext().canManageLive).toBe(true);
   });
 
   it("refuse les commandes d'antenne à qui n'a pas la permission", async () => {
     await firstMessage(await GET(new Request("http://t/"), params("5")));
-    expect((getTournamentViewerContext as jest.Mock).mock.calls[0][4]).toBe(false);
+    expect(rightsPassedToViewerContext().canManageLive).toBe(false);
   });
 
   it("rejoint la salle partagée plutôt que de s'abonner seul", async () => {
@@ -188,9 +201,6 @@ describe("GET /api/tournaments/[id]/stream — palier décidé par le serveur", 
 });
 
 describe("GET /api/tournaments/[id]/stream — droit de suppression", () => {
-  /** Arguments : [snapshot, userId, canManage, canPreview, canManageLive, canDelete]. */
-  const viewerCall = () => (getTournamentViewerContext as jest.Mock).mock.calls[0];
-
   it("accorde la suppression à un administrateur", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(
       { id: 1, isAdmin: true, roles: ["ADMIN"] } as never,
@@ -198,7 +208,7 @@ describe("GET /api/tournaments/[id]/stream — droit de suppression", () => {
 
     await GET(new Request("http://t/"), params("5"));
 
-    expect(viewerCall()[5]).toBe(true);
+    expect(rightsPassedToViewerContext().canDelete).toBe(true);
   });
 
   it.each([
@@ -212,7 +222,7 @@ describe("GET /api/tournaments/[id]/stream — droit de suppression", () => {
 
     await GET(new Request("http://t/"), params("5"));
 
-    expect(viewerCall()[5]).toBe(false);
+    expect(rightsPassedToViewerContext().canDelete).toBe(false);
   });
 });
 
