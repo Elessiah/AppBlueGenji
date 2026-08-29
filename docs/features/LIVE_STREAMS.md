@@ -44,6 +44,21 @@ règle : `findBroadcastingTournament` charge les seuls matchs castés (leur nomb
 est marginal) et filtre en mémoire avec `isMatchLive`, pour qu'il n'existe qu'une
 définition de « ce match est à l'antenne ».
 
+### L'exception : le ré-appariement
+
+Une seule chose ne se dérive pas — l'antenne ouverte à la main survivrait à un
+changement d'affiche. Quand une correction de score en amont remplace un engagé
+d'un match aval par **un autre**, `pushTeamToTarget`
+(`lib/server/tournaments/scoring.ts`) referme donc son antenne : la ligne a
+changé de rencontre, et la laisser ouverte rallumerait le bouton d'accueil vers
+une chaîne qui ne montre pas cette affiche.
+
+Remplir un créneau **encore vide** ne déclenche rien : c'est le cas nominal où le
+match prévu se matérialise, et une diffusion programmée à l'avance doit lui
+survivre. Le mode de déclenchement et le lien sont eux aussi conservés — ils
+disent « ce créneau du tableau est couvert par cette chaîne », ce qui reste vrai
+après un ré-appariement ; seule l'antenne, qui affirme « maintenant », tombe.
+
 ## Deux modes de passage à l'antenne
 
 Choisis **par match**, au moment où on le marque comme casté :
@@ -58,6 +73,12 @@ Choisis **par match**, au moment où on le marque comme casté :
 Passer un match en `AUTO` referme son antenne : `live_started_at` n'a plus de
 sens dans ce mode. Démarquer un match efface aussi son lien et son antenne,
 sinon une ouverture fantôme reprendrait effet à la moindre remise en `MANUAL`.
+
+Les contrôles ne sont proposés que sur un match qui peut réellement passer à
+l'antenne (`isMatchCastable`) : un bye, un match fantôme ou un match déjà noté
+dérivera `OFF` quoi qu'on configure, et lui offrir « ＋ Caster » serait une
+impasse. `canConfigureLive` rouvre toutefois la configuration d'un match déjà
+marqué, sans quoi une diffusion posée par erreur deviendrait ineffaçable.
 
 ## Le bouton « Regarder le live » de l'accueil
 

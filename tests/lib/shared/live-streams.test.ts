@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  canConfigureLive,
   canToggleOnAir,
+  isMatchCastable,
   isMatchLive,
   isMatchLiveTrigger,
   isValidStreamUrl,
@@ -12,6 +14,7 @@ import {
   PLATFORM_LABELS,
   resolveMatchLiveState,
   streamPlatform,
+  type MatchCastableInput,
   type MatchLiveInput,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
@@ -226,6 +229,50 @@ describe("isMatchLive", () => {
     expect(isMatchLive(match({ liveTrigger: "AUTO" }))).toBe(true);
     expect(isMatchLive(match({ liveTrigger: "MANUAL" }))).toBe(false);
     expect(isMatchLive(match())).toBe(false);
+  });
+});
+
+describe("isMatchCastable", () => {
+  function castable(overrides: Partial<MatchCastableInput> = {}): MatchCastableInput {
+    return { ...match(), team1Id: 1, team2Id: 2, ...overrides };
+  }
+
+  it("accepte un match à deux engagés dont le score n'est pas saisi", () => {
+    expect(isMatchCastable(castable({ status: "READY" }))).toBe(true);
+    expect(isMatchCastable(castable({ status: "PENDING" }))).toBe(true);
+  });
+
+  it("refuse un bye — un seul engagé, score posé par le moteur", () => {
+    expect(isMatchCastable(castable({ team2Id: null }))).toBe(false);
+    expect(isMatchCastable(castable({ team1Id: null }))).toBe(false);
+  });
+
+  it("refuse un match fantôme", () => {
+    expect(isMatchCastable(castable({ team1Id: null, team2Id: null }))).toBe(false);
+  });
+
+  it("refuse un match dont le score est déjà saisi", () => {
+    expect(isMatchCastable(castable({ status: "COMPLETED" }))).toBe(false);
+    expect(isMatchCastable(castable({ status: "AWAITING_CONFIRMATION" }))).toBe(false);
+  });
+});
+
+describe("canConfigureLive", () => {
+  function castable(overrides: Partial<MatchCastableInput> = {}): MatchCastableInput {
+    return { ...match(), team1Id: 1, team2Id: 2, ...overrides };
+  }
+
+  it("suit isMatchCastable sur un match non marqué", () => {
+    expect(canConfigureLive(castable())).toBe(true);
+    expect(canConfigureLive(castable({ team2Id: null }))).toBe(false);
+    expect(canConfigureLive(castable({ status: "COMPLETED" }))).toBe(false);
+  });
+
+  it("reste ouvert sur un match marqué devenu non castable", () => {
+    // Sans cette porte de sortie, une diffusion posée par erreur sur un bye
+    // deviendrait ineffaçable.
+    expect(canConfigureLive(castable({ team2Id: null, liveTrigger: "AUTO" }))).toBe(true);
+    expect(canConfigureLive(castable({ status: "COMPLETED", liveTrigger: "MANUAL" }))).toBe(true);
   });
 });
 

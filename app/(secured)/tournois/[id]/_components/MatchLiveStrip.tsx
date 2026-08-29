@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import {
+  canConfigureLive,
   canToggleOnAir,
   PLATFORM_LABELS,
   resolveMatchLiveState,
@@ -35,8 +36,12 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
   // il s'agit. Chaque contrôle porte donc le nom du match.
   const matchLabel = `${match.team1Name ?? "TBD"} contre ${match.team2Name ?? "TBD"}`;
 
-  // Rien à montrer : match non casté et viewer sans droit de diffusion.
-  if (state === "OFF" && !canManage) return null;
+  // Un bye, un match fantôme ou un match déjà noté dérivera `OFF` quoi qu'on
+  // configure : la règle vit dans le module pur, partagée et testée seule.
+  const showConfig = canManage && canConfigureLive(match);
+
+  // Rien à montrer : aucun état de diffusion et aucun contrôle à offrir.
+  if (state === "OFF" && !showConfig) return null;
 
   const toggleOnAir = async (onAir: boolean) => {
     setBusy(true);
@@ -76,7 +81,6 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
     >
       {state !== "OFF" && (
         <span
-          role="status"
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -129,7 +133,7 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
         </button>
       )}
 
-      {canManage && (
+      {showConfig && (
         <button
           type="button"
           className="btn ghost"
@@ -141,6 +145,7 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
           }
           style={{
             marginLeft: showToggle ? undefined : "auto",
+            whiteSpace: "nowrap",
             padding: "2px 8px",
             fontSize: 11,
           }}

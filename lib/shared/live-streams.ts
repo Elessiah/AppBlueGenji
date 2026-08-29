@@ -155,6 +155,12 @@ export type MatchLiveInput = {
   liveStartedAt: string | Date | null;
 };
 
+/** Vue d'un match pour décider s'il peut seulement être casté. */
+export type MatchCastableInput = MatchLiveInput & {
+  team1Id: number | null;
+  team2Id: number | null;
+};
+
 /**
  * État de diffusion d'un match.
  *
@@ -188,4 +194,27 @@ export function isMatchLive(match: MatchLiveInput): boolean {
 export function canToggleOnAir(match: MatchLiveInput): boolean {
   if (match.liveTrigger !== "MANUAL") return false;
   return match.status === "READY";
+}
+
+/**
+ * Ce match peut-il encore passer à l'antenne un jour ?
+ *
+ * Un bye (un seul engagé), un match fantôme (aucun) ou un match dont le score
+ * est déjà saisi dérivera `OFF` quoi qu'on configure : lui proposer une
+ * diffusion serait une impasse, la case se cochant et s'enregistrant sans
+ * jamais rien produire.
+ */
+export function isMatchCastable(match: MatchCastableInput): boolean {
+  if (match.team1Id === null || match.team2Id === null) return false;
+  return match.status !== "COMPLETED" && match.status !== "AWAITING_CONFIRMATION";
+}
+
+/**
+ * Faut-il exposer la configuration de diffusion à un porteur de `live` ?
+ *
+ * On l'ouvre aussi sur un match déjà marqué mais devenu non castable, sans quoi
+ * une diffusion posée par erreur deviendrait ineffaçable.
+ */
+export function canConfigureLive(match: MatchCastableInput): boolean {
+  return isMatchCastable(match) || match.liveTrigger !== null;
 }

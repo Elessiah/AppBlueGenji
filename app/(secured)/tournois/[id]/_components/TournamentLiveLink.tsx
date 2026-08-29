@@ -38,6 +38,20 @@ export function TournamentLiveLink({
   const [draft, setDraft] = useState(liveUrl ?? "");
   const [busy, setBusy] = useState(false);
 
+  /**
+   * Ouvre l'éditeur sur la valeur **courante**.
+   *
+   * Le brouillon ne peut pas se contenter de son initialisation au montage : la
+   * page se recharge par SSE, et un lien changé entre-temps par un autre membre
+   * du staff — ou simplement normalisé par le serveur après notre propre
+   * enregistrement — laisserait un brouillon périmé prêt à réécraser la valeur
+   * en base au prochain envoi.
+   */
+  const openEditor = () => {
+    setDraft(liveUrl ?? "");
+    setEditing(true);
+  };
+
   const platform = streamPlatform(liveUrl);
   const draftTouched = draft.trim().length > 0;
   const draftInvalid = draftTouched && !isValidStreamUrl(draft);
@@ -141,7 +155,7 @@ export function TournamentLiveLink({
         <button
           type="button"
           className="btn ghost"
-          onClick={() => setEditing(true)}
+          onClick={openEditor}
           style={{ padding: "6px 14px", fontSize: 12 }}
         >
           {liveUrl ? "⚙ Modifier la chaîne" : "＋ Chaîne officielle"}
