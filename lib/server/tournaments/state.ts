@@ -44,6 +44,25 @@ export async function syncTournamentState(
   const computed = computeTournamentState(tournament);
   let stateChanged = false;
 
+  // Coup d'envoi d'un plateau vide ou réduit à une seule engagée : le tournoi
+  // saute « en cours » et passe directement à « terminé ».
+  //
+  // Le contrôle précède toute initialisation de format — aucun moteur n'a ainsi
+  // à semer un classement ou des phases pour un tournoi qui n'aura jamais de
+  // match, et surtout aucun ne le laisse coincé en `RUNNING`, faute d'un match
+  // dont la fin le clôturerait. Il porte sur l'état *calculé*, et non sur la
+  // seule bascule depuis les inscriptions : entre la clôture des inscriptions
+  // et l'heure de début, un tournoi repasse par `UPCOMING`, et un tournoi déjà
+  // `RUNNING` (état hérité d'avant cette règle, ou écrit à la main) doit être
+  // rattrapé de la même façon. Une inscription ne se retirant jamais, en
+  // compter moins de deux ici signifie toujours que rien n'a pu commencer.
+  if (computed === "RUNNING") {
+    const { finalizeUnderfilledTournament } = await import("./finalization");
+    if (await finalizeUnderfilledTournament(connection, tournamentId)) {
+      return { row: await loadTournamentRow(connection, tournamentId), stateChanged: true };
+    }
+  }
+
   if (computed !== tournament.state) {
     const isStarting = tournament.state === "REGISTRATION" && computed === "RUNNING";
 
