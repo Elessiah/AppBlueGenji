@@ -17,6 +17,7 @@ import {
 } from "@/lib/shared/match-format";
 import { MatchFormatProvider } from "./_lib/match-format-context";
 import { canForfeitTeam } from "./_lib/forfeit";
+import { canShowEditButton } from "./_lib/edit-entry";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { AdminScoreDialog } from "./_components/AdminScoreDialog";
 import { GhostRegistrationDialog } from "./_components/GhostRegistrationDialog";
@@ -289,9 +290,16 @@ export default function TournamentDetailPage() {
             >
               ← Retour
             </button>
-            <h1 className="ds-title green" style={{ fontSize: "clamp(26px, 3vw, 42px)", marginBottom: 8 }}>
-              {detail.card.name}
-            </h1>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+              <h1 className="ds-title green" style={{ fontSize: "clamp(26px, 3vw, 42px)", marginBottom: 8 }}>
+                {detail.card.name}
+              </h1>
+              {canShowEditButton(detail.card, detail.isAdmin) && (
+                <CyberButton asChild variant="ghost" style={{ fontSize: 13, padding: "6px 16px" }}>
+                  <Link href={`/tournois/${detail.card.id}/modifier`}>Modifier</Link>
+                </CyberButton>
+              )}
+            </div>
             {detail.card.description && (
               <p style={{ color: "var(--text-1)", margin: "0 0 20px", fontSize: 15, lineHeight: 1.6 }}>
                 {detail.card.description}

@@ -31,6 +31,20 @@ const ERROR_MESSAGES: Record<string, string> = {
   TEAM_NOT_IN_TOURNAMENT: "Cette équipe n'est pas inscrite à ce tournoi.",
   FORBIDDEN: "Tu ne peux déclarer forfait que pour ton équipe.",
   FORFEIT_FAILED: "Erreur lors de la déclaration de forfait.",
+  // Édition d'un tournoi (`GET`/`PATCH /api/tournaments/[id]/edit`).
+  TOURNAMENT_LOCKED: "Le tournoi est en cours : il n'est plus modifiable.",
+  FIELD_NOT_EDITABLE: "Ce réglage n'est plus modifiable depuis que le tournoi est visible.",
+  MAX_TEAMS_CANNOT_DECREASE:
+    "Le nombre de places ne peut plus être réduit une fois le tournoi visible.",
+  REGISTRATION_CLOSE_IN_PAST:
+    "La clôture des inscriptions ne peut pas être placée dans le passé.",
+  EMPTY_PATCH: "Aucune modification à enregistrer.",
+  TOURNAMENT_UPDATE_FAILED: "Erreur lors de la modification du tournoi.",
+  INVALID_DATE_ORDER:
+    "Les dates doivent se suivre : visibilité, ouverture, clôture, puis début.",
+  INVALID_DATES: "Une des dates est illisible.",
+  INVALID_MAX_TEAMS: "Le nombre de places doit être compris entre 2 et 256.",
+  MISSING_NAME: "Le nom du tournoi est obligatoire.",
 };
 
 export function mapError(errorCode: string): string {
