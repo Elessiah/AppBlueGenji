@@ -164,8 +164,16 @@ export type ValidatedTournamentInput = {
   enduranceLossDelta: number | null;
   endurancePlayoffSize: number | null;
   matchFormat: MatchFormat | null;
-  /** `null` hors format MULTI. */
-  phases: PhaseConfig[] | null;
+  /**
+   * Phases du format MULTI, **brutes** (telles que reçues du client) : non
+   * normalisées — `position`, `name`, `hasThirdPlaceMatch`… peuvent être
+   * absents. C'est exactement le type accepté par `normalizePhaseConfigs`
+   * (`lib/shared/tournament-phases.ts`), qui doit être appelé — puis
+   * `validatePhases` — avant de lire un champ ou d'insérer quoi que ce soit ;
+   * `createTournament` s'en charge, `updateTournament` devra faire de même.
+   * `null` hors format MULTI.
+   */
+  phases: readonly Partial<PhaseConfig>[] | null;
 };
 
 export function validateTournamentInput(
@@ -332,11 +340,10 @@ export function validateTournamentInput(
       endurancePlayoffSize,
       matchFormat,
       // Les phases ne concernent que le format MULTI : on ne les transmet pas
-      // aux autres formats, même si le client en a envoyé. Elles restent ici
-      // au format brut du client (non normalisées) : `createTournament` les
-      // normalise et les valide au sens strict (`validatePhases`) avant
-      // insertion, comme avant l'extraction.
-      phases: body.format === "MULTI" ? (body.phases as PhaseConfig[]) : null,
+      // aux autres formats, même si le client en a envoyé. Voir le
+      // commentaire du champ `phases` de `ValidatedTournamentInput` ci-dessus :
+      // elles restent brutes ici, à normaliser par l'appelant.
+      phases: body.format === "MULTI" ? (body.phases as Partial<PhaseConfig>[]) : null,
     },
   };
 }

@@ -5,6 +5,7 @@ import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { toIso } from "@/lib/server/serialization";
 import { loadSoloUserIds } from "@/lib/server/solo-entries-service";
 import { isSoloTournament, toParticipantType, type ParticipantType } from "@/lib/shared/participants";
+import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import { validateDateOrder } from "./validation";
 import type { TournamentRow, TournamentListRow } from "./_internal";
 
@@ -178,17 +179,12 @@ export async function createTournament(
     enduranceWinDelta?: number | null;
     enduranceLossDelta?: number | null;
     endurancePlayoffSize?: number | null;
-    phases?: Array<{
-      position: number;
-      format: "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL";
-      name: string | null;
-      qualifierMode: "COUNT" | "PERCENT";
-      qualifierValue: number;
-      hasThirdPlaceMatch: boolean;
-      swissTotalRounds: number | null;
-      survivalRoundsBeforeFirstCut: number | null;
-      survivalRoundsPerCut: number | null;
-    }>;
+    /**
+     * Phases du format MULTI, brutes (non normalisées : `position`, `name`…
+     * peuvent être absents) — voir `normalizePhaseConfigs` juste en dessous,
+     * qui les complète avant validation et insertion.
+     */
+    phases?: readonly Partial<PhaseConfig>[];
   },
 ): Promise<number> {
   const db = await getDatabase();
