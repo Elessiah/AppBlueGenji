@@ -9,6 +9,8 @@ const formatOf = (t: TournamentDef): SeedFormat => t.format ?? "DOUBLE";
 const withFormat = (format: SeedFormat) => TOURNAMENTS.filter((t) => formatOf(t) === format);
 const withState = (state: TournamentDef["state"]) =>
   TOURNAMENTS.filter((t) => t.state === state);
+/** Tournoi lancé sans adversaires : clos par la synchronisation, jamais joué. */
+const isUnderfilled = (t: TournamentDef) => t.teamCount < 2;
 const running = (format: SeedFormat) =>
   TOURNAMENTS.filter((t) => formatOf(t) === format && t.state === "RUNNING");
 
@@ -176,9 +178,24 @@ describe("seed — cohérence des définitions", () => {
 
   it("garde les tournois jouables jouables (≥ 2 équipes en cours / terminé)", () => {
     for (const t of TOURNAMENTS) {
-      if (t.state === "RUNNING" || t.state === "FINISHED") {
+      if (t.state === "FINISHED" || (t.state === "RUNNING" && !isUnderfilled(t))) {
         expect(t.teamCount).toBeGreaterThanOrEqual(2);
       }
+    }
+  });
+
+  it("couvre le coup d'envoi sans adversaires, sans rien lui faire simuler", () => {
+    // La seule exception à la règle ci-dessus : un tournoi « en cours » à moins
+    // de deux engagées est là pour être clos par la première synchronisation
+    // (voir `docs/features/UNDERFILLED_TOURNAMENTS.md`). Le seed ne simule rien
+    // pour lui — il n'a ni match, ni report, ni abandon à porter.
+    const underfilled = withState("RUNNING").filter(isUnderfilled);
+
+    expect(underfilled.map((t) => t.teamCount).sort()).toEqual([0, 1]);
+    for (const t of underfilled) {
+      expect(t.playWaves).toBeUndefined();
+      expect(t.forfeits).toBeUndefined();
+      expect((t.pendingReports ?? 0) + (t.conflicts ?? 0) + (t.expiredReports ?? 0)).toBe(0);
     }
   });
 

@@ -62,6 +62,11 @@ qui attend encore son plateau.
 - Un tournoi multi-phases sous-rempli **au niveau du tournoi** est clos ici ;
   sauter une *phase* trop petite reste l'affaire de `resolvePhasePlan`
   ([MULTI_PHASE_TOURNAMENTS](MULTI_PHASE_TOURNAMENTS.md)).
+- Jeu de test : « Départ Sans Inscrit » (Ronde suisse, 0 engagée) et « Départ à
+  Une Seule Engagée » (BlueGenji Survie, 1 engagée) sont insérés « en cours » et
+  sans match — le seed ne simule rien en dessous de deux engagées — puis clos par
+  la première synchronisation. C'est le contrôle en conditions réelles de la
+  règle.
 - Tests : `tests/tournois/underfilled-finalization.test.ts` (la clôture
   elle-même) et `tests/tournois/underfilled-start.test.ts` (son déclenchement
   dans la synchronisation).
