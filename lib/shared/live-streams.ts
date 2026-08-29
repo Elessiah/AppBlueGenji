@@ -155,12 +155,6 @@ export type MatchLiveInput = {
   liveStartedAt: string | Date | null;
 };
 
-/** Vue d'un match pour décider s'il peut seulement être casté. */
-export type MatchCastableInput = MatchLiveInput & {
-  team1Id: number | null;
-  team2Id: number | null;
-};
-
 /**
  * État de diffusion d'un match.
  *
@@ -209,7 +203,7 @@ export function canToggleOnAir(match: MatchLiveInput): boolean {
  * savoir qui la jouera — c'est même le cas le plus courant d'une diffusion
  * préparée à l'avance.
  */
-export function isMatchCastable(match: MatchCastableInput): boolean {
+export function isMatchCastable(match: MatchLiveInput): boolean {
   return match.status !== "COMPLETED" && match.status !== "AWAITING_CONFIRMATION";
 }
 
@@ -219,6 +213,6 @@ export function isMatchCastable(match: MatchCastableInput): boolean {
  * On l'ouvre aussi sur un match déjà marqué mais devenu non castable, sans quoi
  * une diffusion posée par erreur deviendrait ineffaçable.
  */
-export function canConfigureLive(match: MatchCastableInput): boolean {
+export function canConfigureLive(match: MatchLiveInput): boolean {
   return isMatchCastable(match) || match.liveTrigger !== null;
 }
