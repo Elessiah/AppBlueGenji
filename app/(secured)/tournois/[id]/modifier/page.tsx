@@ -28,6 +28,34 @@ import { mapError } from "../_lib/error-map";
  * la création. Cette page ne garde que ce qui tient à la route : garde de
  * permission, chargement des valeurs et de la fenêtre d'édition, appel réseau.
  */
+
+/** Traduction française des noms de champ éditables. */
+const FIELD_LABELS: Partial<Record<TournamentField, string>> = {
+  name: "Nom du tournoi",
+  description: "Description",
+  game: "Jeu",
+  format: "Format de bracket",
+  participantType: "Type de participants",
+  maxTeams: "Nombre de places",
+  startVisibilityAt: "Début visibilité",
+  registrationOpenAt: "Début inscriptions",
+  registrationCloseAt: "Fin inscriptions",
+  startAt: "Début tournoi",
+  hasThirdPlaceMatch: "Petite finale",
+  survivalRoundsBeforeFirstCut: "Rounds avant la première coupe",
+  survivalRoundsPerCut: "Rounds entre les coupes",
+  swissTotalRounds: "Nombre de rondes",
+  swissPointsWin: "Points par victoire",
+  swissPointsDraw: "Points par nul",
+  swissPointsLoss: "Points par défaite",
+  endurancePoints: "Capital d'endurance",
+  enduranceWinDelta: "Points par victoire de map",
+  enduranceLossDelta: "Points par défaite de map",
+  endurancePlayoffSize: "Équipes en play-offs",
+  matchFormat: "Format de match",
+  phases: "Phases du tournoi",
+};
+
 export default function EditTournamentPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -56,20 +84,28 @@ export default function EditTournamentPage() {
       }
 
       const response = await fetch(`/api/tournaments/${tournamentId}/edit`, { cache: "no-store" });
-      const payload = await response.json();
+      const payload = (await response.json().catch(() => ({}))) as
+        | { window: EditWindow; values: TournamentApiValues }
+        | { error?: string; field?: string };
       if (cancelled) return;
       if (!response.ok) {
-        showError(mapError(payload.error ?? "TOURNAMENT_NOT_FOUND"));
+        const errorPayload = payload as { error?: string; field?: string };
+        let message = mapError(errorPayload.error ?? "TOURNAMENT_NOT_FOUND");
+        if (errorPayload.field && FIELD_LABELS[errorPayload.field as TournamentField]) {
+          message += ` (${FIELD_LABELS[errorPayload.field as TournamentField]})`;
+        }
+        showError(message);
         router.replace("/tournois");
         return;
       }
 
       // Les valeurs serveur arrivent en ISO ; le formulaire attend des dates
       // locales `datetime-local`.
+      const successPayload = payload as { window: EditWindow; values: TournamentApiValues };
       setLoaded({
-        window: payload.window as EditWindow,
-        values: toFormValues(payload.values as TournamentApiValues),
-        startVisibilityAt: (payload.values as TournamentApiValues).startVisibilityAt,
+        window: successPayload.window,
+        values: toFormValues(successPayload.values),
+        startVisibilityAt: successPayload.values.startVisibilityAt,
       });
     })();
 
@@ -152,8 +188,14 @@ export default function EditTournamentPage() {
             headers: { "content-type": "application/json" },
             body: JSON.stringify(body),
           });
-          const result = await response.json();
-          if (!response.ok) throw new Error(mapError(result.error ?? "TOURNAMENT_UPDATE_FAILED"));
+          const result = (await response.json().catch(() => ({}))) as { error?: string; field?: string };
+          if (!response.ok) {
+            let message = mapError(result.error ?? "TOURNAMENT_UPDATE_FAILED");
+            if (result.field && FIELD_LABELS[result.field as TournamentField]) {
+              message += ` (${FIELD_LABELS[result.field as TournamentField]})`;
+            }
+            throw new Error(message);
+          }
 
           showSuccess("Tournoi modifié.");
           router.push(`/tournois/${tournamentId}`);

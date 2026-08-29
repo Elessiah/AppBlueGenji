@@ -152,7 +152,17 @@ export function defaultTournamentFormValues(): TournamentFormValues {
   };
 }
 
-/** Instant ISO → saisie `datetime-local` en heure locale. */
+/**
+ * Instant ISO → saisie `datetime-local` en heure locale.
+ *
+ * Cette conversion ISO → `datetime-local` est correcte uniquement parce que le
+ * chargement et la soumission du formulaire se font dans le même navigateur, à
+ * la même heure de fuseau horaire. Un aller-retour sur plusieurs sessions ou
+ * plusieurs fuseaux perdrait l'information. Cette asymétrie est volontaire :
+ * le formulaire stocke des chaînes locales (ce que HTML5 exige pour
+ * `<input type="datetime-local">`) tandis que l'API parle en ISO 8601
+ * (fuseau-agnostique). Le réseau ne voit jamais la fuseau du navigateur.
+ */
 function isoToLocalInput(iso: string): string {
   const time = new Date(iso).getTime();
   if (!Number.isFinite(time)) return "";
