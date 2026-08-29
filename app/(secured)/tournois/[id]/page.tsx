@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState, useEffect, useRef } from "react";
+import { FormEvent, useCallback, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { formatLocalDateTime } from "@/lib/shared/dates";
@@ -39,6 +39,7 @@ import { EnduranceView } from "./_components/EnduranceView";
 import { MatchRow } from "./_components/MatchRow";
 import { EntrantProvider } from "./_lib/entrant-link";
 import { TournamentProgress } from "./_components/TournamentProgress";
+import { DeleteTournamentDialog } from "./_components/DeleteTournamentDialog";
 
 const FORMAT_LABELS: Record<TournamentFormat, string> = {
   SINGLE: "Simple élim.",
@@ -72,16 +73,36 @@ export default function TournamentDetailPage() {
   const tournamentId = Number(params.id);
   const { showError, showSuccess } = useToast();
 
-  const { tournament: detail, reload } = useTournamentLive(tournamentId);
+  const { tournament: detail, reload, deleted } = useTournamentLive(tournamentId);
   const [drafts, setDrafts] = useState<MatchScoreDraft>({});
   const [selectedMatchForAdmin, setSelectedMatchForAdmin] = useState<BracketMatch | null>(null);
   const [ghostRegistrationOpen, setGhostRegistrationOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   // On retient l'**identifiant** du match en cours de configuration, pas l'objet :
   // la page se recharge par SSE, et un objet capturé à l'ouverture deviendrait
   // périmé — le dialogue rejouerait alors une configuration dépassée par-dessus
   // celle d'un autre membre du staff.
   const [matchForLiveId, setMatchForLiveId] = useState<number | null>(null);
   const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
+
+  // Une fiche supprimée s'évacue une seule fois : la confirmation du dialogue et
+  // l'événement SSE arrivent tous deux, et le premier des deux emporte la mise.
+  const hasLeftRef = useRef(false);
+  const leaveDeletedTournament = useCallback(
+    (notify: () => void) => {
+      if (hasLeftRef.current) return;
+      hasLeftRef.current = true;
+      notify();
+      router.replace("/tournois");
+    },
+    [router],
+  );
+
+  // Suppression par un autre administrateur pendant la consultation.
+  useEffect(() => {
+    if (!deleted) return;
+    leaveDeletedTournament(() => showError("Ce tournoi vient d'être supprimé définitivement."));
+  }, [deleted, leaveDeletedTournament, showError]);
 
   // Dernière phase courante observée. On ne resynchronise la sélection que
   // lorsqu'elle change RÉELLEMENT (une phase vient de démarrer) : comparer
@@ -616,6 +637,50 @@ export default function TournamentDetailPage() {
         </div>
 
         <TournamentProgress detail={detail} />
+
+        {/* Zone de danger : réservée aux administrateurs stricts (`canDelete`),
+            et volontairement isolée en bas de page, loin des actions courantes. */}
+        {detail.canDelete && (
+          <div
+            className="ds-block"
+            style={{
+              marginTop: 24,
+              border: "1px solid color-mix(in srgb, var(--red-live, #ff4d4d) 45%, transparent)",
+              borderRadius: "var(--r-cy-md, 12px)",
+              padding: 18,
+            }}
+          >
+            <div className="ds-section-title">
+              <h2 style={{ color: "var(--red-live, #ff4d4d)" }}>Zone de danger</h2>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 16,
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <p style={{ margin: 0, fontSize: 13, color: "var(--text-2, #9aa4b2)", maxWidth: 560, lineHeight: 1.55 }}>
+                Supprimer ce tournoi l&apos;efface du site pour de bon, avec ses matchs, ses
+                inscriptions et ses classements. Les équipes et les joueurs, eux, sont conservés.
+              </p>
+              <CyberButton
+                variant="ghost"
+                onClick={() => setDeleteDialogOpen(true)}
+                style={{
+                  fontSize: 13,
+                  padding: "8px 18px",
+                  borderColor: "var(--red-live, #ff4d4d)",
+                  color: "var(--red-live, #ff4d4d)",
+                }}
+              >
+                Supprimer le tournoi
+              </CyberButton>
+            </div>
+          </div>
+        )}
       </section>
 
       <AdminScoreDialog
@@ -631,6 +696,17 @@ export default function TournamentDetailPage() {
           match={matchForLive}
           onClose={() => setMatchForLiveId(null)}
           onSaved={() => void reload().catch(() => undefined)}
+        />
+      )}
+
+      {deleteDialogOpen && detail.canDelete && (
+        <DeleteTournamentDialog
+          tournamentId={tournamentId}
+          tournamentName={detail.card.name}
+          onClose={() => setDeleteDialogOpen(false)}
+          onDeleted={(name) =>
+            leaveDeletedTournament(() => showSuccess(`Tournoi « ${name} » supprimé définitivement.`))
+          }
         />
       )}
 

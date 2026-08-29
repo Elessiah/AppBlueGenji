@@ -29,6 +29,10 @@ export { reportMatchScore, finalizeMatch } from "./scoring";
 // Admin (adminResolveMatch is wrapped as public API function)
 export { adminSaveMatchScores, checkDownstreamMatchesHaveNoScores } from "./admin";
 
+// Suppression définitive (administrateurs)
+export { deleteTournament, purgeTournamentRows } from "./deletion";
+export type { DeletedTournament } from "./deletion";
+
 // Notifications
 export { publishUpdatedEvent, publishScoreReportedEvent, publishScoreResolvedEvent, sendBotLogAsync } from "./notifications";
 
@@ -562,6 +566,12 @@ export async function getTournamentDetail(
    * de `canPreview`, qui ne donne que la lecture de l'aperçu.
    */
   canManageLive = isAdmin,
+  /**
+   * Droit de supprimer définitivement le tournoi : administrateur strict, et
+   * non simple porteur de la permission `tournaments`. Défaut `false` — un
+   * appelant qui ne se pose pas la question n'ouvre pas la zone de danger.
+   */
+  canDelete = false,
 ): Promise<TournamentDetail | null> {
   const db = await getDatabase();
 
@@ -695,6 +705,7 @@ export async function getTournamentDetail(
       myTeamId,
       canCreateReportsForTeamIds,
       isAdmin,
+      canDelete,
       canManageLive,
       survival,
       swiss,

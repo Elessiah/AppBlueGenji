@@ -1,7 +1,11 @@
 ﻿import { EventEmitter } from "node:events";
 
 type TournamentLiveEvent = {
-  type: "updated" | "score_reported" | "score_resolved";
+  /**
+   * `deleted` annonce la disparition définitive du tournoi : les abonnés ne
+   * doivent pas le recharger (l'API répondrait 404) mais quitter la fiche.
+   */
+  type: "updated" | "score_reported" | "score_resolved" | "deleted";
   tournamentId: number;
   matchId?: number;
   emittedAt: string;

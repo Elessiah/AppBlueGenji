@@ -1,6 +1,7 @@
 ﻿// Backward compatibility: re-export all from the new tournaments module
 export type {
   // Types
+  DeletedTournament,
   TournamentRow,
   RegistrationRow,
   MatchRow,
@@ -29,6 +30,8 @@ export {
   reportMatchScorePublic as reportMatchScore,
   // Admin
   checkDownstreamMatchesHaveNoScores,
+  // Suppression définitive (administrateurs)
+  deleteTournament,
   // Public API (matching old API expectations)
   adminSaveMatchScoresPublic as adminSaveMatchScores,
   adminResolveMatchPublic as adminResolveMatch,

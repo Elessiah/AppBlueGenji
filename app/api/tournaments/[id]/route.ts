@@ -22,6 +22,9 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     can(user, "tournaments"),
     canAny(user, ["tournaments", "casting"]),
     can(user, "live"),
+    // Suppression définitive : administrateur strict. `can(user, "tournaments")`
+    // ne convient pas — un arbitre gère le tournoi, il ne l'efface pas.
+    user.isAdmin === true,
   );
   if (!detail) return fail("TOURNAMENT_NOT_FOUND", 404);
 

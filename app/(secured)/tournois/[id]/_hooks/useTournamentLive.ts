@@ -8,6 +8,7 @@ export function useTournamentLive(tournamentId: number) {
   const { showError } = useToast();
   const [detail, setDetail] = useState<TournamentDetail | null>(null);
   const [isLive, setIsLive] = useState(false);
+  const [deleted, setDeleted] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -42,6 +43,14 @@ export function useTournamentLive(tournamentId: number) {
           if (cancelled) return;
           const payload = JSON.parse(event.data) as { type?: string };
           if (payload.type === "heartbeat" || payload.type === "connected") return;
+          // Le tournoi n'existe plus : recharger ne ramènerait qu'un 404 et son
+          // toast d'erreur. On coupe le flux et on laisse la page évacuer.
+          if (payload.type === "deleted") {
+            setDeleted(true);
+            eventSource.close();
+            setIsLive(false);
+            return;
+          }
           if (payload.type === "score_reported") playScoreReady();
           load().catch(() => undefined);
         };
@@ -83,6 +92,11 @@ export function useTournamentLive(tournamentId: number) {
     tournament: detail,
     matches: detail?.matches ?? [],
     isLive,
+    /**
+     * Le tournoi a été supprimé définitivement pendant la consultation. La page
+     * doit quitter la fiche : il n'y a plus rien à afficher ni à recharger.
+     */
+    deleted,
     /**
      * Recharge à la demande. Le flux SSE couvre déjà le cas nominal, mais une
      * connexion coupée laisserait l'écran sur un état périmé juste après une
