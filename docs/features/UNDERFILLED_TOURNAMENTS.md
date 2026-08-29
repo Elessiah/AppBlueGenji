@@ -62,4 +62,6 @@ qui attend encore son plateau.
 - Un tournoi multi-phases sous-rempli **au niveau du tournoi** est clos ici ;
   sauter une *phase* trop petite reste l'affaire de `resolvePhasePlan`
   ([MULTI_PHASE_TOURNAMENTS](MULTI_PHASE_TOURNAMENTS.md)).
-- Tests : `tests/tournois/underfilled-start.test.ts`.
+- Tests : `tests/tournois/underfilled-finalization.test.ts` (la clôture
+  elle-même) et `tests/tournois/underfilled-start.test.ts` (son déclenchement
+  dans la synchronisation).
