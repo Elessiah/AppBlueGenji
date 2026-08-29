@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
+import { clearCache } from "@/lib/server/cache";
 
 jest.mock("@/lib/server/database");
+
+// La liste publique est mutualisée (`lib/server/tournaments/list-cache.ts`) :
+// sans cette remise à zéro, le deuxième cas serait servi depuis le cache du
+// premier et ne toucherait jamais la base.
+beforeEach(() => clearCache());
+afterEach(() => clearCache());
 
 type ExecuteMock = jest.Mock;
 

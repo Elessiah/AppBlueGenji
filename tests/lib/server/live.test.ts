@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals
 import {
   publishTournamentEvent,
   subscribeTournament,
-  getSubscribersCount,
   type TournamentLiveEvent,
 } from "@/lib/server/live";
 
@@ -131,36 +130,6 @@ describe("live", () => {
         expect(callback2).toHaveBeenCalledWith(event);
         done();
       });
-    });
-  });
-
-  describe("getSubscribersCount", () => {
-    it("returns 0 when no subscribers", () => {
-      expect(getSubscribersCount(1)).toBe(0);
-    });
-
-    it("returns correct count for tournament", () => {
-      subscribeTournament(1, () => {});
-      expect(getSubscribersCount(1)).toBe(1);
-
-      subscribeTournament(1, () => {});
-      expect(getSubscribersCount(1)).toBe(2);
-    });
-
-    it("does not count subscribers for other tournaments", () => {
-      subscribeTournament(1, () => {});
-      subscribeTournament(2, () => {});
-
-      expect(getSubscribersCount(1)).toBe(1);
-      expect(getSubscribersCount(2)).toBe(1);
-    });
-
-    it("decrements count on unsubscribe", () => {
-      const unsub = subscribeTournament(1, () => {});
-      expect(getSubscribersCount(1)).toBe(1);
-
-      unsub();
-      expect(getSubscribersCount(1)).toBe(0);
     });
   });
 

@@ -1,7 +1,37 @@
-﻿import { getCurrentUser } from "@/lib/server/auth";
-import { subscribeTournament } from "@/lib/server/live";
+/**
+ * Flux temps réel d'un tournoi (SSE).
+ *
+ * Le flux **transporte la donnée** au lieu de se contenter de la signaler : à
+ * la connexion il envoie l'instantané complet du tournoi et le contexte du
+ * lecteur, puis chaque nouvelle version. Le client n'a donc plus rien à
+ * recharger — ni au fil du tournoi, ni au retour sur l'onglet.
+ *
+ * Le calcul de l'instantané et le regroupement des envois vivent dans
+ * `lib/server/tournament-broadcast.ts` : une seule passe en base par tournoi,
+ * quel que soit le nombre de spectateurs.
+ */
+import { getCurrentUser } from "@/lib/server/auth";
+import { enforceRateLimit, STREAM_OPEN_RULE } from "@/lib/server/api-guard";
+import {
+  acquireStreamSlot,
+  joinTournamentRoom,
+} from "@/lib/server/tournament-broadcast";
+import {
+  getTournamentSnapshot,
+  getTournamentViewerContext,
+} from "@/lib/server/tournaments-service";
+import { can, canAny } from "@/lib/shared/permissions";
+import { resolveRefreshTier } from "@/lib/shared/refresh-tiers";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/**
+ * Battement de cœur. Une ligne de commentaire SSE (` : `) suffit à garder la
+ * connexion ouverte au travers des proxys, sans réveiller le client : elle
+ * n'est pas remise à `onmessage`.
+ */
+const HEARTBEAT_MS = 25_000;
 
 export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -9,42 +39,172 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     return new Response("Unauthorized", { status: 401 });
   }
 
+  // Le plafond de flux simultanés ne borne pas le *rythme* d'ouverture : un
+  // client qui ouvre et referme en boucle libère sa place à chaque fermeture et
+  // y échapperait, tout en refaisant à chaque tour le travail le plus cher de
+  // la route (session, instantané, contexte du lecteur).
+  const throttled = enforceRateLimit(STREAM_OPEN_RULE, user.id);
+  if (throttled) return throttled;
+
   const { id } = await context.params;
   const tournamentId = Number(id);
   if (!Number.isInteger(tournamentId) || tournamentId <= 0) {
     return new Response("Invalid tournament id", { status: 400 });
   }
 
+  const snapshot = await getTournamentSnapshot(tournamentId);
+  if (!snapshot) {
+    return new Response("Tournament not found", { status: 404 });
+  }
+
+  // L'aperçu du plateau va plus loin que la gestion : le cast y a droit sans
+  // pouvoir rien modifier (`docs/features/TOURNAMENT_PREVIEW.md`). La diffusion
+  // est, elle, un droit d'écriture à part (`docs/features/LIVE_STREAMS.md`) —
+  // qui doit voyager par ici comme par la lecture REST, ce flux étant le chemin
+  // nominal : sans lui, un arbitre n'aurait ses commandes d'antenne qu'après
+  // une coupure du direct.
+  const narratesLive = canAny(user, ["tournaments", "casting"]);
+  const viewer = await getTournamentViewerContext(
+    snapshot,
+    user.id,
+    can(user, "tournaments"),
+    narratesLive,
+    can(user, "live"),
+    // Suppression définitive : administrateur strict. Ce droit doit voyager par
+    // les deux portes — ici et par la lecture REST de secours —, faute de quoi
+    // la zone de danger n'apparaîtrait qu'après une coupure du direct.
+    user.isAdmin === true,
+  );
+
+  // Palier de fraîcheur : ceux qui font le tournoi — staff, cast, engagés — sont
+  // servis à la seconde, les spectateurs par fenêtres plus larges : même donnée,
+  // moins de trafic (`lib/shared/refresh-tiers.ts`).
+  //
+  // Le cast compte parmi les prioritaires, et pas seulement le staff : un caster
+  // commente le match pendant qu'il se joue. Le laisser au palier spectateur lui
+  // ferait décrire un plateau vieux de vingt secondes, alors même qu'on vient de
+  // lui accorder l'aperçu du tirage.
+  const isParticipant =
+    viewer.myTeamId !== null &&
+    snapshot.registrations.some((row) => row.teamId === viewer.myTeamId);
+  const tier = resolveRefreshTier({ isStaff: narratesLive, isParticipant });
+
+  // Un onglet ouvre un flux. Le plafond ne gêne personne d'ordinaire ; il évite
+  // qu'un client en boucle de reconnexion accapare la machine.
+  const releaseSlot = acquireStreamSlot(user.id);
+  if (!releaseSlot) {
+    return new Response("Too many streams", {
+      status: 429,
+      headers: { "Retry-After": "30" },
+    });
+  }
+
+  // Rien à servir si le client est déjà parti : ni encoder l'instantané (jusqu'à
+  // 154 ko sur un gros plateau), ni ouvrir de salle, ni armer de battement.
+  // C'est sous spam F5 que ce cas se présente — précisément quand ce travail
+  // inutile coûte le plus cher.
+  if (req.signal.aborted) {
+    releaseSlot();
+    // 204 plutôt que le 499 d'nginx : ce dernier est un code de journal, pas un
+    // statut HTTP, et un mandataire ou une supervision le compterait comme une
+    // famille d'erreurs inventée.
+    return new Response(null, { status: 204 });
+  }
+
   const encoder = new TextEncoder();
+
+  /**
+   * Nettoyage de la connexion, hissé hors de `start` pour que `cancel` puisse
+   * l'appeler.
+   *
+   * Le flux se termine par deux portes distinctes : le signal de la requête,
+   * quand le client se déconnecte, et l'annulation du corps de la réponse, quand
+   * c'est le runtime qui le referme. Ne brancher que la première laisse la place
+   * de flux prise par la seconde — et quatre occurrences valent un 429 permanent
+   * sur son propre tournoi.
+   */
+  let cleanup: () => void = () => undefined;
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      const send = (payload: unknown): void => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+      let closed = false;
+      let leaveRoom: (() => void) | null = null;
+      let heartbeat: ReturnType<typeof setInterval> | null = null;
+
+      // Renseigné **avant** la première écriture : la place de flux ne doit
+      // survivre à aucune sortie, pas même celle d'une exception.
+      cleanup = (): void => {
+        if (closed) return;
+        closed = true;
+        if (heartbeat !== null) clearInterval(heartbeat);
+        leaveRoom?.();
+        releaseSlot();
+        try {
+          controller.close();
+        } catch {
+          // Déjà fermé par le client.
+        }
       };
 
-      send({
-        type: "connected",
-        tournamentId,
-        emittedAt: new Date().toISOString(),
-      });
+      const write = (frame: Uint8Array): void => {
+        if (closed) throw new Error("STREAM_CLOSED");
+        controller.enqueue(frame);
+      };
 
-      const unsubscribe = subscribeTournament(tournamentId, (event) => {
-        send(event);
-      });
+      try {
+        // Tout ce dont la page a besoin pour s'afficher, dès la connexion :
+        // aucun appel REST supplémentaire dans le cas nominal.
+        write(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "connected",
+              tournamentId,
+              tier,
+              viewer,
+              snapshot,
+              emittedAt: new Date().toISOString(),
+            })}\n\n`,
+          ),
+        );
 
-      const heartbeat = setInterval(() => {
-        send({
-          type: "heartbeat",
-          emittedAt: new Date().toISOString(),
-        });
-      }, 15000);
+        // `close` sert au cas où le tournoi disparaît : la salle termine alors
+        // le flux, et le client bascule sur son écran « Tournoi introuvable »
+        // au lieu de contempler un plateau figé annoncé « Direct ».
+        leaveRoom = joinTournamentRoom(tournamentId, { tier, send: write, close: cleanup });
 
-      req.signal.addEventListener("abort", () => {
-        clearInterval(heartbeat);
-        unsubscribe();
-        controller.close();
-      });
+        heartbeat = setInterval(() => {
+          try {
+            write(encoder.encode(`: ping\n\n`));
+          } catch {
+            cleanup();
+          }
+        }, HEARTBEAT_MS);
+        heartbeat.unref?.();
+
+        // Course résiduelle : le contrôle plus haut a pu passer juste avant que
+        // le client ne parte. Un signal DÉJÀ avorté ne déclenche jamais son
+        // écouteur.
+        if (req.signal.aborted) {
+          cleanup();
+          return;
+        }
+        req.signal.addEventListener("abort", cleanup);
+      } catch (error) {
+        // Signaler AVANT de nettoyer : `cleanup()` ferme le flux, et
+        // `controller.error()` est un no-op silencieux sur un flux déjà fermé —
+        // le client croirait à une fermeture propre, et rien ne resterait dans
+        // les journaux d'une panne pourtant systématique.
+        console.error(`[tournaments/${tournamentId}/stream] ouverture impossible`, error);
+        try {
+          controller.error(error);
+        } catch {
+          // Flux déjà en erreur : rien à signaler de plus.
+        }
+        cleanup();
+      }
+    },
+    cancel() {
+      cleanup();
     },
   });
 
@@ -53,6 +213,9 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      // Neutralise la mise en tampon d'un reverse proxy, qui retiendrait les
+      // messages et ferait croire à un flux mort.
+      "X-Accel-Buffering": "no",
     },
   });
 }

@@ -32,6 +32,12 @@ export {
   checkDownstreamMatchesHaveNoScores,
   // Suppression définitive (administrateurs)
   deleteTournament,
+  // Instantané partagé + contexte du lecteur (voir tournaments/snapshot.ts)
+  getTournamentSnapshot,
+  getTournamentSnapshotFrame,
+  getTournamentViewerContext,
+  invalidateTournamentSnapshot,
+  invalidateTournamentLists,
   // Public API (matching old API expectations)
   adminSaveMatchScoresPublic as adminSaveMatchScores,
   adminResolveMatchPublic as adminResolveMatch,

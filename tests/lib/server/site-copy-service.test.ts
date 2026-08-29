@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { getSiteCopy, resetSiteCopy, setSiteCopy } from "@/lib/server/site-copy-service";
 import { defaultSiteCopy } from "@/lib/shared/site-copy";
+import { clearCache } from "@/lib/server/cache";
 
 jest.mock("@/lib/server/database");
 
@@ -10,7 +11,12 @@ async function mockDb(execute: jest.Mock) {
 }
 
 describe("getSiteCopy", () => {
-  beforeEach(() => jest.clearAllMocks());
+  // La vitrine est mutualisée (`lib/server/showcase-cache.ts`) : sans cette
+  // remise à zéro, chaque cas resservirait la valeur du précédent.
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
   afterEach(() => jest.restoreAllMocks());
 
   it("sert les défauts quand rien n'est enregistré", async () => {
@@ -51,7 +57,12 @@ describe("getSiteCopy", () => {
 });
 
 describe("setSiteCopy", () => {
-  beforeEach(() => jest.clearAllMocks());
+  // La vitrine est mutualisée (`lib/server/showcase-cache.ts`) : sans cette
+  // remise à zéro, chaque cas resservirait la valeur du précédent.
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
   afterEach(() => jest.restoreAllMocks());
 
   it("upsert la valeur normalisée puis relit l'ensemble", async () => {
@@ -83,7 +94,12 @@ describe("setSiteCopy", () => {
 });
 
 describe("resetSiteCopy", () => {
-  beforeEach(() => jest.clearAllMocks());
+  // La vitrine est mutualisée (`lib/server/showcase-cache.ts`) : sans cette
+  // remise à zéro, chaque cas resservirait la valeur du précédent.
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
   afterEach(() => jest.restoreAllMocks());
 
   it("supprime la ligne pour revenir au texte d'origine", async () => {

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
-jest.mock("@/lib/server/live");
+jest.mock("@/lib/server/tournaments/notifications");
 
 import { deleteTournament } from "@/lib/server/tournaments/deletion";
 import { getDatabase } from "@/lib/server/database";
-import { publishTournamentEvent } from "@/lib/server/live";
+import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 
 type ExecuteMock = jest.Mock;
 
@@ -121,14 +121,16 @@ describe("deleteTournament", () => {
     }
   });
 
-  it("prévient les onglets ouverts par un événement `deleted`", async () => {
+  it("passe par le point de publication commun, qui vide les caches", async () => {
     mockExistingTournament();
 
     await deleteTournament(7);
 
-    expect(publishTournamentEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "deleted", tournamentId: 7 }),
-    );
+    // `publishUpdatedEvent` vide l'instantané, l'aperçu et **les listes** — sans
+    // quoi le tournoi supprimé resterait dans `/tournois` jusqu'à cinq minutes —
+    // puis réveille la salle du flux, qui ferme les connexions faute
+    // d'instantané (`docs/features/REALTIME_REFRESH.md`).
+    expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
   });
 
   it("remonte TOURNAMENT_NOT_FOUND sans rien effacer", async () => {
@@ -141,7 +143,7 @@ describe("deleteTournament", () => {
     expect(connection.rollback).toHaveBeenCalledTimes(1);
     expect(connection.commit).not.toHaveBeenCalled();
     expect(connection.release).toHaveBeenCalledTimes(1);
-    expect(publishTournamentEvent).not.toHaveBeenCalled();
+    expect(publishUpdatedEvent).not.toHaveBeenCalled();
   });
 
   it("annule la transaction et ne publie rien si une requête échoue", async () => {
@@ -157,7 +159,8 @@ describe("deleteTournament", () => {
     expect(connection.rollback).toHaveBeenCalledTimes(1);
     expect(connection.commit).not.toHaveBeenCalled();
     expect(connection.release).toHaveBeenCalledTimes(1);
-    // Publier ici ferait quitter la fiche à des lecteurs pour rien.
-    expect(publishTournamentEvent).not.toHaveBeenCalled();
+    // Publier ici viderait les caches et fermerait les flux d'un tournoi
+    // toujours vivant : les lecteurs quitteraient la fiche pour rien.
+    expect(publishUpdatedEvent).not.toHaveBeenCalled();
   });
 });

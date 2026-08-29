@@ -34,6 +34,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   // d'antenne enverrait le lecteur chercher un bug là où il n'y en a pas.
   FORBIDDEN: "Tu n'as pas les droits nécessaires pour cette action.",
   FORFEIT_FAILED: "Erreur lors de la déclaration de forfait.",
+  // Session expirée : le suivi en direct s'arrête, il faut se reconnecter.
+  UNAUTHORIZED: "Ta session a expiré. Reconnecte-toi pour suivre le tournoi en direct.",
   // Diffusion en direct (`lib/shared/live-streams.ts`).
   INVALID_STREAM_URL:
     "Lien de diffusion non reconnu (Twitch, YouTube ou Kick attendu).",
@@ -45,9 +47,9 @@ const ERROR_MESSAGES: Record<string, string> = {
   MATCH_LIVE_UPDATE_FAILED: "Erreur lors de la mise à jour de la diffusion.",
   TOURNAMENT_LIVE_UPDATE_FAILED: "Erreur lors de la mise à jour de la chaîne officielle.",
   // Suppression définitive (`docs/features/TOURNAMENT_DELETION.md`).
+  // `TOURNAMENT_NOT_FOUND` et `UNAUTHORIZED` sont déjà couverts plus haut.
   TOURNAMENT_DELETE_FAILED: "Erreur lors de la suppression du tournoi.",
   INVALID_TOURNAMENT_ID: "Identifiant de tournoi invalide.",
-  UNAUTHORIZED: "Session expirée : reconnecte-toi.",
 };
 
 export function mapError(errorCode: string): string {

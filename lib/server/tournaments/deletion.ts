@@ -22,7 +22,7 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { publishTournamentEvent } from "@/lib/server/live";
+import { publishUpdatedEvent } from "./notifications";
 
 /** Identité du tournoi effacé, pour le message de confirmation et les logs. */
 export type DeletedTournament = { id: number; name: string };
@@ -93,14 +93,16 @@ export async function deleteTournament(tournamentId: number): Promise<DeletedTou
 
     await connection.commit();
 
-    // Prévient les onglets restés ouverts sur la fiche : sans cet événement ils
-    // continueraient d'interroger un tournoi devenu introuvable et n'afficheraient
-    // qu'une erreur de chargement.
-    publishTournamentEvent({
-      type: "deleted",
-      tournamentId,
-      emittedAt: new Date().toISOString(),
-    });
+    // Même point de passage que toute autre écriture (`./notifications`), et il
+    // suffit : il vide l'instantané, l'aperçu et les listes — sans quoi le
+    // tournoi supprimé resterait affiché dans `/tournois` jusqu'à cinq minutes
+    // — puis réveille la salle du flux. Celle-ci ne retrouve plus d'instantané
+    // et **termine** les connexions ; les lecteurs basculent alors sur leur
+    // écran « Tournoi introuvable » (`docs/features/REALTIME_REFRESH.md`).
+    //
+    // Aucun événement dédié n'est nécessaire : le flux ne dit jamais pourquoi
+    // il tombe, c'est la lecture REST de secours qui voit le 404.
+    publishUpdatedEvent(tournamentId);
 
     return deleted;
   } catch (error) {

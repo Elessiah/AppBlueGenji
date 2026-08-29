@@ -19,8 +19,17 @@ que sur une permission scopée (`PERMISSION_ROLES.md`). Ce n'est pas un oubli :
   et sans trace sur le site une fois fait.
 
 Le drapeau `TournamentDetail.isAdmin` porte donc mal son nom (il vaut en réalité
-`can(user, "tournaments")`). Un champ distinct, `TournamentDetail.canDelete`,
-transporte le droit de suppression et n'est vrai que pour un administrateur.
+`can(user, "tournaments")`). Un champ distinct, `canDelete`, transporte le droit
+de suppression et n'est vrai que pour un administrateur.
+
+Il vit dans le **contexte du lecteur** (`TournamentViewerContext`) et non dans
+l'instantané partagé : celui-ci est diffusé tel quel à toute la salle du flux,
+un droit n'y a pas sa place (`REALTIME_REFRESH.md`). Il voyage donc par les
+**deux portes** — la route du flux (`stream/route.ts`) et la lecture REST de
+secours —, sans quoi la zone de danger n'apparaîtrait qu'après une coupure du
+direct. Et parce que le flux ne transporte que l'instantané, `applyLiveMessage`
+reporte `canDelete` d'une version à l'autre : sans ce report, la zone de danger
+disparaîtrait au premier score rapporté.
 
 | Rôle | Voit la zone de danger | `DELETE` accepté |
 | --- | --- | --- |
@@ -90,26 +99,37 @@ sont tous supprimables. La confirmation par recopie est le garde-fou.
       └─ dialogue ─ recopie du nom ─ DELETE /api/admin/tournaments/[id]
                                           │
                                           ├─ purge transactionnelle
-                                          ├─ événement SSE `deleted`
+                                          ├─ publishUpdatedEvent()
                                           └─ log bot (seule trace restante)
                                                     │
       redirection vers /tournois ◄──────────────────┘
 ```
 
 La zone de danger est isolée en bas de page, sous la frise de progression, loin
-des actions courantes.
+des actions courantes. Elle est retirée quand le suivi est arrêté (`frozen`),
+comme toutes les autres actions.
 
-## Événement `deleted`
+## Ce que voient les autres lecteurs
 
-`TournamentLiveEvent` gagne un type `deleted`, publié après le commit. Les
-onglets restés ouverts sur la fiche ne doivent surtout **pas** recharger : l'API
-répondrait 404 et n'afficherait qu'un toast d'erreur de chargement. Le hook
-`useTournamentLive` coupe donc le flux et lève un drapeau `deleted`, que la page
-traduit en avertissement puis en redirection vers `/tournois`.
+**Aucun événement dédié n'a été ajouté.** La suppression passe par le point de
+publication commun, `publishUpdatedEvent` (`tournaments/notifications.ts`), et
+cela suffit :
 
-L'administrateur qui supprime et l'événement SSE déclenchent la même sortie ;
-une garde (`hasLeftRef`) fait que le premier des deux l'emporte, sans double
-notification.
+1. il **vide les caches** — instantané, aperçu et listes. Sans cette étape, le
+   tournoi supprimé resterait affiché dans `/tournois` jusqu'à cinq minutes ;
+2. il **réveille la salle** du flux, qui ne retrouve plus d'instantané et
+   **termine** les connexions plutôt que de laisser chacun devant un plateau
+   figé estampillé « Direct » ;
+3. la lecture REST de secours du client voit alors le 404 et le traduit en échec
+   définitif : la boucle de reconnexion s'arrête et la page affiche « Tournoi
+   introuvable » avec un retour vers `/tournois`.
+
+C'est la règle du flux : il ne dit jamais *pourquoi* il tombe, c'est la lecture
+de secours qui tranche (`REALTIME_REFRESH.md`). Un type d'événement `deleted`
+aurait dupliqué un chemin déjà éprouvé.
+
+L'administrateur qui supprime, lui, n'attend pas ce détour : le dialogue le
+renvoie vers `/tournois` dès la réponse.
 
 ## Fichiers
 
@@ -120,7 +140,7 @@ notification.
 | Route | `app/api/admin/tournaments/[id]/route.ts` (`DELETE`) |
 | Droit exposé au client | `TournamentDetail.canDelete` (`lib/shared/types.ts`) |
 | Interface | `app/(secured)/tournois/[id]/_components/DeleteTournamentDialog.tsx` + zone de danger dans `page.tsx` |
-| Flux temps réel | `lib/server/live.ts` (type `deleted`), `_hooks/useTournamentLive.ts` |
+| Report du droit dans le flux | `app/(secured)/tournois/[id]/_lib/live-state.ts` (`applyLiveMessage`) |
 
 ## Codes d'erreur
 

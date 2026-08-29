@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
+import { enforceRateLimit, LANDING_READ_RULE, requestClientIp } from "@/lib/server/api-guard";
 import { ok } from "@/lib/server/http";
 import { getLandingCalendar } from "@/lib/server/landing-service";
 import type { LandingCalendarEvent } from "@/lib/shared/landing";
 
-export const revalidate = 300;
+/**
+ * `revalidate` n'a aucun effet à côté de `force-dynamic` : la route est
+ * recalculée à chaque appel. La mutualisation se fait en amont, dans
+ * `landing-service` (cache mémoire à vol unique) — d'où un plafond de débit
+ * ici, seul rempart restant contre une boucle côté client.
+ */
 export const dynamic = "force-dynamic";
 
 function parseLimit(value: string | null): number {
@@ -62,6 +68,9 @@ function buildIcs(events: LandingCalendarEvent[]): string {
 }
 
 export async function GET(req: Request) {
+  const throttled = enforceRateLimit(LANDING_READ_RULE, requestClientIp(req));
+  if (throttled) return throttled;
+
   const url = new URL(req.url);
   const format = (url.searchParams.get("format") ?? "json").trim();
   const limit = parseLimit(url.searchParams.get("limit"));

@@ -1,11 +1,7 @@
 ﻿import { EventEmitter } from "node:events";
 
 type TournamentLiveEvent = {
-  /**
-   * `deleted` annonce la disparition définitive du tournoi : les abonnés ne
-   * doivent pas le recharger (l'API répondrait 404) mais quitter la fiche.
-   */
-  type: "updated" | "score_reported" | "score_resolved" | "deleted";
+  type: "updated" | "score_reported" | "score_resolved";
   tournamentId: number;
   matchId?: number;
   emittedAt: string;
@@ -41,10 +37,6 @@ export function subscribeTournament(
   const listener = (event: TournamentLiveEvent): void => callback(event);
   emitter.on(key(tournamentId), listener);
   return () => emitter.off(key(tournamentId), listener);
-}
-
-export function getSubscribersCount(tournamentId: number): number {
-  return getEmitter().listenerCount(key(tournamentId));
 }
 
 export type { TournamentLiveEvent };

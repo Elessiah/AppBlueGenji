@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useState, useEffect, useRef } from "react";
+import { FormEvent, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { formatLocalDateTime } from "@/lib/shared/dates";
@@ -19,6 +19,7 @@ import { MatchFormatProvider } from "./_lib/match-format-context";
 import { canForfeitTeam } from "./_lib/forfeit";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { AdminScoreDialog } from "./_components/AdminScoreDialog";
+import { LiveIndicator } from "./_components/LiveIndicator";
 import { GhostRegistrationDialog } from "./_components/GhostRegistrationDialog";
 import { MatchLiveDialog } from "./_components/MatchLiveDialog";
 import { TournamentLiveLink } from "./_components/TournamentLiveLink";
@@ -73,7 +74,7 @@ export default function TournamentDetailPage() {
   const tournamentId = Number(params.id);
   const { showError, showSuccess } = useToast();
 
-  const { tournament: detail, reload, deleted } = useTournamentLive(tournamentId);
+  const { tournament: detail, refresh, isLive, tier, fatal } = useTournamentLive(tournamentId);
   const [drafts, setDrafts] = useState<MatchScoreDraft>({});
   const [selectedMatchForAdmin, setSelectedMatchForAdmin] = useState<BracketMatch | null>(null);
   const [ghostRegistrationOpen, setGhostRegistrationOpen] = useState(false);
@@ -84,25 +85,6 @@ export default function TournamentDetailPage() {
   // celle d'un autre membre du staff.
   const [matchForLiveId, setMatchForLiveId] = useState<number | null>(null);
   const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
-
-  // Une fiche supprimée s'évacue une seule fois : la confirmation du dialogue et
-  // l'événement SSE arrivent tous deux, et le premier des deux emporte la mise.
-  const hasLeftRef = useRef(false);
-  const leaveDeletedTournament = useCallback(
-    (notify: () => void) => {
-      if (hasLeftRef.current) return;
-      hasLeftRef.current = true;
-      notify();
-      router.replace("/tournois");
-    },
-    [router],
-  );
-
-  // Suppression par un autre administrateur pendant la consultation.
-  useEffect(() => {
-    if (!deleted) return;
-    leaveDeletedTournament(() => showError("Ce tournoi vient d'être supprimé définitivement."));
-  }, [deleted, leaveDeletedTournament, showError]);
 
   // Dernière phase courante observée. On ne resynchronise la sélection que
   // lorsqu'elle change RÉELLEMENT (une phase vient de démarrer) : comparer
@@ -124,13 +106,52 @@ export default function TournamentDetailPage() {
     lastCurrentPhaseId.current = current;
   }, [detail?.phases, detail?.currentPhaseId, selectedPhaseId]);
 
-  if (!detail) {
+  // Échec définitif avant même d'avoir reçu quoi que ce soit : sans ce cas, la
+  // page resterait sur « Chargement… » pour toujours — le seul état où il ne
+  // reste que le F5, et où il ne sert à rien.
+  if (fatal && !detail) {
     return (
-      <section className="ds-block" style={{ color: "var(--text-2)" }}>
-        Chargement du tournoi...
+      <section className="ds-block" style={{ color: "var(--text-2)" }} role="alert">
+        <h1 className="ds-title green" style={{ fontSize: 24, marginBottom: 12 }}>
+          {fatal === "UNAUTHORIZED" ? "Session expirée" : "Tournoi introuvable"}
+        </h1>
+        <p style={{ margin: "0 0 20px", lineHeight: 1.6 }}>
+          {fatal === "UNAUTHORIZED"
+            ? "Ta session a expiré : le suivi en direct est arrêté. Reconnecte-toi pour le reprendre."
+            : "Ce tournoi n'existe plus. Il a pu être supprimé pendant que tu le consultais."}
+        </p>
+        <CyberButton asChild variant="primary">
+          <Link href={fatal === "UNAUTHORIZED" ? "/connexion" : "/tournois"}>
+            {fatal === "UNAUTHORIZED" ? "Se reconnecter" : "Retour aux tournois"}
+          </Link>
+        </CyberButton>
       </section>
     );
   }
+
+  if (!detail) {
+    // Le premier affichage attend l'ouverture du flux, qui apporte le plateau
+    // et le contexte du lecteur d'un seul coup. `aria-busy` annonce l'attente
+    // aux lecteurs d'écran plutôt que de leur laisser une page muette.
+    return (
+      <section
+        className="ds-block"
+        style={{ color: "var(--text-2)" }}
+        role="status"
+        aria-busy="true"
+      >
+        Chargement du tournoi…
+      </section>
+    );
+  }
+
+  /**
+   * Le suivi est arrêté : ce qui est affiché ne bouge plus. On retire donc les
+   * actions plutôt que de les laisser échouer une par une — une équipe qui
+   * saisit son score en fin de manche n'a aucun moyen de deviner que son
+   * plateau date de plusieurs minutes.
+   */
+  const frozen = fatal !== null;
 
   // Vocabulaire de l'affichage : un tournoi individuel parle de joueurs, pas
   // d'équipes (`lib/shared/participants.ts`).
@@ -144,6 +165,7 @@ export default function TournamentDetailPage() {
   };
 
   const canReport = (match: BracketMatch): boolean => {
+    if (frozen) return false;
     if (!detail?.myTeamId) return false;
     if (match.winnerTeamId !== null) return false;
     if (match.team1Id === null || match.team2Id === null) return false;
@@ -154,6 +176,7 @@ export default function TournamentDetailPage() {
   };
 
   const canAdminResolve = (match: BracketMatch): boolean => {
+    if (frozen) return false;
     if (!detail?.isAdmin) return false;
     if (match.team1Id === null || match.team2Id === null) return false;
     return true;
@@ -189,6 +212,9 @@ export default function TournamentDetailPage() {
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
       showSuccess(`Score transmis pour le match #${match.id}.`);
+      // Retour immédiat pour qui agit : le flux, lui, sert tout le monde à la
+      // cadence de son palier.
+      void refresh();
       setDrafts((prev) => {
         const next = { ...prev };
         delete next[match.id];
@@ -208,6 +234,7 @@ export default function TournamentDetailPage() {
       : detail.card.format;
 
   const canForfeit = (teamId: number): boolean =>
+    !frozen &&
     canForfeitTeam(
       {
         format: forfeitFormat,
@@ -234,6 +261,7 @@ export default function TournamentDetailPage() {
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "FORFEIT_FAILED");
       showSuccess(isMine ? "Forfait enregistré." : `Forfait de ${teamName} enregistré.`);
+      void refresh();
     } catch (e) {
       showError(mapError((e as Error).message));
     }
@@ -247,6 +275,7 @@ export default function TournamentDetailPage() {
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "REGISTRATION_FAILED");
       showSuccess("Inscription validée.");
+      void refresh();
     } catch (e) {
       showError(mapError((e as Error).message));
     }
@@ -349,6 +378,9 @@ export default function TournamentDetailPage() {
               </p>
             )}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              {/* Dit que la page se tient à jour seule : sans ce repère, on
+                  recharge par précaution même quand tout arrive tout seul. */}
+              <LiveIndicator isLive={isLive} tier={tier} fatal={fatal} />
               <Pill variant="blue">{detail.card.game}</Pill>
               <Pill variant={detail.card.state === "RUNNING" ? "live" : "blue"}>
                 {stateMeta.label}
@@ -378,10 +410,10 @@ export default function TournamentDetailPage() {
                 <Pill variant="blue">Petite finale</Pill>
               )}
               <Pill variant="blue">{detail.card.registeredTeams}/{detail.card.maxTeams}</Pill>
-              {detail.isAdmin && (
+              {detail.isAdmin && !frozen && (
                 <Pill variant="blue">⚙ Admin</Pill>
               )}
-              {detail.canRegister && (
+              {detail.canRegister && !frozen && (
                 <CyberButton
                   variant="primary"
                   onClick={registerTeam}
@@ -390,7 +422,7 @@ export default function TournamentDetailPage() {
                   {wording.registerCta}
                 </CyberButton>
               )}
-              {detail.isAdmin && detail.card.state === "REGISTRATION" && (
+              {detail.isAdmin && !frozen && detail.card.state === "REGISTRATION" && (
                 <CyberButton
                   variant="ghost"
                   onClick={() => setGhostRegistrationOpen(true)}
@@ -407,7 +439,7 @@ export default function TournamentDetailPage() {
               tournamentId={tournamentId}
               liveUrl={detail.card.liveUrl}
               canEdit={detail.isAdmin}
-              onSaved={() => void reload().catch(() => undefined)}
+              onSaved={() => void refresh()}
             />
           </div>
         </div>
@@ -605,8 +637,8 @@ export default function TournamentDetailPage() {
           )}
         </div>
 
-        {detail.isAdmin && (
-          <SeedingEditor tournamentId={tournamentId} onReordered={() => router.refresh()} />
+        {detail.isAdmin && !frozen && (
+          <SeedingEditor tournamentId={tournamentId} onReordered={() => void refresh()} />
         )}
 
         <div className="ds-block">
@@ -639,8 +671,9 @@ export default function TournamentDetailPage() {
         <TournamentProgress detail={detail} />
 
         {/* Zone de danger : réservée aux administrateurs stricts (`canDelete`),
-            et volontairement isolée en bas de page, loin des actions courantes. */}
-        {detail.canDelete && (
+            et volontairement isolée en bas de page, loin des actions courantes.
+            Retirée comme les autres actions quand le suivi est arrêté. */}
+        {detail.canDelete && !frozen && (
           <div
             className="ds-block"
             style={{
@@ -687,7 +720,10 @@ export default function TournamentDetailPage() {
         match={selectedMatchForAdmin}
         open={!!selectedMatchForAdmin}
         onClose={() => setSelectedMatchForAdmin(null)}
-        onSubmitted={() => setSelectedMatchForAdmin(null)}
+        onSubmitted={() => {
+          setSelectedMatchForAdmin(null);
+          void refresh();
+        }}
       />
 
       {matchForLive && (
@@ -695,7 +731,7 @@ export default function TournamentDetailPage() {
           key={matchForLive.id}
           match={matchForLive}
           onClose={() => setMatchForLiveId(null)}
-          onSaved={() => void reload().catch(() => undefined)}
+          onSaved={() => void refresh()}
         />
       )}
 
@@ -704,9 +740,13 @@ export default function TournamentDetailPage() {
           tournamentId={tournamentId}
           tournamentName={detail.card.name}
           onClose={() => setDeleteDialogOpen(false)}
-          onDeleted={(name) =>
-            leaveDeletedTournament(() => showSuccess(`Tournoi « ${name} » supprimé définitivement.`))
-          }
+          onDeleted={(name) => {
+            // On quitte sans attendre le flux : la salle finira par fermer les
+            // connexions, mais celui qui vient de supprimer n'a rien à faire sur
+            // la fiche d'un tournoi qui n'existe plus.
+            showSuccess(`Tournoi « ${name} » supprimé définitivement.`);
+            router.replace("/tournois");
+          }}
         />
       )}
 
@@ -714,7 +754,7 @@ export default function TournamentDetailPage() {
         <GhostRegistrationDialog
           tournamentId={tournamentId}
           onClose={() => setGhostRegistrationOpen(false)}
-          onRegistered={() => router.refresh()}
+          onRegistered={() => void refresh()}
         />
       )}
       </LiveProvider>
