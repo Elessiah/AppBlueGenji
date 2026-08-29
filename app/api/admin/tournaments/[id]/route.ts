@@ -28,11 +28,11 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     const deleted = await deleteTournament(tournamentId);
 
     // Une suppression définitive ne laisse rien derrière elle : la trace côté
-    // bot est le seul journal qui subsiste. L'appel est délibérément ignoré s'il
-    // échoue — le bot est optionnel et le tournoi est déjà supprimé.
+    // bot est le seul journal qui subsiste. L'échec est délibérément avalé — le
+    // bot est optionnel, et le tournoi est déjà supprimé : rien à annuler.
     void sendBotLog(
       `🗑️ Tournoi supprimé définitivement : « ${deleted.name} » (#${deleted.id}) par ${user.pseudo} (#${user.id}).`,
-    );
+    ).catch(() => undefined);
 
     return ok({ deleted });
   } catch (error) {
