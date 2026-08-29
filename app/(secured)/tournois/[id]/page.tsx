@@ -24,6 +24,7 @@ import { MatchLiveDialog } from "./_components/MatchLiveDialog";
 import { TournamentLiveLink } from "./_components/TournamentLiveLink";
 import { LiveProvider } from "./_lib/live-context";
 import { SeedingEditor } from "./_components/SeedingEditor";
+import { BracketPreview } from "./_components/BracketPreview";
 import { MatchScoreDraft } from "./_components/BracketTree";
 import { BracketSections } from "./_components/BracketSections";
 import { SurvivalView } from "./_components/SurvivalView";
@@ -37,6 +38,7 @@ import { SwissView } from "./_components/SwissView";
 import { EnduranceView } from "./_components/EnduranceView";
 import { MatchRow } from "./_components/MatchRow";
 import { EntrantProvider } from "./_lib/entrant-link";
+import { TournamentProgress } from "./_components/TournamentProgress";
 
 const FORMAT_LABELS: Record<TournamentFormat, string> = {
   SINGLE: "Simple élim.",
@@ -274,6 +276,17 @@ export default function TournamentDetailPage() {
     .map((b) => ({ type: b, matches: filteredMatches.filter((m) => m.bracket === b) }))
     .filter((b) => b.matches.length > 0);
 
+  // Aperçu du plateau avant lancement, réservé au staff et au cast : le serveur
+  // le laisse à `null` pour les autres, à qui le tirage ne doit rien révéler
+  // d'avance, et pour un tournoi déjà lancé. Deux endroits l'affichent — pendant
+  // les inscriptions et sur un tournoi encore sans match — d'où ce fragment
+  // unique plutôt que deux copies à faire évoluer de front.
+  const previewBlock = detail.preview ? (
+    <div style={{ marginTop: 18 }}>
+      <BracketPreview preview={detail.preview} canReorder={detail.isAdmin} />
+    </div>
+  ) : null;
+
   return (
     <EntrantProvider
       participantType={detail.card.participantType}
@@ -393,15 +406,18 @@ export default function TournamentDetailPage() {
           </div>
 
           {detail.card.state === "REGISTRATION" ? (
-            <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-              {formatForBracket === "SURVIVAL"
-                ? "Le classement de départ (seeding) et les rounds seront générés au démarrage du tournoi."
-                : detail.card.format === "BG_SURVIE"
-                  ? "Le classement de départ est celui du seeding ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi."
-                : detail.card.format === "SWISS"
-                  ? "Le classement de départ (seeding) et la première ronde seront générés au démarrage du tournoi."
-                  : "Le bracket sera généré automatiquement au démarrage du tournoi."}
-            </p>
+            <>
+              <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
+                {formatForBracket === "SURVIVAL"
+                  ? "Le classement de départ (seeding) et les rounds seront générés au démarrage du tournoi."
+                  : detail.card.format === "BG_SURVIE"
+                    ? "Le classement de départ est celui du seeding ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi."
+                  : detail.card.format === "SWISS"
+                    ? "Le classement de départ (seeding) et la première ronde seront générés au démarrage du tournoi."
+                    : "Le bracket sera généré automatiquement au démarrage du tournoi."}
+              </p>
+              {previewBlock}
+            </>
           ) : formatForBracket === "SURVIVAL" && detail.survival ? (
             <>
               <SurvivalView
@@ -520,9 +536,12 @@ export default function TournamentDetailPage() {
               )}
             </>
           ) : !filteredMatches.length ? (
-            <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-              Aucun match disponible pour l&apos;instant.
-            </p>
+            <>
+              <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
+                Aucun match disponible pour l&apos;instant.
+              </p>
+              {previewBlock}
+            </>
           ) : (
             <>
               {brackets.map(({ type, matches }) => (
@@ -595,6 +614,8 @@ export default function TournamentDetailPage() {
             ))}
           </div>
         </div>
+
+        <TournamentProgress detail={detail} />
       </section>
 
       <AdminScoreDialog

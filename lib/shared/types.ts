@@ -2,6 +2,7 @@
 import type { MatchLiveTrigger } from "./live-streams";
 import type { ParticipantType } from "./participants";
 import type { PlatformRole } from "./permissions";
+import type { TournamentPreview } from "./tournament-preview";
 import type { DeepStats, TeamRankingPosition } from "./stats";
 
 export type TournamentFormat =
@@ -357,6 +358,12 @@ export type TournamentDetail = {
    * `/equipes/[id]`.
    */
   soloUserIds: Record<number, number>;
+  /**
+   * Aperçu du plateau avant le lancement (`docs/features/TOURNAMENT_PREVIEW.md`).
+   * `null` pour qui n'a ni la permission `tournaments` ni `casting`, et pour un
+   * tournoi déjà lancé — le plateau réel fait alors foi.
+   */
+  preview: TournamentPreview | null;
 };
 
 /**

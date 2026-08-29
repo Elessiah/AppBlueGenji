@@ -156,6 +156,12 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     discordId: "900000000000000002",
   },
   {
+    pseudo: "Caster",
+    purpose: "rôle CASTER : aperçu du plateau (lecture seule) + diffusion des matchs",
+    platformRoles: ["CASTER"],
+    isAdult: 1,
+  },
+  {
     pseudo: "CommunityManager",
     purpose: "permission showcase seule",
     platformRoles: ["COMMUNITY_MANAGER"],
@@ -165,12 +171,6 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     pseudo: "Recruteur",
     purpose: "permission recruitment seule",
     platformRoles: ["RECRUTEUR"],
-    isAdult: 1,
-  },
-  {
-    pseudo: "Caster",
-    purpose: "permission live seule (diffusion des matchs)",
-    platformRoles: ["CASTER"],
     isAdult: 1,
   },
   {
@@ -1274,6 +1274,33 @@ async function createTournament(
   }
 
   const finish = def.state === "FINISHED";
+
+  // Les phases d'un tournoi multi-mode sont écrites dès sa création par
+  // `createTournament` : un tournoi encore en inscriptions en a donc déjà.
+  // Sans cela, le cas seedé serait le seul de la base à ne pas en avoir, et
+  // l'aperçu du plateau n'aurait rien à prévisualiser.
+  if (isMulti && def.phases && (def.state === "UPCOMING" || def.state === "REGISTRATION")) {
+    const connection = await db.getConnection();
+    try {
+      await insertPhases(
+        connection,
+        tournamentId,
+        def.phases.map((phase, index) => ({
+          position: index + 1,
+          format: phase.format,
+          name: null,
+          qualifierMode: phase.qualifierMode,
+          qualifierValue: phase.qualifierValue,
+          swissTotalRounds: phase.swissTotalRounds ?? null,
+          survivalRoundsBeforeFirstCut: phase.survivalRoundsBeforeFirstCut ?? null,
+          survivalRoundsPerCut: phase.survivalRoundsPerCut ?? null,
+          hasThirdPlaceMatch: phase.hasThirdPlaceMatch ?? false,
+        })),
+      );
+    } finally {
+      connection.release();
+    }
+  }
 
   if (def.state !== "UPCOMING" && def.state !== "REGISTRATION" && teamsToUse.length >= 2) {
     if (isMulti && def.phases) {

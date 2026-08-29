@@ -54,10 +54,12 @@ export default function TeamDetailPage() {
     <section className="fade-in">
       <TeamHeader team={team} onChanged={refresh} canManage={team.canManage} viewerIsOwner={viewerIsOwner || false} />
       <MembershipActions team={team} onChanged={refresh} />
+      {/* Une fantôme n'a aucun membre et ne peut pas en recevoir : le staff
+          l'attribue à un joueur, il n'y invite personne (la route refuse). */}
       <MembersSection
         teamId={teamId}
         members={team.members}
-        canManage={team.canManage}
+        canManage={team.canManage && !team.team.isGhost}
         viewerUserId={viewerUserId}
         onChanged={refresh}
       />

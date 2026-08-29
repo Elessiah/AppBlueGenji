@@ -1,0 +1,228 @@
+/* =========================================================
+   Frise de progression d'un tournoi — Cyber minimal
+   ========================================================= */
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 26px;
+}
+
+.headStage {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.headLabel {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-0);
+  letter-spacing: -0.01em;
+}
+
+.headHint {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.percent {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--blue-300);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 18px rgba(var(--blue-rgb), calc(0.35 * var(--glow, 1)));
+}
+
+/* --- Rail ------------------------------------------------ */
+
+/* Les libellés débordent de part et d'autre du premier et du dernier jalon :
+   le rail se réserve leur demi-largeur en marge, sinon ils sortent de la zone
+   défilante. */
+.rail {
+  position: relative;
+  padding: 10px 58px 8px;
+  /* Bornes incluses (box-sizing: border-box) : laisse ~132 px entre deux jalons,
+     de quoi ne pas faire se toucher deux libellés de 116 px. */
+  min-width: 780px;
+}
+
+.trackWrap {
+  position: relative;
+  height: 4px;
+}
+
+.track,
+.fill {
+  position: absolute;
+  top: 0;
+  height: 4px;
+  border-radius: 999px;
+}
+
+.track {
+  left: 0;
+  right: 0;
+  background: var(--line-strong-cy);
+}
+
+.fill {
+  left: 0;
+  background: linear-gradient(90deg, var(--blue-700), var(--blue-500) 70%, var(--blue-300));
+  box-shadow: 0 0 14px rgba(var(--blue-rgb), calc(0.55 * var(--glow, 1)));
+  transition: width 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* Liseré de tête : matérialise « ça avance encore ». Inutile sur un tournoi
+   terminé, dont la barre est pleine. */
+.fillLive::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  top: -4px;
+  width: 2px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--blue-100);
+  box-shadow: 0 0 10px var(--blue-300);
+  animation: tp-head-pulse 1.8s ease-in-out infinite;
+}
+
+/* --- Jalons ---------------------------------------------- */
+
+/* Recouvre exactement la piste : les jalons se positionnent en pourcentage de
+   sa largeur. */
+.nodes {
+  position: absolute;
+  inset: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.node {
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  width: 116px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  /* Fait chevaucher le point sur la ligne plutôt que de le poser dessous. */
+  margin-top: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong-cy);
+  background: var(--cyber-bg-1);
+  flex-shrink: 0;
+  transition: all 0.25s ease;
+}
+
+.dotDone {
+  border-color: var(--blue-500);
+  background: var(--blue-500);
+}
+
+.dotCurrent {
+  width: 16px;
+  height: 16px;
+  margin-top: -8px;
+  border-color: var(--blue-300);
+  background: var(--blue-300);
+  box-shadow: 0 0 0 5px rgba(var(--blue-rgb), 0.12), 0 0 16px rgba(var(--blue-rgb), 0.7);
+  animation: tp-node-pulse 2.2s ease-in-out infinite;
+}
+
+.caption {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.captionLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  transition: color 0.25s ease;
+}
+
+.captionLabelDone {
+  color: var(--text-1);
+}
+
+.captionLabelCurrent {
+  color: var(--blue-100);
+}
+
+.captionDate {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  color: var(--text-2);
+  opacity: 0.75;
+}
+
+/* Réserve la hauteur des libellés, que le positionnement absolu des jalons
+   retire du flux. */
+.railSpacer {
+  height: 74px;
+}
+
+/* --- Pied ------------------------------------------------ */
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.footStrong {
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+@keyframes tp-node-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 5px rgba(var(--blue-rgb), 0.12), 0 0 16px rgba(var(--blue-rgb), 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 9px rgba(var(--blue-rgb), 0.04), 0 0 22px rgba(var(--blue-rgb), 0.35);
+  }
+}
+
+@keyframes tp-head-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill {
+    transition: none;
+  }
+  .dotCurrent,
+  .fillLive::after {
+    animation: none;
+  }
+}

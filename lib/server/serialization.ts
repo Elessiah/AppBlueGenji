@@ -47,19 +47,7 @@ export function slugifyPseudo(raw: string): string {
     .slice(0, 40);
 }
 
-export function nextPowerOfTwo(n: number): number {
-  if (n <= 1) return 1;
-  return 2 ** Math.ceil(Math.log2(n));
-}
-
-export function generateSeedOrder(size: number): number[] {
-  if (size <= 1) return [1];
-  if (size === 2) return [1, 2];
-  const previous = generateSeedOrder(size / 2);
-  const result: number[] = [];
-  for (const seed of previous) {
-    result.push(seed);
-    result.push(size + 1 - seed);
-  }
-  return result;
-}
+// Le placement des têtes de série est désormais partagé avec l'aperçu du
+// plateau, qui tourne côté client : il vit dans `lib/shared/bracket-seeds.ts`.
+// Réexporté ici pour ne rien casser des appelants serveur historiques.
+export { nextPowerOfTwo, generateSeedOrder } from "@/lib/shared/bracket-seeds";

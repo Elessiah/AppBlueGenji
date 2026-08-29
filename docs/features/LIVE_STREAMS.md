@@ -118,8 +118,12 @@ Ajouter une plateforme = ajouter une entrée à `LIVE_PLATFORMS`.
 
 ## Permissions
 
-Un nouveau rôle **`CASTER`** et une nouvelle permission **`live`**
+Une nouvelle permission **`live`**, portée par le rôle **`CASTER`**
 (`lib/shared/permissions.ts`, voir `PERMISSION_ROLES.md`).
+
+`CASTER` porte deux permissions aux portées bien distinctes : `casting` ne donne
+que la **lecture** de l'aperçu du plateau (`TOURNAMENT_PREVIEW.md`), tandis que
+`live` est le droit d'**écriture** sur l'état de diffusion décrit ici.
 
 | Action | Permission |
 |---|---|

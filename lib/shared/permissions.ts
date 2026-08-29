@@ -11,55 +11,67 @@
  */
 
 /** Rôles attribuables à un utilisateur. Cumulables. */
-export type PlatformRole = "ADMIN" | "ARBITRE" | "COMMUNITY_MANAGER" | "RECRUTEUR" | "CASTER";
+export type PlatformRole = "ADMIN" | "ARBITRE" | "CASTER" | "COMMUNITY_MANAGER" | "RECRUTEUR";
 
 /**
  * Domaines d'action protégés :
  * - `tournaments` — création et gestion des tournois / matchs.
+ * - `casting` — consultation de l'aperçu du plateau avant le lancement, pour
+ *   préparer la diffusion (lecture seule : ne donne aucun droit d'écriture).
+ * - `live` — diffusion proprement dite : marquer un match comme casté, sa
+ *   chaîne, l'ouverture de son antenne. Volontairement distincte de `casting`
+ *   (qui ne lit que l'aperçu) et de `tournaments` : un streamer doit pouvoir
+ *   ouvrir l'antenne sans toucher aux scores ni aux tournois.
  * - `showcase` — site vitrine (sponsors) + association (bureau, stats, bénévoles, contact).
  * - `recruitment` — page recrutement.
- * - `live` — diffusion : marquer un match comme casté, sa chaîne, son antenne.
- *   Volontairement séparée de `tournaments` : un streamer doit pouvoir ouvrir
- *   l'antenne sans pouvoir toucher aux scores ni aux tournois.
  * - `roles` — attribution des rôles de permission aux utilisateurs (réservé ADMIN).
  */
-export type Permission = "tournaments" | "showcase" | "recruitment" | "live" | "roles";
+export type Permission =
+  | "tournaments"
+  | "casting"
+  | "live"
+  | "showcase"
+  | "recruitment"
+  | "roles";
 
 /** Tous les rôles, dans un ordre d'affichage stable (ADMIN en tête). */
 export const PLATFORM_ROLES: readonly PlatformRole[] = [
   "ADMIN",
   "ARBITRE",
+  "CASTER",
   "COMMUNITY_MANAGER",
   "RECRUTEUR",
-  "CASTER",
 ];
 
 /** Libellés FR pour l'UI. */
 export const ROLE_LABELS: Record<PlatformRole, string> = {
   ADMIN: "Administrateur",
   ARBITRE: "Arbitre",
+  CASTER: "Caster",
   COMMUNITY_MANAGER: "Community Manager",
   RECRUTEUR: "Recruteur",
-  CASTER: "Caster",
 };
 
 /** Description courte du périmètre de chaque rôle (UI). */
 export const ROLE_DESCRIPTIONS: Record<PlatformRole, string> = {
   ADMIN: "Tous les droits, dont l'attribution des rôles.",
   ARBITRE: "Créer et gérer les tournois.",
+  CASTER: "Préparer et diffuser les matchs en direct (aperçu du plateau, antenne).",
   COMMUNITY_MANAGER: "Gérer le site vitrine et l'association.",
   RECRUTEUR: "Gérer la page recrutement.",
-  CASTER: "Diffuser les matchs en direct.",
 };
 
 const ROLE_PERMISSIONS: Record<PlatformRole, readonly Permission[]> = {
-  ADMIN: ["tournaments", "showcase", "recruitment", "live", "roles"],
-  // L'arbitre pilote le tournoi : il ouvre aussi l'antenne, sans quoi il
-  // faudrait deux personnes pour lancer un match casté.
-  ARBITRE: ["tournaments", "live"],
+  ADMIN: ["tournaments", "casting", "live", "showcase", "recruitment", "roles"],
+  // L'arbitre gère le tournoi : l'aperçu lui est acquis, sans rôle en plus, et
+  // il ouvre aussi l'antenne — sans quoi il faudrait deux personnes pour lancer
+  // un match casté.
+  ARBITRE: ["tournaments", "casting", "live"],
+  // Les deux faces du métier de caster : préparer (lecture de l'aperçu) et
+  // diffuser (écriture sur l'état de direct des matchs, et rien d'autre).
+  CASTER: ["casting", "live"],
   COMMUNITY_MANAGER: ["showcase"],
   RECRUTEUR: ["recruitment"],
-  CASTER: ["live"],
 };
 
 /** Vrai si `value` est un `PlatformRole` connu. */
@@ -124,4 +136,12 @@ export function can(
   if (!user) return false;
   if (user.isAdmin) return true;
   return hasPermission(user.roles, permission);
+}
+
+/** Vrai si l'utilisateur dispose d'**au moins une** des permissions listées. */
+export function canAny(
+  user: { roles?: readonly PlatformRole[]; isAdmin?: boolean } | null | undefined,
+  permissions: readonly Permission[],
+): boolean {
+  return permissions.some((permission) => can(user, permission));
 }
