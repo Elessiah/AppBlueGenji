@@ -6,6 +6,8 @@ module.exports = {
         '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.jest.json' }],
     },
     moduleNameMapper: {
+        // Les composants importent leurs modules CSS ; Node ne sait pas les lire.
+        '\\.(css|scss|sass)$': '<rootDir>/tests/__mocks__/style-mock.cjs',
         '^@/(.*)$': '<rootDir>/$1',
     },
     moduleFileExtensions: ['ts', 'tsx', 'js'],
