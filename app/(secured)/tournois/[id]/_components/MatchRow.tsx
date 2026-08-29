@@ -7,6 +7,7 @@ import { fromBracketMatch, isScoreEditLocked } from "@/lib/shared/match-lock";
 import { matchFormatLabel, matchWinsRequired } from "@/lib/shared/match-format";
 import { useEntrantLink } from "../_lib/entrant-link";
 import { useMatchFormat } from "../_lib/match-format-context";
+import { MatchLiveStrip } from "./MatchLiveStrip";
 
 const CARD_W = 210;
 const BORDER = "var(--border, #444)";
@@ -118,6 +119,8 @@ export function MatchRow({
           {team2Score}
         </strong>
       </div>
+
+      <MatchLiveStrip match={match} />
 
       {reportable && (
         <form

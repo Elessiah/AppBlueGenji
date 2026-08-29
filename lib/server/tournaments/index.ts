@@ -501,6 +501,7 @@ async function loadTournamentBuckets(
       t.participant_type,
       t.match_format_type,
       t.match_format_value,
+      t.live_url,
       COALESCE(COUNT(r.id), 0) AS registered_teams
      FROM bg_tournaments t
      LEFT JOIN bg_tournament_registrations r ON r.tournament_id = t.id
@@ -527,7 +528,8 @@ async function loadTournamentBuckets(
       t.survival_current_round,
       t.participant_type,
       t.match_format_type,
-      t.match_format_value
+      t.match_format_value,
+      t.live_url
      ORDER BY t.start_at DESC`,
     params,
   );
@@ -630,6 +632,12 @@ export async function getTournamentViewerContext(
    * sans aucun droit d'écriture.
    */
   canPreview = isAdmin,
+  /**
+   * Droit d'écrire l'état de diffusion des matchs : permission `live`. Distinct
+   * de `canPreview`, qui ne donne que la lecture de l'aperçu — un caster lit le
+   * tirage **et** ouvre l'antenne, sans pour autant arbitrer.
+   */
+  canManageLive = isAdmin,
 ): Promise<TournamentViewerContext> {
   const isSolo = isSoloTournament(snapshot.card.participantType);
 
@@ -670,6 +678,7 @@ export async function getTournamentViewerContext(
     myTeamId,
     canCreateReportsForTeamIds: myTeamId ? [myTeamId] : [],
     isAdmin,
+    canManageLive,
   };
 }
 
@@ -688,11 +697,22 @@ export async function getTournamentDetail(
    * sans aucun droit d'écriture.
    */
   canPreview = isAdmin,
+  /**
+   * Droit d'écrire l'état de diffusion des matchs : permission `live`. Distinct
+   * de `canPreview`, qui ne donne que la lecture de l'aperçu.
+   */
+  canManageLive = isAdmin,
 ): Promise<TournamentDetail | null> {
   const snapshot = await getTournamentSnapshot(tournamentId);
   if (!snapshot) return null;
 
-  const viewer = await getTournamentViewerContext(snapshot, userId, isAdmin, canPreview);
+  const viewer = await getTournamentViewerContext(
+    snapshot,
+    userId,
+    isAdmin,
+    canPreview,
+    canManageLive,
+  );
   return { ...snapshot, ...viewer };
 }
 

@@ -1,21 +1,21 @@
 "use client";
 
-import { useState } from "react";
 import { Eye } from "lucide-react";
 import { CyberCard, Pill, TeamSigil } from "@/components/cyber";
 import type { LandingLive } from "@/lib/shared/landing";
 import { inferPhaseLabel, toBestOfLabel } from "@/lib/shared/landing";
-import { LANDING_LIVE_INTERVAL_MS } from "@/lib/shared/refresh-tiers";
-import { useAutoRefresh } from "@/lib/shared/hooks/useAutoRefresh";
+import { PLATFORM_LABELS, streamPlatform } from "@/lib/shared/live-streams";
 import styles from "./LiveCard.module.css";
 
 type LiveCardProps = {
-  initialLive: LandingLive | null;
-  nextUpcomingISO?: string | null;
-};
-
-type LiveResponse = {
+  /**
+   * État du direct, tenu par le `Hero` (`useLandingLive`). La carte est
+   * volontairement contrôlée : elle partage sa source avec le bouton
+   * « Regarder le live », qui doit apparaître et disparaître en même temps
+   * qu'elle annonce un match à l'antenne.
+   */
   live: LandingLive | null;
+  nextUpcomingISO?: string | null;
 };
 
 function sigilFor(name: string | null): string {
@@ -32,41 +32,7 @@ function nextDaysLabel(iso: string | null | undefined): string {
   return `${days} jours`;
 }
 
-export function LiveCard({ initialLive, nextUpcomingISO }: LiveCardProps) {
-  const [live, setLive] = useState<LandingLive | null>(initialLive);
-
-  // La carte est rendue côté serveur avec une valeur fraîche : le premier
-  // chargement n'a donc rien à redemander. Ensuite, la vitrine est publique et
-  // anonyme — palier « spectateur » : quelques minutes, et rien du tout quand
-  // l'onglet est caché. Sans cela, cent visiteurs sur l'accueil produisaient à
-  // eux seuls dix requêtes par seconde sur une agrégation de tous les tournois.
-  useAutoRefresh(
-    async (signal) => {
-      try {
-        const response = await fetch("/api/landing/live", { cache: "no-store", signal });
-        if (!response.ok) return;
-
-        const payload = (await response.json()) as LiveResponse;
-        const raw = payload.live ?? null;
-        if (!raw) {
-          setLive(null);
-          return;
-        }
-
-        const text = (raw.tournament.name ?? "").toLowerCase();
-        const game = text.includes("marvel") || text.includes("rivals") ? "Marvel Rivals" : "Overwatch";
-        const phase = raw.currentMatch
-          ? raw.currentMatch.roundLabel?.toUpperCase?.() ?? "EN ATTENTE"
-          : "EN ATTENTE";
-        setLive({ ...raw, game, phase });
-      } catch {
-        // Requête abandonnée, ou incident réseau passager : la carte garde la
-        // dernière valeur connue.
-      }
-    },
-    { intervalMs: LANDING_LIVE_INTERVAL_MS },
-  );
-
+export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
   if (!live) {
     return (
       <CyberCard ticks className={styles.root}>
@@ -81,6 +47,9 @@ export function LiveCard({ initialLive, nextUpcomingISO }: LiveCardProps) {
   const currentMatch = live.currentMatch;
   const bestOf = toBestOfLabel(currentMatch);
   const title = live.tournament.name.toUpperCase();
+  const matchIsLive = currentMatch?.liveState === "LIVE";
+  const matchIsScheduled = currentMatch?.liveState === "SCHEDULED";
+  const matchPlatform = streamPlatform(currentMatch?.liveUrl);
 
   return (
     <CyberCard ticks className={styles.root}>
@@ -97,6 +66,24 @@ export function LiveCard({ initialLive, nextUpcomingISO }: LiveCardProps) {
 
       {currentMatch ? (
         <div className={styles.match}>
+          {(matchIsLive || matchIsScheduled) && (
+            <div className={matchIsLive ? styles.streamBanner : styles.streamBannerScheduled}>
+              <span className={styles.streamLabel}>
+                {matchIsLive ? "● CE MATCH EST EN DIRECT" : "○ MATCH PROGRAMMÉ EN DIRECT"}
+              </span>
+              {currentMatch.liveUrl && (
+                <a
+                  className={styles.streamLink}
+                  href={currentMatch.liveUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {matchPlatform ? `Voir sur ${PLATFORM_LABELS[matchPlatform]}` : "Voir la chaîne"}
+                </a>
+              )}
+            </div>
+          )}
+
           <div className={styles.team}>
             <TeamSigil letter={sigilFor(currentMatch.team1Name)} size={40} />
             <div className={styles.teamText}>

@@ -47,6 +47,8 @@ function viewerWith(overrides: Partial<TournamentViewerContext> = {}): Tournamen
     myTeamId: null,
     canCreateReportsForTeamIds: [],
     isAdmin: false,
+    canManageLive: false,
+    preview: null,
     ...overrides,
   };
 }
@@ -145,6 +147,24 @@ describe("GET /api/tournaments/[id]/stream — palier décidé par le serveur", 
     );
     const message = await firstMessage(await GET(new Request("http://t/"), params("5")));
     expect(message.tier).toBe("STANDARD");
+  });
+
+  it("accorde les commandes d'antenne selon la permission `live`", async () => {
+    // Le flux est le chemin nominal : la lecture REST ne sert qu'en secours. Si
+    // le droit de diffusion ne voyageait que par elle, un arbitre n'aurait ses
+    // commandes d'antenne qu'après une coupure du direct.
+    (getCurrentUser as jest.Mock).mockResolvedValue(
+      { id: 1, isAdmin: false, roles: ["CASTER"] } as never,
+    );
+    await firstMessage(await GET(new Request("http://t/"), params("5")));
+
+    // 5e argument de `getTournamentViewerContext` : `canManageLive`.
+    expect((getTournamentViewerContext as jest.Mock).mock.calls[0][4]).toBe(true);
+  });
+
+  it("refuse les commandes d'antenne à qui n'a pas la permission", async () => {
+    await firstMessage(await GET(new Request("http://t/"), params("5")));
+    expect((getTournamentViewerContext as jest.Mock).mock.calls[0][4]).toBe(false);
   });
 
   it("rejoint la salle partagée plutôt que de s'abonner seul", async () => {

@@ -10,7 +10,7 @@ s'additionnent.
 | ------------------- | -------------------------------------------------------- |
 | `ADMIN`             | **Tous les droits**, dont l'attribution des rôles.       |
 | `ARBITRE`           | Création et gestion des tournois / matchs (`tournaments`).|
-| `CASTER`            | Aperçu du plateau avant lancement, en lecture seule (`casting`).|
+| `CASTER`            | Aperçu du plateau avant lancement en lecture seule (`casting`), et diffusion en direct des matchs (`live`). |
 | `COMMUNITY_MANAGER` | Site vitrine (sponsors) + association (`showcase`).       |
 | `RECRUTEUR`         | Page recrutement (`recruitment`).                         |
 
@@ -21,6 +21,10 @@ s'additionnent.
 
 - `tournaments` — `POST /api/tournaments`, `PATCH /api/admin/matches/[id]/scores`,
   `POST /api/admin/matches/[id]/resolve`, gestion via `GET /api/tournaments/[id]`.
+- `live` — état de diffusion des matchs : marquer un match comme casté, sa
+  chaîne, l'ouverture et la fermeture de son antenne. C'est un droit d'**écriture**,
+  volontairement distinct de `casting` (lecture seule) et de `tournaments` : un
+  streamer ouvre l'antenne sans toucher aux scores. Voir `LIVE_STREAMS.md`.
 - `casting` — `TournamentDetail.preview`, l'aperçu du plateau avant le lancement
   (`docs/features/TOURNAMENT_PREVIEW.md`). Permission de **lecture seule** :
   elle n'ouvre aucune écriture. `ARBITRE` l'obtient avec `tournaments`.

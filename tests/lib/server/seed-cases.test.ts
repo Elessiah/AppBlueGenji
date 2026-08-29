@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { TOURNAMENTS, type SeedFormat, type TournamentDef } from "@/lib/server/seed-cases";
+import { normalizeStreamUrl } from "@/lib/shared/live-streams";
 
 const FORMATS: SeedFormat[] = ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL"];
 const STATES: TournamentDef["state"][] = ["UPCOMING", "REGISTRATION", "RUNNING", "FINISHED"];
@@ -225,5 +226,51 @@ describe("seed — cohérence des définitions", () => {
     expect(running("DOUBLE").length).toBeGreaterThanOrEqual(3);
     expect(running("SWISS").length).toBeGreaterThanOrEqual(2);
     expect(running("SURVIVAL").length).toBeGreaterThanOrEqual(5);
+  });
+
+  describe("diffusion en direct", () => {
+    const broadcast = TOURNAMENTS.filter((t) => t.live);
+
+    it("couvre les trois situations de diffusion", () => {
+      // À l'antenne d'office, programmé sans antenne, et antenne ouverte à la
+      // main : les trois états que l'interface doit savoir rendre.
+      expect(broadcast.some((t) => t.live!.trigger === "AUTO")).toBe(true);
+      expect(broadcast.some((t) => t.live!.trigger === "MANUAL" && !t.live!.onAir)).toBe(true);
+      expect(broadcast.some((t) => t.live!.trigger === "MANUAL" && t.live!.onAir)).toBe(true);
+    });
+
+    it("ne pose une diffusion que sur des tournois en cours", () => {
+      // Un tournoi à venir n'a pas de match jouable : le cas ne montrerait rien.
+      for (const t of broadcast) {
+        expect(t.state).toBe("RUNNING");
+      }
+    });
+
+    it("laisse des manches non jouées, sinon rien ne serait à l'antenne", () => {
+      for (const t of broadcast) {
+        expect(t.teamCount).toBeGreaterThanOrEqual(4);
+        expect(t.playWaves ?? 0).toBeLessThan(Math.log2(t.teamCount));
+      }
+    });
+
+    it("couvre chaque plateforme de la liste blanche au moins une fois", () => {
+      const hosts = broadcast.map((t) => new URL(t.live!.url).hostname);
+      expect(hosts.some((h) => h.endsWith("twitch.tv"))).toBe(true);
+      expect(hosts.some((h) => h.endsWith("youtube.com"))).toBe(true);
+      expect(hosts.some((h) => h.endsWith("kick.com"))).toBe(true);
+    });
+
+    it("n'utilise que des URL acceptées par la liste blanche", () => {
+      for (const t of broadcast) {
+        expect(normalizeStreamUrl(t.live!.url)).not.toBeNull();
+        if (t.live!.matchUrl) {
+          expect(normalizeStreamUrl(t.live!.matchUrl)).not.toBeNull();
+        }
+      }
+    });
+
+    it("couvre le match casté sans lien propre — badge seul", () => {
+      expect(broadcast.some((t) => !t.live!.matchUrl)).toBe(true);
+    });
   });
 });

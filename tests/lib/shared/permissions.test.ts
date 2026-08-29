@@ -19,6 +19,7 @@ describe("permissions", () => {
       expect(isPlatformRole("CASTER")).toBe(true);
       expect(isPlatformRole("COMMUNITY_MANAGER")).toBe(true);
       expect(isPlatformRole("RECRUTEUR")).toBe(true);
+      expect(isPlatformRole("CASTER")).toBe(true);
       expect(isPlatformRole("OWNER")).toBe(false);
       expect(isPlatformRole("admin")).toBe(false);
       expect(isPlatformRole(42)).toBe(false);
@@ -57,9 +58,16 @@ describe("permissions", () => {
 
   describe("permissionsForRoles", () => {
     it("maps each role to its scope", () => {
-      // L'arbitre gère le tournoi : l'aperçu du plateau lui est acquis.
-      expect([...permissionsForRoles(["ARBITRE"])]).toEqual(["tournaments", "casting"]);
-      expect([...permissionsForRoles(["CASTER"])]).toEqual(["casting"]);
+      // L'arbitre gère le tournoi : l'aperçu du plateau lui est acquis, et il
+      // ouvre aussi l'antenne.
+      expect([...permissionsForRoles(["ARBITRE"])]).toEqual([
+        "tournaments",
+        "casting",
+        "live",
+      ]);
+      // Le caster prépare (aperçu) et diffuse (antenne) — mais ne touche ni aux
+      // scores ni aux tournois.
+      expect([...permissionsForRoles(["CASTER"])]).toEqual(["casting", "live"]);
       expect([...permissionsForRoles(["COMMUNITY_MANAGER"])]).toEqual(["showcase"]);
       expect([...permissionsForRoles(["RECRUTEUR"])]).toEqual(["recruitment"]);
     });
@@ -67,13 +75,13 @@ describe("permissions", () => {
     it("grants every scope to ADMIN", () => {
       const perms = permissionsForRoles(["ADMIN"]);
       expect(perms).toEqual(
-        new Set(["tournaments", "casting", "showcase", "recruitment", "roles"]),
+        new Set(["tournaments", "casting", "live", "showcase", "recruitment", "roles"]),
       );
     });
 
     it("cumulates permissions across roles", () => {
       const perms = permissionsForRoles(["ARBITRE", "RECRUTEUR"]);
-      expect(perms).toEqual(new Set(["tournaments", "casting", "recruitment"]));
+      expect(perms).toEqual(new Set(["tournaments", "casting", "live", "recruitment"]));
     });
 
     it("returns an empty set for no roles", () => {

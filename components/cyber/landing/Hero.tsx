@@ -4,7 +4,9 @@ import Link from "next/link";
 import { CountdownStrip, CyberButton } from "@/components/cyber";
 import type { LandingLive, LandingStats } from "@/lib/shared/landing";
 import type { TournamentCard } from "@/lib/shared/types";
+import { PLATFORM_LABELS, streamPlatform } from "@/lib/shared/live-streams";
 import { LiveCard } from "./LiveCard";
+import { useLandingLive } from "./useLandingLive";
 import { EditableCopy } from "./EditableCopy";
 import type { SiteCopy } from "@/lib/shared/site-copy";
 import styles from "./Hero.module.css";
@@ -19,7 +21,13 @@ type HeroProps = {
   canEditCopy: boolean;
 };
 
-export function Hero({ stats, live, nextUpcoming, copy, canEditCopy }: HeroProps) {
+export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy }: HeroProps) {
+  // Une seule source pour la carte live et le bouton « Regarder le live » :
+  // deux sondages séparés les feraient diverger le temps d'un tick.
+  const live = useLandingLive(initialLive);
+  const stream = live?.stream ?? null;
+  const platform = streamPlatform(stream?.url);
+
   return (
     <section className={styles.root}>
       <div className="fabric" />
@@ -47,12 +55,24 @@ export function Hero({ stats, live, nextUpcoming, copy, canEditCopy }: HeroProps
             <CyberButton variant="primary" asChild>
               <Link href="/tournois">Inscrire mon équipe</Link>
             </CyberButton>
-            <CyberButton variant="ghost" asChild>
-              <a href="#tournois" aria-label="Regarder le live">
-                <span aria-hidden="true">▶</span>
-                Regarder le live
-              </a>
-            </CyberButton>
+            {/* Aucune diffusion en cours → aucun bouton : un « Regarder le
+                live » qui ne mène nulle part crée plus de confusion qu'il n'en
+                lève. */}
+            {stream && (
+              <CyberButton variant="ghost" asChild>
+                <a
+                  href={stream.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Regarder ${stream.tournamentName} en direct${
+                    platform ? ` sur ${PLATFORM_LABELS[platform]}` : ""
+                  } (nouvel onglet)`}
+                >
+                  <span aria-hidden="true">▶</span>
+                  Regarder le live
+                </a>
+              </CyberButton>
+            )}
           </div>
 
           <div className={styles.stats}>
@@ -74,7 +94,7 @@ export function Hero({ stats, live, nextUpcoming, copy, canEditCopy }: HeroProps
         </div>
 
         <div className={styles.right}>
-          <LiveCard initialLive={live} nextUpcomingISO={nextUpcoming?.startAt ?? null} />
+          <LiveCard live={live} nextUpcomingISO={nextUpcoming?.startAt ?? null} />
           {nextUpcoming && (
             <CountdownStrip targetISO={nextUpcoming.startAt} label={`PROCHAIN TOURNOI · ${nextUpcoming.name}`} />
           )}

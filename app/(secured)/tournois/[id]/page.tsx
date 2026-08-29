@@ -21,6 +21,9 @@ import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { AdminScoreDialog } from "./_components/AdminScoreDialog";
 import { LiveIndicator } from "./_components/LiveIndicator";
 import { GhostRegistrationDialog } from "./_components/GhostRegistrationDialog";
+import { MatchLiveDialog } from "./_components/MatchLiveDialog";
+import { TournamentLiveLink } from "./_components/TournamentLiveLink";
+import { LiveProvider } from "./_lib/live-context";
 import { SeedingEditor } from "./_components/SeedingEditor";
 import { BracketPreview } from "./_components/BracketPreview";
 import { MatchScoreDraft } from "./_components/BracketTree";
@@ -36,6 +39,7 @@ import { SwissView } from "./_components/SwissView";
 import { EnduranceView } from "./_components/EnduranceView";
 import { MatchRow } from "./_components/MatchRow";
 import { EntrantProvider } from "./_lib/entrant-link";
+import { TournamentProgress } from "./_components/TournamentProgress";
 
 const FORMAT_LABELS: Record<TournamentFormat, string> = {
   SINGLE: "Simple élim.",
@@ -73,6 +77,11 @@ export default function TournamentDetailPage() {
   const [drafts, setDrafts] = useState<MatchScoreDraft>({});
   const [selectedMatchForAdmin, setSelectedMatchForAdmin] = useState<BracketMatch | null>(null);
   const [ghostRegistrationOpen, setGhostRegistrationOpen] = useState(false);
+  // On retient l'**identifiant** du match en cours de configuration, pas l'objet :
+  // la page se recharge par SSE, et un objet capturé à l'ouverture deviendrait
+  // périmé — le dialogue rejouerait alors une configuration dépassée par-dessus
+  // celle d'un autre membre du staff.
+  const [matchForLiveId, setMatchForLiveId] = useState<number | null>(null);
   const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
 
   // Dernière phase courante observée. On ne resynchronise la sélection que
@@ -303,6 +312,14 @@ export default function TournamentDetailPage() {
     GRAND: "Grande Finale",
     THIRD_PLACE: "Petite Finale",
   };
+  // Résolu à chaque rendu depuis la liste fraîche : le dialogue de diffusion
+  // travaille toujours sur l'état courant du match, et se ferme de lui-même si
+  // le match disparaît (plateau régénéré).
+  const matchForLive =
+    matchForLiveId === null
+      ? null
+      : detail.matches.find((match) => match.id === matchForLiveId) ?? null;
+
   const brackets = bracketOrder
     .map((b) => ({ type: b, matches: filteredMatches.filter((m) => m.bracket === b) }))
     .filter((b) => b.matches.length > 0);
@@ -324,6 +341,7 @@ export default function TournamentDetailPage() {
       soloUserIds={detail.soloUserIds}
     >
       <MatchFormatProvider format={detail.card.matchFormat}>
+      <LiveProvider canManage={detail.canManageLive} openConfig={(match) => setMatchForLiveId(match.id)}>
       <RulesHelpFab format={visibleFormat} contextLabel={contextLabel} />
       <section className="fade-in">
         <div className="ds-header green">
@@ -412,6 +430,15 @@ export default function TournamentDetailPage() {
                 </CyberButton>
               )}
             </div>
+
+            {/* Chaîne officielle : antenne permanente du tournoi, distincte de
+                l'état « en direct » qui, lui, se joue au niveau des matchs. */}
+            <TournamentLiveLink
+              tournamentId={tournamentId}
+              liveUrl={detail.card.liveUrl}
+              canEdit={detail.isAdmin}
+              onSaved={() => void refresh()}
+            />
           </div>
         </div>
 
@@ -638,6 +665,8 @@ export default function TournamentDetailPage() {
             ))}
           </div>
         </div>
+
+        <TournamentProgress detail={detail} />
       </section>
 
       <AdminScoreDialog
@@ -650,6 +679,15 @@ export default function TournamentDetailPage() {
         }}
       />
 
+      {matchForLive && (
+        <MatchLiveDialog
+          key={matchForLive.id}
+          match={matchForLive}
+          onClose={() => setMatchForLiveId(null)}
+          onSaved={() => void refresh()}
+        />
+      )}
+
       {ghostRegistrationOpen && (
         <GhostRegistrationDialog
           tournamentId={tournamentId}
@@ -657,6 +695,7 @@ export default function TournamentDetailPage() {
           onRegistered={() => void refresh()}
         />
       )}
+      </LiveProvider>
       </MatchFormatProvider>
     </EntrantProvider>
   );

@@ -46,8 +46,19 @@ Il est donc scindé en deux :
   de tirage** — les engagées et leur rang — et non sur leur nombre : le staff
   réorganise ce tirage à effectif constant, et c'est le cas le plus fréquent.
 
+  Même raison pour `canManageLive` (permission `live`,
+  `docs/features/LIVE_STREAMS.md`) : les commandes d'antenne d'un match sont un
+  droit du lecteur, pas un état du plateau. L'état de diffusion lui-même
+  (`liveTrigger`, `liveUrl`, `liveStartedAt`) reste dans l'instantané — il est
+  le même pour tout le monde, et c'est ce qui le fait arriver en direct.
+
 `TournamentDetail = TournamentSnapshot & TournamentViewerContext` : les
 appelants existants ne voient aucune différence.
+
+Chaque droit doit voyager par **les deux** portes — la route du flux
+(`stream/route.ts`) et la lecture REST de secours. Le flux étant le chemin
+nominal, un droit câblé uniquement sur la seconde ne parviendrait à son porteur
+qu'après une coupure du direct.
 
 Le flux SSE envoie l'instantané complet à la connexion (avec le contexte du
 lecteur), puis chaque nouvelle version. **Dans le cas nominal, la page de

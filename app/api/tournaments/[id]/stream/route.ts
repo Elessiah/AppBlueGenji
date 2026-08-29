@@ -58,13 +58,18 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   }
 
   // L'aperçu du plateau va plus loin que la gestion : le cast y a droit sans
-  // pouvoir rien modifier (`docs/features/TOURNAMENT_PREVIEW.md`).
+  // pouvoir rien modifier (`docs/features/TOURNAMENT_PREVIEW.md`). La diffusion
+  // est, elle, un droit d'écriture à part (`docs/features/LIVE_STREAMS.md`) —
+  // qui doit voyager par ici comme par la lecture REST, ce flux étant le chemin
+  // nominal : sans lui, un arbitre n'aurait ses commandes d'antenne qu'après
+  // une coupure du direct.
   const narratesLive = canAny(user, ["tournaments", "casting"]);
   const viewer = await getTournamentViewerContext(
     snapshot,
     user.id,
     can(user, "tournaments"),
     narratesLive,
+    can(user, "live"),
   );
 
   // Palier de fraîcheur : ceux qui font le tournoi — staff, cast, engagés — sont

@@ -3,6 +3,7 @@ import { toIso } from "@/lib/server/serialization";
 import { toParticipantType } from "@/lib/shared/participants";
 import type { BracketMatch, TournamentCard, TournamentPhase } from "@/lib/shared/types";
 import { parseMatchFormat } from "@/lib/shared/match-format";
+import { normalizeStreamUrl, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 
 export type TournamentRow = RowDataPacket & {
   id: number;
@@ -32,6 +33,8 @@ export type TournamentRow = RowDataPacket & {
   /** Format des matchs (`BO`/`FT`) ; NULL = saisie de score libre. */
   match_format_type: "BO" | "FT" | null;
   match_format_value: number | null;
+  /** Chaîne officielle du tournoi ; NULL = aucune diffusion annoncée. */
+  live_url: string | null;
 };
 
 export type RegistrationRow = RowDataPacket & {
@@ -75,6 +78,10 @@ export type MatchRow = RowDataPacket & {
   updated_at: Date;
   phase_id: number;
   phase_position: number | null;
+  /** NULL = match non casté (cf. `lib/shared/live-streams.ts`). */
+  live_trigger: MatchLiveTrigger | null;
+  live_url: string | null;
+  live_started_at: Date | null;
 };
 
 export type TournamentListRow = TournamentRow & {
@@ -159,6 +166,11 @@ export function mapCard(row: TournamentListRow): TournamentCard {
       row.survival_rounds_per_cut === null ? null : Number(row.survival_rounds_per_cut),
     phases: null,
     matchFormat: parseMatchFormat(row.match_format_type, row.match_format_value),
+    // Revalidé à la lecture, comme dans `findBroadcastingTournament` : une ligne
+    // posée avant la liste blanche (ou éditée à la main en base) ne doit jamais
+    // ressortir en `href`. Une URL sans schéma, notamment, deviendrait un lien
+    // *relatif* et renverrait le visiteur dans le site au lieu de la chaîne.
+    liveUrl: normalizeStreamUrl(row.live_url),
   };
 }
 
@@ -189,5 +201,8 @@ export function mapMatch(row: MatchRow): BracketMatch {
     updatedAt: toIso(row.updated_at)!,
     phaseId: Number(row.phase_id ?? 0),
     phasePosition: row.phase_position == null ? null : Number(row.phase_position),
+    liveTrigger: row.live_trigger ?? null,
+    liveUrl: normalizeStreamUrl(row.live_url),
+    liveStartedAt: toIso(row.live_started_at),
   };
 }

@@ -321,7 +321,15 @@ export function useTournamentLive(tournamentId: number) {
     fatal,
     /** Palier de fraîcheur accordé par le serveur (`lib/shared/refresh-tiers`). */
     tier: state.tier,
-    /** À appeler après une action de l'utilisateur, pour un retour immédiat. */
+    /**
+     * Recharge à la demande, après une action de l'utilisateur : le flux couvre
+     * le cas nominal, mais celui qui vient d'agir mérite un retour immédiat quel
+     * que soit son palier — et son contexte de lecteur a pu changer.
+     *
+     * Remplace le `reload` d'avant, qui exposait `load` tel quel : la relecture
+     * doit forcer la prise du contexte du lecteur (la version de l'instantané
+     * étant souvent déjà connue) et rouvrir le flux quand l'engagement change.
+     */
     refresh,
   };
 }

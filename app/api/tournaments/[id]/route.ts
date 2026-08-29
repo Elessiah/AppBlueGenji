@@ -24,12 +24,14 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   }
 
   // L'aperçu du plateau va plus loin que la gestion : le cast y a droit sans
-  // pouvoir rien modifier (`docs/features/TOURNAMENT_PREVIEW.md`).
+  // pouvoir rien modifier (`docs/features/TOURNAMENT_PREVIEW.md`). La diffusion
+  // est, elle, un droit d'écriture à part (`docs/features/LIVE_STREAMS.md`).
   const detail = await getTournamentDetail(
     tournamentId,
     user.id,
     can(user, "tournaments"),
     canAny(user, ["tournaments", "casting"]),
+    can(user, "live"),
   );
   if (!detail) return fail("TOURNAMENT_NOT_FOUND", 404);
 
