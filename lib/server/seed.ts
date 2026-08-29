@@ -24,6 +24,7 @@ import {
   forfeitSurvivalTeam,
 } from "./tournaments/survival";
 import { insertPhases, setCurrentPhase, loadPhases } from "./tournaments/phases-repository";
+import { normalizeStreamUrl } from "@/lib/shared/live-streams";
 import { initializeMultiTournament, startPhase, reconcilePhases } from "./tournaments/phases";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { matchWinsRequired } from "@/lib/shared/match-format";
@@ -1150,8 +1151,10 @@ async function applyLiveStreams(
 ): Promise<void> {
   if (!def.live) return;
 
+  // Normalisé comme le ferait la route de production : le jeu de test doit
+  // contenir exactement ce qu'un enregistrement réel produit.
   await db.execute(`UPDATE bg_tournaments SET live_url = ? WHERE id = ?`, [
-    def.live.url,
+    normalizeStreamUrl(def.live.url),
     tournamentId,
   ]);
 
@@ -1163,7 +1166,7 @@ async function applyLiveStreams(
        AND status = 'READY'
        AND team1_id IS NOT NULL
        AND team2_id IS NOT NULL`,
-    [def.live.trigger, def.live.matchUrl ?? null, startedAt, tournamentId]
+    [def.live.trigger, normalizeStreamUrl(def.live.matchUrl), startedAt, tournamentId]
   );
 }
 
