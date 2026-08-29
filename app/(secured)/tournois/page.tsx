@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
 import { sameBuckets, sameTournaments } from "@/lib/shared/tournament-schedule";
-import { REFRESH_CADENCE, resolveRefreshTier } from "@/lib/shared/refresh-tiers";
+import { refreshCadenceFor } from "@/lib/shared/refresh-tiers";
 import { useAutoRefresh } from "@/lib/shared/hooks/useAutoRefresh";
 import { useScheduledBuckets } from "@/lib/shared/hooks/useScheduledBuckets";
 import { useToast } from "@/components/ui/toast";
@@ -125,7 +125,7 @@ export default function TournamentsPage() {
   // presque rien (`lib/server/tournaments/list-cache.ts`).
   useAutoRefresh(
     (signal) => Promise.all([load(true, signal), loadHidden(true, signal)]).then(() => undefined),
-    { intervalMs: REFRESH_CADENCE[resolveRefreshTier({ isStaff: isAdmin })].listIntervalMs },
+    { intervalMs: refreshCadenceFor({ isStaff: isAdmin }).listIntervalMs },
   );
 
   useEffect(() => {

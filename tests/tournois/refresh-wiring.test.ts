@@ -149,9 +149,8 @@ describe("page de tournoi — ce que voit le lecteur", () => {
 describe("liste des tournois — sans flux SSE", () => {
   it("se rafraîchit d'elle-même à la cadence du palier", () => {
     expect(listPage).toContain("useAutoRefresh");
-    expect(listPage).toContain(
-      "REFRESH_CADENCE[resolveRefreshTier({ isStaff: isAdmin })].listIntervalMs",
-    );
+    // La cadence vient du palier, jamais d'un nombre écrit sur place.
+    expect(listPage).toContain("refreshCadenceFor({ isStaff: isAdmin }).listIntervalMs");
     // Un incident réseau passager ne doit pas couvrir l'écran de notifications,
     // pas plus qu'une requête abandonnée par le rafraîchissement suivant.
     expect(listPage).toContain("if (signal?.aborted || silent) return;");
