@@ -34,6 +34,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   // d'antenne enverrait le lecteur chercher un bug là où il n'y en a pas.
   FORBIDDEN: "Tu n'as pas les droits nécessaires pour cette action.",
   FORFEIT_FAILED: "Erreur lors de la déclaration de forfait.",
+  // Session expirée : le suivi en direct s'arrête, il faut se reconnecter.
+  UNAUTHORIZED: "Ta session a expiré. Reconnecte-toi pour suivre le tournoi en direct.",
   // Diffusion en direct (`lib/shared/live-streams.ts`).
   INVALID_STREAM_URL:
     "Lien de diffusion non reconnu (Twitch, YouTube ou Kick attendu).",

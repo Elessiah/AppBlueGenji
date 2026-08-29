@@ -8,6 +8,7 @@ import {
   slugifySponsor,
   validateSponsorInput,
 } from "@/lib/shared/sponsors";
+import { cachedShowcase, invalidateShowcase } from "./showcase-cache";
 
 export type { Sponsor, SponsorInput, SponsorTier } from "@/lib/shared/sponsors";
 export { FALLBACK_SPONSORS } from "@/lib/shared/sponsors";
@@ -34,7 +35,26 @@ function fromRow(row: SponsorRow): Sponsor {
   };
 }
 
+/**
+ * Lecture mutualisée : l'accueil est rendu à chaque visite et cette requête y
+ * revient à chaque fois, pour un contenu que le staff modifie quelques fois par
+ * mois. Toute écriture invalide (voir `./showcase-cache`).
+ *
+ * Le repli de base injoignable est renvoyé **hors** du chargeur mis en cache, à
+ * dessein : `cached` ne mémorise jamais un rejet, si bien qu'une coupure d'une
+ * seconde ne fige pas du contenu de substitution sur l'accueil pendant toute une
+ * minute — la visite suivante retente. Le repli d'une table vide, lui, est un
+ * résultat légitime : il passe par le chargeur et se met en cache normalement.
+ */
 export async function listSponsors(): Promise<Sponsor[]> {
+  try {
+    return await cachedShowcase("sponsors", loadListSponsors);
+  } catch {
+    return FALLBACK_SPONSORS;
+  }
+}
+
+async function loadListSponsors(): Promise<Sponsor[]> {
   let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
   try {
     const dbPromise = getDatabase();
@@ -58,8 +78,6 @@ export async function listSponsors(): Promise<Sponsor[]> {
     }
 
     return rows.map(fromRow);
-  } catch {
-    return FALLBACK_SPONSORS;
   } finally {
     clearTimeout(timeoutHandle);
   }
@@ -110,6 +128,8 @@ export async function createSponsor(input: SponsorInput): Promise<Sponsor> {
     [name, slug, tier, logoUrl, websiteUrl, description, active ? 1 : 0]
   );
 
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
   return { id: Number(res.insertId), name, slug, tier, logoUrl, websiteUrl, description };
 }
 
@@ -134,6 +154,8 @@ export async function updateSponsor(id: number, input: SponsorInput): Promise<Sp
     [name, tier, logoUrl, websiteUrl, description, active ? 1 : 0, id]
   );
 
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
   return { id, name, slug, tier, logoUrl, websiteUrl, description };
 }
 
@@ -145,6 +167,8 @@ export async function updateSponsor(id: number, input: SponsorInput): Promise<Sp
  */
 export async function reorderSponsors(ids: number[]): Promise<void> {
   await applyDisplayOrder("bg_sponsors", ids);
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
 }
 
 /** Supprime un sponsor. Lève `SPONSOR_NOT_FOUND` si l'id n'existe pas. */
@@ -155,4 +179,6 @@ export async function deleteSponsor(id: number): Promise<void> {
     [id]
   );
   if (res.affectedRows === 0) throw new Error("SPONSOR_NOT_FOUND");
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
 }

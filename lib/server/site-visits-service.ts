@@ -20,6 +20,12 @@ import { getDatabase } from "./database";
 import { toIso } from "./serialization";
 import { pushSiteVisitStats } from "./bot-integration";
 import {
+  chargeRateLimit,
+  checkRateLimit,
+  resetRateLimit,
+  type RateLimitRule,
+} from "./rate-limit";
+import {
   normalizeVisitPath,
   SITE_VISIT_WINDOW_MINUTES,
   visitorIdentitySource,
@@ -37,13 +43,14 @@ const BOT_SYNC_INTERVAL_MS = 5 * 60 * 1000;
  * construction à la fenêtre de session, c'est le seul rempart contre une
  * croissance illimitée de la table.
  */
-const VISIT_RATE_LIMIT_PER_MINUTE = 30;
-const VISIT_RATE_WINDOW_MS = 60 * 1000;
-/** Plafond d'IP suivies simultanément, pour que le limiteur reste borné en mémoire. */
-const VISIT_RATE_MAX_TRACKED_IPS = 10_000;
+const VISIT_RATE_RULE: RateLimitRule = {
+  name: "site-visits",
+  limit: 30,
+  windowMs: 60 * 1000,
+  maxKeys: 10_000,
+};
 
 let lastBotSyncAt = 0;
-const visitRateBuckets = new Map<string, { count: number; resetAt: number }>();
 
 interface VisitStatsRow extends RowDataPacket {
   total_visits: number | string | null;
@@ -87,9 +94,7 @@ function rateLimitKey(ip: string | null | undefined): string {
  * peut faire, l'empreinte étant fournie par le client.
  */
 function isVisitRateExceeded(ip: string | null | undefined): boolean {
-  const bucket = visitRateBuckets.get(rateLimitKey(ip));
-  if (!bucket || Date.now() >= bucket.resetAt) return false;
-  return bucket.count >= VISIT_RATE_LIMIT_PER_MINUTE;
+  return !checkRateLimit(VISIT_RATE_RULE, rateLimitKey(ip)).allowed;
 }
 
 /**
@@ -103,32 +108,12 @@ function isVisitRateExceeded(ip: string | null | undefined): boolean {
  * requête, lui, insère à chaque fois et atteint donc le plafond tout de suite.
  */
 function chargeVisitToRateLimit(ip: string | null | undefined): void {
-  const key = rateLimitKey(ip);
-  const now = Date.now();
-
-  const bucket = visitRateBuckets.get(key);
-  if (bucket && now < bucket.resetAt) {
-    bucket.count += 1;
-    return;
-  }
-
-  // Purge opportuniste : on ne balaie la table qu'au moment où elle déborde,
-  // pour ne pas payer un parcours à chaque visite.
-  if (visitRateBuckets.size >= VISIT_RATE_MAX_TRACKED_IPS) {
-    for (const [trackedKey, tracked] of visitRateBuckets) {
-      if (now >= tracked.resetAt) visitRateBuckets.delete(trackedKey);
-    }
-    // Toujours plein de fenêtres actives : on repart de zéro plutôt que de
-    // laisser la mémoire filer.
-    if (visitRateBuckets.size >= VISIT_RATE_MAX_TRACKED_IPS) visitRateBuckets.clear();
-  }
-
-  visitRateBuckets.set(key, { count: 1, resetAt: now + VISIT_RATE_WINDOW_MS });
+  chargeRateLimit(VISIT_RATE_RULE, rateLimitKey(ip));
 }
 
 /** Vide le limiteur de débit (tests). */
 export function resetVisitRateLimit(): void {
-  visitRateBuckets.clear();
+  resetRateLimit(VISIT_RATE_RULE.name);
 }
 
 function count(value: number | string | null | undefined): number {

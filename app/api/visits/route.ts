@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
+import { enforceRateLimit, requestClientIp, VISIT_REQUEST_RULE } from "@/lib/server/api-guard";
 import { ok } from "@/lib/server/http";
 import { recordSiteVisit, syncSiteVisitStatsToBot } from "@/lib/server/site-visits-service";
-import { clientIpFromForwardedFor, parseTrustedProxyHops } from "@/lib/shared/site-visits";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,10 @@ export const dynamic = "force-dynamic";
  * d'un visiteur.
  */
 export async function POST(req: Request) {
+  const ip = requestClientIp(req);
+  const throttled = enforceRateLimit(VISIT_REQUEST_RULE, ip);
+  if (throttled) return throttled;
+
   let path: unknown = "/";
   try {
     const body = (await req.json()) as { path?: unknown };
@@ -28,11 +32,7 @@ export async function POST(req: Request) {
     const user = await getCurrentUser();
     const { recorded } = await recordSiteVisit({
       userId: user?.id ?? null,
-      ip:
-        clientIpFromForwardedFor(
-          req.headers.get("x-forwarded-for"),
-          parseTrustedProxyHops(process.env.TRUSTED_PROXY_HOPS),
-        ) ?? req.headers.get("x-real-ip"),
+      ip,
       userAgent: req.headers.get("user-agent"),
       path,
     });

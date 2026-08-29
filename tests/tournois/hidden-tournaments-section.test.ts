@@ -14,19 +14,26 @@ const route = read("app/api/tournaments/route.ts");
 
 describe("page tournois — section « Tournois invisibles »", () => {
   it("ne demande les invisibles qu'au staff tournois", () => {
-    expect(page).toContain('fetchBuckets("/api/tournaments?scope=hidden")');
+    expect(page).toContain('fetchBuckets("/api/tournaments?scope=hidden", signal)');
     // Un joueur ne déclenche même pas la requête : elle lui serait refusée.
-    expect(page).toMatch(/if \(!isAdmin\) \{\s*setHiddenTournaments\(\[\]\);\s*return;\s*\}/);
-    expect(page).toMatch(/\}, \[isAdmin, showError\]\)/);
+    // Sans permission : la section est vidée et la requête n'est pas envoyée.
+    // Le tableau vide n'est réécrit que s'il ne l'est pas déjà, pour ne pas
+    // redessiner la page à chaque rafraîchissement de fond.
+    expect(page).toMatch(/if \(!isAdmin\) \{[\s\S]{0,400}?setHiddenTournaments\([\s\S]{0,120}?return;\s*\}/);
+    // La permission commande le chargement : elle est dans ses dépendances.
+    expect(page).toMatch(/\[isAdmin, showError\],\s*\);/);
   });
 
   it("charge les invisibles à part de la liste publique", () => {
-    // Deux effets distincts : l'échec de l'un ne vide pas l'autre.
-    const publicLoad = page.slice(page.indexOf("const load = async"));
-    expect(publicLoad).toContain('fetchBuckets("/api/tournaments")');
-    expect(publicLoad.slice(0, publicLoad.indexOf("}, [showError])"))).not.toContain(
-      "scope=hidden",
-    );
+    // Deux chargements distincts : l'échec de l'un ne vide pas l'autre. La
+    // lecture publique est devenue un `useCallback` (elle sert aussi au
+    // rafraîchissement de fond), mais elle reste étrangère aux invisibles.
+    const start = page.indexOf("const load = useCallback(");
+    expect(start).toBeGreaterThan(-1);
+    const publicLoad = page.slice(start, page.indexOf("[showError],", start));
+
+    expect(publicLoad).toContain('fetchBuckets("/api/tournaments", signal)');
+    expect(publicLoad).not.toContain("scope=hidden");
   });
 
   it("réserve la section au staff et la masque quand il n'y a rien", () => {
@@ -37,7 +44,10 @@ describe("page tournois — section « Tournois invisibles »", () => {
   });
 
   it("aplatit les paniers reçus pour la section", () => {
-    expect(page).toContain("setHiddenTournaments(flattenBuckets(hidden))");
+    // La réponse est aplatie avant d'être comparée à la précédente : la section
+    // suit désormais la même cadence de rafraîchissement que la liste publique.
+    expect(page).toContain("flattenBuckets(await fetchBuckets(");
+    expect(page).toContain("sameTournaments(previous, hidden) ? previous : hidden");
   });
 
   it("applique la recherche et le filtre de jeu aux invisibles", () => {

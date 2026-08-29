@@ -1,4 +1,5 @@
 ﻿import { getCurrentUser } from "@/lib/server/auth";
+import { enforceRateLimit, TOURNAMENT_READ_RULE } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { createTournament, listTournamentBuckets } from "@/lib/server/tournaments-service";
 import { isParticipantType, type ParticipantType } from "@/lib/shared/participants";
@@ -10,6 +11,11 @@ import type { TournamentFormat } from "@/lib/shared/types";
 export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
+
+  // Plafond large : la page se rafraîchit d'elle-même à la minute au plus vite
+  // (`lib/shared/refresh-tiers.ts`). Seul un client parti en boucle l'atteint.
+  const throttled = enforceRateLimit(TOURNAMENT_READ_RULE, user.id);
+  if (throttled) return throttled;
 
   const url = new URL(req.url);
   const search = url.searchParams.get("search");

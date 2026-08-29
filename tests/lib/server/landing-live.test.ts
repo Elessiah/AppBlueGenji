@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
-jest.mock("@/lib/server/live");
+jest.mock("@/lib/server/tournaments-service");
 jest.mock("@/lib/server/tournaments/live-streams");
 
 import { getLandingLive } from "@/lib/server/landing-service";
-import { getSubscribersCount } from "@/lib/server/live";
+import { clearCache } from "@/lib/server/cache";
+import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import { findBroadcastingTournament } from "@/lib/server/tournaments/live-streams";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 
@@ -63,25 +64,43 @@ async function mockDb(rows: unknown[]) {
   } as never);
 }
 
+/**
+ * Sert la liste publique par la même porte que la production.
+ *
+ * `getLandingLive` ne prend plus de paniers en argument : son résultat est
+ * mutualisé sous une clé fixe (`landing:live`), et une clé de cache ne peut pas
+ * représenter un argument — un appelant passant une liste filtrée servirait son
+ * direct à tous les visiteurs. Les tests injectent donc là où la production lit.
+ */
+async function liveFrom(list: TournamentBuckets) {
+  (listTournamentBuckets as jest.Mock).mockResolvedValue(list as never);
+  return getLandingLive();
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
-  (getSubscribersCount as jest.Mock).mockReturnValue(3);
+  // Le direct et la liste publique sont mutualisés (`lib/server/cache.ts`) :
+  // sans purge, le premier cas servirait sa réponse à tous les suivants.
+  clearCache();
 });
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => {
+  clearCache();
+  jest.restoreAllMocks();
+});
 
 describe("getLandingLive", () => {
   it("renvoie null sans tournoi en cours", async () => {
     (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
     await mockDb([]);
 
-    expect(await getLandingLive(buckets([]))).toBeNull();
+    expect(await liveFrom(buckets([]))).toBeNull();
   });
 
   it("n'expose aucune cible tant que personne n'est à l'antenne", async () => {
     (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
     await mockDb([matchRow()]);
 
-    const live = await getLandingLive(buckets([card(1, "Coupe A")]));
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
 
     // C'est la condition d'apparition du bouton d'accueil : pas de diffusion,
     // pas de bouton.
@@ -96,7 +115,7 @@ describe("getLandingLive", () => {
     } as never);
     await mockDb([matchRow({ live_trigger: "AUTO", live_url: "https://twitch.tv/bg" })]);
 
-    const live = await getLandingLive(buckets([card(1, "Coupe A")]));
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
 
     expect(live?.stream).toEqual({
       tournamentId: 1,
@@ -114,7 +133,7 @@ describe("getLandingLive", () => {
     } as never);
     await mockDb([matchRow({ live_trigger: "AUTO" })]);
 
-    const live = await getLandingLive(buckets([card(1, "Coupe A"), card(2, "Coupe B")]));
+    const live = await liveFrom(buckets([card(1, "Coupe A"), card(2, "Coupe B")]));
 
     expect(live?.tournament.id).toBe(2);
     expect(live?.stream?.tournamentId).toBe(2);
@@ -127,7 +146,7 @@ describe("getLandingLive", () => {
     } as never);
     await mockDb([matchRow()]);
 
-    const live = await getLandingLive(buckets([card(1, "Coupe A")]));
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
 
     expect(live?.tournament.id).toBe(1);
     // Le tournoi affiché n'est pas celui qui diffuse : pas de bouton non plus.
@@ -141,7 +160,7 @@ describe("getLandingLive", () => {
       matchRow({ id: 101, live_trigger: "AUTO", live_url: "https://twitch.tv/bg" }),
     ]);
 
-    const live = await getLandingLive(buckets([card(1, "Coupe A")]));
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
 
     expect(live?.currentMatch?.id).toBe(101);
     expect(live?.currentMatch?.liveState).toBe("LIVE");
@@ -152,7 +171,7 @@ describe("getLandingLive", () => {
     (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
     await mockDb([matchRow({ id: 100, status: "COMPLETED" }), matchRow({ id: 101 })]);
 
-    const live = await getLandingLive(buckets([card(1, "Coupe A")]));
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
 
     expect(live?.currentMatch?.id).toBe(101);
     expect(live?.currentMatch?.liveState).toBe("OFF");
@@ -162,7 +181,7 @@ describe("getLandingLive", () => {
     (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
     await mockDb([matchRow({ live_trigger: "MANUAL" })]);
 
-    const live = await getLandingLive(buckets([card(1, "Coupe A")]));
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
 
     expect(live?.currentMatch?.liveState).toBe("SCHEDULED");
   });
@@ -171,7 +190,7 @@ describe("getLandingLive", () => {
     (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
     await mockDb([matchRow({ live_trigger: "AUTO", live_url: "https://exemple.com/live" })]);
 
-    const live = await getLandingLive(buckets([card(1, "Coupe A")]));
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
 
     expect(live?.currentMatch?.liveUrl).toBeNull();
   });
@@ -180,7 +199,7 @@ describe("getLandingLive", () => {
     (findBroadcastingTournament as jest.Mock).mockRejectedValue(new Error("boom") as never);
     await mockDb([matchRow()]);
 
-    const live = await getLandingLive(buckets([card(1, "Coupe A")]));
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
 
     // La carte live reste servie : une panne de diffusion ne doit pas vider la
     // page d'accueil.

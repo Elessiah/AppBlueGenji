@@ -1,5 +1,5 @@
 ﻿import "dotenv/config";
-import mysql, { type Pool } from "mysql2/promise";
+import mysql, { type Pool, type PoolConnection } from "mysql2/promise";
 
 let pool: Pool | null = null;
 let migrationPromise: Promise<void> | null = null;
@@ -1054,6 +1054,26 @@ async function ensureMigrations(db: Pool): Promise<void> {
     migrationPromise = runMigrations(db).then();
   }
   await migrationPromise;
+}
+
+/**
+ * Emprunte une connexion du pool le temps d'une lecture, puis la rend — quoi
+ * qu'il arrive.
+ *
+ * Le pool ne compte que 25 places : un `release()` oublié sur un chemin d'erreur
+ * les épuise en silence, et le site se fige sans rien dire. Passer par ce
+ * helper plutôt que d'écrire son propre `try` / `finally` supprime la question.
+ */
+export async function withConnection<T>(
+  run: (connection: PoolConnection) => Promise<T>,
+): Promise<T> {
+  const db = await getDatabase();
+  const connection = await db.getConnection();
+  try {
+    return await run(connection);
+  } finally {
+    connection.release();
+  }
 }
 
 export async function getDatabase(): Promise<Pool> {

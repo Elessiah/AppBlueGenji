@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { LandingLive } from "@/lib/shared/landing";
+import { LANDING_LIVE_INTERVAL_MS } from "@/lib/shared/refresh-tiers";
+import { useAutoRefresh } from "@/lib/shared/hooks/useAutoRefresh";
 
 type LiveResponse = {
   live: LandingLive | null;
 };
-
-/** Cadence de rafraîchissement de la carte live de l'accueil. */
-const POLL_INTERVAL_MS = 10_000;
 
 /**
  * Suit l'état du direct sur la page d'accueil.
@@ -20,40 +19,33 @@ const POLL_INTERVAL_MS = 10_000;
  *
  * Le serveur remplit déjà `game`, `phase` et `stream` ; rien n'est recalculé
  * ici, pour qu'il n'existe qu'une définition de ces libellés.
+ *
+ * La cadence est celle du palier spectateur (`lib/shared/refresh-tiers.ts`), et
+ * le premier chargement est **omis** : la page est rendue côté serveur avec une
+ * valeur fraîche, qui arrive en `initialLive`. Un sondage court, relancé dès le
+ * montage et poursuivi onglet caché, faisait à lui seul une dizaine de requêtes
+ * par seconde dès qu'une centaine de visiteurs ouvraient l'accueil — sur une
+ * agrégation de tous les tournois, et sur un Raspberry Pi. `useAutoRefresh` s'en
+ * charge : rien tant que l'onglet est caché, relecture au retour dessus,
+ * abandon de la requête en vol au démontage.
  */
 export function useLandingLive(initialLive: LandingLive | null): LandingLive | null {
   const [live, setLive] = useState<LandingLive | null>(initialLive);
 
-  useEffect(() => {
-    let mounted = true;
-    const controller = new AbortController();
-
-    async function loadLive() {
+  useAutoRefresh(
+    async (signal) => {
       try {
-        const response = await fetch("/api/landing/live", {
-          signal: controller.signal,
-          cache: "no-store",
-        });
+        const response = await fetch("/api/landing/live", { cache: "no-store", signal });
         if (!response.ok) return;
         const payload = (await response.json()) as LiveResponse;
-        if (mounted) setLive(payload.live ?? null);
+        setLive(payload.live ?? null);
       } catch {
-        // Réseau coupé ou onglet en cours de fermeture : on garde l'état
-        // précédent et le prochain tick réessaiera.
+        // Réseau coupé, requête abandonnée ou onglet en cours de fermeture : on
+        // garde l'état précédent et le prochain passage réessaiera.
       }
-    }
-
-    void loadLive();
-    const interval = window.setInterval(() => {
-      void loadLive();
-    }, POLL_INTERVAL_MS);
-
-    return () => {
-      mounted = false;
-      controller.abort();
-      window.clearInterval(interval);
-    };
-  }, []);
+    },
+    { intervalMs: LANDING_LIVE_INTERVAL_MS },
+  );
 
   return live;
 }
