@@ -1,6 +1,7 @@
 ﻿// Backward compatibility: re-export all from the new tournaments module
 export type {
   // Types
+  DeletedTournament,
   TournamentRow,
   RegistrationRow,
   MatchRow,
@@ -30,6 +31,8 @@ export {
   reportMatchScorePublic as reportMatchScore,
   // Admin
   checkDownstreamMatchesHaveNoScores,
+  // Suppression définitive (administrateurs)
+  deleteTournament,
   // Instantané partagé + contexte du lecteur (voir tournaments/snapshot.ts)
   getTournamentSnapshot,
   getTournamentSnapshotFrame,

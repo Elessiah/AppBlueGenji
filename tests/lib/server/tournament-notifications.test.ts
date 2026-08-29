@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 const invalidateSnapshot = jest.fn();
 const invalidateLists = jest.fn();
 const invalidatePreview = jest.fn();
+const invalidateLanding = jest.fn();
 const publishEvent = jest.fn();
 
 jest.mock("@/lib/server/tournaments/snapshot", () => ({
@@ -20,6 +21,10 @@ jest.mock("@/lib/server/tournaments/list-cache", () => ({
 
 jest.mock("@/lib/server/tournaments/preview-cache", () => ({
   invalidateTournamentPreview: (id: number) => invalidatePreview(id),
+}));
+
+jest.mock("@/lib/server/landing-cache", () => ({
+  invalidateLandingAggregates: () => invalidateLanding(),
 }));
 
 jest.mock("@/lib/server/live", () => ({
@@ -36,6 +41,7 @@ beforeEach(() => {
   invalidateSnapshot.mockReset();
   invalidateLists.mockReset();
   invalidatePreview.mockReset();
+  invalidateLanding.mockReset();
   publishEvent.mockReset();
 });
 
@@ -44,12 +50,17 @@ afterEach(() => {
 });
 
 describe("notifications — invalidation des caches", () => {
-  it("oublie l'instantané, les listes et l'aperçu à une mise à jour", () => {
+  it("oublie l'instantané, les listes, l'aperçu et la vitrine à une mise à jour", () => {
     publishUpdatedEvent(7);
     expect(invalidateSnapshot).toHaveBeenCalledWith(7);
     expect(invalidateLists).toHaveBeenCalledTimes(1);
     // Une inscription ou un seeding réordonné change le tirage prévisible.
     expect(invalidatePreview).toHaveBeenCalledWith(7);
+    // L'accueil agrège les tournois par ses propres requêtes : ses entrées ne
+    // descendent pas du cache des listes. Sans cette invalidation, un tournoi
+    // supprimé resterait une minute dans le compteur, le classement et le
+    // ticker — qui pointerait alors vers une page introuvable.
+    expect(invalidateLanding).toHaveBeenCalledTimes(1);
   });
 
   it("n'oublie que l'instantané à un score rapporté", () => {
@@ -63,6 +74,9 @@ describe("notifications — invalidation des caches", () => {
     expect(invalidateLists).not.toHaveBeenCalled();
     // Un aperçu n'existe qu'avant le lancement : aucun score ne peut le périmer.
     expect(invalidatePreview).not.toHaveBeenCalled();
+    // Même raison que les listes : la vitrine est le cache le plus rentable du
+    // site, le vider à chaque score le garderait froid toute une soirée.
+    expect(invalidateLanding).not.toHaveBeenCalled();
   });
 
   it("n'oublie que l'instantané à un score arbitré", () => {
@@ -70,6 +84,7 @@ describe("notifications — invalidation des caches", () => {
     expect(invalidateSnapshot).toHaveBeenCalledWith(7);
     expect(invalidateLists).not.toHaveBeenCalled();
     expect(invalidatePreview).not.toHaveBeenCalled();
+    expect(invalidateLanding).not.toHaveBeenCalled();
   });
 
   it("invalide avant de réveiller les abonnés", () => {

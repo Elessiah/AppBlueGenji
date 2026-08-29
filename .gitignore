@@ -76,3 +76,6 @@ package-lock.json
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# Revue de code (scripts jetables)
+.review/
