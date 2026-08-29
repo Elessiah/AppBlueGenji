@@ -1,6 +1,5 @@
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import {
-  editLockReason,
   editWindowFor,
   type EditLockReason,
 } from "@/lib/shared/tournament-edit";
@@ -34,5 +33,3 @@ export function editLockNotice(
   }
   return `Le tournoi est visible depuis le ${formatLocalDateTime(startVisibilityAt)} — le format, le jeu et les réglages ne sont plus modifiables.`;
 }
-
-export { editLockReason };

@@ -251,6 +251,7 @@ export type TournamentFormProps = {
   editableFields: ReadonlySet<TournamentField>;
   submitLabel: string;
   onSubmit: (values: TournamentFormValues) => Promise<void>;
+  explanationId?: string;
 };
 
 export function TournamentForm({
@@ -259,6 +260,7 @@ export function TournamentForm({
   editableFields,
   submitLabel,
   onSubmit,
+  explanationId,
 }: TournamentFormProps) {
   const { showError } = useToast();
 
@@ -267,6 +269,7 @@ export function TournamentForm({
     setValues((prev) => ({ ...prev, [key]: value }));
 
   const locked = (field: TournamentField) => !editableFields.has(field);
+  const lockedAttr = (field: TournamentField) => (locked(field) && explanationId ? { "aria-describedby": explanationId } : {});
 
   // Ronde suisse : le nombre de rondes suit la recommandation ⌈log₂(N)⌉ + 1 tant
   // que l'organisateur n'a pas saisi la sienne — sinon un changement d'effectif
@@ -349,6 +352,7 @@ export function TournamentForm({
                 value={values.name}
                 onChange={(e) => set("name", e.target.value)}
                 placeholder="Mon tournoi"
+                {...lockedAttr("name")}
               />
             </div>
             <div className="field">
@@ -358,6 +362,7 @@ export function TournamentForm({
                 disabled={locked("game")}
                 value={values.game}
                 onChange={(e) => set("game", e.target.value as TournamentGame)}
+                {...lockedAttr("game")}
               >
                 <option value="OW2">Overwatch</option>
                 <option value="MR">Marvel Rivals</option>
@@ -371,6 +376,7 @@ export function TournamentForm({
                 value={values.description}
                 onChange={(e) => set("description", e.target.value)}
                 placeholder="Description du tournoi..."
+                {...lockedAttr("description")}
               />
             </div>
           </div>
@@ -394,6 +400,7 @@ export function TournamentForm({
                     hasThirdPlaceMatch: false,
                   }))
                 }
+                {...lockedAttr("format")}
               >
                 <option value="SINGLE">Simple élimination</option>
                 <option value="DOUBLE">Double élimination</option>
@@ -407,7 +414,7 @@ export function TournamentForm({
               <label htmlFor="participant-type">Type de participants</label>
               <select
                 id="participant-type"
-                aria-describedby="participant-type-hint"
+                aria-describedby={`participant-type-hint${locked("participantType") && explanationId ? ` ${explanationId}` : ""}`}
                 disabled={locked("participantType")}
                 value={values.participantType}
                 onChange={(e) => set("participantType", e.target.value as ParticipantType)}
@@ -430,6 +437,7 @@ export function TournamentForm({
                 disabled={locked("maxTeams")}
                 value={maxTeams}
                 onChange={(e) => setMaxTeams(Number(e.target.value))}
+                {...lockedAttr("maxTeams")}
               />
             </div>
 
@@ -455,6 +463,7 @@ export function TournamentForm({
                   setLastMatchFormatValue(value);
                   set("matchFormat", { type: next, value });
                 }}
+                {...lockedAttr("matchFormat")}
               >
                 <option value="BO">Best of (BO)</option>
                 <option value="FT">First to (FT)</option>
@@ -489,6 +498,7 @@ export function TournamentForm({
                     setLastMatchFormatValue(value);
                     set("matchFormat", { type: matchFormatType, value });
                   }}
+                  {...lockedAttr("matchFormat")}
                 />
                 <p style={HINT}>
                   {matchFormatType === "BO"
@@ -521,6 +531,7 @@ export function TournamentForm({
                     disabled={locked("endurancePoints")}
                     value={values.endurancePoints}
                     onChange={(e) => set("endurancePoints", Number(e.target.value))}
+                    {...lockedAttr("endurancePoints")}
                   />
                   <p style={HINT}>
                     Points de départ de chaque équipe. À 0, elle est éliminée.
@@ -537,6 +548,7 @@ export function TournamentForm({
                     disabled={locked("enduranceWinDelta")}
                     value={values.enduranceWinDelta}
                     onChange={(e) => set("enduranceWinDelta", Number(e.target.value))}
+                    {...lockedAttr("enduranceWinDelta")}
                   />
                 </div>
 
@@ -550,6 +562,7 @@ export function TournamentForm({
                     disabled={locked("enduranceLossDelta")}
                     value={values.enduranceLossDelta}
                     onChange={(e) => set("enduranceLossDelta", Number(e.target.value))}
+                    {...lockedAttr("enduranceLossDelta")}
                   />
                 </div>
 
@@ -563,6 +576,7 @@ export function TournamentForm({
                     disabled={locked("endurancePlayoffSize")}
                     value={values.endurancePlayoffSize}
                     onChange={(e) => set("endurancePlayoffSize", Number(e.target.value))}
+                    {...lockedAttr("endurancePlayoffSize")}
                   />
                   <p style={HINT}>
                     La phase d&apos;endurance s&apos;arrête à cet effectif. À 8, l&apos;arbre
@@ -586,6 +600,7 @@ export function TournamentForm({
                     onChange={(e) =>
                       set("survivalRoundsBeforeFirstCut", Number(e.target.value))
                     }
+                    {...lockedAttr("survivalRoundsBeforeFirstCut")}
                   />
                   <p style={HINT}>
                     Laisse le classement se former avant la première élimination.
@@ -602,6 +617,7 @@ export function TournamentForm({
                     disabled={locked("survivalRoundsPerCut")}
                     value={values.survivalRoundsPerCut}
                     onChange={(e) => set("survivalRoundsPerCut", Number(e.target.value))}
+                    {...lockedAttr("survivalRoundsPerCut")}
                   />
                   <p style={HINT}>
                     Cadence appliquée après la première coupe.
@@ -630,6 +646,7 @@ export function TournamentForm({
                     disabled={locked("swissTotalRounds")}
                     value={values.swissTotalRounds}
                     onChange={(e) => setSwissTotalRounds(Number(e.target.value))}
+                    {...lockedAttr("swissTotalRounds")}
                   />
                   <p style={HINT}>
                     Recommandé pour {maxTeams} {wording.many} : {recommendedRounds} ronde
@@ -649,6 +666,7 @@ export function TournamentForm({
                       disabled={locked("swissPointsWin")}
                       value={values.swissPointsWin}
                       onChange={(e) => set("swissPointsWin", Number(e.target.value))}
+                      {...lockedAttr("swissPointsWin")}
                     />
                     <input
                       type="number"
@@ -658,6 +676,7 @@ export function TournamentForm({
                       disabled={locked("swissPointsDraw")}
                       value={values.swissPointsDraw}
                       onChange={(e) => set("swissPointsDraw", Number(e.target.value))}
+                      {...lockedAttr("swissPointsDraw")}
                     />
                     <input
                       type="number"
@@ -667,6 +686,7 @@ export function TournamentForm({
                       disabled={locked("swissPointsLoss")}
                       value={values.swissPointsLoss}
                       onChange={(e) => set("swissPointsLoss", Number(e.target.value))}
+                      {...lockedAttr("swissPointsLoss")}
                     />
                   </div>
                   <p style={HINT}>
@@ -707,7 +727,8 @@ export function TournamentForm({
                     }`,
                     borderRadius: 10,
                     cursor: locked("hasThirdPlaceMatch") ? "not-allowed" : "pointer",
-                    transition: "border-color 0.2s ease, background-color 0.2s ease",
+                    opacity: locked("hasThirdPlaceMatch") ? 0.6 : 1,
+                    transition: "border-color 0.2s ease, background-color 0.2s ease, opacity 0.2s ease",
                     backgroundColor: values.hasThirdPlaceMatch
                       ? "rgba(90, 200, 255, 0.07)"
                       : "transparent",
@@ -723,10 +744,11 @@ export function TournamentForm({
                       width: 18,
                       height: 18,
                       accentColor: "var(--blue-500)",
-                      cursor: "pointer",
+                      cursor: locked("hasThirdPlaceMatch") ? "not-allowed" : "pointer",
                       flexShrink: 0,
                       marginTop: 2,
                     }}
+                    {...lockedAttr("hasThirdPlaceMatch")}
                   />
                   <div style={{ flex: 1 }}>
                     <label
@@ -734,7 +756,7 @@ export function TournamentForm({
                       style={{
                         display: "block",
                         margin: "0 0 4px",
-                        cursor: "pointer",
+                        cursor: locked("hasThirdPlaceMatch") ? "not-allowed" : "pointer",
                         userSelect: "none",
                         fontSize: 14,
                         fontWeight: 500,
@@ -767,6 +789,7 @@ export function TournamentForm({
                 disabled={locked("startVisibilityAt")}
                 value={values.startVisibilityAt}
                 onChange={(e) => set("startVisibilityAt", e.target.value)}
+                {...lockedAttr("startVisibilityAt")}
               />
             </div>
             <div className="field">
@@ -777,6 +800,7 @@ export function TournamentForm({
                 disabled={locked("registrationOpenAt")}
                 value={values.registrationOpenAt}
                 onChange={(e) => set("registrationOpenAt", e.target.value)}
+                {...lockedAttr("registrationOpenAt")}
               />
             </div>
             <div className="field">
@@ -787,6 +811,7 @@ export function TournamentForm({
                 disabled={locked("registrationCloseAt")}
                 value={values.registrationCloseAt}
                 onChange={(e) => set("registrationCloseAt", e.target.value)}
+                {...lockedAttr("registrationCloseAt")}
               />
             </div>
             <div className="field">
@@ -797,6 +822,7 @@ export function TournamentForm({
                 disabled={locked("startAt")}
                 value={values.startAt}
                 onChange={(e) => set("startAt", e.target.value)}
+                {...lockedAttr("startAt")}
               />
             </div>
           </div>

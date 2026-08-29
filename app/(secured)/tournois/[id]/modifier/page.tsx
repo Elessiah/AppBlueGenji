@@ -108,6 +108,7 @@ export default function EditTournamentPage() {
     loaded.window === "FULL" ? null : "VISIBLE",
     loaded.startVisibilityAt,
   );
+  const explanationId = notice ? "tournament-lock-notice" : undefined;
 
   return (
     <section className="fade-in container">
@@ -118,7 +119,7 @@ export default function EditTournamentPage() {
         <h1 className="display" style={{ fontSize: "clamp(30px, 6vw, 48px)", margin: "12px 0 8px" }}>
           Modifier le tournoi
         </h1>
-        {notice && <p style={{ color: "var(--amber)", margin: 0, fontSize: 14 }}>{notice}</p>}
+        {notice && <p id={explanationId} style={{ color: "var(--amber)", margin: 0, fontSize: 14 }}>{notice}</p>}
       </div>
 
       <TournamentForm
@@ -126,6 +127,7 @@ export default function EditTournamentPage() {
         initialValues={loaded.values}
         editableFields={editableFields}
         submitLabel="Enregistrer les modifications"
+        explanationId={explanationId}
         onSubmit={async (values) => {
           const payload = toApiPayload(values);
           const body: Record<string, unknown> = {};

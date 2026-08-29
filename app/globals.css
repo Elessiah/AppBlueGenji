@@ -391,6 +391,13 @@ select {
   background-color: rgba(10, 11, 15, 0.92);
 }
 
+.field input:disabled,
+.field textarea:disabled,
+.field select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 input[type="datetime-local"] {
   appearance: none;
   cursor: pointer;
