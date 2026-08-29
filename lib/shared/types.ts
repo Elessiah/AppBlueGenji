@@ -374,6 +374,7 @@ export type TournamentViewerContext = {
 
 /** Détail complet d'un tournoi pour un lecteur donné. */
 export type TournamentDetail = TournamentSnapshot & TournamentViewerContext;
+
 /**
  * Fréquentation du site, telle que servie à la commande Discord `/stats-site`.
  *

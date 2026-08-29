@@ -39,15 +39,12 @@ function fromRow(row: SponsorRow): Sponsor {
  * Lecture mutualisée : l'accueil est rendu à chaque visite et cette requête y
  * revient à chaque fois, pour un contenu que le staff modifie quelques fois par
  * mois. Toute écriture invalide (voir `./showcase-cache`).
- */
-/**
- * Repli servi quand la base est injoignable.
  *
- * Renvoyé **hors** du chargeur mis en cache, à dessein : `cached` ne mémorise
- * jamais un rejet, si bien qu'une coupure d'une seconde ne fige pas du contenu
- * de substitution sur l'accueil pendant toute une minute — la visite suivante
- * retente. Le repli d'une table vide, lui, est un résultat légitime : il passe
- * par le chargeur et se met en cache normalement.
+ * Le repli de base injoignable est renvoyé **hors** du chargeur mis en cache, à
+ * dessein : `cached` ne mémorise jamais un rejet, si bien qu'une coupure d'une
+ * seconde ne fige pas du contenu de substitution sur l'accueil pendant toute une
+ * minute — la visite suivante retente. Le repli d'une table vide, lui, est un
+ * résultat légitime : il passe par le chargeur et se met en cache normalement.
  */
 export async function listSponsors(): Promise<Sponsor[]> {
   try {
