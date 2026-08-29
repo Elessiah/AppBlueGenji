@@ -198,7 +198,7 @@ export function canToggleOnAir(match: MatchLiveInput): boolean {
  * — la case se cocherait, s'enregistrerait, et ne produirait jamais rien. Cela
  * écarte du même coup les byes, que le moteur crée directement en `COMPLETED`.
  *
- * Un match **pas encore appariné** reste castable, lui : c'est tout l'objet de
+ * Un match **pas encore apparié** reste castable, lui : c'est tout l'objet de
  * l'état `SCHEDULED`. On doit pouvoir annoncer la finale comme castée avant de
  * savoir qui la jouera — c'est même le cas le plus courant d'une diffusion
  * préparée à l'avance.
