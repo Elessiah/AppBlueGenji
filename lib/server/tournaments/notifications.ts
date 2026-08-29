@@ -10,6 +10,7 @@
  */
 import { publishTournamentEvent } from "@/lib/server/live";
 import { sendBotLog } from "@/lib/server/bot-integration";
+import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
 import { invalidateTournamentLists } from "./list-cache";
 import { invalidateTournamentPreview } from "./preview-cache";
 import { invalidateTournamentSnapshot } from "./snapshot";
@@ -18,13 +19,19 @@ import { invalidateTournamentSnapshot } from "./snapshot";
  * Le tournoi lui-même a changé : plateau, inscrites, état.
  *
  * Seul cet événement vide la liste publique — c'est le seul dont le contenu s'y
- * voie (colonnes de `bg_tournaments` et nombre d'inscrites).
+ * voie (colonnes de `bg_tournaments` et nombre d'inscrites) — et, pour la même
+ * raison, les agrégats de la vitrine.
  */
 export function publishUpdatedEvent(tournamentId: number): void {
   invalidateTournamentSnapshot(tournamentId);
   // Une inscription change le tirage prévisible : l'aperçu suit.
   invalidateTournamentPreview(tournamentId);
   invalidateTournamentLists();
+  // L'accueil agrège les tournois par ses propres requêtes (compteur,
+  // classement depuis `bg_matches`, ticker) : ses entrées ne descendent pas du
+  // cache des listes. Sans cette ligne, un tournoi **supprimé** y resterait une
+  // minute, ticker et lien vers une page introuvable compris.
+  invalidateLandingAggregates();
   publishTournamentEvent({
     type: "updated",
     tournamentId,

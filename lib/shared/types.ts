@@ -383,6 +383,13 @@ export type TournamentViewerContext = {
   canCreateReportsForTeamIds: number[];
   isAdmin: boolean;
   /**
+   * Droit de supprimer définitivement le tournoi. Volontairement plus étroit
+   * que `isAdmin` (qui vaut en réalité la permission `tournaments`, portée
+   * aussi par les arbitres) : seul un administrateur efface un tournoi et tout
+   * son historique (`docs/features/TOURNAMENT_DELETION.md`).
+   */
+  canDelete: boolean;
+  /**
    * Le viewer porte-t-il la permission `live` (ADMIN, ARBITRE, CASTER) ? Ouvre
    * les contrôles de diffusion des matchs, distincts des droits d'arbitrage.
    */

@@ -103,6 +103,9 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
     myTeamId: state.detail.myTeamId,
     canCreateReportsForTeamIds: state.detail.canCreateReportsForTeamIds,
     isAdmin: state.detail.isAdmin,
+    // Droit de suppression : administrateur strict, accordé à la connexion.
+    // Comme les autres droits, il tient à la personne et non au plateau.
+    canDelete: state.detail.canDelete,
     // Droit de diffusion : comme les autres droits, il tient à la personne et
     // non au plateau — un instantané ne peut ni l'accorder ni le retirer.
     canManageLive: state.detail.canManageLive,

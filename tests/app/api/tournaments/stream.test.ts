@@ -25,6 +25,20 @@ import {
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
+/**
+ * Droits que la route a résolus pour le lecteur. Objet nommé côté production :
+ * on le lit par ses clés, et non par une position que le moindre paramètre
+ * ajouté décalerait.
+ */
+function rightsPassedToViewerContext(): {
+  canManage?: boolean;
+  canPreview?: boolean;
+  canManageLive?: boolean;
+  canDelete?: boolean;
+} {
+  return (getTournamentViewerContext as jest.Mock).mock.calls[0][2] as Record<string, boolean>;
+}
+
 function snapshotWith(registrations: { teamId: number }[]): TournamentSnapshot {
   return {
     card: { id: 5, participantType: "TEAM", state: "RUNNING" },
@@ -47,6 +61,7 @@ function viewerWith(overrides: Partial<TournamentViewerContext> = {}): Tournamen
     myTeamId: null,
     canCreateReportsForTeamIds: [],
     isAdmin: false,
+    canDelete: false,
     canManageLive: false,
     preview: null,
     ...overrides,
@@ -158,13 +173,12 @@ describe("GET /api/tournaments/[id]/stream — palier décidé par le serveur", 
     );
     await firstMessage(await GET(new Request("http://t/"), params("5")));
 
-    // 5e argument de `getTournamentViewerContext` : `canManageLive`.
-    expect((getTournamentViewerContext as jest.Mock).mock.calls[0][4]).toBe(true);
+    expect(rightsPassedToViewerContext().canManageLive).toBe(true);
   });
 
   it("refuse les commandes d'antenne à qui n'a pas la permission", async () => {
     await firstMessage(await GET(new Request("http://t/"), params("5")));
-    expect((getTournamentViewerContext as jest.Mock).mock.calls[0][4]).toBe(false);
+    expect(rightsPassedToViewerContext().canManageLive).toBe(false);
   });
 
   it("rejoint la salle partagée plutôt que de s'abonner seul", async () => {
@@ -183,6 +197,32 @@ describe("GET /api/tournaments/[id]/stream — palier décidé par le serveur", 
     expect(message.type).toBe("connected");
     expect(message.snapshot).toMatchObject({ version: "v1" });
     expect(message.viewer).toMatchObject({ isAdmin: false });
+  });
+});
+
+describe("GET /api/tournaments/[id]/stream — droit de suppression", () => {
+  it("accorde la suppression à un administrateur", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(
+      { id: 1, isAdmin: true, roles: ["ADMIN"] } as never,
+    );
+
+    await GET(new Request("http://t/"), params("5"));
+
+    expect(rightsPassedToViewerContext().canDelete).toBe(true);
+  });
+
+  it.each([
+    ["un arbitre", ["ARBITRE"]],
+    ["un caster", ["CASTER"]],
+    ["un joueur ordinaire", []],
+  ])("la refuse à %s, malgré la permission `tournaments`", async (_label, roles) => {
+    // Le droit doit voyager par les deux portes — ce flux et la lecture REST de
+    // secours —, et se refuser à l'identique sur les deux.
+    (getCurrentUser as jest.Mock).mockResolvedValue({ id: 2, isAdmin: false, roles } as never);
+
+    await GET(new Request("http://t/"), params("5"));
+
+    expect(rightsPassedToViewerContext().canDelete).toBe(false);
   });
 });
 

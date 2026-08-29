@@ -102,6 +102,7 @@ const viewer = (overrides: Partial<TournamentViewerContext> = {}): TournamentVie
   myTeamId: 10,
   canCreateReportsForTeamIds: [10],
   isAdmin: false,
+  canDelete: false,
   ...overrides,
 });
 
@@ -184,6 +185,23 @@ describe("applyLiveMessage — instantané", () => {
     expect(next.detail?.myTeamId).toBe(10);
     expect(next.detail?.isAdmin).toBe(false);
     expect(next.tier).toBe("PRIORITY");
+  });
+
+  it("conserve le droit de suppression au fil des instantanés", () => {
+    // Un instantané est diffusé tel quel à toute la salle : il ne peut ni
+    // accorder ni retirer un droit. Sans report explicite, la zone de danger
+    // d'un administrateur disparaîtrait au premier score rapporté.
+    const state = connected(INITIAL_LIVE_STATE);
+    state.detail!.canDelete = true;
+
+    const next = applyLiveMessage(state, {
+      type: "snapshot",
+      tournamentId: 7,
+      version: "v2",
+      snapshot: snapshot({ version: "v2" }),
+    });
+
+    expect(next.detail?.canDelete).toBe(true);
   });
 
   it("rend le même état quand la version n'a pas bougé", () => {
