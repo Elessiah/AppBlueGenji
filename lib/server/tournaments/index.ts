@@ -54,6 +54,10 @@ export { tryAutoResolveByes } from "./byes";
 // Finalization
 export { finalizeTournamentIfDone, resolveExpiredScoreReports } from "./finalization";
 
+// Édition
+export { loadEditableTournament, updateTournament } from "./edit";
+export type { EditableTournamentValues } from "./edit";
+
 // Swiss
 export {
   initializeSwissTournament,
