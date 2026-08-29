@@ -6,32 +6,34 @@ La règle vit dans un module pur partagé (`lib/shared/tournament-edit.ts`) entr
 
 ## Les trois fenêtres
 
+La fenêtre est déterminée d'abord par l'**état**, puis par la **visibilité**. L'état prend toujours la priorité : un tournoi `RUNNING` reste `LOCKED` même si sa date de visibilité est repoussée dans le futur.
+
 ### 1. `FULL` — Tournoi masqué
 
-**Condition :** `startVisibilityAt > maintenant()`
+**Condition :** `state !== "RUNNING" AND state !== "FINISHED" AND startVisibilityAt > maintenant()`
 
 Tout est modifiable : nom, jeu, format, barèmes, réglages de survie ou de suisse, phases du format MULTI. Le staff peut réécrire le tournoi de zéro jusqu'à ce qu'il passe la visibilité.
 
 ### 2. `RESTRICTED` — Tournoi annoncé mais pas lancé
 
-**Condition :** `startVisibilityAt ≤ maintenant() ≤ startAt`
+**Condition :** `state !== "RUNNING" AND state !== "FINISHED" AND startVisibilityAt ≤ maintenant()`
 
 Seuls cinq champs survivent à la publication :
 - `name` — le titre du tournoi
 - `description` — la présentation générale
 - `registrationCloseAt` — la date de clôture des inscriptions
-- `startAt` — l'heure du coup d'envoi
+- `startAt` — le début du tournoi
 - `maxTeams` — la capacité (sous contrainte)
 
 Tout ce qui change la **structure** du tournoi est verrouillé : format, jeu, barèmes, réglages. Changez une `Survie` en `Double élimination` une fois que le tournoi est lisible, et vous démentez l'annonce lue par les équipes.
 
 ### 3. `LOCKED` — Tournoi en cours ou terminé
 
-**Condition :** `state === "RUNNING" || state === "FINISHED"`
+**Condition :** `state === "RUNNING" OR state === "FINISHED"`
 
-Plus rien : l'arbitrage des scores prend le relais. Même si la date de visibilité remonte dans le futur par une modification manuelle de la base, un tournoi lancé reste verrouillé. La règle d'état prime sur celle de visibilité.
+Plus rien : l'arbitrage des scores prend le relais. L'état prime : un tournoi lancé reste verrouillé quelle que soit sa date de visibilité.
 
-## Pourquoi le trigger est la **visibilité**, pas le nombre d'inscrits
+## Pourquoi c'est la **visibilité** qui verrouille, pas le nombre d'inscrits
 
 Changer le format ou le jeu en silence après l'annonce brise la confiance — même à zéro inscription. L'annonce est un contrat public : « ce sera une Survie ». Un tournoi peut être visible depuis des semaines sans aucune inscription (c'est normal pendant les périodes creuses) ; une équipe qui découvre le tournoi vendredi sait ce qu'elle s'apprête à jouer. S'il devient `DOUBLE` samedi, elle s'inscrit à autre chose.
 
