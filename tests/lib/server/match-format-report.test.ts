@@ -75,7 +75,7 @@ describe("reportMatchScore — respect du format de match", () => {
     mockTournament({ type: "BO", value: 5 });
     const { conn, writes } = fakeConnection();
 
-    await expect(reportMatchScore(conn, 1, 10, 42, 3, 1)).resolves.toBeNull();
+    await expect(reportMatchScore(conn, 1, 10, 42, 3, 1)).resolves.toBeUndefined();
     expect(writes.some((q) => q.includes("team1_report_score"))).toBe(true);
   });
 
@@ -103,7 +103,7 @@ describe("reportMatchScore — respect du format de match", () => {
     mockTournament(null);
     const { conn, writes } = fakeConnection();
 
-    await expect(reportMatchScore(conn, 1, 10, 42, 7, 2)).resolves.toBeNull();
+    await expect(reportMatchScore(conn, 1, 10, 42, 7, 2)).resolves.toBeUndefined();
     expect(writes.some((q) => q.includes("team1_report_score"))).toBe(true);
   });
 

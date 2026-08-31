@@ -42,7 +42,10 @@ export { deleteTournament } from "./deletion";
 export type { DeletedTournament } from "./deletion";
 
 // Notifications
-export { publishUpdatedEvent, publishScoreReportedEvent, publishScoreResolvedEvent, sendBotLogAsync } from "./notifications";
+export { publishUpdatedEvent, publishScoreReportedEvent, publishScoreResolvedEvent } from "./notifications";
+
+// Journal Discord (voir ./bot-logs)
+export { queueBotLog, flushBotLogs, discardBotLogs } from "./bot-logs";
 
 // Repository
 export {
@@ -141,7 +144,8 @@ import { tryAutoResolveByes } from "./byes";
 import { mapCard } from "./_internal";
 import { loadTournamentRow } from "./repository";
 import { reportMatchScore } from "./scoring";
-import { publishUpdatedEvent, publishScoreReportedEvent, publishScoreResolvedEvent, sendBotLogAsync } from "./notifications";
+import { publishUpdatedEvent, publishScoreReportedEvent, publishScoreResolvedEvent } from "./notifications";
+import { discardBotLogs, flushBotLogs, queueBotLog } from "./bot-logs";
 import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
 import { getTournamentPreview } from "./preview-cache";
@@ -184,10 +188,12 @@ async function syncVisibleTournaments(): Promise<void> {
       }
 
       await connection.commit();
+      flushBotLogs(connection);
     } catch (error) {
       await connection.rollback();
       throw error;
     } finally {
+      discardBotLogs(connection);
       connection.release();
     }
 
@@ -392,7 +398,10 @@ export async function createTournament(
       await insertPhases(connection, tournamentId, phases);
     }
 
+    queueBotLog(connection, { kind: "tournament_created", tournamentId });
+
     await connection.commit();
+    flushBotLogs(connection);
 
     // Sans cela, le tournoi qu'on vient de créer resterait absent de la liste
     // publique et de l'accueil pendant toute la durée de vie du cache — au
@@ -403,6 +412,7 @@ export async function createTournament(
     await connection.rollback();
     throw error;
   } finally {
+    discardBotLogs(connection);
     connection.release();
   }
 }
@@ -561,12 +571,14 @@ export async function registerCurrentUserTeam(tournamentId: number, userId: numb
     await connection.beginTransaction();
     await registerTeamInternal(connection, tournamentId, userId);
     await connection.commit();
+    flushBotLogs(connection);
 
     publishUpdatedEvent(tournamentId);
   } catch (error) {
     await connection.rollback();
     throw error;
   } finally {
+    discardBotLogs(connection);
     connection.release();
   }
 }
@@ -606,12 +618,14 @@ export async function registerGhostTeam(tournamentId: number, teamId: number): P
     await connection.beginTransaction();
     await registerTeamByIdInternal(connection, tournamentId, teamId);
     await connection.commit();
+    flushBotLogs(connection);
 
     publishUpdatedEvent(tournamentId);
   } catch (error) {
     await connection.rollback();
     throw error;
   } finally {
+    discardBotLogs(connection);
     connection.release();
   }
 }
@@ -781,12 +795,11 @@ export async function reportMatchScorePublic(
   const stateBefore = await readTournamentState(tournamentId);
   const db = await getDatabase();
   const connection = await db.getConnection();
-  let pendingBotLog: string | null = null;
 
   try {
     await connection.beginTransaction();
 
-    pendingBotLog = await reportMatchScore(
+    await reportMatchScore(
       connection,
       tournamentId,
       matchId,
@@ -815,16 +828,19 @@ export async function reportMatchScorePublic(
 
     await connection.commit();
 
+    // Le journal part après le commit : rien n'est annoncé qui ne soit écrit,
+    // et une ligne de plus (fin de match, clôture du tournoi) n'allonge pas la
+    // réponse rendue à l'équipe qui vient de saisir son score.
+    flushBotLogs(connection);
+
     publishScoreReportedEvent(tournamentId, matchId);
     await invalidateListsIfStateChanged(tournamentId, stateBefore);
   } catch (error) {
     await connection.rollback();
     throw error;
   } finally {
+    discardBotLogs(connection);
     connection.release();
-    if (pendingBotLog) {
-      await sendBotLogAsync(pendingBotLog);
-    }
   }
 }
 
@@ -863,6 +879,7 @@ export async function adminSaveMatchScoresPublic(
     }
 
     await connection.commit();
+    flushBotLogs(connection);
 
     if (savedTournamentId !== null) {
       publishScoreResolvedEvent(savedTournamentId, matchId);
@@ -875,6 +892,7 @@ export async function adminSaveMatchScoresPublic(
     await connection.rollback();
     throw error;
   } finally {
+    discardBotLogs(connection);
     connection.release();
   }
 }
@@ -940,12 +958,19 @@ export async function forfeitTournamentTeamPublic(
       await reconcilePhases(tournamentId, connection);
     }
 
+    // La ligne d'abandon est réservée par le moteur du format concerné
+    // (survie, suisse, endurance) : elle ne part qu'une fois l'abandon écrit.
+    queueBotLog(connection, { kind: "forfeit", tournamentId, teamId });
+
     await connection.commit();
+    flushBotLogs(connection);
+
     publishUpdatedEvent(tournamentId);
   } catch (error) {
     await connection.rollback();
     throw error;
   } finally {
+    discardBotLogs(connection);
     connection.release();
   }
 }
@@ -989,6 +1014,7 @@ export async function adminResolveMatchPublic(
     await finalizeTournamentIfDone(connection, tournamentId);
 
     await connection.commit();
+    flushBotLogs(connection);
 
     publishScoreReportedEvent(tournamentId, matchId);
     // Même raison que pour la sauvegarde de scores : l'état d'avant n'a pas pu
@@ -999,6 +1025,7 @@ export async function adminResolveMatchPublic(
     await connection.rollback();
     throw error;
   } finally {
+    discardBotLogs(connection);
     connection.release();
   }
 }

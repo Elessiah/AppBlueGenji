@@ -3,6 +3,7 @@ import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { ensureSoloEntry, findSoloEntry } from "@/lib/server/solo-entries-service";
 import { isSoloTournament } from "@/lib/shared/participants";
 import type { TournamentRow } from "./_internal";
+import { queueBotLog } from "./bot-logs";
 import { syncTournamentState } from "./state";
 import { loadTournamentRow } from "./repository";
 
@@ -10,11 +11,15 @@ import { loadTournamentRow } from "./repository";
  * Inscrit une équipe donnée. Cœur commun à l'inscription d'un joueur (son
  * équipe active) et à l'inscription d'une équipe fantôme par le staff : mêmes
  * contrôles d'état, de doublon et de capacité, même attribution de seed.
+ *
+ * @param byStaff Inscription faite *à la place* de l'engagé (équipe fantôme,
+ *   joueur invité). Le journal Discord la distingue de celle d'un joueur.
  */
 async function registerTeam(
   connection: PoolConnection,
   tournamentId: number,
   teamId: number,
+  byStaff: boolean,
 ): Promise<void> {
   const { row: tournament } = await syncTournamentState(connection, tournamentId);
   if (!tournament) {
@@ -54,6 +59,8 @@ async function registerTeam(
      VALUES (?, ?, ?)`,
     [tournamentId, teamId, registeredTeams + 1],
   );
+
+  queueBotLog(connection, { kind: "registration", tournamentId, teamId, byStaff });
 }
 
 /**
@@ -101,7 +108,7 @@ export async function registerCurrentUserTeam(
     throw new Error("NO_ACTIVE_TEAM");
   }
 
-  await registerTeam(connection, tournamentId, teamId);
+  await registerTeam(connection, tournamentId, teamId, false);
 }
 
 /**
@@ -122,7 +129,7 @@ export async function registerTeamById(
   if (teams.length === 0) throw new Error("TEAM_NOT_FOUND");
   if (teams[0].deleted_at !== null) throw new Error("TEAM_ALREADY_DELETED");
 
-  await registerTeam(connection, tournamentId, teamId);
+  await registerTeam(connection, tournamentId, teamId, true);
 }
 
 export async function canUserRegister(

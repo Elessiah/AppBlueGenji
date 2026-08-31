@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteTournament } from "@/lib/server/tournaments-service";
 import { sendBotLog } from "@/lib/server/bot-integration";
+import { formatTournamentDeletedLog } from "@/lib/shared/bot-logs";
 
 /**
  * Supprime définitivement un tournoi et tout ce qui lui appartient (matchs,
@@ -31,7 +32,11 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     // bot est le seul journal qui subsiste. L'échec est délibérément avalé — le
     // bot est optionnel, et le tournoi est déjà supprimé : rien à annuler.
     void sendBotLog(
-      `🗑️ Tournoi supprimé définitivement : « ${deleted.name} » (#${deleted.id}) par ${user.pseudo} (#${user.id}).`,
+      formatTournamentDeletedLog({
+        tournament: { id: deleted.id, name: deleted.name },
+        actorPseudo: user.pseudo,
+        actorId: user.id,
+      }),
     ).catch(() => undefined);
 
     return ok({ deleted });

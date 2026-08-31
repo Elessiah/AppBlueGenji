@@ -9,7 +9,6 @@
  * afficher un score périmé.
  */
 import { publishTournamentEvent } from "@/lib/server/live";
-import { sendBotLog } from "@/lib/server/bot-integration";
 import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
 import { invalidateTournamentLists } from "./list-cache";
 import { invalidateTournamentPreview } from "./preview-cache";
@@ -71,8 +70,4 @@ export function publishScoreResolvedEvent(tournamentId: number, matchId: number)
     matchId,
     emittedAt: new Date().toISOString(),
   });
-}
-
-export async function sendBotLogAsync(message: string): Promise<void> {
-  void sendBotLog(message);
 }

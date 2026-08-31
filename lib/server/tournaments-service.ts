@@ -46,7 +46,10 @@ export {
   publishUpdatedEvent,
   publishScoreReportedEvent,
   publishScoreResolvedEvent,
-  sendBotLogAsync,
+  // Journal Discord
+  queueBotLog,
+  flushBotLogs,
+  discardBotLogs,
   // Repository
   loadTournamentRow,
   loadRegisteredTeamIds,

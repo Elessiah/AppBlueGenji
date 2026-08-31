@@ -1,4 +1,5 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import { queueBotLog } from "./bot-logs";
 import { resetRegistrationRanks, finishTournament } from "./repository";
 
 export async function isEliminationPhaseComplete(
@@ -175,6 +176,11 @@ export async function finalizeUnderfilledTournament(
      WHERE id = ?`,
     [rows.length, tournamentId],
   );
+
+  // Un tournoi qui se clôt sans avoir joué est un incident d'organisation : il
+  // mérite sa ligne, et une ligne à lui — la clôture ordinaire annonce une
+  // championne, celle-ci annonce une salle vide.
+  queueBotLog(connection, { kind: "tournament_underfilled", tournamentId });
 
   return true;
 }
