@@ -26,6 +26,7 @@ const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
 const stream = read("app/api/tournaments/[id]/stream/route.ts");
 const hook = read("app/(secured)/tournois/[id]/_hooks/useTournamentLive.ts");
 const detailPage = read("app/(secured)/tournois/[id]/page.tsx");
+const detailHeader = read("app/(secured)/tournois/[id]/_components/TournamentHeader.tsx");
 const listPage = read("app/(secured)/tournois/page.tsx");
 const index = read("lib/server/tournaments/index.ts");
 const visitTracker = read("components/visit-tracker.tsx");
@@ -145,7 +146,12 @@ describe("page de tournoi — ce que voit le lecteur", () => {
 
   it("dit au lecteur que la page se tient à jour seule", () => {
     // Sans repère visible, on recharge par précaution même quand tout arrive.
-    expect(detailPage).toContain("<LiveIndicator isLive={isLive} tier={tier} fatal={fatal} />");
+    // Le témoin vit dans l'en-tête, du côté de ce qui parle du **lecteur** — la
+    // page ne fait que lui passer l'état du flux.
+    expect(detailPage).toMatch(/<TournamentHeader[\s\S]{0,400}isLive=\{isLive\}/);
+    expect(detailPage).toMatch(/<TournamentHeader[\s\S]{0,400}tier=\{tier\}/);
+    expect(detailPage).toMatch(/<TournamentHeader[\s\S]{0,400}fatal=\{fatal\}/);
+    expect(detailHeader).toContain("<LiveIndicator isLive={isLive} tier={tier} fatal={fatal} />");
   });
 });
 
