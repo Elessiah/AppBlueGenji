@@ -11,12 +11,15 @@ async function mockDb(execute: jest.Mock) {
   (getDatabase as jest.Mock).mockResolvedValue({ execute });
 }
 
-/** Base : la lecture du match trouve une ligne, puis l'UPDATE réussit. */
+/**
+ * Base : la lecture du match trouve une ligne, l'UPDATE réussit, puis le ménage
+ * des rappels déjà envoyés (`bg_match_reminders`) passe.
+ */
 function found(startAt: Date | null = null) {
   return jest
     .fn()
     .mockResolvedValueOnce([[{ id: 42, tournament_id: 7, start_at: startAt }]])
-    .mockResolvedValueOnce([{ affectedRows: 1 }]);
+    .mockResolvedValue([{ affectedRows: 1 }]);
 }
 
 beforeEach(() => jest.clearAllMocks());
@@ -64,6 +67,27 @@ describe("setMatchStartAt", () => {
     expect(await setMatchStartAt(42, "   ")).toBeNull();
     const [, params] = execute.mock.calls[1] as [string, unknown[]];
     expect(params[0]).toBeNull();
+  });
+
+  it("efface les rappels déjà envoyés quand la date change vraiment", async () => {
+    const execute = found(new Date("2026-08-29T18:30:00Z"));
+    await mockDb(execute);
+
+    await setMatchStartAt(42, "2026-08-30T18:30:00Z");
+
+    const [sql, params] = execute.mock.calls[2] as [string, unknown[]];
+    expect(sql).toMatch(/DELETE FROM bg_match_reminders WHERE match_id = \?/);
+    expect(params).toEqual([42]);
+  });
+
+  it("laisse les rappels en place quand la date est réécrite à l'identique", async () => {
+    const execute = found(new Date("2026-08-29T18:30:00Z"));
+    await mockDb(execute);
+
+    await setMatchStartAt(42, "2026-08-29T18:30:00Z");
+
+    // Deux requêtes seulement : la lecture et l'UPDATE. Rien à réannoncer.
+    expect(execute).toHaveBeenCalledTimes(2);
   });
 
   it("refuse une date inexploitable avant même de lire le match", async () => {
