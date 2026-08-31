@@ -1,4 +1,4 @@
-const ERROR_MESSAGES: Record<string, string> = {
+export const ERROR_MESSAGES: Record<string, string> = {
   CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES: "Score verrouillé : la manche suivante a déjà des scores saisis.",
   MATCH_NOT_FOUND: "Match introuvable.",
   MATCH_NOT_READY: "Le match n'a pas deux équipes.",
@@ -60,7 +60,11 @@ const ERROR_MESSAGES: Record<string, string> = {
     "L'antenne ne s'ouvre que sur un match jouable dont le score n'est pas saisi.",
   MATCH_LIVE_UPDATE_FAILED: "Erreur lors de la mise à jour de la diffusion.",
   TOURNAMENT_LIVE_UPDATE_FAILED: "Erreur lors de la mise à jour de la chaîne officielle.",
-// Suppression définitive (`docs/features/TOURNAMENT_DELETION.md`).  // `TOURNAMENT_NOT_FOUND` et `UNAUTHORIZED` sont déjà couverts plus haut.  TOURNAMENT_DELETE_FAILED: "Erreur lors de la suppression du tournoi.",  INVALID_TOURNAMENT_ID: "Identifiant de tournoi invalide.",  INVALID_ID: "Identifiant invalide.",
+  // Suppression définitive (`docs/features/TOURNAMENT_DELETION.md`).
+  // `TOURNAMENT_NOT_FOUND` et `UNAUTHORIZED` sont déjà couverts plus haut.
+  TOURNAMENT_DELETE_FAILED: "Erreur lors de la suppression du tournoi.",
+  INVALID_TOURNAMENT_ID: "Identifiant de tournoi invalide.",
+  INVALID_ID: "Identifiant invalide.",
 };
 
 export function mapError(errorCode: string): string {
