@@ -172,9 +172,11 @@ export function PhaseCard({
           </div>
 
           {/* Last-phase badge — une pastille est un `<span>`, elle tient dans le
-              bouton et reste donc cliquable comme avant. */}
+              bouton et reste donc cliquable comme avant. Repère visuel
+              seulement : `phaseSummary` dit déjà « — phase finale », inutile de
+              l'entendre deux fois dans le nom du bouton. */}
           {isLast && (
-            <Pill variant="blue" style={{ flexShrink: 0 }}>
+            <Pill variant="blue" aria-hidden="true" style={{ flexShrink: 0 }}>
               Phase finale
             </Pill>
           )}
@@ -292,10 +294,14 @@ export function PhaseCard({
             cliquable. Redondante avec le bouton d'intitulé, donc muette pour
             l'assistance (`aria-hidden`) et hors du parcours clavier
             (`tabIndex={-1}`) : le clavier passe par l'intitulé, qui porte déjà
-            `aria-expanded`. */}
+            `aria-expanded`. Le `mousedown` est neutralisé parce que
+            `tabIndex={-1}` ne retire que du parcours clavier : sans lui, un clic
+            poserait le focus **dans** ce sous-arbre `aria-hidden`, là où un
+            lecteur d'écran perd sa position. */}
         <button
           type="button"
           onClick={onToggleExpand}
+          onMouseDown={(e) => e.preventDefault()}
           aria-hidden="true"
           tabIndex={-1}
           style={{

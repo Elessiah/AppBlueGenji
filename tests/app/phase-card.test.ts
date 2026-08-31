@@ -65,8 +65,10 @@ describe("PhaseCard — en-tête d'une phase", () => {
 
     expect(toggleMarkup).toContain("phaseFormatLabel(phase.format)");
     // La pastille est un `<span>` : elle tient dans le bouton, et y reste donc
-    // cliquable comme lorsque tout le bandeau en était un.
+    // cliquable comme lorsque tout le bandeau en était un. Muette, en revanche :
+    // `phaseSummary` dit déjà « — phase finale ».
     expect(toggleMarkup).toContain("Phase finale");
+    expect(toggleMarkup).toMatch(/<Pill[^>]*aria-hidden="true"/);
     for (const action of ["Monter la phase", "Descendre la phase", "Supprimer la phase"]) {
       expect(toggleMarkup).not.toContain(action);
       expect(code).toContain(`aria-label={\`${action} \${phase.position}\`}`);
@@ -83,6 +85,9 @@ describe("PhaseCard — en-tête d'une phase", () => {
     // Mais redondant avec l'intitulé : ni annoncé, ni sur le parcours clavier.
     expect(chevron).toContain('aria-hidden="true"');
     expect(chevron).toContain("tabIndex={-1}");
+    // `tabIndex={-1}` ne retire que du parcours clavier : sans neutraliser le
+    // `mousedown`, un clic poserait le focus dans ce sous-arbre `aria-hidden`.
+    expect(chevron).toContain("onMouseDown={(e) => e.preventDefault()}");
     // Et sans nom accessible ni `aria-expanded` qui doubleraient le bouton.
     expect(chevron).not.toContain("aria-label");
     expect(chevron).not.toContain("aria-expanded");
