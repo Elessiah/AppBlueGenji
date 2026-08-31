@@ -1,0 +1,266 @@
+/* En-tête de la fiche tournoi — voir `_lib/header-meta.ts` pour le choix des
+   informations affichées. Trois étages, séparés par du vide plutôt que par des
+   traits : outils du lecteur, identité, faits du tournoi, puis actions. */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ---------- Étage 1 : outils du lecteur ---------- */
+
+.utility {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(79, 224, 162, 0.72);
+  transition: color 0.2s ease, gap 0.2s ease;
+}
+
+.back:hover {
+  color: rgba(79, 224, 162, 1);
+  gap: 12px;
+}
+
+.back:focus-visible {
+  outline: 2px solid rgba(79, 224, 162, 0.6);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.metaHint:focus-visible {
+  outline: 2px solid rgba(90, 200, 255, 0.6);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Témoin de flux et rôle du lecteur : ce qui parle de *qui regarde*, tenu à
+   l'écart des faits du tournoi — « À jour » au milieu des tags se lisait comme
+   une propriété du tournoi. */
+.viewer {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---------- Étage 2 : identité ---------- */
+
+.identity {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.identityText {
+  min-width: 0;
+  flex: 1 1 420px;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--state-line);
+  background: var(--state-fill);
+  color: var(--state-ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.state::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.stateNeutral {
+  --state-ink: var(--ink-mute, #9aa4b2);
+  --state-line: var(--line-strong-cy, rgba(180, 210, 230, 0.18));
+  --state-fill: rgba(180, 210, 230, 0.04);
+}
+
+.stateGreen {
+  --state-ink: #4fe0a2;
+  --state-line: rgba(79, 224, 162, 0.35);
+  --state-fill: rgba(79, 224, 162, 0.07);
+}
+
+.stateBlue {
+  --state-ink: var(--blue-300, #5ac8ff);
+  --state-line: rgba(90, 200, 255, 0.35);
+  --state-fill: rgba(90, 200, 255, 0.07);
+}
+
+.stateMuted {
+  --state-ink: var(--ink-mute, #9aa4b2);
+  --state-line: rgba(180, 210, 230, 0.2);
+  --state-fill: rgba(180, 210, 230, 0.03);
+}
+
+.identityLine {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-mute, #9aa4b2);
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(26px, 3vw, 42px);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.description {
+  margin: 12px 0 0;
+  max-width: 68ch;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text-1, #c3cbd6);
+}
+
+.identityActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---------- Étage 3 : les faits ---------- */
+
+.meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 20px 28px;
+  padding: 20px 0;
+  border-top: 1px solid var(--line-soft, rgba(180, 210, 230, 0.1));
+  border-bottom: 1px solid var(--line-soft, rgba(180, 210, 230, 0.1));
+}
+
+.metaItem {
+  min-width: 0;
+}
+
+.metaLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-mute, #9aa4b2);
+  margin-bottom: 6px;
+}
+
+.metaValue {
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--ink, #e6edf3);
+  overflow-wrap: anywhere;
+}
+
+.metaValueNum {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+}
+
+.metaHint {
+  border-bottom: 1px dotted var(--line-strong-cy, rgba(180, 210, 230, 0.28));
+  cursor: help;
+}
+
+/* Jauge d'effectif : la seule information de l'en-tête qui gagne à être vue
+   plutôt que lue. */
+.gauge {
+  margin-top: 8px;
+  /* Bornée : au-delà, la jauge cesse de se lire comme une mesure et devient le
+     soulignement de la valeur au-dessus. */
+  max-width: 120px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(180, 210, 230, 0.1);
+  overflow: hidden;
+}
+
+.gaugeFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(90, 200, 255, 0.5), var(--blue-300, #5ac8ff));
+  transition: width 0.4s ease;
+}
+
+/* ---------- Étage 4 : actions ---------- */
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Un spectateur non engagé sur un tournoi lancé n'a aucune action : sans ceci,
+   la rangée vide laisserait quand même l'espacement du `gap` en bas de
+   l'en-tête. */
+.actions:empty {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .shell {
+    gap: 18px;
+  }
+
+  .meta {
+    gap: 16px 20px;
+  }
+
+  .actions > * {
+    flex: 1 1 auto;
+  }
+}
+
+/* Le survol de la flèche de retour et le remplissage de la jauge sont des
+   agréments : ils s'effacent pour qui demande moins de mouvement. */
+@media (prefers-reduced-motion: reduce) {
+  .back,
+  .gaugeFill {
+    transition: none;
+  }
+
+  .back:hover {
+    gap: 8px;
+  }
+}

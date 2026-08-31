@@ -87,8 +87,11 @@ export function PhaseTimeline({
                   {subtitle}
                 </div>
               )}
+              {/* Jamais `live` : une phase en cours n'est pas une diffusion,
+                  et le rouge est réservé à ce qui est réellement à l'antenne
+                  (CLAUDE.md, « trois sens de live »). */}
               <Pill
-                variant={isCurrent ? "live" : "blue"}
+                variant={isCurrent ? "blue" : "default"}
                 style={{ fontSize: 10, padding: "2px 8px" }}
               >
                 {state}
