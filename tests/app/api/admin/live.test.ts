@@ -185,6 +185,19 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     expect(setMatchLiveConfig).toHaveBeenCalledWith(42, { trigger: null, liveUrl: null });
   });
 
+  it("accepte le mode START_TIME", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(caster as never);
+    (setMatchLiveConfig as jest.Mock).mockResolvedValue(undefined as never);
+
+    const res = await putMatchLive(matchReq("PUT", { trigger: "START_TIME" }), matchParams("42"));
+
+    expect(res.status).toBe(200);
+    expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
+      trigger: "START_TIME",
+      liveUrl: null,
+    });
+  });
+
   it("refuse un mode inconnu", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(caster as never);
     const res = await putMatchLive(matchReq("PUT", { trigger: "SOMETIMES" }), matchParams("42"));
@@ -222,6 +235,15 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     expect((await putMatchLive(matchReq("PUT", { trigger: "AUTO" }), matchParams("42"))).status).toBe(
       400,
     );
+
+    // Conflit d'état, pas de saisie : la date manque sur le match, pas dans la
+    // requête — c'est un 409, comme les autres refus de l'antenne.
+    (setMatchLiveConfig as jest.Mock).mockRejectedValue(
+      new Error("MATCH_START_AT_REQUIRED") as never,
+    );
+    const res = await putMatchLive(matchReq("PUT", { trigger: "START_TIME" }), matchParams("42"));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "MATCH_START_AT_REQUIRED" });
   });
 });
 
