@@ -1,0 +1,369 @@
+/* Dialogue d'édition d'un score, pour la permission `tournaments`.
+   Même ossature que les autres modales de la fiche tournoi (voile sombre,
+   carte centrée, jetons « cyber ») — voir `MatchScheduleDialog`.
+
+   Le geste courant est « je saisis un score, je valide » : le score occupe le
+   centre, tout le reste est soit conditionnel, soit replié, soit réduit à un
+   lien. Les styles sortent du JSX parce que le dialogue a des états — champ en
+   défaut, bouton refusé, bandeau de désaccord. */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(6, 8, 12, 0.72);
+}
+
+.dialog {
+  width: 100%;
+  max-width: 460px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 22px;
+  background: var(--cyber-bg-2, #14181f);
+  border: 1px solid var(--line-strong-cy, var(--line-soft));
+  border-radius: var(--r-cy-md, 12px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+
+.dialog:focus-visible {
+  outline: 2px solid var(--blue-400, #5ac8ff);
+  outline-offset: 2px;
+}
+
+/* ---------- En-tête ---------- */
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.headText {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 17px;
+  color: var(--ink, var(--text-0));
+}
+
+.opponents {
+  margin: 5px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-2, #9aa4b2);
+}
+
+/* Ce qui est déjà en base : une ligne sobre, sans cadre — c'est un rappel, pas
+   une alerte, et l'encadrer le mettait au même niveau que le désaccord. */
+.stored {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--blue-300, #8ad9ff);
+}
+
+/* ---------- Désaccord ---------- */
+
+.conflict {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 157, 46, 0.4);
+  border-radius: 8px;
+  background: rgba(255, 157, 46, 0.1);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-1, #c3ccd8);
+}
+
+/* En bloc : le bouton est une action, pas la fin de la phrase — collé au texte,
+   il se lisait « écraserait le sien.Reprendre la valeur à jour ». */
+.conflictAction {
+  display: block;
+  margin-top: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--blue-400, #5ac8ff);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.conflictAction:focus-visible {
+  outline: 2px solid var(--blue-400, #5ac8ff);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.conflictAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ---------- Saisie des scores : le centre de la modale ---------- */
+
+.scores {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: end;
+  margin-top: 22px;
+}
+
+.versus {
+  padding-bottom: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-2, #9aa4b2);
+}
+
+.sideLabel {
+  display: block;
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--blue-400, #5ac8ff);
+  overflow-wrap: anywhere;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.step {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 42px;
+  border: 1px solid rgba(90, 200, 255, 0.28);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--blue-400, #5ac8ff);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.step:hover:not(:disabled) {
+  background: rgba(90, 200, 255, 0.16);
+}
+
+.step:focus-visible {
+  outline: 2px solid var(--blue-400, #5ac8ff);
+  outline-offset: 2px;
+}
+
+.step:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.field {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 42px;
+  padding: 0 8px;
+  border: 1px solid rgba(90, 200, 255, 0.35);
+  border-radius: 8px;
+  background: var(--cyber-bg-1, var(--surface-1));
+  color: var(--ink, var(--text-0));
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.field:focus-visible {
+  outline: none;
+  border-color: var(--blue-400, #5ac8ff);
+  box-shadow: 0 0 0 3px rgba(90, 200, 255, 0.18);
+}
+
+.field[aria-invalid="true"] {
+  border-color: rgba(255, 74, 92, 0.75);
+}
+
+.field:disabled {
+  opacity: 0.4;
+}
+
+/* ---------- Rappel de format, puis forfait replié ---------- */
+
+.formatHint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2, #9aa4b2);
+}
+
+.forfeitZone {
+  margin-top: 16px;
+}
+
+.forfeitPanel {
+  margin-top: 10px;
+}
+
+.forfeitHint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2, #9aa4b2);
+}
+
+.forfeitRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.forfeit {
+  flex: 1 1 130px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 157, 46, 0.3);
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 157, 46, 0.8);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  overflow-wrap: anywhere;
+}
+
+.forfeit:hover:not(:disabled) {
+  background: rgba(255, 157, 46, 0.12);
+}
+
+.forfeit[aria-pressed="true"] {
+  border-color: rgba(255, 157, 46, 0.7);
+  background: rgba(255, 157, 46, 0.18);
+  color: rgba(255, 157, 46, 1);
+}
+
+.forfeit:focus-visible {
+  outline: 2px solid rgba(255, 157, 46, 0.9);
+  outline-offset: 2px;
+}
+
+.forfeit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Lien d'action : le poids le plus faible du dialogue, pour « Déclarer un
+   forfait », « Annuler » et « Fermer » — des sorties, pas des décisions. */
+.link {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text-2, #9aa4b2);
+  text-decoration: underline;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.link:hover:not(:disabled) {
+  color: var(--ink, var(--text-0));
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--blue-400, #5ac8ff);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.link:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ---------- Raison d'un refus, puis actions ---------- */
+
+.blocker {
+  margin: 18px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2, #9aa4b2);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-soft, rgba(255, 255, 255, 0.08));
+}
+
+/* Seul « Fermer » part à gauche : la barre se lit alors « je quitte » d'un
+   côté, « j'écris » de l'autre. */
+.close {
+  margin-right: auto;
+}
+
+/* `:global` obligatoire : `.btn` est une classe du style global, et CSS Modules
+   hacherait un `.btn` local — les règles ci-dessous ne s'appliquaient alors à
+   rien, et les boutons refusés gardaient `opacity: 1` et `cursor: pointer`. */
+.actions :global(.btn) {
+  padding: 9px 16px;
+  font-size: 13px;
+}
+
+/* Le geste attendu doit se voir : l'enregistrement intermédiaire reste en
+   retrait derrière la validation, qui est ce que l'arbitre vient faire. */
+.actions :global(.btn:not(.ghost)) {
+  border-color: rgba(90, 200, 255, 0.65);
+  background: rgba(90, 200, 255, 0.3);
+}
+
+.actions :global(.btn:not(.ghost):hover:not(:disabled)) {
+  background: rgba(90, 200, 255, 0.42);
+}
+
+/* `.btn` global n'a pas d'état désactivé : sans ça, « Valider le résultat »
+   gardait l'apparence d'un bouton cliquable alors qu'il refusait le clic, et
+   rien à l'écran ne disait pourquoi. */
+.actions :global(.btn:disabled) {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.actions :global(.btn:disabled:hover) {
+  transform: none;
+  box-shadow: none;
+}
+
+.actions :global(.btn:focus-visible) {
+  outline: 2px solid var(--blue-400, #5ac8ff);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step,
+  .forfeit,
+  .link,
+  .actions :global(.btn) {
+    transition: none;
+  }
+}

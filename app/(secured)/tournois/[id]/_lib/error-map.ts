@@ -2,7 +2,12 @@ export const ERROR_MESSAGES: Record<string, string> = {
   CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES: "Score verrouillé : la manche suivante a déjà des scores saisis.",
   MATCH_NOT_FOUND: "Match introuvable.",
   MATCH_NOT_READY: "Le match n'a pas deux équipes.",
-  MATCH_ALREADY_COMPLETED: "Le match est déjà terminé.",
+  // Volontairement neutre : le code remonte aussi bien du report d'une équipe
+  // (`reportMatchScore`) que de l'enregistrement d'un score par l'arbitrage. La
+  // consigne « utilise Valider le résultat » enverrait un joueur chercher un
+  // bouton qu'il n'a pas — c'est `decideScoreForm` qui la donne, côté arbitrage,
+  // avant même l'aller-retour.
+  MATCH_ALREADY_COMPLETED: "Ce match est déjà tranché : son résultat ne peut plus être saisi.",
   DRAW_NOT_ALLOWED: "Les scores ne peuvent pas être égaux.",
   // Formulations de repli : l'interface connaît le format du tournoi et
   // remplace ces messages par une version chiffrée (`matchScoreViolationMessage`).
@@ -13,7 +18,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   TOURNAMENT_NOT_RUNNING: "Le tournoi n'est pas en cours.",
   ADMIN_SAVE_SCORES_FAILED: "Erreur lors de la sauvegarde des scores.",
   ADMIN_RESOLVE_FAILED: "Erreur lors de la résolution du match.",
-  INVALID_FORFEIT_TEAM_ID: "ID d'équipe forfait invalide.",
+  INVALID_FORFEIT_TEAM_ID: "Le forfait doit désigner une des deux équipes du match.",
   MISSING_SCORES_OR_FORFEIT: "Scores ou forfait requis.",
   TOURNAMENT_FULL: "Ce tournoi est complet.",
   // Formulation neutre : l'inscrit est une équipe ou un joueur selon le tournoi.

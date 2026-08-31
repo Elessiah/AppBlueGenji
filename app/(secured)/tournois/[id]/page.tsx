@@ -58,7 +58,11 @@ export default function TournamentDetailPage() {
 
   const { tournament: detail, refresh, isLive, tier, fatal } = useTournamentLive(tournamentId);
   const [drafts, setDrafts] = useState<MatchScoreDraft>({});
-  const [selectedMatchForAdmin, setSelectedMatchForAdmin] = useState<BracketMatch | null>(null);
+  // Même raison que les deux dialogues ci-dessous : on retient l'identifiant, pas
+  // l'objet. Un match capturé à l'ouverture ne bougeait plus, si bien que le
+  // dialogue continuait d'afficher « 0 – 0 » sur un match que le flux venait de
+  // rapporter à 2-1 — et l'enregistrer écrasait la saisie de l'autre arbitre.
+  const [selectedMatchForAdminId, setSelectedMatchForAdminId] = useState<number | null>(null);
   const [ghostRegistrationOpen, setGhostRegistrationOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   // On retient l'**identifiant** du match en cours de configuration, pas l'objet :
@@ -72,6 +76,7 @@ export default function TournamentDetailPage() {
   // cela, deux flèches neuves à chaque rendu changeraient la valeur du contexte
   // de diffusion à chaque instantané SSE, et redessineraient les 127 bandeaux
   // d'un plateau à 128 équipes pour un score qui n'en concerne qu'un.
+  const openAdminScore = useCallback((match: BracketMatch) => setSelectedMatchForAdminId(match.id), []);
   const openMatchLive = useCallback((match: BracketMatch) => setMatchForLiveId(match.id), []);
   const openMatchSchedule = useCallback(
     (match: BracketMatch) => setMatchForScheduleId(match.id),
@@ -328,6 +333,10 @@ export default function TournamentDetailPage() {
   // Résolu à chaque rendu depuis la liste fraîche : le dialogue de diffusion
   // travaille toujours sur l'état courant du match, et se ferme de lui-même si
   // le match disparaît (plateau régénéré).
+  const matchForAdminScore =
+    selectedMatchForAdminId === null
+      ? null
+      : detail.matches.find((match) => match.id === selectedMatchForAdminId) ?? null;
   const matchForLive =
     matchForLiveId === null
       ? null
@@ -437,7 +446,7 @@ export default function TournamentDetailPage() {
                 drafts={drafts}
                 onScoreChange={handleScoreChange}
                 onSubmit={submitScore}
-                onOpenAdminModal={setSelectedMatchForAdmin}
+                onOpenAdminModal={openAdminScore}
                 canForfeit={canForfeit}
                 onForfeit={forfeitTeam}
                 emptyLabel={noMatchesLabel}
@@ -474,7 +483,7 @@ export default function TournamentDetailPage() {
                   myScore={drafts[match.id]?.myScore || ""}
                   opponentScore={drafts[match.id]?.opponentScore || ""}
                   onSubmit={submitScore}
-                  onOpenAdminModal={setSelectedMatchForAdmin}
+                  onOpenAdminModal={openAdminScore}
                   allMatches={detail.matches}
                   roundNumber={match.roundNumber}
                   format="SURVIVAL"
@@ -493,7 +502,7 @@ export default function TournamentDetailPage() {
               drafts={drafts}
               onScoreChange={handleScoreChange}
               onSubmit={submitScore}
-              onOpenAdminModal={setSelectedMatchForAdmin}
+              onOpenAdminModal={openAdminScore}
               canForfeit={canForfeit}
               onForfeit={forfeitTeam}
               emptyLabel={noMatchesLabel}
@@ -515,7 +524,7 @@ export default function TournamentDetailPage() {
                       drafts={drafts}
                       onScoreChange={handleScoreChange}
                       onSubmit={submitScore}
-                      onOpenAdminModal={setSelectedMatchForAdmin}
+                      onOpenAdminModal={openAdminScore}
                       format={formatForBracket}
                     />
                   </div>
@@ -566,7 +575,7 @@ export default function TournamentDetailPage() {
                     drafts={drafts}
                     onScoreChange={handleScoreChange}
                     onSubmit={submitScore}
-                    onOpenAdminModal={setSelectedMatchForAdmin}
+                    onOpenAdminModal={openAdminScore}
                     format={formatForBracket}
                   />
                 </div>
@@ -671,15 +680,17 @@ export default function TournamentDetailPage() {
         )}
       </section>
 
-      <AdminScoreDialog
-        match={selectedMatchForAdmin}
-        open={!!selectedMatchForAdmin}
-        onClose={() => setSelectedMatchForAdmin(null)}
-        onSubmitted={() => {
-          setSelectedMatchForAdmin(null);
-          void refresh();
-        }}
-      />
+      {matchForAdminScore && (
+        <AdminScoreDialog
+          key={matchForAdminScore.id}
+          match={matchForAdminScore}
+          onClose={() => setSelectedMatchForAdminId(null)}
+          onSubmitted={() => {
+            setSelectedMatchForAdminId(null);
+            void refresh();
+          }}
+        />
+      )}
 
       {matchForLive && (
         <MatchLiveDialog
