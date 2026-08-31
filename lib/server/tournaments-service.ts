@@ -33,8 +33,10 @@ export {
   checkDownstreamMatchesHaveNoScores,
   // Suppression définitive (administrateurs)
   deleteTournament,
-  // Instantané partagé + contexte du lecteur (voir tournaments/snapshot.ts)
-  getTournamentSnapshot,
+  // Instantané partagé + contexte du lecteur (voir tournaments/snapshot.ts).
+  // `getTournamentSnapshot` n'est pas offert ici : il ignore
+  // `start_visibility_at`. Les routes passent par la variante gardée.
+  getVisibleTournamentSnapshot,
   getTournamentSnapshotFrame,
   getTournamentViewerContext,
   invalidateTournamentSnapshot,
