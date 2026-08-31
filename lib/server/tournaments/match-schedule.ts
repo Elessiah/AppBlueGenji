@@ -19,6 +19,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { normalizeMatchStartAt } from "@/lib/shared/match-schedule";
+import { toIso } from "@/lib/server/serialization";
 import { publishUpdatedEvent } from "./notifications";
 
 type MatchScheduleRow = RowDataPacket & {
@@ -63,6 +64,21 @@ export async function setMatchStartAt(
     startAt === null ? null : new Date(startAt),
     matchId,
   ]);
+
+  // Les rappels déjà envoyés portaient l'ancienne date : ils ne valent plus
+  // rien. Les effacer fait repartir le cycle à zéro
+  // (`lib/server/tournaments/match-reminders.ts`), donc réannoncer la nouvelle
+  // date — c'est précisément ce qu'un déplacement de manche doit produire.
+  // Meilleur effort : une manche reprogrammée ne doit pas échouer parce que le
+  // ménage des rappels a échoué.
+  const previousStartAt = toIso(rows[0].start_at);
+  if (previousStartAt !== startAt) {
+    try {
+      await db.execute(`DELETE FROM bg_match_reminders WHERE match_id = ?`, [matchId]);
+    } catch {
+      // Meilleur effort : au pire, le cycle des rappels garde son ancien état.
+    }
+  }
 
   publishUpdatedEvent(Number(rows[0].tournament_id));
   return startAt;

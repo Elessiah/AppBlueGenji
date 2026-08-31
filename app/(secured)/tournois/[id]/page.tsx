@@ -26,6 +26,8 @@ import { MatchLiveDialog } from "./_components/MatchLiveDialog";
 import { MatchScheduleDialog } from "./_components/MatchScheduleDialog";
 import { TournamentLiveLink } from "./_components/TournamentLiveLink";
 import { LiveProvider } from "./_lib/live-context";
+import { IssueReportProvider } from "./_lib/issue-report-context";
+import { IssueReportDialog } from "./_components/IssueReportDialog";
 import { SeedingEditor } from "./_components/SeedingEditor";
 import { BracketPreview } from "./_components/BracketPreview";
 import { MatchScoreDraft } from "./_components/BracketTree";
@@ -97,6 +99,16 @@ export default function TournamentDetailPage() {
     (match: BracketMatch) => setMatchForScheduleId(match.id),
     [],
   );
+  // Signalement de problème : `undefined` = fermé, `null` = ouvert sur tout le
+  // tournoi, un match = ouvert sur cette manche. Trois états, un seul `useState`
+  // — un booléen doublé d'un match laisserait exister « fermé mais sur ce match ».
+  const [issueTarget, setIssueTarget] = useState<BracketMatch | null | undefined>(undefined);
+  // Stable pour la même raison que `openMatchLive` : le contexte descend dans
+  // chaque `MatchRow` du plateau.
+  const openIssueReport = useCallback(
+    (match: BracketMatch | null) => setIssueTarget(match),
+    [],
+  );
   const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
 
   // L'App Router réutilise ce composant d'un paramètre à l'autre : passer de
@@ -104,6 +116,7 @@ export default function TournamentDetailPage() {
   // son état à zéro pour la même raison). Une modale destructrice ne doit pas
   // survivre au changement de cible.
   useEffect(() => setDeleteDialogOpen(false), [tournamentId]);
+  useEffect(() => setIssueTarget(undefined), [tournamentId]);
 
   // Dernière phase courante observée. On ne resynchronise la sélection que
   // lorsqu'elle change RÉELLEMENT (une phase vient de démarrer) : comparer
@@ -381,6 +394,7 @@ export default function TournamentDetailPage() {
         openConfig={openMatchLive}
         openSchedule={openMatchSchedule}
       >
+      <IssueReportProvider canReport={detail.myTeamId !== null} openReport={openIssueReport}>
       <RulesHelpFab format={visibleFormat} contextLabel={contextLabel} />
       <section className="fade-in">
         <div className="ds-header green">
@@ -464,6 +478,18 @@ export default function TournamentDetailPage() {
                   style={{ fontSize: 13, padding: "6px 16px" }}
                 >
                   {wording.registerCta}
+                </CyberButton>
+              )}
+              {/* Signalement : ouvert aux seuls engagés, à toute heure du
+                  tournoi — un problème d'inscription se signale avant le coup
+                  d'envoi comme un litige de score se signale après. */}
+              {detail.myTeamId !== null && (
+                <CyberButton
+                  variant="ghost"
+                  onClick={() => openIssueReport(null)}
+                  style={{ fontSize: 13, padding: "6px 16px" }}
+                >
+                  ⚠ Signaler un problème
                 </CyberButton>
               )}
               {detail.isAdmin && !frozen && detail.card.state === "REGISTRATION" && (
@@ -805,6 +831,14 @@ export default function TournamentDetailPage() {
         />
       )}
 
+      {issueTarget !== undefined && (
+        <IssueReportDialog
+          tournamentId={tournamentId}
+          match={issueTarget}
+          onClose={() => setIssueTarget(undefined)}
+        />
+      )}
+
       {ghostRegistrationOpen && (
         <GhostRegistrationDialog
           tournamentId={tournamentId}
@@ -812,6 +846,7 @@ export default function TournamentDetailPage() {
           onRegistered={() => void refresh()}
         />
       )}
+      </IssueReportProvider>
       </LiveProvider>
       </MatchFormatProvider>
     </EntrantProvider>

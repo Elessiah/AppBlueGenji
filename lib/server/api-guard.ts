@@ -81,6 +81,20 @@ export const VISIT_REQUEST_RULE: RateLimitRule = {
 };
 
 /**
+ * Signalements de problème, par utilisateur.
+ *
+ * Étroit, à rebours des autres plafonds : chaque appel envoie un message privé
+ * à tous les arbitres. Un joueur en signale un, éventuellement deux quand la
+ * situation évolue — au-delà, c'est du bruit qu'aucun arbitre ne peut trier en
+ * pleine soirée de tournoi.
+ */
+export const ISSUE_REPORT_RULE: RateLimitRule = {
+  name: "tournament-issue-report",
+  limit: 5,
+  windowMs: 10 * 60_000,
+};
+
+/**
  * Applique un plafond. Renvoie la réponse 429 à retourner tel quel, ou `null`
  * si la requête peut continuer.
  *

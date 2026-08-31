@@ -73,6 +73,15 @@ async function purgeTournamentRows(
   await connection.execute(`DELETE FROM bg_swiss_standings WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(`DELETE FROM bg_survival_standings WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(`DELETE FROM bg_endurance_standings WHERE tournament_id = ?`, [tournamentId]);
+  // Les rappels de match pendent aux manches, pas au tournoi : on les efface
+  // avant elles, à la main comme le reste, plutôt que de compter sur la cascade
+  // de `bg_match_reminders.match_id`.
+  await connection.execute(
+    `DELETE r FROM bg_match_reminders r
+     JOIN bg_matches m ON m.id = r.match_id
+     WHERE m.tournament_id = ?`,
+    [tournamentId],
+  );
   await connection.execute(`DELETE FROM bg_matches WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(`DELETE FROM bg_tournament_phases WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(
