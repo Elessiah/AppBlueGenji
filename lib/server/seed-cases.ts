@@ -127,6 +127,14 @@ export const TOURNAMENTS: TournamentDef[] = [
   { name: "BG Survie Impaire + Forfait", game: "OW2", state: "RUNNING", format: "BG_SURVIE", teamCount: 11, maxTeams: 16, daysOffset: -4, endurancePoints: 3, endurancePlayoffSize: 8, playWaves: 2, forfeits: 1, teamOffset: 33 },
   { name: "BG Survie Terminée", game: "MR", state: "FINISHED", format: "BG_SURVIE", teamCount: 9, maxTeams: 16, daysOffset: -20, endurancePoints: 2, endurancePlayoffSize: 8, teamOffset: 45 },
 
+  // ---- RUNNING · coup d'envoi sans adversaires (clôture immédiate) ---------
+  // Insérés « en cours » et sans le moindre match : le seed ne simule rien en
+  // dessous de deux engagées. C'est la première synchronisation qui les clôt et
+  // sacre l'unique engagée, quel que soit le format — voir
+  // `docs/features/UNDERFILLED_TOURNAMENTS.md`.
+  { name: "Départ Sans Inscrit", game: "OW2", state: "RUNNING", format: "SWISS", teamCount: 0, maxTeams: 8, daysOffset: -1, swissTotalRounds: 3 },
+  { name: "Départ à Une Seule Engagée", game: "MR", state: "RUNNING", format: "BG_SURVIE", teamCount: 1, maxTeams: 8, daysOffset: -1, teamOffset: 90 },
+
   // ---- RUNNING · ronde suisse ---------------------------------------------
   { name: "Suisse 8 Équipes", game: "OW2", state: "RUNNING", format: "SWISS", teamCount: 8, maxTeams: 8, daysOffset: -2, swissTotalRounds: 3, playWaves: 1 },
   { name: "Suisse 9 Équipes (bye)", game: "MR", state: "RUNNING", format: "SWISS", teamCount: 9, maxTeams: 16, daysOffset: -3, swissTotalRounds: 4, playWaves: 2, teamOffset: 14 },

@@ -126,6 +126,59 @@ export async function rankEliminationPhase(
   return rankedTeams;
 }
 
+/**
+ * Clôt sans jouer un tournoi qui atteint son coup d'envoi sans adversaires.
+ *
+ * Un plateau vide ou réduit à une seule engagée n'a aucun match à produire : le
+ * laisser passer en `RUNNING` l'y bloquerait pour de bon, puisque c'est
+ * justement la fin des matchs qui clôt un tournoi. La règle est **commune à
+ * tous les formats** et appliquée avant toute initialisation, si bien qu'aucun
+ * moteur (plateau, Survie, Ronde suisse, Endurance, phases) n'a besoin de
+ * connaître ce cas dégénéré ni de créer un classement pour personne.
+ *
+ * L'unique engagée, s'il y en a une, est déclarée première — c'est déjà ce que
+ * faisait l'élimination dans `createBracketIfMissing`.
+ *
+ * Une inscription n'est jamais retirée en cours de route : un tournoi qui en
+ * compte moins de deux n'a donc pas pu commencer, ce qui rend l'appel sûr aussi
+ * bien à la bascule qu'à l'entretien d'un tournoi déjà `RUNNING`.
+ *
+ * @returns `true` si le tournoi a été clos, `false` s'il a de quoi être joué.
+ */
+export async function finalizeUnderfilledTournament(
+  connection: PoolConnection,
+  tournamentId: number,
+): Promise<boolean> {
+  // `LIMIT 2` : seule la distinction « moins de deux » nous intéresse.
+  const [rows] = await connection.execute<(RowDataPacket & { team_id: number })[]>(
+    `SELECT team_id FROM bg_tournament_registrations WHERE tournament_id = ? LIMIT 2`,
+    [tournamentId],
+  );
+
+  if (rows.length > 1) return false;
+
+  if (rows.length === 1) {
+    await connection.execute(
+      `UPDATE bg_tournament_registrations
+       SET final_rank = 1
+       WHERE tournament_id = ? AND team_id = ?`,
+      [tournamentId, Number(rows[0].team_id)],
+    );
+  }
+
+  // `bracket_size` reçoit l'effectif retenu : même écriture, mêmes colonnes que
+  // la clôture d'un plateau vide dans `createBracketIfMissing`, pour qu'un
+  // tournoi clos porte toujours la taille de son plateau plutôt qu'un NULL.
+  await connection.execute(
+    `UPDATE bg_tournaments
+     SET state = 'FINISHED', finished_at = NOW(), bracket_size = ?
+     WHERE id = ?`,
+    [rows.length, tournamentId],
+  );
+
+  return true;
+}
+
 export async function finalizeTournamentIfDone(
   connection: PoolConnection,
   tournamentId: number,

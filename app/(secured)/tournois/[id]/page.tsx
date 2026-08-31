@@ -333,6 +333,15 @@ export default function TournamentDetailPage() {
     .map((b) => ({ type: b, matches: filteredMatches.filter((m) => m.bracket === b) }))
     .filter((b) => b.matches.length > 0);
 
+  // Un tournoi clos sans le moindre match n'attend plus rien : il est parti sans
+  // adversaires (moins de deux engagées au coup d'envoi, voir
+  // docs/features/UNDERFILLED_TOURNAMENTS.md). Lui laisser le « pour l'instant »
+  // d'un plateau encore à naître ferait espérer une suite qui ne viendra pas.
+  const noMatchesLabel =
+    detail.card.state === "FINISHED" && detail.matches.length === 0
+      ? `Tournoi clos sans être joué : moins de deux ${wording.manyEngaged} au coup d'envoi.`
+      : "Aucun match disponible pour l'instant.";
+
   // Aperçu du plateau avant lancement, réservé au staff et au cast : le serveur
   // le laisse à `null` pour les autres, à qui le tirage ne doit rien révéler
   // d'avance, et pour un tournoi déjà lancé. Deux endroits l'affichent — pendant
@@ -501,6 +510,7 @@ export default function TournamentDetailPage() {
                 onOpenAdminModal={setSelectedMatchForAdmin}
                 canForfeit={canForfeit}
                 onForfeit={forfeitTeam}
+                emptyLabel={noMatchesLabel}
               />
               {isMulti && selectedPhase?.state === "FINISHED" && detail.phaseStandings && detail.phaseStandings[selectedPhase.id] && (
                 <div style={{ marginTop: 24 }}>
@@ -556,6 +566,7 @@ export default function TournamentDetailPage() {
               onOpenAdminModal={setSelectedMatchForAdmin}
               canForfeit={canForfeit}
               onForfeit={forfeitTeam}
+              emptyLabel={noMatchesLabel}
             />
           ) : formatForBracket === "SWISS" ? (
             <>
@@ -581,7 +592,7 @@ export default function TournamentDetailPage() {
                 ))
               ) : (
                 <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-                  Aucun match disponible pour l&apos;instant.
+                  {noMatchesLabel}
                 </p>
               )}
               {isMulti && selectedPhase?.state === "FINISHED" && detail.phaseStandings && detail.phaseStandings[selectedPhase.id] && (
@@ -605,7 +616,7 @@ export default function TournamentDetailPage() {
           ) : !filteredMatches.length ? (
             <>
               <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-                Aucun match disponible pour l&apos;instant.
+                {noMatchesLabel}
               </p>
               {previewBlock}
             </>
