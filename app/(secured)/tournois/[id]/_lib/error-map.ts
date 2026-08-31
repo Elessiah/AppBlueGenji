@@ -81,6 +81,10 @@ export const ERROR_MESSAGES: Record<string, string> = {
   TOO_MANY_REQUESTS: "Trop de requêtes coup sur coup. Patiente quelques minutes.",
   ISSUE_REPORT_FAILED: "Erreur lors de l'envoi du signalement.",
   INVALID_MATCH_ID: "Identifiant de match invalide.",
+  // Plus émis par aucune route de cette page — `forfeit` et le report de score
+  // nomment désormais l'identifiant en cause. Conservé comme filet : d'autres
+  // familles de routes l'emploient encore, et un code sans phrase française
+  // s'afficherait brut dans le toast.
   INVALID_ID: "Identifiant invalide.",
 };
 

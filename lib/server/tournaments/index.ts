@@ -13,7 +13,7 @@ import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { isSoloTournament, toParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import { canViewTournament } from "@/lib/shared/tournament-visibility";
-import { validateDateOrder } from "./validation";
+import { parseTournamentDates } from "./validation";
 import type { TournamentListRow } from "./_internal";
 
 // Internal types
@@ -252,18 +252,17 @@ export async function createTournament(
   try {
     await connection.beginTransaction();
 
-    const dateError = validateDateOrder({
+    // Une seule analyse des quatre jalons : `parseTournamentDates` contrôle
+    // l'ordre et rend les `Date` qu'on insère juste après.
+    const dates = parseTournamentDates({
       startVisibilityAt: payload.startVisibilityAt,
       registrationOpenAt: payload.registrationOpenAt,
       registrationCloseAt: payload.registrationCloseAt,
       startAt: payload.startAt,
     });
-    if (dateError) throw new Error(dateError);
+    if (dates.error) throw new Error(dates.error);
 
-    const startVisibilityAt = new Date(payload.startVisibilityAt);
-    const registrationOpenAt = new Date(payload.registrationOpenAt);
-    const registrationCloseAt = new Date(payload.registrationCloseAt);
-    const startAt = new Date(payload.startAt);
+    const { startVisibilityAt, registrationOpenAt, registrationCloseAt, startAt } = dates.value;
 
     const { computeTournamentState } = await import("./state");
 
@@ -275,7 +274,9 @@ export async function createTournament(
       start_at: startAt,
     });
 
-    const hasThirdPlaceMatch = payload.format === "SINGLE" && Boolean(payload.hasThirdPlaceMatch);
+    // La neutralisation hors `SINGLE` vit dans `validateTournamentInput`, seul
+    // endroit où création et édition la partagent (`./validation`).
+    const hasThirdPlaceMatch = Boolean(payload.hasThirdPlaceMatch);
     const game = payload.game ?? "OW2";
     const participantType = toParticipantType(payload.participantType);
 

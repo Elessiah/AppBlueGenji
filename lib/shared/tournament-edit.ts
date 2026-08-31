@@ -9,33 +9,16 @@
  */
 import type { TournamentState } from "./types";
 
-/** Champ modifiable d'un tournoi. */
-export type TournamentField =
-  | "name"
-  | "description"
-  | "game"
-  | "format"
-  | "participantType"
-  | "maxTeams"
-  | "startVisibilityAt"
-  | "registrationOpenAt"
-  | "registrationCloseAt"
-  | "startAt"
-  | "hasThirdPlaceMatch"
-  | "survivalRoundsBeforeFirstCut"
-  | "survivalRoundsPerCut"
-  | "swissTotalRounds"
-  | "swissPointsWin"
-  | "swissPointsDraw"
-  | "swissPointsLoss"
-  | "endurancePoints"
-  | "enduranceWinDelta"
-  | "enduranceLossDelta"
-  | "endurancePlayoffSize"
-  | "matchFormat"
-  | "phases";
-
-export const ALL_TOURNAMENT_FIELDS: readonly TournamentField[] = [
+/**
+ * Tous les champs modifiables d'un tournoi, dans l'ordre du formulaire.
+ *
+ * Cette liste est la **source unique** : `TournamentField` en est dérivé. Les
+ * deux étaient tenus à la main en parallèle, et rien n'obligeait un champ
+ * ajouté au type à rejoindre le tableau — or c'est le tableau que parcourt la
+ * liste blanche de `PATCH /api/tournaments/[id]/edit` : un champ oublié là
+ * aurait été silencieusement ignoré à l'édition, sans la moindre erreur.
+ */
+export const ALL_TOURNAMENT_FIELDS = [
   "name",
   "description",
   "game",
@@ -59,7 +42,10 @@ export const ALL_TOURNAMENT_FIELDS: readonly TournamentField[] = [
   "endurancePlayoffSize",
   "matchFormat",
   "phases",
-];
+] as const;
+
+/** Champ modifiable d'un tournoi. */
+export type TournamentField = (typeof ALL_TOURNAMENT_FIELDS)[number];
 
 /**
  * Champs qui survivent à la publication.
@@ -98,8 +84,12 @@ export type EditableTournament = {
  * Le tournoi est-il encore invisible ?
  *
  * Une date illisible est traitée comme **visible** : mieux vaut restreindre à
- * tort que rouvrir le format d'un tournoi déjà annoncé. Même parti pris que
- * `isTournamentHidden` dans `tournament-visibility.ts`.
+ * tort que rouvrir le format d'un tournoi déjà annoncé.
+ *
+ * `isTournamentPublished` (`tournament-visibility.ts`) tranche l'inverse sur la
+ * même donnée abîmée — non publié, donc réservé au staff. Ce n'est pas une
+ * divergence : les deux se ferment, chacune du côté qui restreint. Ici la
+ * restriction est de moins pouvoir modifier, là-bas de moins pouvoir lire.
  */
 function isHidden(tournament: EditableTournament, now: number): boolean {
   const visibleAt = new Date(tournament.startVisibilityAt).getTime();
@@ -126,11 +116,17 @@ export function editLockReason(
   return null;
 }
 
-export function editableFieldsFor(
-  tournament: EditableTournament,
-  now: number = Date.now(),
-): ReadonlySet<TournamentField> {
-  switch (editWindowFor(tournament, now)) {
+/**
+ * Champs modifiables dans une fenêtre donnée.
+ *
+ * Séparé de `editableFieldsFor` parce que le client ne dispose pas toujours du
+ * tournoi : `GET /api/tournaments/[id]/edit` lui rend la **fenêtre** déjà
+ * calculée, sans l'état. Faute de cette porte, la page d'édition rejouait le
+ * `switch` en miniature — deux écritures de la même règle, dont une seule
+ * aurait suivi l'ajout d'une fenêtre.
+ */
+export function editableFieldsForWindow(window: EditWindow): ReadonlySet<TournamentField> {
+  switch (window) {
     case "FULL":
       return new Set(ALL_TOURNAMENT_FIELDS);
     case "RESTRICTED":
@@ -141,6 +137,13 @@ export function editableFieldsFor(
       // une erreur TypeScript plutôt qu'une logique silencieuse.
       return new Set();
   }
+}
+
+export function editableFieldsFor(
+  tournament: EditableTournament,
+  now: number = Date.now(),
+): ReadonlySet<TournamentField> {
+  return editableFieldsForWindow(editWindowFor(tournament, now));
 }
 
 export function isFieldEditable(

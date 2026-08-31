@@ -6,8 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
 import {
-  ALL_TOURNAMENT_FIELDS,
-  RESTRICTED_FIELDS,
+  editableFieldsForWindow,
   type EditWindow,
   type TournamentField,
 } from "@/lib/shared/tournament-edit";
@@ -138,8 +137,7 @@ export default function EditTournamentPage() {
     );
   }
 
-  const editableFields: ReadonlySet<TournamentField> =
-    loaded.window === "FULL" ? new Set(ALL_TOURNAMENT_FIELDS) : new Set(RESTRICTED_FIELDS);
+  const editableFields: ReadonlySet<TournamentField> = editableFieldsForWindow(loaded.window);
   const notice = editLockNotice(
     loaded.window === "FULL" ? null : "VISIBLE",
     loaded.startVisibilityAt,

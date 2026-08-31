@@ -17,7 +17,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const { id } = await context.params;
   const tournamentId = Number(id);
   if (!Number.isInteger(tournamentId) || tournamentId <= 0) {
-    return fail("INVALID_ID", 400);
+    return fail("INVALID_TOURNAMENT_ID", 400);
   }
 
   const body = (await req.json().catch(() => ({}))) as { teamId?: number };
