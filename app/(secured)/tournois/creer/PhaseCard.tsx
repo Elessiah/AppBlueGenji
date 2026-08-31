@@ -20,6 +20,47 @@ const HINT: CSSProperties = {
 const FULL_WIDTH: CSSProperties = { gridColumn: "1 / -1" };
 const GRID: CSSProperties = { gap: 16 };
 
+/**
+ * Le repli/dépli porte sur le seul intitulé de la phase : les flèches d'ordre et
+ * la suppression sont des boutons **frères**, jamais des descendants (un
+ * `<button>` dans un `<button>` est du HTML invalide — React le signale à
+ * l'hydratation, et lecteurs d'écran comme navigation clavier n'y distinguent
+ * plus les commandes). Le bouton n'a donc pas de style propre : il rend
+ * l'intitulé, et la ligne garde sa mise en page dans le conteneur.
+ */
+const TOGGLE: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  padding: 0,
+  margin: 0,
+  backgroundColor: "transparent",
+  border: "none",
+  font: "inherit",
+  color: "inherit",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+/** Chevron : un bouton dépouillé de tout style propre, pour ne rien peser. */
+const CHEVRON: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  padding: 0,
+  margin: 0,
+  backgroundColor: "transparent",
+  border: "none",
+  fontFamily: "inherit",
+  lineHeight: "inherit",
+  fontSize: 12,
+  color: "var(--ink-mute)",
+  flexShrink: 0,
+  cursor: "pointer",
+  transition: "transform 0.2s ease",
+};
+
 interface PhaseCardProps {
   phase: PhaseConfig;
   isLast: boolean;
@@ -51,6 +92,8 @@ export function PhaseCard({
   const canMoveUp = !disabled && phase.position > 1;
   const canMoveDown = !disabled && phase.position < totalPhases;
   const canRemove = !disabled && totalPhases > MIN_PHASES;
+  const bodyId = `phase-body-${phase.position}`;
+  const toggleId = `phase-toggle-${phase.position}`;
 
   return (
     <div
@@ -60,10 +103,8 @@ export function PhaseCard({
         overflow: "hidden",
       }}
     >
-      {/* Collapsed header */}
-      <button
-        type="button"
-        onClick={onToggleExpand}
+      {/* Collapsed header — conteneur non interactif : les commandes sont frères */}
+      <div
         style={{
           width: "100%",
           display: "flex",
@@ -71,64 +112,75 @@ export function PhaseCard({
           gap: 12,
           padding: "14px 16px",
           backgroundColor: isExpanded ? "rgba(90, 200, 255, 0.07)" : "transparent",
-          border: "none",
-          cursor: "pointer",
           transition: "background-color 0.2s ease",
         }}
       >
-        {/* Position badge */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 32,
-            height: 32,
-            backgroundColor: "var(--line-soft)",
-            borderRadius: 6,
-            fontSize: 14,
-            fontWeight: 600,
-            color: "var(--ink)",
-            flexShrink: 0,
-          }}
+        {/* Repli/dépli : porte le badge de position et l'intitulé de la phase */}
+        <button
+          type="button"
+          id={toggleId}
+          onClick={onToggleExpand}
+          aria-expanded={isExpanded}
+          aria-controls={bodyId}
+          style={TOGGLE}
         >
-          {phase.position}
-        </div>
-
-        {/* Name or format label + summary */}
-        <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
+          {/* Position badge */}
           <div
             style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 32,
+              height: 32,
+              backgroundColor: "var(--line-soft)",
+              borderRadius: 6,
               fontSize: 14,
-              fontWeight: 500,
+              fontWeight: 600,
               color: "var(--ink)",
-              marginBottom: 2,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+              flexShrink: 0,
             }}
           >
-            {phase.name || phaseFormatLabel(phase.format)}
+            {phase.position}
           </div>
-          <div
-            style={{
-              fontSize: 12,
-              color: "var(--ink-mute)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {phaseSummary(phase, isLast)}
-          </div>
-        </div>
 
-        {/* Last-phase badge */}
-        {isLast && (
-          <Pill variant="blue" style={{ flexShrink: 0 }}>
-            Phase finale
-          </Pill>
-        )}
+          {/* Name or format label + summary */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 500,
+                color: "var(--ink)",
+                marginBottom: 2,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {phase.name || phaseFormatLabel(phase.format)}
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: "var(--ink-mute)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {phaseSummary(phase, isLast)}
+            </div>
+          </div>
+
+          {/* Last-phase badge — une pastille est un `<span>`, elle tient dans le
+              bouton et reste donc cliquable comme avant. Repère visuel
+              seulement : `phaseSummary` dit déjà « — phase finale », inutile de
+              l'entendre deux fois dans le nom du bouton. */}
+          {isLast && (
+            <Pill variant="blue" aria-hidden="true" style={{ flexShrink: 0 }}>
+              Phase finale
+            </Pill>
+          )}
+        </button>
 
         {/* Controls */}
         <div
@@ -137,7 +189,6 @@ export function PhaseCard({
             gap: 6,
             flexShrink: 0,
           }}
-          onClick={(e) => e.stopPropagation()}
         >
           <button
             type="button"
@@ -239,31 +290,43 @@ export function PhaseCard({
           </button>
         </div>
 
-        {/* Chevron */}
-        <div
+        {/* Chevron — l'affordance conventionnelle du repli : elle doit rester
+            cliquable. Redondante avec le bouton d'intitulé, donc muette pour
+            l'assistance (`aria-hidden`) et hors du parcours clavier
+            (`tabIndex={-1}`) : le clavier passe par l'intitulé, qui porte déjà
+            `aria-expanded`. Le `mousedown` est neutralisé parce que
+            `tabIndex={-1}` ne retire que du parcours clavier : sans lui, un clic
+            poserait le focus **dans** ce sous-arbre `aria-hidden`, là où un
+            lecteur d'écran perd sa position. */}
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          onMouseDown={(e) => e.preventDefault()}
+          aria-hidden="true"
+          tabIndex={-1}
           style={{
-            display: "flex",
-            alignItems: "center",
-            fontSize: 12,
-            color: "var(--ink-mute)",
-            flexShrink: 0,
+            ...CHEVRON,
             transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
-            transition: "transform 0.2s ease",
           }}
         >
           ▼
-        </div>
-      </button>
+        </button>
+      </div>
 
-      {/* Expanded content */}
-      {isExpanded && (
-        <div
-          style={{
-            borderTop: "1px solid var(--line-soft)",
-            padding: "16px",
-            backgroundColor: "rgba(90, 200, 255, 0.03)",
-          }}
-        >
+      {/* Expanded content — la région existe toujours, pour que `aria-controls`
+          du bouton de repli désigne un élément réel même une fois replié. */}
+      <div
+        id={bodyId}
+        role="group"
+        aria-labelledby={toggleId}
+        hidden={!isExpanded}
+        style={{
+          borderTop: "1px solid var(--line-soft)",
+          padding: "16px",
+          backgroundColor: "rgba(90, 200, 255, 0.03)",
+        }}
+      >
+        {isExpanded && (
           <div className="form-grid" style={GRID}>
             {/* Phase name */}
             <div className="field">
@@ -509,8 +572,8 @@ export function PhaseCard({
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

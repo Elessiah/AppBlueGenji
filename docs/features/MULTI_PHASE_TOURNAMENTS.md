@@ -141,6 +141,19 @@ diverger.
   modulaire : cartes repliées par défaut (une seule dépliée), réordonnancement par
   boutons ↑/↓ étiquetés, ajout/suppression en un clic, et aperçu en direct du plan
   résolu contre l'effectif maximal annoncé.
+  L'en-tête d'une carte (`PhaseCard`) est un **conteneur non interactif** : le
+  repli/dépli est un bouton porté par le seul intitulé (`aria-expanded` +
+  `aria-controls` vers le corps `phase-body-<position>`, région toujours présente
+  dans le document pour que la référence désigne un élément réel), et les flèches
+  d'ordre comme la suppression sont ses **frères**. Un `<button>` englobant
+  aurait fait des trois commandes ses descendants — du HTML invalide, que React
+  signale à l'hydratation et où ni le clavier ni un lecteur d'écran ne
+  distinguent plus « déplier la phase » de « supprimer la phase ».
+  La zone cliquable, elle, ne se rétrécit pas pour autant : la pastille
+  « Phase finale » est un `<span>`, donc rendue **dans** le bouton, et le chevron
+  ▼ — l'affordance conventionnelle du repli — est un bouton jumeau, muet pour
+  l'assistance (`aria-hidden`) et hors du parcours clavier (`tabIndex={-1}`)
+  puisqu'il ne fait que redire l'intitulé.
 - **Détail** (`app/(secured)/tournois/[id]/`) — timeline horizontale des phases ;
   la phase sélectionnée pilote la vue affichée (survie, bracket ou suisse) et le
   **bouton flottant d'aide**, qui renvoie aux règles du mode réellement à l'écran
