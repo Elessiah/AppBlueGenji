@@ -138,6 +138,9 @@ describe("page de tournoi — ce que voit le lecteur", () => {
     expect(detailPage).toMatch(/const canReport = [\s\S]{0,80}if \(frozen\) return false;/);
     expect(detailPage).toMatch(/const canAdminResolve = [\s\S]{0,80}if \(frozen\) return false;/);
     expect(detailPage).toMatch(/canForfeit = [\s\S]{0,40}!frozen/);
+    // La plus destructrice des actions de la page suit la même règle : on ne
+    // supprime pas un tournoi depuis un plateau dont on sait qu'il est périmé.
+    expect(detailPage).toMatch(/detail\.canDelete && !frozen/);
   });
 
   it("dit au lecteur que la page se tient à jour seule", () => {

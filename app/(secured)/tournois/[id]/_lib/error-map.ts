@@ -51,6 +51,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   INVALID_MATCH_START_AT: "Date de début non reconnue.",
   MATCH_SCHEDULE_UPDATE_FAILED: "Erreur lors de la mise à jour de la date de début.",
   TOURNAMENT_LIVE_UPDATE_FAILED: "Erreur lors de la mise à jour de la chaîne officielle.",
+  // Suppression définitive (`docs/features/TOURNAMENT_DELETION.md`).
+  // `TOURNAMENT_NOT_FOUND` et `UNAUTHORIZED` sont déjà couverts plus haut.
+  TOURNAMENT_DELETE_FAILED: "Erreur lors de la suppression du tournoi.",
+  INVALID_TOURNAMENT_ID: "Identifiant de tournoi invalide.",
 };
 
 export function mapError(errorCode: string): string {
