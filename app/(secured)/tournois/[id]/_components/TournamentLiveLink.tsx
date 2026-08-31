@@ -90,7 +90,9 @@ export function TournamentLiveLink({
           flexWrap: "wrap",
           gap: 8,
           alignItems: "flex-start",
-          marginTop: 14,
+          // Prend toute la rangée d'actions de l'en-tête : un champ d'URL
+          // coincé entre deux boutons n'est plus saisissable.
+          flex: "1 1 100%",
         }}
       >
         <div style={{ minWidth: 240, flex: "1 1 240px" }}>
@@ -143,22 +145,14 @@ export function TournamentLiveLink({
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: 8,
-        alignItems: "center",
-        flexWrap: "wrap",
-        marginTop: 14,
-      }}
-    >
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
       {liveUrl && (
         <CyberButton variant="ghost" asChild>
           <a
             href={liveUrl}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ fontSize: 13, padding: "6px 16px" }}
+            style={{ fontSize: 13, padding: "8px 18px" }}
           >
             <span aria-hidden="true">▶</span>
             {platform ? `Chaîne officielle · ${PLATFORM_LABELS[platform]}` : "Chaîne officielle"}
@@ -166,14 +160,13 @@ export function TournamentLiveLink({
         </CyberButton>
       )}
       {canEdit && (
-        <button
-          type="button"
-          className="btn ghost"
+        <CyberButton
+          variant="ghost"
           onClick={openEditor}
-          style={{ padding: "6px 14px", fontSize: 12 }}
+          style={{ fontSize: 13, padding: "8px 18px" }}
         >
           {liveUrl ? "⚙ Modifier la chaîne" : "＋ Chaîne officielle"}
-        </button>
+        </CyberButton>
       )}
     </div>
   );

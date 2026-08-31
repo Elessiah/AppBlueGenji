@@ -7,24 +7,17 @@ import { formatLocalDateTime } from "@/lib/shared/dates";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
 import { entrantHref, participantWording } from "@/lib/shared/participants";
 import { useToast } from "@/components/ui/toast";
-import { Pill, CyberButton } from "@/components/cyber";
+import { CyberButton } from "@/components/cyber";
 import { useTournamentLive } from "./_hooks/useTournamentLive";
 import { mapError } from "./_lib/error-map";
-import {
-  checkMatchScores,
-  matchFormatLabel,
-  matchScoreViolationMessage,
-} from "@/lib/shared/match-format";
+import { checkMatchScores, matchScoreViolationMessage } from "@/lib/shared/match-format";
 import { MatchFormatProvider } from "./_lib/match-format-context";
 import { canForfeitTeam } from "./_lib/forfeit";
-import { canShowEditButton } from "./_lib/edit-entry";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { AdminScoreDialog } from "./_components/AdminScoreDialog";
-import { LiveIndicator } from "./_components/LiveIndicator";
 import { GhostRegistrationDialog } from "./_components/GhostRegistrationDialog";
 import { MatchLiveDialog } from "./_components/MatchLiveDialog";
 import { MatchScheduleDialog } from "./_components/MatchScheduleDialog";
-import { TournamentLiveLink } from "./_components/TournamentLiveLink";
 import { LiveProvider } from "./_lib/live-context";
 import { IssueReportProvider } from "./_lib/issue-report-context";
 import { IssueReportDialog } from "./_components/IssueReportDialog";
@@ -45,15 +38,7 @@ import { MatchRow } from "./_components/MatchRow";
 import { EntrantProvider } from "./_lib/entrant-link";
 import { TournamentProgress } from "./_components/TournamentProgress";
 import { DeleteTournamentDialog } from "./_components/DeleteTournamentDialog";
-
-const FORMAT_LABELS: Record<TournamentFormat, string> = {
-  SINGLE: "Simple élim.",
-  DOUBLE: "Double élim.",
-  SWISS: "Ronde suisse",
-  SURVIVAL: "Survie",
-  MULTI: "Multi-phases",
-  BG_SURVIE: "BlueGenji Survie",
-};
+import { TournamentHeader } from "./_components/TournamentHeader";
 
 /** « Arbre » ne veut rien dire dans les formats à classement, qui n'en ont pas. */
 const BOARD_TITLES: Record<TournamentFormat, string> = {
@@ -63,13 +48,6 @@ const BOARD_TITLES: Record<TournamentFormat, string> = {
   SURVIVAL: "Classement et rounds",
   MULTI: "Phases du tournoi",
   BG_SURVIE: "Endurance et manches",
-};
-
-const STATE_META: Record<string, { label: string; chipClass: string }> = {
-  UPCOMING: { label: "Prochainement", chipClass: "teal" },
-  REGISTRATION: { label: "Inscriptions", chipClass: "green" },
-  RUNNING: { label: "En cours", chipClass: "lime" },
-  FINISHED: { label: "Terminé", chipClass: "muted" },
 };
 
 export default function TournamentDetailPage() {
@@ -313,8 +291,6 @@ export default function TournamentDetailPage() {
     }
   };
 
-  const stateMeta = STATE_META[detail.card.state] ?? { label: detail.card.state, chipClass: "muted" };
-
   const isMulti = detail.card.format === "MULTI";
   const selectedPhase =
     isMulti && selectedPhaseId && detail.phases
@@ -405,122 +381,18 @@ export default function TournamentDetailPage() {
       >
       <RulesHelpFab format={visibleFormat} contextLabel={contextLabel} />
       <section className="fade-in">
-        <div className="ds-header green">
-          <div className="ds-header-body">
-            <button
-              onClick={() => router.back()}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                background: "none",
-                border: "none",
-                color: "rgba(79,224,162,0.7)",
-                cursor: "pointer",
-                fontSize: 14,
-                marginBottom: 12,
-                padding: 0,
-                fontWeight: 500,
-                transition: "color 0.2s",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(79,224,162,1)")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(79,224,162,0.7)")}
-            >
-              ← Retour
-            </button>
-            <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-              <h1 className="ds-title green" style={{ fontSize: "clamp(26px, 3vw, 42px)", marginBottom: 8 }}>
-                {detail.card.name}
-              </h1>
-              {canShowEditButton(detail.card, detail.isAdmin) && (
-                <CyberButton asChild variant="ghost" style={{ fontSize: 13, padding: "6px 16px" }}>
-                  <Link href={`/tournois/${detail.card.id}/modifier`}>Modifier</Link>
-                </CyberButton>
-              )}
-            </div>
-            {detail.card.description && (
-              <p style={{ color: "var(--text-1)", margin: "0 0 20px", fontSize: 15, lineHeight: 1.6 }}>
-                {detail.card.description}
-              </p>
-            )}
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              {/* Dit que la page se tient à jour seule : sans ce repère, on
-                  recharge par précaution même quand tout arrive tout seul. */}
-              <LiveIndicator isLive={isLive} tier={tier} fatal={fatal} />
-              <Pill variant="blue">{detail.card.game}</Pill>
-              <Pill variant={detail.card.state === "RUNNING" ? "live" : "blue"}>
-                {stateMeta.label}
-              </Pill>
-              <Pill variant="blue">
-                {detail.card.format === "SINGLE"
-                  ? "Simple élim."
-                  : detail.card.format === "SURVIVAL"
-                    ? "Survie"
-                    : detail.card.format === "SWISS"
-                      ? "Suisse"
-                      : detail.card.format === "MULTI"
-                        ? "Multi-phases"
-                        : "Double élim."}
-              </Pill>
-              {detail.card.format === "MULTI" && detail.card.state === "RUNNING" && detail.phases && (
-                <Pill variant="blue">
-                  Phase {detail.phases.findIndex((p) => p.id === detail.currentPhaseId) + 1}/{detail.phases.length}
-                </Pill>
-              )}
-              <Pill variant="blue">{FORMAT_LABELS[detail.card.format]}</Pill>
-              {wording.badge && <Pill variant="blue">{wording.badge}</Pill>}
-              {detail.card.matchFormat && (
-                <Pill variant="blue">{matchFormatLabel(detail.card.matchFormat)}</Pill>
-              )}
-              {detail.card.hasThirdPlaceMatch && (
-                <Pill variant="blue">Petite finale</Pill>
-              )}
-              <Pill variant="blue">{detail.card.registeredTeams}/{detail.card.maxTeams}</Pill>
-              {detail.isAdmin && !frozen && (
-                <Pill variant="blue">⚙ Admin</Pill>
-              )}
-              {detail.canRegister && !frozen && (
-                <CyberButton
-                  variant="primary"
-                  onClick={registerTeam}
-                  style={{ fontSize: 13, padding: "6px 16px" }}
-                >
-                  {wording.registerCta}
-                </CyberButton>
-              )}
-              {/* Signalement : ouvert aux seuls engagés, à toute heure du
-                  tournoi — un problème d'inscription se signale avant le coup
-                  d'envoi comme un litige de score se signale après. */}
-              {detail.myTeamId !== null && (
-                <CyberButton
-                  variant="ghost"
-                  onClick={() => openIssueReport(null)}
-                  style={{ fontSize: 13, padding: "6px 16px" }}
-                >
-                  ⚠ Signaler un problème
-                </CyberButton>
-              )}
-              {detail.isAdmin && !frozen && detail.card.state === "REGISTRATION" && (
-                <CyberButton
-                  variant="ghost"
-                  onClick={() => setGhostRegistrationOpen(true)}
-                  style={{ fontSize: 13, padding: "6px 16px" }}
-                >
-                  {wording.guestCta}
-                </CyberButton>
-              )}
-            </div>
-
-            {/* Chaîne officielle : antenne permanente du tournoi, distincte de
-                l'état « en direct » qui, lui, se joue au niveau des matchs. */}
-            <TournamentLiveLink
-              tournamentId={tournamentId}
-              liveUrl={detail.card.liveUrl}
-              canEdit={detail.isAdmin}
-              onSaved={() => void refresh()}
-            />
-          </div>
-        </div>
+        <TournamentHeader
+          detail={detail}
+          isLive={isLive}
+          tier={tier}
+          fatal={fatal}
+          frozen={frozen}
+          onBack={() => router.back()}
+          onRegister={registerTeam}
+          onReportIssue={() => openIssueReport(null)}
+          onGuestRegister={() => setGhostRegistrationOpen(true)}
+          onLiveSaved={() => void refresh()}
+        />
 
         <div className="ds-block" style={{ marginBottom: 20 }}>
           {isMulti && detail.phases && (
