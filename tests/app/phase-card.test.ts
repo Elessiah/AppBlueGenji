@@ -81,6 +81,14 @@ describe("PhaseCard — en-tête d'une phase", () => {
     );
   });
 
+  it("nomme le corps par son bouton et tait le chevron décoratif", () => {
+    expect(code).toContain("const toggleId = `phase-toggle-${phase.position}`");
+    expect(code).toContain("aria-labelledby={toggleId}");
+    // Le chevron redit `aria-expanded` : il n'a rien à annoncer de plus.
+    const chevron = code.slice(code.lastIndexOf("aria-hidden=\"true\""));
+    expect(chevron).toContain("▼");
+  });
+
   it("garde les commandes d'ordre et de suppression étiquetées et bornées", () => {
     expect(code).toContain("const canMoveUp = !disabled && phase.position > 1;");
     expect(code).toContain(

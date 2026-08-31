@@ -76,6 +76,7 @@ export function PhaseCard({
   const canMoveDown = !disabled && phase.position < totalPhases;
   const canRemove = !disabled && totalPhases > MIN_PHASES;
   const bodyId = `phase-body-${phase.position}`;
+  const toggleId = `phase-toggle-${phase.position}`;
 
   return (
     <div
@@ -100,6 +101,7 @@ export function PhaseCard({
         {/* Repli/dépli : porte le badge de position et l'intitulé de la phase */}
         <button
           type="button"
+          id={toggleId}
           onClick={onToggleExpand}
           aria-expanded={isExpanded}
           aria-controls={bodyId}
@@ -268,8 +270,9 @@ export function PhaseCard({
           </button>
         </div>
 
-        {/* Chevron */}
+        {/* Chevron — redondant avec `aria-expanded`, donc muet pour l'assistance */}
         <div
+          aria-hidden="true"
           style={{
             display: "flex",
             alignItems: "center",
@@ -288,6 +291,8 @@ export function PhaseCard({
           du bouton de repli désigne un élément réel même une fois replié. */}
       <div
         id={bodyId}
+        role="group"
+        aria-labelledby={toggleId}
         hidden={!isExpanded}
         style={{
           borderTop: "1px solid var(--line-soft)",
