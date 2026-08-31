@@ -157,19 +157,25 @@ describe("en-tête de tournoi — faits affichés", () => {
       "phase",
     );
 
-    const running = headerMetaItems(card({ format: "MULTI" }), phases, 11, NOW);
+    const running = headerMetaItems(card({ format: "MULTI", state: "RUNNING" }), phases, 11, NOW);
     expect(find(running, "phase")?.value).toBe("2/3");
+
+    // `current_phase_id` n'est pas remis à zéro à la clôture : sans garde
+    // d'état, un multi-phases terminé afficherait « Phase en cours 3/3 ».
+    expect(
+      keys(headerMetaItems(card({ format: "MULTI", state: "FINISHED" }), phases, 12, NOW)),
+    ).not.toContain("phase");
 
     // Phase inconnue (plateau régénéré entre deux instantanés) : rien plutôt
     // qu'un « 0/3 » faux.
-    expect(keys(headerMetaItems(card({ format: "MULTI" }), phases, 99, NOW))).not.toContain(
-      "phase",
-    );
+    expect(
+      keys(headerMetaItems(card({ format: "MULTI", state: "RUNNING" }), phases, 99, NOW)),
+    ).not.toContain("phase");
 
     // Le repère n'a de sens qu'en multi-phases.
-    expect(keys(headerMetaItems(card({ format: "SWISS" }), phases, 11, NOW))).not.toContain(
-      "phase",
-    );
+    expect(
+      keys(headerMetaItems(card({ format: "SWISS", state: "RUNNING" }), phases, 11, NOW)),
+    ).not.toContain("phase");
   });
 
   it("nomme l'effectif selon le type de participant et en donne le remplissage", () => {

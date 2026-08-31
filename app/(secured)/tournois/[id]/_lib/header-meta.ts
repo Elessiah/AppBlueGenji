@@ -95,9 +95,17 @@ export function headerMetaItems(
     kind: "text",
   });
 
-  // Repère utile seulement quand il y a une phase courante à situer : avant le
-  // coup d'envoi, « Phase 0/3 » ne dirait rien.
-  if (card.format === "MULTI" && phases && phases.length > 0 && currentPhaseId !== null) {
+  // Repère utile seulement pendant que le tournoi tourne : avant le coup
+  // d'envoi, « Phase 0/3 » ne dirait rien, et `current_phase_id` **n'est pas
+  // remis à zéro à la clôture** — sans la garde d'état, un multi-phases terminé
+  // afficherait pour toujours « Phase en cours 3/3 ».
+  if (
+    card.format === "MULTI" &&
+    card.state === "RUNNING" &&
+    phases &&
+    phases.length > 0 &&
+    currentPhaseId !== null
+  ) {
     const index = phases.findIndex((phase) => phase.id === currentPhaseId);
     if (index >= 0) {
       items.push({
