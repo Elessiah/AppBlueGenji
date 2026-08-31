@@ -1,0 +1,8 @@
+# ERREUR.txt — erreurs rencontrées mais non réglées (préexistantes / hors périmètre)
+#
+# Format d'une entrée :
+#   - [AAAA-MM-JJ] <fichier:ligne ou zone> — <symptôme observé> — <cause supposée / piste> — (rencontré sur : <branche ou PR>)
+#
+# Ajouter à la fin. Vérifier l'absence de doublon avant d'ajouter.
+# Retirer l'entrée dans le commit qui règle l'erreur.
+

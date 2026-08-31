@@ -223,6 +223,16 @@ Règle universelle : via `useToast()` (`@/components/ui/toast`), bottom-left ove
 - Le CI GitHub Actions (`.github/workflows/ci.yml`) vérifie à chaque PR : lint → build → tests (dans cet ordre, enchaînés via `needs:`).
 - Ne pas merger si le CI est rouge.
 
+### Erreurs préexistantes (`ERREUR.txt`)
+- Toute erreur rencontrée mais **non réglée parce qu'elle préexiste** à la tâche en cours (bug déjà présent sur `main`, hors périmètre de la feature) doit être consignée dans `ERREUR.txt`, à la racine du dépôt, pour être traitée plus tard.
+- Ne jamais élargir silencieusement le périmètre d'une tâche pour corriger un problème préexistant : le noter dans `ERREUR.txt`, le signaler dans le résumé de fin, puis poursuivre.
+- Une entrée par erreur, ajoutée à la fin du fichier, au format :
+  ```
+  - [AAAA-MM-JJ] <fichier:ligne ou zone> — <symptôme observé> — <cause supposée / piste> — (rencontré sur : <branche ou PR>)
+  ```
+- Avant d'ajouter une entrée, vérifier qu'elle n'y figure pas déjà ; le cas échéant, compléter l'entrée existante plutôt que d'en créer une seconde.
+- Retirer l'entrée du fichier dans le commit qui règle enfin l'erreur.
+
 ### Gestion de la complexité
 - Pour toute demande importante (≥ 2 features liées, refactoring architectural, intégration d'un nouveau service externe, ou tâche estimée > ~2h), utiliser le skill `/OpusLocalManager` pour planifier et orchestrer le travail.
 
