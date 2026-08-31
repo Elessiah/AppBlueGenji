@@ -177,7 +177,15 @@ function MetaCell({ item }: { item: HeaderMetaItem }) {
       <dt className={s.metaLabel}>{item.label}</dt>
       <dd className={`${s.metaValue} ${isNumeric ? s.metaValueNum : ""}`} style={{ margin: 0 }}>
         {item.hint ? (
-          <span className={s.metaHint} title={item.hint}>
+          // `title` seul se perd au clavier et pour les lecteurs d'écran : le
+          // repère est donc aussi focusable, et son nom accessible porte
+          // l'explication en plus de la notation.
+          <span
+            className={s.metaHint}
+            title={item.hint}
+            tabIndex={0}
+            aria-label={`${item.value} — ${item.hint}`}
+          >
             {text}
           </span>
         ) : (

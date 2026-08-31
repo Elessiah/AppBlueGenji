@@ -43,6 +43,12 @@
   border-radius: 6px;
 }
 
+.metaHint:focus-visible {
+  outline: 2px solid rgba(90, 200, 255, 0.6);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
 /* Témoin de flux et rôle du lecteur : ce qui parle de *qui regarde*, tenu à
    l'écart des faits du tournoi — « À jour » au milieu des tags se lisait comme
    une propriété du tournoi. */
@@ -236,5 +242,18 @@
 
   .actions > * {
     flex: 1 1 auto;
+  }
+}
+
+/* Le survol de la flèche de retour et le remplissage de la jauge sont des
+   agréments : ils s'effacent pour qui demande moins de mouvement. */
+@media (prefers-reduced-motion: reduce) {
+  .back,
+  .gaugeFill {
+    transition: none;
+  }
+
+  .back:hover {
+    gap: 8px;
   }
 }
