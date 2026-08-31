@@ -4,7 +4,6 @@ import type {
   BotKpis,
   BotServersPayload,
   BotActivity,
-  BotModuleKey,
   BotModulesPayload,
   SiteVisitStats,
 } from "@/lib/shared/types";
@@ -519,38 +518,3 @@ export async function fetchBotModules(guildId: string): Promise<BotModulesPayloa
   }
 }
 
-export async function toggleBotModule(
-  guildId: string,
-  moduleKey: BotModuleKey,
-  enabled: boolean
-): Promise<{ ok: boolean }> {
-  if (isCircuitOpen()) {
-    return { ok: false };
-  }
-
-  const baseUrl = resolveBotInternalUrl();
-
-  try {
-    const response = await fetch(`${baseUrl}/internal/servers/${guildId}/modules/${moduleKey}`, {
-      method: "PUT",
-      headers: {
-        "content-type": "application/json",
-        ...getInternalHeaders(),
-      },
-      body: JSON.stringify({ enabled }),
-      cache: "no-store",
-      signal: AbortSignal.timeout(BOT_FETCH_TIMEOUT_MS),
-    });
-
-    if (!response.ok) {
-      recordFailure();
-      return { ok: false };
-    }
-
-    recordSuccess();
-    return { ok: true };
-  } catch {
-    recordFailure();
-    return { ok: false };
-  }
-}

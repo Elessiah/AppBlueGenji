@@ -644,10 +644,6 @@ export async function getUserActiveTeam(userId: number): Promise<{ teamId: numbe
   };
 }
 
-export async function isTeamOwner(userId: number, teamId: number): Promise<boolean> {
-  return userOwnsTeam(teamId, userId);
-}
-
 export async function transferTeamOwnership(
   requesterId: number,
   teamId: number,

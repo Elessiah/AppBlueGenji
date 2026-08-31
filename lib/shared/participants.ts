@@ -15,8 +15,6 @@
 
 export type ParticipantType = "TEAM" | "SOLO";
 
-export const PARTICIPANT_TYPES: readonly ParticipantType[] = ["TEAM", "SOLO"] as const;
-
 export function isParticipantType(value: unknown): value is ParticipantType {
   return value === "TEAM" || value === "SOLO";
 }

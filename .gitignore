@@ -31,7 +31,6 @@ Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
-next-env.d.ts
 
 # Coverage
 /coverage
@@ -60,11 +59,6 @@ next-env.d.ts
 # Local Next.js telemetry cache
 .next/cache
 
-# Optional: lock files (à garder normalement)
-package-lock.json
-# yarn.lock
-# pnpm-lock.yaml
-
 # Design handoff (temporary reference files)
 .design-handoff/
 
@@ -79,3 +73,7 @@ package-lock.json
 
 # Revue de code (scripts jetables)
 .review/
+
+# Claude Code — état local, jamais versionné
+.claude/worktrees/
+.claude/settings.local.json
