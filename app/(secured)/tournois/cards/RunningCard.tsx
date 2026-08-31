@@ -26,7 +26,7 @@ export function RunningCard({ t }: RunningCardProps) {
       <article className={s.card} data-state="live" style={{ gridColumn: "span 2" }}>
         <div className={`${s.cardRibbon} ${s.cardRibbonLive}`}>
           <span className={s.dot} />
-          LIVE
+          EN COURS
         </div>
 
         <div className={s.cardHead}>
@@ -64,7 +64,7 @@ export function RunningCard({ t }: RunningCardProps) {
         <div className={s.cardFoot}>
           <div style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--red-live)" }}>
             <div style={{ fontSize: "9px", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--ink-mute)", marginBottom: "2px" }}>Statut</div>
-            <div style={{ fontSize: "13px", color: "var(--ink)" }}>LIVE</div>
+            <div style={{ fontSize: "13px", color: "var(--ink)" }}>En cours</div>
           </div>
           <span className={`${s.cardCta}`}>
             Voir bracket

@@ -11,7 +11,7 @@ import type { LiveFailure } from "../_lib/live-state";
  */
 const FATAL_TITLES: Record<LiveFailure, string> = {
   UNAUTHORIZED:
-    "Ta session a expiré : le suivi en direct est arrêté. Reconnecte-toi pour le reprendre.",
+    "Ta session a expiré : la mise à jour automatique est arrêtée. Reconnecte-toi pour la reprendre.",
   TOURNAMENT_NOT_FOUND: "Ce tournoi n'existe plus : il n'y a plus rien à suivre.",
 };
 
@@ -40,6 +40,13 @@ function cadenceLabel(tier: RefreshTier): string {
  * texte annonce donc la cadence réelle du palier accordé, et l'état de repli
  * quand le flux est coupé plutôt qu'un silence qui laisserait douter.
  *
+ * Ni « Direct » ni la pastille rouge : le témoin ne parle que de la **connexion
+ * au flux SSE**, jamais d'une diffusion ni de l'état du tournoi. Il s'allume sur
+ * toute page de tournoi, y compris un tournoi sans chaîne et sans match — le
+ * voir dire « ● Direct » à côté du tag d'état « En cours » faisait croire à un
+ * stream inexistant. Le rouge de `pill-live` reste réservé à ce qui est
+ * réellement à l'antenne.
+ *
  * `role="status"` + `aria-live="polite"` : le changement d'état est annoncé aux
  * lecteurs d'écran sans interrompre la lecture en cours. Le nom accessible
  * reste le texte visible — court, puisqu'il est relu à chaque bascule ; un
@@ -47,16 +54,16 @@ function cadenceLabel(tier: RefreshTier): string {
  * la moindre coupure réseau. L'explication vit dans `title`.
  */
 export function LiveIndicator({ isLive, tier, fatal = null }: LiveIndicatorProps) {
-  const label = fatal ? "Hors ligne" : isLive ? "Direct" : "Reconnexion…";
+  const label = fatal ? "Hors ligne" : isLive ? "À jour" : "Reconnexion…";
   const title = fatal
     ? FATAL_TITLES[fatal]
     : isLive
       ? `Mise à jour automatique ${cadenceLabel(tier)}. Inutile de recharger la page.`
-      : "Connexion au direct interrompue. La page se reconnecte seule et continue de se mettre à jour, plus lentement.";
+      : "Connexion au flux temps réel interrompue. La page se reconnecte seule et continue de se mettre à jour, plus lentement.";
 
   return (
     <Pill
-      variant={isLive ? "live" : "default"}
+      variant={isLive ? "blue" : "default"}
       role="status"
       aria-live="polite"
       title={title}
