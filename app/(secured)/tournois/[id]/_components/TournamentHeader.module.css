@@ -231,6 +231,13 @@
   flex-wrap: wrap;
 }
 
+/* Un spectateur non engagé sur un tournoi lancé n'a aucune action : sans ceci,
+   la rangée vide laisserait quand même l'espacement du `gap` en bas de
+   l'en-tête. */
+.actions:empty {
+  display: none;
+}
+
 @media (max-width: 640px) {
   .shell {
     gap: 18px;
