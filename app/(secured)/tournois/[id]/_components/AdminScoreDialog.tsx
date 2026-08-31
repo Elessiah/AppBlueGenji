@@ -190,8 +190,13 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
             <strong>{matchFormatLabel(matchFormat)}</strong> — {matchFormatDescription(matchFormat)}
           </p>
 
+          {/* `role="status"` : le résultat enregistré peut changer sous les yeux
+              du lecteur (le flux apporte la saisie d'un autre arbitre), et le
+              changement doit s'entendre autant qu'il se voit. */}
           {stored && (
-            <p className={`${styles.notice} ${styles.noticeInfo}`}>{stored}</p>
+            <p className={`${styles.notice} ${styles.noticeInfo}`} role="status">
+              {stored}
+            </p>
           )}
 
           {form.conflict && (

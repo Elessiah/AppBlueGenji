@@ -100,6 +100,12 @@
   cursor: pointer;
 }
 
+.noticeAction:focus-visible {
+  outline: 2px solid var(--blue-400, #5ac8ff);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
 .noticeAction:disabled {
   cursor: not-allowed;
   opacity: 0.6;
@@ -156,6 +162,11 @@
 
 .step:hover:not(:disabled) {
   background: rgba(90, 200, 255, 0.24);
+}
+
+.step:focus-visible {
+  outline: 2px solid var(--blue-400, #5ac8ff);
+  outline-offset: 2px;
 }
 
 .step:disabled {
@@ -245,6 +256,11 @@
   color: rgba(255, 157, 46, 1);
 }
 
+.forfeit:focus-visible {
+  outline: 2px solid rgba(255, 157, 46, 0.9);
+  outline-offset: 2px;
+}
+
 .forfeit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -263,6 +279,11 @@
 .actions .btn {
   padding: 9px 18px;
   font-size: 13px;
+}
+
+.actions .btn:focus-visible {
+  outline: 2px solid var(--blue-400, #5ac8ff);
+  outline-offset: 2px;
 }
 
 /* `.btn` global n'a pas d'état désactivé : sans ça, « Valider le résultat »
@@ -287,4 +308,14 @@
   line-height: 1.5;
   text-align: right;
   color: var(--text-2, #9aa4b2);
+}
+
+/* Les pas de score et les états de bouton s'animent : on les fige pour qui
+   demande moins de mouvement. */
+@media (prefers-reduced-motion: reduce) {
+  .step,
+  .forfeit,
+  .actions .btn {
+    transition: none;
+  }
 }
