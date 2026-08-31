@@ -17,6 +17,7 @@ import { getDatabase } from "@/lib/server/database";
 import { isValidSeedOrder, seedingLockReason, type SeedingEntry, type SeedingLockReason } from "@/lib/shared/seeding";
 import type { MatchScoreState } from "@/lib/shared/match-lock";
 import { loadTournamentRow, getMatchRows, deleteAllMatches, resetRegistrationRanks } from "./repository";
+import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { publishUpdatedEvent } from "./notifications";
 
 export type SeedingBoard = {
@@ -134,11 +135,19 @@ export async function reorderSeeding(tournamentId: number, orderedTeamIds: numbe
     }
 
     await connection.commit();
+    // Réordonner un tournoi déjà démarré rejoue son orchestration, qui peut le
+    // clore (un plan multi-phases entièrement sauté) et donc réserver une ligne
+    // de journal. Sans ce couple flush/discard, l'entrée resterait accrochée à
+    // la connexion — que le pool réattribue — et partirait au nom d'une requête
+    // sans rapport, voire après un `rollback`.
+    flushBotLogs(connection);
+
     publishUpdatedEvent(tournamentId);
   } catch (error) {
     await connection.rollback();
     throw error;
   } finally {
+    discardBotLogs(connection);
     connection.release();
   }
 }

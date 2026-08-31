@@ -83,6 +83,15 @@ connexion ; seul le commit la convertit en message (`flushBotLogs`), l'échec la
 jetant avec le reste (`discardBotLogs`, appelé dans le `finally` de chaque
 transaction concernée).
 
+Les deux appels vont **toujours par paire**, et le `discard` n'est pas
+décoratif : mysql2 réattribue l'objet `PoolConnection`. Une transaction qui
+réserve une ligne sans la vider ni la jeter la laisse accrochée à cette
+connexion, où la prochaine transaction qui flushe l'émettra — au nom d'une
+requête sans rapport, et même si la première avait fini par `rollback`. Toute
+transaction pouvant atteindre un point de réservation doit donc porter la paire,
+`reorderSeeding` compris (réordonner un tournoi démarré rejoue son
+orchestration, qui peut le clore).
+
 ```ts
 try {
   await connection.beginTransaction();
