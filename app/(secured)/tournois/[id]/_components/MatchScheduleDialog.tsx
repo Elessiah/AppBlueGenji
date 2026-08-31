@@ -30,17 +30,25 @@ interface MatchScheduleDialogProps {
 export function MatchScheduleDialog({ match, onClose, onSaved }: MatchScheduleDialogProps) {
   const { showError, showSuccess } = useToast();
   const [startAt, setStartAt] = useState(() => matchStartAtInputValue(match.startAt));
+  // Saisie commencée mais incomplète (« 01/09/____ __:__ »). Le champ
+  // `datetime-local` rend alors `value === ""` — indiscernable d'un champ vidé —
+  // tout en refusant la soumission par la validation native. Sans cet état, le
+  // bouton « Enregistrer » ne ferait donc rien, sans un mot d'explication.
+  const [incomplete, setIncomplete] = useState(false);
   const [busy, setBusy] = useState(false);
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
 
   const touched = startAt.trim().length > 0;
-  const invalid = touched && !isValidMatchStartAt(startAt);
+  const invalid = incomplete || (touched && !isValidMatchStartAt(startAt));
   // Effacer la date d'un match casté « à la date de début » ne casse rien, mais
   // le laisse programmé sans jamais passer à l'antenne : on le dit plutôt que
   // de refuser l'effacement — le calendrier ne dépend pas de la diffusion.
-  const clearsLiveTrigger = !touched && requiresMatchStartAt(match.liveTrigger);
+  // Une saisie seulement incomplète n'est pas un effacement : on n'avertit pas
+  // encore, l'utilisateur est en train de taper.
+  const clearsLiveTrigger =
+    !touched && !incomplete && requiresMatchStartAt(match.liveTrigger);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -113,7 +121,10 @@ export function MatchScheduleDialog({ match, onClose, onSaved }: MatchScheduleDi
               id="match-start-at"
               type="datetime-local"
               value={startAt}
-              onChange={(e) => setStartAt(e.target.value)}
+              onChange={(e) => {
+                setStartAt(e.target.value);
+                setIncomplete(e.target.validity.badInput);
+              }}
               aria-invalid={invalid}
               aria-describedby="match-start-at-hint"
             />
@@ -125,9 +136,11 @@ export function MatchScheduleDialog({ match, onClose, onSaved }: MatchScheduleDi
                 color: invalid ? "rgba(255,74,92,0.95)" : "var(--text-2, #9aa4b2)",
               }}
             >
-              {invalid
-                ? "Date non reconnue."
-                : "Laisser vide pour ne pas annoncer d'horaire. La date est indicative : elle ne lance pas le match."}
+              {incomplete
+                ? "Date incomplète : renseigne le jour et l'heure, ou efface tout le champ pour ne pas annoncer d'horaire."
+                : invalid
+                  ? "Date non reconnue."
+                  : "Laisser vide pour ne pas annoncer d'horaire. La date est indicative : elle ne lance pas le match."}
             </p>
           </div>
 
