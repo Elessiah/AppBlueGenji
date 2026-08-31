@@ -166,8 +166,9 @@ export async function finalizeUnderfilledTournament(
     );
   }
 
-  // `bracket_size` reçoit l'effectif retenu, comme pour un plateau généré : une
-  // colonne laissée à NULL redemanderait une synchronisation à chaque lecture.
+  // `bracket_size` reçoit l'effectif retenu : même écriture, mêmes colonnes que
+  // la clôture d'un plateau vide dans `createBracketIfMissing`, pour qu'un
+  // tournoi clos porte toujours la taille de son plateau plutôt qu'un NULL.
   await connection.execute(
     `UPDATE bg_tournaments
      SET state = 'FINISHED', finished_at = NOW(), bracket_size = ?

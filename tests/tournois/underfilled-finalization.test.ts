@@ -44,8 +44,9 @@ describe("finalizeUnderfilledTournament", () => {
     expect(writes()[0].sql).toContain("SET final_rank = 1");
     expect(writes()[0].params).toEqual([42, 9]);
     expect(writes()[1].sql).toContain("state = 'FINISHED'");
-    // `bracket_size` reçoit l'effectif retenu : laissé à NULL, il redemanderait
-    // une synchronisation à chaque lecture.
+    // `bracket_size` reçoit l'effectif retenu, comme la clôture d'un plateau
+    // vide dans `createBracketIfMissing` : un tournoi clos porte la taille de
+    // son plateau, jamais un NULL.
     expect(writes()[1].params).toEqual([1, 42]);
   });
 

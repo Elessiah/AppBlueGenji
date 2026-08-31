@@ -23,9 +23,10 @@ présents et à venir.
 `finalizeUnderfilledTournament` (`lib/server/tournaments/finalization.ts`) compte
 les inscriptions (`LIMIT 2` : seul « moins de deux » nous intéresse), pose
 `final_rank = 1` sur l'unique engagée le cas échéant, puis écrit `state =
-'FINISHED'`, `finished_at = NOW()` et `bracket_size` = l'effectif retenu — une
-taille laissée à `NULL` redemanderait une synchronisation à chaque lecture
-(`loadMaintainedRow`).
+'FINISHED'`, `finished_at = NOW()` et `bracket_size` = l'effectif retenu — mêmes
+colonnes, même statement que la clôture d'un plateau vide dans
+`createBracketIfMissing`, pour qu'un tournoi clos porte la taille de son plateau
+plutôt qu'un `NULL`.
 
 `syncTournamentState` (`lib/server/tournaments/state.ts`) l'appelle **avant toute
 initialisation de format** : aucun moteur ne sème de classement, de manche ou de
@@ -57,9 +58,10 @@ qui attend encore son plateau.
 ## À savoir
 
 - La branche `registeredTeamIds.length <= 1` de `createBracketIfMissing` reste en
-  place : elle sert encore de garde-fou pour un plateau construit hors
-  synchronisation, et son cas `phaseId > 0` (une **phase** dégénérée, qui ne clôt
-  jamais le tournoi elle-même) n'est pas concerné par cette règle.
+  place pour son cas `phaseId > 0` — une **phase** dégénérée, qui ne clôt jamais
+  le tournoi elle-même et que cette règle ne couvre donc pas — et parce que le
+  service est exporté publiquement. En `phaseId = 0`, la synchronisation passe
+  désormais toujours avant elle.
 - Un tournoi multi-phases sous-rempli **au niveau du tournoi** est clos ici ;
   sauter une *phase* trop petite reste l'affaire de `resolvePhasePlan`
   ([MULTI_PHASE_TOURNAMENTS](MULTI_PHASE_TOURNAMENTS.md)).
