@@ -40,10 +40,16 @@ La décision est un module **pur**, `lib/shared/tournament-visibility.ts` :
 
 Côté serveur, elle est posée à un seul endroit : `getVisibleTournamentSnapshot`
 (`lib/server/tournaments/index.ts`), **unique porte** vers l'instantané en dehors
-du module. `getTournamentSnapshot`, qui ignore la visibilité, n'est plus
-réexporté ni par `tournaments/index.ts` ni par `tournaments-service.ts` — une
-route ne peut donc plus l'atteindre par distraction. Même précaution que pour
-`getTournamentPreview`, réservé de la même façon.
+du module. Ni `getTournamentSnapshot` ni `getTournamentSnapshotFrame` — qui porte
+le même instantané, déjà encodé — ne sont réexportés, ni par `tournaments/index.ts`
+ni par `tournaments-service.ts` : une route ne peut donc plus les atteindre par
+distraction. Même précaution que pour `getTournamentPreview`, réservé de la même
+façon.
+
+La salle de diffusion (`lib/server/tournament-broadcast.ts`) est la seule à avoir
+besoin de la trame, et l'importe directement de `./snapshot`. Elle n'a pas à
+refaire le contrôle : elle ne sert que des abonnés que la route du flux a déjà
+laissés passer.
 
 Les deux portes de lecture y passent :
 

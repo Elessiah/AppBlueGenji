@@ -76,16 +76,17 @@ export { invalidateTournamentPreview } from "./preview-cache";
 
 // Instantané partagé (voir ./snapshot)
 //
-// `getTournamentSnapshot` n'est **délibérément pas** réexporté : il ne consulte
-// pas `start_visibility_at`, et une route qui l'appellerait servirait un tournoi
-// non publié à qui devine son identifiant. Le seul chemin offert au dehors est
-// `getVisibleTournamentSnapshot` (plus bas), qui exige les droits du lecteur —
-// même précaution que pour `getTournamentPreview` ci-dessus.
-export {
-  getTournamentSnapshotFrame,
-  invalidateTournamentSnapshot,
-  SNAPSHOT_TTL_MS,
-} from "./snapshot";
+// Ni `getTournamentSnapshot` ni `getTournamentSnapshotFrame` ne sont réexportés,
+// **délibérément** : aucun des deux ne consulte `start_visibility_at`, et la
+// trame contient l'instantané entier. Une route qui les appellerait servirait
+// un tournoi non publié à qui devine son identifiant. Le seul chemin offert au
+// dehors est `getVisibleTournamentSnapshot` (plus bas), qui exige les droits du
+// lecteur — même précaution que pour `getTournamentPreview` ci-dessus.
+//
+// La salle de diffusion (`lib/server/tournament-broadcast.ts`) est la seule à
+// avoir besoin de la trame, et l'importe directement de `./snapshot` : elle ne
+// sert que des abonnés que la route du flux a déjà laissés passer.
+export { invalidateTournamentSnapshot, SNAPSHOT_TTL_MS } from "./snapshot";
 export type { TournamentSnapshotFrame } from "./snapshot";
 
 // Byes

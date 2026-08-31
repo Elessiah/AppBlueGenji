@@ -330,8 +330,11 @@ export function validateTournamentInput(
       // La petite finale n'a de sens qu'en élimination simple : on la neutralise
       // ailleurs plutôt que de la stocker telle quelle. `createTournament`
       // portait seule cette règle, si bien qu'une **édition** basculant un
-      // tournoi de `SINGLE` à `DOUBLE` gardait la case cochée en base — et
-      // `rankEliminationPhase` la lit aussi en double élimination.
+      // tournoi de `SINGLE` à `DOUBLE` laissait la case cochée en base là où sa
+      // création l'aurait mise à zéro : le formulaire la rouvrait cochée au
+      // retour vers `SINGLE`, activant une petite finale que personne n'avait
+      // redemandée. (`rankEliminationPhase` lit bien la colonne quel que soit le
+      // format, mais ne s'en sert que dans sa branche `SINGLE`.)
       hasThirdPlaceMatch: body.format === "SINGLE" && Boolean(body.hasThirdPlaceMatch),
       survivalRoundsBeforeFirstCut,
       survivalRoundsPerCut,

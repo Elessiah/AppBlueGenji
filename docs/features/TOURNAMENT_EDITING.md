@@ -67,9 +67,13 @@ finale n'a de sens qu'en élimination simple, et c'est là que la règle vit —
 
 Elle ne vivait auparavant que dans `createTournament`. Une **édition** basculant un
 tournoi de `SINGLE` à `DOUBLE` gardait donc la case cochée en base, là où la création du
-même tournoi l'aurait mise à zéro — et `rankEliminationPhase` (`finalization.ts`) relit
-cette colonne en double élimination aussi. C'est exactement le genre de divergence que
-l'extraction de la validation devait supprimer.
+même tournoi l'aurait mise à zéro. Conséquence visible : `loadEditableTournament` relit
+cette colonne, donc le formulaire rouvrait la case cochée dès qu'on revenait à `SINGLE`,
+et l'enregistrement suivant ajoutait une petite finale que personne n'avait redemandée.
+(`rankEliminationPhase` lit la colonne quel que soit le format, mais ne s'en sert que
+dans sa branche `SINGLE` : le classement d'un tournoi `DOUBLE` n'était pas faussé.)
+C'est exactement le genre de divergence que l'extraction de la validation devait
+supprimer.
 
 ## La route de l'édition
 

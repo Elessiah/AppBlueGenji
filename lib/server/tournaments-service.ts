@@ -34,10 +34,10 @@ export {
   // Suppression définitive (administrateurs)
   deleteTournament,
   // Instantané partagé + contexte du lecteur (voir tournaments/snapshot.ts).
-  // `getTournamentSnapshot` n'est pas offert ici : il ignore
-  // `start_visibility_at`. Les routes passent par la variante gardée.
+  // Ni `getTournamentSnapshot` ni `getTournamentSnapshotFrame` ne sont offerts
+  // ici : aucun des deux ne consulte `start_visibility_at`, et la trame porte
+  // l'instantané entier. Les routes passent par la variante gardée.
   getVisibleTournamentSnapshot,
-  getTournamentSnapshotFrame,
   getTournamentViewerContext,
   invalidateTournamentSnapshot,
   invalidateTournamentLists,
