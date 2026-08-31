@@ -11,6 +11,8 @@ import { getDatabase, withConnection } from "@/lib/server/database";
 import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { isSoloTournament, toParticipantType, type ParticipantType } from "@/lib/shared/participants";
+import type { PhaseConfig } from "@/lib/shared/tournament-phases";
+import { validateDateOrder } from "./validation";
 import type { TournamentListRow } from "./_internal";
 
 // Internal types
@@ -85,6 +87,10 @@ export { tryAutoResolveByes } from "./byes";
 
 // Finalization
 export { finalizeTournamentIfDone, resolveExpiredScoreReports } from "./finalization";
+
+// Édition
+export { loadEditableTournament, updateTournament } from "./edit";
+export type { EditableTournamentValues } from "./edit";
 
 // Swiss
 export {
@@ -225,17 +231,12 @@ export async function createTournament(
     enduranceWinDelta?: number | null;
     enduranceLossDelta?: number | null;
     endurancePlayoffSize?: number | null;
-    phases?: Array<{
-      position: number;
-      format: "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL";
-      name: string | null;
-      qualifierMode: "COUNT" | "PERCENT";
-      qualifierValue: number;
-      hasThirdPlaceMatch: boolean;
-      swissTotalRounds: number | null;
-      survivalRoundsBeforeFirstCut: number | null;
-      survivalRoundsPerCut: number | null;
-    }>;
+    /**
+     * Phases du format MULTI, brutes (non normalisées : `position`, `name`…
+     * peuvent être absents) — voir `normalizePhaseConfigs` juste en dessous,
+     * qui les complète avant validation et insertion.
+     */
+    phases?: readonly Partial<PhaseConfig>[];
   },
 ): Promise<number> {
   const db = await getDatabase();
@@ -244,29 +245,18 @@ export async function createTournament(
   try {
     await connection.beginTransaction();
 
+    const dateError = validateDateOrder({
+      startVisibilityAt: payload.startVisibilityAt,
+      registrationOpenAt: payload.registrationOpenAt,
+      registrationCloseAt: payload.registrationCloseAt,
+      startAt: payload.startAt,
+    });
+    if (dateError) throw new Error(dateError);
+
     const startVisibilityAt = new Date(payload.startVisibilityAt);
     const registrationOpenAt = new Date(payload.registrationOpenAt);
     const registrationCloseAt = new Date(payload.registrationCloseAt);
     const startAt = new Date(payload.startAt);
-
-    if (
-      Number.isNaN(startVisibilityAt.getTime()) ||
-      Number.isNaN(registrationOpenAt.getTime()) ||
-      Number.isNaN(registrationCloseAt.getTime()) ||
-      Number.isNaN(startAt.getTime())
-    ) {
-      throw new Error("INVALID_DATES");
-    }
-
-    if (
-      !(
-        startVisibilityAt <= registrationOpenAt &&
-        registrationOpenAt <= registrationCloseAt &&
-        registrationCloseAt <= startAt
-      )
-    ) {
-      throw new Error("INVALID_DATE_ORDER");
-    }
 
     const { computeTournamentState } = await import("./state");
 

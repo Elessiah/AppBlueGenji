@@ -27,10 +27,17 @@ const HINT: CSSProperties = {
 interface PhaseBuilderProps {
   phases: PhaseConfig[];
   maxTeams: number;
+  /** Plan verrouillé : consultable, mais plus modifiable (édition restreinte). */
+  disabled?: boolean;
   onChange: (phases: PhaseConfig[]) => void;
 }
 
-export function PhaseBuilder({ phases, maxTeams, onChange }: PhaseBuilderProps) {
+export function PhaseBuilder({
+  phases,
+  maxTeams,
+  disabled = false,
+  onChange,
+}: PhaseBuilderProps) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
 
   const handleToggleExpand = (index: number) => {
@@ -82,6 +89,7 @@ export function PhaseBuilder({ phases, maxTeams, onChange }: PhaseBuilderProps) 
             isExpanded={expandedIndex === index}
             totalPhases={phases.length}
             maxTeams={maxTeams}
+            disabled={disabled}
             onToggleExpand={() => handleToggleExpand(index)}
             onMoveUp={() => handleMoveUp(index)}
             onMoveDown={() => handleMoveDown(index)}
@@ -96,13 +104,13 @@ export function PhaseBuilder({ phases, maxTeams, onChange }: PhaseBuilderProps) 
         <CyberButton
           variant="ghost"
           onClick={handleAddPhase}
-          disabled={phases.length >= MAX_PHASES}
+          disabled={disabled || phases.length >= MAX_PHASES}
           title={
             phases.length >= MAX_PHASES ? "Maximum de phases atteint" : undefined
           }
           style={{
-            opacity: phases.length >= MAX_PHASES ? 0.5 : 1,
-            cursor: phases.length >= MAX_PHASES ? "not-allowed" : "pointer",
+            opacity: disabled || phases.length >= MAX_PHASES ? 0.5 : 1,
+            cursor: disabled || phases.length >= MAX_PHASES ? "not-allowed" : "pointer",
           }}
         >
           + Ajouter une phase

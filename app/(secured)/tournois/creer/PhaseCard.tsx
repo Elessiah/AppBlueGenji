@@ -26,6 +26,8 @@ interface PhaseCardProps {
   isExpanded: boolean;
   totalPhases: number;
   maxTeams: number;
+  /** Plan verrouillé : consultable, mais plus modifiable (édition restreinte). */
+  disabled?: boolean;
   onToggleExpand: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -39,15 +41,16 @@ export function PhaseCard({
   isExpanded,
   totalPhases,
   maxTeams,
+  disabled = false,
   onToggleExpand,
   onMoveUp,
   onMoveDown,
   onRemove,
   onUpdate,
 }: PhaseCardProps) {
-  const canMoveUp = phase.position > 1;
-  const canMoveDown = phase.position < totalPhases;
-  const canRemove = totalPhases > MIN_PHASES;
+  const canMoveUp = !disabled && phase.position > 1;
+  const canMoveDown = !disabled && phase.position < totalPhases;
+  const canRemove = !disabled && totalPhases > MIN_PHASES;
 
   return (
     <div
@@ -270,6 +273,7 @@ export function PhaseCard({
               <input
                 id={`phase-name-${phase.position}`}
                 type="text"
+                disabled={disabled}
                 value={phase.name || ""}
                 onChange={(e) =>
                   onUpdate({
@@ -286,6 +290,7 @@ export function PhaseCard({
               <label htmlFor={`phase-format-${phase.position}`}>Format</label>
               <select
                 id={`phase-format-${phase.position}`}
+                disabled={disabled}
                 value={phase.format}
                 onChange={(e) =>
                   onUpdate({
@@ -310,6 +315,7 @@ export function PhaseCard({
                   </label>
                   <select
                     id={`phase-mode-${phase.position}`}
+                    disabled={disabled}
                     value={phase.qualifierMode}
                     onChange={(e) =>
                       onUpdate({
@@ -334,6 +340,7 @@ export function PhaseCard({
                     type="number"
                     min={phase.qualifierMode === "COUNT" ? 1 : 1}
                     max={phase.qualifierMode === "COUNT" ? maxTeams : 99}
+                    disabled={disabled}
                     value={phase.qualifierValue}
                     onChange={(e) =>
                       onUpdate({
@@ -357,6 +364,7 @@ export function PhaseCard({
                   type="number"
                   min={1}
                   max={20}
+                  disabled={disabled}
                   value={phase.swissTotalRounds || ""}
                   onChange={(e) =>
                     onUpdate({
@@ -382,6 +390,7 @@ export function PhaseCard({
                     type="number"
                     min={1}
                     max={50}
+                    disabled={disabled}
                     value={phase.survivalRoundsBeforeFirstCut || 3}
                     onChange={(e) =>
                       onUpdate({
@@ -404,6 +413,7 @@ export function PhaseCard({
                     type="number"
                     min={1}
                     max={50}
+                    disabled={disabled}
                     value={phase.survivalRoundsPerCut || 3}
                     onChange={(e) =>
                       onUpdate({
@@ -428,11 +438,14 @@ export function PhaseCard({
                 </label>
                 <div
                   className="checkbox-card"
-                  onClick={() =>
-                    onUpdate({
-                      ...phase,
-                      hasThirdPlaceMatch: !phase.hasThirdPlaceMatch,
-                    })
+                  onClick={
+                    disabled
+                      ? undefined
+                      : () =>
+                          onUpdate({
+                            ...phase,
+                            hasThirdPlaceMatch: !phase.hasThirdPlaceMatch,
+                          })
                   }
                   style={{
                     display: "flex",
@@ -445,7 +458,7 @@ export function PhaseCard({
                         : "var(--line-strong-cy)"
                     }`,
                     borderRadius: 10,
-                    cursor: "pointer",
+                    cursor: disabled ? "not-allowed" : "pointer",
                     transition: "border-color 0.2s ease, background-color 0.2s ease",
                     backgroundColor: phase.hasThirdPlaceMatch
                       ? "rgba(90, 200, 255, 0.07)"
@@ -455,6 +468,7 @@ export function PhaseCard({
                   <input
                     id={`phase-third-${phase.position}`}
                     type="checkbox"
+                    disabled={disabled}
                     checked={phase.hasThirdPlaceMatch}
                     onChange={(e) =>
                       onUpdate({

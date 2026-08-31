@@ -1,4 +1,4 @@
-const ERROR_MESSAGES: Record<string, string> = {
+export const ERROR_MESSAGES: Record<string, string> = {
   CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES: "Score verrouillé : la manche suivante a déjà des scores saisis.",
   MATCH_NOT_FOUND: "Match introuvable.",
   MATCH_NOT_READY: "Le match n'a pas deux équipes.",
@@ -34,6 +34,20 @@ const ERROR_MESSAGES: Record<string, string> = {
   // d'antenne enverrait le lecteur chercher un bug là où il n'y en a pas.
   FORBIDDEN: "Tu n'as pas les droits nécessaires pour cette action.",
   FORFEIT_FAILED: "Erreur lors de la déclaration de forfait.",
+  // Édition d'un tournoi (`GET`/`PATCH /api/tournaments/[id]/edit`).
+  TOURNAMENT_LOCKED: "Le tournoi est en cours : il n'est plus modifiable.",
+  FIELD_NOT_EDITABLE: "Ce réglage n'est plus modifiable depuis que le tournoi est visible.",
+  MAX_TEAMS_CANNOT_DECREASE:
+    "Le nombre de places ne peut plus être réduit une fois le tournoi visible.",
+  REGISTRATION_CLOSE_IN_PAST:
+    "La clôture des inscriptions ne peut pas être placée dans le passé.",
+  EMPTY_PATCH: "Aucune modification à enregistrer.",
+  TOURNAMENT_UPDATE_FAILED: "Erreur lors de la modification du tournoi.",
+  INVALID_DATE_ORDER:
+    "Les dates doivent se suivre : visibilité, ouverture, clôture, puis début.",
+  INVALID_DATES: "Une des dates est illisible.",
+  INVALID_MAX_TEAMS: "Le nombre de places doit être compris entre 2 et 256.",
+  MISSING_NAME: "Le nom du tournoi est obligatoire.",
   // Session expirée : le suivi en direct s'arrête, il faut se reconnecter.
   UNAUTHORIZED: "Ta session a expiré. Reconnecte-toi pour suivre le tournoi en direct.",
   // Diffusion en direct (`lib/shared/live-streams.ts`).
@@ -50,6 +64,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   // `TOURNAMENT_NOT_FOUND` et `UNAUTHORIZED` sont déjà couverts plus haut.
   TOURNAMENT_DELETE_FAILED: "Erreur lors de la suppression du tournoi.",
   INVALID_TOURNAMENT_ID: "Identifiant de tournoi invalide.",
+  INVALID_ID: "Identifiant invalide.",
 };
 
 export function mapError(errorCode: string): string {

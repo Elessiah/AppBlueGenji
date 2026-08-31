@@ -3,6 +3,9 @@
   "compilerOptions": {
     "module": "CommonJS",
     "moduleResolution": "node",
+    // Next compile le JSX lui-même (`jsx: "preserve"`), ce que Node ne sait pas
+    // exécuter : un test qui importe un composant doit le voir transpilé.
+    "jsx": "react-jsx",
     "noEmit": true
   },
   "include": ["tests", "**/*.test.ts", "**/*.test.tsx"]

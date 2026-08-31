@@ -6,6 +6,7 @@ export type {
   RegistrationRow,
   MatchRow,
   TournamentListRow,
+  EditableTournamentValues,
 } from "./tournaments";
 
 export {
@@ -73,4 +74,7 @@ export {
   adminResolveMatchPublic,
   // Abandon (Survie / Ronde suisse)
   forfeitTournamentTeamPublic as forfeitTournamentTeam,
+  // Édition
+  loadEditableTournament,
+  updateTournament,
 } from "./tournaments";
