@@ -82,6 +82,25 @@ describe("PATCH /api/tournaments/[id]/edit", () => {
     await expect(res.json()).resolves.toEqual({ error: "EMPTY_PATCH" });
   });
 
+  // Le corps est analysé derrière un `.catch(() => ({}))` : un corps qui n'est
+  // pas du JSON ne doit pas faire tomber la route en 500, il retombe sur le
+  // patch vide. Rien ne l'exerçait — c'est pourtant ce que produit un client
+  // qui envoie un formulaire au lieu de son JSON.
+  it("traite un corps illisible comme un patch vide, sans planter", async () => {
+    const res = await PATCH(
+      new Request("http://localhost/api/tournaments/1/edit", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: "pas du json {",
+      }),
+      params("1"),
+    );
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "EMPTY_PATCH" });
+    expect(service.updateTournament).not.toHaveBeenCalled();
+  });
+
   it("traduit un tournoi inconnu en 404", async () => {
     (service.updateTournament as jest.Mock).mockRejectedValue(
       new Error("TOURNAMENT_NOT_FOUND") as never,

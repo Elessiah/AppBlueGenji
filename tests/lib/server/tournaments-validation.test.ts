@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  parseTournamentDates,
   validateDateOrder,
   validateTournamentInput,
 } from "@/lib/server/tournaments/validation";
@@ -162,4 +163,83 @@ describe("validateDateOrder", () => {
       }),
     ).toBe("INVALID_DATES");
   });
+});
+
+describe("parseTournamentDates — analyse unique", () => {
+  const d = (hours: number) => new Date(Date.UTC(2026, 0, 1, hours)).toISOString();
+
+  it("rend les quatre dates analysées quand l'ordre tient", () => {
+    // `createTournament` insérait ces quatre `Date` après les avoir
+    // reconstruites de son côté : deux analyses des mêmes chaînes.
+    const parsed = parseTournamentDates({
+      startVisibilityAt: d(1),
+      registrationOpenAt: d(2),
+      registrationCloseAt: d(3),
+      startAt: d(4),
+    });
+
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.value?.startVisibilityAt.toISOString()).toBe(d(1));
+    expect(parsed.value?.registrationOpenAt.toISOString()).toBe(d(2));
+    expect(parsed.value?.registrationCloseAt.toISOString()).toBe(d(3));
+    expect(parsed.value?.startAt.toISOString()).toBe(d(4));
+  });
+
+  it("ne rend aucune date quand l'ordre est inversé", () => {
+    const parsed = parseTournamentDates({
+      startVisibilityAt: d(4),
+      registrationOpenAt: d(2),
+      registrationCloseAt: d(3),
+      startAt: d(5),
+    });
+
+    expect(parsed.error).toBe("INVALID_DATE_ORDER");
+    expect(parsed.value).toBeUndefined();
+  });
+
+  it("ne rend aucune date quand l'une est illisible", () => {
+    const parsed = parseTournamentDates({
+      startVisibilityAt: "n'importe quoi",
+      registrationOpenAt: d(2),
+      registrationCloseAt: d(3),
+      startAt: d(4),
+    });
+
+    expect(parsed.error).toBe("INVALID_DATES");
+    expect(parsed.value).toBeUndefined();
+  });
+
+  it("dit exactement la même chose que validateDateOrder", () => {
+    // L'une délègue à l'autre : leur verdict ne peut pas diverger.
+    const cases = [
+      { startVisibilityAt: d(1), registrationOpenAt: d(2), registrationCloseAt: d(3), startAt: d(4) },
+      { startVisibilityAt: d(4), registrationOpenAt: d(2), registrationCloseAt: d(3), startAt: d(5) },
+      { startVisibilityAt: "zzz", registrationOpenAt: d(2), registrationCloseAt: d(3), startAt: d(4) },
+    ];
+
+    for (const dates of cases) {
+      expect(validateDateOrder(dates)).toBe(parseTournamentDates(dates).error ?? null);
+    }
+  });
+});
+
+describe("validateTournamentInput — petite finale", () => {
+  it("garde la petite finale en élimination simple", () => {
+    expect(value({ ...base, format: "SINGLE", hasThirdPlaceMatch: true }).hasThirdPlaceMatch).toBe(
+      true,
+    );
+  });
+
+  it.each([["DOUBLE"], ["SWISS"]] as const)(
+    "la neutralise en %s",
+    (format) => {
+      // Cette règle ne vivait que dans `createTournament` : une **édition**
+      // basculant un tournoi de SINGLE à DOUBLE laissait la case cochée en base,
+      // et `rankEliminationPhase` la relit aussi en double élimination.
+      const input = { ...base, format, hasThirdPlaceMatch: true } as Parameters<
+        typeof validateTournamentInput
+      >[0];
+      expect(value(input).hasThirdPlaceMatch).toBe(false);
+    },
+  );
 });

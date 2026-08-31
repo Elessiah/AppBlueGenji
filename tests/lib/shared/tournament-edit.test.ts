@@ -1,10 +1,12 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  ALL_TOURNAMENT_FIELDS,
   RESTRICTED_FIELDS,
   checkEditPatch,
   editLockReason,
   editWindowFor,
   editableFieldsFor,
+  editableFieldsForWindow,
   isFieldEditable,
   type EditableTournament,
 } from "@/lib/shared/tournament-edit";
@@ -128,5 +130,51 @@ describe("checkEditPatch", () => {
       code: "FIELD_NOT_EDITABLE",
       field: "maxTeams",
     });
+  });
+});
+
+describe("editableFieldsForWindow", () => {
+  // La page d'édition ne reçoit du serveur que la fenêtre, jamais l'état : sans
+  // cette porte, elle rejouait le `switch` en miniature, deux écritures de la
+  // même règle dont une seule aurait suivi l'ajout d'une fenêtre.
+  it("ouvre tous les champs en FULL", () => {
+    expect([...editableFieldsForWindow("FULL")].sort()).toEqual([...ALL_TOURNAMENT_FIELDS].sort());
+  });
+
+  it("n'ouvre que les champs restreints en RESTRICTED", () => {
+    expect([...editableFieldsForWindow("RESTRICTED")].sort()).toEqual([...RESTRICTED_FIELDS].sort());
+  });
+
+  it("n'ouvre rien en LOCKED", () => {
+    expect(editableFieldsForWindow("LOCKED").size).toBe(0);
+  });
+
+  it("dit la même chose que editableFieldsFor sur un tournoi", () => {
+    const cases: EditableTournament[] = [
+      { state: "UPCOMING", startVisibilityAt: iso(HOUR), maxTeams: 16 },
+      { state: "REGISTRATION", startVisibilityAt: iso(-HOUR), maxTeams: 16 },
+      { state: "RUNNING", startVisibilityAt: iso(-HOUR), maxTeams: 16 },
+    ];
+
+    for (const tournament of cases) {
+      expect([...editableFieldsFor(tournament, NOW)]).toEqual([
+        ...editableFieldsForWindow(editWindowFor(tournament, NOW)),
+      ]);
+    }
+  });
+});
+
+describe("ALL_TOURNAMENT_FIELDS", () => {
+  it("ne contient aucun doublon", () => {
+    expect(new Set(ALL_TOURNAMENT_FIELDS).size).toBe(ALL_TOURNAMENT_FIELDS.length);
+  });
+
+  it("contient tous les champs restreints", () => {
+    // `RESTRICTED_FIELDS` est typé sur `TournamentField`, lui-même dérivé du
+    // tableau : l'inclusion est garantie à la compilation, on la vérifie ici
+    // pour que le contrat reste lisible à l'exécution.
+    for (const field of RESTRICTED_FIELDS) {
+      expect(ALL_TOURNAMENT_FIELDS).toContain(field);
+    }
   });
 });

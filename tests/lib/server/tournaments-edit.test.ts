@@ -45,6 +45,8 @@ function hiddenRow(over: Record<string, unknown> = {}) {
 
 const executed: { sql: string; params: unknown[] }[] = [];
 let rowToReturn: Record<string, unknown> | null;
+/** Phases lues pour un tournoi MULTI. Vide par défaut : la plupart des cas sont mono-format. */
+let phaseRowsToReturn: Record<string, unknown>[] = [];
 
 const connection = {
   beginTransaction: jest.fn(async () => undefined),
@@ -54,7 +56,7 @@ const connection = {
   execute: jest.fn(async (sql: string, params: unknown[] = []) => {
     executed.push({ sql, params });
     if (/FROM bg_tournaments/i.test(sql)) return [rowToReturn ? [rowToReturn] : []];
-    if (/FROM bg_tournament_phases/i.test(sql)) return [[]];
+    if (/FROM bg_tournament_phases/i.test(sql)) return [phaseRowsToReturn];
     return [{ affectedRows: 1, insertId: 1 }];
   }),
 };
@@ -62,6 +64,7 @@ const connection = {
 beforeEach(() => {
   executed.length = 0;
   rowToReturn = hiddenRow();
+  phaseRowsToReturn = [];
   jest.clearAllMocks();
   (getDatabase as jest.Mock).mockResolvedValue({
     getConnection: async () => connection,
@@ -200,6 +203,58 @@ describe("updateTournament", () => {
     await updateTournament(1, { format: "SINGLE" });
     expect(executed.some((q) => /DELETE FROM bg_tournament_phases/i.test(q.sql))).toBe(true);
     expect(executed.some((q) => /INSERT INTO bg_tournament_phases/i.test(q.sql))).toBe(false);
+  });
+
+  it("laisse les phases tranquilles quand le patch ne les concerne pas", async () => {
+    // Renommer un tournoi MULTI reposait ses phases à neuf — un DELETE + INSERT
+    // pour un résultat identique. Le DELETE n'est sûr que parce qu'aucune phase
+    // n'est en cours d'usage tant que le tournoi n'est pas RUNNING, et aucune
+    // clé étrangère ne protège cet invariant : ne pas y toucher hors de propos
+    // réduit d'autant la surface de cette dépendance.
+    rowToReturn = hiddenRow({ format: "MULTI" });
+    phaseRowsToReturn = [
+      {
+        position: 1,
+        name: null,
+        format: "SWISS",
+        qualifier_mode: "COUNT",
+        qualifier_value: 4,
+        has_third_place_match: 0,
+        swiss_total_rounds: 3,
+        survival_rounds_before_first_cut: null,
+        survival_rounds_per_cut: null,
+      },
+      {
+        position: 2,
+        name: null,
+        format: "DOUBLE",
+        qualifier_mode: "COUNT",
+        qualifier_value: 1,
+        has_third_place_match: 0,
+        swiss_total_rounds: null,
+        survival_rounds_before_first_cut: null,
+        survival_rounds_per_cut: null,
+      },
+    ];
+
+    await updateTournament(1, { name: "Nouveau nom" });
+
+    expect(executed.some((q) => /DELETE FROM bg_tournament_phases/i.test(q.sql))).toBe(false);
+    expect(executed.some((q) => /INSERT INTO bg_tournament_phases/i.test(q.sql))).toBe(false);
+    // Le reste de la mise à jour a bien eu lieu.
+    expect(executed.some((q) => /UPDATE bg_tournaments/i.test(q.sql))).toBe(true);
+  });
+
+  it("neutralise la petite finale quand le format quitte SINGLE", async () => {
+    // La règle ne vivait que dans `createTournament` : une édition la laissait
+    // cochée en base, et `rankEliminationPhase` la relit aussi en DOUBLE.
+    rowToReturn = hiddenRow({ has_third_place_match: 1 });
+
+    await updateTournament(1, { format: "DOUBLE" });
+
+    const update = executed.find((q) => /UPDATE bg_tournaments/i.test(q.sql));
+    // La petite finale est le 11e paramètre du `SET`, juste après les dates.
+    expect(update?.params[10]).toBe(0);
   });
 
   it("ne publie rien quand la transaction échoue", async () => {
