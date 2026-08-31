@@ -2,11 +2,12 @@ export const ERROR_MESSAGES: Record<string, string> = {
   CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES: "Score verrouillé : la manche suivante a déjà des scores saisis.",
   MATCH_NOT_FOUND: "Match introuvable.",
   MATCH_NOT_READY: "Le match n'a pas deux équipes.",
-  // Remonte de l'enregistrement d'un score sur un match déjà tranché : cette
-  // route n'écrit pas le vainqueur, corriger un résultat acquis passe par la
-  // validation, qui repropage dans le plateau.
-  MATCH_ALREADY_COMPLETED:
-    "Ce match est déjà tranché : utilise « Valider le résultat » pour le corriger.",
+  // Volontairement neutre : le code remonte aussi bien du report d'une équipe
+  // (`reportMatchScore`) que de l'enregistrement d'un score par l'arbitrage. La
+  // consigne « utilise Valider le résultat » enverrait un joueur chercher un
+  // bouton qu'il n'a pas — c'est `decideScoreForm` qui la donne, côté arbitrage,
+  // avant même l'aller-retour.
+  MATCH_ALREADY_COMPLETED: "Ce match est déjà tranché : son résultat ne peut plus être saisi.",
   DRAW_NOT_ALLOWED: "Les scores ne peuvent pas être égaux.",
   // Formulations de repli : l'interface connaît le format du tournoi et
   // remplace ces messages par une version chiffrée (`matchScoreViolationMessage`).
