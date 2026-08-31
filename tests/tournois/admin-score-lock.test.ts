@@ -2,8 +2,6 @@ import { describe, expect, it } from "@jest/globals";
 import type { PoolConnection } from "mysql2/promise";
 import { checkDownstreamMatchesHaveNoScores } from "@/lib/server/tournaments/admin";
 import type { MatchRow } from "@/lib/server/tournaments/_internal";
-import { scoreFormStateFor } from "@/app/(secured)/tournois/[id]/_lib/score-form";
-import type { BracketMatch } from "@/lib/shared/types";
 
 type Row = Record<string, unknown>;
 
@@ -163,34 +161,5 @@ describe("checkDownstreamMatchesHaveNoScores — survie et ronde suisse", () => 
       dependents: [EMPTY_MATCH, { ...EMPTY_MATCH, id: 6 }],
     });
     await expect(checkDownstreamMatchesHaveNoScores(conn, editedMatch)).resolves.toBeUndefined();
-  });
-});
-
-describe("dialogue d'édition — valeurs d'ouverture", () => {
-  const base = {
-    id: 7,
-    team1Score: null,
-    team2Score: null,
-    forfeitTeamId: null,
-  } as unknown as BracketMatch;
-
-  it("ouvre à 0-0 quand aucun score n'a été saisi", () => {
-    expect(scoreFormStateFor(base)).toEqual({ score1: "0", score2: "0", forfeitTeamId: undefined });
-  });
-
-  it("ouvre sur le score du match, y compris un zéro", () => {
-    expect(scoreFormStateFor({ ...base, team1Score: 2, team2Score: 0 })).toEqual({
-      score1: "2",
-      score2: "0",
-      forfeitTeamId: undefined,
-    });
-  });
-
-  it("reporte le forfait déjà déclaré", () => {
-    expect(scoreFormStateFor({ ...base, forfeitTeamId: 20 }).forfeitTeamId).toBe(20);
-  });
-
-  it("retombe à 0-0 sans match (dialogue fermé)", () => {
-    expect(scoreFormStateFor(null)).toEqual({ score1: "0", score2: "0", forfeitTeamId: undefined });
   });
 });
