@@ -43,7 +43,11 @@ export function MatchLiveDialog({ match, onClose, onSaved }: MatchLiveDialogProp
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
 
   const urlTouched = liveUrl.trim().length > 0;
-  const urlInvalid = urlTouched && !isValidStreamUrl(liveUrl);
+  // Conditionné à `streamed`, comme `triggerNeedsDate` : décocher la case
+  // n'envoie plus l'URL (`liveUrl: null`) et démonte le champ. Sans cette garde,
+  // une saisie fautive laissée derrière soi bloquerait le décochage avec un
+  // champ devenu invisible.
+  const urlInvalid = streamed && urlTouched && !isValidStreamUrl(liveUrl);
   // « À la date de début » n'a pas de frontière à franchir sans date : le
   // serveur refuse ce couple en 409, l'interface le désactive en amont plutôt
   // que de laisser le staff buter dessus. La date se fixe avec la permission

@@ -5,6 +5,7 @@ import { useToast } from "@/components/ui/toast";
 import {
   canConfigureLive,
   canToggleOnAir,
+  isMatchCastable,
   PLATFORM_LABELS,
   requiresMatchStartAt,
   streamPlatform,
@@ -44,8 +45,15 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
   const startAtTitle = formatMatchStartAtFull(match.startAt);
   // Impasse à signaler à ceux qui peuvent la défaire : casté « à la date de
   // début », mais sans date, le match ne passera jamais à l'antenne.
+  //
+  // Borné aux matchs encore castables : sur un match déjà noté, le bandeau reste
+  // ouvert pour qu'on puisse effacer une diffusion posée par erreur, mais
+  // l'horaire n'y est plus pour rien — le direct est terminé, pas en attente.
   const missingStartAt =
-    requiresMatchStartAt(match.liveTrigger) && startAtLabel === null && (canManage || canSchedule);
+    requiresMatchStartAt(match.liveTrigger) &&
+    startAtLabel === null &&
+    isMatchCastable(match) &&
+    (canManage || canSchedule);
   const showToggle = canManage && canToggleOnAir(match);
   // Les libellés visibles sont ultra-courts (la carte fait 210 px) : sortis de
   // leur contexte visuel, « ⚙ Live » ou « Twitch » ne disent pas de quel match
