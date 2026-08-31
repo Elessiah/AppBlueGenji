@@ -3,8 +3,6 @@ import { FORMAT_LABELS, GAME_LABELS } from "@/lib/shared/tournament-labels";
 import { participantWording } from "@/lib/shared/participants";
 import type {
   TournamentCard,
-  TournamentFormat,
-  TournamentGame,
   TournamentPhase,
   TournamentState,
 } from "@/lib/shared/types";
