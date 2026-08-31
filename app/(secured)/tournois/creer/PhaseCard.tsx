@@ -44,6 +44,23 @@ const TOGGLE: CSSProperties = {
   cursor: "pointer",
 };
 
+/** Chevron : un bouton dépouillé de tout style propre, pour ne rien peser. */
+const CHEVRON: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  padding: 0,
+  margin: 0,
+  backgroundColor: "transparent",
+  border: "none",
+  fontFamily: "inherit",
+  lineHeight: "inherit",
+  fontSize: 12,
+  color: "var(--ink-mute)",
+  flexShrink: 0,
+  cursor: "pointer",
+  transition: "transform 0.2s ease",
+};
+
 interface PhaseCardProps {
   phase: PhaseConfig;
   isLast: boolean;
@@ -153,14 +170,15 @@ export function PhaseCard({
               {phaseSummary(phase, isLast)}
             </div>
           </div>
-        </button>
 
-        {/* Last-phase badge */}
-        {isLast && (
-          <Pill variant="blue" style={{ flexShrink: 0 }}>
-            Phase finale
-          </Pill>
-        )}
+          {/* Last-phase badge — une pastille est un `<span>`, elle tient dans le
+              bouton et reste donc cliquable comme avant. */}
+          {isLast && (
+            <Pill variant="blue" style={{ flexShrink: 0 }}>
+              Phase finale
+            </Pill>
+          )}
+        </button>
 
         {/* Controls */}
         <div
@@ -270,21 +288,23 @@ export function PhaseCard({
           </button>
         </div>
 
-        {/* Chevron — redondant avec `aria-expanded`, donc muet pour l'assistance */}
-        <div
+        {/* Chevron — l'affordance conventionnelle du repli : elle doit rester
+            cliquable. Redondante avec le bouton d'intitulé, donc muette pour
+            l'assistance (`aria-hidden`) et hors du parcours clavier
+            (`tabIndex={-1}`) : le clavier passe par l'intitulé, qui porte déjà
+            `aria-expanded`. */}
+        <button
+          type="button"
+          onClick={onToggleExpand}
           aria-hidden="true"
+          tabIndex={-1}
           style={{
-            display: "flex",
-            alignItems: "center",
-            fontSize: 12,
-            color: "var(--ink-mute)",
-            flexShrink: 0,
+            ...CHEVRON,
             transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
-            transition: "transform 0.2s ease",
           }}
         >
           ▼
-        </div>
+        </button>
       </div>
 
       {/* Expanded content — la région existe toujours, pour que `aria-controls`

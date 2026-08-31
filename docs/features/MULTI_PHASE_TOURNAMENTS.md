@@ -149,6 +149,11 @@ diverger.
   aurait fait des trois commandes ses descendants — du HTML invalide, que React
   signale à l'hydratation et où ni le clavier ni un lecteur d'écran ne
   distinguent plus « déplier la phase » de « supprimer la phase ».
+  La zone cliquable, elle, ne se rétrécit pas pour autant : la pastille
+  « Phase finale » est un `<span>`, donc rendue **dans** le bouton, et le chevron
+  ▼ — l'affordance conventionnelle du repli — est un bouton jumeau, muet pour
+  l'assistance (`aria-hidden`) et hors du parcours clavier (`tabIndex={-1}`)
+  puisqu'il ne fait que redire l'intitulé.
 - **Détail** (`app/(secured)/tournois/[id]/`) — timeline horizontale des phases ;
   la phase sélectionnée pilote la vue affichée (survie, bracket ou suisse) et le
   **bouton flottant d'aide**, qui renvoie aux règles du mode réellement à l'écran

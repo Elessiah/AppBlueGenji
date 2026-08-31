@@ -64,10 +64,28 @@ describe("PhaseCard — en-tête d'une phase", () => {
     const toggleMarkup = code.slice(toggleStart, toggleEnd);
 
     expect(toggleMarkup).toContain("phaseFormatLabel(phase.format)");
+    // La pastille est un `<span>` : elle tient dans le bouton, et y reste donc
+    // cliquable comme lorsque tout le bandeau en était un.
+    expect(toggleMarkup).toContain("Phase finale");
     for (const action of ["Monter la phase", "Descendre la phase", "Supprimer la phase"]) {
       expect(toggleMarkup).not.toContain(action);
       expect(code).toContain(`aria-label={\`${action} \${phase.position}\`}`);
     }
+  });
+
+  it("garde le chevron cliquable sans le dédoubler pour clavier et assistance", () => {
+    const chevronStart = code.lastIndexOf("<button", code.indexOf("▼"));
+    const chevron = code.slice(chevronStart, code.indexOf("▼"));
+
+    // Cliquable : c'est l'affordance conventionnelle du repli, et son
+    // orientation annonce déjà l'état.
+    expect(chevron).toContain("onClick={onToggleExpand}");
+    // Mais redondant avec l'intitulé : ni annoncé, ni sur le parcours clavier.
+    expect(chevron).toContain('aria-hidden="true"');
+    expect(chevron).toContain("tabIndex={-1}");
+    // Et sans nom accessible ni `aria-expanded` qui doubleraient le bouton.
+    expect(chevron).not.toContain("aria-label");
+    expect(chevron).not.toContain("aria-expanded");
   });
 
   it("désigne par `aria-controls` un corps de carte réellement présent", () => {
