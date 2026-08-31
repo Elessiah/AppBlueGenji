@@ -115,7 +115,6 @@ export function IssueReportDialog({ tournamentId, match, onClose }: IssueReportD
               onChange={(e) => setMessage(e.target.value)}
               rows={5}
               maxLength={ISSUE_REPORT_MAX_LENGTH}
-              autoFocus
               aria-invalid={touched && !valid}
               aria-describedby="issue-report-hint"
               placeholder="Adversaire absent, score contesté, problème de serveur…"
