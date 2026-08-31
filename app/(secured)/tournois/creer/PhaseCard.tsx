@@ -20,6 +20,30 @@ const HINT: CSSProperties = {
 const FULL_WIDTH: CSSProperties = { gridColumn: "1 / -1" };
 const GRID: CSSProperties = { gap: 16 };
 
+/**
+ * Le repli/dépli porte sur le seul intitulé de la phase : les flèches d'ordre et
+ * la suppression sont des boutons **frères**, jamais des descendants (un
+ * `<button>` dans un `<button>` est du HTML invalide — React le signale à
+ * l'hydratation, et lecteurs d'écran comme navigation clavier n'y distinguent
+ * plus les commandes). Le bouton n'a donc pas de style propre : il rend
+ * l'intitulé, et la ligne garde sa mise en page dans le conteneur.
+ */
+const TOGGLE: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  padding: 0,
+  margin: 0,
+  backgroundColor: "transparent",
+  border: "none",
+  font: "inherit",
+  color: "inherit",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
 interface PhaseCardProps {
   phase: PhaseConfig;
   isLast: boolean;
@@ -51,6 +75,7 @@ export function PhaseCard({
   const canMoveUp = !disabled && phase.position > 1;
   const canMoveDown = !disabled && phase.position < totalPhases;
   const canRemove = !disabled && totalPhases > MIN_PHASES;
+  const bodyId = `phase-body-${phase.position}`;
 
   return (
     <div
@@ -60,10 +85,8 @@ export function PhaseCard({
         overflow: "hidden",
       }}
     >
-      {/* Collapsed header */}
-      <button
-        type="button"
-        onClick={onToggleExpand}
+      {/* Collapsed header — conteneur non interactif : les commandes sont frères */}
+      <div
         style={{
           width: "100%",
           display: "flex",
@@ -71,57 +94,64 @@ export function PhaseCard({
           gap: 12,
           padding: "14px 16px",
           backgroundColor: isExpanded ? "rgba(90, 200, 255, 0.07)" : "transparent",
-          border: "none",
-          cursor: "pointer",
           transition: "background-color 0.2s ease",
         }}
       >
-        {/* Position badge */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 32,
-            height: 32,
-            backgroundColor: "var(--line-soft)",
-            borderRadius: 6,
-            fontSize: 14,
-            fontWeight: 600,
-            color: "var(--ink)",
-            flexShrink: 0,
-          }}
+        {/* Repli/dépli : porte le badge de position et l'intitulé de la phase */}
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          aria-expanded={isExpanded}
+          aria-controls={bodyId}
+          style={TOGGLE}
         >
-          {phase.position}
-        </div>
-
-        {/* Name or format label + summary */}
-        <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
+          {/* Position badge */}
           <div
             style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 32,
+              height: 32,
+              backgroundColor: "var(--line-soft)",
+              borderRadius: 6,
               fontSize: 14,
-              fontWeight: 500,
+              fontWeight: 600,
               color: "var(--ink)",
-              marginBottom: 2,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+              flexShrink: 0,
             }}
           >
-            {phase.name || phaseFormatLabel(phase.format)}
+            {phase.position}
           </div>
-          <div
-            style={{
-              fontSize: 12,
-              color: "var(--ink-mute)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {phaseSummary(phase, isLast)}
+
+          {/* Name or format label + summary */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 500,
+                color: "var(--ink)",
+                marginBottom: 2,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {phase.name || phaseFormatLabel(phase.format)}
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: "var(--ink-mute)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {phaseSummary(phase, isLast)}
+            </div>
           </div>
-        </div>
+        </button>
 
         {/* Last-phase badge */}
         {isLast && (
@@ -137,7 +167,6 @@ export function PhaseCard({
             gap: 6,
             flexShrink: 0,
           }}
-          onClick={(e) => e.stopPropagation()}
         >
           <button
             type="button"
@@ -253,17 +282,20 @@ export function PhaseCard({
         >
           ▼
         </div>
-      </button>
+      </div>
 
-      {/* Expanded content */}
-      {isExpanded && (
-        <div
-          style={{
-            borderTop: "1px solid var(--line-soft)",
-            padding: "16px",
-            backgroundColor: "rgba(90, 200, 255, 0.03)",
-          }}
-        >
+      {/* Expanded content — la région existe toujours, pour que `aria-controls`
+          du bouton de repli désigne un élément réel même une fois replié. */}
+      <div
+        id={bodyId}
+        hidden={!isExpanded}
+        style={{
+          borderTop: "1px solid var(--line-soft)",
+          padding: "16px",
+          backgroundColor: "rgba(90, 200, 255, 0.03)",
+        }}
+      >
+        {isExpanded && (
           <div className="form-grid" style={GRID}>
             {/* Phase name */}
             <div className="field">
@@ -509,8 +541,8 @@ export function PhaseCard({
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
