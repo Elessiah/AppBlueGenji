@@ -51,7 +51,10 @@ function ScoreStepper({ id, teamName, value, max, disabled, onChange }: ScoreSte
           type="button"
           className={styles.step}
           onClick={() => step(-1)}
-          disabled={disabled || (parsed ?? 0) <= 0}
+          // Désactivé sur un vrai zéro, pas sur un champ vide : depuis le vide,
+          // « − » est le seul moyen d'atteindre 0 aux boutons — un 3-0 se saisit
+          // autrement au clavier, ce qui n'existe pas sur mobile.
+          disabled={disabled || parsed === 0}
           aria-label={`Retirer une manche à ${teamName}`}
         >
           −
@@ -175,16 +178,12 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
         onClick={(e) => e.stopPropagation()}
       >
         <form onSubmit={onSubmitForm}>
-          <div className={styles.head}>
-            <div>
-              <h3 id="admin-score-title" className={styles.title}>
-                Score du match
-              </h3>
-              <p className={styles.opponents}>
-                Manche {match.roundNumber} · {team1} vs {team2}
-              </p>
-            </div>
-          </div>
+          <h3 id="admin-score-title" className={styles.title}>
+            Score du match
+          </h3>
+          <p className={styles.opponents}>
+            Manche {match.roundNumber} · {team1} vs {team2}
+          </p>
 
           <p className={styles.formatHint}>
             <strong>{matchFormatLabel(matchFormat)}</strong> — {matchFormatDescription(matchFormat)}
@@ -315,6 +314,12 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
           {/* Une seule raison affichée : celle qui bloque l'action décisive, ou
               à défaut celle de l'enregistrement. Les empiler ferait répéter deux
               fois la même phrase dans le cas courant. */}
+          {form.dirty && !form.decision.resolveBlocker && !form.decision.saveBlocker && (
+            <p className={styles.blockers} role="status">
+              Saisie non enregistrée.
+            </p>
+          )}
+
           {(form.decision.resolveBlocker ?? form.decision.saveBlocker) && (
             <p className={styles.blockers} role="status">
               {scoreBlockerMessage(

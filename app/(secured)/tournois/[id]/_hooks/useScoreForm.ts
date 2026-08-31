@@ -44,7 +44,7 @@ export function useScoreForm(match: BracketMatch | null) {
     const next = scoreFormStateFor(match);
     setSynced({ signature, baseline: next });
 
-    if (untouched || match === null) {
+    if (untouched) {
       setState(next);
       setConflict(false);
     } else {
