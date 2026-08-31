@@ -17,7 +17,7 @@ routes serveur au comportement franchement différent :
 
 | Action | Route | Ce qu'elle fait | Ce qu'elle exige |
 |---|---|---|---|
-| **Enregistrer le score** | `PATCH /api/admin/matches/[id]/scores` | écrit `team1_score` / `team2_score` **et rien d'autre** | le **plafond** du format |
+| **Enregistrer** | `PATCH /api/admin/matches/[id]/scores` | écrit `team1_score` / `team2_score` **et rien d'autre** | le **plafond** du format |
 | **Valider le résultat** | `POST /api/admin/matches/[id]/resolve` | désigne la gagnante, propage dans le plateau, réconcilie le format | l'**objectif** du format |
 
 L'enregistrement existe pour noter l'avancement d'une rencontre en cours :
@@ -52,7 +52,7 @@ perd**, sans la moindre erreur remontée.
 Le refus est posé aux deux bouts :
 
 - `decideScoreForm` renvoie le blocage `ALREADY_DECIDED` et l'interface
-  désactive « Enregistrer le score » en disant quoi faire à la place ;
+  désactive « Enregistrer » en disant quoi faire à la place ;
 - `adminSaveMatchScores` lève `MATCH_ALREADY_COMPLETED` (→ 409) — le contrôle
   qui compte, l'interface n'étant qu'un raccourci.
 
@@ -101,6 +101,29 @@ de ce que le lecteur a fait :
 Le changement d'identifiant reste couvert par la même comparaison : ouvrir le
 dialogue sur un second match repart de son propre score, jamais de celui du
 précédent.
+
+## Ce que la modale montre, et quand
+
+Le geste courant est « je saisis un score, je valide ». Tout ce qui n'y sert pas
+est conditionnel, replié, ou réduit à un lien — la version précédente empilait
+neuf blocs pour ce seul geste, dont un rappel de format qui n'apprenait rien et
+quatre lignes de prose sur le forfait.
+
+| Élément | Affiché quand |
+|---|---|
+| Pastille de format (`BO5`, `FT3`) | le tournoi en a un — « Score libre — aucune limite » occupait une ligne pour rien (le détail va dans son `title`) |
+| Résultat déjà en base | il ne se lit pas dans les champs : match tranché, ou saisie en cours qui recouvre l'ancienne valeur |
+| Bandeau de désaccord | le résultat enregistré a changé pendant une saisie |
+| Forfait | replié derrière « Déclarer un forfait » ; déplié d'office si un forfait est déjà enregistré, puisqu'il commande alors la rencontre |
+| Raison d'un refus | une action est bloquée (celle de la validation d'abord) |
+
+Les actions ont trois poids distincts, faute de quoi elles se lisaient comme
+trois équivalents : **Valider le résultat** est le bouton plein, **Enregistrer**
+est en retrait (`btn ghost`), **Fermer** est un lien poussé à gauche. Le style
+désactivé est posé dans le module — le `.btn` global n'en a pas, et un bouton
+refusé gardait donc `opacity: 1` et `cursor: pointer`, sans rien dire de son
+refus. Il doit être écrit `:global(.btn)` : CSS Modules hacherait un `.btn`
+local, et la règle ne s'appliquerait à rien.
 
 ## Accessibilité
 

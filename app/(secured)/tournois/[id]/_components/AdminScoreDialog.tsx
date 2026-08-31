@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent } from "react";
+import { FormEvent, useState } from "react";
+import { Pill } from "@/components/cyber";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
@@ -92,15 +93,15 @@ function ScoreStepper({ id, teamName, value, max, disabled, onChange }: ScoreSte
 function storedResultLabel(match: BracketMatch, team1: string, team2: string): string | null {
   if (match.forfeitTeamId !== null) {
     const forfeiting = match.forfeitTeamId === match.team1Id ? team1 : team2;
-    return `Forfait enregistré : ${forfeiting} déclare forfait.`;
+    return `Forfait enregistré : ${forfeiting}.`;
   }
   if (match.team1Score === null && match.team2Score === null) return null;
 
   const score = `${match.team1Score ?? 0} – ${match.team2Score ?? 0}`;
-  if (match.winnerTeamId === null) return `Score enregistré : ${score}, match non tranché.`;
+  if (match.winnerTeamId === null) return `Enregistré : ${score}, non tranché.`;
 
   const winner = match.winnerTeamId === match.team1Id ? team1 : team2;
-  return `Résultat validé : ${score}, ${winner} l'emporte.`;
+  return `Tranché : ${score}, ${winner} l'emporte.`;
 }
 
 /**
@@ -109,12 +110,17 @@ function storedResultLabel(match: BracketMatch, team1: string, team2: string): s
  * Deux actions, volontairement distinctes — c'est la différence entre les deux
  * routes serveur, et elle n'était lisible ni sur « OK » ni sur « ✓ Gagnant » :
  *
- * · **Enregistrer le score** note l'avancement d'une rencontre en cours. Le
- *   match ne se tranche pas, le plateau ne bouge pas, seul le plafond du format
- *   est contrôlé. Refusé sur un match déjà tranché : cette route n'écrit que les
+ * · **Enregistrer** note l'avancement d'une rencontre en cours. Le match ne se
+ *   tranche pas, le plateau ne bouge pas, seul le plafond du format est
+ *   contrôlé. Refusé sur un match déjà tranché : cette route n'écrit que les
  *   scores, elle laisserait le vainqueur et la qualifiée sur l'ancien résultat.
  * · **Valider le résultat** désigne la gagnante et propage dans le plateau. Elle
  *   exige un score complet au sens du format (3 manches en BO5).
+ *
+ * Ces deux-là sont les seules choses toujours visibles, avec le score. Le geste
+ * courant est « je saisis, je valide » : le rappel de format ne s'affiche que
+ * s'il y en a un, le résultat déjà en base que s'il ne se lit pas dans les
+ * champs, et le forfait — rare — reste replié derrière un lien.
  *
  * Comportement modal complet via `useDialogBehavior` : `Échap`, piège à focus,
  * arrière-plan figé, focus rendu au déclencheur à la fermeture.
@@ -125,19 +131,30 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: form.submitting });
+  const [forfeitOpen, setForfeitOpen] = useState(false);
 
   const team1 = match.team1Name || "Équipe 1";
   const team2 = match.team2Name || "Équipe 2";
   // Borne haute de la saisie : l'objectif du format (3 en BO5 comme en FT3),
   // ou 99 quand le tournoi laisse le score libre.
   const maxScore = matchFormat ? matchWinsRequired(matchFormat) : 99;
-  const stored = storedResultLabel(match, team1, team2);
+  const forfeitTeamId = form.forfeitTeamId;
   const forfeiting =
-    form.forfeitTeamId === undefined
+    forfeitTeamId === undefined
       ? null
-      : form.forfeitTeamId === match.team1Id
+      : forfeitTeamId === match.team1Id
         ? { out: team1, through: team2 }
         : { out: team2, through: team1 };
+  // Un forfait déjà posé ne se cache pas derrière un lien : il commande la
+  // rencontre, et le replier laisserait croire à un match encore à jouer.
+  const showForfeit = forfeitOpen || forfeitTeamId !== undefined;
+
+  // Ce qui est en base ne se rappelle que s'il ne se lit pas déjà dans les
+  // champs : un match tranché (les champs ne disent pas qui a gagné), ou une
+  // saisie en cours qui recouvre l'ancienne valeur.
+  const stored =
+    match.winnerTeamId !== null || form.dirty ? storedResultLabel(match, team1, team2) : null;
+  const blocker = form.decision.resolveBlocker ?? form.decision.saveBlocker;
 
   const run = async (action: "save" | "resolve") => {
     const ok = await form.submit(action);
@@ -157,7 +174,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
 
   const toggleForfeit = (teamId: number | null) => {
     if (teamId === null) return;
-    form.setForfeitTeamId(form.forfeitTeamId === teamId ? undefined : teamId);
+    form.setForfeitTeamId(forfeitTeamId === teamId ? undefined : teamId);
   };
 
   return (
@@ -178,33 +195,40 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
         onClick={(e) => e.stopPropagation()}
       >
         <form onSubmit={onSubmitForm}>
-          <h3 id="admin-score-title" className={styles.title}>
-            Score du match
-          </h3>
-          <p className={styles.opponents}>
-            Manche {match.roundNumber} · {team1} vs {team2}
-          </p>
-
-          <p className={styles.formatHint}>
-            <strong>{matchFormatLabel(matchFormat)}</strong> — {matchFormatDescription(matchFormat)}
-          </p>
+          <div className={styles.head}>
+            <div className={styles.headText}>
+              <h3 id="admin-score-title" className={styles.title}>
+                Score du match
+              </h3>
+              <p className={styles.opponents}>
+                Manche {match.roundNumber} · {team1} vs {team2}
+              </p>
+            </div>
+            {/* Le format n'apparaît que s'il en existe un : « Score libre —
+                aucune limite » occupait une ligne pour ne rien apprendre. */}
+            {matchFormat && (
+              <Pill variant="blue" title={matchFormatDescription(matchFormat)}>
+                {matchFormatLabel(matchFormat)}
+              </Pill>
+            )}
+          </div>
 
           {/* `role="status"` : le résultat enregistré peut changer sous les yeux
               du lecteur (le flux apporte la saisie d'un autre arbitre), et le
               changement doit s'entendre autant qu'il se voit. */}
           {stored && (
-            <p className={`${styles.notice} ${styles.noticeInfo}`} role="status">
+            <p className={styles.stored} role="status">
               {stored}
             </p>
           )}
 
           {form.conflict && (
-            <div className={`${styles.notice} ${styles.noticeWarn}`} role="alert">
+            <div className={styles.conflict} role="alert">
               Ce match a été modifié pendant ta saisie — quelqu&apos;un d&apos;autre a
               enregistré un résultat. Envoyer maintenant écraserait le sien.
               <button
                 type="button"
-                className={styles.noticeAction}
+                className={styles.conflictAction}
                 onClick={form.adoptStoredResult}
                 disabled={form.submitting}
               >
@@ -219,7 +243,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
               teamName={team1}
               value={form.score1}
               max={maxScore}
-              disabled={form.submitting || form.forfeitTeamId !== undefined}
+              disabled={form.submitting || forfeitTeamId !== undefined}
               onChange={form.setScore1}
             />
             <span className={styles.versus} aria-hidden="true">
@@ -230,55 +254,79 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
               teamName={team2}
               value={form.score2}
               max={maxScore}
-              disabled={form.submitting || form.forfeitTeamId !== undefined}
+              disabled={form.submitting || forfeitTeamId !== undefined}
               onChange={form.setScore2}
             />
           </div>
 
-          <div className={styles.section}>
-            <p className={styles.sectionTitle}>Forfait</p>
-            <p className={styles.sectionHint}>
-              {forfeiting
-                ? `${forfeiting.out} déclare forfait : ${forfeiting.through} l'emporte sans manche jouée.`
-                : "Désigne l'équipe qui déclare forfait. Son adversaire l'emporte, et les scores ci-dessus sont ignorés."}
-            </p>
-            <div className={styles.forfeitRow}>
+          <div className={styles.forfeitZone}>
+            {showForfeit ? (
+              <>
+                <p className={styles.forfeitHint}>
+                  {forfeiting
+                    ? `${forfeiting.out} déclare forfait : ${forfeiting.through} l'emporte sans manche jouée.`
+                    : "Qui déclare forfait ? Son adversaire l'emporte, et les scores saisis sont ignorés."}
+                </p>
+                <div className={styles.forfeitRow}>
+                  <button
+                    type="button"
+                    className={styles.forfeit}
+                    aria-pressed={forfeitTeamId === match.team1Id}
+                    onClick={() => toggleForfeit(match.team1Id)}
+                    disabled={form.submitting || match.team1Id === null}
+                  >
+                    {team1}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.forfeit}
+                    aria-pressed={forfeitTeamId === match.team2Id}
+                    onClick={() => toggleForfeit(match.team2Id)}
+                    disabled={form.submitting || match.team2Id === null}
+                  >
+                    {team2}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.link}
+                    onClick={() => {
+                      form.setForfeitTeamId(undefined);
+                      setForfeitOpen(false);
+                    }}
+                    disabled={form.submitting}
+                  >
+                    {forfeitTeamId === undefined ? "Annuler" : "Annuler le forfait"}
+                  </button>
+                </div>
+              </>
+            ) : (
               <button
                 type="button"
-                className={styles.forfeit}
-                aria-pressed={form.forfeitTeamId === match.team1Id}
-                onClick={() => toggleForfeit(match.team1Id)}
-                disabled={form.submitting || match.team1Id === null}
+                className={styles.link}
+                onClick={() => setForfeitOpen(true)}
+                aria-expanded={false}
+                disabled={form.submitting}
               >
-                {team1}
+                Déclarer un forfait
               </button>
-              <button
-                type="button"
-                className={styles.forfeit}
-                aria-pressed={form.forfeitTeamId === match.team2Id}
-                onClick={() => toggleForfeit(match.team2Id)}
-                disabled={form.submitting || match.team2Id === null}
-              >
-                {team2}
-              </button>
-              {form.forfeitTeamId !== undefined && (
-                <button
-                  type="button"
-                  className="btn ghost"
-                  style={{ padding: "10px 14px", fontSize: 12 }}
-                  onClick={() => form.setForfeitTeamId(undefined)}
-                  disabled={form.submitting}
-                >
-                  Annuler le forfait
-                </button>
-              )}
-            </div>
+            )}
           </div>
 
+          {/* Une seule raison affichée : celle qui bloque l'action décisive, ou
+              à défaut celle de l'enregistrement. Les empiler ferait répéter deux
+              fois la même phrase dans le cas courant. */}
+          {blocker && (
+            <p className={styles.blocker} role="status">
+              {scoreBlockerMessage(blocker, matchFormat)}
+            </p>
+          )}
+
           <div className={styles.actions}>
+            {/* Trois poids, trois rôles : quitter est un lien, l'enregistrement
+                intermédiaire est secondaire, valider est l'action attendue. */}
             <button
               type="button"
-              className="btn ghost"
+              className={`${styles.link} ${styles.close}`}
               onClick={onClose}
               disabled={form.submitting}
             >
@@ -286,7 +334,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
             </button>
             <button
               type="button"
-              className="btn"
+              className="btn ghost"
               onClick={() => void run("save")}
               disabled={!form.decision.canSave || form.submitting}
               title={
@@ -295,7 +343,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
                   : "Note l'avancement sans désigner de vainqueur."
               }
             >
-              {form.submitting ? "…" : "Enregistrer le score"}
+              {form.submitting ? "…" : "Enregistrer"}
             </button>
             <button
               type="submit"
@@ -310,24 +358,6 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
               {form.submitting ? "…" : "Valider le résultat"}
             </button>
           </div>
-
-          {/* Une seule raison affichée : celle qui bloque l'action décisive, ou
-              à défaut celle de l'enregistrement. Les empiler ferait répéter deux
-              fois la même phrase dans le cas courant. */}
-          {form.dirty && !form.decision.resolveBlocker && !form.decision.saveBlocker && (
-            <p className={styles.blockers} role="status">
-              Saisie non enregistrée.
-            </p>
-          )}
-
-          {(form.decision.resolveBlocker ?? form.decision.saveBlocker) && (
-            <p className={styles.blockers} role="status">
-              {scoreBlockerMessage(
-                (form.decision.resolveBlocker ?? form.decision.saveBlocker)!,
-                matchFormat,
-              )}
-            </p>
-          )}
         </form>
       </div>
     </div>
