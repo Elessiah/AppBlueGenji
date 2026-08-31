@@ -28,7 +28,7 @@ npx jest tests/path/to/file.test.ts
 ### Stack
 - **Next.js 15** (App Router), React 18, TypeScript strict mode
 - **MySQL 8+** via `mysql2` — no ORM, raw queries with auto-migration on first API access (`lib/server/database.ts`)
-- **Tailwind CSS 4**, Radix UI components, Lucide icons
+- **CSS Modules + `app/globals.css`** (aucun framework utilitaire), Radix UI Slot, Lucide icons
 
 ### Route Layout
 - `/` — Landing page

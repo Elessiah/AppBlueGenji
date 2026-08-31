@@ -15,7 +15,7 @@ Plateforme BlueGenji Esport:
 
 ## Variables d'environnement
 
-Copier `.env.example` vers `.env`.
+Copier `.env.production.example` vers `.env`.
 
 Variables nécessaires:
 
