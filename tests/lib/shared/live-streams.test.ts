@@ -9,9 +9,12 @@ import {
   LIVE_PLATFORMS,
   MATCH_LIVE_STATE_LABELS,
   MATCH_LIVE_TRIGGER_LABELS,
+  MATCH_LIVE_TRIGGERS,
   MAX_STREAM_URL_LENGTH,
+  nextMatchLiveChangeAt,
   normalizeStreamUrl,
   PLATFORM_LABELS,
+  requiresMatchStartAt,
   resolveMatchLiveState,
   streamPlatform,
   type MatchLiveInput,
@@ -151,13 +154,32 @@ describe("streamPlatform", () => {
 });
 
 describe("isMatchLiveTrigger", () => {
-  it("n'accepte que AUTO et MANUAL", () => {
+  it("n'accepte que les trois modes connus", () => {
     expect(isMatchLiveTrigger("AUTO")).toBe(true);
+    expect(isMatchLiveTrigger("START_TIME")).toBe(true);
     expect(isMatchLiveTrigger("MANUAL")).toBe(true);
     expect(isMatchLiveTrigger("auto")).toBe(false);
+    expect(isMatchLiveTrigger("SCHEDULED")).toBe(false);
     expect(isMatchLiveTrigger(null)).toBe(false);
     expect(isMatchLiveTrigger(undefined)).toBe(false);
     expect(isMatchLiveTrigger(1)).toBe(false);
+  });
+
+  it("reconnaît exactement les modes listés pour l'affichage", () => {
+    for (const trigger of MATCH_LIVE_TRIGGERS) {
+      expect(isMatchLiveTrigger(trigger)).toBe(true);
+      expect(MATCH_LIVE_TRIGGER_LABELS[trigger]).toBeTruthy();
+    }
+    expect(MATCH_LIVE_TRIGGERS).toHaveLength(3);
+  });
+});
+
+describe("requiresMatchStartAt", () => {
+  it("n'est vrai que pour START_TIME", () => {
+    expect(requiresMatchStartAt("START_TIME")).toBe(true);
+    expect(requiresMatchStartAt("AUTO")).toBe(false);
+    expect(requiresMatchStartAt("MANUAL")).toBe(false);
+    expect(requiresMatchStartAt(null)).toBe(false);
   });
 });
 
@@ -197,8 +219,8 @@ describe("resolveMatchLiveState", () => {
     ).toBe("LIVE");
   });
 
-  it("éteint le direct dès qu'un score est saisi, dans les deux modes", () => {
-    const triggers: MatchLiveTrigger[] = ["AUTO", "MANUAL"];
+  it("éteint le direct dès qu'un score est saisi, dans tous les modes", () => {
+    const triggers: MatchLiveTrigger[] = ["AUTO", "START_TIME", "MANUAL"];
     for (const liveTrigger of triggers) {
       for (const status of ["AWAITING_CONFIRMATION", "COMPLETED"] as MatchStatus[]) {
         expect(
@@ -223,11 +245,99 @@ describe("resolveMatchLiveState", () => {
   });
 });
 
+describe("resolveMatchLiveState — mode START_TIME", () => {
+  const AT = Date.UTC(2026, 7, 29, 18, 30);
+  const scheduled = (overrides: Partial<MatchLiveInput> = {}) =>
+    match({ liveTrigger: "START_TIME", startAt: new Date(AT).toISOString(), ...overrides });
+
+  it("reste programmé avant l'heure", () => {
+    expect(resolveMatchLiveState(scheduled(), AT - 1)).toBe("SCHEDULED");
+  });
+
+  it("passe à l'antenne à la seconde dite, sans aucune écriture", () => {
+    expect(resolveMatchLiveState(scheduled(), AT)).toBe("LIVE");
+    expect(resolveMatchLiveState(scheduled(), AT + 60_000)).toBe("LIVE");
+  });
+
+  it("accepte indifféremment une Date, un ISO ou un instant", () => {
+    // Les trois formes coexistent : les lignes SQL portent des `Date`, le flux
+    // des ISO, et `useMatchLiveState` l'instant — seule primitive utilisable en
+    // dépendance d'effet.
+    for (const startAt of [new Date(AT), new Date(AT).toISOString(), AT]) {
+      expect(resolveMatchLiveState(scheduled({ startAt }), AT)).toBe("LIVE");
+      expect(resolveMatchLiveState(scheduled({ startAt }), AT - 1)).toBe("SCHEDULED");
+      expect(nextMatchLiveChangeAt(scheduled({ startAt }), AT - 1)).toBe(AT);
+    }
+  });
+
+  it("reste programmé indéfiniment sans date, plutôt que d'ouvrir l'antenne", () => {
+    expect(resolveMatchLiveState(scheduled({ startAt: null }), AT + 86_400_000)).toBe("SCHEDULED");
+    expect(resolveMatchLiveState(scheduled({ startAt: undefined }), AT)).toBe("SCHEDULED");
+    expect(resolveMatchLiveState(scheduled({ startAt: "n'importe quoi" }), AT)).toBe("SCHEDULED");
+  });
+
+  it("n'ouvre pas l'antenne d'un match pas encore jouable, même à l'heure", () => {
+    expect(resolveMatchLiveState(scheduled({ status: "PENDING" }), AT + 3_600_000)).toBe(
+      "SCHEDULED",
+    );
+  });
+
+  it("ignore une antenne ouverte à la main : la date seule décide", () => {
+    expect(resolveMatchLiveState(scheduled({ liveStartedAt: new Date(AT) }), AT - 1)).toBe(
+      "SCHEDULED",
+    );
+  });
+
+  it("ne laisse pas basculer l'antenne à la main", () => {
+    expect(canToggleOnAir(scheduled())).toBe(false);
+  });
+});
+
+describe("nextMatchLiveChangeAt", () => {
+  const AT = Date.UTC(2026, 7, 29, 18, 30);
+  const scheduled = (overrides: Partial<MatchLiveInput> = {}) =>
+    match({ liveTrigger: "START_TIME", startAt: new Date(AT).toISOString(), ...overrides });
+
+  it("annonce l'horaire d'un match programmé encore à venir", () => {
+    expect(nextMatchLiveChangeAt(scheduled(), AT - 3_600_000)).toBe(AT);
+  });
+
+  it("n'arme rien pour une frontière déjà franchie", () => {
+    expect(nextMatchLiveChangeAt(scheduled(), AT)).toBeNull();
+    expect(nextMatchLiveChangeAt(scheduled(), AT + 1)).toBeNull();
+  });
+
+  it("n'arme rien quand franchir l'heure ne changerait rien", () => {
+    // Le match n'est pas apparié : il restera « programmé » passé l'horaire, et
+    // se réveiller pour redessiner à l'identique serait du gâchis.
+    expect(nextMatchLiveChangeAt(scheduled({ status: "PENDING" }), AT - 1)).toBeNull();
+    // Score déjà saisi : l'état est OFF des deux côtés de l'horaire.
+    expect(nextMatchLiveChangeAt(scheduled({ status: "COMPLETED" }), AT - 1)).toBeNull();
+  });
+
+  it("n'arme rien pour les modes qui ne dépendent pas de l'horloge", () => {
+    for (const liveTrigger of ["AUTO", "MANUAL", null] as (MatchLiveTrigger | null)[]) {
+      expect(nextMatchLiveChangeAt(match({ liveTrigger, startAt: new Date(AT) }), AT - 1)).toBeNull();
+    }
+  });
+
+  it("n'arme rien sans date", () => {
+    expect(nextMatchLiveChangeAt(scheduled({ startAt: null }), AT - 1)).toBeNull();
+  });
+});
+
 describe("isMatchLive", () => {
   it("ne retient que l'état LIVE", () => {
     expect(isMatchLive(match({ liveTrigger: "AUTO" }))).toBe(true);
     expect(isMatchLive(match({ liveTrigger: "MANUAL" }))).toBe(false);
     expect(isMatchLive(match())).toBe(false);
+  });
+
+  it("relaie l'instant jusqu'au mode START_TIME", () => {
+    const at = Date.UTC(2026, 7, 29, 18, 30);
+    const scheduled = match({ liveTrigger: "START_TIME", startAt: new Date(at) });
+    expect(isMatchLive(scheduled, at - 1)).toBe(false);
+    expect(isMatchLive(scheduled, at)).toBe(true);
   });
 });
 

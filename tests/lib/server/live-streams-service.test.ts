@@ -22,6 +22,7 @@ function matchRow(overrides: Record<string, unknown> = {}) {
     id: 42,
     tournament_id: 7,
     status: "READY",
+    start_at: null,
     live_trigger: null,
     live_started_at: null,
     ...overrides,
@@ -121,6 +122,53 @@ describe("setMatchLiveConfig", () => {
     const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
     expect(sql).toMatch(/live_started_at = NULL/);
     expect(params).toEqual(["AUTO", null, 42]);
+  });
+
+  it("referme l'antenne en passant en START_TIME — c'est l'horloge qui décide", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([
+        [
+          matchRow({
+            start_at: new Date("2026-08-29T18:30:00Z"),
+            live_trigger: "MANUAL",
+            live_started_at: new Date(),
+          }),
+        ],
+      ])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+    await mockDb(execute);
+
+    await setMatchLiveConfig(42, { trigger: "START_TIME", liveUrl: null });
+
+    const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
+    expect(sql).toMatch(/live_started_at = NULL/);
+    expect(params).toEqual(["START_TIME", null, 42]);
+  });
+
+  it("refuse START_TIME sur un match sans date de début", async () => {
+    // Accepter ce couple poserait une diffusion qui ne s'ouvrirait jamais, et
+    // l'échec ne se verrait qu'à l'heure du match.
+    const execute = jest.fn().mockResolvedValueOnce([[matchRow({ start_at: null })]]);
+    await mockDb(execute);
+
+    await expect(setMatchLiveConfig(42, { trigger: "START_TIME", liveUrl: null })).rejects.toThrow(
+      "MATCH_START_AT_REQUIRED",
+    );
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(publishUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("laisse démarquer un match sans date — l'impasse doit rester réversible", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([[matchRow({ start_at: null, live_trigger: "START_TIME" })]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+    await mockDb(execute);
+
+    await setMatchLiveConfig(42, { trigger: null, liveUrl: null });
+
+    expect((execute.mock.calls[1] as [string, unknown[]])[1]).toEqual([42]);
   });
 
   it("efface lien et antenne en démarquant le match", async () => {
@@ -266,6 +314,7 @@ describe("findBroadcastingTournament", () => {
       tournament_id: 7,
       live_url: "https://twitch.tv/bluegenji",
       status: "READY",
+      start_at: null,
       live_trigger: "AUTO",
       live_started_at: null,
       ...overrides,
@@ -286,6 +335,36 @@ describe("findBroadcastingTournament", () => {
     const execute = jest
       .fn()
       .mockResolvedValueOnce([[row({ live_trigger: "MANUAL", live_started_at: null })]]);
+    await mockDb(execute);
+
+    expect(await findBroadcastingTournament()).toBeNull();
+  });
+
+  it("retient un match dont l'heure de début est passée", async () => {
+    const execute = jest.fn().mockResolvedValueOnce([
+      [row({ live_trigger: "START_TIME", start_at: new Date(Date.now() - 60_000) })],
+    ]);
+    await mockDb(execute);
+
+    expect(await findBroadcastingTournament()).toEqual({
+      tournamentId: 7,
+      url: "https://twitch.tv/bluegenji",
+    });
+  });
+
+  it("ignore un match dont l'heure de début n'est pas encore atteinte", async () => {
+    const execute = jest.fn().mockResolvedValueOnce([
+      [row({ live_trigger: "START_TIME", start_at: new Date(Date.now() + 3_600_000) })],
+    ]);
+    await mockDb(execute);
+
+    expect(await findBroadcastingTournament()).toBeNull();
+  });
+
+  it("ignore un match programmé à l'heure mais sans date", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([[row({ live_trigger: "START_TIME", start_at: null })]]);
     await mockDb(execute);
 
     expect(await findBroadcastingTournament()).toBeNull();

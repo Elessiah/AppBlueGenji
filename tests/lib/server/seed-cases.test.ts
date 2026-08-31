@@ -248,12 +248,28 @@ describe("seed — cohérence des définitions", () => {
   describe("diffusion en direct", () => {
     const broadcast = TOURNAMENTS.filter((t) => t.live);
 
-    it("couvre les trois situations de diffusion", () => {
-      // À l'antenne d'office, programmé sans antenne, et antenne ouverte à la
-      // main : les trois états que l'interface doit savoir rendre.
+    it("couvre chaque mode de passage à l'antenne", () => {
+      // À l'antenne d'office, programmé sans antenne, antenne ouverte à la
+      // main, et antenne pilotée par le calendrier : tous les états que
+      // l'interface doit savoir rendre.
       expect(broadcast.some((t) => t.live!.trigger === "AUTO")).toBe(true);
       expect(broadcast.some((t) => t.live!.trigger === "MANUAL" && !t.live!.onAir)).toBe(true);
       expect(broadcast.some((t) => t.live!.trigger === "MANUAL" && t.live!.onAir)).toBe(true);
+      expect(broadcast.some((t) => t.live!.trigger === "START_TIME")).toBe(true);
+    });
+
+    it("donne toujours un calendrier aux tournois castés à l'horaire", () => {
+      // Sans date de début, `START_TIME` ne passerait jamais à l'antenne : le
+      // cas seedé ne montrerait rien (et la route le refuserait en 409).
+      for (const t of broadcast.filter((t) => t.live!.trigger === "START_TIME")) {
+        expect(t.matchSchedule).toBeDefined();
+      }
+    });
+
+    it("couvre les deux côtés de la frontière horaire", () => {
+      const scheduledLive = broadcast.filter((t) => t.live!.trigger === "START_TIME");
+      expect(scheduledLive.some((t) => t.matchSchedule!.firstRoundHours < 0)).toBe(true);
+      expect(scheduledLive.some((t) => t.matchSchedule!.firstRoundHours > 0)).toBe(true);
     });
 
     it("ne pose une diffusion que sur des tournois en cours", () => {
@@ -288,6 +304,21 @@ describe("seed — cohérence des définitions", () => {
 
     it("couvre le match casté sans lien propre — badge seul", () => {
       expect(broadcast.some((t) => !t.live!.matchUrl)).toBe(true);
+    });
+  });
+
+  describe("dates de début des matchs", () => {
+    const scheduled = TOURNAMENTS.filter((t) => t.matchSchedule);
+
+    it("couvre le calendrier seul, sans diffusion — le cas le plus courant", () => {
+      expect(scheduled.some((t) => !t.live)).toBe(true);
+    });
+
+    it("ne programme que des tournois en cours, avec un écart entre manches", () => {
+      for (const t of scheduled) {
+        expect(t.state).toBe("RUNNING");
+        expect(t.matchSchedule!.hoursPerRound).toBeGreaterThan(0);
+      }
     });
   });
 });

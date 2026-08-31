@@ -11,6 +11,9 @@ réellement en cours.
 | **Chaîne officielle** | `bg_tournaments.live_url` | L'antenne permanente de l'organisation, affichée en tête de la page du tournoi. |
 | **Diffusion d'un match** | `bg_matches.live_trigger` / `live_url` / `live_started_at` | Ce match est-il casté, par quelle chaîne, et est-il à l'antenne ? |
 
+Un troisième mode d'antenne s'appuie sur le **calendrier** du match plutôt que
+sur le tableau ou sur un clic : voir `docs/features/MATCH_START_DATES.md`.
+
 **Un match n'hérite jamais de la chaîne officielle.** Un match peut être diffusé
 par un streamer indépendant : un lien hérité renverrait le spectateur vers une
 antenne qui ne montre pas ce match. Un match sans lien propre affiche donc son
@@ -24,13 +27,21 @@ Survie, l'état est **dérivé** à chaque lecture par `resolveMatchLiveState`
 mode de déclenchement, le lien, et l'horodatage d'ouverture d'antenne.
 
 ```
-liveTrigger === null                        → OFF        (match non casté)
-status ∈ {AWAITING_CONFIRMATION, COMPLETED} → OFF        (un score a été saisi)
-status === PENDING                          → SCHEDULED  (annoncé, pas jouable)
-liveTrigger === "AUTO"                      → LIVE
-liveTrigger === "MANUAL" && liveStartedAt   → LIVE
-liveTrigger === "MANUAL"                    → SCHEDULED
+liveTrigger === null                          → OFF        (match non casté)
+status ∈ {AWAITING_CONFIRMATION, COMPLETED}   → OFF        (un score a été saisi)
+status === PENDING                            → SCHEDULED  (annoncé, pas jouable)
+liveTrigger === "AUTO"                        → LIVE
+liveTrigger === "START_TIME" && now >= startAt → LIVE
+liveTrigger === "START_TIME"                  → SCHEDULED  (heure pas atteinte, ou pas de date)
+liveTrigger === "MANUAL" && liveStartedAt     → LIVE
+liveTrigger === "MANUAL"                      → SCHEDULED
 ```
+
+`resolveMatchLiveState` prend `now` en second argument (défaut `Date.now()`) :
+serveur, client et tests se placent ainsi au même instant. Seul `START_TIME`
+produit une bascule **sans écriture** — `nextMatchLiveChangeAt` en donne
+l'horaire, que le client transforme en un unique `setTimeout`
+(`useMatchLiveState`).
 
 Deux conséquences voulues :
 
@@ -147,6 +158,7 @@ match casté. `ADMIN` a tout.
 | `lib/server/tournaments/live-streams.ts` | Écritures + résolution de la cible du bouton d'accueil. |
 | `app/api/admin/tournaments/[id]/live/route.ts` | `PUT` — chaîne officielle (`tournaments`). |
 | `app/api/admin/matches/[matchId]/live/route.ts` | `PUT` — configuration ; `POST` — antenne (`live`). |
+| `app/api/admin/matches/[matchId]/schedule/route.ts` | `PUT` — date de début du match (`tournaments`). |
 | `components/cyber/landing/useLandingLive.ts` | Sondage unique de l'accueil. |
 | `app/(secured)/tournois/[id]/_components/MatchLiveStrip.tsx` | Badge, lien et contrôles sous chaque match. |
 | `app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx` | Configuration de diffusion d'un match. |
@@ -157,14 +169,15 @@ match casté. `ADMIN` a tout.
 | Code | HTTP | Sens |
 |---|---|---|
 | `INVALID_STREAM_URL` | 400 | Lien hors liste blanche, ou inexploitable. |
-| `INVALID_LIVE_TRIGGER` | 400 | Mode autre que `AUTO` / `MANUAL`. |
+| `INVALID_LIVE_TRIGGER` | 400 | Mode autre que `AUTO` / `START_TIME` / `MANUAL`. |
 | `INVALID_ON_AIR` | 400 | `onAir` absent ou non booléen. |
 | `LIVE_TRIGGER_NOT_MANUAL` | 409 | Antenne basculée sur un match en `AUTO` (rien à basculer). |
 | `MATCH_NOT_LIVE_READY` | 409 | Antenne ouverte sur un match non jouable ou déjà noté. |
+| `MATCH_START_AT_REQUIRED` | 409 | Mode `START_TIME` demandé sur un match sans date de début. |
 
 ## Jeu de test
 
-`npm run seed` produit trois cas (`lib/server/seed-cases.ts`, champ `live`) :
+`npm run seed` produit cinq cas (`lib/server/seed-cases.ts`, champ `live`) :
 
 - **Live Auto (à l'antenne)** — chaîne officielle + matchs en `AUTO` : le cas
   nominal du bouton d'accueil.
@@ -172,5 +185,9 @@ match casté. `ADMIN` a tout.
   sont « programmés » et ce tournoi **ne doit pas** faire apparaître le bouton.
 - **Live Manuel (antenne ouverte)** — antenne ouverte sans lien sur les matchs :
   badge « en direct » seul, le spectateur passe par la chaîne officielle.
+- **Live Horaire (heure passée)** — mode `START_TIME` dont l'horaire est déjà
+  franchi : à l'antenne sans que personne n'ait cliqué.
+- **Live Horaire (heure à venir)** — même configuration, horaire futur : le match
+  reste « programmé » et bascule tout seul à l'heure dite.
 
 Le compte `Test_Caster` porte la permission `live` seule.

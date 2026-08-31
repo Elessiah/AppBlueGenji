@@ -18,15 +18,20 @@
  * Module pur : le serveur (garde-fous, résolution du bouton d'accueil) et
  * l'interface (badges, boutons) appliquent exactement la même règle.
  */
+import { matchStartAtTime } from "./match-schedule";
 import type { MatchStatus } from "./types";
 
 /**
  * Mode de passage à l'antenne d'un match casté.
  * - `AUTO` — le direct s'ouvre dès que le match devient jouable.
+ * - `START_TIME` — le direct s'ouvre à la **date de début du match**
+ *   (`lib/shared/match-schedule.ts`), une fois le match jouable. C'est le mode
+ *   d'un plateau annoncé à l'avance : l'antenne suit le programme publié, sans
+ *   que personne n'ait à cliquer à l'heure dite.
  * - `MANUAL` — le direct s'ouvre au clic, ce qui convient aux tournois étalés
  *   sur plusieurs jours où un match peut être jouable des heures avant le cast.
  */
-export type MatchLiveTrigger = "AUTO" | "MANUAL";
+export type MatchLiveTrigger = "AUTO" | "START_TIME" | "MANUAL";
 
 /**
  * État de diffusion d'un match, dérivé.
@@ -42,11 +47,25 @@ export const MATCH_LIVE_STATE_LABELS: Record<Exclude<MatchLiveState, "OFF">, str
   LIVE: "En direct",
 };
 
+/** Modes de déclenchement, dans un ordre d'affichage stable. */
+export const MATCH_LIVE_TRIGGERS: readonly MatchLiveTrigger[] = ["AUTO", "START_TIME", "MANUAL"];
+
 /** Libellés FR des modes de déclenchement. */
 export const MATCH_LIVE_TRIGGER_LABELS: Record<MatchLiveTrigger, string> = {
   AUTO: "Automatique au démarrage du match",
+  START_TIME: "À la date de début du match",
   MANUAL: "Manuel (bouton d'antenne)",
 };
+
+/**
+ * Ce mode a-t-il besoin d'une date de début sur le match ?
+ *
+ * Seul `START_TIME` en dépend, et il en dépend totalement : sans date, il n'a
+ * aucune frontière à franchir et le match resterait indéfiniment « programmé ».
+ */
+export function requiresMatchStartAt(trigger: MatchLiveTrigger | null): boolean {
+  return trigger === "START_TIME";
+}
 
 /**
  * Plateformes de diffusion acceptées.
@@ -143,7 +162,7 @@ export function isValidStreamUrl(input: unknown): boolean {
 
 /** Vrai si `value` est un mode de déclenchement connu. */
 export function isMatchLiveTrigger(value: unknown): value is MatchLiveTrigger {
-  return value === "AUTO" || value === "MANUAL";
+  return value === "AUTO" || value === "START_TIME" || value === "MANUAL";
 }
 
 /** Vue minimale d'un match, commune aux lignes SQL et au type `BracketMatch`. */
@@ -153,10 +172,17 @@ export type MatchLiveInput = {
   liveTrigger: MatchLiveTrigger | null;
   /** Ouverture d'antenne (mode `MANUAL`) ; `null` = antenne fermée. */
   liveStartedAt: string | Date | null;
+  /**
+   * Date de début programmée du match (mode `START_TIME`) ; `null` = aucune.
+   * Facultative pour que les appelants qui n'en ont pas — un match reconstruit
+   * de mémoire dans un test, une ligne d'un flux antérieur — restent valides.
+   * Accepte aussi l'instant en millisecondes (`matchStartAtTime`).
+   */
+  startAt?: string | Date | number | null;
 };
 
 /**
- * État de diffusion d'un match.
+ * État de diffusion d'un match, à l'instant `now`.
  *
  * Ordre des règles, du plus fort au plus faible :
  * 1. pas de mode de déclenchement → le match n'est pas casté ;
@@ -164,19 +190,60 @@ export type MatchLiveInput = {
  *    attente ou score validé) : le direct est terminé ;
  * 3. le match n'est pas encore jouable → annoncé, pas encore à l'antenne ;
  * 4. `AUTO` → à l'antenne dès que le match est jouable ;
- * 5. `MANUAL` → à l'antenne si et seulement si elle a été ouverte.
+ * 5. `START_TIME` → à l'antenne une fois la date de début atteinte. Une date
+ *    absente laisse le match « programmé » indéfiniment : c'est une impasse,
+ *    mais une impasse **visible et réversible** — préférable à un direct qui
+ *    s'ouvrirait sur une heure qu'on n'a pas donnée ;
+ * 6. `MANUAL` → à l'antenne si et seulement si elle a été ouverte.
+ *
+ * `now` est un paramètre et non un appel à l'horloge, pour que le serveur, le
+ * client et les tests puissent tous se placer au même instant.
  */
-export function resolveMatchLiveState(match: MatchLiveInput): MatchLiveState {
+export function resolveMatchLiveState(
+  match: MatchLiveInput,
+  now: number = Date.now(),
+): MatchLiveState {
   if (match.liveTrigger === null) return "OFF";
   if (match.status === "AWAITING_CONFIRMATION" || match.status === "COMPLETED") return "OFF";
   if (match.status === "PENDING") return "SCHEDULED";
   if (match.liveTrigger === "AUTO") return "LIVE";
+  if (match.liveTrigger === "START_TIME") {
+    const startAt = matchStartAtTime({ startAt: match.startAt });
+    return startAt !== null && now >= startAt ? "LIVE" : "SCHEDULED";
+  }
   return match.liveStartedAt ? "LIVE" : "SCHEDULED";
 }
 
-/** Vrai si le match est à l'antenne. */
-export function isMatchLive(match: MatchLiveInput): boolean {
-  return resolveMatchLiveState(match) === "LIVE";
+/** Vrai si le match est à l'antenne à l'instant `now`. */
+export function isMatchLive(match: MatchLiveInput, now: number = Date.now()): boolean {
+  return resolveMatchLiveState(match, now) === "LIVE";
+}
+
+/**
+ * Instant du prochain changement d'état **par le seul passage du temps**, ou
+ * `null` s'il n'y en a pas.
+ *
+ * Seul `START_TIME` en produit un : les autres modes ne bougent qu'à la suite
+ * d'une écriture, que le flux temps réel pousse déjà. Sert à programmer un
+ * unique `setTimeout` côté client — même principe que
+ * `nextTournamentStateChangeAt` — pour que le badge bascule à la seconde dite
+ * sans sondage ni rechargement.
+ *
+ * On vérifie que la frontière change réellement l'état plutôt que de la
+ * renvoyer d'office : un match encore `PENDING` à son heure de début reste
+ * « programmé », et se réveiller pour redessiner à l'identique serait du gâchis.
+ */
+export function nextMatchLiveChangeAt(
+  match: MatchLiveInput,
+  now: number = Date.now(),
+): number | null {
+  if (match.liveTrigger !== "START_TIME") return null;
+
+  const startAt = matchStartAtTime({ startAt: match.startAt });
+  if (startAt === null || startAt <= now) return null;
+
+  const current = resolveMatchLiveState(match, now);
+  return resolveMatchLiveState(match, startAt) === current ? null : startAt;
 }
 
 /**

@@ -52,6 +52,7 @@ export interface TournamentDef extends ReportStateCounts {
   phases?: SeedPhase[]; // MULTI : phases successives du tournoi
   matchFormat?: MatchFormat; // format de match (BO5, FT3…) ; absent = score libre
   live?: SeedLive; // diffusion en direct ; absent = aucune chaîne annoncée
+  matchSchedule?: SeedMatchSchedule; // dates de début des manches ; absent = aucun horaire
 }
 
 /**
@@ -65,11 +66,27 @@ export interface TournamentDef extends ReportStateCounts {
 export interface SeedLive {
   /** Chaîne officielle du tournoi. */
   url: string;
-  trigger: "AUTO" | "MANUAL";
+  trigger: "AUTO" | "START_TIME" | "MANUAL";
   /** `MANUAL` : ouvre l'antenne d'office. Sans effet en `AUTO`. */
   onAir?: boolean;
   /** Chaîne portée par les matchs castés ; absente = badge sans lien. */
   matchUrl?: string;
+}
+
+/**
+ * Calendrier des manches d'un tournoi seedé
+ * (`lib/shared/match-schedule.ts`).
+ *
+ * Les horaires sont **relatifs à l'exécution du seed** : un `firstRoundHours`
+ * négatif place la première manche dans le passé, ce qui met à l'antenne un
+ * match casté en `START_TIME`, tandis qu'un horaire à venir le laisse
+ * « programmé ». C'est ce couple qui rend la bascule observable sans attendre.
+ */
+export interface SeedMatchSchedule {
+  /** Décalage horaire de la manche 1 par rapport à maintenant. */
+  firstRoundHours: number;
+  /** Écart entre deux manches consécutives, en heures. */
+  hoursPerRound: number;
 }
 
 
@@ -118,6 +135,15 @@ export const TOURNAMENTS: TournamentDef[] = [
   // Antenne ouverte à la main, sans lien sur les matchs : badge « en direct »
   // seul, le spectateur passe par la chaîne officielle.
   { name: "Live Manuel (antenne ouverte)", game: "OW2", state: "RUNNING", format: "DOUBLE", teamCount: 8, maxTeams: 8, daysOffset: -3, playWaves: 1, teamOffset: 76, live: { url: "https://kick.com/bluegenji", trigger: "MANUAL", onAir: true } },
+  // Antenne pilotée par le calendrier : l'heure de la manche restante est déjà
+  // passée, donc le match est à l'antenne sans que personne n'ait cliqué.
+  { name: "Live Horaire (heure passée)", game: "MR", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -2, playWaves: 1, teamOffset: 84, matchSchedule: { firstRoundHours: -3, hoursPerRound: 1 }, live: { url: "https://www.twitch.tv/bluegenji", trigger: "START_TIME", matchUrl: "https://www.twitch.tv/bluegenji" } },
+  // Même configuration, heure à venir : le match reste « programmé » et
+  // basculera tout seul à l'horaire — sans requête, minuteur côté client.
+  { name: "Live Horaire (heure à venir)", game: "OW2", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 92, matchSchedule: { firstRoundHours: 3, hoursPerRound: 1 }, live: { url: "https://www.youtube.com/@bluegenji", trigger: "START_TIME" } },
+  // Calendrier seul, sans diffusion : le cas le plus courant — l'arbitre
+  // annonce les horaires d'un plateau étalé sur la journée.
+  { name: "Plateau Horaires (sans live)", game: "MR", state: "RUNNING", format: "DOUBLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 100, matchSchedule: { firstRoundHours: -1, hoursPerRound: 2 } },
 
   // ---- RUNNING · BlueGenji Survie (endurance puis play-offs) ---------------
   // Capital réduit pour que des éliminations tombent vite, et petit plateau de

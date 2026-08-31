@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState, useEffect, useRef } from "react";
+import { FormEvent, useCallback, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { formatLocalDateTime } from "@/lib/shared/dates";
@@ -23,6 +23,7 @@ import { AdminScoreDialog } from "./_components/AdminScoreDialog";
 import { LiveIndicator } from "./_components/LiveIndicator";
 import { GhostRegistrationDialog } from "./_components/GhostRegistrationDialog";
 import { MatchLiveDialog } from "./_components/MatchLiveDialog";
+import { MatchScheduleDialog } from "./_components/MatchScheduleDialog";
 import { TournamentLiveLink } from "./_components/TournamentLiveLink";
 import { LiveProvider } from "./_lib/live-context";
 import { SeedingEditor } from "./_components/SeedingEditor";
@@ -85,6 +86,17 @@ export default function TournamentDetailPage() {
   // périmé — le dialogue rejouerait alors une configuration dépassée par-dessus
   // celle d'un autre membre du staff.
   const [matchForLiveId, setMatchForLiveId] = useState<number | null>(null);
+  // Même raison que ci-dessus : on retient l'identifiant, pas l'objet.
+  const [matchForScheduleId, setMatchForScheduleId] = useState<number | null>(null);
+  // Stables pour la vie de la page : les `setState` de React le sont déjà. Sans
+  // cela, deux flèches neuves à chaque rendu changeraient la valeur du contexte
+  // de diffusion à chaque instantané SSE, et redessineraient les 127 bandeaux
+  // d'un plateau à 128 équipes pour un score qui n'en concerne qu'un.
+  const openMatchLive = useCallback((match: BracketMatch) => setMatchForLiveId(match.id), []);
+  const openMatchSchedule = useCallback(
+    (match: BracketMatch) => setMatchForScheduleId(match.id),
+    [],
+  );
   const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
 
   // L'App Router réutilise ce composant d'un paramètre à l'autre : passer de
@@ -328,6 +340,10 @@ export default function TournamentDetailPage() {
     matchForLiveId === null
       ? null
       : detail.matches.find((match) => match.id === matchForLiveId) ?? null;
+  const matchForSchedule =
+    matchForScheduleId === null
+      ? null
+      : detail.matches.find((match) => match.id === matchForScheduleId) ?? null;
 
   const brackets = bracketOrder
     .map((b) => ({ type: b, matches: filteredMatches.filter((m) => m.bracket === b) }))
@@ -359,7 +375,12 @@ export default function TournamentDetailPage() {
       soloUserIds={detail.soloUserIds}
     >
       <MatchFormatProvider format={detail.card.matchFormat}>
-      <LiveProvider canManage={detail.canManageLive} openConfig={(match) => setMatchForLiveId(match.id)}>
+      <LiveProvider
+        canManage={detail.canManageLive}
+        canSchedule={detail.isAdmin}
+        openConfig={openMatchLive}
+        openSchedule={openMatchSchedule}
+      >
       <RulesHelpFab format={visibleFormat} contextLabel={contextLabel} />
       <section className="fade-in">
         <div className="ds-header green">
@@ -756,6 +777,15 @@ export default function TournamentDetailPage() {
           key={matchForLive.id}
           match={matchForLive}
           onClose={() => setMatchForLiveId(null)}
+          onSaved={() => void refresh()}
+        />
+      )}
+
+      {matchForSchedule && (
+        <MatchScheduleDialog
+          key={matchForSchedule.id}
+          match={matchForSchedule}
+          onClose={() => setMatchForScheduleId(null)}
           onSaved={() => void refresh()}
         />
       )}

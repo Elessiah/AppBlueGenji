@@ -50,6 +50,7 @@ function matchRow(overrides: Record<string, unknown> = {}) {
     team2_name: "Bravo",
     team1_score: null,
     team2_score: null,
+    start_at: null,
     live_trigger: null,
     live_url: null,
     live_started_at: null,
@@ -180,6 +181,32 @@ describe("getLandingLive", () => {
   it("expose l'état programmé d'un match casté hors antenne", async () => {
     (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
     await mockDb([matchRow({ live_trigger: "MANUAL" })]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+
+    expect(live?.currentMatch?.liveState).toBe("SCHEDULED");
+  });
+
+  it("met en avant un match dont l'heure de début est passée", async () => {
+    (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
+    await mockDb([
+      matchRow({
+        live_trigger: "START_TIME",
+        start_at: new Date(Date.now() - 60_000),
+        live_url: "https://twitch.tv/bg",
+      }),
+    ]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+
+    expect(live?.currentMatch?.liveState).toBe("LIVE");
+  });
+
+  it("laisse programmé un match dont l'heure n'est pas atteinte", async () => {
+    (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
+    await mockDb([
+      matchRow({ live_trigger: "START_TIME", start_at: new Date(Date.now() + 3_600_000) }),
+    ]);
 
     const live = await liveFrom(buckets([card(1, "Coupe A")]));
 

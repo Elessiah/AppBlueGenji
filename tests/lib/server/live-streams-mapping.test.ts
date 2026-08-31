@@ -42,7 +42,7 @@ function tournamentRow(liveUrl: string | null) {
   } as never;
 }
 
-function matchRow(liveUrl: string | null) {
+function matchRow(liveUrl: string | null, startAt: Date | null = null) {
   return {
     id: 5,
     tournament_id: 1,
@@ -75,6 +75,7 @@ function matchRow(liveUrl: string | null) {
     updated_at: new Date("2026-08-20T00:00:00Z"),
     phase_id: 0,
     phase_position: null,
+    start_at: startAt,
     live_trigger: "AUTO",
     live_url: liveUrl,
     live_started_at: null,
@@ -111,5 +112,25 @@ describe("mapMatch — chaîne du match", () => {
     const match = mapMatch(matchRow("https://twitch.tv/bg"));
     expect(match.liveTrigger).toBe("AUTO");
     expect(match.liveStartedAt).toBeNull();
+  });
+});
+
+describe("mapMatch — date de début", () => {
+  it("sérialise l'horaire en ISO", () => {
+    const startAt = new Date("2026-08-29T18:30:00Z");
+    expect(mapMatch(matchRow(null, startAt)).startAt).toBe("2026-08-29T18:30:00.000Z");
+  });
+
+  it("garde null quand aucun horaire n'est annoncé", () => {
+    expect(mapMatch(matchRow(null)).startAt).toBeNull();
+  });
+
+  it("tolère une ligne antérieure à la colonne", () => {
+    // La migration ajoute la colonne, mais un appelant qui construit une ligne
+    // sans elle (test, cache d'un ancien format) ne doit pas produire `undefined`
+    // dans la charge utile poussée par le flux.
+    const row = matchRow(null) as unknown as Record<string, unknown>;
+    delete row.start_at;
+    expect(mapMatch(row as never).startAt).toBeNull();
   });
 });

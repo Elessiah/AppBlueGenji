@@ -7,9 +7,12 @@ import {
   isValidStreamUrl,
   LIVE_PLATFORMS,
   MATCH_LIVE_TRIGGER_LABELS,
+  MATCH_LIVE_TRIGGERS,
   MAX_STREAM_URL_LENGTH,
+  requiresMatchStartAt,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
+import { formatMatchStartAt } from "@/lib/shared/match-schedule";
 import type { BracketMatch } from "@/lib/shared/types";
 import { mapError } from "../_lib/error-map";
 
@@ -40,11 +43,28 @@ export function MatchLiveDialog({ match, onClose, onSaved }: MatchLiveDialogProp
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
 
   const urlTouched = liveUrl.trim().length > 0;
-  const urlInvalid = urlTouched && !isValidStreamUrl(liveUrl);
+  // Conditionné à `streamed`, comme `triggerNeedsDate` : décocher la case
+  // n'envoie plus l'URL (`liveUrl: null`) et démonte le champ. Sans cette garde,
+  // une saisie fautive laissée derrière soi bloquerait le décochage avec un
+  // champ devenu invisible.
+  const urlInvalid = streamed && urlTouched && !isValidStreamUrl(liveUrl);
+  // « À la date de début » n'a pas de frontière à franchir sans date : le
+  // serveur refuse ce couple en 409, l'interface le désactive en amont plutôt
+  // que de laisser le staff buter dessus. La date se fixe avec la permission
+  // `tournaments`, sur le bandeau du match.
+  //
+  // Conditionné à `streamed` : décocher « ce match est casté » envoie
+  // `trigger: null`, que le serveur accepte toujours. Sans cette garde, un match
+  // passé en `START_TIME` puis privé de sa date deviendrait indécastable — les
+  // radios sont masquées quand la case est décochée, donc `trigger` resterait
+  // bloqué sur `START_TIME` et « Enregistrer » sur désactivé.
+  const startAtLabel = formatMatchStartAt(match.startAt);
+  const startAtMissing = startAtLabel === null;
+  const triggerNeedsDate = streamed && requiresMatchStartAt(trigger) && startAtMissing;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (urlInvalid) return;
+    if (urlInvalid || triggerNeedsDate) return;
 
     setBusy(true);
     try {
@@ -144,31 +164,38 @@ export function MatchLiveDialog({ match, onClose, onSaved }: MatchLiveDialogProp
                 >
                   Passage à l&apos;antenne
                 </legend>
-                {(["AUTO", "MANUAL"] as const).map((option) => (
-                  <label
-                    key={option}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      fontSize: 13,
-                      color: "var(--text-1, #c3ccd8)",
-                      marginBottom: 6,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="match-live-trigger"
-                      value={option}
-                      checked={trigger === option}
-                      onChange={() => setTrigger(option)}
-                    />
-                    {MATCH_LIVE_TRIGGER_LABELS[option]}
-                  </label>
-                ))}
+                {MATCH_LIVE_TRIGGERS.map((option) => {
+                  const disabled = requiresMatchStartAt(option) && startAtMissing;
+                  return (
+                    <label
+                      key={option}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        fontSize: 13,
+                        color: disabled ? "var(--text-2, #9aa4b2)" : "var(--text-1, #c3ccd8)",
+                        marginBottom: 6,
+                        cursor: disabled ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="match-live-trigger"
+                        value={option}
+                        checked={trigger === option}
+                        disabled={disabled}
+                        onChange={() => setTrigger(option)}
+                      />
+                      {MATCH_LIVE_TRIGGER_LABELS[option]}
+                      {requiresMatchStartAt(option) && startAtLabel && ` (${startAtLabel})`}
+                    </label>
+                  );
+                })}
                 <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-2, #9aa4b2)" }}>
-                  Le direct s&apos;arrête tout seul dès qu&apos;un score est saisi.
+                  {startAtMissing
+                    ? "Aucune date de début n'est fixée sur ce match : l'antenne à l'heure dite demande d'abord un horaire."
+                    : "Le direct s'arrête tout seul dès qu'un score est saisi."}
                 </p>
               </fieldset>
 
@@ -212,7 +239,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: MatchLiveDialogProp
             <button
               type="submit"
               className="btn"
-              disabled={busy || urlInvalid}
+              disabled={busy || urlInvalid || triggerNeedsDate}
               style={{ padding: "8px 20px", fontSize: 13 }}
             >
               {busy ? "Enregistrement…" : "Enregistrer"}
