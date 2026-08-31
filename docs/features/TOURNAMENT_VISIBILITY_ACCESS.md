@@ -83,6 +83,13 @@ impose `startVisibilityAt <= registrationOpenAt <= registrationCloseAt <= startA
 engagement qu'il est impossible d'avoir. `edit` est de son côté gardé par
 `can(user, "tournaments")`.
 
+L'invariant porte sur ce que l'**application** écrit : les deux seuls chemins qui
+posent ces quatre dates passent par `validateDateOrder`. Une ligne fabriquée à la
+main en base — ou par `npm run seed`, qui insère en SQL direct — pourrait le
+violer et rendre `register` atteignable sur un tournoi caché. Si un jour une
+écriture contourne cette validation, c'est la garde de visibilité qu'il faudra
+porter aussi sur ces routes, pas seulement les dates qu'il faudra recontrôler.
+
 La vitrine publique est logée à la même enseigne : le calendrier et le ticker de
 `/` passent par `listTournamentBuckets`, déjà filtré.
 
