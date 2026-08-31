@@ -42,6 +42,23 @@ function tournamentLabel(tournament: BotLogTournament): string {
   return `« ${tournament.name} » (#${tournament.id})`;
 }
 
+/**
+ * Entame commune à toutes les lignes : `<emoji> <Nature> — « Nom » (#id)`.
+ *
+ * Le canal se lit en diagonale, souvent sur un téléphone posé à côté du clavier :
+ * une entame identique fait tomber la nature de l'évènement toujours au même
+ * endroit, et le regard n'a plus qu'à balayer la colonne de gauche. C'est aussi
+ * ce qui garantit qu'aucune ligne n'oublie de dire de quel tournoi elle parle —
+ * la fonction ne sait pas en écrire une sans.
+ *
+ * @param emoji Pictogramme de tête, distinct par nature d'évènement.
+ * @param kind Nature de l'évènement, en toutes lettres.
+ * @param tournament Tournoi concerné.
+ */
+function lead(emoji: string, kind: string, tournament: BotLogTournament): string {
+  return `${emoji} ${kind} — ${tournamentLabel(tournament)}`;
+}
+
 /** Création d'un tournoi par le staff. */
 export function formatTournamentCreatedLog(context: {
   tournament: BotLogTournament;
@@ -60,7 +77,7 @@ export function formatTournamentCreatedLog(context: {
   if (context.startAt !== null) {
     parts.push(`début le ${formatMatchStart(context.startAt)}`);
   }
-  return `📅 Nouveau tournoi ${tournamentLabel(context.tournament)} — ${parts.join(", ")}.`;
+  return `${lead("📅", "Nouveau tournoi", context.tournament)} : ${parts.join(", ")}.`;
 }
 
 /**
@@ -81,7 +98,7 @@ export function formatRegistrationLog(context: {
 }): string {
   const field = `${context.registeredTeams}/${context.maxTeams} ${participantWording(context.participantType).many}`;
   const author = context.byStaff ? " (ajout du staff)" : "";
-  return `✅ Inscription — ${tournamentLabel(context.tournament)} : ${context.entrantName}${author}. ${field}.`;
+  return `${lead("✅", "Inscription", context.tournament)} : ${context.entrantName}${author}. ${field}.`;
 }
 
 /**
@@ -95,7 +112,7 @@ export function formatForfeitLog(context: {
   tournament: BotLogTournament;
   entrantName: string;
 }): string {
-  return `🚪 Abandon — ${tournamentLabel(context.tournament)} : ${context.entrantName} quitte la compétition.`;
+  return `${lead("🚪", "Abandon", context.tournament)} : ${context.entrantName} quitte la compétition.`;
 }
 
 /**
@@ -119,7 +136,7 @@ export function formatMatchResultLog(context: {
   const round = matchRoundLabel(context.bracket, context.roundNumber);
   const score = `${context.team1Name} ${context.team1Score}–${context.team2Score} ${context.team2Name}`;
   const forfeit = context.forfeit ? " (forfait)" : "";
-  return `🏁 ${tournamentLabel(context.tournament)} · ${round} : ${score}${forfeit}.`;
+  return `${lead("🏁", "Match terminé", context.tournament)} · ${round} : ${score}${forfeit}.`;
 }
 
 /** Désaccord entre les deux reports d'un même match : un arbitre doit trancher. */
@@ -132,7 +149,7 @@ export function formatScoreConflictLog(context: {
   team2Name: string;
 }): string {
   const round = matchRoundLabel(context.bracket, context.roundNumber);
-  return `⚠️ Conflit de score — ${tournamentLabel(context.tournament)} · ${round} : ${context.team1Name} vs ${context.team2Name} (match #${context.matchId}). Arbitrage requis.`;
+  return `${lead("⚠️", "Conflit de score", context.tournament)} · ${round} : ${context.team1Name} vs ${context.team2Name} (match #${context.matchId}). Arbitrage requis.`;
 }
 
 /** Coup d'envoi : le tournoi passe « en cours ». */
@@ -143,7 +160,7 @@ export function formatTournamentStartedLog(context: {
   participantType: ParticipantType;
 }): string {
   const field = `${context.registeredTeams} ${participantWording(context.participantType).many}`;
-  return `🚀 Coup d'envoi — ${tournamentLabel(context.tournament)} : ${field}, ${formatLabel(context.format)}.`;
+  return `${lead("🚀", "Coup d'envoi", context.tournament)} : ${field}, ${formatLabel(context.format)}.`;
 }
 
 /** Clôture d'un tournoi, avec sa championne quand le classement en désigne une. */
@@ -152,7 +169,7 @@ export function formatTournamentFinishedLog(context: {
   championName: string | null;
 }): string {
   const champion = context.championName ? ` : ${context.championName} l'emporte.` : ".";
-  return `🏆 Tournoi terminé — ${tournamentLabel(context.tournament)}${champion}`;
+  return `${lead("🏆", "Tournoi terminé", context.tournament)}${champion}`;
 }
 
 /**
@@ -172,7 +189,7 @@ export function formatUnderfilledTournamentLog(context: {
     context.registeredTeams === 0
       ? "aucun engagement"
       : `1 seul${wording.one === "équipe" ? "e équipe engagée" : " joueur engagé"}`;
-  return `🚫 Tournoi clos faute d'adversaires — ${tournamentLabel(context.tournament)} : ${field}.`;
+  return `${lead("🚫", "Tournoi clos faute d'adversaires", context.tournament)} : ${field}.`;
 }
 
 /** Suppression définitive d'un tournoi (administrateur). */
@@ -181,5 +198,5 @@ export function formatTournamentDeletedLog(context: {
   actorPseudo: string;
   actorId: number;
 }): string {
-  return `🗑️ Tournoi supprimé définitivement : ${tournamentLabel(context.tournament)} par ${context.actorPseudo} (#${context.actorId}).`;
+  return `${lead("🗑️", "Tournoi supprimé définitivement", context.tournament)}, par ${context.actorPseudo} (#${context.actorId}).`;
 }

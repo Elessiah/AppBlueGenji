@@ -14,15 +14,21 @@ jamais le site en retour.
 
 | Évènement | Ligne | Déclencheur |
 | --- | --- | --- |
-| Création d'un tournoi | `📅 Nouveau tournoi « … » (#12) — Ronde suisse · Overwatch 2, 16 équipes max, créé par …, début le …` | `createTournament` |
+| Création d'un tournoi | `📅 Nouveau tournoi — « … » (#12) : Ronde suisse · Overwatch 2, 16 équipes max, créé par …, début le …` | `createTournament` |
 | Inscription | `✅ Inscription — « … » (#12) : Alpha. 3/16 équipes.` | `registerTeam` (joueur ou staff) |
 | Abandon | `🚪 Abandon — « … » (#12) : Alpha quitte la compétition.` | `forfeitTournamentTeamPublic` |
 | Coup d'envoi | `🚀 Coup d'envoi — « … » (#12) : 8 équipes, Survie.` | bascule vers `RUNNING` |
-| Fin d'un match | `🏁 « … » (#12) · Manche 2 : Alpha 2–1 Bêta.` | `finalizeMatch` |
-| Conflit de score | `⚠️ Conflit de score — … Arbitrage requis.` | reports contradictoires |
+| Fin d'un match | `🏁 Match terminé — « … » (#12) · Manche 2 : Alpha 2–1 Bêta.` | `finalizeMatch` |
+| Conflit de score | `⚠️ Conflit de score — « … » (#12) · Manche 2 : … Arbitrage requis.` | reports contradictoires |
 | Clôture | `🏆 Tournoi terminé — « … » (#12) : Alpha l'emporte.` | `finishTournament` |
 | Clôture sans adversaires | `🚫 Tournoi clos faute d'adversaires — « … » (#12) : aucun engagement.` | `finalizeUnderfilledTournament` |
-| Suppression définitive | `🗑️ Tournoi supprimé définitivement : « … » (#12) par … (#3).` | `DELETE /api/admin/tournaments/[id]` |
+| Suppression définitive | `🗑️ Tournoi supprimé définitivement — « … » (#12), par … (#3).` | `DELETE /api/admin/tournaments/[id]` |
+
+Toutes les lignes partagent la même entame — `<pictogramme> <Nature> — « Nom »
+(#id)` — et un pictogramme distinct par nature. Le canal se lit en diagonale,
+souvent sur un téléphone posé à côté du clavier : la nature de l'évènement tombe
+toujours au même endroit, et le regard n'a plus qu'à balayer la colonne de
+gauche.
 
 L'identifiant suit toujours le nom : deux éditions d'un même tournoi portent
 volontiers le même titre, et une ligne doit pouvoir être rapprochée de sa page

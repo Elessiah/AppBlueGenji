@@ -82,6 +82,20 @@ describe("règles de rédaction communes", () => {
       expect(line).toContain("« Coupe BlueGenji » (#12)");
     }
   });
+
+  it("ouvre chaque ligne sur la même entame : pictogramme, nature, tournoi", () => {
+    // C'est ce qui rend le canal lisible en diagonale : la nature de
+    // l'évènement tombe toujours au même endroit.
+    for (const line of ALL_LINES()) {
+      expect(line).toMatch(/^\S+ [A-ZÀ-Ý][^—]* — « Coupe BlueGenji » \(#12\)/u);
+    }
+  });
+
+  it("emploie un pictogramme distinct par nature d'évènement", () => {
+    const emojis = ALL_LINES().map((line) => line.split(" ")[0]);
+
+    expect(new Set(emojis).size).toBe(emojis.length);
+  });
 });
 
 describe("formatTournamentCreatedLog", () => {
@@ -203,6 +217,7 @@ describe("formatMatchResultLog", () => {
       team2Score: 1,
     });
 
+    expect(line).toContain("Match terminé");
     expect(line).toContain("Manche 2");
     expect(line).toContain("Les Renards 2–1 Team Nova");
     expect(line).not.toContain("forfait");
