@@ -169,23 +169,3 @@ export function samePlan(a: SwissRoundPlan, b: SwissRoundPlan): boolean {
   const right = b.pairings.map(key).sort();
   return left.every((value, index) => value === right[index]);
 }
-
-/**
- * Forme « à plat » historique : les appariements suivis, le cas échéant, d'une
- * entrée `teamBId: null` pour la victoire d'office.
- */
-function flatten(plan: SwissRoundPlan): Pairing[] {
-  return plan.byeTeamId === null
-    ? plan.pairings
-    : [...plan.pairings, { teamAId: plan.byeTeamId, teamBId: null }];
-}
-
-/** @see planFirstRound — variante renvoyant le bye comme un appariement à vide. */
-export function pairFirstRound(participants: Participant[]): Pairing[] {
-  return flatten(planFirstRound(participants));
-}
-
-/** @see planNextRound — variante renvoyant le bye comme un appariement à vide. */
-export function pairNextRound(participants: Participant[]): Pairing[] {
-  return flatten(planNextRound(participants));
-}

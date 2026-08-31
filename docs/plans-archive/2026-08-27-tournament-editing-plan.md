@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Spec de référence : `docs/superpowers/specs/2026-08-27-tournament-editing-design.md`. En cas de contradiction, la spec fait foi.
+- Spec de référence : `docs/plans-archive/2026-08-27-tournament-editing-design.md`. En cas de contradiction, la spec fait foi.
 - Tout le texte d'interface est en **français**.
 - Les messages d'erreur et de succès passent par `useToast()` de `@/components/ui/toast` (`showError` / `showSuccess`), en superposition bas-gauche — **jamais** en ligne dans la page.
 - `lib/server/*` ne s'importe jamais depuis un composant client. `lib/shared/*` s'importe partout.

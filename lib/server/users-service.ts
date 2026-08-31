@@ -745,21 +745,6 @@ export async function getUserIdByPseudo(pseudo: string): Promise<number | null> 
   return rows.length === 0 ? null : Number(rows[0].id);
 }
 
-export async function getActiveMembershipTeamId(userId: number): Promise<number | null> {
-  const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { team_id: number })[]>(
-    `SELECT team_id
-     FROM bg_team_members
-     WHERE user_id = ?
-       AND left_at IS NULL
-     ORDER BY id DESC
-     LIMIT 1`,
-    [userId],
-  );
-
-  return rows.length === 0 ? null : Number(rows[0].team_id);
-}
-
 export function sanitizeRoles(roles: TeamRole[]): TeamRole[] {
   const parsed = parseRoles(roles);
   const unique = new Set(parsed);
@@ -768,5 +753,4 @@ export function sanitizeRoles(roles: TeamRole[]): TeamRole[] {
   }
   return Array.from(unique);
 }
-
 
