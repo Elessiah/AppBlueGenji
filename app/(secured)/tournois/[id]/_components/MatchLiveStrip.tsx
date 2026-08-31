@@ -108,7 +108,9 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
         >
           <span aria-hidden="true">🕑</span>
           <span className="sr-only">Début programmé : </span>
-          {startAtLabel}
+          {/* Chiffres à chasse fixe : les horaires d'une même colonne
+              s'alignent, et la carte ne se réajuste pas à chaque minute. */}
+          <span className="num">{startAtLabel}</span>
         </span>
       )}
 
@@ -117,7 +119,8 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
           title="Ce match passe à l'antenne à sa date de début, mais aucune date n'est fixée."
           style={{ color: "rgba(255,157,46,0.95)", whiteSpace: "nowrap" }}
         >
-          ⚠ sans date
+          <span aria-hidden="true">⚠</span>
+          <span className="sr-only">Attention : </span> sans date
         </span>
       )}
 
@@ -152,69 +155,74 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
         </a>
       )}
 
-      {showToggle && (
-        <button
-          type="button"
-          className="btn"
-          disabled={busy}
-          onClick={() => void toggleOnAir(state !== "LIVE")}
-          aria-label={
-            state === "LIVE"
-              ? `Couper le direct de ${matchLabel}`
-              : `Lancer le direct de ${matchLabel}`
-          }
+      {/* Les contrôles se regroupent à droite derrière un unique `marginLeft`.
+          Les répartir bouton par bouton obligeait chacun à savoir lesquels de
+          ses voisins étaient rendus — trois conditions à retenir d'accord entre
+          elles pour un seul effet visuel. */}
+      {(showToggle || canSchedule || showConfig) && (
+        <span
           style={{
+            display: "inline-flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 6,
             marginLeft: "auto",
-            padding: "2px 8px",
-            fontSize: 11,
-            background: state === "LIVE" ? "rgba(255,74,92,0.16)" : "rgba(79,224,162,0.14)",
-            borderColor: state === "LIVE" ? "rgba(255,74,92,0.45)" : "rgba(79,224,162,0.4)",
           }}
         >
-          {busy ? "…" : state === "LIVE" ? "■ Couper" : "▶ Antenne"}
-        </button>
-      )}
+        {showToggle && (
+          <button
+            type="button"
+            className="btn"
+            disabled={busy}
+            onClick={() => void toggleOnAir(state !== "LIVE")}
+            aria-label={
+              state === "LIVE"
+                ? `Couper le direct de ${matchLabel}`
+                : `Lancer le direct de ${matchLabel}`
+            }
+            style={{
+              padding: "2px 8px",
+              fontSize: 11,
+              background: state === "LIVE" ? "rgba(255,74,92,0.16)" : "rgba(79,224,162,0.14)",
+              borderColor: state === "LIVE" ? "rgba(255,74,92,0.45)" : "rgba(79,224,162,0.4)",
+            }}
+          >
+            {busy ? "…" : state === "LIVE" ? "■ Couper" : "▶ Antenne"}
+          </button>
+        )}
 
-      {canSchedule && (
-        <button
-          type="button"
-          className="btn ghost"
-          onClick={() => openSchedule(match)}
-          aria-label={
-            startAtLabel === null
-              ? `Programmer ${matchLabel}`
-              : `Modifier la date de début de ${matchLabel}`
-          }
-          style={{
-            marginLeft: showToggle || startAtLabel ? undefined : "auto",
-            whiteSpace: "nowrap",
-            padding: "2px 8px",
-            fontSize: 11,
-          }}
-        >
-          {startAtLabel === null ? "＋ Date" : "🗓 Date"}
-        </button>
-      )}
+        {canSchedule && (
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={() => openSchedule(match)}
+            aria-label={
+              startAtLabel === null
+                ? `Programmer ${matchLabel}`
+                : `Modifier la date de début de ${matchLabel}`
+            }
+            style={{ whiteSpace: "nowrap", padding: "2px 8px", fontSize: 11 }}
+          >
+            {startAtLabel === null ? "＋ Date" : "🗓 Date"}
+          </button>
+        )}
 
-      {showConfig && (
-        <button
-          type="button"
-          className="btn ghost"
-          onClick={() => openConfig(match)}
-          aria-label={
-            match.liveTrigger === null
-              ? `Caster ${matchLabel}`
-              : `Configurer la diffusion de ${matchLabel}`
-          }
-          style={{
-            marginLeft: showToggle || canSchedule || startAtLabel ? undefined : "auto",
-            whiteSpace: "nowrap",
-            padding: "2px 8px",
-            fontSize: 11,
-          }}
-        >
-          {match.liveTrigger === null ? "＋ Caster" : "⚙ Live"}
-        </button>
+        {showConfig && (
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={() => openConfig(match)}
+            aria-label={
+              match.liveTrigger === null
+                ? `Caster ${matchLabel}`
+                : `Configurer la diffusion de ${matchLabel}`
+            }
+            style={{ whiteSpace: "nowrap", padding: "2px 8px", fontSize: 11 }}
+          >
+            {match.liveTrigger === null ? "＋ Caster" : "⚙ Live"}
+          </button>
+        )}
+        </span>
       )}
     </div>
   );
