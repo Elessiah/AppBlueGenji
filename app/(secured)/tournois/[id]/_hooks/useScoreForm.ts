@@ -47,7 +47,11 @@ export function useScoreForm(match: BracketMatch | null) {
     if (untouched) {
       setState(next);
       setConflict(false);
-    } else {
+    } else if (!submitting) {
+      // Pas pendant un envoi : le flux rapporte alors **notre propre** écriture,
+      // qui arrive presque toujours avant la réponse HTTP. Sans cette réserve,
+      // l'arbitre voyait « ce match a été modifié pendant ta saisie » accuser un
+      // tiers de sa propre validation, le temps que le dialogue se referme.
       setConflict(true);
     }
   }
