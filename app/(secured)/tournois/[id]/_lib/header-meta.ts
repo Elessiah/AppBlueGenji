@@ -1,9 +1,8 @@
 import { matchFormatLabel, matchFormatDescription } from "@/lib/shared/match-format";
+import { FORMAT_LABELS, GAME_LABELS } from "@/lib/shared/tournament-labels";
 import { participantWording } from "@/lib/shared/participants";
 import type {
   TournamentCard,
-  TournamentFormat,
-  TournamentGame,
   TournamentPhase,
   TournamentState,
 } from "@/lib/shared/types";
@@ -24,19 +23,10 @@ import type {
  * `_components/TournamentHeader.tsx`.
  */
 
-export const FORMAT_LABELS: Record<TournamentFormat, string> = {
-  SINGLE: "Simple élimination",
-  DOUBLE: "Double élimination",
-  SWISS: "Ronde suisse",
-  SURVIVAL: "Survie",
-  MULTI: "Multi-phases",
-  BG_SURVIE: "BlueGenji Survie",
-};
-
-export const GAME_LABELS: Record<TournamentGame, string> = {
-  OW2: "Overwatch 2",
-  MR: "Marvel Rivals",
-};
+// Les libellés eux-mêmes vivent dans `lib/shared/tournament-labels.ts` : le
+// serveur les emploie aussi pour rédiger le journal Discord. Réexportés ici,
+// où le reste de l'en-tête (et ses tests) les lit depuis toujours.
+export { FORMAT_LABELS, GAME_LABELS };
 
 /**
  * Libellés d'état, et **ton** qui les habille.

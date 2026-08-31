@@ -2,6 +2,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { checkMatchScores, parseMatchFormat } from "@/lib/shared/match-format";
 import { MatchRow } from "./_internal";
+import { queueBotLog } from "./bot-logs";
 import { resolveUserEntrantTeamId } from "./registration";
 import { syncTournamentState } from "./state";
 import { tryAutoResolveByes } from "./byes";
@@ -108,6 +109,12 @@ export async function finalizeMatch(
     ],
   );
 
+  // Seul point de passage des matchs réellement tranchés — accord des deux
+  // engagés, délai de report expiré, arbitrage. Les byes et matchs fantômes
+  // passent par leurs propres écritures (`./byes`, les moteurs à classement) et
+  // n'encombrent donc pas le journal.
+  queueBotLog(connection, { kind: "match_finished", matchId: Number(match.id) });
+
   await pushTeamToTarget(
     connection,
     match.next_winner_match_id === null ? null : Number(match.next_winner_match_id),
@@ -140,7 +147,7 @@ export async function reportMatchScore(
   userId: number,
   myScoreRaw: number,
   opponentScoreRaw: number,
-): Promise<string | null> {
+): Promise<void> {
   const myScore = validateScoreValue(myScoreRaw);
   const opponentScore = validateScoreValue(opponentScoreRaw);
 
@@ -264,7 +271,6 @@ export async function reportMatchScore(
   );
 
   const updated = updatedRows[0];
-  let pendingBotLog: string | null = null;
 
   if (
     updated.team1_report_score !== null &&
@@ -294,34 +300,12 @@ export async function reportMatchScore(
         matchId,
       ]);
 
-      const [teamNames] = await connection.execute<
-        (RowDataPacket & {
-          team1_name: string;
-          team2_name: string;
-          tournament_name: string;
-        })[]
-      >(
-        `SELECT
-          t1.name AS team1_name,
-          t2.name AS team2_name,
-          tr.name AS tournament_name
-         FROM bg_matches m
-         JOIN bg_teams t1 ON t1.id = m.team1_id
-         JOIN bg_teams t2 ON t2.id = m.team2_id
-         JOIN bg_tournaments tr ON tr.id = m.tournament_id
-         WHERE m.id = ?
-         LIMIT 1`,
-        [matchId],
-      );
-
-      if (teamNames.length > 0) {
-        const info = teamNames[0];
-        pendingBotLog = `[Score conflict] Tournoi "${info.tournament_name}" - Match #${matchId} : ${info.team1_name} vs ${info.team2_name}. Validation admin requise.`;
-      }
+      // Les deux engagés se contredisent : un arbitre doit trancher, et il ne
+      // le saura que par le canal Discord — d'où une ligne de journal, résolue
+      // après le commit comme les autres (`./bot-logs`).
+      queueBotLog(connection, { kind: "score_conflict", matchId });
     }
   }
 
   await tryAutoResolveByes(connection, tournamentId);
-
-  return pendingBotLog;
 }

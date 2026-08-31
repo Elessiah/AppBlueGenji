@@ -1,6 +1,7 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { TournamentState } from "@/lib/shared/types";
 import { TournamentRow, RegistrationRow, MatchRow, TournamentListRow } from "./_internal";
+import { queueBotLog } from "./bot-logs";
 
 export async function loadTournamentRow(
   connection: PoolConnection,
@@ -115,16 +116,31 @@ export async function updateTournamentBracketSize(
   ]);
 }
 
+/**
+ * Clôt un tournoi. Point de passage unique de tous les formats (élimination,
+ * survie, ronde suisse, endurance, phases), et à ce titre l'endroit où le
+ * journal Discord réserve sa ligne de clôture : la championne, elle, est relue
+ * après le commit — le classement final s'écrit juste après cet appel.
+ */
 export async function finishTournament(
   connection: PoolConnection,
   tournamentId: number,
 ): Promise<void> {
-  await connection.execute(
+  // `state <> 'FINISHED'` fait de la clôture une opération à effet unique. Un
+  // tournoi déjà clos peut repasser ici — un arbitre qui corrige le score d'une
+  // archive rejoue toute la finalisation —, et sans cette clause il y gagnerait
+  // une nouvelle date de clôture (celle de la correction, pas celle du tournoi)
+  // et une seconde annonce de sa championne sur Discord.
+  const [result] = await connection.execute<ResultSetHeader>(
     `UPDATE bg_tournaments
      SET state = 'FINISHED', finished_at = NOW()
-     WHERE id = ?`,
+     WHERE id = ? AND state <> 'FINISHED'`,
     [tournamentId],
   );
+
+  if (result.affectedRows > 0) {
+    queueBotLog(connection, { kind: "tournament_finished", tournamentId });
+  }
 }
 
 export async function getRegistrationRows(

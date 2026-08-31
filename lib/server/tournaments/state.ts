@@ -2,6 +2,7 @@ import type { PoolConnection } from "mysql2/promise";
 import type { TournamentState } from "@/lib/shared/types";
 import { computeTournamentState as sharedComputeTournamentState } from "@/lib/shared/tournament-state";
 import { TournamentRow } from "./_internal";
+import { queueBotLog } from "./bot-logs";
 import {
   loadTournamentRow,
   updateTournamentState,
@@ -97,6 +98,19 @@ export async function syncTournamentState(
     await updateTournamentState(connection, tournamentId, computed);
     tournament.state = computed;
     stateChanged = true;
+
+    // Coup d'envoi : la seule bascule d'état qui vaille une ligne de journal.
+    // La condition ne porte pas sur `isStarting` mais sur l'état d'arrivée : un
+    // tournoi repasse par `UPCOMING` entre la clôture des inscriptions et son
+    // heure de début, et c'est donc de là qu'il part « en cours » le plus
+    // souvent.
+    // L'ouverture des inscriptions se lit sur la page et se déduit des dates
+    // annoncées ; le passage « en cours », lui, est le moment où le staff a
+    // quelque chose à surveiller. La clôture est journalisée par
+    // `finishTournament`, quel que soit le format qui la décide.
+    if (computed === "RUNNING") {
+      queueBotLog(connection, { kind: "tournament_started", tournamentId });
+    }
 
     // Après passage en RUNNING : clôture immédiate si départ à ≤ 1 équipe.
     if (isSurvivalStart) {

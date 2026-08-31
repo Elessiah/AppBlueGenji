@@ -41,6 +41,7 @@ import {
 } from "./repository";
 import { invalidateTournamentLists } from "./list-cache";
 import { hasPendingStateTransition, syncTournamentState } from "./state";
+import { discardBotLogs, flushBotLogs } from "./bot-logs";
 
 /**
  * Durée de vie d'un instantané. Volontairement courte : elle ne sert qu'à
@@ -119,6 +120,9 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
     await connection.beginTransaction();
     const syncResult = await syncTournamentState(connection, tournamentId);
     await connection.commit();
+    // Cette bascule-là aussi peut lancer ou clore un tournoi : le journal
+    // Discord ne dépend pas de *qui* a déclenché la synchronisation.
+    flushBotLogs(connection);
 
     // La même bascule déclenchée depuis la liste publie un événement ; ici, non
     // — le tournoi qui démarre parce qu'un spectateur a ouvert sa page laisserait
@@ -131,6 +135,7 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
     await connection.rollback();
     throw error;
   } finally {
+    discardBotLogs(connection);
     connection.release();
   }
 }

@@ -7,6 +7,7 @@ jest.mock("@/lib/server/tournaments/bg-survie");
 jest.mock("@/lib/server/tournaments/swiss");
 jest.mock("@/lib/server/tournaments/survival");
 jest.mock("@/lib/server/tournaments/phases");
+jest.mock("@/lib/server/tournaments/bot-logs");
 
 import { loadSeedingBoard, reorderSeeding } from "@/lib/server/tournaments/seeding";
 import {
@@ -20,6 +21,7 @@ import { initializeEnduranceTournament } from "@/lib/server/tournaments/bg-survi
 import { initializeSwissTournament } from "@/lib/server/tournaments/swiss";
 import { initializeSurvivalTournament } from "@/lib/server/tournaments/survival";
 import { initializeMultiTournament } from "@/lib/server/tournaments/phases";
+import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 
 type Row = Record<string, unknown>;
 
@@ -136,6 +138,30 @@ describe("reorderSeeding", () => {
     expect(publishUpdatedEvent).toHaveBeenCalledWith(5);
     // Aucun match généré : rien à reconstruire.
     expect(deleteAllMatches).not.toHaveBeenCalled();
+  });
+
+  it("vide la file du journal Discord après le commit, et la jette au retour", async () => {
+    // Réordonner un tournoi démarré rejoue son orchestration, qui peut le clore
+    // et donc réserver une ligne. Sans flush/discard, l'entrée resterait
+    // accrochée à une connexion que le pool réattribue.
+    (loadTournamentRow as jest.Mock).mockResolvedValue(tournament({ state: "RUNNING" }) as never);
+    (getMatchRows as jest.Mock).mockResolvedValue([matchRow()] as never);
+
+    await reorderSeeding(5, [2, 1]);
+
+    expect(flushBotLogs).toHaveBeenCalledWith(connection);
+    expect(discardBotLogs).toHaveBeenCalledWith(connection);
+  });
+
+  it("jette la file du journal quand la transaction échoue", async () => {
+    (loadTournamentRow as jest.Mock).mockResolvedValue(tournament() as never);
+    (getMatchRows as jest.Mock).mockResolvedValue([] as never);
+    connection.commit.mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK") as never);
+
+    await expect(reorderSeeding(5, [2, 1])).rejects.toThrow("ER_LOCK_DEADLOCK");
+
+    expect(flushBotLogs).not.toHaveBeenCalled();
+    expect(discardBotLogs).toHaveBeenCalledWith(connection);
   });
 
   it("détruit le plateau existant pour qu'il soit régénéré", async () => {
