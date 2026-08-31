@@ -128,13 +128,19 @@ export function formatMatchResultLog(context: {
   roundNumber: number;
   team1Name: string;
   team2Name: string;
-  team1Score: number;
-  team2Score: number;
+  /** `null` sur un forfait arbitré : le moteur n'y écrit aucun score. */
+  team1Score: number | null;
+  team2Score: number | null;
   /** Forfait déclaré sur ce match : le score seul ne le dirait pas. */
   forfeit?: boolean;
 }): string {
   const round = matchRoundLabel(context.bracket, context.roundNumber);
-  const score = `${context.team1Name} ${context.team1Score}–${context.team2Score} ${context.team2Name}`;
+  // Un forfait prononcé par un arbitre laisse les deux scores à `null` : la
+  // rencontre n'a pas été jouée. Écrire « 0–0 » raconterait un match nul.
+  const score =
+    context.team1Score === null || context.team2Score === null
+      ? `${context.team1Name} vs ${context.team2Name}`
+      : `${context.team1Name} ${context.team1Score}–${context.team2Score} ${context.team2Name}`;
   const forfeit = context.forfeit ? " (forfait)" : "";
   return `${lead("🏁", "Match terminé", context.tournament)} · ${round} : ${score}${forfeit}.`;
 }

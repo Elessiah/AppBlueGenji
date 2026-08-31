@@ -195,6 +195,15 @@ describe("resolveBotLogs", () => {
     expect(messages).toEqual([]);
   });
 
+  it("décrit un forfait arbitré, qui ne porte aucun score", async () => {
+    mockDb([[{ ...MATCH_ROW, team1_score: null, team2_score: null, forfeit_team_id: 102 }]]);
+
+    const [message] = await resolveBotLogs([{ kind: "match_finished", matchId: 31 }]);
+
+    expect(message).toContain("Les Renards vs Team Nova");
+    expect(message).toContain("(forfait)");
+  });
+
   it("ignore un match sans score enregistré", async () => {
     mockDb([[{ ...MATCH_ROW, team1_score: null, team2_score: null }]]);
 

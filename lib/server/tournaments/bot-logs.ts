@@ -289,16 +289,19 @@ async function resolveOne(entry: PendingBotLog): Promise<string | null> {
       // d'effectifs impairs).
       if (!match || Number(match.is_bye ?? 0) === 1) return null;
       if (!match.team1_name || !match.team2_name) return null;
-      if (match.team1_score === null || match.team2_score === null) return null;
+      // Un forfait arbitré ne porte aucun score : c'est le seul cas où leur
+      // absence décrit un match bel et bien tranché.
+      const forfeit = match.forfeit_team_id !== null;
+      if (!forfeit && (match.team1_score === null || match.team2_score === null)) return null;
       return formatMatchResultLog({
         tournament: { id: Number(match.tournament_id), name: match.tournament_name },
         bracket: String(match.bracket),
         roundNumber: Number(match.round_number),
         team1Name: match.team1_name,
         team2Name: match.team2_name,
-        team1Score: Number(match.team1_score),
-        team2Score: Number(match.team2_score),
-        forfeit: match.forfeit_team_id !== null,
+        team1Score: match.team1_score === null ? null : Number(match.team1_score),
+        team2Score: match.team2_score === null ? null : Number(match.team2_score),
+        forfeit,
       });
     }
 

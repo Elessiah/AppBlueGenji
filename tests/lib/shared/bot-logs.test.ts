@@ -238,6 +238,23 @@ describe("formatMatchResultLog", () => {
     expect(line).toContain("(forfait)");
   });
 
+  it("dit « vs » plutôt que 0–0 sur un forfait arbitré, qui n'a aucun score", () => {
+    const line = formatMatchResultLog({
+      tournament: TOURNAMENT,
+      bracket: "UPPER",
+      roundNumber: 1,
+      team1Name: "Les Renards",
+      team2Name: "Team Nova",
+      team1Score: null,
+      team2Score: null,
+      forfeit: true,
+    });
+
+    expect(line).toContain("Les Renards vs Team Nova");
+    expect(line).toContain("(forfait)");
+    expect(line).not.toContain("0–0");
+  });
+
   it("emploie le vocabulaire de manche partagé avec les rappels", () => {
     const grand = formatMatchResultLog({
       tournament: TOURNAMENT,
