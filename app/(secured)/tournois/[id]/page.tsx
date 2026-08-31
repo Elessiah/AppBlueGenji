@@ -394,7 +394,15 @@ export default function TournamentDetailPage() {
         openConfig={openMatchLive}
         openSchedule={openMatchSchedule}
       >
-      <IssueReportProvider canReport={detail.myTeamId !== null} openReport={openIssueReport}>
+      {/* Le bouton **par match** suit la règle de `frozen` : le plateau affiché
+          ne bouge plus, et signaler « ce match » depuis une manche périmée
+          désignerait la mauvaise. Celui de l'en-tête reste, lui, disponible —
+          c'est justement quand le site décroche qu'il faut pouvoir joindre un
+          arbitre. */}
+      <IssueReportProvider
+        canReport={detail.myTeamId !== null && !frozen}
+        openReport={openIssueReport}
+      >
       <RulesHelpFab format={visibleFormat} contextLabel={contextLabel} />
       <section className="fade-in">
         <div className="ds-header green">

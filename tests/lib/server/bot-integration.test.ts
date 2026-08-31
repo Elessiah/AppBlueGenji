@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import {
   fetchBotStats,
+  pushDiscordDirectMessages,
+  pushRefereeAlert,
   pushSiteVisitStats,
   resolveDiscordUser,
   sendDiscordLoginCode,
@@ -188,6 +190,89 @@ describe("bot-integration", () => {
       jest.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 500 }));
 
       await expect(pushSiteVisitStats(stats)).resolves.toBeUndefined();
+    });
+  });
+
+  describe("notifications Discord", () => {
+    const recipients = [{ discordId: "555000111", handle: "kiro", label: "Kiro" }];
+
+    /** Ouvre le coupe-circuit : trois échecs consécutifs suffisent. */
+    async function tripCircuit() {
+      jest.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 500 }));
+      for (let i = 0; i < 3; i++) await pushSiteVisitStats({} as SiteVisitStats);
+      jest.restoreAllMocks();
+    }
+
+    it("poste un message privé sur le canal interne", async () => {
+      const fetchMock = jest
+        .spyOn(global, "fetch")
+        .mockResolvedValue(Response.json({ sent: 1, unresolved: [], failed: [] }));
+
+      const report = await pushDiscordDirectMessages("Rappel", recipients, "match-reminder");
+
+      expect(report).toEqual({ sent: 1, unresolved: [], failed: [] });
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:4400/internal/notify/dm",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+
+    it("complète un bilan partiel du bot", async () => {
+      jest.spyOn(global, "fetch").mockResolvedValue(Response.json({ sent: 2 }));
+
+      expect(await pushRefereeAlert("Signalement", "issue-report")).toEqual({
+        sent: 2,
+        unresolved: [],
+        failed: [],
+      });
+    });
+
+    it("rend un bilan neuf à chaque appel — pas de tableaux partagés", async () => {
+      jest.spyOn(global, "fetch").mockResolvedValue(Response.json({ sent: 0 }));
+
+      const first = await pushRefereeAlert("A", "issue-report");
+      const second = await pushRefereeAlert("B", "issue-report");
+
+      expect(first?.unresolved).not.toBe(second?.unresolved);
+    });
+
+    it("n'appelle pas le bot sans destinataire", async () => {
+      const fetchMock = jest.spyOn(global, "fetch");
+
+      expect(await pushDiscordDirectMessages("Rappel", [], "match-reminder")).toEqual({
+        sent: 0,
+        unresolved: [],
+        failed: [],
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("rend null quand le bot est injoignable", async () => {
+      jest.spyOn(global, "fetch").mockRejectedValue(new Error("ECONNREFUSED"));
+
+      expect(await pushRefereeAlert("Signalement", "issue-report")).toBeNull();
+    });
+
+    it("court-circuite les rappels quand le bot vient d'échouer en série", async () => {
+      await tripCircuit();
+      const fetchMock = jest.spyOn(global, "fetch");
+
+      expect(await pushDiscordDirectMessages("Rappel", recipients, "match-reminder")).toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("tente quand même l'alerte arbitres : un signalement est une action de joueur", async () => {
+      await tripCircuit();
+      const fetchMock = jest
+        .spyOn(global, "fetch")
+        .mockResolvedValue(Response.json({ sent: 1, unresolved: [], failed: [] }));
+
+      expect(await pushRefereeAlert("Signalement", "issue-report")).toEqual({
+        sent: 1,
+        unresolved: [],
+        failed: [],
+      });
+      expect(fetchMock).toHaveBeenCalled();
     });
   });
 });

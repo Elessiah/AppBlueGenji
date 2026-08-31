@@ -156,6 +156,17 @@ Rien n'est stocké côté site — c'est une alerte, pas un ticket.
 répondre « signalement envoyé » quand rien n'est parti laisserait le joueur
 attendre un arbitre qui n'a rien reçu.
 
+Le **coupe-circuit** de `bot-integration` est ignoré sur ce chemin, comme pour
+l'envoi du code de connexion : il protège le site d'un bot en panne que le trafic
+de fond sollicite en boucle, mais un balayage de rappels qui vient de l'ouvrir
+refuserait sinon le signalement d'un joueur sans même essayer. Une action
+explicite mérite sa tentative.
+
+Le bouton **par match** disparaît quand le suivi temps réel décroche (`frozen`) —
+le plateau affiché ne bouge plus, et signaler « ce match » depuis une manche
+périmée désignerait la mauvaise. Celui de l'**en-tête** reste : c'est justement
+quand le site décroche qu'il faut pouvoir joindre un arbitre.
+
 Le plafond de débit (`ISSUE_REPORT_RULE`) est étroit à rebours des autres — cinq
 par dix minutes et par utilisateur : chaque appel fait vibrer le téléphone de
 tous les arbitres.
