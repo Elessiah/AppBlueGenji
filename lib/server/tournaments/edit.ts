@@ -51,8 +51,6 @@ export type EditableTournamentValues = {
   phases: PhaseConfig[] | null;
 };
 
-type EditRow = RowDataPacket & Record<string, never>;
-
 /**
  * Lit la ligne avec **toutes** les colonnes éditables.
  *
@@ -64,7 +62,7 @@ async function loadEditRow(
   tournamentId: number,
   forUpdate: boolean,
 ): Promise<Record<string, unknown> | null> {
-  const [rows] = await connection.execute<EditRow[]>(
+  const [rows] = await connection.execute<RowDataPacket[]>(
     `SELECT
       id, name, description, format, game, participant_type, max_teams, state,
       start_visibility_at, registration_open_at, registration_close_at, start_at,
@@ -127,7 +125,7 @@ async function loadPhaseConfigs(
   connection: PoolConnection,
   tournamentId: number,
 ): Promise<PhaseConfig[]> {
-  const [rows] = await connection.execute<EditRow[]>(
+  const [rows] = await connection.execute<RowDataPacket[]>(
     `SELECT position, name, format, qualifier_mode, qualifier_value,
             has_third_place_match, swiss_total_rounds,
             survival_rounds_before_first_cut, survival_rounds_per_cut
@@ -305,19 +303,27 @@ export async function updateTournament(
       ],
     );
 
-    // Les phases sont toujours reposées à neuf : l'invariant qui rend cela sûr
-    // repose sur l'état du tournoi. Seules les fonctions de démarrage
-    // (initializeMultiTournament, startPhase) et le recalcul du seeding écrivent
-    // une phase_id, et toutes exigent state === "RUNNING". Or, on a jeté
-    // TOURNAMENT_LOCKED plus haut si l'état était RUNNING : donc aucune phase
-    // n'existe au moment de ce DELETE. Il n'y a pas de clé étrangère pour
-    // protéger cet invariant — une réduction future du verrou sur l'édition
-    // pourrait le briser silencieusement.
-    await connection.execute(`DELETE FROM bg_tournament_phases WHERE tournament_id = ?`, [
-      tournamentId,
-    ]);
-    if (valid.format === "MULTI" && normalizedPhases) {
-      await insertPhases(connection, tournamentId, normalizedPhases);
+    // Les phases ne sont reposées à neuf que si le patch les concerne — soit
+    // directement, soit par un changement de format qui les rend caduques.
+    // Renommer un tournoi MULTI ne touchait pas moins ses phases : le
+    // DELETE + INSERT était inconditionnel, pour un résultat identique à
+    // l'octet près.
+    //
+    // L'invariant qui rend ce DELETE sûr repose sur l'état du tournoi. Seules
+    // les fonctions de démarrage (initializeMultiTournament, startPhase) et le
+    // recalcul du seeding écrivent une phase_id, et toutes exigent
+    // state === "RUNNING". Or on a jeté TOURNAMENT_LOCKED plus haut si l'état
+    // était RUNNING : aucune phase n'est donc en cours d'usage ici. Il n'y a pas
+    // de clé étrangère pour protéger cet invariant — une réduction future du
+    // verrou sur l'édition pourrait le briser silencieusement. Ne plus y toucher
+    // hors de propos réduit d'autant la surface de cette dépendance.
+    if (patch.format !== undefined || patch.phases !== undefined) {
+      await connection.execute(`DELETE FROM bg_tournament_phases WHERE tournament_id = ?`, [
+        tournamentId,
+      ]);
+      if (valid.format === "MULTI" && normalizedPhases) {
+        await insertPhases(connection, tournamentId, normalizedPhases);
+      }
     }
 
     await connection.commit();

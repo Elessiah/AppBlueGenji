@@ -13,7 +13,7 @@ jest.mock("@/lib/server/tournaments-service");
 import { GET } from "@/app/api/tournaments/[id]/stream/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import {
-  getTournamentSnapshot,
+  getVisibleTournamentSnapshot,
   getTournamentViewerContext,
 } from "@/lib/server/tournaments-service";
 import { resetRateLimit } from "@/lib/server/rate-limit";
@@ -82,7 +82,7 @@ beforeEach(() => {
   resetRateLimit();
   resetTournamentBroadcast();
   (getCurrentUser as jest.Mock).mockResolvedValue({ id: 1, isAdmin: false, roles: [] } as never);
-  (getTournamentSnapshot as jest.Mock).mockResolvedValue(snapshotWith([]) as never);
+  (getVisibleTournamentSnapshot as jest.Mock).mockResolvedValue(snapshotWith([]) as never);
   (getTournamentViewerContext as jest.Mock).mockResolvedValue(viewerWith() as never);
 });
 
@@ -106,7 +106,7 @@ describe("GET /api/tournaments/[id]/stream — accès", () => {
   it("répond 404 sur un tournoi inconnu plutôt que d'ouvrir un flux vide", async () => {
     // C'est ce 404 que la lecture de secours du client traduit en échec
     // définitif : sans lui, la page réessaierait pour l'éternité.
-    (getTournamentSnapshot as jest.Mock).mockResolvedValue(null as never);
+    (getVisibleTournamentSnapshot as jest.Mock).mockResolvedValue(null as never);
     expect((await GET(new Request("http://t/"), params("5"))).status).toBe(404);
   });
 });
@@ -145,7 +145,7 @@ describe("GET /api/tournaments/[id]/stream — palier décidé par le serveur", 
   });
 
   it("passe un engagé du tournoi en prioritaire", async () => {
-    (getTournamentSnapshot as jest.Mock).mockResolvedValue(
+    (getVisibleTournamentSnapshot as jest.Mock).mockResolvedValue(
       snapshotWith([{ teamId: 42 }]) as never,
     );
     (getTournamentViewerContext as jest.Mock).mockResolvedValue(
@@ -284,5 +284,55 @@ describe("GET /api/tournaments/[id]/stream — plafonds", () => {
     // flux mort.
     expect(response.headers.get("X-Accel-Buffering")).toBe("no");
     await response.body!.cancel();
+  });
+});
+
+describe("GET /api/tournaments/[id]/stream — garde de visibilité", () => {
+  /** Droits passés à la garde de visibilité : `[id, { canManage }]`. */
+  function visibilityCall() {
+    return (getVisibleTournamentSnapshot as jest.Mock).mock.calls[0];
+  }
+
+  it("lit sans droit de gestion pour un simple spectateur", async () => {
+    // Le flux est le chemin nominal : si la garde n'était posée que sur la
+    // lecture REST de secours, elle ne servirait à rien tant que le direct tient.
+    const response = await GET(new Request("http://t/"), params("5"));
+    await response.body!.cancel();
+
+    expect(visibilityCall()).toEqual([5, { canManage: false }]);
+  });
+
+  it("accorde la gestion à un arbitre, qui voit donc les tournois non publiés", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(
+      { id: 1, isAdmin: false, roles: ["ARBITRE"] } as never,
+    );
+
+    const response = await GET(new Request("http://t/"), params("5"));
+    await response.body!.cancel();
+
+    expect(visibilityCall()).toEqual([5, { canManage: true }]);
+  });
+
+  it("laisse le cast sans droit de gestion : il ne voit pas les tournois non publiés", async () => {
+    // `casting` donne l'aperçu du plateau, pas l'accès à un tournoi que le staff
+    // n'a pas encore annoncé — c'est déjà l'audience de la liste des invisibles.
+    (getCurrentUser as jest.Mock).mockResolvedValue(
+      { id: 1, isAdmin: false, roles: ["CASTER"] } as never,
+    );
+
+    const response = await GET(new Request("http://t/"), params("5"));
+    await response.body!.cancel();
+
+    expect(visibilityCall()).toEqual([5, { canManage: false }]);
+  });
+
+  it("répond 404 — et non 403 — quand la garde refuse", async () => {
+    // Un 403 confirmerait l'existence du tournoi qu'on cherche justement à
+    // cacher, l'identifiant étant un entier consécutif.
+    (getVisibleTournamentSnapshot as jest.Mock).mockResolvedValue(null as never);
+
+    const response = await GET(new Request("http://t/"), params("5"));
+
+    expect(response.status).toBe(404);
   });
 });

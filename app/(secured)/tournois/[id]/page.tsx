@@ -128,7 +128,10 @@ export default function TournamentDetailPage() {
         <p style={{ margin: "0 0 20px", lineHeight: 1.6 }}>
           {fatal === "UNAUTHORIZED"
             ? "Ta session a expiré : le suivi en direct est arrêté. Reconnecte-toi pour le reprendre."
-            : "Ce tournoi n'existe plus. Il a pu être supprimé pendant que tu le consultais."}
+            : // Volontairement neutre : ce 404 recouvre le tournoi supprimé et
+              // le tournoi pas encore publié, que le serveur refuse sans dire
+              // lequel des deux (`docs/features/TOURNAMENT_VISIBILITY_ACCESS.md`).
+              "Ce tournoi n'est pas accessible. Il a pu être supprimé, ou n'est pas encore ouvert au public."}
         </p>
         <CyberButton asChild variant="primary">
           <Link href={fatal === "UNAUTHORIZED" ? "/connexion" : "/tournois"}>

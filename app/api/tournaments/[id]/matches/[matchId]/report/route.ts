@@ -10,8 +10,14 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const tournamentId = Number(id);
   const matchId = Number(rawMatchId);
 
-  if (!Number.isInteger(tournamentId) || tournamentId <= 0 || !Number.isInteger(matchId) || matchId <= 0) {
-    return fail("INVALID_ID", 400);
+  // Deux identifiants, deux codes : `INVALID_ID` laissait le client deviner
+  // lequel des deux était en cause, et divisait le vocabulaire des routes
+  // sœurs, qui nomment déjà `INVALID_TOURNAMENT_ID`.
+  if (!Number.isInteger(tournamentId) || tournamentId <= 0) {
+    return fail("INVALID_TOURNAMENT_ID", 400);
+  }
+  if (!Number.isInteger(matchId) || matchId <= 0) {
+    return fail("INVALID_MATCH_ID", 400);
   }
 
   try {

@@ -59,6 +59,22 @@ Une date de visibilité illisible (`Invalid Date`) est traitée comme **visible*
 
 La validation des valeurs est **identique à celle de la création**, tirée de `lib/server/tournaments/validation.ts`. Ni l'édition ni la création n'ont leur propre jeu de règles : les deux empruntent le même code. Si la création accepte un barème suisse monotone et l'édition le refuse, vous avez un bug. Les tests gardent la couverture en place — la création teste le module, l'édition le réappelle sur ses propres cas.
 
+## Ce que la validation partagée normalise
+
+`validateTournamentInput` ne fait pas que refuser : elle **normalise** aussi. La petite
+finale n'a de sens qu'en élimination simple, et c'est là que la règle vit —
+`hasThirdPlaceMatch` retombe à `false` dès que le format n'est pas `SINGLE`.
+
+Elle ne vivait auparavant que dans `createTournament`. Une **édition** basculant un
+tournoi de `SINGLE` à `DOUBLE` gardait donc la case cochée en base, là où la création du
+même tournoi l'aurait mise à zéro. Conséquence visible : `loadEditableTournament` relit
+cette colonne, donc le formulaire rouvrait la case cochée dès qu'on revenait à `SINGLE`,
+et l'enregistrement suivant ajoutait une petite finale que personne n'avait redemandée.
+(`rankEliminationPhase` lit la colonne quel que soit le format, mais ne s'en sert que
+dans sa branche `SINGLE` : le classement d'un tournoi `DOUBLE` n'était pas faussé.)
+C'est exactement le genre de divergence que l'extraction de la validation devait
+supprimer.
+
 ## La route de l'édition
 
 `PATCH /api/tournaments/[id]/edit` — réservée au staff `tournaments` (`can(user, "tournaments")`).
@@ -90,16 +106,26 @@ La fenêtre est calculée **à nouveau** une fois la transaction commencée, sou
 
 Pour rendre un champ modifiable :
 
-1. Ajouter son nom à `TournamentField` (type union) dans `lib/shared/tournament-edit.ts`
-2. L'inclure dans `ALL_TOURNAMENT_FIELDS`
-3. Si le champ doit survivre à la publication, l'ajouter à `RESTRICTED_FIELDS`
-4. Ajouter la colonne au `SELECT` et au `UPDATE` dans `loadEditRow` et `updateTournament` (`lib/server/tournaments/edit.ts`)
-5. Ajouter le champ à `EditableTournamentValues` (type d'échange) dans `lib/server/tournaments/edit.ts`
-6. L'ajouter au formulaire (`app/(secured)/tournois/_components/TournamentForm.tsx`)
+1. Ajouter son nom à `ALL_TOURNAMENT_FIELDS` dans `lib/shared/tournament-edit.ts` —
+   `TournamentField` en est **dérivé** (`typeof ALL_TOURNAMENT_FIELDS[number]`), il n'y a
+   donc plus qu'une liste à tenir. C'est ce tableau que parcourt la liste blanche de la
+   route : un champ ajouté au seul type y aurait été ignoré en silence.
+2. Si le champ doit survivre à la publication, l'ajouter à `RESTRICTED_FIELDS`
+3. Ajouter la colonne au `SELECT` et au `UPDATE` dans `loadEditRow` et `updateTournament` (`lib/server/tournaments/edit.ts`)
+4. Ajouter le champ à `EditableTournamentValues` (type d'échange) dans `lib/server/tournaments/edit.ts`
+5. L'ajouter au formulaire — `_components/TournamentForm.tsx` pour un champ commun,
+   `_components/FormatSettings.tsx` s'il ne concerne qu'un format
 
 Si le champ a des règles de validation propres (range, contrainte avec un autre champ), ajouter le contrôle dans `checkEditPatch` si c'est un droit d'édition (avant/après l'application), ou dans `validateTournamentInput` si c'est une cohérence de valeurs.
 
-Les phases du format MULTI sont reposées à neuf à chaque édition : la colonne n'existe pas, mais elle voyage dans `EditableTournamentValues.phases` (type brut, à normaliser avant insertion, comme en création).
+Les phases du format MULTI n'ont pas de colonne : elles voyagent dans
+`EditableTournamentValues.phases` (type brut, à normaliser avant insertion, comme en
+création). Elles sont reposées à neuf — `DELETE` puis `INSERT` — **quand le patch les
+concerne**, c'est-à-dire s'il porte `phases` ou `format`. Un patch qui n'y touche pas
+les laisse en place : le `DELETE` n'est sûr que parce qu'aucune phase n'est en cours
+d'usage tant que le tournoi n'est pas `RUNNING` (et `RUNNING` ⇒ `TOURNAMENT_LOCKED`),
+un invariant qu'aucune clé étrangère ne protège. Ne l'exercer que quand c'est utile
+réduit d'autant la surface de cette dépendance.
 
 ## Surfaces
 
@@ -111,4 +137,12 @@ Les phases du format MULTI sont reposées à neuf à chaque édition : la colonn
 | API | `PATCH /api/tournaments/[id]/edit` (`app/api/tournaments/[id]/edit/route.ts`) |
 | Page du tournoi (bouton) | `app/(secured)/tournois/[id]/_components/TournamentDetail.tsx` |
 | Formule du bouton et notice | `app/(secured)/tournois/[id]/_lib/edit-entry.ts` |
-| Interface | `app/(secured)/tournois/[id]/modifier/page.tsx` + `app/(secured)/tournois/_components/TournamentForm.tsx` (partagé avec création) |
+| Interface | `app/(secured)/tournois/[id]/modifier/page.tsx` |
+| Formulaire (partagé avec la création) | `app/(secured)/tournois/_components/TournamentForm.tsx` |
+| Réglages propres au format | `app/(secured)/tournois/_components/FormatSettings.tsx` |
+| Valeurs du formulaire et ponts avec l'API | `app/(secured)/tournois/_lib/tournament-form-values.ts` |
+
+La page d'édition ne reçoit du serveur que la **fenêtre**, pas l'état : elle en tire ses
+champs modifiables par `editableFieldsForWindow`, la même fonction que sert
+`editableFieldsFor` côté serveur. Elle rejouait auparavant le `switch` en miniature —
+deux écritures de la même règle, dont une seule aurait suivi l'ajout d'une fenêtre.

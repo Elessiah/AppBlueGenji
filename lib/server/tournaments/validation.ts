@@ -327,7 +327,15 @@ export function validateTournamentInput(
       game: body.game ?? "OW2",
       participantType: body.participantType ?? "TEAM",
       maxTeams,
-      hasThirdPlaceMatch: Boolean(body.hasThirdPlaceMatch),
+      // La petite finale n'a de sens qu'en élimination simple : on la neutralise
+      // ailleurs plutôt que de la stocker telle quelle. `createTournament`
+      // portait seule cette règle, si bien qu'une **édition** basculant un
+      // tournoi de `SINGLE` à `DOUBLE` laissait la case cochée en base là où sa
+      // création l'aurait mise à zéro : le formulaire la rouvrait cochée au
+      // retour vers `SINGLE`, activant une petite finale que personne n'avait
+      // redemandée. (`rankEliminationPhase` lit bien la colonne quel que soit le
+      // format, mais ne s'en sert que dans sa branche `SINGLE`.)
+      hasThirdPlaceMatch: body.format === "SINGLE" && Boolean(body.hasThirdPlaceMatch),
       survivalRoundsBeforeFirstCut,
       survivalRoundsPerCut,
       swissTotalRounds,
@@ -348,18 +356,35 @@ export function validateTournamentInput(
   };
 }
 
-/**
- * Ordre chronologique des quatre jalons.
- *
- * Déplacé depuis `createTournament` pour que l'édition applique la même règle
- * sur les valeurs **résultantes** — champs modifiés et champs conservés mêlés.
- */
-export function validateDateOrder(dates: {
+/** Les quatre jalons d'un tournoi, en ISO. */
+export type TournamentDateStrings = {
   startVisibilityAt: string;
   registrationOpenAt: string;
   registrationCloseAt: string;
   startAt: string;
-}): "INVALID_DATES" | "INVALID_DATE_ORDER" | null {
+};
+
+/** Les mêmes, une fois analysés. */
+export type TournamentDates = Record<keyof TournamentDateStrings, Date>;
+
+export type DateOrderError = "INVALID_DATES" | "INVALID_DATE_ORDER";
+
+/**
+ * Analyse les quatre jalons **et** vérifie leur ordre chronologique.
+ *
+ * Rend les `Date` construites au passage : l'appelant qui va les insérer n'a pas
+ * à les reconstruire, ce que faisait `createTournament` — quatre `new Date` sur
+ * des chaînes que cette fonction venait d'analyser, avec le risque qu'un jour
+ * les deux analyses ne portent plus sur les mêmes valeurs.
+ *
+ * L'ordre `startVisibilityAt <= registrationOpenAt` n'est pas décoratif : c'est
+ * lui qui garantit qu'un tournoi encore invisible est toujours `UPCOMING`, et
+ * donc que les routes d'écriture n'ont pas à connaître la visibilité
+ * (`docs/features/TOURNAMENT_VISIBILITY_ACCESS.md`).
+ */
+export function parseTournamentDates(
+  dates: TournamentDateStrings,
+): { error: DateOrderError; value?: never } | { error?: never; value: TournamentDates } {
   const startVisibilityAt = new Date(dates.startVisibilityAt);
   const registrationOpenAt = new Date(dates.registrationOpenAt);
   const registrationCloseAt = new Date(dates.registrationCloseAt);
@@ -371,7 +396,7 @@ export function validateDateOrder(dates: {
     Number.isNaN(registrationCloseAt.getTime()) ||
     Number.isNaN(startAt.getTime())
   ) {
-    return "INVALID_DATES";
+    return { error: "INVALID_DATES" };
   }
 
   if (
@@ -381,8 +406,18 @@ export function validateDateOrder(dates: {
       registrationCloseAt <= startAt
     )
   ) {
-    return "INVALID_DATE_ORDER";
+    return { error: "INVALID_DATE_ORDER" };
   }
 
-  return null;
+  return { value: { startVisibilityAt, registrationOpenAt, registrationCloseAt, startAt } };
+}
+
+/**
+ * Ordre chronologique des quatre jalons, sans les valeurs analysées.
+ *
+ * Déplacé depuis `createTournament` pour que l'édition applique la même règle
+ * sur les valeurs **résultantes** — champs modifiés et champs conservés mêlés.
+ */
+export function validateDateOrder(dates: TournamentDateStrings): DateOrderError | null {
+  return parseTournamentDates(dates).error ?? null;
 }

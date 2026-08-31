@@ -17,7 +17,7 @@ import {
   joinTournamentRoom,
 } from "@/lib/server/tournament-broadcast";
 import {
-  getTournamentSnapshot,
+  getVisibleTournamentSnapshot,
   getTournamentViewerContext,
 } from "@/lib/server/tournaments-service";
 import { can, canAny } from "@/lib/shared/permissions";
@@ -52,7 +52,16 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     return new Response("Invalid tournament id", { status: 400 });
   }
 
-  const snapshot = await getTournamentSnapshot(tournamentId);
+  // Gestion résolue **avant** la lecture : elle décide aussi de l'accès. Un
+  // tournoi dont la date de visibilité n'est pas atteinte n'est lisible que par
+  // la permission `tournaments`, ici comme par la lecture REST de secours
+  // (`lib/shared/tournament-visibility.ts`) — un droit posé sur une seule des
+  // deux portes n'arriverait qu'après une coupure du direct.
+  const canManage = can(user, "tournaments");
+
+  // 404 et non 403 : le tournoi qu'on cache ne doit pas se trahir par le code
+  // de refus. « N'existe pas » et « pas encore publié » se répondent pareil.
+  const snapshot = await getVisibleTournamentSnapshot(tournamentId, { canManage });
   if (!snapshot) {
     return new Response("Tournament not found", { status: 404 });
   }
@@ -65,7 +74,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   // une coupure du direct.
   const narratesLive = canAny(user, ["tournaments", "casting"]);
   const viewer = await getTournamentViewerContext(snapshot, user.id, {
-    canManage: can(user, "tournaments"),
+    canManage,
     canPreview: narratesLive,
     canManageLive: can(user, "live"),
     // Suppression définitive : administrateur strict. Ce droit doit voyager par

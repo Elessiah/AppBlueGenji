@@ -12,7 +12,8 @@ import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { isSoloTournament, toParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
-import { validateDateOrder } from "./validation";
+import { canViewTournament } from "@/lib/shared/tournament-visibility";
+import { parseTournamentDates } from "./validation";
 import type { TournamentListRow } from "./_internal";
 
 // Internal types
@@ -74,12 +75,18 @@ export { invalidateTournamentLists, TOURNAMENT_LIST_TTL_MS } from "./list-cache"
 export { invalidateTournamentPreview } from "./preview-cache";
 
 // Instantané partagé (voir ./snapshot)
-export {
-  getTournamentSnapshot,
-  getTournamentSnapshotFrame,
-  invalidateTournamentSnapshot,
-  SNAPSHOT_TTL_MS,
-} from "./snapshot";
+//
+// Ni `getTournamentSnapshot` ni `getTournamentSnapshotFrame` ne sont réexportés,
+// **délibérément** : aucun des deux ne consulte `start_visibility_at`, et la
+// trame contient l'instantané entier. Une route qui les appellerait servirait
+// un tournoi non publié à qui devine son identifiant. Le seul chemin offert au
+// dehors est `getVisibleTournamentSnapshot` (plus bas), qui exige les droits du
+// lecteur — même précaution que pour `getTournamentPreview` ci-dessus.
+//
+// La salle de diffusion (`lib/server/tournament-broadcast.ts`) est la seule à
+// avoir besoin de la trame, et l'importe directement de `./snapshot` : elle ne
+// sert que des abonnés que la route du flux a déjà laissés passer.
+export { invalidateTournamentSnapshot, SNAPSHOT_TTL_MS } from "./snapshot";
 export type { TournamentSnapshotFrame } from "./snapshot";
 
 // Byes
@@ -246,18 +253,17 @@ export async function createTournament(
   try {
     await connection.beginTransaction();
 
-    const dateError = validateDateOrder({
+    // Une seule analyse des quatre jalons : `parseTournamentDates` contrôle
+    // l'ordre et rend les `Date` qu'on insère juste après.
+    const dates = parseTournamentDates({
       startVisibilityAt: payload.startVisibilityAt,
       registrationOpenAt: payload.registrationOpenAt,
       registrationCloseAt: payload.registrationCloseAt,
       startAt: payload.startAt,
     });
-    if (dateError) throw new Error(dateError);
+    if (dates.error) throw new Error(dates.error);
 
-    const startVisibilityAt = new Date(payload.startVisibilityAt);
-    const registrationOpenAt = new Date(payload.registrationOpenAt);
-    const registrationCloseAt = new Date(payload.registrationCloseAt);
-    const startAt = new Date(payload.startAt);
+    const { startVisibilityAt, registrationOpenAt, registrationCloseAt, startAt } = dates.value;
 
     const { computeTournamentState } = await import("./state");
 
@@ -269,7 +275,9 @@ export async function createTournament(
       start_at: startAt,
     });
 
-    const hasThirdPlaceMatch = payload.format === "SINGLE" && Boolean(payload.hasThirdPlaceMatch);
+    // La neutralisation hors `SINGLE` vit dans `validateTournamentInput`, seul
+    // endroit où création et édition la partagent (`./validation`).
+    const hasThirdPlaceMatch = Boolean(payload.hasThirdPlaceMatch);
     const game = payload.game ?? "OW2";
     const participantType = toParticipantType(payload.participantType);
 
@@ -716,6 +724,35 @@ export async function getTournamentViewerContext(
 }
 
 /**
+ * Instantané partagé d'un tournoi **que ce lecteur a le droit de lire**.
+ *
+ * Unique porte vers `getTournamentSnapshot` en dehors de ce module : celui-ci
+ * ignore `start_visibility_at`, donc un tournoi encore en préparation s'y lisait
+ * intégralement pour peu qu'on connaisse son identifiant. La règle vit dans
+ * `lib/shared/tournament-visibility.ts`, et les deux portes de lecture — le flux
+ * SSE et la lecture REST de secours — passent toutes deux par ici.
+ *
+ * `null` recouvre les deux cas, « n'existe pas » et « pas pour vous », et
+ * l'appelant les traduit en un même 404 : distinguer les deux confirmerait
+ * l'existence du tournoi qu'on protège.
+ *
+ * Un tournoi devenu visible pendant qu'on le lit ne fait qu'élargir l'accès, et
+ * l'inverse ne peut pas arriver : l'édition ne rouvre `startVisibilityAt` que
+ * dans la fenêtre `FULL`, qui suppose le tournoi encore invisible
+ * (`lib/shared/tournament-edit.ts`). Un flux déjà ouvert n'a donc rien à
+ * revérifier à chaque trame.
+ */
+export async function getVisibleTournamentSnapshot(
+  tournamentId: number,
+  rights: TournamentViewerRights = {},
+): Promise<TournamentSnapshot | null> {
+  const snapshot = await getTournamentSnapshot(tournamentId);
+  if (!snapshot) return null;
+  if (!canViewTournament(snapshot.card, { canManage: rights.canManage === true })) return null;
+  return snapshot;
+}
+
+/**
  * Détail complet du tournoi pour un lecteur donné : l'instantané partagé
  * (mutualisé entre tous les spectateurs, voir `./snapshot`) complété de son
  * contexte personnel.
@@ -725,7 +762,7 @@ export async function getTournamentDetail(
   userId: number,
   rights: TournamentViewerRights = {},
 ): Promise<TournamentDetail | null> {
-  const snapshot = await getTournamentSnapshot(tournamentId);
+  const snapshot = await getVisibleTournamentSnapshot(tournamentId, rights);
   if (!snapshot) return null;
 
   const viewer = await getTournamentViewerContext(snapshot, userId, rights);
