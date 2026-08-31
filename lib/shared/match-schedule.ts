@@ -74,13 +74,23 @@ export function isValidMatchStartAt(input: unknown): boolean {
  * `BracketMatch`.
  */
 export type MatchScheduleInput = {
-  /** Date de début programmée ; `null` = pas d'horaire annoncé. */
-  startAt: string | Date | null | undefined;
+  /**
+   * Date de début programmée ; `null` = pas d'horaire annoncé.
+   *
+   * L'instant en millisecondes est accepté au même titre que l'ISO et la
+   * `Date` : c'est la seule des trois formes qui soit une **primitive**, donc
+   * la seule qu'un hook React puisse mettre en dépendance d'effet sans se
+   * redéclencher à chaque rendu (cf. `useMatchLiveState`).
+   */
+  startAt: string | Date | number | null | undefined;
 };
 
 /** Instant (ms) de la date de début, ou `null` si elle n'est pas exploitable. */
 export function matchStartAtTime(match: MatchScheduleInput): number | null {
   if (match.startAt === null || match.startAt === undefined) return null;
+  if (typeof match.startAt === "number") {
+    return Number.isFinite(match.startAt) ? match.startAt : null;
+  }
   const time =
     match.startAt instanceof Date ? match.startAt.getTime() : new Date(match.startAt).getTime();
   return Number.isFinite(time) ? time : null;
@@ -94,7 +104,9 @@ export function matchStartAtTime(match: MatchScheduleInput): number | null {
  * date absente ou illisible donne une chaîne vide, ce qui vide le champ plutôt
  * que d'y afficher `Invalid Date`.
  */
-export function matchStartAtInputValue(startAt: string | Date | null | undefined): string {
+export function matchStartAtInputValue(
+  startAt: string | Date | number | null | undefined,
+): string {
   const time = matchStartAtTime({ startAt });
   if (time === null) return "";
   const local = new Date(time - new Date(time).getTimezoneOffset() * 60_000);
@@ -108,7 +120,9 @@ export function matchStartAtInputValue(startAt: string | Date | null | undefined
  * match qu'on est en train de jouer n'apprend rien. La date complète reste
  * accessible en `title`/`aria-label` via {@link formatMatchStartAtFull}.
  */
-export function formatMatchStartAt(startAt: string | Date | null | undefined): string | null {
+export function formatMatchStartAt(
+  startAt: string | Date | number | null | undefined,
+): string | null {
   const time = matchStartAtTime({ startAt });
   if (time === null) return null;
   return new Date(time).toLocaleString("fr-FR", {
@@ -120,7 +134,9 @@ export function formatMatchStartAt(startAt: string | Date | null | undefined): s
 }
 
 /** Date de début complète, pour les infobulles et les lecteurs d'écran. */
-export function formatMatchStartAtFull(startAt: string | Date | null | undefined): string | null {
+export function formatMatchStartAtFull(
+  startAt: string | Date | number | null | undefined,
+): string | null {
   const time = matchStartAtTime({ startAt });
   if (time === null) return null;
   return new Date(time).toLocaleString("fr-FR", {

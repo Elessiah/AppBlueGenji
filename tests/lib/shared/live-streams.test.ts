@@ -259,8 +259,15 @@ describe("resolveMatchLiveState — mode START_TIME", () => {
     expect(resolveMatchLiveState(scheduled(), AT + 60_000)).toBe("LIVE");
   });
 
-  it("accepte une Date comme une chaîne ISO", () => {
-    expect(resolveMatchLiveState(scheduled({ startAt: new Date(AT) }), AT)).toBe("LIVE");
+  it("accepte indifféremment une Date, un ISO ou un instant", () => {
+    // Les trois formes coexistent : les lignes SQL portent des `Date`, le flux
+    // des ISO, et `useMatchLiveState` l'instant — seule primitive utilisable en
+    // dépendance d'effet.
+    for (const startAt of [new Date(AT), new Date(AT).toISOString(), AT]) {
+      expect(resolveMatchLiveState(scheduled({ startAt }), AT)).toBe("LIVE");
+      expect(resolveMatchLiveState(scheduled({ startAt }), AT - 1)).toBe("SCHEDULED");
+      expect(nextMatchLiveChangeAt(scheduled({ startAt }), AT - 1)).toBe(AT);
+    }
   });
 
   it("reste programmé indéfiniment sans date, plutôt que d'ouvrir l'antenne", () => {

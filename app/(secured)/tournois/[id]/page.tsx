@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState, useEffect, useRef } from "react";
+import { FormEvent, useCallback, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { formatLocalDateTime } from "@/lib/shared/dates";
@@ -85,6 +85,15 @@ export default function TournamentDetailPage() {
   const [matchForLiveId, setMatchForLiveId] = useState<number | null>(null);
   // Même raison que ci-dessus : on retient l'identifiant, pas l'objet.
   const [matchForScheduleId, setMatchForScheduleId] = useState<number | null>(null);
+  // Stables pour la vie de la page : les `setState` de React le sont déjà. Sans
+  // cela, deux flèches neuves à chaque rendu changeraient la valeur du contexte
+  // de diffusion à chaque instantané SSE, et redessineraient les 127 bandeaux
+  // d'un plateau à 128 équipes pour un score qui n'en concerne qu'un.
+  const openMatchLive = useCallback((match: BracketMatch) => setMatchForLiveId(match.id), []);
+  const openMatchSchedule = useCallback(
+    (match: BracketMatch) => setMatchForScheduleId(match.id),
+    [],
+  );
   const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
 
   // Dernière phase courante observée. On ne resynchronise la sélection que
@@ -351,8 +360,8 @@ export default function TournamentDetailPage() {
       <LiveProvider
         canManage={detail.canManageLive}
         canSchedule={detail.isAdmin}
-        openConfig={(match) => setMatchForLiveId(match.id)}
-        openSchedule={(match) => setMatchForScheduleId(match.id)}
+        openConfig={openMatchLive}
+        openSchedule={openMatchSchedule}
       >
       <RulesHelpFab format={visibleFormat} contextLabel={contextLabel} />
       <section className="fade-in">

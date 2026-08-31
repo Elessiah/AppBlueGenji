@@ -92,6 +92,26 @@ describe("matchStartAtTime", () => {
     expect(matchStartAtTime({ startAt: undefined })).toBeNull();
     expect(matchStartAtTime({ startAt: "pas une date" })).toBeNull();
   });
+
+  it("accepte l'instant lui-même, la seule des trois formes qui soit primitive", () => {
+    // C'est ce qui permet à `useMatchLiveState` d'en faire une dépendance
+    // d'effet : une `Date` serait une nouvelle référence à chaque rendu.
+    const time = Date.UTC(2026, 7, 29, 18, 30);
+    expect(matchStartAtTime({ startAt: time })).toBe(time);
+    expect(matchStartAtTime({ startAt: 0 })).toBe(0);
+    expect(matchStartAtTime({ startAt: Number.NaN })).toBeNull();
+    expect(matchStartAtTime({ startAt: Number.POSITIVE_INFINITY })).toBeNull();
+  });
+
+  it("fait l'aller-retour entre les trois formes", () => {
+    const time = Date.UTC(2026, 7, 29, 18, 30);
+    const forms = [time, new Date(time), new Date(time).toISOString()];
+    for (const startAt of forms) {
+      expect(matchStartAtTime({ startAt })).toBe(time);
+      expect(formatMatchStartAt(startAt)).toBe(formatMatchStartAt(time));
+      expect(matchStartAtInputValue(startAt)).toBe(matchStartAtInputValue(time));
+    }
+  });
 });
 
 describe("matchStartAtInputValue", () => {

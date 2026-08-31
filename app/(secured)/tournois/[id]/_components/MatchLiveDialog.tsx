@@ -48,9 +48,15 @@ export function MatchLiveDialog({ match, onClose, onSaved }: MatchLiveDialogProp
   // serveur refuse ce couple en 409, l'interface le désactive en amont plutôt
   // que de laisser le staff buter dessus. La date se fixe avec la permission
   // `tournaments`, sur le bandeau du match.
+  //
+  // Conditionné à `streamed` : décocher « ce match est casté » envoie
+  // `trigger: null`, que le serveur accepte toujours. Sans cette garde, un match
+  // passé en `START_TIME` puis privé de sa date deviendrait indécastable — les
+  // radios sont masquées quand la case est décochée, donc `trigger` resterait
+  // bloqué sur `START_TIME` et « Enregistrer » sur désactivé.
   const startAtLabel = formatMatchStartAt(match.startAt);
   const startAtMissing = startAtLabel === null;
-  const triggerNeedsDate = requiresMatchStartAt(trigger) && startAtMissing;
+  const triggerNeedsDate = streamed && requiresMatchStartAt(trigger) && startAtMissing;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();

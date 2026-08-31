@@ -176,8 +176,9 @@ export type MatchLiveInput = {
    * Date de début programmée du match (mode `START_TIME`) ; `null` = aucune.
    * Facultative pour que les appelants qui n'en ont pas — un match reconstruit
    * de mémoire dans un test, une ligne d'un flux antérieur — restent valides.
+   * Accepte aussi l'instant en millisecondes (`matchStartAtTime`).
    */
-  startAt?: string | Date | null;
+  startAt?: string | Date | number | null;
 };
 
 /**

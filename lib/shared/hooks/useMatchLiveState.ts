@@ -7,6 +7,7 @@ import {
   type MatchLiveInput,
   type MatchLiveState,
 } from "@/lib/shared/live-streams";
+import { matchStartAtTime } from "@/lib/shared/match-schedule";
 
 /**
  * État de diffusion d'un match, **rebasculé à la seconde dite**.
@@ -25,15 +26,28 @@ import {
 export function useMatchLiveState(match: MatchLiveInput): MatchLiveState {
   const [now, setNow] = useState(() => Date.now());
 
+  // Dépendances réduites à des **primitives**. `MatchLiveInput` accepte aussi
+  // bien une chaîne ISO qu'une `Date` — les lignes SQL en portent, et le module
+  // pur est partagé avec le serveur. Or une `Date` est une nouvelle référence à
+  // chaque rendu : mise en dépendance d'effet, elle relancerait `setNow`, qui
+  // provoquerait le rendu suivant, en boucle serrée jusqu'au « Maximum update
+  // depth exceeded ». On ne garde donc que l'instant et un booléen.
+  const { status, liveTrigger } = match;
+  const onAir = match.liveStartedAt !== null && match.liveStartedAt !== undefined;
+  const startAt = matchStartAtTime({ startAt: match.startAt });
+
   // Recale l'horloge à chaque nouvelle version du match : sans cela, un match
   // reçu par le flux resterait interprété avec l'heure du rendu précédent.
-  const { status, liveTrigger, liveStartedAt, startAt } = match;
   useEffect(() => {
     setNow(Date.now());
-  }, [status, liveTrigger, liveStartedAt, startAt]);
+  }, [status, liveTrigger, onAir, startAt]);
 
   useEffect(() => {
-    const at = nextMatchLiveChangeAt({ status, liveTrigger, liveStartedAt, startAt }, now);
+    // Vue reconstruite depuis les primitives, et non `match` : la garder hors
+    // des dépendances est justement ce qui évite la boucle ci-dessus. Poser
+    // `liveStartedAt: null` est fidèle — seul `START_TIME` produit une
+    // frontière, et son état ne consulte jamais l'antenne manuelle.
+    const at = nextMatchLiveChangeAt({ status, liveTrigger, liveStartedAt: null, startAt }, now);
     if (at === null) return;
 
     // `setTimeout` sature au-delà de ~24,8 jours et se déclencherait alors
@@ -46,7 +60,9 @@ export function useMatchLiveState(match: MatchLiveInput): MatchLiveState {
     // et le couple minuteur/rendu tournerait en boucle serrée.
     const timer = setTimeout(() => setNow(Math.max(at, Date.now())), delay);
     return () => clearTimeout(timer);
-  }, [status, liveTrigger, liveStartedAt, startAt, now]);
+  }, [status, liveTrigger, startAt, now]);
 
-  return resolveMatchLiveState({ status, liveTrigger, liveStartedAt, startAt }, now);
+  // Au rendu, en revanche, on repasse le match tel quel : aucune dépendance
+  // n'est en jeu, et l'antenne manuelle compte pour les modes qui la lisent.
+  return resolveMatchLiveState(match, now);
 }
