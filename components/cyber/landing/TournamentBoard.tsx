@@ -27,7 +27,7 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
           <span className="eyebrow">SECTION 01</span>
           <h2 className={styles.sectionTitle}>Tournois en cours et à venir</h2>
         </div>
-        <div className={styles.meta}>LIVE · INSCRIPTIONS · BRACKETS</div>
+        <div className={styles.meta}>EN COURS · INSCRIPTIONS · BRACKETS</div>
       </div>
 
       <div className={styles.grid}>
@@ -36,14 +36,14 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
             <>
               <div className={styles.badgeRow}>
                 <Pill variant={featured.state === "RUNNING" ? "live" : "blue"}>
-                  {featured.state === "RUNNING" ? "LIVE" : inferGameShortLabel(featured.name)}
+                  {featured.state === "RUNNING" ? "EN COURS" : inferGameShortLabel(featured.name)}
                 </Pill>
                 <span className="mono">{inferGameLabel(featured.name).toUpperCase()}</span>
               </div>
 
               <div className={styles.gameEyebrow}>{inferGameLabel(featured.name).toUpperCase()}</div>
               <h3 className={styles.featuredTitle}>{makeTitle(featured)}</h3>
-              <div className={styles.phase}>{featured.state} · BRACKET LIVE</div>
+              <div className={styles.phase}>{featured.state} · BRACKET</div>
               <MiniBracket matches={miniBracket} />
 
               <div className={styles.footerRow}>

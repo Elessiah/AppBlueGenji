@@ -15,7 +15,7 @@ function dayLabel(date: Date): string {
 }
 
 function tagLabel(state: LandingCalendarEvent["state"]): string {
-  if (state === "RUNNING") return "LIVE";
+  if (state === "RUNNING") return "EN COURS";
   if (state === "REGISTRATION") return "OPEN";
   if (state === "FINISHED") return "ARCHIVE";
   return "OPEN";

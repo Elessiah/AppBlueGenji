@@ -37,8 +37,8 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
     return (
       <CyberCard ticks className={styles.root}>
         <div className={styles.empty}>
-          <span className="pill pill-blue">INFO LIVE</span>
-          <p>Aucun tournoi en direct. Le prochain démarre dans {nextDaysLabel(nextUpcomingISO)}.</p>
+          <span className="pill pill-blue">INFO TOURNOI</span>
+          <p>Aucun tournoi en cours. Le prochain démarre dans {nextDaysLabel(nextUpcomingISO)}.</p>
         </div>
       </CyberCard>
     );
@@ -54,7 +54,7 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
   return (
     <CyberCard ticks className={styles.root}>
       <div className={styles.head}>
-        <Pill variant="live">LIVE</Pill>
+        <Pill variant="live">EN COURS</Pill>
         <span className="mono">{live.game.toUpperCase()} · {inferPhaseLabel(currentMatch)}</span>
         <span className={styles.viewers}>
           <Eye size={12} />
