@@ -10,12 +10,13 @@ Un tournoi se termine quand ses matchs se terminent. Un plateau à moins de deux
 engagées n'en produit aucun : passé en `RUNNING`, il y resterait indéfiniment,
 sans rien à jouer ni à clore.
 
-Trois formats savaient déjà se sortir de là — l'élimination dans
-`createBracketIfMissing`, la Survie et la Ronde suisse dans leur réconciliation —
-chacun à sa manière, et deux ne le savaient pas : « BlueGenji Survie » et une
-Ronde suisse **sans aucune** inscrite (sa réconciliation abandonne sur un
-classement vide) restaient bloqués. La règle est donc remontée d'un cran, là où
-un seul contrôle vaut pour tous les formats présents et à venir.
+Chaque format s'en sortait à sa manière — l'élimination dans
+`createBracketIfMissing`, la Survie, la Ronde suisse et « BlueGenji Survie » dans
+leur réconciliation — sauf **à zéro engagée** : là, `reconcileSwiss` et
+`reconcileEndurance` abandonnent sur un classement vide, et leur tournoi restait
+« en cours » pour toujours. Plutôt qu'une rustine de plus par format, la règle
+est remontée d'un cran, là où un seul contrôle vaut pour tous les formats
+présents et à venir.
 
 ## Où le contrôle est posé
 
