@@ -206,11 +206,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
             </div>
             {/* Le format n'apparaît que s'il en existe un : « Score libre —
                 aucune limite » occupait une ligne pour ne rien apprendre. */}
-            {matchFormat && (
-              <Pill variant="blue" title={matchFormatDescription(matchFormat)}>
-                {matchFormatLabel(matchFormat)}
-              </Pill>
-            )}
+            {matchFormat && <Pill variant="blue">{matchFormatLabel(matchFormat)}</Pill>}
           </div>
 
           {/* `role="status"` : le résultat enregistré peut changer sous les yeux
@@ -259,9 +255,42 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
             />
           </div>
 
+          {/* La règle chiffrée sous les champs plutôt qu'en `title` de la
+              pastille : une infobulle sur un `<span>` ne s'atteint ni au clavier
+              ni au doigt, et c'est la seule chose qui borne la saisie. */}
+          {matchFormat && (
+            <p className={styles.formatHint}>{matchFormatDescription(matchFormat)}</p>
+          )}
+
           <div className={styles.forfeitZone}>
-            {showForfeit ? (
-              <>
+            {/* Dépliage en bonne et due forme : le bouton reste en place et
+                porte `aria-expanded`. Un bouton qui s'efface au profit du
+                panneau annonçait « replié » puis disparaissait, sans jamais
+                signaler l'ouverture. Il sert aussi d'annulation, ce qui évite un
+                troisième bouton dans la rangée. */}
+            <button
+              type="button"
+              className={styles.link}
+              onClick={() => {
+                if (showForfeit) form.setForfeitTeamId(undefined);
+                setForfeitOpen(!showForfeit);
+              }}
+              aria-expanded={showForfeit}
+              aria-controls="admin-score-forfeit"
+              disabled={form.submitting}
+            >
+              {/* « Annuler le forfait » n'a de sens qu'une fois une équipe
+                  désignée : panneau ouvert et vide, il n'y a que le panneau à
+                  refermer. */}
+              {forfeitTeamId !== undefined
+                ? "Annuler le forfait"
+                : showForfeit
+                  ? "Annuler"
+                  : "Déclarer un forfait"}
+            </button>
+
+            {showForfeit && (
+              <div id="admin-score-forfeit" className={styles.forfeitPanel}>
                 <p className={styles.forfeitHint}>
                   {forfeiting
                     ? `${forfeiting.out} déclare forfait : ${forfeiting.through} l'emporte sans manche jouée.`
@@ -286,29 +315,8 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
                   >
                     {team2}
                   </button>
-                  <button
-                    type="button"
-                    className={styles.link}
-                    onClick={() => {
-                      form.setForfeitTeamId(undefined);
-                      setForfeitOpen(false);
-                    }}
-                    disabled={form.submitting}
-                  >
-                    {forfeitTeamId === undefined ? "Annuler" : "Annuler le forfait"}
-                  </button>
                 </div>
-              </>
-            ) : (
-              <button
-                type="button"
-                className={styles.link}
-                onClick={() => setForfeitOpen(true)}
-                aria-expanded={false}
-                disabled={form.submitting}
-              >
-                Déclarer un forfait
-              </button>
+              </div>
             )}
           </div>
 

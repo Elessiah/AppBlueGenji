@@ -111,10 +111,10 @@ quatre lignes de prose sur le forfait.
 
 | Élément | Affiché quand |
 |---|---|
-| Pastille de format (`BO5`, `FT3`) | le tournoi en a un — « Score libre — aucune limite » occupait une ligne pour rien (le détail va dans son `title`) |
+| Pastille de format (`BO5`, `FT3`) et sa règle chiffrée | le tournoi en a un — « Score libre — aucune limite » occupait une ligne pour ne rien apprendre |
 | Résultat déjà en base | il ne se lit pas dans les champs : match tranché, ou saisie en cours qui recouvre l'ancienne valeur |
 | Bandeau de désaccord | le résultat enregistré a changé pendant une saisie |
-| Forfait | replié derrière « Déclarer un forfait » ; déplié d'office si un forfait est déjà enregistré, puisqu'il commande alors la rencontre |
+| Forfait | replié derrière « Déclarer un forfait » ; déplié d'office si un forfait est déjà enregistré, puisqu'il commande alors la rencontre. Le bouton est un vrai dépliage — il reste en place, porte `aria-expanded` / `aria-controls`, et sert d'annulation, ce qui évite un troisième bouton dans la rangée |
 | Raison d'un refus | une action est bloquée (celle de la validation d'abord) |
 
 Les actions ont trois poids distincts, faute de quoi elles se lisaient comme
@@ -126,6 +126,11 @@ refus. Il doit être écrit `:global(.btn)` : CSS Modules hacherait un `.btn`
 local, et la règle ne s'appliquerait à rien.
 
 ## Accessibilité
+
+La règle chiffrée du format (« premier à 3 manches gagnées, 5 au maximum ») est
+posée **sous les champs**, pas en `title` de la pastille : une infobulle sur un
+`<span>` ne s'atteint ni au clavier ni au doigt, et c'est la seule chose qui
+borne la saisie.
 
 Le dialogue passe par `useDialogBehavior` comme les autres modales du site :
 `Échap` (bloqué pendant un envoi), piège à focus, défilement de l'arrière-plan

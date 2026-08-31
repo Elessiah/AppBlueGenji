@@ -200,10 +200,21 @@
   opacity: 0.4;
 }
 
-/* ---------- Forfait : replié tant qu'on n'en déclare pas ---------- */
+/* ---------- Rappel de format, puis forfait replié ---------- */
+
+.formatHint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2, #9aa4b2);
+}
 
 .forfeitZone {
   margin-top: 16px;
+}
+
+.forfeitPanel {
+  margin-top: 10px;
 }
 
 .forfeitHint {
