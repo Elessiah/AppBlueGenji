@@ -1,481 +1,325 @@
+"use client";
+
+import { FormEvent } from "react";
 import type { BracketMatch } from "@/lib/shared/types";
+import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
-  checkMatchScores,
   matchFormatDescription,
   matchFormatLabel,
   matchWinsRequired,
 } from "@/lib/shared/match-format";
 import { useScoreForm } from "../_hooks/useScoreForm";
+import { parseScoreInput, scoreBlockerMessage } from "../_lib/score-form";
 import { useMatchFormat } from "../_lib/match-format-context";
+import styles from "./AdminScoreDialog.module.css";
 
 interface AdminScoreDialogProps {
-  match: BracketMatch | null;
-  open: boolean;
+  /** Match **résolu à chaque rendu** depuis la liste rafraîchie par le flux. */
+  match: BracketMatch;
   onClose: () => void;
   onSubmitted: () => void;
 }
 
-export function AdminScoreDialog({ match, open, onClose, onSubmitted }: AdminScoreDialogProps) {
+interface ScoreStepperProps {
+  id: string;
+  teamName: string;
+  value: string;
+  max: number;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}
+
+/**
+ * Un côté du score. Les deux équipes partageaient jusqu'ici deux blocs de
+ * balises identiques recopiés l'un sous l'autre — une correction sur l'un se
+ * perdait sur l'autre.
+ */
+function ScoreStepper({ id, teamName, value, max, disabled, onChange }: ScoreStepperProps) {
+  const parsed = parseScoreInput(value);
+  // Un champ vide n'est pas une erreur : c'est un score pas encore saisi. Seule
+  // une valeur illisible ou hors plage se signale en rouge.
+  const invalid = value.trim() !== "" && (parsed === null || parsed > max);
+  const step = (delta: number) => onChange(String(Math.min(max, Math.max(0, (parsed ?? 0) + delta))));
+
+  return (
+    <div>
+      <label className={styles.sideLabel} htmlFor={id}>
+        {teamName}
+      </label>
+      <div className={styles.stepper}>
+        <button
+          type="button"
+          className={styles.step}
+          onClick={() => step(-1)}
+          disabled={disabled || (parsed ?? 0) <= 0}
+          aria-label={`Retirer une manche à ${teamName}`}
+        >
+          −
+        </button>
+        <input
+          id={id}
+          className={styles.field}
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={max}
+          step={1}
+          value={value}
+          placeholder="—"
+          aria-invalid={invalid}
+          aria-label={`Manches gagnées par ${teamName}`}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+        />
+        <button
+          type="button"
+          className={styles.step}
+          onClick={() => step(1)}
+          disabled={disabled || (parsed ?? 0) >= max}
+          aria-label={`Ajouter une manche à ${teamName}`}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Résultat déjà enregistré, en une phrase — ou `null` s'il n'y en a pas. */
+function storedResultLabel(match: BracketMatch, team1: string, team2: string): string | null {
+  if (match.forfeitTeamId !== null) {
+    const forfeiting = match.forfeitTeamId === match.team1Id ? team1 : team2;
+    return `Forfait enregistré : ${forfeiting} déclare forfait.`;
+  }
+  if (match.team1Score === null && match.team2Score === null) return null;
+
+  const score = `${match.team1Score ?? 0} – ${match.team2Score ?? 0}`;
+  if (match.winnerTeamId === null) return `Score enregistré : ${score}, match non tranché.`;
+
+  const winner = match.winnerTeamId === match.team1Id ? team1 : team2;
+  return `Résultat validé : ${score}, ${winner} l'emporte.`;
+}
+
+/**
+ * Édition d'un score par l'arbitrage (permission `tournaments`).
+ *
+ * Deux actions, volontairement distinctes — c'est la différence entre les deux
+ * routes serveur, et elle n'était lisible ni sur « OK » ni sur « ✓ Gagnant » :
+ *
+ * · **Enregistrer le score** note l'avancement d'une rencontre en cours. Le
+ *   match ne se tranche pas, le plateau ne bouge pas, seul le plafond du format
+ *   est contrôlé. Refusé sur un match déjà tranché : cette route n'écrit que les
+ *   scores, elle laisserait le vainqueur et la qualifiée sur l'ancien résultat.
+ * · **Valider le résultat** désigne la gagnante et propage dans le plateau. Elle
+ *   exige un score complet au sens du format (3 manches en BO5).
+ *
+ * Comportement modal complet via `useDialogBehavior` : `Échap`, piège à focus,
+ * arrière-plan figé, focus rendu au déclencheur à la fermeture.
+ */
+export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDialogProps) {
   const form = useScoreForm(match);
   const matchFormat = useMatchFormat();
+  // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
+  // d'écrire.
+  const dialogRef = useDialogBehavior({ open: true, onClose, locked: form.submitting });
 
-  if (!open || !match) return null;
-
+  const team1 = match.team1Name || "Équipe 1";
+  const team2 = match.team2Name || "Équipe 2";
   // Borne haute de la saisie : l'objectif du format (3 en BO5 comme en FT3),
   // ou 99 quand le tournoi laisse le score libre.
   const maxScore = matchFormat ? matchWinsRequired(matchFormat) : 99;
+  const stored = storedResultLabel(match, team1, team2);
+  const forfeiting =
+    form.forfeitTeamId === undefined
+      ? null
+      : form.forfeitTeamId === match.team1Id
+        ? { out: team1, through: team2 }
+        : { out: team2, through: team1 };
 
-  const handleSaveScores = async () => {
-    const ok = await form.submit("save");
+  const run = async (action: "save" | "resolve") => {
+    const ok = await form.submit(action);
     if (ok) {
       onSubmitted();
       onClose();
     }
   };
 
-  const handleDefineWinner = async () => {
-    const ok = await form.submit("resolve");
-    if (ok) {
-      onSubmitted();
-      onClose();
-    }
+  // `Entrée` dans un champ vaut « valider le résultat » : c'est l'issue
+  // attendue d'une saisie de score, l'enregistrement intermédiaire étant un
+  // geste délibéré.
+  const onSubmitForm = (event: FormEvent) => {
+    event.preventDefault();
+    if (form.decision.canResolve && !form.submitting) void run("resolve");
   };
 
-  const s1Num = Number(form.score1);
-  const s2Num = Number(form.score2);
-  const scoresAreFiniteNumbers = Number.isFinite(s1Num) && Number.isFinite(s2Num);
-  // Le format ne bride la sauvegarde que sur son plafond : l'arbitrage doit
-  // pouvoir noter un 1-0 en cours de rencontre. Désigner un vainqueur, en
-  // revanche, exige un score complet.
-  const respectsCap =
-    scoresAreFiniteNumbers && !checkMatchScores(matchFormat, s1Num, s2Num, { decisive: false });
-  const respectsFormat =
-    scoresAreFiniteNumbers && !checkMatchScores(matchFormat, s1Num, s2Num, { decisive: true });
-  const canSaveScores = form.forfeitTeamId ? true : respectsCap;
-  const canDeclareWinner = form.forfeitTeamId
-    ? true
-    : respectsFormat && s1Num !== s2Num;
+  const toggleForfeit = (teamId: number | null) => {
+    if (teamId === null) return;
+    form.setForfeitTeamId(form.forfeitTeamId === teamId ? undefined : teamId);
+  };
 
   return (
-    <>
+    <div
+      className={styles.backdrop}
+      role="presentation"
+      onClick={() => {
+        if (!form.submitting) onClose();
+      }}
+    >
       <div
-        onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(0,0,0,0.65)",
-          zIndex: 999,
-        }}
-      />
-      <div
-        style={{
-          position: "fixed",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          background: "linear-gradient(135deg, rgba(89,212,255,0.12) 0%, rgba(89,212,255,0.06) 100%)",
-          border: `2px solid rgba(89,212,255,0.5)`,
-          borderRadius: 12,
-          padding: 32,
-          maxWidth: 540,
-          width: "90vw",
-          maxHeight: "90vh",
-          overflow: "auto",
-          zIndex: 1000,
-          boxShadow: "0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(89,212,255,0.2), inset 0 1px 0 rgba(89,212,255,0.1)",
-          backdropFilter: "blur(4px)",
-        }}
+        ref={dialogRef}
+        className={styles.dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="admin-score-title"
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
       >
-        <h2 style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 700, color: "var(--text-0)" }}>
-          Éditer le score du match
-        </h2>
-
-        <p style={{ margin: "0 0 24px", fontSize: 12.5, color: "var(--text-2)", lineHeight: 1.5 }}>
-          <strong style={{ color: "rgba(89,212,255,0.9)" }}>{matchFormatLabel(matchFormat)}</strong>
-          {" — "}
-          {matchFormatDescription(matchFormat)}
-        </p>
-
-        {form.forfeitTeamId && (
-          <div
-            style={{
-              marginBottom: 20,
-              padding: 12,
-              background: "rgba(255,157,46,0.12)",
-              border: "1px solid rgba(255,157,46,0.35)",
-              borderRadius: 6,
-              fontSize: 13,
-              color: "rgba(255,157,46,0.9)",
-            }}
-          >
-            ⚠ Forfait déclaré : {form.forfeitTeamId === match.team1Id ? match.team1Name || "Équipe 1" : match.team2Name || "Équipe 2"} a déclaré forfait
-          </div>
-        )}
-
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 16, alignItems: "end" }}>
+        <form onSubmit={onSubmitForm}>
+          <div className={styles.head}>
             <div>
-              <label
-                style={{
-                  display: "block",
-                  margin: "0 0 10px",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "rgba(89,212,255,0.9)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                {match.team1Name || "Équipe 1"}
-              </label>
-              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const val = Math.max(0, Number(form.score1 || 0) - 1);
-                    form.setScore1(String(val));
-                  }}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    padding: 0,
-                    fontSize: 16,
-                    fontWeight: 700,
-                    background: "rgba(89,212,255,0.15)",
-                    border: "1px solid rgba(89,212,255,0.3)",
-                    borderRadius: 6,
-                    color: "rgba(89,212,255,0.9)",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "all 0.2s",
-                    flexShrink: 0,
-                  }}
-                  disabled={form.submitting}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(89,212,255,0.25)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(89,212,255,0.15)";
-                  }}
-                >
-                  −
-                </button>
-                <input
-                  type="number"
-                  min={0}
-                  max={maxScore}
-                  value={form.score1}
-                  onChange={(e) => form.setScore1(e.target.value)}
-                  aria-label={`Score de ${match.team1Name || "l'équipe 1"}`}
-                  autoFocus
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    padding: "10px 12px",
-                    fontSize: 22,
-                    fontWeight: 700,
-                    textAlign: "center",
-                    background: "var(--surface-1)",
-                    border: `2px solid rgba(89,212,255,0.4)`,
-                    borderRadius: 8,
-                    color: "var(--text-0)",
-                    transition: "border-color 0.2s",
-                  }}
-                  disabled={form.submitting}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    const val = Math.min(maxScore, Number(form.score1 || 0) + 1);
-                    form.setScore1(String(val));
-                  }}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    padding: 0,
-                    fontSize: 16,
-                    fontWeight: 700,
-                    background: "rgba(89,212,255,0.15)",
-                    border: "1px solid rgba(89,212,255,0.3)",
-                    borderRadius: 6,
-                    color: "rgba(89,212,255,0.9)",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "all 0.2s",
-                    flexShrink: 0,
-                  }}
-                  disabled={form.submitting}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(89,212,255,0.25)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(89,212,255,0.15)";
-                  }}
-                >
-                  +
-                </button>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text-1)" }}>vs</span>
-            </div>
-
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  margin: "0 0 10px",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "rgba(89,212,255,0.9)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                {match.team2Name || "Équipe 2"}
-              </label>
-              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const val = Math.max(0, Number(form.score2 || 0) - 1);
-                    form.setScore2(String(val));
-                  }}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    padding: 0,
-                    fontSize: 16,
-                    fontWeight: 700,
-                    background: "rgba(89,212,255,0.15)",
-                    border: "1px solid rgba(89,212,255,0.3)",
-                    borderRadius: 6,
-                    color: "rgba(89,212,255,0.9)",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "all 0.2s",
-                    flexShrink: 0,
-                  }}
-                  disabled={form.submitting}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(89,212,255,0.25)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(89,212,255,0.15)";
-                  }}
-                >
-                  −
-                </button>
-                <input
-                  type="number"
-                  min={0}
-                  max={maxScore}
-                  value={form.score2}
-                  onChange={(e) => form.setScore2(e.target.value)}
-                  aria-label={`Score de ${match.team2Name || "l'équipe 2"}`}
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    padding: "10px 12px",
-                    fontSize: 22,
-                    fontWeight: 700,
-                    textAlign: "center",
-                    background: "var(--surface-1)",
-                    border: `2px solid rgba(89,212,255,0.4)`,
-                    borderRadius: 8,
-                    color: "var(--text-0)",
-                    transition: "border-color 0.2s",
-                  }}
-                  disabled={form.submitting}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    const val = Math.min(maxScore, Number(form.score2 || 0) + 1);
-                    form.setScore2(String(val));
-                  }}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    padding: 0,
-                    fontSize: 16,
-                    fontWeight: 700,
-                    background: "rgba(89,212,255,0.15)",
-                    border: "1px solid rgba(89,212,255,0.3)",
-                    borderRadius: 6,
-                    color: "rgba(89,212,255,0.9)",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "all 0.2s",
-                    flexShrink: 0,
-                  }}
-                  disabled={form.submitting}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(89,212,255,0.25)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(89,212,255,0.15)";
-                  }}
-                >
-                  +
-                </button>
-              </div>
+              <h3 id="admin-score-title" className={styles.title}>
+                Score du match
+              </h3>
+              <p className={styles.opponents}>
+                Manche {match.roundNumber} · {team1} vs {team2}
+              </p>
             </div>
           </div>
-        </div>
 
-        <div style={{ marginBottom: 24, paddingTop: 20, borderTop: "1px solid rgba(89,212,255,0.2)" }}>
-          <p
-            style={{
-              fontSize: 11,
-              textTransform: "uppercase",
-              letterSpacing: "0.09em",
-              color: "var(--text-2)",
-              margin: "0 0 12px",
-              fontWeight: 700,
-            }}
-          >
-            Forfait
+          <p className={styles.formatHint}>
+            <strong>{matchFormatLabel(matchFormat)}</strong> — {matchFormatDescription(matchFormat)}
           </p>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              type="button"
-              onClick={() => form.setForfeitTeamId(form.forfeitTeamId === match.team1Id ? undefined : match.team1Id ?? undefined)}
-              style={{
-                flex: 1,
-                padding: "10px 12px",
-                fontSize: 12,
-                fontWeight: 600,
-                background: form.forfeitTeamId === match.team1Id ? "rgba(255,157,46,0.2)" : "rgba(255,157,46,0.08)",
-                border: `2px solid rgba(255,157,46,${form.forfeitTeamId === match.team1Id ? 0.5 : 0.25})`,
-                borderRadius: 6,
-                color: form.forfeitTeamId === match.team1Id ? "rgba(255,157,46,1)" : "rgba(255,157,46,0.6)",
-                cursor: form.submitting ? "not-allowed" : "pointer",
-                transition: "all 0.2s",
-              }}
-              disabled={form.submitting}
-            >
-              {match.team1Name || "Équipe 1"}
-            </button>
-            <button
-              type="button"
-              onClick={() => form.setForfeitTeamId(form.forfeitTeamId === match.team2Id ? undefined : match.team2Id ?? undefined)}
-              style={{
-                flex: 1,
-                padding: "10px 12px",
-                fontSize: 12,
-                fontWeight: 600,
-                background: form.forfeitTeamId === match.team2Id ? "rgba(255,157,46,0.2)" : "rgba(255,157,46,0.08)",
-                border: `2px solid rgba(255,157,46,${form.forfeitTeamId === match.team2Id ? 0.5 : 0.25})`,
-                borderRadius: 6,
-                color: form.forfeitTeamId === match.team2Id ? "rgba(255,157,46,1)" : "rgba(255,157,46,0.6)",
-                cursor: form.submitting ? "not-allowed" : "pointer",
-                transition: "all 0.2s",
-              }}
-              disabled={form.submitting}
-            >
-              {match.team2Name || "Équipe 2"}
-            </button>
-            {form.forfeitTeamId && (
+
+          {stored && (
+            <p className={`${styles.notice} ${styles.noticeInfo}`}>{stored}</p>
+          )}
+
+          {form.conflict && (
+            <div className={`${styles.notice} ${styles.noticeWarn}`} role="alert">
+              Ce match a été modifié pendant ta saisie — quelqu&apos;un d&apos;autre a
+              enregistré un résultat. Envoyer maintenant écraserait le sien.
               <button
                 type="button"
-                onClick={() => form.setForfeitTeamId(undefined)}
-                style={{
-                  padding: "10px 12px",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  background: "rgba(89,212,255,0.08)",
-                  border: "1px solid rgba(89,212,255,0.25)",
-                  borderRadius: 6,
-                  color: "rgba(89,212,255,0.6)",
-                  cursor: form.submitting ? "not-allowed" : "pointer",
-                  transition: "all 0.2s",
-                  whiteSpace: "nowrap",
-                }}
+                className={styles.noticeAction}
+                onClick={form.adoptStoredResult}
                 disabled={form.submitting}
               >
-                Annuler forfait
+                Reprendre la valeur à jour
               </button>
-            )}
-          </div>
-        </div>
+            </div>
+          )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr 1fr", gap: 12, alignItems: "stretch" }}>
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn"
-            style={{
-              padding: "12px 16px",
-              fontSize: 14,
-              fontWeight: 600,
-              background: "var(--surface-1)",
-              borderColor: "var(--border)",
-              color: "var(--text-1)",
-              cursor: form.submitting ? "not-allowed" : "pointer",
-              opacity: form.submitting ? 0.6 : 1,
-              whiteSpace: "nowrap",
-            }}
-            disabled={form.submitting}
-          >
-            Annuler
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveScores}
-            className="btn"
-            style={{
-              padding: "12px 16px",
-              fontSize: 13,
-              fontWeight: 600,
-              background: canSaveScores ? "rgba(79,224,162,0.15)" : "rgba(79,224,162,0.05)",
-              borderColor: "rgba(79,224,162,0.4)",
-              color: canSaveScores ? "rgba(79,224,162,1)" : "rgba(79,224,162,0.5)",
-              cursor: canSaveScores && !form.submitting ? "pointer" : "not-allowed",
-              opacity: canSaveScores && !form.submitting ? 1 : 0.5,
-              transition: "all 0.2s",
-            }}
-            disabled={!canSaveScores || form.submitting}
-          >
-            {form.submitting ? "..." : "OK"}
-          </button>
-          <button
-            type="button"
-            onClick={handleDefineWinner}
-            className="btn"
-            style={{
-              padding: "12px 16px",
-              fontSize: 13,
-              fontWeight: 600,
-              background: canDeclareWinner ? "rgba(89,212,255,0.2)" : "rgba(89,212,255,0.08)",
-              borderColor: "rgba(89,212,255,0.5)",
-              color: canDeclareWinner ? "rgba(89,212,255,1)" : "rgba(89,212,255,0.5)",
-              cursor: canDeclareWinner && !form.submitting ? "pointer" : "not-allowed",
-              opacity: canDeclareWinner && !form.submitting ? 1 : 0.5,
-              transition: "all 0.2s",
-            }}
-            disabled={!canDeclareWinner || form.submitting}
-            title={
-              canDeclareWinner
-                ? undefined
-                : matchFormat
-                  ? `Le vainqueur doit atteindre ${maxScore} manche${maxScore > 1 ? "s" : ""} (${matchFormatLabel(matchFormat)}).`
-                  : "Les scores ne peuvent pas être égaux."
-            }
-          >
-            {form.submitting ? "..." : "✓ Gagnant"}
-          </button>
-        </div>
+          <div className={styles.scores}>
+            <ScoreStepper
+              id="admin-score-team1"
+              teamName={team1}
+              value={form.score1}
+              max={maxScore}
+              disabled={form.submitting || form.forfeitTeamId !== undefined}
+              onChange={form.setScore1}
+            />
+            <span className={styles.versus} aria-hidden="true">
+              VS
+            </span>
+            <ScoreStepper
+              id="admin-score-team2"
+              teamName={team2}
+              value={form.score2}
+              max={maxScore}
+              disabled={form.submitting || form.forfeitTeamId !== undefined}
+              onChange={form.setScore2}
+            />
+          </div>
+
+          <div className={styles.section}>
+            <p className={styles.sectionTitle}>Forfait</p>
+            <p className={styles.sectionHint}>
+              {forfeiting
+                ? `${forfeiting.out} déclare forfait : ${forfeiting.through} l'emporte sans manche jouée.`
+                : "Désigne l'équipe qui déclare forfait. Son adversaire l'emporte, et les scores ci-dessus sont ignorés."}
+            </p>
+            <div className={styles.forfeitRow}>
+              <button
+                type="button"
+                className={styles.forfeit}
+                aria-pressed={form.forfeitTeamId === match.team1Id}
+                onClick={() => toggleForfeit(match.team1Id)}
+                disabled={form.submitting || match.team1Id === null}
+              >
+                {team1}
+              </button>
+              <button
+                type="button"
+                className={styles.forfeit}
+                aria-pressed={form.forfeitTeamId === match.team2Id}
+                onClick={() => toggleForfeit(match.team2Id)}
+                disabled={form.submitting || match.team2Id === null}
+              >
+                {team2}
+              </button>
+              {form.forfeitTeamId !== undefined && (
+                <button
+                  type="button"
+                  className="btn ghost"
+                  style={{ padding: "10px 14px", fontSize: 12 }}
+                  onClick={() => form.setForfeitTeamId(undefined)}
+                  disabled={form.submitting}
+                >
+                  Annuler le forfait
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={onClose}
+              disabled={form.submitting}
+            >
+              Fermer
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => void run("save")}
+              disabled={!form.decision.canSave || form.submitting}
+              title={
+                form.decision.saveBlocker
+                  ? scoreBlockerMessage(form.decision.saveBlocker, matchFormat)
+                  : "Note l'avancement sans désigner de vainqueur."
+              }
+            >
+              {form.submitting ? "…" : "Enregistrer le score"}
+            </button>
+            <button
+              type="submit"
+              className="btn"
+              disabled={!form.decision.canResolve || form.submitting}
+              title={
+                form.decision.resolveBlocker
+                  ? scoreBlockerMessage(form.decision.resolveBlocker, matchFormat)
+                  : "Désigne la gagnante et met le plateau à jour."
+              }
+            >
+              {form.submitting ? "…" : "Valider le résultat"}
+            </button>
+          </div>
+
+          {/* Une seule raison affichée : celle qui bloque l'action décisive, ou
+              à défaut celle de l'enregistrement. Les empiler ferait répéter deux
+              fois la même phrase dans le cas courant. */}
+          {(form.decision.resolveBlocker ?? form.decision.saveBlocker) && (
+            <p className={styles.blockers} role="status">
+              {scoreBlockerMessage(
+                (form.decision.resolveBlocker ?? form.decision.saveBlocker)!,
+                matchFormat,
+              )}
+            </p>
+          )}
+        </form>
       </div>
-    </>
+    </div>
   );
 }

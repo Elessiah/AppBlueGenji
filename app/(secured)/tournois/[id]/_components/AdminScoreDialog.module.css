@@ -1,0 +1,290 @@
+/* Dialogue d'édition d'un score, pour la permission `tournaments`.
+   Même ossature que les autres modales de la fiche tournoi (voile sombre,
+   carte centrée, jetons « cyber ») — voir `MatchScheduleDialog`. Les styles
+   sortent du JSX ici parce que le dialogue a des états : champ en défaut,
+   bouton refusé, bandeau de désaccord. */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(6, 8, 12, 0.72);
+}
+
+.dialog {
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 22px;
+  background: var(--cyber-bg-2, #14181f);
+  border: 1px solid var(--line-strong-cy, var(--line-soft));
+  border-radius: var(--r-cy-md, 12px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+
+.dialog:focus-visible {
+  outline: 2px solid var(--blue-400, #5ac8ff);
+  outline-offset: 2px;
+}
+
+/* ---------- En-tête ---------- */
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  color: var(--ink, var(--text-0));
+}
+
+.opponents {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--text-2, #9aa4b2);
+}
+
+.formatHint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2, #9aa4b2);
+}
+
+.formatHint strong {
+  color: var(--blue-400, #5ac8ff);
+}
+
+/* ---------- Bandeaux ---------- */
+
+.notice {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-1, #c3ccd8);
+}
+
+.noticeWarn {
+  border: 1px solid rgba(255, 157, 46, 0.4);
+  background: rgba(255, 157, 46, 0.1);
+}
+
+.noticeInfo {
+  border: 1px solid rgba(90, 200, 255, 0.35);
+  background: rgba(90, 200, 255, 0.08);
+}
+
+/* En bloc : le bouton est une action, pas la fin de la phrase — collé au texte,
+   il se lisait « écraserait le sien.Reprendre la valeur à jour ». */
+.noticeAction {
+  display: block;
+  margin-top: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--blue-400, #5ac8ff);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.noticeAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ---------- Saisie des scores ---------- */
+
+.scores {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: end;
+  margin-top: 20px;
+}
+
+.versus {
+  padding-bottom: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-2, #9aa4b2);
+}
+
+.sideLabel {
+  display: block;
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--blue-400, #5ac8ff);
+  overflow-wrap: anywhere;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.step {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 40px;
+  border: 1px solid rgba(90, 200, 255, 0.3);
+  border-radius: 6px;
+  background: rgba(90, 200, 255, 0.12);
+  color: var(--blue-400, #5ac8ff);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.step:hover:not(:disabled) {
+  background: rgba(90, 200, 255, 0.24);
+}
+
+.step:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.field {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 40px;
+  padding: 0 8px;
+  border: 2px solid rgba(90, 200, 255, 0.4);
+  border-radius: 8px;
+  background: var(--cyber-bg-1, var(--surface-1));
+  color: var(--ink, var(--text-0));
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.field:focus-visible {
+  outline: none;
+  border-color: var(--blue-400, #5ac8ff);
+  box-shadow: 0 0 0 3px rgba(90, 200, 255, 0.18);
+}
+
+.field[aria-invalid="true"] {
+  border-color: rgba(255, 74, 92, 0.75);
+}
+
+.field:disabled {
+  opacity: 0.5;
+}
+
+/* ---------- Forfait ---------- */
+
+.section {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-soft, rgba(255, 255, 255, 0.08));
+}
+
+.sectionTitle {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-2, #9aa4b2);
+}
+
+.sectionHint {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2, #9aa4b2);
+}
+
+.forfeitRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.forfeit {
+  flex: 1 1 140px;
+  padding: 10px 12px;
+  border: 2px solid rgba(255, 157, 46, 0.25);
+  border-radius: 6px;
+  background: rgba(255, 157, 46, 0.08);
+  color: rgba(255, 157, 46, 0.75);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  overflow-wrap: anywhere;
+}
+
+.forfeit:hover:not(:disabled) {
+  background: rgba(255, 157, 46, 0.16);
+}
+
+.forfeit[aria-pressed="true"] {
+  border-color: rgba(255, 157, 46, 0.6);
+  background: rgba(255, 157, 46, 0.2);
+  color: rgba(255, 157, 46, 1);
+}
+
+.forfeit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- Actions ---------- */
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.actions .btn {
+  padding: 9px 18px;
+  font-size: 13px;
+}
+
+/* `.btn` global n'a pas d'état désactivé : sans ça, « Valider le résultat »
+   gardait l'apparence d'un bouton cliquable alors qu'il refusait le clic, et
+   rien à l'écran ne disait pourquoi. */
+.actions .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.actions .btn:disabled:hover {
+  background: rgba(89, 212, 255, 0.14);
+  transform: none;
+  box-shadow: none;
+}
+
+.blockers {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: right;
+  color: var(--text-2, #9aa4b2);
+}

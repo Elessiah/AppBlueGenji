@@ -195,6 +195,20 @@ async function checkScoresAgainstMatchFormat(
   if (violation) throw new Error(violation);
 }
 
+/**
+ * Le forfait déclaré porte-t-il sur une des deux engagées de ce match ?
+ *
+ * L'interface ne propose que les deux boutons, mais la route accepte n'importe
+ * quel entier positif : sans ce contrôle, un `forfeitTeamId` étranger passait en
+ * base, et `adminResolveMatch` en déduisait un vainqueur par défaut — l'équipe 1
+ * gagnait parce qu'aucune des deux n'était celle qui « déclarait forfait ».
+ */
+function assertForfeitBelongsToMatch(match: MatchRow, forfeitTeamId: number): void {
+  if (forfeitTeamId !== Number(match.team1_id) && forfeitTeamId !== Number(match.team2_id)) {
+    throw new Error("INVALID_FORFEIT_TEAM_ID");
+  }
+}
+
 export async function adminSaveMatchScores(
   connection: PoolConnection,
   matchId: number,
@@ -221,9 +235,19 @@ export async function adminSaveMatchScores(
   const match = matches[0];
   if (match.team1_id === null || match.team2_id === null) throw new Error("MATCH_NOT_READY");
 
+  // Cette route n'écrit que les scores : elle ne recalcule ni le vainqueur ni la
+  // suite du plateau. Appliquée à un match déjà tranché, elle le laissait donc
+  // affiché « 2-1 » pour l'équipe portée perdante, la qualifiée du tour suivant
+  // restant l'ancienne — deux vérités contradictoires en base, sans une erreur.
+  // Corriger un résultat acquis passe par `adminResolveMatch`, qui refait le
+  // travail en entier.
+  if (match.winner_team_id !== null) throw new Error("MATCH_ALREADY_COMPLETED");
+
   await checkDownstreamMatchesHaveNoScores(connection, match);
 
   if (forfeitTeamId !== undefined) {
+    assertForfeitBelongsToMatch(match, forfeitTeamId);
+
     await connection.execute(
       `UPDATE bg_matches
        SET team1_score = NULL,
@@ -292,6 +316,8 @@ export async function adminResolveMatch(
   let resultTeam2Score: number | null;
 
   if (forfeitTeamId !== undefined) {
+    assertForfeitBelongsToMatch(match, forfeitTeamId);
+
     winnerTeamId =
       forfeitTeamId === Number(match.team1_id) ? Number(match.team2_id) : Number(match.team1_id);
     loserTeamId =
