@@ -80,6 +80,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // toutes par `mapError`.
   TOO_MANY_REQUESTS: "Trop de requêtes coup sur coup. Patiente quelques minutes.",
   ISSUE_REPORT_FAILED: "Erreur lors de l'envoi du signalement.",
+  INVALID_MATCH_ID: "Identifiant de match invalide.",
   INVALID_ID: "Identifiant invalide.",
 };
 

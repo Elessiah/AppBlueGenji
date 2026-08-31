@@ -46,19 +46,21 @@ disparaîtrait au premier score rapporté.
 ## Ce qui est supprimé
 
 `purgeTournamentRows` (`lib/server/tournaments/deletion.ts`) efface, dans cet
-ordre et en une transaction, **les seules tables portant un `tournament_id`** :
+ordre et en une transaction, les tables portant un `tournament_id` — plus la
+seule qui pende à une **manche** :
 
 | Étape | Table | Raison de l'ordre |
 | --- | --- | --- |
 | 1 | `bg_matches` (UPDATE) | désarme `next_winner_match_id` / `next_loser_match_id`, les matchs se pointant entre eux |
-| 2 | `bg_tournament_phase_teams` | sa clé étrangère passe par `phase_id` : l'étape 7 l'emporterait déjà, on la nomme quand même |
+| 2 | `bg_tournament_phase_teams` | sa clé étrangère passe par `phase_id` : l'étape 8 l'emporterait déjà, on la nomme quand même |
 | 3 | `bg_swiss_standings` | |
 | 4 | `bg_survival_standings` | |
 | 5 | `bg_endurance_standings` | |
-| 6 | `bg_matches` (DELETE) | |
-| 7 | `bg_tournament_phases` | après les matchs qui les référencent |
-| 8 | `bg_tournament_registrations` | |
-| 9 | `bg_tournaments` | la racine |
+| 6 | `bg_match_reminders` | par jointure sur `bg_matches` : c'est la manche qu'elle référence, pas le tournoi |
+| 7 | `bg_matches` (DELETE) | après les rappels qui les référencent |
+| 8 | `bg_tournament_phases` | après les matchs qui les référencent |
+| 9 | `bg_tournament_registrations` | |
+| 10 | `bg_tournaments` | la racine |
 
 Les suppressions sont **écrites explicitement** alors que le schéma cascaderait
 seul depuis `bg_tournaments` — un seul `DELETE` suffirait. Deux raisons de ne pas
