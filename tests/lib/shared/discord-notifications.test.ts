@@ -114,6 +114,13 @@ describe("openedMatchReminders", () => {
     ]);
   });
 
+  it("ne retient rien une fois le match commencé", () => {
+    // Le balayage ne lit que des manches à venir, mais quelques millisecondes
+    // séparent sa lecture de sa décision : on n'annonce pas un match en cours.
+    expect(openedMatchReminders(START, START)).toEqual([]);
+    expect(openedMatchReminders(START, new Date(START.getTime() + MINUTE))).toEqual([]);
+  });
+
   it("ne retient rien sans horaire ni sur une date illisible", () => {
     expect(openedMatchReminders(null, before(60))).toEqual([]);
     expect(openedMatchReminders("pas une date", before(60))).toEqual([]);

@@ -133,6 +133,12 @@ export const MATCH_SEEN_KEY = "SEEN";
  * l'annonce les remplace tous par une seule ligne, qui porte la date — et seuls
  * les paliers encore devant continuent de courir.
  *
+ * Rien non plus une fois le match commencé, comme pour `dueMatchReminders` : le
+ * balayage ne retient que des manches à venir, mais quelques dizaines de
+ * millisecondes séparent sa lecture de sa décision, et une manche qui démarre
+ * dans cet intervalle ne doit pas déclencher l'annonce d'un match déjà en
+ * cours.
+ *
  * @param startAt Début du match.
  * @param now Instant de référence.
  * @returns Les paliers déjà dépassés ou en cours, du plus lointain au plus proche.
@@ -146,6 +152,8 @@ export function openedMatchReminders(
   if (!Number.isFinite(start)) return [];
 
   const nowMs = now.getTime();
+  if (nowMs >= start) return [];
+
   return MATCH_REMINDER_OFFSETS.filter(
     (offset) => nowMs >= start - offset.minutesBefore * MINUTE_MS,
   );
