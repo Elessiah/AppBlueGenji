@@ -164,7 +164,11 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
 
     const [sql] = query.mock.calls[0] as [string];
     expect(sql).toMatch(/m\.start_at > NOW\(\)/);
-    expect(sql).toMatch(/DATE_ADD\(NOW\(\), INTERVAL 7 DAY\)/);
+    // Fenêtre de lecture = horizon + une journée de marge, pour que la manche
+    // soit observée avant que le palier « une semaine » ne s'ouvre.
+    expect(sql).toMatch(/DATE_ADD\(NOW\(\), INTERVAL \? SECOND\)/);
+    const [, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(params).toEqual([8 * 24 * 60 * 60]);
     expect(sql).toMatch(/m\.status <> 'COMPLETED'/);
     // Jointure interne sur les deux engagées : un bye n'est pas un match.
     expect(sql).toMatch(/JOIN bg_teams t1/);

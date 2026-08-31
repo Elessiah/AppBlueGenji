@@ -76,6 +76,12 @@ découvre cette date » de « le temps a passé depuis ». Sans elle, un match
 programmé à trois jours recevrait le rappel « dans une semaine » — la fenêtre du
 palier est bel et bien ouverte, mais ce qu'il annonce est faux.
 
+C'est aussi ce qui impose la marge de `MATCH_REMINDER_LOOKAHEAD_MS` : le balayage
+lit **une journée plus loin** que le plus grand palier. Une fenêtre de lecture
+égale à l'horizon ferait découvrir chaque manche à la seconde exacte où le palier
+« une semaine » s'ouvre — donc toujours par le régime d'annonce, et ce palier ne
+partirait jamais.
+
 ### Reprogrammer une manche
 
 `setMatchStartAt` efface les lignes `bg_match_reminders` de la manche **quand la

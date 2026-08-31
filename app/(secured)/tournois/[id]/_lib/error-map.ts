@@ -75,7 +75,10 @@ export const ERROR_MESSAGES: Record<string, string> = {
   NOT_REGISTERED: "Seuls les engagés du tournoi peuvent signaler un problème.",
   BOT_INTERNAL_UNREACHABLE:
     "Le bot Discord est injoignable : le signalement n'est pas parti. Préviens le staff sur Discord.",
-  TOO_MANY_REQUESTS: "Trop de signalements coup sur coup. Patiente quelques minutes.",
+  // Générique à dessein : le plafond de débit est partagé par toutes les routes
+  // de la page (lecture, report de score, signalement), et cette page les mappe
+  // toutes par `mapError`.
+  TOO_MANY_REQUESTS: "Trop de requêtes coup sur coup. Patiente quelques minutes.",
   ISSUE_REPORT_FAILED: "Erreur lors de l'envoi du signalement.",
   INVALID_ID: "Identifiant invalide.",
 };

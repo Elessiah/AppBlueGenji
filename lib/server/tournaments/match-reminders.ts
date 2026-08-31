@@ -33,6 +33,7 @@ import {
   type DiscordRecipient,
 } from "@/lib/server/bot-integration";
 import {
+  MATCH_REMINDER_LOOKAHEAD_MS,
   MATCH_REMINDER_OFFSETS,
   MATCH_SEEN_KEY,
   buildMatchReminderMessage,
@@ -41,7 +42,6 @@ import {
   matchRoundLabel,
   openedMatchReminders,
   type MatchReminderOffset,
-  type MatchReminderOffsetKey,
 } from "@/lib/shared/discord-notifications";
 
 type ScheduledMatchRow = RowDataPacket & {
@@ -233,11 +233,12 @@ async function planMatchSends(
     return [{ match, offset: null, remaining: [...remaining] }];
   }
 
-  const due = dueMatchReminders(
-    match.start_at,
-    now,
-    [...alreadySent] as MatchReminderOffsetKey[],
+  // `alreadySent` porte aussi la marque d'observation, qui n'est pas un palier :
+  // on ne transmet que les clés qui en sont.
+  const sentOffsets = MATCH_REMINDER_OFFSETS.map((offset) => offset.key).filter((key) =>
+    alreadySent.has(key),
   );
+  const due = dueMatchReminders(match.start_at, now, sentOffsets);
 
   const planned: PlannedSend[] = [];
   for (const offset of due) {
@@ -256,6 +257,11 @@ async function runSweep(now: Date): Promise<number> {
   // Les deux engagées sont exigées — un plateau programmé à l'avance dont les
   // qualifiées ne sont pas connues n'a personne à prévenir, et un bye n'est pas
   // un match.
+  //
+  // La borne haute vient du module partagé et vaut l'horizon **plus une marge** :
+  // une fenêtre de lecture égale à l'horizon ferait découvrir chaque manche à la
+  // seconde où le palier « une semaine » s'ouvre, donc toujours par le régime
+  // d'annonce, et ce palier ne partirait jamais.
   const [matches] = await db.query<ScheduledMatchRow[]>(
     `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.start_at,
             m.team1_id, m.team2_id,
@@ -267,8 +273,9 @@ async function runSweep(now: Date): Promise<number> {
        JOIN bg_teams t2 ON t2.id = m.team2_id
       WHERE m.start_at IS NOT NULL
         AND m.start_at > NOW()
-        AND m.start_at <= DATE_ADD(NOW(), INTERVAL 7 DAY)
+        AND m.start_at <= DATE_ADD(NOW(), INTERVAL ? SECOND)
         AND m.status <> 'COMPLETED'`,
+    [Math.round(MATCH_REMINDER_LOOKAHEAD_MS / 1000)],
   );
   if (matches.length === 0) return 0;
 

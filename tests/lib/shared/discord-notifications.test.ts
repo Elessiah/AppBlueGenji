@@ -3,6 +3,7 @@ import {
   ISSUE_REPORT_MAX_LENGTH,
   ISSUE_REPORT_MIN_LENGTH,
   MATCH_REMINDER_HORIZON_MS,
+  MATCH_REMINDER_LOOKAHEAD_MS,
   MATCH_REMINDER_OFFSETS,
   MATCH_SEEN_KEY,
   buildIssueReportMessage,
@@ -73,6 +74,13 @@ describe("dueMatchReminders", () => {
 
   it("expose un horizon égal au plus grand palier", () => {
     expect(MATCH_REMINDER_HORIZON_MS).toBe(7 * 24 * 60 * MINUTE);
+  });
+
+  it("lit une journée plus loin que l'horizon, pour que le premier palier soit atteignable", () => {
+    // Une fenêtre de lecture égale à l'horizon ferait découvrir chaque manche à
+    // la seconde où le palier « une semaine » s'ouvre : il ne partirait jamais.
+    expect(MATCH_REMINDER_LOOKAHEAD_MS).toBeGreaterThan(MATCH_REMINDER_HORIZON_MS);
+    expect(MATCH_REMINDER_LOOKAHEAD_MS).toBe(8 * 24 * 60 * MINUTE);
   });
 
   it("garde les paliers ordonnés du plus lointain au plus proche", () => {

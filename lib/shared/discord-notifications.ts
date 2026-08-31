@@ -101,6 +101,19 @@ export const MATCH_REMINDER_HORIZON_MS =
   Math.max(...MATCH_REMINDER_OFFSETS.map((o) => o.minutesBefore)) * MINUTE_MS;
 
 /**
+ * Fenêtre de **lecture** du balayage : l'horizon, plus une journée de marge.
+ *
+ * La marge n'est pas décorative, elle est ce qui rend le premier palier
+ * atteignable. Le balayage ne voit une manche que si elle est dans sa fenêtre
+ * de lecture ; si celle-ci valait exactement l'horizon, toute manche serait
+ * découverte **au moment même** où le palier « une semaine » s'ouvre, donc
+ * toujours par le régime d'annonce — et ce palier ne partirait jamais. Une
+ * journée d'avance laisse le site observer la manche avant que quoi que ce soit
+ * ne soit dû, et les trois paliers courent alors normalement.
+ */
+export const MATCH_REMINDER_LOOKAHEAD_MS = MATCH_REMINDER_HORIZON_MS + 24 * 60 * MINUTE_MS;
+
+/**
  * Clé de la ligne posée à la **première observation** d'une manche programmée.
  *
  * Elle ne correspond à aucun message : elle marque que le site a vu cette date,

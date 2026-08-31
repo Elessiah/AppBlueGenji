@@ -274,7 +274,13 @@ export type DiscordDeliveryReport = {
   failed: string[];
 };
 
-const EMPTY_DELIVERY: DiscordDeliveryReport = { sent: 0, unresolved: [], failed: [] };
+/**
+ * Bilan vide. Une fabrique, pas une constante partagée : les deux tableaux
+ * seraient sinon la même instance dans tous les bilans rendus.
+ */
+function emptyDelivery(): DiscordDeliveryReport {
+  return { sent: 0, unresolved: [], failed: [] };
+}
 
 async function postDiscordNotification(
   path: string,
@@ -302,7 +308,7 @@ async function postDiscordNotification(
     }
 
     recordSuccess();
-    return { ...EMPTY_DELIVERY, ...((await response.json()) as Partial<DiscordDeliveryReport>) };
+    return { ...emptyDelivery(), ...((await response.json()) as Partial<DiscordDeliveryReport>) };
   } catch {
     recordFailure();
     return null;
@@ -323,7 +329,7 @@ export async function pushDiscordDirectMessages(
   recipients: DiscordRecipient[],
   context: string,
 ): Promise<DiscordDeliveryReport | null> {
-  if (recipients.length === 0) return { ...EMPTY_DELIVERY };
+  if (recipients.length === 0) return emptyDelivery();
   return postDiscordNotification("/internal/notify/dm", { message, recipients, context });
 }
 
