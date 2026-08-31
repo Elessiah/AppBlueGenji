@@ -1068,6 +1068,30 @@ async function runMigrations(db: Pool): Promise<void> {
   } catch {
     // Already migrated
   }
+
+  // Rappels de match déjà envoyés (`lib/shared/discord-notifications.ts`).
+  //
+  // Une ligne par (manche, palier), posée **avant** l'envoi : c'est la clé
+  // unique qui fait office de verrou. Deux requêtes concurrentes déclenchent
+  // toutes deux le balayage — sans elle, le joueur recevrait deux fois le même
+  // rappel. Le `ON DELETE CASCADE` suit la manche : un plateau régénéré
+  // (réappariement d'une ronde suisse, correction de score en survie) efface
+  // ses matchs, donc ses rappels, et les nouveaux repartent de zéro.
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS bg_match_reminders (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        match_id BIGINT NOT NULL,
+        offset_key VARCHAR(8) NOT NULL,
+        sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_bg_match_reminders (match_id, offset_key),
+        CONSTRAINT fk_bg_match_reminders_match FOREIGN KEY (match_id)
+          REFERENCES bg_matches(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+  } catch {
+    // Table already exists
+  }
 }
 
 async function ensureMigrations(db: Pool): Promise<void> {

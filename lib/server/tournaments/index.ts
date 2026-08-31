@@ -145,6 +145,7 @@ import { publishUpdatedEvent, publishScoreReportedEvent, publishScoreResolvedEve
 import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
 import { getTournamentPreview } from "./preview-cache";
+import { dispatchDueMatchReminders } from "./match-reminders";
 
 let pendingSync: Promise<void> | null = null;
 let lastSyncAt = 0;
@@ -447,6 +448,12 @@ export async function listTournamentBuckets(
   // panne passagère de MySQL viderait sinon `/tournois` alors qu'il n'y avait
   // rien à en faire.
   await syncVisibleTournaments().catch(() => undefined);
+
+  // Les rappels de match n'ont pas d'ordonnanceur : c'est le trafic qui les
+  // entraîne, comme la bascule d'état juste au-dessus. Étranglé à une minute et
+  // sans attente ici — un bot lent ou injoignable ne doit pas retarder la
+  // liste, et le prochain passage rattrapera ce qui reste dû.
+  void dispatchDueMatchReminders().catch(() => undefined);
 
   // Seule la liste publique est mutualisée : celle des tournois pas encore
   // visibles est réservée au staff, elle est courte et bien plus rarement lue.

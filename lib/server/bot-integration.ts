@@ -14,6 +14,13 @@ const DEFAULT_BOT_INTERNAL_PORT = "4400";
 
 const BOT_FETCH_TIMEOUT_MS = 1500; // degradation gracieuse : 1.5 s max
 const BOT_LOGIN_FETCH_TIMEOUT_MS = 3000; // login = action utilisateur, on tolère un peu moins
+// Une distribution de messages privés enchaîne un appel Discord par
+// destinataire : la fenêtre des lectures (1,5 s) la couperait en plein envoi.
+const BOT_NOTIFY_FETCH_TIMEOUT_MS = 15_000;
+// Alerter les arbitres suppose en plus de récupérer les membres de leur rôle,
+// dont le coût dépend de la taille du serveur : on laisse plus de temps encore,
+// pour ne pas répondre « pas envoyé » à un signalement qui partira.
+const BOT_REFEREE_FETCH_TIMEOUT_MS = 30_000;
 
 // Circuit breaker simple : si N échecs consécutifs, on court-circuite pendant T ms
 let consecutiveFailures = 0;
@@ -248,6 +255,119 @@ export async function pushSiteVisitStats(stats: SiteVisitStats): Promise<void> {
     recordFailure();
     // Best-effort : la fréquentation ne doit jamais faire échouer une visite.
   }
+}
+
+/**
+ * Destinataire d'un message privé Discord, tel que le site le connaît.
+ *
+ * `discordId` n'est renseigné que pour les comptes liés par code Discord ; le
+ * `handle` (tag) suffit au bot, qui retrouve le membre **sur le serveur
+ * BlueGenji** — la seule population qu'il démarche. Un joueur qui n'y est pas
+ * ne reçoit aucune tentative d'envoi, et revient dans `unresolved`.
+ */
+export type DiscordRecipient = {
+  discordId: string | null;
+  handle: string | null;
+  label: string;
+};
+
+/** Bilan d'une distribution, tel que le bot le rend. */
+export type DiscordDeliveryReport = {
+  sent: number;
+  unresolved: string[];
+  failed: string[];
+};
+
+/**
+ * Bilan vide. Une fabrique, pas une constante partagée : les deux tableaux
+ * seraient sinon la même instance dans tous les bilans rendus.
+ */
+function emptyDelivery(): DiscordDeliveryReport {
+  return { sent: 0, unresolved: [], failed: [] };
+}
+
+async function postDiscordNotification(
+  path: string,
+  body: unknown,
+  options: { timeoutMs: number; honourCircuit: boolean },
+): Promise<DiscordDeliveryReport | null> {
+  if (options.honourCircuit && isCircuitOpen()) return null;
+
+  const baseUrl = resolveBotInternalUrl();
+
+  try {
+    const response = await fetch(`${baseUrl}${path}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...getInternalHeaders(),
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      signal: AbortSignal.timeout(options.timeoutMs),
+    });
+
+    if (!response.ok) {
+      recordFailure();
+      return null;
+    }
+
+    recordSuccess();
+    return { ...emptyDelivery(), ...((await response.json()) as Partial<DiscordDeliveryReport>) };
+  } catch {
+    recordFailure();
+    return null;
+  }
+}
+
+/**
+ * Envoie un message privé Discord à une liste de joueurs.
+ *
+ * Meilleur effort, comme tout ce qui passe par le canal interne : un bot
+ * injoignable ne doit pas faire échouer la lecture d'une page de tournoi, qui
+ * est ce qui déclenche le balayage des rappels.
+ *
+ * @returns Le bilan du bot, ou `null` s'il est injoignable.
+ */
+export async function pushDiscordDirectMessages(
+  message: string,
+  recipients: DiscordRecipient[],
+  context: string,
+): Promise<DiscordDeliveryReport | null> {
+  if (recipients.length === 0) return emptyDelivery();
+  return postDiscordNotification(
+    "/internal/notify/dm",
+    { message, recipients, context },
+    { timeoutMs: BOT_NOTIFY_FETCH_TIMEOUT_MS, honourCircuit: true },
+  );
+}
+
+/**
+ * Alerte les arbitres : canal de logs du bot **et** message privé à chaque
+ * membre du rôle arbitre configuré côté Discord (`/set-referee-role`).
+ *
+ * Contrairement aux rappels, l'échec est **remonté à l'appelant** (`null`) : un
+ * signalement est une action utilisateur, et lui répondre « c'est parti » quand
+ * rien n'est parti serait un mensonge — le joueur attendrait un arbitre qui
+ * n'a rien reçu.
+ *
+ * Le coupe-circuit est **ignoré ici**, comme pour l'envoi du code de connexion :
+ * il protège le site d'un bot en panne quand le trafic de fond le sollicite en
+ * boucle, mais un balayage de rappels qui vient de l'ouvrir refuserait alors le
+ * signalement d'un joueur sans même essayer. Une action explicite mérite sa
+ * tentative.
+ *
+ * @returns Le bilan du bot, ou `null` s'il est injoignable.
+ */
+export async function pushRefereeAlert(
+  message: string,
+  context: string,
+): Promise<DiscordDeliveryReport | null> {
+  return postDiscordNotification(
+    "/internal/notify/referees",
+    { message, context },
+    { timeoutMs: BOT_REFEREE_FETCH_TIMEOUT_MS, honourCircuit: false },
+  );
 }
 
 export async function fetchBotStatus(): Promise<BotStatus | null> {

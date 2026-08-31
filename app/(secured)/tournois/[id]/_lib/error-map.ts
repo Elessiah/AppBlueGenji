@@ -69,6 +69,18 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // `TOURNAMENT_NOT_FOUND` et `UNAUTHORIZED` sont déjà couverts plus haut.
   TOURNAMENT_DELETE_FAILED: "Erreur lors de la suppression du tournoi.",
   INVALID_TOURNAMENT_ID: "Identifiant de tournoi invalide.",
+  // Signalement d'un problème (`lib/shared/discord-notifications.ts`).
+  INVALID_ISSUE_MESSAGE:
+    "Décris le problème en 10 à 1000 caractères pour que l'arbitre puisse agir.",
+  NOT_REGISTERED: "Seuls les engagés du tournoi peuvent signaler un problème.",
+  BOT_INTERNAL_UNREACHABLE:
+    "Le bot Discord est injoignable : le signalement n'est pas parti. Préviens le staff sur Discord.",
+  // Générique à dessein : le plafond de débit est partagé par toutes les routes
+  // de la page (lecture, report de score, signalement), et cette page les mappe
+  // toutes par `mapError`.
+  TOO_MANY_REQUESTS: "Trop de requêtes coup sur coup. Patiente quelques minutes.",
+  ISSUE_REPORT_FAILED: "Erreur lors de l'envoi du signalement.",
+  INVALID_MATCH_ID: "Identifiant de match invalide.",
   INVALID_ID: "Identifiant invalide.",
 };
 

@@ -7,6 +7,7 @@ import { fromBracketMatch, isScoreEditLocked } from "@/lib/shared/match-lock";
 import { matchFormatLabel, matchWinsRequired } from "@/lib/shared/match-format";
 import { useEntrantLink } from "../_lib/entrant-link";
 import { useMatchFormat } from "../_lib/match-format-context";
+import { useIssueReport } from "../_lib/issue-report-context";
 import { MatchLiveStrip } from "./MatchLiveStrip";
 
 const CARD_W = 210;
@@ -43,6 +44,12 @@ export function MatchRow({
   // Format du tournoi (BO5, FT3…) : rappelé au-dessus des champs et appliqué
   // comme borne haute, pour que la saisie ne parte pas hors format.
   const matchFormat = useMatchFormat();
+  // Signalement : réservé aux engagés du tournoi, et seulement sur une manche
+  // dont les deux adversaires sont connus — il n'y a rien à arbitrer sur une
+  // case encore vide.
+  const { canReport, openReport } = useIssueReport();
+  const canReportMatch =
+    canReport && match.team1Id !== null && match.team2Id !== null;
   const maxScore = matchFormat ? matchWinsRequired(matchFormat) : 99;
 
   const team1Win = match.winnerTeamId !== null && match.winnerTeamId === match.team1Id;
@@ -191,6 +198,27 @@ export function MatchRow({
             style={{ padding: "4px 12px", fontSize: 12, background: "rgba(89,212,255,0.15)", borderColor: "rgba(89,212,255,0.4)" }}
           >
             ✎ Éditer le score
+          </button>
+        </div>
+      )}
+
+      {canReportMatch && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            padding: "4px 6px",
+            borderTop: `1px solid ${BORDER}`,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => openReport(match)}
+            className="btn ghost"
+            title="Prévenir le staff d'un problème sur ce match"
+            style={{ padding: "3px 10px", fontSize: 11 }}
+          >
+            ⚠ Signaler un problème
           </button>
         </div>
       )}
