@@ -178,6 +178,22 @@ describe("page du tournoi — ce que dit la zone des matchs vide", () => {
     // Les deux emplacements passent par le libellé calculé : sans cela, l'un
     // des deux annoncerait encore des matchs « pour l'instant » absents.
     expect(source).not.toContain("Aucun match disponible pour l&apos;instant.");
-    expect(source.match(/\{noMatchesLabel\}/g)).toHaveLength(2);
+    expect(source.match(/\{noMatchesLabel\}/g)).toHaveLength(4);
+  });
+
+  it("le passe aussi aux vues qui affichent leurs propres manches", () => {
+    // La Survie et la Ronde suisse ne passent pas par la zone générique : sans
+    // ce relais, elles seraient les seules à promettre des matchs à venir sur
+    // un tournoi clos sans avoir été joué.
+    expect(source.match(/emptyLabel=\{noMatchesLabel\}/g)).toHaveLength(2);
+    for (const view of ["SurvivalView", "SwissView"]) {
+      const component = readFileSync(
+        join(__dirname, "..", "..", "app", "(secured)", "tournois", "[id]", "_components", `${view}.tsx`),
+        "utf8",
+      );
+      // Le défaut garde le libellé d'origine pour tout autre appelant.
+      expect(component).toContain(`emptyLabel = "Aucun match pour l'instant."`);
+      expect(component).toContain("{emptyLabel}");
+    }
   });
 });

@@ -494,6 +494,7 @@ export default function TournamentDetailPage() {
                 onOpenAdminModal={setSelectedMatchForAdmin}
                 canForfeit={canForfeit}
                 onForfeit={forfeitTeam}
+                emptyLabel={noMatchesLabel}
               />
               {isMulti && selectedPhase?.state === "FINISHED" && detail.phaseStandings && detail.phaseStandings[selectedPhase.id] && (
                 <div style={{ marginTop: 24 }}>
@@ -549,6 +550,7 @@ export default function TournamentDetailPage() {
               onOpenAdminModal={setSelectedMatchForAdmin}
               canForfeit={canForfeit}
               onForfeit={forfeitTeam}
+              emptyLabel={noMatchesLabel}
             />
           ) : formatForBracket === "SWISS" ? (
             <>

@@ -29,6 +29,12 @@ interface SurvivalViewProps {
   /** Le forfait de cette équipe peut-il être déclaré depuis le classement ? */
   canForfeit: (teamId: number) => boolean;
   onForfeit: (teamId: number, teamName: string) => void;
+  /**
+   * Ce qu'affiche la zone des manches quand il n'y en a aucune. La page le
+   * calcule : un tournoi clos sans avoir été joué n'attend plus de match, et le
+   * « pour l'instant » par défaut lui promettrait une suite qui ne viendra pas.
+   */
+  emptyLabel?: string;
 }
 
 const STATUS_META: Record<SurvivalStandingRow["status"], { label: string; color: string }> = {
@@ -51,6 +57,7 @@ export function SurvivalView({
   onOpenAdminModal,
   canForfeit,
   onForfeit,
+  emptyLabel = "Aucun match pour l'instant.",
 }: SurvivalViewProps) {
   const entrantLink = useEntrantLink();
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
@@ -255,7 +262,7 @@ export function SurvivalView({
           style={{ flex: 1, minWidth: 0, paddingBottom: 12 }}
         >
           {roundNums.length === 0 ? (
-            <p style={{ color: "var(--text-2)", fontSize: 14 }}>Aucun match pour l&apos;instant.</p>
+            <p style={{ color: "var(--text-2)", fontSize: 14 }}>{emptyLabel}</p>
           ) : (
             <div style={{ display: "flex", gap: 16 }}>
               {roundNums.map((roundNum) => {
