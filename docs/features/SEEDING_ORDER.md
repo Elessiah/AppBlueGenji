@@ -8,6 +8,38 @@ survie, plateau initial en multi-phases.
 Le staff (`can(user, "tournaments")`) peut le réordonner avec des flèches ↑ / ↓
 depuis la page du tournoi.
 
+## Où on le règle
+
+**Dans la liste des inscrites, sur les lignes elles-mêmes** — bloc « Inscriptions
+· ordre de départ » de `/tournois/[id]`.
+
+L'ordre a d'abord vécu dans un bloc « Seeding » à part, posé juste au-dessus d'un
+tableau « Inscriptions » qui listait les mêmes équipes avec leur seed. Deux
+listes identiques dont une seule se manipulait : celle qu'on cherche est celle
+qui porte le nom de la chose (« les inscrites »), et c'est justement celle qui
+n'avait pas de flèches. Il n'y en a donc plus qu'une, et les flèches sont dessus.
+
+Deux conséquences de forme :
+
+- la **fenêtre d'édition** est déduite du détail déjà reçu (`seedingLockReason`
+  rejouée côté client sur `detail.matches`), et non d'une requête à part : les
+  flèches apparaissent avec la page. Le serveur reste le juge — il refuse en 409
+  une écriture devenue interdite entre-temps ;
+- le clic déplace la ligne **tout de suite**, puis se laisse corriger par ce que
+  rapporte le flux. Sans cet affichage optimiste, un aller-retour complet (écriture
+  puis rafraîchissement) sépare le clic de son effet, et le bouton passe pour mort.
+
+## Ce que la liste montre — et ce que le moteur jouera
+
+`TournamentSnapshot.seedingSource` dit d'où vient l'ordre effectif :
+`MANUAL`, `RANKING` ou `REGISTRATION` (règle dans `seedingSource()`,
+`lib/shared/seeding.ts` — la même que celle de l'aperçu du plateau).
+
+En `RANKING`, la liste triée par `seed` **n'est pas** le tirage : le moteur
+seedera depuis le classement du site tant que personne n'a réordonné. Le bloc le
+dit alors explicitement, à côté des flèches qui permettent d'y remédier — sans
+quoi le staff lit un ordre d'inscription en croyant lire un tirage.
+
 ## Fenêtre d'édition
 
 L'ordre reste modifiable **jusqu'à la première saisie de score**, ce qui couvre
@@ -64,7 +96,10 @@ et réamorce le format.
 | Logique pure | `lib/shared/seeding.ts` |
 | Orchestration | `lib/server/tournaments/seeding.ts` |
 | API | `GET` / `PATCH /api/admin/tournaments/[id]/seeding` |
-| Interface | `app/(secured)/tournois/[id]/_components/SeedingEditor.tsx` |
+| Interface | `app/(secured)/tournois/[id]/_components/RegistrationsPanel.tsx` |
+
+`GET` sert l'ordre courant et la fenêtre d'édition côté serveur ; l'interface,
+elle, dérive la fenêtre du détail déjà reçu et n'appelle que `PATCH`.
 
 `PATCH` attend `{ teamIds: number[] }` — la liste **complète** des inscrites dans
 le nouvel ordre. Toute liste qui n'est pas une permutation exacte est refusée
@@ -73,7 +108,10 @@ faire disparaître une équipe du tournoi. Ordre figé → `SEEDING_LOCKED` (409
 
 ## Tests
 
-- `tests/lib/shared/seeding.test.ts` — verrou, déplacement, validation d'ordre.
+- `tests/lib/shared/seeding.test.ts` — verrou, déplacement, validation d'ordre,
+  provenance de l'ordre (`seedingSource`, `isSeedOrderEffective`).
+- `tests/lib/server/tournament-snapshot.test.ts` — `seedingSource` porté par
+  l'instantané, `manual_seeding` compris.
 - `tests/tournois/seeding-service.test.ts` — écriture des seeds, reconstruction
   du plateau, refus (verrou, permutation invalide, tournoi inconnu).
 - `tests/app/api/admin/seeding.test.ts` — permissions et codes d'erreur.
