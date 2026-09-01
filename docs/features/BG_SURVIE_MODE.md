@@ -87,6 +87,7 @@ décision humaine.
 | Classement | table `bg_endurance_standings` |
 | Vue | `app/(secured)/tournois/[id]/_components/EnduranceView.tsx` |
 | Verrouillage | `lib/shared/match-lock.ts` (format traité comme la Survie) |
+| Chiffre d'un forfait | `lib/shared/match-format.ts` (`forfeitMapCount`) |
 | Règles publiques | `/regles/bluegenji-survie` |
 
 Comme la Survie et la Ronde suisse, **tout est rejoué** depuis l'historique des
@@ -107,7 +108,7 @@ ultérieure portant une saisie verrouille les précédentes, play-offs compris.
 ## Forfait : un score plein, pas un match blanc
 
 Un forfait — déclaré par l'arbitrage sur un match (`forfeit_team_id`) ou entraîné
-par un abandon — vaut le **score maximal du format du tournoi** :
+par un retrait — vaut le **score maximal du format du tournoi** :
 
 | Format du tournoi | Score compté | Endurance |
 | --- | --- | --- |
@@ -115,18 +116,81 @@ par un abandon — vaut le **score maximal du format du tournoi** :
 | FT2 / BO3 | 2-0 | −2 / +2 |
 | Score libre (aucun format) | 1-0 | −1 / +1 |
 
-C'est `forfeitMapCount(format)` (`lib/shared/bg-survie.ts`) qui pose ce nombre,
-depuis `matchWinsRequired` — la seule définition de l'objectif d'un format.
+C'est `forfeitMapCount(format)` (`lib/shared/match-format.ts`) qui pose ce
+nombre, depuis `matchWinsRequired` — la seule définition de l'objectif d'un
+format. Il vivait dans `bg-survie.ts` tant que le mode était seul à s'en servir ;
+il appartient au **format de match**, pas au mode, maintenant que le score plein
+s'écrit en base pour tous les formats.
 
-Le rejeu ne peut pas lire les colonnes de score pour un forfait : l'arbitrage
-les met à `NULL` (`adminResolveMatch`), il n'y a rien à lire. Le barème est donc
-**dérivé du format**, ce qui laisse un forfait déjà enregistré se recalculer tout
-seul — comme le reste du mode.
+`adminResolveMatch` **écrit** ce score dans `bg_matches` au lieu de laisser les
+colonnes à `NULL`. La différence n'est pas cosmétique : la manche s'affiche
+« 3 – FF » au lieu de « - – FF », le bilan de maps des fiches compte les trois
+maps, et le rejeu d'endurance lit la même chose que tout le monde. Un forfait
+enregistré **avant** cette règle porte encore des colonnes vides : le rejeu
+(`enduranceMatchMaps`) et le bilan de maps (`forfeitAwareMapScore`) le
+rechiffrent alors depuis le format, si bien qu'aucune reprise de données n'est
+nécessaire.
 
-Un forfait compte comme une victoire au bilan V/D de son bénéficiaire : la
-rencontre a bien un vainqueur.
+Un forfait compte comme une victoire au bilan V/D de son bénéficiaire, et comme
+une défaite pour l'équipe partie : la rencontre a bien un vainqueur. Les fiches
+équipe et joueur l'isolent en plus dans leur compteur « forfaits donnés /
+reçus », sans le retirer du bilan.
 
-## Abandon
+## Les deux forfaits, et pourquoi ils ne se confondent pas
+
+Le règlement en connaît deux, et l'interface doit les distinguer : sinon
+l'arbitre qui veut sanctionner une absence sur **une** rencontre sort l'équipe du
+tournoi entier.
+
+| | Forfait sur une manche | Forfait sur tout le reste du tournoi |
+| --- | --- | --- |
+| Geste | dialogue de score → « Déclarer un forfait sur cette manche » | classement → bouton « Forfait » (« Abandonner » pour son propre engagé) |
+| Route | `POST /api/admin/matches/[matchId]/resolve` | `POST /api/tournaments/[id]/forfeit` |
+| Écrit | `forfeit_team_id` + score plein sur **ce** match | statut `FORFEIT`, capital à 0, match en cours clos |
+| Suite | l'équipe reste en lice et joue la manche suivante | l'équipe n'est plus appariée |
+| Au classement | capital amputé du score plein | « Forfait (Mn) », et « FF » rouge dans le tableau |
+
+Le premier est ouvert à tous les formats de tournoi ; le second n'a de sens que
+là où l'on reste en lice sans être éliminé par une défaite (Survie, Ronde
+suisse, BlueGenji Survie — `FORMATS_WITH_FORFEIT`).
+
+## Le tableau manche par manche
+
+`EnduranceView` affiche, sous le classement, le capital de chaque équipe
+**manche par manche** — la lecture « feuille de calcul » qui sert de référence à
+l'arbitrage. Une ligne par équipe, une colonne par manche jouée.
+
+Trois natures de case, et non une seule valeur numérique tolérant les trous
+(`EnduranceRoundCell`) :
+
+| Case | Sens |
+| --- | --- |
+| un nombre | capital à l'issue de la manche (0 compris : la manche qui vide le capital affiche ce zéro) |
+| **FF** en rouge | manche couverte par un forfait de tournoi — de la manche du retrait jusqu'à la fin |
+| — | l'équipe était déjà éliminée, elle n'a pas disputé cette manche |
+
+Un capital de 0 ne dit pas si l'équipe a été vidée par ses résultats ou retirée
+du tournoi, et une case vide ne dit pas si la manche reste à jouer ou si l'équipe
+n'y était plus : c'est pourquoi la case porte sa nature, et pas seulement un
+nombre.
+
+L'historique n'est **pas stocké**. `replayEnduranceDetailed` le produit dans le
+même parcours que le classement — même boucle, mêmes entrées — si bien qu'une
+correction de score le refait comme elle refait tout le reste, sans colonne ni
+migration. Le statut de chaque case est lu **au moment où la manche se referme**,
+jamais à la fin du rejeu : une équipe éliminée à la manche 5 a bien un capital à
+montrer pour les manches 1 à 4.
+
+La dernière colonne est celle de la manche **en cours** : elle vaut le capital
+acquis jusque-là et bouge à mesure que les scores tombent. Elle porte donc la
+même valeur que la colonne « Endurance » du classement.
+
+Le rouge est celui du danger (`--danger`), jamais `--red-live`, réservé à ce qui
+est réellement à l'antenne. La zone défile horizontalement (`ScrollArea`) plutôt
+que de se replier sur mobile : un tableau de capitaux empilé en colonne ne se
+compare plus.
+
+## Retrait du tournoi (abandon / forfait général)
 
 Pris en charge comme en Survie et en Ronde suisse : le capital tombe à 0,
 l'équipe sort, le classement est rejoué et la manche suivante réappariée.
@@ -136,18 +200,19 @@ adversaire avec `forfeit_team_id` et le score plein du format — sans quoi la
 manche ne pourrait jamais se terminer et la suivante ne serait jamais appariée.
 
 Le score plein peut vider le capital de l'équipe partie **dans la même manche**
-que son abandon. Le rejeu applique alors les matchs *avant* les abandons, puis
+que son retrait. Le rejeu applique alors les matchs *avant* les abandons, puis
 laisse l'abandon écraser l'élimination qu'il vient de provoquer : au classement,
 la décision humaine (`FORFEIT`) prime sur la conséquence mécanique
 (`ELIMINATED`).
 
-L'abandon se déclare depuis le classement de la vue du mode
-(`EnduranceView`) : un représentant de l'engagé pour sa propre équipe,
-l'arbitrage (`can(user, "tournaments")`) pour n'importe laquelle — mêmes règles
-que la Survie et la Ronde suisse, portées par `_lib/forfeit.ts` et
+Le retrait se déclare depuis le classement de la vue du mode
+(`EnduranceView`) : un représentant de l'engagé pour sa propre équipe — le bouton
+dit alors « Abandonner » —, l'arbitrage (`can(user, "tournaments")`) pour
+n'importe laquelle — le bouton dit « Forfait ». Mêmes règles que la Survie et la
+Ronde suisse, portées par `_lib/forfeit.ts` et
 `POST /api/tournaments/[id]/forfeit`.
 
-### L'abandon s'arrête à la phase qualificative
+### Le retrait s'arrête à la phase qualificative
 
 `forfeitEnduranceTeam` ne sait clore qu'un match de la **manche courante**
 (`endurance_current_round`) : l'arbre final vit à partir de
@@ -171,7 +236,11 @@ qui fasse avancer l'arbre.
   élimination immédiate, idempotence du rejeu, correction de score qui annule
   une élimination, départage par le classement précédent, tableau des play-offs.
 - `tests/tournois/bg-survie-service.test.ts` — orchestration : seeding initial,
-  génération des manches, tableau imposé, réconciliation, abandon.
+  génération des manches, tableau imposé, réconciliation, abandon, historique
+  manche par manche exposé par `loadEnduranceMeta`.
+- `tests/tournois/bg-survie-forfeit.test.ts` — les deux forfaits : score plein
+  écrit sur un forfait ponctuel, cases « FF » du tableau, bilan de maps des
+  fiches.
 
 ## Interactions avec le reste du moteur
 

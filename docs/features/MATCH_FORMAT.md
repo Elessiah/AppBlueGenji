@@ -47,6 +47,21 @@ Le dernier contrôle ne s'applique qu'aux saisies **décisives** :
 Les scores posés par le moteur — byes (1-0), matchs fantômes, forfaits — ne
 passent pas par ces contrôles : ils ne sont pas saisis.
 
+## Le format chiffre aussi les forfaits
+
+`forfeitMapCount(format)` donne les manches qu'emporte le vainqueur d'un forfait,
+l'autre restant à zéro : l'objectif du format (FT3 → 3-0), ou 1-0 en saisie libre
+— le plus petit score qui désigne encore un vainqueur, un 0-0 n'en désignant
+aucun.
+
+Un forfait n'est donc pas une rencontre blanche, et ce n'est pas une subtilité
+d'affichage : `adminResolveMatch` écrit ce score en base, si bien qu'il compte au
+bilan de maps des fiches, au capital d'endurance d'une BlueGenji Survie et dans
+la manche affichée (« 3 – FF »), sans qu'aucun de ces lecteurs ait à redécouvrir
+la règle. Les forfaits enregistrés avant cette règle portent des colonnes vides :
+`forfeitAwareMapScore` (fiches) et `enduranceMatchMaps` (BlueGenji Survie) les
+rechiffrent depuis le format.
+
 ## Où c'est visible
 
 - **Création du tournoi** (`/tournois/creer`) : un sélecteur *Best of / First to /

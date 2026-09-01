@@ -84,7 +84,18 @@ points différent de celui posé juste à côté.
 
 Les **forfaits**, eux, comptent comme des matchs (ils décident réellement d'une
 rencontre) mais sont isolés dans `forfeitsGiven` / `forfeitsReceived`, selon que
-l'entité a déclaré forfait ou l'a subi.
+l'entité a déclaré forfait ou l'a subi. « Isolé » veut dire *compté en plus*,
+jamais *mis de côté* : un forfait est une victoire pleine pour son bénéficiaire,
+au bilan comme aux séries.
+
+Son **bilan de maps** ne se lit pas dans les colonnes de score : il se chiffre au
+score plein du format du tournoi (FT3 → 3-0), par `forfeitAwareMapScore`. La
+règle est écrite en base depuis `adminResolveMatch`, mais les forfaits
+enregistrés avant elle portent encore des colonnes vides — les compter au pied de
+la lettre afficherait une victoire à 0 map, et le différentiel de la fiche serait
+faux sans qu'aucun chiffre ne paraisse anormal. C'est la même dérivation que
+celle du rejeu d'endurance (`docs/features/BG_SURVIE_MODE.md`), et elle vaut pour
+tous les formats.
 
 ## Le cas du joueur : fenêtres d'appartenance
 
