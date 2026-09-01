@@ -1,4 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   defaultTournamentFormValues,
   toApiPayload,
@@ -116,5 +118,61 @@ describe("toFormValues", () => {
     });
     expect(back.startAt).toBe(values.startAt);
     expect(back.registrationOpenAt).toBe(values.registrationOpenAt);
+  });
+});
+
+/**
+ * Les deux notations sont offertes à la configuration, création comme édition.
+ *
+ * Le formulaire est partagé par `/tournois/creer` et `/tournois/[id]/modifier` :
+ * une notation offerte à l'un l'est forcément à l'autre. Ces tests l'ancrent,
+ * pour qu'un tournoi en `FT` reste configurable — et donc affichable — dans les
+ * deux écrans.
+ */
+describe("format de match — les deux notations", () => {
+  const values = { ...defaultTournamentFormValues(), name: "Coupe test" };
+
+  it("aplatit un First to comme un Best of", () => {
+    const payload = toApiPayload({ ...values, matchFormat: { type: "FT", value: 3 } });
+    expect(payload.matchFormatType).toBe("FT");
+    expect(payload.matchFormatValue).toBe(3);
+  });
+
+  it("fait l'aller-retour sans perte sur les deux notations", () => {
+    for (const matchFormat of [
+      { type: "BO", value: 5 },
+      { type: "FT", value: 3 },
+      null,
+    ] as const) {
+      const back = toFormValues({
+        ...values,
+        matchFormat,
+        description: null,
+        survivalRoundsPerCut: null,
+        swissTotalRounds: null,
+        endurancePoints: null,
+        phases: null,
+      });
+      expect(back.matchFormat).toEqual(matchFormat);
+    }
+  });
+
+  it("propose « Best of », « First to » et le score libre dans le même sélecteur", () => {
+    const source = readFileSync(
+      join(__dirname, "..", "..", "app", "(secured)", "tournois", "_components", "TournamentForm.tsx"),
+      "utf8",
+    );
+    expect(source).toContain('<option value="BO">');
+    expect(source).toContain('<option value="FT">');
+    expect(source).toContain('<option value="LIBRE">');
+  });
+
+  it("le formulaire de modification est celui de la création", () => {
+    const edit = readFileSync(
+      join(__dirname, "..", "..", "app", "(secured)", "tournois", "[id]", "modifier", "page.tsx"),
+      "utf8",
+    );
+    expect(edit).toContain("TournamentForm");
+    expect(edit).toContain("_components/TournamentForm");
   });
 });
