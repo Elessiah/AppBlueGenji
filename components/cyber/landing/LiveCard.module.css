@@ -64,6 +64,18 @@
   text-transform: uppercase;
 }
 
+/*
+ * Notation du format de match (« FT3 »). `<abbr>` porte l'explication en
+ * infobulle ; on neutralise le soulignement pointillé que les navigateurs y
+ * ajoutent, qui ferait tache dans une ligne déjà toute en capitales espacées.
+ */
+.matchFormat {
+  text-decoration: none;
+  border-bottom: none;
+  cursor: help;
+  color: inherit;
+}
+
 .map {
   display: flex;
   justify-content: space-between;

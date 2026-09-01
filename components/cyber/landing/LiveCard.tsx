@@ -6,7 +6,7 @@ import { EntityLink } from "@/components/entity-link";
 import type { LandingLive } from "@/lib/shared/landing";
 import { inferPhaseLabel } from "@/lib/shared/landing";
 import { PLATFORM_LABELS, streamPlatform } from "@/lib/shared/live-streams";
-import { matchFormatLabel } from "@/lib/shared/match-format";
+import { matchFormatDescription, matchFormatLabel } from "@/lib/shared/match-format";
 import styles from "./LiveCard.module.css";
 
 type LiveCardProps = {
@@ -119,7 +119,23 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
 
           <div className={`${styles.vs} mono`}>
             MATCH {String(currentMatch.id).padStart(2, "0")}
-            {matchFormat && ` · ${matchFormatLabel(matchFormat)}`}
+            {matchFormat && (
+              <>
+                {" · "}
+                {/*
+                  « FT3 » ne se lit pas tout seul : l'infobulle donne la course
+                  en toutes lettres, la même phrase que la fiche du tournoi.
+                  `<abbr>` la porte aussi pour les lecteurs d'écran, là où un
+                  `title` sur un `<span>` n'est qu'une décoration.
+                */}
+                <abbr
+                  className={styles.matchFormat}
+                  title={`${matchFormatLabel(matchFormat)} — ${matchFormatDescription(matchFormat)}`}
+                >
+                  {matchFormatLabel(matchFormat)}
+                </abbr>
+              </>
+            )}
           </div>
 
           <div className={styles.team}>
