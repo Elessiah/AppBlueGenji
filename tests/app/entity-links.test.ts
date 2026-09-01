@@ -98,7 +98,7 @@ describe("Page de tournoi — engagés cliquables", () => {
     "SurvivalView.tsx": "app/(secured)/tournois/[id]/_components/SurvivalView.tsx",
     "SwissView.tsx": "app/(secured)/tournois/[id]/_components/SwissView.tsx",
     "EnduranceView.tsx": "app/(secured)/tournois/[id]/_components/EnduranceView.tsx",
-    "SeedingEditor.tsx": "app/(secured)/tournois/[id]/_components/SeedingEditor.tsx",
+    "RegistrationsPanel.tsx": "app/(secured)/tournois/[id]/_components/RegistrationsPanel.tsx",
     "BracketPreview.tsx": "app/(secured)/tournois/[id]/_components/BracketPreview.tsx",
     "TournamentProgress.tsx": "app/(secured)/tournois/[id]/_components/TournamentProgress.tsx",
   };
@@ -124,8 +124,20 @@ describe("Page de tournoi — engagés cliquables", () => {
   });
 
   it("mène la liste des inscriptions vers la fiche de chaque engagé", () => {
-    const code = stripComments(read("app/(secured)/tournois/[id]/page.tsx"));
-    expect(code).toContain("<EntityLink href={entrantHref(reg.teamId, detail.soloUserIds)}>");
+    const code = stripComments(
+      read("app/(secured)/tournois/[id]/_components/RegistrationsPanel.tsx"),
+    );
+    expect(code).toContain("<EntrantLink className={styles.name} teamId={reg.teamId}>");
+  });
+
+  it("laisse `.entity-link` seule porter l'affordance du nom d'un inscrit", () => {
+    // La colonne garde sa mise en page ; couleur, soulignement et contour de
+    // focus viennent de la classe partagée. Les redéclarer ici ferait dépendre
+    // l'apparence de l'ordre d'injection des feuilles.
+    const css = read("app/(secured)/tournois/[id]/_components/RegistrationsPanel.module.css");
+    expect(css).not.toContain(".name:hover");
+    const block = css.slice(css.indexOf(".name {"));
+    expect(block.slice(0, block.indexOf("}"))).not.toMatch(/color:|text-decoration:/);
   });
 });
 

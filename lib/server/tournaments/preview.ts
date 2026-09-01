@@ -22,15 +22,10 @@ import {
   type PreviewSeedingSource,
   type TournamentPreview,
 } from "@/lib/shared/tournament-preview";
+import { seedingSource } from "@/lib/shared/seeding";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import type { TournamentRow } from "./_internal";
 import { loadPhases } from "./phases-repository";
-
-/**
- * Formats dont le seeding par défaut est l'ordre d'inscription (`seed`), par
- * opposition à ceux qui seedent depuis le classement du site.
- */
-const REGISTRATION_ORDER_FORMATS = new Set(["SINGLE", "DOUBLE", "BG_SURVIE"]);
 
 /** Réglages de format que `TournamentRow` ne porte pas. */
 type PreviewSettingsRow = RowDataPacket & {
@@ -41,14 +36,6 @@ type PreviewSettingsRow = RowDataPacket & {
 /** L'aperçu n'a de sens qu'avant le lancement : ensuite, le vrai plateau existe. */
 export function isPreviewableState(state: TournamentRow["state"]): boolean {
   return state === "UPCOMING" || state === "REGISTRATION";
-}
-
-function seedingSource(
-  format: TournamentRow["format"],
-  manualSeeding: boolean,
-): PreviewSeedingSource {
-  if (manualSeeding) return "MANUAL";
-  return REGISTRATION_ORDER_FORMATS.has(format) ? "REGISTRATION" : "RANKING";
 }
 
 /**

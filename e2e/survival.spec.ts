@@ -74,7 +74,7 @@ test.describe("Tournoi mode Survie (authentifié)", () => {
     // La page détail rend bien le format « Survie » et ses sections.
     await expect(page.getByText("Survie", { exact: true }).first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "Arbre du tournoi" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Inscriptions" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Inscriptions/ })).toBeVisible();
   });
 });
 

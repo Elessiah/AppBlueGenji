@@ -116,16 +116,11 @@ export function BracketPreview({ preview, canReorder }: BracketPreviewProps) {
       <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--text-2)", lineHeight: 1.6 }}>
         Voici les appariements qu&apos;un lancement immédiat produirait. Ils se recalculent à
         chaque inscription et à chaque changement de seeding
-        {canReorder ? ", que vous pouvez ajuster dans le bloc « Seeding » ci-dessous" : ""}.
+        {canReorder
+          ? ", que vous pouvez ajuster avec les flèches de la liste « Inscriptions · ordre de départ » ci-dessous"
+          : ""}
+        .
       </p>
-
-      {canReorder && preview.seedingSource === "RANKING" && (
-        <p style={{ margin: "0 0 14px", fontSize: 12, color: "var(--text-2)", lineHeight: 1.6 }}>
-          Ce format se seede sur le classement du site : l&apos;ordre affiché dans le bloc
-          « Seeding » est celui des inscriptions et ne prendra effet qu&apos;au premier
-          réordonnancement.
-        </p>
-      )}
 
       {preview.phasePlan && preview.phasePlan.length > 0 && (
         <ul

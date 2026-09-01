@@ -1,0 +1,142 @@
+/*
+ * Liste des inscrites — et, pour le staff, l'endroit où l'on en change l'ordre.
+ *
+ * Grille propre plutôt que la `.table-row` globale (quatre colonnes figées) :
+ * il faut une colonne d'actions qui n'existe que pour le staff, et qui doit
+ * disparaître proprement sur mobile.
+ */
+.table {
+  border: 1px solid var(--line, var(--line-soft));
+  border-radius: var(--radius-sm, 8px);
+  overflow: hidden;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1.6fr) 1fr 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line, var(--line-soft));
+}
+
+/* Colonne d'actions : ajoutée seulement quand le staff peut réordonner. */
+.reorderable {
+  grid-template-columns: 56px minmax(0, 1.6fr) 1fr 1fr 92px;
+}
+
+.row:first-child {
+  border-top: none;
+}
+
+.header {
+  color: var(--text-2);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Le rang saute à l'œil : c'est lui que le staff vient régler. */
+.seed {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--blue-300, var(--accent-blue));
+}
+
+/* Couleur, soulignement et contour de focus viennent de `.entity-link`
+   (`app/globals.css`), affordance unique des noms d'entite : les redeclarer ici
+   ferait dependre l'apparence de l'ordre d'injection des feuilles. */
+.name {
+  overflow-wrap: anywhere;
+}
+
+.muted {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--line-strong-cy, var(--line));
+  border-radius: var(--r-cy-sm, 6px);
+  background: transparent;
+  color: var(--ink, var(--text-0));
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.arrow:hover:not(:disabled) {
+  border-color: var(--blue-400, var(--accent-blue));
+  color: var(--blue-200, var(--accent-blue));
+  background: color-mix(in srgb, var(--blue-500, #5ac8ff) 12%, transparent);
+}
+
+.arrow:focus-visible {
+  outline: 2px solid var(--blue-400, var(--accent-blue));
+  outline-offset: 2px;
+}
+
+.arrow:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.hint {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+/* Avertissement : la liste affichée n'est pas l'ordre que jouera le moteur. */
+.warning {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--amber, #ffb347) 40%, transparent);
+  border-radius: var(--r-cy-sm, 6px);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-1, var(--ink));
+}
+
+.actionsHead {
+  text-align: right;
+}
+
+.empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+@media (max-width: 720px) {
+  .row,
+  .reorderable {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .actions {
+    justify-content: flex-start;
+    margin-top: 6px;
+  }
+
+  /* Une seule colonne : l'intitulé « Ordre » n'a plus de colonne à coiffer. */
+  .actionsHead {
+    display: none;
+  }
+}

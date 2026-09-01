@@ -65,7 +65,21 @@ export async function syncTournamentState(
   }
 
   if (computed !== tournament.state) {
-    const isStarting = tournament.state === "REGISTRATION" && computed === "RUNNING";
+    // Le coup d'envoi se reconnaît à l'état **d'arrivée**, et non au couple
+    // `REGISTRATION → RUNNING`. On est déjà à l'intérieur de `computed !==
+    // state` : `computed === "RUNNING"` implique donc que l'état de départ est
+    // `UPCOMING` ou `REGISTRATION`, jamais `RUNNING` ni `FINISHED` (un tournoi
+    // fini reste calculé fini). Les deux départs comptent, et le second n'est
+    // même pas le plus courant : entre la clôture des inscriptions et l'heure de
+    // début, un tournoi **repasse par `UPCOMING`** — c'est de là qu'il part le
+    // plus souvent, comme le note déjà le journal quelques lignes plus bas.
+    // Exiger `REGISTRATION` privait donc la ronde suisse, la survie, la BG
+    // Survie et le multi-phases de leur initialisation dès que la clôture et le
+    // début n'étaient pas simultanés : classement jamais semé, aucune manche
+    // générée, et un tournoi « en cours » qui n'a rien à jouer. Les formats à
+    // plateau y échappaient seuls, `createBracketIfMissing` les rattrapant dans
+    // l'entretien ci-dessous.
+    const isStarting = computed === "RUNNING";
 
     const isSwissStart = isStarting && tournament.format === "SWISS";
     if (isSwissStart) {
@@ -88,8 +102,7 @@ export async function syncTournamentState(
       await generateEnduranceRound(tournamentId, connection);
     }
 
-    const isMultiStart =
-      tournament.state === "REGISTRATION" && computed === "RUNNING" && tournament.format === "MULTI";
+    const isMultiStart = isStarting && tournament.format === "MULTI";
     if (isMultiStart) {
       const { initializeMultiTournament } = await import("./phases");
       await initializeMultiTournament(tournamentId, connection);

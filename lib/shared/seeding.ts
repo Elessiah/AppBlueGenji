@@ -11,7 +11,49 @@
  * verrouillage des scores (`match-lock.ts`), byes et matchs fantômes exclus.
  */
 import { hasScoreInput, type MatchScoreState } from "./match-lock";
-import type { TournamentState } from "./types";
+import type { SeedingSource, TournamentFormat, TournamentState } from "./types";
+
+export type { SeedingSource } from "./types";
+
+/** Libellés FR de la provenance de l'ordre, pour l'interface. */
+export const SEEDING_SOURCE_LABELS: Record<SeedingSource, string> = {
+  MANUAL: "Ordre fixé par le staff",
+  RANKING: "Classement du site",
+  REGISTRATION: "Ordre d'inscription",
+};
+
+/**
+ * Formats dont le seeding par défaut est l'ordre d'inscription (la colonne
+ * `seed`), par opposition à ceux qui seedent depuis le classement du site.
+ */
+const REGISTRATION_ORDER_FORMATS: ReadonlySet<TournamentFormat> = new Set<TournamentFormat>([
+  "SINGLE",
+  "DOUBLE",
+  "BG_SURVIE",
+]);
+
+/**
+ * Quelle source l'ordre de seeding suit-il aujourd'hui ?
+ *
+ * Un ordre fixé à la main l'emporte sur tout ; sinon le format décide. Cette
+ * fonction est l'unique définition de la règle : l'aperçu du plateau et la liste
+ * des inscriptions s'en servent pour dire la même chose que le moteur.
+ */
+export function seedingSource(format: TournamentFormat, manualSeeding: boolean): SeedingSource {
+  if (manualSeeding) return "MANUAL";
+  return REGISTRATION_ORDER_FORMATS.has(format) ? "REGISTRATION" : "RANKING";
+}
+
+/**
+ * L'ordre affiché (celui de la colonne `seed`) est-il bien celui qui sera joué ?
+ *
+ * Non en `RANKING` : la liste montre alors l'ordre d'arrivée des inscriptions
+ * alors que le moteur seedera depuis le classement du site. Le dire évite le
+ * malentendu — le staff croit lire le tirage, il ne lit que des inscriptions.
+ */
+export function isSeedOrderEffective(source: SeedingSource): boolean {
+  return source !== "RANKING";
+}
 
 export type SeedingEntry = {
   teamId: number;

@@ -5,6 +5,7 @@ import { CyberButton, Pill } from "@/components/cyber";
 import type { RefreshTier } from "@/lib/shared/refresh-tiers";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { participantWording } from "@/lib/shared/participants";
+import { canLaunchNow } from "@/lib/shared/tournament-launch";
 import type { LiveFailure } from "../_lib/live-state";
 import { canShowEditButton } from "../_lib/edit-entry";
 import {
@@ -37,6 +38,8 @@ interface TournamentHeaderProps {
   onRegister: () => void;
   onReportIssue: () => void;
   onGuestRegister: () => void;
+  /** Abréger le calendrier et démarrer sur-le-champ (staff `tournaments`). */
+  onLaunchNow: () => void;
   onLiveSaved: () => void;
 }
 
@@ -70,6 +73,7 @@ export function TournamentHeader({
   onRegister,
   onReportIssue,
   onGuestRegister,
+  onLaunchNow,
   onLiveSaved,
 }: TournamentHeaderProps) {
   const { card } = detail;
@@ -144,6 +148,23 @@ export function TournamentHeader({
               style={{ fontSize: 13, padding: "8px 18px" }}
             >
               {wording.guestCta}
+            </CyberButton>
+          )}
+          {/* Lancement anticipé. Le bouton n'apparaît que là où il mène quelque
+              part — même principe que « Modifier » : pas de bouton grisé sur un
+              tournoi déjà en cours. La règle vient du module pur partagé, que le
+              serveur rejoue sous verrou (`lib/shared/tournament-launch.ts`). */}
+          {detail.isAdmin && !frozen && canLaunchNow(card) && (
+            <CyberButton
+              variant="ghost"
+              onClick={onLaunchNow}
+              title="Abréger les étapes d'avant-course et démarrer le tournoi immédiatement."
+              style={{ fontSize: 13, padding: "8px 18px" }}
+            >
+              {/* Le chevron est décoratif : le lecteur d'écran doit entendre
+                  l'action, pas « triangle pointant vers la droite ». Même
+                  traitement que la flèche du bouton « Retour ». */}
+              <span aria-hidden="true">▶</span> Lancer maintenant
             </CyberButton>
           )}
           {/* Signalement : ouvert aux seuls engagés, à toute heure du tournoi —

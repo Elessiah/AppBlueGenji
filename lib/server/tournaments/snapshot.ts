@@ -32,6 +32,7 @@ import { cached, invalidateCached } from "@/lib/server/cache";
 import { loadSoloUserIds } from "@/lib/server/solo-entries-service";
 import { toIso } from "@/lib/server/serialization";
 import { isSoloTournament } from "@/lib/shared/participants";
+import { seedingSource } from "@/lib/shared/seeding";
 import { mapCard, mapMatch, type TournamentRow } from "./_internal";
 import {
   getMatchRows,
@@ -258,6 +259,7 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
       currentPhaseId: phasesDetail?.currentPhaseId ?? null,
       phaseStandings: phasesDetail?.phaseStandings ?? {},
       soloUserIds,
+      seedingSource: seedingSource(card.format, Number(tournament.manual_seeding ?? 0) === 1),
     };
 
     const payloadJson = JSON.stringify(payload);
