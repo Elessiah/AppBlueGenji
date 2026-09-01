@@ -272,7 +272,7 @@ export default function TournamentDetailPage() {
     const isMine = detail?.myTeamId === teamId;
     const confirmation = isMine
       ? wording.forfeitSelfConfirm
-      : `Déclarer l'abandon de ${teamName} ? ${wording.subject} quittera définitivement le tournoi.`;
+      : `Déclarer ${teamName} forfait pour tout le reste du tournoi ? ${wording.subject} quittera définitivement le tournoi. Pour un forfait sur une seule manche, passez par le score du match.`;
     if (!window.confirm(confirmation)) return;
     try {
       const response = await fetch(`/api/tournaments/${tournamentId}/forfeit`, {

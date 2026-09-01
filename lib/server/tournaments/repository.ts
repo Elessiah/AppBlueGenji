@@ -1,7 +1,60 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { TournamentState } from "@/lib/shared/types";
+import { forfeitMapCount, parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { TournamentRow, RegistrationRow, MatchRow, TournamentListRow } from "./_internal";
 import { queueBotLog } from "./bot-logs";
+
+/**
+ * Format de match du tournoi (`null` = saisie libre).
+ *
+ * Il se lit sur le **tournoi**, phases comprises : le réglage vaut pour toute la
+ * compétition (`docs/features/MATCH_FORMAT.md`), une phase n'en redéfinit pas.
+ */
+export async function loadTournamentMatchFormat(
+  connection: PoolConnection,
+  tournamentId: number,
+): Promise<MatchFormat | null> {
+  const [rows] = await connection.execute<
+    (RowDataPacket & { match_format_type: "BO" | "FT" | null; match_format_value: number | null })[]
+  >(
+    `SELECT match_format_type, match_format_value
+     FROM bg_tournaments
+     WHERE id = ?
+     LIMIT 1`,
+    [tournamentId],
+  );
+
+  const row = rows[0];
+  if (!row) return null;
+  return parseMatchFormat(row.match_format_type, row.match_format_value);
+}
+
+/**
+ * Score à inscrire sur un match clos par forfait : le score plein du format
+ * (FT3 → 3-0), l'équipe partie restant à zéro.
+ *
+ * Commodité pour les appelants qui n'ont pas déjà le format sous la main —
+ * l'arbitrage, l'abandon en Survie et en Ronde suisse. La règle, elle, tient
+ * dans `forfeitMapCount` (`lib/shared/match-format.ts`) : c'est elle qu'applique
+ * aussi `forfeitEnduranceTeam`, qui lit le format avec le reste de son tournoi.
+ *
+ * Ces chemins écrivaient auparavant leur propre chiffre — un 1-0 en dur pour la
+ * Survie et la Ronde suisse — si bien qu'un même forfait s'affichait « 1 – FF »
+ * sur la manche pendant que la fiche de l'adversaire en comptait trois maps, le
+ * bilan dérivant du format.
+ */
+export async function forfeitMatchScores(
+  connection: PoolConnection,
+  tournamentId: number,
+  team1Forfeits: boolean,
+): Promise<{ team1Score: number; team2Score: number }> {
+  const maps = forfeitMapCount(await loadTournamentMatchFormat(connection, tournamentId));
+
+  return {
+    team1Score: team1Forfeits ? 0 : maps,
+    team2Score: team1Forfeits ? maps : 0,
+  };
+}
 
 export async function loadTournamentRow(
   connection: PoolConnection,

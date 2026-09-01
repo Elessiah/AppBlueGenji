@@ -1,4 +1,5 @@
-﻿import type { MatchFormat } from "./match-format";
+﻿import type { EnduranceRoundCell } from "./bg-survie";
+import type { MatchFormat } from "./match-format";
 import type { MatchLiveTrigger } from "./live-streams";
 import type { ParticipantType } from "./participants";
 import type { PlatformRole } from "./permissions";
@@ -87,6 +88,12 @@ export type EnduranceStandingRow = {
   status: "ACTIVE" | "ELIMINATED" | "FORFEIT";
   eliminatedRound: number | null;
   rank: number;
+  /**
+   * Capital manche par manche, aligné sur `EnduranceMeta.rounds` — la lecture
+   * « feuille de calcul » du mode. Une équipe déclarée forfait y porte « FF »
+   * sur la manche de sa sortie et sur toutes les suivantes.
+   */
+  rounds: EnduranceRoundCell[];
 };
 
 export type EnduranceMeta = {
@@ -107,6 +114,8 @@ export type EnduranceMeta = {
   currentRound: number;
   /** Vrai dès que l'arbre des play-offs a été construit. */
   playoffsStarted: boolean;
+  /** Manches qualificatives jouées, dans l'ordre : colonnes du tableau. */
+  rounds: number[];
   standings: EnduranceStandingRow[];
 };
 

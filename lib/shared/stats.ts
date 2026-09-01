@@ -12,6 +12,7 @@
  * leaderboard de la landing et au seeding des modes à classement.
  */
 
+import { forfeitMapCount, type MatchFormat } from "./match-format";
 import { rankingPoints } from "./ranking";
 import type { BracketType, TournamentFormat, TournamentGame, TournamentState } from "./types";
 
@@ -41,6 +42,36 @@ export type StatsMatch = {
   /** `GIVEN` = forfait de l'entité, `RECEIVED` = forfait de l'adversaire. */
   forfeit: "NONE" | "GIVEN" | "RECEIVED";
 };
+
+/**
+ * Bilan de maps d'une rencontre, vu depuis l'entité — la seule lecture du score
+ * qui vaille pour une fiche.
+ *
+ * Un **forfait** ne se lit pas dans les colonnes de score : il se chiffre au
+ * score plein du format du tournoi (FT3 → 3-0). La règle est écrite en base
+ * depuis `adminResolveMatch`, mais les forfaits enregistrés avant elle portent
+ * encore des scores nuls ou absents — un bilan qui se contenterait de les lire
+ * afficherait une victoire à 0 map, et le différentiel de la fiche s'en
+ * trouverait faux sans qu'aucun chiffre ne paraisse anormal. Le forfait est
+ * donc **dérivé du format**, comme le fait déjà le rejeu d'endurance.
+ *
+ * @param format format de match du tournoi (`null` = saisie libre → 1-0).
+ */
+export function forfeitAwareMapScore(
+  forfeit: StatsMatch["forfeit"],
+  format: MatchFormat | null,
+  scoreFor: number | null,
+  scoreAgainst: number | null,
+): { scoreFor: number; scoreAgainst: number } {
+  if (forfeit !== "NONE") {
+    const maps = forfeitMapCount(format);
+    return forfeit === "GIVEN"
+      ? { scoreFor: 0, scoreAgainst: maps }
+      : { scoreFor: maps, scoreAgainst: 0 };
+  }
+
+  return { scoreFor: Number(scoreFor ?? 0), scoreAgainst: Number(scoreAgainst ?? 0) };
+}
 
 /** Une participation à un tournoi, vue depuis l'entité analysée. */
 export type StatsTournament = {

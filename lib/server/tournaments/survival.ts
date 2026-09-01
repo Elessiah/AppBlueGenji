@@ -12,7 +12,7 @@ import {
   type SurvivalStanding,
 } from "@/lib/shared/survival";
 import { rankingPointsSql } from "@/lib/shared/ranking";
-import { createMatch, finishTournament } from "./repository";
+import { createMatch, finishTournament, forfeitMatchScores } from "./repository";
 
 const DEFAULT_ROUNDS_PER_CUT = 3;
 
@@ -655,6 +655,11 @@ export async function forfeitSurvivalTeam(
       Number(match.team1_id) === teamId ? match.team2_id : match.team1_id;
     if (opponentId !== null) {
       const team1IsForfeit = Number(match.team1_id) === teamId;
+      // Score plein du format (FT3 → 3-0), et non un 1-0 en dur : un forfait
+      // compte comme une rencontre pleine, et le bilan de maps des fiches le
+      // chiffre déjà ainsi. Deux règles auraient affiché « 1 – FF » sur la
+      // manche pendant que la fiche de l'adversaire en comptait trois.
+      const scores = await forfeitMatchScores(conn, tournamentId, team1IsForfeit);
       await conn.execute(
         `UPDATE bg_matches SET
           status = 'COMPLETED',
@@ -671,8 +676,8 @@ export async function forfeitSurvivalTeam(
           Number(opponentId),
           teamId,
           teamId,
-          team1IsForfeit ? 0 : 1,
-          team1IsForfeit ? 1 : 0,
+          scores.team1Score,
+          scores.team2Score,
           match.id,
         ],
       );

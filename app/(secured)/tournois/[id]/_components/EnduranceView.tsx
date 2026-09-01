@@ -1,6 +1,14 @@
 "use client";
 
+import { ScrollArea } from "@/components/cyber";
 import type { BracketMatch, EnduranceMeta } from "@/lib/shared/types";
+import {
+  enduranceCellLabel,
+  enduranceCellTitle,
+  enduranceCellTone,
+  enduranceHistoryColumns,
+  type EnduranceCellTone,
+} from "../_lib/endurance-history";
 import { EntrantLink, useParticipantWording } from "../_lib/entrant-link";
 import styles from "./EnduranceView.module.css";
 
@@ -37,6 +45,96 @@ const STATUS_LABELS: Record<EnduranceMeta["standings"][number]["status"], string
   ELIMINATED: "Éliminée",
   FORFEIT: "Forfait",
 };
+
+/** Habillage d'une case, selon le poids décidé par `_lib/endurance-history`. */
+const CELL_CLASS: Record<EnduranceCellTone, string> = {
+  POINTS: "num",
+  ZERO: `num ${styles.historyZero}`,
+  FORFEIT: styles.historyForfeit,
+  OUT: styles.historyOut,
+};
+
+/**
+ * Tableau du capital d'endurance **manche par manche**, comme la feuille de
+ * calcul qui tient le règlement : une ligne par équipe, une colonne par manche.
+ *
+ * C'est le seul endroit où un forfait de tournoi se lit d'un coup d'œil : la
+ * colonne « Statut » du classement dit qu'une équipe est partie, elle ne dit pas
+ * **à partir de quand** — ici, ses manches restantes portent « FF » en rouge au
+ * lieu d'un capital, et le tableau se lit comme le document d'arbitrage.
+ *
+ * Défilement horizontal plutôt que repli mobile : un tableau de capitaux empilé
+ * en colonne ne se compare plus.
+ */
+function EnduranceHistory({
+  endurance,
+  myTeamId,
+}: {
+  endurance: EnduranceMeta;
+  myTeamId: number | null;
+}) {
+  if (endurance.rounds.length === 0) return null;
+
+  const columns = enduranceHistoryColumns(endurance.rounds.length);
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div className="mono" style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 8 }}>
+        ENDURANCE MANCHE PAR MANCHE
+      </div>
+      <ScrollArea fade ariaLabel="Capital d'endurance manche par manche">
+        <div className={styles.historyTable}>
+          <div
+            className={`${styles.historyRow} ${styles.historyHead}`}
+            style={{ "--history-cols": columns } as React.CSSProperties}
+          >
+            <span className={styles.historyTeam}>Équipe</span>
+            {endurance.rounds.map((round) => (
+              <span key={round} className={styles.historyCell} title={`Manche ${round}`}>
+                M{round}
+              </span>
+            ))}
+          </div>
+          {endurance.standings.map((standing) => (
+            <div
+              key={standing.teamId}
+              className={[
+                styles.historyRow,
+                standing.status === "FORFEIT" ? styles.historyRowForfeit : null,
+                myTeamId !== null && standing.teamId === myTeamId ? styles.historyRowMine : null,
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              style={{ "--history-cols": columns } as React.CSSProperties}
+            >
+              {/* Même affordance que le classement au-dessus : un nom d'engagé
+                  mène toujours à sa fiche, d'une vue à l'autre. */}
+              <EntrantLink teamId={standing.teamId} className={styles.historyTeam}>
+                {standing.teamName}
+              </EntrantLink>
+              {standing.rounds.map((cell) => (
+                <span
+                  key={cell.round}
+                  className={`${styles.historyCell} ${CELL_CLASS[enduranceCellTone(cell)]}`}
+                  title={enduranceCellTitle(standing.teamName, cell)}
+                >
+                  {enduranceCellLabel(cell)}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+      {/* Une case rouge n'est lisible qu'accompagnée de ce qu'elle veut dire :
+          la légende n'apparaît que s'il y a effectivement un forfait à lire. */}
+      {endurance.standings.some((standing) => standing.status === "FORFEIT") && (
+        <p className="mono" style={{ fontSize: 10, color: "var(--text-2)", margin: "8px 0 0" }}>
+          FF = FORFAIT SUR TOUT LE RESTE DU TOURNOI
+        </p>
+      )}
+    </div>
+  );
+}
 
 /**
  * Vue du mode « BlueGenji Survie » : capital d'endurance de chaque équipe, puis
@@ -143,12 +241,12 @@ export function EnduranceView({
                       title={
                         isMine
                           ? `Abandonner : ${wording.subject} quittera définitivement le tournoi`
-                          : `Déclarer l'abandon de ${standing.teamName}`
+                          : `Déclarer ${standing.teamName} forfait pour tout le reste du tournoi`
                       }
                       aria-label={
                         isMine
                           ? "Abandonner le tournoi"
-                          : `Déclarer l'abandon de ${standing.teamName}`
+                          : `Déclarer ${standing.teamName} forfait pour tout le reste du tournoi`
                       }
                       style={{
                         padding: "3px 8px",
@@ -160,7 +258,14 @@ export function EnduranceView({
                         color: AMBER,
                       }}
                     >
-                      Abandonner
+                      {/*
+                        Deux gestes différents sous un même bouton : le lecteur
+                        qui quitte le tournoi « abandonne », l'arbitrage, lui,
+                        « déclare forfait » une équipe — pour tout le reste du
+                        tournoi, et non sur la seule manche en cours (ce
+                        forfait-là se pose sur le match).
+                      */}
+                      {isMine ? "Abandonner" : "Forfait"}
                     </button>
                   )}
                 </span>
@@ -169,6 +274,8 @@ export function EnduranceView({
           );
         })}
       </div>
+
+      <EnduranceHistory endurance={endurance} myTeamId={myTeamId} />
 
       {rounds.map((round) => (
         <div key={round} style={{ marginBottom: 20 }}>

@@ -16,15 +16,18 @@ import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
 function fakeConnection(matchFormat: { type: string; value: number } | null): {
   conn: PoolConnection;
   writes: string[];
+  writeParams: unknown[][];
 } {
   const writes: string[] = [];
+  const writeParams: unknown[][] = [];
 
   const conn = {
-    execute: async (sql: string) => {
+    execute: async (sql: string, params: unknown[] = []) => {
       const q = sql.replace(/\s+/g, " ").trim();
 
       if (q.startsWith("UPDATE")) {
         writes.push(q);
+        writeParams.push(params);
         return [{ affectedRows: 1 }, []];
       }
 
@@ -68,7 +71,7 @@ function fakeConnection(matchFormat: { type: string; value: number } | null): {
     },
   } as unknown as PoolConnection;
 
-  return { conn, writes };
+  return { conn, writes, writeParams };
 }
 
 describe("adminSaveMatchScores — respect du format de match", () => {
@@ -106,6 +109,19 @@ describe("adminSaveMatchScores — respect du format de match", () => {
     await adminSaveMatchScores(conn, 10, undefined, undefined, 200);
     expect(writes.some((q) => q.includes("forfeit_team_id"))).toBe(true);
   });
+
+  it("écrit le score plein du format sur un forfait, pas des colonnes vides", async () => {
+    const { conn, writeParams } = fakeConnection({ type: "BO", value: 5 });
+    await adminSaveMatchScores(conn, 10, undefined, undefined, 200);
+    // BO5 → objectif 3 : l'équipe 1 l'emporte 3-0 sur l'équipe 2, partie.
+    expect(writeParams[0].slice(0, 3)).toEqual([3, 0, 200]);
+  });
+
+  it("retombe sur 1-0 en saisie libre — un 0-0 ne désignerait aucun vainqueur", async () => {
+    const { conn, writeParams } = fakeConnection(null);
+    await adminSaveMatchScores(conn, 10, undefined, undefined, 100);
+    expect(writeParams[0].slice(0, 3)).toEqual([0, 1, 100]);
+  });
 });
 
 describe("adminResolveMatch — respect du format de match", () => {
@@ -141,11 +157,36 @@ describe("adminResolveMatch — respect du format de match", () => {
   it("finalise un forfait quel que soit le format", async () => {
     const { conn } = fakeConnection({ type: "BO", value: 5 });
     await adminResolveMatch(conn, 10, undefined, undefined, 100);
+    // Le forfait n'est pas contrôlé contre le format — il est *chiffré* par lui :
+    // un score plein 0-3 au lieu de deux colonnes vides, pour qu'il compte
+    // partout où le score d'une manche est relu (bilan de maps, endurance).
     expect(finalizeMatch).toHaveBeenCalledWith(
       expect.anything(),
       1,
       expect.anything(),
-      expect.objectContaining({ winnerTeamId: 200, team1Score: null }),
+      expect.objectContaining({ winnerTeamId: 200, team1Score: 0, team2Score: 3 }),
+    );
+  });
+
+  it("chiffre le forfait selon le format du tournoi", async () => {
+    const { conn } = fakeConnection({ type: "BO", value: 3 });
+    await adminResolveMatch(conn, 10, undefined, undefined, 200);
+    expect(finalizeMatch).toHaveBeenCalledWith(
+      expect.anything(),
+      1,
+      expect.anything(),
+      expect.objectContaining({ winnerTeamId: 100, team1Score: 2, team2Score: 0 }),
+    );
+  });
+
+  it("retombe sur 1-0 quand le tournoi laisse le score libre", async () => {
+    const { conn } = fakeConnection(null);
+    await adminResolveMatch(conn, 10, undefined, undefined, 200);
+    expect(finalizeMatch).toHaveBeenCalledWith(
+      expect.anything(),
+      1,
+      expect.anything(),
+      expect.objectContaining({ winnerTeamId: 100, team1Score: 1, team2Score: 0 }),
     );
   });
 });

@@ -76,8 +76,12 @@ export function MatchRow({
   const team2Display = match.team2Name || match.team2Placeholder || (roundNumber === 1 && match.team2Id === null && match.team1Id !== null ? "BYE" : "TBD");
 
   const isBye = match.team1Id === null || match.team2Id === null;
-  const team1Score = !isBye && match.status === "COMPLETED" && match.forfeitTeamId === match.team1Id ? "FF" : (match.team1Score ?? "-");
-  const team2Score = !isBye && match.status === "COMPLETED" && match.forfeitTeamId === match.team2Id ? "FF" : (match.team2Score ?? "-");
+  // « FF » dès que le forfait est *enregistré*, sans attendre qu'il soit tranché :
+  // l'arbitrage peut noter un forfait sans valider le résultat, et le score plein
+  // porté en face (3-0 en FT3) se lisait alors comme une rencontre jouée et
+  // gagnée, sur un match que personne n'a encore remporté.
+  const team1Score = !isBye && match.forfeitTeamId === match.team1Id ? "FF" : (match.team1Score ?? "-");
+  const team2Score = !isBye && match.forfeitTeamId === match.team2Id ? "FF" : (match.team2Score ?? "-");
 
   return (
     <div

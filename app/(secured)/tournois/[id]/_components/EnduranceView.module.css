@@ -36,3 +36,124 @@
     align-items: start;
   }
 }
+
+/*
+ * Tableau « manche par manche » — la lecture feuille de calcul du mode.
+ *
+ * Le gabarit complet voyage dans une variable (`--history-cols`) plutôt qu'en
+ * `grid-template-columns` en ligne : le nombre de manches n'est connu qu'au
+ * rendu, mais une déclaration en ligne l'emporterait sur toute règle d'ici,
+ * media query comprise. La zone défile horizontalement (`ScrollArea`) au lieu
+ * de se replier : un tableau de capitaux perd tout son sens empilé en colonne.
+ */
+/*
+ * Cadre du tableau. Il ne réutilise pas `.table-like` : cette classe globale
+ * porte `overflow: hidden`, qui rognait les lignes (`min-width: max-content`)
+ * sans que le `ScrollArea` autour ait quoi que ce soit à faire défiler — au-delà
+ * d'une vingtaine de manches sur un écran large, et de cinq sur un mobile, les
+ * colonnes suivantes étaient invisibles et inatteignables. Le même ancêtre
+ * annulait le `position: sticky` de la colonne d'équipe, dont la boîte de
+ * défilement devenait un cadre qui ne défile jamais.
+ */
+.historyTable {
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.12));
+  border-radius: var(--r-cy-sm, 6px);
+  min-width: max-content;
+}
+
+.historyRow {
+  --history-row-bg: var(--cyber-bg-1, #0a0c11);
+  display: grid;
+  grid-template-columns: var(--history-cols);
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line-soft, rgba(255, 255, 255, 0.06));
+  min-width: max-content;
+  background: var(--history-row-bg);
+}
+
+.historyRow:last-child {
+  border-bottom: none;
+  border-bottom-left-radius: var(--r-cy-sm, 6px);
+  border-bottom-right-radius: var(--r-cy-sm, 6px);
+}
+
+.historyRow:first-child {
+  border-top-left-radius: var(--r-cy-sm, 6px);
+  border-top-right-radius: var(--r-cy-sm, 6px);
+}
+
+.historyHead {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2, #8c95a6);
+}
+
+/*
+ * Le nom reste visible quand le tableau défile : sur une dizaine de manches, une
+ * ligne de nombres sans son équipe ne se lit plus. Le fond de la colonne suit
+ * celui de la ligne (`--history-row-bg`, redéfini pour la ligne du lecteur),
+ * sinon le contenu défilé apparaîtrait au travers.
+ */
+.historyTeam {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  padding-right: 8px;
+  background: var(--history-row-bg);
+}
+
+.historyCell {
+  text-align: center;
+  font-size: 12px;
+  line-height: 20px;
+  border-radius: 3px;
+}
+
+/* Capital vidé : la case reste un nombre, mais elle ne se lit plus comme un score sain. */
+.historyZero {
+  color: var(--text-2, #8c95a6);
+}
+
+/*
+ * Forfait sur le reste du tournoi : case rouge portant « FF » au lieu d'un
+ * capital. Le rouge est celui du danger (`--danger`), jamais `--red-live`, qui
+ * n'habille que ce qui est réellement à l'antenne.
+ *
+ * Chaque jeton porte son repli : une case « FF » privée de `--danger-rgb`
+ * n'aurait plus ni fond ni couleur — elle perdrait le rouge, c'est-à-dire la
+ * seule chose qu'elle a à dire.
+ */
+.historyForfeit {
+  background: rgba(var(--danger-rgb, 255, 110, 130), 0.18);
+  border: 1px solid rgba(var(--danger-rgb, 255, 110, 130), 0.45);
+  color: var(--danger, #ff6e82);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* Manche que l'équipe n'a pas disputée : rien à montrer, sans trou dans la grille. */
+.historyOut {
+  color: var(--text-2, #8c95a6);
+  opacity: 0.45;
+}
+
+/*
+ * Ligne d'une équipe retirée : le même rouge, en fond très dilué, que les cases
+ * « FF » qu'elle porte. La ligne se repère alors d'un coup d'œil dans un tableau
+ * de plusieurs dizaines d'équipes, sans que le rouge concurrence les cases.
+ */
+.historyRowForfeit {
+  --history-row-bg: rgba(var(--danger-rgb, 255, 110, 130), 0.06);
+}
+
+/* Ligne de l'engagé du lecteur : même teinte que dans le classement au-dessus. */
+.historyRowMine {
+  --history-row-bg: rgba(89, 212, 255, 0.06);
+}

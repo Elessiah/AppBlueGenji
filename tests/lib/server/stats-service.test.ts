@@ -32,6 +32,8 @@ function matchRow(overrides: Record<string, unknown> = {}) {
     team2_score: 1,
     winner_team_id: 5,
     forfeit_team_id: null,
+    match_format_type: null,
+    match_format_value: null,
     ...overrides,
   };
 }
@@ -144,6 +146,84 @@ describe("getTeamStats", () => {
 
     expect(stats.forfeitsGiven).toBe(1);
     expect(stats.forfeitsReceived).toBe(1);
+  });
+
+  it("compte un forfait comme une victoire pleine, séries comprises", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([
+        [matchRow({ id: 1, forfeit_team_id: 9, winner_team_id: 5, team1_score: null, team2_score: null })],
+      ])
+      .mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    const stats = await getTeamStats(5);
+
+    expect(stats.matchesPlayed).toBe(1);
+    expect(stats.matchesWon).toBe(1);
+    expect(stats.currentStreak).toEqual({ kind: "WIN", length: 1 });
+    expect(stats.favouriteOpponent).toMatchObject({ teamId: 9, won: 1 });
+  });
+
+  it("chiffre le bilan de maps d'un forfait au score plein du format", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([
+        [
+          matchRow({
+            id: 1,
+            forfeit_team_id: 9,
+            winner_team_id: 5,
+            // Colonnes vides : c'est le cas des forfaits enregistrés avant que
+            // la règle ne s'écrive en base.
+            team1_score: null,
+            team2_score: null,
+            match_format_type: "FT",
+            match_format_value: 3,
+          }),
+        ],
+      ])
+      .mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    const stats = await getTeamStats(5);
+
+    expect(stats.mapsWon).toBe(3);
+    expect(stats.mapsLost).toBe(0);
+  });
+
+  it("compte 1-0 pour un forfait dans un tournoi en saisie libre", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([
+        [
+          matchRow({
+            id: 1,
+            forfeit_team_id: 5,
+            winner_team_id: 9,
+            team1_score: null,
+            team2_score: null,
+          }),
+        ],
+      ])
+      .mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    const stats = await getTeamStats(5);
+
+    expect(stats.mapsWon).toBe(0);
+    expect(stats.mapsLost).toBe(1);
+  });
+
+  it("lit le format du tournoi dans la requête de matchs", async () => {
+    const execute = jest.fn().mockResolvedValue([[]]);
+    await mockDb(execute);
+
+    await getTeamStats(5);
+
+    const [sql] = execute.mock.calls[0] as [string, unknown[]];
+    expect(sql).toMatch(/t\.match_format_type/);
+    expect(sql).toMatch(/t\.match_format_value/);
   });
 
   it("retombe sur des valeurs sûres quand jeu et format sont absents", async () => {

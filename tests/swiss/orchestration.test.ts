@@ -30,6 +30,8 @@ type FakeMatch = {
   loserTeamId: number | null;
   isBye: number;
   hasScoreInput: boolean;
+  team1Score: number | null;
+  team2Score: number | null;
 };
 
 type FakeStanding = {
@@ -57,6 +59,8 @@ function fakeDb(options: {
   currentRound?: number;
   /** Forme brute de la colonne JSON des départages (tableau ou chaîne). */
   tiebreakers?: unknown;
+  /** Format de match du tournoi — il chiffre le score d'un forfait. */
+  matchFormat?: { type: "BO" | "FT"; value: number } | null;
 }): FakeDb {
   const tournament: Record<string, unknown> = {
     format: options.format ?? "SWISS",
@@ -86,6 +90,19 @@ function fakeDb(options: {
       const q = sql.replace(/\s+/g, " ").trim();
 
       if (q.startsWith("SELECT format, state")) return [[{ ...tournament }], []];
+
+      // Format de match du tournoi : c'est lui qui chiffre un forfait.
+      if (q.startsWith("SELECT match_format_type")) {
+        return [
+          [
+            {
+              match_format_type: options.matchFormat?.type ?? null,
+              match_format_value: options.matchFormat?.value ?? null,
+            },
+          ],
+          [],
+        ];
+      }
 
       if (q.includes("FROM bg_swiss_standings WHERE tournament_id = ?") && q.includes("ORDER BY seed")) {
         return [
@@ -205,6 +222,8 @@ function fakeDb(options: {
         match.status = "COMPLETED";
         match.winnerTeamId = Number(params[0]);
         match.loserTeamId = Number(params[1]);
+        match.team1Score = Number(params[3]);
+        match.team2Score = Number(params[4]);
         match.hasScoreInput = true;
         return [{}, []];
       }
@@ -558,6 +577,29 @@ describe("swiss — forfeitSwissTeam", () => {
     expect(round2Teams).not.toContain(5);
     // Effectif redevenu impair : une victoire d'office est distribuée.
     expect(db.matches.filter((m) => m.round === 2 && m.isBye === 1)).toHaveLength(1);
+  });
+
+  it("écrit le score plein du format sur le match abandonné", async () => {
+    // Un forfait n'est pas une rencontre blanche : en FT3 il vaut 3-0, comme le
+    // compte déjà le bilan de maps des fiches. Un 1-0 en dur aurait affiché
+    // « 1 – FF » sur la manche pendant que la fiche en comptait trois.
+    const db = fakeDb({ teamCount: 8, totalRounds: 3, matchFormat: { type: "FT", value: 3 } });
+    await generateSwissRound(1, db.conn);
+
+    await forfeitSwissTeam(1, 5, db.conn);
+
+    const match = db.matches.find((m) => m.round === 1 && m.team1Id === 1)!;
+    expect([match.team1Score, match.team2Score]).toEqual([3, 0]);
+  });
+
+  it("retombe sur 1-0 quand le tournoi laisse le score libre", async () => {
+    const db = fakeDb({ teamCount: 8, totalRounds: 3 });
+    await generateSwissRound(1, db.conn);
+
+    await forfeitSwissTeam(1, 5, db.conn);
+
+    const match = db.matches.find((m) => m.round === 1 && m.team1Id === 1)!;
+    expect([match.team1Score, match.team2Score]).toEqual([1, 0]);
   });
 
   it("refuse un forfait hors mode suisse, hors tournoi en cours, ou déjà déclaré", async () => {
