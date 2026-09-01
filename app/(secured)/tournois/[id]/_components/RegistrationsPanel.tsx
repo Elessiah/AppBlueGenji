@@ -15,6 +15,7 @@ import {
 import { fromBracketMatch } from "@/lib/shared/match-lock";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { useEntrantLink, useParticipantWording } from "../_lib/entrant-link";
+import { mapError } from "../_lib/error-map";
 import styles from "./RegistrationsPanel.module.css";
 
 interface RegistrationsPanelProps {
@@ -55,6 +56,15 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
   const [pending, setPending] = useState<number[] | null>(null);
   const baseline = useRef<string>("");
 
+  // Le clavier ne doit pas perdre sa place : la ligne bouge, et le bouton qu'on
+  // vient d'actionner se désactive dès qu'elle atteint une extrémité — le
+  // navigateur retire alors le focus, qui retombe sur le corps de la page.
+  const buttons = useRef(new Map<string, HTMLButtonElement | null>());
+  const [refocus, setRefocus] = useState<{ teamId: number; direction: "up" | "down" } | null>(null);
+  // Le lecteur d'écran a besoin qu'on lui dise ce qui a bougé : le seul retour
+  // visuel est le déplacement de la ligne.
+  const [announcement, setAnnouncement] = useState("");
+
   const serverOrder = detail.registrations.map((reg) => reg.teamId);
   const serverKey = serverOrder.join(",");
 
@@ -69,12 +79,27 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
     return reg ? [reg] : [];
   });
 
+  useEffect(() => {
+    if (!refocus) return;
+    const key = (direction: "up" | "down") => `${refocus.teamId}:${direction}`;
+    const preferred = buttons.current.get(key(refocus.direction));
+    // Arrivé en tête ou en queue, le bouton actionné n'existe plus comme cible :
+    // on rend la main à celui qui ramène la ligne d'où elle vient.
+    const target =
+      preferred && !preferred.disabled
+        ? preferred
+        : buttons.current.get(key(refocus.direction === "up" ? "down" : "up"));
+    target?.focus();
+    setRefocus(null);
+  }, [refocus]);
+
   const lockReason = seedingLockReason(detail.card.state, detail.matches.map(fromBracketMatch));
   const staff = detail.isAdmin && canReorder;
   const reorderable = staff && lockReason === null && rows.length > 1;
 
   const move = async (teamId: number, direction: "up" | "down") => {
     const next = moveInOrder(order, teamId, direction);
+    const name = byId.get(teamId)?.teamName ?? "";
     baseline.current = serverKey;
     setPending(next);
     setBusy(true);
@@ -87,14 +112,17 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
       const payload = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(payload.error || "SEEDING_REORDER_FAILED");
       showSuccess("Ordre mis à jour.");
+      // Tournure neutre : le genre de « équipe » et de « joueur » diverge.
+      setAnnouncement(`Nouveau rang de ${name} : ${next.indexOf(teamId) + 1} sur ${next.length}.`);
       onReordered();
     } catch (e) {
       // L'ordre du serveur fait foi : on lâche l'affichage optimiste plutôt que
       // de laisser croire à une écriture qui n'a pas eu lieu.
       setPending(null);
-      showError((e as Error).message);
+      showError(mapError((e as Error).message));
     } finally {
       setBusy(false);
+      setRefocus({ teamId, direction });
     }
   };
 
@@ -111,11 +139,13 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
       {staff && (
         <>
           <p className={styles.hint}>
-            {lockReason === null
-              ? "Ce rang décide des appariements de la première manche. Réordonnez les lignes avec les flèches ci-contre, jusqu'à la première saisie de score."
-              : LOCK_MESSAGES[lockReason]}
+            {lockReason !== null
+              ? LOCK_MESSAGES[lockReason]
+              : reorderable
+                ? "Ce rang décide des appariements de la première manche. Réordonnez les lignes avec les flèches ci-contre, jusqu'à la première saisie de score."
+                : `Ce rang décidera des appariements de la première manche. Il se règlera ici dès qu'il y aura deux ${wording.manyEngaged}.`}
           </p>
-          {!showsRealDraw && (
+          {!showsRealDraw && rows.length > 0 && (
             <p className={styles.warning}>
               Ce format seede depuis le classement du site : les rangs ci-dessous ne sont
               que l&apos;ordre d&apos;arrivée des inscriptions et ne seront pas ceux du
@@ -126,50 +156,66 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
         </>
       )}
 
-      <div className={styles.table}>
-        <div className={`${styles.row} ${styles.header} ${reorderable ? styles.reorderable : ""}`}>
-          <span>Rang</span>
-          <span>{wording.oneCapitalized}</span>
-          <span>Inscription</span>
-          <span>Classement final</span>
-          {reorderable && <span style={{ textAlign: "right" }}>Ordre</span>}
-        </div>
-        {rows.map((reg, index) => (
-          <div
-            key={reg.teamId}
-            className={`${styles.row} ${reorderable ? styles.reorderable : ""}`}
-          >
-            <span className={styles.seed}>#{index + 1}</span>
-            <Link className={styles.name} href={entrantLink(reg.teamId)}>
-              {reg.teamName}
-            </Link>
-            <span className={styles.muted}>{formatLocalDateTime(reg.registeredAt)}</span>
-            <span className={styles.muted}>{reg.finalRank ?? "-"}</span>
-            {reorderable && (
-              <span className={styles.actions}>
-                <button
-                  type="button"
-                  className={styles.arrow}
-                  aria-label={`Monter ${reg.teamName}`}
-                  disabled={busy || index === 0}
-                  onClick={() => move(reg.teamId, "up")}
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  className={styles.arrow}
-                  aria-label={`Descendre ${reg.teamName}`}
-                  disabled={busy || index === rows.length - 1}
-                  onClick={() => move(reg.teamId, "down")}
-                >
-                  ↓
-                </button>
-              </span>
-            )}
+      {rows.length === 0 ? (
+        <p className={styles.empty}>Aucune inscription pour le moment.</p>
+      ) : (
+        <div className={styles.table}>
+          <div className={`${styles.row} ${styles.header} ${reorderable ? styles.reorderable : ""}`}>
+            <span>Rang</span>
+            <span>{wording.oneCapitalized}</span>
+            <span>Inscription</span>
+            <span>Classement final</span>
+            {reorderable && <span className={styles.actionsHead}>Ordre</span>}
           </div>
-        ))}
-      </div>
+          {rows.map((reg, index) => (
+            <div
+              key={reg.teamId}
+              className={`${styles.row} ${reorderable ? styles.reorderable : ""}`}
+            >
+              <span className={styles.seed}>#{index + 1}</span>
+              <Link className={styles.name} href={entrantLink(reg.teamId)}>
+                {reg.teamName}
+              </Link>
+              <span className={styles.muted}>{formatLocalDateTime(reg.registeredAt)}</span>
+              <span className={styles.muted}>{reg.finalRank ?? "-"}</span>
+              {reorderable && (
+                <span className={styles.actions}>
+                  <button
+                    type="button"
+                    ref={(node) => {
+                      buttons.current.set(`${reg.teamId}:up`, node);
+                    }}
+                    className={styles.arrow}
+                    aria-label={`Monter ${reg.teamName} d'un rang`}
+                    title="Monter d'un rang"
+                    disabled={busy || index === 0}
+                    onClick={() => move(reg.teamId, "up")}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    ref={(node) => {
+                      buttons.current.set(`${reg.teamId}:down`, node);
+                    }}
+                    className={styles.arrow}
+                    aria-label={`Descendre ${reg.teamName} d'un rang`}
+                    title="Descendre d'un rang"
+                    disabled={busy || index === rows.length - 1}
+                    onClick={() => move(reg.teamId, "down")}
+                  >
+                    ↓
+                  </button>
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p aria-live="polite" className={styles.srOnly}>
+        {announcement}
+      </p>
     </div>
   );
 }
