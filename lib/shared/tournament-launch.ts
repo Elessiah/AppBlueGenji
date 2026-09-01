@@ -95,9 +95,9 @@ function timeOf(value: string): number {
  * Le seul vrai refus est **« il n'y a plus rien à abréger »** : les quatre
  * étapes d'avant-course sont toutes des points de départ valides, y compris
  * « masqué » — abréger publie alors le tournoi au passage (voir l'en-tête du
- * module). L'état consulté est le *calculé*, pas le stocké : un tournoi dont
- * l'heure de début est passée n'a rien à abréger même si la colonne `state`
- * n'a pas encore été recalée, et il partira à la prochaine synchronisation.
+ * module). Deux lectures de l'état y concourent, et il faut les deux : le
+ * *stocké*, qui peut avoir été forcé à la main avant l'heure, et le *calculé*,
+ * qui a pu dépasser le coup d'envoi sans que la colonne soit recalée.
  *
  * Ce qui n'est **pas** un refus, alors qu'on pourrait s'y attendre : partir
  * d'une étape où personne n'a pu s'engager (l'inscription exige l'état
@@ -124,6 +124,18 @@ export function launchBlockReason(
   // tournoi passerait alors chaque contrôle sans qu'aucun n'ait rien vérifié.
   if (milestones.some((time) => !Number.isFinite(time))) return "INVALID_DATES";
 
+  // L'état stocké fait plancher, exactement comme pour la frise
+  // (`stageFloorFromState`) et pour la fenêtre d'édition : un tournoi peut être
+  // lancé ou clos à la main avant l'heure, et ses dates ne le racontent alors
+  // plus. Le seul consulter laisserait « abréger » un tournoi que la page
+  // affiche en cours — les deux modules répondraient différemment sur la même
+  // ligne, et le bouton proposerait d'abréger le vide.
+  if (tournament.state === "FINISHED") return "TOURNAMENT_ALREADY_FINISHED";
+  if (tournament.state === "RUNNING") return "TOURNAMENT_ALREADY_STARTED";
+
+  // Et l'état calculé fait le reste : les dates peuvent avoir dépassé le coup
+  // d'envoi sans que la colonne ait été recalée — il n'y a alors plus rien à
+  // abréger, la prochaine synchronisation lancera le tournoi d'elle-même.
   const state = computeTournamentState(tournament as TournamentStateInput, now);
   if (state === "FINISHED") return "TOURNAMENT_ALREADY_FINISHED";
   if (state === "RUNNING") return "TOURNAMENT_ALREADY_STARTED";
