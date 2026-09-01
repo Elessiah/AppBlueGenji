@@ -219,10 +219,11 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
       {
         title: "Phase qualificative — l'endurance",
         body: [
-          "Chaque équipe reçoit le même capital de départ (9 points par défaut, réglable à la création). Une victoire de map rapporte un point, une défaite en retire un.",
+          "Chaque équipe reçoit le même capital de départ (9 points par défaut, réglable à la création). Une victoire de map rapporte un point, une défaite en retire un : un match gagné 3-0 déplace donc trois points, un 3-2 un seul.",
         ],
         bullets: [
           "Une équipe dont le capital atteint zéro est éliminée sur-le-champ.",
+          "Un forfait compte comme le score maximal du format du tournoi : en FT3, l'équipe forfait encaisse un 3-0 et perd trois points d'endurance.",
           "Le classement est relu avant chaque manche : endurance décroissante, puis — à égalité — l'ordre du classement précédent.",
           "Les équipes s'affrontent par couples adjacents : 1ʳᵉ contre 2ᵉ, 3ᵉ contre 4ᵉ, et ainsi de suite.",
           "La mieux classée du couple prend le side gauche, l'autre le side droite.",

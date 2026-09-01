@@ -478,6 +478,10 @@ export default function TournamentDetailPage() {
             <EnduranceView
               endurance={detail.endurance}
               matches={detail.matches}
+              isFinished={detail.card.state === "FINISHED"}
+              myTeamId={detail.myTeamId}
+              canForfeit={canForfeit}
+              onForfeit={forfeitTeam}
               renderMatch={(match) => (
                 <MatchRow
                   key={match.id}

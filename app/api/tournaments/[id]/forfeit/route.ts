@@ -56,6 +56,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       message === "NOT_SURVIVAL" ||
       message === "NOT_SWISS" ||
       message === "NOT_BG_SURVIE" ||
+      message === "ENDURANCE_PLAYOFFS_STARTED" ||
       message === "FORMAT_WITHOUT_FORFEIT" ||
       message === "TOURNAMENT_NOT_RUNNING" ||
       message === "TEAM_ALREADY_OUT"

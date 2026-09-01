@@ -17,6 +17,8 @@ function tournamentRow(overrides: Row = {}): Row {
   return {
     format: "BG_SURVIE",
     state: "RUNNING",
+    match_format_type: null,
+    match_format_value: null,
     endurance_start_points: 9,
     endurance_win_delta: 1,
     endurance_loss_delta: 1,
@@ -279,6 +281,89 @@ describe("reconcileEndurance", () => {
     // Les équipes sans match gardent leur capital.
     expect(byTeam.get(3)).toEqual({ points: 9, wins: 0, losses: 0 });
   });
+
+  /** Classement persisté par une réconciliation, indexé par équipe. */
+  function persistedPoints(conn: { execute: jest.Mock }): Map<unknown, number> {
+    return new Map(
+      conn.execute.mock.calls
+        .filter(([sql]) => String(sql).includes("INSERT INTO bg_endurance_standings"))
+        .map(([, params]) => {
+          const values = params as unknown[];
+          return [values[1], values[3] as number];
+        }),
+    );
+  }
+
+  it("porte les maps de chaque match au capital, côté par côté", async () => {
+    const conn = makeConn([
+      [[tournamentRow({ endurance_current_round: 1, endurance_playoff_size: 2 })]],
+      [[standingRow(1), standingRow(2), standingRow(3), standingRow(4)]],
+      [
+        [
+          // 2 (à droite) l'emporte 3-1 : les scores sont rangés par side, le
+          // service doit les réordonner par vainqueur.
+          {
+            round_number: 1,
+            status: "COMPLETED",
+            team1_id: 1,
+            team2_id: 2,
+            team1_score: 1,
+            team2_score: 3,
+            winner_team_id: 2,
+            loser_team_id: 1,
+            forfeit_team_id: null,
+          },
+        ],
+      ],
+      [[]], // forfaits
+    ]);
+
+    await reconcileEndurance(5, conn);
+
+    const points = persistedPoints(conn);
+    expect(points.get(2)).toBe(11); // 9 + 3 − 1
+    expect(points.get(1)).toBe(7); // 9 + 1 − 3
+  });
+
+  it("chiffre un forfait de l'historique sur le format du tournoi", async () => {
+    const conn = makeConn([
+      [
+        [
+          tournamentRow({
+            endurance_current_round: 1,
+            endurance_playoff_size: 2,
+            match_format_type: "FT",
+            match_format_value: 3,
+          }),
+        ],
+      ],
+      [[standingRow(1), standingRow(2), standingRow(3), standingRow(4)]],
+      [
+        [
+          // Forfait arbitré : les colonnes de score sont NULL, seul le format
+          // dit ce que vaut la rencontre.
+          {
+            round_number: 1,
+            status: "COMPLETED",
+            team1_id: 1,
+            team2_id: 2,
+            team1_score: null,
+            team2_score: null,
+            winner_team_id: 1,
+            loser_team_id: 2,
+            forfeit_team_id: 2,
+          },
+        ],
+      ],
+      [[]], // forfaits
+    ]);
+
+    await reconcileEndurance(5, conn);
+
+    const points = persistedPoints(conn);
+    expect(points.get(1)).toBe(12);
+    expect(points.get(2)).toBe(6);
+  });
 });
 
 describe("reconcileEndurance — réappariement après correction", () => {
@@ -392,8 +477,57 @@ describe("forfeitEnduranceTeam", () => {
     const closed = conn.execute.mock.calls.find(([sql]) =>
       String(sql).includes("status = 'COMPLETED'"),
     );
-    // Vainqueur = adversaire, forfait tracé, score 0-1 côté équipe partie.
+    // Vainqueur = adversaire, forfait tracé, score 0-1 côté équipe partie
+    // (tournoi en saisie libre : le forfait ne vaut qu'une map).
     expect(closed?.[1]).toEqual([7, 42, 42, 0, 1, 900]);
+  });
+
+  it("clôt le match sur le score plein du format du tournoi (FT3 → 3-0)", async () => {
+    const conn = makeConn([
+      [
+        [
+          tournamentRow({
+            endurance_current_round: 3,
+            match_format_type: "FT",
+            match_format_value: 3,
+          }),
+        ],
+      ],
+      [[{ status: "ACTIVE" }]],
+      [{ affectedRows: 1 }],
+      [[{ id: 900, team1_id: 42, team2_id: 7 }]],
+    ]);
+
+    await forfeitEnduranceTeam(5, 42, conn);
+
+    const closed = conn.execute.mock.calls.find(([sql]) =>
+      String(sql).includes("status = 'COMPLETED'"),
+    );
+    expect(closed?.[1]).toEqual([7, 42, 42, 0, 3, 900]);
+  });
+
+  it("suit aussi un BO5 (trois manches à gagner), équipe partie à gauche", async () => {
+    const conn = makeConn([
+      [
+        [
+          tournamentRow({
+            endurance_current_round: 2,
+            match_format_type: "BO",
+            match_format_value: 5,
+          }),
+        ],
+      ],
+      [[{ status: "ACTIVE" }]],
+      [{ affectedRows: 1 }],
+      [[{ id: 901, team1_id: 7, team2_id: 42 }]],
+    ]);
+
+    await forfeitEnduranceTeam(5, 42, conn);
+
+    const closed = conn.execute.mock.calls.find(([sql]) =>
+      String(sql).includes("status = 'COMPLETED'"),
+    );
+    expect(closed?.[1]).toEqual([7, 42, 42, 3, 0, 901]);
   });
 
   it("clôt aussi quand l'équipe partie était à droite", async () => {
@@ -428,5 +562,20 @@ describe("forfeitEnduranceTeam", () => {
     const conn = makeConn([[[tournamentRow({ format: "SURVIVAL" })]]]);
 
     await expect(forfeitEnduranceTeam(5, 42, conn)).rejects.toThrow("NOT_BG_SURVIE");
+  });
+
+  // L'arbre final vit à partir de `PLAYOFF_ROUND_OFFSET` : la fonction ne sait
+  // clore qu'un match de `endurance_current_round`, une manche qualificative.
+  // Accepter l'abandon laisserait le match de play-off ouvert à jamais.
+  it("refuse un abandon une fois les play-offs lancés", async () => {
+    const conn = makeConn([
+      [[tournamentRow({ endurance_playoffs_started: 1, endurance_current_round: 4 })]],
+    ]);
+
+    await expect(forfeitEnduranceTeam(5, 42, conn)).rejects.toThrow(
+      "ENDURANCE_PLAYOFFS_STARTED",
+    );
+    // Refus avant toute écriture : ni classement touché, ni match clos.
+    expect(conn.execute.mock.calls).toHaveLength(1);
   });
 });

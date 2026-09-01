@@ -33,6 +33,8 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // Formulations neutres : le forfait peut aussi être déclaré par l'arbitrage
   // pour une autre équipe que la sienne.
   TEAM_ALREADY_OUT: "Cette équipe n'est plus en lice dans ce tournoi.",
+  ENDURANCE_PLAYOFFS_STARTED:
+    "Les play-offs ont commencé : un forfait se déclare désormais sur le match lui-même.",
   TEAM_NOT_IN_TOURNAMENT: "Cette équipe n'est pas inscrite à ce tournoi.",
   // Volontairement neutre : le même code remonte du forfait, de la diffusion et
   // de toute route protégée. Un message parlant de forfait sur un refus

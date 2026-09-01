@@ -16,7 +16,12 @@ inchangé : ce sont deux formats distincts.
 | Perte par map perdue | −1 | `endurance_loss_delta` |
 | Effectif des play-offs | 8 | `endurance_playoff_size` |
 
-- Une équipe dont le capital atteint **0 est éliminée sur-le-champ**.
+- Le barème se compte **map par map**, dans les deux sens : un 3-0 rapporte
+  trois points au vainqueur et en coûte trois au perdant, un 3-2 n'en déplace
+  qu'un. Ce n'est pas un point par match gagné.
+- Une équipe dont le capital atteint **0 est éliminée sur-le-champ** — vainqueur
+  du match compris, si le barème fait peser une map perdue plus lourd qu'une map
+  gagnée.
 - Le classement est relu avant chaque manche : endurance décroissante, puis —
   à égalité — **l'ordre du classement précédent**.
 - Appariement par couples adjacents (1 vs 2, 3 vs 4…), la mieux classée du
@@ -59,6 +64,13 @@ tableau du règlement n'est défini que pour huit. Sur un effectif qui n'est pas
 une puissance de deux, un tour peut compter un nombre impair de vainqueurs :
 le dernier **passe le tour** (bye) au lieu d'être écarté.
 
+Le plateau **peut** passer sous huit en une seule manche, et c'est le barème par
+map qui le rend ordinaire : un 3-0 retirant trois points d'un coup, plusieurs
+équipes proches de zéro sortent ensemble. `selectQualifiedTeamIds` ne retient
+donc que les équipes **encore en lice** — `assignRanks` rangeant les sorties
+juste après les actives, une tranche des `playoffSize` premières compléterait
+sinon l'arbre avec des éliminées à 0 point.
+
 ## Classement de départ
 
 Il n'est **pas** calculé depuis le classement du site : il vient de l'ordre de
@@ -92,15 +104,66 @@ détruits et reformés depuis le classement rejoué — comme le font déjà la 
 et la Ronde suisse. Au-delà, `match-lock` interdit la correction : toute manche
 ultérieure portant une saisie verrouille les précédentes, play-offs compris.
 
+## Forfait : un score plein, pas un match blanc
+
+Un forfait — déclaré par l'arbitrage sur un match (`forfeit_team_id`) ou entraîné
+par un abandon — vaut le **score maximal du format du tournoi** :
+
+| Format du tournoi | Score compté | Endurance |
+| --- | --- | --- |
+| FT3 / BO5 | 3-0 | −3 pour l'équipe forfait, +3 pour l'adversaire |
+| FT2 / BO3 | 2-0 | −2 / +2 |
+| Score libre (aucun format) | 1-0 | −1 / +1 |
+
+C'est `forfeitMapCount(format)` (`lib/shared/bg-survie.ts`) qui pose ce nombre,
+depuis `matchWinsRequired` — la seule définition de l'objectif d'un format.
+
+Le rejeu ne peut pas lire les colonnes de score pour un forfait : l'arbitrage
+les met à `NULL` (`adminResolveMatch`), il n'y a rien à lire. Le barème est donc
+**dérivé du format**, ce qui laisse un forfait déjà enregistré se recalculer tout
+seul — comme le reste du mode.
+
+Un forfait compte comme une victoire au bilan V/D de son bénéficiaire : la
+rencontre a bien un vainqueur.
+
 ## Abandon
 
 Pris en charge comme en Survie et en Ronde suisse : le capital tombe à 0,
 l'équipe sort, le classement est rejoué et la manche suivante réappariée.
 
 Le match en cours de l'équipe partie est **clos** au passage, attribué à son
-adversaire avec `forfeit_team_id` — sans quoi la manche ne pourrait jamais se
-terminer et la suivante ne serait jamais appariée. Ce match reste ignoré par le
-rejeu pour le calcul des points : un forfait n'est pas une map jouée.
+adversaire avec `forfeit_team_id` et le score plein du format — sans quoi la
+manche ne pourrait jamais se terminer et la suivante ne serait jamais appariée.
+
+Le score plein peut vider le capital de l'équipe partie **dans la même manche**
+que son abandon. Le rejeu applique alors les matchs *avant* les abandons, puis
+laisse l'abandon écraser l'élimination qu'il vient de provoquer : au classement,
+la décision humaine (`FORFEIT`) prime sur la conséquence mécanique
+(`ELIMINATED`).
+
+L'abandon se déclare depuis le classement de la vue du mode
+(`EnduranceView`) : un représentant de l'engagé pour sa propre équipe,
+l'arbitrage (`can(user, "tournaments")`) pour n'importe laquelle — mêmes règles
+que la Survie et la Ronde suisse, portées par `_lib/forfeit.ts` et
+`POST /api/tournaments/[id]/forfeit`.
+
+### L'abandon s'arrête à la phase qualificative
+
+`forfeitEnduranceTeam` ne sait clore qu'un match de la **manche courante**
+(`endurance_current_round`) : l'arbre final vit à partir de
+`PLAYOFF_ROUND_OFFSET` (1000), hors de sa portée. Un abandon accepté en
+play-offs marquerait l'équipe `FORFEIT` au classement tout en la laissant
+engagée dans un match ouvert que rien ne viendrait jamais clore — et le rejeu
+daterait son abandon d'une manche qualificative qu'elle avait en réalité jouée
+et gagnée, puisque `eliminated_round` vaut alors la dernière manche générée.
+
+Le refus est posé aux deux bouts : `EnduranceView` masque le bouton dès
+`endurance.playoffsStarted`, et `forfeitEnduranceTeam` lève
+`ENDURANCE_PLAYOFFS_STARTED` (→ 400) pour qui appellerait la route directement.
+
+Un forfait de play-off se tranche donc **sur le match lui-même**, par
+l'arbitrage (`adminResolveMatch` avec `forfeitTeamId`) : c'est le seul chemin
+qui fasse avancer l'arbre.
 
 ## Tests
 
