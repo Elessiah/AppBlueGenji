@@ -563,4 +563,19 @@ describe("forfeitEnduranceTeam", () => {
 
     await expect(forfeitEnduranceTeam(5, 42, conn)).rejects.toThrow("NOT_BG_SURVIE");
   });
+
+  // L'arbre final vit à partir de `PLAYOFF_ROUND_OFFSET` : la fonction ne sait
+  // clore qu'un match de `endurance_current_round`, une manche qualificative.
+  // Accepter l'abandon laisserait le match de play-off ouvert à jamais.
+  it("refuse un abandon une fois les play-offs lancés", async () => {
+    const conn = makeConn([
+      [[tournamentRow({ endurance_playoffs_started: 1, endurance_current_round: 4 })]],
+    ]);
+
+    await expect(forfeitEnduranceTeam(5, 42, conn)).rejects.toThrow(
+      "ENDURANCE_PLAYOFFS_STARTED",
+    );
+    // Refus avant toute écriture : ni classement touché, ni match clos.
+    expect(conn.execute.mock.calls).toHaveLength(1);
+  });
 });

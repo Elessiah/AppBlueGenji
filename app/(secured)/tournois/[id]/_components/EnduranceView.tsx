@@ -2,6 +2,7 @@
 
 import type { BracketMatch, EnduranceMeta } from "@/lib/shared/types";
 import { useParticipantWording } from "../_lib/entrant-link";
+import styles from "./EnduranceView.module.css";
 
 interface EnduranceViewProps {
   endurance: EnduranceMeta;
@@ -19,19 +20,13 @@ interface EnduranceViewProps {
 const AMBER = "rgba(255,157,46,0.9)";
 
 /**
- * Le gabarit par défaut de `.table-row` ne compte que quatre colonnes : sans
- * cette grille explicite, le classement (cinq cellules) repliait la dernière
- * sur une seconde ligne.
- *
- * Chaque ligne est sa propre grille : la colonne d'action doit donc être de
- * largeur **fixe**, et n'exister que si au moins une ligne porte un bouton —
- * une colonne `auto` se serait dimensionnée ligne par ligne, décalant les
- * colonnes des lignes avec bouton par rapport à toutes les autres.
+ * Classe de gabarit du classement (cf. `EnduranceView.module.css`) : cinq
+ * colonnes, six quand au moins une ligne porte un bouton d'abandon. Le gabarit
+ * est une classe et non un style en ligne, sans quoi il l'emporterait sur le
+ * repli mobile de `.table-row`.
  */
-function rowGrid(withActions: boolean): React.CSSProperties {
-  return {
-    gridTemplateColumns: `44px minmax(0, 1.6fr) 1fr 1fr 1fr${withActions ? " 108px" : ""}`,
-  };
+function rowClass(withActions: boolean): string {
+  return `table-row ${withActions ? styles.rowWithActions : styles.row}`;
 }
 
 /** Première manche de play-offs (cf. `lib/server/tournaments/bg-survie.ts`). */
@@ -67,15 +62,24 @@ export function EnduranceView({
 
   // Abandon : proposé sur les équipes encore en lice, à leurs représentants
   // comme à l'arbitrage (cf. `canForfeit` côté page).
+  //
+  // **Pas pendant les play-offs.** `forfeitEnduranceTeam` ne sait clore qu'un
+  // match de la manche qualificative courante (`endurance_current_round`) ;
+  // l'arbre final vit à partir de `PLAYOFF_ROUND_OFFSET`, hors de sa portée. Un
+  // abandon y laisserait l'équipe déclarée forfait au classement mais toujours
+  // engagée dans un match ouvert — que rien ne viendrait jamais clore. Un
+  // forfait de play-off se tranche sur le match lui-même, par l'arbitrage, qui
+  // fait alors avancer l'arbre. Même refus côté serveur.
   const canForfeitRow = (teamId: number, status: string): boolean =>
     !isFinished &&
+    !endurance.playoffsStarted &&
     status === "ACTIVE" &&
     canForfeit !== undefined &&
     onForfeit !== undefined &&
     canForfeit(teamId);
 
   const showActions = endurance.standings.some((s) => canForfeitRow(s.teamId, s.status));
-  const grid = rowGrid(showActions);
+  const rowClassName = rowClass(showActions);
 
   return (
     <>
@@ -93,7 +97,7 @@ export function EnduranceView({
       </p>
 
       <div className="table-like" style={{ marginBottom: 24 }}>
-        <div className="table-row table-header" style={grid}>
+        <div className={`${rowClassName} table-header`}>
           <span>#</span>
           <span>{wording.oneCapitalized}</span>
           <span>Endurance</span>
@@ -108,10 +112,8 @@ export function EnduranceView({
           return (
             <div
               key={standing.teamId}
-              className="table-row"
+              className={rowClassName}
               style={{
-                ...grid,
-                alignItems: "center",
                 opacity: standing.status === "ACTIVE" ? 1 : 0.55,
                 background: isMine ? "rgba(89,212,255,0.06)" : undefined,
               }}

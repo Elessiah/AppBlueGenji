@@ -140,6 +140,24 @@ l'arbitrage (`can(user, "tournaments")`) pour n'importe laquelle — mêmes règ
 que la Survie et la Ronde suisse, portées par `_lib/forfeit.ts` et
 `POST /api/tournaments/[id]/forfeit`.
 
+### L'abandon s'arrête à la phase qualificative
+
+`forfeitEnduranceTeam` ne sait clore qu'un match de la **manche courante**
+(`endurance_current_round`) : l'arbre final vit à partir de
+`PLAYOFF_ROUND_OFFSET` (1000), hors de sa portée. Un abandon accepté en
+play-offs marquerait l'équipe `FORFEIT` au classement tout en la laissant
+engagée dans un match ouvert que rien ne viendrait jamais clore — et le rejeu
+daterait son abandon d'une manche qualificative qu'elle avait en réalité jouée
+et gagnée, puisque `eliminated_round` vaut alors la dernière manche générée.
+
+Le refus est posé aux deux bouts : `EnduranceView` masque le bouton dès
+`endurance.playoffsStarted`, et `forfeitEnduranceTeam` lève
+`ENDURANCE_PLAYOFFS_STARTED` (→ 400) pour qui appellerait la route directement.
+
+Un forfait de play-off se tranche donc **sur le match lui-même**, par
+l'arbitrage (`adminResolveMatch` avec `forfeitTeamId`) : c'est le seul chemin
+qui fasse avancer l'arbre.
+
 ## Tests
 
 - `tests/tournois/bg-survie.test.ts` — logique pure : barème, endurance,

@@ -101,4 +101,25 @@ describe("abandon — câblage des vues à classement", () => {
     expect(rule).toContain('status === "ACTIVE"');
     expect(rule).toContain("canForfeit(teamId)");
   });
+
+  it("retire l'abandon dès les play-offs, que le service ne sait pas clore", () => {
+    // `forfeitEnduranceTeam` ne clôt qu'un match de `endurance_current_round` :
+    // l'arbre final est hors de sa portée, et un abandon accepté y laisserait un
+    // match ouvert pour une équipe déclarée forfait.
+    const rule = enduranceView.slice(
+      enduranceView.indexOf("const canForfeitRow"),
+      enduranceView.indexOf("const showActions"),
+    );
+    expect(rule).toContain("!endurance.playoffsStarted");
+  });
+
+  it("laisse le gabarit du classement en feuille de style, pas en style en ligne", () => {
+    // Un style en ligne l'emporte sur la media query qui replie `.table-row` en
+    // une colonne sous 920 px : le gabarit doit rester une classe.
+    expect(enduranceView).not.toContain("gridTemplateColumns");
+
+    const css = read("app/(secured)/tournois/[id]/_components/EnduranceView.module.css");
+    expect(css).toContain("@media (max-width: 920px)");
+    expect(css).toContain("grid-template-columns: 1fr;");
+  });
 });

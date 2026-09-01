@@ -670,7 +670,16 @@ async function finalizeEndurance(
  * Déclare l'abandon d'une équipe : elle quitte le tournoi et son capital tombe
  * à 0. Le classement est ensuite rejoué (l'abandon est une entrée du rejeu).
  *
- * @throws NOT_BG_SURVIE | TEAM_NOT_IN_TOURNAMENT | TEAM_ALREADY_OUT
+ * **Réservé à la phase qualificative.** Cette fonction ne sait clore qu'un match
+ * de la manche courante (`endurance_current_round`) ; l'arbre final vit à partir
+ * de `PLAYOFF_ROUND_OFFSET`, hors de sa portée. Laisser passer un abandon en
+ * play-offs marquerait l'équipe `FORFEIT` au classement tout en la laissant
+ * engagée dans un match ouvert que rien ne viendrait clore — et le rejeu
+ * daterait l'abandon d'une manche qualificative qu'elle avait en réalité jouée.
+ * Un forfait de play-off se tranche sur le match lui-même (`adminResolveMatch`
+ * avec `forfeitTeamId`), qui fait avancer l'arbre.
+ *
+ * @throws NOT_BG_SURVIE | ENDURANCE_PLAYOFFS_STARTED | TEAM_NOT_IN_TOURNAMENT | TEAM_ALREADY_OUT
  */
 export async function forfeitEnduranceTeam(
   tournamentId: number,
@@ -679,6 +688,9 @@ export async function forfeitEnduranceTeam(
 ): Promise<void> {
   const tournament = await loadTournament(conn, tournamentId);
   if (!tournament || tournament.format !== "BG_SURVIE") throw new Error("NOT_BG_SURVIE");
+  if (Number(tournament.endurance_playoffs_started) === 1) {
+    throw new Error("ENDURANCE_PLAYOFFS_STARTED");
+  }
 
   const [rows] = await conn.execute<(RowDataPacket & { status: string })[]>(
     `SELECT status FROM bg_endurance_standings WHERE tournament_id = ? AND team_id = ? LIMIT 1`,
