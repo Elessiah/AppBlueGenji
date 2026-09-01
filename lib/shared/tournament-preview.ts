@@ -21,6 +21,7 @@ import {
   resolveEnduranceConfig,
   type EnduranceStanding,
 } from "./bg-survie";
+import type { SeedingSource } from "./seeding";
 import { planSurvivalRound, type SurvivalStanding } from "./survival";
 import { computeRecommendedRounds } from "./swiss";
 import { planFirstRound, type Participant } from "./swiss-pairing";
@@ -58,19 +59,12 @@ export type PreviewPairing = {
 };
 
 /**
- * D'où vient l'ordre affiché — la même distinction que `manual_seeding` :
- * - `MANUAL` — ordre fixé à la main par le staff, il fait autorité ;
- * - `RANKING` — classement du site (survie, suisse, multi-phases) ;
- * - `REGISTRATION` — ordre d'arrivée des inscriptions (formats à plateau).
+ * D'où vient l'ordre affiché. Défini dans `lib/shared/seeding.ts`, qui porte la
+ * règle : l'aperçu et la liste des inscriptions doivent en dire exactement la
+ * même chose. Réexporté ici par commodité pour les lecteurs de l'aperçu.
  */
-export type PreviewSeedingSource = "MANUAL" | "RANKING" | "REGISTRATION";
-
-/** Libellés FR de la provenance de l'ordre, pour l'interface. */
-export const SEEDING_SOURCE_LABELS: Record<PreviewSeedingSource, string> = {
-  MANUAL: "Ordre fixé par le staff",
-  RANKING: "Classement du site",
-  REGISTRATION: "Ordre d'inscription",
-};
+export type PreviewSeedingSource = SeedingSource;
+export { SEEDING_SOURCE_LABELS } from "./seeding";
 
 export type TournamentPreviewInput = {
   format: TournamentFormat;

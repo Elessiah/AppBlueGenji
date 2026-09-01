@@ -238,6 +238,19 @@ export type TeamHistoryRow = {
   playedAt: string;
 };
 
+/**
+ * D'où vient l'ordre qui décidera du tirage — la même distinction que la colonne
+ * `bg_tournaments.manual_seeding` :
+ *
+ * - `MANUAL` — ordre fixé à la main par le staff, il fait autorité partout ;
+ * - `RANKING` — classement du site (survie, ronde suisse, multi-phases) ;
+ * - `REGISTRATION` — ordre d'arrivée des inscriptions (formats à plateau).
+ *
+ * La règle qui le calcule vit dans `lib/shared/seeding.ts` ; le type est ici
+ * parce que l'instantané du tournoi le transporte.
+ */
+export type SeedingSource = "MANUAL" | "RANKING" | "REGISTRATION";
+
 export type TournamentCard = {
   id: number;
   name: string;
@@ -361,6 +374,12 @@ export type TournamentSnapshot = {
    * `/equipes/[id]`.
    */
   soloUserIds: Record<number, number>;
+  /**
+   * D'où vient l'ordre de seeding effectif. Sert à l'interface pour dire si la
+   * liste des inscrites, triée par `seed`, est bien celle que jouera le moteur —
+   * en `RANKING` elle ne l'est pas, le classement du site prend la main.
+   */
+  seedingSource: SeedingSource;
   /**
    * Empreinte du contenu ci-dessus. Deux instantanés de même version portent la
    * même information : le serveur s'abstient alors de les envoyer, et le client

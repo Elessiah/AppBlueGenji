@@ -15,6 +15,9 @@ jest.mock("@/lib/server/tournaments/state");
 jest.mock("@/lib/server/tournaments/list-cache");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/database");
+// Les formats à classement chargent leurs métadonnées : hors sujet ici, et elles
+// exigeraient une vraie base.
+jest.mock("@/lib/server/tournaments/swiss");
 
 import {
   getTournamentSnapshot,
@@ -30,6 +33,7 @@ import {
 import { hasPendingStateTransition, syncTournamentState } from "@/lib/server/tournaments/state";
 import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
 import { getDatabase } from "@/lib/server/database";
+import { loadSwissMeta } from "@/lib/server/tournaments/swiss";
 import { clearCache } from "@/lib/server/cache";
 
 const TOURNAMENT_ID = 5;
@@ -113,6 +117,7 @@ beforeEach(() => {
   (getTournamentListRow as jest.Mock).mockResolvedValue(listRow() as never);
   (getRegistrationRows as jest.Mock).mockResolvedValue([] as never);
   (getMatchRows as jest.Mock).mockResolvedValue([] as never);
+  (loadSwissMeta as jest.Mock).mockResolvedValue(null as never);
 });
 
 afterEach(() => {
@@ -227,5 +232,40 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     await getTournamentSnapshotFrame(TOURNAMENT_ID);
 
     expect(invalidateTournamentLists).not.toHaveBeenCalled();
+  });
+});
+
+describe("getTournamentSnapshot — provenance de l'ordre de seeding", () => {
+  it("annonce l'ordre d'inscription pour un format à plateau", async () => {
+    const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
+    expect(snapshot?.seedingSource).toBe("REGISTRATION");
+  });
+
+  it("annonce le classement du site pour un format à classement", async () => {
+    (loadTournamentRow as jest.Mock).mockResolvedValue(runningRow({ format: "SWISS" }) as never);
+    (syncTournamentState as jest.Mock).mockResolvedValue({
+      row: runningRow({ format: "SWISS" }),
+      stateChanged: false,
+    } as never);
+    (getTournamentListRow as jest.Mock).mockResolvedValue(listRow({ format: "SWISS" }) as never);
+
+    const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
+    expect(snapshot?.seedingSource).toBe("RANKING");
+  });
+
+  it("annonce l'ordre du staff dès que manual_seeding est posé, format à classement compris", async () => {
+    // Sans quoi l'interface continuerait d'avertir « ce n'est pas le tirage »
+    // alors que le staff vient précisément de le fixer.
+    (loadTournamentRow as jest.Mock).mockResolvedValue(
+      runningRow({ format: "SWISS", manual_seeding: 1 }) as never,
+    );
+    (syncTournamentState as jest.Mock).mockResolvedValue({
+      row: runningRow({ format: "SWISS", manual_seeding: 1 }),
+      stateChanged: false,
+    } as never);
+    (getTournamentListRow as jest.Mock).mockResolvedValue(listRow({ format: "SWISS" }) as never);
+
+    const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
+    expect(snapshot?.seedingSource).toBe("MANUAL");
   });
 });

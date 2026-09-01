@@ -2,10 +2,14 @@ import { describe, expect, it } from "@jest/globals";
 import {
   applySeedOrder,
   canReorderSeeding,
+  isSeedOrderEffective,
   isValidSeedOrder,
   moveInOrder,
   seedingLockReason,
+  SEEDING_SOURCE_LABELS,
+  seedingSource,
 } from "@/lib/shared/seeding";
+import type { TournamentFormat } from "@/lib/shared/types";
 import type { MatchScoreState } from "@/lib/shared/match-lock";
 
 function match(overrides: Partial<MatchScoreState> = {}): MatchScoreState {
@@ -120,5 +124,43 @@ describe("applySeedOrder", () => {
   it("ignore un identifiant inconnu au lieu de produire un trou", () => {
     const entries = [{ teamId: 1, teamName: "Alpha", seed: 1 }];
     expect(applySeedOrder(entries, [99, 1])).toEqual([{ teamId: 1, teamName: "Alpha", seed: 1 }]);
+  });
+});
+
+describe("seedingSource", () => {
+  it.each<[TournamentFormat]>([["SINGLE"], ["DOUBLE"], ["BG_SURVIE"]])(
+    "%s lit la colonne seed, donc l'ordre d'inscription tant que personne n'a réordonné",
+    (format) => {
+      expect(seedingSource(format, false)).toBe("REGISTRATION");
+    },
+  );
+
+  it.each<[TournamentFormat]>([["SWISS"], ["SURVIVAL"], ["MULTI"]])(
+    "%s seede depuis le classement du site",
+    (format) => {
+      expect(seedingSource(format, false)).toBe("RANKING");
+    },
+  );
+
+  it("un ordre fixé à la main l'emporte sur le format, quel qu'il soit", () => {
+    const formats: TournamentFormat[] = ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL", "MULTI", "BG_SURVIE"];
+    for (const format of formats) {
+      expect(seedingSource(format, true)).toBe("MANUAL");
+    }
+  });
+
+  it("a un libellé pour chaque provenance", () => {
+    expect(Object.keys(SEEDING_SOURCE_LABELS).sort()).toEqual(["MANUAL", "RANKING", "REGISTRATION"]);
+  });
+});
+
+describe("isSeedOrderEffective", () => {
+  it("la liste triée par seed est bien le tirage en MANUAL et en REGISTRATION", () => {
+    expect(isSeedOrderEffective("MANUAL")).toBe(true);
+    expect(isSeedOrderEffective("REGISTRATION")).toBe(true);
+  });
+
+  it("ne l'est pas en RANKING : le classement du site prendra la main au lancement", () => {
+    expect(isSeedOrderEffective("RANKING")).toBe(false);
   });
 });
