@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import { useToast } from "@/components/ui/toast";
 import { Pill } from "@/components/cyber";
@@ -14,7 +13,7 @@ import {
 } from "@/lib/shared/seeding";
 import { fromBracketMatch } from "@/lib/shared/match-lock";
 import type { TournamentDetail } from "@/lib/shared/types";
-import { useEntrantLink, useParticipantWording } from "../_lib/entrant-link";
+import { EntrantLink, useParticipantWording } from "../_lib/entrant-link";
 import { mapError } from "../_lib/error-map";
 import styles from "./RegistrationsPanel.module.css";
 
@@ -47,7 +46,6 @@ const LOCK_MESSAGES: Record<NonNullable<SeedingLockReason>, string> = {
 export function RegistrationsPanel({ detail, canReorder, onReordered }: RegistrationsPanelProps) {
   const { showError, showSuccess } = useToast();
   const wording = useParticipantWording();
-  const entrantLink = useEntrantLink();
   const [busy, setBusy] = useState(false);
 
   // Ordre affiché en attendant que le flux rapporte l'écriture : sans lui, la
@@ -173,9 +171,9 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
               className={`${styles.row} ${reorderable ? styles.reorderable : ""}`}
             >
               <span className={styles.seed}>#{index + 1}</span>
-              <Link className={styles.name} href={entrantLink(reg.teamId)}>
+              <EntrantLink className={styles.name} teamId={reg.teamId}>
                 {reg.teamName}
-              </Link>
+              </EntrantLink>
               <span className={styles.muted}>{formatLocalDateTime(reg.registeredAt)}</span>
               <span className={styles.muted}>{reg.finalRank ?? "-"}</span>
               {reorderable && (

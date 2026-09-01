@@ -11,6 +11,14 @@ export type LandingLiveMatch = {
   id: number;
   team1Name: string | null;
   team2Name: string | null;
+  /**
+   * Fiche de l'engagé, résolue côté serveur par `entrantHref` : `/equipes/[id]`
+   * pour une équipe, `/joueurs/[id]` pour l'entrée solo d'un tournoi
+   * individuel. `null` quand la place est vide (bye, adversaire à désigner) —
+   * il n'y a alors rien à ouvrir.
+   */
+  team1Href: string | null;
+  team2Href: string | null;
   team1Score: number | null;
   team2Score: number | null;
   bracket: string;

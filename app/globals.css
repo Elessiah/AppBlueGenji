@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --bg-0: #07080a;
   --bg-1: #0d0f13;
   --bg-2: #14161c;
@@ -44,6 +44,35 @@ body {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+/* Lien vers la fiche d'une equipe ou d'un joueur.
+   `a` est global sans decoration : sans marque au survol, un nom cliquable ne
+   se distingue pas d'un nom mort. La classe pose la seule affordance du site
+   pour ces liens d'entite, pour qu'un nom se comporte partout pareil. */
+.entity-link {
+  color: inherit;
+  text-decoration: none;
+  border-radius: 3px;
+  transition: color 0.15s ease;
+}
+
+.entity-link:hover,
+.entity-link:focus-visible {
+  color: var(--blue-100, #5ac8ff);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.entity-link:focus-visible {
+  outline: 1px solid var(--blue-300, #5ac8ff);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entity-link {
+    transition: none;
+  }
 }
 
 .container {

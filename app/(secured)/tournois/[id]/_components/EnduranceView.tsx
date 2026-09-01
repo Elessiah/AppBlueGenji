@@ -9,7 +9,7 @@ import {
   enduranceHistoryColumns,
   type EnduranceCellTone,
 } from "../_lib/endurance-history";
-import { useParticipantWording } from "../_lib/entrant-link";
+import { EntrantLink, useParticipantWording } from "../_lib/entrant-link";
 import styles from "./EnduranceView.module.css";
 
 interface EnduranceViewProps {
@@ -107,7 +107,11 @@ function EnduranceHistory({
                 .join(" ")}
               style={{ "--history-cols": columns } as React.CSSProperties}
             >
-              <span className={styles.historyTeam}>{standing.teamName}</span>
+              {/* Même affordance que le classement au-dessus : un nom d'engagé
+                  mène toujours à sa fiche, d'une vue à l'autre. */}
+              <EntrantLink teamId={standing.teamId} className={styles.historyTeam}>
+                {standing.teamName}
+              </EntrantLink>
               {standing.rounds.map((cell) => (
                 <span
                   key={cell.round}
@@ -213,7 +217,12 @@ export function EnduranceView({
               }}
             >
               <span className="num">{standing.rank}</span>
-              <span style={{ fontWeight: isMine ? 700 : undefined }}>{standing.teamName}</span>
+              <EntrantLink
+                teamId={standing.teamId}
+                style={{ fontWeight: isMine ? 700 : undefined }}
+              >
+                {standing.teamName}
+              </EntrantLink>
               <span className="num">{standing.points}</span>
               <span>
                 {standing.wins} / {standing.losses}

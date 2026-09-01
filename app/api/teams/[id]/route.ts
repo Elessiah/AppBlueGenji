@@ -1,6 +1,7 @@
 ﻿import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { getTeamDetail, softDeleteTeam, updateTeamMeta } from "@/lib/server/teams-service";
+import { findSoloEntryUser } from "@/lib/server/solo-entries-service";
 import { can } from "@/lib/shared/permissions";
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -15,7 +16,16 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
 
   // Consultation de la fiche : seul appel qui calcule la place au classement.
   const detail = await getTeamDetail(teamId, user.id, can(user, "tournaments"), true);
-  if (!detail) return fail("TEAM_NOT_FOUND", 404);
+  if (!detail) {
+    // Une entrée solo est une ligne de `bg_teams` sans fiche d'équipe : son
+    // identité publique est le profil du joueur. Un lien vers `/equipes/[id]`
+    // reste donc valide — il mène ailleurs, il ne casse pas.
+    const soloUserId = await findSoloEntryUser(teamId);
+    if (soloUserId !== null) {
+      return fail("TEAM_IS_SOLO_ENTRY", 404, { soloUserId });
+    }
+    return fail("TEAM_NOT_FOUND", 404);
+  }
 
   return ok(detail);
 }

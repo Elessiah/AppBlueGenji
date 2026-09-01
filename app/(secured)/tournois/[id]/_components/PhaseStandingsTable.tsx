@@ -1,16 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import type { TournamentPhaseStanding } from "@/lib/shared/types";
 import { Pill } from "@/components/cyber";
-import { useEntrantLink, useParticipantWording } from "../_lib/entrant-link";
+import { EntrantLink, useParticipantWording } from "../_lib/entrant-link";
 
 interface PhaseStandingsTableProps {
   standings: TournamentPhaseStanding[];
 }
 
 export function PhaseStandingsTable({ standings }: PhaseStandingsTableProps) {
-  const entrantLink = useEntrantLink();
   const wording = useParticipantWording();
 
   return (
@@ -22,15 +20,7 @@ export function PhaseStandingsTable({ standings }: PhaseStandingsTableProps) {
       </div>
       {standings.map((standing) => (
         <div key={standing.teamId} className="table-row">
-          <Link
-            href={entrantLink(standing.teamId)}
-            style={{
-              textDecoration: "none",
-              color: "inherit",
-            }}
-          >
-            {standing.teamName}
-          </Link>
+          <EntrantLink teamId={standing.teamId}>{standing.teamName}</EntrantLink>
           <span>{standing.rank ?? "-"}</span>
           <span>
             {standing.qualified ? (

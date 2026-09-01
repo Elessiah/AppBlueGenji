@@ -10,7 +10,15 @@ export function useTeamDetail(teamId: number) {
   const { status, data, error, refresh } = useResourceLoader<TeamDetailResponse>(
     `/api/teams/${teamId}`,
     {
-      onNotFoundRedirect: () => {
+      onNotFoundRedirect: (payload) => {
+        // Un identifiant d'entrée solo n'est pas une équipe manquante : le
+        // joueur a bien une fiche, ailleurs. On y mène sans faire clignoter une
+        // erreur — le lien était valide.
+        const soloUserId = payload.soloUserId;
+        if (typeof soloUserId === "number") {
+          router.replace(`/joueurs/${soloUserId}`);
+          return;
+        }
         showError("TEAM_NOT_FOUND");
         setTimeout(() => router.push("/equipes"), 1500);
       },

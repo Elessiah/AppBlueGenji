@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { PlayerLink } from "@/components/entity-link";
 import Image from "next/image";
 import { formatLocalDate } from "@/lib/shared/dates";
 import type { PublicUserProfile, TeamMember, TeamRole } from "@/lib/shared/types";
@@ -95,7 +95,7 @@ export function MembersSection({
           </div>
           {members.map((member) => (
             <div className="table-row" key={member.membershipId}>
-              <Link href={`/joueurs/${member.userId}`}>{member.pseudo}</Link>
+              <PlayerLink userId={member.userId}>{member.pseudo}</PlayerLink>
               <span>{member.roles.join(", ")}</span>
               <span>{formatLocalDate(member.joinedAt)}</span>
               <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
