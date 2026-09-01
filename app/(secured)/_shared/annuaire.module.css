@@ -997,7 +997,11 @@
 .cardOverlay {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  /* Au-dessus des enfants **positionnes** de la carte (pastille de rang,
+     sigil, cadre d'avatar) : en `z-index: auto`, ils peignent apres la plaque
+     dans l'ordre du DOM et intercepteraient le clic, alors qu'ils faisaient
+     partie du lien quand celui-ci enveloppait la carte. */
+  z-index: 1;
   border-radius: inherit;
 }
 
@@ -1008,5 +1012,5 @@
 
 .aboveOverlay {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }

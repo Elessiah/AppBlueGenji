@@ -50,21 +50,43 @@ par-dessus.
 
 ```
 <article class="card">              ← la carte, plus un lien
-  <a class="cardOverlay" />         ← position: absolute; inset: 0 — le lien principal
+  <a class="cardOverlay" />         ← position: absolute; inset: 0; z-index: 1
   …contenu statique, sous la plaque…
-  <a class="rosterItem">…</a>       ← position: relative; z-index: 1 — repasse au-dessus
+  <a class="rosterItem">…</a>       ← position: relative; z-index: 2 — repasse au-dessus
 </article>
 ```
+
+**Le `z-index` de la plaque n'est pas décoratif.** Une carte porte des enfants
+déjà positionnés — la pastille de rang, le sigil, le cadre d'avatar — sans
+`z-index` à eux. En `z-index: auto`, ils appartiennent à la même couche de
+peinture que la plaque et, venant après elle dans le DOM, ils passent
+**au-dessus** : un clic sur le `#01` ou sur l'avatar n'ouvrirait plus rien,
+alors qu'il faisait partie du lien quand celui-ci enveloppait la carte. D'où
+trois étages : décorations positionnées (`auto`) < plaque (`1`) < liens
+imbriqués (`2`).
+
+Corollaire : le pointeur ne survole plus les descendants de la carte, seulement
+la plaque. Un `:hover` posé sur un descendant (le bouton « Voir l'équipe ») ne
+se déclencherait plus jamais — il s'écrit désormais `.card:hover .cta`. Plus
+juste, du reste : cliquer n'importe où sur la carte fait ce que le bouton
+annonce.
 
 La plaque n'a pas de texte : son seul intitulé est son `aria-label` (« Voir la
 fiche de … »). Corollaire dans `TeamCard` : l'avatar du roster devient
 décoratif (`alt=""`), le lien qui l'entoure portant déjà le pseudo — sans quoi
 le lecteur d'écran l'annoncerait deux fois.
 
-Piège de mise en page : le chevauchement des visages (`margin-left: -6px`) se
-joue désormais sur l'élément du roster et non sur la pastille. `.avatar` est
-tantôt un `img`, tantôt un `span` ; `:first-of-type` ne saurait pas les
-départager une fois les liens intercalés. D'où `.rosterItem + .rosterItem`.
+Deux pièges de mise en page, tous deux dus à l'élément de roster nouvellement
+intercalé :
+
+- le chevauchement des visages (`margin-left: -6px`) se joue sur cet élément et
+  non sur la pastille. `.avatar` est tantôt un `img`, tantôt un `span` ;
+  `:first-of-type` ne saurait pas les départager. D'où
+  `.rosterItem + .rosterItem` ;
+- la pastille « +N » porte `.rosterItem` **et** `.avatar` : un `display`
+  différent sur l'un l'emporterait sur l'autre par simple ordre de source, et le
+  « +N » sortirait de son cercle. Les deux partagent donc
+  `display: grid; place-items: center`.
 
 ## `/equipes/[id]` sur une entrée solo
 

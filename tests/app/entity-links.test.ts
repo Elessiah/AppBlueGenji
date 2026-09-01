@@ -165,14 +165,71 @@ describe("Cartes d'annuaire — deux destinations, sans ancre imbriquée", () =>
     expect(code).toContain("className={s.aboveOverlay}");
   });
 
-  it("empile la plaque sous les liens imbriqués, dans les deux feuilles", () => {
+  it("couvre toute la carte", () => {
     for (const css of [
       read("app/(secured)/equipes/cards/TeamCard.module.css"),
       read("app/(secured)/_shared/annuaire.module.css"),
     ]) {
       expect(css).toContain(".cardOverlay {");
-      expect(css).toMatch(/\.cardOverlay \{[^}]*position: absolute;[^}]*inset: 0;/);
+      expect(css).toMatch(/\.cardOverlay \{[\s\S]*?position: absolute;[\s\S]*?inset: 0;/);
     }
+  });
+
+  /**
+   * La plaque doit passer **au-dessus** des enfants positionnés de la carte
+   * (pastille de rang, sigil, cadre d'avatar) : en `z-index: auto`, ils peignent
+   * après elle dans l'ordre du DOM et intercepteraient le clic — alors qu'ils
+   * faisaient partie du lien quand celui-ci enveloppait la carte. Et **en
+   * dessous** des liens imbriqués, qui mènent ailleurs.
+   */
+  const zIndexOf = (css: string, selector: string): number => {
+    const block = css.slice(css.indexOf(`${selector} {`));
+    const match = block.slice(0, block.indexOf("}")).match(/z-index:\s*(-?\d+)/);
+    expect(match).not.toBeNull();
+    return Number(match![1]);
+  };
+
+  it("passe la plaque au-dessus des décorations positionnées de la carte", () => {
+    for (const [css, decorations] of [
+      [read("app/(secured)/equipes/cards/TeamCard.module.css"), [".rank", ".sigil"]],
+      [read("app/(secured)/_shared/annuaire.module.css"), [".plAvatarWrap"]],
+    ] as [string, string[]][]) {
+      // Ces décorations n'ont pas de `z-index` : elles se rangent dans la couche
+      // des positionnés `auto`, que la plaque doit dominer avec un entier > 0.
+      for (const selector of decorations) {
+        const block = css.slice(css.indexOf(`${selector} {`));
+        expect(block.slice(0, block.indexOf("}"))).not.toMatch(/z-index:/);
+      }
+      expect(zIndexOf(css, ".cardOverlay")).toBeGreaterThan(0);
+    }
+  });
+
+  it("laisse les liens imbriqués au-dessus de la plaque", () => {
+    const team = read("app/(secured)/equipes/cards/TeamCard.module.css");
+    expect(zIndexOf(team, ".rosterItem")).toBeGreaterThan(zIndexOf(team, ".cardOverlay"));
+
+    const annuaire = read("app/(secured)/_shared/annuaire.module.css");
+    expect(zIndexOf(annuaire, ".aboveOverlay")).toBeGreaterThan(
+      zIndexOf(annuaire, ".cardOverlay"),
+    );
+  });
+
+  it("aligne la pastille « +N » sur la mise en page de `.avatar`", () => {
+    // Elle porte les deux classes : un `display` différent sur `.rosterItem`
+    // l'emporterait sur `.avatar` par simple ordre de source, et le « +N »
+    // sortirait de son cercle.
+    const css = read("app/(secured)/equipes/cards/TeamCard.module.css");
+    const roster = css.slice(css.indexOf(".rosterItem {"));
+    const block = roster.slice(0, roster.indexOf("}"));
+    expect(block).toContain("display: grid;");
+    expect(block).toContain("place-items: center;");
+    expect(block).not.toContain("line-height: 0;");
+  });
+
+  it("allume le bouton d'appel au survol de la carte, pas du bouton", () => {
+    // La plaque couvre le bouton : `.cta:hover` ne se déclencherait plus jamais.
+    const css = read("app/(secured)/equipes/cards/TeamCard.module.css");
+    expect(css).toContain(".card:hover .cta {");
   });
 
   it("décale les visages du roster sur l'élément du roster, pas sur la pastille", () => {
