@@ -60,9 +60,14 @@ export function EnduranceView({
 
   return (
     <>
+      {/*
+        Le barème se compte map par map : « par victoire » laissait lire un
+        point par match gagné, alors qu'un 3-0 en déplace trois — et c'est ce
+        même compte qui chiffre un forfait.
+      */}
       <p className="mono" style={{ fontSize: 11, color: "var(--text-2)", margin: "0 0 16px" }}>
-        ENDURANCE {endurance.startPoints} PTS · +{endurance.winDelta} PAR VICTOIRE · −
-        {endurance.lossDelta} PAR DÉFAITE ·{" "}
+        ENDURANCE {endurance.startPoints} PTS · +{endurance.winDelta} PAR MAP GAGNÉE · −
+        {endurance.lossDelta} PAR MAP PERDUE · FORFAIT COMPTÉ {endurance.forfeitMaps}-0 ·{" "}
         {endurance.playoffsStarted
           ? `PLAY-OFFS À ${endurance.playoffSize}`
           : `MANCHE ${endurance.currentRound} · ${activeCount} ${wording.manyCapitalized.toUpperCase()} EN LICE → ${endurance.playoffSize}`}
