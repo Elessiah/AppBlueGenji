@@ -118,8 +118,13 @@ export function inferPhaseLabel(match: LandingLiveMatch | null): string {
   return label;
 }
 
-export function toBestOfLabel(match: LandingLiveMatch | null): "BO5" | "BO3" {
-  if (!match) return "BO3";
-  return match.roundLabel.toLowerCase().includes("final") ? "BO5" : "BO3";
-}
+/*
+ * Pas de `toBestOfLabel` ici : le format de match est une donnée du tournoi
+ * (`TournamentCard.matchFormat`), pas une déduction du nom de la manche. La
+ * fonction qui vivait à cet endroit devinait « BO5 » en finale et « BO3 »
+ * partout ailleurs, si bien qu'un tournoi réglé en FT3 s'annonçait « BO3 » sur
+ * l'accueil — et un tournoi en score libre, « BO3 » aussi. La notation ne
+ * s'écrit plus qu'à un seul endroit, `matchFormatLabel`
+ * (`lib/shared/match-format.ts`), qui lit le réglage au lieu de l'inventer.
+ */
 
