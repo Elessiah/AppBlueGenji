@@ -66,8 +66,14 @@ describe("enduranceHistoryColumns", () => {
     expect(enduranceHistoryColumns(3)).toBe("minmax(140px, 1fr) repeat(3, 40px)");
   });
 
-  it("reste un gabarit valide sans aucune manche", () => {
-    expect(enduranceHistoryColumns(0)).toBe("minmax(140px, 1fr) repeat(0, 40px)");
-    expect(enduranceHistoryColumns(-2)).toBe("minmax(140px, 1fr) repeat(0, 40px)");
+  it("n'écrit pas de `repeat(0, …)`, que le moteur CSS rejetterait", () => {
+    // Multiplicité nulle ou négative : la déclaration entière serait ignorée et
+    // la grille retomberait sur une colonne implicite, sans rien signaler.
+    expect(enduranceHistoryColumns(0)).toBe("minmax(140px, 1fr)");
+    expect(enduranceHistoryColumns(-2)).toBe("minmax(140px, 1fr)");
+  });
+
+  it("arrondit un compte non entier plutôt que de le poser tel quel", () => {
+    expect(enduranceHistoryColumns(2.7)).toBe("minmax(140px, 1fr) repeat(2, 40px)");
   });
 });

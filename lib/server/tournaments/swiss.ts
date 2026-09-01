@@ -22,7 +22,7 @@ import {
 } from "@/lib/shared/swiss-pairing";
 import { rankingPointsSql } from "@/lib/shared/ranking";
 import type { SwissMeta, SwissTiebreaker } from "@/lib/shared/types";
-import { createMatch, finishTournament } from "./repository";
+import { createMatch, finishTournament, forfeitMatchScores } from "./repository";
 
 interface TournamentSwissRow extends RowDataPacket {
   format: string;
@@ -692,6 +692,11 @@ export async function forfeitSwissTeam(
     const opponentId = Number(match.team1_id) === teamId ? match.team2_id : match.team1_id;
     if (opponentId !== null) {
       const team1IsForfeit = Number(match.team1_id) === teamId;
+      // Score plein du format (FT3 → 3-0), et non un 1-0 en dur : un forfait
+      // compte comme une rencontre pleine, et le bilan de maps des fiches le
+      // chiffre déjà ainsi. Deux règles auraient affiché « 1 – FF » sur la
+      // manche pendant que la fiche de l'adversaire en comptait trois.
+      const scores = await forfeitMatchScores(conn, tournamentId, team1IsForfeit);
       await conn.execute(
         `UPDATE bg_matches SET
           status = 'COMPLETED',
@@ -708,8 +713,8 @@ export async function forfeitSwissTeam(
           Number(opponentId),
           teamId,
           teamId,
-          team1IsForfeit ? 0 : 1,
-          team1IsForfeit ? 1 : 0,
+          scores.team1Score,
+          scores.team2Score,
           match.id,
         ],
       );

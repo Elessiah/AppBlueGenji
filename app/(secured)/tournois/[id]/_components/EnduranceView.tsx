@@ -83,7 +83,7 @@ function EnduranceHistory({
         ENDURANCE MANCHE PAR MANCHE
       </div>
       <ScrollArea fade ariaLabel="Capital d'endurance manche par manche">
-        <div className="table-like">
+        <div className={styles.historyTable}>
           <div
             className={`${styles.historyRow} ${styles.historyHead}`}
             style={{ "--history-cols": columns } as React.CSSProperties}

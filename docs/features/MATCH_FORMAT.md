@@ -62,6 +62,12 @@ la règle. Les forfaits enregistrés avant cette règle portent des colonnes vid
 `forfeitAwareMapScore` (fiches) et `enduranceMatchMaps` (BlueGenji Survie) les
 rechiffrent depuis le format.
 
+Les **abandons** l'écrivent aussi, par `forfeitMatchScores`
+(`lib/server/tournaments/repository.ts`) : arbitrage, Survie, Ronde suisse et
+BlueGenji Survie posent le même chiffre. La Survie et la Ronde suisse écrivaient
+auparavant un 1-0 en dur — la manche affichait alors « 1 – FF » pendant que la
+fiche de l'adversaire en comptait trois maps, le bilan dérivant du format.
+
 ## Où c'est visible
 
 - **Création du tournoi** (`/tournois/creer`) : un sélecteur *Best of / First to /

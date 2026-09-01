@@ -6,6 +6,7 @@ import {
   type EnduranceMatchOutcome,
   type EnduranceRoundCell,
 } from "@/lib/shared/bg-survie";
+import { forfeitMatchScores, loadTournamentMatchFormat } from "@/lib/server/tournaments/repository";
 import { forfeitMapCount } from "@/lib/shared/match-format";
 import { forfeitAwareMapScore } from "@/lib/shared/stats";
 
@@ -236,6 +237,62 @@ describe("forfeitAwareMapScore — le bilan de maps d'un forfait", () => {
   it("laisse une rencontre ordinaire à son score", () => {
     expect(forfeitAwareMapScore("NONE", FT3, 3, 2)).toEqual({ scoreFor: 3, scoreAgainst: 2 });
     expect(forfeitAwareMapScore("NONE", FT3, null, null)).toEqual({ scoreFor: 0, scoreAgainst: 0 });
+  });
+});
+
+describe("forfeitMatchScores — un seul chiffre pour tous les abandons", () => {
+  /** Connexion factice servant le format de match du tournoi. */
+  function formatConnection(row: Record<string, unknown> | null): PoolConnection {
+    return {
+      execute: async () => [row === null ? [] : [row], []],
+    } as unknown as PoolConnection;
+  }
+
+  it("chiffre le forfait au score plein, côté team1 comme côté team2", async () => {
+    const conn = formatConnection({ match_format_type: "FT", match_format_value: 3 });
+
+    await expect(forfeitMatchScores(conn, 1, true)).resolves.toEqual({
+      team1Score: 0,
+      team2Score: 3,
+    });
+    await expect(forfeitMatchScores(conn, 1, false)).resolves.toEqual({
+      team1Score: 3,
+      team2Score: 0,
+    });
+  });
+
+  it("suit le format : un BO3 vaut 2-0", async () => {
+    const conn = formatConnection({ match_format_type: "BO", match_format_value: 3 });
+    await expect(forfeitMatchScores(conn, 1, true)).resolves.toEqual({
+      team1Score: 0,
+      team2Score: 2,
+    });
+  });
+
+  it("retombe sur 1-0 en saisie libre", async () => {
+    const conn = formatConnection({ match_format_type: null, match_format_value: null });
+    await expect(forfeitMatchScores(conn, 1, false)).resolves.toEqual({
+      team1Score: 1,
+      team2Score: 0,
+    });
+  });
+
+  it("ne suppose aucun format sur un tournoi introuvable, plutôt que d'échouer", async () => {
+    const conn = formatConnection(null);
+    await expect(loadTournamentMatchFormat(conn, 404)).resolves.toBeNull();
+    await expect(forfeitMatchScores(conn, 404, true)).resolves.toEqual({
+      team1Score: 0,
+      team2Score: 1,
+    });
+  });
+
+  it("ignore un format incohérent en base — un « BO4 » n'a pas de vainqueur", async () => {
+    const conn = formatConnection({ match_format_type: "BO", match_format_value: 4 });
+    await expect(loadTournamentMatchFormat(conn, 1)).resolves.toBeNull();
+    await expect(forfeitMatchScores(conn, 1, true)).resolves.toEqual({
+      team1Score: 0,
+      team2Score: 1,
+    });
   });
 });
 

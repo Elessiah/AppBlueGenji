@@ -60,7 +60,14 @@ export function enduranceCellTitle(teamName: string, cell: EnduranceRoundCell): 
  * `grid-template-columns` en ligne : le nombre de manches n'est connu qu'au
  * rendu, mais une déclaration en ligne l'emporterait sur toute règle de la
  * feuille de style, media query comprise.
+ *
+ * Aucune manche → la seule colonne d'équipe. `repeat()` exige une multiplicité
+ * **positive** : un `repeat(0, 40px)` ferait rejeter la déclaration entière par
+ * le moteur CSS, et la grille retomberait sur une colonne implicite sans que
+ * rien ne le signale.
  */
 export function enduranceHistoryColumns(roundCount: number): string {
-  return `minmax(140px, 1fr) repeat(${Math.max(0, roundCount)}, 40px)`;
+  const rounds = Math.max(0, Math.floor(roundCount));
+  if (rounds === 0) return "minmax(140px, 1fr)";
+  return `minmax(140px, 1fr) repeat(${rounds}, 40px)`;
 }
