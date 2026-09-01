@@ -8,6 +8,7 @@ import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/t
 import { entrantHref, participantWording } from "@/lib/shared/participants";
 import { useToast } from "@/components/ui/toast";
 import { CyberButton } from "@/components/cyber";
+import { EntityLink } from "@/components/entity-link";
 import { useTournamentLive } from "./_hooks/useTournamentLive";
 import { mapError } from "./_lib/error-map";
 import { checkMatchScores, matchScoreViolationMessage } from "@/lib/shared/match-format";
@@ -618,12 +619,9 @@ export default function TournamentDetailPage() {
             </div>
             {detail.registrations.map((reg) => (
               <div key={reg.teamId} className="table-row">
-                <Link
-                  href={entrantHref(reg.teamId, detail.soloUserIds)}
-                  style={{ color: "inherit", textDecoration: "none" }}
-                >
+                <EntityLink href={entrantHref(reg.teamId, detail.soloUserIds)}>
                   {reg.teamName}
-                </Link>
+                </EntityLink>
                 <span>{reg.seed ?? "-"}</span>
                 <span>{formatLocalDateTime(reg.registeredAt)}</span>
                 <span>{reg.finalRank ?? "-"}</span>

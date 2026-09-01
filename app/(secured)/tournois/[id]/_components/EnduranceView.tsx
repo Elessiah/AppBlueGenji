@@ -1,7 +1,7 @@
 "use client";
 
 import type { BracketMatch, EnduranceMeta } from "@/lib/shared/types";
-import { useParticipantWording } from "../_lib/entrant-link";
+import { EntrantLink, useParticipantWording } from "../_lib/entrant-link";
 
 interface EnduranceViewProps {
   endurance: EnduranceMeta;
@@ -57,7 +57,7 @@ export function EnduranceView({ endurance, matches, renderMatch }: EnduranceView
             style={{ opacity: standing.status === "ACTIVE" ? 1 : 0.55 }}
           >
             <span className="num">{standing.rank}</span>
-            <span>{standing.teamName}</span>
+            <EntrantLink teamId={standing.teamId}>{standing.teamName}</EntrantLink>
             <span className="num">{standing.points}</span>
             <span>
               {standing.wins} / {standing.losses}

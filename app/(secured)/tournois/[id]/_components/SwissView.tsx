@@ -1,13 +1,12 @@
 "use client";
 
 import { FormEvent } from "react";
-import Link from "next/link";
 import type { BracketMatch, SwissMeta, SwissStandingRow } from "@/lib/shared/types";
 import { formatPoints } from "@/lib/shared/swiss";
 import { MatchScoreDraft } from "./BracketTree";
 import { MatchRow } from "./MatchRow";
 import { ScrollArea } from "@/components/cyber";
-import { useEntrantLink } from "../_lib/entrant-link";
+import { EntrantLink } from "../_lib/entrant-link";
 
 const COL_W = 226;
 const BORDER = "var(--border, #444)";
@@ -66,7 +65,6 @@ export function SwissView({
   onForfeit,
   emptyLabel = "Aucun match pour l'instant.",
 }: SwissViewProps) {
-  const entrantLink = useEntrantLink();
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
   const activeCount = swiss.standings.filter((s) => s.status === "ACTIVE").length;
   const roundsLeft = Math.max(swiss.totalRounds - swiss.currentRound, 0);
@@ -90,7 +88,10 @@ export function SwissView({
             fontSize: 15,
           }}
         >
-          🏆 Championne — <strong>{champion.teamName}</strong>
+          🏆 Championne —{" "}
+          <EntrantLink teamId={champion.teamId}>
+            <strong>{champion.teamName}</strong>
+          </EntrantLink>
         </div>
       )}
 
@@ -198,20 +199,18 @@ export function SwissView({
                   >
                     {team.rank}
                   </span>
-                  <Link
-                    href={entrantLink(team.teamId)}
+                  <EntrantLink
+                    teamId={team.teamId}
                     style={{
                       flex: 1,
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
-                      textDecoration: "none",
-                      color: "inherit",
                       fontWeight: isMine ? 700 : 500,
                     }}
                   >
                     {team.teamName}
-                  </Link>
+                  </EntrantLink>
                   <span
                     className="num"
                     style={{ width: 34, textAlign: "right", fontWeight: 700 }}
@@ -361,11 +360,10 @@ export function SwissView({
                                 background: "var(--surface-1)",
                               }}
                             >
-                              <Link
-                                href={entrantLink(byeTeamId)}
+                              <EntrantLink
+                                teamId={byeTeamId}
                                 style={{
                                   color: "var(--text-0)",
-                                  textDecoration: "none",
                                   fontWeight: 600,
                                   display: "block",
                                   overflow: "hidden",
@@ -374,7 +372,7 @@ export function SwissView({
                                 }}
                               >
                                 {match.team1Name}
-                              </Link>
+                              </EntrantLink>
                               <span style={{ fontSize: 11, color: ACCENT }}>
                                 ✓ Victoire d&apos;office
                               </span>

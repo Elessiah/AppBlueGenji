@@ -7,6 +7,7 @@ import { LogoutButton } from "@/components/logout-button";
 import { Coche } from "@/components/Coche";
 import type { FullProfileResponse } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
+import { TeamLink } from "@/components/entity-link";
 
 // Le pseudo n'est plus masquable : identité de base du joueur sur la plateforme.
 const VISIBILITY_LABELS: Record<string, string> = {
@@ -387,7 +388,7 @@ export default function ProfilePage() {
           <div className="table-like">
             {invitations.map((inv) => (
               <div className="table-row" key={inv.id} style={{ alignItems: "center" }}>
-                <span>{inv.teamName}</span>
+                <TeamLink teamId={inv.teamId}>{inv.teamName}</TeamLink>
                 <span style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                   <button
                     type="button"

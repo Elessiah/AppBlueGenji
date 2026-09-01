@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { TeamLink } from "@/components/entity-link";
 import { useParams, useRouter } from "next/navigation";
 import { LogoWithGlow } from "@/components/logo-with-glow";
 import { formatLocalDate } from "@/lib/shared/dates";
@@ -259,7 +260,7 @@ export default function PlayerDetailPage() {
           </div>
           {data.teamsTimeline.map((entry) => (
             <div className="table-row" key={`${entry.teamId}-${entry.joinedAt}`}>
-              <Link href={`/equipes/${entry.teamId}`}>{entry.teamName}</Link>
+              <TeamLink teamId={entry.teamId}>{entry.teamName}</TeamLink>
               <span>{entry.roles.join(", ")}</span>
               <span>{formatLocalDate(entry.joinedAt)}</span>
               <span>{entry.leftAt ? formatLocalDate(entry.leftAt) : "Actif"}</span>

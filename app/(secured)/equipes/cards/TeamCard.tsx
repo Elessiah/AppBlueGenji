@@ -4,14 +4,29 @@ import Image from "next/image";
 import Link from "next/link";
 import type { TeamListItem } from "@/lib/shared/types";
 import { getPaletteColor } from "@/lib/shared/palette";
+import { PlayerLink } from "@/components/entity-link";
 import s from "./TeamCard.module.css";
 
+/**
+ * Carte d'annuaire d'une équipe.
+ *
+ * La carte entière mène à la fiche de l'équipe, et chaque visage du roster mène
+ * au profil du joueur : un `<a>` dans un `<a>` étant invalide, le lien de la
+ * carte est une plaque transparente posée par-dessus (`.cardOverlay`) que les
+ * liens du roster traversent en repassant au-dessus d'elle (`.rosterItem`).
+ */
 export function TeamCard({ team }: { team: TeamListItem }) {
   const color = getPaletteColor(team.id);
   const isTop3 = team.rank <= 3;
 
   return (
-    <Link href={`/equipes/${team.id}`} className={s.card} style={{ "--c": color } as React.CSSProperties}>
+    <article className={s.card} style={{ "--c": color } as React.CSSProperties}>
+      <Link
+        href={`/equipes/${team.id}`}
+        className={s.cardOverlay}
+        aria-label={`Voir la fiche de ${team.name}`}
+      />
+
       <div className={`${s.rank} ${isTop3 ? s.rankTop : ""}`}>
         #{String(team.rank).padStart(2, "0")}
       </div>
@@ -61,25 +76,34 @@ export function TeamCard({ team }: { team: TeamListItem }) {
 
       <div className={s.roster}>
         <span className={s.rosterLbl}>Roster</span>
-        {team.rosterPreview.slice(0, 5).map((m) =>
-          m.avatarUrl ? (
-            <Image
-              key={m.userId}
-              src={m.avatarUrl}
-              alt={m.pseudo}
-              width={26}
-              height={26}
-              unoptimized
-              referrerPolicy="no-referrer"
-              className={s.avatar}
-            />
-          ) : (
-            <div key={m.userId} className={s.avatar}>
-              {m.pseudo[0].toUpperCase()}
-            </div>
-          )
+        {team.rosterPreview.slice(0, 5).map((m) => (
+          <PlayerLink
+            key={m.userId}
+            userId={m.userId}
+            className={s.rosterItem}
+            title={`Voir la fiche de ${m.pseudo}`}
+            aria-label={`Voir la fiche de ${m.pseudo}`}
+          >
+            {m.avatarUrl ? (
+              <Image
+                src={m.avatarUrl}
+                alt=""
+                width={26}
+                height={26}
+                unoptimized
+                referrerPolicy="no-referrer"
+                className={s.avatar}
+              />
+            ) : (
+              <span className={s.avatar}>{m.pseudo[0].toUpperCase()}</span>
+            )}
+          </PlayerLink>
+        ))}
+        {team.rosterPreview.length > 5 && (
+          <span className={`${s.rosterItem} ${s.avatar} ${s.avatarMore}`}>
+            +{team.rosterPreview.length - 5}
+          </span>
         )}
-        {team.rosterPreview.length > 5 && <div className={`${s.avatar} ${s.avatarMore}`}>+{team.rosterPreview.length - 5}</div>}
       </div>
 
       {team.games.length > 0 && (
@@ -96,8 +120,8 @@ export function TeamCard({ team }: { team: TeamListItem }) {
         <span className={s.footMeta}>
           FONDÉE · {new Date(team.createdAt).toLocaleDateString("fr-FR", { month: "short", year: "numeric" }).toUpperCase()}
         </span>
-        <span className={s.cta}>Voir l'équipe →</span>
+        <span className={s.cta}>Voir l&apos;équipe →</span>
       </div>
-    </Link>
+    </article>
   );
 }

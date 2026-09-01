@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { TeamDetailResponse } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
+import { PlayerLink } from "@/components/entity-link";
 
 interface MembershipActionsProps {
   team: TeamDetailResponse;
@@ -167,7 +168,7 @@ export function MembershipActions({ team, onChanged }: MembershipActionsProps) {
           <div className="table-like">
             {requests.map((r) => (
               <div className="table-row" key={r.id} style={{ alignItems: "center" }}>
-                <span>{r.pseudo}</span>
+                <PlayerLink userId={r.userId}>{r.pseudo}</PlayerLink>
                 <span style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                   <button
                     type="button"

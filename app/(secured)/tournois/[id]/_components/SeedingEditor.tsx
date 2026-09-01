@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ui/toast";
-import { useParticipantWording } from "../_lib/entrant-link";
+import { EntrantLink, useParticipantWording } from "../_lib/entrant-link";
 import { moveInOrder, type SeedingEntry, type SeedingLockReason } from "@/lib/shared/seeding";
 
 interface SeedingEditorProps {
@@ -108,7 +108,7 @@ export function SeedingEditor({ tournamentId, onReordered }: SeedingEditorProps)
         {entries.map((entry, index) => (
           <div key={entry.teamId} className="table-row" style={{ alignItems: "center" }}>
             <span className="num" style={{ minWidth: 32 }}>#{entry.seed}</span>
-            <span>{entry.teamName}</span>
+            <EntrantLink teamId={entry.teamId}>{entry.teamName}</EntrantLink>
             <span style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
               <button
                 type="button"

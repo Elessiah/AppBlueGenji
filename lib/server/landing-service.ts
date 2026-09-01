@@ -26,6 +26,7 @@ import {
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
 import { rankingPoints, rankingPointsSql } from "@/lib/shared/ranking";
+import { entrantHref } from "@/lib/shared/participants";
 
 const DEFAULT_STATS: LandingStats = {
   players: 0,
@@ -78,8 +79,12 @@ type LiveMatchRow = RowDataPacket & {
   round_number: number;
   match_number: number;
   status: MatchStatus;
+  team1_id: number | null;
+  team2_id: number | null;
   team1_name: string | null;
   team2_name: string | null;
+  team1_solo_user_id: number | null;
+  team2_solo_user_id: number | null;
   team1_score: number | null;
   team2_score: number | null;
   start_at: Date | string | null;
@@ -87,6 +92,18 @@ type LiveMatchRow = RowDataPacket & {
   live_url: string | null;
   live_started_at: Date | string | null;
 };
+
+/**
+ * Fiche de l'engagé d'une des deux places d'un match.
+ *
+ * Passe par `entrantHref` plutôt que de recomposer le chemin : c'est la même
+ * règle que sur la page de tournoi, une entrée solo menant au profil du joueur
+ * et non à une fiche d'équipe qui n'existe pas.
+ */
+function entrantHrefFor(teamId: number | null, soloUserId: number | null): string | null {
+  if (teamId === null) return null;
+  return entrantHref(Number(teamId), soloUserId === null ? null : { [Number(teamId)]: Number(soloUserId) });
+}
 
 /** Vue « diffusion » d'une ligne de match, pour le module pur partagé. */
 function toLiveInput(row: LiveMatchRow) {
@@ -147,8 +164,12 @@ async function loadLandingLive(): Promise<LandingLive | null> {
         m.round_number,
         m.match_number,
         m.status,
+        m.team1_id,
+        m.team2_id,
         t1.name AS team1_name,
         t2.name AS team2_name,
+        t1.solo_user_id AS team1_solo_user_id,
+        t2.solo_user_id AS team2_solo_user_id,
         m.team1_score,
         m.team2_score,
         m.start_at,
@@ -176,6 +197,8 @@ async function loadLandingLive(): Promise<LandingLive | null> {
           id: Number(currentRow.id),
           team1Name: currentRow.team1_name,
           team2Name: currentRow.team2_name,
+          team1Href: entrantHrefFor(currentRow.team1_id, currentRow.team1_solo_user_id),
+          team2Href: entrantHrefFor(currentRow.team2_id, currentRow.team2_solo_user_id),
           team1Score: currentRow.team1_score === null ? null : Number(currentRow.team1_score),
           team2Score: currentRow.team2_score === null ? null : Number(currentRow.team2_score),
           bracket: currentRow.bracket,

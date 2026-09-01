@@ -989,3 +989,24 @@
     font-size: 38px;
   }
 }
+
+/* Lien principal d'une carte d'annuaire : une plaque transparente posee
+   par-dessus, plutot qu'un `<a>` qui enveloppe tout le contenu — sans quoi les
+   liens imbriques (nom d'equipe, roster) seraient des `<a>` dans un `<a>`.
+   `.aboveOverlay` repasse au-dessus de la plaque pour rester cliquable. */
+.cardOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+.cardOverlay:focus-visible {
+  outline: 1px solid var(--blue-300, #5ac8ff);
+  outline-offset: -3px;
+}
+
+.aboveOverlay {
+  position: relative;
+  z-index: 1;
+}

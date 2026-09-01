@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { TeamSigil } from "@/components/cyber";
+import { TeamLink } from "@/components/entity-link";
 import type { LandingLeaderboardRow } from "@/lib/shared/landing";
 import styles from "./Leaderboard.module.css";
 
@@ -83,7 +84,9 @@ export function Leaderboard({ initialRows }: LeaderboardProps) {
               <span className={styles.rank}>{String(row.rank).padStart(2, "0")}</span>
               <span className={styles.team}>
                 <TeamSigil letter={row.teamName.charAt(0)} size={24} />
-                <span>{row.teamName}</span>
+                <TeamLink teamId={row.teamId} title={`Voir la fiche de ${row.teamName}`}>
+                  {row.teamName}
+                </TeamLink>
               </span>
               <span className={styles.wl}>
                 <span className={styles.wins}>{row.wins}</span>

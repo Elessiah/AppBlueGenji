@@ -2,6 +2,7 @@
 
 import { Eye } from "lucide-react";
 import { CyberCard, Pill, TeamSigil } from "@/components/cyber";
+import { EntityLink } from "@/components/entity-link";
 import type { LandingLive } from "@/lib/shared/landing";
 import { inferPhaseLabel, toBestOfLabel } from "@/lib/shared/landing";
 import { PLATFORM_LABELS, streamPlatform } from "@/lib/shared/live-streams";
@@ -17,6 +18,22 @@ type LiveCardProps = {
   live: LandingLive | null;
   nextUpcomingISO?: string | null;
 };
+
+/**
+ * Nom d'un engagé du match à l'antenne, cliquable quand la place est occupée.
+ *
+ * Le chemin est résolu côté serveur (`LandingLiveMatch.team1Href`) : la carte
+ * n'a pas à savoir si le tournoi oppose des équipes ou des joueurs. Une place
+ * vide — bye, adversaire encore à désigner — ne mène nulle part.
+ */
+function EntrantName({ href, name }: { href: string | null; name: string }) {
+  if (!href) return <>{name}</>;
+  return (
+    <EntityLink href={href} title={`Voir la fiche de ${name}`}>
+      {name}
+    </EntityLink>
+  );
+}
 
 function sigilFor(name: string | null): string {
   if (!name) return "?";
@@ -87,7 +104,9 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
           <div className={styles.team}>
             <TeamSigil letter={sigilFor(currentMatch.team1Name)} size={40} />
             <div className={styles.teamText}>
-              <div className={styles.teamName}>{currentMatch.team1Name ?? "Équipe 1"}</div>
+              <div className={styles.teamName}>
+                <EntrantName href={currentMatch.team1Href} name={currentMatch.team1Name ?? "Équipe 1"} />
+              </div>
               <div className="mono">FR · SEED 1</div>
             </div>
             <div className="num" style={{ fontSize: 30 }}>{currentMatch.team1Score ?? "—"}</div>
@@ -100,7 +119,9 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
           <div className={styles.team}>
             <TeamSigil letter={sigilFor(currentMatch.team2Name)} color="var(--amber)" size={40} />
             <div className={styles.teamText}>
-              <div className={styles.teamName}>{currentMatch.team2Name ?? "Équipe 2"}</div>
+              <div className={styles.teamName}>
+                <EntrantName href={currentMatch.team2Href} name={currentMatch.team2Name ?? "Équipe 2"} />
+              </div>
               <div className="mono">FR · SEED 4</div>
             </div>
             <div className="num" style={{ fontSize: 30 }}>{currentMatch.team2Score ?? "—"}</div>

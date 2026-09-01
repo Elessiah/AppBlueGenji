@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { PublicUserProfile } from "@/lib/shared/types";
 import { getPaletteColor } from "@/lib/shared/palette";
+import { TeamLink } from "@/components/entity-link";
 import s from "../../_shared/annuaire.module.css";
 
 const ROLE_CLASS: Record<string, string> = {
@@ -26,11 +27,25 @@ const ROLE_LABEL: Record<string, string> = {
   MANAGER: "MANAGER",
 };
 
+/**
+ * Carte d'annuaire d'un joueur.
+ *
+ * La carte entière mène au profil, et le nom de son équipe mène à la fiche de
+ * l'équipe : deux destinations, donc deux liens. Un `<a>` dans un `<a>` étant
+ * invalide, le lien de la carte n'enveloppe pas le contenu — c'est une plaque
+ * transparente posée par-dessus (`.cardOverlay`), que le lien d'équipe traverse
+ * en repassant au-dessus d'elle (`.aboveOverlay`).
+ */
 export function PlayerCard({ player }: { player: PublicUserProfile }) {
   const teamColor = player.team ? getPaletteColor(player.team.colorIndex) : "var(--ink-mute)";
 
   return (
-    <Link href={`/joueurs/${player.id}`} className={s.plCard} style={{ "--c": teamColor } as React.CSSProperties}>
+    <article className={s.plCard} style={{ "--c": teamColor } as React.CSSProperties}>
+      <Link
+        href={`/joueurs/${player.id}`}
+        className={s.cardOverlay}
+        aria-label={`Voir la fiche de ${player.pseudo}`}
+      />
       <div className={s.plHead}>
         <div className={s.plAvatarWrap}>
           <div className={s.plAvatar}>
@@ -52,7 +67,14 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
         <div className={s.plTeam}>
           {player.team ? (
             <>
-              ROSTER · <em>{player.team.name.toUpperCase()}</em>
+              ROSTER ·{" "}
+              <TeamLink
+                teamId={player.team.id}
+                className={s.aboveOverlay}
+                title={`Voir la fiche de ${player.team.name}`}
+              >
+                <em>{player.team.name.toUpperCase()}</em>
+              </TeamLink>
             </>
           ) : (
             <span style={{ color: "var(--ink-dim)" }}>FREE AGENT</span>
@@ -92,6 +114,6 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
           ))}
         </div>
       )}
-    </Link>
+    </article>
   );
 }

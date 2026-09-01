@@ -195,7 +195,6 @@
   border-radius: 50%;
   border: 1px solid var(--line-soft);
   background: var(--cyber-bg-2);
-  margin-left: -6px;
   display: grid;
   place-items: center;
   font-family: var(--font-mono);
@@ -203,11 +202,32 @@
   color: var(--ink-mute);
 }
 
-.avatar:first-of-type {
-  margin-left: 0;
+/* Le chevauchement se joue sur l'element du roster (lien du joueur, ou pastille
+   « +N »), pas sur la pastille elle-meme : celle-ci est tantot un `img`, tantot
+   un `span`, et `:first-of-type` ne saurait pas les departager. */
+.rosterItem {
+  position: relative;
+  z-index: 1;
+  display: block;
+  line-height: 0;
+  border-radius: 50%;
 }
 
-.avatar.avatarMore {
+.rosterItem + .rosterItem {
+  margin-left: -6px;
+}
+
+.rosterItem:hover .avatar,
+.rosterItem:focus-visible .avatar {
+  border-color: var(--blue-300, #5ac8ff);
+}
+
+.rosterItem:focus-visible {
+  outline: 1px solid var(--blue-300, #5ac8ff);
+  outline-offset: 2px;
+}
+
+.rosterItem.avatarMore {
   background: rgba(255, 157, 46, 0.08);
   border-color: rgba(255, 157, 46, 0.25);
   color: #ff9d2e;
@@ -301,4 +321,20 @@
 
 .formCell.d {
   background: var(--ink-dim);
+}
+
+/* Lien principal de la carte : une plaque transparente plutot qu'un `<a>` qui
+   enveloppe tout, pour que le roster puisse porter ses propres liens (un `<a>`
+   dans un `<a>` est invalide). Les elements cliquables imbriques remontent
+   au-dessus avec `z-index: 1`. */
+.cardOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+.cardOverlay:focus-visible {
+  outline: 1px solid var(--blue-300, #5ac8ff);
+  outline-offset: -3px;
 }
