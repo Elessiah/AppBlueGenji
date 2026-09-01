@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import type { PoolConnection } from "mysql2/promise";
 import { finalizeUnderfilledTournament } from "@/lib/server/tournaments/finalization";
+import { MIN_ENTRANTS_FOR_MATCHES } from "@/lib/shared/constants";
 
 type Call = { sql: string; params: unknown[] };
 
@@ -58,13 +59,17 @@ describe("finalizeUnderfilledTournament", () => {
   });
 
   it("ne lit que ce qu'il faut pour trancher", async () => {
-    // `LIMIT 2` : seule la distinction « moins de deux » compte — un tournoi à
-    // 128 engagées ne doit pas les charger toutes à chaque synchronisation.
+    // Le `LIMIT` s'arrête au seuil : seule la distinction « moins de deux »
+    // compte — un tournoi à 128 engagées ne doit pas les charger toutes à
+    // chaque synchronisation. L'attente est écrite depuis la constante et non
+    // depuis un « 2 » recopié : c'est le même seuil qu'annonce la confirmation
+    // du lancement anticipé, et le test doit suivre s'il bouge plutôt que de
+    // rougir sur une valeur devenue juste.
     const { connection, calls } = fakeConnection([9, 10]);
 
     await finalizeUnderfilledTournament(connection, 42);
 
-    expect(calls[0].sql).toContain("LIMIT 2");
+    expect(calls[0].sql).toContain(`LIMIT ${MIN_ENTRANTS_FOR_MATCHES}`);
     expect(calls[0].params).toEqual([42]);
   });
 });
