@@ -5,6 +5,8 @@ import {
   buildPlayoffPairings,
   compareEndurance,
   DEFAULT_ENDURANCE_CONFIG,
+  enduranceMatchMaps,
+  forfeitMapCount,
   planEnduranceRound,
   PLAYOFF_QUARTER_PAIRINGS,
   qualificationComplete,
@@ -40,6 +42,21 @@ function win(round: number, winnerTeamId: number, loserTeamId: number): Enduranc
   return { round, completed: true, winnerTeamId, loserTeamId };
 }
 
+/** Victoire avec son score de maps, seule forme qui fasse bouger le barème. */
+function winMaps(
+  round: number,
+  winnerTeamId: number,
+  loserTeamId: number,
+  winnerMaps: number,
+  loserMaps: number,
+): EnduranceMatchOutcome {
+  return { round, completed: true, winnerTeamId, loserTeamId, winnerMaps, loserMaps };
+}
+
+const FT3 = { type: "FT", value: 3 } as const;
+const BO5 = { type: "BO", value: 5 } as const;
+const BO3 = { type: "BO", value: 3 } as const;
+
 describe("resolveEnduranceConfig", () => {
   it("retombe sur 9 / ±1 / 8 quand rien n'est renseigné", () => {
     expect(resolveEnduranceConfig()).toEqual(DEFAULT_ENDURANCE_CONFIG);
@@ -64,6 +81,55 @@ describe("resolveEnduranceConfig", () => {
     [{ startPoints: Number.NaN }],
   ])("ignore une valeur absurde (%p)", (partial) => {
     expect(resolveEnduranceConfig(partial)).toEqual(DEFAULT_ENDURANCE_CONFIG);
+  });
+});
+
+describe("forfeitMapCount", () => {
+  it("vaut l'objectif du format : FT3 et BO5 valent trois maps", () => {
+    expect(forfeitMapCount(FT3)).toBe(3);
+    expect(forfeitMapCount(BO5)).toBe(3);
+    expect(forfeitMapCount(BO3)).toBe(2);
+    expect(forfeitMapCount({ type: "FT", value: 1 })).toBe(1);
+  });
+
+  it("retombe sur une map en saisie libre", () => {
+    expect(forfeitMapCount(null)).toBe(1);
+    expect(forfeitMapCount(undefined)).toBe(1);
+  });
+});
+
+describe("enduranceMatchMaps", () => {
+  const played = (winnerMaps: unknown, loserMaps: unknown): EnduranceMatchOutcome => ({
+    round: 1,
+    completed: true,
+    winnerTeamId: 1,
+    loserTeamId: 2,
+    winnerMaps: winnerMaps as number | null,
+    loserMaps: loserMaps as number | null,
+  });
+
+  it("rend les scores saisis tels quels", () => {
+    expect(enduranceMatchMaps(played(3, 1), FT3)).toEqual({ winnerMaps: 3, loserMaps: 1 });
+    expect(enduranceMatchMaps(played(3, 0), FT3)).toEqual({ winnerMaps: 3, loserMaps: 0 });
+  });
+
+  it("ignore les scores d'un forfait au profit du format", () => {
+    const forfeit = { ...played(9, 9), isForfeit: true };
+    expect(enduranceMatchMaps(forfeit, FT3)).toEqual({ winnerMaps: 3, loserMaps: 0 });
+  });
+
+  it.each([
+    ["scores absents", played(null, null)],
+    ["score du vainqueur absent", played(null, 2)],
+    ["match tranché sans score (0-0)", played(0, 0)],
+    ["score négatif", played(3, -1)],
+    ["score non numérique", played("x", "y")],
+  ])("retombe sur un 1-0 : %s", (_label, outcome) => {
+    expect(enduranceMatchMaps(outcome, FT3)).toEqual({ winnerMaps: 1, loserMaps: 0 });
+  });
+
+  it("tronque un score décimal plutôt que de le propager", () => {
+    expect(enduranceMatchMaps(played(3.7, 1.2), FT3)).toEqual({ winnerMaps: 3, loserMaps: 1 });
   });
 });
 
@@ -209,19 +275,141 @@ describe("replayEndurance — endurance et éliminations", () => {
     expect(after.find((s) => s.teamId === 2)).toMatchObject({ status: "ACTIVE", points: 2 });
   });
 
-  it("n'accorde aucun point pour un match gagné sur forfait", () => {
-    // Le match est clos côté base (la manche peut se terminer) mais aucune map
-    // n'a été jouée : le barème se compte par map gagnée.
+  it("compte un forfait comme le score plein du format (FT3 → 3-0)", () => {
+    // Aucune map n'a été jouée, mais le règlement compte le forfait comme un
+    // 3-0 : trois points au vainqueur, trois de moins au perdant.
+    const standings = replayEndurance({
+      teams: teams(2),
+      matches: [{ round: 1, completed: true, winnerTeamId: 1, loserTeamId: 2, isForfeit: true }],
+      forfeits: [],
+      config: CONFIG,
+      lastRound: 1,
+      matchFormat: FT3,
+    });
+    const byId = new Map(standings.map((s) => [s.teamId, s]));
+    expect(byId.get(1)).toMatchObject({ points: 12, wins: 1, losses: 0 });
+    expect(byId.get(2)).toMatchObject({ points: 6, wins: 0, losses: 1, status: "ACTIVE" });
+  });
+
+  it("chiffre le forfait sur le format du tournoi, pas sur les colonnes de score", () => {
+    // L'arbitrage laisse les scores à NULL sur un forfait : seul le format dit
+    // combien de maps il vaut.
+    const forfeit = {
+      round: 1,
+      completed: true,
+      winnerTeamId: 1,
+      loserTeamId: 2,
+      winnerMaps: null,
+      loserMaps: null,
+      isForfeit: true,
+    };
+    const pointsOf = (matchFormat: Parameters<typeof forfeitMapCount>[0]) =>
+      replayEndurance({
+        teams: teams(2),
+        matches: [forfeit],
+        forfeits: [],
+        config: CONFIG,
+        lastRound: 1,
+        matchFormat,
+      }).find((s) => s.teamId === 2)!.points;
+
+    expect(pointsOf(BO5)).toBe(6);
+    expect(pointsOf(BO3)).toBe(7);
+    // Score libre : le forfait retombe sur une seule map.
+    expect(pointsOf(null)).toBe(8);
+  });
+
+  it("élimine sur-le-champ une équipe que le forfait vide de son capital", () => {
+    const standings = replayEndurance({
+      teams: teams(2),
+      matches: [{ round: 1, completed: true, winnerTeamId: 1, loserTeamId: 2, isForfeit: true }],
+      forfeits: [],
+      config: resolveEnduranceConfig({ startPoints: 3 }),
+      lastRound: 1,
+      matchFormat: FT3,
+    });
+    expect(standings.find((s) => s.teamId === 2)).toMatchObject({
+      points: 0,
+      status: "ELIMINATED",
+      eliminatedRound: 1,
+    });
+  });
+
+  it("écrit FORFAIT plutôt qu'ÉLIMINÉE quand l'abandon a lui-même vidé le capital", () => {
+    // Abandon en manche 1 : le match est clos 3-0, ce qui met l'équipe à 0 dans
+    // la même manche. C'est la décision humaine qui doit rester au classement.
     const standings = replayEndurance({
       teams: teams(2),
       matches: [{ round: 1, completed: true, winnerTeamId: 1, loserTeamId: 2, isForfeit: true }],
       forfeits: [{ teamId: 2, round: 1 }],
-      config: CONFIG,
+      config: resolveEnduranceConfig({ startPoints: 3 }),
       lastRound: 1,
+      matchFormat: FT3,
     });
     const byId = new Map(standings.map((s) => [s.teamId, s]));
-    expect(byId.get(1)).toMatchObject({ points: 9, wins: 0, losses: 0 });
-    expect(byId.get(2)).toMatchObject({ status: "FORFEIT", points: 0 });
+    expect(byId.get(2)).toMatchObject({ status: "FORFEIT", points: 0, eliminatedRound: 1 });
+    // L'adversaire encaisse bien ses trois points au passage.
+    expect(byId.get(1)!.points).toBe(6);
+  });
+
+  it("compte le barème map par map, pas match par match", () => {
+    const standings = replayEndurance({
+      teams: teams(4),
+      matches: [winMaps(1, 1, 2, 3, 0), winMaps(1, 3, 4, 3, 2)],
+      forfeits: [],
+      config: CONFIG,
+      lastRound: 1,
+      matchFormat: FT3,
+    });
+    const byId = new Map(standings.map((s) => [s.teamId, s]));
+    // 3-0 : trois maps gagnées d'un côté, trois perdues de l'autre.
+    expect(byId.get(1)).toMatchObject({ points: 12, wins: 1, losses: 0 });
+    expect(byId.get(2)).toMatchObject({ points: 6, wins: 0, losses: 1 });
+    // 3-2 : le vainqueur ne gagne qu'un point net, le perdant n'en perd qu'un.
+    expect(byId.get(3)!.points).toBe(10);
+    expect(byId.get(4)!.points).toBe(8);
+  });
+
+  it("retombe sur un 1-0 quand le match n'a pas de score (saisie libre)", () => {
+    const standings = replayEndurance({
+      teams: teams(2),
+      matches: [win(1, 1, 2)],
+      forfeits: [],
+      config: CONFIG,
+      lastRound: 1,
+      matchFormat: null,
+    });
+    const byId = new Map(standings.map((s) => [s.teamId, s]));
+    expect(byId.get(1)!.points).toBe(10);
+    expect(byId.get(2)!.points).toBe(8);
+  });
+
+  it("sort aussi le vainqueur d'un match qui l'a vidé de son capital", () => {
+    // Barème où une map perdue coûte plus qu'une map gagnée ne rapporte : un
+    // 3-2 peut faire tomber son vainqueur à 0.
+    const standings = replayEndurance({
+      teams: teams(2),
+      matches: [winMaps(1, 1, 2, 3, 2)],
+      forfeits: [],
+      config: resolveEnduranceConfig({ startPoints: 3, winDelta: 1, lossDelta: 3 }),
+      lastRound: 1,
+      matchFormat: FT3,
+    });
+    const byId = new Map(standings.map((s) => [s.teamId, s]));
+    expect(byId.get(1)).toMatchObject({ points: 0, status: "ELIMINATED", wins: 1 });
+    expect(byId.get(2)).toMatchObject({ points: 0, status: "ELIMINATED", losses: 1 });
+  });
+
+  it("reste idempotent avec des scores de maps", () => {
+    const input = {
+      teams: teams(4),
+      matches: [winMaps(1, 1, 2, 3, 1), winMaps(1, 3, 4, 3, 0)],
+      forfeits: [],
+      config: CONFIG,
+      lastRound: 1,
+      matchFormat: FT3,
+    };
+    expect(replayEndurance(input)).toEqual(replayEndurance(input));
   });
 
   it("prend en compte un abandon comme une sortie", () => {
@@ -315,6 +503,31 @@ describe("phase éliminatoire", () => {
       standing({ teamId: index + 1, points: 20 - index, previousRank: index + 1 }),
     );
     expect(selectQualifiedTeamIds(standings, CONFIG)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+  });
+
+  // Le barème par map sort plusieurs équipes dans la même manche : le plateau
+  // peut passer sous huit d'un coup. `assignRanks` rangeant les sorties après
+  // les actives, une tranche non filtrée complèterait l'arbre avec elles.
+  it("ne complète jamais le plateau avec des équipes sorties", () => {
+    const standings = [
+      ...Array.from({ length: 5 }, (_, index) =>
+        standing({ teamId: index + 1, points: 9 - index, previousRank: index + 1 }),
+      ),
+      standing({ teamId: 6, points: 0, status: "ELIMINATED", eliminatedRound: 4 }),
+      standing({ teamId: 7, points: 0, status: "FORFEIT", eliminatedRound: 4 }),
+      standing({ teamId: 8, points: 0, status: "ELIMINATED", eliminatedRound: 3 }),
+      standing({ teamId: 9, points: 0, status: "ELIMINATED", eliminatedRound: 3 }),
+    ];
+
+    expect(selectQualifiedTeamIds(standings, CONFIG)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("ne qualifie personne quand la dernière manche a tout vidé", () => {
+    const standings = Array.from({ length: 8 }, (_, index) =>
+      standing({ teamId: index + 1, points: 0, status: "ELIMINATED", eliminatedRound: 5 }),
+    );
+
+    expect(selectQualifiedTeamIds(standings, CONFIG)).toEqual([]);
   });
 });
 

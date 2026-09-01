@@ -92,10 +92,15 @@ export type EnduranceStandingRow = {
 export type EnduranceMeta = {
   /** Capital de départ (défaut 9). */
   startPoints: number;
-  /** Points gagnés par victoire de map. */
+  /** Points gagnés par map gagnée. */
   winDelta: number;
-  /** Points perdus par défaite de map. */
+  /** Points perdus par map perdue. */
   lossDelta: number;
+  /**
+   * Maps portées au vainqueur d'un forfait : le score plein du format du
+   * tournoi (FT3 → 3), 1 en saisie libre.
+   */
+  forfeitMaps: number;
   /** Effectif de la phase éliminatoire (8 par le règlement). */
   playoffSize: number;
   /** Dernière manche générée en phase qualificative. */

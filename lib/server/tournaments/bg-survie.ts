@@ -15,6 +15,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import {
   assignRanks,
   buildPlayoffPairings,
+  forfeitMapCount,
   planEnduranceRound,
   qualificationComplete,
   rankActiveTeams,
@@ -25,11 +26,14 @@ import {
   type EnduranceMatchOutcome,
   type EnduranceStanding,
 } from "@/lib/shared/bg-survie";
+import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { createMatch, finishTournament } from "./repository";
 
 type TournamentEnduranceRow = RowDataPacket & {
   format: string;
   state: string;
+  match_format_type: string | null;
+  match_format_value: number | null;
   endurance_start_points: number | null;
   endurance_win_delta: number | null;
   endurance_loss_delta: number | null;
@@ -44,7 +48,8 @@ async function loadTournament(
   tournamentId: number,
 ): Promise<TournamentEnduranceRow | null> {
   const [rows] = await conn.execute<TournamentEnduranceRow[]>(
-    `SELECT format, state, endurance_start_points, endurance_win_delta, endurance_loss_delta,
+    `SELECT format, state, match_format_type, match_format_value,
+            endurance_start_points, endurance_win_delta, endurance_loss_delta,
             endurance_playoff_size, endurance_current_round, endurance_playoffs_started,
             has_third_place_match
      FROM bg_tournaments WHERE id = ? LIMIT 1`,
@@ -60,6 +65,14 @@ function configOf(tournament: TournamentEnduranceRow): EnduranceConfig {
     lossDelta: tournament.endurance_loss_delta ?? undefined,
     playoffSize: tournament.endurance_playoff_size ?? undefined,
   });
+}
+
+/**
+ * Format de match du tournoi (`null` = score libre). C'est lui qui chiffre un
+ * forfait : en FT3, l'équipe partie encaisse un 3-0.
+ */
+function matchFormatOf(tournament: TournamentEnduranceRow): MatchFormat | null {
+  return parseMatchFormat(tournament.match_format_type, tournament.match_format_value);
 }
 
 /** Manches de la phase qualificative : bracket UPPER, phase_id 0. */
@@ -254,27 +267,43 @@ async function loadQualificationOutcomes(
     (RowDataPacket & {
       round_number: number;
       status: string;
+      team1_id: number | null;
+      team2_id: number | null;
+      team1_score: number | null;
+      team2_score: number | null;
       winner_team_id: number | null;
       loser_team_id: number | null;
       forfeit_team_id: number | null;
     })[]
   >(
-    `SELECT round_number, status, winner_team_id, loser_team_id, forfeit_team_id
+    `SELECT round_number, status, team1_id, team2_id, team1_score, team2_score,
+            winner_team_id, loser_team_id, forfeit_team_id
      FROM bg_matches
      WHERE tournament_id = ? AND phase_id = 0 AND round_number < ?
      ORDER BY round_number ASC, match_number ASC`,
     [tournamentId, PLAYOFF_ROUND_OFFSET],
   );
 
-  return rows.map((row) => ({
-    round: Number(row.round_number),
-    completed: row.status === "COMPLETED",
-    winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
-    loserTeamId: row.loser_team_id === null ? null : Number(row.loser_team_id),
-    // `!= null` couvre aussi une colonne absente : un forfait doit être une
-    // information positive, jamais un défaut.
-    isForfeit: row.forfeit_team_id != null,
-  }));
+  return rows.map((row) => {
+    const winnerTeamId = row.winner_team_id === null ? null : Number(row.winner_team_id);
+    // Les scores sont rangés par side (team1/team2) : les réordonner par
+    // vainqueur/perdant est ce qui permet au barème de se compter map par map.
+    const winnerIsTeam1 = winnerTeamId !== null && winnerTeamId === Number(row.team1_id);
+    const winnerScore = winnerIsTeam1 ? row.team1_score : row.team2_score;
+    const loserScore = winnerIsTeam1 ? row.team2_score : row.team1_score;
+
+    return {
+      round: Number(row.round_number),
+      completed: row.status === "COMPLETED",
+      winnerTeamId,
+      loserTeamId: row.loser_team_id === null ? null : Number(row.loser_team_id),
+      winnerMaps: winnerScore === null ? null : Number(winnerScore),
+      loserMaps: loserScore === null ? null : Number(loserScore),
+      // `!= null` couvre aussi une colonne absente : un forfait doit être une
+      // information positive, jamais un défaut.
+      isForfeit: row.forfeit_team_id != null,
+    };
+  });
 }
 
 /** Abandons déclarés, dérivés du statut FORFEIT déjà stocké. */
@@ -322,6 +351,7 @@ export async function reconcileEndurance(
     forfeits: await loadForfeits(conn, tournamentId),
     config,
     lastRound: Number(tournament.endurance_current_round),
+    matchFormat: matchFormatOf(tournament),
   });
 
   await persistStandings(conn, tournamentId, assignRanks(replayed));
@@ -640,7 +670,16 @@ async function finalizeEndurance(
  * Déclare l'abandon d'une équipe : elle quitte le tournoi et son capital tombe
  * à 0. Le classement est ensuite rejoué (l'abandon est une entrée du rejeu).
  *
- * @throws NOT_BG_SURVIE | TEAM_NOT_IN_TOURNAMENT | TEAM_ALREADY_OUT
+ * **Réservé à la phase qualificative.** Cette fonction ne sait clore qu'un match
+ * de la manche courante (`endurance_current_round`) ; l'arbre final vit à partir
+ * de `PLAYOFF_ROUND_OFFSET`, hors de sa portée. Laisser passer un abandon en
+ * play-offs marquerait l'équipe `FORFEIT` au classement tout en la laissant
+ * engagée dans un match ouvert que rien ne viendrait clore — et le rejeu
+ * daterait l'abandon d'une manche qualificative qu'elle avait en réalité jouée.
+ * Un forfait de play-off se tranche sur le match lui-même (`adminResolveMatch`
+ * avec `forfeitTeamId`), qui fait avancer l'arbre.
+ *
+ * @throws NOT_BG_SURVIE | ENDURANCE_PLAYOFFS_STARTED | TEAM_NOT_IN_TOURNAMENT | TEAM_ALREADY_OUT
  */
 export async function forfeitEnduranceTeam(
   tournamentId: number,
@@ -649,6 +688,9 @@ export async function forfeitEnduranceTeam(
 ): Promise<void> {
   const tournament = await loadTournament(conn, tournamentId);
   if (!tournament || tournament.format !== "BG_SURVIE") throw new Error("NOT_BG_SURVIE");
+  if (Number(tournament.endurance_playoffs_started) === 1) {
+    throw new Error("ENDURANCE_PLAYOFFS_STARTED");
+  }
 
   const [rows] = await conn.execute<(RowDataPacket & { status: string })[]>(
     `SELECT status FROM bg_endurance_standings WHERE tournament_id = ? AND team_id = ? LIMIT 1`,
@@ -668,8 +710,9 @@ export async function forfeitEnduranceTeam(
 
   // Clôt le match en cours de l'équipe partie, sans quoi la manche ne pourrait
   // plus se terminer et la suivante ne serait jamais appariée. Le match est
-  // marqué forfait : le rejeu l'ignore pour les points — un forfait n'est pas
-  // une map jouée — mais la manche, elle, est complète.
+  // marqué forfait et porte le score plein du format du tournoi (FT3 → 3-0) :
+  // le rejeu en tire le barème d'endurance, et l'affichage montre la même chose
+  // qu'une rencontre réellement gagnée sur ce score.
   const [pending] = await conn.execute<
     (RowDataPacket & { id: number; team1_id: number | null; team2_id: number | null })[]
   >(
@@ -684,6 +727,7 @@ export async function forfeitEnduranceTeam(
     const match = pending[0];
     const opponentId = Number(match.team1_id) === teamId ? match.team2_id : match.team1_id;
     const team1IsForfeit = Number(match.team1_id) === teamId;
+    const wonMaps = forfeitMapCount(matchFormatOf(tournament));
 
     await conn.execute(
       `UPDATE bg_matches SET
@@ -698,8 +742,8 @@ export async function forfeitEnduranceTeam(
         opponentId,
         teamId,
         teamId,
-        team1IsForfeit ? 0 : 1,
-        team1IsForfeit ? 1 : 0,
+        team1IsForfeit ? 0 : wonMaps,
+        team1IsForfeit ? wonMaps : 0,
         match.id,
       ],
     );
@@ -742,6 +786,7 @@ export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: numb
     startPoints: config.startPoints,
     winDelta: config.winDelta,
     lossDelta: config.lossDelta,
+    forfeitMaps: forfeitMapCount(matchFormatOf(tournament)),
     playoffSize: config.playoffSize,
     currentRound: Number(tournament.endurance_current_round),
     playoffsStarted: Number(tournament.endurance_playoffs_started) === 1,

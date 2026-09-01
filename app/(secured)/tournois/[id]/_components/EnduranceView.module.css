@@ -1,0 +1,38 @@
+/*
+ * Gabarit du classement d'endurance.
+ *
+ * `.table-row` (globals.css) ne déclare que quatre colonnes ; le classement en
+ * compte cinq — six quand l'abandon est proposé. Le gabarit vit ici et **non
+ * dans un `style` en ligne** : un style en ligne l'emporte sur toute feuille de
+ * style, media query comprise, et le repli mobile de `.table-row`
+ * (`@media (max-width: 920px) { grid-template-columns: 1fr }`) ne s'appliquait
+ * alors plus — le tableau gardait ses six colonnes sur un écran de 375 px, où
+ * les 44 px du rang et les 108 px de l'action ne laissent rien au nom.
+ *
+ * Les sélecteurs sont doublés de `:global(.table-row)` pour passer devant la
+ * règle globale quel que soit l'ordre d'injection des feuilles — même
+ * précaution que le `:global(.btn)` du dialogue de score.
+ */
+:global(.table-row).row {
+  grid-template-columns: 44px minmax(0, 1.6fr) 1fr 1fr 1fr;
+  align-items: center;
+}
+
+/*
+ * Chaque ligne est sa propre grille : la colonne d'action est donc de largeur
+ * **fixe**, et n'existe que si au moins une ligne porte un bouton — une colonne
+ * `auto` se serait dimensionnée ligne par ligne, décalant les colonnes des
+ * lignes avec bouton par rapport à toutes les autres.
+ */
+:global(.table-row).rowWithActions {
+  grid-template-columns: 44px minmax(0, 1.6fr) 1fr 1fr 1fr 108px;
+}
+
+/* Repli mobile, comme toutes les autres tables de l'application. */
+@media (max-width: 920px) {
+  :global(.table-row).row,
+  :global(.table-row).rowWithActions {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+}
