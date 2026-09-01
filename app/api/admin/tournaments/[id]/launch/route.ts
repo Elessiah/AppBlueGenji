@@ -4,7 +4,7 @@ import { launchTournamentNow } from "@/lib/server/tournaments/launch";
 import { can } from "@/lib/shared/permissions";
 
 /**
- * Abrège le calendrier du tournoi et le lance immédiatement.
+ * Abrège les étapes d'avant-course du tournoi et le lance immédiatement.
  *
  * Réservé au staff `tournaments` (administrateur ou arbitre), et non aux seuls
  * administrateurs : lancer un tournoi est un acte d'organisation, celui-là même
@@ -36,15 +36,10 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
 
     if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);
 
-    // Fenêtre de lancement fermée : le tournoi a démarré, s'est terminé, n'est
-    // pas publié, ou n'a pas encore ouvert ses inscriptions. 409 — l'état du
-    // tournoi contredit la demande, la demande elle-même est bien formée.
-    if (
-      message === "TOURNAMENT_ALREADY_STARTED" ||
-      message === "TOURNAMENT_ALREADY_FINISHED" ||
-      message === "TOURNAMENT_NOT_PUBLISHED" ||
-      message === "REGISTRATION_NOT_OPEN"
-    ) {
+    // Il n'y a plus rien à abréger : le tournoi a déjà démarré, ou s'est
+    // terminé. 409 — l'état du tournoi contredit la demande, la demande
+    // elle-même est bien formée.
+    if (message === "TOURNAMENT_ALREADY_STARTED" || message === "TOURNAMENT_ALREADY_FINISHED") {
       return fail(message, 409);
     }
 

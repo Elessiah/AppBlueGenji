@@ -80,10 +80,6 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // formulations qui disent ce qui a changé, et non ce qu'il fallait faire.
   TOURNAMENT_ALREADY_STARTED: "Ce tournoi a déjà démarré : il n'y a plus rien à abréger.",
   TOURNAMENT_ALREADY_FINISHED: "Ce tournoi est terminé.",
-  TOURNAMENT_NOT_PUBLISHED:
-    "Ce tournoi n'est pas encore publié : rends-le visible avant de le lancer.",
-  REGISTRATION_NOT_OPEN:
-    "Les inscriptions ne sont pas encore ouvertes : personne ne peut être engagé.",
   TOURNAMENT_LAUNCH_FAILED: "Erreur lors du lancement du tournoi.",
   // Signalement d'un problème (`lib/shared/discord-notifications.ts`).
   INVALID_ISSUE_MESSAGE:

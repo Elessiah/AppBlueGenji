@@ -1,8 +1,10 @@
 /**
- * Abréger un tournoi pour le lancer sur-le-champ — logique pure, partagée.
+ * Abréger les étapes pré-`RUNNING` d'un tournoi pour le lancer sur-le-champ —
+ * logique pure, partagée.
  *
- * Un tournoi démarre à l'heure annoncée, et rien ne permettait de le faire
- * démarrer plus tôt. L'édition (`tournament-edit.ts`) n'y suffit pas, et pas par
+ * Un tournoi traverse quatre étapes avant de commencer — masqué, annoncé,
+ * inscriptions, clôture (`tournament-progress.ts`) — et rien ne permettait de
+ * les écourter. L'édition (`tournament-edit.ts`) n'y suffit pas, et pas par
  * omission : reculer `registrationCloseAt` dans le passé y est explicitement
  * refusé, et avancer `startAt` seul ne change rien — `computeTournamentState`
  * teste les inscriptions **avant** le coup d'envoi, si bien qu'un tournoi dont
@@ -13,11 +15,18 @@
  *
  * Le principe tient en une phrase : **on ne fait jamais avancer une date, on ne
  * fait que la reculer**. Chaque jalon est ramené au plus tôt entre sa valeur et
- * l'instant du lancement, dans l'ordre inverse du calendrier. L'ordre
- * chronologique exigé par `validateDateOrder` s'en trouve préservé par
- * construction, sans qu'aucun cas particulier n'ait à être écrit, et un tournoi
- * déjà dans l'entre-deux (inscriptions closes, début à venir) ne voit pas ses
- * inscriptions rouvertes rétroactivement.
+ * l'instant du lancement, dans l'ordre inverse du calendrier. Trois propriétés
+ * en découlent seules, sans un cas particulier écrit à la main :
+ *
+ * - l'ordre chronologique exigé par `validateDateOrder` est préservé, donc
+ *   aussi l'invariant « un tournoi caché est toujours `UPCOMING` » dont
+ *   `docs/features/TOURNAMENT_VISIBILITY_ACCESS.md` dispense les routes
+ *   d'écriture — abréger depuis l'étape « masqué » **publie** le tournoi au
+ *   passage, il ne devient jamais « en cours et invisible » ;
+ * - un tournoi déjà dans l'entre-deux (inscriptions closes, début à venir) ne
+ *   voit pas ses inscriptions rouvertes rétroactivement ;
+ * - n'importe laquelle des quatre étapes peut donc être le point de départ, et
+ *   toutes celles qui restaient sont franchies d'un coup.
  *
  * L'état n'est jamais écrit à la main : ce sont les dates qui font foi partout
  * ailleurs (`tournament-state.ts`), et un état posé de force serait défait à la
@@ -26,9 +35,15 @@
  * `syncTournamentState` lance le tournoi comme il l'aurait fait à l'heure dite.
  *
  * Module pur : l'interface s'en sert pour n'afficher le bouton que lorsqu'il
- * mène quelque part, le serveur pour rejouer la règle sous verrou.
+ * mène quelque part et pour nommer ce qui va être sauté, le serveur pour
+ * rejouer la règle sous verrou.
  */
 import { computeTournamentState, type TournamentStateInput } from "./tournament-state";
+import {
+  computeTournamentProgress,
+  TOURNAMENT_STAGE_ORDER,
+  type TournamentStageKey,
+} from "./tournament-progress";
 import type { TournamentState } from "./types";
 
 /**
@@ -60,9 +75,7 @@ export type LaunchableTournament = {
 export type LaunchBlockReason =
   | "INVALID_DATES"
   | "TOURNAMENT_ALREADY_STARTED"
-  | "TOURNAMENT_ALREADY_FINISHED"
-  | "TOURNAMENT_NOT_PUBLISHED"
-  | "REGISTRATION_NOT_OPEN";
+  | "TOURNAMENT_ALREADY_FINISHED";
 
 /** Les quatre jalons, une fois abrégés. Dates ISO, comme partout côté client. */
 export type ShortenedSchedule = {
@@ -79,22 +92,21 @@ function timeOf(value: string): number {
 /**
  * Premier obstacle au lancement anticipé, ou `null` s'il n'y en a pas.
  *
- * Trois refus, et chacun protège un invariant du reste du projet :
+ * Le seul vrai refus est **« il n'y a plus rien à abréger »** : les quatre
+ * étapes d'avant-course sont toutes des points de départ valides, y compris
+ * « masqué » — abréger publie alors le tournoi au passage (voir l'en-tête du
+ * module). L'état consulté est le *calculé*, pas le stocké : un tournoi dont
+ * l'heure de début est passée n'a rien à abréger même si la colonne `state`
+ * n'a pas encore été recalée, et il partira à la prochaine synchronisation.
  *
- * 1. **Déjà lancé, déjà fini.** L'état consulté est le *calculé*, pas le
- *    stocké : un tournoi dont l'heure de début est passée n'a rien à abréger,
- *    même si la colonne `state` n'a pas encore été recalée. Il partira à la
- *    prochaine synchronisation, laquelle n'attend personne.
- * 2. **Pas encore publié.** Un tournoi caché est toujours `UPCOMING`, et
- *    `docs/features/TOURNAMENT_VISIBILITY_ACCESS.md` s'appuie sur cette
- *    garantie pour dispenser les routes d'écriture de tout contrôle de
- *    visibilité. Le lancer d'ici produirait exactement le tournoi que cette
- *    garantie déclare impossible : en cours, et invisible.
- * 3. **Inscriptions pas encore ouvertes.** Personne n'a pu s'engager — ni un
- *    joueur, ni le staff par une équipe invitée, les deux exigeant l'état
- *    `REGISTRATION`. « Lancer » n'y produirait qu'une clôture immédiate faute
- *    d'adversaires (`docs/features/UNDERFILLED_TOURNAMENTS.md`), sous un nom
- *    qui promet le contraire.
+ * Ce qui n'est **pas** un refus, alors qu'on pourrait s'y attendre : partir
+ * d'une étape où personne n'a pu s'engager (l'inscription exige l'état
+ * `REGISTRATION`, pour un joueur comme pour une équipe invitée). Le lancement
+ * clôt alors le tournoi sur-le-champ, faute d'adversaires
+ * (`docs/features/UNDERFILLED_TOURNAMENTS.md`) : c'est une conséquence à
+ * annoncer avant le clic — `willCloseWithoutMatches` — et non un droit à
+ * retirer. Refuser reviendrait à décider à la place de l'organisateur qu'un
+ * tournoi mort-né doit rester ouvert jusqu'à son heure.
  */
 export function launchBlockReason(
   tournament: LaunchableTournament,
@@ -116,11 +128,30 @@ export function launchBlockReason(
   if (state === "FINISHED") return "TOURNAMENT_ALREADY_FINISHED";
   if (state === "RUNNING") return "TOURNAMENT_ALREADY_STARTED";
 
-  const [startVisibilityAt, registrationOpenAt] = milestones;
-  if (startVisibilityAt > now) return "TOURNAMENT_NOT_PUBLISHED";
-  if (registrationOpenAt > now) return "REGISTRATION_NOT_OPEN";
-
   return null;
+}
+
+/**
+ * Étapes d'avant-course que le lancement va franchir d'un coup, de celle où le
+ * tournoi se trouve jusqu'à la dernière avant « En cours ».
+ *
+ * L'étape courante en fait partie : elle est **abrégée**, pas sautée — mais du
+ * point de vue de qui confirme, la distinction ne change rien, ce sont les
+ * étapes qui n'auront pas lieu comme prévu. Vide dès qu'il n'y a plus rien à
+ * abréger, c'est-à-dire exactement quand `launchBlockReason` refuse.
+ *
+ * L'étape est celle de `computeTournamentProgress`, et non l'état du moteur :
+ * c'est la seule des deux à distinguer « masqué » d'« annoncé » et l'avant de
+ * l'après-inscriptions — les quatre nuances dont il est justement question ici.
+ */
+export function abridgedStagesForLaunch(
+  tournament: LaunchableTournament,
+  now: number = Date.now(),
+): TournamentStageKey[] {
+  const runningIndex = TOURNAMENT_STAGE_ORDER.indexOf("RUNNING");
+  const { currentIndex } = computeTournamentProgress(tournament, { now });
+  if (currentIndex >= runningIndex) return [];
+  return TOURNAMENT_STAGE_ORDER.slice(currentIndex, runningIndex);
 }
 
 /** Raccourci de lecture : le tournoi peut-il être abrégé maintenant ? */

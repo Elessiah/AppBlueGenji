@@ -158,7 +158,7 @@ export function TournamentHeader({
             <CyberButton
               variant="ghost"
               onClick={onLaunchNow}
-              title="Clore les inscriptions et démarrer le tournoi immédiatement."
+              title="Abréger les étapes d'avant-course et démarrer le tournoi immédiatement."
               style={{ fontSize: 13, padding: "8px 18px" }}
             >
               ▶ Lancer maintenant

@@ -1,5 +1,6 @@
 /**
- * Lancement anticipé d'un tournoi : abréger son calendrier, puis le démarrer.
+ * Lancement anticipé d'un tournoi : abréger ses étapes d'avant-course
+ * (masqué, annoncé, inscriptions, clôture), puis le démarrer.
  *
  * Le module n'invente aucun coup d'envoi. Il ramène les quatre jalons au plus
  * tôt (`lib/shared/tournament-launch.ts`, pur et partagé avec l'interface) puis
@@ -92,7 +93,7 @@ async function countEntrants(
 }
 
 /**
- * Abrège le calendrier du tournoi et le démarre immédiatement.
+ * Abrège les étapes d'avant-course du tournoi et le démarre immédiatement.
  *
  * @throws `TOURNAMENT_NOT_FOUND` — identifiant inconnu.
  * @throws le code de `LaunchBlockReason` — la fenêtre de lancement est fermée.
