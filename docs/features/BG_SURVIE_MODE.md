@@ -64,6 +64,13 @@ tableau du règlement n'est défini que pour huit. Sur un effectif qui n'est pas
 une puissance de deux, un tour peut compter un nombre impair de vainqueurs :
 le dernier **passe le tour** (bye) au lieu d'être écarté.
 
+Le plateau **peut** passer sous huit en une seule manche, et c'est le barème par
+map qui le rend ordinaire : un 3-0 retirant trois points d'un coup, plusieurs
+équipes proches de zéro sortent ensemble. `selectQualifiedTeamIds` ne retient
+donc que les équipes **encore en lice** — `assignRanks` rangeant les sorties
+juste après les actives, une tranche des `playoffSize` premières compléterait
+sinon l'arbre avec des éliminées à 0 point.
+
 ## Classement de départ
 
 Il n'est **pas** calculé depuis le classement du site : il vient de l'ordre de

@@ -504,6 +504,31 @@ describe("phase éliminatoire", () => {
     );
     expect(selectQualifiedTeamIds(standings, CONFIG)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
+
+  // Le barème par map sort plusieurs équipes dans la même manche : le plateau
+  // peut passer sous huit d'un coup. `assignRanks` rangeant les sorties après
+  // les actives, une tranche non filtrée complèterait l'arbre avec elles.
+  it("ne complète jamais le plateau avec des équipes sorties", () => {
+    const standings = [
+      ...Array.from({ length: 5 }, (_, index) =>
+        standing({ teamId: index + 1, points: 9 - index, previousRank: index + 1 }),
+      ),
+      standing({ teamId: 6, points: 0, status: "ELIMINATED", eliminatedRound: 4 }),
+      standing({ teamId: 7, points: 0, status: "FORFEIT", eliminatedRound: 4 }),
+      standing({ teamId: 8, points: 0, status: "ELIMINATED", eliminatedRound: 3 }),
+      standing({ teamId: 9, points: 0, status: "ELIMINATED", eliminatedRound: 3 }),
+    ];
+
+    expect(selectQualifiedTeamIds(standings, CONFIG)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("ne qualifie personne quand la dernière manche a tout vidé", () => {
+    const standings = Array.from({ length: 8 }, (_, index) =>
+      standing({ teamId: index + 1, points: 0, status: "ELIMINATED", eliminatedRound: 5 }),
+    );
+
+    expect(selectQualifiedTeamIds(standings, CONFIG)).toEqual([]);
+  });
 });
 
 describe("qualificationComplete", () => {

@@ -374,12 +374,26 @@ export function buildPlayoffPairings(qualified: number[]): EndurancePairing[] {
   }));
 }
 
-/** Les `playoffSize` premières équipes du classement, dans l'ordre. */
+/**
+ * Les `playoffSize` premières équipes **encore en lice**, dans l'ordre.
+ *
+ * Le filtre sur le statut n'est pas décoratif : `assignRanks` range les actives
+ * d'abord puis les sorties, si bien qu'une simple tranche compléterait le
+ * plateau avec des éliminées dès qu'il en reste moins que `playoffSize`. Le cas
+ * n'était qu'un accident tant qu'une manche ne retirait qu'un point au perdant ;
+ * le barème par map en fait une situation ordinaire — un 3-0 en retire trois, et
+ * plusieurs équipes proches de zéro sortent alors dans la même manche.
+ *
+ * L'appelant sait déjà quoi faire d'un effectif qui n'est pas exactement celui
+ * attendu : `startEndurancePlayoffs` retombe sur un appariement haut contre bas,
+ * et clôt le tournoi à une qualifiée ou moins.
+ */
 export function selectQualifiedTeamIds(
   standings: EnduranceStanding[],
   config: EnduranceConfig,
 ): number[] {
   return assignRanks(standings)
+    .filter((standing) => standing.status === "ACTIVE")
     .slice(0, config.playoffSize)
     .map((standing) => standing.teamId);
 }
