@@ -86,9 +86,13 @@ Deux conséquences à retenir avant d'afficher un format quelque part :
    gardent donc par `matchFormat && …` plutôt que de rendre le libellé de repli
    « Score libre », qui n'a de sens que dans une phrase d'aide de formulaire.
 
-Un test de source (`tests/app/live-card-match-format.test.tsx`) tient les deux
-bouts : le rendu réel de la carte pour chaque valeur des deux notations, et
-l'absence de toute notation écrite en dur hors du module partagé.
+`tests/app/live-card-match-format.test.tsx` tient les deux bouts : le rendu réel
+de la carte pour chaque valeur des deux notations, et un balayage de tout
+`app/`, `components/`, `lib/` qui refuse deux choses hors du module partagé —
+une notation qui **est** à elle seule une chaîne (`"BO3"`, le libellé qu'on
+recopie), et l'assemblage d'un type et d'un nombre. Les notations citées **en
+prose** restent permises : « un Best of se joue en nombre impair de manches
+(BO1, BO3, BO5…) » explique la règle, il ne l'affiche pas.
 
 ## Où c'est visible
 

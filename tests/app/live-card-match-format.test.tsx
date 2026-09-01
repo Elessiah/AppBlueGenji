@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { LiveCard } from "@/components/cyber/landing/LiveCard";
@@ -139,36 +139,112 @@ describe("LiveCard — notation du format de match", () => {
 
 /**
  * Garde-fou de source, dans l'esprit d'`entity-links.test.ts` : la notation
- * `BO`/`FT` ne s'écrit qu'à un seul endroit. Un `switch` recopié ailleurs est
- * exactement ce qui a produit le bug — il vivait dans `lib/shared/landing.ts`.
+ * `BO`/`FT` ne s'assemble qu'à un seul endroit.
+ *
+ * Le balayage porte sur **tout** `app/`, `components/` et `lib/`, et non sur
+ * les trois fichiers du correctif : la régression qu'il existe pour attraper
+ * est précisément l'apparition d'un second assembleur *ailleurs* — c'est ce
+ * qu'était `toBestOfLabel`, dans un module de la vitrine que personne ne
+ * relisait en pensant « format de match ».
+ *
+ * Deux signaux, et pas un de plus, pour rester tolérant aux refactorings :
+ *
+ * 1. une chaîne qui **est** une notation (`"BO3"`, `'FT5'`) — le libellé qu'on
+ *    recopie au lieu de l'appeler. Une notation **citée en prose** reste
+ *    permise : « (BO1, BO3, BO5…) » explique la règle dans une aide de saisie,
+ *    il ne l'affiche pas ;
+ * 2. l'assemblage d'un type et d'un nombre, par interpolation ou par
+ *    concaténation.
  */
 const ROOT = join(__dirname, "..", "..");
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 
 /** Retire commentaires de bloc et de ligne : ils citent « BO5 » en prose. */
 function stripComments(code: string): string {
-  return code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+  return code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ 	]*\/\/.*$/gm, "");
 }
 
+/** Le seul module autorisé à écrire la notation. */
+const SOURCE_OF_TRUTH = join("lib", "shared", "match-format.ts");
+
+/** Tous les fichiers TypeScript du produit (hors tests, hors dépendances). */
+function sourceFiles(): string[] {
+  const out: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+      const rel = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "node_modules" || entry.name === ".next") continue;
+        walk(rel);
+      } else if (/\.tsx?$/.test(entry.name)) {
+        out.push(rel);
+      }
+    }
+  };
+  for (const root of ["app", "components", "lib"]) walk(root);
+  return out.filter((file) => file !== SOURCE_OF_TRUTH);
+}
+
+/** Une chaîne dont le contenu **entier** est une notation : « "BO3" », « 'FT5' ». */
+const NOTATION_LITERAL = /"(?:BO|FT)\d+"|'(?:BO|FT)\d+'|`(?:BO|FT)\d+`/g;
+
+/**
+ * Un type et un nombre accolés : `` `${f.type}${f.value}` `` ou `type + value`.
+ * C'est la forme qu'aurait une seconde implémentation de `matchFormatLabel`.
+ */
+const NOTATION_ASSEMBLY =
+  /\$\{[^}]*\btype\b[^}]*\}\s*\$\{[^}]*\bvalue\b[^}]*\}|\btype\s*\+\s*[\w.]*\bvalue\b/g;
+
 describe("source unique de la notation", () => {
+  it("le balayage voit ce qu'il interdit", () => {
+    // Garde-fou du garde-fou : sans ça, un motif cassé rendrait la suite verte.
+    expect('const label = "BO3";'.match(NOTATION_LITERAL)).toHaveLength(1);
+    expect("return `${format.type}${format.value}`;".match(NOTATION_ASSEMBLY)).toHaveLength(1);
+    expect("return type + format.value;".match(NOTATION_ASSEMBLY)).toHaveLength(1);
+    // …et laisse passer la prose, qui cite la notation sans l'afficher.
+    expect('"Un Best of se joue en nombre impair (BO1, BO3, BO5…)."'.match(NOTATION_LITERAL))
+      .toBeNull();
+  });
+
+  it("balaye un ensemble de fichiers non vide", () => {
+    const files = sourceFiles();
+    expect(files.length).toBeGreaterThan(100);
+    expect(files).toContain(join("components", "cyber", "landing", "LiveCard.tsx"));
+    expect(files).not.toContain(SOURCE_OF_TRUTH);
+  });
+
+  it("aucun fichier ne recopie ni n'assemble la notation hors du module partagé", () => {
+    const offenders: string[] = [];
+    for (const file of sourceFiles()) {
+      const code = stripComments(read(file));
+      for (const pattern of [NOTATION_LITERAL, NOTATION_ASSEMBLY]) {
+        pattern.lastIndex = 0;
+        for (const hit of code.match(pattern) ?? []) offenders.push(`${file} → ${hit}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it("`lib/shared/landing.ts` n'écrit plus de notation de format", () => {
-    const code = stripComments(read("lib/shared/landing.ts"));
+    const code = stripComments(read(join("lib", "shared", "landing.ts")));
     expect(code).not.toMatch(/BO\d|FT\d/);
     expect(code).not.toContain("toBestOfLabel");
   });
 
   it("la carte de l'accueil lit le réglage du tournoi et passe par le module partagé", () => {
-    const code = stripComments(read("components/cyber/landing/LiveCard.tsx"));
+    const code = stripComments(read(join("components", "cyber", "landing", "LiveCard.tsx")));
     expect(code).toContain("matchFormatLabel");
     expect(code).toContain("tournament.matchFormat");
-    // Aucune notation en dur : la valeur vient de la donnée, pas d'un littéral.
-    expect(code).not.toMatch(/["'`](?:BO|FT)\d+["'`]/);
   });
 
-  it("`matchFormatLabel` reste la seule à assembler type et nombre", () => {
-    const code = read("lib/shared/match-format.ts");
-    // Une seule interpolation `${type}${value}` dans tout le module.
-    const assembly = code.match(/\$\{format\.type\}\$\{format\.value\}/g) ?? [];
-    expect(assembly).toHaveLength(1);
+  it("`matchFormatLabel` reste la seule sortie possible pour une notation", () => {
+    // Contrat, pas texte source : le libellé est bien type + nombre, quelle que
+    // soit la façon dont le module l'écrit.
+    for (const type of ["BO", "FT"] as const) {
+      const { min, max } = MATCH_FORMAT_BOUNDS[type];
+      for (let value = min; value <= max; value += 1) {
+        expect(matchFormatLabel({ type, value })).toBe(`${type}${value}`);
+      }
+    }
   });
 });

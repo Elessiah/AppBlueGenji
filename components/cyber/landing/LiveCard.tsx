@@ -123,15 +123,14 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
               <>
                 {" · "}
                 {/*
-                  « FT3 » ne se lit pas tout seul : l'infobulle donne la course
-                  en toutes lettres, la même phrase que la fiche du tournoi.
-                  `<abbr>` la porte aussi pour les lecteurs d'écran, là où un
-                  `title` sur un `<span>` n'est qu'une décoration.
+                  « FT3 » ne se lit pas tout seul. `<abbr title>` porte
+                  l'**expansion** de l'abréviation, et rien d'autre : y répéter
+                  « FT3 » ferait annoncer deux fois la même chose aux lecteurs
+                  d'écran, qui lisent déjà le contenu visible. L'infobulle reste
+                  un confort de souris — la fiche du tournoi donne la même
+                  phrase en clair, sous la pastille de format.
                 */}
-                <abbr
-                  className={styles.matchFormat}
-                  title={`${matchFormatLabel(matchFormat)} — ${matchFormatDescription(matchFormat)}`}
-                >
+                <abbr className={styles.matchFormat} title={matchFormatDescription(matchFormat)}>
                   {matchFormatLabel(matchFormat)}
                 </abbr>
               </>
