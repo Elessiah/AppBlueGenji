@@ -1,8 +1,14 @@
 "use client";
 
 import { ScrollArea } from "@/components/cyber";
-import type { EnduranceRoundCell } from "@/lib/shared/bg-survie";
 import type { BracketMatch, EnduranceMeta } from "@/lib/shared/types";
+import {
+  enduranceCellLabel,
+  enduranceCellTitle,
+  enduranceCellTone,
+  enduranceHistoryColumns,
+  type EnduranceCellTone,
+} from "../_lib/endurance-history";
 import { useParticipantWording } from "../_lib/entrant-link";
 import styles from "./EnduranceView.module.css";
 
@@ -40,25 +46,13 @@ const STATUS_LABELS: Record<EnduranceMeta["standings"][number]["status"], string
   FORFEIT: "Forfait",
 };
 
-/** Contenu d'une case du tableau manche par manche. */
-function historyCellLabel(cell: EnduranceRoundCell): string {
-  if (cell.kind === "FORFEIT") return "FF";
-  if (cell.kind === "OUT") return "—";
-  return String(cell.points ?? 0);
-}
-
-function historyCellClass(cell: EnduranceRoundCell): string {
-  if (cell.kind === "FORFEIT") return `${styles.historyCell} ${styles.historyForfeit}`;
-  if (cell.kind === "OUT") return `${styles.historyCell} ${styles.historyOut}`;
-  return `${styles.historyCell} num${cell.points === 0 ? ` ${styles.historyZero}` : ""}`;
-}
-
-/** Phrase lue par un lecteur d'écran (et infobulle) pour une case. */
-function historyCellTitle(teamName: string, cell: EnduranceRoundCell): string {
-  if (cell.kind === "FORFEIT") return `${teamName} · manche ${cell.round} : forfait`;
-  if (cell.kind === "OUT") return `${teamName} · manche ${cell.round} : déjà éliminée`;
-  return `${teamName} · manche ${cell.round} : ${cell.points} point${(cell.points ?? 0) > 1 ? "s" : ""}`;
-}
+/** Habillage d'une case, selon le poids décidé par `_lib/endurance-history`. */
+const CELL_CLASS: Record<EnduranceCellTone, string> = {
+  POINTS: "num",
+  ZERO: `num ${styles.historyZero}`,
+  FORFEIT: styles.historyForfeit,
+  OUT: styles.historyOut,
+};
 
 /**
  * Tableau du capital d'endurance **manche par manche**, comme la feuille de
@@ -81,7 +75,7 @@ function EnduranceHistory({
 }) {
   if (endurance.rounds.length === 0) return null;
 
-  const columns = `minmax(140px, 1fr) repeat(${endurance.rounds.length}, 40px)`;
+  const columns = enduranceHistoryColumns(endurance.rounds.length);
 
   return (
     <div style={{ marginBottom: 24 }}>
@@ -119,10 +113,10 @@ function EnduranceHistory({
               {standing.rounds.map((cell) => (
                 <span
                   key={cell.round}
-                  className={historyCellClass(cell)}
-                  title={historyCellTitle(standing.teamName, cell)}
+                  className={`${styles.historyCell} ${CELL_CLASS[enduranceCellTone(cell)]}`}
+                  title={enduranceCellTitle(standing.teamName, cell)}
                 >
-                  {historyCellLabel(cell)}
+                  {enduranceCellLabel(cell)}
                 </span>
               ))}
             </div>
