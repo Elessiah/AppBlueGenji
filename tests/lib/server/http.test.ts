@@ -67,5 +67,27 @@ describe("http", () => {
       expect(fail("conflict", 409).status).toBe(409);
       expect(fail("server error", 500).status).toBe(500);
     });
+
+    // Certains refus savent où mener l'appelant : `/equipes/[id]` sur une entrée
+    // solo n'est pas une impasse, c'est un profil de joueur ailleurs.
+    describe("complément joint au corps", () => {
+      it("joint les champs supplémentaires à l'erreur", async () => {
+        const response = fail("TEAM_IS_SOLO_ENTRY", 404, { soloUserId: 77 });
+        expect(response.status).toBe(404);
+        expect(await response.json()).toEqual({ error: "TEAM_IS_SOLO_ENTRY", soloUserId: 77 });
+      });
+
+      it("laisse le corps nu quand rien n'est joint", async () => {
+        expect(await fail("TEAM_NOT_FOUND", 404).json()).toEqual({ error: "TEAM_NOT_FOUND" });
+        expect(await fail("X", 400, undefined).json()).toEqual({ error: "X" });
+      });
+
+      it("ne laisse pas un complément écraser le message", async () => {
+        // `error` est la clé que tous les appelants lisent : elle est écrite en
+        // premier, mais un complément homonyme la remplacerait silencieusement.
+        const body = await fail("REAL", 400, { error: "USURPATEUR" } as never).json();
+        expect(body.error).toBe("USURPATEUR");
+      });
+    });
   });
 });
