@@ -208,13 +208,6 @@ export function qualificationComplete(activeCount: number, config: EnduranceConf
 }
 
 /**
- * Rejoue la phase qualificative et renvoie l'état complet des équipes.
- *
- * L'élimination est **immédiate** : dès que le capital atteint 0 au cours d'une
- * manche, l'équipe est sortie et ne participe plus aux suivantes — même si un
- * match ultérieur la mentionnait (cas d'un score corrigé a posteriori).
- */
-/**
  * Applique le solde de maps d'une équipe sur son capital, et la sort du tournoi
  * si celui-ci tombe à 0.
  *
@@ -237,6 +230,13 @@ function applyMapDelta(
   }
 }
 
+/**
+ * Rejoue la phase qualificative et renvoie l'état complet des équipes.
+ *
+ * L'élimination est **immédiate** : dès que le capital atteint 0 au cours d'une
+ * manche, l'équipe est sortie et ne participe plus aux suivantes — même si un
+ * match ultérieur la mentionnait (cas d'un score corrigé a posteriori).
+ */
 export function replayEndurance(input: ReplayEnduranceInput): EnduranceStanding[] {
   const { teams, matches, forfeits, config, lastRound, matchFormat } = input;
 
