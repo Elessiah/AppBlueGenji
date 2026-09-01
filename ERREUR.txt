@@ -6,3 +6,4 @@
 # Ajouter à la fin. Vérifier l'absence de doublon avant d'ajouter.
 # Retirer l'entrée dans le commit qui règle l'erreur.
 
+- [2026-09-01] app/(secured)/joueurs/[id]/page.tsx:104, app/(secured)/profil/page.tsx:209, components/arena-nav.tsx:72 — avatar de repli cassé (404) pour tout compte sans avatar — `/vercel.svg` est référencé comme `src` de repli mais le fichier n'existe pas dans `public/` (reste du template Next.js, supprimé depuis) ; remplacer par un repli existant ou par la pastille à initiale déjà utilisée dans les cartes d'annuaire — (rencontré sur : feature/clickable-teams-players-9ae592)
