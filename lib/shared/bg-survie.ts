@@ -4,8 +4,10 @@
  * Deux temps :
  *
  * 1. **Phase qualificative (endurance).** Chaque équipe démarre avec un capital
- *    de points d'endurance (9 par défaut). Une victoire de map en rapporte,
- *    une défaite en retire. À 0, l'équipe est éliminée sur-le-champ. Le
+ *    de points d'endurance (9 par défaut). Le barème se compte **map par map** :
+ *    chaque map gagnée en rapporte, chaque map perdue en retire — un 3-0 coûte
+ *    donc trois points au perdant et en rapporte trois au vainqueur, là où un
+ *    3-2 n'en déplace qu'un. À 0, l'équipe est éliminée sur-le-champ. Le
  *    classement se relit avant chaque manche : d'abord par endurance
  *    décroissante, puis — à égalité — dans l'**ordre du classement précédent**.
  *    Les équipes s'apparient par couples adjacents (1 vs 2, 3 vs 4, …) ; sur un
@@ -27,15 +29,17 @@
  * Module pur : aucune dépendance base de données, entièrement testable.
  */
 
+import { matchWinsRequired, type MatchFormat } from "./match-format";
+
 export type EnduranceStatus = "ACTIVE" | "ELIMINATED" | "FORFEIT";
 
 /** Barème d'endurance d'un tournoi. */
 export type EnduranceConfig = {
   /** Capital de départ (défaut 9). */
   startPoints: number;
-  /** Points gagnés par victoire de map (défaut 1). */
+  /** Points gagnés par **map** gagnée (défaut 1). */
   winDelta: number;
-  /** Points perdus par défaite de map (défaut 1). */
+  /** Points perdus par **map** perdue (défaut 1). */
   lossDelta: number;
   /** Effectif de la phase éliminatoire (défaut 8). */
   playoffSize: number;
@@ -81,13 +85,51 @@ export type EnduranceMatchOutcome = {
   completed: boolean;
   winnerTeamId: number | null;
   loserTeamId: number | null;
+  /** Maps gagnées par le vainqueur (`null` = non saisi). */
+  winnerMaps?: number | null;
+  /** Maps gagnées par le perdant (`null` = non saisi). */
+  loserMaps?: number | null;
   /**
-   * Match clos par forfait : il compte pour l'achèvement de la manche, mais pas
-   * pour l'endurance — le barème se compte **par map gagnée**, et une map non
-   * disputée n'en est pas une.
+   * Match clos par forfait. Il compte comme une rencontre **pleine** : le
+   * règlement traite le forfait comme le score maximal du format du tournoi
+   * (FT3 → 3-0), donc trois points d'endurance au perdant et trois au
+   * vainqueur. Les scores en base sont `NULL` sur un forfait déclaré par
+   * l'arbitrage : le barème se dérive alors du format, jamais des colonnes.
    */
   isForfeit?: boolean;
 };
+
+/** Maps qu'emporte le vainqueur d'un forfait, selon le format du tournoi. */
+export function forfeitMapCount(format: MatchFormat | null | undefined): number {
+  return format ? matchWinsRequired(format) : 1;
+}
+
+/**
+ * Maps à porter au compte de chaque équipe pour un match rejoué.
+ *
+ * Trois sources, dans l'ordre : le **format** pour un forfait (aucune map n'a
+ * été jouée, mais le règlement en compte l'équivalent d'un score plein), les
+ * **scores saisis** pour une rencontre disputée, et un 1-0 de repli pour un
+ * match tranché sans score — un tournoi en saisie libre, ou un historique
+ * antérieur au format de match. Le repli ne peut pas être 0-0 : le match a un
+ * vainqueur, il doit coûter quelque chose au perdant.
+ */
+export function enduranceMatchMaps(
+  outcome: EnduranceMatchOutcome,
+  format: MatchFormat | null | undefined,
+): { winnerMaps: number; loserMaps: number } {
+  if (outcome.isForfeit) return { winnerMaps: forfeitMapCount(format), loserMaps: 0 };
+
+  const winnerMaps = Number(outcome.winnerMaps);
+  const loserMaps = Number(outcome.loserMaps);
+
+  if (!Number.isFinite(winnerMaps) || !Number.isFinite(loserMaps)) {
+    return { winnerMaps: 1, loserMaps: 0 };
+  }
+  if (winnerMaps <= 0 || loserMaps < 0) return { winnerMaps: 1, loserMaps: 0 };
+
+  return { winnerMaps: Math.floor(winnerMaps), loserMaps: Math.floor(loserMaps) };
+}
 
 /** Abandon déclaré : décision humaine, non déductible des matchs. */
 export type EnduranceForfeit = { teamId: number; round: number };
@@ -99,6 +141,11 @@ export type ReplayEnduranceInput = {
   config: EnduranceConfig;
   /** Dernière manche générée. */
   lastRound: number;
+  /**
+   * Format de match du tournoi (`null` = score libre). Il ne sert qu'à chiffrer
+   * un forfait, seul cas où aucun score n'est saisi.
+   */
+  matchFormat?: MatchFormat | null;
 };
 
 /** Normalise un barème partiel (valeurs manquantes ou absurdes → défauts). */
@@ -167,8 +214,31 @@ export function qualificationComplete(activeCount: number, config: EnduranceConf
  * manche, l'équipe est sortie et ne participe plus aux suivantes — même si un
  * match ultérieur la mentionnait (cas d'un score corrigé a posteriori).
  */
+/**
+ * Applique le solde de maps d'une équipe sur son capital, et la sort du tournoi
+ * si celui-ci tombe à 0.
+ *
+ * Le contrôle vaut pour les **deux** équipes du match, pas seulement la
+ * perdante : sur un barème où la perte pèse plus que le gain, un 3-2 peut
+ * coûter des points à son vainqueur.
+ */
+function applyMapDelta(
+  standing: EnduranceStanding,
+  mapsWon: number,
+  mapsLost: number,
+  config: EnduranceConfig,
+  round: number,
+): void {
+  standing.points += config.winDelta * mapsWon - config.lossDelta * mapsLost;
+  if (standing.points <= 0) {
+    standing.points = 0;
+    standing.status = "ELIMINATED";
+    standing.eliminatedRound = round;
+  }
+}
+
 export function replayEndurance(input: ReplayEnduranceInput): EnduranceStanding[] {
-  const { teams, matches, forfeits, config, lastRound } = input;
+  const { teams, matches, forfeits, config, lastRound, matchFormat } = input;
 
   const standings = new Map<number, EnduranceStanding>(
     teams.map((team) => [
@@ -204,8 +274,6 @@ export function replayEndurance(input: ReplayEnduranceInput): EnduranceStanding[
   for (let round = 1; round <= maxRound; round += 1) {
     for (const match of matches) {
       if (match.round !== round || !match.completed) continue;
-      // Walkover : aucune map jouée, donc aucun point échangé.
-      if (match.isForfeit) continue;
 
       const winner = match.winnerTeamId === null ? null : standings.get(match.winnerTeamId);
       const loser = match.loserTeamId === null ? null : standings.get(match.loserTeamId);
@@ -218,21 +286,26 @@ export function replayEndurance(input: ReplayEnduranceInput): EnduranceStanding[
         continue;
       }
 
-      winner.wins += 1;
-      winner.points += config.winDelta;
+      const { winnerMaps, loserMaps } = enduranceMatchMaps(match, matchFormat);
 
+      winner.wins += 1;
       loser.losses += 1;
-      loser.points -= config.lossDelta;
-      if (loser.points <= 0) {
-        loser.points = 0;
-        loser.status = "ELIMINATED";
-        loser.eliminatedRound = round;
-      }
+
+      // Barème map par map, dans les deux sens : le vainqueur d'un 3-2 ne
+      // gagne qu'un point net, celui d'un 3-0 en gagne trois.
+      applyMapDelta(winner, winnerMaps, loserMaps, config, round);
+      applyMapDelta(loser, loserMaps, winnerMaps, config, round);
     }
 
     for (const teamId of forfeitsByRound.get(round) ?? []) {
       const standing = standings.get(teamId);
-      if (standing && standing.status === "ACTIVE") {
+      if (!standing) continue;
+      // L'abandon prime sur l'élimination que son propre match de forfait vient
+      // peut-être de provoquer dans cette même manche (le score plein peut vider
+      // le capital) : c'est la décision humaine qui est écrite au classement.
+      const eliminatedThisRound =
+        standing.status === "ELIMINATED" && standing.eliminatedRound === round;
+      if (standing.status === "ACTIVE" || eliminatedThisRound) {
         standing.status = "FORFEIT";
         standing.eliminatedRound = round;
         standing.points = 0;
