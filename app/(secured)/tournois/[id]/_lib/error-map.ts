@@ -74,6 +74,17 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // `TOURNAMENT_NOT_FOUND` et `UNAUTHORIZED` sont déjà couverts plus haut.
   TOURNAMENT_DELETE_FAILED: "Erreur lors de la suppression du tournoi.",
   INVALID_TOURNAMENT_ID: "Identifiant de tournoi invalide.",
+  // Lancement anticipé (`lib/shared/tournament-launch.ts`). Le bouton n'est
+  // affiché que lorsque la fenêtre est ouverte : ces messages n'apparaissent
+  // que si le tournoi a bougé entre l'affichage et le clic — d'où des
+  // formulations qui disent ce qui a changé, et non ce qu'il fallait faire.
+  TOURNAMENT_ALREADY_STARTED: "Ce tournoi a déjà démarré : il n'y a plus rien à abréger.",
+  TOURNAMENT_ALREADY_FINISHED: "Ce tournoi est terminé.",
+  TOURNAMENT_NOT_PUBLISHED:
+    "Ce tournoi n'est pas encore publié : rends-le visible avant de le lancer.",
+  REGISTRATION_NOT_OPEN:
+    "Les inscriptions ne sont pas encore ouvertes : personne ne peut être engagé.",
+  TOURNAMENT_LAUNCH_FAILED: "Erreur lors du lancement du tournoi.",
   // Signalement d'un problème (`lib/shared/discord-notifications.ts`).
   INVALID_ISSUE_MESSAGE:
     "Décris le problème en 10 à 1000 caractères pour que l'arbitre puisse agir.",
