@@ -126,20 +126,6 @@
   color: var(--text-2);
 }
 
-/* Annonce destinée aux lecteurs d'écran : la ligne qui bouge est le seul retour
-   visuel d'un réordonnancement. */
-.srOnly {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 @media (max-width: 720px) {
   .row,
   .reorderable {

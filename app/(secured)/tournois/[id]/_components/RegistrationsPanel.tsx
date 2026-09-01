@@ -213,7 +213,9 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
         </div>
       )}
 
-      <p aria-live="polite" className={styles.srOnly}>
+      {/* `sr-only` global (`app/globals.css`) : la ligne qui bouge est le seul
+          retour visuel d'un réordonnancement, il faut le dire à l'oreille. */}
+      <p aria-live="polite" className="sr-only">
         {announcement}
       </p>
     </div>

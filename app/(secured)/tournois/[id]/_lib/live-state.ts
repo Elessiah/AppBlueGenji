@@ -216,9 +216,9 @@ export function fatalFailure(status: number): LiveFailure | null {
  * quand quelque chose le périme : le passage à un état où l'aperçu n'a plus
  * lieu d'être, ou un changement de l'ordre de tirage.
  *
- * L'**ordre**, et non le nombre d'inscrites : `SeedingEditor` existe justement
- * pour que le staff réorganise ce tirage avant le lancement, à effectif
- * constant. Compter les inscrites laisserait le caster sur l'ancien ordre
+ * L'**ordre**, et non le nombre d'inscrites : les flèches de `RegistrationsPanel`
+ * existent justement pour que le staff réorganise ce tirage avant le lancement,
+ * à effectif constant. Compter les inscrites laisserait le caster sur l'ancien ordre
  * pendant que l'arbitre voit le nouveau — le cas le plus probable de tous.
  */
 export function shouldRefreshViewerContext(
