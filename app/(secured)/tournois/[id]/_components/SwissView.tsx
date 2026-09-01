@@ -201,6 +201,7 @@ export function SwissView({
                   </span>
                   <EntrantLink
                     teamId={team.teamId}
+                    title={team.teamName}
                     style={{
                       flex: 1,
                       overflow: "hidden",
@@ -362,6 +363,7 @@ export function SwissView({
                             >
                               <EntrantLink
                                 teamId={byeTeamId}
+                                title={match.team1Name ?? undefined}
                                 style={{
                                   color: "var(--text-0)",
                                   fontWeight: 600,

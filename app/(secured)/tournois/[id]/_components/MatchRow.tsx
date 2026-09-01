@@ -94,6 +94,7 @@ export function MatchRow({
         {match.team1Id ? (
           <EntrantLink
             teamId={match.team1Id}
+            title={team1Display}
             style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, display: "block" }}
           >
             {team1Display}
@@ -111,6 +112,7 @@ export function MatchRow({
         {match.team2Id ? (
           <EntrantLink
             teamId={match.team2Id}
+            title={team2Display}
             style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, display: "block" }}
           >
             {team2Display}
