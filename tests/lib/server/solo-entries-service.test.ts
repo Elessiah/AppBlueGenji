@@ -3,9 +3,11 @@ import type { PoolConnection } from "mysql2/promise";
 import {
   ensureSoloEntry,
   findSoloEntry,
+  findSoloEntryUser,
   loadSoloUserIds,
   syncSoloEntryIdentity,
 } from "@/lib/server/solo-entries-service";
+import { getDatabase } from "@/lib/server/database";
 
 jest.mock("@/lib/server/database");
 
@@ -210,5 +212,50 @@ describe("loadSoloUserIds", () => {
     const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
     expect(sql).toMatch(/solo_user_id IS NOT NULL/);
     expect(params).toEqual([7, 8, 9]);
+  });
+});
+
+/**
+ * Le sens inverse de `findSoloEntry` : d'un identifiant d'engagé vers le compte
+ * qu'il représente. Sert à `/equipes/[id]`, où un lien parfaitement valide peut
+ * désigner une entrée solo — laquelle n'a pas de fiche d'équipe.
+ */
+describe("findSoloEntryUser", () => {
+  beforeEach(() => jest.clearAllMocks());
+  afterEach(() => jest.restoreAllMocks());
+
+  async function withRows(rows: unknown[]) {
+    const execute = jest.fn().mockResolvedValue([rows, []] as never);
+    (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+    return execute;
+  }
+
+  it("rend le compte derrière une entrée solo", async () => {
+    const execute = await withRows([{ solo_user_id: 17372 }]);
+
+    await expect(findSoloEntryUser(15245)).resolves.toBe(17372);
+
+    const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
+    expect(sql).toMatch(/SELECT solo_user_id FROM bg_teams WHERE id = \? LIMIT 1/);
+    expect(params).toEqual([15245]);
+  });
+
+  it("rend null pour une vraie équipe", async () => {
+    // `solo_user_id IS NULL` : la ligne existe, mais c'est une équipe — sa fiche
+    // s'ouvre normalement, il n'y a rien à rediriger.
+    await withRows([{ solo_user_id: null }]);
+    await expect(findSoloEntryUser(641)).resolves.toBeNull();
+  });
+
+  it("rend null pour un identifiant inconnu", async () => {
+    await withRows([]);
+    await expect(findSoloEntryUser(999999)).resolves.toBeNull();
+  });
+
+  it("normalise un identifiant rendu en chaîne par le pilote", async () => {
+    // `BIGINT` peut remonter en chaîne selon la configuration mysql2 : un
+    // `/joueurs/"77"` construirait la même URL, mais le typage mentirait.
+    await withRows([{ solo_user_id: "77" }]);
+    await expect(findSoloEntryUser(15245)).resolves.toBe(77);
   });
 });

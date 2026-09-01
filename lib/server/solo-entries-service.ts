@@ -176,3 +176,21 @@ export async function loadSoloUserIds(
   }
   return map;
 }
+
+/**
+ * Compte joueur derrière une entrée solo, ou `null` si l'identifiant désigne
+ * une vraie équipe (ou rien).
+ *
+ * Une entrée solo occupe une ligne de `bg_teams` mais n'a pas de fiche
+ * d'équipe : `/equipes/[id]` s'en sert pour renvoyer sur `/joueurs/[id]` plutôt
+ * que d'afficher « Équipe non trouvée » à un lien pourtant valide.
+ */
+export async function findSoloEntryUser(teamId: number): Promise<number | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { solo_user_id: number | null })[]>(
+    `SELECT solo_user_id FROM bg_teams WHERE id = ? LIMIT 1`,
+    [teamId],
+  );
+  if (rows.length === 0 || rows[0].solo_user_id === null) return null;
+  return Number(rows[0].solo_user_id);
+}

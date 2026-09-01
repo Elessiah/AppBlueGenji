@@ -46,8 +46,12 @@ function matchRow(overrides: Record<string, unknown> = {}) {
     round_number: 1,
     match_number: 1,
     status: "READY",
+    team1_id: 11,
+    team2_id: 12,
     team1_name: "Alpha",
     team2_name: "Bravo",
+    team1_solo_user_id: null,
+    team2_solo_user_id: null,
     team1_score: null,
     team2_score: null,
     start_at: null,
@@ -232,5 +236,57 @@ describe("getLandingLive", () => {
     // page d'accueil.
     expect(live?.tournament.id).toBe(1);
     expect(live?.stream).toBeNull();
+  });
+});
+
+/**
+ * La carte du direct de l'accueil nomme les deux engagés du match à l'antenne.
+ *
+ * Le chemin de leur fiche est résolu **ici**, pas dans la carte : un tournoi
+ * individuel oppose des joueurs, dont l'engagé est une entrée solo — une ligne
+ * de `bg_teams` sans fiche d'équipe. La carte n'a pas de quoi trancher, et un
+ * `/equipes/[id]` écrit côté client mènerait à « Équipe non trouvée ».
+ */
+describe("getLandingLive — fiche des engagés du match", () => {
+  beforeEach(() => {
+    (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
+  });
+
+  it("mène à la fiche d'équipe dans un tournoi par équipes", async () => {
+    await mockDb([matchRow()]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+
+    expect(live?.currentMatch?.team1Href).toBe("/equipes/11");
+    expect(live?.currentMatch?.team2Href).toBe("/equipes/12");
+  });
+
+  it("mène au profil du joueur derrière une entrée solo", async () => {
+    await mockDb([matchRow({ team1_solo_user_id: 500, team2_solo_user_id: 501 })]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe solo")]));
+
+    expect(live?.currentMatch?.team1Href).toBe("/joueurs/500");
+    expect(live?.currentMatch?.team2Href).toBe("/joueurs/501");
+  });
+
+  it("ne mène nulle part sur une place vide", async () => {
+    // Bye, ou adversaire pas encore désigné : il n'y a rien à ouvrir. La carte
+    // affiche alors le nom sans lien plutôt qu'un lien mort.
+    await mockDb([matchRow({ team2_id: null, team2_name: null })]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+
+    expect(live?.currentMatch?.team1Href).toBe("/equipes/11");
+    expect(live?.currentMatch?.team2Href).toBeNull();
+  });
+
+  it("panache équipe et entrée solo sans confondre les deux côtés", async () => {
+    await mockDb([matchRow({ team2_solo_user_id: 501 })]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe mixte")]));
+
+    expect(live?.currentMatch?.team1Href).toBe("/equipes/11");
+    expect(live?.currentMatch?.team2Href).toBe("/joueurs/501");
   });
 });

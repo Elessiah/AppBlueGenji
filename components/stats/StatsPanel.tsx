@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import Link from "next/link";
+import { TeamLink } from "@/components/entity-link";
 import { formatLocalDate } from "@/lib/shared/dates";
 import {
   formatDiff,
@@ -95,7 +95,7 @@ function OpponentCard({
       {opponent ? (
         <>
           <div className={s.opponentName}>
-            <Link href={`/equipes/${opponent.teamId}`}>{opponent.teamName}</Link>
+            <TeamLink teamId={opponent.teamId}>{opponent.teamName}</TeamLink>
           </div>
           <div className={s.opponentMeta}>
             {opponent.played} confrontation{opponent.played > 1 ? "s" : ""} · {opponent.won}V / {opponent.lost}D

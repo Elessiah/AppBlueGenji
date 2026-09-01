@@ -1,13 +1,12 @@
 "use client";
 
 import { FormEvent } from "react";
-import Link from "next/link";
 import type { BracketMatch, SurvivalMeta, SurvivalStandingRow } from "@/lib/shared/types";
 import { isCutRound, nextCutRound, teamsToEliminate } from "@/lib/shared/survival";
 import { MatchScoreDraft } from "./BracketTree";
 import { MatchRow } from "./MatchRow";
 import { ScrollArea } from "@/components/cyber";
-import { useEntrantLink } from "../_lib/entrant-link";
+import { EntrantLink } from "../_lib/entrant-link";
 
 const COL_W = 226;
 const BORDER = "var(--border, #444)";
@@ -59,7 +58,6 @@ export function SurvivalView({
   onForfeit,
   emptyLabel = "Aucun match pour l'instant.",
 }: SurvivalViewProps) {
-  const entrantLink = useEntrantLink();
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
   const activeCount = survival.standings.filter((s) => s.status === "ACTIVE").length;
   const barrageRounds = survival.barrageRounds ?? 0;
@@ -109,7 +107,10 @@ export function SurvivalView({
             fontSize: 15,
           }}
         >
-          🏆 Championne — <strong>{champion.teamName}</strong>
+          🏆 Championne —{" "}
+          <EntrantLink teamId={champion.teamId}>
+            <strong>{champion.teamName}</strong>
+          </EntrantLink>
         </div>
       )}
 
@@ -135,7 +136,7 @@ export function SurvivalView({
 
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
         {/* Classement courant */}
-        <div style={{ flex: "0 0 340px", minWidth: 280 }}>
+        <div style={{ flex: "1 1 340px", minWidth: 280, maxWidth: 520 }}>
           <div
             style={{
               fontSize: 11,
@@ -180,20 +181,23 @@ export function SurvivalView({
                   <span className="num" style={{ width: 22, color: "var(--text-2)", fontWeight: 600 }}>
                     {team.rank}
                   </span>
-                  <Link
-                    href={entrantLink(team.teamId)}
+                  <EntrantLink
+                    teamId={team.teamId}
+                    title={team.teamName}
                     style={{
-                      flex: 1,
+                      // Base non nulle : avec `flex: 1` (base 0), le nom ne pesait
+                      // rien dans la negociation d'espace et se faisait rogner a
+                      // quelques pixels par les colonnes fixes et le bouton
+                      // d'abandon. Il retrecit desormais comme les autres.
+                      flex: "1 1 72px",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
-                      textDecoration: "none",
-                      color: "inherit",
                       fontWeight: isMine ? 700 : 500,
                     }}
                   >
                     {team.teamName}
-                  </Link>
+                  </EntrantLink>
                   <span className="mono" style={{ fontSize: 12, color: "var(--text-2)" }}>
                     {team.wins}-{team.losses}
                   </span>
@@ -341,11 +345,11 @@ export function SurvivalView({
                                 background: "var(--surface-1)",
                               }}
                             >
-                              <Link
-                                href={entrantLink(byeTeamId)}
+                              <EntrantLink
+                                teamId={byeTeamId}
+                                title={match.team1Name ?? undefined}
                                 style={{
                                   color: "var(--text-0)",
-                                  textDecoration: "none",
                                   fontWeight: 600,
                                   display: "block",
                                   overflow: "hidden",
@@ -354,7 +358,7 @@ export function SurvivalView({
                                 }}
                               >
                                 {match.team1Name}
-                              </Link>
+                              </EntrantLink>
                               <span style={{ fontSize: 11, color: ACCENT }}>
                                 ✓ Victoire d&apos;office
                               </span>

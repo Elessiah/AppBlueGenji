@@ -8,9 +8,15 @@ export type ResourceState<T> =
   | { status: "not-found"; data: null; error: null }
   | { status: "error"; data: null; error: string };
 
+/**
+ * Corps d'un 404. Certaines routes y joignent de quoi rebondir plutôt que de
+ * laisser la page sur un cul-de-sac (`TEAM_IS_SOLO_ENTRY` + `soloUserId`).
+ */
+export type NotFoundPayload = { error?: string } & Record<string, unknown>;
+
 export function useResourceLoader<T>(
   url: string,
-  options?: { onNotFoundRedirect?: () => void },
+  options?: { onNotFoundRedirect?: (payload: NotFoundPayload) => void },
 ) {
   const [state, setState] = useState<ResourceState<T>>({ status: "loading", data: null, error: null });
 
@@ -25,8 +31,9 @@ export function useResourceLoader<T>(
     try {
       const res = await fetch(url, { cache: "no-store" });
       if (res.status === 404) {
+        const body = (await res.json().catch(() => ({}))) as NotFoundPayload;
         setState({ status: "not-found", data: null, error: null });
-        optionsRef.current?.onNotFoundRedirect?.();
+        optionsRef.current?.onNotFoundRedirect?.(body);
         return;
       }
       if (!res.ok) {

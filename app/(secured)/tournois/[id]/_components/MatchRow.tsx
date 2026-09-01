@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent } from "react";
 import type { BracketMatch, TournamentFormat } from "@/lib/shared/types";
 import { fromBracketMatch, isScoreEditLocked } from "@/lib/shared/match-lock";
 import { matchFormatLabel, matchWinsRequired } from "@/lib/shared/match-format";
-import { useEntrantLink } from "../_lib/entrant-link";
+import { EntrantLink } from "../_lib/entrant-link";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { useIssueReport } from "../_lib/issue-report-context";
 import { MatchLiveStrip } from "./MatchLiveStrip";
@@ -40,7 +39,6 @@ export function MatchRow({
   roundNumber,
   format,
 }: MatchRowProps) {
-  const entrantLink = useEntrantLink();
   // Format du tournoi (BO5, FT3…) : rappelé au-dessus des champs et appliqué
   // comme borne haute, pour que la saisie ne parte pas hors format.
   const matchFormat = useMatchFormat();
@@ -94,12 +92,13 @@ export function MatchRow({
     >
       <div style={{ ...rowStyle(team1Win), borderBottom: `1px solid ${BORDER}` }}>
         {match.team1Id ? (
-          <Link
-            href={entrantLink(match.team1Id)}
-            style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, display: "block", textDecoration: "none", color: "inherit" }}
+          <EntrantLink
+            teamId={match.team1Id}
+            title={team1Display}
+            style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, display: "block" }}
           >
             {team1Display}
-          </Link>
+          </EntrantLink>
         ) : (
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
             {team1Display}
@@ -111,12 +110,13 @@ export function MatchRow({
       </div>
       <div style={rowStyle(team2Win)}>
         {match.team2Id ? (
-          <Link
-            href={entrantLink(match.team2Id)}
-            style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, display: "block", textDecoration: "none", color: "inherit" }}
+          <EntrantLink
+            teamId={match.team2Id}
+            title={team2Display}
+            style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, display: "block" }}
           >
             {team2Display}
-          </Link>
+          </EntrantLink>
         ) : (
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
             {team2Display}

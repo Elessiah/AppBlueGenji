@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { EntityLink, type EntityLinkProps } from "@/components/entity-link";
 import { entrantHref, participantWording, type ParticipantType } from "@/lib/shared/participants";
 
 /**
@@ -46,4 +47,20 @@ export function useEntrantLink(): (teamId: number) => string {
 export function useParticipantWording() {
   const { participantType } = useContext(EntrantContext);
   return participantWording(participantType);
+}
+
+/**
+ * Nom d'un engagé, cliquable vers sa fiche.
+ *
+ * Les vues de plateau, de classement et de manche répétaient toutes le même
+ * `<Link href={entrantLink(id)} style={{ color: "inherit", … }}>` : le composant
+ * porte la résolution du lien *et* l'affordance, pour qu'un nom d'engagé se
+ * comporte de la même façon d'une vue à l'autre.
+ */
+export function EntrantLink({
+  teamId,
+  ...rest
+}: EntityLinkProps & { teamId: number }) {
+  const entrantLink = useEntrantLink();
+  return <EntityLink href={entrantLink(teamId)} {...rest} />;
 }

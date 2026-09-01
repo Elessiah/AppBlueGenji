@@ -1,7 +1,7 @@
 "use client";
 
 import type { BracketMatch, EnduranceMeta } from "@/lib/shared/types";
-import { useParticipantWording } from "../_lib/entrant-link";
+import { EntrantLink, useParticipantWording } from "../_lib/entrant-link";
 import styles from "./EnduranceView.module.css";
 
 interface EnduranceViewProps {
@@ -119,7 +119,12 @@ export function EnduranceView({
               }}
             >
               <span className="num">{standing.rank}</span>
-              <span style={{ fontWeight: isMine ? 700 : undefined }}>{standing.teamName}</span>
+              <EntrantLink
+                teamId={standing.teamId}
+                style={{ fontWeight: isMine ? 700 : undefined }}
+              >
+                {standing.teamName}
+              </EntrantLink>
               <span className="num">{standing.points}</span>
               <span>
                 {standing.wins} / {standing.losses}

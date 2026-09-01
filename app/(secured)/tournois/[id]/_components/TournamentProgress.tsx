@@ -8,6 +8,7 @@ import {
   formatStageCountdown,
 } from "@/lib/shared/tournament-progress";
 import type { TournamentDetail } from "@/lib/shared/types";
+import { EntrantLink } from "../_lib/entrant-link";
 import styles from "./TournamentProgress.module.css";
 
 interface TournamentProgressProps {
@@ -81,7 +82,7 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
   // Le champion nomme mieux la fin qu'une paraphrase de l'étape courante, déjà
   // écrite en tête du bloc.
   const champion = showsFinished
-    ? (detail.registrations.find((reg) => reg.finalRank === 1)?.teamName ?? null)
+    ? (detail.registrations.find((reg) => reg.finalRank === 1) ?? null)
     : null;
 
   return (
@@ -175,7 +176,9 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
           champion ? (
             <>
               <span>Vainqueur :</span>
-              <span className={styles.footStrong}>{champion}</span>
+              <EntrantLink teamId={champion.teamId} className={styles.footStrong}>
+                {champion.teamName}
+              </EntrantLink>
             </>
           ) : (
             <span>Le tournoi est clos.</span>

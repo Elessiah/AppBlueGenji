@@ -94,7 +94,11 @@ fantômes**, y compris en individuel — c'est le même mécanisme, présenté c
   « Joueur » dans les inscriptions et les classements, dialogue « Inscrire un
   joueur invité ».
 - **Liens** — dans les brackets et les classements, un engagé solo pointe vers
-  `/joueurs/[id]` et non `/equipes/[id]`.
+  `/joueurs/[id]` et non `/equipes/[id]` (`EntrantLink`, cf.
+  [noms cliquables](ENTITY_LINKS.md)). Là où l'appelant n'a qu'un `team_id` sans
+  savoir ce qu'il désigne — adversaire favori, bête noire —,
+  `GET /api/teams/[id]` répond **404 `TEAM_IS_SOLO_ENTRY` + `soloUserId`** et la
+  page mène au profil du joueur : une entrée solo n'est pas une équipe manquante.
 
 Tout le vocabulaire vit dans `PARTICIPANT_WORDING` (`lib/shared/participants.ts`)
 et se diffuse dans la page de tournoi par le contexte

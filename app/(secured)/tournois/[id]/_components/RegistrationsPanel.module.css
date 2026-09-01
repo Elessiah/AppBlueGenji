@@ -44,14 +44,11 @@
   color: var(--blue-300, var(--accent-blue));
 }
 
+/* Couleur, soulignement et contour de focus viennent de `.entity-link`
+   (`app/globals.css`), affordance unique des noms d'entite : les redeclarer ici
+   ferait dependre l'apparence de l'ordre d'injection des feuilles. */
 .name {
-  color: inherit;
-  text-decoration: none;
   overflow-wrap: anywhere;
-}
-
-.name:hover {
-  color: var(--blue-200, var(--accent-blue));
 }
 
 .muted {

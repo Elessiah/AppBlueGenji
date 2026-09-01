@@ -989,3 +989,28 @@
     font-size: 38px;
   }
 }
+
+/* Lien principal d'une carte d'annuaire : une plaque transparente posee
+   par-dessus, plutot qu'un `<a>` qui enveloppe tout le contenu — sans quoi les
+   liens imbriques (nom d'equipe, roster) seraient des `<a>` dans un `<a>`.
+   `.aboveOverlay` repasse au-dessus de la plaque pour rester cliquable. */
+.cardOverlay {
+  position: absolute;
+  inset: 0;
+  /* Au-dessus des enfants **positionnes** de la carte (pastille de rang,
+     sigil, cadre d'avatar) : en `z-index: auto`, ils peignent apres la plaque
+     dans l'ordre du DOM et intercepteraient le clic, alors qu'ils faisaient
+     partie du lien quand celui-ci enveloppait la carte. */
+  z-index: 1;
+  border-radius: inherit;
+}
+
+.cardOverlay:focus-visible {
+  outline: 1px solid var(--blue-300, #5ac8ff);
+  outline-offset: -3px;
+}
+
+.aboveOverlay {
+  position: relative;
+  z-index: 2;
+}
