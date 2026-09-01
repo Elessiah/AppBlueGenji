@@ -141,6 +141,40 @@ describe("Page de tournoi — engagés cliquables", () => {
   });
 });
 
+/**
+ * Un lien large de quatre pixels n'est pas cliquable.
+ *
+ * Dans le classement d'une ronde suisse et d'une survie, le nom de l'engagé
+ * était le **seul** enfant flexible de la ligne, en `flex: 1` — donc de base
+ * nulle. Toutes les autres colonnes portant une largeur fixe, il n'héritait que
+ * du reliquat : quatre pixels une fois le bouton « Abandonner » rendu, la
+ * colonne du classement étant elle-même figée. Le nom, contenu principal de la
+ * ligne, disparaissait au profit de ses statistiques.
+ */
+describe("Classements — le nom de l'engagé garde sa place", () => {
+  const views = {
+    SwissView: "app/(secured)/tournois/[id]/_components/SwissView.tsx",
+    SurvivalView: "app/(secured)/tournois/[id]/_components/SurvivalView.tsx",
+  };
+
+  for (const [name, path] of Object.entries(views)) {
+    it(`${name} donne au nom une base non nulle`, () => {
+      const code = read(path);
+      // `flex: 1` vaut `flex: 1 1 0%` : le nom ne pèse alors rien dans la
+      // négociation d'espace et se fait rogner en premier.
+      expect(code).toContain('flex: "1 1 72px"');
+    });
+
+    it(`${name} laisse la colonne du classement prendre l'espace libre`, () => {
+      const code = read(path);
+      const col = code.slice(code.indexOf("flex: \"1 1"), code.indexOf("flex: \"1 1") + 90);
+      // Bornée : la colonne des rondes, à côté, doit garder de quoi s'afficher.
+      expect(col).toMatch(/maxWidth: \d+/);
+      expect(code).not.toMatch(/flex: "0 0 (400|340)px"/);
+    });
+  }
+});
+
 describe("Cartes d'annuaire — deux destinations, sans ancre imbriquée", () => {
   const cards = {
     TeamCard: "app/(secured)/equipes/cards/TeamCard.tsx",

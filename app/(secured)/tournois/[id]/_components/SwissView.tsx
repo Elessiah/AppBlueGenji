@@ -113,7 +113,7 @@ export function SwissView({
 
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
         {/* Classement aux points */}
-        <div style={{ flex: "0 0 400px", minWidth: 300 }}>
+        <div style={{ flex: "1 1 400px", minWidth: 300, maxWidth: 560 }}>
           <div
             style={{
               fontSize: 11,
@@ -203,7 +203,11 @@ export function SwissView({
                     teamId={team.teamId}
                     title={team.teamName}
                     style={{
-                      flex: 1,
+                      // Base non nulle : avec `flex: 1` (base 0), le nom ne pesait
+                      // rien dans la negociation d'espace et se faisait rogner a
+                      // quelques pixels par les colonnes fixes et le bouton
+                      // d'abandon. Il retrecit desormais comme les autres.
+                      flex: "1 1 72px",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",

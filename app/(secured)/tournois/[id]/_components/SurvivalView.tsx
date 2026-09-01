@@ -136,7 +136,7 @@ export function SurvivalView({
 
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
         {/* Classement courant */}
-        <div style={{ flex: "0 0 340px", minWidth: 280 }}>
+        <div style={{ flex: "1 1 340px", minWidth: 280, maxWidth: 520 }}>
           <div
             style={{
               fontSize: 11,
@@ -185,7 +185,11 @@ export function SurvivalView({
                     teamId={team.teamId}
                     title={team.teamName}
                     style={{
-                      flex: 1,
+                      // Base non nulle : avec `flex: 1` (base 0), le nom ne pesait
+                      // rien dans la negociation d'espace et se faisait rogner a
+                      // quelques pixels par les colonnes fixes et le bouton
+                      // d'abandon. Il retrecit desormais comme les autres.
+                      flex: "1 1 72px",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",

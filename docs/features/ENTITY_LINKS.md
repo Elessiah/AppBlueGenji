@@ -88,6 +88,22 @@ intercalé :
   « +N » sortirait de son cercle. Les deux partagent donc
   `display: grid; place-items: center`.
 
+## Un lien de quatre pixels n'est pas cliquable
+
+Dans le classement d'une ronde suisse et d'une survie, le nom de l'engagé était
+le **seul** enfant flexible de la ligne (`flex: 1`, donc de base nulle) : toutes
+les autres colonnes portant une largeur fixe, il n'héritait que du reliquat.
+Avec le bouton « Abandonner » rendu et la colonne du classement figée à
+`flex: 0 0 400px`, ce reliquat tombait à **quatre pixels** — le contenu
+principal de la ligne effacé au profit de ses statistiques.
+
+Deux corrections, mécaniques toutes les deux : le nom reçoit une base réelle
+(`flex: 1 1 72px`), si bien qu'il rétrécit à proportion des autres au lieu de
+perdre à tous les coups ; et la colonne du classement prend l'espace libre
+(`flex: 1 1 400px`) plutôt que de rester figée, bornée par un `maxWidth` pour
+que les rondes voisines gardent de quoi s'afficher — elles défilent déjà
+horizontalement.
+
 ## `/equipes/[id]` sur une entrée solo
 
 Rendre les noms cliquables partout fait naître des liens là où l'appelant n'a
