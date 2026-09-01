@@ -109,6 +109,10 @@ export function LaunchTournamentDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="launch-tournament-title"
+        // Le résumé est lu à l'ouverture, avant que le focus n'atteigne les
+        // boutons : sans lui, la modale s'annonce « Lancer le tournoi
+        // maintenant » et laisse deviner ce que « maintenant » remplace.
+        aria-describedby="launch-tournament-summary"
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         style={{
@@ -127,7 +131,10 @@ export function LaunchTournamentDialog({
           Lancer le tournoi maintenant
         </h3>
 
-        <p style={{ marginTop: 10, fontSize: 13, color: "var(--text-2, #9aa4b2)", lineHeight: 1.55 }}>
+        <p
+          id="launch-tournament-summary"
+          style={{ marginTop: 10, fontSize: 13, color: "var(--text-2, #9aa4b2)", lineHeight: 1.55 }}
+        >
           Le coup d&apos;envoi est avancé à cet instant, au lieu du{" "}
           <strong style={{ color: "var(--ink)" }}>{formatLocalDateTime(card.startAt)}</strong>. Le
           tirage est fait sur les engagés du moment : personne ne pourra plus rejoindre le tournoi.
@@ -137,7 +144,10 @@ export function LaunchTournamentDialog({
           style={{
             margin: "16px 0 0",
             display: "grid",
-            gridTemplateColumns: "1fr auto",
+            // `auto minmax(0, 1fr)` et non `1fr auto` : la liste des étapes est
+            // la valeur la plus longue, et c'est elle qui doit se replier sur
+            // une fenêtre étroite plutôt que d'écraser son intitulé.
+            gridTemplateColumns: "auto minmax(0, 1fr)",
             gap: "8px 16px",
             fontSize: 13,
             alignItems: "baseline",
@@ -146,7 +156,14 @@ export function LaunchTournamentDialog({
           {stages.length > 0 && (
             <>
               <dt style={{ color: "var(--text-2, #9aa4b2)" }}>Étapes abrégées</dt>
-              <dd style={{ margin: 0, fontWeight: 600, textAlign: "right" }}>
+              <dd
+                style={{
+                  margin: 0,
+                  fontWeight: 600,
+                  textAlign: "right",
+                  overflowWrap: "anywhere",
+                }}
+              >
                 {stages.join(" › ")}
               </dd>
             </>
@@ -170,6 +187,10 @@ export function LaunchTournamentDialog({
           // Rouge assumé : ce n'est pas un lancement mais une clôture, et
           // l'annoncer après coup serait la découvrir à la place du staff.
           <p
+            // `role="note"` plutôt qu'une simple couleur : le rouge est la
+            // seule chose qui distingue cet avertissement du reste, et il ne
+            // dit rien à qui ne le voit pas.
+            role="note"
             style={{
               marginTop: 14,
               fontSize: 13,

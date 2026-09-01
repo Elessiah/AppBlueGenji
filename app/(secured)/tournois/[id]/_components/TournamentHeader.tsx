@@ -161,7 +161,10 @@ export function TournamentHeader({
               title="Abréger les étapes d'avant-course et démarrer le tournoi immédiatement."
               style={{ fontSize: 13, padding: "8px 18px" }}
             >
-              ▶ Lancer maintenant
+              {/* Le chevron est décoratif : le lecteur d'écran doit entendre
+                  l'action, pas « triangle pointant vers la droite ». Même
+                  traitement que la flèche du bouton « Retour ». */}
+              <span aria-hidden="true">▶</span> Lancer maintenant
             </CyberButton>
           )}
           {/* Signalement : ouvert aux seuls engagés, à toute heure du tournoi —
