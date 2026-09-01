@@ -47,6 +47,7 @@
  * de se replier : un tableau de capitaux perd tout son sens empilé en colonne.
  */
 .historyRow {
+  --history-row-bg: var(--cyber-bg-1, #0a0c11);
   display: grid;
   grid-template-columns: var(--history-cols);
   align-items: center;
@@ -54,6 +55,7 @@
   padding: 4px 8px;
   border-bottom: 1px solid var(--line-soft, rgba(255, 255, 255, 0.06));
   min-width: max-content;
+  background: var(--history-row-bg);
 }
 
 .historyRow:last-child {
@@ -67,12 +69,22 @@
   color: var(--text-2);
 }
 
+/*
+ * Le nom reste visible quand le tableau défile : sur une dizaine de manches, une
+ * ligne de nombres sans son équipe ne se lit plus. Le fond de la colonne suit
+ * celui de la ligne (`--history-row-bg`, redéfini pour la ligne du lecteur),
+ * sinon le contenu défilé apparaîtrait au travers.
+ */
 .historyTeam {
+  position: sticky;
+  left: 0;
+  z-index: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
   padding-right: 8px;
+  background: var(--history-row-bg);
 }
 
 .historyCell {
@@ -104,4 +116,18 @@
 .historyOut {
   color: var(--text-2);
   opacity: 0.45;
+}
+
+/*
+ * Ligne d'une équipe retirée : le même rouge, en fond très dilué, que les cases
+ * « FF » qu'elle porte. La ligne se repère alors d'un coup d'œil dans un tableau
+ * de plusieurs dizaines d'équipes, sans que le rouge concurrence les cases.
+ */
+.historyRowForfeit {
+  --history-row-bg: rgba(var(--danger-rgb), 0.06);
+}
+
+/* Ligne de l'engagé du lecteur : même teinte que dans le classement au-dessus. */
+.historyRowMine {
+  --history-row-bg: rgba(89, 212, 255, 0.06);
 }

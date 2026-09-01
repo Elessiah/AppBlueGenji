@@ -90,7 +90,7 @@ function EnduranceHistory({
           >
             <span className={styles.historyTeam}>Équipe</span>
             {endurance.rounds.map((round) => (
-              <span key={round} className={styles.historyCell}>
+              <span key={round} className={styles.historyCell} title={`Manche ${round}`}>
                 M{round}
               </span>
             ))}
@@ -98,16 +98,14 @@ function EnduranceHistory({
           {endurance.standings.map((standing) => (
             <div
               key={standing.teamId}
-              className={styles.historyRow}
-              style={
-                {
-                  "--history-cols": columns,
-                  background:
-                    myTeamId !== null && standing.teamId === myTeamId
-                      ? "rgba(89,212,255,0.06)"
-                      : undefined,
-                } as React.CSSProperties
-              }
+              className={[
+                styles.historyRow,
+                standing.status === "FORFEIT" ? styles.historyRowForfeit : null,
+                myTeamId !== null && standing.teamId === myTeamId ? styles.historyRowMine : null,
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              style={{ "--history-cols": columns } as React.CSSProperties}
             >
               <span className={styles.historyTeam}>{standing.teamName}</span>
               {standing.rounds.map((cell) => (
