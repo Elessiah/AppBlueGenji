@@ -251,9 +251,15 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
         ],
       },
       {
-        title: "Abandon",
+        title: "Forfait : deux gestes à ne pas confondre",
         body: [
-          "Une équipe peut se retirer en cours de route : son capital tombe à zéro et elle quitte le tournoi. Le classement est aussitôt recalculé, et la manche suivante réappariée en conséquence.",
+          "Un forfait ne fait jamais match blanc : il compte pour le score maximal du format du tournoi. En FT3, l'équipe absente encaisse un 3-0 — trois points d'endurance en moins pour elle, trois de plus pour son adversaire — et la rencontre entre au palmarès des deux équipes comme une victoire et une défaite pleines.",
+        ],
+        bullets: [
+          "Forfait sur une manche : l'équipe ne se présente pas à une rencontre. L'arbitre le déclare sur le match ; l'équipe reste engagée et joue la manche suivante avec le capital qui lui reste.",
+          "Forfait sur le reste du tournoi : l'équipe se retire, ou l'arbitre l'en retire. Son capital tombe à zéro, elle ne sera plus appariée, et le classement est aussitôt recalculé — la manche suivante est réappariée en conséquence.",
+          "Dans le tableau manche par manche, une équipe retirée n'affiche plus de capital : ses manches restantes portent « FF » en rouge, à la manière de la feuille de calcul d'arbitrage.",
+          "Le retrait définitif n'est possible que pendant la phase qualificative. Une fois l'arbre des play-offs lancé, un forfait se tranche sur le match, qui fait avancer le tableau.",
         ],
       },
     ],

@@ -16,10 +16,12 @@
 import type { RowDataPacket } from "mysql2";
 import { getDatabase } from "./database";
 import { toIso } from "./serialization";
+import { parseMatchFormat } from "@/lib/shared/match-format";
 import { rankingPointsSql } from "@/lib/shared/ranking";
 import {
   computeDeepStats,
   emptyDeepStats,
+  forfeitAwareMapScore,
   type DeepStats,
   type StatsMatch,
   type StatsTournament,
@@ -99,6 +101,8 @@ type MatchStatRow = RowDataPacket & {
   team2_score: number | null;
   winner_team_id: number;
   forfeit_team_id: number | null;
+  match_format_type: "BO" | "FT" | null;
+  match_format_value: number | null;
 };
 
 type RegistrationStatRow = RowDataPacket & {
@@ -191,7 +195,9 @@ async function loadMatchRows(
       m.team1_score,
       m.team2_score,
       m.winner_team_id,
-      m.forfeit_team_id
+      m.forfeit_team_id,
+      t.match_format_type,
+      t.match_format_value
      FROM bg_matches m
      JOIN bg_tournaments t ON t.id = m.tournament_id
      LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
@@ -240,6 +246,15 @@ function toStatsMatch(row: MatchStatRow, teamId: number): StatsMatch {
   let forfeit: StatsMatch["forfeit"] = "NONE";
   if (forfeitTeamId !== null) forfeit = forfeitTeamId === teamId ? "GIVEN" : "RECEIVED";
 
+  // Le bilan de maps d'un forfait vient du **format** du tournoi, pas des
+  // colonnes : elles sont vides sur les forfaits antérieurs à la règle.
+  const maps = forfeitAwareMapScore(
+    forfeit,
+    parseMatchFormat(row.match_format_type, row.match_format_value),
+    isTeam1 ? row.team1_score : row.team2_score,
+    isTeam1 ? row.team2_score : row.team1_score,
+  );
+
   return {
     matchId: Number(row.id),
     tournamentId: Number(row.tournament_id),
@@ -251,8 +266,8 @@ function toStatsMatch(row: MatchStatRow, teamId: number): StatsMatch {
     opponentTeamId: opponentId,
     opponentName,
     won: Number(row.winner_team_id) === teamId,
-    scoreFor: Number((isTeam1 ? row.team1_score : row.team2_score) ?? 0),
-    scoreAgainst: Number((isTeam1 ? row.team2_score : row.team1_score) ?? 0),
+    scoreFor: maps.scoreFor,
+    scoreAgainst: maps.scoreAgainst,
     forfeit,
   };
 }

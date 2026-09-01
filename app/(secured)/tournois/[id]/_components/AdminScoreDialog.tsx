@@ -5,6 +5,7 @@ import { Pill } from "@/components/cyber";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
+  forfeitMapCount,
   matchFormatDescription,
   matchFormatLabel,
   matchWinsRequired,
@@ -93,7 +94,8 @@ function ScoreStepper({ id, teamName, value, max, disabled, onChange }: ScoreSte
 function storedResultLabel(match: BracketMatch, team1: string, team2: string): string | null {
   if (match.forfeitTeamId !== null) {
     const forfeiting = match.forfeitTeamId === match.team1Id ? team1 : team2;
-    return `Forfait enregistré : ${forfeiting}.`;
+    const beneficiary = match.forfeitTeamId === match.team1Id ? team2 : team1;
+    return `Forfait enregistré : ${forfeiting}, ${beneficiary} l'emporte.`;
   }
   if (match.team1Score === null && match.team2Score === null) return null;
 
@@ -138,6 +140,9 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
   // Borne haute de la saisie : l'objectif du format (3 en BO5 comme en FT3),
   // ou 99 quand le tournoi laisse le score libre.
   const maxScore = matchFormat ? matchWinsRequired(matchFormat) : 99;
+  // Score qu'emporte le vainqueur d'un forfait : celui du format, 1 en saisie
+  // libre — la même valeur que celle écrite en base par la route.
+  const forfeitMaps = forfeitMapCount(matchFormat);
   const forfeitTeamId = form.forfeitTeamId;
   const forfeiting =
     forfeitTeamId === undefined
@@ -286,15 +291,22 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
                 ? "Annuler le forfait"
                 : showForfeit
                   ? "Annuler"
-                  : "Déclarer un forfait"}
+                  : "Déclarer un forfait sur cette manche"}
             </button>
 
             {showForfeit && (
               <div id="admin-score-forfeit" className={styles.forfeitPanel}>
+                {/* Le forfait n'est pas une rencontre blanche : il se compte
+                    au score plein du format (FT3 → 3-0), et c'est ce chiffre
+                    qu'il faut annoncer avant le clic — il entre au bilan de
+                    maps comme au capital d'endurance d'une BlueGenji Survie.
+                    Le geste ne porte que sur **cette** manche : retirer une
+                    équipe de tout le reste du tournoi se fait depuis son
+                    classement, pas d'ici. */}
                 <p className={styles.forfeitHint}>
                   {forfeiting
-                    ? `${forfeiting.out} déclare forfait : ${forfeiting.through} l'emporte sans manche jouée.`
-                    : "Qui déclare forfait ? Son adversaire l'emporte, et les scores saisis sont ignorés."}
+                    ? `${forfeiting.out} déclare forfait sur cette manche : ${forfeiting.through} l'emporte ${forfeitMaps}-0, sans manche jouée.`
+                    : `Qui déclare forfait sur cette manche ? Son adversaire l'emporte ${forfeitMaps}-0, et les scores saisis sont ignorés.`}
                 </p>
                 <div className={styles.forfeitRow}>
                   <button

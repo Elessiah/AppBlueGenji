@@ -29,7 +29,12 @@
  * Module pur : aucune dépendance base de données, entièrement testable.
  */
 
-import { matchWinsRequired, type MatchFormat } from "./match-format";
+import { forfeitMapCount, type MatchFormat } from "./match-format";
+
+// Le chiffre d'un forfait appartient au format de match, pas au mode : il est
+// défini une seule fois dans `match-format.ts` et réexporté ici, où l'appelaient
+// déjà l'orchestration et la vue.
+export { forfeitMapCount };
 
 export type EnduranceStatus = "ACTIVE" | "ELIMINATED" | "FORFEIT";
 
@@ -99,11 +104,6 @@ export type EnduranceMatchOutcome = {
   isForfeit?: boolean;
 };
 
-/** Maps qu'emporte le vainqueur d'un forfait, selon le format du tournoi. */
-export function forfeitMapCount(format: MatchFormat | null | undefined): number {
-  return format ? matchWinsRequired(format) : 1;
-}
-
 /**
  * Maps à porter au compte de chaque équipe pour un match rejoué.
  *
@@ -130,6 +130,30 @@ export function enduranceMatchMaps(
 
   return { winnerMaps: Math.floor(winnerMaps), loserMaps: Math.floor(loserMaps) };
 }
+
+/**
+ * Une case du tableau d'endurance, manche par manche — la lecture « feuille de
+ * calcul » du classement.
+ *
+ * Trois natures, et pas une seule valeur numérique tolérant les trous : un
+ * capital de 0 ne dit pas si l'équipe a été vidée par ses résultats ou déclarée
+ * forfait, et une case vide ne dit pas si la manche reste à jouer ou si
+ * l'équipe n'y était plus.
+ *
+ * - `POINTS` — capital à l'issue de la manche (0 compris : la manche qui vide
+ *   le capital affiche bien ce zéro).
+ * - `FORFEIT` — manche couverte par un **forfait de tournoi** : l'équipe est
+ *   partie, la case porte « FF » en rouge au lieu d'un nombre, et le restera
+ *   pour toutes les manches suivantes.
+ * - `OUT` — l'équipe était déjà éliminée : elle n'a pas disputé cette manche et
+ *   n'a donc aucun capital à y montrer.
+ */
+export type EnduranceRoundCell = {
+  round: number;
+  kind: "POINTS" | "FORFEIT" | "OUT";
+  /** Capital à l'issue de la manche. `null` hors des cases `POINTS`. */
+  points: number | null;
+};
 
 /** Abandon déclaré : décision humaine, non déductible des matchs. */
 export type EnduranceForfeit = { teamId: number; round: number };
@@ -231,6 +255,41 @@ function applyMapDelta(
 }
 
 /**
+ * État d'une équipe à la fin de la manche qu'on est en train d'enregistrer.
+ *
+ * Le statut est lu **au moment où la manche se referme**, pas à la fin du
+ * rejeu : c'est ce qui rend la case honnête. Une équipe éliminée à la manche 5
+ * a bien un capital à montrer pour les manches 1 à 4 ; lire son statut final
+ * les blanchirait toutes.
+ */
+function enduranceRoundCell(standing: EnduranceStanding, round: number): EnduranceRoundCell {
+  // Le forfait couvre la manche où il est déclaré **et tout le reste** : c'est
+  // la case rouge « FF » du tableau, pas un capital tombé à zéro.
+  if (standing.status === "FORFEIT") return { round, kind: "FORFEIT", points: null };
+
+  // Éliminée lors d'une manche **antérieure** : elle n'a pas joué celle-ci. La
+  // manche qui la vide, elle, affiche son zéro — c'est le résultat de la manche.
+  if (
+    standing.status === "ELIMINATED" &&
+    standing.eliminatedRound !== null &&
+    standing.eliminatedRound < round
+  ) {
+    return { round, kind: "OUT", points: null };
+  }
+
+  return { round, kind: "POINTS", points: standing.points };
+}
+
+/** Rejeu complet : classement final **et** capital manche par manche. */
+export type EnduranceReplay = {
+  standings: EnduranceStanding[];
+  /** Manches rejouées, dans l'ordre (1..N). Vide avant la première manche. */
+  rounds: number[];
+  /** Cases du tableau, par équipe, alignées sur `rounds`. */
+  history: Map<number, EnduranceRoundCell[]>;
+};
+
+/**
  * Rejoue la phase qualificative et renvoie l'état complet des équipes.
  *
  * L'élimination est **immédiate** : dès que le capital atteint 0 au cours d'une
@@ -238,6 +297,18 @@ function applyMapDelta(
  * match ultérieur la mentionnait (cas d'un score corrigé a posteriori).
  */
 export function replayEndurance(input: ReplayEnduranceInput): EnduranceStanding[] {
+  return replayEnduranceDetailed(input).standings;
+}
+
+/**
+ * Même rejeu, avec l'historique manche par manche en plus.
+ *
+ * Il n'est pas stocké : il se dérive du même parcours que le classement, donc
+ * une correction de score le refait comme elle refait tout le reste. C'est la
+ * raison d'être de cette variante — recalculer l'historique dans un second
+ * passage laisserait deux vérités possibles pour un même tournoi.
+ */
+export function replayEnduranceDetailed(input: ReplayEnduranceInput): EnduranceReplay {
   const { teams, matches, forfeits, config, lastRound, matchFormat } = input;
 
   const standings = new Map<number, EnduranceStanding>(
@@ -270,6 +341,9 @@ export function replayEndurance(input: ReplayEnduranceInput): EnduranceStanding[
     ...forfeits.map((f) => f.round),
     0,
   );
+
+  const rounds: number[] = [];
+  const history = new Map<number, EnduranceRoundCell[]>(teams.map((team) => [team.teamId, []]));
 
   for (let round = 1; round <= maxRound; round += 1) {
     for (const match of matches) {
@@ -317,9 +391,14 @@ export function replayEndurance(input: ReplayEnduranceInput): EnduranceStanding[
     ordered.forEach((standing, index) => {
       standing.previousRank = index + 1;
     });
+
+    rounds.push(round);
+    for (const standing of standings.values()) {
+      history.get(standing.teamId)?.push(enduranceRoundCell(standing, round));
+    }
   }
 
-  return assignRanks([...standings.values()]);
+  return { standings: assignRanks([...standings.values()]), rounds, history };
 }
 
 /**

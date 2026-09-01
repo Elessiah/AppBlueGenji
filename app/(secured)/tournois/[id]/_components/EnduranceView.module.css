@@ -36,3 +36,72 @@
     align-items: start;
   }
 }
+
+/*
+ * Tableau « manche par manche » — la lecture feuille de calcul du mode.
+ *
+ * Le gabarit complet voyage dans une variable (`--history-cols`) plutôt qu'en
+ * `grid-template-columns` en ligne : le nombre de manches n'est connu qu'au
+ * rendu, mais une déclaration en ligne l'emporterait sur toute règle d'ici,
+ * media query comprise. La zone défile horizontalement (`ScrollArea`) au lieu
+ * de se replier : un tableau de capitaux perd tout son sens empilé en colonne.
+ */
+.historyRow {
+  display: grid;
+  grid-template-columns: var(--history-cols);
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line-soft, rgba(255, 255, 255, 0.06));
+  min-width: max-content;
+}
+
+.historyRow:last-child {
+  border-bottom: none;
+}
+
+.historyHead {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.historyTeam {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  padding-right: 8px;
+}
+
+.historyCell {
+  text-align: center;
+  font-size: 12px;
+  line-height: 20px;
+  border-radius: 3px;
+}
+
+/* Capital vidé : la case reste un nombre, mais elle ne se lit plus comme un score sain. */
+.historyZero {
+  color: var(--text-2);
+}
+
+/*
+ * Forfait sur le reste du tournoi : case rouge portant « FF » au lieu d'un
+ * capital. Le rouge est celui du danger (`--danger`), jamais `--red-live`, qui
+ * n'habille que ce qui est réellement à l'antenne.
+ */
+.historyForfeit {
+  background: rgba(var(--danger-rgb), 0.18);
+  border: 1px solid rgba(var(--danger-rgb), 0.45);
+  color: var(--danger);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* Manche que l'équipe n'a pas disputée : rien à montrer, sans trou dans la grille. */
+.historyOut {
+  color: var(--text-2);
+  opacity: 0.45;
+}

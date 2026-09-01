@@ -20,6 +20,7 @@ import {
   qualificationComplete,
   rankActiveTeams,
   replayEndurance,
+  replayEnduranceDetailed,
   resolveEnduranceConfig,
   selectQualifiedTeamIds,
   type EnduranceConfig,
@@ -782,6 +783,25 @@ export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: numb
     [tournamentId],
   );
 
+  // Historique manche par manche — la lecture « feuille de calcul » du mode.
+  // Il n'est **pas** stocké : le même rejeu qui produit le classement le
+  // produit, si bien qu'une correction de score le refait sans migration ni
+  // colonne à tenir à jour. Les abandons se relisent ici depuis les lignes déjà
+  // chargées, plutôt que par une seconde requête sur la même table.
+  const detailed = replayEnduranceDetailed({
+    teams: rows.map((row) => ({ teamId: Number(row.team_id), seed: Number(row.seed) })),
+    matches: await loadQualificationOutcomes(conn, tournamentId),
+    forfeits: rows
+      .filter((row) => row.status === "FORFEIT")
+      .map((row) => ({
+        teamId: Number(row.team_id),
+        round: Number(row.eliminated_round ?? 1),
+      })),
+    config,
+    lastRound: Number(tournament.endurance_current_round),
+    matchFormat: matchFormatOf(tournament),
+  });
+
   return {
     startPoints: config.startPoints,
     winDelta: config.winDelta,
@@ -790,6 +810,7 @@ export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: numb
     playoffSize: config.playoffSize,
     currentRound: Number(tournament.endurance_current_round),
     playoffsStarted: Number(tournament.endurance_playoffs_started) === 1,
+    rounds: detailed.rounds,
     standings: rows.map((row) => ({
       teamId: Number(row.team_id),
       teamName: row.team_name,
@@ -801,6 +822,7 @@ export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: numb
       status: row.status,
       eliminatedRound: row.eliminated_round === null ? null : Number(row.eliminated_round),
       rank: Number(row.rank),
+      rounds: detailed.history.get(Number(row.team_id)) ?? [],
     })),
   };
 }

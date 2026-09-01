@@ -1,5 +1,7 @@
 "use client";
 
+import { ScrollArea } from "@/components/cyber";
+import type { EnduranceRoundCell } from "@/lib/shared/bg-survie";
 import type { BracketMatch, EnduranceMeta } from "@/lib/shared/types";
 import { useParticipantWording } from "../_lib/entrant-link";
 import styles from "./EnduranceView.module.css";
@@ -37,6 +39,106 @@ const STATUS_LABELS: Record<EnduranceMeta["standings"][number]["status"], string
   ELIMINATED: "Éliminée",
   FORFEIT: "Forfait",
 };
+
+/** Contenu d'une case du tableau manche par manche. */
+function historyCellLabel(cell: EnduranceRoundCell): string {
+  if (cell.kind === "FORFEIT") return "FF";
+  if (cell.kind === "OUT") return "—";
+  return String(cell.points ?? 0);
+}
+
+function historyCellClass(cell: EnduranceRoundCell): string {
+  if (cell.kind === "FORFEIT") return `${styles.historyCell} ${styles.historyForfeit}`;
+  if (cell.kind === "OUT") return `${styles.historyCell} ${styles.historyOut}`;
+  return `${styles.historyCell} num${cell.points === 0 ? ` ${styles.historyZero}` : ""}`;
+}
+
+/** Phrase lue par un lecteur d'écran (et infobulle) pour une case. */
+function historyCellTitle(teamName: string, cell: EnduranceRoundCell): string {
+  if (cell.kind === "FORFEIT") return `${teamName} · manche ${cell.round} : forfait`;
+  if (cell.kind === "OUT") return `${teamName} · manche ${cell.round} : déjà éliminée`;
+  return `${teamName} · manche ${cell.round} : ${cell.points} point${(cell.points ?? 0) > 1 ? "s" : ""}`;
+}
+
+/**
+ * Tableau du capital d'endurance **manche par manche**, comme la feuille de
+ * calcul qui tient le règlement : une ligne par équipe, une colonne par manche.
+ *
+ * C'est le seul endroit où un forfait de tournoi se lit d'un coup d'œil : la
+ * colonne « Statut » du classement dit qu'une équipe est partie, elle ne dit pas
+ * **à partir de quand** — ici, ses manches restantes portent « FF » en rouge au
+ * lieu d'un capital, et le tableau se lit comme le document d'arbitrage.
+ *
+ * Défilement horizontal plutôt que repli mobile : un tableau de capitaux empilé
+ * en colonne ne se compare plus.
+ */
+function EnduranceHistory({
+  endurance,
+  myTeamId,
+}: {
+  endurance: EnduranceMeta;
+  myTeamId: number | null;
+}) {
+  if (endurance.rounds.length === 0) return null;
+
+  const columns = `minmax(140px, 1fr) repeat(${endurance.rounds.length}, 40px)`;
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div className="mono" style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 8 }}>
+        ENDURANCE MANCHE PAR MANCHE
+      </div>
+      <ScrollArea fade ariaLabel="Capital d'endurance manche par manche">
+        <div className="table-like">
+          <div
+            className={`${styles.historyRow} ${styles.historyHead}`}
+            style={{ "--history-cols": columns } as React.CSSProperties}
+          >
+            <span className={styles.historyTeam}>Équipe</span>
+            {endurance.rounds.map((round) => (
+              <span key={round} className={styles.historyCell}>
+                M{round}
+              </span>
+            ))}
+          </div>
+          {endurance.standings.map((standing) => (
+            <div
+              key={standing.teamId}
+              className={styles.historyRow}
+              style={
+                {
+                  "--history-cols": columns,
+                  background:
+                    myTeamId !== null && standing.teamId === myTeamId
+                      ? "rgba(89,212,255,0.06)"
+                      : undefined,
+                } as React.CSSProperties
+              }
+            >
+              <span className={styles.historyTeam}>{standing.teamName}</span>
+              {standing.rounds.map((cell) => (
+                <span
+                  key={cell.round}
+                  className={historyCellClass(cell)}
+                  title={historyCellTitle(standing.teamName, cell)}
+                >
+                  {historyCellLabel(cell)}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+      {/* Une case rouge n'est lisible qu'accompagnée de ce qu'elle veut dire :
+          la légende n'apparaît que s'il y a effectivement un forfait à lire. */}
+      {endurance.standings.some((standing) => standing.status === "FORFEIT") && (
+        <p className="mono" style={{ fontSize: 10, color: "var(--text-2)", margin: "8px 0 0" }}>
+          FF = FORFAIT SUR TOUT LE RESTE DU TOURNOI
+        </p>
+      )}
+    </div>
+  );
+}
 
 /**
  * Vue du mode « BlueGenji Survie » : capital d'endurance de chaque équipe, puis
@@ -138,12 +240,12 @@ export function EnduranceView({
                       title={
                         isMine
                           ? `Abandonner : ${wording.subject} quittera définitivement le tournoi`
-                          : `Déclarer l'abandon de ${standing.teamName}`
+                          : `Déclarer ${standing.teamName} forfait pour tout le reste du tournoi`
                       }
                       aria-label={
                         isMine
                           ? "Abandonner le tournoi"
-                          : `Déclarer l'abandon de ${standing.teamName}`
+                          : `Déclarer ${standing.teamName} forfait pour tout le reste du tournoi`
                       }
                       style={{
                         padding: "3px 8px",
@@ -155,7 +257,14 @@ export function EnduranceView({
                         color: AMBER,
                       }}
                     >
-                      Abandonner
+                      {/*
+                        Deux gestes différents sous un même bouton : le lecteur
+                        qui quitte le tournoi « abandonne », l'arbitrage, lui,
+                        « déclare forfait » une équipe — pour tout le reste du
+                        tournoi, et non sur la seule manche en cours (ce
+                        forfait-là se pose sur le match).
+                      */}
+                      {isMine ? "Abandonner" : "Forfait"}
                     </button>
                   )}
                 </span>
@@ -164,6 +273,8 @@ export function EnduranceView({
           );
         })}
       </div>
+
+      <EnduranceHistory endurance={endurance} myTeamId={myTeamId} />
 
       {rounds.map((round) => (
         <div key={round} style={{ marginBottom: 20 }}>

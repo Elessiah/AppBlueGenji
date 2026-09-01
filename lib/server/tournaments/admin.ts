@@ -1,7 +1,12 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { dependentMatches, hasScoreInput, type MatchScoreState } from "@/lib/shared/match-lock";
-import { checkMatchScores, parseMatchFormat } from "@/lib/shared/match-format";
+import {
+  checkMatchScores,
+  forfeitMapCount,
+  parseMatchFormat,
+  type MatchFormat,
+} from "@/lib/shared/match-format";
 import { MatchRow } from "./_internal";
 import { finalizeMatch } from "./scoring";
 import { tryAutoResolveByes } from "./byes";
@@ -173,6 +178,20 @@ async function checkScoresAgainstMatchFormat(
   team2Score: number,
   decisive: boolean,
 ): Promise<void> {
+  const violation = checkMatchScores(
+    await loadTournamentMatchFormat(connection, tournamentId),
+    team1Score,
+    team2Score,
+    { decisive },
+  );
+  if (violation) throw new Error(violation);
+}
+
+/** Format de match du tournoi (`null` = saisie libre). */
+async function loadTournamentMatchFormat(
+  connection: PoolConnection,
+  tournamentId: number,
+): Promise<MatchFormat | null> {
   const [rows] = await connection.execute<
     (RowDataPacket & { match_format_type: "BO" | "FT" | null; match_format_value: number | null })[]
   >(
@@ -184,15 +203,34 @@ async function checkScoresAgainstMatchFormat(
   );
 
   const row = rows[0];
-  if (!row) return;
+  if (!row) return null;
+  return parseMatchFormat(row.match_format_type, row.match_format_value);
+}
 
-  const violation = checkMatchScores(
-    parseMatchFormat(row.match_format_type, row.match_format_value),
-    team1Score,
-    team2Score,
-    { decisive },
-  );
-  if (violation) throw new Error(violation);
+/**
+ * Score à inscrire pour un forfait ponctuel — celui qu'un arbitre déclare sur
+ * **une** rencontre, sans que l'équipe quitte le tournoi.
+ *
+ * Le forfait n'est pas une rencontre blanche : il vaut le score plein du format
+ * (FT3 → 3-0). L'écrire en base plutôt que de le laisser à `NULL` est ce qui le
+ * fait compter partout de la même façon — bilan de maps des fiches, affichage
+ * de la manche, barème d'endurance — sans que chaque lecteur ait à redécouvrir
+ * la règle. Le mode BlueGenji Survie la connaissait déjà pour son compte : elle
+ * vaut maintenant pour tous les formats, comme le veut le règlement.
+ */
+async function forfeitScores(
+  connection: PoolConnection,
+  tournamentId: number,
+  match: MatchRow,
+  forfeitTeamId: number,
+): Promise<{ team1Score: number; team2Score: number }> {
+  const maps = forfeitMapCount(await loadTournamentMatchFormat(connection, tournamentId));
+  const team1Forfeits = forfeitTeamId === Number(match.team1_id);
+
+  return {
+    team1Score: team1Forfeits ? 0 : maps,
+    team2Score: team1Forfeits ? maps : 0,
+  };
 }
 
 /**
@@ -248,13 +286,20 @@ export async function adminSaveMatchScores(
   if (forfeitTeamId !== undefined) {
     assertForfeitBelongsToMatch(match, forfeitTeamId);
 
+    const scores = await forfeitScores(
+      connection,
+      Number(match.tournament_id),
+      match,
+      forfeitTeamId,
+    );
+
     await connection.execute(
       `UPDATE bg_matches
-       SET team1_score = NULL,
-           team2_score = NULL,
+       SET team1_score = ?,
+           team2_score = ?,
            forfeit_team_id = ?
        WHERE id = ?`,
-      [forfeitTeamId, matchId],
+      [scores.team1Score, scores.team2Score, forfeitTeamId, matchId],
     );
   } else if (team1Score !== undefined && team2Score !== undefined) {
     await checkScoresAgainstMatchFormat(
@@ -322,8 +367,12 @@ export async function adminResolveMatch(
       forfeitTeamId === Number(match.team1_id) ? Number(match.team2_id) : Number(match.team1_id);
     loserTeamId =
       forfeitTeamId === Number(match.team1_id) ? Number(match.team1_id) : Number(match.team2_id);
-    resultTeam1Score = null;
-    resultTeam2Score = null;
+
+    // Score plein du format, et non `NULL` : un forfait se compte comme une
+    // victoire 3-0 (en FT3), partout où le score d'une manche est relu.
+    const scores = await forfeitScores(connection, tournamentId, match, forfeitTeamId);
+    resultTeam1Score = scores.team1Score;
+    resultTeam2Score = scores.team2Score;
   } else if (team1Score !== undefined && team2Score !== undefined) {
     await checkScoresAgainstMatchFormat(connection, tournamentId, team1Score, team2Score, true);
 

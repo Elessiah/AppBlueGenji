@@ -83,6 +83,23 @@ export function matchMaxMaps(format: MatchFormat): number {
   return matchWinsRequired(format) * 2 - 1;
 }
 
+/**
+ * Manches portées au vainqueur d'un **forfait**, l'autre équipe restant à zéro.
+ *
+ * Un forfait n'est pas une rencontre blanche : le règlement le compte comme le
+ * score plein du format du tournoi — un FT3 se solde donc par un 3-0, avec tout
+ * ce que cela emporte (barème d'endurance, bilan de maps des fiches). Sans
+ * format — tournoi en saisie libre — il vaut 1-0 : le plus petit score qui
+ * désigne encore un vainqueur, car un 0-0 n'en désignerait aucun.
+ *
+ * C'est la seule définition du chiffre : `adminResolveMatch` l'écrit en base,
+ * le rejeu d'endurance et le bilan de maps le relisent depuis le format pour
+ * les forfaits enregistrés avant cette règle, sans score en colonnes.
+ */
+export function forfeitMapCount(format: MatchFormat | null | undefined): number {
+  return format ? matchWinsRequired(format) : 1;
+}
+
 /** Étiquette courte, telle qu'affichée sur les pastilles : « BO5 », « FT3 ». */
 export function matchFormatLabel(format: MatchFormat | null): string {
   return format ? `${format.type}${format.value}` : "Score libre";
