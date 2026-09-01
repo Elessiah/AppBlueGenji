@@ -20,12 +20,19 @@ const AMBER = "rgba(255,157,46,0.9)";
 
 /**
  * Le gabarit par défaut de `.table-row` ne compte que quatre colonnes : sans
- * cette grille explicite, le classement (six cellules) repliait les dernières
+ * cette grille explicite, le classement (cinq cellules) repliait la dernière
  * sur une seconde ligne.
+ *
+ * Chaque ligne est sa propre grille : la colonne d'action doit donc être de
+ * largeur **fixe**, et n'exister que si au moins une ligne porte un bouton —
+ * une colonne `auto` se serait dimensionnée ligne par ligne, décalant les
+ * colonnes des lignes avec bouton par rapport à toutes les autres.
  */
-const ROW_GRID: React.CSSProperties = {
-  gridTemplateColumns: "44px minmax(0, 1.6fr) 1fr 1fr 1fr auto",
-};
+function rowGrid(withActions: boolean): React.CSSProperties {
+  return {
+    gridTemplateColumns: `44px minmax(0, 1.6fr) 1fr 1fr 1fr${withActions ? " 108px" : ""}`,
+  };
+}
 
 /** Première manche de play-offs (cf. `lib/server/tournaments/bg-survie.ts`). */
 const PLAYOFF_ROUND_OFFSET = 1000;
@@ -58,6 +65,18 @@ export function EnduranceView({
   const rounds = [...new Set(visible.map((match) => match.roundNumber))].sort((a, b) => b - a);
   const activeCount = endurance.standings.filter((s) => s.status === "ACTIVE").length;
 
+  // Abandon : proposé sur les équipes encore en lice, à leurs représentants
+  // comme à l'arbitrage (cf. `canForfeit` côté page).
+  const canForfeitRow = (teamId: number, status: string): boolean =>
+    !isFinished &&
+    status === "ACTIVE" &&
+    canForfeit !== undefined &&
+    onForfeit !== undefined &&
+    canForfeit(teamId);
+
+  const showActions = endurance.standings.some((s) => canForfeitRow(s.teamId, s.status));
+  const grid = rowGrid(showActions);
+
   return (
     <>
       {/*
@@ -74,31 +93,24 @@ export function EnduranceView({
       </p>
 
       <div className="table-like" style={{ marginBottom: 24 }}>
-        <div className="table-row table-header" style={ROW_GRID}>
+        <div className="table-row table-header" style={grid}>
           <span>#</span>
           <span>{wording.oneCapitalized}</span>
           <span>Endurance</span>
           <span>V / D</span>
           <span>Statut</span>
-          <span className="sr-only">Actions</span>
+          {showActions && <span className="sr-only">Actions</span>}
         </div>
         {endurance.standings.map((standing) => {
           const isMine = myTeamId !== null && standing.teamId === myTeamId;
-          // Abandon : proposé sur les équipes encore en lice, à leurs
-          // représentants comme à l'arbitrage (cf. `canForfeit` côté page).
-          const forfeitable =
-            !isFinished &&
-            standing.status === "ACTIVE" &&
-            canForfeit !== undefined &&
-            onForfeit !== undefined &&
-            canForfeit(standing.teamId);
+          const forfeitable = canForfeitRow(standing.teamId, standing.status);
 
           return (
             <div
               key={standing.teamId}
               className="table-row"
               style={{
-                ...ROW_GRID,
+                ...grid,
                 alignItems: "center",
                 opacity: standing.status === "ACTIVE" ? 1 : 0.55,
                 background: isMine ? "rgba(89,212,255,0.06)" : undefined,
@@ -114,36 +126,38 @@ export function EnduranceView({
                 {STATUS_LABELS[standing.status]}
                 {standing.eliminatedRound ? ` (M${standing.eliminatedRound})` : ""}
               </span>
-              <span>
-                {forfeitable && (
-                  <button
-                    type="button"
-                    onClick={() => onForfeit(standing.teamId, standing.teamName)}
-                    className="btn"
-                    title={
-                      isMine
-                        ? `Abandonner : ${wording.subject} quittera définitivement le tournoi`
-                        : `Déclarer l'abandon de ${standing.teamName}`
-                    }
-                    aria-label={
-                      isMine
-                        ? "Abandonner le tournoi"
-                        : `Déclarer l'abandon de ${standing.teamName}`
-                    }
-                    style={{
-                      padding: "3px 8px",
-                      fontSize: 10,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
-                      background: "rgba(255,157,46,0.12)",
-                      borderColor: "rgba(255,157,46,0.4)",
-                      color: AMBER,
-                    }}
-                  >
-                    Abandonner
-                  </button>
-                )}
-              </span>
+              {showActions && (
+                <span>
+                  {forfeitable && onForfeit !== undefined && (
+                    <button
+                      type="button"
+                      onClick={() => onForfeit(standing.teamId, standing.teamName)}
+                      className="btn"
+                      title={
+                        isMine
+                          ? `Abandonner : ${wording.subject} quittera définitivement le tournoi`
+                          : `Déclarer l'abandon de ${standing.teamName}`
+                      }
+                      aria-label={
+                        isMine
+                          ? "Abandonner le tournoi"
+                          : `Déclarer l'abandon de ${standing.teamName}`
+                      }
+                      style={{
+                        padding: "3px 8px",
+                        fontSize: 10,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
+                        background: "rgba(255,157,46,0.12)",
+                        borderColor: "rgba(255,157,46,0.4)",
+                        color: AMBER,
+                      }}
+                    >
+                      Abandonner
+                    </button>
+                  )}
+                </span>
+              )}
             </div>
           );
         })}

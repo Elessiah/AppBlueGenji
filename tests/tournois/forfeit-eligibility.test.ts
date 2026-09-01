@@ -91,8 +91,14 @@ describe("abandon — câblage des vues à classement", () => {
   });
 
   it("n'offre l'abandon en BlueGenji Survie que sur une équipe encore en lice", () => {
-    expect(enduranceView).toContain('standing.status === "ACTIVE"');
-    expect(enduranceView).toContain("canForfeit(standing.teamId)");
-    expect(enduranceView).toContain("!isFinished");
+    // Trois conditions, toutes portées par la même règle de ligne : tournoi non
+    // clos, équipe active, et la décision d'éligibilité déléguée à la page.
+    const rule = enduranceView.slice(
+      enduranceView.indexOf("const canForfeitRow"),
+      enduranceView.indexOf("const showActions"),
+    );
+    expect(rule).toContain("!isFinished");
+    expect(rule).toContain('status === "ACTIVE"');
+    expect(rule).toContain("canForfeit(teamId)");
   });
 });
