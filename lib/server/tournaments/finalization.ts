@@ -1,4 +1,5 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import { MIN_ENTRANTS_FOR_MATCHES } from "@/lib/shared/constants";
 import { queueBotLog } from "./bot-logs";
 import { resetRegistrationRanks, finishTournament } from "./repository";
 
@@ -150,13 +151,19 @@ export async function finalizeUnderfilledTournament(
   connection: PoolConnection,
   tournamentId: number,
 ): Promise<boolean> {
-  // `LIMIT 2` : seule la distinction « moins de deux » nous intéresse.
+  // Le `LIMIT` s'arrête au seuil : seule la distinction « moins de deux » nous
+  // intéresse, jamais l'effectif exact d'un plateau à 128. Le nombre vient de
+  // `MIN_ENTRANTS_FOR_MATCHES` (`lib/shared/constants.ts`), partagé avec la
+  // confirmation du lancement anticipé, qui annonce cette clôture avant le clic
+  // — écrit deux fois, il aurait fini par se contredire. C'est une constante du
+  // module, jamais une entrée : rien d'externe n'atteint cette interpolation.
   const [rows] = await connection.execute<(RowDataPacket & { team_id: number })[]>(
-    `SELECT team_id FROM bg_tournament_registrations WHERE tournament_id = ? LIMIT 2`,
+    `SELECT team_id FROM bg_tournament_registrations
+     WHERE tournament_id = ? LIMIT ${MIN_ENTRANTS_FOR_MATCHES}`,
     [tournamentId],
   );
 
-  if (rows.length > 1) return false;
+  if (rows.length >= MIN_ENTRANTS_FOR_MATCHES) return false;
 
   if (rows.length === 1) {
     await connection.execute(

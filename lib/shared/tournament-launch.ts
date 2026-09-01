@@ -38,6 +38,7 @@
  * mène quelque part et pour nommer ce qui va être sauté, le serveur pour
  * rejouer la règle sous verrou.
  */
+import { MIN_ENTRANTS_FOR_MATCHES } from "./constants";
 import { computeTournamentState, type TournamentStateInput } from "./tournament-state";
 import {
   computeTournamentProgress,
@@ -149,17 +150,28 @@ export function launchBlockReason(
  *
  * L'étape courante en fait partie : elle est **abrégée**, pas sautée — mais du
  * point de vue de qui confirme, la distinction ne change rien, ce sont les
- * étapes qui n'auront pas lieu comme prévu. Vide dès qu'il n'y a plus rien à
- * abréger, c'est-à-dire exactement quand `launchBlockReason` refuse.
+ * étapes qui n'auront pas lieu comme prévu.
  *
- * L'étape est celle de `computeTournamentProgress`, et non l'état du moteur :
- * c'est la seule des deux à distinguer « masqué » d'« annoncé » et l'avant de
- * l'après-inscriptions — les quatre nuances dont il est justement question ici.
+ * **Vide exactement quand `launchBlockReason` refuse**, et c'est ce refus qui
+ * le décide, pas un second calcul qui lui ressemblerait. Les deux modules ne
+ * traitent pas les dates abîmées de la même façon : `computeTournamentProgress`
+ * remplace un jalon illisible par celui de son voisin (`orderedMilestones`)
+ * pour que la frise reste dessinable, là où abréger s'y refuse. Sans cette
+ * ligne, un tournoi aux dates corrompues rendrait une liste d'étapes bien
+ * remplie sur une action que le serveur va refuser en 400 — et l'équivalence
+ * annoncée ici serait plus forte que celle tenue.
+ *
+ * L'étape, elle, est bien celle de `computeTournamentProgress` et non l'état du
+ * moteur : c'est la seule des deux à distinguer « masqué » d'« annoncé » et
+ * l'avant de l'après-inscriptions — les quatre nuances dont il est justement
+ * question ici.
  */
 export function abridgedStagesForLaunch(
   tournament: LaunchableTournament,
   now: number = Date.now(),
 ): TournamentStageKey[] {
+  if (launchBlockReason(tournament, now) !== null) return [];
+
   const runningIndex = TOURNAMENT_STAGE_ORDER.indexOf("RUNNING");
   const { currentIndex } = computeTournamentProgress(tournament, { now });
   if (currentIndex >= runningIndex) return [];
@@ -205,18 +217,18 @@ export function shortenScheduleForLaunch(
 }
 
 /**
- * Effectif en deçà duquel le lancement ne produira aucun match : le tournoi est
- * clos sur-le-champ, l'unique engagée déclarée première
- * (`docs/features/UNDERFILLED_TOURNAMENTS.md`).
+ * Le lancement clôturera-t-il le tournoi sans qu'un seul match soit joué ?
  *
- * Ce n'est pas un refus — c'est exactement ce qui se produirait à l'heure
- * annoncée, et un organisateur peut vouloir en finir tout de suite avec un
- * plateau désert. Mais « Lancer » ne doit pas être ce qui le lui apprend : la
- * confirmation le dit avant le clic.
+ * Le seuil est celui du moteur (`MIN_ENTRANTS_FOR_MATCHES`, `./constants`),
+ * partagé avec `finalizeUnderfilledTournament` qui décide réellement de la
+ * clôture : la confirmation ne peut pas promettre autre chose que ce qui va se
+ * passer.
+ *
+ * Un effectif insuffisant n'est pas un refus — c'est exactement ce qui se
+ * produirait à l'heure annoncée, et un organisateur peut vouloir en finir tout
+ * de suite avec un plateau désert. Mais « Lancer » ne doit pas être ce qui le
+ * lui apprend : la confirmation le dit avant le clic.
  */
-export const MIN_ENTRANTS_FOR_MATCHES = 2;
-
-/** Le lancement clôturera-t-il le tournoi sans qu'un seul match soit joué ? */
 export function willCloseWithoutMatches(entrantCount: number): boolean {
   return entrantCount < MIN_ENTRANTS_FOR_MATCHES;
 }

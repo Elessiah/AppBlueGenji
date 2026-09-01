@@ -9,6 +9,7 @@ import {
   willCloseWithoutMatches,
   type LaunchableTournament,
 } from "@/lib/shared/tournament-launch";
+import { MIN_ENTRANTS_FOR_MATCHES } from "@/lib/shared/constants";
 import { computeTournamentState } from "@/lib/shared/tournament-state";
 import type { TournamentState } from "@/lib/shared/types";
 
@@ -192,6 +193,29 @@ describe("abridgedStagesForLaunch", () => {
   it("n'énumère plus rien sur un tournoi terminé", () => {
     expect(abridgedStagesForLaunch({ ...STAGES.REGISTRATION, state: "FINISHED" }, NOW)).toEqual([]);
   });
+
+  it.each([
+    ["startVisibilityAt"],
+    ["registrationOpenAt"],
+    ["registrationCloseAt"],
+    ["startAt"],
+  ] as const)("n'énumère plus rien quand %s est illisible", (field) => {
+    // `computeTournamentProgress` tolère une date abîmée (elle emprunte celle
+    // de son voisin, pour que la frise reste dessinable) là où abréger s'y
+    // refuse. Sans l'alignement sur `launchBlockReason`, la confirmation
+    // listerait des étapes sur une action que le serveur refuse en 400.
+    const broken = { ...STAGES.REGISTRATION, [field]: "pas une date" };
+
+    expect(abridgedStagesForLaunch(broken, NOW)).toEqual([]);
+    expect(launchBlockReason(broken, NOW)).toBe("INVALID_DATES");
+  });
+
+  it.each(STAGE_NAMES)("est vide si et seulement si le lancement est refusé — %s", (name) => {
+    const tournament = STAGES[name];
+    const blocked = launchBlockReason(tournament, NOW) !== null;
+
+    expect(abridgedStagesForLaunch(tournament, NOW).length === 0).toBe(blocked);
+  });
 });
 
 describe("willCloseWithoutMatches", () => {
@@ -202,5 +226,12 @@ describe("willCloseWithoutMatches", () => {
     [16, false],
   ])("à %i engagés → %s", (count, expected) => {
     expect(willCloseWithoutMatches(count as number)).toBe(expected);
+  });
+
+  it("suit le seuil du moteur plutôt qu'un 2 réécrit ici", () => {
+    // `finalizeUnderfilledTournament` lit la même constante : la confirmation
+    // ne peut pas promettre une clôture que le moteur ne prononcerait pas.
+    expect(willCloseWithoutMatches(MIN_ENTRANTS_FOR_MATCHES)).toBe(false);
+    expect(willCloseWithoutMatches(MIN_ENTRANTS_FOR_MATCHES - 1)).toBe(true);
   });
 });
