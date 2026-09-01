@@ -3,9 +3,8 @@
 import { FormEvent, useCallback, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { formatLocalDateTime } from "@/lib/shared/dates";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
-import { entrantHref, participantWording } from "@/lib/shared/participants";
+import { participantWording } from "@/lib/shared/participants";
 import { useToast } from "@/components/ui/toast";
 import { CyberButton } from "@/components/cyber";
 import { useTournamentLive } from "./_hooks/useTournamentLive";
@@ -21,7 +20,7 @@ import { MatchScheduleDialog } from "./_components/MatchScheduleDialog";
 import { LiveProvider } from "./_lib/live-context";
 import { IssueReportProvider } from "./_lib/issue-report-context";
 import { IssueReportDialog } from "./_components/IssueReportDialog";
-import { SeedingEditor } from "./_components/SeedingEditor";
+import { RegistrationsPanel } from "./_components/RegistrationsPanel";
 import { BracketPreview } from "./_components/BracketPreview";
 import { MatchScoreDraft } from "./_components/BracketTree";
 import { BracketSections } from "./_components/BracketSections";
@@ -601,36 +600,11 @@ export default function TournamentDetailPage() {
           )}
         </div>
 
-        {detail.isAdmin && !frozen && (
-          <SeedingEditor tournamentId={tournamentId} onReordered={() => void refresh()} />
-        )}
-
-        <div className="ds-block">
-          <div className="ds-section-title green">
-            <h2>Inscriptions</h2>
-          </div>
-          <div className="table-like">
-            <div className="table-row table-header">
-              <span>{wording.oneCapitalized}</span>
-              <span>Seed</span>
-              <span>Inscription</span>
-              <span>Classement final</span>
-            </div>
-            {detail.registrations.map((reg) => (
-              <div key={reg.teamId} className="table-row">
-                <Link
-                  href={entrantHref(reg.teamId, detail.soloUserIds)}
-                  style={{ color: "inherit", textDecoration: "none" }}
-                >
-                  {reg.teamName}
-                </Link>
-                <span>{reg.seed ?? "-"}</span>
-                <span>{formatLocalDateTime(reg.registeredAt)}</span>
-                <span>{reg.finalRank ?? "-"}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <RegistrationsPanel
+          detail={detail}
+          canReorder={!frozen}
+          onReordered={() => void refresh()}
+        />
 
         <TournamentProgress detail={detail} />
 
