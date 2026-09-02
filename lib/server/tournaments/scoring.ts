@@ -119,7 +119,18 @@ export async function finalizeMatch(
   // d'objet, et leurs réservations doivent partir avec elles. C'est ce qui rend
   // « une alerte de conflit par manche » temporaire plutôt que définitif — un
   // désaccord qui renaît après un arbitrage doit pouvoir alerter à nouveau.
-  await clearRefereeAlerts(connection, Number(match.id));
+  //
+  // Au meilleur effort, comme tout ce qui touche aux notifications : `finalizeMatch`
+  // est le point de passage de **tous** les matchs tranchés, report de score et
+  // arbitrage compris, et une table d'alertes absente — la migration de
+  // `database.ts` avale ses erreurs — ne doit pas rendre le moteur inutilisable.
+  // Au pire, la manche garde des réservations sans objet, et un désaccord qui
+  // renaîtrait plus tard n'alerterait pas.
+  try {
+    await clearRefereeAlerts(connection, Number(match.id));
+  } catch {
+    // Meilleur effort.
+  }
 
   await pushTeamToTarget(
     connection,

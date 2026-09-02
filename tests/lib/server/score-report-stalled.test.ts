@@ -6,11 +6,7 @@ jest.mock("@/lib/server/tournaments/bot-logs");
 
 import { resolveExpiredScoreReports } from "@/lib/server/tournaments/finalization";
 import { finalizeMatch } from "@/lib/server/tournaments/scoring";
-import {
-  hasQueuedBotLog,
-  queueBotLog,
-  queueRefereeAlert,
-} from "@/lib/server/tournaments/bot-logs";
+import { queueBotLog, queueRefereeAlert } from "@/lib/server/tournaments/bot-logs";
 
 type Queued = { kind: string } & Record<string, unknown>;
 
@@ -62,9 +58,6 @@ beforeEach(() => {
   (queueBotLog as jest.Mock).mockReturnValue(true);
   // `queueRefereeAlert` réserve puis met en file, et rend « l'alerte partira-t-elle ? ».
   (queueRefereeAlert as jest.Mock).mockResolvedValue(true as never);
-  // Aucune alerte de conflit en file par défaut : le désaccord ne vient pas de
-  // naître dans cette transaction.
-  (hasQueuedBotLog as jest.Mock).mockReturnValue(false);
 });
 
 describe("resolveExpiredScoreReports", () => {
@@ -308,25 +301,6 @@ describe("resolveExpiredScoreReports", () => {
     await resolveExpiredScoreReports(connection, 12);
 
     expect(finalizeMatch).not.toHaveBeenCalled();
-    expect(queueRefereeAlert).not.toHaveBeenCalled();
-  });
-
-  // Le conflit vient d'être mis en file par le report qui a ouvert cette
-  // transaction : le téléphone de l'arbitre sonne déjà, et deux messages dans
-  // la même seconde ne diraient pas deux choses.
-  it("n'escalade pas quand l'alerte de conflit vient d'être mise en file", async () => {
-    const connection = fakeConnection({
-      rows: (q) => (q.includes("FROM bg_matches") ? [expiredRow({ id: 43 })] : []),
-    });
-
-    (hasQueuedBotLog as jest.Mock).mockReturnValue(true);
-
-    await resolveExpiredScoreReports(connection, 12);
-
-    expect(hasQueuedBotLog).toHaveBeenCalledWith(connection, {
-      kind: "score_conflict",
-      matchId: 43,
-    });
     expect(queueRefereeAlert).not.toHaveBeenCalled();
   });
 

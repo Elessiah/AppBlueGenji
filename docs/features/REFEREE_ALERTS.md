@@ -162,8 +162,15 @@ minutes » : une borne basse, la seule chose qu'il puisse promettre sans mentir.
 Reste un cas où les deux alertes tomberaient dans la même seconde : un second
 report contradictoire qui arrive très tard crée le conflit *et* remplit la
 condition d'escalade, dans la même transaction. L'escalade se tait alors — le
-téléphone de l'arbitre est déjà en train de sonner (`hasQueuedBotLog`), et elle
-repassera au prochain balayage si rien n'a bougé.
+téléphone de l'arbitre est déjà en train de sonner — et elle repassera au
+prochain balayage si rien n'a bougé.
+
+La règle est posée dans `flushBotLogs`, **sur la file entière**, et non chez
+celui qui réserve : `resolveExpiredScoreReports` est appelée *deux fois* par
+report de score — une fois avant la mise en file du conflit (via
+`syncTournamentState`) et une fois après —, si bien qu'une garde posée à la
+réservation ne verrait qu'un des deux ordres. La file, elle, les voit tous les
+deux ; l'escalade écartée rend sa réservation et repassera plus tard.
 
 ### Pourquoi une table
 
@@ -192,7 +199,9 @@ Il porte donc sa propre clé (`SCORE_CONFLICT`), posée par le même
 `claimRefereeAlert`. La réservation est **temporaire** : `finalizeMatch` efface
 toutes les réservations de la manche qu'il tranche (`clearRefereeAlerts`), si
 bien qu'un désaccord qui renaît après un arbitrage — correction de score sur une
-archive — alerte de nouveau.
+archive — alerte de nouveau. Cet effacement est au **meilleur effort** :
+`finalizeMatch` est le point de passage de tous les matchs tranchés, et une
+table d'alertes absente ne doit pas rendre le moteur inutilisable.
 
 ### Une réservation se rend quand rien n'est parti
 
@@ -217,6 +226,19 @@ dans les deux cas où l'alerte n'est pas partie :
   la ligne sur le pool, et le prochain balayage réessaie. C'est le bon sens du
   risque : pour une alerte qui ne se répète pas d'elle-même, un doublon vaut
   mieux qu'un silence.
+
+« Remis » veut dire *le bot a accepté et posté*, pas *un arbitre a lu*. Le point
+d'entrée écrit d'abord dans le canal de logs, puis démarche le rôle : un bilan à
+`sent: 0` — rôle non configuré, messages privés fermés — décrit une trace bel et
+bien posée, la seule qui soit durable. Rejouer sur ce critère reposterait cette
+trace à chaque balayage, pour toujours.
+
+La ligne est effacée **par son identifiant**, jamais par sa paire
+`(match_id, alert_key)` : la libération peut arriver trente secondes après la
+réservation — la fenêtre que s'accorde le bot pour lire les membres du rôle —,
+et un autre balayage a pu, entre-temps, reposer la même paire puis remettre son
+alerte. Effacer « la réservation de cette manche » emporterait alors celle d'un
+autre, qui, lui, avait bel et bien alerté.
 
 Un seul point d'entrée pose tout cela pour le moteur : `queueRefereeAlert`
 réserve, met en file, et rend la réservation si l'un des deux échoue. Il **ne

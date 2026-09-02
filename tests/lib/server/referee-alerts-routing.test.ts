@@ -89,7 +89,7 @@ describe("routage vers deux transports", () => {
     const connection = fakeConnection();
     mockDb([[MATCH_ROW]]);
 
-    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31 });
+    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
     flushBotLogs(connection);
     await new Promise((resolve) => setImmediate(resolve));
 
@@ -233,14 +233,14 @@ describe("réservation rendue quand l'alerte n'est pas remise", () => {
     const execute = mockDb([[MATCH_ROW]]);
     (pushRefereeAlert as jest.Mock).mockResolvedValue(null as never);
 
-    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31 });
+    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
     flushBotLogs(connection);
     await new Promise((resolve) => setImmediate(resolve));
 
     const deletes = writes(execute);
     expect(deletes).toHaveLength(1);
     expect(deletes[0].sql).toContain("bg_referee_alerts");
-    expect(deletes[0].params).toEqual([31, "SCORE_REPORT_STALLED"]);
+    expect(deletes[0].params).toEqual([77]);
   });
 
   // Même chose quand le transport rejette plutôt que de rendre `null`.
@@ -249,7 +249,7 @@ describe("réservation rendue quand l'alerte n'est pas remise", () => {
     const execute = mockDb([[MATCH_ROW]]);
     (pushRefereeAlert as jest.Mock).mockRejectedValue(new Error("ECONNREFUSED") as never);
 
-    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31 });
+    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
     flushBotLogs(connection);
     await new Promise((resolve) => setImmediate(resolve));
 
@@ -266,7 +266,7 @@ describe("réservation rendue quand l'alerte n'est pas remise", () => {
       failed: [],
     } as never);
 
-    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31 });
+    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
     flushBotLogs(connection);
     await new Promise((resolve) => setImmediate(resolve));
 
@@ -280,13 +280,13 @@ describe("réservation rendue quand l'alerte n'est pas remise", () => {
     const execute = mockDb([[MATCH_ROW]]);
     (pushRefereeAlert as jest.Mock).mockResolvedValue(null as never);
 
-    queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31, claimId: 88 });
     flushBotLogs(connection);
     await new Promise((resolve) => setImmediate(resolve));
 
     const deletes = writes(execute);
     expect(deletes).toHaveLength(1);
-    expect(deletes[0].params).toEqual([31, "SCORE_CONFLICT"]);
+    expect(deletes[0].params).toEqual([88]);
   });
 
   // Une entrée qui ne se **résout** pas — ligne effacée entre-temps, engagé sans
@@ -297,14 +297,28 @@ describe("réservation rendue quand l'alerte n'est pas remise", () => {
     // Aucune ligne : `loadMatch` ne trouve rien, l'entrée est ignorée.
     const execute = mockDb([[]]);
 
-    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31 });
+    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
     flushBotLogs(connection);
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(pushRefereeAlert).not.toHaveBeenCalled();
     const deletes = writes(execute);
     expect(deletes).toHaveLength(1);
-    expect(deletes[0].params).toEqual([31, "SCORE_REPORT_STALLED"]);
+    expect(deletes[0].params).toEqual([77]);
+  });
+
+  // Une alerte mise en file sans réservation — le cas d'une entrée posée à la
+  // main, hors de `queueRefereeAlert` — n'a pas d'identifiant à effacer.
+  it("ne libère rien pour une alerte sans réservation", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([[MATCH_ROW]]);
+    (pushRefereeAlert as jest.Mock).mockResolvedValue(null as never);
+
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(writes(execute)).toHaveLength(0);
   });
 
   // Une ligne de journal ne réserve rien : il n'y a rien à rendre.
@@ -318,6 +332,59 @@ describe("réservation rendue quand l'alerte n'est pas remise", () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(writes(execute)).toHaveLength(0);
+  });
+});
+
+describe("conflit et escalade dans la même transaction", () => {
+  /**
+   * Les deux évènements peuvent naître du même report tardif, et dans un ordre
+   * ou dans l'autre selon le passage d'entretien qui les produit : la règle est
+   * donc posée sur la file entière, une fois, au moment de l'envoi.
+   */
+  it("n'envoie pas l'escalade quand le conflit part dans la même file", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([[MATCH_ROW]]);
+
+    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31, claimId: 88 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    // Un seul message : celui du conflit.
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+    expect((pushRefereeAlert as jest.Mock).mock.calls[0][0]).toContain("contradictoires");
+    // Et l'escalade écartée rend sa réservation, pour repasser plus tard.
+    const deletes = execute.mock.calls
+      .map((call) => ({ sql: String(call[0]), params: (call[1] ?? []) as unknown[] }))
+      .filter((call) => call.sql.trim().startsWith("DELETE"));
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0].params).toEqual([77]);
+  });
+
+  // L'ordre inverse doit donner le même résultat.
+  it("écarte l'escalade quel que soit l'ordre des deux évènements", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31, claimId: 88 });
+    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+  });
+
+  // Une escalade sur **une autre** manche n'est pas écartée pour autant.
+  it("n'écarte pas l'escalade d'une autre manche", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW], [{ ...MATCH_ROW, id: 32 }]]);
+
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31, claimId: 88 });
+    queueBotLog(connection, { kind: "score_report_stalled", matchId: 32, claimId: 77 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(2);
   });
 });
 

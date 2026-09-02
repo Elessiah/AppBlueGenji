@@ -71,8 +71,8 @@ export type PendingBotLog =
   | { kind: "registration"; tournamentId: number; teamId: number; byStaff: boolean }
   | { kind: "forfeit"; tournamentId: number; teamId: number }
   | { kind: "match_finished"; matchId: number }
-  | { kind: "score_conflict"; matchId: number }
-  | { kind: "score_report_stalled"; matchId: number }
+  | { kind: "score_conflict"; matchId: number; claimId?: number }
+  | { kind: "score_report_stalled"; matchId: number; claimId?: number }
   | { kind: "tournament_started"; tournamentId: number }
   | { kind: "tournament_finished"; tournamentId: number }
   | { kind: "tournament_underfilled"; tournamentId: number };
@@ -124,6 +124,17 @@ export const CONFLICT_ALERT_KEY = "SCORE_CONFLICT";
 export const STALLED_ALERT_KEY = "SCORE_REPORT_STALLED";
 
 /**
+ * Les entrées qui réservent une alerte arbitre.
+ *
+ * `queueRefereeAlert` ne prend qu'elles : une entrée de journal n'a pas de
+ * réservation à porter, et le type l'empêche d'y entrer par distraction.
+ */
+export type RefereeAlertEntry = Extract<
+  PendingBotLog,
+  { kind: "score_conflict" | "score_report_stalled" }
+>;
+
+/**
  * Clé de réservation d'un évènement, ou `null` s'il n'en réserve aucune.
  *
  * Une seule fonction pour tout le module : c'est elle qui garantit que ce que
@@ -140,8 +151,17 @@ export function refereeAlertKey(entry: PendingBotLog): string | null {
   }
 }
 
-/** Une réservation d'alerte se pose et se retire par la même paire de clés. */
-const RELEASE_ALERT_SQL = `DELETE FROM bg_referee_alerts WHERE match_id = ? AND alert_key = ?`;
+/**
+ * Une réservation se retire par **son identifiant de ligne**, jamais par sa
+ * paire `(match_id, alert_key)`.
+ *
+ * La libération peut arriver trente secondes après la réservation — c'est la
+ * fenêtre que s'accorde le bot pour lire les membres du rôle —, et un autre
+ * balayage a pu, entre-temps, reposer la même paire de clés puis remettre son
+ * alerte. Effacer « la réservation de cette manche » emporterait alors celle
+ * d'un autre, qui, lui, avait bel et bien alerté.
+ */
+const RELEASE_ALERT_SQL = `DELETE FROM bg_referee_alerts WHERE id = ?`;
 
 /**
  * Plafond d'entrées retenues par transaction.
@@ -213,15 +233,30 @@ export function flushBotLogs(connection: PoolConnection): void {
   pending.delete(connection);
   if (!queue || queue.length === 0) return;
 
+  // Une manche dont le désaccord vient d'être annoncé n'a pas besoin de son
+  // escalade dans la même seconde : le téléphone de l'arbitre sonne déjà, et
+  // deux messages d'affilée ne diraient pas deux choses. La règle est posée
+  // **ici**, sur la file entière, et non chez celui qui réserve : les deux
+  // évènements peuvent arriver dans un ordre ou dans l'autre selon le passage
+  // d'entretien qui les produit, et une garde posée à la réservation ne verrait
+  // que l'un des deux ordres.
+  const announcedConflicts = new Set(
+    queue.filter((entry) => entry.kind === "score_conflict").map(refereeAlertMatchId),
+  );
+  const toSend = queue.filter(
+    (entry) =>
+      !(entry.kind === "score_report_stalled" && announcedConflicts.has(entry.matchId)),
+  );
+
   void (async () => {
     // Ce qui a été **effectivement remis** aux arbitres, repéré par la clé de
-    // l'entrée. Tout le reste — non remis, mais aussi non *résolu* : ligne
-    // effacée entre-temps, engagé sans nom, erreur MySQL passagère — doit
-    // rendre sa réservation, sans quoi elle serait consommée en silence et
-    // aucun passage ultérieur ne réessaierait.
+    // l'entrée. Tout le reste — écarté ci-dessus, non remis, mais aussi non
+    // *résolu* : ligne effacée entre-temps, engagé sans nom, erreur MySQL
+    // passagère — doit rendre sa réservation, sans quoi elle serait consommée
+    // en silence et aucun passage ultérieur ne réessaierait.
     const delivered = new Set<string>();
 
-    for (const { entry, channel, message } of await resolveBotLogs(queue)) {
+    for (const { entry, channel, message } of await resolveBotLogs(toSend)) {
       if (channel !== "REFEREE") {
         await sendBotLog(message);
         continue;
@@ -231,6 +266,14 @@ export function flushBotLogs(connection: PoolConnection): void {
       // problème : personne n'attend cette réponse, et un bot éteint ferait
       // sinon patienter chaque envoi de fond sur la fenêtre de 30 s que
       // demande la lecture des membres du rôle.
+      //
+      // « Remis » veut dire *le bot a accepté et posté*, pas *un arbitre a lu*.
+      // Le point d'entrée écrit d'abord dans le canal de logs, puis démarche le
+      // rôle : un bilan à `sent: 0` — rôle non configuré, messages privés
+      // fermés — décrit une trace bel et bien posée, la seule qui soit durable.
+      // Rejouer sur ce critère reposterait cette trace à chaque balayage, pour
+      // toujours. Seul un `null` (bot injoignable, coupe-circuit ouvert) dit que
+      // rien n'est parti.
       let sent = false;
       try {
         sent = (await pushRefereeAlert(message, "referee-alert", { honourCircuit: true })) !== null;
@@ -245,9 +288,9 @@ export function flushBotLogs(connection: PoolConnection): void {
     // pas d'elle-même : il n'y a pas de palier suivant pour la rattraper.
     for (const entry of queue) {
       if (delivered.has(entryKey(entry))) continue;
-      const alertKey = refereeAlertKey(entry);
-      if (alertKey === null) continue;
-      await releaseRefereeAlertOnPool(refereeAlertMatchId(entry), alertKey);
+      const claimId = refereeAlertClaimId(entry);
+      if (claimId === null) continue;
+      await releaseRefereeAlertOnPool(claimId);
     }
   })().catch(() => undefined);
 }
@@ -258,6 +301,21 @@ export function flushBotLogs(connection: PoolConnection): void {
  * Les deux natures concernées portent un `matchId` ; le `switch` est là pour
  * que TypeScript le sache, pas pour trancher quoi que ce soit.
  */
+/**
+ * Identifiant de la réservation portée par une entrée, `null` si elle n'en a
+ * pas — évènement de journal, ou alerte mise en file sans passer par
+ * `queueRefereeAlert`.
+ */
+function refereeAlertClaimId(entry: PendingBotLog): number | null {
+  switch (entry.kind) {
+    case "score_conflict":
+    case "score_report_stalled":
+      return entry.claimId ?? null;
+    default:
+      return null;
+  }
+}
+
 function refereeAlertMatchId(entry: PendingBotLog): number {
   switch (entry.kind) {
     case "score_conflict":
@@ -286,18 +344,22 @@ function refereeAlertMatchId(entry: PendingBotLog): number {
  * réappariement d'une ronde suisse, correction de score en survie — efface ses
  * matchs, donc ses réservations.
  *
- * @returns `true` si la réservation est acquise (c'est à nous d'alerter).
+ * @returns L'identifiant de la ligne réservée (c'est à nous d'alerter), ou
+ *          `null` si un autre passage l'a prise. L'identifiant, et non un
+ *          booléen : c'est **cette ligne-là** qu'il faudra rendre si l'alerte
+ *          ne part pas, et pas celle qu'un autre balayage aura posée depuis.
  */
 export async function claimRefereeAlert(
   connection: PoolConnection,
   matchId: number,
   alertKey: string,
-): Promise<boolean> {
+): Promise<number | null> {
   const [result] = await connection.execute(
     `INSERT IGNORE INTO bg_referee_alerts (match_id, alert_key) VALUES (?, ?)`,
     [matchId, alertKey],
   );
-  return (result as { affectedRows?: number }).affectedRows === 1;
+  const written = result as { affectedRows?: number; insertId?: number };
+  return written.affectedRows === 1 ? Number(written.insertId) : null;
 }
 
 /**
@@ -309,10 +371,9 @@ export async function claimRefereeAlert(
  */
 export async function releaseRefereeAlert(
   connection: PoolConnection,
-  matchId: number,
-  alertKey: string,
+  claimId: number,
 ): Promise<void> {
-  await connection.execute(RELEASE_ALERT_SQL, [matchId, alertKey]);
+  await connection.execute(RELEASE_ALERT_SQL, [claimId]);
 }
 
 /**
@@ -345,36 +406,30 @@ export async function clearRefereeAlerts(
  */
 export async function queueRefereeAlert(
   connection: PoolConnection,
-  entry: PendingBotLog,
+  entry: RefereeAlertEntry,
 ): Promise<boolean> {
   const alertKey = refereeAlertKey(entry);
+  // Le type d'entrée le garantit ; la lecture ne coûte rien et évite un `!`.
   if (alertKey === null) return queueBotLog(connection, entry);
 
-  const matchId = refereeAlertMatchId(entry);
+  let claimId: number | null;
   try {
-    if (!(await claimRefereeAlert(connection, matchId, alertKey))) return false;
+    claimId = await claimRefereeAlert(connection, entry.matchId, alertKey);
   } catch {
     return false;
   }
+  if (claimId === null) return false;
 
   // La file est plafonnée : un balayage chargé peut abandonner l'entrée. La
   // réservation serait alors consommée sans qu'aucune alerte ne parte, et aucun
   // passage ultérieur ne réessaierait — on la rend.
-  if (queueBotLog(connection, entry)) return true;
+  if (queueBotLog(connection, { ...entry, claimId })) return true;
   try {
-    await releaseRefereeAlert(connection, matchId, alertKey);
+    await releaseRefereeAlert(connection, claimId);
   } catch {
     // Meilleur effort : au pire, cette manche n'aura pas son alerte.
   }
   return false;
-}
-
-/** `true` si cette entrée exacte attend déjà d'être envoyée sur cette connexion. */
-export function hasQueuedBotLog(connection: PoolConnection, entry: PendingBotLog): boolean {
-  const queue = pending.get(connection);
-  if (!queue) return false;
-  const key = entryKey(entry);
-  return queue.some((existing) => entryKey(existing) === key);
 }
 
 /**
@@ -385,10 +440,10 @@ export function hasQueuedBotLog(connection: PoolConnection, entry: PendingBotLog
  * chemin — une réservation qu'on n'arrive pas à rendre laisse simplement la
  * manche sans escalade, ce qui est l'état d'avant.
  */
-async function releaseRefereeAlertOnPool(matchId: number, alertKey: string): Promise<void> {
+async function releaseRefereeAlertOnPool(claimId: number): Promise<void> {
   try {
     const db = await getDatabase();
-    await db.execute(RELEASE_ALERT_SQL, [matchId, alertKey]);
+    await db.execute(RELEASE_ALERT_SQL, [claimId]);
   } catch {
     // Meilleur effort.
   }

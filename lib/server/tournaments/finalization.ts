@@ -1,7 +1,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { MIN_ENTRANTS_FOR_MATCHES } from "@/lib/shared/constants";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
-import { hasQueuedBotLog, queueBotLog, queueRefereeAlert } from "./bot-logs";
+import { queueBotLog, queueRefereeAlert } from "./bot-logs";
 import { resetRegistrationRanks, finishTournament } from "./repository";
 
 export async function isEliminationPhaseComplete(
@@ -278,9 +278,13 @@ export async function finalizeTournamentIfDone(
  * colonne est posée au premier report et jamais réécrite tant que la manche
  * n'est pas tranchée (`COALESCE`) : elle ne peut donc pas être repoussée par
  * une engagée qui resaisirait son score en boucle, contrairement aux
- * horodatages de report. Et elle ne double jamais l'alerte de conflit : si
- * celle-ci vient d'être mise en file dans cette même transaction, l'arbitre est
- * déjà prévenu, et l'escalade attendra le prochain passage.
+ * horodatages de report.
+ *
+ * Le doublon avec l'alerte de conflit — les deux évènements peuvent naître dans
+ * la même transaction — n'est pas écarté ici : cette fonction est appelée
+ * **deux fois** par report de score, une fois avant la mise en file du conflit
+ * et une fois après, et une garde posée à la réservation ne verrait donc qu'un
+ * des deux ordres. C'est `flushBotLogs` qui tranche, sur la file entière.
  */
 export async function resolveExpiredScoreReports(
   connection: PoolConnection,
@@ -364,14 +368,10 @@ export async function resolveExpiredScoreReports(
     // qui dure, pas un désaccord qui vient de naître.
     if (Number(match.conflict_stalled ?? 0) !== 1) continue;
 
-    const matchId = Number(match.id);
-
-    // L'alerte de conflit vient d'être mise en file par ce même report : le
-    // téléphone de l'arbitre est déjà en train de sonner, et deux messages dans
-    // la même seconde ne diraient pas deux choses.
-    if (hasQueuedBotLog(connection, { kind: "score_conflict", matchId })) continue;
-
-    await queueRefereeAlert(connection, { kind: "score_report_stalled", matchId });
+    await queueRefereeAlert(connection, {
+      kind: "score_report_stalled",
+      matchId: Number(match.id),
+    });
   }
 }
 

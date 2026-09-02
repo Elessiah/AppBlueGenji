@@ -86,6 +86,12 @@ async function purgeTournamentRows(
   // manches, et la liste relisible de ce qui part vaut mieux qu'une cascade que
   // personne ne relit — d'autant que la création de la table est avalée par un
   // `catch` dans `database.ts`, où une contrainte manquante passerait inaperçue.
+  //
+  // Sans `try`, contrairement au chemin du moteur : une suppression n'est pas
+  // une notification au meilleur effort, c'est un geste dont on attend qu'il
+  // soit **complet**. Échouer bruyamment vaut mieux que laisser des lignes
+  // pointant vers des manches effacées (et si la table manquait vraiment, la
+  // contrainte de `bg_matches` bloquerait l'étape suivante de toute façon).
   await connection.execute(
     `DELETE a FROM bg_referee_alerts a
      JOIN bg_matches m ON m.id = a.match_id
