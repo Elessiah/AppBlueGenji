@@ -72,7 +72,7 @@ describe("leaderboard de la landing", () => {
     ]);
   });
 
-  it("borne le classement de référence à une semaine en arrière", async () => {
+  it("borne le classement de référence à une semaine, sur l'horloge de la base", async () => {
     const execute = await mockDb([row(1, "Alpha", 2, 0)]);
 
     await getLandingLeaderboard(8);
@@ -81,9 +81,8 @@ describe("leaderboard de la landing", () => {
       (call) => Array.isArray(call[1]) && (call[1] as unknown[]).length > 0,
     );
     expect(bounded).toBeDefined();
-    const [when] = bounded![1] as [Date];
-    const days = (Date.now() - when.getTime()) / 86_400_000;
-    expect(days).toBeCloseTo(7, 1);
+    expect(String(bounded![0])).toContain("DATE_SUB(NOW(), INTERVAL ? DAY)");
+    expect(bounded![1]).toEqual([7]);
   });
 
   it("compare la tendance à deux photos du même calcul", async () => {

@@ -96,24 +96,31 @@ export function TeamCard({ team }: { team: TeamListItem }) {
         </div>
       )}
 
-      <div className={s.stats} role="group" aria-label="Bilan de l'équipe">
+      {/* Les libellés abrégés restent lisibles par les lecteurs d'écran, leur
+          forme longue étant donnée en `sr-only` juste à côté : `aria-label` sur
+          un `<div>` sans rôle (`generic`) n'accepte pas de nom d'auteur — la
+          carte n'annoncerait alors que trois nombres nus. */}
+      <div className={s.stats}>
         <div title={`${RANKING_POINTS_LABEL} · ${RANKING_POINTS_HINT}`}>
-          <div className={s.statLbl} aria-hidden="true">Pts</div>
-          <div className={s.statVal} aria-label={`${team.points} points de classement`}>
-            {team.points}
+          <div className={s.statLbl}>
+            <span aria-hidden="true">Pts</span>
+            <span className="sr-only">{RANKING_POINTS_LABEL}</span>
           </div>
+          <div className={s.statVal}>{team.points}</div>
         </div>
         <div>
-          <div className={s.statLbl} aria-hidden="true">Vict.</div>
-          <div className={`${s.statVal} ${s.win}`} aria-label={`${team.wins} victoires`}>
-            {team.wins}
+          <div className={s.statLbl}>
+            <span aria-hidden="true">Vict.</span>
+            <span className="sr-only">Victoires</span>
           </div>
+          <div className={`${s.statVal} ${s.win}`}>{team.wins}</div>
         </div>
         <div>
-          <div className={s.statLbl} aria-hidden="true">Déf.</div>
-          <div className={`${s.statVal} ${s.loss}`} aria-label={`${team.losses} défaites`}>
-            {team.losses}
+          <div className={s.statLbl}>
+            <span aria-hidden="true">Déf.</span>
+            <span className="sr-only">Défaites</span>
           </div>
+          <div className={`${s.statVal} ${s.loss}`}>{team.losses}</div>
         </div>
       </div>
 

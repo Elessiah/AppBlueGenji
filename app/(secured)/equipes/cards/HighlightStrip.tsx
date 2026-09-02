@@ -18,11 +18,12 @@ export function HighlightStrip({ teams }: { teams: TeamListItem[] }) {
             </div>
           </div>
           <div title={`${RANKING_POINTS_LABEL} · ${RANKING_POINTS_HINT}`}>
-            <div className={s.pts} aria-label={`${t.points} points de classement`}>
-              {t.points}
-            </div>
-            <div className={s.ptsLbl} aria-hidden="true">
-              PTS
+            <div className={s.pts}>{t.points}</div>
+            {/* Même règle que sur la carte : le mot complet est lu, l'abréviation
+                est vue. Un `aria-label` posé ici ne serait pas exposé. */}
+            <div className={s.ptsLbl}>
+              <span aria-hidden="true">PTS</span>
+              <span className="sr-only">{RANKING_POINTS_LABEL}</span>
             </div>
           </div>
         </div>

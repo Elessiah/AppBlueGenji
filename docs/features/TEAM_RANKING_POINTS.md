@@ -73,7 +73,10 @@ points — déjà triée. Toutes les vues en descendent :
   le bilan affiché juste au-dessus ;
 - le leaderboard de la landing y lit ses lignes, et sa **tendance** : deux
   appels au même chargeur, dont l'un borné à une semaine en arrière
-  (`completedBefore`) — la flèche compare deux photos du même calcul.
+  (`completedMoreThanDaysAgo`) — la flèche compare deux photos du même calcul.
+  La borne est exprimée en **jours** et posée par MySQL (`DATE_SUB(NOW(), …)`),
+  jamais en date calculée côté application : les dates de match sont écrites par
+  la base, une seconde horloge décalerait la fenêtre du seul écart de fuseau.
 
 Les points sont posés en TypeScript par `rankingPoints`, jamais relus d'une
 colonne SQL : la refonte du barème n'aura qu'un point de calcul à remplacer.

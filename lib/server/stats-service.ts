@@ -321,10 +321,17 @@ export type TeamRankingOptions = {
    */
   includeUnplayed?: boolean;
   /**
-   * Ne retenir que les matchs terminés avant cette date — sert à reconstituer
-   * le classement d'il y a une semaine pour la tendance du leaderboard.
+   * Ne retenir que les matchs terminés il y a **plus de N jours** — sert à
+   * reconstituer le classement d'il y a une semaine pour la tendance du
+   * leaderboard.
+   *
+   * Un nombre de jours, et non une date calculée côté application : les
+   * `updated_at` sont écrits par la base, la borne doit donc se lire sur la
+   * même horloge (`DATE_SUB(NOW(), …)`). Une date construite en JavaScript est
+   * mise en forme dans le fuseau du process Node — app en UTC, base en heure de
+   * Paris, et la fenêtre se décale sans que rien ne le signale.
    */
-  completedBefore?: Date;
+  completedMoreThanDaysAgo?: number;
 };
 
 /**
@@ -346,7 +353,14 @@ export type TeamRankingOptions = {
 export async function loadTeamRanking(options: TeamRankingOptions = {}): Promise<TeamRankingRow[]> {
   const db = await getDatabase();
   const join = options.includeUnplayed ? "LEFT JOIN" : "JOIN";
-  const before = options.completedBefore ? `\n      AND m.updated_at < ?` : "";
+  const days = options.completedMoreThanDaysAgo;
+  // La valeur part en paramètre lié, mais un entier positif est aussi la seule
+  // fenêtre qui ait un sens : autant refuser tout de suite.
+  if (days !== undefined && (!Number.isInteger(days) || days < 0)) {
+    throw new Error("INVALID_RANKING_WINDOW");
+  }
+  const before =
+    days === undefined ? "" : `\n      AND m.updated_at < DATE_SUB(NOW(), INTERVAL ? DAY)`;
   const [rows] = await db.execute<TeamRankingRowSql[]>(
     `SELECT
       t.id AS team_id,
@@ -359,7 +373,7 @@ export async function loadTeamRanking(options: TeamRankingOptions = {}): Promise
        ON ${rankingMatchJoinSql("t.id")}${before}
      WHERE t.solo_user_id IS NULL
      GROUP BY t.id, t.name, t.logo_url`,
-    options.completedBefore ? [options.completedBefore] : [],
+    days === undefined ? [] : [days],
   );
 
   return rows

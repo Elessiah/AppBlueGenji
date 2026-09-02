@@ -232,17 +232,13 @@ async function loadLandingLive(): Promise<LandingLive | null> {
   }
 }
 
-const TREND_WINDOW_DAYS = 7;
-
 /**
- * Le classement d'il y a une semaine, pour la tendance. Même chargeur que le
- * classement courant : la flèche compare deux photos du **même** calcul, sans
- * quoi elle mesurerait l'écart entre deux barèmes plutôt que le temps qui
- * passe.
+ * Recul de la photo de référence servant la tendance, en **jours** : la borne
+ * est posée par MySQL (`DATE_SUB(NOW(), …)`), les dates de match étant écrites
+ * par la base — une seule horloge, donc pas de fenêtre décalée par l'écart de
+ * fuseau entre l'app et la base.
  */
-function trendWindowStart(now: Date): Date {
-  return new Date(now.getTime() - TREND_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-}
+const TREND_WINDOW_DAYS = 7;
 
 export async function getLandingLeaderboard(limit = 8): Promise<LandingLeaderboardRow[]> {
   const safeLimit = Math.min(50, Math.max(1, Math.trunc(limit)));
@@ -255,7 +251,9 @@ async function loadLandingLeaderboard(safeLimit: number): Promise<LandingLeaderb
   try {
     const [currentRows, previousRows] = await Promise.all([
       loadTeamRanking({ includeUnplayed: true }),
-      loadTeamRanking({ includeUnplayed: true, completedBefore: trendWindowStart(new Date()) }),
+      // Le classement d'il y a une semaine : **même chargeur**, donc la flèche
+      // compare deux photos du même calcul plutôt que deux barèmes.
+      loadTeamRanking({ includeUnplayed: true, completedMoreThanDaysAgo: TREND_WINDOW_DAYS }),
     ]);
     const previousRanks = new Map(previousRows.map((row, index) => [row.teamId, index + 1]));
 

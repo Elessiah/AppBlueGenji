@@ -512,19 +512,21 @@ describe("loadTeamRanking", () => {
     ]);
   });
 
-  it("borne les matchs retenus quand une date est fournie", async () => {
+  // La borne est calculée par MySQL : les dates de match sont écrites par la
+  // base, une date construite côté Node décalerait la fenêtre du seul écart de
+  // fuseau entre l'app et la base.
+  it("borne les matchs retenus sur l'horloge de la base", async () => {
     const execute = jest.fn().mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
-    const before = new Date("2026-01-01T00:00:00Z");
-    await loadTeamRanking({ includeUnplayed: true, completedBefore: before });
+    await loadTeamRanking({ includeUnplayed: true, completedMoreThanDaysAgo: 7 });
 
     const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
-    expect(sql).toContain("m.updated_at < ?");
-    expect(params).toEqual([before]);
+    expect(sql).toContain("m.updated_at < DATE_SUB(NOW(), INTERVAL ? DAY)");
+    expect(params).toEqual([7]);
   });
 
-  it("ne borne rien, et ne lie aucun paramètre, sans date", async () => {
+  it("ne borne rien, et ne lie aucun paramètre, sans fenêtre", async () => {
     const execute = jest.fn().mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
@@ -533,6 +535,28 @@ describe("loadTeamRanking", () => {
     const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
     expect(sql).not.toContain("m.updated_at");
     expect(params).toEqual([]);
+  });
+
+  // La valeur part en paramètre lié, mais une fenêtre négative ou fractionnaire
+  // ne veut rien dire : autant refuser avant d'interroger la base.
+  it.each([-1, 1.5, Number.NaN])("refuse une fenêtre absurde (%p)", async (days) => {
+    const execute = jest.fn().mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    await expect(loadTeamRanking({ completedMoreThanDaysAgo: days })).rejects.toThrow(
+      "INVALID_RANKING_WINDOW",
+    );
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("accepte une fenêtre nulle", async () => {
+    const execute = jest.fn().mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    await loadTeamRanking({ completedMoreThanDaysAgo: 0 });
+
+    const [, params] = execute.mock.calls[0] as [string, unknown[]];
+    expect(params).toEqual([0]);
   });
 
   it("tolère des agrégats absents", async () => {
