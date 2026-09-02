@@ -281,3 +281,22 @@ export const RANKING_POINTS_HINT =
 
 /** Ce qu'affiche une équipe qui n'a encore disputé aucun match compté. */
 export const RANKING_UNRANKED_HINT = "Aucun match joué : cote de départ";
+
+/**
+ * La règle de seeding, telle qu'on l'explique au visiteur sur les pages
+ * `/regles` des modes qui seedent au classement (Survie, Ronde suisse,
+ * Multi-phases).
+ *
+ * Elle vit **ici**, dérivée des constantes, et non recopiée dans le registre des
+ * règles : les deux pages y annonçaient encore « victoire = 3 points, défaite =
+ * 1 point » — l'ancien barème de la carte d'annuaire, celui où une défaite
+ * rapportait des points, retiré du code par la PR #88 sans que le texte suive.
+ * Deux phrases copiées dérivent ; une constante partagée, non.
+ *
+ * Sans marqueur Markdown : les pages de règles rendent le texte tel quel.
+ */
+export const RANKING_SEEDING_RULE =
+  `Le seeding initial vient du classement du site : chaque équipe part de `
+  + `${RANKING_BASE_POINTS} points, et chaque match en transfère du perdant au `
+  + `vainqueur — d'autant plus que le résultat était improbable. `
+  + `Seed 1 = meilleure équipe.`;

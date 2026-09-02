@@ -11,6 +11,7 @@
  * Module `shared` : importable côté serveur comme côté client.
  */
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "./constants";
+import { RANKING_SEEDING_RULE } from "./ranking";
 import type { TournamentFormat } from "./types";
 
 /** `SOON` = mode décrit mais pas encore ouvert à la création. */
@@ -289,7 +290,7 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
       {
         title: "Classement de départ",
         body: [
-          "Le seeding initial vient du classement du site, calculé sur l'ensemble des matchs joués toutes compétitions confondues (victoire = 3 points, défaite = 1 point). Seed 1 = meilleure équipe.",
+          RANKING_SEEDING_RULE,
         ],
       },
       {
@@ -369,7 +370,7 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
       {
         title: "Première ronde",
         body: [
-          "Le seeding initial vient du classement du site, calculé sur l'ensemble des matchs joués toutes compétitions confondues (victoire = 3 points, défaite = 1 point). Seed 1 = meilleure équipe.",
+          RANKING_SEEDING_RULE,
         ],
         bullets: [
           "La moitié haute du seeding affronte la moitié basse : la 1ʳᵉ rencontre la (N/2 + 1)ᵉ, et ainsi de suite.",

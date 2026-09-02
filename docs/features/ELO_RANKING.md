@@ -203,6 +203,12 @@ puisque la cote en dépend directement.
   vit déjà le classement.
 - `DeepStats` ne porte plus de `rankingPoints` — un bilan de matchs ne suffit
   pas à déduire une cote.
+- Les pages publiques `/regles/survie` et `/regles/ronde-suisse` annonçaient
+  encore « victoire = 3 points, défaite = 1 point » — l'ancien barème de la
+  carte d'annuaire, celui où une défaite *rapportait* des points, retiré du code
+  par la PR #88 sans que le texte suive. La phrase est désormais unique
+  (`RANKING_SEEDING_RULE`) et dérivée des constantes : deux phrases copiées
+  dérivent, une constante partagée non.
 - L'infobulle annonce la nouvelle règle, **dérivée des constantes** : « Base 500
   · une victoire prend à l'adversaire d'autant plus de points qu'elle était
   improbable (plancher 100) ». Une équipe non classée lit « Aucun match joué :

@@ -13,6 +13,7 @@ import {
   RANKING_POINTS_HINT,
   RANKING_POINTS_LABEL,
   RANKING_SCALE,
+  RANKING_SEEDING_RULE,
   RANKING_UNRANKED_HINT,
   rankedPointsOf,
   rankingMatchJoinSql,
@@ -401,5 +402,20 @@ describe("légendes", () => {
     expect(RANKING_POINTS_HINT.length).toBeLessThan(90);
     expect(RANKING_POINTS_LABEL).toBe("Points de classement");
     expect(RANKING_UNRANKED_HINT).toContain("Aucun match joué");
+  });
+
+  /**
+   * Les pages `/regles` annonçaient encore « victoire = 3 points, défaite =
+   * 1 point » — l'ancien barème de la carte d'annuaire, retiré du code par la
+   * PR #88 sans que le texte suive. La phrase est désormais unique et dérivée
+   * des constantes : elle ne peut plus dériver toute seule.
+   */
+  it("explique le seeding avec la règle réellement appliquée", () => {
+    expect(RANKING_SEEDING_RULE).toContain(String(RANKING_BASE_POINTS));
+    expect(RANKING_SEEDING_RULE).toContain("Seed 1");
+    expect(RANKING_SEEDING_RULE).not.toContain("3 points");
+    expect(RANKING_SEEDING_RULE).not.toMatch(/défaite = \d/);
+    // Les pages de règles rendent le texte brut : pas de gras Markdown.
+    expect(RANKING_SEEDING_RULE).not.toContain("**");
   });
 });
