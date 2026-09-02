@@ -189,18 +189,63 @@ const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 const SOURCE_OF_TRUTH = join("lib", "shared", "match-format.ts");
 
 /**
- * Retire les commentaires : ils citent « BO5 » en prose, et un commentaire de
- * **fin de ligne** compte autant qu'un commentaire de pleine ligne — une seule
- * note « // renvoie "BO5" » suffirait sinon à rendre la suite rouge sans
- * qu'aucun libellé n'ait été recopié.
+ * Blanchit les commentaires **sans toucher aux chaînes**.
  *
- * Le `[^:]` devant `//` épargne les protocoles (`https://…`), la seule paire de
- * barres qui traverse ce dépôt hors commentaire.
+ * Une coupe par expression régulière paraît suffisante ; elle ne l'est pas, et
+ * elle rate précisément ce que ce garde-fou cherche.
+ * `app/api/landing/calendar/route.ts` contient `"PRODID:-//BlueGenji//FR"` :
+ * couper la ligne à la première paire de barres la tronche au milieu d'une
+ * chaîne, et tout ce qui suit — un « BO3 » recopié, par exemple — sort du
+ * balayage sans être vu. On lit donc le fichier caractère par caractère en
+ * suivant l'état (code, chaîne, gabarit, commentaire), et on remplace les seuls
+ * commentaires par des espaces : les décalages et les lignes sont conservés, et
+ * les chaînes restent intactes — ce sont exactement ce qu'on veut inspecter.
  */
 function stripComments(code: string): string {
-  return code
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, (_match, before: string) => before);
+  const out = [...code];
+  let i = 0;
+  const blank = (from: number, to: number) => {
+    for (let k = from; k < to; k += 1) if (out[k] !== "\n") out[k] = " ";
+  };
+
+  while (i < code.length) {
+    const two = code.slice(i, i + 2);
+
+    if (two === "//") {
+      const end = code.indexOf("\n", i);
+      const stop = end === -1 ? code.length : end;
+      blank(i, stop);
+      i = stop;
+      continue;
+    }
+
+    if (two === "/*") {
+      const end = code.indexOf("*/", i + 2);
+      const stop = end === -1 ? code.length : end + 2;
+      blank(i, stop);
+      i = stop;
+      continue;
+    }
+
+    const quote = code[i];
+    if (quote === '"' || quote === "'" || quote === "`") {
+      i += 1;
+      while (i < code.length) {
+        if (code[i] === "\\") {
+          i += 2;
+          continue;
+        }
+        if (code[i] === quote) break;
+        i += 1;
+      }
+      i += 1;
+      continue;
+    }
+
+    i += 1;
+  }
+
+  return out.join("");
 }
 
 /** Tous les fichiers TypeScript du produit (hors tests, hors dépendances). */
@@ -225,24 +270,54 @@ function sourceFiles(): string[] {
 const NOTATION_LITERAL = /"(?:BO|FT)\d+"|'(?:BO|FT)\d+'|`(?:BO|FT)\d+`/g;
 
 /**
- * Un type et un nombre accolés : `` `${f.type}${f.value}` `` ou `type + value`.
+ * Un type et un nombre accolés par interpolation : `` `${f.type}${f.value}` ``.
  * C'est la forme qu'aurait une seconde implémentation de `matchFormatLabel`.
  */
-const NOTATION_ASSEMBLY =
-  /\$\{[^}]*\btype\b[^}]*\}\s*\$\{[^}]*\bvalue\b[^}]*\}|\btype\s*\+\s*[\w.]*\bvalue\b/g;
+const NOTATION_ASSEMBLY = /\$\{[^}]*\btype\b[^}]*\}\s*\$\{[^}]*\bvalue\b[^}]*\}/g;
+
+/**
+ * La même chose par concaténation — cherchée dans les **seuls** fichiers qui
+ * parlent de format de match.
+ *
+ * `type + value` est une expression trop banale pour être interdite partout :
+ * `setting.type + setting.value` n'a rien d'un format de match, et échouer
+ * dessus accuserait un fichier qui n'y est pour rien. L'interpolation, elle,
+ * est assez singulière pour valoir partout.
+ */
+const NOTATION_CONCAT = /\btype\s*\+\s*[\w.]*\bvalue\b/g;
+
+/** Le fichier manipule-t-il un format de match ? */
+const MATCH_FORMAT_FILE = /\bMatchFormat\b|\bmatchFormat\b|match-format/;
 
 describe("match-format — une seule écriture de la notation", () => {
   it("le balayage voit ce qu'il interdit", () => {
     // Garde-fou du garde-fou : sans ça, un motif cassé rendrait la suite verte.
     expect('const label = "BO3";'.match(NOTATION_LITERAL)).toHaveLength(1);
     expect("return `${format.type}${format.value}`;".match(NOTATION_ASSEMBLY)).toHaveLength(1);
-    expect("return type + format.value;".match(NOTATION_ASSEMBLY)).toHaveLength(1);
+    expect("return type + format.value;".match(NOTATION_CONCAT)).toHaveLength(1);
+
     // …et laisse passer la prose, qui cite la notation sans l'afficher.
     expect('"Un Best of se joue en nombre impair (BO1, BO3, BO5…)."'.match(NOTATION_LITERAL))
       .toBeNull();
     expect('{ name: "BO5 Élimination" }'.match(NOTATION_LITERAL)).toBeNull();
-    expect(stripComments('const x = 1; // renvoie "BO5"')).toBe("const x = 1; ");
-    expect(stripComments('const u = "https://x.dev/a"; // note')).toBe('const u = "https://x.dev/a"; ');
+
+    // La concaténation ne vaut que dans un fichier qui parle de format.
+    expect(MATCH_FORMAT_FILE.test("const f: MatchFormat = x;")).toBe(true);
+    expect(MATCH_FORMAT_FILE.test("const key = setting.type + setting.value;")).toBe(false);
+  });
+
+  it("blanchit les commentaires sans entamer les chaînes", () => {
+    // Le commentaire part, sa largeur reste : les colonnes ne bougent pas.
+    expect(stripComments('const x = 1; // renvoie "BO5"')).toBe(`const x = 1; ${" ".repeat(16)}`);
+    expect(stripComments('a; /* "BO5" */ b;')).toBe(`a; ${" ".repeat(11)} b;`);
+    // Une paire de barres *dans* une chaîne ne coupe rien : c'est le cas réel
+    // d'`app/api/landing/calendar/route.ts`, où une coupe naïve masquait la fin
+    // de la ligne — donc un « BO3 » qui y serait posé.
+    const ical = 'const p = "PRODID:-//BlueGenji//FR"; const l = "BO3";';
+    expect(stripComments(ical)).toBe(ical);
+    expect(stripComments(ical).match(NOTATION_LITERAL)).toHaveLength(1);
+    // Les retours à la ligne survivent : les numéros de ligne restent lisibles.
+    expect(stripComments("a; // x\nb;")).toBe(`a; ${" ".repeat(4)}\nb;`);
   });
 
   it("balaye un ensemble de fichiers non vide", () => {
@@ -256,9 +331,11 @@ describe("match-format — une seule écriture de la notation", () => {
     const offenders: string[] = [];
     for (const file of sourceFiles()) {
       const code = stripComments(read(file));
-      for (const pattern of [NOTATION_LITERAL, NOTATION_ASSEMBLY]) {
+      const patterns = [NOTATION_LITERAL, NOTATION_ASSEMBLY];
+      if (MATCH_FORMAT_FILE.test(code)) patterns.push(NOTATION_CONCAT);
+      for (const pattern of patterns) {
         pattern.lastIndex = 0;
-        for (const hit of code.match(pattern) ?? []) offenders.push(`${file} → ${hit}`);
+        for (const hit of code.match(pattern) ?? []) offenders.push(`${file} → ${hit.trim()}`);
       }
     }
 
