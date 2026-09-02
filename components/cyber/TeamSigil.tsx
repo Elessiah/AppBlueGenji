@@ -15,11 +15,16 @@ interface TeamSigilProps {
 }
 
 /**
- * Part de la hauteur de la case occupée par le texte, selon sa longueur. Les
- * valeurs sont choisies pour qu'un sigle de 4 caractères tienne dans la plus
- * petite case (24 px) sans toucher le liseré.
+ * Part de la hauteur de la case occupée par le texte, selon sa longueur.
+ *
+ * Le texte n'était pas dimensionné du tout : il héritait des 14 px du corps de
+ * page. Les deux longueurs déjà rendues quelque part sont donc calées pour
+ * **retrouver cette taille** — une lettre dans une case de 24 px (leaderboard)
+ * et trois initiales dans une case de 40 px (bureau) — faute de quoi cette
+ * fonctionnalité rapetisserait deux écrans qui n'ont rien à voir avec le sigle.
+ * Seules les longueurs nouvelles se resserrent, pour tenir dans le cadre.
  */
-const FONT_RATIO = [0.5, 0.5, 0.38, 0.3, 0.24];
+const FONT_RATIO = [0.58, 0.58, 0.44, 0.35, 0.26];
 
 export function TeamSigil({
   label,

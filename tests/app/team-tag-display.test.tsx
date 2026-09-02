@@ -81,6 +81,16 @@ describe("TeamSigil", () => {
     expect(two).toBeGreaterThan(four);
   });
 
+  it("rend les longueurs déjà affichées à la taille qu'elles avaient (14 px)", () => {
+    // Le texte héritait des 14 px du corps de page : le leaderboard (une lettre
+    // dans 24 px) et le bureau (trois initiales dans 40 px) ne doivent pas
+    // rapetisser au passage.
+    const sizeOf = (html: string) => Number(/--font-size:\s*(\d+)px/.exec(html)?.[1]);
+
+    expect(sizeOf(renderToStaticMarkup(<TeamSigil label="D" size={24} />))).toBe(14);
+    expect(sizeOf(renderToStaticMarkup(<TeamSigil label="LEO" size={40} />))).toBe(14);
+  });
+
   it("fait tenir un sigle de quatre caractères dans la plus petite case", () => {
     const html = renderToStaticMarkup(<TeamSigil label="DRGN" size={24} />);
     const fontSize = Number(/--font-size:\s*(\d+)px/.exec(html)?.[1]);
