@@ -87,17 +87,21 @@ async function purgeTournamentRows(
   // personne ne relit — d'autant que la création de la table est avalée par un
   // `catch` dans `database.ts`, où une contrainte manquante passerait inaperçue.
   //
-  // Sans `try`, contrairement au chemin du moteur : une suppression n'est pas
-  // une notification au meilleur effort, c'est un geste dont on attend qu'il
-  // soit **complet**. Échouer bruyamment vaut mieux que laisser des lignes
-  // pointant vers des manches effacées (et si la table manquait vraiment, la
-  // contrainte de `bg_matches` bloquerait l'étape suivante de toute façon).
-  await connection.execute(
-    `DELETE a FROM bg_referee_alerts a
-     JOIN bg_matches m ON m.id = a.match_id
-     WHERE m.tournament_id = ?`,
-    [tournamentId],
-  );
+  // Sous `try`, à la différence de ses voisines : la contrainte qui protège
+  // `bg_matches` vit **sur cette table-là**, donc une base où le `CREATE TABLE`
+  // avalé a échoué n'a ni table ni contrainte — le `DELETE` y lèverait
+  // `ER_NO_SUCH_TABLE` et rendrait *tous* les tournois indéboulonnables, pour
+  // une table de notifications. Il n'y a alors rien à effacer non plus.
+  try {
+    await connection.execute(
+      `DELETE a FROM bg_referee_alerts a
+       JOIN bg_matches m ON m.id = a.match_id
+       WHERE m.tournament_id = ?`,
+      [tournamentId],
+    );
+  } catch {
+    // Meilleur effort : voir ci-dessus.
+  }
   await connection.execute(`DELETE FROM bg_matches WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(`DELETE FROM bg_tournament_phases WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(

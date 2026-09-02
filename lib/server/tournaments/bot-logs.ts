@@ -37,7 +37,7 @@
  * et se contente du log.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { pushRefereeAlert, sendBotLog } from "@/lib/server/bot-integration";
+import { isBotCircuitOpen, pushRefereeAlert, sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
 import {
   formatForfeitLog,
@@ -247,6 +247,11 @@ export function flushBotLogs(connection: PoolConnection): void {
     (entry) =>
       !(entry.kind === "score_report_stalled" && announcedConflicts.has(entry.matchId)),
   );
+  // Une escalade ainsi écartée **garde** sa réservation, et c'est voulu : la
+  // rendre la ferait repartir au balayage suivant, quelques secondes plus tard —
+  // exactement le doublon que ce filtre existe pour éviter. L'arbitre vient
+  // d'être prévenu pour cette manche ; s'il la tranche, `finalizeMatch` effacera
+  // la réservation, et un désaccord ultérieur pourra de nouveau escalader.
 
   void (async () => {
     // Ce qui a été **effectivement remis** aux arbitres, repéré par la clé de
@@ -286,7 +291,7 @@ export function flushBotLogs(connection: PoolConnection): void {
     // Rendre la réservation choisit le risque du doublon plutôt que celui du
     // silence, et c'est le bon sens du risque pour une alerte qui ne se répète
     // pas d'elle-même : il n'y a pas de palier suivant pour la rattraper.
-    for (const entry of queue) {
+    for (const entry of toSend) {
       if (delivered.has(entryKey(entry))) continue;
       const claimId = refereeAlertClaimId(entry);
       if (claimId === null) continue;
@@ -389,7 +394,34 @@ export async function clearRefereeAlerts(
   connection: PoolConnection,
   matchId: number,
 ): Promise<void> {
+  dropQueuedRefereeAlerts(connection, matchId);
   await connection.execute(`DELETE FROM bg_referee_alerts WHERE match_id = ?`, [matchId]);
+}
+
+/**
+ * Retire de la file les alertes d'une manche que la transaction vient de
+ * trancher.
+ *
+ * Les deux évènements peuvent naître du même appel : `reportMatchScore` ouvre
+ * par `syncTournamentState`, dont l'entretien peut réserver une escalade sur la
+ * manche M, puis le report reçu clôt M s'il concorde avec celui de l'adversaire.
+ * Sans ce retrait, le commit annoncerait aux arbitres qu'une rencontre
+ * `COMPLETED` « n'est toujours pas tranchée ».
+ *
+ * Effacer la ligne en base ne suffisait pas : la file vit en mémoire, sur la
+ * connexion, et c'est elle qui décide de ce qui part.
+ */
+function dropQueuedRefereeAlerts(connection: PoolConnection, matchId: number): void {
+  const queue = pending.get(connection);
+  if (!queue) return;
+  const kept = queue.filter(
+    (entry) =>
+      !(
+        (entry.kind === "score_conflict" || entry.kind === "score_report_stalled") &&
+        entry.matchId === matchId
+      ),
+  );
+  if (kept.length !== queue.length) pending.set(connection, kept);
 }
 
 /**
@@ -412,11 +444,23 @@ export async function queueRefereeAlert(
   // Le type d'entrée le garantit ; la lecture ne coûte rien et évite un `!`.
   if (alertKey === null) return queueBotLog(connection, entry);
 
+  // Réserver ce qu'on sait ne pas pouvoir envoyer, puis rendre la réservation,
+  // ferait tourner une pompe d'`INSERT`/`DELETE` pendant toute la panne — le
+  // constat qui produit l'escalade se refait à chaque lecture de la page. Le
+  // coupe-circuit se referme au bout de sa temporisation, et le balayage suivant
+  // réservera pour de bon.
+  if (isBotCircuitOpen()) return false;
+
   let claimId: number | null;
   try {
     claimId = await claimRefereeAlert(connection, entry.matchId, alertKey);
   } catch {
-    return false;
+    // La réservation est inaccessible — table absente, verrou heurté. Le
+    // conflit part quand même, **sans marque** : c'est une alerte par report,
+    // donc une par action d'un joueur, comme avant que ce canal n'existe. Une
+    // escalade, elle, se tait : née d'un constat refait à chaque entretien, elle
+    // partirait en boucle.
+    return entry.kind === "score_conflict" ? queueBotLog(connection, entry) : false;
   }
   if (claimId === null) return false;
 

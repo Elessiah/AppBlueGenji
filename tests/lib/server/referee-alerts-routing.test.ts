@@ -5,17 +5,39 @@ jest.mock("@/lib/server/bot-integration");
 
 import type { PoolConnection } from "mysql2/promise";
 import {
+  clearRefereeAlerts,
   discardBotLogs,
   flushBotLogs,
   queueBotLog,
+  queueRefereeAlert,
   resolveBotLogs,
 } from "@/lib/server/tournaments/bot-logs";
-import { pushRefereeAlert, sendBotLog } from "@/lib/server/bot-integration";
+import {
+  isBotCircuitOpen,
+  pushRefereeAlert,
+  sendBotLog,
+} from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
 
-/** Une connexion ne sert ici que de clé : la file est indexée par identité. */
+/**
+ * Une connexion ne sert ici que de clé : la file est indexée par identité.
+ *
+ * Elle sait tout de même écrire, pour les tests qui réservent une alerte —
+ * `INSERT IGNORE` rend alors une ligne, comme MySQL le ferait.
+ */
 function fakeConnection(): PoolConnection {
-  return {} as PoolConnection;
+  return {
+    execute: async () => [{ affectedRows: 1, insertId: 501 }, []],
+  } as unknown as PoolConnection;
+}
+
+/** Une connexion dont la réservation échoue : table absente, verrou heurté. */
+function failingClaimConnection(): PoolConnection {
+  return {
+    execute: async () => {
+      throw new Error("ER_NO_SUCH_TABLE");
+    },
+  } as unknown as PoolConnection;
 }
 
 const MATCH_ROW = {
@@ -66,6 +88,7 @@ const DELIVERED = { sent: 1, unresolved: [], failed: [] };
 
 beforeEach(() => {
   jest.clearAllMocks();
+  (isBotCircuitOpen as jest.Mock).mockReturnValue(false);
   (sendBotLog as jest.Mock).mockResolvedValue(undefined as never);
   (pushRefereeAlert as jest.Mock).mockResolvedValue(DELIVERED as never);
 });
@@ -353,12 +376,12 @@ describe("conflit et escalade dans la même transaction", () => {
     // Un seul message : celui du conflit.
     expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
     expect((pushRefereeAlert as jest.Mock).mock.calls[0][0]).toContain("contradictoires");
-    // Et l'escalade écartée rend sa réservation, pour repasser plus tard.
+    // Et l'escalade écartée **garde** sa réservation : la rendre la ferait
+    // repartir au balayage suivant, soit le doublon qu'on vient d'éviter.
     const deletes = execute.mock.calls
       .map((call) => ({ sql: String(call[0]), params: (call[1] ?? []) as unknown[] }))
       .filter((call) => call.sql.trim().startsWith("DELETE"));
-    expect(deletes).toHaveLength(1);
-    expect(deletes[0].params).toEqual([77]);
+    expect(deletes).toHaveLength(0);
   });
 
   // L'ordre inverse doit donner le même résultat.
@@ -385,6 +408,93 @@ describe("conflit et escalade dans la même transaction", () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(pushRefereeAlert).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("manche tranchée dans la même transaction", () => {
+  /**
+   * `reportMatchScore` ouvre par `syncTournamentState`, dont l'entretien peut
+   * réserver une escalade sur la manche M ; le report reçu clôt ensuite M s'il
+   * concorde. Sans retrait de la file, le commit annoncerait aux arbitres qu'une
+   * rencontre déjà `COMPLETED` « n'est toujours pas tranchée ».
+   */
+  it("retire de la file les alertes d'une manche que la transaction vient de clore", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+
+    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
+    await clearRefereeAlerts(connection, 31);
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(pushRefereeAlert).not.toHaveBeenCalled();
+  });
+
+  // Les alertes des **autres** manches restent en file.
+  it("ne retire que les alertes de la manche tranchée", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+
+    queueBotLog(connection, { kind: "score_conflict", matchId: 32, claimId: 88 });
+    await clearRefereeAlerts(connection, 31);
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("réservation d'une alerte arbitre", () => {
+  // Réserver ce qu'on sait ne pas pouvoir envoyer ferait tourner une pompe
+  // d'INSERT/DELETE pendant toute la panne : le constat se refait à chaque
+  // lecture de la page du tournoi.
+  it("ne réserve rien tant que le coupe-circuit est ouvert", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([]);
+    (isBotCircuitOpen as jest.Mock).mockReturnValue(true);
+
+    const queuedNow = await queueRefereeAlert(connection, {
+      kind: "score_report_stalled",
+      matchId: 31,
+    });
+
+    expect(queuedNow).toBe(false);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  // Réservation inaccessible — table absente, verrou heurté. Le conflit part
+  // quand même, sans marque : une alerte par report, donc une par action d'un
+  // joueur, comme avant que ce canal n'existe.
+  it("annonce quand même un conflit dont la réservation échoue", async () => {
+    const connection = failingClaimConnection();
+    mockDb([[MATCH_ROW]]);
+
+    const queuedNow = await queueRefereeAlert(connection, {
+      kind: "score_conflict",
+      matchId: 31,
+    });
+
+    expect(queuedNow).toBe(true);
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+  });
+
+  // L'escalade, elle, se tait : née d'un constat refait à chaque entretien,
+  // elle partirait en boucle.
+  it("se tait sur une escalade dont la réservation échoue", async () => {
+    const connection = failingClaimConnection();
+    mockDb([[MATCH_ROW]]);
+
+    const queuedNow = await queueRefereeAlert(connection, {
+      kind: "score_report_stalled",
+      matchId: 31,
+    });
+
+    expect(queuedNow).toBe(false);
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(pushRefereeAlert).not.toHaveBeenCalled();
   });
 });
 

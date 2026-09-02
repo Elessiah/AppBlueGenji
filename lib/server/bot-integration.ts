@@ -31,6 +31,19 @@ function isCircuitOpen(): boolean {
   return Date.now() < circuitOpenUntil;
 }
 
+/**
+ * `true` tant que le coupe-circuit est ouvert : le bot vient d'échouer
+ * plusieurs fois d'affilée et rien ne part.
+ *
+ * Exporté pour les appelants qui **réservent** un envoi avant de le faire
+ * (`lib/server/tournaments/bot-logs.ts`) : réserver ce qu'on sait ne pas
+ * pouvoir envoyer, puis rendre la réservation, ferait tourner une pompe
+ * d'`INSERT`/`DELETE` pendant toute la panne.
+ */
+export function isBotCircuitOpen(): boolean {
+  return isCircuitOpen();
+}
+
 function recordFailure(): void {
   consecutiveFailures += 1;
   if (consecutiveFailures >= CIRCUIT_THRESHOLD) {

@@ -170,7 +170,15 @@ celui qui réserve : `resolveExpiredScoreReports` est appelée *deux fois* par
 report de score — une fois avant la mise en file du conflit (via
 `syncTournamentState`) et une fois après —, si bien qu'une garde posée à la
 réservation ne verrait qu'un des deux ordres. La file, elle, les voit tous les
-deux ; l'escalade écartée rend sa réservation et repassera plus tard.
+deux. L'escalade ainsi écartée **garde** sa réservation : la rendre la ferait
+repartir au balayage suivant, quelques secondes plus tard — soit exactement le
+doublon qu'on vient d'éviter.
+
+Le même appel peut aussi **clore** la manche : le report reçu concorde avec
+celui de l'adversaire, alors qu'un entretien venait de réserver son escalade.
+`finalizeMatch` retire donc de la file les alertes de la manche qu'il tranche, en
+plus d'effacer leurs lignes — sans quoi le commit annoncerait aux arbitres
+qu'une rencontre déjà `COMPLETED` « n'est toujours pas tranchée ».
 
 ### Pourquoi une table
 
@@ -244,8 +252,16 @@ Un seul point d'entrée pose tout cela pour le moteur : `queueRefereeAlert`
 réserve, met en file, et rend la réservation si l'un des deux échoue. Il **ne
 lève jamais** — un verrou heurté sur `bg_referee_alerts`, ou la table absente
 (la migration de `database.ts` avale ses erreurs), ne doit pas faire échouer le
-report de score ni le balayage qui l'a appelé. On renonce alors à alerter, ce qui
-est exactement l'état d'avant cette fonctionnalité.
+report de score ni le balayage qui l'a appelé. Le **conflit** part alors quand
+même, sans marque : c'est une alerte par report, donc une par action d'un joueur,
+comme avant que ce canal n'existe. L'**escalade**, née d'un constat refait à
+chaque entretien, se tait : sans marque, elle partirait en boucle.
+
+Et il ne réserve rien tant que le **coupe-circuit** est ouvert. Réserver ce qu'on
+sait ne pas pouvoir envoyer, puis rendre la réservation au flush, ferait tourner
+une pompe d'`INSERT`/`DELETE` pendant toute la panne — le constat se refaisant à
+chaque lecture de la page. Le coupe-circuit se referme au bout de sa
+temporisation, et le balayage suivant réserve pour de bon.
 
 ## Dégradation
 
@@ -281,6 +297,7 @@ Rien de tout cela ne peut faire échouer une transaction du moteur.
 | Transport vers le bot | `lib/server/bot-integration.ts` (`pushRefereeAlert`) |
 | Lien vers la page d'un tournoi | `lib/server/tournaments/app-url.ts` |
 | Table de réservation | `bg_referee_alerts` (`lib/server/database.ts`) |
+| Effacement à la suppression d'un tournoi | `lib/server/tournaments/deletion.ts` |
 
 Côté bot (`blueGenjiBot`), rien à ajouter : `POST /internal/notify/referees` et
 `/set-referee-role` existent déjà, documentés dans `doc/internal-api.md`.
