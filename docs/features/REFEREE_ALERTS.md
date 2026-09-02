@@ -118,7 +118,7 @@ ce qui permet d'agir :
 
 ```
 ⚠️ Arbitrage requis — « Coupe BlueGenji » (#12) · Manche 2 : Les Renards vs Team Nova (match #31) — reports de score contradictoires. https://…/tournois/12
-⏱️ Arbitrage requis — « Coupe BlueGenji » (#12) · Manche 2 : Les Renards vs Team Nova (match #31) — toujours pas tranché 30 minutes après le report. https://…/tournois/12
+⏱️ Arbitrage requis — « Coupe BlueGenji » (#12) · Manche 2 : Les Renards vs Team Nova (match #31) — toujours pas tranché plus de 30 minutes après le désaccord. https://…/tournois/12
 ```
 
 Nature de l'intervention en tête, tournoi et identifiant, manche, les deux
@@ -146,6 +146,18 @@ constate qu'une demi-heure plus tard personne n'a tranché. Un canal chargé un
 soir de tournoi avale la première ; la seconde arrive quand le match est
 vraiment en souffrance.
 
+Le délai de l'escalade court **depuis le désaccord** — le second des deux
+reports —, pas depuis `score_deadline_at`, qui est posé au premier. La nuance
+n'est pas théorique : un second report contradictoire qui arrive *après* le
+délai créerait le conflit et son escalade dans la même transaction, donc dans la
+même seconde, le second message annonçant une demi-heure d'attente qui n'a pas eu
+lieu. La comparaison est faite en SQL (`GREATEST(team1_reported_at,
+team2_reported_at)` contre `NOW()`), dans le même référentiel que celui qui a
+écrit ces horodatages — comparer côté Node demanderait de faire confiance à
+l'alignement de son horloge et de son fuseau avec ceux du serveur. Et le message
+dit « plus de N minutes » : une borne basse, la seule chose qu'il puisse
+promettre sans mentir.
+
 ### Pourquoi une table
 
 Cette alerte ne naît pas d'une écriture mais d'un **constat**, refait à chaque
@@ -161,6 +173,26 @@ table suit la manche (`ON DELETE CASCADE`) : un plateau régénéré — réappa
 d'une ronde suisse, correction de score en survie — efface ses matchs, donc ses
 réservations.
 
+### Une réservation se rend quand rien n'est parti
+
+Réserver avant d'envoyer protège du doublon, et expose au silence : c'est le
+compromis assumé des rappels de match, où un palier manqué se rattrape au
+suivant. Ici il n'y a pas de palier suivant — l'escalade ne se répète pas — et
+le silence serait donc définitif. La réservation est par conséquent **rendue**
+dans les deux cas où l'alerte n'est pas partie :
+
+- **La file de journal a refusé l'entrée.** Elle est plafonnée à 32 par
+  transaction, et `syncVisibleTournaments` en ouvre une seule pour tous les
+  tournois d'un balayage : une escalade vue en fin de boucle pouvait être
+  réservée sans jamais être mise en file. `queueBotLog` rend désormais un
+  booléen, et un `false` fait rendre la réservation **dans la même
+  transaction** (`releaseRefereeAlert`).
+- **Le bot n'a rien reçu.** `pushRefereeAlert` rend `null` — bot éteint,
+  coupe-circuit ouvert, réseau coupé — ou rejette : `flushBotLogs` efface alors
+  la ligne sur le pool, et le prochain balayage réessaie. C'est le bon sens du
+  risque : pour une alerte qui ne se répète pas d'elle-même, un doublon vaut
+  mieux qu'un silence.
+
 ## Dégradation
 
 Rien de tout cela ne peut faire échouer une transaction du moteur.
@@ -171,7 +203,8 @@ Rien de tout cela ne peut faire échouer une transaction du moteur.
 - `flushBotLogs` ne s'attend pas et ne lève jamais. Une entrée qui ne se résout
   pas (match effacé entre-temps, engagé manquant) est ignorée.
 - `pushRefereeAlert` rend `null` quand le bot est injoignable : c'est un
-  résultat, pas une exception.
+  résultat, pas une exception — et un résultat **lu**, qui fait rendre la
+  réservation de l'escalade (voir ci-dessus).
 - **Rôle arbitre non configuré** : le bot répond quand même 200 et se contente du
   log. Le site n'a rien de particulier à prévoir — et c'est bien la trace de
   l'incident qui compte, plus que le message privé.

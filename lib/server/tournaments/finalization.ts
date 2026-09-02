@@ -1,6 +1,12 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { MIN_ENTRANTS_FOR_MATCHES } from "@/lib/shared/constants";
-import { claimRefereeAlert, queueBotLog } from "./bot-logs";
+import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
+import {
+  STALLED_ALERT_KEY,
+  claimRefereeAlert,
+  queueBotLog,
+  releaseRefereeAlert,
+} from "./bot-logs";
 import { resetRegistrationRanks, finishTournament } from "./repository";
 
 export async function isEliminationPhaseComplete(
@@ -258,14 +264,6 @@ export async function finalizeTournamentIfDone(
 }
 
 /**
- * Clé de l'alerte « report expiré, toujours pas tranché ».
- *
- * Une seule par manche : l'escalade constate un blocage, elle ne le suit pas
- * minute par minute.
- */
-const STALLED_ALERT_KEY = "SCORE_REPORT_STALLED";
-
-/**
  * Tranche les reports de score dont le délai a expiré, et **alerte l'arbitre**
  * sur ceux qu'aucune règle ne peut trancher.
  *
@@ -280,12 +278,19 @@ const STALLED_ALERT_KEY = "SCORE_REPORT_STALLED";
  * moment du désaccord, celle-ci constate qu'une demi-heure plus tard personne
  * n'a tranché. `claimRefereeAlert` la réserve dans la transaction en cours pour
  * qu'elle ne parte qu'une fois — la fonction est appelée à chaque entretien.
+ *
+ * Le délai de l'escalade court **depuis le désaccord** (le second des deux
+ * reports), pas depuis `score_deadline_at`, qui est posé au premier. Sans cette
+ * distinction, un second report contradictoire arrivant après le délai
+ * déclencherait le conflit *et* son escalade dans la même transaction, donc
+ * dans la même seconde : deux messages pour un désaccord d'une seconde, dont le
+ * second annoncerait une demi-heure d'attente qui n'a pas eu lieu.
  */
 export async function resolveExpiredScoreReports(
   connection: PoolConnection,
   tournamentId: number,
 ): Promise<void> {
-  const [rows] = await connection.execute<MatchRow[]>(
+  const [rows] = await connection.execute<ExpiredMatchRow[]>(
     `SELECT
       id,
       tournament_id,
@@ -298,14 +303,20 @@ export async function resolveExpiredScoreReports(
       next_winner_match_id,
       next_winner_slot,
       next_loser_match_id,
-      next_loser_slot
+      next_loser_slot,
+      (
+        team1_reported_at IS NOT NULL
+        AND team2_reported_at IS NOT NULL
+        AND GREATEST(team1_reported_at, team2_reported_at)
+              <= DATE_SUB(NOW(), INTERVAL ? MINUTE)
+      ) AS conflict_stalled
      FROM bg_matches
      WHERE tournament_id = ?
        AND status = 'AWAITING_CONFIRMATION'
        AND score_deadline_at IS NOT NULL
        AND score_deadline_at <= NOW()
        AND winner_team_id IS NULL`,
-    [tournamentId],
+    [SCORE_REPORT_TIMEOUT_MINUTES, tournamentId],
   );
 
   // Import at runtime to avoid circular deps
@@ -354,12 +365,19 @@ export async function resolveExpiredScoreReports(
     }
 
     // Les deux ont reporté, et ils se contredisent — sans quoi le report aurait
-    // clos la manche sur-le-champ. Le délai vient de passer sans que personne
-    // n'arbitre : c'est le seul cas où l'expiration ne débloque rien.
-    if (team1Reported && team2Reported) {
+    // clos la manche sur-le-champ. C'est le seul cas où l'expiration du délai ne
+    // débloque rien. On n'escalade toutefois que si le **désaccord** lui-même a
+    // dépassé le délai : celui qui vient de naître est déjà annoncé par
+    // l'alerte de conflit, souvent dans cette transaction même.
+    if (team1Reported && team2Reported && Number(match.conflict_stalled ?? 0) === 1) {
       const matchId = Number(match.id);
       if (await claimRefereeAlert(connection, matchId, STALLED_ALERT_KEY)) {
-        queueBotLog(connection, { kind: "score_report_stalled", matchId });
+        // La file est plafonnée : un balayage chargé peut abandonner l'entrée.
+        // La réservation serait alors consommée sans qu'aucune alerte ne parte,
+        // et aucun passage ultérieur ne réessaierait — on la rend.
+        if (!queueBotLog(connection, { kind: "score_report_stalled", matchId })) {
+          await releaseRefereeAlert(connection, matchId, STALLED_ALERT_KEY);
+        }
       }
     }
   }
@@ -367,3 +385,13 @@ export async function resolveExpiredScoreReports(
 
 // Import MatchRow type
 import type { MatchRow } from "./_internal";
+
+/**
+ * Manche au report expiré, augmentée du seul calcul qu'il vaut mieux laisser à
+ * MySQL : le désaccord a-t-il lui-même dépassé le délai ?
+ *
+ * Comparer deux horodatages côté Node demanderait de faire confiance à
+ * l'alignement de son horloge et de son fuseau avec ceux du serveur ; `NOW()`
+ * les compare dans le même référentiel que celui qui les a écrits.
+ */
+type ExpiredMatchRow = MatchRow & { conflict_stalled: number | null };

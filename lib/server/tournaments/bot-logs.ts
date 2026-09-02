@@ -90,11 +90,30 @@ type AssertSameKinds = [
 const KINDS_MATCH: AssertSameKinds = [true, true];
 void KINDS_MATCH;
 
-/** Une ligne prête à partir, et le canal qui doit la porter. */
+/**
+ * Une ligne prête à partir, le canal qui doit la porter, et l'entrée dont elle
+ * vient.
+ *
+ * L'entrée voyage jusqu'au transport parce qu'un envoi qui échoue peut avoir à
+ * **défaire** ce que sa mise en file avait réservé (voir `flushBotLogs`).
+ */
 export interface ResolvedBotLog {
+  entry: PendingBotLog;
   channel: BotEventChannel;
   message: string;
 }
+
+/**
+ * Clé de réservation de l'escalade « désaccord non tranché ».
+ *
+ * Déclarée ici, où vit `claimRefereeAlert`, parce que deux endroits doivent la
+ * connaître : `resolveExpiredScoreReports`, qui réserve, et `flushBotLogs`, qui
+ * rend la réservation si l'alerte n'est pas partie.
+ */
+export const STALLED_ALERT_KEY = "SCORE_REPORT_STALLED";
+
+/** Une réservation d'alerte se pose et se retire par la même paire de clés. */
+const RELEASE_ALERT_SQL = `DELETE FROM bg_referee_alerts WHERE match_id = ? AND alert_key = ?`;
 
 /**
  * Plafond d'entrées retenues par transaction.
@@ -124,16 +143,27 @@ function entryKey(entry: PendingBotLog): string {
 /**
  * Réserve une ligne de journal, à envoyer si — et seulement si — la transaction
  * en cours aboutit.
+ *
+ * @returns `true` si l'évènement est retenu (une entrée identique déjà en file
+ *          compte comme retenue : elle produira la même ligne), `false` s'il est
+ *          **abandonné** parce que la file a atteint son plafond. Un appelant
+ *          qui a réservé quelque chose en base avant de mettre en file doit
+ *          lire ce retour : sans quoi la réservation serait consommée sans
+ *          qu'aucun message ne parte, et jamais rejouée.
  */
-export function queueBotLog(connection: PoolConnection, entry: PendingBotLog): void {
+export function queueBotLog(connection: PoolConnection, entry: PendingBotLog): boolean {
   const queue = pending.get(connection);
   if (!queue) {
     pending.set(connection, [entry]);
-    return;
+    return true;
   }
-  if (queue.length >= MAX_PENDING_PER_TRANSACTION) return;
-  if (queue.some((existing) => entryKey(existing) === entryKey(entry))) return;
+  // Le dédoublonnage passe **avant** le plafond : une entrée déjà en file est
+  // retenue, elle n'est pas perdue, et l'annoncer perdue ferait rendre une
+  // réservation encore utile.
+  if (queue.some((existing) => entryKey(existing) === entryKey(entry))) return true;
+  if (queue.length >= MAX_PENDING_PER_TRANSACTION) return false;
   queue.push(entry);
+  return true;
 }
 
 /** Jette les lignes réservées : la transaction n'a pas abouti. */
@@ -156,15 +186,33 @@ export function flushBotLogs(connection: PoolConnection): void {
   if (!queue || queue.length === 0) return;
 
   void (async () => {
-    for (const { channel, message } of await resolveBotLogs(queue)) {
-      if (channel === "REFEREE") {
-        // Le coupe-circuit est respecté ici, contrairement au signalement d'un
-        // problème : personne n'attend cette réponse, et un bot éteint ferait
-        // sinon patienter chaque envoi de fond sur la fenêtre de 30 s que
-        // demande la lecture des membres du rôle.
-        await pushRefereeAlert(message, "referee-alert", { honourCircuit: true });
-      } else {
+    for (const { entry, channel, message } of await resolveBotLogs(queue)) {
+      if (channel !== "REFEREE") {
         await sendBotLog(message);
+        continue;
+      }
+
+      // Le coupe-circuit est respecté ici, contrairement au signalement d'un
+      // problème : personne n'attend cette réponse, et un bot éteint ferait
+      // sinon patienter chaque envoi de fond sur la fenêtre de 30 s que
+      // demande la lecture des membres du rôle.
+      let delivered = false;
+      try {
+        delivered =
+          (await pushRefereeAlert(message, "referee-alert", { honourCircuit: true })) !== null;
+      } catch {
+        delivered = false;
+      }
+
+      // Une alerte réservée en base mais **non remise** — bot éteint,
+      // coupe-circuit ouvert, réseau coupé — doit rendre sa réservation, sinon
+      // la table censée éviter le doublon finit par n'alerter personne : la
+      // manche resterait bloquée sans que le prochain balayage ne réessaie.
+      // Rendre la réservation choisit le risque du doublon plutôt que celui du
+      // silence, et c'est le bon sens du risque pour une alerte qui ne se
+      // répète pas d'elle-même.
+      if (!delivered && entry.kind === "score_report_stalled") {
+        await releaseRefereeAlertOnPool(entry.matchId, STALLED_ALERT_KEY);
       }
     }
   })().catch(() => undefined);
@@ -203,6 +251,38 @@ export async function claimRefereeAlert(
 }
 
 /**
+ * Rend une réservation d'alerte **dans la transaction en cours**.
+ *
+ * Le pendant de `claimRefereeAlert`, pour le cas où la mise en file échoue
+ * après coup : la réservation et son abandon sont alors validés ou annulés
+ * ensemble, et le prochain balayage retrouve la manche vierge.
+ */
+export async function releaseRefereeAlert(
+  connection: PoolConnection,
+  matchId: number,
+  alertKey: string,
+): Promise<void> {
+  await connection.execute(RELEASE_ALERT_SQL, [matchId, alertKey]);
+}
+
+/**
+ * Rend une réservation d'alerte **après le commit**, sur le pool.
+ *
+ * C'est le chemin de `flushBotLogs` : la transaction est close depuis longtemps
+ * quand on apprend que le bot n'a rien reçu. Meilleur effort, comme tout ce
+ * chemin — une réservation qu'on n'arrive pas à rendre laisse simplement la
+ * manche sans escalade, ce qui est l'état d'avant.
+ */
+async function releaseRefereeAlertOnPool(matchId: number, alertKey: string): Promise<void> {
+  try {
+    const db = await getDatabase();
+    await db.execute(RELEASE_ALERT_SQL, [matchId, alertKey]);
+  } catch {
+    // Meilleur effort.
+  }
+}
+
+/**
  * Traduit des entrées en lignes de journal, en relisant la base.
  *
  * Exporté pour les tests : c'est là que vit tout ce qui peut se tromper de nom,
@@ -219,7 +299,7 @@ export async function resolveBotLogs(
   for (const entry of entries) {
     try {
       const message = await resolveOne(entry);
-      if (message) messages.push({ channel: botEventChannel(entry.kind), message });
+      if (message) messages.push({ entry, channel: botEventChannel(entry.kind), message });
     } catch {
       // Meilleur effort : une ligne perdue n'emporte pas les suivantes.
     }

@@ -57,10 +57,17 @@ function mockDb(rows: unknown[][]): jest.Mock {
   return execute as unknown as jest.Mock;
 }
 
+/**
+ * Le contrat nominal de `pushRefereeAlert` est de rendre un bilan, pas
+ * `undefined` : rendre `null` signifierait « bot injoignable » et ferait rendre
+ * la réservation. Les tests qui éprouvent l'échec le remplacent.
+ */
+const DELIVERED = { sent: 1, unresolved: [], failed: [] };
+
 beforeEach(() => {
   jest.clearAllMocks();
   (sendBotLog as jest.Mock).mockResolvedValue(undefined as never);
-  (pushRefereeAlert as jest.Mock).mockResolvedValue(undefined as never);
+  (pushRefereeAlert as jest.Mock).mockResolvedValue(DELIVERED as never);
 });
 
 describe("routage vers deux transports", () => {
@@ -208,6 +215,75 @@ describe("routage vers deux transports", () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(pushRefereeAlert).toHaveBeenCalled();
+  });
+});
+
+describe("réservation rendue quand l'alerte n'est pas remise", () => {
+  /** Les requêtes d'écriture vues sur le pool, après le flush. */
+  function writes(execute: jest.Mock): { sql: string; params: unknown[] }[] {
+    return execute.mock.calls
+      .map((call) => ({ sql: String(call[0]), params: (call[1] ?? []) as unknown[] }))
+      .filter((call) => call.sql.trim().startsWith("DELETE"));
+  }
+
+  // Bot injoignable : la réservation posée en base doit être rendue, sinon la
+  // manche reste bloquée et plus aucun balayage ne réessaiera.
+  it("libère la réservation quand l'escalade n'est pas remise", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([[MATCH_ROW]]);
+    (pushRefereeAlert as jest.Mock).mockResolvedValue(null as never);
+
+    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const deletes = writes(execute);
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0].sql).toContain("bg_referee_alerts");
+    expect(deletes[0].params).toEqual([31, "SCORE_REPORT_STALLED"]);
+  });
+
+  // Même chose quand le transport rejette plutôt que de rendre `null`.
+  it("libère aussi la réservation quand le transport rejette", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([[MATCH_ROW]]);
+    (pushRefereeAlert as jest.Mock).mockRejectedValue(new Error("ECONNREFUSED") as never);
+
+    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(writes(execute)).toHaveLength(1);
+  });
+
+  // Remise réussie : la réservation reste, c'est elle qui interdit le doublon.
+  it("garde la réservation quand l'escalade est bien remise", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([[MATCH_ROW]]);
+    (pushRefereeAlert as jest.Mock).mockResolvedValue({
+      sent: 2,
+      unresolved: [],
+      failed: [],
+    } as never);
+
+    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(writes(execute)).toHaveLength(0);
+  });
+
+  // Un conflit de score ne réserve rien : il n'y a rien à rendre, même en échec.
+  it("ne libère rien pour un conflit de score, qui ne réserve pas", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([[MATCH_ROW]]);
+    (pushRefereeAlert as jest.Mock).mockResolvedValue(null as never);
+
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(writes(execute)).toHaveLength(0);
   });
 });
 
