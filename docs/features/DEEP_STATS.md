@@ -77,10 +77,13 @@ différentiel de maps. C'est la même règle que celle appliquée par
 
 Seuls les matchs `COMPLETED` avec un vainqueur désigné entrent dans le calcul.
 
-Ce filtre vit dans **une seule constante**, `PLAYED_MATCH_SQL`, partagée par le
-bilan et par le classement. Il avait d'abord été écrit deux fois : le classement
-comptait alors les byes et la fiche affichait une place calculée sur un total de
-points différent de celui posé juste à côté.
+Ce filtre vit dans **une seule fonction**, `playedMatchSql`
+(`lib/shared/ranking.ts`), partagée par le bilan, par le classement, par
+l'annuaire `/equipes`, par le leaderboard de la landing et par le seeding des
+tournois à classement. Il avait d'abord été écrit une fois par vue : le
+classement comptait alors les byes et la fiche affichait une place calculée sur
+un total de points différent de celui posé juste à côté. Voir
+`docs/features/TEAM_RANKING_POINTS.md`.
 
 Les **forfaits**, eux, comptent comme des matchs (ils décident réellement d'une
 rencontre) mais sont isolés dans `forfeitsGiven` / `forfeitsReceived`, selon que
@@ -135,9 +138,11 @@ Trois conséquences voulues :
 
 ## Classement du site
 
-`getTeamRankingPosition` situe l'équipe dans le classement général, avec le
-barème partagé (`lib/shared/ranking.ts`) appliqué à **la même assiette de matchs
-que le bilan de la fiche**. Les équipes à égalité de points partagent le même
+`getTeamRankingPosition` situe l'équipe dans le classement général en lisant
+`loadTeamRanking`, **unique** agrégat de points d'équipe du projet : barème
+partagé (`lib/shared/ranking.ts`) appliqué à **la même assiette de matchs que le
+bilan de la fiche**. L'annuaire `/equipes` et le leaderboard de la landing lisent
+le même chargeur — un seul nombre de points par équipe, quelle que soit la page. Les équipes à égalité de points partagent le même
 rang, et une équipe sans match n'est pas classée (`position: null`) — `total`
 compte donc les équipes ayant réellement joué.
 
