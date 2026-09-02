@@ -86,13 +86,18 @@ Deux conséquences à retenir avant d'afficher un format quelque part :
    gardent donc par `matchFormat && …` plutôt que de rendre le libellé de repli
    « Score libre », qui n'a de sens que dans une phrase d'aide de formulaire.
 
-`tests/app/live-card-match-format.test.tsx` tient les deux bouts : le rendu réel
-de la carte pour chaque valeur des deux notations, et un balayage de tout
-`app/`, `components/`, `lib/` qui refuse deux choses hors du module partagé —
-une notation qui **est** à elle seule une chaîne (`"BO3"`, le libellé qu'on
-recopie), et l'assemblage d'un type et d'un nombre. Les notations citées **en
-prose** restent permises : « un Best of se joue en nombre impair de manches
-(BO1, BO3, BO5…) » explique la règle, il ne l'affiche pas.
+Deux tests tiennent les deux bouts :
+
+- `tests/app/live-card-match-format.test.tsx` rend réellement la carte de
+  l'accueil pour chaque valeur des deux notations, et vérifie qu'elle n'annonce
+  rien sur un tournoi en score libre ;
+- `tests/lib/shared/match-format.test.ts` balaye tout `app/`, `components/` et
+  `lib/` et refuse deux choses hors du module partagé — une chaîne qui **est**
+  une notation (`"BO3"`, le libellé qu'on recopie) et l'assemblage d'un type et
+  d'un nombre. Le garde-fou vit avec le module qu'il protège, pas avec l'écran
+  qui a révélé le bug. Les notations citées **en prose** restent permises :
+  « un Best of se joue en nombre impair de manches (BO1, BO3, BO5…) » explique
+  la règle, il ne l'affiche pas.
 
 ## Où c'est visible
 
