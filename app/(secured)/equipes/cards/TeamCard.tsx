@@ -14,6 +14,11 @@ import s from "./TeamCard.module.css";
  * au profil du joueur : un `<a>` dans un `<a>` étant invalide, le lien de la
  * carte est une plaque transparente posée par-dessus (`.cardOverlay`) que les
  * liens du roster traversent en repassant au-dessus d'elle (`.rosterItem`).
+ *
+ * L'emblème (`.sigil`) montre le **logo** de l'équipe quand elle en a un, et
+ * retombe sur l'initiale de son nom sinon. La carte n'affichait que l'initiale :
+ * `TeamListItem.logoUrl` voyageait bien de `listTeams` jusqu'ici, mais aucun
+ * rendu ne le lisait — le logo n'apparaissait donc que sur `/equipes/[id]`.
  */
 export function TeamCard({ team }: { team: TeamListItem }) {
   const color = getPaletteColor(team.id);
@@ -32,10 +37,29 @@ export function TeamCard({ team }: { team: TeamListItem }) {
       </div>
 
       <div className={s.head}>
-        <div className={s.sigil} style={{ "--c": color } as React.CSSProperties}>
-          {team.name[0].toUpperCase()}
+        {/* Décoratif de bout en bout : logo comme initiale ne font que redire le
+            nom de l'équipe, écrit juste à côté. Une lecture d'écran qui
+            annoncerait « D, Dragon Squad » n'apprendrait rien. */}
+        <div
+          className={s.sigil}
+          style={{ "--c": color } as React.CSSProperties}
+          aria-hidden="true"
+        >
+          {team.logoUrl ? (
+            <Image
+              src={team.logoUrl}
+              alt=""
+              width={56}
+              height={56}
+              unoptimized
+              referrerPolicy="no-referrer"
+              className={s.sigilLogo}
+            />
+          ) : (
+            team.name[0].toUpperCase()
+          )}
         </div>
-        <div>
+        <div className={s.headText}>
           <div className={s.name}>
             {team.name}
             {team.isGhost && (
