@@ -106,6 +106,14 @@ nominal. Elle existe pour la base qui l'aurait reçue par une version
 intermédiaire, remplie sans contrainte : sans elle, la création de l'index
 échouerait, l'unicité ne serait jamais posée, et rien ne le dirait.
 
+Piège rencontré à l'étape 2, et vérifié contre un vrai MySQL : la clause
+`WHERE tag <> UPPER(tag)`, qui devait éviter les écritures inutiles, est
+**toujours fausse** en collation insensible à la casse — « yy8 » et « YY8 » y
+sont la même chaîne. Écrite ainsi, la mise en majuscules ne s'appliquait à
+aucune ligne. La comparaison se fait donc octet à octet
+(`CAST(tag AS BINARY) <> CAST(UPPER(tag) AS BINARY)`), seule façon de poser la
+question qui se pose vraiment : « cette valeur est-elle écrite en majuscules ? »
+
 Une équipe qui perd son sigle retombe sur ses initiales et pourra en choisir un
 autre. **Effacer plutôt qu'inventer un suffixe** : un sigle est un nom, il se
 choisit ; « DRA2 » attribué dans le dos d'une équipe serait une donnée fausse.

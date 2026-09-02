@@ -58,6 +58,13 @@ describe("migration du sigle (lib/server/database.ts)", () => {
     expect(sql).toMatch(/UPPER\(t\.tag\) = dupes\.normalized/);
   });
 
+  it("compare octet à octet pour décider ce qui reste à mettre en majuscules", () => {
+    // `tag <> UPPER(tag)` est toujours faux en collation insensible à la casse :
+    // écrite ainsi, la mise en forme ne s'appliquait à aucune ligne.
+    expect(sql).toMatch(/CAST\(tag AS BINARY\) <> CAST\(UPPER\(tag\) AS BINARY\)/);
+    expect(sql).not.toMatch(/WHERE tag IS NOT NULL AND tag <> UPPER\(tag\)/);
+  });
+
   it("n'invente aucun sigle de remplacement", () => {
     // Effacer, jamais suffixer : un sigle est un nom, il se choisit.
     expect(sql).not.toMatch(/CONCAT\(tag/);

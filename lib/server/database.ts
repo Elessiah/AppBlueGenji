@@ -1120,8 +1120,19 @@ async function runMigrations(db: Pool): Promise<void> {
   // chez les autres, qui retombent sur leurs initiales dérivées et pourront en
   // choisir un autre. Effacer plutôt qu'inventer un suffixe : un sigle est un
   // nom, il se choisit, il ne se génère pas dans le dos de son équipe.
+  // Piège de la collation : `tag <> UPPER(tag)` est **toujours faux** en
+  // `utf8mb4_general_ci`, qui tient « yy8 » et « YY8 » pour la même chaîne. La
+  // clause qui devait éviter les écritures inutiles n'en laissait donc passer
+  // aucune, et la mise en majuscules ne s'appliquait jamais. La comparaison est
+  // faite octet à octet pour poser la question qui se pose vraiment : « cette
+  // valeur est-elle écrite en majuscules ? »
   try {
-    await db.execute(`UPDATE bg_teams SET tag = UPPER(tag) WHERE tag IS NOT NULL AND tag <> UPPER(tag)`);
+    await db.execute(`
+      UPDATE bg_teams
+      SET tag = UPPER(tag)
+      WHERE tag IS NOT NULL
+        AND CAST(tag AS BINARY) <> CAST(UPPER(tag) AS BINARY)
+    `);
   } catch {
     // Colonne absente sur une base antérieure à la migration ci-dessus.
   }
