@@ -12,11 +12,25 @@ import type { BotEventKind } from "@/lib/shared/bot-logs";
 const TOURNAMENT = { id: 42, name: "Coupe de Fer" };
 
 describe("BOT_EVENT_CHANNELS", () => {
-  it("classe toutes les valeurs de BotEventKind sans undefined", () => {
-    // Itère explicitement sur Object.entries pour s'assurer que toutes les
-    // clés sont traitées et qu'aucune valeur n'est undefined.
-    for (const [key, channel] of Object.entries(BOT_EVENT_CHANNELS)) {
-      expect(channel).toBeDefined();
+  it("classe chaque nature d'évènement, sans en oublier ni en inventer", () => {
+    // La liste est réécrite à la main plutôt que dérivée de la table : c'est
+    // elle qui fait office de second témoin. Un évènement ajouté au journal
+    // sans être classé — ou classé sans exister — casse ici, là où le `Record`
+    // exhaustif ne protège que du premier cas.
+    const expected: BotEventKind[] = [
+      "tournament_created",
+      "registration",
+      "forfeit",
+      "match_finished",
+      "score_conflict",
+      "score_report_stalled",
+      "tournament_started",
+      "tournament_finished",
+      "tournament_underfilled",
+    ];
+
+    expect(Object.keys(BOT_EVENT_CHANNELS).sort()).toEqual([...expected].sort());
+    for (const channel of Object.values(BOT_EVENT_CHANNELS)) {
       expect(channel).toMatch(/^(JOURNAL|REFEREE)$/);
     }
   });

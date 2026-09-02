@@ -35,7 +35,8 @@ beforeEach(() => {
 });
 
 describe("resolveExpiredScoreReports", () => {
-  // Cas 1 : Seul team1 a reporté → finalizeMatch appelé, aucune alerte
+  // Un seul report : le silence de l'adversaire vaut accord, le moteur
+  // tranche seul. Rien à arbitrer, donc aucune alerte.
   it("résout un report expiré quand seul team1 a saisi le score", async () => {
     const connection = fakeConnection({
       rows: (q) => {
@@ -84,7 +85,7 @@ describe("resolveExpiredScoreReports", () => {
     expect(queueBotLog).not.toHaveBeenCalled();
   });
 
-  // Cas 2 : Seul team2 a reporté → finalizeMatch appelé, aucune alerte
+  // Symétrique, côté team2 : la règle ne dépend pas de qui a parlé.
   it("résout un report expiré quand seul team2 a saisi le score", async () => {
     const connection = fakeConnection({
       rows: (q) => {
@@ -133,7 +134,8 @@ describe("resolveExpiredScoreReports", () => {
     expect(queueBotLog).not.toHaveBeenCalled();
   });
 
-  // Cas 3 : Les deux ont reporté des scores contradictoires → alerte arbitre
+  // Les deux ont reporté et se contredisent : le délai ne débloque rien —
+  // départager deux affirmations opposées est une décision, pas une règle.
   it("alerte l'arbitre quand les deux équipes ont reporté des scores contradictoires", async () => {
     const connection = fakeConnection({
       rows: (q) => {
@@ -173,7 +175,8 @@ describe("resolveExpiredScoreReports", () => {
     expect(queued()).toEqual([{ kind: "score_report_stalled", matchId: 33 }]);
   });
 
-  // Cas 4 : Réservation déjà prise (claimRefereeAlert rend false)
+  // L'entretien repasse à chaque lecture de la page : sans la réservation,
+  // l'arbitre recevrait la même alerte toutes les quelques secondes.
   it("n'envoie pas d'alerte si la réservation est déjà prise", async () => {
     const connection = fakeConnection({
       rows: (q) => {
@@ -187,7 +190,7 @@ describe("resolveExpiredScoreReports", () => {
               team1_report_score: 2,
               team1_report_opponent_score: 1,
               team2_report_score: 2,
-              team2_report_opponent_score: 2,
+              team2_report_opponent_score: 1,
               next_winner_match_id: null,
               next_winner_slot: null,
               next_loser_match_id: null,
@@ -211,7 +214,7 @@ describe("resolveExpiredScoreReports", () => {
     expect(queueBotLog).not.toHaveBeenCalled();
   });
 
-  // Cas 5 : Une manche dont team1_id ou team2_id est null est ignorée
+  // Une case vide n'est pas un adversaire : rien à trancher, rien à nommer.
   it("ignore une manche où un adversaire manque", async () => {
     const connection = fakeConnection({
       rows: (q) => {
@@ -245,7 +248,7 @@ describe("resolveExpiredScoreReports", () => {
     expect(queueBotLog).not.toHaveBeenCalled();
   });
 
-  // Cas 6 : Aucune ligne expirée ⇒ aucun appel du tout
+  // Le cas nominal, de loin le plus fréquent : rien n'a expiré.
   it("n'effectue aucune action quand il n'y a pas de report expiré", async () => {
     const connection = fakeConnection({
       rows: (q) => {
@@ -264,7 +267,7 @@ describe("resolveExpiredScoreReports", () => {
     expect(queueBotLog).not.toHaveBeenCalled();
   });
 
-  // Cas bonus : Vérifier que team2_id null est aussi ignoré
+  // Même garde, de l'autre côté de l'affiche.
   it("ignore une manche où team2_id est null", async () => {
     const connection = fakeConnection({
       rows: (q) => {

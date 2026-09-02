@@ -174,22 +174,27 @@ describe("routage vers deux transports", () => {
     expect(pushRefereeAlert).toHaveBeenCalled();
   });
 
-  // Rejet générique de pushRefereeAlert : aucune exception ne remonte.
-  it("ne jette pas quand pushRefereeAlert rejette pour une raison quelconque", async () => {
+  // Bot injoignable, second visage : `pushRefereeAlert` rend `null` plutôt que
+  // de rejeter — c'est son contrat nominal. La ligne suivante de la file doit
+  // partir quand même.
+  it("poursuit la file quand pushRefereeAlert rend null (bot injoignable)", async () => {
     const connection = fakeConnection();
-    mockDb([[MATCH_ROW]]);
-    (pushRefereeAlert as jest.Mock).mockRejectedValue(new Error("ERROR") as never);
+    mockDb([[MATCH_ROW], [TOURNAMENT_ROW]]);
+    (pushRefereeAlert as jest.Mock).mockResolvedValue(null as never);
 
     queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+    queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
     flushBotLogs(connection);
     await new Promise((resolve) => setImmediate(resolve));
 
-    // Vérifier que l'appel a bien été tenté, même si la fonction a rejeté.
-    expect(pushRefereeAlert).toHaveBeenCalled();
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
   });
 
-  // Rôle arbitre non configuré : le bot répond 200 mais avec sent: 0 → pas d'exception.
-  it("appelle pushRefereeAlert même si le rôle arbitre est non configuré", async () => {
+  // Rôle arbitre non configuré : le bot répond 200 avec `sent: 0` — il s'est
+  // contenté du log de son côté. Rien de particulier à prévoir ici, et surtout
+  // pas une erreur : l'alerte a bien été remise.
+  it("traite un rôle arbitre non configuré comme un envoi réussi", async () => {
     const connection = fakeConnection();
     mockDb([[MATCH_ROW]]);
     (pushRefereeAlert as jest.Mock).mockResolvedValue({
