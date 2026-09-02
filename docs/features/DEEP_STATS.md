@@ -41,9 +41,14 @@ Les tournois en cours comptent dans les participations mais, faute de
 
 ### Bilan des matchs
 `matchesPlayed` / `matchesWon` / `matchesLost` / `winRate`, plus le détail des
-maps : `mapsWon`, `mapsLost`, `mapDiff`, `mapWinRate`. Les points de classement
-(`rankingPoints`) réutilisent le barème partagé — 100 par victoire, −20 par
-défaite.
+maps : `mapsWon`, `mapsLost`, `mapDiff`, `mapWinRate`.
+
+`DeepStats` ne porte **aucun** total de points de classement : la cote du site
+est une notation de type Elo, qui dépend des cotes adverses au moment de chaque
+rencontre et ne peut donc pas se déduire du seul bilan d'une entité. Elle arrive
+par `TeamRankingPosition`, aux côtés de la place qu'elle produit — un seul
+nombre, aucune divergence possible avec le rang affiché juste à côté. Voir
+[`ELO_RANKING.md`](./ELO_RANKING.md).
 
 ### Dynamique
 `currentStreak` (série en cours, victoire ou défaite), `bestWinStreak`,
@@ -138,23 +143,24 @@ Trois conséquences voulues :
 
 ## Classement du site
 
-`getTeamRankingPosition` situe l'équipe dans le classement général en lisant
-`loadTeamRanking`, **unique** agrégat de points d'équipe du projet : barème
-partagé (`lib/shared/ranking.ts`) appliqué à **la même assiette de matchs que le
-bilan de la fiche**. L'annuaire `/equipes` et le leaderboard de la landing lisent
-le même chargeur — un seul nombre de points par équipe, quelle que soit la page. Les équipes à égalité de points partagent le même
-rang, et une équipe sans match n'est pas classée (`position: null`) — `total`
-compte donc les équipes ayant réellement joué.
+`getTeamRankingPosition` (`lib/server/ranking-service.ts`) situe l'équipe dans le
+classement général en lisant `loadTeamRanking`, **unique** source de points
+d'équipe du projet : la cote rejouée par `lib/shared/ranking.ts`, sur **la même
+assiette de matchs que le bilan de la fiche**. L'annuaire `/equipes`, le
+leaderboard de la landing et le seeding lisent le même chargeur — un seul nombre
+de points par équipe, quelle que soit la page. Les équipes à égalité de cote
+partagent le même rang, et une équipe sans match n'est pas classée
+(`position: null`) — `total` compte donc les équipes ayant réellement joué.
 
 Une défaite s'y compte comme « avoir joué le match sans le gagner », et non via
 `bg_matches.loser_team_id` : le moteur pose parfois un vainqueur sans renseigner
 le perdant (9 lignes sur le jeu de test), ce qui suffisait à faire diverger le
 rang du total de points affiché sur la même fiche.
 
-Le leaderboard de la landing part, lui, de **toutes** les équipes et de tous les
-matchs terminés : une équipe sans match y figure à 0 point. Les deux vues n'ont
-pas le même dénominateur, c'est assumé — ce qui compte est que la place affichée
-sur la fiche découle du total de points affiché sur cette même fiche.
+Le leaderboard de la landing part, lui, de **toutes** les équipes : une équipe
+sans match y figure à la cote de départ, rangée derrière toutes les classées. Les
+deux vues n'ont pas le même dénominateur, c'est assumé — ce qui compte est que la
+place affichée sur la fiche découle de la cote affichée sur cette même fiche.
 
 Le classement n'est calculé que pour la **consultation** de la fiche : il exige
 une agrégation sur toutes les équipes, hors de propos pour un ajout de membre.
