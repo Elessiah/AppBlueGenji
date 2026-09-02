@@ -10,6 +10,7 @@
  */
 import { publishTournamentEvent } from "@/lib/server/live";
 import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
+import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
 import { invalidateTournamentLists } from "./list-cache";
 import { invalidateTournamentPreview } from "./preview-cache";
 import { invalidateTournamentSnapshot } from "./snapshot";
@@ -31,6 +32,10 @@ export function publishUpdatedEvent(tournamentId: number): void {
   // cache des listes. Sans cette ligne, un tournoi **supprimé** y resterait une
   // minute, ticker et lien vers une page introuvable compris.
   invalidateLandingAggregates();
+  // Le classement du site est un **rejeu** de tous les matchs : un tournoi
+  // supprimé emporte ses rencontres, et toutes les cotes qu'elles avaient
+  // déplacées. Rien ne se répare tout seul dans un cache.
+  invalidateTeamRanking();
   publishTournamentEvent({
     type: "updated",
     tournamentId,
@@ -47,12 +52,18 @@ export function publishUpdatedEvent(tournamentId: number): void {
  * tournois — les scores tombent en rafales, et l'accueil relancerait alors son
  * agrégat sur tous les tournois à presque chaque visite.
  *
+ * Le **classement**, lui, en dépend directement : c'est le seul cache global
+ * qu'un score doive vider, et il n'y a pas de demi-mesure possible — une cote
+ * de type Elo se rejoue en entier, un score corrigé déplace donc aussi tout ce
+ * qui l'a suivi.
+ *
  * Le cas où un score change bien l'état — celui qui clôt le tournoi — est
  * traité par l'appelant, qui compare l'état avant et après sa transaction
  * (`invalidateListsIfStateChanged`).
  */
 export function publishScoreReportedEvent(tournamentId: number, matchId: number): void {
   invalidateTournamentSnapshot(tournamentId);
+  invalidateTeamRanking();
   publishTournamentEvent({
     type: "score_reported",
     tournamentId,
@@ -64,6 +75,7 @@ export function publishScoreReportedEvent(tournamentId: number, matchId: number)
 /** Idem : l'arbitrage d'un score ne déplace pas un tournoi dans la liste. */
 export function publishScoreResolvedEvent(tournamentId: number, matchId: number): void {
   invalidateTournamentSnapshot(tournamentId);
+  invalidateTeamRanking();
   publishTournamentEvent({
     type: "score_resolved",
     tournamentId,

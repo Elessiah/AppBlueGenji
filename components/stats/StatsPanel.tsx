@@ -12,7 +12,11 @@ import {
   type StatsSplit,
   type TeamRankingPosition,
 } from "@/lib/shared/stats";
-import { RANKING_POINTS_HINT, RANKING_POINTS_LABEL } from "@/lib/shared/ranking";
+import {
+  RANKING_POINTS_HINT,
+  RANKING_POINTS_LABEL,
+  RANKING_UNRANKED_HINT,
+} from "@/lib/shared/ranking";
 import s from "./StatsPanel.module.css";
 
 interface StatsPanelProps {
@@ -207,12 +211,25 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
           <Tile label="Podiums" value={stats.podiums} hint="Top 3" />
           <Tile label="Meilleur rang" value={stats.bestRank ?? "—"} />
           <Tile label="Rang moyen" value={stats.averageRank ?? "—"} />
+          {/* La place et la cote qui la produit sortent du **même** objet :
+              deux nombres d'une seule lecture, jamais deux calculs. Une fiche
+              joueur ne les reçoit pas — le classement note des équipes, pas des
+              personnes. */}
           {ranking ? (
-            <Tile
-              label="Classement du site"
-              value={ranking.position ? `#${ranking.position}` : "—"}
-              hint={ranking.position ? `sur ${ranking.total} équipes classées` : "Aucun match joué"}
-            />
+            <>
+              <Tile
+                label="Classement du site"
+                value={ranking.position ? `#${ranking.position}` : "—"}
+                hint={
+                  ranking.position ? `sur ${ranking.total} équipes classées` : "Aucun match joué"
+                }
+              />
+              <Tile
+                label={RANKING_POINTS_LABEL}
+                value={ranking.points}
+                hint={ranking.position ? RANKING_POINTS_HINT : RANKING_UNRANKED_HINT}
+              />
+            </>
           ) : null}
         </div>
       </Group>
@@ -227,11 +244,6 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
             label="Maps"
             value={`${stats.mapsWon} / ${stats.mapsLost}`}
             hint={`Diff. ${formatDiff(stats.mapDiff)} · ${formatRate(stats.mapWinRate)}`}
-          />
-          <Tile
-            label={RANKING_POINTS_LABEL}
-            value={stats.rankingPoints}
-            hint={RANKING_POINTS_HINT}
           />
         </div>
       </Group>

@@ -17,14 +17,7 @@ import type { RowDataPacket } from "mysql2";
 import { getDatabase } from "./database";
 import { toIso } from "./serialization";
 import { parseMatchFormat } from "@/lib/shared/match-format";
-import {
-  compareRankedTeams,
-  PLAYED_MATCH_SQL,
-  rankingLossesSql,
-  rankingMatchJoinSql,
-  rankingPoints,
-  rankingWinsSql,
-} from "@/lib/shared/ranking";
+import { PLAYED_MATCH_SQL } from "@/lib/shared/ranking";
 import {
   computeDeepStats,
   emptyDeepStats,
@@ -32,7 +25,6 @@ import {
   type DeepStats,
   type StatsMatch,
   type StatsTournament,
-  type TeamRankingPosition,
 } from "@/lib/shared/stats";
 import type {
   BracketType,
@@ -293,128 +285,6 @@ export async function getTeamEntityStats(teamId: number): Promise<EntityStats> {
 /** Raccourci quand seul l'agrégat est utile. */
 export async function getTeamStats(teamId: number): Promise<DeepStats> {
   return (await getTeamEntityStats(teamId)).stats;
-}
-
-/** Une équipe au classement du site, telle que la voient toutes les vues. */
-export type TeamRankingRow = {
-  teamId: number;
-  teamName: string;
-  logoUrl: string | null;
-  wins: number;
-  losses: number;
-  /** Barème partagé appliqué à `wins` / `losses`. Jamais recalculé ailleurs. */
-  points: number;
-};
-
-type TeamRankingRowSql = RowDataPacket & {
-  team_id: number;
-  team_name: string;
-  logo_url: string | null;
-  wins: number;
-  losses: number;
-};
-
-export type TeamRankingOptions = {
-  /**
-   * Inclure les équipes n'ayant encore joué aucun match, à 0 point (annuaire,
-   * leaderboard). Par défaut, seules les équipes classées sont retournées.
-   */
-  includeUnplayed?: boolean;
-  /**
-   * Ne retenir que les matchs terminés il y a **plus de N jours** — sert à
-   * reconstituer le classement d'il y a une semaine pour la tendance du
-   * leaderboard.
-   *
-   * Un nombre de jours, et non une date calculée côté application : les
-   * `updated_at` sont écrits par la base, la borne doit donc se lire sur la
-   * même horloge (`DATE_SUB(NOW(), …)`). Une date construite en JavaScript est
-   * mise en forme dans le fuseau du process Node — app en UTC, base en heure de
-   * Paris, et la fenêtre se décale sans que rien ne le signale.
-   */
-  completedMoreThanDaysAgo?: number;
-};
-
-/**
- * **Le** classement du site : une ligne par équipe, triée par le barème partagé
- * (`lib/shared/ranking.ts`) appliqué à l'assiette partagée (`playedMatchSql` —
- * byes et matchs fantômes exclus).
- *
- * Toutes les vues qui affichent des « points d'équipe » passent par ici :
- * l'annuaire `/equipes`, la place au classement de la fiche, le leaderboard de
- * la landing. Chacune avait sa propre requête, et donc son propre nombre — le
- * pire étant l'annuaire, dont les victoires étaient multipliées par l'effectif
- * de l'équipe (produit cartésien avec la jointure des membres) avant d'être
- * comptées 3 points la victoire et **+1 la défaite**.
- *
- * Les points sont posés en TypeScript par `rankingPoints`, pas relus d'une
- * colonne SQL : la refonte du barème (base 500 + force de l'adversaire) n'aura
- * qu'un point de calcul à remplacer.
- */
-export async function loadTeamRanking(options: TeamRankingOptions = {}): Promise<TeamRankingRow[]> {
-  const db = await getDatabase();
-  const join = options.includeUnplayed ? "LEFT JOIN" : "JOIN";
-  const days = options.completedMoreThanDaysAgo;
-  // La valeur part en paramètre lié, mais un entier positif est aussi la seule
-  // fenêtre qui ait un sens : autant refuser tout de suite.
-  if (days !== undefined && (!Number.isInteger(days) || days < 0)) {
-    throw new Error("INVALID_RANKING_WINDOW");
-  }
-  const before =
-    days === undefined ? "" : `\n      AND m.updated_at < DATE_SUB(NOW(), INTERVAL ? DAY)`;
-  const [rows] = await db.execute<TeamRankingRowSql[]>(
-    `SELECT
-      t.id AS team_id,
-      t.name AS team_name,
-      t.logo_url,
-      ${rankingWinsSql("t.id")} AS wins,
-      ${rankingLossesSql("t.id")} AS losses
-     FROM bg_teams t
-     ${join} bg_matches m
-       ON ${rankingMatchJoinSql("t.id")}${before}
-     WHERE t.solo_user_id IS NULL
-     GROUP BY t.id, t.name, t.logo_url`,
-    days === undefined ? [] : [days],
-  );
-
-  return rows
-    .map((row) => {
-      const wins = Number(row.wins ?? 0);
-      const losses = Number(row.losses ?? 0);
-      return {
-        teamId: Number(row.team_id),
-        teamName: row.team_name,
-        logoUrl: row.logo_url,
-        wins,
-        losses,
-        points: rankingPoints(wins, losses),
-      };
-    })
-    .sort((a, b) =>
-      compareRankedTeams(
-        { points: a.points, wins: a.wins, name: a.teamName },
-        { points: b.points, wins: b.wins, name: b.teamName },
-      ),
-    );
-}
-
-/**
- * Place de l'équipe au classement du site, lue dans `loadTeamRanking` — le
- * total de points affiché sur la fiche et la place posée juste à côté sortent
- * donc du même calcul, sur la même assiette que le bilan des matchs.
- *
- * Une équipe sans match n'est pas classée : `total` compte les équipes ayant
- * réellement joué, là où le leaderboard de la landing part de **toutes** les
- * équipes (une équipe sans match y figure à 0 point). Les deux vues n'ont pas
- * le même dénominateur, mais bien le même nombre de points par équipe.
- */
-export async function getTeamRankingPosition(teamId: number): Promise<TeamRankingPosition> {
-  const scored = await loadTeamRanking();
-  const self = scored.find((row) => row.teamId === teamId);
-
-  if (!self) return { position: null, total: scored.length, points: 0 };
-
-  const ahead = scored.filter((row) => row.points > self.points).length;
-  return { position: ahead + 1, total: scored.length, points: self.points };
 }
 
 /**

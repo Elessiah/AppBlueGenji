@@ -20,12 +20,7 @@ import {
   type Participant,
   type SwissRoundPlan,
 } from "@/lib/shared/swiss-pairing";
-import {
-  rankingLossesSql,
-  rankingMatchJoinSql,
-  rankingPointsForTeamSql,
-  rankingWinsSql,
-} from "@/lib/shared/ranking";
+import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import type { SwissMeta, SwissTiebreaker } from "@/lib/shared/types";
 import { createMatch, finishTournament, forfeitMatchScores } from "./repository";
 
@@ -313,14 +308,10 @@ export async function initializeSwissTournament(
   const tournament = await loadTournament(conn, tournamentId, false, phaseId);
   if (!tournament || tournament.format !== "SWISS") return;
 
-  // Seed par le classement du site, au **même barème** que le leaderboard de la
-  // landing (`lib/shared/ranking.ts`) et que le mode Survie : la ronde 1 oppose
-  // la moitié haute à la moitié basse, encore faut-il que « haute » veuille dire
-  // quelque chose.
-  // Barème **et** assiette du classement du site : mêmes matchs comptés que
-  // sur l'annuaire et sur les fiches (`lib/shared/ranking.ts`).
-  const WINS = rankingWinsSql("r.team_id");
-  const LOSSES = rankingLossesSql("r.team_id");
+  // Seed par le classement du site, par le **même chargeur** que le leaderboard
+  // de la landing, l'annuaire et le mode Survie
+  // (`loadEntrantsBySiteRanking`) : la ronde 1 oppose la moitié haute à la
+  // moitié basse, encore faut-il que « haute » veuille dire quelque chose.
   let seedRows: Array<{ team_id: number }>;
   if (options?.teamIds) {
     // Phase : le plateau et son ordre viennent de la phase precedente.
@@ -336,20 +327,8 @@ export async function initializeSwissTournament(
     );
     seedRows = rows;
   } else {
-  const [rows] = await conn.execute<(RowDataPacket & { team_id: number })[]>(
-    `SELECT
-      r.team_id,
-      ${WINS} AS wins,
-      ${LOSSES} AS losses
-     FROM bg_tournament_registrations r
-     LEFT JOIN bg_matches m
-       ON ${rankingMatchJoinSql("r.team_id")}
-     WHERE r.tournament_id = ?
-     GROUP BY r.team_id
-     ORDER BY ${rankingPointsForTeamSql("r.team_id")} DESC, ${WINS} DESC, r.team_id ASC`,
-    [tournamentId],
-  );
-    seedRows = rows;
+    const ordered = await loadEntrantsBySiteRanking(conn, tournamentId);
+    seedRows = ordered.map((entrant) => ({ team_id: entrant.teamId }));
   }
 
   let seed = 1;

@@ -3,7 +3,8 @@ import { getDatabase } from "@/lib/server/database";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import type { TeamDetailResponse, TeamListItem, TeamMember, TeamRole } from "@/lib/shared/types";
 import { getUserIdByPseudo, sanitizeRoles } from "@/lib/server/users-service";
-import { getTeamEntityStats, getTeamRankingPosition, loadTeamRanking } from "@/lib/server/stats-service";
+import { getTeamEntityStats } from "@/lib/server/stats-service";
+import { getTeamRankingPosition, loadTeamRanking } from "@/lib/server/ranking-service";
 import { compareRankedTeams, rankingMatchJoinSql } from "@/lib/shared/ranking";
 import { assertTeamTagAvailable, mapTeamTagConflict, resolveTeamTag } from "@/lib/server/team-tags";
 
@@ -264,7 +265,9 @@ export async function listTeams(): Promise<TeamListItem[]> {
     };
   });
 
-  // Même ordre que le leaderboard de la landing : points, victoires, nom.
+  // Même ordre que le leaderboard de la landing : les classées d'abord, puis la
+  // cote, les victoires et le nom. `TeamListItem` porte les quatre champs que
+  // `compareRankedTeams` lit, donc la carte se trie avec la règle unique.
   unsorted.sort(compareRankedTeams);
 
   const teams: TeamListItem[] = unsorted.map((team, index) => ({

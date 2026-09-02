@@ -25,7 +25,7 @@ import {
   resolveMatchLiveState,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
-import { loadTeamRanking } from "@/lib/server/stats-service";
+import { loadTeamRanking } from "@/lib/server/ranking-service";
 import { entrantHref } from "@/lib/shared/participants";
 
 const DEFAULT_STATS: LandingStats = {
