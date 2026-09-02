@@ -1,4 +1,5 @@
 import type { TeamListItem } from "@/lib/shared/types";
+import { RANKING_POINTS_HINT, RANKING_POINTS_LABEL } from "@/lib/shared/ranking";
 import s from "./HighlightStrip.module.css";
 
 export function HighlightStrip({ teams }: { teams: TeamListItem[] }) {
@@ -16,9 +17,13 @@ export function HighlightStrip({ teams }: { teams: TeamListItem[] }) {
               {t.wins}V – {t.losses}D{t.region ? ` · ${t.region}` : ""}
             </div>
           </div>
-          <div>
-            <div className={s.pts}>{t.points}</div>
-            <div className={s.ptsLbl}>PTS</div>
+          <div title={`${RANKING_POINTS_LABEL} · ${RANKING_POINTS_HINT}`}>
+            <div className={s.pts} aria-label={`${t.points} points de classement`}>
+              {t.points}
+            </div>
+            <div className={s.ptsLbl} aria-hidden="true">
+              PTS
+            </div>
           </div>
         </div>
       ))}

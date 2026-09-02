@@ -6,6 +6,7 @@ import type { TeamListItem } from "@/lib/shared/types";
 import { getPaletteColor } from "@/lib/shared/palette";
 import { PlayerLink } from "@/components/entity-link";
 import { displayTeamTag } from "@/lib/shared/team-tag";
+import { RANKING_POINTS_HINT, RANKING_POINTS_LABEL } from "@/lib/shared/ranking";
 import s from "./TeamCard.module.css";
 
 /**
@@ -81,25 +82,38 @@ export function TeamCard({ team }: { team: TeamListItem }) {
       </div>
 
       {team.form.length > 0 && (
-        <div className={s.formBar} title="10 derniers matchs">
+        <div
+          className={s.formBar}
+          role="img"
+          title={`${team.form.length} derniers matchs, du plus récent au plus ancien`}
+          aria-label={`${team.form.length} derniers matchs : ${team.form
+            .map((r) => (r === "w" ? "victoire" : r === "l" ? "défaite" : "nul"))
+            .join(", ")}`}
+        >
           {team.form.map((r, i) => (
             <div key={i} className={`${s.formCell} ${s[r]}`} />
           ))}
         </div>
       )}
 
-      <div className={s.stats}>
-        <div>
-          <div className={s.statLbl}>Pts</div>
-          <div className={s.statVal}>{team.points}</div>
+      <div className={s.stats} role="group" aria-label="Bilan de l'équipe">
+        <div title={`${RANKING_POINTS_LABEL} · ${RANKING_POINTS_HINT}`}>
+          <div className={s.statLbl} aria-hidden="true">Pts</div>
+          <div className={s.statVal} aria-label={`${team.points} points de classement`}>
+            {team.points}
+          </div>
         </div>
         <div>
-          <div className={s.statLbl}>Vict.</div>
-          <div className={`${s.statVal} ${s.win}`}>{team.wins}</div>
+          <div className={s.statLbl} aria-hidden="true">Vict.</div>
+          <div className={`${s.statVal} ${s.win}`} aria-label={`${team.wins} victoires`}>
+            {team.wins}
+          </div>
         </div>
         <div>
-          <div className={s.statLbl}>Déf.</div>
-          <div className={`${s.statVal} ${s.loss}`}>{team.losses}</div>
+          <div className={s.statLbl} aria-hidden="true">Déf.</div>
+          <div className={`${s.statVal} ${s.loss}`} aria-label={`${team.losses} défaites`}>
+            {team.losses}
+          </div>
         </div>
       </div>
 

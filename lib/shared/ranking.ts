@@ -109,3 +109,14 @@ export function compareRankedTeams(
   if (b.wins !== a.wins) return b.wins - a.wins;
   return a.name.localeCompare(b.name, "fr");
 }
+
+/** Intitulé du total de points, partout où il s'affiche. */
+export const RANKING_POINTS_LABEL = "Points de classement";
+
+/**
+ * Le barème en toutes lettres, dérivé des constantes plutôt que réécrit à la
+ * main : une refonte du barème corrige d'elle-même la légende qui l'annonce.
+ */
+export const RANKING_POINTS_HINT = `${RANKING_POINTS_PER_WIN} par victoire, −${Math.abs(
+  RANKING_POINTS_PER_LOSS,
+)} par défaite`;

@@ -12,6 +12,7 @@ import {
   type StatsSplit,
   type TeamRankingPosition,
 } from "@/lib/shared/stats";
+import { RANKING_POINTS_HINT, RANKING_POINTS_LABEL } from "@/lib/shared/ranking";
 import s from "./StatsPanel.module.css";
 
 interface StatsPanelProps {
@@ -227,7 +228,11 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
             value={`${stats.mapsWon} / ${stats.mapsLost}`}
             hint={`Diff. ${formatDiff(stats.mapDiff)} · ${formatRate(stats.mapWinRate)}`}
           />
-          <Tile label="Points de classement" value={stats.rankingPoints} hint="100 par victoire, −20 par défaite" />
+          <Tile
+            label={RANKING_POINTS_LABEL}
+            value={stats.rankingPoints}
+            hint={RANKING_POINTS_HINT}
+          />
         </div>
       </Group>
 

@@ -10,6 +10,8 @@ import {
   rankingPoints,
   rankingPointsForTeamSql,
   rankingPointsSql,
+  RANKING_POINTS_HINT,
+  RANKING_POINTS_LABEL,
   rankingWinsSql,
 } from "@/lib/shared/ranking";
 
@@ -32,6 +34,14 @@ describe("barème", () => {
 
   it("peut descendre sous zéro", () => {
     expect(rankingPoints(0, 3)).toBeLessThan(0);
+  });
+
+  it("annonce le barème qu'il applique, sans le réécrire à la main", () => {
+    expect(RANKING_POINTS_HINT).toContain(String(RANKING_POINTS_PER_WIN));
+    expect(RANKING_POINTS_HINT).toContain(String(Math.abs(RANKING_POINTS_PER_LOSS)));
+    // Signe typographique, pas un trait d'union.
+    expect(RANKING_POINTS_HINT).toContain("−");
+    expect(RANKING_POINTS_LABEL).toBe("Points de classement");
   });
 
   it("dit la même chose en SQL qu'en TypeScript", () => {
