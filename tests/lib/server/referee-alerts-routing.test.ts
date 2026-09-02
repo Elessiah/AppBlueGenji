@@ -5,8 +5,8 @@ jest.mock("@/lib/server/bot-integration");
 
 import type { PoolConnection } from "mysql2/promise";
 import {
-  clearRefereeAlerts,
   discardBotLogs,
+  dropQueuedRefereeAlerts,
   flushBotLogs,
   queueBotLog,
   queueRefereeAlert,
@@ -366,7 +366,7 @@ describe("conflit et escalade dans la même transaction", () => {
    */
   it("n'envoie pas l'escalade quand le conflit part dans la même file", async () => {
     const connection = fakeConnection();
-    const execute = mockDb([[MATCH_ROW]]);
+    const execute = mockDb([[MATCH_ROW], [MATCH_ROW]]);
 
     queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
     queueBotLog(connection, { kind: "score_conflict", matchId: 31, claimId: 88 });
@@ -387,7 +387,7 @@ describe("conflit et escalade dans la même transaction", () => {
   // L'ordre inverse doit donner le même résultat.
   it("écarte l'escalade quel que soit l'ordre des deux évènements", async () => {
     const connection = fakeConnection();
-    mockDb([[MATCH_ROW]]);
+    mockDb([[MATCH_ROW], [MATCH_ROW]]);
 
     queueBotLog(connection, { kind: "score_conflict", matchId: 31, claimId: 88 });
     queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
@@ -395,6 +395,22 @@ describe("conflit et escalade dans la même transaction", () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+  });
+
+  // Se taire sur la seule présence du conflit ne suffirait pas : s'il n'est
+  // finalement pas remis, l'arbitre n'aurait rien reçu, et l'escalade aurait
+  // gardé une réservation qui l'empêcherait de repartir un jour.
+  it("envoie l'escalade quand le conflit n'a finalement pas été remis", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW], [MATCH_ROW]]);
+    (pushRefereeAlert as jest.Mock).mockResolvedValueOnce(null as never);
+
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31, claimId: 88 });
+    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(2);
   });
 
   // Une escalade sur **une autre** manche n'est pas écartée pour autant.
@@ -423,7 +439,7 @@ describe("manche tranchée dans la même transaction", () => {
     mockDb([[MATCH_ROW]]);
 
     queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
-    await clearRefereeAlerts(connection, 31);
+    dropQueuedRefereeAlerts(connection, 31);
     flushBotLogs(connection);
     await new Promise((resolve) => setImmediate(resolve));
 
@@ -436,7 +452,7 @@ describe("manche tranchée dans la même transaction", () => {
     mockDb([[MATCH_ROW]]);
 
     queueBotLog(connection, { kind: "score_conflict", matchId: 32, claimId: 88 });
-    await clearRefereeAlerts(connection, 31);
+    dropQueuedRefereeAlerts(connection, 31);
     flushBotLogs(connection);
     await new Promise((resolve) => setImmediate(resolve));
 

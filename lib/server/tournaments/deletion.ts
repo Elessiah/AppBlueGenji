@@ -34,6 +34,7 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { publishUpdatedEvent } from "./notifications";
 
 /** Identité du tournoi effacé, pour le message de confirmation et les logs. */
@@ -87,11 +88,14 @@ async function purgeTournamentRows(
   // personne ne relit — d'autant que la création de la table est avalée par un
   // `catch` dans `database.ts`, où une contrainte manquante passerait inaperçue.
   //
-  // Sous `try`, à la différence de ses voisines : la contrainte qui protège
-  // `bg_matches` vit **sur cette table-là**, donc une base où le `CREATE TABLE`
-  // avalé a échoué n'a ni table ni contrainte — le `DELETE` y lèverait
-  // `ER_NO_SUCH_TABLE` et rendrait *tous* les tournois indéboulonnables, pour
-  // une table de notifications. Il n'y a alors rien à effacer non plus.
+  // Sous `try`, à la différence de ses voisines, mais **pour ce seul cas** : la
+  // contrainte qui protège `bg_matches` vit sur cette table-là, donc une base
+  // où le `CREATE TABLE` avalé a échoué n'a ni table ni contrainte — le
+  // `DELETE` y lèverait `ER_NO_SUCH_TABLE` et rendrait *tous* les tournois
+  // indéboulonnables, pour une table de notifications ; il n'y a alors rien à
+  // effacer non plus. Toute autre erreur remonte : un interblocage, par exemple,
+  // annule la transaction, et poursuivre la purge sur une transaction défaite
+  // laisserait un tournoi à moitié supprimé.
   try {
     await connection.execute(
       `DELETE a FROM bg_referee_alerts a
@@ -99,8 +103,8 @@ async function purgeTournamentRows(
        WHERE m.tournament_id = ?`,
       [tournamentId],
     );
-  } catch {
-    // Meilleur effort : voir ci-dessus.
+  } catch (error) {
+    if (!isMissingTableError(error)) throw error;
   }
   await connection.execute(`DELETE FROM bg_matches WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(`DELETE FROM bg_tournament_phases WHERE tournament_id = ?`, [tournamentId]);

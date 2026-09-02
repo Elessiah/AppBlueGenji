@@ -170,14 +170,20 @@ celui qui réserve : `resolveExpiredScoreReports` est appelée *deux fois* par
 report de score — une fois avant la mise en file du conflit (via
 `syncTournamentState`) et une fois après —, si bien qu'une garde posée à la
 réservation ne verrait qu'un des deux ordres. La file, elle, les voit tous les
-deux. L'escalade ainsi écartée **garde** sa réservation : la rendre la ferait
-repartir au balayage suivant, quelques secondes plus tard — soit exactement le
-doublon qu'on vient d'éviter.
+deux.
+
+L'escalade part donc **en dernier**, et ne se tait que si le conflit de sa manche
+a été *effectivement remis*. Se taire sur la seule présence du conflit dans la
+file ne suffirait pas : s'il n'était finalement pas remis — bot qui bat de
+l'aile, manche réappariée entre-temps —, l'arbitre n'aurait rien reçu du tout, et
+l'escalade aurait gardé une réservation qui l'empêcherait de repartir un jour.
+L'escalade réellement écartée, elle, **garde** sa réservation : la rendre la
+ferait repartir au balayage suivant, soit le doublon qu'on vient d'éviter.
 
 Le même appel peut aussi **clore** la manche : le report reçu concorde avec
 celui de l'adversaire, alors qu'un entretien venait de réserver son escalade.
-`finalizeMatch` retire donc de la file les alertes de la manche qu'il tranche, en
-plus d'effacer leurs lignes — sans quoi le commit annoncerait aux arbitres
+`finalizeMatch` retire donc de la file — en mémoire, sans une écriture — les
+alertes de la manche qu'il tranche, sans quoi le commit annoncerait aux arbitres
 qu'une rencontre déjà `COMPLETED` « n'est toujours pas tranchée ».
 
 ### Pourquoi une table
@@ -204,12 +210,16 @@ désaccord ferait sonner le téléphone de tous les arbitres. Une ligne de journ
 supportait cette répétition ; un message privé, non.
 
 Il porte donc sa propre clé (`SCORE_CONFLICT`), posée par le même
-`claimRefereeAlert`. La réservation est **temporaire** : `finalizeMatch` efface
-toutes les réservations de la manche qu'il tranche (`clearRefereeAlerts`), si
-bien qu'un désaccord qui renaît après un arbitrage — correction de score sur une
-archive — alerte de nouveau. Cet effacement est au **meilleur effort** :
-`finalizeMatch` est le point de passage de tous les matchs tranchés, et une
-table d'alertes absente ne doit pas rendre le moteur inutilisable.
+`claimRefereeAlert`. La réservation est **temporaire** : les lignes d'une manche
+tranchée sont effacées, si bien qu'un désaccord qui renaît après un arbitrage —
+correction de score sur une archive — alerte de nouveau.
+
+Cet effacement se fait **après le commit**, sur le pool, à partir de la trace
+`match_finished` que `finalizeMatch` a déjà mise en file. Pas dans la transaction
+du moteur : `finalizeMatch` est le point de passage de **tous** les matchs
+tranchés, et y poser un `DELETE` de plus ferait tenir un verrou de plus jusqu'au
+commit, sur son chemin le plus chaud — jusqu'à l'interblocage avec le balayage
+qui, lui, réserve.
 
 ### Une réservation se rend quand rien n'est parti
 
@@ -249,9 +259,13 @@ alerte. Effacer « la réservation de cette manche » emporterait alors celle d'
 autre, qui, lui, avait bel et bien alerté.
 
 Un seul point d'entrée pose tout cela pour le moteur : `queueRefereeAlert`
-réserve, met en file, et rend la réservation si l'un des deux échoue. Il **ne
-lève jamais** — un verrou heurté sur `bg_referee_alerts`, ou la table absente
-(la migration de `database.ts` avale ses erreurs), ne doit pas faire échouer le
+réserve, met en file, et rend la réservation si l'un des deux échoue. Il ne lève
+que sur ce qui a **déjà défait la transaction** — un interblocage, qu'InnoDB
+règle en annulant la transaction entière : l'avaler laisserait le moteur
+poursuivre et commiter sur une écriture qui n'existe plus, et rendre un 200 pour
+un report de score disparu (`lib/server/mysql-errors.ts`). Tout le reste — table
+absente parce que la migration de `database.ts` avale ses erreurs, verrou dépassé
+(qui n'annule que la requête) — est absorbé : cela ne doit pas faire échouer le
 report de score ni le balayage qui l'a appelé. Le **conflit** part alors quand
 même, sans marque : c'est une alerte par report, donc une par action d'un joueur,
 comme avant que ce canal n'existe. L'**escalade**, née d'un constat refait à
@@ -298,6 +312,7 @@ Rien de tout cela ne peut faire échouer une transaction du moteur.
 | Lien vers la page d'un tournoi | `lib/server/tournaments/app-url.ts` |
 | Table de réservation | `bg_referee_alerts` (`lib/server/database.ts`) |
 | Effacement à la suppression d'un tournoi | `lib/server/tournaments/deletion.ts` |
+| Erreurs MySQL qu'on a le droit d'ignorer | `lib/server/mysql-errors.ts` |
 
 Côté bot (`blueGenjiBot`), rien à ajouter : `POST /internal/notify/referees` et
 `/set-referee-role` existent déjà, documentés dans `doc/internal-api.md`.

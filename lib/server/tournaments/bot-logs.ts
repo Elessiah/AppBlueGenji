@@ -39,6 +39,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { isBotCircuitOpen, pushRefereeAlert, sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
+import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import {
   formatForfeitLog,
   formatMatchResultLog,
@@ -240,31 +241,31 @@ export function flushBotLogs(connection: PoolConnection): void {
   // évènements peuvent arriver dans un ordre ou dans l'autre selon le passage
   // d'entretien qui les produit, et une garde posée à la réservation ne verrait
   // que l'un des deux ordres.
-  const announcedConflicts = new Set(
-    queue.filter((entry) => entry.kind === "score_conflict").map(refereeAlertMatchId),
-  );
-  const toSend = queue.filter(
-    (entry) =>
-      !(entry.kind === "score_report_stalled" && announcedConflicts.has(entry.matchId)),
-  );
-  // Une escalade ainsi écartée **garde** sa réservation, et c'est voulu : la
-  // rendre la ferait repartir au balayage suivant, quelques secondes plus tard —
-  // exactement le doublon que ce filtre existe pour éviter. L'arbitre vient
-  // d'être prévenu pour cette manche ; s'il la tranche, `finalizeMatch` effacera
-  // la réservation, et un désaccord ultérieur pourra de nouveau escalader.
+  //
+  // L'escalade passe donc **en dernier**, et ne se tait que si le conflit de sa
+  // manche a été *effectivement remis*. Se taire sur la seule présence du
+  // conflit dans la file ne suffirait pas : si celui-ci n'était finalement pas
+  // remis — bot qui bat de l'aile, manche réappariée entre-temps —, l'arbitre
+  // n'aurait rien reçu du tout, et l'escalade aurait gardé une réservation qui
+  // l'empêcherait de repartir un jour.
+  const escalations = queue.filter((entry) => entry.kind === "score_report_stalled");
+  const rest = queue.filter((entry) => entry.kind !== "score_report_stalled");
 
   void (async () => {
     // Ce qui a été **effectivement remis** aux arbitres, repéré par la clé de
-    // l'entrée. Tout le reste — écarté ci-dessus, non remis, mais aussi non
-    // *résolu* : ligne effacée entre-temps, engagé sans nom, erreur MySQL
-    // passagère — doit rendre sa réservation, sans quoi elle serait consommée
-    // en silence et aucun passage ultérieur ne réessaierait.
+    // l'entrée. Tout le reste — non remis, mais aussi non *résolu* : ligne
+    // effacée entre-temps, engagé sans nom, erreur MySQL passagère — doit rendre
+    // sa réservation, sans quoi elle serait consommée en silence et aucun
+    // passage ultérieur ne réessaierait.
     const delivered = new Set<string>();
+    /** Manches dont le désaccord vient d'être annoncé, et remis. */
+    const announcedConflicts = new Set<number>();
 
-    for (const { entry, channel, message } of await resolveBotLogs(toSend)) {
+    /** Envoie une ligne déjà rédigée, et dit si les arbitres l'ont reçue. */
+    async function deliver({ entry, channel, message }: ResolvedBotLog): Promise<void> {
       if (channel !== "REFEREE") {
         await sendBotLog(message);
-        continue;
+        return;
       }
 
       // Le coupe-circuit est respecté ici, contrairement au signalement d'un
@@ -285,17 +286,45 @@ export function flushBotLogs(connection: PoolConnection): void {
       } catch {
         sent = false;
       }
-      if (sent) delivered.add(entryKey(entry));
+      if (!sent) return;
+      delivered.add(entryKey(entry));
+      if (entry.kind === "score_conflict") announcedConflicts.add(entry.matchId);
+    }
+
+    for (const resolved of await resolveBotLogs(rest)) await deliver(resolved);
+
+    for (const resolved of await resolveBotLogs(escalations)) {
+      // Le téléphone de l'arbitre vient de sonner pour cette manche : un second
+      // message dans la même seconde ne dirait pas une seconde chose. La
+      // réservation est **gardée** — la rendre ferait repartir l'escalade au
+      // balayage suivant, soit le doublon qu'on vient d'éviter ; et si la manche
+      // est tranchée, `finalizeMatch` l'effacera de toute façon.
+      if (announcedConflicts.has(refereeAlertMatchId(resolved.entry))) {
+        delivered.add(entryKey(resolved.entry));
+        continue;
+      }
+      await deliver(resolved);
     }
 
     // Rendre la réservation choisit le risque du doublon plutôt que celui du
     // silence, et c'est le bon sens du risque pour une alerte qui ne se répète
     // pas d'elle-même : il n'y a pas de palier suivant pour la rattraper.
-    for (const entry of toSend) {
+    for (const entry of queue) {
       if (delivered.has(entryKey(entry))) continue;
       const claimId = refereeAlertClaimId(entry);
       if (claimId === null) continue;
       await releaseRefereeAlertOnPool(claimId);
+    }
+
+    // La manche est tranchée : ses réservations n'ont plus d'objet, et un
+    // désaccord qui renaîtrait après arbitrage doit pouvoir alerter de nouveau.
+    // L'effacement se fait **après le commit**, sur le pool, et non dans la
+    // transaction du moteur : `finalizeMatch` est le point de passage de tous
+    // les matchs tranchés, et y poser un `DELETE` de plus ferait tenir un verrou
+    // de plus sur son chemin le plus chaud — jusqu'à l'interblocage avec le
+    // balayage qui, lui, réserve.
+    for (const entry of queue) {
+      if (entry.kind === "match_finished") await clearRefereeAlertsOnPool(entry.matchId);
     }
   })().catch(() => undefined);
 }
@@ -382,20 +411,26 @@ export async function releaseRefereeAlert(
 }
 
 /**
- * Efface toutes les réservations d'une manche : elle est tranchée, les alertes
- * qu'elle avait produites n'ont plus d'objet.
+ * Efface, **après le commit**, les réservations d'une manche tranchée.
  *
- * C'est ce qui rend la réservation du conflit **temporaire** plutôt que
- * définitive : un désaccord qui renaît après un arbitrage — correction de score
- * sur une archive, par exemple — doit pouvoir alerter à nouveau. Sans cet
- * effacement, « une alerte par manche » vaudrait pour la vie du plateau.
+ * C'est ce qui rend la réservation du conflit temporaire plutôt que définitive :
+ * un désaccord qui renaît après un arbitrage — correction de score sur une
+ * archive — doit pouvoir alerter à nouveau. Sans cet effacement, « une alerte
+ * par manche » vaudrait pour la vie du plateau.
+ *
+ * Sur le pool, jamais dans la transaction du moteur : `finalizeMatch` est le
+ * point de passage de **tous** les matchs tranchés, et y poser un `DELETE` de
+ * plus ferait tenir un verrou de plus jusqu'au commit, sur son chemin le plus
+ * chaud — jusqu'à l'interblocage avec le balayage qui, lui, réserve. Meilleur
+ * effort : au pire, la manche garde des réservations sans objet.
  */
-export async function clearRefereeAlerts(
-  connection: PoolConnection,
-  matchId: number,
-): Promise<void> {
-  dropQueuedRefereeAlerts(connection, matchId);
-  await connection.execute(`DELETE FROM bg_referee_alerts WHERE match_id = ?`, [matchId]);
+async function clearRefereeAlertsOnPool(matchId: number): Promise<void> {
+  try {
+    const db = await getDatabase();
+    await db.execute(`DELETE FROM bg_referee_alerts WHERE match_id = ?`, [matchId]);
+  } catch {
+    // Meilleur effort.
+  }
 }
 
 /**
@@ -408,10 +443,11 @@ export async function clearRefereeAlerts(
  * Sans ce retrait, le commit annoncerait aux arbitres qu'une rencontre
  * `COMPLETED` « n'est toujours pas tranchée ».
  *
- * Effacer la ligne en base ne suffisait pas : la file vit en mémoire, sur la
- * connexion, et c'est elle qui décide de ce qui part.
+ * En mémoire seulement, et **synchrone** : la file vit sur la connexion, c'est
+ * elle qui décide de ce qui part, et la nettoyer ne doit rien coûter au moteur.
+ * L'effacement en base suit le commit (`clearRefereeAlertsOnPool`).
  */
-function dropQueuedRefereeAlerts(connection: PoolConnection, matchId: number): void {
+export function dropQueuedRefereeAlerts(connection: PoolConnection, matchId: number): void {
   const queue = pending.get(connection);
   if (!queue) return;
   const kept = queue.filter(
@@ -454,12 +490,18 @@ export async function queueRefereeAlert(
   let claimId: number | null;
   try {
     claimId = await claimRefereeAlert(connection, entry.matchId, alertKey);
-  } catch {
-    // La réservation est inaccessible — table absente, verrou heurté. Le
-    // conflit part quand même, **sans marque** : c'est une alerte par report,
-    // donc une par action d'un joueur, comme avant que ce canal n'existe. Une
-    // escalade, elle, se tait : née d'un constat refait à chaque entretien, elle
-    // partirait en boucle.
+  } catch (error) {
+    // Un interblocage n'est pas une écriture manquée : InnoDB vient d'annuler
+    // la **transaction entière** de l'appelant. L'avaler laisserait le moteur
+    // poursuivre — propager une qualifiée, commiter — sur une transaction
+    // défaite, et rendre un 200 pour un report de score qui n'existe plus.
+    if (isTransactionAborted(error)) throw error;
+
+    // Tout le reste laisse la transaction debout : la réservation est seulement
+    // inaccessible — table absente, verrou dépassé. Le conflit part quand même,
+    // **sans marque** : c'est une alerte par report, donc une par action d'un
+    // joueur, comme avant que ce canal n'existe. Une escalade, elle, se tait :
+    // née d'un constat refait à chaque entretien, elle partirait en boucle.
     return entry.kind === "score_conflict" ? queueBotLog(connection, entry) : false;
   }
   if (claimId === null) return false;

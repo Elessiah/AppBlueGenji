@@ -2,7 +2,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { checkMatchScores, parseMatchFormat } from "@/lib/shared/match-format";
 import { MatchRow } from "./_internal";
-import { clearRefereeAlerts, queueBotLog, queueRefereeAlert } from "./bot-logs";
+import { dropQueuedRefereeAlerts, queueBotLog, queueRefereeAlert } from "./bot-logs";
 import { resolveUserEntrantTeamId } from "./registration";
 import { syncTournamentState } from "./state";
 import { tryAutoResolveByes } from "./byes";
@@ -115,22 +115,16 @@ export async function finalizeMatch(
   // n'encombrent donc pas le journal.
   queueBotLog(connection, { kind: "match_finished", matchId: Number(match.id) });
 
-  // La manche est tranchée : les alertes qu'elle avait produites n'ont plus
-  // d'objet, et leurs réservations doivent partir avec elles. C'est ce qui rend
-  // « une alerte de conflit par manche » temporaire plutôt que définitif — un
-  // désaccord qui renaît après un arbitrage doit pouvoir alerter à nouveau.
+  // Le même appel a pu, quelques instructions plus tôt, réserver une escalade
+  // sur cette manche : `reportMatchScore` ouvre par `syncTournamentState`, dont
+  // l'entretien tranche les reports expirés, puis clôt la manche si le report
+  // reçu concorde. Sans ce retrait, le commit annoncerait aux arbitres qu'une
+  // rencontre déjà `COMPLETED` « n'est toujours pas tranchée ».
   //
-  // Au meilleur effort, comme tout ce qui touche aux notifications : `finalizeMatch`
-  // est le point de passage de **tous** les matchs tranchés, report de score et
-  // arbitrage compris, et une table d'alertes absente — la migration de
-  // `database.ts` avale ses erreurs — ne doit pas rendre le moteur inutilisable.
-  // Au pire, la manche garde des réservations sans objet, et un désaccord qui
-  // renaîtrait plus tard n'alerterait pas.
-  try {
-    await clearRefereeAlerts(connection, Number(match.id));
-  } catch {
-    // Meilleur effort.
-  }
+  // Retrait **en mémoire seulement** : rien à écrire ici, donc aucun verrou de
+  // plus sur le chemin le plus chaud du moteur. L'effacement des lignes suit le
+  // commit, dans `flushBotLogs`, sur la trace `match_finished` posée ci-dessus.
+  dropQueuedRefereeAlerts(connection, Number(match.id));
 
   await pushTeamToTarget(
     connection,
