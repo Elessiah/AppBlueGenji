@@ -1,5 +1,11 @@
 # Points d'équipe — une seule source
 
+> **Le barème a changé depuis.** Ce document raconte l'unification des *sources*
+> (une assiette, un chargeur, un ordre), qui tient toujours. Le **calcul**, lui,
+> n'est plus un cumul additif : c'est une cote de type Elo, décrite dans
+> [`ELO_RANKING.md`](./ELO_RANKING.md). Les tableaux ci-dessous décrivent l'état
+> d'avant la correction, conservé pour la mémoire du bug.
+
 Une équipe affichait ses « points » à trois endroits, et les trois donnaient
 trois nombres différents pour la même équipe :
 
@@ -50,22 +56,23 @@ et un barème partagé ne suffit pas : posé sur deux assiettes différentes, il
 rend encore deux nombres différents. `lib/shared/ranking.ts` porte donc les
 deux.
 
-| Fonction | Rôle |
-| --- | --- |
-| `rankingPoints` / `rankingPointsSql` | le **barème** — 100 par victoire, −20 par défaite |
-| `playedMatchSql` / `PLAYED_MATCH_SQL` | l'**assiette** — terminé, non-bye, deux équipes réelles, un vainqueur |
-| `rankingMatchJoinSql` | la jointure équipe ↔ matchs comptés |
-| `rankingWinsSql` / `rankingLossesSql` | les agrégats — une défaite est « avoir joué sans gagner » |
-| `rankingPointsForTeamSql` | les deux composés, pour un `ORDER BY` |
-| `compareRankedTeams` | l'**ordre** — points, victoires, nom |
+| Fonction | Rôle | Aujourd'hui |
+| --- | --- | --- |
+| `rankingPoints` / `rankingPointsSql` | le **barème** — 100 par victoire, −20 par défaite | remplacé par `replayRanking` / `ratingTransfer` |
+| `playedMatchSql` / `PLAYED_MATCH_SQL` | l'**assiette** — terminé, non-bye, deux équipes réelles, un vainqueur | inchangé |
+| `rankingMatchJoinSql` | la jointure équipe ↔ matchs comptés | inchangé |
+| `rankingWinsSql` / `rankingLossesSql` | les agrégats — une défaite est « avoir joué sans gagner » | retirés : le rejeu les compte |
+| `rankingPointsForTeamSql` | les deux composés, pour un `ORDER BY` | retiré : une cote ne s'écrit pas en SQL |
+| `compareRankedTeams` | l'**ordre** — points, victoires, nom | étendu : les non classées passent après |
 
 Le module reste pur : il ne produit que des chaînes SQL, dont les seules valeurs
 interpolées sont ses propres constantes et les expressions passées par
 l'appelant.
 
 Au-dessus, un seul chargeur serveur : `loadTeamRanking`
-(`lib/server/stats-service.ts`) rend une ligne par équipe — victoires, défaites,
-points — déjà triée. Toutes les vues en descendent :
+(`lib/server/ranking-service.ts` depuis la refonte Elo) rend une ligne par
+équipe — victoires, défaites, points — déjà triée. Toutes les vues en
+descendent :
 
 - l'annuaire `/equipes` (`listTeams`) y lit le bilan et les points de chaque
   carte, et n'agrège plus rien lui-même ;
@@ -78,8 +85,8 @@ points — déjà triée. Toutes les vues en descendent :
   jamais en date calculée côté application : les dates de match sont écrites par
   la base, une seconde horloge décalerait la fenêtre du seul écart de fuseau.
 
-Les points sont posés en TypeScript par `rankingPoints`, jamais relus d'une
-colonne SQL : la refonte du barème n'aura qu'un point de calcul à remplacer.
+Les points ont toujours été posés en TypeScript, jamais relus d'une colonne
+SQL : la refonte du barème n'a bien eu qu'un point de calcul à remplacer.
 
 L'ordre, lui, se décide **en mémoire** (`compareRankedTeams`) : la collation
 MySQL et `localeCompare("fr")` ne départagent pas les noms de la même façon, et
@@ -90,7 +97,8 @@ deux vues triées chacune de son côté finiraient par afficher deux ordres.
 **Le seeding.** Survie, Suisse, Multi et l'aperçu du plateau réécrivaient chacun
 les mêmes deux expressions `WINS` / `LOSSES` — avec `loser_team_id` et sans
 écarter les byes. Ils passent par les fonctions partagées : un tournoi seede
-désormais sur le classement que le site affiche.
+désormais sur le classement que le site affiche. (Depuis la refonte Elo, par la
+fonction unique `loadEntrantsBySiteRanking`.)
 
 **La barre de forme des cartes.** Elle se lisait sur les 1000 derniers matchs du
 site, byes compris — au-delà, les équipes les moins actives n'avaient plus de
@@ -111,11 +119,11 @@ diverger, et ne le peut plus, c'est le **nombre de points d'une équipe**.
 
 ## Tests
 
-- `tests/lib/shared/ranking.test.ts` — barème, assiette, agrégats, ordre.
+- `tests/lib/shared/ranking.test.ts` — formule, assiette, rejeu, ordre.
 - `tests/lib/server/team-points-consistency.test.ts` — l'ancre : un jeu de
   matchs, et le même nombre lu sur la carte d'annuaire, sur la fiche et au
   classement. Le fichier échoue dès qu'une vue se remet à calculer de son côté.
 - `tests/lib/server/landing-leaderboard.test.ts` — barème, équipes sans match,
   fenêtre de tendance, dégradation si la base tombe.
-- `tests/lib/server/stats-service.test.ts` — `loadTeamRanking` : tri, bornage,
-  agrégats absents.
+- `tests/lib/server/ranking-service.test.ts` — `loadTeamRanking` : tri, bornage,
+  découpage, mutualisation.

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { listTeams } from "@/lib/server/teams-service";
+import { clearCache } from "@/lib/server/cache";
 
 jest.mock("@/lib/server/database");
 
@@ -12,31 +13,46 @@ jest.mock("@/lib/server/database");
  */
 
 const TEAM_QUERY = /AS members_count/;
-const RANKING_QUERY = /AS wins/;
+const IDENTITY_QUERY = /FROM bg_teams\s+WHERE solo_user_id IS NULL/;
+const REPLAY_QUERY = /AS played_at/;
 
 /**
- * `listTeams` enchaîne cinq lectures : équipes, forme, classement, roster,
- * jeux. On les distingue par leur SQL plutôt que par leur rang d'appel, pour ne
- * pas casser au moindre déplacement d'une requête.
+ * `listTeams` enchaîne plusieurs lectures : équipes, forme, classement (rejeu
+ * des matchs puis identités), roster, jeux. On les distingue par leur SQL
+ * plutôt que par leur rang d'appel, pour ne pas casser au moindre déplacement
+ * d'une requête.
  *
- * Le bilan (victoires, défaites, points) ne sort **pas** de la requête des
- * équipes : il vient du classement du site, servi ici par la même fixture — la
- * carte d'annuaire et la fiche lisent le même nombre.
+ * Le bilan (victoires, défaites, cote) ne sort **pas** de la requête des
+ * équipes : il vient du classement du site, rejoué ici depuis les mêmes matchs
+ * — la carte d'annuaire et la fiche lisent le même nombre.
+ *
+ * `wins` sur une ligne d'équipe décrit ici le nombre de victoires à fabriquer
+ * dans le rejeu : chacune est une rencontre gagnée contre une équipe de passage,
+ * ce qui monte la cote sans polluer la liste.
  */
 async function mockDb(teamRows: Record<string, unknown>[]) {
+  let matchId = 0;
+  let sparringId = 10_000;
+  const matches = teamRows.flatMap((row) =>
+    Array.from({ length: Number(row.wins ?? 0) }, () => {
+      matchId += 1;
+      sparringId += 1;
+      return {
+        id: matchId,
+        team1_id: row.id,
+        team2_id: sparringId,
+        winner_team_id: row.id,
+        played_at: new Date(`2026-06-${String((matchId % 28) + 1).padStart(2, "0")}T18:00:00Z`),
+      };
+    }),
+  );
+
   const execute = jest.fn(async (sql: unknown) => {
     const text = String(sql);
     if (TEAM_QUERY.test(text)) return [teamRows];
-    if (RANKING_QUERY.test(text)) {
-      return [
-        teamRows.map((row) => ({
-          team_id: row.id,
-          team_name: row.name,
-          logo_url: row.logo_url,
-          wins: row.wins,
-          losses: row.losses,
-        })),
-      ];
+    if (REPLAY_QUERY.test(text)) return [matches];
+    if (IDENTITY_QUERY.test(text)) {
+      return [teamRows.map((row) => ({ id: row.id, name: row.name, logo_url: row.logo_url }))];
     }
     return [[]];
   });
@@ -61,8 +77,16 @@ function teamRow(overrides: Record<string, unknown> = {}) {
 }
 
 describe("listTeams — logo des équipes", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  // Le classement est mutualisé entre appels : sans purge, un test lirait la
+  // photo du précédent.
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    clearCache();
+  });
 
   it("expose le logo de l'équipe", async () => {
     await mockDb([teamRow()]);

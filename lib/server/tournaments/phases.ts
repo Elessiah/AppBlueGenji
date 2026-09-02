@@ -13,11 +13,7 @@ import {
   loadPhaseStandings,
 } from "./phases-repository";
 import { loadTournamentRow, finishTournament, getRegistrationRows } from "./repository";
-import {
-  rankingMatchJoinSql,
-  rankingPointsForTeamSql,
-  rankingWinsSql,
-} from "@/lib/shared/ranking";
+import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import { createBracketIfMissing } from "./bracket-generator";
 import { tryAutoResolveByes } from "./byes";
 import { isEliminationPhaseComplete, rankEliminationPhase } from "./finalization";
@@ -64,32 +60,29 @@ export async function initializeMultiTournament(
 
   const resolved = resolvePhasePlan(registeredCount, phaseConfigs);
 
-  // Seed la phase 1 depuis le classement du site (exactement comme Survie),
-  // barème **et** assiette compris (`lib/shared/ranking.ts`) — sauf si le staff
-  // a ordonné le seeding à la main, auquel cas l'ordre des inscriptions fait
-  // autorité.
-  const WINS = rankingWinsSql("r.team_id");
-
-  const [seededRows] = Number(tournament.manual_seeding ?? 0) === 1
-    ? await conn.execute<(RowDataPacket & { team_id: number; seed: number })[]>(
-        `SELECT
-          team_id,
-          ROW_NUMBER() OVER (ORDER BY COALESCE(seed, 1000000), registered_at ASC) AS seed
-         FROM bg_tournament_registrations
-         WHERE tournament_id = ?`,
-        [tournamentId],
-      )
-    : await conn.execute<(RowDataPacket & { team_id: number; seed: number })[]>(
-        `SELECT
-          r.team_id,
-          ROW_NUMBER() OVER (ORDER BY ${rankingPointsForTeamSql("r.team_id")} DESC, ${WINS} DESC, r.team_id ASC) AS seed
-         FROM bg_tournament_registrations r
-         LEFT JOIN bg_matches m
-           ON ${rankingMatchJoinSql("r.team_id")}
-         WHERE r.tournament_id = ?
-         GROUP BY r.team_id`,
-        [tournamentId],
-      );
+  // Seed la phase 1 depuis le classement du site (exactement comme Survie), par
+  // le chargeur unique `loadEntrantsBySiteRanking` — sauf si le staff a ordonné
+  // le seeding à la main, auquel cas l'ordre des inscriptions fait autorité.
+  //
+  // Le rang n'est plus posé par un `ROW_NUMBER()` : une cote rejouée ne s'écrit
+  // pas en SQL, l'ordre vient donc du chargeur et la numérotation de sa place
+  // dans la liste.
+  const seededRows: Array<{ team_id: number; seed: number }> =
+    Number(tournament.manual_seeding ?? 0) === 1
+      ? (
+          await conn.execute<(RowDataPacket & { team_id: number; seed: number })[]>(
+            `SELECT
+              team_id,
+              ROW_NUMBER() OVER (ORDER BY COALESCE(seed, 1000000), registered_at ASC) AS seed
+             FROM bg_tournament_registrations
+             WHERE tournament_id = ?`,
+            [tournamentId],
+          )
+        )[0].map((row) => ({ team_id: Number(row.team_id), seed: Number(row.seed) }))
+      : (await loadEntrantsBySiteRanking(conn, tournamentId)).map((entrant, index) => ({
+          team_id: entrant.teamId,
+          seed: index + 1,
+        }));
 
   // Persiste les métriques de chaque phase (entrants, qualifiants, max_rounds, state=SKIPPED)
   for (const resolvedPhase of resolved) {

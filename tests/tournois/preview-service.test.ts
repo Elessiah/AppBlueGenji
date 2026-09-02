@@ -32,17 +32,32 @@ function settingsRows(overrides: Row = {}) {
   return [{ swiss_total_rounds: null, endurance_playoff_size: null, ...overrides }];
 }
 
-/** Enchaîne les réponses : ordre des inscrites, puis réglages du format. */
-function mockQueries(entrants: Row[], settings: Row[] = settingsRows()) {
+/**
+ * Répond **par le SQL** et non par l'ordre des appels : le seeding par
+ * classement du site rejoue les matchs (`loadEntrantsBySiteRanking`), donc le
+ * nombre de requêtes dépend de la source d'ordre — figer une séquence rendrait
+ * le test faux à la première lecture ajoutée.
+ */
+function mockQueries(entrants: Row[], settings: Row[] = settingsRows(), matches: Row[] = []) {
   connection.execute.mockReset();
-  connection.execute
-    .mockResolvedValueOnce([entrants] as never)
-    .mockResolvedValueOnce([settings] as never);
+  connection.execute.mockImplementation((async (sql: unknown) => {
+    const text = String(sql);
+    if (text.includes("swiss_total_rounds")) return [settings];
+    if (text.includes("FROM bg_matches")) return [matches];
+    return [entrants];
+  }) as never);
 }
 
-/** SQL de la n-ième requête exécutée, espaces normalisés. */
-function sqlOf(callIndex: number): string {
-  return String(connection.execute.mock.calls[callIndex][0]).replace(/\s+/g, " ");
+/** SQL de toutes les requêtes exécutées, espaces normalisés. */
+function allSql(): string[] {
+  return connection.execute.mock.calls.map((call) =>
+    String(call[0]).replace(/\s+/g, " "),
+  );
+}
+
+/** La requête qui lit les inscrites — celle qui porte l'ordre de seeding. */
+function entrantsSql(): string {
+  return allSql().find((sql) => sql.includes("bg_tournament_registrations")) ?? "";
 }
 
 function run(row: TournamentRow) {
@@ -86,7 +101,7 @@ describe("loadTournamentPreview", () => {
     const preview = await run(tournament({ format: "SINGLE" }));
 
     expect(preview?.seedingSource).toBe("REGISTRATION");
-    expect(sqlOf(0)).toContain("ORDER BY COALESCE(r.seed, 1000000), r.registered_at ASC");
+    expect(entrantsSql()).toContain("ORDER BY COALESCE(r.seed, 1000000), r.registered_at ASC");
     expect(preview?.entrants.map((entrant) => entrant.teamName)).toEqual([
       "Alpha",
       "Beta",
@@ -103,8 +118,10 @@ describe("loadTournamentPreview", () => {
     const preview = await run(tournament({ format: "SWISS" }));
 
     expect(preview?.seedingSource).toBe("RANKING");
-    expect(sqlOf(0)).toContain("winner_team_id");
-    expect(sqlOf(0)).not.toContain("ORDER BY COALESCE(r.seed");
+    // Le classement est rejoué depuis les matchs comptés, puis appliqué aux
+    // inscrites : la requête d'ordre ne trie donc plus rien elle-même.
+    expect(allSql().some((sql) => sql.includes("winner_team_id"))).toBe(true);
+    expect(entrantsSql()).not.toContain("ORDER BY COALESCE(r.seed");
   });
 
   it("ordonne une survie par le classement du site", async () => {
@@ -119,7 +136,7 @@ describe("loadTournamentPreview", () => {
     const preview = await run(tournament({ format: "BG_SURVIE" }));
 
     expect(preview?.seedingSource).toBe("REGISTRATION");
-    expect(sqlOf(0)).toContain("ORDER BY COALESCE(r.seed, 1000000), r.registered_at ASC");
+    expect(entrantsSql()).toContain("ORDER BY COALESCE(r.seed, 1000000), r.registered_at ASC");
   });
 
   it("fait primer l'ordre saisi à la main sur le classement du site", async () => {
@@ -128,7 +145,7 @@ describe("loadTournamentPreview", () => {
     const preview = await run(tournament({ format: "SURVIVAL", manual_seeding: 1 }));
 
     expect(preview?.seedingSource).toBe("MANUAL");
-    expect(sqlOf(0)).toContain("ORDER BY COALESCE(r.seed, 1000000), r.registered_at ASC");
+    expect(entrantsSql()).toContain("ORDER BY COALESCE(r.seed, 1000000), r.registered_at ASC");
   });
 
   it("reprend les réglages de format du tournoi", async () => {

@@ -11,7 +11,6 @@ import {
   type StatsMatch,
   type StatsTournament,
 } from "@/lib/shared/stats";
-import { RANKING_POINTS_PER_LOSS, RANKING_POINTS_PER_WIN } from "@/lib/shared/ranking";
 
 const NOW = new Date("2026-06-15T12:00:00Z");
 
@@ -113,11 +112,6 @@ describe("computeDeepStats", () => {
       expect(stats.mapsLost).toBe(3);
       expect(stats.mapDiff).toBe(0);
       expect(stats.mapWinRate).toBe(0.5);
-    });
-
-    it("applique le barème de classement partagé", () => {
-      const stats = computeDeepStats(series([true, true, false]), [], NOW);
-      expect(stats.rankingPoints).toBe(2 * RANKING_POINTS_PER_WIN + RANKING_POINTS_PER_LOSS);
     });
 
     it("distingue les forfaits donnés des forfaits reçus", () => {

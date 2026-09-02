@@ -8,7 +8,6 @@ import {
   samePairings,
   type SurvivalMatchOutcome,
 } from "@/lib/shared/survival";
-import { rankingPoints, rankingPointsSql } from "@/lib/shared/ranking";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -224,36 +223,24 @@ describe("samePairings", () => {
   });
 });
 
-describe("barème de classement partagé", () => {
-  it("pénalise les défaites", () => {
-    expect(rankingPoints(3, 0)).toBeGreaterThan(rankingPoints(3, 5));
-    expect(rankingPoints(0, 10)).toBeLessThan(0);
-    // Une équipe qui gagne passe devant une équipe qui accumule les défaites.
-    expect(rankingPoints(3, 0)).toBeGreaterThan(rankingPoints(0, 10));
-  });
-
-  it("expose la même formule en SQL", () => {
-    expect(rankingPointsSql("w", "l")).toBe("((w) * 100 + (l) * -20)");
-  });
-
-  it("est utilisé par le leaderboard du site et par le seeding Survie", () => {
+describe("classement du site partagé", () => {
+  it("est lu par le leaderboard du site et par le seeding Survie, sans être réécrit", () => {
     const root = join(__dirname, "..", "..");
     const read = (path: string) => readFileSync(join(root, path), "utf8");
 
     // Le leaderboard ne calcule plus rien lui-même : il lit le classement du
-    // site, seul endroit où le barème est appliqué.
+    // site, seul endroit où la cote est calculée.
     const landing = read("lib/server/landing-service.ts");
     expect(landing).toContain("loadTeamRanking");
     expect(landing).not.toContain("SUM(CASE WHEN m.winner_team_id");
     expect(landing).not.toMatch(/wins \* 100 - losses \* 20/);
 
-    // Le seeding compose lui aussi le barème par l'assembleur partagé, sans
-    // réécrire ses propres agrégats.
+    // Le seeding passe par le chargeur unique. Une cote de type Elo ne s'écrit
+    // pas en SQL : plus aucun `ORDER BY` de points dans le moteur.
     const survival = read("lib/server/tournaments/survival.ts");
-    expect(survival).toContain("rankingPointsForTeamSql");
+    expect(survival).toContain("loadEntrantsBySiteRanking");
     expect(survival).not.toContain("SUM(CASE WHEN m.winner_team_id");
-    // L'ancien barème (les défaites rapportaient des points) doit avoir disparu.
-    expect(survival).not.toContain("* 3");
+    expect(survival).not.toContain("rankingPointsForTeamSql");
   });
 });
 

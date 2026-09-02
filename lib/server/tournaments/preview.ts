@@ -9,17 +9,13 @@
  * publié par `registerCurrentUserTeam`.
  *
  * L'ordre reproduit exactement celui qu'appliquerait le moteur au démarrage :
- * même requête de classement du site que `initializeSwissTournament`,
- * `initializeSurvivalTournament` et `initializeMultiTournament`, et même lecture
- * de `manual_seeding`. Un aperçu qui divergerait du tirage réel serait pire que
- * pas d'aperçu du tout.
+ * même chargeur de classement du site (`loadEntrantsBySiteRanking`) que
+ * `initializeSwissTournament`, `initializeSurvivalTournament` et
+ * `initializeMultiTournament`, et même lecture de `manual_seeding`. Un aperçu
+ * qui divergerait du tirage réel serait pire que pas d'aperçu du tout.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import {
-  rankingMatchJoinSql,
-  rankingPointsForTeamSql,
-  rankingWinsSql,
-} from "@/lib/shared/ranking";
+import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import {
   buildTournamentPreview,
   type PreviewEntrant,
@@ -54,37 +50,34 @@ async function loadOrderedEntrants(
   tournamentId: number,
   source: PreviewSeedingSource,
 ): Promise<PreviewEntrant[]> {
-  // Barème **et** assiette du classement du site : mêmes matchs comptés que
-  // sur l'annuaire et sur les fiches (`lib/shared/ranking.ts`).
-  const WINS = rankingWinsSql("r.team_id");
-
-  const [rows] =
+  // Classement du site : **le même chargeur** que le seeding réel
+  // (`loadEntrantsBySiteRanking`). Un aperçu qui divergerait du tirage serait
+  // pire que pas d'aperçu du tout.
+  //
+  // `transactional: false` : l'aperçu est une lecture seule, hors transaction —
+  // il lit donc le classement **mutualisé**, celui-là même que l'annuaire et le
+  // leaderboard affichent au même moment. Rejouer tout `bg_matches` à chaque
+  // consultation coûterait sans rien garantir de plus, et l'aperçu est déjà
+  // recalculé à chaque inscription.
+  const ordered =
     source === "RANKING"
-      ? await connection.execute<(RowDataPacket & { team_id: number; team_name: string })[]>(
-          `SELECT r.team_id, t.name AS team_name
-           FROM bg_tournament_registrations r
-           JOIN bg_teams t ON t.id = r.team_id
-           LEFT JOIN bg_matches m
-             ON ${rankingMatchJoinSql("r.team_id")}
-           WHERE r.tournament_id = ?
-           GROUP BY r.team_id, t.name
-           ORDER BY ${rankingPointsForTeamSql("r.team_id")} DESC, ${WINS} DESC, r.team_id ASC`,
-          [tournamentId],
-        )
-      : await connection.execute<(RowDataPacket & { team_id: number; team_name: string })[]>(
-          `SELECT r.team_id, t.name AS team_name
-           FROM bg_tournament_registrations r
-           JOIN bg_teams t ON t.id = r.team_id
-           WHERE r.tournament_id = ?
-           ORDER BY COALESCE(r.seed, 1000000), r.registered_at ASC`,
-          [tournamentId],
-        );
+      ? await loadEntrantsBySiteRanking(connection, tournamentId, { transactional: false })
+      : (
+          await connection.execute<(RowDataPacket & { team_id: number; team_name: string })[]>(
+            `SELECT r.team_id, t.name AS team_name
+             FROM bg_tournament_registrations r
+             JOIN bg_teams t ON t.id = r.team_id
+             WHERE r.tournament_id = ?
+             ORDER BY COALESCE(r.seed, 1000000), r.registered_at ASC`,
+            [tournamentId],
+          )
+        )[0].map((row) => ({ teamId: Number(row.team_id), teamName: row.team_name }));
 
   // Le rang affiché est recalculé de 1 à N : `seed` peut être NULL ou à trous
   // sur d'anciennes inscriptions, et le classement du site n'en produit aucun.
-  return rows.map((row, index) => ({
-    teamId: Number(row.team_id),
-    teamName: row.team_name,
+  return ordered.map((entrant, index) => ({
+    teamId: entrant.teamId,
+    teamName: entrant.teamName,
     seed: index + 1,
   }));
 }

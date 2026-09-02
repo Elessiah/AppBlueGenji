@@ -8,12 +8,13 @@
  * le même barème et les mêmes définitions — un joueur ne peut plus afficher un
  * bilan incohérent avec celui de ses équipes.
  *
- * Les points de classement réutilisent `lib/shared/ranking.ts`, commun au
- * leaderboard de la landing et au seeding des modes à classement.
+ * Le module ne porte **aucun** total de points de classement : la cote du site
+ * est une notation de type Elo, qui dépend des cotes adverses au moment de
+ * chaque rencontre et ne peut donc pas se déduire du seul bilan d'une entité.
+ * Elle vit dans `lib/shared/ranking.ts` et arrive par `TeamRankingPosition`.
  */
 
 import { forfeitMapCount, type MatchFormat } from "./match-format";
-import { rankingPoints } from "./ranking";
 import type { BracketType, TournamentFormat, TournamentGame, TournamentState } from "./types";
 
 /** Nombre de résultats retenus pour la « forme récente ». */
@@ -117,12 +118,20 @@ export type StatsActivityPoint = {
   won: number;
 };
 
-/** Place d'une équipe au classement du site (même barème que la landing). */
+/**
+ * Place d'une équipe au classement du site, et la cote qui la produit.
+ *
+ * C'est **le seul** porteur des points de classement d'une fiche : le bloc
+ * `DeepStats` n'en contient pas, faute de pouvoir les déduire du bilan de
+ * l'entité — un seul nombre, donc aucune divergence possible avec le rang
+ * affiché à côté.
+ */
 export type TeamRankingPosition = {
   /** Rang, `null` si l'équipe n'a encore joué aucun match. */
   position: number | null;
   /** Nombre d'équipes ayant joué au moins un match. */
   total: number;
+  /** Cote rejouée. Cote de départ pour une équipe non classée. */
   points: number;
 };
 
@@ -160,9 +169,6 @@ export type DeepStats = {
   worstLossStreak: number;
   /** Jusqu'aux `FORM_LENGTH` derniers résultats, le plus récent en tête. */
   form: ("W" | "L")[];
-
-  // — Classement
-  rankingPoints: number;
 
   // — Forfaits
   forfeitsGiven: number;
@@ -236,7 +242,6 @@ export function emptyDeepStats(now: Date = new Date()): DeepStats {
     bestWinStreak: 0,
     worstLossStreak: 0,
     form: [],
-    rankingPoints: 0,
     forfeitsGiven: 0,
     forfeitsReceived: 0,
     byGame: [],
@@ -409,7 +414,6 @@ export function computeDeepStats(
   stats.winRate = ratio(stats.matchesWon, stats.matchesPlayed);
   stats.mapDiff = stats.mapsWon - stats.mapsLost;
   stats.mapWinRate = ratio(stats.mapsWon, stats.mapsWon + stats.mapsLost);
-  stats.rankingPoints = rankingPoints(stats.matchesWon, stats.matchesLost);
   stats.byGame = toSplits(byGame, (key) => GAME_STAT_LABELS[key] ?? key);
   stats.byFormat = toSplits(byFormat, (key) => FORMAT_STAT_LABELS[key] ?? key);
 
