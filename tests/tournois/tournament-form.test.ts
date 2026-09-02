@@ -1,5 +1,11 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  ALL_TOURNAMENT_FIELDS,
+  editWindowFor,
+  isFieldEditable,
+} from "@/lib/shared/tournament-edit";
+import { MATCH_FORMAT_BOUNDS, isValidMatchFormat } from "@/lib/shared/match-format";
+import {
   defaultTournamentFormValues,
   toApiPayload,
   toFormValues,
@@ -116,5 +122,78 @@ describe("toFormValues", () => {
     });
     expect(back.startAt).toBe(values.startAt);
     expect(back.registrationOpenAt).toBe(values.registrationOpenAt);
+  });
+});
+
+/**
+ * Les deux notations sont offertes à la configuration, création comme édition.
+ *
+ * Le formulaire est partagé par `/tournois/creer` et `/tournois/[id]/modifier` :
+ * une notation offerte à l'un l'est forcément à l'autre. Ces tests l'ancrent,
+ * pour qu'un tournoi en `FT` reste configurable — et donc affichable — dans les
+ * deux écrans.
+ */
+describe("format de match — les deux notations", () => {
+  const values = { ...defaultTournamentFormValues(), name: "Coupe test" };
+
+  it("aplatit un First to comme un Best of", () => {
+    const payload = toApiPayload({ ...values, matchFormat: { type: "FT", value: 3 } });
+    expect(payload.matchFormatType).toBe("FT");
+    expect(payload.matchFormatValue).toBe(3);
+  });
+
+  it("fait l'aller-retour sans perte sur les deux notations", () => {
+    for (const matchFormat of [
+      { type: "BO", value: 5 },
+      { type: "FT", value: 3 },
+      null,
+    ] as const) {
+      const back = toFormValues({
+        ...values,
+        matchFormat,
+        description: null,
+        survivalRoundsPerCut: null,
+        swissTotalRounds: null,
+        endurancePoints: null,
+        phases: null,
+      });
+      expect(back.matchFormat).toEqual(matchFormat);
+    }
+  });
+
+  it("accepte les deux notations sur tout leur domaine de saisie", () => {
+    // Le sélecteur du formulaire n'offre rien que la validation partagée
+    // refuserait : chaque valeur atteignable par les champs doit passer.
+    for (const type of ["BO", "FT"] as const) {
+      const { min, max } = MATCH_FORMAT_BOUNDS[type];
+      for (let value = min; value <= max; value += 1) {
+        if (type === "BO" && value % 2 === 0) continue; // un « BO4 » n'existe pas
+        const payload = toApiPayload({ ...values, matchFormat: { type, value } });
+        expect(isValidMatchFormat(payload.matchFormatType, payload.matchFormatValue)).toBe(true);
+      }
+    }
+  });
+
+  it("laisse le format de match modifiable après création, sur un tournoi encore caché", () => {
+    // La création et l'édition partagent le même formulaire : ce qui décide que
+    // les deux notations restent offertes à l'édition, c'est la fenêtre.
+    const hidden = {
+      state: "UPCOMING" as const,
+      startVisibilityAt: new Date(Date.now() + 86_400_000).toISOString(),
+      maxTeams: 8,
+    };
+    expect(editWindowFor(hidden)).toBe("FULL");
+    expect(isFieldEditable("matchFormat", hidden)).toBe(true);
+    expect(ALL_TOURNAMENT_FIELDS).toContain("matchFormat");
+  });
+
+  it("verrouille le format une fois le tournoi annoncé, puis lancé", () => {
+    const announced = {
+      state: "REGISTRATION" as const,
+      startVisibilityAt: new Date(Date.now() - 86_400_000).toISOString(),
+      maxTeams: 8,
+    };
+    expect(isFieldEditable("matchFormat", announced)).toBe(false);
+    expect(isFieldEditable("matchFormat", { ...announced, state: "RUNNING" })).toBe(false);
   });
 });

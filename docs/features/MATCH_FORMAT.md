@@ -68,11 +68,46 @@ BlueGenji Survie posent le même chiffre. La Survie et la Ronde suisse écrivaie
 auparavant un 1-0 en dur — la manche affichait alors « 1 – FF » pendant que la
 fiche de l'adversaire en comptait trois maps, le bilan dérivant du format.
 
+## Une seule fonction écrit la notation
+
+`matchFormatLabel(format)` est la **source unique** du libellé — « BO5 »,
+« FT3 » — et il n'y a aucune autre façon d'assembler le type et le nombre. La
+règle n'est pas décorative : la carte « en cours » de l'accueil portait sa
+propre fonction, `toBestOfLabel`, qui **devinait** la notation depuis le nom de
+la manche (« BO5 » dès que le libellé contenait « final », « BO3 » sinon) sans
+jamais lire `TournamentCard.matchFormat`. Un tournoi réglé en FT3 s'y annonçait
+donc « BO3 », et un tournoi en score libre aussi.
+
+Deux conséquences à retenir avant d'afficher un format quelque part :
+
+1. la notation se **lit** dans `matchFormat`, elle ne se déduit ni du nom de la
+   manche, ni du format de bracket, ni de l'étape du tournoi ;
+2. un tournoi **sans** format n'a pas de notation à montrer. Les pastilles se
+   gardent donc par `matchFormat && …` plutôt que de rendre le libellé de repli
+   « Score libre », qui n'a de sens que dans une phrase d'aide de formulaire.
+
+Deux tests tiennent les deux bouts :
+
+- `tests/app/live-card-match-format.test.tsx` rend réellement la carte de
+  l'accueil pour chaque valeur des deux notations, et vérifie qu'elle n'annonce
+  rien sur un tournoi en score libre ;
+- `tests/lib/shared/match-format.test.ts` balaye tout `app/`, `components/` et
+  `lib/` et refuse deux choses hors du module partagé — une chaîne qui **est**
+  une notation (`"BO3"`, le libellé qu'on recopie) et l'assemblage d'un type et
+  d'un nombre. Le garde-fou vit avec le module qu'il protège, pas avec l'écran
+  qui a révélé le bug. Les notations citées **en prose** restent permises :
+  « un Best of se joue en nombre impair de manches (BO1, BO3, BO5…) » explique
+  la règle, il ne l'affiche pas.
+
 ## Où c'est visible
 
 - **Création du tournoi** (`/tournois/creer`) : un sélecteur *Best of / First to /
-  Libre* et le nombre de manches, avec le rappel de ce que ça implique.
+  Libre* et le nombre de manches, avec le rappel de ce que ça implique. Le même
+  formulaire sert à l'**édition** (`/tournois/[id]/modifier`) : les deux
+  notations y sont donc offertes de la même façon, dans la fenêtre `FULL`.
 - **Page du tournoi** : une pastille `BO5` à côté du format de bracket.
+- **Accueil**, carte du tournoi en cours : la notation suit le numéro du match
+  (« MATCH 42 · FT3 »), et disparaît sur un tournoi en score libre.
 - **Saisie d'équipe** : le rappel « BO5 · premier à 3 » au-dessus des deux
   champs, bornés à l'objectif.
 - **Dialogue d'arbitrage** : le format en toutes lettres sous le titre, les
@@ -121,3 +156,5 @@ générés sont toujours saisissables dans l'interface.
 | Garde-fou arbitrage | `lib/server/tournaments/admin.ts` |
 | Contexte React | `app/(secured)/tournois/[id]/_lib/match-format-context.tsx` |
 | Interface de saisie | `_components/MatchRow.tsx`, `_components/AdminScoreDialog.tsx`, `_hooks/useScoreForm.ts` |
+| Carte « en cours » de l'accueil | `components/cyber/landing/LiveCard.tsx` |
+| Formulaire (création **et** édition) | `app/(secured)/tournois/_components/TournamentForm.tsx` |

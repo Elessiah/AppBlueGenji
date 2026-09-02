@@ -4,8 +4,9 @@ import { Eye } from "lucide-react";
 import { CyberCard, Pill, TeamSigil } from "@/components/cyber";
 import { EntityLink } from "@/components/entity-link";
 import type { LandingLive } from "@/lib/shared/landing";
-import { inferPhaseLabel, toBestOfLabel } from "@/lib/shared/landing";
+import { inferPhaseLabel } from "@/lib/shared/landing";
 import { PLATFORM_LABELS, streamPlatform } from "@/lib/shared/live-streams";
+import { matchFormatLabel } from "@/lib/shared/match-format";
 import styles from "./LiveCard.module.css";
 
 type LiveCardProps = {
@@ -62,7 +63,11 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
   }
 
   const currentMatch = live.currentMatch;
-  const bestOf = toBestOfLabel(currentMatch);
+  // Le format des matchs est un réglage du tournoi, jamais une déduction du nom
+  // de la manche : un FT3 s'écrit « FT3 », un BO5 « BO5 ». Un tournoi en score
+  // libre n'a rien à annoncer — la ligne se réduit alors au numéro du match
+  // plutôt que d'afficher « Score libre » là où on attend une notation.
+  const matchFormat = live.tournament.matchFormat;
   const title = live.tournament.name.toUpperCase();
   const matchIsLive = currentMatch?.liveState === "LIVE";
   const matchIsScheduled = currentMatch?.liveState === "SCHEDULED";
@@ -113,7 +118,24 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
           </div>
 
           <div className={`${styles.vs} mono`}>
-            MATCH {String(currentMatch.id).padStart(2, "0")} · {bestOf}
+            MATCH {String(currentMatch.id).padStart(2, "0")}
+            {matchFormat && (
+              <>
+                {" · "}
+                {/*
+                  Un simple libellé, comme les trois autres écrans qui affichent
+                  un format (en-tête du tournoi, carte de match, arbitrage). Ni
+                  `<abbr>` ni `title` : l'infobulle est réservée à la souris, la
+                  règle chiffrée qu'elle porterait est la même en BO5 et en FT3
+                  (elle ne distingue donc pas les deux notations), et un lecteur
+                  d'écran qui l'annonce à la place du contenu perdrait justement
+                  la notation. Ce qui manque à un visiteur n'est pas une bulle,
+                  c'est la règle **visible** — elle a sa place sur la fiche du
+                  tournoi, pas dans une ligne de dix pixels.
+                */}
+                <span className={styles.matchFormat}>{matchFormatLabel(matchFormat)}</span>
+              </>
+            )}
           </div>
 
           <div className={styles.team}>

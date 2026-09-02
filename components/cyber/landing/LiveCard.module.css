@@ -64,6 +64,15 @@
   text-transform: uppercase;
 }
 
+/*
+ * Notation du format de match (« FT3 ») : le seul fait *du tournoi* dans une
+ * ligne qui numérote la rencontre. Un cran plus clair que le reste de la ligne
+ * suffit à l'en détacher, sans lui donner le poids d'une pastille.
+ */
+.matchFormat {
+  color: var(--ink);
+}
+
 .map {
   display: flex;
   justify-content: space-between;

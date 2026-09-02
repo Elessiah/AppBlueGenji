@@ -1,10 +1,14 @@
 import { describe, expect, it } from "@jest/globals";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import * as ts from "typescript";
 import {
   DEFAULT_MATCH_FORMAT,
   checkMatchScores,
   isValidMatchFormat,
   matchFormatDescription,
   matchFormatLabel,
+  MATCH_FORMAT_BOUNDS,
   matchMaxMaps,
   matchScoreViolationMessage,
   matchWinsRequired,
@@ -157,5 +161,221 @@ describe("match-format — message d'erreur", () => {
 
   it("reste générique en saisie libre", () => {
     expect(matchScoreViolationMessage(null, "SCORE_EXCEEDS_MATCH_FORMAT")).toBe("Score invalide.");
+  });
+});
+
+/**
+ * `matchFormatLabel` est la **seule** fonction du dépôt qui écrive « BO5 » ou
+ * « FT3 ». Ce garde-fou balaye tout `app/`, `components/` et `lib/`, parce que
+ * la régression qu'il existe pour attraper est l'apparition d'un second
+ * assembleur *ailleurs* : c'était `toBestOfLabel`, dans un module de la vitrine
+ * que personne ne relisait en pensant « format de match ». Il devinait « BO5 »
+ * en finale et « BO3 » sinon, et affichait donc « BO3 » sur un tournoi FT3.
+ *
+ * Deux signaux seulement, pour rester tolérant aux refactorings :
+ *
+ * 1. une chaîne qui **est** une notation (`"BO3"`, `'FT5'`) — le libellé qu'on
+ *    recopie au lieu de l'appeler ;
+ * 2. l'assemblage d'un type et d'un nombre, par interpolation ou concaténation.
+ *
+ * Ce qui reste permis : citer la notation **en prose** (« un Best of se joue en
+ * nombre impair : BO1, BO3, BO5… ») dans une phrase d'aide ou un commentaire,
+ * et nommer un jeu d'essai « BO5 Élimination ». On explique la règle, on ne
+ * l'affiche pas.
+ */
+const ROOT = join(__dirname, "..", "..", "..");
+const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
+
+/** Le seul module autorisé à écrire la notation. */
+const SOURCE_OF_TRUTH = join("lib", "shared", "match-format.ts");
+
+/**
+ * Retire les commentaires — par le compilateur TypeScript, pas à la main.
+ *
+ * Distinguer un commentaire d'une chaîne demande de savoir lire du TypeScript,
+ * et un lecteur écrit pour l'occasion se trompe sur des cas qui existent
+ * réellement dans ce dépôt :
+ *
+ * - `lib/server/bot-docs.ts` contient `.replace(/"/g, "&quot;")` — le guillemet
+ *   d'une **expression régulière** ; pris pour une ouverture de chaîne, il
+ *   inverse la parité des guillemets jusqu'à la fin du fichier, et tout ce qui
+ *   suit est lu à l'envers (commentaires vus comme du code, code vu comme une
+ *   chaîne) ;
+ * - `app/api/landing/calendar/route.ts` contient `"PRODID:-//BlueGenji//FR"` —
+ *   une paire de barres **dans** une chaîne, qu'une coupe naïve prend pour un
+ *   commentaire ;
+ * - plusieurs fichiers portent des emoji, hors du plan multilingue de base :
+ *   un balayage indexé sur les points de code et un autre sur les unités UTF-16
+ *   se décalent d'un cran par paire de substitution.
+ *
+ * `transpileModule` sait tout cela, puisque c'est son métier. Les chaînes, les
+ * gabarits et les expressions régulières sortent intacts — ce sont exactement
+ * ce qu'on veut inspecter — et les commentaires disparaissent. Les positions ne
+ * sont pas conservées, ce dont le balayage n'a pas besoin : il cherche des
+ * motifs, pas des colonnes.
+ */
+function stripComments(code: string, fileName = "source.tsx"): string {
+  return ts.transpileModule(code, {
+    fileName,
+    reportDiagnostics: false,
+    compilerOptions: {
+      removeComments: true,
+      target: ts.ScriptTarget.ESNext,
+      jsx: ts.JsxEmit.Preserve,
+      isolatedModules: true,
+    },
+  }).outputText;
+}
+
+/** Tous les fichiers TypeScript du produit (hors tests, hors dépendances). */
+function sourceFiles(): string[] {
+  const out: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+      const rel = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "node_modules" || entry.name === ".next") continue;
+        walk(rel);
+      } else if (/\.tsx?$/.test(entry.name)) {
+        out.push(rel);
+      }
+    }
+  };
+  for (const root of ["app", "components", "lib"]) walk(root);
+  return out.filter((file) => file !== SOURCE_OF_TRUTH);
+}
+
+/** Une chaîne dont le contenu **entier** est une notation : « "BO3" », « 'FT5' ». */
+const NOTATION_LITERAL = /"(?:BO|FT)\d+"|'(?:BO|FT)\d+'|`(?:BO|FT)\d+`/g;
+
+/**
+ * Un type et un nombre accolés par interpolation : `` `${f.type}${f.value}` ``.
+ * C'est la forme qu'aurait une seconde implémentation de `matchFormatLabel`.
+ */
+const NOTATION_ASSEMBLY = /\$\{[^}]*\btype\b[^}]*\}\s*\$\{[^}]*\bvalue\b[^}]*\}/g;
+
+/**
+ * La même chose par concaténation — cherchée dans les **seuls** fichiers qui
+ * parlent de format de match.
+ *
+ * `type + value` est une expression trop banale pour être interdite partout :
+ * `setting.type + setting.value` n'a rien d'un format de match, et échouer
+ * dessus accuserait un fichier qui n'y est pour rien. L'interpolation, elle,
+ * est assez singulière pour valoir partout.
+ */
+const NOTATION_CONCAT = /\btype\s*\+\s*[\w.]*\bvalue\b/g;
+
+/**
+ * Le fichier parle-t-il de format de match ?
+ *
+ * Éprouvé sur le **texte d'origine**, commentaires et annotations de type
+ * compris : la transpilation efface `const f: MatchFormat` comme le reste des
+ * types, et le fichier passerait pour étranger au sujet. Élargir la portée ne
+ * risque qu'un contrôle de trop, jamais un contrôle manquant.
+ */
+const MATCH_FORMAT_FILE = /\bMatchFormat\b|\bmatchFormat\b|match-format/;
+
+describe("match-format — une seule écriture de la notation", () => {
+  it("le balayage voit ce qu'il interdit", () => {
+    // Garde-fou du garde-fou : sans ça, un motif cassé rendrait la suite verte.
+    expect('const label = "BO3";'.match(NOTATION_LITERAL)).toHaveLength(1);
+    expect("return `${format.type}${format.value}`;".match(NOTATION_ASSEMBLY)).toHaveLength(1);
+    expect("return type + format.value;".match(NOTATION_CONCAT)).toHaveLength(1);
+
+    // …et laisse passer la prose, qui cite la notation sans l'afficher.
+    expect('"Un Best of se joue en nombre impair (BO1, BO3, BO5…)."'.match(NOTATION_LITERAL))
+      .toBeNull();
+    expect('{ name: "BO5 Élimination" }'.match(NOTATION_LITERAL)).toBeNull();
+
+    // La concaténation ne vaut que dans un fichier qui parle de format.
+    expect(MATCH_FORMAT_FILE.test("const f: MatchFormat = x;")).toBe(true);
+    expect(MATCH_FORMAT_FILE.test("const key = setting.type + setting.value;")).toBe(false);
+  });
+
+  it("retire les commentaires sans entamer chaînes, gabarits ni expressions régulières", () => {
+    const strip = (code: string) => stripComments(code).trim();
+
+    expect(strip('const x = 1; // renvoie "BO5"')).toBe("const x = 1;");
+    expect(strip('const y = 2; /* "BO5" */')).toBe("const y = 2;");
+
+    // Une paire de barres *dans* une chaîne ne coupe rien : le cas réel
+    // d'`app/api/landing/calendar/route.ts`.
+    expect(strip('const p = "PRODID:-//BlueGenji//FR";')).toBe('const p = "PRODID:-//BlueGenji//FR";');
+
+    // Un guillemet dans une expression régulière n'ouvre pas une chaîne : le
+    // cas réel de `lib/server/bot-docs.ts`. Une coupe artisanale lisait tout le
+    // reste du fichier à l'envers — donc plus aucun commentaire n'était retiré.
+    const withRegex = 'const r = s.replace(/"/g, "&quot;");\n// prose "FT9"\nconst k = "BO3";';
+    expect(strip(withRegex)).toContain('replace(/"/g, "&quot;")');
+    expect(strip(withRegex)).not.toContain("FT9");
+    expect(strip(withRegex).match(NOTATION_LITERAL)).toHaveLength(1);
+
+    // Un emoji ne décale rien : le commentaire qui le suit part bien en entier.
+    const withEmoji = 'const e = "🚪"; /* "BO3" */ const real = "BO5";';
+    expect(strip(withEmoji)).not.toContain("BO3");
+    expect(strip(withEmoji).match(NOTATION_LITERAL)).toHaveLength(1);
+
+    // Le JSX survit : les fichiers d'écran passent par le même chemin.
+    expect(strip("const el = <span>{x}</span>; // note")).toContain("<span>");
+  });
+
+  it("balaye un ensemble de fichiers non vide", () => {
+    const files = sourceFiles();
+    expect(files.length).toBeGreaterThan(100);
+    expect(files).toContain(join("components", "cyber", "landing", "LiveCard.tsx"));
+    expect(files).not.toContain(SOURCE_OF_TRUTH);
+  });
+
+  it("aucun fichier ne recopie ni n'assemble la notation hors du module partagé", () => {
+    const offenders: string[] = [];
+    for (const file of sourceFiles()) {
+      const raw = read(file);
+      const code = stripComments(raw, file);
+      const patterns = [NOTATION_LITERAL, NOTATION_ASSEMBLY];
+      if (MATCH_FORMAT_FILE.test(raw)) patterns.push(NOTATION_CONCAT);
+      for (const pattern of patterns) {
+        pattern.lastIndex = 0;
+        for (const hit of code.match(pattern) ?? []) offenders.push(`${file} → ${hit.trim()}`);
+      }
+    }
+
+    if (offenders.length > 0) {
+      throw new Error(
+        [
+          "Une notation de format de match (« BO5 », « FT3 ») est écrite hors de",
+          `${SOURCE_OF_TRUTH} :`,
+          ...offenders.map((offender) => `  · ${offender}`),
+          "",
+          "Appelle `matchFormatLabel(format)` — et garde la pastille derrière un",
+          "`format && …`, un tournoi en score libre n'ayant pas de notation.",
+          "C'est cette duplication qui a fait afficher « BO3 » sur un tournoi FT3",
+          "(voir docs/features/MATCH_FORMAT.md). Citer la notation en prose reste",
+          "permis : c'est une chaîne *égale* à la notation qui est refusée.",
+        ].join("\n"),
+      );
+    }
+  });
+
+  it("`lib/shared/landing.ts` n'écrit plus de notation de format", () => {
+    const file = join("lib", "shared", "landing.ts");
+    const code = stripComments(read(file), file);
+    expect(code).not.toMatch(/BO\d|FT\d/);
+    expect(code).not.toContain("toBestOfLabel");
+  });
+
+  it("la carte de l'accueil lit le réglage du tournoi et passe par le module partagé", () => {
+    const file = join("components", "cyber", "landing", "LiveCard.tsx");
+    const code = stripComments(read(file), file);
+    expect(code).toContain("matchFormatLabel");
+    expect(code).toContain("tournament.matchFormat");
+  });
+
+  it("rend bien type + nombre, sur tout le domaine de saisie", () => {
+    for (const type of ["BO", "FT"] as const) {
+      const { min, max } = MATCH_FORMAT_BOUNDS[type];
+      for (let value = min; value <= max; value += 1) {
+        expect(matchFormatLabel({ type, value })).toBe(`${type}${value}`);
+      }
+    }
   });
 });
