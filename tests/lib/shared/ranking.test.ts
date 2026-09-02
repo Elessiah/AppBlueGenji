@@ -395,6 +395,10 @@ describe("légendes", () => {
     expect(RANKING_POINTS_HINT).toContain(String(RANKING_FLOOR_POINTS));
     // L'ancien barème additif ne doit plus être annoncé nulle part.
     expect(RANKING_POINTS_HINT).not.toContain("par victoire");
+    expect(RANKING_POINTS_HINT).not.toContain("par défaite");
+    // Elle tient sur une ligne de tuile : la légende voisine (« sur N équipes
+    // classées ») fait 24 signes, celle-ci ne doit pas déformer la grille.
+    expect(RANKING_POINTS_HINT.length).toBeLessThan(90);
     expect(RANKING_POINTS_LABEL).toBe("Points de classement");
     expect(RANKING_UNRANKED_HINT).toContain("Aucun match joué");
   });

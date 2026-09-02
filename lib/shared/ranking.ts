@@ -273,8 +273,8 @@ export const RANKING_POINTS_LABEL = "Points de classement";
  * main : un réglage du classement corrige de lui-même la légende qui l'annonce.
  */
 export const RANKING_POINTS_HINT =
-  `Base ${RANKING_BASE_POINTS} · une victoire prend à l'adversaire d'autant plus de points `
-  + `qu'elle était improbable (plancher ${RANKING_FLOOR_POINTS})`;
+  `Base ${RANKING_BASE_POINTS} · plus la victoire est improbable, plus elle rapporte `
+  + `(plancher ${RANKING_FLOOR_POINTS})`;
 
 /** Ce qu'affiche une équipe qui n'a encore disputé aucun match compté. */
 export const RANKING_UNRANKED_HINT = "Aucun match joué : cote de départ";

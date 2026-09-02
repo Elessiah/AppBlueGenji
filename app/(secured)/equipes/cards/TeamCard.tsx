@@ -6,7 +6,12 @@ import type { TeamListItem } from "@/lib/shared/types";
 import { getPaletteColor } from "@/lib/shared/palette";
 import { PlayerLink } from "@/components/entity-link";
 import { displayTeamTag } from "@/lib/shared/team-tag";
-import { RANKING_POINTS_HINT, RANKING_POINTS_LABEL } from "@/lib/shared/ranking";
+import {
+  isRankedTeam,
+  RANKING_POINTS_HINT,
+  RANKING_POINTS_LABEL,
+  RANKING_UNRANKED_HINT,
+} from "@/lib/shared/ranking";
 import s from "./TeamCard.module.css";
 
 /**
@@ -101,7 +106,14 @@ export function TeamCard({ team }: { team: TeamListItem }) {
           un `<div>` sans rôle (`generic`) n'accepte pas de nom d'auteur — la
           carte n'annoncerait alors que trois nombres nus. */}
       <div className={s.stats}>
-        <div title={`${RANKING_POINTS_LABEL} · ${RANKING_POINTS_HINT}`}>
+        {/* Tout le monde part de la même cote : sans cette nuance, une équipe
+            qui n'a jamais joué afficherait le même nombre qu'une équipe qui l'a
+            gagné, et rien ne dirait la différence. */}
+        <div
+          title={`${RANKING_POINTS_LABEL} · ${
+            isRankedTeam(team) ? RANKING_POINTS_HINT : RANKING_UNRANKED_HINT
+          }`}
+        >
           <div className={s.statLbl}>
             <span aria-hidden="true">Pts</span>
             <span className="sr-only">{RANKING_POINTS_LABEL}</span>
