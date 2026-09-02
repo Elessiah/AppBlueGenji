@@ -1,0 +1,250 @@
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+
+jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/bot-integration");
+
+import type { PoolConnection } from "mysql2/promise";
+import {
+  discardBotLogs,
+  flushBotLogs,
+  queueBotLog,
+  resolveBotLogs,
+} from "@/lib/server/tournaments/bot-logs";
+import { pushRefereeAlert, sendBotLog } from "@/lib/server/bot-integration";
+import { getDatabase } from "@/lib/server/database";
+
+/** Une connexion ne sert ici que de clé : la file est indexée par identité. */
+function fakeConnection(): PoolConnection {
+  return {} as PoolConnection;
+}
+
+const MATCH_ROW = {
+  id: 31,
+  bracket: "UPPER",
+  round_number: 2,
+  team1_score: 2,
+  team2_score: 1,
+  forfeit_team_id: null,
+  is_bye: 0,
+  team1_name: "Les Renards",
+  team2_name: "Team Nova",
+  tournament_id: 12,
+  tournament_name: "Coupe BlueGenji",
+};
+
+const TOURNAMENT_ROW = {
+  id: 12,
+  name: "Coupe BlueGenji",
+  format: "SWISS",
+  game: "OW2",
+  max_teams: 16,
+  participant_type: "TEAM",
+  start_at: new Date("2026-03-14T18:00:00.000Z"),
+  organizer_pseudo: "Kiro",
+  registered_teams: 3,
+  champion_name: null,
+};
+
+/**
+ * Câble la base : chaque requête rend la première ligne restante.
+ * L'ordre suffit — les résolutions sont séquentielles, une entrée à la fois.
+ */
+function mockDb(rows: unknown[][]): jest.Mock {
+  const execute = jest.fn<() => Promise<unknown>>();
+  for (const result of rows) execute.mockResolvedValueOnce([result]);
+  execute.mockResolvedValue([[]]);
+  (getDatabase as jest.Mock).mockResolvedValue({ execute });
+  return execute as unknown as jest.Mock;
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  (sendBotLog as jest.Mock).mockResolvedValue(undefined as never);
+  (pushRefereeAlert as jest.Mock).mockResolvedValue(undefined as never);
+});
+
+describe("routage vers deux transports", () => {
+  // Conflit de score → alerte arbitre seulement, jamais journal.
+  it("route score_conflict vers pushRefereeAlert, pas sendBotLog", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  // Report expiré sans réponse → alerte arbitre seulement.
+  it("route score_report_stalled vers pushRefereeAlert, pas sendBotLog", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+
+    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  // Coup d'envoi → journal seulement, jamais alerte arbitre.
+  it("route tournament_started vers sendBotLog, pas pushRefereeAlert", async () => {
+    const connection = fakeConnection();
+    mockDb([[TOURNAMENT_ROW]]);
+
+    queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+    expect(pushRefereeAlert).not.toHaveBeenCalled();
+  });
+
+  // Fin de match → journal seulement.
+  it("route match_finished vers sendBotLog, pas pushRefereeAlert", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+
+    queueBotLog(connection, { kind: "match_finished", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+    expect(pushRefereeAlert).not.toHaveBeenCalled();
+  });
+
+  // File mixte : un évènement REFEREE, un évènement JOURNAL → chaque transport exactement une fois.
+  it("appelle chaque transport exactement une fois sur une file mixte", async () => {
+    const connection = fakeConnection();
+    // Une requête par évènement : loadRefereeAlertContext pour score_conflict, loadMatch pour match_finished.
+    mockDb([[MATCH_ROW], [MATCH_ROW]]);
+
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+    queueBotLog(connection, { kind: "match_finished", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+  });
+
+  // L'alerte arbitre est appelée avec le coupe-circuit activé.
+  it("appelle pushRefereeAlert avec { honourCircuit: true }", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(pushRefereeAlert).toHaveBeenCalledWith(
+      expect.any(String),
+      "referee-alert",
+      { honourCircuit: true },
+    );
+  });
+
+  // Annulation de transaction : ni journal ni alerte arbitre ne partent.
+  it("n'envoie rien quand la transaction est annulée", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+    discardBotLogs(connection);
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(pushRefereeAlert).not.toHaveBeenCalled();
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  // Bot injoignable : flushBotLogs ne lève pas, même si pushRefereeAlert rejette.
+  it("ne lève pas quand pushRefereeAlert rejette (bot injoignable)", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+    (pushRefereeAlert as jest.Mock).mockRejectedValue(new Error("ECONNREFUSED") as never);
+
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+    expect(() => flushBotLogs(connection)).not.toThrow();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(pushRefereeAlert).toHaveBeenCalled();
+  });
+
+  // Rejet générique de pushRefereeAlert : aucune exception ne remonte.
+  it("ne jette pas quand pushRefereeAlert rejette pour une raison quelconque", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+    (pushRefereeAlert as jest.Mock).mockRejectedValue(new Error("ERROR") as never);
+
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    // Vérifier que l'appel a bien été tenté, même si la fonction a rejeté.
+    expect(pushRefereeAlert).toHaveBeenCalled();
+  });
+
+  // Rôle arbitre non configuré : le bot répond 200 mais avec sent: 0 → pas d'exception.
+  it("appelle pushRefereeAlert même si le rôle arbitre est non configuré", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+    (pushRefereeAlert as jest.Mock).mockResolvedValue({
+      sent: 0,
+      unresolved: [],
+      failed: [],
+    });
+
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(pushRefereeAlert).toHaveBeenCalled();
+  });
+});
+
+describe("resolveBotLogs pour le routage", () => {
+  // Les conflits de score sont classés comme alerte arbitre.
+  it("assigne channel === 'REFEREE' aux conflits de score", async () => {
+    mockDb([[MATCH_ROW]]);
+
+    const logs = await resolveBotLogs([{ kind: "score_conflict", matchId: 31 }]);
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].channel).toBe("REFEREE");
+    expect(logs[0].message).toContain("Arbitrage requis");
+  });
+
+  // Les rapports expirés sont des alertes arbitre.
+  it("assigne channel === 'REFEREE' aux reports expirés", async () => {
+    mockDb([[MATCH_ROW]]);
+
+    const logs = await resolveBotLogs([{ kind: "score_report_stalled", matchId: 31 }]);
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].channel).toBe("REFEREE");
+  });
+
+  // Les coups d'envoi vont au journal.
+  it("assigne channel === 'JOURNAL' aux coups d'envoi", async () => {
+    mockDb([[TOURNAMENT_ROW]]);
+
+    const logs = await resolveBotLogs([{ kind: "tournament_started", tournamentId: 12 }]);
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].channel).toBe("JOURNAL");
+  });
+
+  // Les fins de match vont au journal.
+  it("assigne channel === 'JOURNAL' aux fins de match", async () => {
+    mockDb([[MATCH_ROW]]);
+
+    const logs = await resolveBotLogs([{ kind: "match_finished", matchId: 31 }]);
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].channel).toBe("JOURNAL");
+  });
+});
