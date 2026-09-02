@@ -120,7 +120,11 @@ const MESSAGES: Record<TeamTagRejection | typeof TEAM_TAG_ALREADY_USED, string> 
  */
 export function teamTagErrorMessage(code: string | null | undefined): string | null {
   if (!code) return null;
-  return code in MESSAGES ? MESSAGES[code as keyof typeof MESSAGES] : null;
+  // `code in MESSAGES` remonterait la chaîne de prototypes : « constructor » ou
+  // « toString » y passeraient le test et rendraient une **fonction** au lieu
+  // d'une chaîne, que l'appelant afficherait telle quelle en toast.
+  if (!Object.prototype.hasOwnProperty.call(MESSAGES, code)) return null;
+  return MESSAGES[code as keyof typeof MESSAGES];
 }
 
 /**

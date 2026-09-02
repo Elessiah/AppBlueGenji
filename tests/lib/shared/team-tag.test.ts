@@ -134,6 +134,15 @@ describe("teamTagErrorMessage", () => {
     expect(teamTagErrorMessage("")).toBeNull();
     expect(teamTagErrorMessage(null)).toBeNull();
   });
+
+  it.each(["constructor", "toString", "valueOf", "hasOwnProperty", "__proto__"])(
+    "ne confond pas %s avec un code de sigle",
+    (inherited) => {
+      // `code in MESSAGES` remonterait la chaîne de prototypes et rendrait une
+      // **fonction**, que l'appelant afficherait telle quelle en toast.
+      expect(teamTagErrorMessage(inherited)).toBeNull();
+    },
+  );
 });
 
 describe("displayTeamTag", () => {

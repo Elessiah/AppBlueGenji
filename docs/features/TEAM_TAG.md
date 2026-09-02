@@ -122,6 +122,14 @@ La colonne garde la collation par défaut d'`utf8mb4`, insensible à la casse :
 « bg » et « BG » se heurtent à l'index. C'est une ceinture — le service normalise
 en majuscules avant d'écrire.
 
+## Dissolution
+
+`softDeleteTeam` conserve la ligne de l'équipe — ses statistiques et son
+historique restent consultables — mais anonymise ce que ses membres avaient
+saisi et **libère ses identités uniques : le nom et le sigle**. Sans cette
+remise à `NULL`, le sigle d'une équipe qui n'existe plus resterait pris pour
+toujours, alors même que son nom, lui, était rendu.
+
 ## Affichage
 
 `displayTeamTag(tag, name)` est le seul point d'entrée d'affichage : le sigle

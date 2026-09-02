@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { createTeam, updateTeamMeta } from "@/lib/server/teams-service";
+import { createTeam, softDeleteTeam, updateTeamMeta } from "@/lib/server/teams-service";
 
 jest.mock("@/lib/server/database");
 
@@ -185,5 +185,27 @@ describe("updateTeamMeta — sigle", () => {
 
     await expect(updateTeamMeta(1, 12, { tag: "BG" })).rejects.toThrow("FORBIDDEN");
     expect(sqlOf(poolExecute)).not.toMatch(/UPDATE bg_teams/);
+  });
+});
+
+describe("softDeleteTeam — sigle", () => {
+  beforeEach(() => jest.clearAllMocks());
+  afterEach(() => jest.restoreAllMocks());
+
+  it("libère le sigle en même temps que le nom", async () => {
+    const { poolExecute, connectionExecute, connection } = await mockDb();
+    poolExecute
+      .mockResolvedValueOnce([[{ deleted_at: null }], []]) // pas déjà dissoute
+      .mockResolvedValueOnce([[{ roles_json: JSON.stringify(["OWNER"]) }], []]); // OWNER
+    connectionExecute.mockResolvedValue([{ affectedRows: 1 }, []]);
+
+    await softDeleteTeam(1, 12);
+
+    const [anonymize] = connectionExecute.mock.calls[0] as [string, unknown[]];
+    // Une équipe dissoute garde sa ligne pour ses statistiques : sans cette
+    // remise à NULL, son sigle resterait pris à jamais sur tout le site.
+    expect(anonymize).toMatch(/SET deleted_at = NOW\(\)/);
+    expect(anonymize).toMatch(/tag = NULL/);
+    expect(connection.commit).toHaveBeenCalled();
   });
 });

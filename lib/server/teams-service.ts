@@ -765,11 +765,15 @@ export async function softDeleteTeam(
   try {
     await connection.beginTransaction();
 
-    // Anonymise les données saisies par l'utilisateur et libère le nom unique.
+    // Anonymise les données saisies par l'utilisateur et libère les deux
+    // identités uniques : le nom **et le sigle**. Le sigle vaut sur tout le
+    // site ; laissé sur une équipe dissoute, il resterait pris à jamais par une
+    // équipe qui n'existe plus — la ligne, elle, survit pour ses statistiques.
     await connection.execute(
       `UPDATE bg_teams
        SET deleted_at = NOW(),
            name = CONCAT('Équipe dissoute #', id),
+           tag = NULL,
            description = NULL,
            logo_url = NULL
        WHERE id = ?`,
