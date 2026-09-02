@@ -50,6 +50,11 @@ function imgTags(markup: string): string[] {
   return markup.match(/<img\b[^>]*>/g) ?? [];
 }
 
+/** Retire les commentaires de la feuille : ils citent des sélecteurs en prose. */
+function stripCssComments(css: string): string {
+  return css.replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
 describe("TeamCard — logo d'équipe dans l'annuaire", () => {
   it("rend le logo de l'équipe quand elle en a un", () => {
     const markup = renderToStaticMarkup(
@@ -133,11 +138,18 @@ describe("TeamCard — logo d'équipe dans l'annuaire", () => {
  *    l'emblème occupait la moitié de l'en-tête, et le nom s'élidait pour rien ;
  * 2. un logo laissé **dans le flux** impose sa taille intrinsèque à la case —
  *    un fichier de 128 px débordait sur les statistiques de la carte.
+ *
+ * Les commentaires de la feuille sont retirés avant lecture, comme dans
+ * `tests/app/entity-links.test.ts` : ils **citent** en prose le sélecteur que
+ * ces gardes interdisent, et une reformulation qui recopierait la règle avec son
+ * accolade ferait échouer un code pourtant correct.
  */
 describe("TeamCard — le cadre de l'emblème ne se laisse pas étirer", () => {
-  const css = readFileSync(
-    join(__dirname, "..", "..", "app", "(secured)", "equipes", "cards", "TeamCard.module.css"),
-    "utf8",
+  const css = stripCssComments(
+    readFileSync(
+      join(__dirname, "..", "..", "app", "(secured)", "equipes", "cards", "TeamCard.module.css"),
+      "utf8",
+    ),
   );
 
   it("réserve `flex: 1` au bloc de texte, jamais à tous les enfants de l'en-tête", () => {
