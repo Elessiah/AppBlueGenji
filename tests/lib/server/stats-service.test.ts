@@ -5,8 +5,13 @@ import {
   getTeamEntityStats,
   getTeamRankingPosition,
   getTeamStats,
+  loadTeamRanking,
 } from "@/lib/server/stats-service";
-import { RANKING_POINTS_PER_LOSS, RANKING_POINTS_PER_WIN } from "@/lib/shared/ranking";
+import {
+  RANKING_POINTS_PER_LOSS,
+  RANKING_POINTS_PER_WIN,
+  rankingPoints,
+} from "@/lib/shared/ranking";
 
 jest.mock("@/lib/server/database");
 
@@ -368,43 +373,33 @@ describe("historique dérivé des mêmes matchs", () => {
   });
 });
 
+/** Ligne de classement telle que la rend la requête partagée. */
+function rankingRow(teamId: number, wins: number, losses: number, name = `Test - ${teamId}`) {
+  return { team_id: teamId, team_name: name, logo_url: null, wins, losses };
+}
+
 describe("getTeamRankingPosition", () => {
   beforeEach(() => jest.clearAllMocks());
   afterEach(() => jest.restoreAllMocks());
 
   it("place l'équipe d'après le barème partagé", async () => {
     const execute = jest.fn().mockResolvedValueOnce([
-      [
-        { team_id: 1, points: 500 },
-        { team_id: 5, points: 300 },
-        { team_id: 7, points: 900 },
-      ],
+      [rankingRow(1, 5, 0), rankingRow(5, 3, 0), rankingRow(7, 9, 0)],
     ]);
     await mockDb(execute);
 
-    expect(await getTeamRankingPosition(5)).toEqual({ position: 3, total: 3, points: 300 });
+    expect(await getTeamRankingPosition(5)).toEqual({
+      position: 3,
+      total: 3,
+      points: rankingPoints(3, 0),
+    });
   });
 
   it("donne le même rang à deux équipes à égalité", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([
-      [
-        { team_id: 1, points: 900 },
-        { team_id: 5, points: 300 },
-        { team_id: 7, points: 300 },
-      ],
-    ]);
-    await mockDb(execute);
-
+    const rows = [rankingRow(1, 9, 0), rankingRow(5, 3, 0), rankingRow(7, 3, 0)];
+    await mockDb(jest.fn().mockResolvedValueOnce([rows]));
     const first = await getTeamRankingPosition(5);
-    await mockDb(
-      jest.fn().mockResolvedValueOnce([
-        [
-          { team_id: 1, points: 900 },
-          { team_id: 5, points: 300 },
-          { team_id: 7, points: 300 },
-        ],
-      ]),
-    );
+    await mockDb(jest.fn().mockResolvedValueOnce([rows]));
     const second = await getTeamRankingPosition(7);
 
     expect(first.position).toBe(2);
@@ -452,21 +447,104 @@ describe("getTeamRankingPosition", () => {
   });
 
   it("ne classe pas une équipe sans aucun match joué", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[{ team_id: 1, points: 100 }]]);
+    const execute = jest.fn().mockResolvedValueOnce([[rankingRow(1, 1, 0)]]);
     await mockDb(execute);
 
     expect(await getTeamRankingPosition(42)).toEqual({ position: null, total: 1, points: 0 });
   });
 
-  it("utilise bien le barème du module de classement", async () => {
+  // Une équipe sans match ne doit pas apparaître au classement de la fiche :
+  // c'est la jointure interne qui l'écarte, pas un filtre en mémoire.
+  it("n'inclut que les équipes ayant joué", async () => {
     const execute = jest.fn().mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     await getTeamRankingPosition(1);
 
     const [sql] = execute.mock.calls[0] as [string];
-    expect(sql).toContain(String(RANKING_POINTS_PER_WIN));
-    expect(sql).toContain(String(RANKING_POINTS_PER_LOSS));
+    expect(sql).not.toContain("LEFT JOIN bg_matches");
+  });
+
+  it("utilise bien le barème du module de classement", async () => {
+    const execute = jest.fn().mockResolvedValueOnce([[rankingRow(1, 2, 3)]]);
+    await mockDb(execute);
+
+    const { points } = await getTeamRankingPosition(1);
+
+    expect(points).toBe(2 * RANKING_POINTS_PER_WIN + 3 * RANKING_POINTS_PER_LOSS);
+  });
+});
+
+describe("loadTeamRanking", () => {
+  beforeEach(() => jest.clearAllMocks());
+  afterEach(() => jest.restoreAllMocks());
+
+  it("trie par points, puis victoires, puis nom", async () => {
+    await mockDb(
+      jest.fn().mockResolvedValueOnce([
+        [
+          rankingRow(1, 1, 0, "Zulu"),
+          rankingRow(2, 3, 0, "Bravo"),
+          rankingRow(3, 3, 0, "Alpha"),
+          rankingRow(4, 4, 5, "Charlie"),
+        ],
+      ]),
+    );
+
+    const rows = await loadTeamRanking();
+
+    // 3 victoires (300) devant 4 victoires et 5 défaites (300 aussi, mais plus
+    // de victoires ⇒ devant), puis l'ordre alphabétique départage les deux
+    // équipes à trois victoires.
+    expect(rows.map((row) => row.teamName)).toEqual(["Charlie", "Alpha", "Bravo", "Zulu"]);
+  });
+
+  it("garde les équipes sans match quand on le demande", async () => {
+    const execute = jest.fn().mockResolvedValueOnce([[rankingRow(1, 0, 0)]]);
+    await mockDb(execute);
+
+    const rows = await loadTeamRanking({ includeUnplayed: true });
+
+    const [sql] = execute.mock.calls[0] as [string];
+    expect(sql).toContain("LEFT JOIN bg_matches");
+    expect(rows).toEqual([
+      { teamId: 1, teamName: "Test - 1", logoUrl: null, wins: 0, losses: 0, points: 0 },
+    ]);
+  });
+
+  it("borne les matchs retenus quand une date est fournie", async () => {
+    const execute = jest.fn().mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    const before = new Date("2026-01-01T00:00:00Z");
+    await loadTeamRanking({ includeUnplayed: true, completedBefore: before });
+
+    const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("m.updated_at < ?");
+    expect(params).toEqual([before]);
+  });
+
+  it("ne borne rien, et ne lie aucun paramètre, sans date", async () => {
+    const execute = jest.fn().mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    await loadTeamRanking();
+
+    const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
+    expect(sql).not.toContain("m.updated_at");
+    expect(params).toEqual([]);
+  });
+
+  it("tolère des agrégats absents", async () => {
+    await mockDb(
+      jest
+        .fn()
+        .mockResolvedValueOnce([[{ team_id: 1, team_name: "Test - 1", logo_url: null, wins: null, losses: null }]]),
+    );
+
+    expect(await loadTeamRanking()).toEqual([
+      { teamId: 1, teamName: "Test - 1", logoUrl: null, wins: 0, losses: 0, points: 0 },
+    ]);
   });
 });
 

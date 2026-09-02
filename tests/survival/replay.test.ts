@@ -240,9 +240,11 @@ describe("barème de classement partagé", () => {
     const root = join(__dirname, "..", "..");
     const read = (path: string) => readFileSync(join(root, path), "utf8");
 
+    // Le leaderboard ne calcule plus rien lui-même : il lit le classement du
+    // site, seul endroit où le barème est appliqué.
     const landing = read("lib/server/landing-service.ts");
-    expect(landing).toContain("rankingPointsSql");
-    expect(landing).toContain("rankingPoints(");
+    expect(landing).toContain("loadTeamRanking");
+    expect(landing).not.toContain("SUM(CASE WHEN m.winner_team_id");
     expect(landing).not.toMatch(/wins \* 100 - losses \* 20/);
 
     const survival = read("lib/server/tournaments/survival.ts");
