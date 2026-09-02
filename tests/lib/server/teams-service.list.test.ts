@@ -11,16 +11,33 @@ jest.mock("@/lib/server/database");
  * réécriture de la requête ne redevienne pas la cause du même symptôme.
  */
 
-const TEAM_QUERY = /FROM bg_teams t/;
+const TEAM_QUERY = /AS members_count/;
+const RANKING_QUERY = /AS wins/;
 
 /**
- * `listTeams` enchaîne quatre lectures : équipes, matchs (forme), roster, jeux.
- * On les distingue par leur SQL plutôt que par leur rang d'appel, pour ne pas
- * casser au moindre déplacement d'une requête.
+ * `listTeams` enchaîne cinq lectures : équipes, forme, classement, roster,
+ * jeux. On les distingue par leur SQL plutôt que par leur rang d'appel, pour ne
+ * pas casser au moindre déplacement d'une requête.
+ *
+ * Le bilan (victoires, défaites, points) ne sort **pas** de la requête des
+ * équipes : il vient du classement du site, servi ici par la même fixture — la
+ * carte d'annuaire et la fiche lisent le même nombre.
  */
 async function mockDb(teamRows: Record<string, unknown>[]) {
   const execute = jest.fn(async (sql: unknown) => {
-    if (TEAM_QUERY.test(String(sql))) return [teamRows];
+    const text = String(sql);
+    if (TEAM_QUERY.test(text)) return [teamRows];
+    if (RANKING_QUERY.test(text)) {
+      return [
+        teamRows.map((row) => ({
+          team_id: row.id,
+          team_name: row.name,
+          logo_url: row.logo_url,
+          wins: row.wins,
+          losses: row.losses,
+        })),
+      ];
+    }
     return [[]];
   });
   const { getDatabase } = await import("@/lib/server/database");
@@ -32,6 +49,7 @@ function teamRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 12,
     name: "Dragon Squad",
+    tag: null,
     logo_url: "/api/uploads/team-logos/12.webp",
     created_at: new Date("2026-01-15T10:00:00.000Z"),
     is_ghost: 0,

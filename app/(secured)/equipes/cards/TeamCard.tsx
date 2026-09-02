@@ -6,6 +6,7 @@ import type { TeamListItem } from "@/lib/shared/types";
 import { getPaletteColor } from "@/lib/shared/palette";
 import { PlayerLink } from "@/components/entity-link";
 import { displayTeamTag } from "@/lib/shared/team-tag";
+import { RANKING_POINTS_HINT, RANKING_POINTS_LABEL } from "@/lib/shared/ranking";
 import s from "./TeamCard.module.css";
 
 /**
@@ -81,24 +82,44 @@ export function TeamCard({ team }: { team: TeamListItem }) {
       </div>
 
       {team.form.length > 0 && (
-        <div className={s.formBar} title="10 derniers matchs">
+        <div
+          className={s.formBar}
+          role="img"
+          title={`${team.form.length} derniers matchs, du plus récent au plus ancien`}
+          aria-label={`${team.form.length} derniers matchs : ${team.form
+            .map((r) => (r === "w" ? "victoire" : r === "l" ? "défaite" : "nul"))
+            .join(", ")}`}
+        >
           {team.form.map((r, i) => (
             <div key={i} className={`${s.formCell} ${s[r]}`} />
           ))}
         </div>
       )}
 
+      {/* Les libellés abrégés restent lisibles par les lecteurs d'écran, leur
+          forme longue étant donnée en `sr-only` juste à côté : `aria-label` sur
+          un `<div>` sans rôle (`generic`) n'accepte pas de nom d'auteur — la
+          carte n'annoncerait alors que trois nombres nus. */}
       <div className={s.stats}>
-        <div>
-          <div className={s.statLbl}>Pts</div>
+        <div title={`${RANKING_POINTS_LABEL} · ${RANKING_POINTS_HINT}`}>
+          <div className={s.statLbl}>
+            <span aria-hidden="true">Pts</span>
+            <span className="sr-only">{RANKING_POINTS_LABEL}</span>
+          </div>
           <div className={s.statVal}>{team.points}</div>
         </div>
         <div>
-          <div className={s.statLbl}>Vict.</div>
+          <div className={s.statLbl}>
+            <span aria-hidden="true">Vict.</span>
+            <span className="sr-only">Victoires</span>
+          </div>
           <div className={`${s.statVal} ${s.win}`}>{team.wins}</div>
         </div>
         <div>
-          <div className={s.statLbl}>Déf.</div>
+          <div className={s.statLbl}>
+            <span aria-hidden="true">Déf.</span>
+            <span className="sr-only">Défaites</span>
+          </div>
           <div className={`${s.statVal} ${s.loss}`}>{team.losses}</div>
         </div>
       </div>

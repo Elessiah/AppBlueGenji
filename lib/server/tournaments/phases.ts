@@ -13,7 +13,11 @@ import {
   loadPhaseStandings,
 } from "./phases-repository";
 import { loadTournamentRow, finishTournament, getRegistrationRows } from "./repository";
-import { rankingPointsSql } from "@/lib/shared/ranking";
+import {
+  rankingMatchJoinSql,
+  rankingPointsForTeamSql,
+  rankingWinsSql,
+} from "@/lib/shared/ranking";
 import { createBracketIfMissing } from "./bracket-generator";
 import { tryAutoResolveByes } from "./byes";
 import { isEliminationPhaseComplete, rankEliminationPhase } from "./finalization";
@@ -60,11 +64,11 @@ export async function initializeMultiTournament(
 
   const resolved = resolvePhasePlan(registeredCount, phaseConfigs);
 
-  // Seed la phase 1 depuis le classement du site (exactement comme Survie) —
-  // sauf si le staff a ordonné le seeding à la main, auquel cas l'ordre des
-  // inscriptions fait autorité.
-  const WINS = "COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
-  const LOSSES = "COALESCE(SUM(CASE WHEN m.loser_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
+  // Seed la phase 1 depuis le classement du site (exactement comme Survie),
+  // barème **et** assiette compris (`lib/shared/ranking.ts`) — sauf si le staff
+  // a ordonné le seeding à la main, auquel cas l'ordre des inscriptions fait
+  // autorité.
+  const WINS = rankingWinsSql("r.team_id");
 
   const [seededRows] = Number(tournament.manual_seeding ?? 0) === 1
     ? await conn.execute<(RowDataPacket & { team_id: number; seed: number })[]>(
@@ -78,11 +82,10 @@ export async function initializeMultiTournament(
     : await conn.execute<(RowDataPacket & { team_id: number; seed: number })[]>(
         `SELECT
           r.team_id,
-          ROW_NUMBER() OVER (ORDER BY ${rankingPointsSql(WINS, LOSSES)} DESC, ${WINS} DESC, r.team_id ASC) AS seed
+          ROW_NUMBER() OVER (ORDER BY ${rankingPointsForTeamSql("r.team_id")} DESC, ${WINS} DESC, r.team_id ASC) AS seed
          FROM bg_tournament_registrations r
          LEFT JOIN bg_matches m
-           ON (m.team1_id = r.team_id OR m.team2_id = r.team_id)
-          AND m.status = 'COMPLETED'
+           ON ${rankingMatchJoinSql("r.team_id")}
          WHERE r.tournament_id = ?
          GROUP BY r.team_id`,
         [tournamentId],

@@ -11,7 +11,12 @@ import {
   type SurvivalMatchOutcome,
   type SurvivalStanding,
 } from "@/lib/shared/survival";
-import { rankingPointsSql } from "@/lib/shared/ranking";
+import {
+  rankingLossesSql,
+  rankingMatchJoinSql,
+  rankingPointsForTeamSql,
+  rankingWinsSql,
+} from "@/lib/shared/ranking";
 import { createMatch, finishTournament, forfeitMatchScores } from "./repository";
 
 const DEFAULT_ROUNDS_PER_CUT = 3;
@@ -302,8 +307,9 @@ export async function initializeSurvivalTournament(
     );
     seedRows = rows.map((row) => ({ team_id: Number(row.team_id), wins: 0, losses: 0 }));
   } else {
-    const WINS = "COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
-    const LOSSES = "COALESCE(SUM(CASE WHEN m.loser_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
+    // Barème **et** assiette du classement du site (`lib/shared/ranking.ts`).
+    const WINS = rankingWinsSql("r.team_id");
+    const LOSSES = rankingLossesSql("r.team_id");
     const [rows] = await conn.execute<
       (RowDataPacket & { team_id: number; wins: number; losses: number })[]
     >(
@@ -313,11 +319,10 @@ export async function initializeSurvivalTournament(
         ${LOSSES} AS losses
        FROM bg_tournament_registrations r
        LEFT JOIN bg_matches m
-         ON (m.team1_id = r.team_id OR m.team2_id = r.team_id)
-        AND m.status = 'COMPLETED'
+         ON ${rankingMatchJoinSql("r.team_id")}
        WHERE r.tournament_id = ?
        GROUP BY r.team_id
-       ORDER BY ${rankingPointsSql(WINS, LOSSES)} DESC, ${WINS} DESC, r.team_id ASC`,
+       ORDER BY ${rankingPointsForTeamSql("r.team_id")} DESC, ${WINS} DESC, r.team_id ASC`,
       [tournamentId],
     );
     seedRows = rows;

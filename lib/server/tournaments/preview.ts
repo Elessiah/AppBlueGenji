@@ -15,7 +15,11 @@
  * pas d'aperçu du tout.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { rankingPointsSql } from "@/lib/shared/ranking";
+import {
+  rankingMatchJoinSql,
+  rankingPointsForTeamSql,
+  rankingWinsSql,
+} from "@/lib/shared/ranking";
 import {
   buildTournamentPreview,
   type PreviewEntrant,
@@ -50,8 +54,9 @@ async function loadOrderedEntrants(
   tournamentId: number,
   source: PreviewSeedingSource,
 ): Promise<PreviewEntrant[]> {
-  const WINS = "COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
-  const LOSSES = "COALESCE(SUM(CASE WHEN m.loser_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
+  // Barème **et** assiette du classement du site : mêmes matchs comptés que
+  // sur l'annuaire et sur les fiches (`lib/shared/ranking.ts`).
+  const WINS = rankingWinsSql("r.team_id");
 
   const [rows] =
     source === "RANKING"
@@ -60,11 +65,10 @@ async function loadOrderedEntrants(
            FROM bg_tournament_registrations r
            JOIN bg_teams t ON t.id = r.team_id
            LEFT JOIN bg_matches m
-             ON (m.team1_id = r.team_id OR m.team2_id = r.team_id)
-            AND m.status = 'COMPLETED'
+             ON ${rankingMatchJoinSql("r.team_id")}
            WHERE r.tournament_id = ?
            GROUP BY r.team_id, t.name
-           ORDER BY ${rankingPointsSql(WINS, LOSSES)} DESC, ${WINS} DESC, r.team_id ASC`,
+           ORDER BY ${rankingPointsForTeamSql("r.team_id")} DESC, ${WINS} DESC, r.team_id ASC`,
           [tournamentId],
         )
       : await connection.execute<(RowDataPacket & { team_id: number; team_name: string })[]>(

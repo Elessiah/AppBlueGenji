@@ -3,8 +3,16 @@ import { getDatabase } from "@/lib/server/database";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import type { TeamDetailResponse, TeamListItem, TeamMember, TeamRole } from "@/lib/shared/types";
 import { getUserIdByPseudo, sanitizeRoles } from "@/lib/server/users-service";
-import { getTeamEntityStats, getTeamRankingPosition } from "@/lib/server/stats-service";
+import { getTeamEntityStats, getTeamRankingPosition, loadTeamRanking } from "@/lib/server/stats-service";
+import { compareRankedTeams, rankingMatchJoinSql } from "@/lib/shared/ranking";
 import { assertTeamTagAvailable, mapTeamTagConflict, resolveTeamTag } from "@/lib/server/team-tags";
+
+/**
+ * Longueur de la barre de forme des cartes d'annuaire. Les fiches en montrent
+ * moins (`FORM_LENGTH` de `lib/shared/stats.ts`) : c'est le même historique,
+ * lu sur une fenêtre plus courte, jamais un autre calcul.
+ */
+const LIST_FORM_LENGTH = 10;
 
 type TeamMemberRow = RowDataPacket & {
   membership_id: number;
@@ -93,7 +101,12 @@ async function ghostAdminOverride(teamId: number, viewerManagesGhostTeams: boole
 export async function listTeams(): Promise<TeamListItem[]> {
   const db = await getDatabase();
 
-  // Get teams with member count, wins, losses
+  // Effectif et identité de chaque équipe. Le bilan (victoires, défaites,
+  // points) ne se calcule **pas** ici : il vient de `loadTeamRanking`, source
+  // unique du classement du site. L'agréger dans cette requête revenait à le
+  // multiplier par l'effectif de l'équipe — la jointure des membres et celle
+  // des matchs formaient un produit cartésien, et une équipe de six joueurs
+  // affichait six fois ses victoires.
   const [teamRows] = await db.execute<
     (RowDataPacket & {
       id: number;
@@ -102,8 +115,6 @@ export async function listTeams(): Promise<TeamListItem[]> {
       logo_url: string | null;
       created_at: Date;
       members_count: number;
-      wins: number;
-      losses: number;
       is_ghost: 0 | 1;
     })[]
   >(
@@ -114,60 +125,57 @@ export async function listTeams(): Promise<TeamListItem[]> {
       t.logo_url,
       t.created_at,
       t.is_ghost,
-      COALESCE(COUNT(DISTINCT tm.id), 0) AS members_count,
-      COALESCE(SUM(CASE WHEN m.winner_team_id = t.id THEN 1 ELSE 0 END), 0) AS wins,
-      COALESCE(SUM(CASE WHEN m.status = 'COMPLETED' AND m.winner_team_id IS NOT NULL AND m.winner_team_id != t.id AND (m.team1_id = t.id OR m.team2_id = t.id) THEN 1 ELSE 0 END), 0) AS losses
+      COALESCE(COUNT(tm.id), 0) AS members_count
      FROM bg_teams t
      LEFT JOIN bg_team_members tm ON tm.team_id = t.id AND tm.left_at IS NULL
-     LEFT JOIN bg_matches m ON (m.team1_id = t.id OR m.team2_id = t.id)
      WHERE t.deleted_at IS NULL
        AND t.solo_user_id IS NULL
      GROUP BY t.id, t.name, t.tag, t.logo_url, t.created_at, t.is_ghost`,
   );
 
-  // Get form data (last 10 matches per team) - simplified approach
-  const allMatches = await db.execute<
-    (RowDataPacket & {
-      id: number;
-      team1_id: number | null;
-      team2_id: number | null;
-      winner_team_id: number | null;
-      created_at: Date;
-    })[]
+  // Forme : les dix derniers résultats de chaque équipe, le plus récent en
+  // tête. Même assiette de matchs que le bilan (`playedMatchSql`) et même
+  // chronologie que les fiches (`updated_at`, à défaut les dates du tournoi) :
+  // la barre de forme de la carte est le début de celle de la fiche, pas une
+  // autre lecture des mêmes matchs. Le découpage par équipe se fait en SQL, ce
+  // qui évite aussi de ne servir que les 1000 derniers matchs du site — au-delà,
+  // les équipes les moins actives n'avaient plus de forme du tout.
+  const [formRows] = await db.execute<
+    (RowDataPacket & { team_id: number; result: "w" | "l" })[]
   >(
-    `SELECT id, team1_id, team2_id, winner_team_id, created_at
-     FROM bg_matches
-     WHERE status = 'COMPLETED'
-     ORDER BY created_at DESC
-     LIMIT 1000`,
+    `SELECT team_id, result
+     FROM (
+       SELECT
+         t.id AS team_id,
+         CASE WHEN m.winner_team_id = t.id THEN 'w' ELSE 'l' END AS result,
+         ROW_NUMBER() OVER (
+           PARTITION BY t.id
+           ORDER BY COALESCE(m.updated_at, tr.finished_at, tr.start_at) DESC, m.id DESC
+         ) AS rn
+       FROM bg_teams t
+       JOIN bg_matches m
+         ON ${rankingMatchJoinSql("t.id")}
+       JOIN bg_tournaments tr ON tr.id = m.tournament_id
+       WHERE t.deleted_at IS NULL
+         AND t.solo_user_id IS NULL
+     ) ranked
+     WHERE rn <= ${LIST_FORM_LENGTH}
+     ORDER BY team_id ASC, rn ASC`,
   );
 
-  // Build form data for each team
   const formByTeam = new Map<number, ("w" | "l" | "d")[]>();
-  const matchesPerTeam = new Map<number, number>();
-
-  for (const match of allMatches[0]) {
-    if (match.team1_id) {
-      if (!matchesPerTeam.has(match.team1_id)) {
-        matchesPerTeam.set(match.team1_id, 0);
-        formByTeam.set(match.team1_id, []);
-      }
-      if (matchesPerTeam.get(match.team1_id)! < 10) {
-        formByTeam.get(match.team1_id)!.push(match.winner_team_id === match.team1_id ? "w" : "l");
-        matchesPerTeam.set(match.team1_id, matchesPerTeam.get(match.team1_id)! + 1);
-      }
-    }
-    if (match.team2_id) {
-      if (!matchesPerTeam.has(match.team2_id)) {
-        matchesPerTeam.set(match.team2_id, 0);
-        formByTeam.set(match.team2_id, []);
-      }
-      if (matchesPerTeam.get(match.team2_id)! < 10) {
-        formByTeam.get(match.team2_id)!.push(match.winner_team_id === match.team2_id ? "w" : "l");
-        matchesPerTeam.set(match.team2_id, matchesPerTeam.get(match.team2_id)! + 1);
-      }
-    }
+  for (const row of formRows) {
+    const teamId = Number(row.team_id);
+    const form = formByTeam.get(teamId) ?? [];
+    form.push(row.result);
+    formByTeam.set(teamId, form);
   }
+
+  // Bilan et points : une seule source pour l'annuaire, la fiche et le
+  // leaderboard de la landing.
+  const rankingByTeam = new Map(
+    (await loadTeamRanking({ includeUnplayed: true })).map((row) => [row.teamId, row]),
+  );
 
   // Get roster preview
   const [rosterRows] = await db.execute<
@@ -235,29 +243,29 @@ export async function listTeams(): Promise<TeamListItem[]> {
   }
 
   // Transform rows and calculate rank
-  const unsorted: Omit<TeamListItem, "rank">[] = teamRows.map((row) => ({
-    id: Number(row.id),
-    name: row.name,
-    tag: row.tag,
-    logoUrl: row.logo_url,
-    membersCount: Number(row.members_count),
-    createdAt: toIso(row.created_at)!,
-    wins: Number(row.wins),
-    losses: Number(row.losses),
-    points: Number(row.wins) * 3 + Number(row.losses) * 1,
-    form: formByTeam.get(Number(row.id)) || [],
-    games: gamesByTeam.get(Number(row.id)) || [],
-    rosterPreview: rosterByTeam.get(Number(row.id)) || [],
-    region: null,
-    isGhost: row.is_ghost === 1,
-  }));
-
-  // Sort and assign rank
-  unsorted.sort((a, b) => {
-    if (b.points !== a.points) return b.points - a.points;
-    if (b.wins !== a.wins) return b.wins - a.wins;
-    return a.name.localeCompare(b.name, "fr");
+  const unsorted: Omit<TeamListItem, "rank">[] = teamRows.map((row) => {
+    const id = Number(row.id);
+    const ranked = rankingByTeam.get(id);
+    return {
+      id,
+      name: row.name,
+      tag: row.tag,
+      logoUrl: row.logo_url,
+      membersCount: Number(row.members_count),
+      createdAt: toIso(row.created_at)!,
+      wins: ranked?.wins ?? 0,
+      losses: ranked?.losses ?? 0,
+      points: ranked?.points ?? 0,
+      form: formByTeam.get(id) || [],
+      games: gamesByTeam.get(id) || [],
+      rosterPreview: rosterByTeam.get(id) || [],
+      region: null,
+      isGhost: row.is_ghost === 1,
+    };
   });
+
+  // Même ordre que le leaderboard de la landing : points, victoires, nom.
+  unsorted.sort(compareRankedTeams);
 
   const teams: TeamListItem[] = unsorted.map((team, index) => ({
     ...team,

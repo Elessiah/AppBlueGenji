@@ -25,7 +25,7 @@ import {
   resolveMatchLiveState,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
-import { rankingPoints, rankingPointsSql } from "@/lib/shared/ranking";
+import { loadTeamRanking } from "@/lib/server/stats-service";
 import { entrantHref } from "@/lib/shared/participants";
 
 const DEFAULT_STATS: LandingStats = {
@@ -232,39 +232,13 @@ async function loadLandingLive(): Promise<LandingLive | null> {
   }
 }
 
-type LeaderboardSourceRow = RowDataPacket & {
-  team_id: number;
-  team_name: string;
-  logo_url: string | null;
-  wins: number;
-  losses: number;
-};
-
-async function loadLeaderboardRows(
-  db: Awaited<ReturnType<typeof getDatabase>>,
-  olderThanSevenDays: boolean,
-): Promise<LeaderboardSourceRow[]> {
-  const where = olderThanSevenDays
-    ? `AND m.updated_at < DATE_SUB(NOW(), INTERVAL 7 DAY)`
-    : "";
-  const [rows] = await db.execute<LeaderboardSourceRow[]>(
-    `SELECT
-      t.id AS team_id,
-      t.name AS team_name,
-      t.logo_url,
-      COALESCE(SUM(CASE WHEN m.winner_team_id = t.id THEN 1 ELSE 0 END), 0) AS wins,
-      COALESCE(SUM(CASE WHEN m.loser_team_id = t.id THEN 1 ELSE 0 END), 0) AS losses
-     FROM bg_teams t
-     LEFT JOIN bg_matches m
-       ON (m.team1_id = t.id OR m.team2_id = t.id)
-      AND m.status = 'COMPLETED'
-      ${where}
-     WHERE t.solo_user_id IS NULL
-     GROUP BY t.id, t.name, t.logo_url
-     ORDER BY ${rankingPointsSql("wins", "losses")} DESC, wins DESC, t.name ASC`,
-  );
-  return rows;
-}
+/**
+ * Recul de la photo de référence servant la tendance, en **jours** : la borne
+ * est posée par MySQL (`DATE_SUB(NOW(), …)`), les dates de match étant écrites
+ * par la base — une seule horloge, donc pas de fenêtre décalée par l'écart de
+ * fuseau entre l'app et la base.
+ */
+const TREND_WINDOW_DAYS = 7;
 
 export async function getLandingLeaderboard(limit = 8): Promise<LandingLeaderboardRow[]> {
   const safeLimit = Math.min(50, Math.max(1, Math.trunc(limit)));
@@ -275,17 +249,18 @@ export async function getLandingLeaderboard(limit = 8): Promise<LandingLeaderboa
 
 async function loadLandingLeaderboard(safeLimit: number): Promise<LandingLeaderboardRow[]> {
   try {
-    const db = await getDatabase();
     const [currentRows, previousRows] = await Promise.all([
-      loadLeaderboardRows(db, false),
-      loadLeaderboardRows(db, true),
+      loadTeamRanking({ includeUnplayed: true }),
+      // Le classement d'il y a une semaine : **même chargeur**, donc la flèche
+      // compare deux photos du même calcul plutôt que deux barèmes.
+      loadTeamRanking({ includeUnplayed: true, completedMoreThanDaysAgo: TREND_WINDOW_DAYS }),
     ]);
-    const previousRanks = new Map(previousRows.map((row, index) => [Number(row.team_id), index + 1]));
+    const previousRanks = new Map(previousRows.map((row, index) => [row.teamId, index + 1]));
 
     return currentRows.slice(0, safeLimit).map((row, index) => {
       const rank = index + 1;
-      const teamId = Number(row.team_id);
-      const points = rankingPoints(Number(row.wins ?? 0), Number(row.losses ?? 0));
+      const teamId = row.teamId;
+      const points = row.points;
       const previousRank = previousRanks.get(teamId);
       let trend: "up" | "down" | "flat" = "flat";
       let trendValue = 0;
@@ -302,10 +277,10 @@ async function loadLandingLeaderboard(safeLimit: number): Promise<LandingLeaderb
       return {
         rank,
         teamId,
-        teamName: row.team_name,
-        logoUrl: row.logo_url,
-        wins: Number(row.wins ?? 0),
-        losses: Number(row.losses ?? 0),
+        teamName: row.teamName,
+        logoUrl: row.logoUrl,
+        wins: row.wins,
+        losses: row.losses,
         points,
         trend,
         trendValue,
