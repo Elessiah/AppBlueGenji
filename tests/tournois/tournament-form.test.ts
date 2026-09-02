@@ -1,6 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import {
+  ALL_TOURNAMENT_FIELDS,
+  editWindowFor,
+  isFieldEditable,
+} from "@/lib/shared/tournament-edit";
+import { MATCH_FORMAT_BOUNDS, isValidMatchFormat } from "@/lib/shared/match-format";
 import {
   defaultTournamentFormValues,
   toApiPayload,
@@ -157,22 +161,39 @@ describe("format de match — les deux notations", () => {
     }
   });
 
-  it("propose « Best of », « First to » et le score libre dans le même sélecteur", () => {
-    const source = readFileSync(
-      join(__dirname, "..", "..", "app", "(secured)", "tournois", "_components", "TournamentForm.tsx"),
-      "utf8",
-    );
-    expect(source).toContain('<option value="BO">');
-    expect(source).toContain('<option value="FT">');
-    expect(source).toContain('<option value="LIBRE">');
+  it("accepte les deux notations sur tout leur domaine de saisie", () => {
+    // Le sélecteur du formulaire n'offre rien que la validation partagée
+    // refuserait : chaque valeur atteignable par les champs doit passer.
+    for (const type of ["BO", "FT"] as const) {
+      const { min, max } = MATCH_FORMAT_BOUNDS[type];
+      for (let value = min; value <= max; value += 1) {
+        if (type === "BO" && value % 2 === 0) continue; // un « BO4 » n'existe pas
+        const payload = toApiPayload({ ...values, matchFormat: { type, value } });
+        expect(isValidMatchFormat(payload.matchFormatType, payload.matchFormatValue)).toBe(true);
+      }
+    }
   });
 
-  it("le formulaire de modification est celui de la création", () => {
-    const edit = readFileSync(
-      join(__dirname, "..", "..", "app", "(secured)", "tournois", "[id]", "modifier", "page.tsx"),
-      "utf8",
-    );
-    expect(edit).toContain("TournamentForm");
-    expect(edit).toContain("_components/TournamentForm");
+  it("laisse le format de match modifiable après création, sur un tournoi encore caché", () => {
+    // La création et l'édition partagent le même formulaire : ce qui décide que
+    // les deux notations restent offertes à l'édition, c'est la fenêtre.
+    const hidden = {
+      state: "UPCOMING" as const,
+      startVisibilityAt: new Date(Date.now() + 86_400_000).toISOString(),
+      maxTeams: 8,
+    };
+    expect(editWindowFor(hidden)).toBe("FULL");
+    expect(isFieldEditable("matchFormat", hidden)).toBe(true);
+    expect(ALL_TOURNAMENT_FIELDS).toContain("matchFormat");
+  });
+
+  it("verrouille le format une fois le tournoi annoncé, puis lancé", () => {
+    const announced = {
+      state: "REGISTRATION" as const,
+      startVisibilityAt: new Date(Date.now() - 86_400_000).toISOString(),
+      maxTeams: 8,
+    };
+    expect(isFieldEditable("matchFormat", announced)).toBe(false);
+    expect(isFieldEditable("matchFormat", { ...announced, state: "RUNNING" })).toBe(false);
   });
 });

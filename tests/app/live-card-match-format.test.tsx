@@ -159,9 +159,19 @@ describe("LiveCard — notation du format de match", () => {
 const ROOT = join(__dirname, "..", "..");
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 
-/** Retire commentaires de bloc et de ligne : ils citent « BO5 » en prose. */
+/**
+ * Retire les commentaires : ils citent « BO5 » en prose, et un commentaire de
+ * **fin de ligne** compte autant qu'un commentaire de pleine ligne — le
+ * balayage est repo-wide, une seule note « // renvoie "BO5" » suffirait sinon à
+ * rendre la suite rouge sans qu'aucun libellé n'ait été recopié.
+ *
+ * Le `[^:]` devant `//` épargne les protocoles (`https://…`), la seule paire de
+ * barres qui traverse ce dépôt hors commentaire.
+ */
 function stripComments(code: string): string {
-  return code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ 	]*\/\/.*$/gm, "");
+  return code
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, (_match, before: string) => before);
 }
 
 /** Le seul module autorisé à écrire la notation. */
@@ -204,6 +214,11 @@ describe("source unique de la notation", () => {
     // …et laisse passer la prose, qui cite la notation sans l'afficher.
     expect('"Un Best of se joue en nombre impair (BO1, BO3, BO5…)."'.match(NOTATION_LITERAL))
       .toBeNull();
+    // …y compris en commentaire de fin de ligne, et sans manger une URL.
+    expect(stripComments('const x = 1; // renvoie "BO5"')).toBe("const x = 1; ");
+    expect(stripComments('const u = "https://x.dev/a"; // note')).toBe(
+      'const u = "https://x.dev/a"; ',
+    );
   });
 
   it("balaye un ensemble de fichiers non vide", () => {

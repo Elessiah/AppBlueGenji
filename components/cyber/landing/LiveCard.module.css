@@ -65,15 +65,12 @@
 }
 
 /*
- * Notation du format de match (« FT3 »). `<abbr>` porte l'explication en
- * infobulle ; on neutralise le soulignement pointillé que les navigateurs y
- * ajoutent, qui ferait tache dans une ligne déjà toute en capitales espacées.
+ * Notation du format de match (« FT3 ») : le seul fait *du tournoi* dans une
+ * ligne qui numérote la rencontre. Un cran plus clair que le reste de la ligne
+ * suffit à l'en détacher, sans lui donner le poids d'une pastille.
  */
 .matchFormat {
-  text-decoration: none;
-  border-bottom: none;
-  cursor: help;
-  color: inherit;
+  color: var(--ink);
 }
 
 .map {

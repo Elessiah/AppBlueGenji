@@ -6,7 +6,7 @@ import { EntityLink } from "@/components/entity-link";
 import type { LandingLive } from "@/lib/shared/landing";
 import { inferPhaseLabel } from "@/lib/shared/landing";
 import { PLATFORM_LABELS, streamPlatform } from "@/lib/shared/live-streams";
-import { matchFormatDescription, matchFormatLabel } from "@/lib/shared/match-format";
+import { matchFormatLabel } from "@/lib/shared/match-format";
 import styles from "./LiveCard.module.css";
 
 type LiveCardProps = {
@@ -123,16 +123,17 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
               <>
                 {" · "}
                 {/*
-                  « FT3 » ne se lit pas tout seul. `<abbr title>` porte
-                  l'**expansion** de l'abréviation, et rien d'autre : y répéter
-                  « FT3 » ferait annoncer deux fois la même chose aux lecteurs
-                  d'écran, qui lisent déjà le contenu visible. L'infobulle reste
-                  un confort de souris — la fiche du tournoi donne la même
-                  phrase en clair, sous la pastille de format.
+                  Un simple libellé, comme les trois autres écrans qui affichent
+                  un format (en-tête du tournoi, carte de match, arbitrage). Ni
+                  `<abbr>` ni `title` : l'infobulle est réservée à la souris, la
+                  règle chiffrée qu'elle porterait est la même en BO5 et en FT3
+                  (elle ne distingue donc pas les deux notations), et un lecteur
+                  d'écran qui l'annonce à la place du contenu perdrait justement
+                  la notation. Ce qui manque à un visiteur n'est pas une bulle,
+                  c'est la règle **visible** — elle a sa place sur la fiche du
+                  tournoi, pas dans une ligne de dix pixels.
                 */}
-                <abbr className={styles.matchFormat} title={matchFormatDescription(matchFormat)}>
-                  {matchFormatLabel(matchFormat)}
-                </abbr>
+                <span className={styles.matchFormat}>{matchFormatLabel(matchFormat)}</span>
               </>
             )}
           </div>
