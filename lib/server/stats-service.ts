@@ -17,7 +17,14 @@ import type { RowDataPacket } from "mysql2";
 import { getDatabase } from "./database";
 import { toIso } from "./serialization";
 import { parseMatchFormat } from "@/lib/shared/match-format";
-import { rankingPointsSql } from "@/lib/shared/ranking";
+import {
+  compareRankedTeams,
+  PLAYED_MATCH_SQL,
+  rankingLossesSql,
+  rankingMatchJoinSql,
+  rankingPoints,
+  rankingWinsSql,
+} from "@/lib/shared/ranking";
 import {
   computeDeepStats,
   emptyDeepStats,
@@ -131,21 +138,6 @@ type Membership = {
   /** `null` = toujours membre. */
   leftAt: number | null;
 };
-
-/**
- * Matchs qui comptent dans un bilan : terminés, avec un vainqueur et deux
- * équipes réelles. Byes (`is_bye`) et matchs fantômes (une équipe manquante)
- * sont écartés — leur score est posé par le moteur de tournoi, pas joué.
- *
- * Constante partagée par le bilan et par le classement : sans elle, les deux
- * requêtes avaient divergé et la fiche affichait un total de points calculé
- * autrement que la place au classement posée juste à côté.
- */
-const PLAYED_MATCH_SQL = `m.status = 'COMPLETED'
-       AND m.is_bye = 0
-       AND m.team1_id IS NOT NULL
-       AND m.team2_id IS NOT NULL
-       AND m.winner_team_id IS NOT NULL`;
 
 /**
  * Liste de placeholders `?,?,?` pour un `IN (...)`. `db.execute` ne développe
@@ -303,44 +295,106 @@ export async function getTeamStats(teamId: number): Promise<DeepStats> {
   return (await getTeamEntityStats(teamId)).stats;
 }
 
+/** Une équipe au classement du site, telle que la voient toutes les vues. */
+export type TeamRankingRow = {
+  teamId: number;
+  teamName: string;
+  logoUrl: string | null;
+  wins: number;
+  losses: number;
+  /** Barème partagé appliqué à `wins` / `losses`. Jamais recalculé ailleurs. */
+  points: number;
+};
+
+type TeamRankingRowSql = RowDataPacket & {
+  team_id: number;
+  team_name: string;
+  logo_url: string | null;
+  wins: number;
+  losses: number;
+};
+
+export type TeamRankingOptions = {
+  /**
+   * Inclure les équipes n'ayant encore joué aucun match, à 0 point (annuaire,
+   * leaderboard). Par défaut, seules les équipes classées sont retournées.
+   */
+  includeUnplayed?: boolean;
+  /**
+   * Ne retenir que les matchs terminés avant cette date — sert à reconstituer
+   * le classement d'il y a une semaine pour la tendance du leaderboard.
+   */
+  completedBefore?: Date;
+};
+
 /**
- * Place de l'équipe au classement du site : barème partagé
- * (`lib/shared/ranking.ts`) appliqué à la **même assiette de matchs que le
- * bilan de la fiche** (`PLAYED_MATCH_SQL`), pour que le total de points affiché
- * et la place ne puissent pas se contredire.
+ * **Le** classement du site : une ligne par équipe, triée par le barème partagé
+ * (`lib/shared/ranking.ts`) appliqué à l'assiette partagée (`playedMatchSql` —
+ * byes et matchs fantômes exclus).
  *
- * Le leaderboard de la landing, lui, part de toutes les équipes et de tous les
- * matchs terminés : une équipe sans match y figure à 0 point alors qu'elle
- * n'est pas classée ici. Les deux vues n'ont donc pas le même dénominateur —
- * `total` compte les équipes ayant réellement joué.
+ * Toutes les vues qui affichent des « points d'équipe » passent par ici :
+ * l'annuaire `/equipes`, la place au classement de la fiche, le leaderboard de
+ * la landing. Chacune avait sa propre requête, et donc son propre nombre — le
+ * pire étant l'annuaire, dont les victoires étaient multipliées par l'effectif
+ * de l'équipe (produit cartésien avec la jointure des membres) avant d'être
+ * comptées 3 points la victoire et **+1 la défaite**.
+ *
+ * Les points sont posés en TypeScript par `rankingPoints`, pas relus d'une
+ * colonne SQL : la refonte du barème (base 500 + force de l'adversaire) n'aura
+ * qu'un point de calcul à remplacer.
  */
-export async function getTeamRankingPosition(teamId: number): Promise<TeamRankingPosition> {
+export async function loadTeamRanking(options: TeamRankingOptions = {}): Promise<TeamRankingRow[]> {
   const db = await getDatabase();
-  const [rows] = await db.execute<
-    (RowDataPacket & { team_id: number; points: number })[]
-  >(
+  const join = options.includeUnplayed ? "LEFT JOIN" : "JOIN";
+  const before = options.completedBefore ? `\n      AND m.updated_at < ?` : "";
+  const [rows] = await db.execute<TeamRankingRowSql[]>(
     `SELECT
       t.id AS team_id,
-      ${rankingPointsSql(
-        "SUM(CASE WHEN m.winner_team_id = t.id THEN 1 ELSE 0 END)",
-        // Défaite = avoir joué le match sans le gagner. Compter `loser_team_id`
-        // à la place laisserait filer les matchs où le moteur a posé un
-        // vainqueur sans renseigner le perdant : le rang se calculerait alors
-        // sur un total différent des points affichés sur la même fiche.
-        "SUM(CASE WHEN m.winner_team_id <> t.id THEN 1 ELSE 0 END)",
-      )} AS points
+      t.name AS team_name,
+      t.logo_url,
+      ${rankingWinsSql("t.id")} AS wins,
+      ${rankingLossesSql("t.id")} AS losses
      FROM bg_teams t
-     JOIN bg_matches m
-       ON (m.team1_id = t.id OR m.team2_id = t.id)
-      AND ${PLAYED_MATCH_SQL}
+     ${join} bg_matches m
+       ON ${rankingMatchJoinSql("t.id")}${before}
      WHERE t.solo_user_id IS NULL
-     GROUP BY t.id`,
+     GROUP BY t.id, t.name, t.logo_url`,
+    options.completedBefore ? [options.completedBefore] : [],
   );
 
-  const scored = rows.map((row) => ({
-    teamId: Number(row.team_id),
-    points: Number(row.points ?? 0),
-  }));
+  return rows
+    .map((row) => {
+      const wins = Number(row.wins ?? 0);
+      const losses = Number(row.losses ?? 0);
+      return {
+        teamId: Number(row.team_id),
+        teamName: row.team_name,
+        logoUrl: row.logo_url,
+        wins,
+        losses,
+        points: rankingPoints(wins, losses),
+      };
+    })
+    .sort((a, b) =>
+      compareRankedTeams(
+        { points: a.points, wins: a.wins, name: a.teamName },
+        { points: b.points, wins: b.wins, name: b.teamName },
+      ),
+    );
+}
+
+/**
+ * Place de l'équipe au classement du site, lue dans `loadTeamRanking` — le
+ * total de points affiché sur la fiche et la place posée juste à côté sortent
+ * donc du même calcul, sur la même assiette que le bilan des matchs.
+ *
+ * Une équipe sans match n'est pas classée : `total` compte les équipes ayant
+ * réellement joué, là où le leaderboard de la landing part de **toutes** les
+ * équipes (une équipe sans match y figure à 0 point). Les deux vues n'ont pas
+ * le même dénominateur, mais bien le même nombre de points par équipe.
+ */
+export async function getTeamRankingPosition(teamId: number): Promise<TeamRankingPosition> {
+  const scored = await loadTeamRanking();
   const self = scored.find((row) => row.teamId === teamId);
 
   if (!self) return { position: null, total: scored.length, points: 0 };

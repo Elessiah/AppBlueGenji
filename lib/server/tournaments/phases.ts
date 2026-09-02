@@ -13,7 +13,12 @@ import {
   loadPhaseStandings,
 } from "./phases-repository";
 import { loadTournamentRow, finishTournament, getRegistrationRows } from "./repository";
-import { rankingPointsSql } from "@/lib/shared/ranking";
+import {
+  rankingLossesSql,
+  rankingMatchJoinSql,
+  rankingPointsSql,
+  rankingWinsSql,
+} from "@/lib/shared/ranking";
 import { createBracketIfMissing } from "./bracket-generator";
 import { tryAutoResolveByes } from "./byes";
 import { isEliminationPhaseComplete, rankEliminationPhase } from "./finalization";
@@ -63,8 +68,10 @@ export async function initializeMultiTournament(
   // Seed la phase 1 depuis le classement du site (exactement comme Survie) —
   // sauf si le staff a ordonné le seeding à la main, auquel cas l'ordre des
   // inscriptions fait autorité.
-  const WINS = "COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
-  const LOSSES = "COALESCE(SUM(CASE WHEN m.loser_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
+  // Barème **et** assiette du classement du site : mêmes matchs comptés que
+  // sur l'annuaire et sur les fiches (`lib/shared/ranking.ts`).
+  const WINS = rankingWinsSql("r.team_id");
+  const LOSSES = rankingLossesSql("r.team_id");
 
   const [seededRows] = Number(tournament.manual_seeding ?? 0) === 1
     ? await conn.execute<(RowDataPacket & { team_id: number; seed: number })[]>(
@@ -81,8 +88,7 @@ export async function initializeMultiTournament(
           ROW_NUMBER() OVER (ORDER BY ${rankingPointsSql(WINS, LOSSES)} DESC, ${WINS} DESC, r.team_id ASC) AS seed
          FROM bg_tournament_registrations r
          LEFT JOIN bg_matches m
-           ON (m.team1_id = r.team_id OR m.team2_id = r.team_id)
-          AND m.status = 'COMPLETED'
+             ON ${rankingMatchJoinSql("r.team_id")}
          WHERE r.tournament_id = ?
          GROUP BY r.team_id`,
         [tournamentId],

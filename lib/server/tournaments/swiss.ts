@@ -20,7 +20,12 @@ import {
   type Participant,
   type SwissRoundPlan,
 } from "@/lib/shared/swiss-pairing";
-import { rankingPointsSql } from "@/lib/shared/ranking";
+import {
+  rankingLossesSql,
+  rankingMatchJoinSql,
+  rankingPointsSql,
+  rankingWinsSql,
+} from "@/lib/shared/ranking";
 import type { SwissMeta, SwissTiebreaker } from "@/lib/shared/types";
 import { createMatch, finishTournament, forfeitMatchScores } from "./repository";
 
@@ -312,8 +317,10 @@ export async function initializeSwissTournament(
   // landing (`lib/shared/ranking.ts`) et que le mode Survie : la ronde 1 oppose
   // la moitié haute à la moitié basse, encore faut-il que « haute » veuille dire
   // quelque chose.
-  const WINS = "COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
-  const LOSSES = "COALESCE(SUM(CASE WHEN m.loser_team_id = r.team_id THEN 1 ELSE 0 END), 0)";
+  // Barème **et** assiette du classement du site : mêmes matchs comptés que
+  // sur l'annuaire et sur les fiches (`lib/shared/ranking.ts`).
+  const WINS = rankingWinsSql("r.team_id");
+  const LOSSES = rankingLossesSql("r.team_id");
   let seedRows: Array<{ team_id: number }>;
   if (options?.teamIds) {
     // Phase : le plateau et son ordre viennent de la phase precedente.
@@ -336,8 +343,7 @@ export async function initializeSwissTournament(
       ${LOSSES} AS losses
      FROM bg_tournament_registrations r
      LEFT JOIN bg_matches m
-       ON (m.team1_id = r.team_id OR m.team2_id = r.team_id)
-      AND m.status = 'COMPLETED'
+             ON ${rankingMatchJoinSql("r.team_id")}
      WHERE r.tournament_id = ?
      GROUP BY r.team_id
      ORDER BY ${rankingPointsSql(WINS, LOSSES)} DESC, ${WINS} DESC, r.team_id ASC`,
