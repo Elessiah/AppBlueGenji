@@ -70,7 +70,15 @@
   padding-right: 60px;
 }
 
-.head > div {
+/* Le bloc de texte de l'en-tête (nom, tag), et lui seul : `min-width: 0` lève
+   la minimale automatique d'un élément flex, sans quoi le nom déborderait au
+   lieu de s'élider, et `flex: 1` lui donne toute la place restante.
+   La règle visait `.head > div` — donc aussi l'emblème, qui est un `div` frère.
+   Plus spécifique que `.sigil`, elle écrasait son `flex-shrink: 0` par un
+   `flex: 1 1 0%` : l'emblème s'étirait à la moitié de l'en-tête (un rectangle
+   de 127 px pour une case déclarée carrée de 56), et le nom de l'équipe s'y
+   élidait pour rien. Un logo posé dedans y serait recadré en bandeau. */
+.headText {
   min-width: 0;
   flex: 1;
 }
@@ -89,6 +97,25 @@
   background: color-mix(in oklab, var(--c, #ff9d2e) 10%, transparent);
   flex-shrink: 0;
   position: relative;
+}
+
+/* Logo de l'équipe, quand elle en a un : il remplit le cadre de l'emblème sans
+   le remplacer — le liseré coloré et son halo (`::after`) restent, la carte
+   garde sa silhouette qu'il y ait un logo ou une initiale.
+   Il est posé **hors du flux** : une image de 128 px laissée en flux impose sa
+   taille intrinsèque à la case (la minimale automatique d'un élément flex vaut
+   son contenu, et `flex-shrink: 0` n'interdit que le rétrécissement). Le cadre
+   fait donc 56 px quel que soit le fichier importé.
+   Pas d'`overflow: hidden` sur `.sigil` pour l'arrondir : `::after` déborde de
+   trois pixels et serait rogné avec lui. Le rayon est donc porté par l'image,
+   d'un pixel de moins que celui du cadre — l'épaisseur de la bordure. */
+.sigilLogo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 7px;
 }
 
 .sigil::after {
