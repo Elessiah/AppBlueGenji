@@ -118,7 +118,7 @@ ce qui permet d'agir :
 
 ```
 ⚠️ Arbitrage requis — « Coupe BlueGenji » (#12) · Manche 2 : Les Renards vs Team Nova (match #31) — reports de score contradictoires. https://…/tournois/12
-⏱️ Arbitrage requis — « Coupe BlueGenji » (#12) · Manche 2 : Les Renards vs Team Nova (match #31) — toujours pas tranché plus de 30 minutes après le désaccord. https://…/tournois/12
+⏱️ Arbitrage requis — « Coupe BlueGenji » (#12) · Manche 2 : Les Renards vs Team Nova (match #31) — délai de report dépassé depuis plus de 30 minutes, toujours pas tranché. https://…/tournois/12
 ```
 
 Nature de l'intervention en tête, tournoi et identifiant, manche, les deux
@@ -146,17 +146,24 @@ constate qu'une demi-heure plus tard personne n'a tranché. Un canal chargé un
 soir de tournoi avale la première ; la seconde arrive quand le match est
 vraiment en souffrance.
 
-Le délai de l'escalade court **depuis le désaccord** — le second des deux
-reports —, pas depuis `score_deadline_at`, qui est posé au premier. La nuance
-n'est pas théorique : un second report contradictoire qui arrive *après* le
-délai créerait le conflit et son escalade dans la même transaction, donc dans la
-même seconde, le second message annonçant une demi-heure d'attente qui n'a pas eu
-lieu. La comparaison est faite en SQL (`GREATEST(team1_reported_at,
-team2_reported_at)` contre `NOW()`), dans le même référentiel que celui qui a
-écrit ces horodatages — comparer côté Node demanderait de faire confiance à
-l'alignement de son horloge et de son fuseau avec ceux du serveur. Et le message
-dit « plus de N minutes » : une borne basse, la seule chose qu'il puisse
-promettre sans mentir.
+L'escalade attend **un délai de plus** après `score_deadline_at`, et le jalon
+n'est pas choisi au hasard : cette colonne est posée au premier report et jamais
+réécrite tant que la manche n'est pas tranchée (`COALESCE`). Les horodatages de
+report, eux, se repoussent à chaque saisie — une engagée qui resaisirait son
+score toutes les vingt-cinq minutes repousserait indéfiniment sa propre escalade,
+et le blocage qu'elle entretient ne serait jamais signalé.
+
+La comparaison est faite en SQL (`score_deadline_at <= DATE_SUB(NOW(), INTERVAL
+… MINUTE)`), dans le même référentiel que celui qui a écrit la colonne :
+comparer côté Node demanderait de faire confiance à l'alignement de son horloge
+et de son fuseau avec ceux du serveur. Et le message dit « depuis plus de N
+minutes » : une borne basse, la seule chose qu'il puisse promettre sans mentir.
+
+Reste un cas où les deux alertes tomberaient dans la même seconde : un second
+report contradictoire qui arrive très tard crée le conflit *et* remplit la
+condition d'escalade, dans la même transaction. L'escalade se tait alors — le
+téléphone de l'arbitre est déjà en train de sonner (`hasQueuedBotLog`), et elle
+repassera au prochain balayage si rien n'a bougé.
 
 ### Pourquoi une table
 
@@ -173,6 +180,20 @@ table suit la manche (`ON DELETE CASCADE`) : un plateau régénéré — réappa
 d'une ronde suisse, correction de score en survie — efface ses matchs, donc ses
 réservations.
 
+### Le conflit est réservé lui aussi
+
+Le conflit de score naît d'une écriture, pas d'un constat — mais rien n'interdit
+de refaire cette écriture : tant que la manche n'est pas tranchée, les deux
+engagées peuvent resaisir leur score autant de fois qu'elles veulent, et chaque
+désaccord ferait sonner le téléphone de tous les arbitres. Une ligne de journal
+supportait cette répétition ; un message privé, non.
+
+Il porte donc sa propre clé (`SCORE_CONFLICT`), posée par le même
+`claimRefereeAlert`. La réservation est **temporaire** : `finalizeMatch` efface
+toutes les réservations de la manche qu'il tranche (`clearRefereeAlerts`), si
+bien qu'un désaccord qui renaît après un arbitrage — correction de score sur une
+archive — alerte de nouveau.
+
 ### Une réservation se rend quand rien n'est parti
 
 Réserver avant d'envoyer protège du doublon, et expose au silence : c'est le
@@ -186,12 +207,23 @@ dans les deux cas où l'alerte n'est pas partie :
   tournois d'un balayage : une escalade vue en fin de boucle pouvait être
   réservée sans jamais être mise en file. `queueBotLog` rend désormais un
   booléen, et un `false` fait rendre la réservation **dans la même
-  transaction** (`releaseRefereeAlert`).
+  transaction**.
+- **L'entrée ne s'est pas résolue.** Ligne effacée entre-temps, engagé sans nom,
+  erreur MySQL passagère : la ligne n'atteint jamais le transport. `flushBotLogs`
+  compare donc ce qu'il a **remis** à ce qu'il avait en file, et rend tout le
+  reste — c'est la file qui fait foi, pas la liste des messages rédigés.
 - **Le bot n'a rien reçu.** `pushRefereeAlert` rend `null` — bot éteint,
   coupe-circuit ouvert, réseau coupé — ou rejette : `flushBotLogs` efface alors
   la ligne sur le pool, et le prochain balayage réessaie. C'est le bon sens du
   risque : pour une alerte qui ne se répète pas d'elle-même, un doublon vaut
   mieux qu'un silence.
+
+Un seul point d'entrée pose tout cela pour le moteur : `queueRefereeAlert`
+réserve, met en file, et rend la réservation si l'un des deux échoue. Il **ne
+lève jamais** — un verrou heurté sur `bg_referee_alerts`, ou la table absente
+(la migration de `database.ts` avale ses erreurs), ne doit pas faire échouer le
+report de score ni le balayage qui l'a appelé. On renonce alors à alerter, ce qui
+est exactement l'état d'avant cette fonctionnalité.
 
 ## Dégradation
 
@@ -223,6 +255,7 @@ Rien de tout cela ne peut faire échouer une transaction du moteur.
 | Vocabulaire des évènements (pur) | `lib/shared/bot-logs.ts` (`BotEventKind`) |
 | File par transaction, routage, réservation | `lib/server/tournaments/bot-logs.ts` |
 | Détection du report expiré non tranché | `lib/server/tournaments/finalization.ts` |
+| Réservation du conflit, effacement à l'arbitrage | `lib/server/tournaments/scoring.ts` |
 | Transport vers le bot | `lib/server/bot-integration.ts` (`pushRefereeAlert`) |
 | Lien vers la page d'un tournoi | `lib/server/tournaments/app-url.ts` |
 | Table de réservation | `bg_referee_alerts` (`lib/server/database.ts`) |

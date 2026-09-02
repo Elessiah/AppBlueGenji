@@ -1,12 +1,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { MIN_ENTRANTS_FOR_MATCHES } from "@/lib/shared/constants";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
-import {
-  STALLED_ALERT_KEY,
-  claimRefereeAlert,
-  queueBotLog,
-  releaseRefereeAlert,
-} from "./bot-logs";
+import { hasQueuedBotLog, queueBotLog, queueRefereeAlert } from "./bot-logs";
 import { resetRegistrationRanks, finishTournament } from "./repository";
 
 export async function isEliminationPhaseComplete(
@@ -279,12 +274,13 @@ export async function finalizeTournamentIfDone(
  * n'a tranché. `claimRefereeAlert` la réserve dans la transaction en cours pour
  * qu'elle ne parte qu'une fois — la fonction est appelée à chaque entretien.
  *
- * Le délai de l'escalade court **depuis le désaccord** (le second des deux
- * reports), pas depuis `score_deadline_at`, qui est posé au premier. Sans cette
- * distinction, un second report contradictoire arrivant après le délai
- * déclencherait le conflit *et* son escalade dans la même transaction, donc
- * dans la même seconde : deux messages pour un désaccord d'une seconde, dont le
- * second annoncerait une demi-heure d'attente qui n'a pas eu lieu.
+ * L'escalade attend **un délai de plus** après `score_deadline_at`. Cette
+ * colonne est posée au premier report et jamais réécrite tant que la manche
+ * n'est pas tranchée (`COALESCE`) : elle ne peut donc pas être repoussée par
+ * une engagée qui resaisirait son score en boucle, contrairement aux
+ * horodatages de report. Et elle ne double jamais l'alerte de conflit : si
+ * celle-ci vient d'être mise en file dans cette même transaction, l'arbitre est
+ * déjà prévenu, et l'escalade attendra le prochain passage.
  */
 export async function resolveExpiredScoreReports(
   connection: PoolConnection,
@@ -304,12 +300,7 @@ export async function resolveExpiredScoreReports(
       next_winner_slot,
       next_loser_match_id,
       next_loser_slot,
-      (
-        team1_reported_at IS NOT NULL
-        AND team2_reported_at IS NOT NULL
-        AND GREATEST(team1_reported_at, team2_reported_at)
-              <= DATE_SUB(NOW(), INTERVAL ? MINUTE)
-      ) AS conflict_stalled
+      (score_deadline_at <= DATE_SUB(NOW(), INTERVAL ? MINUTE)) AS conflict_stalled
      FROM bg_matches
      WHERE tournament_id = ?
        AND status = 'AWAITING_CONFIRMATION'
@@ -366,20 +357,21 @@ export async function resolveExpiredScoreReports(
 
     // Les deux ont reporté, et ils se contredisent — sans quoi le report aurait
     // clos la manche sur-le-champ. C'est le seul cas où l'expiration du délai ne
-    // débloque rien. On n'escalade toutefois que si le **désaccord** lui-même a
-    // dépassé le délai : celui qui vient de naître est déjà annoncé par
-    // l'alerte de conflit, souvent dans cette transaction même.
-    if (team1Reported && team2Reported && Number(match.conflict_stalled ?? 0) === 1) {
-      const matchId = Number(match.id);
-      if (await claimRefereeAlert(connection, matchId, STALLED_ALERT_KEY)) {
-        // La file est plafonnée : un balayage chargé peut abandonner l'entrée.
-        // La réservation serait alors consommée sans qu'aucune alerte ne parte,
-        // et aucun passage ultérieur ne réessaierait — on la rend.
-        if (!queueBotLog(connection, { kind: "score_report_stalled", matchId })) {
-          await releaseRefereeAlert(connection, matchId, STALLED_ALERT_KEY);
-        }
-      }
-    }
+    // débloque rien.
+    if (!team1Reported || !team2Reported) continue;
+
+    // Un délai de plus après l'expiration : l'escalade constate une souffrance
+    // qui dure, pas un désaccord qui vient de naître.
+    if (Number(match.conflict_stalled ?? 0) !== 1) continue;
+
+    const matchId = Number(match.id);
+
+    // L'alerte de conflit vient d'être mise en file par ce même report : le
+    // téléphone de l'arbitre est déjà en train de sonner, et deux messages dans
+    // la même seconde ne diraient pas deux choses.
+    if (hasQueuedBotLog(connection, { kind: "score_conflict", matchId })) continue;
+
+    await queueRefereeAlert(connection, { kind: "score_report_stalled", matchId });
   }
 }
 

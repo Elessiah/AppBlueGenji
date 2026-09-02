@@ -7,15 +7,15 @@ jest.mock("@/lib/server/tournaments/bot-logs");
 import { resolveExpiredScoreReports } from "@/lib/server/tournaments/finalization";
 import { finalizeMatch } from "@/lib/server/tournaments/scoring";
 import {
-  claimRefereeAlert,
+  hasQueuedBotLog,
   queueBotLog,
-  releaseRefereeAlert,
+  queueRefereeAlert,
 } from "@/lib/server/tournaments/bot-logs";
 
 type Queued = { kind: string } & Record<string, unknown>;
 
 function queued(): Queued[] {
-  return (queueBotLog as jest.Mock).mock.calls.map((call) => call[1] as Queued);
+  return (queueRefereeAlert as jest.Mock).mock.calls.map((call) => call[1] as Queued);
 }
 
 /** Connexion factice : `rows` répond aux SELECT, les écritures sont comptées. */
@@ -59,9 +59,12 @@ function expiredRow(overrides: Record<string, unknown>): Record<string, unknown>
 
 beforeEach(() => {
   jest.clearAllMocks();
-  // `queueBotLog` rend un booléen : « l'évènement est-il retenu ? ». Le défaut
-  // est le cas nominal ; les tests qui éprouvent le plafond le remplacent.
   (queueBotLog as jest.Mock).mockReturnValue(true);
+  // `queueRefereeAlert` réserve puis met en file, et rend « l'alerte partira-t-elle ? ».
+  (queueRefereeAlert as jest.Mock).mockResolvedValue(true as never);
+  // Aucune alerte de conflit en file par défaut : le désaccord ne vient pas de
+  // naître dans cette transaction.
+  (hasQueuedBotLog as jest.Mock).mockReturnValue(false);
 });
 
 describe("resolveExpiredScoreReports", () => {
@@ -111,8 +114,7 @@ describe("resolveExpiredScoreReports", () => {
     );
 
     // Aucune alerte n'est réservée
-    expect(claimRefereeAlert).not.toHaveBeenCalled();
-    expect(queueBotLog).not.toHaveBeenCalled();
+    expect(queueRefereeAlert).not.toHaveBeenCalled();
   });
 
   // Symétrique, côté team2 : la règle ne dépend pas de qui a parlé.
@@ -160,8 +162,7 @@ describe("resolveExpiredScoreReports", () => {
     );
 
     // Aucune alerte n'est réservée
-    expect(claimRefereeAlert).not.toHaveBeenCalled();
-    expect(queueBotLog).not.toHaveBeenCalled();
+    expect(queueRefereeAlert).not.toHaveBeenCalled();
   });
 
   // Les deux ont reporté et se contredisent : le délai ne débloque rien —
@@ -192,18 +193,16 @@ describe("resolveExpiredScoreReports", () => {
       },
     });
 
-    (claimRefereeAlert as jest.Mock).mockResolvedValue(true);
-
     await resolveExpiredScoreReports(connection, 12);
 
-    // finalizeMatch n'est PAS appelé
+    // finalizeMatch n'est PAS appelé : rien ici n'est tranchable par une règle.
     expect(finalizeMatch).not.toHaveBeenCalled();
 
-    // claimRefereeAlert est appelé avec les bons paramètres
-    expect(claimRefereeAlert).toHaveBeenCalledWith(connection, 33, "SCORE_REPORT_STALLED");
-
-    // L'alerte est réservée au bot
-    expect(queued()).toEqual([{ kind: "score_report_stalled", matchId: 33 }]);
+    // L'alerte passe par le chemin réservé, qui pose la marque en base.
+    expect(queueRefereeAlert).toHaveBeenCalledWith(connection, {
+      kind: "score_report_stalled",
+      matchId: 33,
+    });
   });
 
   // L'entretien repasse à chaque lecture de la page : sans la réservation,
@@ -234,15 +233,16 @@ describe("resolveExpiredScoreReports", () => {
       },
     });
 
-    // claimRefereeAlert retourne false = réservation déjà prise
-    (claimRefereeAlert as jest.Mock).mockResolvedValue(false);
+    // La marque est déjà posée : le chemin réservé le dit en rendant `false`,
+    // et rien d'autre ne doit se produire — l'alerte est déjà partie.
+    (queueRefereeAlert as jest.Mock).mockResolvedValue(false as never);
 
     await resolveExpiredScoreReports(connection, 12);
 
-    // claimRefereeAlert est appelé
-    expect(claimRefereeAlert).toHaveBeenCalledWith(connection, 34, "SCORE_REPORT_STALLED");
-
-    // Mais queueBotLog n'est PAS appelé
+    expect(queueRefereeAlert).toHaveBeenCalledWith(connection, {
+      kind: "score_report_stalled",
+      matchId: 34,
+    });
     expect(queueBotLog).not.toHaveBeenCalled();
   });
 
@@ -276,8 +276,7 @@ describe("resolveExpiredScoreReports", () => {
 
     // Aucun appel du tout
     expect(finalizeMatch).not.toHaveBeenCalled();
-    expect(claimRefereeAlert).not.toHaveBeenCalled();
-    expect(queueBotLog).not.toHaveBeenCalled();
+    expect(queueRefereeAlert).not.toHaveBeenCalled();
   });
 
   // Le cas nominal, de loin le plus fréquent : rien n'a expiré.
@@ -295,8 +294,7 @@ describe("resolveExpiredScoreReports", () => {
 
     // Aucun appel du tout
     expect(finalizeMatch).not.toHaveBeenCalled();
-    expect(claimRefereeAlert).not.toHaveBeenCalled();
-    expect(queueBotLog).not.toHaveBeenCalled();
+    expect(queueRefereeAlert).not.toHaveBeenCalled();
   });
 
   // Un désaccord qui vient de naître est déjà annoncé par l'alerte de conflit,
@@ -310,40 +308,26 @@ describe("resolveExpiredScoreReports", () => {
     await resolveExpiredScoreReports(connection, 12);
 
     expect(finalizeMatch).not.toHaveBeenCalled();
-    expect(claimRefereeAlert).not.toHaveBeenCalled();
-    expect(queueBotLog).not.toHaveBeenCalled();
+    expect(queueRefereeAlert).not.toHaveBeenCalled();
   });
 
-  // La file est plafonnée : un balayage chargé peut abandonner l'entrée. La
-  // réservation serait alors consommée sans qu'aucune alerte ne parte, et aucun
-  // passage ultérieur ne réessaierait — elle doit être rendue.
-  it("rend la réservation quand la file de journal refuse l'entrée", async () => {
-    const seen: string[] = [];
+  // Le conflit vient d'être mis en file par le report qui a ouvert cette
+  // transaction : le téléphone de l'arbitre sonne déjà, et deux messages dans
+  // la même seconde ne diraient pas deux choses.
+  it("n'escalade pas quand l'alerte de conflit vient d'être mise en file", async () => {
     const connection = fakeConnection({
-      seen,
-      rows: (q) => (q.includes("FROM bg_matches") ? [expiredRow({ id: 41 })] : []),
+      rows: (q) => (q.includes("FROM bg_matches") ? [expiredRow({ id: 43 })] : []),
     });
 
-    (claimRefereeAlert as jest.Mock).mockResolvedValue(true);
-    (queueBotLog as jest.Mock).mockReturnValue(false);
+    (hasQueuedBotLog as jest.Mock).mockReturnValue(true);
 
     await resolveExpiredScoreReports(connection, 12);
 
-    expect(releaseRefereeAlert).toHaveBeenCalledWith(connection, 41, "SCORE_REPORT_STALLED");
-  });
-
-  // Le chemin nominal ne rend jamais la réservation.
-  it("garde la réservation quand l'entrée est bien mise en file", async () => {
-    const connection = fakeConnection({
-      rows: (q) => (q.includes("FROM bg_matches") ? [expiredRow({ id: 42 })] : []),
+    expect(hasQueuedBotLog).toHaveBeenCalledWith(connection, {
+      kind: "score_conflict",
+      matchId: 43,
     });
-
-    (claimRefereeAlert as jest.Mock).mockResolvedValue(true);
-    (queueBotLog as jest.Mock).mockReturnValue(true);
-
-    await resolveExpiredScoreReports(connection, 12);
-
-    expect(releaseRefereeAlert).not.toHaveBeenCalled();
+    expect(queueRefereeAlert).not.toHaveBeenCalled();
   });
 
   // Même garde, de l'autre côté de l'affiche.
@@ -376,7 +360,6 @@ describe("resolveExpiredScoreReports", () => {
 
     // Aucun appel du tout
     expect(finalizeMatch).not.toHaveBeenCalled();
-    expect(claimRefereeAlert).not.toHaveBeenCalled();
-    expect(queueBotLog).not.toHaveBeenCalled();
+    expect(queueRefereeAlert).not.toHaveBeenCalled();
   });
 });

@@ -171,14 +171,15 @@ export function formatScoreConflictAlert(context: RefereeAlertContext): string {
  * arbitre s'en saisisse. Un canal chargé un soir de tournoi avale la première
  * alerte ; la seconde arrive quand le match est vraiment en souffrance.
  *
- * Le délai est compté **depuis le désaccord** — le second des deux reports —,
- * pas depuis le premier report : c'est le désaccord qui bloque la rencontre, et
- * une escalade envoyée dans la même seconde que le conflit ne serait qu'un
- * doublon. D'où « plus de N minutes », une borne basse, la seule chose que le
- * message puisse promettre sans mentir.
+ * Le compte part de l'**expiration du délai de report**, jalon que le moteur ne
+ * réécrit jamais tant que la manche n'est pas tranchée — les horodatages de
+ * report, eux, se repoussent à chaque saisie, et une engagée qui resaisirait son
+ * score en boucle repousserait indéfiniment sa propre escalade. D'où « plus de
+ * N minutes », une borne basse : la seule chose que le message puisse promettre
+ * sans mentir.
  *
  * @param context La rencontre concernée.
- * @param minutesElapsed Délai écoulé depuis le désaccord, au minimum, en minutes.
+ * @param minutesElapsed Délai écoulé depuis l'expiration, au minimum, en minutes.
  */
 export function formatStalledScoreReportAlert(
   context: RefereeAlertContext,
@@ -186,7 +187,7 @@ export function formatStalledScoreReportAlert(
 ): string {
   return alertLine(
     "⏱️",
-    `toujours pas tranché plus de ${minutesElapsed} minutes après le désaccord`,
+    `délai de report dépassé depuis plus de ${minutesElapsed} minutes, toujours pas tranché`,
     context,
   );
 }

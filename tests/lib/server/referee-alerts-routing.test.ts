@@ -273,13 +273,47 @@ describe("réservation rendue quand l'alerte n'est pas remise", () => {
     expect(writes(execute)).toHaveLength(0);
   });
 
-  // Un conflit de score ne réserve rien : il n'y a rien à rendre, même en échec.
-  it("ne libère rien pour un conflit de score, qui ne réserve pas", async () => {
+  // Le conflit de score réserve lui aussi : sa réservation se rend de la même
+  // façon, avec sa propre clé.
+  it("libère la réservation d'un conflit non remis", async () => {
     const connection = fakeConnection();
     const execute = mockDb([[MATCH_ROW]]);
     (pushRefereeAlert as jest.Mock).mockResolvedValue(null as never);
 
     queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const deletes = writes(execute);
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0].params).toEqual([31, "SCORE_CONFLICT"]);
+  });
+
+  // Une entrée qui ne se **résout** pas — ligne effacée entre-temps, engagé sans
+  // nom, erreur MySQL passagère — n'atteint jamais le transport. Sa réservation
+  // doit être rendue quand même, sans quoi elle serait consommée en silence.
+  it("libère la réservation d'une entrée qui ne se résout pas", async () => {
+    const connection = fakeConnection();
+    // Aucune ligne : `loadMatch` ne trouve rien, l'entrée est ignorée.
+    const execute = mockDb([[]]);
+
+    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(pushRefereeAlert).not.toHaveBeenCalled();
+    const deletes = writes(execute);
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0].params).toEqual([31, "SCORE_REPORT_STALLED"]);
+  });
+
+  // Une ligne de journal ne réserve rien : il n'y a rien à rendre.
+  it("ne libère rien pour un évènement de journal", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([[TOURNAMENT_ROW]]);
+    (sendBotLog as jest.Mock).mockRejectedValue(new Error("ECONNREFUSED") as never);
+
+    queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
     flushBotLogs(connection);
     await new Promise((resolve) => setImmediate(resolve));
 

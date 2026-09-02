@@ -2,7 +2,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { checkMatchScores, parseMatchFormat } from "@/lib/shared/match-format";
 import { MatchRow } from "./_internal";
-import { queueBotLog } from "./bot-logs";
+import { clearRefereeAlerts, queueBotLog, queueRefereeAlert } from "./bot-logs";
 import { resolveUserEntrantTeamId } from "./registration";
 import { syncTournamentState } from "./state";
 import { tryAutoResolveByes } from "./byes";
@@ -114,6 +114,12 @@ export async function finalizeMatch(
   // passent par leurs propres écritures (`./byes`, les moteurs à classement) et
   // n'encombrent donc pas le journal.
   queueBotLog(connection, { kind: "match_finished", matchId: Number(match.id) });
+
+  // La manche est tranchée : les alertes qu'elle avait produites n'ont plus
+  // d'objet, et leurs réservations doivent partir avec elles. C'est ce qui rend
+  // « une alerte de conflit par manche » temporaire plutôt que définitif — un
+  // désaccord qui renaît après un arbitrage doit pouvoir alerter à nouveau.
+  await clearRefereeAlerts(connection, Number(match.id));
 
   await pushTeamToTarget(
     connection,
@@ -301,9 +307,15 @@ export async function reportMatchScore(
       ]);
 
       // Les deux engagés se contredisent : un arbitre doit trancher, et il ne
-      // le saura que par le canal Discord — d'où une ligne de journal, résolue
-      // après le commit comme les autres (`./bot-logs`).
-      queueBotLog(connection, { kind: "score_conflict", matchId });
+      // le saura que par le canal Discord — d'où une alerte, résolue après le
+      // commit comme les lignes de journal (`./bot-logs`).
+      //
+      // Réservée, et pas seulement mise en file : rien n'interdit aux deux
+      // engagées de resaisir leur score tant que la manche n'est pas tranchée,
+      // et chaque désaccord ferait sinon sonner le téléphone de tous les
+      // arbitres. La réservation est effacée par `finalizeMatch`, si bien qu'un
+      // désaccord qui renaît après un arbitrage alerte de nouveau.
+      await queueRefereeAlert(connection, { kind: "score_conflict", matchId });
     }
   }
 

@@ -104,13 +104,41 @@ export interface ResolvedBotLog {
 }
 
 /**
- * Clé de réservation de l'escalade « désaccord non tranché ».
+ * Clés de réservation des alertes arbitre, par nature d'évènement.
  *
- * Déclarée ici, où vit `claimRefereeAlert`, parce que deux endroits doivent la
- * connaître : `resolveExpiredScoreReports`, qui réserve, et `flushBotLogs`, qui
- * rend la réservation si l'alerte n'est pas partie.
+ * Déclarées ici, où vit `claimRefereeAlert`, parce que trois endroits doivent
+ * les connaître : le moteur, qui réserve avant de mettre en file ;
+ * `flushBotLogs`, qui rend la réservation si l'alerte n'est pas partie ; et
+ * `finalizeMatch`, qui les efface toutes quand la manche est enfin tranchée.
+ *
+ * **Les deux alertes arbitre sont réservées**, pas seulement l'escalade. Le
+ * conflit de score naît d'une écriture, mais rien n'interdit de la refaire :
+ * tant que la manche n'est pas tranchée, les deux engagées peuvent resaisir
+ * leur score autant de fois qu'elles veulent, et chaque désaccord ferait sonner
+ * le téléphone de tous les arbitres. Une ligne de journal supportait cette
+ * répétition ; un message privé, non.
  */
+export const CONFLICT_ALERT_KEY = "SCORE_CONFLICT";
+
+/** Clé de réservation de l'escalade « délai dépassé, toujours pas tranché ». */
 export const STALLED_ALERT_KEY = "SCORE_REPORT_STALLED";
+
+/**
+ * Clé de réservation d'un évènement, ou `null` s'il n'en réserve aucune.
+ *
+ * Une seule fonction pour tout le module : c'est elle qui garantit que ce que
+ * le moteur réserve est exactement ce que le flush sait rendre.
+ */
+export function refereeAlertKey(entry: PendingBotLog): string | null {
+  switch (entry.kind) {
+    case "score_conflict":
+      return CONFLICT_ALERT_KEY;
+    case "score_report_stalled":
+      return STALLED_ALERT_KEY;
+    default:
+      return null;
+  }
+}
 
 /** Une réservation d'alerte se pose et se retire par la même paire de clés. */
 const RELEASE_ALERT_SQL = `DELETE FROM bg_referee_alerts WHERE match_id = ? AND alert_key = ?`;
@@ -186,6 +214,13 @@ export function flushBotLogs(connection: PoolConnection): void {
   if (!queue || queue.length === 0) return;
 
   void (async () => {
+    // Ce qui a été **effectivement remis** aux arbitres, repéré par la clé de
+    // l'entrée. Tout le reste — non remis, mais aussi non *résolu* : ligne
+    // effacée entre-temps, engagé sans nom, erreur MySQL passagère — doit
+    // rendre sa réservation, sans quoi elle serait consommée en silence et
+    // aucun passage ultérieur ne réessaierait.
+    const delivered = new Set<string>();
+
     for (const { entry, channel, message } of await resolveBotLogs(queue)) {
       if (channel !== "REFEREE") {
         await sendBotLog(message);
@@ -196,26 +231,41 @@ export function flushBotLogs(connection: PoolConnection): void {
       // problème : personne n'attend cette réponse, et un bot éteint ferait
       // sinon patienter chaque envoi de fond sur la fenêtre de 30 s que
       // demande la lecture des membres du rôle.
-      let delivered = false;
+      let sent = false;
       try {
-        delivered =
-          (await pushRefereeAlert(message, "referee-alert", { honourCircuit: true })) !== null;
+        sent = (await pushRefereeAlert(message, "referee-alert", { honourCircuit: true })) !== null;
       } catch {
-        delivered = false;
+        sent = false;
       }
+      if (sent) delivered.add(entryKey(entry));
+    }
 
-      // Une alerte réservée en base mais **non remise** — bot éteint,
-      // coupe-circuit ouvert, réseau coupé — doit rendre sa réservation, sinon
-      // la table censée éviter le doublon finit par n'alerter personne : la
-      // manche resterait bloquée sans que le prochain balayage ne réessaie.
-      // Rendre la réservation choisit le risque du doublon plutôt que celui du
-      // silence, et c'est le bon sens du risque pour une alerte qui ne se
-      // répète pas d'elle-même.
-      if (!delivered && entry.kind === "score_report_stalled") {
-        await releaseRefereeAlertOnPool(entry.matchId, STALLED_ALERT_KEY);
-      }
+    // Rendre la réservation choisit le risque du doublon plutôt que celui du
+    // silence, et c'est le bon sens du risque pour une alerte qui ne se répète
+    // pas d'elle-même : il n'y a pas de palier suivant pour la rattraper.
+    for (const entry of queue) {
+      if (delivered.has(entryKey(entry))) continue;
+      const alertKey = refereeAlertKey(entry);
+      if (alertKey === null) continue;
+      await releaseRefereeAlertOnPool(refereeAlertMatchId(entry), alertKey);
     }
   })().catch(() => undefined);
+}
+
+/**
+ * Manche d'une entrée qui réserve une alerte.
+ *
+ * Les deux natures concernées portent un `matchId` ; le `switch` est là pour
+ * que TypeScript le sache, pas pour trancher quoi que ce soit.
+ */
+function refereeAlertMatchId(entry: PendingBotLog): number {
+  switch (entry.kind) {
+    case "score_conflict":
+    case "score_report_stalled":
+      return entry.matchId;
+    default:
+      throw new Error("NO_MATCH_ID");
+  }
 }
 
 /**
@@ -263,6 +313,68 @@ export async function releaseRefereeAlert(
   alertKey: string,
 ): Promise<void> {
   await connection.execute(RELEASE_ALERT_SQL, [matchId, alertKey]);
+}
+
+/**
+ * Efface toutes les réservations d'une manche : elle est tranchée, les alertes
+ * qu'elle avait produites n'ont plus d'objet.
+ *
+ * C'est ce qui rend la réservation du conflit **temporaire** plutôt que
+ * définitive : un désaccord qui renaît après un arbitrage — correction de score
+ * sur une archive, par exemple — doit pouvoir alerter à nouveau. Sans cet
+ * effacement, « une alerte par manche » vaudrait pour la vie du plateau.
+ */
+export async function clearRefereeAlerts(
+  connection: PoolConnection,
+  matchId: number,
+): Promise<void> {
+  await connection.execute(`DELETE FROM bg_referee_alerts WHERE match_id = ?`, [matchId]);
+}
+
+/**
+ * Réserve une alerte arbitre sans jamais faire échouer la transaction qui
+ * l'appelle.
+ *
+ * Une notification est au meilleur effort de bout en bout, et le moteur ne doit
+ * pas rendre un 500 sur un report de score parce qu'un `INSERT` d'alerte a
+ * heurté un verrou — ou parce que la table manque, la migration de
+ * `database.ts` avalant ses erreurs. En cas d'échec on renonce à alerter, ce
+ * qui est exactement l'état d'avant cette fonctionnalité.
+ *
+ * @returns `true` si la réservation est acquise **et** l'entrée mise en file.
+ */
+export async function queueRefereeAlert(
+  connection: PoolConnection,
+  entry: PendingBotLog,
+): Promise<boolean> {
+  const alertKey = refereeAlertKey(entry);
+  if (alertKey === null) return queueBotLog(connection, entry);
+
+  const matchId = refereeAlertMatchId(entry);
+  try {
+    if (!(await claimRefereeAlert(connection, matchId, alertKey))) return false;
+  } catch {
+    return false;
+  }
+
+  // La file est plafonnée : un balayage chargé peut abandonner l'entrée. La
+  // réservation serait alors consommée sans qu'aucune alerte ne parte, et aucun
+  // passage ultérieur ne réessaierait — on la rend.
+  if (queueBotLog(connection, entry)) return true;
+  try {
+    await releaseRefereeAlert(connection, matchId, alertKey);
+  } catch {
+    // Meilleur effort : au pire, cette manche n'aura pas son alerte.
+  }
+  return false;
+}
+
+/** `true` si cette entrée exacte attend déjà d'être envoyée sur cette connexion. */
+export function hasQueuedBotLog(connection: PoolConnection, entry: PendingBotLog): boolean {
+  const queue = pending.get(connection);
+  if (!queue) return false;
+  const key = entryKey(entry);
+  return queue.some((existing) => entryKey(existing) === key);
 }
 
 /**

@@ -82,6 +82,16 @@ async function purgeTournamentRows(
      WHERE m.tournament_id = ?`,
     [tournamentId],
   );
+  // Même remarque pour les réservations d'alerte arbitre : elles pendent aux
+  // manches, et la liste relisible de ce qui part vaut mieux qu'une cascade que
+  // personne ne relit — d'autant que la création de la table est avalée par un
+  // `catch` dans `database.ts`, où une contrainte manquante passerait inaperçue.
+  await connection.execute(
+    `DELETE a FROM bg_referee_alerts a
+     JOIN bg_matches m ON m.id = a.match_id
+     WHERE m.tournament_id = ?`,
+    [tournamentId],
+  );
   await connection.execute(`DELETE FROM bg_matches WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(`DELETE FROM bg_tournament_phases WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(
