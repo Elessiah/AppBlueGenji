@@ -122,8 +122,21 @@ function fakeDb(options: {
         return [found ? [{ status: found.status }] : [], []];
       }
 
+      // Rejeu du classement du site : aucune rencontre passée dans cette base
+      // factice, toutes les inscrites sont donc à la cote de départ et l'ordre
+      // se départage sur le nom.
+      if (q.includes("AS played_at")) {
+        return [[], []];
+      }
+
       if (q.includes("FROM bg_tournament_registrations r")) {
-        return [standings.map((s) => ({ team_id: s.teamId })), []];
+        return [
+          standings.map((s) => ({
+            team_id: s.teamId,
+            team_name: `Test - ${String(s.teamId).padStart(3, "0")}`,
+          })),
+          [],
+        ];
       }
 
       if (q.startsWith("SELECT round_number, status, team1_id")) {

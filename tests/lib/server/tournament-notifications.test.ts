@@ -9,6 +9,7 @@ const invalidateSnapshot = jest.fn();
 const invalidateLists = jest.fn();
 const invalidatePreview = jest.fn();
 const invalidateLanding = jest.fn();
+const invalidateRanking = jest.fn();
 const publishEvent = jest.fn();
 
 jest.mock("@/lib/server/tournaments/snapshot", () => ({
@@ -27,6 +28,10 @@ jest.mock("@/lib/server/landing-cache", () => ({
   invalidateLandingAggregates: () => invalidateLanding(),
 }));
 
+jest.mock("@/lib/server/ranking-cache", () => ({
+  invalidateTeamRanking: () => invalidateRanking(),
+}));
+
 jest.mock("@/lib/server/live", () => ({
   publishTournamentEvent: (event: unknown) => publishEvent(event),
 }));
@@ -42,6 +47,7 @@ beforeEach(() => {
   invalidateLists.mockReset();
   invalidatePreview.mockReset();
   invalidateLanding.mockReset();
+  invalidateRanking.mockReset();
   publishEvent.mockReset();
 });
 
@@ -50,7 +56,7 @@ afterEach(() => {
 });
 
 describe("notifications — invalidation des caches", () => {
-  it("oublie l'instantané, les listes, l'aperçu et la vitrine à une mise à jour", () => {
+  it("oublie l'instantané, les listes, l'aperçu, la vitrine et le classement à une mise à jour", () => {
     publishUpdatedEvent(7);
     expect(invalidateSnapshot).toHaveBeenCalledWith(7);
     expect(invalidateLists).toHaveBeenCalledTimes(1);
@@ -61,9 +67,12 @@ describe("notifications — invalidation des caches", () => {
     // supprimé resterait une minute dans le compteur, le classement et le
     // ticker — qui pointerait alors vers une page introuvable.
     expect(invalidateLanding).toHaveBeenCalledTimes(1);
+    // Un tournoi supprimé emporte ses rencontres, et avec elles toutes les
+    // cotes qu'elles avaient déplacées : le classement se rejoue en entier.
+    expect(invalidateRanking).toHaveBeenCalledTimes(1);
   });
 
-  it("n'oublie que l'instantané à un score rapporté", () => {
+  it("n'oublie que l'instantané et le classement à un score rapporté", () => {
     // Un score ne touche ni les colonnes de `bg_tournaments` ni le nombre
     // d'inscrites : vider les listes ici les garderait froides toute une soirée
     // de tournois, quand les scores tombent en rafales — précisément la charge
@@ -77,14 +86,19 @@ describe("notifications — invalidation des caches", () => {
     // Même raison que les listes : la vitrine est le cache le plus rentable du
     // site, le vider à chaque score le garderait froid toute une soirée.
     expect(invalidateLanding).not.toHaveBeenCalled();
+    // Le classement, lui, en dépend directement : c'est le seul cache global
+    // qu'un score doive vider. Une cote se rejoue en entier — un score corrigé
+    // déplace aussi tout ce qui l'a suivi.
+    expect(invalidateRanking).toHaveBeenCalledTimes(1);
   });
 
-  it("n'oublie que l'instantané à un score arbitré", () => {
+  it("n'oublie que l'instantané et le classement à un score arbitré", () => {
     publishScoreResolvedEvent(7, 42);
     expect(invalidateSnapshot).toHaveBeenCalledWith(7);
     expect(invalidateLists).not.toHaveBeenCalled();
     expect(invalidatePreview).not.toHaveBeenCalled();
     expect(invalidateLanding).not.toHaveBeenCalled();
+    expect(invalidateRanking).toHaveBeenCalledTimes(1);
   });
 
   it("invalide avant de réveiller les abonnés", () => {
