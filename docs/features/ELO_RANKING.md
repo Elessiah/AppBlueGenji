@@ -130,13 +130,31 @@ ordre **stable**, sinon deux calculs du même classement rendraient deux nombres
 différents. L'`ORDER BY` SQL n'est qu'une commodité : la règle appartient au
 module pur, qui retrie ce qu'il reçoit.
 
+### La date d'un match est celle de sa dernière écriture
+
 La chronologie lue est celle des fiches et des barres de forme —
 `COALESCE(m.updated_at, t.finished_at, t.start_at)` — une seule lecture de
-« quand ce match a-t-il eu lieu », donc pas deux histoires du site.
+« quand ce match a-t-il eu lieu », donc pas deux histoires du site. C'est un
+choix, et il a une conséquence qu'il vaut mieux énoncer que découvrir :
 
-Corriger un score ne défait donc pas seulement son propre résultat : il rejoue
-**tout ce qui a suivi**, exactement comme une coupe de Survie se défait quand le
-score qui l'avait provoquée est corrigé.
+**corriger un vieux score le redate.** `updated_at` passe à l'instant de la
+correction : le match quitte sa place dans l'histoire et se rejoue **en
+dernier**, aux cotes d'aujourd'hui. Les rencontres qu'il précédait ne sont donc
+pas re-dérivées depuis ses cotes corrigées — elles se rejouent inchangées, avant
+lui. Corollaire : rétablir le score d'origine ne rétablit pas forcément le
+classement d'origine, puisque la date, elle, ne revient pas en arrière.
+
+Ce que le rejeu garantit, et qui est la propriété recherchée, est plus étroit et
+plus solide : **le classement est une fonction pure des matchs comptés, de leurs
+vainqueurs et de leurs dates**. Rien n'est accumulé, donc rien ne se désynchronise
+— un score corrigé, un match rouvert, un tournoi supprimé disparaissent
+entièrement du calcul, sans laisser de points derrière eux. C'est ce qu'une somme
+stockée ne savait pas faire.
+
+Retenir une date immuable (le début du tournoi, par exemple) ferait diverger
+l'ordre du classement de celui des barres de forme et des fiches — la divergence
+même que la PR #88 venait de supprimer. Une seule chronologie pour tout le site,
+et ses limites écrites.
 
 ## Ce que le rejeu entraîne
 
@@ -154,9 +172,13 @@ Ronde suisse, Multi-phases, aperçu du plateau) passent par une seule fonction,
 inscrites avec `compareRankedTeams`. Un aperçu ne peut donc pas diverger du
 tirage réel, ni deux formats se seeder différemment.
 
-Elle lit sur **la connexion de l'appelant** : le seeding s'exécute dans la
-transaction qui lance le tournoi et doit voir le classement tel que cette
-transaction le voit — pas une photo mutualisée.
+Tout s'y lit sur **la connexion de l'appelant**. Ce que règle son option
+`transactional`, c'est seulement le droit de resservir une photo déjà prise :
+le **seeding** le refuse (il s'exécute dans la transaction qui lance le tournoi
+et doit voir ce qu'elle voit), l'**aperçu du plateau** l'accepte — c'est une
+lecture seule, hors transaction, qui n'a aucune raison de rejouer tout
+`bg_matches` par consultation et affiche d'ailleurs le classement que l'annuaire
+montre au même moment.
 
 ### Le coût, et le cache
 
@@ -193,6 +215,9 @@ puisque la cote en dépend directement.
   points conservée), le **plancher** et son entorse assumée, le **rejeu**
   (indépendance à l'ordre reçu, dépendance à l'ordre réel, stabilité à
   l'identifiant), l'assiette, l'ordre de tri.
+- `tests/lib/server/ranking-service.test.ts` couvre aussi le **redatage** : une
+  correction qui repousse `updated_at` rejoue le match en dernier, et le
+  classement reste une fonction pure de ce que la base contient.
 - `tests/lib/server/ranking-service.test.ts` — la collecte (assiette,
   chronologie, fenêtre de tendance, fenêtres refusées), la mutualisation et son
   invalidation, le découpage solo / non classées, `loadEntrantsBySiteRanking`, et

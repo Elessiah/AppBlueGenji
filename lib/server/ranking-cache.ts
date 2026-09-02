@@ -38,8 +38,8 @@ export function cachedRanking<T>(key: string, loader: () => Promise<T>): Promise
 }
 
 /**
- * Oublie le classement. Appelé dès qu'un match bouge — un score corrigé ne
- * déplace pas seulement son propre résultat, il **rejoue** tout ce qui suit.
+ * Oublie le classement. Appelé dès qu'un match bouge : le classement entier est
+ * rejoué depuis `bg_matches`, donc aucune entrée n'en réchappe.
  */
 export function invalidateTeamRanking(): void {
   invalidateCachedPrefix(PREFIX);

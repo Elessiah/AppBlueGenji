@@ -1,5 +1,10 @@
 import type { TeamListItem } from "@/lib/shared/types";
-import { RANKING_POINTS_HINT, RANKING_POINTS_LABEL } from "@/lib/shared/ranking";
+import {
+  isRankedTeam,
+  RANKING_POINTS_HINT,
+  RANKING_POINTS_LABEL,
+  RANKING_UNRANKED_HINT,
+} from "@/lib/shared/ranking";
 import s from "./HighlightStrip.module.css";
 
 export function HighlightStrip({ teams }: { teams: TeamListItem[] }) {
@@ -17,7 +22,16 @@ export function HighlightStrip({ teams }: { teams: TeamListItem[] }) {
               {t.wins}V – {t.losses}D{t.region ? ` · ${t.region}` : ""}
             </div>
           </div>
-          <div title={`${RANKING_POINTS_LABEL} · ${RANKING_POINTS_HINT}`}>
+          {/* Même nuance que sur la carte : un filtre par jeu peut laisser
+              moins de trois équipes classées, et une équipe à 0V–0D monterait
+              alors sur le podium avec la cote de départ. Annoncer une cote
+              gagnée sur ce nombre-là, c'est expliquer deux fois le même chiffre
+              de deux façons contradictoires sur la même page. */}
+          <div
+            title={`${RANKING_POINTS_LABEL} · ${
+              isRankedTeam(t) ? RANKING_POINTS_HINT : RANKING_UNRANKED_HINT
+            }`}
+          >
             <div className={s.pts}>{t.points}</div>
             {/* Même règle que sur la carte : le mot complet est lu, l'abréviation
                 est vue. Un `aria-label` posé ici ne serait pas exposé. */}

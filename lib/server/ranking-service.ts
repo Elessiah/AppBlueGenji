@@ -18,9 +18,10 @@
  * seeding qui triaient sur une expression SQL ne le peuvent pas davantage :
  * elles lisent maintenant l'état rejoué, comme les autres vues.
  *
- * Rien n'est stocké pour autant — c'est la propriété que le projet tient
- * partout (`replaySurvival`, `replaySwiss`) : une correction de score se
- * répercute seule, sur le match corrigé **et** sur tous ceux qui l'ont suivi.
+ * Rien n'est stocké pour autant — c'est la propriété que le projet tient partout
+ * (`replaySurvival`, `replaySwiss`) : le classement est une **fonction pure** des
+ * matchs comptés, de leurs vainqueurs et de leurs dates. Une correction de score
+ * s'y répercute seule, et rien ne reste accroché à un total accumulé.
  *
  * ## Coût
  *
@@ -86,10 +87,22 @@ export type TeamRankingOptions = {
    * Lire sur une connexion précise plutôt que sur le pool.
    *
    * Le seeding s'exécute **dans la transaction** qui lance le tournoi : il doit
-   * voir le classement tel que cette transaction le voit, et non une photo
-   * mutualisée. Une connexion donnée court-circuite donc aussi le cache.
+   * lire là où sa transaction voit ce qu'elle a écrit.
    */
   connection?: Queryable;
+  /**
+   * Accepter la photo mutualisée du classement (`ranking-cache`) plutôt que de
+   * rejouer pour soi.
+   *
+   * C'est le réglage des **lectures** : elles n'ont aucune raison de rejouer
+   * tout `bg_matches` par consultation, et le cache leur sert d'ailleurs
+   * exactement le nombre que l'annuaire et le leaderboard affichent au même
+   * moment. Par défaut, une lecture sur le pool est donc mutualisée.
+   *
+   * Le seeding, lui, doit poser `false` : dans la transaction qui lance le
+   * tournoi, une photo prise avant elle n'est pas ce qu'elle voit.
+   */
+  shared?: boolean;
 };
 
 type RankedMatchRow = RowDataPacket & {
@@ -173,19 +186,25 @@ async function loadRankedMatches(
  * rejeu.
  */
 export async function loadRankingState(
-  options: Pick<TeamRankingOptions, "completedMoreThanDaysAgo" | "connection"> = {},
+  options: Pick<TeamRankingOptions, "completedMoreThanDaysAgo" | "connection" | "shared"> = {},
 ): Promise<Map<number, RankedTeamState>> {
   const days = options.completedMoreThanDaysAgo;
   validateWindow(days);
 
-  if (options.connection) {
-    return replayRanking(await loadRankedMatches(options.connection, days));
-  }
-
-  return cachedRanking(`state:${days ?? "all"}`, async () => {
-    const db = await getDatabase();
+  // Une connexion donnée reste la source de données ; ce que `shared` décide,
+  // c'est seulement si l'on a le droit de resservir une photo déjà prise. Les
+  // deux sont indépendants : l'aperçu du plateau lit sur sa connexion **et**
+  // accepte le cache, le seeding lit sur la sienne et le refuse.
+  const replay = async () => {
+    const db = options.connection ?? (await getDatabase());
     return replayRanking(await loadRankedMatches(db, days));
-  });
+  };
+
+  // Sans connexion, on lit pour afficher : mutualisé par défaut.
+  const shared = options.shared ?? options.connection === undefined;
+  if (!shared) return replay();
+
+  return cachedRanking(`state:${days ?? "all"}`, replay);
 }
 
 /**
@@ -251,15 +270,27 @@ type EntrantRow = RowDataPacket & { team_id: number; team_name: string };
  * SQL, et l'ordre passe donc par `compareRankedTeams` — la règle de tri unique,
  * celle-là même qu'appliquent l'annuaire et le leaderboard.
  *
- * La lecture se fait sur la connexion de l'appelant : le seeding s'exécute dans
- * la transaction qui lance le tournoi et doit voir le classement tel que cette
- * transaction le voit.
+ * Tout se lit sur la connexion de l'appelant. Ce que `transactional` décide,
+ * c'est seulement si le classement peut venir d'une photo déjà prise
+ * (`ranking-cache`) :
+ *
+ * - `true` (défaut) — le seeding : il s'exécute dans la transaction qui lance le
+ *   tournoi et doit voir le classement tel que cette transaction le voit, donc
+ *   sans photo antérieure ;
+ * - `false` — l'aperçu du plateau : une **lecture seule**, hors transaction, où
+ *   rejouer tout `bg_matches` par consultation coûterait sans rien garantir de
+ *   plus. Le cache y sert d'ailleurs la même donnée que l'annuaire et le
+ *   leaderboard affichent au même moment.
  */
 export async function loadEntrantsBySiteRanking(
   connection: Queryable,
   tournamentId: number,
+  options: { transactional?: boolean } = {},
 ): Promise<RankedEntrant[]> {
-  const states = await loadRankingState({ connection });
+  const states = await loadRankingState({
+    connection,
+    shared: options.transactional === false,
+  });
 
   const [rows] = await connection.execute<EntrantRow[]>(
     `SELECT r.team_id, t.name AS team_name

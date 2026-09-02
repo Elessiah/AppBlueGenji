@@ -51,11 +51,17 @@ async function loadOrderedEntrants(
   source: PreviewSeedingSource,
 ): Promise<PreviewEntrant[]> {
   // Classement du site : **le même chargeur** que le seeding réel
-  // (`loadEntrantsBySiteRanking`), sur la connexion de l'appelant. Un aperçu qui
-  // divergerait du tirage serait pire que pas d'aperçu du tout.
+  // (`loadEntrantsBySiteRanking`). Un aperçu qui divergerait du tirage serait
+  // pire que pas d'aperçu du tout.
+  //
+  // `transactional: false` : l'aperçu est une lecture seule, hors transaction —
+  // il lit donc le classement **mutualisé**, celui-là même que l'annuaire et le
+  // leaderboard affichent au même moment. Rejouer tout `bg_matches` à chaque
+  // consultation coûterait sans rien garantir de plus, et l'aperçu est déjà
+  // recalculé à chaque inscription.
   const ordered =
     source === "RANKING"
-      ? await loadEntrantsBySiteRanking(connection, tournamentId)
+      ? await loadEntrantsBySiteRanking(connection, tournamentId, { transactional: false })
       : (
           await connection.execute<(RowDataPacket & { team_id: number; team_name: string })[]>(
             `SELECT r.team_id, t.name AS team_name

@@ -367,6 +367,55 @@ describe("loadEntrantsBySiteRanking", () => {
     expect(pool).not.toHaveBeenCalled();
   });
 
+  // L'aperçu du plateau est une lecture seule, hors transaction : rejouer tout
+  // `bg_matches` à chaque consultation coûterait sans rien garantir de plus.
+  it("mutualise le classement quand l'appelant n'est pas transactionnel", async () => {
+    const connection = connectionWith(
+      [matchRow(1, 1, 2, 1)],
+      [{ team_id: 1, team_name: "Alpha" }],
+    );
+
+    await loadEntrantsBySiteRanking(connection, 7, { transactional: false });
+    await loadEntrantsBySiteRanking(connection, 7, { transactional: false });
+
+    const sql = connection.execute.mock.calls.map((call) => String(call[0]));
+    // Un seul rejeu pour deux aperçus — mais les inscrites, elles, sont relues
+    // à chaque fois : c'est le classement qui est mutualisé, pas la lecture du
+    // tournoi.
+    expect(sql.filter((text) => text.includes("AS played_at"))).toHaveLength(1);
+    expect(sql.filter((text) => text.includes("bg_tournament_registrations"))).toHaveLength(2);
+  });
+
+  // La connexion reste la source de données dans les deux cas : le cache décide
+  // seulement si l'on a le droit de resservir une photo déjà prise.
+  it("lit toujours sur la connexion de l'appelant, mutualisé ou non", async () => {
+    const pool = await mockDb(fakeDb([matchRow(1, 1, 2, 1)], []));
+    const connection = connectionWith(
+      [matchRow(1, 1, 2, 1)],
+      [{ team_id: 1, team_name: "Alpha" }],
+    );
+
+    await loadEntrantsBySiteRanking(connection, 7, { transactional: false });
+
+    expect(pool).not.toHaveBeenCalled();
+  });
+
+  it("classe pareil qu'un appel transactionnel, cache ou pas", async () => {
+    const matches = [matchRow(1, 1, 2, 1), matchRow(2, 3, 1, 3)];
+    const entrants = [
+      { team_id: 2, team_name: "Bravo" },
+      { team_id: 1, team_name: "Alpha" },
+      { team_id: 3, team_name: "Charlie" },
+    ];
+    await mockDb(fakeDb(matches, []));
+    const connection = connectionWith(matches, entrants);
+
+    const cachedOrder = await loadEntrantsBySiteRanking(connection, 7, { transactional: false });
+    const liveOrder = await loadEntrantsBySiteRanking(connection, 7);
+
+    expect(cachedOrder).toEqual(liveOrder);
+  });
+
   it("ne rend rien pour un tournoi sans inscrite", async () => {
     expect(await loadEntrantsBySiteRanking(connectionWith([], []), 7)).toEqual([]);
   });
@@ -387,10 +436,11 @@ describe("loadEntrantsBySiteRanking", () => {
 });
 
 /**
- * Le rejeu est ce qui remplace la somme : une correction de score ne se répare
- * pas d'elle-même dans un total accumulé, elle se répare dans un rejeu.
+ * Le rejeu est ce qui remplace la somme : le classement est une **fonction
+ * pure** des matchs comptés, de leurs vainqueurs et de leurs dates. Rien n'est
+ * accumulé, donc rien ne reste accroché à un total quand la base change.
  */
-describe("rejeu — une correction de score se répercute seule", () => {
+describe("rejeu — le classement est une fonction de ce que la base contient", () => {
   const teams = [teamRow(1, "Alpha"), teamRow(2, "Bravo"), teamRow(3, "Charlie")];
 
   async function pointsAfter(matches: Row[]): Promise<Map<number, number>> {
@@ -400,19 +450,46 @@ describe("rejeu — une correction de score se répercute seule", () => {
     return new Map(rows.map((row) => [row.teamId, row.points]));
   }
 
-  it("défait le premier résultat **et** tout ce qui a suivi", async () => {
+  it("répercute une correction de score sur les deux équipes concernées", async () => {
     const before = await pointsAfter([matchRow(1, 1, 2, 1), matchRow(2, 1, 3, 1)]);
     // Le score du premier match est corrigé : c'est 2 qui l'emporte.
     const after = await pointsAfter([matchRow(1, 1, 2, 2), matchRow(2, 1, 3, 1)]);
 
     expect(after.get(1)).toBeLessThan(before.get(1)!);
     expect(after.get(2)).toBeGreaterThan(before.get(2)!);
+  });
+
+  it("re-dérive aussi les rencontres postérieures à celle qu'on corrige", async () => {
+    const before = await pointsAfter([matchRow(1, 1, 2, 1), matchRow(2, 1, 3, 1)]);
+    const after = await pointsAfter([matchRow(1, 1, 2, 2), matchRow(2, 1, 3, 1)]);
+
     // Le second match n'a pas changé de vainqueur, mais il ne rapporte plus la
     // même chose : 1 l'a joué depuis une cote plus basse.
     expect(after.get(3)).not.toBe(before.get(3));
   });
 
-  it("revient exactement au même classement une fois le score rétabli", async () => {
+  /**
+   * La chronologie du rejeu est `updated_at` : corriger un vieux score le
+   * **redate**, et le match se rejoue en dernier plutôt qu'à sa place d'origine
+   * (voir `docs/features/ELO_RANKING.md`). Le classement reste une fonction de
+   * la base — mais d'une base dont la date a bougé, ce que la doc énonce plutôt
+   * que de promettre une reconstitution de l'histoire.
+   */
+  it("rejoue en dernier un match dont la correction a repoussé la date", async () => {
+    const untouched = matchRow(2, 1, 3, 1, 2);
+    // Même résultat, deux dates : à sa place d'origine, puis redaté après la
+    // rencontre suivante — comme le ferait une correction tardive.
+    const inPlace = await pointsAfter([matchRow(1, 1, 2, 1, 1), untouched]);
+    const redated = await pointsAfter([matchRow(1, 1, 2, 1, 9), untouched]);
+
+    expect(redated.get(3)).not.toBe(inPlace.get(3));
+    // Les deux lectures restent déterministes : rejouer la même base rend le
+    // même classement.
+    const again = await pointsAfter([matchRow(1, 1, 2, 1, 9), untouched]);
+    expect([...again.entries()]).toEqual([...redated.entries()]);
+  });
+
+  it("rend le même classement pour une base identique, quel qu'ait été l'entre-temps", async () => {
     const initial = await pointsAfter([matchRow(1, 1, 2, 1), matchRow(2, 1, 3, 1)]);
     await pointsAfter([matchRow(1, 1, 2, 2), matchRow(2, 1, 3, 1)]);
     const restored = await pointsAfter([matchRow(1, 1, 2, 1), matchRow(2, 1, 3, 1)]);

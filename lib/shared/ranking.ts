@@ -28,8 +28,11 @@
  * 2. **Ordre chronologique.** Une cote dépend de l'ordre des rencontres, ce que
  *    la somme d'avant ignorait. Rien n'est stocké pour autant : le classement se
  *    **rejoue** depuis `bg_matches` ({@link replayRanking}), comme
- *    `replaySurvival` / `replaySwiss` rejouent leurs tournois. Une correction de
- *    score se répercute donc seule, y compris sur tous les matchs postérieurs.
+ *    `replaySurvival` / `replaySwiss` rejouent leurs tournois — il est donc une
+ *    **fonction pure** des matchs comptés, de leurs vainqueurs et de leurs
+ *    dates, jamais un total accumulé. La date retenue étant celle de la dernière
+ *    écriture du match, corriger un vieux score le **redate** et le rejoue en
+ *    dernier : voir `docs/features/ELO_RANKING.md`.
  * 3. **Assiette partagée.** Les matchs qui comptent sont exactement ceux du
  *    bilan des fiches ({@link playedMatchSql}) — byes et matchs fantômes
  *    écartés. Un barème partagé posé sur deux assiettes différentes rend encore
