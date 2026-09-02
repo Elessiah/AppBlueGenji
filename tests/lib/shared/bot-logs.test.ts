@@ -4,7 +4,6 @@ import {
   formatForfeitLog,
   formatMatchResultLog,
   formatRegistrationLog,
-  formatScoreConflictLog,
   formatTournamentCreatedLog,
   formatTournamentDeletedLog,
   formatTournamentFinishedLog,
@@ -46,14 +45,6 @@ const ALL_LINES = () => [
     team2Name: "Team Nova",
     team1Score: 2,
     team2Score: 1,
-  }),
-  formatScoreConflictLog({
-    tournament: TOURNAMENT,
-    matchId: 31,
-    bracket: "UPPER",
-    roundNumber: 2,
-    team1Name: "Les Renards",
-    team2Name: "Team Nova",
   }),
   formatTournamentStartedLog({
     tournament: TOURNAMENT,
@@ -277,23 +268,6 @@ describe("formatMatchResultLog", () => {
 
     expect(grand).toContain("Grande finale");
     expect(lower).toContain("Loser bracket · manche 4");
-  });
-});
-
-describe("formatScoreConflictLog", () => {
-  it("désigne le match à arbitrer par son identifiant", () => {
-    const line = formatScoreConflictLog({
-      tournament: TOURNAMENT,
-      matchId: 31,
-      bracket: "UPPER",
-      roundNumber: 2,
-      team1Name: "Les Renards",
-      team2Name: "Team Nova",
-    });
-
-    expect(line).toContain("match #31");
-    expect(line).toContain("Les Renards vs Team Nova");
-    expect(line).toContain("Arbitrage requis");
   });
 });
 

@@ -43,6 +43,7 @@ import {
   openedMatchReminders,
   type MatchReminderOffset,
 } from "@/lib/shared/discord-notifications";
+import { tournamentPageUrl } from "./app-url";
 
 type ScheduledMatchRow = RowDataPacket & {
   id: number;
@@ -81,12 +82,6 @@ const SWEEP_THROTTLE_MS = 60_000;
 
 let lastSweepAt = 0;
 let pendingSweep: Promise<number> | null = null;
-
-/** URL publique de la page d'un tournoi, si l'app sait sous quel nom elle est servie. */
-function tournamentUrl(tournamentId: number): string | null {
-  const base = process.env.APP_URL?.trim().replace(/\/+$/, "");
-  return base ? `${base}/tournois/${tournamentId}` : null;
-}
 
 /**
  * Destinataire Discord d'un joueur.
@@ -301,7 +296,7 @@ async function runSweep(now: Date): Promise<number> {
 
   for (const { match, offset, remaining } of planned) {
     const roundLabel = matchRoundLabel(String(match.bracket), Number(match.round_number));
-    const url = tournamentUrl(Number(match.tournament_id));
+    const url = tournamentPageUrl(Number(match.tournament_id));
 
     const sides: { teamId: number; teamName: string; opponentName: string }[] = [
       {

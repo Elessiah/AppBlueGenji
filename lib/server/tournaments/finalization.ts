@@ -1,6 +1,6 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { MIN_ENTRANTS_FOR_MATCHES } from "@/lib/shared/constants";
-import { queueBotLog } from "./bot-logs";
+import { claimRefereeAlert, queueBotLog } from "./bot-logs";
 import { resetRegistrationRanks, finishTournament } from "./repository";
 
 export async function isEliminationPhaseComplete(
@@ -257,6 +257,30 @@ export async function finalizeTournamentIfDone(
   }
 }
 
+/**
+ * Clé de l'alerte « report expiré, toujours pas tranché ».
+ *
+ * Une seule par manche : l'escalade constate un blocage, elle ne le suit pas
+ * minute par minute.
+ */
+const STALLED_ALERT_KEY = "SCORE_REPORT_STALLED";
+
+/**
+ * Tranche les reports de score dont le délai a expiré, et **alerte l'arbitre**
+ * sur ceux qu'aucune règle ne peut trancher.
+ *
+ * Le délai n'a d'effet que sur une manche à **un seul** report : il vaut alors
+ * accord tacite de l'adversaire silencieux, et le moteur clôt la rencontre. Sur
+ * une manche où les **deux** engagées ont reporté des scores contradictoires, il
+ * ne peut rien — départager deux affirmations opposées n'est pas une règle,
+ * c'est une décision. Ces manches restent donc `AWAITING_CONFIRMATION`
+ * indéfiniment, et sont exactement celles qui attendent un humain.
+ *
+ * D'où une alerte, distincte de celle du conflit lui-même : la première part au
+ * moment du désaccord, celle-ci constate qu'une demi-heure plus tard personne
+ * n'a tranché. `claimRefereeAlert` la réserve dans la transaction en cours pour
+ * qu'elle ne parte qu'une fois — la fonction est appelée à chaque entretien.
+ */
 export async function resolveExpiredScoreReports(
   connection: PoolConnection,
   tournamentId: number,
@@ -292,11 +316,12 @@ export async function resolveExpiredScoreReports(
       continue;
     }
 
-    if (
-      match.team1_report_score !== null &&
-      match.team1_report_opponent_score !== null &&
-      match.team2_report_score === null
-    ) {
+    const team1Reported =
+      match.team1_report_score !== null && match.team1_report_opponent_score !== null;
+    const team2Reported =
+      match.team2_report_score !== null && match.team2_report_opponent_score !== null;
+
+    if (team1Reported && !team2Reported) {
       const team1Score = Number(match.team1_report_score);
       const team2Score = Number(match.team1_report_opponent_score);
       const winnerTeamId = team1Score >= team2Score ? Number(match.team1_id) : Number(match.team2_id);
@@ -309,13 +334,10 @@ export async function resolveExpiredScoreReports(
         winnerTeamId,
         loserTeamId,
       });
+      continue;
     }
 
-    if (
-      match.team2_report_score !== null &&
-      match.team2_report_opponent_score !== null &&
-      match.team1_report_score === null
-    ) {
+    if (team2Reported && !team1Reported) {
       const team1Score = Number(match.team2_report_opponent_score);
       const team2Score = Number(match.team2_report_score);
       const winnerTeamId = team1Score >= team2Score ? Number(match.team1_id) : Number(match.team2_id);
@@ -328,6 +350,17 @@ export async function resolveExpiredScoreReports(
         winnerTeamId,
         loserTeamId,
       });
+      continue;
+    }
+
+    // Les deux ont reporté, et ils se contredisent — sans quoi le report aurait
+    // clos la manche sur-le-champ. Le délai vient de passer sans que personne
+    // n'arbitre : c'est le seul cas où l'expiration ne débloque rien.
+    if (team1Reported && team2Reported) {
+      const matchId = Number(match.id);
+      if (await claimRefereeAlert(connection, matchId, STALLED_ALERT_KEY)) {
+        queueBotLog(connection, { kind: "score_report_stalled", matchId });
+      }
     }
   }
 }

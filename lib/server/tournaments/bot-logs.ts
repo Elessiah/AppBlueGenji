@@ -19,24 +19,46 @@
  * la ligne parle de l'état réellement enregistré (le classement final n'est
  * écrit qu'après la clôture, par exemple).
  *
+ * **3. Choisir le canal une seule fois.** Tous les évènements ne vont pas au
+ * même endroit : ceux qui appellent une intervention humaine partent au canal
+ * arbitre (`POST /internal/notify/referees` : messages privés au rôle configuré
+ * par `/set-referee-role`, plus une trace que le bot pose lui-même dans le canal
+ * de logs), les autres au journal (`POST /internal/log`). Le tri est une règle
+ * pure et unique — `lib/shared/referee-alerts.ts` — appliquée ici, à l'envoi :
+ * aucun appelant ne le connaît, et un évènement ajouté demain est classé sans
+ * qu'on touche au moteur. Chaque entrée part par **exactement un** transport,
+ * ce qui interdit le doublon : le point d'entrée arbitre écrivant déjà dans le
+ * canal de logs, l'y envoyer aussi par `sendBotLog` afficherait la ligne deux
+ * fois dans le même salon.
+ *
  * L'envoi lui-même reste au meilleur effort, comme tout ce qui passe par le
  * canal interne : ni la lecture ni l'écriture ne doivent échouer parce que le
- * bot dort.
+ * bot dort. Un rôle arbitre non configuré n'y change rien — le bot répond 200
+ * et se contente du log.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { sendBotLog } from "@/lib/server/bot-integration";
+import { pushRefereeAlert, sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
 import {
   formatForfeitLog,
   formatMatchResultLog,
   formatRegistrationLog,
-  formatScoreConflictLog,
   formatTournamentCreatedLog,
   formatTournamentFinishedLog,
   formatTournamentStartedLog,
   formatUnderfilledTournamentLog,
+  type BotEventKind,
 } from "@/lib/shared/bot-logs";
+import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { toParticipantType } from "@/lib/shared/participants";
+import {
+  botEventChannel,
+  formatScoreConflictAlert,
+  formatStalledScoreReportAlert,
+  type BotEventChannel,
+  type RefereeAlertContext,
+} from "@/lib/shared/referee-alerts";
+import { tournamentPageUrl } from "./app-url";
 
 /**
  * Évènement réservé pendant une transaction.
@@ -50,9 +72,29 @@ export type PendingBotLog =
   | { kind: "forfeit"; tournamentId: number; teamId: number }
   | { kind: "match_finished"; matchId: number }
   | { kind: "score_conflict"; matchId: number }
+  | { kind: "score_report_stalled"; matchId: number }
   | { kind: "tournament_started"; tournamentId: number }
   | { kind: "tournament_finished"; tournamentId: number }
   | { kind: "tournament_underfilled"; tournamentId: number };
+
+/**
+ * Garde de compilation : les natures d'entrée sont **exactement** celles que le
+ * tri connaît (`BotEventKind`). Une entrée inventée ici sans être classée dans
+ * `lib/shared/referee-alerts.ts` — ou l'inverse — ne compile pas, et le canal
+ * d'un nouvel évènement ne peut donc pas rester indécis.
+ */
+type AssertSameKinds = [
+  PendingBotLog["kind"] extends BotEventKind ? true : never,
+  BotEventKind extends PendingBotLog["kind"] ? true : never,
+];
+const KINDS_MATCH: AssertSameKinds = [true, true];
+void KINDS_MATCH;
+
+/** Une ligne prête à partir, et le canal qui doit la porter. */
+export interface ResolvedBotLog {
+  channel: BotEventChannel;
+  message: string;
+}
 
 /**
  * Plafond d'entrées retenues par transaction.
@@ -114,10 +156,50 @@ export function flushBotLogs(connection: PoolConnection): void {
   if (!queue || queue.length === 0) return;
 
   void (async () => {
-    for (const message of await resolveBotLogs(queue)) {
-      await sendBotLog(message);
+    for (const { channel, message } of await resolveBotLogs(queue)) {
+      if (channel === "REFEREE") {
+        // Le coupe-circuit est respecté ici, contrairement au signalement d'un
+        // problème : personne n'attend cette réponse, et un bot éteint ferait
+        // sinon patienter chaque envoi de fond sur la fenêtre de 30 s que
+        // demande la lecture des membres du rôle.
+        await pushRefereeAlert(message, "referee-alert", { honourCircuit: true });
+      } else {
+        await sendBotLog(message);
+      }
     }
   })().catch(() => undefined);
+}
+
+/**
+ * Réserve une alerte arbitre pour une manche, **dans la transaction en cours**.
+ *
+ * Certaines alertes ne naissent pas d'une écriture mais d'un constat répété à
+ * chaque passage d'entretien — « ce report a dépassé son délai et personne n'a
+ * tranché ». Sans marque, l'arbitre recevrait le même message à chaque lecture
+ * de la page. La ligne `bg_referee_alerts (match_id, alert_key)` porte donc une
+ * clé unique, et seule l'insertion qui gagne réserve l'envoi.
+ *
+ * Elle est écrite sur la **connexion de la transaction**, et non sur le pool :
+ * la réservation et l'évènement sont ainsi validés ou annulés ensemble — un
+ * rollback ne consomme pas l'alerte, contrairement aux rappels de match, dont
+ * la réservation précède un envoi hors transaction.
+ *
+ * La table suit la manche (`ON DELETE CASCADE`) : un plateau régénéré —
+ * réappariement d'une ronde suisse, correction de score en survie — efface ses
+ * matchs, donc ses réservations.
+ *
+ * @returns `true` si la réservation est acquise (c'est à nous d'alerter).
+ */
+export async function claimRefereeAlert(
+  connection: PoolConnection,
+  matchId: number,
+  alertKey: string,
+): Promise<boolean> {
+  const [result] = await connection.execute(
+    `INSERT IGNORE INTO bg_referee_alerts (match_id, alert_key) VALUES (?, ?)`,
+    [matchId, alertKey],
+  );
+  return (result as { affectedRows?: number }).affectedRows === 1;
 }
 
 /**
@@ -129,13 +211,15 @@ export function flushBotLogs(connection: PoolConnection): void {
  * journal manquant vaut mieux qu'un journal faux, et rien ici ne justifie de
  * remonter une erreur.
  */
-export async function resolveBotLogs(entries: readonly PendingBotLog[]): Promise<string[]> {
-  const messages: string[] = [];
+export async function resolveBotLogs(
+  entries: readonly PendingBotLog[],
+): Promise<ResolvedBotLog[]> {
+  const messages: ResolvedBotLog[] = [];
 
   for (const entry of entries) {
     try {
       const message = await resolveOne(entry);
-      if (message) messages.push(message);
+      if (message) messages.push({ channel: botEventChannel(entry.kind), message });
     } catch {
       // Meilleur effort : une ligne perdue n'emporte pas les suivantes.
     }
@@ -238,6 +322,27 @@ async function loadMatch(matchId: number): Promise<MatchLogRow | null> {
   return rows[0] ?? null;
 }
 
+/**
+ * Ce qu'une alerte arbitre a besoin de savoir d'une rencontre bloquée.
+ *
+ * Une manche dont un adversaire manque n'a pas d'alerte à produire : il n'y a
+ * rien à arbitrer entre une équipe et une case vide, et le message ne saurait
+ * pas quoi nommer.
+ */
+async function loadRefereeAlertContext(matchId: number): Promise<RefereeAlertContext | null> {
+  const match = await loadMatch(matchId);
+  if (!match || !match.team1_name || !match.team2_name) return null;
+  return {
+    tournament: { id: Number(match.tournament_id), name: match.tournament_name },
+    tournamentUrl: tournamentPageUrl(Number(match.tournament_id)),
+    matchId: Number(match.id),
+    bracket: String(match.bracket),
+    roundNumber: Number(match.round_number),
+    team1Name: match.team1_name,
+    team2Name: match.team2_name,
+  };
+}
+
 async function resolveOne(entry: PendingBotLog): Promise<string | null> {
   switch (entry.kind) {
     case "tournament_created": {
@@ -306,16 +411,15 @@ async function resolveOne(entry: PendingBotLog): Promise<string | null> {
     }
 
     case "score_conflict": {
-      const match = await loadMatch(entry.matchId);
-      if (!match || !match.team1_name || !match.team2_name) return null;
-      return formatScoreConflictLog({
-        tournament: { id: Number(match.tournament_id), name: match.tournament_name },
-        matchId: Number(match.id),
-        bracket: String(match.bracket),
-        roundNumber: Number(match.round_number),
-        team1Name: match.team1_name,
-        team2Name: match.team2_name,
-      });
+      const context = await loadRefereeAlertContext(entry.matchId);
+      return context === null ? null : formatScoreConflictAlert(context);
+    }
+
+    case "score_report_stalled": {
+      const context = await loadRefereeAlertContext(entry.matchId);
+      return context === null
+        ? null
+        : formatStalledScoreReportAlert(context, SCORE_REPORT_TIMEOUT_MINUTES);
     }
 
     case "tournament_started": {

@@ -17,6 +17,11 @@
  *    page. Le nombre de lignes d'un tournoi reste ainsi de l'ordre de son nombre
  *    de matchs, quel que soit le trafic.
  *
+ * **Tous les évènements ne finissent pas ici.** Ceux qui appellent une
+ * intervention humaine partent sur le canal arbitre, plus court et adressé au
+ * rôle configuré côté Discord — le tri, unique et pur, vit dans
+ * `lib/shared/referee-alerts.ts`, qui rédige aussi ces alertes.
+ *
  * Module pur (`lib/shared`) : aucune base, aucun réseau. Le déclenchement et la
  * résolution des noms vivent dans `lib/server/tournaments/bot-logs.ts`.
  */
@@ -30,6 +35,26 @@ export interface BotLogTournament {
   id: number;
   name: string;
 }
+
+/**
+ * Vocabulaire des évènements que le moteur peut annoncer.
+ *
+ * Déclaré ici, où vit le journal, mais lu ailleurs : `lib/shared/referee-alerts.ts`
+ * en fait un `Record` exhaustif pour décider du canal de chaque évènement, et
+ * `lib/server/tournaments/bot-logs.ts` contraint sur lui les entrées de sa file.
+ * Un évènement ajouté à cette union sans être classé ne compile pas — c'est ce
+ * qui garantit que le tri n'a jamais à être répété chez un appelant.
+ */
+export type BotEventKind =
+  | "tournament_created"
+  | "registration"
+  | "forfeit"
+  | "match_finished"
+  | "score_conflict"
+  | "score_report_stalled"
+  | "tournament_started"
+  | "tournament_finished"
+  | "tournament_underfilled";
 
 /**
  * Titre d'un tournoi tel qu'il apparaît dans le journal.
@@ -143,19 +168,6 @@ export function formatMatchResultLog(context: {
       : `${context.team1Name} ${context.team1Score}–${context.team2Score} ${context.team2Name}`;
   const forfeit = context.forfeit ? " (forfait)" : "";
   return `${lead("🏁", "Match terminé", context.tournament)} · ${round} : ${score}${forfeit}.`;
-}
-
-/** Désaccord entre les deux reports d'un même match : un arbitre doit trancher. */
-export function formatScoreConflictLog(context: {
-  tournament: BotLogTournament;
-  matchId: number;
-  bracket: string;
-  roundNumber: number;
-  team1Name: string;
-  team2Name: string;
-}): string {
-  const round = matchRoundLabel(context.bracket, context.roundNumber);
-  return `${lead("⚠️", "Conflit de score", context.tournament)} · ${round} : ${context.team1Name} vs ${context.team2Name} (match #${context.matchId}). Arbitrage requis.`;
 }
 
 /** Coup d'envoi : le tournoi passe « en cours ». */
