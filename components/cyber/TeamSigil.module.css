@@ -9,4 +9,11 @@
   background: color-mix(in oklab, var(--c) 8%, transparent);
   display: grid;
   place-items: center;
+  /* Le texte n'a jamais été dimensionné : il héritait de son contexte, si bien
+     qu'un sigle de plusieurs caractères débordait d'une case carrée de 24 px.
+     La taille est calculée par le composant, d'après la longueur du sigle. */
+  font-size: var(--font-size, 16px);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  overflow: hidden;
 }

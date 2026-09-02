@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useToast } from "@/components/ui/toast";
 import { CyberCard, CyberButton } from "@/components/cyber";
+import {
+  TEAM_TAG_MAX_LENGTH,
+  TEAM_TAG_MIN_LENGTH,
+  normalizeTeamTag,
+  teamTagErrorMessage,
+} from "@/lib/shared/team-tag";
 
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -13,6 +19,7 @@ export default function CreateTeamPage() {
   const router = useRouter();
   const { showError } = useToast();
   const [name, setName] = useState("");
+  const [tag, setTag] = useState("");
   const [description, setDescription] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -36,7 +43,11 @@ export default function CreateTeamPage() {
       const response = await fetch("/api/teams", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, description: description.trim() || null }),
+        body: JSON.stringify({
+          name,
+          description: description.trim() || null,
+          tag: tag.trim() || null,
+        }),
       });
       const payload = (await response.json()) as { error?: string; teamId?: number };
       if (!response.ok || !payload.teamId) throw new Error(payload.error || "TEAM_CREATE_FAILED");
@@ -57,7 +68,8 @@ export default function CreateTeamPage() {
       router.push(`/equipes/${payload.teamId}`);
       router.refresh();
     } catch (e) {
-      showError((e as Error).message);
+      const code = (e as Error).message;
+      showError(teamTagErrorMessage(code) ?? code);
     } finally {
       setLoading(false);
     }
@@ -79,8 +91,34 @@ export default function CreateTeamPage() {
         <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           <div className="form-grid">
             <div className="field">
-              <label>Nom d'équipe</label>
-              <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Mon équipe" />
+              <label htmlFor="team-name">Nom d&apos;équipe</label>
+              <input
+                id="team-name"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Mon équipe"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="team-tag">Sigle (optionnel)</label>
+              {/* Normalisé à la frappe : le champ montre déjà ce qui sera
+                  enregistré, plutôt que de laisser découvrir la majuscule
+                  après coup. */}
+              <input
+                id="team-tag"
+                value={tag}
+                onChange={(e) => setTag(normalizeTeamTag(e.target.value))}
+                placeholder="BG"
+                minLength={TEAM_TAG_MIN_LENGTH}
+                maxLength={TEAM_TAG_MAX_LENGTH}
+                pattern="[A-Za-z0-9]*"
+                aria-describedby="team-tag-help"
+                style={{ textTransform: "uppercase", letterSpacing: "0.12em", maxWidth: 160 }}
+              />
+              <p id="team-tag-help" style={{ fontSize: 11, color: "var(--ink-mute)", margin: "6px 0 0" }}>
+                {TEAM_TAG_MIN_LENGTH} à {TEAM_TAG_MAX_LENGTH} lettres ou chiffres, unique sur le site
+              </p>
             </div>
             <div className="field" style={{ gridColumn: "1 / -1" }}>
               <label>Description (optionnel)</label>

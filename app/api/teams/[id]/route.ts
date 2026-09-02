@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { getTeamDetail, softDeleteTeam, updateTeamMeta } from "@/lib/server/teams-service";
 import { findSoloEntryUser } from "@/lib/server/solo-entries-service";
 import { can } from "@/lib/shared/permissions";
+import { TEAM_TAG_ALREADY_USED, isTeamTagRejection } from "@/lib/shared/team-tag";
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -41,12 +42,12 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   }
 
   try {
-    const body = (await req.json()) as { name?: string; description?: string | null };
+    const body = (await req.json()) as { name?: string; description?: string | null; tag?: string | null };
     const managesGhostTeams = can(user, "tournaments");
     await updateTeamMeta(
       user.id,
       teamId,
-      { name: body.name, description: body.description },
+      { name: body.name, description: body.description, tag: body.tag },
       managesGhostTeams,
     );
 
@@ -55,6 +56,8 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   } catch (error) {
     const message = (error as Error).message;
     if (message === "FORBIDDEN") return fail(message, 403);
+    if (message === TEAM_TAG_ALREADY_USED) return fail(message, 409);
+    if (isTeamTagRejection(message)) return fail(message, 400);
     return fail(message || "TEAM_UPDATE_FAILED", 400);
   }
 }

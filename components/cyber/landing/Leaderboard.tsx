@@ -83,7 +83,7 @@ export function Leaderboard({ initialRows }: LeaderboardProps) {
             <div key={row.teamId} className={`${styles.row} ${row.rank <= 3 ? styles.top : ""}`}>
               <span className={styles.rank}>{String(row.rank).padStart(2, "0")}</span>
               <span className={styles.team}>
-                <TeamSigil letter={row.teamName.charAt(0)} size={24} />
+                <TeamSigil label={row.teamName.charAt(0)} size={24} />
                 <TeamLink teamId={row.teamId} title={`Voir la fiche de ${row.teamName}`}>
                   {row.teamName}
                 </TeamLink>

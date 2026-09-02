@@ -26,6 +26,8 @@ describe("createGhostTeam", () => {
   afterEach(() => jest.restoreAllMocks());
 
   it("insère une équipe marquée fantôme, sans aucun membre", async () => {
+    // Deux requêtes : le sigle est cherché avant d'insérer (ici, aucun sigle
+    // demandé, la recherche est donc court-circuitée).
     const execute = jest.fn().mockResolvedValue([{ insertId: 42 }]);
     await mockDb(execute);
 
@@ -34,9 +36,9 @@ describe("createGhostTeam", () => {
     expect(execute).toHaveBeenCalledTimes(1);
     const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
     expect(sql).toMatch(/INSERT INTO bg_teams .*is_ghost/s);
-    expect(sql).toMatch(/VALUES \(\?, NULL, \?, 1\)/);
-    // Nom et description sont trimés.
-    expect(params).toEqual(["Les Fantômes", "Équipe invitée"]);
+    expect(sql).toMatch(/VALUES \(\?, \?, NULL, \?, 1\)/);
+    // Nom et description sont trimés ; le sigle absent vaut NULL.
+    expect(params).toEqual(["Les Fantômes", null, "Équipe invitée"]);
   });
 
   it("normalise une description vide en NULL", async () => {
@@ -46,7 +48,7 @@ describe("createGhostTeam", () => {
     await createGhostTeam("Alpha Squad", "   ");
 
     const [, params] = execute.mock.calls[0] as [string, unknown[]];
-    expect(params).toEqual(["Alpha Squad", null]);
+    expect(params).toEqual(["Alpha Squad", null, null]);
   });
 
   it.each(["ab", "  a  ", "x".repeat(61)])("refuse un nom invalide (%s)", async (name) => {

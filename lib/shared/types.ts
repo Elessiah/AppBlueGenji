@@ -218,6 +218,12 @@ export type PublicUserProfile = {
 export type TeamListItem = {
   id: number;
   name: string;
+  /**
+   * Sigle de l'équipe (2 à 4 caractères alphanumériques, majuscules), unique
+   * sur tout le site. `null` tant que l'équipe n'en a pas choisi : l'affichage
+   * retombe alors sur les initiales du nom (`displayTeamTag`).
+   */
+  tag: string | null;
   logoUrl: string | null;
   membersCount: number;
   createdAt: string;
@@ -608,6 +614,8 @@ export type TeamDetailResponse = {
   team: {
     id: number;
     name: string;
+    /** Sigle unique de l'équipe, ou `null` si elle n'en a pas — cf. `TeamListItem.tag`. */
+    tag: string | null;
     logoUrl: string | null;
     description: string | null;
     createdAt: string;

@@ -4,6 +4,7 @@ import { parseRoles, toIso } from "@/lib/server/serialization";
 import type { TeamDetailResponse, TeamListItem, TeamMember, TeamRole } from "@/lib/shared/types";
 import { getUserIdByPseudo, sanitizeRoles } from "@/lib/server/users-service";
 import { getTeamEntityStats, getTeamRankingPosition } from "@/lib/server/stats-service";
+import { assertTeamTagAvailable, mapTeamTagConflict, resolveTeamTag } from "@/lib/server/team-tags";
 
 type TeamMemberRow = RowDataPacket & {
   membership_id: number;
@@ -97,6 +98,7 @@ export async function listTeams(): Promise<TeamListItem[]> {
     (RowDataPacket & {
       id: number;
       name: string;
+      tag: string | null;
       logo_url: string | null;
       created_at: Date;
       members_count: number;
@@ -108,6 +110,7 @@ export async function listTeams(): Promise<TeamListItem[]> {
     `SELECT
       t.id,
       t.name,
+      t.tag,
       t.logo_url,
       t.created_at,
       t.is_ghost,
@@ -119,7 +122,7 @@ export async function listTeams(): Promise<TeamListItem[]> {
      LEFT JOIN bg_matches m ON (m.team1_id = t.id OR m.team2_id = t.id)
      WHERE t.deleted_at IS NULL
        AND t.solo_user_id IS NULL
-     GROUP BY t.id, t.name, t.logo_url, t.created_at, t.is_ghost`,
+     GROUP BY t.id, t.name, t.tag, t.logo_url, t.created_at, t.is_ghost`,
   );
 
   // Get form data (last 10 matches per team) - simplified approach
@@ -235,6 +238,7 @@ export async function listTeams(): Promise<TeamListItem[]> {
   const unsorted: Omit<TeamListItem, "rank">[] = teamRows.map((row) => ({
     id: Number(row.id),
     name: row.name,
+    tag: row.tag,
     logoUrl: row.logo_url,
     membersCount: Number(row.members_count),
     createdAt: toIso(row.created_at)!,
@@ -263,12 +267,21 @@ export async function listTeams(): Promise<TeamListItem[]> {
   return teams;
 }
 
+/**
+ * Crée une équipe et en fait son auteur OWNER.
+ *
+ * Le sigle est facultatif (`null` = pas de sigle). Sa forme est validée avant
+ * toute écriture, son unicité vérifiée dans la transaction — et rattrapée par
+ * l'index unique si une création concurrente a pris le même entre-temps.
+ */
 export async function createTeam(
   ownerUserId: number,
   name: string,
   description?: string | null,
+  tag?: string | null,
 ): Promise<number> {
   const db = await getDatabase();
+  const normalizedTag = resolveTeamTag(tag);
 
   const [existingMembership] = await db.execute<(RowDataPacket & { id: number })[]>(
     `SELECT id
@@ -287,11 +300,14 @@ export async function createTeam(
   try {
     await connection.beginTransaction();
 
-    const [teamInsert] = await connection.execute<ResultSetHeader>(
-      `INSERT INTO bg_teams (name, logo_url, description)
-       VALUES (?, NULL, ?)`,
-      [name.trim(), description?.trim() ? description.trim() : null],
-    );
+    await assertTeamTagAvailable(connection, normalizedTag);
+
+    const [teamInsert] = await mapTeamTagConflict(() =>
+      connection.execute<ResultSetHeader>(
+        `INSERT INTO bg_teams (name, tag, logo_url, description)
+         VALUES (?, ?, NULL, ?)`,
+        [name.trim(), normalizedTag, description?.trim() ? description.trim() : null],
+      ));
 
     const ownerRoles = JSON.stringify(["OWNER"]);
 
@@ -333,8 +349,8 @@ export async function getTeamDetail(
 ): Promise<TeamDetailResponse | null> {
   const db = await getDatabase();
 
-  const [teams] = await db.execute<(RowDataPacket & { id: number; name: string; logo_url: string | null; description: string | null; created_at: Date; deleted_at: Date | null; is_ghost: 0 | 1; solo_user_id: number | null })[]>(
-    `SELECT id, name, logo_url, description, created_at, deleted_at, is_ghost, solo_user_id
+  const [teams] = await db.execute<(RowDataPacket & { id: number; name: string; tag: string | null; logo_url: string | null; description: string | null; created_at: Date; deleted_at: Date | null; is_ghost: 0 | 1; solo_user_id: number | null })[]>(
+    `SELECT id, name, tag, logo_url, description, created_at, deleted_at, is_ghost, solo_user_id
      FROM bg_teams
      WHERE id = ?
      LIMIT 1`,
@@ -402,6 +418,7 @@ export async function getTeamDetail(
     team: {
       id: Number(teams[0].id),
       name: teams[0].name,
+      tag: teams[0].tag,
       logoUrl: teams[0].logo_url,
       description: teams[0].description,
       createdAt: toIso(teams[0].created_at)!,
@@ -419,10 +436,14 @@ export async function getTeamDetail(
   };
 }
 
+/**
+ * Met à jour les métadonnées d'une équipe. Un champ absent du patch n'est pas
+ * touché ; `tag: null` (ou une chaîne vide) **retire** le sigle.
+ */
 export async function updateTeamMeta(
   requesterId: number,
   teamId: number,
-  patch: { name?: string; description?: string | null },
+  patch: { name?: string; description?: string | null; tag?: string | null },
   viewerManagesGhostTeams = false,
 ): Promise<void> {
   const db = await getDatabase();
@@ -446,10 +467,20 @@ export async function updateTeamMeta(
     params.push(patch.description?.trim() ? patch.description.trim() : null);
   }
 
+  if (patch.tag !== undefined) {
+    const normalizedTag = resolveTeamTag(patch.tag);
+    // L'équipe garde le sien : sans cette exclusion, réenregistrer la fiche
+    // sans toucher au sigle le déclarerait pris par elle-même.
+    await assertTeamTagAvailable(db, normalizedTag, teamId);
+    updates.push("tag = ?");
+    params.push(normalizedTag);
+  }
+
   if (updates.length === 0) return;
 
   params.push(teamId);
-  await db.execute(`UPDATE bg_teams SET ${updates.join(", ")} WHERE id = ?`, params);
+  await mapTeamTagConflict(() =>
+    db.execute(`UPDATE bg_teams SET ${updates.join(", ")} WHERE id = ?`, params));
 }
 
 export async function updateTeamLogo(
@@ -734,11 +765,15 @@ export async function softDeleteTeam(
   try {
     await connection.beginTransaction();
 
-    // Anonymise les données saisies par l'utilisateur et libère le nom unique.
+    // Anonymise les données saisies par l'utilisateur et libère les deux
+    // identités uniques : le nom **et le sigle**. Le sigle vaut sur tout le
+    // site ; laissé sur une équipe dissoute, il resterait pris à jamais par une
+    // équipe qui n'existe plus — la ligne, elle, survit pour ses statistiques.
     await connection.execute(
       `UPDATE bg_teams
        SET deleted_at = NOW(),
            name = CONCAT('Équipe dissoute #', id),
+           tag = NULL,
            description = NULL,
            logo_url = NULL
        WHERE id = ?`,

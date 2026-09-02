@@ -8,6 +8,25 @@
 
 import type { MatchFormat } from "@/lib/shared/match-format";
 
+/**
+ * Sigle d'une équipe de remplissage (`Test - Bracket Team N`) : « B » suivi du
+ * rang en base 36 sur trois caractères — « B001 », « B002 », … « B03W » pour la
+ * 140ᵉ. Quatre caractères alphanumériques, donc un sigle valide au sens de
+ * `lib/shared/team-tag.ts`, et deux rangs distincts ne peuvent pas produire la
+ * même chaîne : sans cela, l'index unique `uniq_bg_teams_tag` ferait échouer le
+ * seed à la première collision. Le préfixe « B0 » les tient à l'écart des
+ * sigles écrits à la main dans `seed.ts`, dont aucun ne commence ainsi.
+ *
+ * Au-delà de 46 655 équipes de remplissage, le rang déborderait sur un
+ * quatrième caractère et le sigle sur cinq : le seed n'en génère qu'environ
+ * 140, mais la borne est vérifiée ici plutôt que découverte en base.
+ */
+export function bulkTeamTag(index: number): string {
+  const suffix = index.toString(36).toUpperCase();
+  if (suffix.length > 3) throw new Error("BULK_TEAM_TAG_OVERFLOW");
+  return `B${suffix.padStart(3, "0")}`;
+}
+
 export interface ReportStateCounts {
   pendingReports?: number;
   conflicts?: number;

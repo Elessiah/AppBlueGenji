@@ -1092,6 +1092,70 @@ async function runMigrations(db: Pool): Promise<void> {
   } catch {
     // Table already exists
   }
+
+  // Migration: sigle d'équipe (« trigramme », `lib/shared/team-tag.ts`).
+  //
+  // 2 à 4 caractères alphanumériques, en majuscules, **unique sur tout le
+  // site**. `NULL` signifie « pas de sigle » : c'est l'état de toutes les
+  // équipes créées avant la fonctionnalité, et l'unicité MySQL ignore les
+  // `NULL` — autant d'équipes sans sigle qu'on veut, aucune collision. C'est
+  // aussi ce qui laisse les **entrées solo** hors de l'espace de noms sans une
+  // règle de plus : elles ne se voient jamais attribuer de sigle.
+  //
+  // La colonne garde la collation par défaut (`utf8mb4`, insensible à la
+  // casse) : deux sigles ne différant que par la casse se heurtent donc à
+  // l'index. C'est une ceinture, pas la règle — le service normalise en
+  // majuscules avant d'écrire.
+  try {
+    await db.execute(`ALTER TABLE bg_teams ADD COLUMN tag VARCHAR(4) NULL`);
+  } catch {
+    // Column already exists
+  }
+
+  // L'index unique ne peut naître que sur des données qui le respectent déjà.
+  // Sur une base de production, la colonne existe peut-être depuis une version
+  // intermédiaire, remplie sans contrainte : on met donc les valeurs en forme
+  // (majuscules) puis on **libère les doublons** avant d'indexer. Le sigle est
+  // conservé à la plus ancienne des équipes en conflit (`MIN(id)`) et effacé
+  // chez les autres, qui retombent sur leurs initiales dérivées et pourront en
+  // choisir un autre. Effacer plutôt qu'inventer un suffixe : un sigle est un
+  // nom, il se choisit, il ne se génère pas dans le dos de son équipe.
+  // Piège de la collation : `tag <> UPPER(tag)` est **toujours faux** en
+  // `utf8mb4_general_ci`, qui tient « yy8 » et « YY8 » pour la même chaîne. La
+  // clause qui devait éviter les écritures inutiles n'en laissait donc passer
+  // aucune, et la mise en majuscules ne s'appliquait jamais. La comparaison est
+  // faite octet à octet pour poser la question qui se pose vraiment : « cette
+  // valeur est-elle écrite en majuscules ? »
+  try {
+    await db.execute(`
+      UPDATE bg_teams
+      SET tag = UPPER(tag)
+      WHERE tag IS NOT NULL
+        AND CAST(tag AS BINARY) <> CAST(UPPER(tag) AS BINARY)
+    `);
+  } catch {
+    // Colonne absente sur une base antérieure à la migration ci-dessus.
+  }
+  try {
+    await db.execute(`
+      UPDATE bg_teams t
+      JOIN (
+        SELECT UPPER(tag) AS normalized, MIN(id) AS keep_id
+        FROM bg_teams
+        WHERE tag IS NOT NULL
+        GROUP BY UPPER(tag)
+        HAVING COUNT(*) > 1
+      ) dupes ON UPPER(t.tag) = dupes.normalized AND t.id <> dupes.keep_id
+      SET t.tag = NULL
+    `);
+  } catch {
+    // Colonne absente, ou aucun doublon à libérer.
+  }
+  try {
+    await db.execute(`ALTER TABLE bg_teams ADD UNIQUE INDEX uniq_bg_teams_tag (tag)`);
+  } catch {
+    // Index already exists
+  }
 }
 
 async function ensureMigrations(db: Pool): Promise<void> {

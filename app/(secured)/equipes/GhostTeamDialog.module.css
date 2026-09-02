@@ -34,6 +34,16 @@
   margin: 0 0 20px;
 }
 
+/* Les champs du dialogue se touchaient : `.field` ne pose que l'écart entre son
+   libellé et sa saisie, pas entre deux champs. Cela passait tant qu'il n'y en
+   avait que deux ; avec le sigle et sa ligne d'aide, l'aide venait coller le
+   libellé suivant.
+   `.field` est une classe **globale** : sans `:global`, CSS Modules la hacherait
+   et la règle ne s'appliquerait à rien. */
+.panel :global(.field) + :global(.field) {
+  margin-top: 18px;
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;

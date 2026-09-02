@@ -15,6 +15,7 @@
  */
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { assertTeamTagAvailable, mapTeamTagConflict, resolveTeamTag } from "@/lib/server/team-tags";
 
 export const GHOST_TEAM_NAME_MIN = 3;
 export const GHOST_TEAM_NAME_MAX = 60;
@@ -22,19 +23,30 @@ export const GHOST_TEAM_NAME_MAX = 60;
 /**
  * Crée une équipe fantôme. Contrairement à `createTeam`, aucune ligne
  * `bg_team_members` n'est écrite : personne ne « possède » l'équipe.
+ *
+ * Le sigle suit exactement la règle des équipes réelles — une fantôme court les
+ * mêmes tournois et s'affiche dans les mêmes plateaux, deux sigles identiques
+ * s'y confondraient tout autant.
  */
-export async function createGhostTeam(name: string, description?: string | null): Promise<number> {
+export async function createGhostTeam(
+  name: string,
+  description?: string | null,
+  tag?: string | null,
+): Promise<number> {
   const trimmed = name.trim();
   if (trimmed.length < GHOST_TEAM_NAME_MIN || trimmed.length > GHOST_TEAM_NAME_MAX) {
     throw new Error("INVALID_TEAM_NAME");
   }
+  const normalizedTag = resolveTeamTag(tag);
 
   const db = await getDatabase();
-  const [insert] = await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_teams (name, logo_url, description, is_ghost)
-     VALUES (?, NULL, ?, 1)`,
-    [trimmed, description?.trim() ? description.trim() : null],
-  );
+  await assertTeamTagAvailable(db, normalizedTag);
+  const [insert] = await mapTeamTagConflict(() =>
+    db.execute<ResultSetHeader>(
+      `INSERT INTO bg_teams (name, tag, logo_url, description, is_ghost)
+       VALUES (?, ?, NULL, ?, 1)`,
+      [trimmed, normalizedTag, description?.trim() ? description.trim() : null],
+    ));
 
   return Number(insert.insertId);
 }

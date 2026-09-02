@@ -2,6 +2,12 @@
 
 import { FormEvent, useState } from "react";
 import { useToast } from "@/components/ui/toast";
+import {
+  TEAM_TAG_MAX_LENGTH,
+  TEAM_TAG_MIN_LENGTH,
+  normalizeTeamTag,
+  teamTagErrorMessage,
+} from "@/lib/shared/team-tag";
 import s from "./GhostTeamDialog.module.css";
 
 type GhostTeamDialogProps = {
@@ -18,6 +24,7 @@ type GhostTeamDialogProps = {
 export function GhostTeamDialog({ onClose, onCreated }: GhostTeamDialogProps) {
   const { showError, showSuccess } = useToast();
   const [name, setName] = useState("");
+  const [tag, setTag] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -28,7 +35,12 @@ export function GhostTeamDialog({ onClose, onCreated }: GhostTeamDialogProps) {
       const response = await fetch("/api/teams", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, description: description.trim() || null, ghost: true }),
+        body: JSON.stringify({
+          name,
+          description: description.trim() || null,
+          tag: tag.trim() || null,
+          ghost: true,
+        }),
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "GHOST_TEAM_CREATE_FAILED");
@@ -36,7 +48,8 @@ export function GhostTeamDialog({ onClose, onCreated }: GhostTeamDialogProps) {
       onCreated();
       onClose();
     } catch (e) {
-      showError((e as Error).message);
+      const code = (e as Error).message;
+      showError(teamTagErrorMessage(code) ?? code);
     } finally {
       setBusy(false);
     }
@@ -65,6 +78,23 @@ export function GhostTeamDialog({ onClose, onCreated }: GhostTeamDialogProps) {
               required
               autoFocus
             />
+          </div>
+          <div className="field">
+            <label htmlFor="ghost-team-tag">Sigle (facultatif)</label>
+            <input
+              id="ghost-team-tag"
+              value={tag}
+              onChange={(e) => setTag(normalizeTeamTag(e.target.value))}
+              minLength={TEAM_TAG_MIN_LENGTH}
+              maxLength={TEAM_TAG_MAX_LENGTH}
+              pattern="[A-Za-z0-9]*"
+              placeholder="BG"
+              aria-describedby="ghost-team-tag-help"
+              style={{ textTransform: "uppercase", letterSpacing: "0.12em", maxWidth: 160 }}
+            />
+            <p id="ghost-team-tag-help" style={{ fontSize: 11, color: "var(--ink-mute)", margin: "6px 0 0" }}>
+              {TEAM_TAG_MIN_LENGTH} à {TEAM_TAG_MAX_LENGTH} lettres ou chiffres, unique sur le site
+            </p>
           </div>
           <div className="field">
             <label htmlFor="ghost-team-description">Description (facultatif)</label>
