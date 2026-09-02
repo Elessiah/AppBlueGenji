@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import * as ts from "typescript";
 import {
   DEFAULT_MATCH_FORMAT,
   checkMatchScores,
@@ -189,63 +190,41 @@ const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 const SOURCE_OF_TRUTH = join("lib", "shared", "match-format.ts");
 
 /**
- * Blanchit les commentaires **sans toucher aux chaînes**.
+ * Retire les commentaires — par le compilateur TypeScript, pas à la main.
  *
- * Une coupe par expression régulière paraît suffisante ; elle ne l'est pas, et
- * elle rate précisément ce que ce garde-fou cherche.
- * `app/api/landing/calendar/route.ts` contient `"PRODID:-//BlueGenji//FR"` :
- * couper la ligne à la première paire de barres la tronche au milieu d'une
- * chaîne, et tout ce qui suit — un « BO3 » recopié, par exemple — sort du
- * balayage sans être vu. On lit donc le fichier caractère par caractère en
- * suivant l'état (code, chaîne, gabarit, commentaire), et on remplace les seuls
- * commentaires par des espaces : les décalages et les lignes sont conservés, et
- * les chaînes restent intactes — ce sont exactement ce qu'on veut inspecter.
+ * Distinguer un commentaire d'une chaîne demande de savoir lire du TypeScript,
+ * et un lecteur écrit pour l'occasion se trompe sur des cas qui existent
+ * réellement dans ce dépôt :
+ *
+ * - `lib/server/bot-docs.ts` contient `.replace(/"/g, "&quot;")` — le guillemet
+ *   d'une **expression régulière** ; pris pour une ouverture de chaîne, il
+ *   inverse la parité des guillemets jusqu'à la fin du fichier, et tout ce qui
+ *   suit est lu à l'envers (commentaires vus comme du code, code vu comme une
+ *   chaîne) ;
+ * - `app/api/landing/calendar/route.ts` contient `"PRODID:-//BlueGenji//FR"` —
+ *   une paire de barres **dans** une chaîne, qu'une coupe naïve prend pour un
+ *   commentaire ;
+ * - plusieurs fichiers portent des emoji, hors du plan multilingue de base :
+ *   un balayage indexé sur les points de code et un autre sur les unités UTF-16
+ *   se décalent d'un cran par paire de substitution.
+ *
+ * `transpileModule` sait tout cela, puisque c'est son métier. Les chaînes, les
+ * gabarits et les expressions régulières sortent intacts — ce sont exactement
+ * ce qu'on veut inspecter — et les commentaires disparaissent. Les positions ne
+ * sont pas conservées, ce dont le balayage n'a pas besoin : il cherche des
+ * motifs, pas des colonnes.
  */
-function stripComments(code: string): string {
-  const out = [...code];
-  let i = 0;
-  const blank = (from: number, to: number) => {
-    for (let k = from; k < to; k += 1) if (out[k] !== "\n") out[k] = " ";
-  };
-
-  while (i < code.length) {
-    const two = code.slice(i, i + 2);
-
-    if (two === "//") {
-      const end = code.indexOf("\n", i);
-      const stop = end === -1 ? code.length : end;
-      blank(i, stop);
-      i = stop;
-      continue;
-    }
-
-    if (two === "/*") {
-      const end = code.indexOf("*/", i + 2);
-      const stop = end === -1 ? code.length : end + 2;
-      blank(i, stop);
-      i = stop;
-      continue;
-    }
-
-    const quote = code[i];
-    if (quote === '"' || quote === "'" || quote === "`") {
-      i += 1;
-      while (i < code.length) {
-        if (code[i] === "\\") {
-          i += 2;
-          continue;
-        }
-        if (code[i] === quote) break;
-        i += 1;
-      }
-      i += 1;
-      continue;
-    }
-
-    i += 1;
-  }
-
-  return out.join("");
+function stripComments(code: string, fileName = "source.tsx"): string {
+  return ts.transpileModule(code, {
+    fileName,
+    reportDiagnostics: false,
+    compilerOptions: {
+      removeComments: true,
+      target: ts.ScriptTarget.ESNext,
+      jsx: ts.JsxEmit.Preserve,
+      isolatedModules: true,
+    },
+  }).outputText;
 }
 
 /** Tous les fichiers TypeScript du produit (hors tests, hors dépendances). */
@@ -286,7 +265,14 @@ const NOTATION_ASSEMBLY = /\$\{[^}]*\btype\b[^}]*\}\s*\$\{[^}]*\bvalue\b[^}]*\}/
  */
 const NOTATION_CONCAT = /\btype\s*\+\s*[\w.]*\bvalue\b/g;
 
-/** Le fichier manipule-t-il un format de match ? */
+/**
+ * Le fichier parle-t-il de format de match ?
+ *
+ * Éprouvé sur le **texte d'origine**, commentaires et annotations de type
+ * compris : la transpilation efface `const f: MatchFormat` comme le reste des
+ * types, et le fichier passerait pour étranger au sujet. Élargir la portée ne
+ * risque qu'un contrôle de trop, jamais un contrôle manquant.
+ */
 const MATCH_FORMAT_FILE = /\bMatchFormat\b|\bmatchFormat\b|match-format/;
 
 describe("match-format — une seule écriture de la notation", () => {
@@ -306,18 +292,31 @@ describe("match-format — une seule écriture de la notation", () => {
     expect(MATCH_FORMAT_FILE.test("const key = setting.type + setting.value;")).toBe(false);
   });
 
-  it("blanchit les commentaires sans entamer les chaînes", () => {
-    // Le commentaire part, sa largeur reste : les colonnes ne bougent pas.
-    expect(stripComments('const x = 1; // renvoie "BO5"')).toBe(`const x = 1; ${" ".repeat(16)}`);
-    expect(stripComments('a; /* "BO5" */ b;')).toBe(`a; ${" ".repeat(11)} b;`);
-    // Une paire de barres *dans* une chaîne ne coupe rien : c'est le cas réel
-    // d'`app/api/landing/calendar/route.ts`, où une coupe naïve masquait la fin
-    // de la ligne — donc un « BO3 » qui y serait posé.
-    const ical = 'const p = "PRODID:-//BlueGenji//FR"; const l = "BO3";';
-    expect(stripComments(ical)).toBe(ical);
-    expect(stripComments(ical).match(NOTATION_LITERAL)).toHaveLength(1);
-    // Les retours à la ligne survivent : les numéros de ligne restent lisibles.
-    expect(stripComments("a; // x\nb;")).toBe(`a; ${" ".repeat(4)}\nb;`);
+  it("retire les commentaires sans entamer chaînes, gabarits ni expressions régulières", () => {
+    const strip = (code: string) => stripComments(code).trim();
+
+    expect(strip('const x = 1; // renvoie "BO5"')).toBe("const x = 1;");
+    expect(strip('const y = 2; /* "BO5" */')).toBe("const y = 2;");
+
+    // Une paire de barres *dans* une chaîne ne coupe rien : le cas réel
+    // d'`app/api/landing/calendar/route.ts`.
+    expect(strip('const p = "PRODID:-//BlueGenji//FR";')).toBe('const p = "PRODID:-//BlueGenji//FR";');
+
+    // Un guillemet dans une expression régulière n'ouvre pas une chaîne : le
+    // cas réel de `lib/server/bot-docs.ts`. Une coupe artisanale lisait tout le
+    // reste du fichier à l'envers — donc plus aucun commentaire n'était retiré.
+    const withRegex = 'const r = s.replace(/"/g, "&quot;");\n// prose "FT9"\nconst k = "BO3";';
+    expect(strip(withRegex)).toContain('replace(/"/g, "&quot;")');
+    expect(strip(withRegex)).not.toContain("FT9");
+    expect(strip(withRegex).match(NOTATION_LITERAL)).toHaveLength(1);
+
+    // Un emoji ne décale rien : le commentaire qui le suit part bien en entier.
+    const withEmoji = 'const e = "🚪"; /* "BO3" */ const real = "BO5";';
+    expect(strip(withEmoji)).not.toContain("BO3");
+    expect(strip(withEmoji).match(NOTATION_LITERAL)).toHaveLength(1);
+
+    // Le JSX survit : les fichiers d'écran passent par le même chemin.
+    expect(strip("const el = <span>{x}</span>; // note")).toContain("<span>");
   });
 
   it("balaye un ensemble de fichiers non vide", () => {
@@ -330,9 +329,10 @@ describe("match-format — une seule écriture de la notation", () => {
   it("aucun fichier ne recopie ni n'assemble la notation hors du module partagé", () => {
     const offenders: string[] = [];
     for (const file of sourceFiles()) {
-      const code = stripComments(read(file));
+      const raw = read(file);
+      const code = stripComments(raw, file);
       const patterns = [NOTATION_LITERAL, NOTATION_ASSEMBLY];
-      if (MATCH_FORMAT_FILE.test(code)) patterns.push(NOTATION_CONCAT);
+      if (MATCH_FORMAT_FILE.test(raw)) patterns.push(NOTATION_CONCAT);
       for (const pattern of patterns) {
         pattern.lastIndex = 0;
         for (const hit of code.match(pattern) ?? []) offenders.push(`${file} → ${hit.trim()}`);
@@ -357,13 +357,15 @@ describe("match-format — une seule écriture de la notation", () => {
   });
 
   it("`lib/shared/landing.ts` n'écrit plus de notation de format", () => {
-    const code = stripComments(read(join("lib", "shared", "landing.ts")));
+    const file = join("lib", "shared", "landing.ts");
+    const code = stripComments(read(file), file);
     expect(code).not.toMatch(/BO\d|FT\d/);
     expect(code).not.toContain("toBestOfLabel");
   });
 
   it("la carte de l'accueil lit le réglage du tournoi et passe par le module partagé", () => {
-    const code = stripComments(read(join("components", "cyber", "landing", "LiveCard.tsx")));
+    const file = join("components", "cyber", "landing", "LiveCard.tsx");
+    const code = stripComments(read(file), file);
     expect(code).toContain("matchFormatLabel");
     expect(code).toContain("tournament.matchFormat");
   });
