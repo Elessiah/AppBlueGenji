@@ -247,8 +247,11 @@ describe("barème de classement partagé", () => {
     expect(landing).not.toContain("SUM(CASE WHEN m.winner_team_id");
     expect(landing).not.toMatch(/wins \* 100 - losses \* 20/);
 
+    // Le seeding compose lui aussi le barème par l'assembleur partagé, sans
+    // réécrire ses propres agrégats.
     const survival = read("lib/server/tournaments/survival.ts");
-    expect(survival).toContain("rankingPointsSql");
+    expect(survival).toContain("rankingPointsForTeamSql");
+    expect(survival).not.toContain("SUM(CASE WHEN m.winner_team_id");
     // L'ancien barème (les défaites rapportaient des points) doit avoir disparu.
     expect(survival).not.toContain("* 3");
   });

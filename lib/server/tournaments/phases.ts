@@ -14,9 +14,8 @@ import {
 } from "./phases-repository";
 import { loadTournamentRow, finishTournament, getRegistrationRows } from "./repository";
 import {
-  rankingLossesSql,
   rankingMatchJoinSql,
-  rankingPointsSql,
+  rankingPointsForTeamSql,
   rankingWinsSql,
 } from "@/lib/shared/ranking";
 import { createBracketIfMissing } from "./bracket-generator";
@@ -71,7 +70,6 @@ export async function initializeMultiTournament(
   // Barème **et** assiette du classement du site : mêmes matchs comptés que
   // sur l'annuaire et sur les fiches (`lib/shared/ranking.ts`).
   const WINS = rankingWinsSql("r.team_id");
-  const LOSSES = rankingLossesSql("r.team_id");
 
   const [seededRows] = Number(tournament.manual_seeding ?? 0) === 1
     ? await conn.execute<(RowDataPacket & { team_id: number; seed: number })[]>(
@@ -85,7 +83,7 @@ export async function initializeMultiTournament(
     : await conn.execute<(RowDataPacket & { team_id: number; seed: number })[]>(
         `SELECT
           r.team_id,
-          ROW_NUMBER() OVER (ORDER BY ${rankingPointsSql(WINS, LOSSES)} DESC, ${WINS} DESC, r.team_id ASC) AS seed
+          ROW_NUMBER() OVER (ORDER BY ${rankingPointsForTeamSql("r.team_id")} DESC, ${WINS} DESC, r.team_id ASC) AS seed
          FROM bg_tournament_registrations r
          LEFT JOIN bg_matches m
              ON ${rankingMatchJoinSql("r.team_id")}

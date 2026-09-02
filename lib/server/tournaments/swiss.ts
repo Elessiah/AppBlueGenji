@@ -23,7 +23,7 @@ import {
 import {
   rankingLossesSql,
   rankingMatchJoinSql,
-  rankingPointsSql,
+  rankingPointsForTeamSql,
   rankingWinsSql,
 } from "@/lib/shared/ranking";
 import type { SwissMeta, SwissTiebreaker } from "@/lib/shared/types";
@@ -346,7 +346,7 @@ export async function initializeSwissTournament(
              ON ${rankingMatchJoinSql("r.team_id")}
      WHERE r.tournament_id = ?
      GROUP BY r.team_id
-     ORDER BY ${rankingPointsSql(WINS, LOSSES)} DESC, ${WINS} DESC, r.team_id ASC`,
+     ORDER BY ${rankingPointsForTeamSql("r.team_id")} DESC, ${WINS} DESC, r.team_id ASC`,
     [tournamentId],
   );
     seedRows = rows;

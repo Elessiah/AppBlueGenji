@@ -16,9 +16,8 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import {
-  rankingLossesSql,
   rankingMatchJoinSql,
-  rankingPointsSql,
+  rankingPointsForTeamSql,
   rankingWinsSql,
 } from "@/lib/shared/ranking";
 import {
@@ -58,7 +57,6 @@ async function loadOrderedEntrants(
   // Barème **et** assiette du classement du site : mêmes matchs comptés que
   // sur l'annuaire et sur les fiches (`lib/shared/ranking.ts`).
   const WINS = rankingWinsSql("r.team_id");
-  const LOSSES = rankingLossesSql("r.team_id");
 
   const [rows] =
     source === "RANKING"
@@ -70,7 +68,7 @@ async function loadOrderedEntrants(
              ON ${rankingMatchJoinSql("r.team_id")}
            WHERE r.tournament_id = ?
            GROUP BY r.team_id, t.name
-           ORDER BY ${rankingPointsSql(WINS, LOSSES)} DESC, ${WINS} DESC, r.team_id ASC`,
+           ORDER BY ${rankingPointsForTeamSql("r.team_id")} DESC, ${WINS} DESC, r.team_id ASC`,
           [tournamentId],
         )
       : await connection.execute<(RowDataPacket & { team_id: number; team_name: string })[]>(
