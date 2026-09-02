@@ -198,7 +198,7 @@ export function BureauSection({ initialMembers, isAdmin }: BureauSectionProps) {
         {members.map((b, index) => (
           <CyberCard key={b.id} lift className={styles.bureauCard}>
             <div className={styles.bureauSigil}>
-              <TeamSigil letter={b.initials} color={b.color} size={40} />
+              <TeamSigil label={b.initials} color={b.color} size={40} />
             </div>
             <div className={styles.bureauDivider} />
             <div>
@@ -265,7 +265,7 @@ export function BureauSection({ initialMembers, isAdmin }: BureauSectionProps) {
             </h3>
 
             <div className={styles.modalPreview}>
-              <TeamSigil letter={previewInitials} color={form.color || "var(--blue-500)"} size={40} />
+              <TeamSigil label={previewInitials} color={form.color || "var(--blue-500)"} size={40} />
               <button
                 type="button"
                 className={styles.bureauAction}

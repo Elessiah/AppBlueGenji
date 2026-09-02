@@ -51,7 +51,7 @@ describe("POST /api/teams — création d'équipe fantôme", () => {
 
     expect(res.status).toBe(201);
     expect(await res.json()).toEqual({ teamId: 42, ghost: true });
-    expect(createGhostTeam).toHaveBeenCalledWith("Fantômes", null);
+    expect(createGhostTeam).toHaveBeenCalledWith("Fantômes", null, null);
     // Aucune équipe « réelle » créée : l'arbitre garde son équipe active.
     expect(createTeam).not.toHaveBeenCalled();
   });
@@ -63,7 +63,7 @@ describe("POST /api/teams — création d'équipe fantôme", () => {
     const res = await createTeamRoute(jsonReq({ name: "Vraie équipe" }));
 
     expect(res.status).toBe(201);
-    expect(createTeam).toHaveBeenCalledWith(2, "Vraie équipe", null);
+    expect(createTeam).toHaveBeenCalledWith(2, "Vraie équipe", null, null);
     expect(createGhostTeam).not.toHaveBeenCalled();
   });
 

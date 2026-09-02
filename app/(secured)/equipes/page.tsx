@@ -62,7 +62,9 @@ export default function TeamsPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let r = teams.filter((t) => {
-      if (q && !`${t.name} ${t.region || ""}`.toLowerCase().includes(q)) return false;
+      // Le sigle est un nom court : on cherche une équipe par « BG » comme par
+      // son nom complet.
+      if (q && !`${t.name} ${t.tag || ""} ${t.region || ""}`.toLowerCase().includes(q)) return false;
       if (gameFilter === "all") return true;
       if (gameFilter === "ow2") return t.games.includes("OW2");
       if (gameFilter === "mr") return t.games.includes("MR");

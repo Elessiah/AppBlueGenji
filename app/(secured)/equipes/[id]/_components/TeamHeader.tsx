@@ -7,6 +7,13 @@ import { LogoWithGlow } from "@/components/logo-with-glow";
 import type { TeamDetailResponse } from "@/lib/shared/types";
 import { formatRate } from "@/lib/shared/stats";
 import { useToast } from "@/components/ui/toast";
+import {
+  TEAM_TAG_MAX_LENGTH,
+  TEAM_TAG_MIN_LENGTH,
+  displayTeamTag,
+  normalizeTeamTag,
+  teamTagErrorMessage,
+} from "@/lib/shared/team-tag";
 import { TransferOwnershipDialog } from "./TransferOwnershipDialog";
 import { ClaimGhostTeamDialog } from "./ClaimGhostTeamDialog";
 
@@ -24,6 +31,7 @@ export function TeamHeader({ team, onChanged, canManage, viewerIsOwner }: TeamHe
   const { showError, showSuccess } = useToast();
   const router = useRouter();
   const [name, setName] = useState(team.team.name);
+  const [tag, setTag] = useState(team.team.tag ?? "");
   const [description, setDescription] = useState(team.team.description ?? "");
   const [logoBusy, setLogoBusy] = useState(false);
   const logoFileRef = useRef<HTMLInputElement | null>(null);
@@ -60,14 +68,19 @@ export function TeamHeader({ team, onChanged, canManage, viewerIsOwner }: TeamHe
       const response = await fetch(`/api/teams/${team.team.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, description: description.trim() || null }),
+        body: JSON.stringify({
+          name,
+          description: description.trim() || null,
+          tag: tag.trim() || null,
+        }),
       });
       const payload = (await response.json()) as TeamDetailResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "TEAM_UPDATE_FAILED");
       showSuccess("Équipe mise à jour.");
       onChanged();
     } catch (e) {
-      showError((e as Error).message);
+      const code = (e as Error).message;
+      showError(teamTagErrorMessage(code) ?? code);
     }
   };
 
@@ -171,9 +184,29 @@ export function TeamHeader({ team, onChanged, canManage, viewerIsOwner }: TeamHe
                     </span>
                   )}
                 </h1>
-                <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14, maxWidth: 560 }}>
-                  {team.team.description || "Historique compétitif et gestion du roster"}
-                </p>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+                  {/* Sigle de l'équipe — à défaut, les initiales de son nom :
+                      la ligne ne disparaît pas selon que l'équipe en a choisi
+                      un ou non. */}
+                  <span
+                    className="mono"
+                    title={team.team.tag ? "Sigle de l'équipe" : "Initiales — cette équipe n'a pas encore de sigle"}
+                    style={{
+                      fontSize: 11,
+                      letterSpacing: "0.2em",
+                      color: team.team.tag ? "#ff9d2e" : "var(--ink-mute)",
+                      border: "1px solid rgba(255,157,46,0.25)",
+                      borderRadius: 999,
+                      padding: "3px 10px",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {displayTeamTag(team.team.tag, team.team.name)}
+                  </span>
+                  <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14, maxWidth: 560 }}>
+                    {team.team.description || "Historique compétitif et gestion du roster"}
+                  </p>
+                </div>
               </div>
             </div>
             <Link href="/equipes" className="btn ghost" style={{ padding: "9px 18px", fontSize: 13, flexShrink: 0 }}>
@@ -213,8 +246,25 @@ export function TeamHeader({ team, onChanged, canManage, viewerIsOwner }: TeamHe
           <form onSubmit={saveMeta}>
             <div className="form-grid">
               <div className="field">
-                <label>Nom de l'équipe</label>
-                <input value={name} onChange={(e) => setName(e.target.value)} />
+                <label htmlFor="team-meta-name">Nom de l&apos;équipe</label>
+                <input id="team-meta-name" value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div className="field">
+                <label htmlFor="team-meta-tag">Sigle</label>
+                <input
+                  id="team-meta-tag"
+                  value={tag}
+                  onChange={(e) => setTag(normalizeTeamTag(e.target.value))}
+                  minLength={TEAM_TAG_MIN_LENGTH}
+                  maxLength={TEAM_TAG_MAX_LENGTH}
+                  pattern="[A-Za-z0-9]*"
+                  placeholder="BG"
+                  aria-describedby="team-meta-tag-help"
+                  style={{ textTransform: "uppercase", letterSpacing: "0.12em", maxWidth: 160 }}
+                />
+                <p id="team-meta-tag-help" style={{ fontSize: 11, color: "var(--text-2)", margin: "6px 0 0" }}>
+                  {TEAM_TAG_MIN_LENGTH} à {TEAM_TAG_MAX_LENGTH} lettres ou chiffres, unique sur le site — laisser vide pour ne pas en avoir
+                </p>
               </div>
               <div className="field" style={{ gridColumn: "1 / -1" }}>
                 <label>Description</label>

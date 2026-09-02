@@ -31,6 +31,7 @@ import { matchWinsRequired } from "@/lib/shared/match-format";
 import { soloEntryNameCandidates } from "@/lib/shared/participants";
 import {
   TOURNAMENTS,
+  bulkTeamTag,
   type ReportStateCounts,
   type SeedFormat,
   type TournamentDef,
@@ -232,27 +233,34 @@ interface TeamDef {
   members: number[];
   logo?: boolean;
   roles?: string[][];
+  /**
+   * Sigle de l'équipe (`lib/shared/team-tag.ts`) : 2 à 4 caractères
+   * alphanumériques, **unique sur tout le site**. `null` couvre le cas des
+   * équipes sans sigle, qui retombent sur les initiales de leur nom — l'état
+   * de toutes les équipes créées avant la fonctionnalité.
+   */
+  tag: string | null;
 }
 
 const FICTIONAL_TEAMS: TeamDef[] = [
-  { name: "Dragon Squad", members: [0, 1, 2, 3, 4, 5, 6], logo: true },
-  { name: "Phoenix Force", members: [3, 4, 5, 7, 8] },
-  { name: "Thunder Legion", members: [6, 7, 8, 9], logo: true },
-  { name: "Frost Alliance", members: [9, 10, 11] },
-  { name: "Eclipse Titans", members: [12, 13, 14, 15] },
-  { name: "Shadow Masters", members: [0, 5, 10] },
-  { name: "Stellar Nexus", members: [2, 7, 12] },
-  { name: "Cosmic Void", members: [1, 8, 15] },
-  { name: "Inferno Squad", members: [16, 17, 18] },
-  { name: "Vortex Crew", members: [19, 20, 21] },
-  { name: "Blaze Titans", members: [22, 23, 24] },
-  { name: "Nova Warriors", members: [25, 26, 27] },
-  { name: "Silent Hunters", members: [28, 29, 30] },
-  { name: "Ghost Division", members: [3, 16, 19] },
-  { name: "Ice Dynasty", members: [9, 22, 25] },
-  { name: "Fire Legends", members: [17, 23, 28] },
+  { name: "Dragon Squad", members: [0, 1, 2, 3, 4, 5, 6], logo: true, tag: "DRGN" },
+  { name: "Phoenix Force", members: [3, 4, 5, 7, 8], tag: "PHNX" },
+  { name: "Thunder Legion", members: [6, 7, 8, 9], logo: true, tag: "THDR" },
+  { name: "Frost Alliance", members: [9, 10, 11], tag: "FRST" },
+  { name: "Eclipse Titans", members: [12, 13, 14, 15], tag: "ECL" },
+  { name: "Shadow Masters", members: [0, 5, 10], tag: "SHDW" },
+  { name: "Stellar Nexus", members: [2, 7, 12], tag: "STLR" },
+  { name: "Cosmic Void", members: [1, 8, 15], tag: "CSMC" },
+  { name: "Inferno Squad", members: [16, 17, 18], tag: "INFR" },
+  { name: "Vortex Crew", members: [19, 20, 21], tag: "VRTX" },
+  { name: "Blaze Titans", members: [22, 23, 24], tag: "BLZ" },
+  { name: "Nova Warriors", members: [25, 26, 27], tag: "NOVA" },
+  { name: "Silent Hunters", members: [28, 29, 30], tag: "SLNT" },
+  { name: "Ghost Division", members: [3, 16, 19], tag: "GHST" },
+  { name: "Ice Dynasty", members: [9, 22, 25], tag: "ICE" },
+  { name: "Fire Legends", members: [17, 23, 28], tag: "FIRE" },
   // Cas limites de composition
-  { name: "Solo Ranger", members: [31] },
+  { name: "Solo Ranger", members: [31], tag: "SR" },
   {
     name: "Staff Only",
     members: [20, 26],
@@ -260,11 +268,17 @@ const FICTIONAL_TEAMS: TeamDef[] = [
       ["OWNER", "MANAGER"],
       ["COACH"],
     ],
+    // Sigle numérique : le jeu de caractères autorisé ne se limite pas aux
+    // lettres.
+    tag: "ST01",
   },
   {
     name: "Roster Complet",
     members: [1, 4, 11, 13, 18, 24, 29, 30],
     logo: true,
+    // Sans sigle : couvre l'affichage de repli (initiales du nom) sur la carte
+    // d'annuaire comme sur la fiche.
+    tag: null,
   },
 ];
 
@@ -499,8 +513,8 @@ async function createTeams(db: Pool, userIds: number[]): Promise<number[]> {
     const teamName = `Test - ${team.name}`;
     try {
       const [result] = await db.execute<ResultSetHeader>(
-        `INSERT INTO bg_teams (name, logo_url) VALUES (?, ?)`,
-        [teamName, team.logo ? "https://placehold.co/128x128/0b1220/5ac8ff?text=BG" : null]
+        `INSERT INTO bg_teams (name, tag, logo_url) VALUES (?, ?, ?)`,
+        [teamName, team.tag, team.logo ? "https://placehold.co/128x128/0b1220/5ac8ff?text=BG" : null]
       );
       const teamId = result.insertId as number;
       teamIds.push(teamId);
@@ -524,9 +538,11 @@ async function createTeams(db: Pool, userIds: number[]): Promise<number[]> {
 // Équipes fantômes : créées par le staff, sans aucun membre (voir
 // `docs/features/GHOST_TEAMS.md`). Présentes dans le jeu de test pour couvrir
 // l'affichage du badge, l'attribution à un joueur et l'inscription en tournoi.
+// Une équipe fantôme entre dans le même espace de noms de sigles qu'une équipe
+// réelle : elle court les mêmes tournois et s'affiche dans les mêmes plateaux.
 const GHOST_TEAMS = [
-  { name: "Test - Fantôme Invitée", description: "Équipe invitée, inscrite hors plateforme." },
-  { name: "Test - Fantôme Remplissage", description: null },
+  { name: "Test - Fantôme Invitée", description: "Équipe invitée, inscrite hors plateforme.", tag: "GH01" },
+  { name: "Test - Fantôme Remplissage", description: null, tag: "GH02" },
 ] as const;
 
 async function createGhostTeams(db: Pool): Promise<number[]> {
@@ -535,8 +551,8 @@ async function createGhostTeams(db: Pool): Promise<number[]> {
   for (const team of GHOST_TEAMS) {
     try {
       const [result] = await db.execute<ResultSetHeader>(
-        `INSERT INTO bg_teams (name, logo_url, description, is_ghost) VALUES (?, NULL, ?, 1)`,
-        [team.name, team.description],
+        `INSERT INTO bg_teams (name, tag, logo_url, description, is_ghost) VALUES (?, ?, NULL, ?, 1)`,
+        [team.name, team.tag, team.description],
       );
       teamIds.push(result.insertId as number);
     } catch (error) {
@@ -597,8 +613,8 @@ async function createBulkTeams(db: Pool, count: number): Promise<number[]> {
       const userId = userResult.insertId as number;
 
       const [teamResult] = await db.execute<ResultSetHeader>(
-        `INSERT INTO bg_teams (name, logo_url) VALUES (?, NULL)`,
-        [`Test - Bracket Team ${i}`]
+        `INSERT INTO bg_teams (name, tag, logo_url) VALUES (?, ?, NULL)`,
+        [`Test - Bracket Team ${i}`, bulkTeamTag(i)]
       );
       const teamId = teamResult.insertId as number;
       teamIds.push(teamId);

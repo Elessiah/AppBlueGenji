@@ -107,7 +107,7 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
           )}
 
           <div className={styles.team}>
-            <TeamSigil letter={sigilFor(currentMatch.team1Name)} size={40} />
+            <TeamSigil label={sigilFor(currentMatch.team1Name)} size={40} />
             <div className={styles.teamText}>
               <div className={styles.teamName}>
                 <EntrantName href={currentMatch.team1Href} name={currentMatch.team1Name ?? "Équipe 1"} />
@@ -139,7 +139,7 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
           </div>
 
           <div className={styles.team}>
-            <TeamSigil letter={sigilFor(currentMatch.team2Name)} color="var(--amber)" size={40} />
+            <TeamSigil label={sigilFor(currentMatch.team2Name)} color="var(--amber)" size={40} />
             <div className={styles.teamText}>
               <div className={styles.teamName}>
                 <EntrantName href={currentMatch.team2Href} name={currentMatch.team2Name ?? "Équipe 2"} />

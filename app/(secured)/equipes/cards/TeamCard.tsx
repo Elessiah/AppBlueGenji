@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { TeamListItem } from "@/lib/shared/types";
 import { getPaletteColor } from "@/lib/shared/palette";
 import { PlayerLink } from "@/components/entity-link";
+import { displayTeamTag } from "@/lib/shared/team-tag";
 import s from "./TeamCard.module.css";
 
 /**
@@ -14,6 +15,10 @@ import s from "./TeamCard.module.css";
  * au profil du joueur : un `<a>` dans un `<a>` étant invalide, le lien de la
  * carte est une plaque transparente posée par-dessus (`.cardOverlay`) que les
  * liens du roster traversent en repassant au-dessus d'elle (`.rosterItem`).
+ *
+ * La ligne sous le nom porte le **sigle** de l'équipe (`bg_teams.tag`, unique
+ * sur le site) ; à défaut, les initiales dérivées de son nom — l'affichage
+ * qu'avaient toutes les cartes avant que le sigle ne soit une donnée saisie.
  *
  * L'emblème (`.sigil`) montre le **logo** de l'équipe quand elle en a un, et
  * retombe sur l'initiale de son nom sinon. La carte n'affichait que l'initiale :
@@ -69,7 +74,7 @@ export function TeamCard({ team }: { team: TeamListItem }) {
             )}
           </div>
           <div className={s.tag}>
-            {team.name.slice(0, 3).toUpperCase()}
+            {displayTeamTag(team.tag, team.name)}
             {team.region && ` · ${team.region}`}
           </div>
         </div>
