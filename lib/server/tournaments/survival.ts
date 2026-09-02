@@ -319,7 +319,7 @@ export async function initializeSurvivalTournament(
         ${LOSSES} AS losses
        FROM bg_tournament_registrations r
        LEFT JOIN bg_matches m
-             ON ${rankingMatchJoinSql("r.team_id")}
+         ON ${rankingMatchJoinSql("r.team_id")}
        WHERE r.tournament_id = ?
        GROUP BY r.team_id
        ORDER BY ${rankingPointsForTeamSql("r.team_id")} DESC, ${WINS} DESC, r.team_id ASC`,

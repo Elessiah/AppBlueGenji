@@ -64,11 +64,10 @@ export async function initializeMultiTournament(
 
   const resolved = resolvePhasePlan(registeredCount, phaseConfigs);
 
-  // Seed la phase 1 depuis le classement du site (exactement comme Survie) —
-  // sauf si le staff a ordonné le seeding à la main, auquel cas l'ordre des
-  // inscriptions fait autorité.
-  // Barème **et** assiette du classement du site : mêmes matchs comptés que
-  // sur l'annuaire et sur les fiches (`lib/shared/ranking.ts`).
+  // Seed la phase 1 depuis le classement du site (exactement comme Survie),
+  // barème **et** assiette compris (`lib/shared/ranking.ts`) — sauf si le staff
+  // a ordonné le seeding à la main, auquel cas l'ordre des inscriptions fait
+  // autorité.
   const WINS = rankingWinsSql("r.team_id");
 
   const [seededRows] = Number(tournament.manual_seeding ?? 0) === 1
@@ -86,7 +85,7 @@ export async function initializeMultiTournament(
           ROW_NUMBER() OVER (ORDER BY ${rankingPointsForTeamSql("r.team_id")} DESC, ${WINS} DESC, r.team_id ASC) AS seed
          FROM bg_tournament_registrations r
          LEFT JOIN bg_matches m
-             ON ${rankingMatchJoinSql("r.team_id")}
+           ON ${rankingMatchJoinSql("r.team_id")}
          WHERE r.tournament_id = ?
          GROUP BY r.team_id`,
         [tournamentId],
