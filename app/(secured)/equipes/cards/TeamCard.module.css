@@ -125,6 +125,14 @@
   border: 1px solid color-mix(in oklab, var(--c, #ff9d2e) 30%, transparent);
   border-radius: 10px;
   pointer-events: none;
+  transition: border-color 0.2s;
+}
+
+/* Même raison que pour `.cta` : la plaque de lien couvre la carte, le pointeur
+   ne survole jamais l'emblème lui-même. C'est donc le survol de la carte qui
+   allume son halo — la carte réagit d'un bloc, puisqu'elle est un seul lien. */
+.card:hover .sigil::after {
+  border-color: color-mix(in oklab, var(--c, #ff9d2e) 60%, transparent);
 }
 
 .name {

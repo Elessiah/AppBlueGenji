@@ -37,7 +37,14 @@ export function TeamCard({ team }: { team: TeamListItem }) {
       </div>
 
       <div className={s.head}>
-        <div className={s.sigil} style={{ "--c": color } as React.CSSProperties}>
+        {/* Décoratif de bout en bout : logo comme initiale ne font que redire le
+            nom de l'équipe, écrit juste à côté. Une lecture d'écran qui
+            annoncerait « D, Dragon Squad » n'apprendrait rien. */}
+        <div
+          className={s.sigil}
+          style={{ "--c": color } as React.CSSProperties}
+          aria-hidden="true"
+        >
           {team.logoUrl ? (
             <Image
               src={team.logoUrl}
