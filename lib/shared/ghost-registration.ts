@@ -24,11 +24,23 @@ import type { ParticipantWording } from "./participants";
 
 /**
  * Plafond de taille d'un lot. Sans rapport avec l'effectif du tournoi (borné,
- * lui, à 256 places par la validation de création) : c'est une borne de forme
- * sur le corps de la requête, pour qu'une sélection aberrante soit refusée
- * avant d'ouvrir une transaction.
+ * lui, à 256 places par la validation de création).
+ *
+ * Il vaut **32**, et ce nombre n'est pas arbitraire : un lot est *une*
+ * transaction, et le journal Discord ne retient que
+ * `MAX_PENDING_PER_TRANSACTION = 32` entrées par transaction
+ * (`lib/server/tournaments/bot-logs.ts`) — au-delà, `queueBotLog` abandonne, et
+ * les inscriptions passées la trente-deuxième s'écriraient **sans leur ligne de
+ * journal**, silencieusement. Remonter le plafond du journal pour l'occasion
+ * serait le mauvais levier : il borne l'empreinte mémoire du `seed`, qui rejoue
+ * des milliers de matchs sur une même connexion. Un test tient le couple
+ * (`tests/lib/server/ghost-bulk-registration.test.ts`).
+ *
+ * Le même nombre borne la durée du verrou pris sur la ligne du tournoi :
+ * remplir un plateau de 128 demande quatre gestes au lieu d'un, mais aucune
+ * inscription de joueur n'attend derrière une transaction de cent écritures.
  */
-export const GHOST_BATCH_MAX = 256;
+export const GHOST_BATCH_MAX = 32;
 
 /** Refus de forme d'une sélection, avant toute lecture en base. */
 export type GhostBatchRejection =
@@ -50,20 +62,30 @@ export type GhostBatchSelection =
  * fois le même identifiant dit la même intention (« inscris cet engagé »), et
  * le punir par un `ALREADY_REGISTERED` reviendrait à refuser tout le lot pour
  * une maladresse du client.
+ *
+ * Le plafond porte sur **ce qui est envoyé**, et il est vérifié *avant* de
+ * parcourir quoi que ce soit. Deux raisons, et la seconde est la vraie : une
+ * liste de mille identifiants n'est pas une sélection valable, dût-elle se
+ * réduire à un seul après dédoublonnage ; et compter d'abord, plafonner
+ * ensuite, laissait un corps de 100 000 entiers (moins d'un mégaoctet, sous
+ * n'importe quelle limite de corps) occuper la boucle d'évènements avant d'être
+ * refusé — le processus entier, flux SSE compris, s'arrêtait le temps du refus.
  */
 export function parseGhostBatch(raw: unknown): GhostBatchSelection {
   if (!Array.isArray(raw)) return { ok: false, error: "INVALID_TEAM_IDS" };
   if (raw.length === 0) return { ok: false, error: "EMPTY_TEAM_SELECTION" };
+  if (raw.length > GHOST_BATCH_MAX) return { ok: false, error: "TOO_MANY_TEAMS" };
 
+  const seen = new Set<number>();
   const teamIds: number[] = [];
   for (const value of raw) {
     if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
       return { ok: false, error: "INVALID_TEAM_IDS" };
     }
-    if (!teamIds.includes(value)) teamIds.push(value);
+    if (seen.has(value)) continue;
+    seen.add(value);
+    teamIds.push(value);
   }
-
-  if (teamIds.length > GHOST_BATCH_MAX) return { ok: false, error: "TOO_MANY_TEAMS" };
 
   return { ok: true, teamIds };
 }
@@ -75,6 +97,28 @@ export function parseGhostBatch(raw: unknown): GhostBatchSelection {
  */
 export function remainingSlots(maxTeams: number, registeredTeams: number): number {
   return Math.max(0, maxTeams - registeredTeams);
+}
+
+/**
+ * Ce qu'un lot peut porter : les places encore libres du tournoi, et jamais
+ * plus que le plafond de forme d'une requête.
+ */
+export function batchCapacity(remaining: number): number {
+  return Math.min(remaining, GHOST_BATCH_MAX);
+}
+
+/**
+ * Compteur de sélection, qui dit **laquelle des deux bornes** s'applique.
+ *
+ * « 3 / 14 places » devant un tournoi qui en a quatorze de libres, « 3 / 32 par
+ * lot » devant un tournoi qui en a cent : afficher « places » dans le second cas
+ * ferait croire le plateau presque plein alors que c'est la requête qui est
+ * bornée.
+ */
+export function batchCounterLabel(selectedCount: number, remaining: number): string {
+  const capacity = batchCapacity(remaining);
+  const unit = remaining <= GHOST_BATCH_MAX ? `place${capacity > 1 ? "s" : ""}` : "par lot";
+  return `${selectedCount} / ${capacity} ${unit}`;
 }
 
 /**

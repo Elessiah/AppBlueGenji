@@ -4,6 +4,9 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import {
+  batchCapacity,
+  batchCounterLabel,
+  GHOST_BATCH_MAX,
   guestBatchSuccessMessage,
   matchesTeamSearch,
   registrationErrorTeamId,
@@ -48,7 +51,9 @@ export function GhostRegistrationDialog({
   const { showError, showSuccess } = useToast();
   const wording = useParticipantWording();
   const [teams, setTeams] = useState<GhostTeamOption[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  // Trois états, pas deux : la liste n'est pas « vide » tant qu'on ne sait pas,
+  // et une liste qu'on n'a pas pu lire n'est pas une liste épuisée.
+  const [load, setLoad] = useState<"pending" | "loaded" | "failed">("pending");
   const [mode, setMode] = useState<"existing" | "new">("existing");
   const [selected, setSelected] = useState<number[]>([]);
   const [query, setQuery] = useState("");
@@ -67,12 +72,18 @@ export function GhostRegistrationDialog({
         if (cancelled) return;
         const available = payload.teams ?? [];
         setTeams(available);
-        setLoaded(true);
+        setLoad("loaded");
         // Plus rien à cocher (aucune fantôme, ou toutes déjà engagées) : la
         // création est le seul chemin utile.
         if (available.length === 0) setMode("new");
       } catch (e) {
-        if (!cancelled) showError(mapEntrantError((e as Error).message, null));
+        if (cancelled) return;
+        // Sans cette branche, l'échec laissait « Chargement… » à l'écran pour la
+        // vie du dialogue, l'onglet « Existantes » désactivé et aucun repli : il
+        // fallait fermer et rouvrir pour retenter.
+        setLoad("failed");
+        setMode("new");
+        showError(mapEntrantError((e as Error).message, null));
       }
     })();
     return () => {
@@ -90,16 +101,20 @@ export function GhostRegistrationDialog({
     [teams],
   );
 
-  const overCapacity = selected.length > remainingSlots;
+  const capacity = batchCapacity(remainingSlots);
+  const overCapacity = selected.length > capacity;
 
   // Trois vides bien distincts : on ne sait pas encore, il n'y a plus rien à
   // inscrire, ou la recherche ne trouve rien. « Aucun résultat » sur une liste
   // qui n'a pas fini de charger enverrait créer une équipe déjà en stock.
-  const emptyMessage = !loaded
-    ? "Chargement…"
-    : teams.length === 0
-      ? wording.guestNoneLeft
-      : "Aucun résultat pour cette recherche.";
+  const emptyMessage =
+    load === "pending"
+      ? "Chargement…"
+      : load === "failed"
+        ? "Liste indisponible. Ferme et rouvre la fenêtre pour réessayer."
+        : teams.length === 0
+          ? wording.guestNoneLeft
+          : "Aucun résultat pour cette recherche.";
 
   const toggle = (teamId: number) => {
     setSelected((current) =>
@@ -112,10 +127,17 @@ export function GhostRegistrationDialog({
   // « Tout sélectionner » porte sur ce que la recherche laisse voir : cocher en
   // masse des lignes hors écran serait un piège, la sélection ne se relisant que
   // par son compteur.
+  //
+  // Il s'arrête à ce qu'un lot peut porter : cocher cent quarante équipes de
+  // remplissage devant quatorze places désactivait « Inscrire » sans autre issue
+  // que de décocher cent vingt-six cases à la main.
   const selectVisible = () => {
     setSelected((current) => {
       const next = [...current];
-      for (const team of visible) if (!next.includes(team.id)) next.push(team.id);
+      for (const team of visible) {
+        if (next.length >= capacity) break;
+        if (!next.includes(team.id)) next.push(team.id);
+      }
       return next;
     });
   };
@@ -221,7 +243,7 @@ export function GhostRegistrationDialog({
                   overCapacity ? styles.countOver : selected.length > 0 ? styles.countActive : ""
                 }`}
               >
-                {selected.length} / {remainingSlots} place{remainingSlots > 1 ? "s" : ""}
+                {batchCounterLabel(selected.length, remainingSlots)}
               </span>
             </p>
 
@@ -230,6 +252,14 @@ export function GhostRegistrationDialog({
               className={styles.search}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              // Un champ de saisie dans un formulaire soumet à la touche Entrée.
+              // Ici, filtrer puis appuyer sur Entrée inscrivait le lot coché et
+              // fermait la fenêtre : une écriture irréversible sans le clic qui
+              // la confirme. Le filtre s'applique déjà à la frappe, Entrée n'a
+              // donc rien à y déclencher.
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.preventDefault();
+              }}
               placeholder="Rechercher…"
               aria-label="Filtrer la liste par nom"
               autoFocus
@@ -268,7 +298,7 @@ export function GhostRegistrationDialog({
                 type="button"
                 className={styles.linkButton}
                 onClick={selectVisible}
-                disabled={busy || visible.length === 0}
+                disabled={busy || visible.length === 0 || selected.length >= capacity}
               >
                 Tout sélectionner
               </button>
@@ -314,7 +344,9 @@ export function GhostRegistrationDialog({
             // encore faut-il faire le lien.
             title={
               overCapacity
-                ? `Il ne reste que ${remainingSlots} place${remainingSlots > 1 ? "s" : ""} dans ce tournoi.`
+                ? remainingSlots <= GHOST_BATCH_MAX
+                  ? `Il ne reste que ${remainingSlots} place${remainingSlots > 1 ? "s" : ""} dans ce tournoi.`
+                  : `${GHOST_BATCH_MAX} engagés au maximum par inscription : recommencez pour les suivants.`
                 : undefined
             }
           >

@@ -5,9 +5,9 @@ jest.mock("@/lib/server/tournaments/bot-logs");
 jest.mock("@/lib/server/tournaments/state");
 
 import { registerTeamsByIds } from "@/lib/server/tournaments/registration";
-import { queueBotLog } from "@/lib/server/tournaments/bot-logs";
+import { MAX_PENDING_PER_TRANSACTION, queueBotLog } from "@/lib/server/tournaments/bot-logs";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
-import { registrationErrorTeamId } from "@/lib/shared/ghost-registration";
+import { GHOST_BATCH_MAX, registrationErrorTeamId } from "@/lib/shared/ghost-registration";
 
 /**
  * Inscription **en lot** d'équipes fantômes, vue du moteur.
@@ -40,7 +40,6 @@ function fakeConnection(options: {
   teams: Row[];
   registered?: number;
   alreadyRegistered?: number[];
-  tournament?: Row;
 }) {
   const inserted: number[] = [];
   let registered = options.registered ?? 0;
@@ -253,6 +252,45 @@ describe("registerTeamsByIds", () => {
     expect((error as Error).message).toBe("TEAM_NOT_FOUND");
     expect(registrationErrorTeamId(error)).toBe(999);
     expect(inserted).toEqual([]);
+  });
+
+  it("verrouille les équipes relues, dans un ordre fixe", async () => {
+    // Lecture verrouillante et non ordinaire : c'est la première lecture de la
+    // transaction, donc celle qui fige l'instantané REPEATABLE READ. Sans
+    // `FOR UPDATE`, une fantôme attribuée à un joueur juste après resterait
+    // « fantôme » aux yeux de la transaction, et s'inscrirait quand même.
+    const teamIds = [903, 900];
+    const { connection } = fakeConnection({ teams: teamIds.map(ghost) });
+
+    await registerTeamsByIds(connection, 12, teamIds);
+
+    const check = sqlOf(connection).find((q) => q.includes("SELECT id, is_ghost, deleted_at"));
+    expect(check).toContain("FOR UPDATE");
+    // Ordre de verrouillage constant : deux lots qui se recoupent s'attendent
+    // au lieu de s'interbloquer.
+    expect(check).toContain("ORDER BY id");
+  });
+
+  it("ne dépasse jamais ce que le journal Discord retient par transaction", () => {
+    // Un lot est **une** transaction, et `queueBotLog` abandonne au-delà de son
+    // plafond : un lot plus large s'écrirait sans les lignes de journal des
+    // inscriptions suivantes, silencieusement. Le couple se tient ici, faute de
+    // pouvoir importer un module serveur depuis `lib/shared`.
+    expect(GHOST_BATCH_MAX).toBeLessThanOrEqual(MAX_PENDING_PER_TRANSACTION);
+  });
+
+  it("réserve une ligne de journal pour chaque inscription d'un lot plein", async () => {
+    const teamIds = Array.from({ length: GHOST_BATCH_MAX }, (_, index) => 900 + index);
+    const { connection, inserted } = fakeConnection({ teams: teamIds.map(ghost) });
+    (syncTournamentState as jest.Mock).mockResolvedValue({
+      row: { ...TOURNAMENT, max_teams: GHOST_BATCH_MAX },
+      stateChanged: false,
+    } as never);
+
+    await registerTeamsByIds(connection, 12, teamIds);
+
+    expect(inserted).toEqual(teamIds);
+    expect((queueBotLog as jest.Mock).mock.calls).toHaveLength(GHOST_BATCH_MAX);
   });
 
   it("relit le caractère fantôme en une seule requête, quelle que soit la taille du lot", async () => {

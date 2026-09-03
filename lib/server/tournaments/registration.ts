@@ -163,12 +163,27 @@ export async function registerTeamsByIds(
 ): Promise<void> {
   if (teamIds.length === 0) throw new Error("EMPTY_TEAM_SELECTION");
 
+  // Lecture **verrouillante**, et pas seulement par prudence : c'est la
+  // première lecture de la transaction, donc celle qui fige l'instantané
+  // `REPEATABLE READ`. Une lecture ordinaire verrait l'état du monde à cet
+  // instant et n'en démordrait plus — `claimGhostTeam` pourrait valider son
+  // `is_ghost = 0` juste après, et l'inscription passerait quand même : la
+  // course que ce contrôle prétend fermer resterait ouverte. `FOR UPDATE` lit
+  // la dernière version validée et retient la ligne jusqu'au commit.
+  //
+  // `ORDER BY id` fixe l'ordre de verrouillage : deux lots qui se recoupent
+  // prennent leurs lignes dans le même ordre et s'attendent au lieu de
+  // s'interbloquer. Les équipes sont verrouillées **avant** le tournoi, ordre
+  // que suit aussi l'inscription d'un joueur (qui ne verrouille, elle, que le
+  // tournoi).
   const [teams] = await connection.execute<
     (RowDataPacket & { id: number; is_ghost: 0 | 1; deleted_at: Date | null })[]
   >(
     `SELECT id, is_ghost, deleted_at
      FROM bg_teams
-     WHERE id IN (${teamIds.map(() => "?").join(",")})`,
+     WHERE id IN (${teamIds.map(() => "?").join(",")})
+     ORDER BY id
+     FOR UPDATE`,
     teamIds,
   );
 

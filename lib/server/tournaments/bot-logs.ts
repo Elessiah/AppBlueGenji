@@ -173,7 +173,7 @@ const RELEASE_ALERT_SQL = `DELETE FROM bg_referee_alerts WHERE id = ?`;
  * matchs sur une même connexion sans jamais vider la file. Il borne l'empreinte
  * mémoire sans rien changer au fonctionnement nominal.
  */
-const MAX_PENDING_PER_TRANSACTION = 32;
+export const MAX_PENDING_PER_TRANSACTION = 32;
 
 /**
  * Files en attente, indexées par connexion.

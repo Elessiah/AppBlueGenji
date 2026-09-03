@@ -8,6 +8,7 @@ import { GET, POST } from "@/app/api/admin/tournaments/[id]/ghost-registrations/
 import { getCurrentUser } from "@/lib/server/auth";
 import { listGhostTeams } from "@/lib/server/ghost-teams-service";
 import { registerGhostTeams } from "@/lib/server/tournaments-service";
+import { GHOST_BATCH_MAX } from "@/lib/shared/ghost-registration";
 
 type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
 
@@ -142,7 +143,7 @@ describe("POST /api/admin/tournaments/[id]/ghost-registrations", () => {
   it("refuse un lot au-delà du plafond de forme", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
 
-    const teamIds = Array.from({ length: 257 }, (_, index) => index + 1);
+    const teamIds = Array.from({ length: GHOST_BATCH_MAX + 1 }, (_, index) => index + 1);
     const res = await POST(jsonReq({ teamIds }), params("5"));
 
     expect(res.status).toBe(400);

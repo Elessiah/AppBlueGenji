@@ -1,5 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  batchCapacity,
+  batchCounterLabel,
   GHOST_BATCH_MAX,
   guestBatchSuccessMessage,
   matchesTeamSearch,
@@ -61,11 +63,20 @@ describe("parseGhostBatch", () => {
     expect(parseGhostBatch(teamIds)).toEqual({ ok: false, error: "TOO_MANY_TEAMS" });
   });
 
-  it("compte le plafond après dédoublonnage", () => {
-    // Le plafond borne l'intention, pas la maladresse : un lot d'un seul engagé
-    // répété mille fois n'est pas un lot de mille.
+  it("plafonne ce qui est envoyé, pas ce qu'il en reste", () => {
+    // Un corps trop long est refusé sans être parcouru : compter d'abord et
+    // plafonner ensuite laissait 100 000 entiers occuper la boucle d'évènements
+    // avant le refus. Une liste de mille identifiants n'est de toute façon pas
+    // une sélection valable, dût-elle se réduire à un seul.
     const teamIds = Array.from({ length: GHOST_BATCH_MAX + 10 }, () => 4);
-    expect(parseGhostBatch(teamIds)).toEqual({ ok: true, teamIds: [4] });
+    expect(parseGhostBatch(teamIds)).toEqual({ ok: false, error: "TOO_MANY_TEAMS" });
+  });
+
+  it("refuse un corps démesuré sans le parcourir", () => {
+    const huge = Array.from({ length: 100_000 }, (_, index) => index + 1);
+    const started = Date.now();
+    expect(parseGhostBatch(huge)).toEqual({ ok: false, error: "TOO_MANY_TEAMS" });
+    expect(Date.now() - started).toBeLessThan(200);
   });
 });
 
@@ -82,6 +93,41 @@ describe("remainingSlots", () => {
     // L'effectif maximal peut être réduit après coup : « -3 places restantes »
     // n'a aucun sens à l'écran.
     expect(remainingSlots(8, 12)).toBe(0);
+  });
+});
+
+describe("batchCapacity", () => {
+  it("s'arrête aux places libres quand elles manquent", () => {
+    expect(batchCapacity(5)).toBe(5);
+  });
+
+  it("s'arrête au plafond de forme quand les places abondent", () => {
+    expect(batchCapacity(200)).toBe(GHOST_BATCH_MAX);
+  });
+
+  it("vaut zéro sur un tournoi complet", () => {
+    expect(batchCapacity(0)).toBe(0);
+  });
+});
+
+describe("batchCounterLabel", () => {
+  it("compte en places quand c'est le tournoi qui borne", () => {
+    expect(batchCounterLabel(3, 14)).toBe("3 / 14 places");
+  });
+
+  it("accorde le singulier sur une seule place", () => {
+    expect(batchCounterLabel(0, 1)).toBe("0 / 1 place");
+  });
+
+  it("dit « par lot » quand c'est la requête qui borne", () => {
+    // « 3 / 32 places » devant un tournoi qui en a cent de libres ferait croire
+    // le plateau presque plein.
+    expect(batchCounterLabel(3, 100)).toBe(`3 / ${GHOST_BATCH_MAX} par lot`);
+  });
+
+  it("bascule pile au plafond", () => {
+    expect(batchCounterLabel(0, GHOST_BATCH_MAX)).toBe(`0 / ${GHOST_BATCH_MAX} places`);
+    expect(batchCounterLabel(0, GHOST_BATCH_MAX + 1)).toBe(`0 / ${GHOST_BATCH_MAX} par lot`);
   });
 });
 

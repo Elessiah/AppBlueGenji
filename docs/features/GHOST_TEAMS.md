@@ -117,6 +117,27 @@ retrouve le nom dans sa propre liste. Les refus qui valent pour le lot entier
 (`REGISTRATION_CLOSED`, `TOURNAMENT_FULL`) n'en portent pas : les affubler d'un
 nom laisserait croire que les autres seraient passés.
 
+### Taille d'un lot : 32
+
+`GHOST_BATCH_MAX = 32`, et ce nombre n'est pas arbitraire : un lot est **une**
+transaction, et le journal Discord ne retient que `MAX_PENDING_PER_TRANSACTION
+= 32` entrées par transaction (`lib/server/tournaments/bot-logs.ts`) — au-delà,
+`queueBotLog` abandonne, et les inscriptions passées la trente-deuxième
+s'écriraient **sans leur ligne de journal**, silencieusement. Remonter le
+plafond du journal serait le mauvais levier : il borne l'empreinte mémoire du
+`seed`, qui rejoue des milliers de matchs sur une même connexion. Un test tient
+le couple (`GHOST_BATCH_MAX <= MAX_PENDING_PER_TRANSACTION`), faute de pouvoir
+importer un module serveur depuis `lib/shared`.
+
+Le même nombre borne la durée du verrou pris sur la ligne du tournoi : remplir
+un plateau de 128 demande quatre gestes au lieu d'un, mais aucune inscription de
+joueur n'attend derrière une transaction de cent écritures.
+
+Le plafond porte sur **ce qui est envoyé**, et il est vérifié avant que la liste
+ne soit parcourue : compter d'abord et plafonner ensuite laissait un corps de
+100 000 entiers occuper la boucle d'évènements avant d'être refusé — le
+processus entier, flux SSE compris, s'arrêtait le temps du refus.
+
 ### Le plafond d'effectif tient
 
 L'effectif est relu **à chaque insertion**, sur la connexion de la transaction :
@@ -138,6 +159,17 @@ L'état est *calculé* (`syncTournamentState`) : un tournoi qui n'est plus en
 inscriptions au moment du clic refuse tout le lot par `REGISTRATION_CLOSED`
 (409), quelle que soit la liste affichée. Aucune garde nouvelle : c'est celle de
 l'inscription ordinaire.
+
+### Le contrôle « c'est bien une fantôme » est verrouillant
+
+Il est relu dans la transaction, et par un `SELECT … ORDER BY id FOR UPDATE` —
+pas par prudence : c'est la **première lecture** de la transaction, donc celle
+qui fige l'instantané `REPEATABLE READ`. Une lecture ordinaire verrait l'état du
+monde à cet instant et n'en démordrait plus ; `claimGhostTeam` pourrait valider
+son `is_ghost = 0` juste après, et l'inscription passerait quand même — la
+course que le contrôle prétend fermer resterait ouverte. `ORDER BY id` fixe
+l'ordre de verrouillage : deux lots qui se recoupent s'attendent au lieu de
+s'interbloquer.
 
 ### Ne pas reproposer les déjà inscrites
 
