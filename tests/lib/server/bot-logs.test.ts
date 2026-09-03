@@ -161,9 +161,9 @@ describe("resolveBotLogs", () => {
   it("relit les noms après coup, plutôt que de les faire porter au moteur", async () => {
     const execute = mockDb([[{ ...TOURNAMENT_ROW, champion_name: "Les Renards" }]]);
 
-    const [message] = await resolveBotLogs([{ kind: "tournament_finished", tournamentId: 12 }]);
+    const [entry] = await resolveBotLogs([{ kind: "tournament_finished", tournamentId: 12 }]);
 
-    expect(message).toContain("Les Renards l'emporte");
+    expect(entry.message).toContain("Les Renards l'emporte");
     // Le renvoi ne portait que l'identifiant : tout le reste vient de la base.
     expect(execute.mock.calls[0][1]).toEqual([12]);
   });
@@ -171,20 +171,20 @@ describe("resolveBotLogs", () => {
   it("décrit une inscription avec l'effectif atteint", async () => {
     mockDb([[TOURNAMENT_ROW], [{ name: "Les Renards" }]]);
 
-    const [message] = await resolveBotLogs([
+    const [entry] = await resolveBotLogs([
       { kind: "registration", tournamentId: 12, teamId: 101, byStaff: false },
     ]);
 
-    expect(message).toContain("Les Renards");
-    expect(message).toContain("3/16 équipes");
+    expect(entry.message).toContain("Les Renards");
+    expect(entry.message).toContain("3/16 équipes");
   });
 
   it("décrit un match tranché avec son score", async () => {
     mockDb([[MATCH_ROW]]);
 
-    const [message] = await resolveBotLogs([{ kind: "match_finished", matchId: 31 }]);
+    const [entry] = await resolveBotLogs([{ kind: "match_finished", matchId: 31 }]);
 
-    expect(message).toContain("Les Renards 2–1 Team Nova");
+    expect(entry.message).toContain("Les Renards 2–1 Team Nova");
   });
 
   it("ignore les byes, dont le score est posé par le moteur", async () => {
@@ -198,10 +198,10 @@ describe("resolveBotLogs", () => {
   it("décrit un forfait arbitré, qui ne porte aucun score", async () => {
     mockDb([[{ ...MATCH_ROW, team1_score: null, team2_score: null, forfeit_team_id: 102 }]]);
 
-    const [message] = await resolveBotLogs([{ kind: "match_finished", matchId: 31 }]);
+    const [entry] = await resolveBotLogs([{ kind: "match_finished", matchId: 31 }]);
 
-    expect(message).toContain("Les Renards vs Team Nova");
-    expect(message).toContain("(forfait)");
+    expect(entry.message).toContain("Les Renards vs Team Nova");
+    expect(entry.message).toContain("(forfait)");
   });
 
   it("ignore un match sans score enregistré", async () => {
@@ -245,20 +245,20 @@ describe("resolveBotLogs", () => {
   it("nomme un organisateur inconnu plutôt que d'écrire « null »", async () => {
     mockDb([[{ ...TOURNAMENT_ROW, organizer_pseudo: null }]]);
 
-    const [message] = await resolveBotLogs([{ kind: "tournament_created", tournamentId: 12 }]);
+    const [entry] = await resolveBotLogs([{ kind: "tournament_created", tournamentId: 12 }]);
 
-    expect(message).toContain("créé par le staff");
-    expect(message).not.toContain("null");
+    expect(entry.message).toContain("créé par le staff");
+    expect(entry.message).not.toContain("null");
   });
 
   it("retombe sur le vocabulaire d'équipe quand le type de participant est douteux", async () => {
     mockDb([[{ ...TOURNAMENT_ROW, participant_type: null }], [{ name: "Les Renards" }]]);
 
-    const [message] = await resolveBotLogs([
+    const [entry] = await resolveBotLogs([
       { kind: "registration", tournamentId: 12, teamId: 101, byStaff: true },
     ]);
 
-    expect(message).toContain("3/16 équipes");
-    expect(message).toContain("(ajout du staff)");
+    expect(entry.message).toContain("3/16 équipes");
+    expect(entry.message).toContain("(ajout du staff)");
   });
 });

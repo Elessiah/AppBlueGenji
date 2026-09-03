@@ -1,6 +1,6 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { MIN_ENTRANTS_FOR_MATCHES } from "@/lib/shared/constants";
-import { queueBotLog } from "./bot-logs";
+import { MIN_ENTRANTS_FOR_MATCHES, SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
+import { queueBotLog, queueRefereeAlert } from "./bot-logs";
 import { resetRegistrationRanks, finishTournament } from "./repository";
 
 export async function isEliminationPhaseComplete(
@@ -257,11 +257,40 @@ export async function finalizeTournamentIfDone(
   }
 }
 
+/**
+ * Tranche les reports de score dont le délai a expiré, et **alerte l'arbitre**
+ * sur ceux qu'aucune règle ne peut trancher.
+ *
+ * Le délai n'a d'effet que sur une manche à **un seul** report : il vaut alors
+ * accord tacite de l'adversaire silencieux, et le moteur clôt la rencontre. Sur
+ * une manche où les **deux** engagées ont reporté des scores contradictoires, il
+ * ne peut rien — départager deux affirmations opposées n'est pas une règle,
+ * c'est une décision. Ces manches restent donc `AWAITING_CONFIRMATION`
+ * indéfiniment, et sont exactement celles qui attendent un humain.
+ *
+ * D'où une alerte, distincte de celle du conflit lui-même : la première part au
+ * moment du désaccord, celle-ci constate qu'un délai de report plus tard —
+ * `SCORE_REPORT_TIMEOUT_MINUTES`, la seule source — personne n'a tranché.
+ * `claimRefereeAlert` la réserve dans la transaction en cours pour qu'elle ne
+ * parte qu'une fois : la fonction, elle, est appelée à chaque entretien.
+ *
+ * L'escalade attend **un délai de plus** après `score_deadline_at`. Cette
+ * colonne est posée au premier report et jamais réécrite tant que la manche
+ * n'est pas tranchée (`COALESCE`) : elle ne peut donc pas être repoussée par
+ * une engagée qui resaisirait son score en boucle, contrairement aux
+ * horodatages de report.
+ *
+ * Le doublon avec l'alerte de conflit — les deux évènements peuvent naître dans
+ * la même transaction — n'est pas écarté ici : cette fonction est appelée
+ * **deux fois** par report de score, une fois avant la mise en file du conflit
+ * et une fois après, et une garde posée à la réservation ne verrait donc qu'un
+ * des deux ordres. C'est `flushBotLogs` qui tranche, sur la file entière.
+ */
 export async function resolveExpiredScoreReports(
   connection: PoolConnection,
   tournamentId: number,
 ): Promise<void> {
-  const [rows] = await connection.execute<MatchRow[]>(
+  const [rows] = await connection.execute<ExpiredMatchRow[]>(
     `SELECT
       id,
       tournament_id,
@@ -274,14 +303,15 @@ export async function resolveExpiredScoreReports(
       next_winner_match_id,
       next_winner_slot,
       next_loser_match_id,
-      next_loser_slot
+      next_loser_slot,
+      (score_deadline_at <= DATE_SUB(NOW(), INTERVAL ? MINUTE)) AS conflict_stalled
      FROM bg_matches
      WHERE tournament_id = ?
        AND status = 'AWAITING_CONFIRMATION'
        AND score_deadline_at IS NOT NULL
        AND score_deadline_at <= NOW()
        AND winner_team_id IS NULL`,
-    [tournamentId],
+    [SCORE_REPORT_TIMEOUT_MINUTES, tournamentId],
   );
 
   // Import at runtime to avoid circular deps
@@ -292,11 +322,12 @@ export async function resolveExpiredScoreReports(
       continue;
     }
 
-    if (
-      match.team1_report_score !== null &&
-      match.team1_report_opponent_score !== null &&
-      match.team2_report_score === null
-    ) {
+    const team1Reported =
+      match.team1_report_score !== null && match.team1_report_opponent_score !== null;
+    const team2Reported =
+      match.team2_report_score !== null && match.team2_report_opponent_score !== null;
+
+    if (team1Reported && !team2Reported) {
       const team1Score = Number(match.team1_report_score);
       const team2Score = Number(match.team1_report_opponent_score);
       const winnerTeamId = team1Score >= team2Score ? Number(match.team1_id) : Number(match.team2_id);
@@ -309,13 +340,10 @@ export async function resolveExpiredScoreReports(
         winnerTeamId,
         loserTeamId,
       });
+      continue;
     }
 
-    if (
-      match.team2_report_score !== null &&
-      match.team2_report_opponent_score !== null &&
-      match.team1_report_score === null
-    ) {
+    if (team2Reported && !team1Reported) {
       const team1Score = Number(match.team2_report_opponent_score);
       const team2Score = Number(match.team2_report_score);
       const winnerTeamId = team1Score >= team2Score ? Number(match.team1_id) : Number(match.team2_id);
@@ -328,9 +356,34 @@ export async function resolveExpiredScoreReports(
         winnerTeamId,
         loserTeamId,
       });
+      continue;
     }
+
+    // Les deux ont reporté, et ils se contredisent — sans quoi le report aurait
+    // clos la manche sur-le-champ. C'est le seul cas où l'expiration du délai ne
+    // débloque rien.
+    if (!team1Reported || !team2Reported) continue;
+
+    // Un délai de plus après l'expiration : l'escalade constate une souffrance
+    // qui dure, pas un désaccord qui vient de naître.
+    if (Number(match.conflict_stalled ?? 0) !== 1) continue;
+
+    await queueRefereeAlert(connection, {
+      kind: "score_report_stalled",
+      matchId: Number(match.id),
+    });
   }
 }
 
 // Import MatchRow type
 import type { MatchRow } from "./_internal";
+
+/**
+ * Manche au report expiré, augmentée du seul calcul qu'il vaut mieux laisser à
+ * MySQL : le désaccord a-t-il lui-même dépassé le délai ?
+ *
+ * Comparer deux horodatages côté Node demanderait de faire confiance à
+ * l'alignement de son horloge et de son fuseau avec ceux du serveur ; `NOW()`
+ * les compare dans le même référentiel que celui qui les a écrits.
+ */
+type ExpiredMatchRow = MatchRow & { conflict_stalled: number | null };

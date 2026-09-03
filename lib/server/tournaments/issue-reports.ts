@@ -22,6 +22,7 @@ import {
   matchRoundLabel,
   normalizeIssueReportMessage,
 } from "@/lib/shared/discord-notifications";
+import { tournamentPageUrl } from "./app-url";
 import { resolveUserEntrantTeamId } from "./registration";
 import { loadTournamentRow } from "./repository";
 
@@ -42,11 +43,6 @@ type MatchRow = RowDataPacket & {
 export interface IssueReportResult {
   /** Arbitres joints en message privé (le log part dans tous les cas). */
   notifiedReferees: number;
-}
-
-function tournamentUrl(tournamentId: number): string | null {
-  const base = process.env.APP_URL?.trim().replace(/\/+$/, "");
-  return base ? `${base}/tournois/${tournamentId}` : null;
 }
 
 /**
@@ -119,7 +115,7 @@ export async function reportTournamentIssue(
   const alert = await pushRefereeAlert(
     buildIssueReportMessage({
       tournamentName: String(context.tournament_name),
-      tournamentUrl: tournamentUrl(tournamentId),
+      tournamentUrl: tournamentPageUrl(tournamentId),
       reporterPseudo: String(context.reporter_pseudo),
       entrantName: String(context.entrant_name),
       matchLabel,

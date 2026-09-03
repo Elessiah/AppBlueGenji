@@ -19,10 +19,15 @@ jamais le site en retour.
 | Abandon | `🚪 Abandon — « … » (#12) : Alpha quitte la compétition.` | `forfeitTournamentTeamPublic` |
 | Coup d'envoi | `🚀 Coup d'envoi — « … » (#12) : 8 équipes, Survie.` | bascule vers `RUNNING` |
 | Fin d'un match | `🏁 Match terminé — « … » (#12) · Manche 2 : Alpha 2–1 Bêta.` | `finalizeMatch` |
-| Conflit de score | `⚠️ Conflit de score — « … » (#12) · Manche 2 : … Arbitrage requis.` | reports contradictoires |
 | Clôture | `🏆 Tournoi terminé — « … » (#12) : Alpha l'emporte.` | `finishTournament` |
 | Clôture sans adversaires | `🚫 Tournoi clos faute d'adversaires — « … » (#12) : aucun engagement.` | `finalizeUnderfilledTournament` |
 | Suppression définitive | `🗑️ Tournoi supprimé définitivement — « … » (#12), par … (#3).` | `DELETE /api/admin/tournaments/[id]` |
+
+Le **conflit de score** n'y figure plus : c'est le premier évènement du site à
+appeler une intervention humaine, il part donc au **canal arbitre**
+(`docs/features/REFEREE_ALERTS.md`), qui écrit lui aussi dans ce salon — en plus
+court, et en message privé au rôle configuré. Chaque évènement part par
+exactement un transport, sans quoi la ligne s'afficherait deux fois.
 
 Toutes les lignes partagent la même entame — `<pictogramme> <Nature> — « Nom »
 (#id)` — et un pictogramme distinct par nature. Le canal se lit en diagonale,
@@ -62,11 +67,21 @@ Restent donc dehors, en connaissance de cause :
   d'un tournoi reste de l'ordre de son nombre de matchs, qu'il ait trois
   spectateurs ou trois cents.
 
+## Ce qui part ailleurs
+
+Un journal complet n'est pas un outil d'arbitrage : ce même volume, souhaitable
+pour suivre une soirée, noie la seule ligne qui attend un geste. Les évènements
+qui appellent une intervention humaine — conflit de score, report expiré non
+tranché, signalement d'un problème — partent donc au **canal arbitre**, décidé
+par une règle pure et unique (`lib/shared/referee-alerts.ts`). Voir
+`docs/features/REFEREE_ALERTS.md`.
+
 ## Modules
 
 | Rôle | Fichier |
 | --- | --- |
 | Rédaction (pur) | `lib/shared/bot-logs.ts` |
+| Tri journal / canal arbitre (pur) | `lib/shared/referee-alerts.ts` |
 | Libellés format / jeu (pur, partagés avec l'en-tête) | `lib/shared/tournament-labels.ts` |
 | File par transaction et résolution | `lib/server/tournaments/bot-logs.ts` |
 | Transport vers le bot | `lib/server/bot-integration.ts` (`sendBotLog`) |

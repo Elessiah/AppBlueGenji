@@ -1093,6 +1093,32 @@ async function runMigrations(db: Pool): Promise<void> {
     // Table already exists
   }
 
+  // Alertes déjà envoyées au rôle arbitre pour une manche
+  // (`lib/shared/referee-alerts.ts`).
+  //
+  // Même motif que `bg_match_reminders`, pour un besoin voisin : une alerte qui
+  // naît d'un **constat** — « ce report a dépassé son délai et personne n'a
+  // tranché » — se reproduit à chaque passage d'entretien, donc à chaque
+  // lecture de la page. La clé unique `(match_id, alert_key)` fait qu'elle ne
+  // part qu'une fois. La réservation est écrite dans la transaction du moteur,
+  // si bien qu'un rollback ne consomme pas l'alerte. `ON DELETE CASCADE` suit
+  // la manche : un plateau régénéré efface ses matchs, donc ses réservations.
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS bg_referee_alerts (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        match_id BIGINT NOT NULL,
+        alert_key VARCHAR(32) NOT NULL,
+        sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_bg_referee_alerts (match_id, alert_key),
+        CONSTRAINT fk_bg_referee_alerts_match FOREIGN KEY (match_id)
+          REFERENCES bg_matches(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+  } catch {
+    // Table already exists
+  }
+
   // Migration: sigle d'équipe (« trigramme », `lib/shared/team-tag.ts`).
   //
   // 2 à 4 caractères alphanumériques, en majuscules, **unique sur tout le

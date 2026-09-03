@@ -2,7 +2,12 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { checkMatchScores, parseMatchFormat } from "@/lib/shared/match-format";
 import { MatchRow } from "./_internal";
-import { queueBotLog } from "./bot-logs";
+import {
+  dropQueuedRefereeAlerts,
+  markMatchResolved,
+  queueBotLog,
+  queueRefereeAlert,
+} from "./bot-logs";
 import { resolveUserEntrantTeamId } from "./registration";
 import { syncTournamentState } from "./state";
 import { tryAutoResolveByes } from "./byes";
@@ -114,6 +119,25 @@ export async function finalizeMatch(
   // passent par leurs propres écritures (`./byes`, les moteurs à classement) et
   // n'encombrent donc pas le journal.
   queueBotLog(connection, { kind: "match_finished", matchId: Number(match.id) });
+
+  // Le même appel a pu, quelques instructions plus tôt, réserver une escalade
+  // sur cette manche : `reportMatchScore` ouvre par `syncTournamentState`, dont
+  // l'entretien tranche les reports expirés, puis clôt la manche si le report
+  // reçu concorde. Sans ce retrait, le commit annoncerait aux arbitres qu'une
+  // rencontre déjà `COMPLETED` « n'est toujours pas tranchée ».
+  //
+  // Retrait **en mémoire seulement** : rien à écrire ici, donc aucun verrou de
+  // plus sur le chemin le plus chaud du moteur. L'effacement des lignes en base
+  // suit le commit, dans `flushBotLogs`.
+  dropQueuedRefereeAlerts(connection, Number(match.id));
+
+  // Et la manche est notée tranchée, pour que ses réservations soient effacées
+  // après le commit. Une marque à part, et non la ligne de journal ci-dessus :
+  // la file est plafonnée, et un balayage chargé abandonne ses dernières entrées
+  // — le ménage, lui, ne peut pas être abandonné, sans quoi la clé
+  // `SCORE_CONFLICT` resterait posée et aucun désaccord né après cet arbitrage
+  // n'alerterait plus personne.
+  markMatchResolved(connection, Number(match.id));
 
   await pushTeamToTarget(
     connection,
@@ -301,9 +325,15 @@ export async function reportMatchScore(
       ]);
 
       // Les deux engagés se contredisent : un arbitre doit trancher, et il ne
-      // le saura que par le canal Discord — d'où une ligne de journal, résolue
-      // après le commit comme les autres (`./bot-logs`).
-      queueBotLog(connection, { kind: "score_conflict", matchId });
+      // le saura que par le canal Discord — d'où une alerte, résolue après le
+      // commit comme les lignes de journal (`./bot-logs`).
+      //
+      // Réservée, et pas seulement mise en file : rien n'interdit aux deux
+      // engagées de resaisir leur score tant que la manche n'est pas tranchée,
+      // et chaque désaccord ferait sinon sonner le téléphone de tous les
+      // arbitres. La réservation est effacée par `finalizeMatch`, si bien qu'un
+      // désaccord qui renaît après un arbitrage alerte de nouveau.
+      await queueRefereeAlert(connection, { kind: "score_conflict", matchId });
     }
   }
 

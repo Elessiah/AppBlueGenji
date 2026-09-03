@@ -6,7 +6,7 @@ jest.mock("@/lib/server/teams-service");
 jest.mock("@/lib/server/tournaments/byes");
 jest.mock("@/lib/server/tournaments/state");
 
-import { queueBotLog } from "@/lib/server/tournaments/bot-logs";
+import { queueBotLog, queueRefereeAlert } from "@/lib/server/tournaments/bot-logs";
 import { finalizeMatch, reportMatchScore } from "@/lib/server/tournaments/scoring";
 import { finishTournament } from "@/lib/server/tournaments/repository";
 import { finalizeUnderfilledTournament } from "@/lib/server/tournaments/finalization";
@@ -26,6 +26,11 @@ type Queued = { kind: string } & Record<string, unknown>;
 
 function queued(): Queued[] {
   return (queueBotLog as jest.Mock).mock.calls.map((call) => call[1] as Queued);
+}
+
+/** Les évènements passés par le chemin réservé aux alertes arbitre. */
+function alerted(): Queued[] {
+  return (queueRefereeAlert as jest.Mock).mock.calls.map((call) => call[1] as Queued);
 }
 
 /** Connexion factice : `rows` répond aux SELECT, les UPDATE sont comptés. */
@@ -52,6 +57,8 @@ function mockTournamentState(row: Record<string, unknown>): void {
 beforeEach(() => {
   jest.clearAllMocks();
   (tryAutoResolveByes as jest.Mock).mockResolvedValue(undefined as never);
+  (queueBotLog as jest.Mock).mockReturnValue(true);
+  (queueRefereeAlert as jest.Mock).mockResolvedValue(true as never);
 });
 
 describe("finishTournament", () => {
@@ -238,6 +245,10 @@ describe("reportMatchScore", () => {
   it("réserve un conflit quand les deux reports se contredisent", async () => {
     await reportMatchScore(reportConnection({ score: 2, opponent: 0 }), 12, 31, 42, 2, 1);
 
-    expect(queued()).toEqual([{ kind: "score_conflict", matchId: 31 }]);
+    // Par le chemin des alertes, pas par la simple mise en file : le conflit
+    // doit être réservé, sans quoi deux engagées qui resaisissent leur score en
+    // boucle feraient sonner le téléphone des arbitres à chaque fois.
+    expect(alerted()).toEqual([{ kind: "score_conflict", matchId: 31 }]);
+    expect(queued()).toEqual([]);
   });
 });

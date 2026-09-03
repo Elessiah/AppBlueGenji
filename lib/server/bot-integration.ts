@@ -31,6 +31,19 @@ function isCircuitOpen(): boolean {
   return Date.now() < circuitOpenUntil;
 }
 
+/**
+ * `true` tant que le coupe-circuit est ouvert : le bot vient d'échouer
+ * plusieurs fois d'affilée et rien ne part.
+ *
+ * Exporté pour les appelants qui **réservent** un envoi avant de le faire
+ * (`lib/server/tournaments/bot-logs.ts`) : réserver ce qu'on sait ne pas
+ * pouvoir envoyer, puis rendre la réservation, ferait tourner une pompe
+ * d'`INSERT`/`DELETE` pendant toute la panne.
+ */
+export function isBotCircuitOpen(): boolean {
+  return isCircuitOpen();
+}
+
 function recordFailure(): void {
   consecutiveFailures += 1;
   if (consecutiveFailures >= CIRCUIT_THRESHOLD) {
@@ -356,16 +369,29 @@ export async function pushDiscordDirectMessages(
  * signalement d'un joueur sans même essayer. Une action explicite mérite sa
  * tentative.
  *
- * @returns Le bilan du bot, ou `null` s'il est injoignable.
+ * Ce raisonnement vaut pour une **action utilisateur**, pas pour le trafic de
+ * fond : les alertes que le moteur produit lui-même (conflit de score, report
+ * expiré) passent `honourCircuit: true`, personne n'attendant leur réponse.
+ * Sans cela, un bot éteint ferait patienter chaque flux d'arrière-plan sur la
+ * fenêtre de 30 s que la recherche des membres du rôle impose.
+ *
+ * @param message Texte déjà rédigé, borné côté bot.
+ * @param context Étiquette de journalisation côté bot (« issue-report », …).
+ * @param options `honourCircuit` : respecter le coupe-circuit (défaut `false`).
+ * @returns Le bilan du bot, ou `null` s'il est injoignable — jamais d'exception.
  */
 export async function pushRefereeAlert(
   message: string,
   context: string,
+  options: { honourCircuit?: boolean } = {},
 ): Promise<DiscordDeliveryReport | null> {
   return postDiscordNotification(
     "/internal/notify/referees",
     { message, context },
-    { timeoutMs: BOT_REFEREE_FETCH_TIMEOUT_MS, honourCircuit: false },
+    {
+      timeoutMs: BOT_REFEREE_FETCH_TIMEOUT_MS,
+      honourCircuit: options.honourCircuit ?? false,
+    },
   );
 }
 

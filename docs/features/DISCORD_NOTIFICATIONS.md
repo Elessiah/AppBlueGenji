@@ -9,6 +9,11 @@ une seule mécanique : **le site rédige, le bot distribue**.
   tournoi ou depuis un match ; le bot le relaie au canal de logs et au rôle
   arbitre.
 
+Le même canal « rôle arbitre » porte aussi les alertes que le **moteur** produit
+de lui-même — conflit de score, report expiré non tranché : le signalement en est
+le troisième cas, pas le seul. Le tri entre journal complet et canal arbitre vit
+dans `lib/shared/referee-alerts.ts` ; voir `docs/features/REFEREE_ALERTS.md`.
+
 Le sens des appels reste **app → bot**, comme pour l'auth, les logs et la
 fréquentation : le bot n'appelle jamais le site en retour.
 
@@ -19,6 +24,8 @@ fréquentation : le bot n'appelle jamais le site en retour.
 | Règle pure (fenêtres, rédaction, validation) | `lib/shared/discord-notifications.ts` |
 | Balayage et envoi des rappels | `lib/server/tournaments/match-reminders.ts` |
 | Signalement d'un problème | `lib/server/tournaments/issue-reports.ts` |
+| Tri journal / canal arbitre (pur) | `lib/shared/referee-alerts.ts` |
+| Lien vers la page d'un tournoi | `lib/server/tournaments/app-url.ts` |
 | Transport vers le bot | `lib/server/bot-integration.ts` |
 | Route du signalement | `app/api/tournaments/[id]/report-issue/route.ts` |
 | Interface | `_components/IssueReportDialog.tsx`, `_lib/issue-report-context.tsx` |
@@ -156,7 +163,9 @@ Rien n'est stocké côté site — c'est une alerte, pas un ticket.
 répondre « signalement envoyé » quand rien n'est parti laisserait le joueur
 attendre un arbitre qui n'a rien reçu.
 
-Le **coupe-circuit** de `bot-integration` est ignoré sur ce chemin, comme pour
+Le **coupe-circuit** de `bot-integration` est ignoré sur ce chemin — et sur celui-là
+seulement : les alertes que le moteur produit en arrière-plan le respectent, elles
+(`pushRefereeAlert(…, { honourCircuit: true })`). Ici, comme pour
 l'envoi du code de connexion : il protège le site d'un bot en panne que le trafic
 de fond sollicite en boucle, mais un balayage de rappels qui vient de l'ouvrir
 refuserait sinon le signalement d'un joueur sans même essayer. Une action
