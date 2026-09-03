@@ -21,6 +21,17 @@ export type LandingLiveMatch = {
   team2Href: string | null;
   team1Score: number | null;
   team2Score: number | null;
+  /**
+   * Rang de l'engagé dans l'ordre de seeding du tournoi, ou `null` quand ce
+   * rang n'existe pas — place vide, ou tournoi dont le tirage ne suit **pas**
+   * la colonne `seed` (`isSeedOrderEffective`, `lib/shared/seeding.ts`). La
+   * carte affichait « SEED 1 » et « SEED 4 » en dur, identiques pour tous les
+   * matchs : plutôt que de remplacer une invention par une autre — l'ordre
+   * d'inscription lu comme un seed en Suisse ou en Survie, qui seedent depuis
+   * le classement du site —, on ne dit rien quand on ne sait pas.
+   */
+  team1Seed: number | null;
+  team2Seed: number | null;
   bracket: string;
   roundLabel: string;
   /** État de diffusion du match, dérivé (`lib/shared/live-streams.ts`). */

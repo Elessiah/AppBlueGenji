@@ -27,6 +27,7 @@ import {
 } from "@/lib/shared/live-streams";
 import { loadTeamRanking } from "@/lib/server/ranking-service";
 import { entrantHref } from "@/lib/shared/participants";
+import { isSeedOrderEffective, seedingSource } from "@/lib/shared/seeding";
 
 const DEFAULT_STATS: LandingStats = {
   players: 0,
@@ -87,6 +88,9 @@ type LiveMatchRow = RowDataPacket & {
   team2_solo_user_id: number | null;
   team1_score: number | null;
   team2_score: number | null;
+  team1_seed: number | null;
+  team2_seed: number | null;
+  manual_seeding: number | null;
   start_at: Date | string | null;
   live_trigger: MatchLiveTrigger | null;
   live_url: string | null;
@@ -103,6 +107,13 @@ type LiveMatchRow = RowDataPacket & {
 function entrantHrefFor(teamId: number | null, soloUserId: number | null): string | null {
   if (teamId === null) return null;
   return entrantHref(Number(teamId), soloUserId === null ? null : { [Number(teamId)]: Number(soloUserId) });
+}
+
+/** Seed exploitable (entier positif), ou `null` — la colonne est nullable. */
+function toSeed(value: number | null): number | null {
+  if (value === null) return null;
+  const seed = Number(value);
+  return Number.isSafeInteger(seed) && seed > 0 ? seed : null;
 }
 
 /** Vue « diffusion » d'une ligne de match, pour le module pur partagé. */
@@ -172,13 +183,21 @@ async function loadLandingLive(): Promise<LandingLive | null> {
         t2.solo_user_id AS team2_solo_user_id,
         m.team1_score,
         m.team2_score,
+        r1.seed AS team1_seed,
+        r2.seed AS team2_seed,
+        t.manual_seeding,
         m.start_at,
         m.live_trigger,
         m.live_url,
         m.live_started_at
        FROM bg_matches m
+       JOIN bg_tournaments t ON t.id = m.tournament_id
        LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
        LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
+       LEFT JOIN bg_tournament_registrations r1
+         ON r1.tournament_id = m.tournament_id AND r1.team_id = m.team1_id
+       LEFT JOIN bg_tournament_registrations r2
+         ON r2.tournament_id = m.tournament_id AND r2.team_id = m.team2_id
        WHERE m.tournament_id = ?
        ORDER BY FIELD(m.bracket, 'UPPER', 'LOWER', 'GRAND', 'THIRD_PLACE') ASC,
                 m.round_number ASC,
@@ -192,6 +211,17 @@ async function loadLandingLive(): Promise<LandingLive | null> {
       rows.find((row) => isMatchLive(toLiveInput(row))) ??
       rows.find((row) => row.status === "READY" || row.status === "AWAITING_CONFIRMATION") ??
       null;
+    // La colonne `seed` porte l'ordre d'inscription ; elle n'est le **tirage**
+    // du tournoi que dans les formats qui seedent depuis elle (ou dès que le
+    // staff a réordonné à la main). En Suisse, en Survie et en multi-phases, le
+    // moteur seede depuis le classement du site : afficher « SEED 3 » y serait
+    // la même invention que le « SEED 1 » écrit en dur qu'on remplace.
+    const seedOrderIsTheDraw =
+      currentRow !== null &&
+      isSeedOrderEffective(
+        seedingSource(tournament.format, Number(currentRow.manual_seeding ?? 0) === 1),
+      );
+
     const currentMatch: LandingLiveMatch | null = currentRow
       ? {
           id: Number(currentRow.id),
@@ -201,6 +231,8 @@ async function loadLandingLive(): Promise<LandingLive | null> {
           team2Href: entrantHrefFor(currentRow.team2_id, currentRow.team2_solo_user_id),
           team1Score: currentRow.team1_score === null ? null : Number(currentRow.team1_score),
           team2Score: currentRow.team2_score === null ? null : Number(currentRow.team2_score),
+          team1Seed: seedOrderIsTheDraw ? toSeed(currentRow.team1_seed) : null,
+          team2Seed: seedOrderIsTheDraw ? toSeed(currentRow.team2_seed) : null,
           bracket: currentRow.bracket,
           roundLabel: roundLabelFor(
             currentRow.bracket,

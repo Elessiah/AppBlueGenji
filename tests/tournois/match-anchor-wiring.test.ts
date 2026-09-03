@@ -1,0 +1,205 @@
+import { describe, expect, it } from "@jest/globals";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { MATCH_ANCHOR_PREFIX } from "@/lib/shared/match-anchor";
+
+/**
+ * L'ancre `#match-[id]` ne s'observe pas dans un test unitaire : le harnais
+ * Jest tourne en environnement `node`, sans DOM ni bibliothèque de rendu — un
+ * hook qui appelle `document.getElementById` et `scrollIntoView` n'y est pas
+ * montable. Ce qui décide se teste donc là où il vit, dans le module pur
+ * (`tests/lib/shared/match-anchor.test.ts`).
+ *
+ * Restent les branchements, et ils portent tout le reste de la fonctionnalité :
+ * une ancre publiée sans cible dans le DOM, ou une cible posée que personne ne
+ * cherche, ne casse rien de visible — le lien mène simplement en haut de la
+ * page. Ces cas tiennent donc les points de passage.
+ */
+const ROOT = join(__dirname, "..", "..");
+const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
+
+const TOURNAMENT_DIR = join("app", "(secured)", "tournois", "[id]");
+const MATCH_ROW = read(join(TOURNAMENT_DIR, "_components", "MatchRow.tsx"));
+const PAGE = read(join(TOURNAMENT_DIR, "page.tsx"));
+const HOOK = read(join(TOURNAMENT_DIR, "_hooks", "useMatchAnchor.ts"));
+const GLOBALS = read("app/globals.css");
+const SECTIONS = read(join(TOURNAMENT_DIR, "_components", "BracketSections.tsx"));
+const LIVE_CARD = read("components/cyber/landing/LiveCard.tsx");
+
+describe("ancre d'un match — points de passage", () => {
+  it("pose l'identifiant DOM sur la carte de match", () => {
+    expect(MATCH_ROW).toContain('from "@/lib/shared/match-anchor"');
+    expect(MATCH_ROW).toContain("id={matchAnchorId(match.id)}");
+  });
+
+  it("le fait dans `MatchRow`, passage unique de toutes les vues", () => {
+    // Arbre, survie, suisse, endurance : les quatre vues rendent leurs cartes
+    // par `MatchRow`. Poser l'ancre ailleurs, c'est l'oublier dans trois vues.
+    //
+    // Une **inclusion**, pas un inventaire : lister exhaustivement les fichiers
+    // qui utilisent `MatchRow` ne dirait rien du cas qu'on protège — une vue qui
+    // rendrait des cartes *sans* passer par lui —, et casserait sur l'ajout
+    // d'une cinquième vue parfaitement conforme.
+    const components = join(ROOT, TOURNAMENT_DIR, "_components");
+    const renderers = readdirSync(components).filter((file) => {
+      if (!file.endsWith(".tsx") || file === "MatchRow.tsx") return false;
+      return readFileSync(join(components, file), "utf8").includes("<MatchRow");
+    });
+    expect(renderers).toEqual(
+      expect.arrayContaining(["BracketTree.tsx", "SurvivalView.tsx", "SwissView.tsx"]),
+    );
+    // La quatrième (`EnduranceView`) reçoit sa carte déjà rendue par la page.
+    expect(PAGE).toContain("<MatchRow");
+  });
+
+  it("branche le hook et le surlignage sur la page du tournoi", () => {
+    expect(PAGE).toContain("useMatchAnchor(");
+    expect(PAGE).toContain("<MatchAnchorProvider");
+    // La bascule de phase passe par le sélecteur de la page : sans elle, une
+    // ancre visant une phase non affichée ne trouverait jamais sa cible.
+    expect(PAGE).toContain("onSelectPhase: setSelectedPhaseId");
+  });
+
+  it("déplie le volet où dort la cible", () => {
+    // Un gros tableau ne rend qu'un volet à la fois : sans cette ouverture, le
+    // hook chercherait dans le DOM un élément que rien ne rend, jusqu'à
+    // renoncer. `BracketSections` est le seul endroit qui sache relier un match
+    // à son volet.
+    expect(SECTIONS).toContain("useMatchAnchorTarget()");
+    expect(SECTIONS).toContain("setOpenKeys(");
+    // On ajoute sans refermer : le lecteur reste libre de replier ensuite.
+    expect(SECTIONS).toContain("prev.has(section.key) ? prev :");
+  });
+
+  it("attend la cible au lieu de la chercher une seule fois", () => {
+    // Le plateau arrive par le flux SSE, après le premier rendu : chercher
+    // l'élément une fois après le montage ne trouverait jamais rien.
+    expect(HOOK).toContain("LOOKUP_TIMEOUT_MS");
+    expect(HOOK).toContain("setTimeout(look");
+  });
+
+  it("se rejoue d'un tournoi à l'autre", () => {
+    // L'App Router **réutilise** cette page d'un `[id]` à l'autre, et une
+    // navigation client passe par `history.pushState`, qui ne déclenche pas de
+    // `hashchange` : sans cette dépendance, l'ancre du second tournoi serait
+    // purement ignorée, et le halo du premier pourrait suivre sur une manche de
+    // même identifiant.
+    expect(HOOK).toContain("}, [tournamentId]);");
+    expect(PAGE).toMatch(/useMatchAnchor\(\{\s+tournamentId,/);
+    // La sélection de phase repart de zéro avec elle : elle appartient au
+    // tournoi qu'on quitte. Les deux repères partent **ensemble** — remettre le
+    // seul `lastCurrentPhaseId` ferait croire à un démarrage de phase au premier
+    // instantané, ce qui écraserait la phase que l'ancre vient de choisir ;
+    // remettre la seule sélection laisserait ce faux démarrage la reprendre.
+    expect(PAGE).toMatch(
+      /setSelectedPhaseId\(null\);\s+lastCurrentPhaseId\.current = undefined;\s+\}, \[tournamentId\]\);/,
+    );
+  });
+
+  it("ne reprend pas la main sur un lecteur qui l'a déjà prise", () => {
+    // La recherche peut durer vingt secondes ; arriver après coup pour recadrer
+    // et déplacer le focus arracherait le curseur d'un champ de score en cours
+    // de saisie. Le halo, lui, reste : il ne dérange personne.
+    expect(HOOK).toContain("READER_GESTURES");
+    expect(HOOK).toContain("if (!readerTookOver.current) {");
+    expect(HOOK).toContain("if (readerTookOver.current) return;");
+    // `scroll` n'en fait pas partie : c'est nous qui le déclenchons.
+    expect(HOOK).not.toContain('"scroll"');
+  });
+
+  it("renonce au bout d'un délai borné", () => {
+    // Un identifiant qui ne désigne aucun match de ce tournoi ne doit pas
+    // laisser une boucle derrière lui.
+    expect(HOOK).toMatch(/Date\.now\(\) >= deadlineRef\.current/);
+  });
+
+  it("fait défiler les conteneurs ancestraux, pas seulement la page", () => {
+    // `block`/`inline: "center"` : c'est ce qui rend l'ancre valable à
+    // l'intérieur d'un `<ScrollArea>` horizontal (arbre, rondes, rounds).
+    expect(HOOK).toContain('block: "center"');
+    expect(HOOK).toContain('inline: "center"');
+  });
+
+  it("défile d'un coup, sans animation", () => {
+    // Observé : `behavior: "smooth"` s'anime sur plusieurs frames, pendant
+    // lesquelles la page vit encore (instantané SSE, bascule de phase, volet qui
+    // se déplie) — l'animation y est avalée **sans la moindre erreur**, et
+    // l'ancre laissait le lecteur en haut de la page, halo allumé sur une carte
+    // hors écran. Un navigateur ne fait pas autre chose sur une ancre native :
+    // on arrive à destination, on ne s'y rend pas.
+    // La forme interdite, et elle seule : bannir la sous-chaîne « behavior: »
+    // dans tout le fichier condamnerait aussi le commentaire qui explique
+    // pourquoi on ne s'en sert pas.
+    expect(HOOK).not.toMatch(/scrollIntoView\([^)]*behavior/);
+  });
+
+  it("contrôle le placement une fois la page retombée", () => {
+    // La page continue de vivre après le défilement : un instantané peut
+    // rallonger un classement et chasser la carte de l'écran.
+    expect(HOOK).toContain("SETTLE_CHECK_MS");
+    expect(HOOK).toContain("isOnScreen(element)");
+  });
+
+  it("respecte le réglage « animations réduites » du système", () => {
+    expect(GLOBALS).toMatch(/\.match-anchor-target\s*\{/);
+    // Le repère reste, seul le fondu disparaît : sans lui, on ne saurait plus
+    // quelle carte on venait voir.
+    const reduced = GLOBALS.slice(GLOBALS.indexOf(".match-anchor-target"));
+    expect(reduced).toContain("animation: none");
+  });
+
+  it("annonce la carte à un lecteur d'écran", () => {
+    // Le défilement et le halo ne disent rien à qui ne voit pas la page : le
+    // focus va sur la carte, comme le navigateur le fait sur une ancre native.
+    expect(HOOK).toContain("focus({ preventScroll: true })");
+    expect(MATCH_ROW).toContain("tabIndex={-1}");
+  });
+});
+
+describe("ancre d'un match — une seule écriture du préfixe", () => {
+  /**
+   * Préfixe **suivi d'un identifiant** — une interpolation ou un chiffre.
+   *
+   * Ce que l'on traque est un `match-42` recopié à la main, pas les modules
+   * voisins dont le nom commence par les mêmes lettres (`match-format-context`,
+   * `match-schedule`, `match-lock`) : sans cette précision, le garde-fou
+   * accuserait une demi-douzaine de fichiers innocents et serait désactivé.
+   */
+  const COPIED_PREFIX = new RegExp(`["'\`]#?${MATCH_ANCHOR_PREFIX}(\\$\\{|[0-9])`);
+
+  /** Fichiers de code du dépôt (hors tests, hors dépendances). */
+  function sourceFiles(dir: string, found: string[] = []): string[] {
+    for (const entry of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+      if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) sourceFiles(path, found);
+      else if (/\.tsx?$/.test(entry.name)) found.push(path);
+    }
+    return found;
+  }
+
+  it("n'écrit le préfixe qu'une fois, dans le module pur", () => {
+    // Le préfixe est un contrat entre l'accueil (qui écrit le lien) et la fiche
+    // du tournoi (qui le lit). Deux littéraux dériveraient sans qu'un test s'en
+    // aperçoive : le lien mènerait simplement en haut de la page.
+    const offenders = [...sourceFiles("app"), ...sourceFiles("components"), ...sourceFiles("lib")]
+      .filter((path) => !path.endsWith(join("lib", "shared", "match-anchor.ts")))
+      .filter((path) => COPIED_PREFIX.test(read(path)));
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("saurait repérer un préfixe recopié ailleurs", () => {
+    // Contre-épreuve du cas précédent : un filtre qui ne trouve jamais rien
+    // passe aussi quand il ne cherche rien.
+    expect(COPIED_PREFIX.test("const id = `match-${match.id}`;")).toBe(true);
+    expect(COPIED_PREFIX.test('router.push("#match-42");')).toBe(true);
+    expect(COPIED_PREFIX.test('import x from "./match-format-context";')).toBe(false);
+    expect(COPIED_PREFIX.test('import { isScoreEditLocked } from "./match-lock";')).toBe(false);
+  });
+
+  it("fait descendre le chemin de l'accueil du même module", () => {
+    expect(LIVE_CARD).toContain("tournamentMatchHref(");
+    expect(LIVE_CARD).not.toContain("`/tournois/${");
+  });
+});

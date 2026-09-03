@@ -35,6 +35,8 @@ import { SwissView } from "./_components/SwissView";
 import { EnduranceView } from "./_components/EnduranceView";
 import { MatchRow } from "./_components/MatchRow";
 import { EntrantProvider } from "./_lib/entrant-link";
+import { MatchAnchorProvider } from "./_lib/match-anchor-context";
+import { useMatchAnchor } from "./_hooks/useMatchAnchor";
 import { TournamentProgress } from "./_components/TournamentProgress";
 import { DeleteTournamentDialog } from "./_components/DeleteTournamentDialog";
 import { LaunchTournamentDialog } from "./_components/LaunchTournamentDialog";
@@ -95,6 +97,16 @@ export default function TournamentDetailPage() {
   );
   const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
 
+  // Lien profond `#match-[id]` : la fiche s'ouvre défilée sur le match désigné
+  // (carte « en cours » de l'accueil, lien partagé). Le hook révèle au besoin la
+  // phase qui le contient, attend qu'il arrive par le flux, puis le surligne.
+  const { targetMatchId, highlightedMatchId } = useMatchAnchor({
+    tournamentId,
+    matches: detail?.matches,
+    selectedPhaseId,
+    onSelectPhase: setSelectedPhaseId,
+  });
+
   // L'App Router réutilise ce composant d'un paramètre à l'autre : passer de
   // `/tournois/1` à `/tournois/2` ne le remonte pas (`useTournamentLive` remet
   // son état à zéro pour la même raison). Une modale destructrice ne doit pas
@@ -109,21 +121,52 @@ export default function TournamentDetailPage() {
   // lorsqu'elle change RÉELLEMENT (une phase vient de démarrer) : comparer
   // directement à `selectedPhaseId` ramènerait l'affichage sur la phase en cours
   // à chaque clic, rendant impossible la consultation d'une phase terminée.
-  const lastCurrentPhaseId = useRef<number | null>(null);
+  //
+  // `undefined` = **rien observé encore**, et ce troisième état n'est pas du
+  // luxe : parti de `null`, le premier instantané ressemblait à un changement de
+  // phase (`null` → la phase en cours) et emportait la sélection avec lui. Le
+  // défaut ci-dessous le masquait tant qu'il était seul à écrire ; il ne l'est
+  // plus depuis qu'une ancre `#match-[id]` peut avoir déjà choisi une phase.
+  const lastCurrentPhaseId = useRef<number | null | undefined>(undefined);
+
+  // Même précaution que les trois dialogues ci-dessus, et pour la même raison :
+  // la page n'est pas remontée d'un tournoi à l'autre. Une phase appartient à
+  // **son** tournoi — garder son identifiant laisserait `selectedPhase`
+  // introuvable, donc `filteredMatches` non filtré, et la fiche empilerait
+  // toutes les phases. Les deux repères partent ensemble : remettre le seul
+  // `lastCurrentPhaseId` ferait croire à un démarrage de phase au premier
+  // instantané du nouveau tournoi, ce qui écraserait la phase qu'une ancre
+  // `#match-[id]` vient de choisir.
+  useEffect(() => {
+    setSelectedPhaseId(null);
+    lastCurrentPhaseId.current = undefined;
+  }, [tournamentId]);
 
   useEffect(() => {
-    if (!detail?.phases) return;
+    const phases = detail?.phases;
+    if (!phases) return;
 
-    const current = detail.currentPhaseId ?? null;
-
-    if (selectedPhaseId === null) {
-      setSelectedPhaseId(defaultSelectedPhaseId(detail.phases, current));
-    } else if (current !== null && current !== lastCurrentPhaseId.current) {
-      setSelectedPhaseId(current);
-    }
-
+    const current = detail?.currentPhaseId ?? null;
+    const phaseJustStarted =
+      lastCurrentPhaseId.current !== undefined &&
+      current !== null &&
+      current !== lastCurrentPhaseId.current;
     lastCurrentPhaseId.current = current;
-  }, [detail?.phases, detail?.currentPhaseId, selectedPhaseId]);
+
+    // Mise à jour **fonctionnelle**, et ce n'est pas un détail de style : cet
+    // effet n'est pas seul à écrire la phase sélectionnée. `useMatchAnchor`
+    // l'écrit aussi, pour révéler la phase d'un match visé par une ancre, et il
+    // est déclaré plus haut — ses effets passent donc avant celui-ci **dans le
+    // même commit**, où `selectedPhaseId` vaut encore ce qu'il valait au rendu.
+    // Lu directement, il valait `null` : ce défaut écrasait aussitôt la phase
+    // que l'ancre venait de choisir, et le match restait introuvable. Le
+    // paramètre `previous`, lui, porte la valeur écrite juste avant.
+    setSelectedPhaseId((previous) => {
+      if (previous === null) return defaultSelectedPhaseId(phases, current);
+      if (phaseJustStarted) return current;
+      return previous;
+    });
+  }, [detail?.phases, detail?.currentPhaseId]);
 
   // Échec définitif avant même d'avoir reçu quoi que ce soit : sans ce cas, la
   // page resterait sur « Chargement… » pour toujours — le seul état où il ne
@@ -379,6 +422,10 @@ export default function TournamentDetailPage() {
       participantType={detail.card.participantType}
       soloUserIds={detail.soloUserIds}
     >
+      <MatchAnchorProvider
+        targetMatchId={targetMatchId}
+        highlightedMatchId={highlightedMatchId}
+      >
       <MatchFormatProvider format={detail.card.matchFormat}>
       <LiveProvider
         canManage={detail.canManageLive}
@@ -746,6 +793,7 @@ export default function TournamentDetailPage() {
       </IssueReportProvider>
       </LiveProvider>
       </MatchFormatProvider>
+      </MatchAnchorProvider>
     </EntrantProvider>
   );
 }
