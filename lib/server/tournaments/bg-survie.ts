@@ -19,6 +19,7 @@ import {
   planEnduranceRound,
   qualificationComplete,
   rankActiveTeams,
+  roundLimitReached,
   replayEndurance,
   replayEnduranceDetailed,
   resolveEnduranceConfig,
@@ -26,6 +27,7 @@ import {
   type EnduranceConfig,
   type EnduranceMatchOutcome,
   type EnduranceStanding,
+  type EnduranceStatus,
 } from "@/lib/shared/bg-survie";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { createMatch, finishTournament } from "./repository";
@@ -39,6 +41,7 @@ type TournamentEnduranceRow = RowDataPacket & {
   endurance_win_delta: number | null;
   endurance_loss_delta: number | null;
   endurance_playoff_size: number | null;
+  endurance_max_rounds: number | null;
   endurance_current_round: number;
   endurance_playoffs_started: number;
   has_third_place_match: number;
@@ -51,8 +54,8 @@ async function loadTournament(
   const [rows] = await conn.execute<TournamentEnduranceRow[]>(
     `SELECT format, state, match_format_type, match_format_value,
             endurance_start_points, endurance_win_delta, endurance_loss_delta,
-            endurance_playoff_size, endurance_current_round, endurance_playoffs_started,
-            has_third_place_match
+            endurance_playoff_size, endurance_max_rounds, endurance_current_round,
+            endurance_playoffs_started, has_third_place_match
      FROM bg_tournaments WHERE id = ? LIMIT 1`,
     [tournamentId],
   );
@@ -65,6 +68,7 @@ function configOf(tournament: TournamentEnduranceRow): EnduranceConfig {
     winDelta: tournament.endurance_win_delta ?? undefined,
     lossDelta: tournament.endurance_loss_delta ?? undefined,
     playoffSize: tournament.endurance_playoff_size ?? undefined,
+    maxRounds: tournament.endurance_max_rounds ?? undefined,
   });
 }
 
@@ -97,7 +101,7 @@ export async function loadEnduranceStandings(
       points: number;
       wins: number;
       losses: number;
-      status: "ACTIVE" | "ELIMINATED" | "FORFEIT";
+      status: EnduranceStatus;
       eliminated_round: number | null;
       rank: number;
     })[]
@@ -195,7 +199,8 @@ export async function initializeEnduranceTournament(
   await conn.execute(
     `UPDATE bg_tournaments
      SET endurance_start_points = ?, endurance_win_delta = ?, endurance_loss_delta = ?,
-         endurance_playoff_size = ?, endurance_current_round = 0, endurance_playoffs_started = 0,
+         endurance_playoff_size = ?, endurance_max_rounds = ?,
+         endurance_current_round = 0, endurance_playoffs_started = 0,
          bracket_size = ?
      WHERE id = ?`,
     [
@@ -203,6 +208,7 @@ export async function initializeEnduranceTournament(
       config.winDelta,
       config.lossDelta,
       config.playoffSize,
+      config.maxRounds,
       standings.length,
       tournamentId,
     ],
@@ -230,6 +236,11 @@ export async function generateEnduranceRound(
   if (active.length < 2 || qualificationComplete(active.length, config)) return;
 
   const nextRound = Number(tournament.endurance_current_round) + 1;
+
+  // Plafond de manches : on n'en pose jamais une de plus. Le rejeu a déjà
+  // tranché qui est qualifié à la dernière manche — c'est `reconcileEndurance`
+  // qui enchaîne sur les play-offs, ici il n'y a plus rien à apparier.
+  if (roundLimitReached(config, nextRound - 1)) return;
   const pairings = planEnduranceRound(standings);
 
   let matchNumber = 1;
@@ -364,6 +375,9 @@ export async function reconcileEndurance(
 
   const active = replayed.filter((standing) => standing.status === "ACTIVE");
 
+  // Le plafond de manches n'a pas de branche à lui : le rejeu écarte lui-même
+  // les non-qualifiées à la dernière manche, si bien que l'effectif retombe à
+  // `playoffSize` et que la bascule ci-dessous se déclenche comme d'habitude.
   if (qualificationComplete(active.length, config)) {
     await startEndurancePlayoffs(tournamentId, conn);
     return;
@@ -769,7 +783,7 @@ export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: numb
       points: number;
       wins: number;
       losses: number;
-      status: "ACTIVE" | "ELIMINATED" | "FORFEIT";
+      status: EnduranceStatus;
       eliminated_round: number | null;
       rank: number;
     })[]
@@ -808,6 +822,7 @@ export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: numb
     lossDelta: config.lossDelta,
     forfeitMaps: forfeitMapCount(matchFormatOf(tournament)),
     playoffSize: config.playoffSize,
+    maxRounds: config.maxRounds,
     currentRound: Number(tournament.endurance_current_round),
     playoffsStarted: Number(tournament.endurance_playoffs_started) === 1,
     rounds: detailed.rounds,

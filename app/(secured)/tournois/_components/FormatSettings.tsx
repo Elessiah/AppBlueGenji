@@ -120,6 +120,26 @@ export function FormatSettings({
               suit le tableau du règlement (8v4, 6v2, 1v5, 3v7) avec petite finale.
             </p>
           </div>
+
+          <div className="field">
+            <label htmlFor="endurance-max-rounds">Manches maximum</label>
+            <input
+              id="endurance-max-rounds"
+              type="number"
+              min={0}
+              max={50}
+              disabled={locked("enduranceMaxRounds")}
+              value={values.enduranceMaxRounds}
+              onChange={(e) => set("enduranceMaxRounds", Number(e.target.value))}
+              {...lockedAttr("enduranceMaxRounds")}
+            />
+            <p style={HINT}>
+              0 = aucune limite : la phase court jusqu&apos;à l&apos;effectif ci-dessus.
+              Sinon elle s&apos;arrête à cette manche et les meilleures du classement
+              sont qualifiées ; celles qui ne peuvent plus les rejoindre sortent
+              avant la fin.
+            </p>
+          </div>
         </>
       )}
 

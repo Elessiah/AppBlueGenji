@@ -47,6 +47,7 @@ export type EditableTournamentValues = {
   enduranceWinDelta: number | null;
   enduranceLossDelta: number | null;
   endurancePlayoffSize: number | null;
+  enduranceMaxRounds: number | null;
   matchFormat: MatchFormat | null;
   phases: PhaseConfig[] | null;
 };
@@ -70,7 +71,7 @@ async function loadEditRow(
       survival_rounds_before_first_cut, survival_rounds_per_cut,
       swiss_total_rounds, swiss_points_win, swiss_points_draw, swiss_points_loss,
       endurance_start_points, endurance_win_delta, endurance_loss_delta,
-      endurance_playoff_size,
+      endurance_playoff_size, endurance_max_rounds,
       match_format_type, match_format_value
      FROM bg_tournaments
      WHERE id = ?
@@ -109,6 +110,7 @@ function toValues(
     enduranceWinDelta: num(row.endurance_win_delta),
     enduranceLossDelta: num(row.endurance_loss_delta),
     endurancePlayoffSize: num(row.endurance_playoff_size),
+    enduranceMaxRounds: num(row.endurance_max_rounds),
     matchFormat:
       row.match_format_type === null || row.match_format_value === null
         ? null
@@ -236,6 +238,7 @@ export async function updateTournament(
       enduranceWinDelta: next.enduranceWinDelta ?? undefined,
       enduranceLossDelta: next.enduranceLossDelta ?? undefined,
       endurancePlayoffSize: next.endurancePlayoffSize ?? undefined,
+      enduranceMaxRounds: next.enduranceMaxRounds ?? undefined,
       matchFormatType: next.matchFormat?.type ?? null,
       matchFormatValue: next.matchFormat?.value ?? null,
       phases: next.phases ?? undefined,
@@ -272,7 +275,7 @@ export async function updateTournament(
         survival_rounds_before_first_cut = ?, survival_rounds_per_cut = ?,
         swiss_total_rounds = ?, swiss_points_win = ?, swiss_points_draw = ?, swiss_points_loss = ?,
         endurance_start_points = ?, endurance_win_delta = ?, endurance_loss_delta = ?,
-        endurance_playoff_size = ?,
+        endurance_playoff_size = ?, endurance_max_rounds = ?,
         match_format_type = ?, match_format_value = ?
        WHERE id = ?`,
       [
@@ -297,6 +300,7 @@ export async function updateTournament(
         valid.enduranceWinDelta,
         valid.enduranceLossDelta,
         valid.endurancePlayoffSize,
+        valid.enduranceMaxRounds,
         valid.matchFormat?.type ?? null,
         valid.matchFormat?.value ?? null,
         tournamentId,

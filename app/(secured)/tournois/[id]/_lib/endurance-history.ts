@@ -16,7 +16,8 @@ import type { EnduranceRoundCell } from "@/lib/shared/bg-survie";
  * - `ZERO` — capital vidé : c'est encore un nombre, mais il ne se lit plus
  *   comme un score sain ;
  * - `FORFEIT` — forfait sur le reste du tournoi : case rouge portant « FF » ;
- * - `OUT` — manche que l'équipe, déjà éliminée, n'a pas disputée.
+ * - `OUT` — manche que l'équipe, déjà sortie, n'a pas disputée (capital vidé
+ *   ou plus aucune chance de rejoindre les play-offs).
  */
 export type EnduranceCellTone = "POINTS" | "ZERO" | "FORFEIT" | "OUT";
 
@@ -46,7 +47,9 @@ export function enduranceCellTitle(teamName: string, cell: EnduranceRoundCell): 
   const prefix = `${teamName} · manche ${cell.round}`;
 
   if (cell.kind === "FORFEIT") return `${prefix} : forfait sur le reste du tournoi`;
-  if (cell.kind === "OUT") return `${prefix} : déjà éliminée`;
+  // « Déjà sortie » et non « déjà éliminée » : la case couvre aussi une équipe
+  // écartée faute de perspectives, qui gardait pourtant du capital.
+  if (cell.kind === "OUT") return `${prefix} : déjà sortie de la phase qualificative`;
 
   const points = cell.points ?? 0;
   return `${prefix} : ${points} point${points > 1 ? "s" : ""} d'endurance`;

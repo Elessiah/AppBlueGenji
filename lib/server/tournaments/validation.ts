@@ -141,6 +141,7 @@ export type TournamentInputBody = {
   enduranceWinDelta?: number;
   enduranceLossDelta?: number;
   endurancePlayoffSize?: number;
+  enduranceMaxRounds?: number;
   matchFormatType?: string | null;
   matchFormatValue?: number | null;
 };
@@ -163,6 +164,7 @@ export type ValidatedTournamentInput = {
   enduranceWinDelta: number | null;
   enduranceLossDelta: number | null;
   endurancePlayoffSize: number | null;
+  enduranceMaxRounds: number | null;
   matchFormat: MatchFormat | null;
   /**
    * Phases du format MULTI, **brutes** (telles que reçues du client) : non
@@ -251,12 +253,16 @@ export function validateTournamentInput(
   let enduranceWinDelta: number | null = null;
   let enduranceLossDelta: number | null = null;
   let endurancePlayoffSize: number | null = null;
+  // `null` = phase à durée libre : elle s'arrête sur l'effectif, jamais sur le
+  // calendrier. C'est le comportement d'origine du mode, et il reste le défaut.
+  let enduranceMaxRounds: number | null = null;
   if (body.format === "BG_SURVIE") {
     const settings: [unknown, number, number, (v: number) => void][] = [
       [body.endurancePoints, 1, 99, (v) => (endurancePoints = v)],
       [body.enduranceWinDelta, 1, 20, (v) => (enduranceWinDelta = v)],
       [body.enduranceLossDelta, 1, 20, (v) => (enduranceLossDelta = v)],
       [body.endurancePlayoffSize, 2, 32, (v) => (endurancePlayoffSize = v)],
+      [body.enduranceMaxRounds, 1, 50, (v) => (enduranceMaxRounds = v)],
     ];
 
     for (const [raw, min, max, assign] of settings) {
@@ -346,6 +352,7 @@ export function validateTournamentInput(
       enduranceWinDelta,
       enduranceLossDelta,
       endurancePlayoffSize,
+      enduranceMaxRounds,
       matchFormat,
       // Les phases ne concernent que le format MULTI : on ne les transmet pas
       // aux autres formats, même si le client en a envoyé. Voir le

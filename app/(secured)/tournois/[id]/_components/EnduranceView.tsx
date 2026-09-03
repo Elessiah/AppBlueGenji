@@ -40,9 +40,16 @@ function rowClass(withActions: boolean): string {
 /** Première manche de play-offs (cf. `lib/server/tournaments/bg-survie.ts`). */
 const PLAYOFF_ROUND_OFFSET = 1000;
 
+/**
+ * « Éliminée » et « Hors course » ne disent pas la même chose et ne peuvent pas
+ * partager un libellé : la première a vidé son capital, la seconde en garde
+ * mais ne peut plus rejoindre les play-offs dans les manches restantes — sa
+ * ligne montre encore des points, et « Éliminée » à côté ne se lirait pas.
+ */
 const STATUS_LABELS: Record<EnduranceMeta["standings"][number]["status"], string> = {
   ACTIVE: "En lice",
   ELIMINATED: "Éliminée",
+  OUT_OF_CONTENTION: "Hors course",
   FORFEIT: "Forfait",
 };
 
@@ -158,6 +165,14 @@ export function EnduranceView({
   const rounds = [...new Set(visible.map((match) => match.roundNumber))].sort((a, b) => b - a);
   const activeCount = endurance.standings.filter((s) => s.status === "ACTIVE").length;
 
+  // Sous plafond, la manche courante ne se lit qu'accompagnée de son total :
+  // « manche 4 » ne dit pas s'il en reste six ou une seule, et c'est justement
+  // ce qui décide qui est encore en course.
+  const roundLabel =
+    endurance.maxRounds === null
+      ? String(endurance.currentRound)
+      : `${endurance.currentRound}/${endurance.maxRounds}`;
+
   // Abandon : proposé sur les équipes encore en lice, à leurs représentants
   // comme à l'arbitrage (cf. `canForfeit` côté page).
   //
@@ -191,7 +206,7 @@ export function EnduranceView({
         {endurance.lossDelta} PAR MAP PERDUE · FORFAIT COMPTÉ {endurance.forfeitMaps}-0 ·{" "}
         {endurance.playoffsStarted
           ? `PLAY-OFFS À ${endurance.playoffSize}`
-          : `MANCHE ${endurance.currentRound} · ${activeCount} ${wording.manyCapitalized.toUpperCase()} EN LICE → ${endurance.playoffSize}`}
+          : `MANCHE ${roundLabel} · ${activeCount} ${wording.manyCapitalized.toUpperCase()} EN LICE → ${endurance.playoffSize}`}
       </p>
 
       <div className="table-like" style={{ marginBottom: 24 }}>

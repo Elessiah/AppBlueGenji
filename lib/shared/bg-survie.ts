@@ -14,7 +14,12 @@
  *    effectif impair, la dernière du classement ne joue pas et son capital est
  *    inchangé. La mieux classée du couple part à gauche.
  *    La phase s'arrête dès qu'il ne reste plus que `playoffSize` équipes
- *    (8 par défaut) ou moins.
+ *    (8 par défaut) ou moins — ou, si le tournoi fixe un nombre maximal de
+ *    manches (`maxRounds`), dès que ce nombre est atteint : les `playoffSize`
+ *    premières du classement sont alors qualifiées, les autres sortent.
+ *    Sous plafond, une équipe qui ne peut plus **mathématiquement** rejoindre
+ *    ce plateau dans les manches restantes est écartée sans attendre la fin
+ *    (`enduranceEliminationCut`).
  *
  * 2. **Phase éliminatoire.** Les qualifiées jouent un arbre à élimination
  *    directe dont les affrontements suivent un tableau fixe (8v4, 6v2, 1v5,
@@ -29,14 +34,23 @@
  * Module pur : aucune dépendance base de données, entièrement testable.
  */
 
-import { forfeitMapCount, type MatchFormat } from "./match-format";
+import { forfeitMapCount, matchWinsRequired, type MatchFormat } from "./match-format";
 
 // Le chiffre d'un forfait appartient au format de match, pas au mode : il est
 // défini une seule fois dans `match-format.ts` et réexporté ici, où l'appelaient
 // déjà l'orchestration et la vue.
 export { forfeitMapCount };
 
-export type EnduranceStatus = "ACTIVE" | "ELIMINATED" | "FORFEIT";
+/**
+ * Sortie d'une équipe de la phase qualificative.
+ *
+ * `ELIMINATED` et `OUT_OF_CONTENTION` ne se confondent pas, et c'est tout
+ * l'intérêt de les nommer séparément : la première a **vidé son capital**
+ * (0 point, elle est tombée), la seconde en a encore mais **ne peut plus
+ * atteindre le plateau des play-offs** dans les manches qui restent. Afficher
+ * « Éliminée » à côté d'un capital de 6 points ne se lit pas.
+ */
+export type EnduranceStatus = "ACTIVE" | "ELIMINATED" | "OUT_OF_CONTENTION" | "FORFEIT";
 
 /** Barème d'endurance d'un tournoi. */
 export type EnduranceConfig = {
@@ -48,6 +62,16 @@ export type EnduranceConfig = {
   lossDelta: number;
   /** Effectif de la phase éliminatoire (défaut 8). */
   playoffSize: number;
+  /**
+   * Nombre maximal de manches qualificatives. `null` = aucune limite : la
+   * phase court jusqu'à ce que l'effectif retombe à `playoffSize`, seul
+   * comportement qu'aient connu les tournois d'avant ce réglage.
+   *
+   * Fixé, il change la nature de la phase : elle s'arrête à la manche dite, et
+   * les `playoffSize` premières du classement sont qualifiées — même si elles
+   * sont encore trente.
+   */
+  maxRounds: number | null;
 };
 
 export const DEFAULT_ENDURANCE_CONFIG: EnduranceConfig = {
@@ -55,6 +79,7 @@ export const DEFAULT_ENDURANCE_CONFIG: EnduranceConfig = {
   winDelta: 1,
   lossDelta: 1,
   playoffSize: 8,
+  maxRounds: null,
 };
 
 export type EnduranceStanding = {
@@ -178,6 +203,7 @@ export function resolveEnduranceConfig(input?: Partial<EnduranceConfig> | null):
   const win = Number(input?.winDelta);
   const loss = Number(input?.lossDelta);
   const playoff = Number(input?.playoffSize);
+  const maxRounds = Number(input?.maxRounds);
 
   return {
     startPoints: Number.isFinite(start) && start > 0 ? Math.floor(start) : DEFAULT_ENDURANCE_CONFIG.startPoints,
@@ -185,6 +211,9 @@ export function resolveEnduranceConfig(input?: Partial<EnduranceConfig> | null):
     lossDelta: Number.isFinite(loss) && loss > 0 ? Math.floor(loss) : DEFAULT_ENDURANCE_CONFIG.lossDelta,
     playoffSize:
       Number.isFinite(playoff) && playoff >= 2 ? Math.floor(playoff) : DEFAULT_ENDURANCE_CONFIG.playoffSize,
+    // Une limite absurde (0, négative, absente) n'est pas une limite : le mode
+    // retombe alors sur la phase à durée libre, son comportement d'origine.
+    maxRounds: Number.isFinite(maxRounds) && maxRounds >= 1 ? Math.floor(maxRounds) : null,
   };
 }
 
@@ -232,6 +261,96 @@ export function qualificationComplete(activeCount: number, config: EnduranceConf
 }
 
 /**
+ * Le plafond de manches qualificatives est-il atteint ?
+ *
+ * `completedRounds` compte les manches **déjà closes**. Sans plafond la réponse
+ * est toujours « non » : la phase ne s'arrête alors que sur l'effectif, comme
+ * elle l'a toujours fait.
+ */
+export function roundLimitReached(config: EnduranceConfig, completedRounds: number): boolean {
+  return config.maxRounds !== null && completedRounds >= config.maxRounds;
+}
+
+/**
+ * Amplitude d'une manche pour une équipe : ce qu'elle peut gagner au mieux, ce
+ * qu'elle peut perdre au pire.
+ *
+ * Le plafond vient du **format de match** : en FT3 un vainqueur emporte trois
+ * maps au maximum, un perdant en encaisse trois. Sans format — tournoi en
+ * saisie libre — il n'y a pas de plafond du tout, donc `null` : rien n'y est
+ * mathématiquement acquis, et aucune équipe ne peut être écartée d'avance.
+ */
+export function enduranceRoundSwing(
+  config: EnduranceConfig,
+  format: MatchFormat | null | undefined,
+): { gain: number; loss: number } | null {
+  if (!format) return null;
+
+  const maps = matchWinsRequired(format);
+  return { gain: config.winDelta * maps, loss: config.lossDelta * maps };
+}
+
+/**
+ * Équipes à écarter à la fin d'une manche, quand la phase a un plafond.
+ *
+ * Deux situations, la même conclusion — l'équipe ne jouera plus :
+ *
+ * - `remainingRounds === 0` — la dernière manche vient d'être jouée : les
+ *   `playoffSize` premières sont qualifiées, **tout le reste sort**. Sans ce
+ *   trait, la phase s'arrêterait en laissant trente équipes « en lice » dont
+ *   huit seulement disputent l'arbre.
+ * - `remainingRounds > 0` — élimination **mathématique** : une équipe sort dès
+ *   qu'au moins `playoffSize` autres finiront devant elle quoi qu'il arrive. Le
+ *   critère compare le **plafond** de l'équipe (elle gagne tout ce qui reste) au
+ *   **plancher** des autres (elles perdent tout ce qui reste) : mieux vaut
+ *   garder une manche de trop une équipe condamnée que d'en sortir une qui
+ *   pouvait encore revenir. Une adversaire dont le plancher dépasse ce plafond
+ *   ne peut pas non plus tomber à zéro en route — son acquis est donc réel, pas
+ *   seulement arithmétique.
+ *
+ * **Parité.** Un effectif impair fait chômer une équipe à chaque manche : la
+ * coupe mathématique est abandonnée si elle laisse un nombre impair d'équipes
+ * *à qui il reste des manches à jouer*. On ne prive pas une équipe en course de
+ * sa manche pour sortir des équipes condamnées — elles le resteront à la
+ * manche suivante. Le cas ne se pose pas quand la coupe ramène pile à
+ * `playoffSize` : plus personne ne dispute de manche qualificative derrière.
+ */
+export function enduranceEliminationCut(
+  standings: EnduranceStanding[],
+  config: EnduranceConfig,
+  remainingRounds: number,
+  format: MatchFormat | null | undefined,
+): number[] {
+  if (remainingRounds < 0) return [];
+
+  const active = rankActiveTeams(standings);
+
+  // Dernière manche jouée : la coupe est un simple trait sous la cible.
+  if (remainingRounds === 0) return active.slice(config.playoffSize).map((s) => s.teamId);
+
+  const swing = enduranceRoundSwing(config, format);
+  if (!swing) return [];
+
+  const gain = swing.gain * remainingRounds;
+  const loss = swing.loss * remainingRounds;
+
+  const doomed = active.filter((team) => {
+    const ceiling = team.points + gain;
+    const ahead = active.filter(
+      (other) => other.teamId !== team.teamId && other.points - loss > ceiling,
+    ).length;
+    return ahead >= config.playoffSize;
+  });
+
+  if (doomed.length === 0) return [];
+
+  const survivors = active.length - doomed.length;
+  if (survivors > config.playoffSize && survivors % 2 !== 0) return [];
+
+  return doomed.map((team) => team.teamId);
+}
+
+/**
  * Applique le solde de maps d'une équipe sur son capital, et la sort du tournoi
  * si celui-ci tombe à 0.
  *
@@ -267,10 +386,12 @@ function enduranceRoundCell(standing: EnduranceStanding, round: number): Enduran
   // la case rouge « FF » du tableau, pas un capital tombé à zéro.
   if (standing.status === "FORFEIT") return { round, kind: "FORFEIT", points: null };
 
-  // Éliminée lors d'une manche **antérieure** : elle n'a pas joué celle-ci. La
-  // manche qui la vide, elle, affiche son zéro — c'est le résultat de la manche.
+  // Sortie lors d'une manche **antérieure** : elle n'a pas joué celle-ci. La
+  // manche de sa sortie, elle, affiche son capital — c'est le résultat de la
+  // manche, et pour une équipe écartée faute de perspectives ce capital n'est
+  // même pas nul.
   if (
-    standing.status === "ELIMINATED" &&
+    standing.status !== "ACTIVE" &&
     standing.eliminatedRound !== null &&
     standing.eliminatedRound < round
   ) {
@@ -342,6 +463,22 @@ export function replayEnduranceDetailed(input: ReplayEnduranceInput): EnduranceR
     0,
   );
 
+  // Une manche est **close** quand elle a des matchs et qu'ils sont tous joués.
+  // La coupe de fin de manche s'y adosse : sur une manche entamée, une équipe
+  // qui n'a pas encore disputé la sienne verrait son plafond calculé comme si
+  // elle avait déjà tout perdu.
+  const roundProgress = new Map<number, { total: number; done: number }>();
+  for (const match of matches) {
+    const entry = roundProgress.get(match.round) ?? { total: 0, done: 0 };
+    entry.total += 1;
+    if (match.completed) entry.done += 1;
+    roundProgress.set(match.round, entry);
+  }
+  const roundIsClosed = (round: number): boolean => {
+    const entry = roundProgress.get(round);
+    return entry !== undefined && entry.total > 0 && entry.total === entry.done;
+  };
+
   const rounds: number[] = [];
   const history = new Map<number, EnduranceRoundCell[]>(teams.map((team) => [team.teamId, []]));
 
@@ -383,6 +520,24 @@ export function replayEnduranceDetailed(input: ReplayEnduranceInput): EnduranceR
         standing.status = "FORFEIT";
         standing.eliminatedRound = round;
         standing.points = 0;
+      }
+    }
+
+    // Coupe de fin de manche — seulement sous plafond de manches, seulement sur
+    // une manche close. Les équipes écartées gardent leur capital : c'est
+    // l'horizon qui leur manque, pas les points.
+    if (config.maxRounds !== null && roundIsClosed(round)) {
+      const cut = enduranceEliminationCut(
+        [...standings.values()],
+        config,
+        config.maxRounds - round,
+        matchFormat,
+      );
+      for (const teamId of cut) {
+        const standing = standings.get(teamId);
+        if (!standing) continue;
+        standing.status = "OUT_OF_CONTENTION";
+        standing.eliminatedRound = round;
       }
     }
 

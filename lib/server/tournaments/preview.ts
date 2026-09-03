@@ -31,6 +31,7 @@ import { loadPhases } from "./phases-repository";
 type PreviewSettingsRow = RowDataPacket & {
   swiss_total_rounds: number | null;
   endurance_playoff_size: number | null;
+  endurance_max_rounds: number | null;
 };
 
 /** L'aperçu n'a de sens qu'avant le lancement : ensuite, le vrai plateau existe. */
@@ -123,7 +124,8 @@ export async function loadTournamentPreview(
   const entrants = await loadOrderedEntrants(connection, tournament.id, source);
 
   const [settings] = await connection.execute<PreviewSettingsRow[]>(
-    `SELECT swiss_total_rounds, endurance_playoff_size FROM bg_tournaments WHERE id = ? LIMIT 1`,
+    `SELECT swiss_total_rounds, endurance_playoff_size, endurance_max_rounds
+     FROM bg_tournaments WHERE id = ? LIMIT 1`,
     [tournament.id],
   );
 
@@ -149,6 +151,10 @@ export async function loadTournamentPreview(
       settings[0]?.endurance_playoff_size === null || settings[0]?.endurance_playoff_size === undefined
         ? null
         : Number(settings[0].endurance_playoff_size),
+    enduranceMaxRounds:
+      settings[0]?.endurance_max_rounds === null || settings[0]?.endurance_max_rounds === undefined
+        ? null
+        : Number(settings[0].endurance_max_rounds),
     phases,
   });
 }
