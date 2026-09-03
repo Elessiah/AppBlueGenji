@@ -91,6 +91,26 @@ Le **focus** va sur la carte (`tabIndex={-1}` sur `MatchRow`, `focus({
 preventScroll: true })` dans le hook) : le défilement et le halo ne disent rien à
 qui ne voit pas la page, et un navigateur en fait autant sur une ancre native.
 
+### On ne reprend jamais la main sur le lecteur
+
+La recherche peut durer vingt secondes, et la page reste utilisable pendant ce
+temps. Arriver après coup pour recadrer et déplacer le focus arracherait le
+curseur d'un champ de score en cours de saisie. Le hook guette donc les gestes
+qui ne peuvent venir que d'une personne (`pointerdown`, `keydown`, `wheel`,
+`touchstart` — pas `scroll`, que nous déclenchons nous-mêmes) : si l'un d'eux est
+passé, on **renonce au déplacement, pas au repère**. Le halo s'allume quand même —
+il désigne toujours la manche qu'on venait voir, et on la trouve en défilant.
+
+### L'ancre se rejoue d'un tournoi à l'autre
+
+L'App Router **réutilise** cette page d'un `[id]` à l'autre — `useTournamentLive`
+et les trois dialogues de la page prennent déjà cette précaution — et une
+navigation client passe par `history.pushState`, qui ne déclenche **pas** de
+`hashchange`. La lecture du fragment dépend donc de `tournamentId` : sans cela,
+`/tournois/5#match-42` → `/tournois/7#match-99` ignorerait purement l'ancre du
+second tournoi, et le halo du premier pourrait suivre sur une manche de même
+identifiant.
+
 ### Trois pièges, traités explicitement
 
 **Le contenu arrive après le premier rendu.** La page ouvre le flux SSE, et

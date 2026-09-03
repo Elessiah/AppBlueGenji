@@ -101,6 +101,7 @@ export default function TournamentDetailPage() {
   // (carte « en cours » de l'accueil, lien partagé). Le hook révèle au besoin la
   // phase qui le contient, attend qu'il arrive par le flux, puis le surligne.
   const { targetMatchId, highlightedMatchId } = useMatchAnchor({
+    tournamentId,
     matches: detail?.matches,
     selectedPhaseId,
     onSelectPhase: setSelectedPhaseId,

@@ -38,6 +38,17 @@ const SETTLE_CHECK_MS = 700;
  *  pas devenir un état permanent de la carte. */
 const HIGHLIGHT_MS = 3_000;
 
+/**
+ * Gestes par lesquels le lecteur reprend la main sur la page.
+ *
+ * La recherche peut durer vingt secondes ; pendant ce temps la page est
+ * utilisable, et arriver après coup pour recadrer et déplacer le focus
+ * arracherait le curseur d'un champ de score en cours de saisie. Ces
+ * évènements-là ne peuvent venir que d'une personne — un `mousemove` ne compte
+ * pas, et `scroll` non plus : c'est *nous* qui le déclenchons.
+ */
+const READER_GESTURES = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
+
 export type MatchAnchorState = {
   /** Match cherché, tant qu'il n'a pas été trouvé (ou que l'attente dure). */
   targetMatchId: number | null;
@@ -46,6 +57,18 @@ export type MatchAnchorState = {
 };
 
 type UseMatchAnchorOptions = {
+  /**
+   * Tournoi affiché.
+   *
+   * Il n'entre dans aucun calcul : il sert de **remise à zéro**. L'App Router
+   * réutilise la page d'un paramètre à l'autre — `/tournois/5` → `/tournois/7`
+   * ne la remonte pas —, et une navigation client passe par `history.pushState`,
+   * qui ne déclenche **pas** de `hashchange`. Sans cette dépendance, l'ancre du
+   * second tournoi serait purement ignorée, et le halo du premier pourrait
+   * suivre sur une manche de même identifiant. C'est la précaution que prennent
+   * déjà `useTournamentLive` et les trois dialogues de la page.
+   */
+  tournamentId: number;
   /** Matchs connus du tournoi ; `undefined` tant que le flux n'a rien apporté. */
   matches: readonly PhasedMatch[] | null | undefined;
   /** Phase affichée (`MULTI` uniquement), pour savoir s'il faut en changer. */
@@ -113,6 +136,7 @@ function isOnScreen(element: HTMLElement): boolean {
  * dort (`BracketSections`) — puis le `surlignage`, une fois arrivé.
  */
 export function useMatchAnchor({
+  tournamentId,
   matches,
   selectedPhaseId,
   onSelectPhase,
@@ -123,21 +147,47 @@ export function useMatchAnchor({
   const deadlineRef = useRef(0);
   /** Cible dont la phase a déjà été révélée. */
   const phaseAppliedFor = useRef<number | null>(null);
+  /** Le lecteur a-t-il pris la main depuis que cette cible est cherchée ? */
+  const readerTookOver = useRef(false);
 
   // 1. Le fragment d'URL.
+  //
+  // Relancé à chaque changement de tournoi, parce que la page n'est pas remontée
+  // pour autant et qu'un `pushState` ne produit pas de `hashchange`.
   useEffect(() => {
+    // Ce qui restait de la cible précédente ne concerne pas ce tournoi-ci.
+    setTarget(null);
+    setHighlighted(null);
+    phaseAppliedFor.current = null;
+
     const read = () => {
       const matchId = parseMatchAnchor(window.location.hash);
       if (matchId === null) return;
       deadlineRef.current = Date.now() + LOOKUP_TIMEOUT_MS;
       phaseAppliedFor.current = null;
+      // Le clic qui a mené ici a produit son propre `pointerdown`, mais **avant**
+      // cet effet : la marque repart donc de zéro pour la nouvelle cible.
+      readerTookOver.current = false;
       setTarget(matchId);
+    };
+
+    // Gestes qui ne peuvent venir que du lecteur — un `mousemove` n'en est pas
+    // un, et le défilement, non plus : celui qu'on déclenche nous-mêmes lèverait
+    // la marque qu'il est censé poser.
+    const takeOver = () => {
+      readerTookOver.current = true;
     };
 
     read();
     window.addEventListener("hashchange", read);
-    return () => window.removeEventListener("hashchange", read);
-  }, []);
+    for (const event of READER_GESTURES) {
+      window.addEventListener(event, takeOver, { passive: true });
+    }
+    return () => {
+      window.removeEventListener("hashchange", read);
+      for (const event of READER_GESTURES) window.removeEventListener(event, takeOver);
+    };
+  }, [tournamentId]);
 
   // 2. La phase qui contient la cible (`MULTI`).
   useEffect(() => {
@@ -165,12 +215,18 @@ export function useMatchAnchor({
 
       const element = document.getElementById(matchAnchorId(target));
       if (element) {
-        centerInView(element);
-        // Le focus suit, sans son propre recadrage : c'est ce que fait le
-        // navigateur sur une ancre native, et c'est ce qui annonce la carte à un
-        // lecteur d'écran — le halo et le défilement ne disent rien à qui ne
-        // voit pas la page.
-        element.focus({ preventScroll: true });
+        // Le lecteur a pris la main entre-temps : on renonce au déplacement,
+        // pas au repère. Le halo reste — il désigne toujours la manche qu'il
+        // venait voir, et il la trouvera en défilant — mais on ne lui arrache
+        // ni sa position ni son curseur.
+        if (!readerTookOver.current) {
+          centerInView(element);
+          // Le focus suit, sans son propre recadrage : c'est ce que fait le
+          // navigateur sur une ancre native, et c'est ce qui annonce la carte à
+          // un lecteur d'écran — le halo et le défilement ne disent rien à qui
+          // ne voit pas la page.
+          element.focus({ preventScroll: true });
+        }
         setHighlighted(target);
         setTarget(null);
         return;
@@ -195,9 +251,13 @@ export function useMatchAnchor({
     if (highlighted === null) return;
 
     const timer = setTimeout(() => {
+      // Même règle qu'à l'arrivée : on ne rattrape que la page, jamais le
+      // lecteur. S'il a bougé de lui-même, la carte est hors écran parce qu'il
+      // l'a voulu.
+      if (readerTookOver.current) return;
       const element = document.getElementById(matchAnchorId(highlighted));
       // On ne recadre que si la carte a réellement quitté l'écran : la corriger
-      // d'office reprendrait la main sur un lecteur qui a commencé à défiler.
+      // d'office serait un second saut sans raison.
       if (element && !isOnScreen(element)) centerInView(element);
     }, SETTLE_CHECK_MS);
 

@@ -71,6 +71,27 @@ describe("ancre d'un match — points de passage", () => {
     expect(HOOK).toContain("setTimeout(look");
   });
 
+  it("se rejoue d'un tournoi à l'autre", () => {
+    // L'App Router **réutilise** cette page d'un `[id]` à l'autre, et une
+    // navigation client passe par `history.pushState`, qui ne déclenche pas de
+    // `hashchange` : sans cette dépendance, l'ancre du second tournoi serait
+    // purement ignorée, et le halo du premier pourrait suivre sur une manche de
+    // même identifiant.
+    expect(HOOK).toContain("}, [tournamentId]);");
+    expect(PAGE).toMatch(/useMatchAnchor\(\{\s+tournamentId,/);
+  });
+
+  it("ne reprend pas la main sur un lecteur qui l'a déjà prise", () => {
+    // La recherche peut durer vingt secondes ; arriver après coup pour recadrer
+    // et déplacer le focus arracherait le curseur d'un champ de score en cours
+    // de saisie. Le halo, lui, reste : il ne dérange personne.
+    expect(HOOK).toContain("READER_GESTURES");
+    expect(HOOK).toContain("if (!readerTookOver.current) {");
+    expect(HOOK).toContain("if (readerTookOver.current) return;");
+    // `scroll` n'en fait pas partie : c'est nous qui le déclenchons.
+    expect(HOOK).not.toContain('"scroll"');
+  });
+
   it("renonce au bout d'un délai borné", () => {
     // Un identifiant qui ne désigne aucun match de ce tournoi ne doit pas
     // laisser une boucle derrière lui.
