@@ -139,10 +139,43 @@ Le même nombre borne la durée du verrou pris sur la ligne du tournoi : remplir
 un plateau de 128 demande quatre gestes au lieu d'un, mais aucune inscription de
 joueur n'attend derrière une transaction de cent écritures.
 
+L'égalité des deux nombres n'est pas une marge nulle par distraction : un lot qui
+**aboutit** ne met en file que ses inscriptions. Les deux autres évènements que
+la transaction pourrait produire (`tournament_started`,
+`tournament_underfilled`, réservés par `syncTournamentState`) supposent que
+l'état a quitté `REGISTRATION` — auquel cas `registerTeam` lève
+`REGISTRATION_CLOSED`, le lot est défait et la file jetée.
+
 Le plafond porte sur **ce qui est envoyé**, et il est vérifié avant que la liste
 ne soit parcourue : compter d'abord et plafonner ensuite laissait un corps de
 100 000 entiers occuper la boucle d'évènements avant d'être refusé — le
 processus entier, flux SSE compris, s'arrêtait le temps du refus.
+
+### Une ligne de journal par inscription, et non par geste
+
+Le lot ne collapse pas ses lignes de journal, contrairement à l'évènement de
+flux, et la différence n'est pas une inconséquence : le flux ne transporte qu'un
+signal de rafraîchissement, là où une ligne de journal **nomme l'engagé** qui
+vient d'entrer — c'est tout son objet pour une trace de staff. Trente-deux
+fantômes inscrites produisent donc ce que produiraient trente-deux joueurs
+s'inscrivant un par un, soit l'ordre de grandeur que `BOT_ACTIVITY_LOG.md`
+s'autorise (un plateau de 32 compte 31 matchs). L'envoi ne ralentit rien :
+`flushBotLogs` ne s'attend pas.
+
+### Pas de seconde connexion sous le verrou
+
+`getUserActiveTeam` accepte une connexion, et l'inscription d'un joueur la lui
+passe — celle de sa transaction. Sans cela, la fonction empruntait une
+**seconde** place du pool (25) alors que la transaction en retenait déjà une
+*et* tenait le verrou du tournoi : le porteur du verrou attend une connexion que
+les transactions bloquées sur son verrou ne rendront pas, et rien ne se dénoue
+avant `innodb_lock_wait_timeout`. Le convoi est né avec ce verrou — avant, les
+inscriptions ne se sérialisaient pas —, il se règle donc ici.
+
+Le contexte du lecteur (`getTournamentViewerContext`), lui, appelle toujours
+`getUserActiveTeam` **sans** connexion : il n'est dans aucune transaction, et y
+réserver une place du pool pour une seule requête doublerait la pression à
+chaque connexion SSE.
 
 ### Le plafond d'effectif tient
 

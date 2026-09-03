@@ -111,7 +111,11 @@ export async function resolveUserEntrantTeamId(
     return findSoloEntry(connection, userId);
   }
 
-  const activeTeam = await getUserActiveTeam(userId);
+  // Sur la connexion de l'appelant : cette résolution est appelée depuis des
+  // transactions (inscription, report de score, forfait), et emprunter une
+  // seconde place du pool sous un verrou de ligne arme un convoi (voir
+  // `getUserActiveTeam`).
+  const activeTeam = await getUserActiveTeam(userId, connection);
   return activeTeam?.teamId ?? null;
 }
 
@@ -136,9 +140,12 @@ export async function registerCurrentUserTeam(
 
   // L'entrée solo n'est créée qu'ici : un joueur qui n'a jamais participé à un
   // tournoi individuel n'a pas de ligne parasite dans `bg_teams`.
+  // Sur la connexion de la transaction, verrou du tournoi en main : ouvrir une
+  // seconde connexion ici attendrait une place du pool que les transactions
+  // bloquées sur ce verrou ne rendront pas (voir `getUserActiveTeam`).
   const teamId = isSoloTournament(tournament.participant_type)
     ? await ensureSoloEntry(connection, userId)
-    : (await getUserActiveTeam(userId))?.teamId ?? null;
+    : (await getUserActiveTeam(userId, connection))?.teamId ?? null;
 
   if (teamId === null) {
     throw new Error("NO_ACTIVE_TEAM");

@@ -1,4 +1,4 @@
-﻿import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+﻿import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import type { TeamDetailResponse, TeamListItem, TeamMember, TeamRole } from "@/lib/shared/types";
@@ -666,8 +666,22 @@ export async function leaveTeam(userId: number, teamId: number): Promise<void> {
   );
 }
 
-export async function getUserActiveTeam(userId: number): Promise<{ teamId: number; teamName: string } | null> {
-  const db = await getDatabase();
+/**
+ * Équipe active d'un joueur (une seule, invariant du projet).
+ *
+ * @param connection Connexion sur laquelle lire. **À fournir dès que l'appelant
+ *   est dans une transaction** : sans elle, la fonction emprunte une *seconde*
+ *   place du pool (25) alors que la première est retenue par la transaction. Un
+ *   appelant qui tient en plus un verrou de ligne — l'inscription retient celle
+ *   du tournoi — arme alors un convoi : le porteur du verrou attend une
+ *   connexion que les transactions bloquées sur son verrou ne rendront pas, et
+ *   rien ne se dénoue avant `innodb_lock_wait_timeout`.
+ */
+export async function getUserActiveTeam(
+  userId: number,
+  connection?: Pick<PoolConnection, "execute">,
+): Promise<{ teamId: number; teamName: string } | null> {
+  const db = connection ?? (await getDatabase());
   const [rows] = await db.execute<(RowDataPacket & { team_id: number; team_name: string })[]>(
     `SELECT tm.team_id, t.name AS team_name
      FROM bg_team_members tm

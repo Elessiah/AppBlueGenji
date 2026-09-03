@@ -286,6 +286,20 @@ describe("registerTeamsByIds", () => {
     expect(GHOST_BATCH_MAX).toBeLessThanOrEqual(MAX_PENDING_PER_TRANSACTION);
   });
 
+  it("ne met en file que des inscriptions : le lot ne partage sa transaction avec rien", async () => {
+    // C'est ce qui rend l'égalité des deux plafonds suffisante. Les deux autres
+    // évènements que la transaction pourrait produire (`tournament_started`,
+    // `tournament_underfilled`) supposent que l'état a quitté `REGISTRATION` —
+    // auquel cas le lot est refusé et la file jetée.
+    const teamIds = [900, 901, 902];
+    const { connection } = fakeConnection({ teams: teamIds.map(ghost) });
+
+    await registerTeamsByIds(connection, 12, teamIds);
+
+    const kinds = (queueBotLog as jest.Mock).mock.calls.map((call) => (call[1] as { kind: string }).kind);
+    expect(kinds).toEqual(["registration", "registration", "registration"]);
+  });
+
   it("réserve une ligne de journal pour chaque inscription d'un lot plein", async () => {
     const teamIds = Array.from({ length: GHOST_BATCH_MAX }, (_, index) => 900 + index);
     const { connection, inserted } = fakeConnection({ teams: teamIds.map(ghost) });
@@ -333,6 +347,18 @@ describe("ordre de verrouillage des points d'entrée", () => {
     await registerCurrentUserTeam(connection, 12, 42);
 
     expect(firstStatement(connection)).toMatch(/FROM bg_tournaments WHERE id = \? FOR UPDATE/);
+  });
+
+  it("cherche l'équipe active sur la connexion de la transaction", async () => {
+    // Verrou du tournoi en main, emprunter une *seconde* place du pool arme un
+    // convoi : le porteur du verrou attend une connexion que les transactions
+    // bloquées sur son verrou ne rendront pas avant `innodb_lock_wait_timeout`.
+    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 101 } as never);
+    const { connection } = fakeConnection({ teams: [] });
+
+    await registerCurrentUserTeam(connection, 12, 42);
+
+    expect(getUserActiveTeam).toHaveBeenCalledWith(42, connection);
   });
 
   it("verrouille avant la moindre lecture, à l'inscription d'un lot", async () => {

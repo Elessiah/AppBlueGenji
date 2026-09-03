@@ -36,9 +36,26 @@ import type { ParticipantWording } from "./participants";
  * des milliers de matchs sur une même connexion. Un test tient le couple
  * (`tests/lib/server/ghost-bulk-registration.test.ts`).
  *
+ * L'égalité des deux nombres n'est pas une marge nulle par distraction : un lot
+ * qui **aboutit** ne met en file que ses inscriptions. Les deux autres
+ * évènements que la transaction pourrait produire (`tournament_started`,
+ * `tournament_underfilled`, réservés par `syncTournamentState`) supposent que
+ * l'état a quitté `REGISTRATION` — auquel cas `registerTeam` lève
+ * `REGISTRATION_CLOSED`, le lot est défait et la file jetée. Trente-deux
+ * inscriptions ne peuvent donc pas se retrouver trente-troisième.
+ *
  * Le même nombre borne la durée du verrou pris sur la ligne du tournoi :
  * remplir un plateau de 128 demande quatre gestes au lieu d'un, mais aucune
  * inscription de joueur n'attend derrière une transaction de cent écritures.
+ *
+ * Le lot ne collapse **pas** ses lignes de journal en une seule, contrairement à
+ * l'évènement de flux : le flux ne transporte qu'un signal de rafraîchissement,
+ * là où une ligne de journal **nomme l'engagé** qui vient d'entrer — c'est tout
+ * son objet pour une trace de staff. Trente-deux fantômes inscrites produisent
+ * donc ce que produiraient trente-deux joueurs s'inscrivant un par un, ce qui
+ * reste l'ordre de grandeur que `BOT_ACTIVITY_LOG.md` s'autorise (un plateau de
+ * 32 compte 31 matchs). L'envoi ne ralentit rien : `flushBotLogs` ne s'attend
+ * pas.
  */
 export const GHOST_BATCH_MAX = 32;
 

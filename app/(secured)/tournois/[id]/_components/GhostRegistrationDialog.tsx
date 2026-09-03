@@ -116,7 +116,7 @@ export function GhostRegistrationDialog({
       : load === "failed"
         ? "Liste indisponible. Ferme et rouvre la fenêtre pour réessayer."
         : teams.length === 0
-          ? wording.guestNoneLeft
+          ? wording.guestNoneAvailable
           : "Aucun résultat pour cette recherche.";
 
   const toggle = (teamId: number) => {
