@@ -21,6 +21,20 @@ async function registerTeam(
   teamId: number,
   byStaff: boolean,
 ): Promise<void> {
+  // Verrou sur la ligne du tournoi, avant toute lecture de l'effectif.
+  //
+  // Le plafond se contrôle en comptant les inscriptions puis en insérant : sans
+  // verrou, deux inscriptions simultanées lisent le même compte et passent
+  // toutes les deux — une place de plus que le maximum, et un plateau qui ne
+  // tombe plus juste. L'unicité `(tournament_id, team_id)` protège du doublon,
+  // pas du dépassement d'effectif. Le verrou est pris ici, dans le tronc commun,
+  // et non chez l'appelant : il vaut pour l'inscription d'un joueur comme pour
+  // un lot d'équipes fantômes, et un lot le prend une fois puis le garde.
+  //
+  // Première écriture de la transaction, donc ordre de verrouillage constant :
+  // deux inscriptions concurrentes se sérialisent au lieu de s'interbloquer.
+  await connection.execute(`SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE`, [tournamentId]);
+
   const { row: tournament } = await syncTournamentState(connection, tournamentId);
   if (!tournament) {
     throw new Error("TOURNAMENT_NOT_FOUND");
@@ -112,24 +126,73 @@ export async function registerCurrentUserTeam(
 }
 
 /**
- * Inscription d'une équipe **fantôme** par le staff (permission `tournaments`).
- * Le contrôle « l'équipe est bien fantôme » est fait par l'appelant : cette
- * fonction refuse simplement toute équipe inexistante ou dissoute.
+ * Erreur d'inscription qui **désigne un engagé** : le lot étant tout ou rien, le
+ * refus doit dire lequel a bloqué, faute de quoi le staff n'a plus qu'à
+ * recouper sa sélection contre la liste des inscrites.
+ *
+ * Le code reste porté par `message`, comme partout ailleurs dans le moteur : la
+ * route le mappe sur un statut HTTP sans rien savoir de cette propriété, et
+ * joint `teamId` au corps quand il y en a un.
  */
-export async function registerTeamById(
+export type TeamScopedRegistrationError = Error & { teamId: number };
+
+function teamScopedError(code: string, teamId: number): TeamScopedRegistrationError {
+  return Object.assign(new Error(code), { teamId });
+}
+
+/**
+ * Inscription d'un **lot** d'équipes fantômes par le staff (permission
+ * `tournaments`), dans la transaction de l'appelant : ou bien toutes entrent,
+ * ou bien aucune n'entre.
+ *
+ * Le caractère fantôme est relu **ici**, sur la connexion de la transaction, et
+ * non par la route : entre l'affichage de la liste et la validation d'un lot il
+ * s'écoule le temps de cocher des dizaines de lignes, pendant lequel une
+ * fantôme peut être attribuée à un joueur (`claimGhostTeam`) ou dissoute. Une
+ * entrée solo est écartée par la même condition — elle naît avec
+ * `is_ghost = 0` : le staff n'inscrit jamais un joueur du site à sa place, pas
+ * plus qu'une équipe réelle.
+ *
+ * Les identifiants sont supposés dédoublonnés (`parseGhostBatch`) : deux fois le
+ * même buterait sur `ALREADY_REGISTERED` au second passage.
+ */
+export async function registerTeamsByIds(
   connection: PoolConnection,
   tournamentId: number,
-  teamId: number,
+  teamIds: number[],
 ): Promise<void> {
-  const [teams] = await connection.execute<(RowDataPacket & { deleted_at: Date | null })[]>(
-    `SELECT deleted_at FROM bg_teams WHERE id = ? LIMIT 1`,
-    [teamId],
+  if (teamIds.length === 0) throw new Error("EMPTY_TEAM_SELECTION");
+
+  const [teams] = await connection.execute<
+    (RowDataPacket & { id: number; is_ghost: 0 | 1; deleted_at: Date | null })[]
+  >(
+    `SELECT id, is_ghost, deleted_at
+     FROM bg_teams
+     WHERE id IN (${teamIds.map(() => "?").join(",")})`,
+    teamIds,
   );
 
-  if (teams.length === 0) throw new Error("TEAM_NOT_FOUND");
-  if (teams[0].deleted_at !== null) throw new Error("TEAM_ALREADY_DELETED");
+  const byId = new Map(teams.map((team) => [Number(team.id), team]));
+  for (const teamId of teamIds) {
+    const team = byId.get(teamId);
+    if (!team) throw teamScopedError("TEAM_NOT_FOUND", teamId);
+    if (team.deleted_at !== null) throw teamScopedError("TEAM_ALREADY_DELETED", teamId);
+    if (team.is_ghost !== 1) throw teamScopedError("NOT_A_GHOST_TEAM", teamId);
+  }
 
-  await registerTeam(connection, tournamentId, teamId, true);
+  for (const teamId of teamIds) {
+    try {
+      await registerTeam(connection, tournamentId, teamId, true);
+    } catch (error) {
+      // `ALREADY_REGISTERED` est le seul refus du tronc commun qui parle d'un
+      // engagé précis : le tournoi clos ou complet vaut pour le lot entier, et
+      // l'affubler d'un nom laisserait croire que les autres seraient passés.
+      if ((error as Error).message === "ALREADY_REGISTERED") {
+        throw teamScopedError("ALREADY_REGISTERED", teamId);
+      }
+      throw error;
+    }
+  }
 }
 
 export async function canUserRegister(

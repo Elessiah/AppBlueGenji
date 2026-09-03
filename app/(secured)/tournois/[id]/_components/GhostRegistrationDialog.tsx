@@ -1,39 +1,62 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
+import {
+  guestBatchSuccessMessage,
+  matchesTeamSearch,
+  registrationErrorTeamId,
+} from "@/lib/shared/ghost-registration";
 import { useParticipantWording } from "../_lib/entrant-link";
+import { mapEntrantError } from "../_lib/error-map";
+import styles from "./GhostRegistrationDialog.module.css";
 
 type GhostTeamOption = { id: number; name: string; logoUrl: string | null };
 
 interface GhostRegistrationDialogProps {
   tournamentId: number;
+  /** Places encore libres, pour borner la sélection avant l'aller-retour. */
+  remainingSlots: number;
   onClose: () => void;
   onRegistered: () => void;
 }
 
 /**
- * Inscription par le staff (`tournaments`) d'un engagé sans compte sur le site :
- * une équipe fantôme, ou un joueur invité si le tournoi est individuel — c'est
- * la même ligne `bg_teams` dans les deux cas, seul le vocabulaire change.
+ * Inscription par le staff (`tournaments`) d'engagés sans compte sur le site :
+ * des équipes fantômes, ou des joueurs invités si le tournoi est individuel —
+ * c'est la même ligne `bg_teams` dans les deux cas, seul le vocabulaire change.
  *
- * Deux chemins : choisir une fantôme existante, ou en créer une à la volée —
- * le cas courant quand il faut compléter un bracket juste avant le départ.
+ * Deux chemins : cocher plusieurs engagés existants et les inscrire **en une
+ * seule action**, ou en créer un à la volée — le cas courant quand il faut
+ * compléter un bracket juste avant le départ.
+ *
+ * La liste ne propose que ce qui reste à inscrire : les déjà engagés sont
+ * écartés côté serveur (`listGhostTeams(tournamentId)`), pas masqués ici. Elle
+ * peut être longue (un jeu de test compte cent quarante équipes de
+ * remplissage), d'où la recherche et la zone défilante.
+ *
+ * Le lot est **tout ou rien** : le serveur défait toute la transaction au
+ * premier refus, et nomme l'engagé qui a bloqué.
  */
 export function GhostRegistrationDialog({
   tournamentId,
+  remainingSlots,
   onClose,
   onRegistered,
 }: GhostRegistrationDialogProps) {
   const { showError, showSuccess } = useToast();
   const wording = useParticipantWording();
   const [teams, setTeams] = useState<GhostTeamOption[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [mode, setMode] = useState<"existing" | "new">("existing");
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number[]>([]);
+  const [query, setQuery] = useState("");
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         const res = await fetch(`/api/admin/tournaments/${tournamentId}/ghost-registrations`, {
@@ -41,31 +64,72 @@ export function GhostRegistrationDialog({
         });
         const payload = (await res.json()) as { teams?: GhostTeamOption[]; error?: string };
         if (!res.ok) throw new Error(payload.error || "GHOST_TEAMS_LOAD_FAILED");
-        setTeams(payload.teams ?? []);
-        // Aucune fantôme en stock : la création est le seul chemin utile.
-        if ((payload.teams ?? []).length === 0) setMode("new");
-        else setSelectedId(payload.teams![0].id);
+        if (cancelled) return;
+        const available = payload.teams ?? [];
+        setTeams(available);
+        setLoaded(true);
+        // Plus rien à cocher (aucune fantôme, ou toutes déjà engagées) : la
+        // création est le seul chemin utile.
+        if (available.length === 0) setMode("new");
       } catch (e) {
-        showError((e as Error).message);
+        if (!cancelled) showError(mapEntrantError((e as Error).message, null));
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [tournamentId, showError]);
 
-  const register = async (teamId: number) => {
+  const visible = useMemo(
+    () => teams.filter((team) => matchesTeamSearch(team.name, query)),
+    [teams, query],
+  );
+
+  const nameById = useMemo(
+    () => new Map(teams.map((team) => [team.id, team.name])),
+    [teams],
+  );
+
+  const overCapacity = selected.length > remainingSlots;
+
+  const toggle = (teamId: number) => {
+    setSelected((current) =>
+      current.includes(teamId)
+        ? current.filter((id) => id !== teamId)
+        : [...current, teamId],
+    );
+  };
+
+  // « Tout sélectionner » porte sur ce que la recherche laisse voir : cocher en
+  // masse des lignes hors écran serait un piège, la sélection ne se relisant que
+  // par son compteur.
+  const selectVisible = () => {
+    setSelected((current) => {
+      const next = [...current];
+      for (const team of visible) if (!next.includes(team.id)) next.push(team.id);
+      return next;
+    });
+  };
+
+  const registerBatch = async (teamIds: number[]) => {
     const res = await fetch(`/api/admin/tournaments/${tournamentId}/ghost-registrations`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ teamId }),
+      body: JSON.stringify({ teamIds }),
     });
-    const payload = (await res.json()) as { error?: string };
-    if (!res.ok) throw new Error(payload.error || "GHOST_REGISTRATION_FAILED");
+    const payload = (await res.json()) as { error?: string; teamId?: number };
+    if (!res.ok) {
+      throw Object.assign(new Error(payload.error || "GHOST_REGISTRATION_FAILED"), {
+        teamId: payload.teamId,
+      });
+    }
   };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
     try {
-      let teamId = selectedId;
+      let teamIds = selected;
 
       if (mode === "new") {
         const res = await fetch("/api/teams", {
@@ -75,21 +139,30 @@ export function GhostRegistrationDialog({
         });
         const payload = (await res.json()) as { teamId?: number; error?: string };
         if (!res.ok || !payload.teamId) throw new Error(payload.error || "GHOST_TEAM_CREATE_FAILED");
-        teamId = payload.teamId;
+        teamIds = [payload.teamId];
       }
 
-      if (!teamId) throw new Error("INVALID_TEAM_ID");
+      if (teamIds.length === 0) throw new Error("EMPTY_TEAM_SELECTION");
 
-      await register(teamId);
-      showSuccess(wording.guestSuccess);
+      await registerBatch(teamIds);
+      showSuccess(guestBatchSuccessMessage(teamIds.length, wording));
       onRegistered();
       onClose();
     } catch (e) {
-      showError((e as Error).message);
+      // Le refus qui désigne un engagé le nomme : sur un lot de trente, « déjà
+      // inscrite » sans nom n'apprend rien.
+      const teamId = registrationErrorTeamId(e);
+      const name = teamId === undefined ? null : nameById.get(teamId) ?? null;
+      showError(mapEntrantError((e as Error).message, name));
     } finally {
       setBusy(false);
     }
   };
+
+  const submitDisabled = busy
+    || (mode === "existing"
+      ? selected.length === 0 || overCapacity
+      : newName.trim().length < 3);
 
   return (
     <div
@@ -99,72 +172,103 @@ export function GhostRegistrationDialog({
       onClick={() => {
         if (!busy) onClose();
       }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 80,
-        background: "rgba(6, 8, 12, 0.72)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
+      className={styles.overlay}
     >
-      <form
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={submit}
-        style={{
-          width: "100%",
-          maxWidth: 460,
-          background: "var(--cyber-bg-2, #14181f)",
-          border: "1px solid var(--line-strong-cy, var(--line-soft))",
-          borderRadius: "var(--r-cy-md, 12px)",
-          boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
-          padding: 22,
-        }}
-      >
-        <h3 id="ghost-registration-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
+      <form onClick={(e) => e.stopPropagation()} onSubmit={submit} className={styles.panel}>
+        <h3 id="ghost-registration-title" className={styles.title}>
           {wording.guestTitle}
         </h3>
-        <p style={{ marginTop: 6, fontSize: 13, color: "var(--text-2, #9aa4b2)" }}>
-          {wording.guestHint}
-        </p>
+        <p className={styles.hint}>{wording.guestHint}</p>
 
-        <div style={{ display: "flex", gap: 8, margin: "16px 0" }}>
+        <div className={styles.modes}>
           <button
             type="button"
-            className={mode === "existing" ? "btn" : "btn ghost"}
+            className={`${mode === "existing" ? "btn" : "btn ghost"} ${styles.modeButton}`}
             onClick={() => setMode("existing")}
             disabled={teams.length === 0}
-            style={{ padding: "6px 14px", fontSize: 12, opacity: teams.length === 0 ? 0.5 : 1 }}
+            aria-pressed={mode === "existing"}
           >
-            Existante
+            Existantes
           </button>
           <button
             type="button"
-            className={mode === "new" ? "btn" : "btn ghost"}
+            className={`${mode === "new" ? "btn" : "btn ghost"} ${styles.modeButton}`}
             onClick={() => setMode("new")}
-            style={{ padding: "6px 14px", fontSize: 12 }}
+            aria-pressed={mode === "new"}
           >
             Nouvelle
           </button>
         </div>
 
         {mode === "existing" ? (
-          <div className="field">
-            <label htmlFor="ghost-team-select">{wording.guestSelectLabel}</label>
-            <select
-              id="ghost-team-select"
-              value={selectedId ?? ""}
-              onChange={(e) => setSelectedId(Number(e.target.value))}
-              required
+          <div>
+            <p className={styles.listLabel} id="ghost-team-list-label">
+              <span>{wording.guestSelectManyLabel}</span>
+              <span
+                className={`${styles.count} ${
+                  overCapacity ? styles.countOver : selected.length > 0 ? styles.countActive : ""
+                }`}
+              >
+                {selected.length} / {remainingSlots} place{remainingSlots > 1 ? "s" : ""}
+              </span>
+            </p>
+
+            <input
+              type="search"
+              className={styles.search}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Rechercher…"
+              aria-label="Filtrer la liste par nom"
+              autoFocus
+            />
+
+            <ScrollArea
+              orientation="y"
+              className={styles.list}
+              ariaLabel={wording.guestSelectManyLabel}
             >
-              {teams.map((team) => (
-                <option key={team.id} value={team.id}>
-                  {team.name}
-                </option>
-              ))}
-            </select>
+              {visible.length === 0 ? (
+                <p className={styles.empty}>
+                  {!loaded
+                    ? "Chargement…"
+                    : teams.length === 0
+                      ? `Aucun engagé sans compte disponible : ils sont tous déjà inscrits.`
+                      : "Aucun résultat pour cette recherche."}
+                </p>
+              ) : (
+                visible.map((team) => (
+                  <label key={team.id} className={styles.option}>
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(team.id)}
+                      onChange={() => toggle(team.id)}
+                      disabled={busy}
+                    />
+                    <span className={styles.optionName}>{team.name}</span>
+                  </label>
+                ))
+              )}
+            </ScrollArea>
+
+            <div className={styles.bulk}>
+              <button
+                type="button"
+                className={styles.linkButton}
+                onClick={selectVisible}
+                disabled={busy || visible.length === 0}
+              >
+                Tout sélectionner
+              </button>
+              <button
+                type="button"
+                className={styles.linkButton}
+                onClick={() => setSelected([])}
+                disabled={busy || selected.length === 0}
+              >
+                Tout désélectionner
+              </button>
+            </div>
           </div>
         ) : (
           <div className="field">
@@ -181,23 +285,25 @@ export function GhostRegistrationDialog({
           </div>
         )}
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+        <div className={styles.actions}>
           <button
             type="button"
-            className="btn ghost"
+            className={`btn ghost ${styles.actionButton}`}
             onClick={onClose}
             disabled={busy}
-            style={{ padding: "8px 18px", fontSize: 13 }}
           >
             Annuler
           </button>
           <button
             type="submit"
-            className="btn"
-            disabled={busy || (mode === "existing" ? !selectedId : newName.trim().length < 3)}
-            style={{ padding: "8px 20px", fontSize: 13 }}
+            className={`btn ${styles.actionButton}`}
+            disabled={submitDisabled}
           >
-            {busy ? "Inscription…" : "Inscrire"}
+            {busy
+              ? "Inscription…"
+              : mode === "existing" && selected.length > 1
+                ? `Inscrire (${selected.length})`
+                : "Inscrire"}
           </button>
         </div>
       </form>

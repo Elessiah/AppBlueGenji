@@ -143,7 +143,7 @@ export {
 import { syncTournamentState } from "./state";
 import {
   registerCurrentUserTeam as registerTeamInternal,
-  registerTeamById as registerTeamByIdInternal,
+  registerTeamsByIds as registerTeamsByIdsInternal,
   resolveUserEntrantTeamId,
 } from "./registration";
 import { resolveExpiredScoreReports, finalizeTournamentIfDone } from "./finalization";
@@ -615,16 +615,28 @@ export async function getUserEntrantTeamId(
 }
 
 /**
- * Inscrit une équipe fantôme au nom du staff. L'appelant (route API) vérifie la
- * permission `tournaments` et le caractère fantôme de l'équipe.
+ * Inscrit un **lot** d'équipes fantômes au nom du staff. L'appelant (route API)
+ * vérifie la permission `tournaments` ; le caractère fantôme de chaque équipe
+ * est relu dans la transaction, au plus près de l'écriture.
+ *
+ * **Tout ou rien** : une seule transaction, un seul événement de flux. Un lot est
+ * une intention unique, et un résultat partiel obligerait le staff à recouper sa
+ * sélection contre la liste des inscrites pour savoir ce qui est passé. Le
+ * plafond d'effectif est relu à chaque insertion, sur la connexion de la
+ * transaction : le compte grandit avec le lot, et la place manquante arrête
+ * l'ensemble par `TOURNAMENT_FULL`.
+ *
+ * Un seul `publishUpdatedEvent` après le commit : le panneau d'inscriptions et
+ * l'aperçu du plateau se refont une fois, sur l'état final, plutôt que N fois
+ * sur des états intermédiaires qui n'ont jamais existé hors de la transaction.
  */
-export async function registerGhostTeam(tournamentId: number, teamId: number): Promise<void> {
+export async function registerGhostTeams(tournamentId: number, teamIds: number[]): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
 
   try {
     await connection.beginTransaction();
-    await registerTeamByIdInternal(connection, tournamentId, teamId);
+    await registerTeamsByIdsInternal(connection, tournamentId, teamIds);
     await connection.commit();
     flushBotLogs(connection);
 

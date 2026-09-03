@@ -105,8 +105,39 @@ export const ERROR_MESSAGES: Record<string, string> = {
   SEEDING_LOCKED: "Un score a été saisi : l'ordre de départ est désormais figé.",
   INVALID_SEED_ORDER: "Ordre invalide : la liste doit contenir tous les engagés, une seule fois.",
   SEEDING_REORDER_FAILED: "Erreur lors de l'enregistrement du nouvel ordre.",
+  // Inscription en lot d'engagés sans compte
+  // (`POST /api/admin/tournaments/[id]/ghost-registrations`). Le lot est tout ou
+  // rien : chaque phrase le dit, sans quoi le staff ne saurait pas s'il doit
+  // reprendre toute sa sélection ou seulement la fin.
+  EMPTY_TEAM_SELECTION: "Sélectionne au moins un engagé à inscrire.",
+  INVALID_TEAM_IDS: "Sélection illisible : recharge la page et recommence.",
+  TOO_MANY_TEAMS: "Sélection trop large : inscris-les en plusieurs fois.",
+  // Une fantôme attribuée à un joueur entre l'affichage de la liste et le clic
+  // n'est plus une fantôme : le staff n'inscrit pas l'équipe d'un joueur à sa
+  // place, ni une entrée solo.
+  NOT_A_GHOST_TEAM:
+    "Cet engagé n'est plus une équipe fantôme : aucune inscription n'a été enregistrée.",
+  TEAM_ALREADY_DELETED: "Cet engagé a été dissous : aucune inscription n'a été enregistrée.",
+  TEAM_NOT_FOUND: "Engagé introuvable : aucune inscription n'a été enregistrée.",
+  GHOST_TEAMS_LOAD_FAILED: "Impossible de charger la liste des équipes fantômes.",
+  GHOST_TEAM_CREATE_FAILED: "Erreur lors de la création de l'équipe fantôme.",
+  GHOST_REGISTRATION_FAILED: "Erreur lors de l'inscription : rien n'a été enregistré.",
 };
 
 export function mapError(errorCode: string): string {
   return ERROR_MESSAGES[errorCode] || errorCode;
+}
+
+/**
+ * Message d'un refus qui **désigne un engagé**. Sur un lot de trente, « déjà
+ * inscrite » sans nom n'apprend rien : le serveur joint l'identifiant en cause,
+ * l'appelant retrouve le nom, et la phrase le porte en tête.
+ *
+ * Le nom est mis à part par un tiret plutôt qu'inséré dans la phrase : le genre
+ * d'« équipe » et de « joueur » diverge, et les messages sont partagés entre les
+ * deux types de tournoi.
+ */
+export function mapEntrantError(errorCode: string, entrantName: string | null): string {
+  const message = mapError(errorCode);
+  return entrantName ? `${entrantName} — ${message}` : message;
 }

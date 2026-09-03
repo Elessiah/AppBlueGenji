@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
 import { participantWording } from "@/lib/shared/participants";
+import { remainingSlots } from "@/lib/shared/ghost-registration";
 import { useToast } from "@/components/ui/toast";
 import { CyberButton } from "@/components/cyber";
 import { useTournamentLive } from "./_hooks/useTournamentLive";
@@ -786,6 +787,7 @@ export default function TournamentDetailPage() {
       {ghostRegistrationOpen && (
         <GhostRegistrationDialog
           tournamentId={tournamentId}
+          remainingSlots={remainingSlots(detail.card.maxTeams, detail.card.registeredTeams)}
           onClose={() => setGhostRegistrationOpen(false)}
           onRegistered={() => void refresh()}
         />

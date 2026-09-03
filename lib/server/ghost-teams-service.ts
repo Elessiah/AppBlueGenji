@@ -109,14 +109,39 @@ export async function claimGhostTeam(teamId: number, newOwnerUserId: number): Pr
 /**
  * Équipes fantômes encore actives, pour les sélecteurs d'administration
  * (inscription à un tournoi). Triées par nom.
+ *
+ * @param excludeTournamentId Tournoi dont les engagées sont retirées de la
+ *   liste. Une équipe déjà inscrite n'a rien à faire dans un sélecteur
+ *   d'inscription : la reproposer ne pouvait mener qu'à un `ALREADY_REGISTERED`
+ *   après l'aller-retour, et sur un lot elle ferait échouer toute la sélection.
+ *   Le filtre est posé **en base** et non côté client : la liste est relue à
+ *   chaque ouverture du dialogue, elle doit refléter les inscriptions arrivées
+ *   entre-temps.
+ *
+ *   Le `solo_user_id IS NULL` est redondant avec `is_ghost = 1` (une entrée solo
+ *   naît avec `is_ghost = 0`) mais tenu par convention du projet : on ne liste
+ *   jamais `bg_teams` sans écarter les entrées solo, qui ne sont pas des
+ *   équipes.
  */
-export async function listGhostTeams(): Promise<{ id: number; name: string; logoUrl: string | null }[]> {
+export async function listGhostTeams(
+  excludeTournamentId?: number,
+): Promise<{ id: number; name: string; logoUrl: string | null }[]> {
   const db = await getDatabase();
+  const exclusion =
+    excludeTournamentId === undefined
+      ? ""
+      : `AND NOT EXISTS (
+           SELECT 1 FROM bg_tournament_registrations r
+           WHERE r.tournament_id = ? AND r.team_id = bg_teams.id
+         )`;
+
   const [rows] = await db.execute<(RowDataPacket & { id: number; name: string; logo_url: string | null })[]>(
     `SELECT id, name, logo_url
      FROM bg_teams
-     WHERE is_ghost = 1 AND deleted_at IS NULL
+     WHERE is_ghost = 1 AND deleted_at IS NULL AND solo_user_id IS NULL
+     ${exclusion}
      ORDER BY name ASC`,
+    excludeTournamentId === undefined ? [] : [excludeTournamentId],
   );
 
   return rows.map((row) => ({
