@@ -8,14 +8,14 @@ import { getLandingLive } from "@/lib/server/landing-service";
 import { clearCache } from "@/lib/server/cache";
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import { findBroadcastingTournament } from "@/lib/server/tournaments/live-streams";
-import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
+import type { TournamentBuckets, TournamentCard, TournamentFormat } from "@/lib/shared/types";
 
-function card(id: number, name: string): TournamentCard {
+function card(id: number, name: string, format: TournamentFormat = "SINGLE"): TournamentCard {
   return {
     id,
     name,
     description: null,
-    format: "SINGLE",
+    format,
     game: "OW2",
     participantType: "TEAM",
     maxTeams: 8,
@@ -54,6 +54,9 @@ function matchRow(overrides: Record<string, unknown> = {}) {
     team2_solo_user_id: null,
     team1_score: null,
     team2_score: null,
+    team1_seed: 1,
+    team2_seed: 4,
+    manual_seeding: 0,
     start_at: null,
     live_trigger: null,
     live_url: null,
@@ -288,5 +291,84 @@ describe("getLandingLive — fiche des engagés du match", () => {
 
     expect(live?.currentMatch?.team1Href).toBe("/equipes/11");
     expect(live?.currentMatch?.team2Href).toBe("/joueurs/501");
+  });
+});
+
+/**
+ * Seeds des deux engagés du match mis en avant.
+ *
+ * La carte de l'accueil écrivait « SEED 1 » et « SEED 4 » **en dur**, identiques
+ * sur tous les matchs de tous les tournois. Les remplacer par la colonne
+ * `bg_tournament_registrations.seed` ne suffit pas : cette colonne porte l'ordre
+ * d'inscription, qui n'est le **tirage** que dans les formats qui seedent depuis
+ * elle (`isSeedOrderEffective`). En Suisse, en Survie et en multi-phases, le
+ * moteur seede depuis le classement du site — annoncer un seed y serait la même
+ * invention, avec un chiffre plus crédible.
+ */
+describe("getLandingLive — seeds du match mis en avant", () => {
+  beforeEach(() => {
+    (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
+  });
+
+  it("expose les seeds d'une élimination simple, qui seede par ordre d'inscription", async () => {
+    await mockDb([matchRow({ team1_seed: 3, team2_seed: 6 })]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A", "SINGLE")]));
+
+    expect(live?.currentMatch?.team1Seed).toBe(3);
+    expect(live?.currentMatch?.team2Seed).toBe(6);
+  });
+
+  it("expose aussi les seeds d'une double élimination et d'une BG Survie", async () => {
+    for (const format of ["DOUBLE", "BG_SURVIE"] as const) {
+      clearCache();
+      await mockDb([matchRow({ team1_seed: 2, team2_seed: 7 })]);
+      const live = await liveFrom(buckets([card(1, "Coupe A", format)]));
+      expect(live?.currentMatch?.team1Seed).toBe(2);
+      expect(live?.currentMatch?.team2Seed).toBe(7);
+    }
+  });
+
+  it("n'annonce aucun seed dans les formats qui seedent depuis le classement du site", async () => {
+    for (const format of ["SWISS", "SURVIVAL", "MULTI"] as const) {
+      clearCache();
+      await mockDb([matchRow({ team1_seed: 1, team2_seed: 2 })]);
+      const live = await liveFrom(buckets([card(1, "Coupe A", format)]));
+      // La colonne existe et vaut 1 et 2 : c'est l'ordre d'arrivée des
+      // inscriptions, pas le tirage. On préfère ne rien dire.
+      expect(live?.currentMatch?.team1Seed).toBeNull();
+      expect(live?.currentMatch?.team2Seed).toBeNull();
+    }
+  });
+
+  it("rend son seed à une ronde suisse dont le staff a fixé l'ordre à la main", async () => {
+    // `manual_seeding` l'emporte sur le format : la colonne `seed` **est** alors
+    // le tirage, quel que soit le format.
+    await mockDb([matchRow({ team1_seed: 5, team2_seed: 8, manual_seeding: 1 })]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A", "SWISS")]));
+
+    expect(live?.currentMatch?.team1Seed).toBe(5);
+    expect(live?.currentMatch?.team2Seed).toBe(8);
+  });
+
+  it("laisse le seed à null sur une place vide, et sur une colonne non renseignée", async () => {
+    await mockDb([matchRow({ team2_id: null, team2_name: null, team2_seed: null })]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+
+    expect(live?.currentMatch?.team1Seed).toBe(1);
+    expect(live?.currentMatch?.team2Seed).toBeNull();
+  });
+
+  it("refuse un seed aberrant plutôt que de l'afficher", async () => {
+    // La colonne est un `INT NULL` sans contrainte : un 0 ou un négatif venu
+    // d'une migration ratée ne doit pas s'afficher comme « SEED 0 ».
+    await mockDb([matchRow({ team1_seed: 0, team2_seed: -3 })]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+
+    expect(live?.currentMatch?.team1Seed).toBeNull();
+    expect(live?.currentMatch?.team2Seed).toBeNull();
   });
 });

@@ -54,6 +54,8 @@ function match(roundLabel: string): LandingLiveMatch {
     team2Href: "/equipes/2",
     team1Score: 1,
     team2Score: 0,
+    team1Seed: null,
+    team2Seed: null,
     bracket: "UPPER",
     roundLabel,
     liveState: "OFF",
