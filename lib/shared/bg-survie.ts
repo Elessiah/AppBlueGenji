@@ -295,10 +295,13 @@ export function enduranceRoundSwing(
  *
  * Deux situations, la même conclusion — l'équipe ne jouera plus :
  *
- * - `remainingRounds === 0` — la dernière manche vient d'être jouée : les
+ * - `remainingRounds <= 0` — la dernière manche vient d'être jouée : les
  *   `playoffSize` premières sont qualifiées, **tout le reste sort**. Sans ce
  *   trait, la phase s'arrêterait en laissant trente équipes « en lice » dont
- *   huit seulement disputent l'arbre.
+ *   huit seulement disputent l'arbre. Un reste **négatif** y est rangé plutôt
+ *   qu'écarté : la phase est finie dans les deux cas, alors que ne rien couper
+ *   laisserait un tournoi sans issue — plus de manche à poser (le plafond
+ *   l'interdit) et jamais assez d'éliminations pour basculer en play-offs.
  * - `remainingRounds > 0` — élimination **mathématique** : une équipe sort dès
  *   qu'au moins `playoffSize` autres finiront devant elle quoi qu'il arrive. Le
  *   critère compare le **plafond** de l'équipe (elle gagne tout ce qui reste) au
@@ -321,12 +324,10 @@ export function enduranceEliminationCut(
   remainingRounds: number,
   format: MatchFormat | null | undefined,
 ): number[] {
-  if (remainingRounds < 0) return [];
-
   const active = rankActiveTeams(standings);
 
-  // Dernière manche jouée : la coupe est un simple trait sous la cible.
-  if (remainingRounds === 0) return active.slice(config.playoffSize).map((s) => s.teamId);
+  // Plus de manche à jouer : la coupe est un simple trait sous la cible.
+  if (remainingRounds <= 0) return active.slice(config.playoffSize).map((s) => s.teamId);
 
   const swing = enduranceRoundSwing(config, format);
   if (!swing) return [];

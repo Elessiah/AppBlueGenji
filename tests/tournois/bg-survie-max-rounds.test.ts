@@ -114,6 +114,14 @@ describe("enduranceEliminationCut — dernière manche", () => {
     expect(enduranceEliminationCut([standing(1, 12)], cfg, 0, FT3)).toEqual([]);
   });
 
+  // Un reste négatif — manche courante au-delà du plafond — est rangé avec la
+  // dernière manche : ne rien couper laisserait un tournoi sans issue, plus
+  // aucune manche à poser et jamais assez d'éliminations pour les play-offs.
+  it("traite un reste négatif comme la fin de la phase", () => {
+    const standings = [standing(1, 12), standing(2, 11), standing(3, 8), standing(4, 8)];
+    expect(enduranceEliminationCut(standings, cfg, -2, FT3)).toEqual([3, 4]);
+  });
+
   // Le trait de fin ne demande aucun format : il ne prédit rien, il constate.
   it("s'applique même en saisie libre", () => {
     const standings = [standing(1, 12), standing(2, 11), standing(3, 8)];

@@ -48,7 +48,7 @@ export type TournamentFormValues = {
   /**
    * Plafond de manches qualificatives, **0 valant « aucune limite »**. Le
    * formulaire ne manipule que des nombres ; c'est `toApiPayload` qui traduit
-   * ce zéro en champ absent, donc en `NULL` côté base.
+   * ce zéro en `null`, donc en `NULL` côté base.
    */
   enduranceMaxRounds: number;
   matchFormat: MatchFormat | null;
@@ -183,12 +183,16 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
     enduranceWinDelta: format === "BG_SURVIE" ? values.enduranceWinDelta : undefined,
     enduranceLossDelta: format === "BG_SURVIE" ? values.enduranceLossDelta : undefined,
     endurancePlayoffSize: format === "BG_SURVIE" ? values.endurancePlayoffSize : undefined,
-    // 0 n'est pas une valeur à enregistrer, c'est l'absence de plafond : on
-    // omet le champ, et le serveur écrit `NULL`.
+    // 0 n'est pas une valeur à enregistrer, c'est l'absence de plafond — et
+    // c'est `null` qui le dit, jamais `undefined` : la liste blanche de
+    // `PATCH .../edit` ne recopie que les champs dont `body[field] !==
+    // undefined`, et `updateTournament` fusionne le patch sur les valeurs
+    // courantes. Un champ omis vaut donc « on ne touche pas », si bien qu'un
+    // plafond une fois posé ne pourrait plus jamais être retiré. Hors du mode,
+    // en revanche, on ne touche effectivement à rien (comme le reste du barème
+    // d'endurance).
     enduranceMaxRounds:
-      format === "BG_SURVIE" && values.enduranceMaxRounds > 0
-        ? values.enduranceMaxRounds
-        : undefined,
+      format === "BG_SURVIE" ? (values.enduranceMaxRounds > 0 ? values.enduranceMaxRounds : null) : undefined,
     matchFormatType: values.matchFormat?.type ?? null,
     matchFormatValue: values.matchFormat?.value ?? null,
   };

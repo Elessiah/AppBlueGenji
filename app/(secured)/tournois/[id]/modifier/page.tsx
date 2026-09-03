@@ -51,6 +51,7 @@ const FIELD_LABELS: Partial<Record<TournamentField, string>> = {
   enduranceWinDelta: "Points par victoire de map",
   enduranceLossDelta: "Points par défaite de map",
   endurancePlayoffSize: "Équipes en play-offs",
+  enduranceMaxRounds: "Manches maximum",
   matchFormat: "Format de match",
   phases: "Phases du tournoi",
 };
