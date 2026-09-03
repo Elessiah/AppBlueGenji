@@ -53,6 +53,19 @@ const STATUS_LABELS: Record<EnduranceMeta["standings"][number]["status"], string
   FORFEIT: "Forfait",
 };
 
+/**
+ * Une ligne sortie s'estompe, mais pas toutes au même degré : « Hors course »
+ * porte encore un capital à lire, là où une éliminée ou une partie n'affiche
+ * qu'un zéro. Les effacer pareil rendrait la moins lisible des trois celle qui
+ * a justement un chiffre à montrer.
+ */
+const ROW_OPACITY: Record<EnduranceMeta["standings"][number]["status"], number> = {
+  ACTIVE: 1,
+  OUT_OF_CONTENTION: 0.8,
+  ELIMINATED: 0.55,
+  FORFEIT: 0.55,
+};
+
 /** Habillage d'une case, selon le poids décidé par `_lib/endurance-history`. */
 const CELL_CLASS: Record<EnduranceCellTone, string> = {
   POINTS: "num",
@@ -194,6 +207,11 @@ export function EnduranceView({
   const showActions = endurance.standings.some((s) => canForfeitRow(s.teamId, s.status));
   const rowClassName = rowClass(showActions);
 
+  // « Hors course » ne se devine pas : la ligne affiche encore un capital, et
+  // rien n'explique pourquoi elle n'est plus en lice. La légende n'apparaît
+  // qu'en présence d'une telle ligne, comme celle du forfait plus bas.
+  const showOutLegend = endurance.standings.some((s) => s.status === "OUT_OF_CONTENTION");
+
   return (
     <>
       {/*
@@ -209,7 +227,7 @@ export function EnduranceView({
           : `MANCHE ${roundLabel} · ${activeCount} ${wording.manyCapitalized.toUpperCase()} EN LICE → ${endurance.playoffSize}`}
       </p>
 
-      <div className="table-like" style={{ marginBottom: 24 }}>
+      <div className="table-like" style={{ marginBottom: showOutLegend ? 8 : 24 }}>
         <div className={`${rowClassName} table-header`}>
           <span>#</span>
           <span>{wording.oneCapitalized}</span>
@@ -227,7 +245,7 @@ export function EnduranceView({
               key={standing.teamId}
               className={rowClassName}
               style={{
-                opacity: standing.status === "ACTIVE" ? 1 : 0.55,
+                opacity: ROW_OPACITY[standing.status],
                 background: isMine ? "rgba(89,212,255,0.06)" : undefined,
               }}
             >
@@ -289,6 +307,13 @@ export function EnduranceView({
           );
         })}
       </div>
+
+      {showOutLegend && (
+        <p className="mono" style={{ fontSize: 10, color: "var(--text-2)", margin: "0 0 24px" }}>
+          HORS COURSE = CAPITAL RESTANT, MAIS PLUS AUCUNE CHANCE D&apos;ATTEINDRE LES PLAY-OFFS
+          {endurance.maxRounds === null ? "" : ` DANS LES ${endurance.maxRounds} MANCHES PRÉVUES`}
+        </p>
+      )}
 
       <EnduranceHistory endurance={endurance} myTeamId={myTeamId} />
 
