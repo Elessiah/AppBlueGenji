@@ -75,6 +75,34 @@ a {
   }
 }
 
+/* Carte de match visee par une ancre `#match-[id]` (lien profond depuis
+   l'accueil). La page s'ouvre deja defilee au bon endroit : ce halo dit
+   **laquelle** des cartes visibles on venait voir, puis s'efface.
+   La classe est globale parce que `MatchRow` n'a pas de module CSS — ses styles
+   sont en ligne, et une animation ne s'ecrit pas en style en ligne. */
+.match-anchor-target {
+  animation: match-anchor-pulse 3s ease-out 1;
+}
+
+@keyframes match-anchor-pulse {
+  0%,
+  70% {
+    box-shadow: 0 0 0 2px var(--blue-300, #5ac8ff), 0 0 22px rgba(90, 200, 255, 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(90, 200, 255, 0), 0 0 0 rgba(90, 200, 255, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Le repere reste indispensable — c'est lui qui designe la carte —, seul le
+     fondu disparait : un contour net, pose et retire d'un coup. */
+  .match-anchor-target {
+    animation: none;
+    box-shadow: 0 0 0 2px var(--blue-300, #5ac8ff);
+  }
+}
+
 .container {
   width: min(1280px, calc(100% - 48px));
   margin-inline: auto;

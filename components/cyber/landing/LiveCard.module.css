@@ -73,18 +73,69 @@
   color: var(--ink);
 }
 
-.map {
+/* Lien principal de la carte : une plaque transparente plutot qu'un `<a>` qui
+   enveloppe tout, pour que les noms d'engages et le bouton de diffusion puissent
+   porter leurs propres liens (un `<a>` dans un `<a>` casse l'hydratation).
+   Trois etages : decorations en `z-index: auto`, plaque a 1, liens imbriques a 2. */
+.cardOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+
+.cardOverlay:focus-visible {
+  outline: 1px solid var(--blue-300, #5ac8ff);
+  outline-offset: -3px;
+}
+
+/* Tout ce qui reste cliquable par-dessus la plaque. */
+.nested {
+  position: relative;
+  z-index: 2;
+}
+
+/* Affordance de la plaque. Purement visuelle (`aria-hidden`) : c'est la plaque
+   qui porte le lien et son intitule. */
+.footer {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
-  border: 1px dashed rgba(90, 200, 255, 0.28);
-  border-radius: var(--r-cy-sm);
-  padding: 10px 12px;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 12px;
   font-family: var(--font-mono);
   font-size: 11px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--blue-300);
+  color: var(--ink-mute);
+  transition: color 0.18s ease;
+}
+
+.footerArrow {
+  transition: transform 0.18s ease;
+}
+
+/* Le `:hover` se pose sur la carte, pas sur le pied : la plaque couvre toute la
+   carte, un survol du pied seul ne dirait pas ou l'on clique. */
+.root:hover .footer,
+.cardOverlay:focus-visible ~ .footer {
+  color: var(--blue-100, #5ac8ff);
+}
+
+.root:hover .footerArrow {
+  transform: translateX(4px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .footer,
+  .footerArrow {
+    transition: none;
+  }
+
+  .root:hover .footerArrow {
+    transform: none;
+  }
 }
 
 .empty {
@@ -148,16 +199,40 @@
   animation: liveCardPulse 2s ease-in-out infinite;
 }
 
-.streamLink {
+/* Acces au direct : un vrai bouton, et seulement quand le match est a
+   l'antenne. Il herite du rouge de son bandeau — la seule couleur reservee a ce
+   qui diffuse reellement. */
+.streamButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid currentColor;
+  border-radius: var(--r-cy-sm);
+  padding: 4px 10px;
   color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  font-family: inherit;
+  font-size: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  font-weight: 600;
   white-space: nowrap;
+  transition: background-color 0.18s ease;
 }
 
-.streamLink:hover,
-.streamLink:focus-visible {
-  opacity: 0.8;
+.streamButton:hover,
+.streamButton:focus-visible {
+  background: rgba(255, 74, 92, 0.18);
+}
+
+.streamButton:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .streamButton {
+    transition: none;
+  }
 }
 
 @keyframes liveCardPulse {

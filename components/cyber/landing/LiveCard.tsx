@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Eye } from "lucide-react";
 import { CyberCard, Pill, TeamSigil } from "@/components/cyber";
 import { EntityLink } from "@/components/entity-link";
@@ -7,6 +8,7 @@ import type { LandingLive } from "@/lib/shared/landing";
 import { inferPhaseLabel } from "@/lib/shared/landing";
 import { PLATFORM_LABELS, streamPlatform } from "@/lib/shared/live-streams";
 import { matchFormatLabel } from "@/lib/shared/match-format";
+import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import styles from "./LiveCard.module.css";
 
 type LiveCardProps = {
@@ -30,7 +32,7 @@ type LiveCardProps = {
 function EntrantName({ href, name }: { href: string | null; name: string }) {
   if (!href) return <>{name}</>;
   return (
-    <EntityLink href={href} title={`Voir la fiche de ${name}`}>
+    <EntityLink href={href} className={styles.nested} title={`Voir la fiche de ${name}`}>
       {name}
     </EntityLink>
   );
@@ -50,6 +52,19 @@ function nextDaysLabel(iso: string | null | undefined): string {
   return `${days} jours`;
 }
 
+/**
+ * Carte du tournoi en cours, en tête de l'accueil.
+ *
+ * Elle met un match en avant ; elle **y mène** aussi. Le lien principal est une
+ * plaque transparente (`.cardOverlay`) plutôt qu'une ancre enveloppant toute la
+ * carte : les noms d'engagés et le bouton de diffusion portent leurs propres
+ * liens, et un `<a>` dans un `<a>` casse l'hydratation. Les liens imbriqués
+ * repassent au-dessus de la plaque avec `.nested`.
+ *
+ * La cible est `/tournois/[id]#match-[id]` (`tournamentMatchHref`) : la fiche du
+ * tournoi s'ouvre défilée sur ce match précis, et le surligne à l'arrivée. Sans
+ * match à montrer, elle se réduit au tournoi.
+ */
 export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
   if (!live) {
     return (
@@ -72,11 +87,31 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
   const matchIsLive = currentMatch?.liveState === "LIVE";
   const matchIsScheduled = currentMatch?.liveState === "SCHEDULED";
   const matchPlatform = streamPlatform(currentMatch?.liveUrl);
+  // Le bouton de diffusion n'apparaît **que** pour un match réellement à
+  // l'antenne. `SCHEDULED` annonce un cast à venir : la chaîne ne montre pas
+  // encore ce match, et l'y envoyer serait la même impasse que le bouton
+  // « Regarder le live » du hero, qui ne se rend qu'à l'antenne ouverte.
+  const streamHref = matchIsLive ? currentMatch?.liveUrl ?? null : null;
+
+  const team1Label = currentMatch?.team1Name ?? "Équipe 1";
+  const team2Label = currentMatch?.team2Name ?? "Équipe 2";
+  const href = tournamentMatchHref(live.tournament.id, currentMatch?.id ?? null);
+  const openLabel = currentMatch
+    ? `Ouvrir ${live.tournament.name} sur le match ${team1Label} contre ${team2Label}`
+    : `Ouvrir la fiche du tournoi ${live.tournament.name}`;
 
   return (
     <CyberCard ticks className={styles.root}>
+      {/* Plaque de lien : posée en premier pour rester sous les liens imbriqués
+          dans l'ordre du DOM autant que par le `z-index`. */}
+      <Link href={href} className={styles.cardOverlay} aria-label={openLabel} />
+
       <div className={styles.head}>
-        <Pill variant="live">EN COURS</Pill>
+        {/* Bleu, et non `variant="live"` : « EN COURS » est l'**état du
+            tournoi**, pas une diffusion. Le rouge n'habille que ce qui est
+            réellement à l'antenne — désormais le bandeau du match casté, à
+            trois lignes d'ici, avec lequel il se confondait. */}
+        <Pill variant="blue">EN COURS</Pill>
         <span className="mono">{live.game.toUpperCase()} · {inferPhaseLabel(currentMatch)}</span>
         <span className={styles.viewers}>
           <Eye size={12} />
@@ -91,16 +126,20 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
           {(matchIsLive || matchIsScheduled) && (
             <div className={matchIsLive ? styles.streamBanner : styles.streamBannerScheduled}>
               <span className={styles.streamLabel}>
-                {matchIsLive ? "● CE MATCH EST EN DIRECT" : "○ MATCH PROGRAMMÉ EN DIRECT"}
+                {matchIsLive ? "● CE MATCH EST EN DIRECT" : "○ DIFFUSION ANNONCÉE"}
               </span>
-              {currentMatch.liveUrl && (
+              {streamHref && (
                 <a
-                  className={styles.streamLink}
-                  href={currentMatch.liveUrl}
+                  className={`${styles.streamButton} ${styles.nested}`}
+                  href={streamHref}
                   target="_blank"
                   rel="noopener noreferrer"
+                  aria-label={`Regarder ${team1Label} contre ${team2Label} en direct${
+                    matchPlatform ? ` sur ${PLATFORM_LABELS[matchPlatform]}` : ""
+                  } (nouvel onglet)`}
                 >
-                  {matchPlatform ? `Voir sur ${PLATFORM_LABELS[matchPlatform]}` : "Voir la chaîne"}
+                  <span aria-hidden="true">▶</span>
+                  {matchPlatform ? `Regarder sur ${PLATFORM_LABELS[matchPlatform]}` : "Regarder le live"}
                 </a>
               )}
             </div>
@@ -110,9 +149,13 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
             <TeamSigil label={sigilFor(currentMatch.team1Name)} size={40} />
             <div className={styles.teamText}>
               <div className={styles.teamName}>
-                <EntrantName href={currentMatch.team1Href} name={currentMatch.team1Name ?? "Équipe 1"} />
+                <EntrantName href={currentMatch.team1Href} name={team1Label} />
               </div>
-              <div className="mono">FR · SEED 1</div>
+              {/* Rien plutôt qu'un seed inventé : la ligne portait « FR · SEED 1 »
+                  en dur, identique sur tous les matchs de tous les tournois. */}
+              {currentMatch.team1Seed !== null && (
+                <div className="mono">SEED {currentMatch.team1Seed}</div>
+              )}
             </div>
             <div className="num" style={{ fontSize: 30 }}>{currentMatch.team1Score ?? "—"}</div>
           </div>
@@ -142,9 +185,11 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
             <TeamSigil label={sigilFor(currentMatch.team2Name)} color="var(--amber)" size={40} />
             <div className={styles.teamText}>
               <div className={styles.teamName}>
-                <EntrantName href={currentMatch.team2Href} name={currentMatch.team2Name ?? "Équipe 2"} />
+                <EntrantName href={currentMatch.team2Href} name={team2Label} />
               </div>
-              <div className="mono">FR · SEED 4</div>
+              {currentMatch.team2Seed !== null && (
+                <div className="mono">SEED {currentMatch.team2Seed}</div>
+              )}
             </div>
             <div className="num" style={{ fontSize: 30 }}>{currentMatch.team2Score ?? "—"}</div>
           </div>
@@ -155,9 +200,15 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
         </div>
       )}
 
-      <div className={styles.map}>
-        <span>CARTE EN COURS</span>
-        <span>—</span>
+      {/*
+        Affordance de la plaque, et rien de plus : le seul lien est la plaque
+        elle-même, un second `<a>` redisant la même cible n'ajouterait qu'un
+        arrêt de tabulation. Remplace le bloc « CARTE EN COURS · — », qui
+        promettait la map jouée que le modèle ne porte pas.
+      */}
+      <div className={styles.footer} aria-hidden="true">
+        <span>{currentMatch ? "Voir le match dans le tournoi" : "Voir le tournoi"}</span>
+        <span className={styles.footerArrow}>→</span>
       </div>
     </CyberCard>
   );

@@ -4,9 +4,11 @@ import { FormEvent } from "react";
 import type { BracketMatch, TournamentFormat } from "@/lib/shared/types";
 import { fromBracketMatch, isScoreEditLocked } from "@/lib/shared/match-lock";
 import { matchFormatLabel, matchWinsRequired } from "@/lib/shared/match-format";
+import { matchAnchorId } from "@/lib/shared/match-anchor";
 import { EntrantLink } from "../_lib/entrant-link";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { useIssueReport } from "../_lib/issue-report-context";
+import { useHighlightedMatch } from "../_lib/match-anchor-context";
 import { MatchLiveStrip } from "./MatchLiveStrip";
 
 const CARD_W = 210;
@@ -48,6 +50,10 @@ export function MatchRow({
   const { canReport, openReport } = useIssueReport();
   const canReportMatch =
     canReport && match.team1Id !== null && match.team2Id !== null;
+  // Cible d'une ancre `#match-[id]` : la carte est surlignée quelques secondes
+  // à l'arrivée. Sans ce repère, la page s'ouvre défilée au bon endroit mais le
+  // lecteur ne sait pas laquelle des cartes visibles il venait voir.
+  const isAnchorTarget = useHighlightedMatch() === match.id;
   const maxScore = matchFormat ? matchWinsRequired(matchFormat) : 99;
 
   const team1Win = match.winnerTeamId !== null && match.winnerTeamId === match.team1Id;
@@ -85,6 +91,12 @@ export function MatchRow({
 
   return (
     <div
+      // Ancre du lien profond `/tournois/[id]#match-[id]`, posée ici parce que
+      // `MatchRow` est le passage unique de toutes les vues (arbre, survie,
+      // suisse, endurance) : une carte de match a donc toujours son identifiant,
+      // sans qu'aucune vue ait à y penser.
+      id={matchAnchorId(match.id)}
+      className={isAnchorTarget ? "match-anchor-target" : undefined}
       style={{
         width: CARD_W,
         background: "var(--surface-1)",
@@ -92,6 +104,10 @@ export function MatchRow({
         borderRadius: 6,
         overflow: "hidden",
         fontSize: 13,
+        // Marge de sécurité pour le saut natif du navigateur sur `#match-…`
+        // (rechargement d'une URL ancrée) : le défilement piloté par
+        // `useMatchAnchor` centre la carte, celui du navigateur la colle en haut.
+        scrollMargin: 96,
       }}
     >
       <div style={{ ...rowStyle(team1Win), borderBottom: `1px solid ${BORDER}` }}>
