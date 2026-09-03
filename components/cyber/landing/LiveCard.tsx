@@ -101,7 +101,11 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
     : `Ouvrir la fiche du tournoi ${live.tournament.name}`;
 
   return (
-    <CyberCard ticks className={styles.root}>
+    // `lift` : la carte est cliquable de bout en bout, sa bordure doit réagir au
+    // survol. Le pied fléché dit *où* l'on va, la bordure dit *que* l'on peut y
+    // aller — la carte sans tournoi en cours, elle, ne mène nulle part et n'en
+    // reçoit pas.
+    <CyberCard ticks lift className={styles.root}>
       {/* Plaque de lien : posée en premier pour rester sous les liens imbriqués
           dans l'ordre du DOM autant que par le `z-index`. */}
       <Link href={href} className={styles.cardOverlay} aria-label={openLabel} />

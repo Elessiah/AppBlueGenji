@@ -84,13 +84,37 @@ describe("ancre d'un match — points de passage", () => {
     expect(HOOK).toContain('inline: "center"');
   });
 
+  it("défile d'un coup, sans animation", () => {
+    // Observé : `behavior: "smooth"` s'anime sur plusieurs frames, pendant
+    // lesquelles la page vit encore (instantané SSE, bascule de phase, volet qui
+    // se déplie) — l'animation y est avalée **sans la moindre erreur**, et
+    // l'ancre laissait le lecteur en haut de la page, halo allumé sur une carte
+    // hors écran. Un navigateur ne fait pas autre chose sur une ancre native :
+    // on arrive à destination, on ne s'y rend pas.
+    expect(HOOK).not.toContain('behavior: "smooth"');
+    expect(HOOK).not.toContain("behavior:");
+  });
+
+  it("contrôle le placement une fois la page retombée", () => {
+    // La page continue de vivre après le défilement : un instantané peut
+    // rallonger un classement et chasser la carte de l'écran.
+    expect(HOOK).toContain("SETTLE_CHECK_MS");
+    expect(HOOK).toContain("isOnScreen(element)");
+  });
+
   it("respecte le réglage « animations réduites » du système", () => {
-    expect(HOOK).toContain("prefers-reduced-motion: reduce");
     expect(GLOBALS).toMatch(/\.match-anchor-target\s*\{/);
     // Le repère reste, seul le fondu disparaît : sans lui, on ne saurait plus
     // quelle carte on venait voir.
     const reduced = GLOBALS.slice(GLOBALS.indexOf(".match-anchor-target"));
     expect(reduced).toContain("animation: none");
+  });
+
+  it("annonce la carte à un lecteur d'écran", () => {
+    // Le défilement et le halo ne disent rien à qui ne voit pas la page : le
+    // focus va sur la carte, comme le navigateur le fait sur une ancre native.
+    expect(HOOK).toContain("focus({ preventScroll: true })");
+    expect(MATCH_ROW).toContain("tabIndex={-1}");
   });
 });
 

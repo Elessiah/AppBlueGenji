@@ -25,6 +25,15 @@ const LOOKUP_TIMEOUT_MS = 20_000;
  *  ne sont plus servies. */
 const LOOKUP_INTERVAL_MS = 100;
 
+/**
+ * Délai de la passe de contrôle du placement.
+ *
+ * La page continue de vivre après le défilement : un instantané SSE peut
+ * rallonger un classement, déplier un bandeau de diffusion, et faire descendre
+ * la carte hors de l'écran juste après qu'on l'y a amenée.
+ */
+const SETTLE_CHECK_MS = 700;
+
 /** Durée du surlignage d'arrivée. Assez long pour être vu, assez court pour ne
  *  pas devenir un état permanent de la carte. */
 const HIGHLIGHT_MS = 3_000;
@@ -45,17 +54,41 @@ type UseMatchAnchorOptions = {
   onSelectPhase: (phaseId: number) => void;
 };
 
-function prefersReducedMotion(): boolean {
+/**
+ * Amène la carte au centre de l'écran **et** de sa zone défilante.
+ *
+ * `block`/`inline: "center"` fait défiler *tous* les conteneurs ancestraux :
+ * c'est ce qui rend l'ancre valable à l'intérieur d'un `<ScrollArea>` horizontal
+ * (arbre, rondes suisses, rounds de survie) sans que la zone défilante ait quoi
+ * que ce soit à savoir de l'ancre.
+ *
+ * Le défilement est **instantané**, et c'est délibéré. C'est déjà ce que fait un
+ * navigateur sur une ancre native — on arrive à destination, on ne s'y rend pas.
+ * Et surtout, un défilement animé s'étale sur plusieurs frames, pendant
+ * lesquelles la page vit encore : le flux SSE re-rend le plateau, la phase
+ * bascule, un volet se déplie. L'animation y est avalée sans la moindre erreur —
+ * l'ancre laissait alors le lecteur en haut de la page, avec le halo allumé sur
+ * une carte qu'il ne voyait pas.
+ */
+function centerInView(element: HTMLElement): void {
+  element.scrollIntoView({ block: "center", inline: "center" });
+}
+
+/** La carte touche-t-elle encore l'écran ? */
+function isOnScreen(element: HTMLElement): boolean {
+  const rect = element.getBoundingClientRect();
   return (
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    rect.bottom > 0 &&
+    rect.right > 0 &&
+    rect.top < window.innerHeight &&
+    rect.left < window.innerWidth
   );
 }
 
 /**
  * Ouvre la fiche du tournoi défilée sur le match désigné par `#match-[id]`.
  *
- * Trois étapes, volontairement séparées — chacune peut échouer seule sans
+ * Cinq étapes, volontairement séparées — chacune peut échouer seule sans
  * empêcher les autres d'aboutir :
  *
  * 1. **Lire le fragment** (au montage, et à chaque `hashchange` : un second clic
@@ -63,14 +96,14 @@ function prefersReducedMotion(): boolean {
  * 2. **Révéler la phase** qui contient le match, en `MULTI` — une seule fois par
  *    cible (`phaseAppliedFor`), sinon un clic du lecteur sur une autre phase
  *    serait défait par l'ancre à chaque instantané SSE.
- * 3. **Chercher l'élément puis défiler.** `scrollIntoView` avec
- *    `block`/`inline: "center"` fait défiler *tous* les conteneurs ancestraux —
- *    c'est ce qui rend l'ancre valable à l'intérieur d'un `<ScrollArea>`
- *    horizontal (arbre, rondes suisses, rounds de survie) sans que la zone
- *    défilante ait quoi que ce soit à savoir de l'ancre. La recherche est
- *    répétée, parce que la cible peut n'être rendue que plus tard : le flux SSE
- *    apporte le plateau, la phase bascule, et `BracketSections` déplie le volet
- *    où dort le match (il n'en rend qu'un à la fois sur un gros tableau).
+ * 3. **Chercher l'élément puis défiler.** La recherche est répétée, parce que la
+ *    cible peut n'être rendue que plus tard : le flux SSE apporte le plateau, la
+ *    phase bascule, et `BracketSections` déplie le volet où dort le match (il
+ *    n'en rend qu'un à la fois sur un gros tableau).
+ * 4. **Contrôler le placement** une fois la page retombée : elle continue de
+ *    vivre après le défilement, et un instantané peut chasser la carte de
+ *    l'écran juste après qu'on l'y a amenée.
+ * 5. **Éteindre le surlignage.**
  *
  * Le fragment n'est **pas** effacé de l'URL après usage : le lien reste
  * copiable et partageable, et un rechargement doit redéfiler au même endroit.
@@ -132,11 +165,12 @@ export function useMatchAnchor({
 
       const element = document.getElementById(matchAnchorId(target));
       if (element) {
-        element.scrollIntoView({
-          behavior: prefersReducedMotion() ? "auto" : "smooth",
-          block: "center",
-          inline: "center",
-        });
+        centerInView(element);
+        // Le focus suit, sans son propre recadrage : c'est ce que fait le
+        // navigateur sur une ancre native, et c'est ce qui annonce la carte à un
+        // lecteur d'écran — le halo et le défilement ne disent rien à qui ne
+        // voit pas la page.
+        element.focus({ preventScroll: true });
         setHighlighted(target);
         setTarget(null);
         return;
@@ -156,7 +190,21 @@ export function useMatchAnchor({
     };
   }, [target]);
 
-  // 4. Extinction du surlignage.
+  // 4. Contrôle du placement, une fois la page retombée.
+  useEffect(() => {
+    if (highlighted === null) return;
+
+    const timer = setTimeout(() => {
+      const element = document.getElementById(matchAnchorId(highlighted));
+      // On ne recadre que si la carte a réellement quitté l'écran : la corriger
+      // d'office reprendrait la main sur un lecteur qui a commencé à défiler.
+      if (element && !isOnScreen(element)) centerInView(element);
+    }, SETTLE_CHECK_MS);
+
+    return () => clearTimeout(timer);
+  }, [highlighted]);
+
+  // 5. Extinction du surlignage.
   useEffect(() => {
     if (highlighted === null) return;
     const timer = setTimeout(() => setHighlighted(null), HIGHLIGHT_MS);

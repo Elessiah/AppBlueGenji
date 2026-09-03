@@ -58,7 +58,7 @@ qu'aucune vue ait à y penser — la poser dans une vue, c'est l'oublier dans tr
 
 ## 4. Le défilement : `useMatchAnchor`
 
-`app/(secured)/tournois/[id]/_hooks/useMatchAnchor.ts`. Quatre étapes séparées,
+`app/(secured)/tournois/[id]/_hooks/useMatchAnchor.ts`. Cinq étapes séparées,
 chacune pouvant échouer seule :
 
 1. **Lire le fragment** — au montage, et à chaque `hashchange` (un second clic
@@ -68,8 +68,28 @@ chacune pouvant échouer seule :
    sans ce garde-fou, un clic du lecteur sur une autre phase serait défait par
    l'ancre à chaque instantané SSE, et la page deviendrait innavigable tant que
    le fragment resterait dans l'URL.
-3. **Chercher l'élément, puis défiler.**
-4. **Surligner**, trois secondes.
+3. **Chercher l'élément, défiler, poser le focus.**
+4. **Contrôler le placement** 700 ms plus tard.
+5. **Surligner**, trois secondes.
+
+### Le défilement est instantané, et le placement se vérifie
+
+Pas d'animation : c'est ce que fait le navigateur sur une ancre native — on
+arrive à destination, on ne s'y rend pas. Et surtout, `behavior: "smooth"` s'étale
+sur plusieurs frames pendant lesquelles cette page-là vit encore (instantané SSE,
+bascule de phase, volet qui se déplie). **L'animation y est avalée sans la
+moindre erreur** : mesuré en conditions réelles, `scrollY` restait à 0 tandis que
+le halo s'allumait sur une carte hors écran — la panne parfaite, silencieuse et
+plausible. Le même appel en instantané tient.
+
+Pour la même raison, le placement est **vérifié** plutôt que supposé : 700 ms
+après l'arrivée, si la carte a quitté l'écran, on la recentre — une fois, et
+seulement si elle en est réellement sortie, pour ne pas reprendre la main sur un
+lecteur qui a commencé à défiler.
+
+Le **focus** va sur la carte (`tabIndex={-1}` sur `MatchRow`, `focus({
+preventScroll: true })` dans le hook) : le défilement et le halo ne disent rien à
+qui ne voit pas la page, et un navigateur en fait autant sur une ancre native.
 
 ### Trois pièges, traités explicitement
 

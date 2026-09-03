@@ -97,6 +97,12 @@ export function MatchRow({
       // sans qu'aucune vue ait à y penser.
       id={matchAnchorId(match.id)}
       className={isAnchorTarget ? "match-anchor-target" : undefined}
+      // Hors de l'ordre de tabulation, mais focalisable par programme : à
+      // l'arrivée d'une ancre, `useMatchAnchor` y pose le focus pour qu'un
+      // lecteur d'écran annonce la carte. Sans cela, le défilement et le halo
+      // ne disent rien à qui ne voit pas la page — le navigateur en fait autant
+      // sur une ancre native, que le flux SSE nous empêche d'utiliser.
+      tabIndex={-1}
       style={{
         width: CARD_W,
         background: "var(--surface-1)",
