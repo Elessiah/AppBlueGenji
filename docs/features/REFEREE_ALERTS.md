@@ -118,7 +118,7 @@ ce qui permet d'agir :
 
 ```
 ⚠️ Arbitrage requis — « Coupe BlueGenji » (#12) · Manche 2 : Les Renards vs Team Nova (match #31) — reports de score contradictoires. https://…/tournois/12
-⏱️ Arbitrage requis — « Coupe BlueGenji » (#12) · Manche 2 : Les Renards vs Team Nova (match #31) — délai de report dépassé depuis plus de 30 minutes, toujours pas tranché. https://…/tournois/12
+⏱️ Arbitrage requis — « Coupe BlueGenji » (#12) · Manche 2 : Les Renards vs Team Nova (match #31) — délai de report dépassé depuis plus de 10 minutes, toujours pas tranché. https://…/tournois/12
 ```
 
 Nature de l'intervention en tête, tournoi et identifiant, manche, les deux
@@ -142,7 +142,7 @@ Ces manches restent `AWAITING_CONFIRMATION` indéfiniment.
 `resolveExpiredScoreReports` les repère : ce sont exactement celles que ses deux
 branches d'auto-résolution laissent passer. Elle y pose une seconde alerte,
 distincte du conflit lui-même — la première part au moment du désaccord, celle-ci
-constate qu'une demi-heure plus tard personne n'a tranché. Un canal chargé un
+constate qu'un délai de report plus tard personne n'a tranché. Un canal chargé un
 soir de tournoi avale la première ; la seconde arrive quand le match est
 vraiment en souffrance.
 
@@ -150,8 +150,14 @@ L'escalade attend **un délai de plus** après `score_deadline_at`, et le jalon
 n'est pas choisi au hasard : cette colonne est posée au premier report et jamais
 réécrite tant que la manche n'est pas tranchée (`COALESCE`). Les horodatages de
 report, eux, se repoussent à chaque saisie — une engagée qui resaisirait son
-score toutes les vingt-cinq minutes repousserait indéfiniment sa propre escalade,
+score juste avant chaque échéance repousserait indéfiniment sa propre escalade,
 et le blocage qu'elle entretient ne serait jamais signalé.
+
+Aucune durée n'est citée en dur ici, et l'exemple ci-dessus vaut pour la valeur
+du jour : la seule source est `SCORE_REPORT_TIMEOUT_MINUTES`
+(`lib/shared/constants.ts`), que le message reprend telle quelle. L'escalade part
+donc **deux délais** après le premier report — un pour l'expiration, un pour la
+souffrance constatée — quelle que soit la valeur réglée.
 
 La comparaison est faite en SQL (`score_deadline_at <= DATE_SUB(NOW(), INTERVAL
 … MINUTE)`), dans le même référentiel que celui qui a écrit la colonne :
@@ -214,12 +220,20 @@ Il porte donc sa propre clé (`SCORE_CONFLICT`), posée par le même
 tranchée sont effacées, si bien qu'un désaccord qui renaît après un arbitrage —
 correction de score sur une archive — alerte de nouveau.
 
-Cet effacement se fait **après le commit**, sur le pool, à partir de la trace
-`match_finished` que `finalizeMatch` a déjà mise en file. Pas dans la transaction
+Cet effacement se fait **après le commit**, sur le pool. Pas dans la transaction
 du moteur : `finalizeMatch` est le point de passage de **tous** les matchs
 tranchés, et y poser un `DELETE` de plus ferait tenir un verrou de plus jusqu'au
 commit, sur son chemin le plus chaud — jusqu'à l'interblocage avec le balayage
 qui, lui, réserve.
+
+Ce que `finalizeMatch` laisse derrière lui est donc une simple **marque en
+mémoire** (`markMatchResolved`), tenue à part de la file de journal. À part, et
+non sur la ligne `match_finished` qu'il met en file juste avant : cette file est
+plafonnée à 32 entrées par transaction, et un balayage chargé abandonne les
+dernières. Perdre une ligne de journal coûte une ligne d'historique ; perdre le
+ménage laisserait la clé `SCORE_CONFLICT` posée pour la vie du plateau, et plus
+aucun désaccord né après cet arbitrage n'alerterait quiconque. Le nettoyage ne
+dépend pas du sort d'une ligne d'affichage.
 
 ### Une réservation se rend quand rien n'est parti
 
@@ -270,6 +284,16 @@ report de score ni le balayage qui l'a appelé. Le **conflit** part alors quand
 même, sans marque : c'est une alerte par report, donc une par action d'un joueur,
 comme avant que ce canal n'existe. L'**escalade**, née d'un constat refait à
 chaque entretien, se tait : sans marque, elle partirait en boucle.
+
+Et il ne réserve rien quand la manche a **déjà** sa ligne. Le constat qui produit
+l'escalade se refait à chaque entretien, donc à chaque reconstruction
+d'instantané tant que la rencontre est bloquée : rejouer l'`INSERT IGNORE` y
+serait sans effet, mais prendrait une intention de verrou sur l'index unique et
+consommerait un `AUTO_INCREMENT` à chaque passage, dans la transaction du moteur.
+Une lecture préalable écarte ce cas nominal sans rien verrouiller. Elle ne
+*garantit* rien — deux transactions simultanées peuvent toutes deux ne rien voir
+—, et n'a pas à le faire : c'est l'index unique qui tranche la course, comme
+avant.
 
 Et il ne réserve rien tant que le **coupe-circuit** est ouvert. Réserver ce qu'on
 sait ne pas pouvoir envoyer, puis rendre la réservation au flush, ferait tourner
