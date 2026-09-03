@@ -78,7 +78,10 @@
 }
 
 .list {
-  max-height: 260px;
+  /* Bornée par la hauteur de la fenêtre, pas seulement en pixels : sur un écran
+     bas, une liste de 260 px poussait « Inscrire » sous le pli, et le dialogue
+     n'avait plus de bouton visible. */
+  max-height: min(260px, 32vh);
   border: 1px solid var(--line-soft);
   border-radius: var(--r-cy-sm, 8px);
   background: var(--cyber-bg-1, rgba(0, 0, 0, 0.25));
@@ -101,6 +104,12 @@
 
 .option:hover {
   background: var(--cyber-bg-3, rgba(255, 255, 255, 0.04));
+}
+
+/* La ligne cochée se relit d'un coup d'œil : sur une liste longue, la seule
+   case à cocher se perd dans la colonne. */
+.optionChecked {
+  background: rgba(90, 200, 255, 0.1);
 }
 
 .option input {
@@ -156,4 +165,54 @@
 .actionButton {
   padding: 8px 20px;
   font-size: 13px;
+}
+
+/* `:global` obligatoire : `.btn` appartient au style global, et CSS Modules
+   hacherait un `.btn` local — la règle ne s'appliquerait alors à rien. Le `.btn`
+   global n'a pas d'état désactivé : sans ces lignes, « Inscrire » gardait
+   l'apparence d'un bouton cliquable alors qu'il refusait le clic. */
+.panel :global(.btn:disabled) {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.panel :global(.btn:disabled:hover) {
+  transform: none;
+  box-shadow: none;
+}
+
+.panel :global(.btn:focus-visible) {
+  outline: 2px solid var(--blue-400, #5ac8ff);
+  outline-offset: 2px;
+}
+
+.linkButton:focus-visible,
+.option:focus-within {
+  outline: 2px solid var(--blue-400, #5ac8ff);
+  outline-offset: 2px;
+}
+
+/* Écran bas : le dialogue se resserre plutôt que de pousser « Inscrire » hors
+   de la fenêtre. Rien n'est masqué — seuls les blancs se réduisent. */
+@media (max-height: 560px) {
+  .panel {
+    padding: 14px 18px;
+  }
+
+  .modes {
+    margin: 10px 0;
+  }
+
+  .actions {
+    margin-top: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel :global(.btn),
+  .option {
+    transition: none;
+  }
 }

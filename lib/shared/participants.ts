@@ -64,6 +64,8 @@ export type ParticipantWording = {
   guestSelectLabel: string;
   /** Libellé de la liste à cocher, où l'on en choisit plusieurs d'un coup. */
   guestSelectManyLabel: string;
+  /** Liste vide : tout ce qui existait est déjà engagé dans ce tournoi. */
+  guestNoneLeft: string;
   /** Libellé du champ de nom à la création d'un engagé sans compte. */
   guestNewNameLabel: string;
   /** Confirmation affichée après inscription d'un engagé sans compte. */
@@ -97,6 +99,7 @@ export const PARTICIPANT_WORDING: Record<ParticipantType, ParticipantWording> = 
       "Réservé aux équipes fantômes : une équipe de joueurs s'inscrit toujours elle-même.",
     guestSelectLabel: "Équipe fantôme",
     guestSelectManyLabel: "Équipes fantômes à inscrire",
+    guestNoneLeft: "Aucune équipe fantôme disponible : elles sont toutes déjà inscrites.",
     guestNewNameLabel: "Nom de la nouvelle équipe",
     guestSuccess: "Équipe fantôme inscrite.",
     guestManySuccess: "équipes fantômes inscrites.",
@@ -119,6 +122,7 @@ export const PARTICIPANT_WORDING: Record<ParticipantType, ParticipantWording> = 
       "Réservé aux joueurs sans compte sur le site : un joueur inscrit s'engage toujours lui-même.",
     guestSelectLabel: "Joueur invité",
     guestSelectManyLabel: "Joueurs invités à inscrire",
+    guestNoneLeft: "Aucun joueur invité disponible : ils sont tous déjà inscrits.",
     guestNewNameLabel: "Pseudo du joueur invité",
     guestSuccess: "Joueur invité inscrit.",
     guestManySuccess: "joueurs invités inscrits.",

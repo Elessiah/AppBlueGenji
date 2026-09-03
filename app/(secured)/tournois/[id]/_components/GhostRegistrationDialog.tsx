@@ -92,6 +92,15 @@ export function GhostRegistrationDialog({
 
   const overCapacity = selected.length > remainingSlots;
 
+  // Trois vides bien distincts : on ne sait pas encore, il n'y a plus rien à
+  // inscrire, ou la recherche ne trouve rien. « Aucun résultat » sur une liste
+  // qui n'a pas fini de charger enverrait créer une équipe déjà en stock.
+  const emptyMessage = !loaded
+    ? "Chargement…"
+    : teams.length === 0
+      ? wording.guestNoneLeft
+      : "Aucun résultat pour cette recherche.";
+
   const toggle = (teamId: number) => {
     setSelected((current) =>
       current.includes(teamId)
@@ -204,7 +213,10 @@ export function GhostRegistrationDialog({
           <div>
             <p className={styles.listLabel} id="ghost-team-list-label">
               <span>{wording.guestSelectManyLabel}</span>
+              {/* Le seul retour d'un clic sur une case est ce compteur : il doit
+                  aussi s'entendre. */}
               <span
+                aria-live="polite"
                 className={`${styles.count} ${
                   overCapacity ? styles.countOver : selected.length > 0 ? styles.countActive : ""
                 }`}
@@ -229,25 +241,25 @@ export function GhostRegistrationDialog({
               ariaLabel={wording.guestSelectManyLabel}
             >
               {visible.length === 0 ? (
-                <p className={styles.empty}>
-                  {!loaded
-                    ? "Chargement…"
-                    : teams.length === 0
-                      ? `Aucun engagé sans compte disponible : ils sont tous déjà inscrits.`
-                      : "Aucun résultat pour cette recherche."}
-                </p>
+                <p className={styles.empty}>{emptyMessage}</p>
               ) : (
-                visible.map((team) => (
-                  <label key={team.id} className={styles.option}>
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(team.id)}
-                      onChange={() => toggle(team.id)}
-                      disabled={busy}
-                    />
-                    <span className={styles.optionName}>{team.name}</span>
-                  </label>
-                ))
+                visible.map((team) => {
+                  const checked = selected.includes(team.id);
+                  return (
+                    <label
+                      key={team.id}
+                      className={`${styles.option} ${checked ? styles.optionChecked : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggle(team.id)}
+                        disabled={busy}
+                      />
+                      <span className={styles.optionName}>{team.name}</span>
+                    </label>
+                  );
+                })
               )}
             </ScrollArea>
 
@@ -298,6 +310,13 @@ export function GhostRegistrationDialog({
             type="submit"
             className={`btn ${styles.actionButton}`}
             disabled={submitDisabled}
+            // Le bouton grisé doit dire pourquoi : le compteur passe à l'ambre,
+            // encore faut-il faire le lien.
+            title={
+              overCapacity
+                ? `Il ne reste que ${remainingSlots} place${remainingSlots > 1 ? "s" : ""} dans ce tournoi.`
+                : undefined
+            }
           >
             {busy
               ? "Inscription…"
