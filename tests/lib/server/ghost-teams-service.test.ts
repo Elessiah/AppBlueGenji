@@ -184,7 +184,25 @@ describe("listGhostTeams", () => {
       { id: 2, name: "Beta", logoUrl: "/a.webp" },
     ]);
 
-    const [sql] = execute.mock.calls[0] as [string];
+    const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
     expect(sql).toMatch(/WHERE is_ghost = 1 AND deleted_at IS NULL/);
+    // Une entrée solo n'est pas une équipe : elle ne se liste jamais comme telle.
+    expect(sql).toMatch(/solo_user_id IS NULL/);
+    // Sans tournoi, aucune exclusion — et donc aucun paramètre à lier.
+    expect(sql).not.toMatch(/NOT EXISTS/);
+    expect(params).toEqual([]);
+  });
+
+  it("écarte les fantômes déjà engagées dans le tournoi visé", async () => {
+    const execute = jest.fn().mockResolvedValue([[{ id: 1, name: "Alpha", logo_url: null }]]);
+    await mockDb(execute);
+
+    await expect(listGhostTeams(12)).resolves.toEqual([{ id: 1, name: "Alpha", logoUrl: null }]);
+
+    const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
+    // L'exclusion est posée en base : la liste est relue à chaque ouverture du
+    // dialogue et doit refléter les inscriptions arrivées entre-temps.
+    expect(sql).toMatch(/NOT EXISTS[\s\S]*bg_tournament_registrations/);
+    expect(params).toEqual([12]);
   });
 });

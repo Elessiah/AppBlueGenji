@@ -1,5 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
-import { ERROR_MESSAGES, mapError } from "@/app/(secured)/tournois/[id]/_lib/error-map";
+import {
+  ERROR_MESSAGES,
+  mapBatchError,
+  mapEntrantError,
+  mapError,
+} from "@/app/(secured)/tournois/[id]/_lib/error-map";
 
 /**
  * Les codes que le serveur renvoie réellement doivent tous avoir une phrase
@@ -59,5 +64,61 @@ describe("mapError — intégrité de la table", () => {
 
   it.each(codes.map((code) => [code]))("traduit %s sans le renvoyer tel quel", (code) => {
     expect(mapError(code)).not.toBe(code);
+  });
+});
+
+describe("mapError — inscription en lot d'engagés sans compte", () => {
+  it.each([
+    ["EMPTY_TEAM_SELECTION"],
+    ["INVALID_TEAM_IDS"],
+    ["TOO_MANY_TEAMS"],
+    ["NOT_A_GHOST_TEAM"],
+    ["TEAM_ALREADY_DELETED"],
+    ["TEAM_NOT_FOUND"],
+    ["GHOST_TEAMS_LOAD_FAILED"],
+    ["GHOST_TEAM_CREATE_FAILED"],
+    ["GHOST_REGISTRATION_FAILED"],
+  ])("traduit %s", (code) => {
+    expect(mapError(code)).not.toBe(code);
+  });
+
+});
+
+describe("mapBatchError", () => {
+  it("dit qu'un lot refusé n'a rien enregistré", () => {
+    // Le tout-ou-rien doit se lire dans la phrase : sans cette précision, le
+    // staff ne sait pas s'il doit reprendre toute sa sélection ou seulement la
+    // fin. Ces mêmes codes servent aussi à l'inscription d'un seul, d'où la
+    // précision ajoutée ici et non dans la table.
+    for (const code of ["TOURNAMENT_FULL", "ALREADY_REGISTERED", "REGISTRATION_CLOSED"]) {
+      expect(mapBatchError(code, null, 25)).toBe(`${mapError(code)} Rien n'a été enregistré.`);
+    }
+  });
+
+  it("se tait sur un lot d'un seul, où la précision n'apprend rien", () => {
+    expect(mapBatchError("TOURNAMENT_FULL", null, 1)).toBe(mapError("TOURNAMENT_FULL"));
+    expect(mapBatchError("TOURNAMENT_FULL", null, 0)).toBe(mapError("TOURNAMENT_FULL"));
+  });
+
+  it("nomme l'engagé et précise, quand le refus fait les deux", () => {
+    expect(mapBatchError("ALREADY_REGISTERED", "Alpha", 4)).toBe(
+      `Alpha — ${mapError("ALREADY_REGISTERED")} Rien n'a été enregistré.`,
+    );
+  });
+});
+
+describe("mapEntrantError", () => {
+  it("met le nom de l'engagé en tête du message", () => {
+    expect(mapEntrantError("ALREADY_REGISTERED", "Les Fantômes")).toBe(
+      `Les Fantômes — ${mapError("ALREADY_REGISTERED")}`,
+    );
+  });
+
+  it("retombe sur le message seul quand le refus ne nomme personne", () => {
+    expect(mapEntrantError("TOURNAMENT_FULL", null)).toBe(mapError("TOURNAMENT_FULL"));
+  });
+
+  it("traduit toujours le code, nom ou pas", () => {
+    expect(mapEntrantError("REGISTRATION_CLOSED", "Alpha")).not.toContain("REGISTRATION_CLOSED");
   });
 });

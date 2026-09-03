@@ -41,10 +41,12 @@ création (staff)  →  inscription à un tournoi  →  attribution à un joueur
    Les services acceptent un dernier argument `viewerManagesGhostTeams`, fourni
    par la route depuis les rôles du viewer.
 3. **Inscription à un tournoi** — `POST /api/admin/tournaments/[id]/ghost-registrations`
-   avec `{ teamId }`. La route refuse (`NOT_A_GHOST_TEAM`, 409) toute équipe
-   réelle : le staff n'inscrit jamais l'équipe d'un joueur à sa place. Les
-   contrôles d'état, de doublon et de capacité sont ceux de l'inscription
-   normale (`registerTeam` dans `lib/server/tournaments/registration.ts`).
+   avec `{ teamIds: [...] }`, **une ou plusieurs** à la fois (voir
+   « Inscription en lot » ci-dessous). Le moteur refuse (`NOT_A_GHOST_TEAM`,
+   409) toute équipe réelle : le staff n'inscrit jamais l'équipe d'un joueur à
+   sa place. Les contrôles d'état, de doublon et de capacité sont ceux de
+   l'inscription normale (`registerTeam` dans
+   `lib/server/tournaments/registration.ts`).
 4. **Attribution** — `POST /api/teams/[id]/claim` avec `{ pseudo }`. Le joueur
    devient `OWNER`, `is_ghost` repasse à 0 et l'équipe redevient ordinaire.
    Refus si le joueur appartient déjà à une équipe (`USER_ALREADY_IN_TEAM`),
@@ -72,7 +74,10 @@ création (staff)  →  inscription à un tournoi  →  attribution à un joueur
   d'adhésion sont masqués (`canManage && !isGhost`) : les routes de roster
   refusent la dérogation fantôme, ces contrôles ne pourraient que renvoyer 403.
 - **`/tournois/[id]`** — bouton « + Équipe fantôme » pendant les inscriptions,
-  permettant de choisir une fantôme existante ou d'en créer une à la volée.
+  permettant de cocher plusieurs fantômes existantes ou d'en créer une à la
+  volée (`GhostRegistrationDialog`). La liste porte une recherche (insensible à
+  la casse et aux accents) et défile dans un `<ScrollArea>` ; un compteur
+  « sélection / places restantes » désactive le bouton avant l'aller-retour.
 
 ## Champs exposés
 
@@ -81,14 +86,177 @@ création (staff)  →  inscription à un tournoi  →  attribution à un joueur
 de la permission, pas d'une appartenance). `GET /api/teams` renvoie aussi
 `canManageGhostTeams` pour piloter l'affichage des contrôles.
 
+## Inscription en lot
+
+`POST /api/admin/tournaments/[id]/ghost-registrations` prend `{ teamIds }` — une
+liste, jamais un identifiant seul : inscrire une fantôme et en inscrire trente
+suit désormais le même chemin, il n'y a pas deux règles à tenir.
+
+| Élément | Détail |
+| --- | --- |
+| Logique pure | `lib/shared/ghost-registration.ts` (lecture de la sélection, recherche, phrases) |
+| Orchestration | `registerGhostTeams` (`lib/server/tournaments/index.ts`) → `registerTeamsByIds` (`.../registration.ts`) |
+| Liste proposée | `listGhostTeams(tournamentId)` — les déjà engagées sont écartées **en base** |
+| Interface | `GhostRegistrationDialog` (`app/(secured)/tournois/[id]/_components/`) |
+
+### Tout ou rien
+
+Un lot est **une seule intention** : ou bien les fantômes choisies entrent
+toutes, ou bien aucune n'entre. Une seule transaction, défaite au premier refus,
+et **un seul** `publishUpdatedEvent` après le commit — le panneau d'inscriptions
+et l'aperçu du plateau se refont une fois, sur l'état final, plutôt que N fois
+sur des états intermédiaires qui n'ont jamais existé hors de la transaction.
+
+Le résultat partiel a été écarté : il obligerait le staff à recouper sa
+sélection contre la liste des inscrites pour savoir ce qui est passé, et
+distribuerait les rangs de départ à un préfixe arbitraire de la sélection. En
+contrepartie, le refus **nomme l'engagé qui a bloqué** — le corps de l'erreur
+porte `teamId` quand le refus en désigne un (`ALREADY_REGISTERED`,
+`NOT_A_GHOST_TEAM`, `TEAM_ALREADY_DELETED`, `TEAM_NOT_FOUND`), et le dialogue
+retrouve le nom dans sa propre liste. Les refus qui valent pour le lot entier
+(`REGISTRATION_CLOSED`, `TOURNAMENT_FULL`) n'en portent pas : les affubler d'un
+nom laisserait croire que les autres seraient passés.
+
+Le tout-ou-rien se lit aussi dans la phrase : `mapBatchError`
+(`_lib/error-map.ts`) ajoute « Rien n'a été enregistré. » dès que la requête
+portait plus d'un engagé. La précision n'est pas dans la table des messages, et
+pas par oubli : les mêmes codes servent à l'inscription d'un seul, où elle
+n'apprendrait rien, et seul l'appelant sait combien il en avait envoyé.
+
+### Taille d'un lot : 32
+
+`GHOST_BATCH_MAX = 32`, et ce nombre n'est pas arbitraire : un lot est **une**
+transaction, et le journal Discord ne retient que `MAX_PENDING_PER_TRANSACTION
+= 32` entrées par transaction (`lib/server/tournaments/bot-logs.ts`) — au-delà,
+`queueBotLog` abandonne, et les inscriptions passées la trente-deuxième
+s'écriraient **sans leur ligne de journal**, silencieusement. Remonter le
+plafond du journal serait le mauvais levier : il borne l'empreinte mémoire du
+`seed`, qui rejoue des milliers de matchs sur une même connexion. Un test tient
+le couple (`GHOST_BATCH_MAX <= MAX_PENDING_PER_TRANSACTION`), faute de pouvoir
+importer un module serveur depuis `lib/shared`.
+
+Le même nombre borne la durée du verrou pris sur la ligne du tournoi : remplir
+un plateau de 128 demande quatre gestes au lieu d'un, mais aucune inscription de
+joueur n'attend derrière une transaction de cent écritures.
+
+L'égalité des deux nombres n'est pas une marge nulle par distraction : un lot qui
+**aboutit** ne met en file que ses inscriptions. Les deux autres évènements que
+la transaction pourrait produire (`tournament_started`,
+`tournament_underfilled`, réservés par `syncTournamentState`) supposent que
+l'état a quitté `REGISTRATION` — auquel cas `registerTeam` lève
+`REGISTRATION_CLOSED`, le lot est défait et la file jetée.
+
+Le plafond porte sur **ce qui est envoyé**, et il est vérifié avant que la liste
+ne soit parcourue : compter d'abord et plafonner ensuite laissait un corps de
+100 000 entiers occuper la boucle d'évènements avant d'être refusé — le
+processus entier, flux SSE compris, s'arrêtait le temps du refus.
+
+### Une ligne de journal par inscription, et non par geste
+
+Le lot ne collapse pas ses lignes de journal, contrairement à l'évènement de
+flux, et la différence n'est pas une inconséquence : le flux ne transporte qu'un
+signal de rafraîchissement, là où une ligne de journal **nomme l'engagé** qui
+vient d'entrer — c'est tout son objet pour une trace de staff. Trente-deux
+fantômes inscrites produisent donc ce que produiraient trente-deux joueurs
+s'inscrivant un par un, soit l'ordre de grandeur que `BOT_ACTIVITY_LOG.md`
+s'autorise (un plateau de 32 compte 31 matchs). L'envoi ne ralentit rien :
+`flushBotLogs` ne s'attend pas.
+
+### Pas de seconde connexion sous le verrou
+
+`getUserActiveTeam` accepte une connexion, et l'inscription d'un joueur la lui
+passe — celle de sa transaction. Sans cela, la fonction empruntait une
+**seconde** place du pool (25) alors que la transaction en retenait déjà une
+*et* tenait le verrou du tournoi : le porteur du verrou attend une connexion que
+les transactions bloquées sur son verrou ne rendront pas, et rien ne se dénoue
+avant `innodb_lock_wait_timeout`. Le convoi est né avec ce verrou — avant, les
+inscriptions ne se sérialisaient pas —, il se règle donc ici.
+
+Le contexte du lecteur (`getTournamentViewerContext`), lui, appelle toujours
+`getUserActiveTeam` **sans** connexion : il n'est dans aucune transaction, et y
+réserver une place du pool pour une seule requête doublerait la pression à
+chaque connexion SSE.
+
+### Le plafond d'effectif tient
+
+L'effectif est relu **à chaque insertion**, sur la connexion de la transaction :
+le compte grandit avec le lot, et la place manquante arrête l'ensemble par
+`TOURNAMENT_FULL`. Le compteur du dialogue n'est qu'une commodité — le serveur
+reste le juge.
+
+Un verrou `SELECT … FOR UPDATE` sur la ligne du tournoi (`lockTournamentRow`)
+précède le comptage : sans lui, deux inscriptions simultanées lisent le même
+effectif et passent toutes les deux — l'unicité `(tournament_id, team_id)`
+protège du doublon, pas du dépassement d'effectif.
+
+Il est pris en **toute première instruction** de la transaction, par chacun des
+deux points d'entrée (`registerCurrentUserTeam`, `registerTeamsByIds`), et non
+par le seul tronc commun. La nuance porte tout : sous `REPEATABLE READ`, c'est
+la première lecture **ordinaire** qui fige l'instantané, et une lecture
+verrouillante n'en crée pas. Un `loadTournamentRow` placé avant le verrou — ne
+serait-ce que pour connaître le type de participant — fige donc le monde *avant*
+l'attente ; la transaction obtient ensuite le verrou, puis compte un effectif
+périmé, et le plafond saute exactement comme s'il n'y avait pas de verrou. Le
+verrou repris dans `registerTeam` n'est qu'un **plancher** : il garantit qu'un
+appelant ajouté demain ne compte jamais sans verrou, il ne suffit pas à lui
+seul. L'ordre de verrouillage reste constant (le tournoi d'abord), donc pas
+d'interblocage.
+
+### Fenêtre d'inscription, et rien d'autre
+
+L'état est *calculé* (`syncTournamentState`) : un tournoi qui n'est plus en
+inscriptions au moment du clic refuse tout le lot par `REGISTRATION_CLOSED`
+(409), quelle que soit la liste affichée. Aucune garde nouvelle : c'est celle de
+l'inscription ordinaire.
+
+### Le contrôle « c'est bien une fantôme » est verrouillant
+
+Il est relu dans la transaction, et par un `SELECT … ORDER BY id FOR UPDATE` —
+pas par prudence : c'est la **première lecture** de la transaction, donc celle
+qui fige l'instantané `REPEATABLE READ`. Une lecture ordinaire verrait l'état du
+monde à cet instant et n'en démordrait plus ; `claimGhostTeam` pourrait valider
+son `is_ghost = 0` juste après, et l'inscription passerait quand même — la
+course que le contrôle prétend fermer resterait ouverte. `ORDER BY id` fixe
+l'ordre de verrouillage : deux lots qui se recoupent s'attendent au lieu de
+s'interbloquer.
+
+### Ne pas reproposer les déjà inscrites
+
+`listGhostTeams(tournamentId)` pose l'exclusion **en base**
+(`NOT EXISTS … bg_tournament_registrations`) plutôt que côté client : la liste
+est relue à chaque ouverture du dialogue et doit refléter les inscriptions
+arrivées entre-temps. Le filtre ne remplace pas le contrôle d'écriture — une
+inscription peut toujours arriver pendant qu'on coche, et le lot est alors
+refusé en nommant l'équipe en cause.
+
+### Tournois individuels
+
+La multi-inscription **y a un sens et y fonctionne**, sans code particulier :
+dans un tournoi `participant_type = 'SOLO'`, un « joueur invité » *est* une
+équipe fantôme — la même ligne `bg_teams`, seul le vocabulaire change
+(`PARTICIPANT_WORDING`). Ce qui n'y entre jamais, c'est une **entrée solo**
+(`bg_teams.solo_user_id`) : elle naît avec `is_ghost = 0`, elle est donc écartée
+de la liste et refusée à l'écriture par le même `NOT_A_GHOST_TEAM` qu'une équipe
+réelle. Un joueur inscrit sur le site s'engage toujours lui-même.
+
 ## Tests
 
+- `tests/lib/shared/ghost-registration.test.ts` — module pur : lecture de la
+  sélection (lot vide, doublons, plafond de forme), places restantes, recherche
+  sans accents, phrases au singulier et au pluriel.
+- `tests/lib/server/ghost-bulk-registration.test.ts` — moteur : lot complet,
+  rangs de départ qui se suivent, verrou avant le comptage, déjà inscrite,
+  plafond atteint **en cours de lot**, hors fenêtre, équipe réelle, entrée solo,
+  fantôme dissoute.
+- `tests/lib/server/ghost-bulk-transaction.test.ts` — tout ou rien : une seule
+  transaction, un seul évènement de flux, rollback sans publication.
 - `tests/lib/server/ghost-teams-service.test.ts` — création, attribution
-  (tous les refus), liste, rollback transactionnel.
+  (tous les refus), liste, exclusion des déjà engagées, rollback transactionnel.
 - `tests/lib/server/teams-service.ghost.test.ts` — la dérogation autorise le
   staff sur une fantôme et **jamais** sur une équipe réelle.
 - `tests/app/api/teams/ghost-teams.test.ts` — création et attribution côté route.
-- `tests/app/api/admin/ghost-registrations.test.ts` — inscription en tournoi.
+- `tests/app/api/admin/ghost-registrations.test.ts` — route : permissions, lot
+  illisible, codes HTTP, `teamId` joint aux refus qui désignent un engagé.
 
 > **Piège connu.** L'attribution filtrait le futur propriétaire sur
 > `bg_users.deleted_at`, colonne qui n'existe que sur `bg_teams` — `bg_users`

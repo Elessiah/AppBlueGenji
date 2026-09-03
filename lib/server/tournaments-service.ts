@@ -20,7 +20,7 @@ export {
   hasPendingStateTransition,
   // Registration
   registerCurrentUserTeam,
-  registerGhostTeam,
+  registerGhostTeams,
   canUserRegister,
   getUserEntrantTeamId,
   // Bracket

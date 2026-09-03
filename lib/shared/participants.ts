@@ -62,10 +62,26 @@ export type ParticipantWording = {
   guestHint: string;
   /** Libellé du sélecteur d'engagé sans compte existant. */
   guestSelectLabel: string;
+  /** Libellé de la liste à cocher, où l'on en choisit plusieurs d'un coup. */
+  guestSelectManyLabel: string;
+  /**
+   * Liste de sélection vide. La phrase couvre **les deux** raisons possibles :
+   * tout est déjà engagé, ou rien n'a encore été créé. Le dialogue ne sait pas
+   * les distinguer — il ne reçoit que ce qui reste — et affirmer « elles sont
+   * toutes déjà inscrites » devant un plateau vide serait un contresens.
+   */
+  guestNoneAvailable: string;
   /** Libellé du champ de nom à la création d'un engagé sans compte. */
   guestNewNameLabel: string;
   /** Confirmation affichée après inscription d'un engagé sans compte. */
   guestSuccess: string;
+  /**
+   * Fin de phrase de la confirmation d'un **lot**, précédée du nombre :
+   * « 7 équipes fantômes inscrites. ». Le pluriel de la langue et l'accord du
+   * participe changent avec le type de participant, ils ne se déduisent pas de
+   * `guestSuccess`.
+   */
+  guestManySuccess: string;
   /** Badge du bandeau de tournoi (null = rien à signaler, cas des équipes). */
   badge: string | null;
 };
@@ -87,8 +103,12 @@ export const PARTICIPANT_WORDING: Record<ParticipantType, ParticipantWording> = 
     guestHint:
       "Réservé aux équipes fantômes : une équipe de joueurs s'inscrit toujours elle-même.",
     guestSelectLabel: "Équipe fantôme",
+    guestSelectManyLabel: "Équipes fantômes à inscrire",
+    guestNoneAvailable:
+      "Aucune équipe fantôme à inscrire : elles sont toutes engagées, ou il n'en existe pas encore.",
     guestNewNameLabel: "Nom de la nouvelle équipe",
     guestSuccess: "Équipe fantôme inscrite.",
+    guestManySuccess: "équipes fantômes inscrites.",
     badge: null,
   },
   SOLO: {
@@ -107,8 +127,12 @@ export const PARTICIPANT_WORDING: Record<ParticipantType, ParticipantWording> = 
     guestHint:
       "Réservé aux joueurs sans compte sur le site : un joueur inscrit s'engage toujours lui-même.",
     guestSelectLabel: "Joueur invité",
+    guestSelectManyLabel: "Joueurs invités à inscrire",
+    guestNoneAvailable:
+      "Aucun joueur invité à inscrire : ils sont tous engagés, ou il n'en existe pas encore.",
     guestNewNameLabel: "Pseudo du joueur invité",
     guestSuccess: "Joueur invité inscrit.",
+    guestManySuccess: "joueurs invités inscrits.",
     badge: "Individuel",
   },
 };
