@@ -184,13 +184,23 @@ le compte grandit avec le lot, et la place manquante arrête l'ensemble par
 `TOURNAMENT_FULL`. Le compteur du dialogue n'est qu'une commodité — le serveur
 reste le juge.
 
-`registerTeam` prend en outre un verrou `SELECT … FOR UPDATE` sur la ligne du
-tournoi **avant** de compter, en première écriture de la transaction (ordre de
-verrouillage constant, donc pas d'interblocage). Sans lui, deux inscriptions
-simultanées lisent le même effectif et passent toutes les deux : l'unicité
-`(tournament_id, team_id)` protège du doublon, pas du dépassement d'effectif. Le
-verrou est posé dans le tronc commun, il vaut donc aussi pour l'inscription d'un
-joueur.
+Un verrou `SELECT … FOR UPDATE` sur la ligne du tournoi (`lockTournamentRow`)
+précède le comptage : sans lui, deux inscriptions simultanées lisent le même
+effectif et passent toutes les deux — l'unicité `(tournament_id, team_id)`
+protège du doublon, pas du dépassement d'effectif.
+
+Il est pris en **toute première instruction** de la transaction, par chacun des
+deux points d'entrée (`registerCurrentUserTeam`, `registerTeamsByIds`), et non
+par le seul tronc commun. La nuance porte tout : sous `REPEATABLE READ`, c'est
+la première lecture **ordinaire** qui fige l'instantané, et une lecture
+verrouillante n'en crée pas. Un `loadTournamentRow` placé avant le verrou — ne
+serait-ce que pour connaître le type de participant — fige donc le monde *avant*
+l'attente ; la transaction obtient ensuite le verrou, puis compte un effectif
+périmé, et le plafond saute exactement comme s'il n'y avait pas de verrou. Le
+verrou repris dans `registerTeam` n'est qu'un **plancher** : il garantit qu'un
+appelant ajouté demain ne compte jamais sans verrou, il ne suffit pas à lui
+seul. L'ordre de verrouillage reste constant (le tournoi d'abord), donc pas
+d'interblocage.
 
 ### Fenêtre d'inscription, et rien d'autre
 
