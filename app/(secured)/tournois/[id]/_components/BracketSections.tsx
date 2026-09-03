@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
 import { BracketTree, MatchScoreDraft, ScrollRequest } from "./BracketTree";
 import { ACCENT, buildSections, defaultOpenKey, findMyNextMatch, qualifyDestinationMatchId } from "../_lib/bracket-sections";
+import { useMatchAnchorTarget } from "../_lib/match-anchor-context";
 
 interface BracketSectionsProps {
   bracketType: BracketType;
@@ -49,6 +50,24 @@ export function BracketSections({
     return new Set(initial ? [initial] : []);
   });
   const [scrollRequest, setScrollRequest] = useState<ScrollRequest | null>(null);
+
+  // Ancre `#match-[id]` : un gros tableau ne rend qu'un volet à la fois, et la
+  // cible peut dormir dans un volet replié — le hook la chercherait alors dans
+  // le DOM jusqu'à renoncer. Le volet qui la contient s'ouvre donc, et c'est le
+  // seul endroit qui sache faire ce lien entre un match et un volet.
+  //
+  // On **ajoute** sans jamais refermer : le lecteur reste libre de replier ce
+  // qu'il veut ensuite, et un état identique n'est pas réécrit — sans quoi
+  // `sections` et `matches`, recréés à chaque rendu, boucleraient.
+  const anchorTargetId = useMatchAnchorTarget();
+  useEffect(() => {
+    if (anchorTargetId === null) return;
+    const target = matches.find((m) => m.id === anchorTargetId);
+    if (!target) return;
+    const section = sections.find((s) => s.rounds.includes(target.roundNumber));
+    if (!section) return;
+    setOpenKeys((prev) => (prev.has(section.key) ? prev : new Set(prev).add(section.key)));
+  }, [anchorTargetId, matches, sections]);
 
   const toggle = (key: string) =>
     setOpenKeys((prev) => {

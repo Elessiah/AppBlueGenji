@@ -71,7 +71,7 @@ chacune pouvant échouer seule :
 3. **Chercher l'élément, puis défiler.**
 4. **Surligner**, trois secondes.
 
-### Deux pièges, traités explicitement
+### Trois pièges, traités explicitement
 
 **Le contenu arrive après le premier rendu.** La page ouvre le flux SSE, et
 c'est lui qui apporte le plateau : chercher l'élément une seule fois après le
@@ -81,6 +81,16 @@ passe en arrière-plan) et **renonce au bout de 20 s**. Un identifiant qui ne
 désigne aucun match de ce tournoi — manche d'un autre tournoi, plateau régénéré
 depuis, manche qualificative masquée par les play-offs d'une BG Survie — ne
 laisse donc pas une boucle derrière lui : la page reste simplement en haut.
+
+**Le match dort dans un volet replié.** Un gros tableau est découpé en
+volets (« Premiers tours », « Quarts de finale »…) et `BracketSections` n'en rend
+qu'un à la fois : sur le tableau des perdants d'un plateau à 128 équipes, 214
+cartes sur 254 ne sont pas dans le DOM. Le hook chercherait donc jusqu'à
+renoncer. C'est `BracketSections` qui **ajoute** le volet de la cible à ses
+volets ouverts — il est le seul endroit qui sache relier un match à un volet —,
+et il n'en referme jamais aucun : le lecteur reste libre de replier ensuite. La
+cible lui arrive par `useMatchAnchorTarget()`, distinct du surlignage : l'une
+vaut *avant* d'avoir trouvé le match, l'autre *après*.
 
 **Le match vit dans une zone défilante.** Les rondes, les rounds et les colonnes
 d'arbre sont dans un `<ScrollArea>` horizontal. `scrollIntoView` avec
@@ -94,13 +104,16 @@ et un rechargement doit redéfiler au même endroit. C'est aussi pourquoi
 
 ### Le surlignage
 
-`MatchHighlightProvider` (`_lib/match-anchor-context.tsx`) diffuse
-l'identifiant surligné par contexte, comme `LiveProvider` et
-`IssueReportProvider` : `MatchRow` est rendu depuis quatre vues, et faire
-descendre en props un identifiant qui ne concerne qu'une carte sur cent
-obligerait chacune à relayer une valeur dont elle n'a que faire. La valeur est
-un **nombre nu** : les 127 cartes d'un gros plateau ne se redessinent donc qu'à
-l'arrivée et à l'extinction du halo.
+`MatchAnchorProvider` (`_lib/match-anchor-context.tsx`) diffuse par contexte,
+comme `LiveProvider` et `IssueReportProvider` : les cartes sont rendues depuis
+quatre vues, et faire descendre en props un identifiant qui ne concerne qu'une
+carte sur cent obligerait chacune à relayer une valeur dont elle n'a que faire.
+
+**Deux contextes plutôt qu'un objet**, parce que la cible et le surlignage n'ont
+ni le même public (`BracketSections` / `MatchRow`) ni le même moment. Réunis, ils
+feraient redessiner les 127 cartes d'un gros plateau à chaque changement de l'un
+ou l'autre ; séparés, ce sont deux valeurs primitives, qui ne changent d'identité
+qu'en changeant de valeur.
 
 Le style est global (`.match-anchor-target` dans `app/globals.css`) parce que
 `MatchRow` n'a pas de module CSS — ses styles sont en ligne, et une animation ne
@@ -161,8 +174,9 @@ les tournois : « FR · SEED 1 » / « FR · SEED 4 », et un bloc « CARTE EN C
 | `lib/server/landing-service.ts` | Seeds des deux engagés, sous condition de `seedingSource`. |
 | `lib/shared/landing.ts` | `LandingLiveMatch.team1Seed` / `team2Seed`. |
 | `app/(secured)/tournois/[id]/_hooks/useMatchAnchor.ts` | Lecture du fragment, phase, défilement, surlignage. |
-| `app/(secured)/tournois/[id]/_lib/match-anchor-context.tsx` | Diffusion de la cible surlignée. |
+| `app/(secured)/tournois/[id]/_lib/match-anchor-context.tsx` | Diffusion de la cible cherchée et du match surligné. |
 | `app/(secured)/tournois/[id]/_components/MatchRow.tsx` | Pose l'ancre et la classe de surlignage. |
+| `app/(secured)/tournois/[id]/_components/BracketSections.tsx` | Déplie le volet où dort la cible. |
 | `app/globals.css` | `.match-anchor-target` et son repli sans animation. |
 
 ## Tests

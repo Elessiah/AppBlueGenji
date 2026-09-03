@@ -35,7 +35,7 @@ import { SwissView } from "./_components/SwissView";
 import { EnduranceView } from "./_components/EnduranceView";
 import { MatchRow } from "./_components/MatchRow";
 import { EntrantProvider } from "./_lib/entrant-link";
-import { MatchHighlightProvider } from "./_lib/match-anchor-context";
+import { MatchAnchorProvider } from "./_lib/match-anchor-context";
 import { useMatchAnchor } from "./_hooks/useMatchAnchor";
 import { TournamentProgress } from "./_components/TournamentProgress";
 import { DeleteTournamentDialog } from "./_components/DeleteTournamentDialog";
@@ -100,7 +100,7 @@ export default function TournamentDetailPage() {
   // Lien profond `#match-[id]` : la fiche s'ouvre défilée sur le match désigné
   // (carte « en cours » de l'accueil, lien partagé). Le hook révèle au besoin la
   // phase qui le contient, attend qu'il arrive par le flux, puis le surligne.
-  const highlightedMatchId = useMatchAnchor({
+  const { targetMatchId, highlightedMatchId } = useMatchAnchor({
     matches: detail?.matches,
     selectedPhaseId,
     onSelectPhase: setSelectedPhaseId,
@@ -390,7 +390,10 @@ export default function TournamentDetailPage() {
       participantType={detail.card.participantType}
       soloUserIds={detail.soloUserIds}
     >
-      <MatchHighlightProvider matchId={highlightedMatchId}>
+      <MatchAnchorProvider
+        targetMatchId={targetMatchId}
+        highlightedMatchId={highlightedMatchId}
+      >
       <MatchFormatProvider format={detail.card.matchFormat}>
       <LiveProvider
         canManage={detail.canManageLive}
@@ -758,7 +761,7 @@ export default function TournamentDetailPage() {
       </IssueReportProvider>
       </LiveProvider>
       </MatchFormatProvider>
-      </MatchHighlightProvider>
+      </MatchAnchorProvider>
     </EntrantProvider>
   );
 }

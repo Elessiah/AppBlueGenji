@@ -23,6 +23,7 @@ const MATCH_ROW = read(join(TOURNAMENT_DIR, "_components", "MatchRow.tsx"));
 const PAGE = read(join(TOURNAMENT_DIR, "page.tsx"));
 const HOOK = read(join(TOURNAMENT_DIR, "_hooks", "useMatchAnchor.ts"));
 const GLOBALS = read("app/globals.css");
+const SECTIONS = read(join(TOURNAMENT_DIR, "_components", "BracketSections.tsx"));
 const LIVE_CARD = read("components/cyber/landing/LiveCard.tsx");
 
 describe("ancre d'un match — points de passage", () => {
@@ -46,10 +47,21 @@ describe("ancre d'un match — points de passage", () => {
 
   it("branche le hook et le surlignage sur la page du tournoi", () => {
     expect(PAGE).toContain("useMatchAnchor(");
-    expect(PAGE).toContain("<MatchHighlightProvider");
+    expect(PAGE).toContain("<MatchAnchorProvider");
     // La bascule de phase passe par le sélecteur de la page : sans elle, une
     // ancre visant une phase non affichée ne trouverait jamais sa cible.
     expect(PAGE).toContain("onSelectPhase: setSelectedPhaseId");
+  });
+
+  it("déplie le volet où dort la cible", () => {
+    // Un gros tableau ne rend qu'un volet à la fois : sans cette ouverture, le
+    // hook chercherait dans le DOM un élément que rien ne rend, jusqu'à
+    // renoncer. `BracketSections` est le seul endroit qui sache relier un match
+    // à son volet.
+    expect(SECTIONS).toContain("useMatchAnchorTarget()");
+    expect(SECTIONS).toContain("setOpenKeys(");
+    // On ajoute sans refermer : le lecteur reste libre de replier ensuite.
+    expect(SECTIONS).toContain("prev.has(section.key) ? prev :");
   });
 
   it("attend la cible au lieu de la chercher une seule fois", () => {

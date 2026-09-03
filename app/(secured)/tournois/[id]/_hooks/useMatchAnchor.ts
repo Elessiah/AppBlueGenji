@@ -29,6 +29,13 @@ const LOOKUP_INTERVAL_MS = 100;
  *  pas devenir un état permanent de la carte. */
 const HIGHLIGHT_MS = 3_000;
 
+export type MatchAnchorState = {
+  /** Match cherché, tant qu'il n'a pas été trouvé (ou que l'attente dure). */
+  targetMatchId: number | null;
+  /** Match trouvé, le temps du surlignage. */
+  highlightedMatchId: number | null;
+};
+
 type UseMatchAnchorOptions = {
   /** Matchs connus du tournoi ; `undefined` tant que le flux n'a rien apporté. */
   matches: readonly PhasedMatch[] | null | undefined;
@@ -60,18 +67,23 @@ function prefersReducedMotion(): boolean {
  *    `block`/`inline: "center"` fait défiler *tous* les conteneurs ancestraux —
  *    c'est ce qui rend l'ancre valable à l'intérieur d'un `<ScrollArea>`
  *    horizontal (arbre, rondes suisses, rounds de survie) sans que la zone
- *    défilante ait quoi que ce soit à savoir de l'ancre.
+ *    défilante ait quoi que ce soit à savoir de l'ancre. La recherche est
+ *    répétée, parce que la cible peut n'être rendue que plus tard : le flux SSE
+ *    apporte le plateau, la phase bascule, et `BracketSections` déplie le volet
+ *    où dort le match (il n'en rend qu'un à la fois sur un gros tableau).
  *
  * Le fragment n'est **pas** effacé de l'URL après usage : le lien reste
  * copiable et partageable, et un rechargement doit redéfiler au même endroit.
  *
- * Renvoie l'identifiant du match à surligner (`null` hors surlignage).
+ * Renvoie **deux** identifiants, qui ne valent pas au même moment : la `cible`
+ * tant que le match est cherché — c'est elle qui fait déplier le volet où il
+ * dort (`BracketSections`) — puis le `surlignage`, une fois arrivé.
  */
 export function useMatchAnchor({
   matches,
   selectedPhaseId,
   onSelectPhase,
-}: UseMatchAnchorOptions): number | null {
+}: UseMatchAnchorOptions): MatchAnchorState {
   const [target, setTarget] = useState<number | null>(null);
   const [highlighted, setHighlighted] = useState<number | null>(null);
   /** Instant d'abandon de la recherche en cours. */
@@ -151,5 +163,5 @@ export function useMatchAnchor({
     return () => clearTimeout(timer);
   }, [highlighted]);
 
-  return highlighted;
+  return { targetMatchId: target, highlightedMatchId: highlighted };
 }
