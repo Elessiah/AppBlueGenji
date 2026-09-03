@@ -235,6 +235,12 @@ ménage laisserait la clé `SCORE_CONFLICT` posée pour la vie du plateau, et pl
 aucun désaccord né après cet arbitrage n'alerterait quiconque. Le nettoyage ne
 dépend pas du sort d'une ligne d'affichage.
 
+Cette liste n'a donc pas de plafond non plus, et l'effacement se fait **par
+lots** : `syncVisibleTournaments` ouvre une seule transaction pour tous les
+tournois non terminés, et un balayage qui tranche deux cents manches doit coûter
+quelques requêtes, pas deux cents allers-retours au pool — d'autant qu'en régime
+normal la quasi-totalité de ces manches n'a jamais rien réservé.
+
 ### Une réservation se rend quand rien n'est parti
 
 Réserver avant d'envoyer protège du doublon, et expose au silence : c'est le

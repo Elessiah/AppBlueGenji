@@ -464,8 +464,45 @@ describe("manche tranchée dans la même transaction", () => {
       .map((call) => ({ sql: String(call[0]), params: (call[1] ?? []) as unknown[] }))
       .filter((call) => call.sql.includes("bg_referee_alerts"));
     expect(deletes).toHaveLength(1);
-    expect(deletes[0].sql).toContain("match_id");
+    expect(deletes[0].sql).toContain("match_id IN");
     expect(deletes[0].params).toEqual([31]);
+  });
+
+  // Plusieurs manches tranchées par la même transaction — le cas d'un balayage
+  // qui auto-résout une salve de reports expirés — partent en **une** requête,
+  // et non en un aller-retour par manche.
+  it("efface les réservations de plusieurs manches en une requête", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([]);
+
+    markMatchResolved(connection, 31);
+    markMatchResolved(connection, 32);
+    markMatchResolved(connection, 33);
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const deletes = execute.mock.calls.filter((call) =>
+      String(call[0]).includes("bg_referee_alerts"),
+    );
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0][1]).toEqual([31, 32, 33]);
+  });
+
+  // La même manche notée deux fois ne compte qu'une : c'est un ensemble.
+  it("ne cite qu'une fois une manche notée deux fois", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([]);
+
+    markMatchResolved(connection, 31);
+    markMatchResolved(connection, 31);
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const deletes = execute.mock.calls.filter((call) =>
+      String(call[0]).includes("bg_referee_alerts"),
+    );
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0][1]).toEqual([31]);
   });
 
   // Le ménage ne dépend pas du sort de la ligne `match_finished` : sans elle en

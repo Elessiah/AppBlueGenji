@@ -262,9 +262,9 @@ export function discardBotLogs(connection: PoolConnection): void {
 export function flushBotLogs(connection: PoolConnection): void {
   const queue = pending.get(connection) ?? [];
   pending.delete(connection);
-  const resolved = resolvedMatches.get(connection) ?? new Set<number>();
+  const settled = resolvedMatches.get(connection) ?? new Set<number>();
   resolvedMatches.delete(connection);
-  if (queue.length === 0 && resolved.size === 0) return;
+  if (queue.length === 0 && settled.size === 0) return;
 
   // Une manche dont le désaccord vient d'être annoncé n'a pas besoin de son
   // escalade dans la même seconde : le téléphone de l'arbitre sonne déjà, et
@@ -359,8 +359,10 @@ export function flushBotLogs(connection: PoolConnection): void {
     // La liste vient de `markMatchResolved`, jamais des entrées `match_finished`
     // de la file : celle-ci est plafonnée, et une manche tranchée par un
     // balayage chargé perdrait alors son ménage — donc sa clé `SCORE_CONFLICT`,
-    // pour toujours.
-    for (const matchId of resolved) await clearRefereeAlertsOnPool(matchId);
+    // pour toujours. Elle n'est donc pas plafonnée non plus, d'où un effacement
+    // **par lots** : un balayage qui tranche deux cents manches doit coûter
+    // quelques requêtes, pas deux cents allers-retours au pool.
+    await clearRefereeAlertsOnPool(settled);
   })().catch(() => undefined);
 }
 
@@ -396,29 +398,6 @@ function refereeAlertMatchId(entry: PendingBotLog): number {
 }
 
 /**
- * Réserve une alerte arbitre pour une manche, **dans la transaction en cours**.
- *
- * Certaines alertes ne naissent pas d'une écriture mais d'un constat répété à
- * chaque passage d'entretien — « ce report a dépassé son délai et personne n'a
- * tranché ». Sans marque, l'arbitre recevrait le même message à chaque lecture
- * de la page. La ligne `bg_referee_alerts (match_id, alert_key)` porte donc une
- * clé unique, et seule l'insertion qui gagne réserve l'envoi.
- *
- * Elle est écrite sur la **connexion de la transaction**, et non sur le pool :
- * la réservation et l'évènement sont ainsi validés ou annulés ensemble — un
- * rollback ne consomme pas l'alerte, contrairement aux rappels de match, dont
- * la réservation précède un envoi hors transaction.
- *
- * La table suit la manche (`ON DELETE CASCADE`) : un plateau régénéré —
- * réappariement d'une ronde suisse, correction de score en survie — efface ses
- * matchs, donc ses réservations.
- *
- * @returns L'identifiant de la ligne réservée (c'est à nous d'alerter), ou
- *          `null` si un autre passage l'a prise. L'identifiant, et non un
- *          booléen : c'est **cette ligne-là** qu'il faudra rendre si l'alerte
- *          ne part pas, et pas celle qu'un autre balayage aura posée depuis.
- */
-/**
  * Une manche a-t-elle **déjà** une réservation sous cette clé ?
  *
  * Lecture cohérente, sans verrou — et c'est tout l'intérêt : le constat qui
@@ -445,6 +424,29 @@ async function refereeAlertExists(
   return rows.length > 0;
 }
 
+/**
+ * Réserve une alerte arbitre pour une manche, **dans la transaction en cours**.
+ *
+ * Certaines alertes ne naissent pas d'une écriture mais d'un constat répété à
+ * chaque passage d'entretien — « ce report a dépassé son délai et personne n'a
+ * tranché ». Sans marque, l'arbitre recevrait le même message à chaque lecture
+ * de la page. La ligne `bg_referee_alerts (match_id, alert_key)` porte donc une
+ * clé unique, et seule l'insertion qui gagne réserve l'envoi.
+ *
+ * Elle est écrite sur la **connexion de la transaction**, et non sur le pool :
+ * la réservation et l'évènement sont ainsi validés ou annulés ensemble — un
+ * rollback ne consomme pas l'alerte, contrairement aux rappels de match, dont
+ * la réservation précède un envoi hors transaction.
+ *
+ * La table suit la manche (`ON DELETE CASCADE`) : un plateau régénéré —
+ * réappariement d'une ronde suisse, correction de score en survie — efface ses
+ * matchs, donc ses réservations.
+ *
+ * @returns L'identifiant de la ligne réservée (c'est à nous d'alerter), ou
+ *          `null` si un autre passage l'a prise. L'identifiant, et non un
+ *          booléen : c'est **cette ligne-là** qu'il faudra rendre si l'alerte
+ *          ne part pas, et pas celle qu'un autre balayage aura posée depuis.
+ */
 export async function claimRefereeAlert(
   connection: PoolConnection,
   matchId: number,
@@ -485,11 +487,27 @@ export async function releaseRefereeAlert(
  * plus ferait tenir un verrou de plus jusqu'au commit, sur son chemin le plus
  * chaud — jusqu'à l'interblocage avec le balayage qui, lui, réserve. Meilleur
  * effort : au pire, la manche garde des réservations sans objet.
+ *
+ * Par **lots**, parce que rien ne borne le nombre de manches qu'une transaction
+ * peut trancher : `syncVisibleTournaments` en ouvre une seule pour tous les
+ * tournois non terminés, et une manche tranchée n'a le plus souvent aucune
+ * réservation à effacer. Une requête par manche ferait payer au pool le prix
+ * d'un ménage qui, en régime normal, ne trouve rien.
  */
-async function clearRefereeAlertsOnPool(matchId: number): Promise<void> {
+const CLEAR_ALERTS_CHUNK = 200;
+
+async function clearRefereeAlertsOnPool(matchIds: ReadonlySet<number>): Promise<void> {
+  if (matchIds.size === 0) return;
   try {
     const db = await getDatabase();
-    await db.execute(`DELETE FROM bg_referee_alerts WHERE match_id = ?`, [matchId]);
+    const ids = [...matchIds];
+    for (let from = 0; from < ids.length; from += CLEAR_ALERTS_CHUNK) {
+      const chunk = ids.slice(from, from + CLEAR_ALERTS_CHUNK);
+      await db.execute(
+        `DELETE FROM bg_referee_alerts WHERE match_id IN (${chunk.map(() => "?").join(", ")})`,
+        chunk,
+      );
+    }
   } catch {
     // Meilleur effort.
   }
