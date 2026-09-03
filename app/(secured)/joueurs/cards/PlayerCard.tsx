@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { PublicUserProfile } from "@/lib/shared/types";
+import { avatarInitial } from "@/lib/shared/avatar";
 import { getPaletteColor } from "@/lib/shared/palette";
 import { TeamLink } from "@/components/entity-link";
 import s from "../../_shared/annuaire.module.css";
@@ -59,7 +60,7 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <span className={s.plAvatarFallback}>{player.pseudo[0].toUpperCase()}</span>
+              <span className={s.plAvatarFallback}>{avatarInitial(player.pseudo)}</span>
             )}
           </div>
         </div>

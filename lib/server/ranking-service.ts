@@ -213,9 +213,17 @@ export async function loadRankingState(
  *
  * Les entrées solo (`solo_user_id`) sont écartées de la liste : ce sont des
  * engagés de tournoi individuel, pas des équipes — les laisser décalerait le
- * rang de toutes les autres. Les équipes fantômes, elles, restent : ce sont des
- * équipes du site, administrées par le staff, et elles jouent contre les
- * autres.
+ * rang de toutes les autres. Les équipes **dissoutes** (`deleted_at`) le sont
+ * pour la même raison : elles ne figurent plus à l'annuaire `/equipes`, et un
+ * classement qui leur garde un rang annonce « 12ᵉ sur 40 équipes classées »
+ * dans une liste qui n'en montre que 30. Les équipes fantômes, elles, restent :
+ * ce sont des équipes du site, administrées par le staff, et elles jouent
+ * contre les autres.
+ *
+ * L'exclusion porte sur la **liste**, jamais sur le rejeu : les rencontres
+ * d'une dissoute restent comptées, sans quoi la cote de toutes celles qui l'ont
+ * affrontée serait réécrite le jour où elle se dissout. C'est la même règle que
+ * pour les entrées solo — rejouées, hors liste.
  */
 export async function loadTeamRanking(options: TeamRankingOptions = {}): Promise<TeamRankingRow[]> {
   const db = options.connection ?? (await getDatabase());
@@ -224,7 +232,7 @@ export async function loadTeamRanking(options: TeamRankingOptions = {}): Promise
   const [teams] = await db.execute<TeamIdentityRow[]>(
     `SELECT id, name, logo_url
      FROM bg_teams
-     WHERE solo_user_id IS NULL`,
+     WHERE solo_user_id IS NULL AND deleted_at IS NULL`,
   );
 
   const rows: TeamRankingRow[] = [];
@@ -336,8 +344,20 @@ export async function getTeamRankingPosition(teamId: number): Promise<TeamRankin
   const scored = await loadTeamRanking();
   const self = scored.find((row) => row.teamId === teamId);
 
-  if (!self) return { position: null, total: scored.length, points: RANKING_BASE_POINTS };
+  if (self) {
+    const ahead = scored.filter((row) => row.points > self.points).length;
+    return { position: ahead + 1, total: scored.length, points: self.points };
+  }
 
-  const ahead = scored.filter((row) => row.points > self.points).length;
-  return { position: ahead + 1, total: scored.length, points: self.points };
+  // Hors liste : équipe sans match, entrée solo, ou équipe dissoute. La cote se
+  // lit alors sur l'état rejoué et non sur la valeur de départ — une dissoute a
+  // joué, et afficher 500 sur sa fiche à côté d'un bilan de vingt matchs ferait
+  // dire deux choses à la même page. Les deux lectures passent par la photo
+  // mutualisée : c'est le même rejeu, pas un second.
+  const states = await loadRankingState();
+  return {
+    position: null,
+    total: scored.length,
+    points: states.get(teamId)?.points ?? RANKING_BASE_POINTS,
+  };
 }

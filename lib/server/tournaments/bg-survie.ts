@@ -363,12 +363,6 @@ export async function reconcileEndurance(
   }
 
   const active = replayed.filter((standing) => standing.status === "ACTIVE");
-
-  if (qualificationComplete(active.length, config)) {
-    await startEndurancePlayoffs(tournamentId, conn);
-    return;
-  }
-
   const currentRound = Number(tournament.endurance_current_round);
 
   // Une correction de score en amont réécrit le classement : la manche courante,
@@ -391,10 +385,21 @@ export async function reconcileEndurance(
     }
   }
 
-  // Manche courante terminée → on apparie la suivante.
-  if (await roundIsComplete(conn, tournamentId, currentRound)) {
-    await generateEnduranceRound(tournamentId, conn);
+  // Rien ne se décide **au milieu d'une manche**. Un seul score reporté peut
+  // faire tomber l'effectif actif sur la cible des play-offs alors que les
+  // autres rencontres de la manche sont encore `READY` : bascule immédiate, et
+  // ces matchs restaient ouverts à jamais — `reconcileEndurance` repartant
+  // ensuite par la branche `playoffsStarted`, plus rien ne les regardait. La
+  // manche entière est donc jouée avant qu'on lise son classement, que ce soit
+  // pour clore la qualification ou pour apparier la suivante.
+  if (!(await roundIsComplete(conn, tournamentId, currentRound))) return;
+
+  if (qualificationComplete(active.length, config)) {
+    await startEndurancePlayoffs(tournamentId, conn);
+    return;
   }
+
+  await generateEnduranceRound(tournamentId, conn);
 }
 
 /** Un match de la manche porte-t-il déjà une saisie ? */

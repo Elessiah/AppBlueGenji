@@ -1,9 +1,9 @@
 ﻿"use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoWithGlow } from "./logo-with-glow";
+import { UserAvatar } from "./user-avatar";
 import s from "./arena-nav.module.css";
 
 type ArenaNavProps = {
@@ -68,14 +68,7 @@ export function ArenaNav({ pseudo, avatarUrl, activeTeam }: ArenaNavProps) {
             </Link>
           )}
           <Link href="/profil" className={s.avatarChip}>
-            <Image
-              src={avatarUrl || "/vercel.svg"}
-              alt="Avatar"
-              width={30}
-              height={30}
-              unoptimized
-              referrerPolicy="no-referrer"
-            />
+            <UserAvatar src={avatarUrl} pseudo={pseudo} size={30} />
             <span>{pseudo}</span>
           </Link>
         </div>

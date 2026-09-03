@@ -5,6 +5,7 @@ import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { CyberCard, Pill } from "@/components/cyber";
 import { RuleDiagramFigure } from "@/components/rules/RuleDiagram";
+import { EmphasisText } from "@/components/rules/EmphasisText";
 import {
   COMMON_RULES,
   TOURNAMENT_RULE_MODES,
@@ -42,13 +43,15 @@ function RuleCard({ rule }: { rule: RuleSection }) {
       <h3 className={styles.ruleTitle}>{rule.title}</h3>
       {rule.body.map((paragraph) => (
         <p key={paragraph} className={styles.ruleBody}>
-          {paragraph}
+          <EmphasisText text={paragraph} />
         </p>
       ))}
       {rule.bullets && (
         <ul className={styles.bullets}>
           {rule.bullets.map((bullet) => (
-            <li key={bullet}>{bullet}</li>
+            <li key={bullet}>
+              <EmphasisText text={bullet} />
+            </li>
           ))}
         </ul>
       )}
@@ -108,7 +111,9 @@ export default async function RuleModePage({ params }: PageProps) {
           {mode.principles.map((principle, i) => (
             <li key={principle} className={styles.principle}>
               <span className={styles.principleNum}>0{i + 1}</span>
-              <span>{principle}</span>
+              <span>
+                <EmphasisText text={principle} />
+              </span>
             </li>
           ))}
         </ul>

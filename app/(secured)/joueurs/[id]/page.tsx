@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { TeamLink } from "@/components/entity-link";
 import { useParams, useRouter } from "next/navigation";
-import { LogoWithGlow } from "@/components/logo-with-glow";
+import { UserAvatar } from "@/components/user-avatar";
 import { formatLocalDate } from "@/lib/shared/dates";
 import type { FullProfileResponse } from "@/lib/shared/types";
 import {
@@ -100,15 +100,12 @@ export default function PlayerDetailPage() {
         <div className="ds-header-body">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-              <LogoWithGlow
-                src={data.profile.avatarUrl || "/vercel.svg"}
-                alt={data.profile.pseudo}
-                width={64}
-                height={64}
-                size="sm"
-                borderRadius={999}
+              <UserAvatar
+                src={data.profile.avatarUrl}
+                pseudo={data.profile.pseudo}
+                size={64}
                 borderColor="rgba(89,212,255,0.3)"
-                unoptimized
+                glow
               />
               <div>
                 <h1 className="ds-title blue" style={{ fontSize: "clamp(26px, 3vw, 40px)", marginBottom: 6 }}>

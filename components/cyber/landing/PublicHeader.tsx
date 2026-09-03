@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { UserAvatar } from "@/components/user-avatar";
 import { CyberButton } from "@/components/cyber";
 import { getCurrentUser } from "@/lib/server/auth";
 import { PublicNavMenu } from "./PublicNavMenu";
@@ -53,15 +54,7 @@ export async function PublicHeader() {
                 aria-label="Mon profil"
                 style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
               >
-                <Image
-                  src={user.avatarUrl || "/vercel.svg"}
-                  alt="Avatar"
-                  width={30}
-                  height={30}
-                  unoptimized
-                  referrerPolicy="no-referrer"
-                  style={{ borderRadius: "50%", border: "1.5px solid rgba(89,212,255,0.35)" }}
-                />
+                <UserAvatar src={user.avatarUrl} pseudo={user.pseudo} size={30} />
                 <span>{user.pseudo}</span>
               </Link>
             </>

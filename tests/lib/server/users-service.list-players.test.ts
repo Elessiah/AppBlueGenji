@@ -27,14 +27,17 @@ function userRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** listPlayers enchaîne 4 requêtes : users, memberships, tournois, wins/losses. */
+/**
+ * `listPlayers` enchaîne : les comptes, leur équipe courante, puis le bilan par
+ * `loadPlayerRecords` (appartenances, matchs, inscriptions). Sans appartenance,
+ * le chargeur s'arrête là — d'où trois réponses seulement.
+ */
 async function runList(rows: Record<string, unknown>[], viewerId: number) {
   const execute = jest
     .fn()
     .mockResolvedValueOnce([rows]) // bg_users
-    .mockResolvedValueOnce([[]]) // team memberships
-    .mockResolvedValueOnce([[]]) // tournament counts
-    .mockResolvedValueOnce([[]]); // wins/losses
+    .mockResolvedValueOnce([[]]) // team memberships (équipe courante)
+    .mockResolvedValueOnce([[]]); // appartenances (loadPlayerRecords)
   await mockDb(execute);
   return listPlayers(viewerId);
 }
@@ -80,18 +83,34 @@ describe("listPlayers visibility", () => {
       .fn()
       .mockResolvedValueOnce([[userRow({ id: 7 }), userRow({ id: 9, pseudo: "Other" })]])
       .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    await listPlayers(999);
+
+    const [sql, params] = execute.mock.calls[2] as [string, unknown[]];
+    expect(sql).toMatch(/FROM bg_team_members\s+WHERE user_id IN \(\?, \?\)/);
+    expect(sql).toMatch(/FROM bg_teams\s+WHERE solo_user_id IN \(\?, \?\)/);
+    // Une liste d'identifiants par branche.
+    expect(params).toEqual([7, 9, 7, 9]);
+  });
+
+  // Le bilan de la carte ne se calcule plus ici : il descend du même chargeur
+  // que la fiche, sur l'assiette partagée. Deux requêtes d'agrégation maison
+  // avaient fini par contredire la fiche du même joueur.
+  it("ne compte plus victoires et défaites avec sa propre requête", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([[userRow({ id: 7 })]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     await listPlayers(999);
 
-    for (const call of execute.mock.calls.slice(2)) {
-      const [sql, params] = call as [string, unknown[]];
-      expect(sql).toMatch(/FROM bg_team_members\s+WHERE user_id IN \(\?,\?\)/);
-      expect(sql).toMatch(/FROM bg_teams\s+WHERE solo_user_id IN \(\?,\?\)/);
-      // Une liste d'identifiants par branche.
-      expect(params).toEqual([7, 9, 7, 9]);
+    for (const call of execute.mock.calls) {
+      const [sql] = call as [string];
+      expect(sql).not.toMatch(/loser_team_id = tm\.team_id/);
     }
   });
 

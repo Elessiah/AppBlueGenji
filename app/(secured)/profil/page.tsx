@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { UserAvatar } from "@/components/user-avatar";
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
@@ -204,15 +204,11 @@ export default function ProfilePage() {
     <section className="fade-in">
       <div className="ds-header">
         <div className="ds-header-body" style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          <Image
+          <UserAvatar
             className="avatar"
-            src={data.profile.avatarUrl || "/vercel.svg"}
-            alt={data.profile.pseudo}
-            width={60}
-            height={60}
-            unoptimized
-            referrerPolicy="no-referrer"
-            style={{ width: 60, height: 60, borderRadius: "50%", border: "2px solid rgba(89,212,255,0.35)" }}
+            src={data.profile.avatarUrl}
+            pseudo={data.profile.pseudo}
+            size={60}
           />
           <div>
             <h1 className="ds-title blue" style={{ fontSize: "clamp(28px, 3vw, 42px)", marginBottom: 6 }}>
