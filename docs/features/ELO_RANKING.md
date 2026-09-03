@@ -88,6 +88,26 @@ classées, quelle que soit sa cote — puis trie à la cote, aux victoires, au n
 C'est la **règle de tri unique** : annuaire, fiche, leaderboard et seeding
 l'appliquent tous.
 
+### Équipes dissoutes
+
+Une équipe dissoute (`bg_teams.deleted_at`) sort de la **liste**, comme une
+entrée solo. Elle ne figure plus à l'annuaire `/equipes` : lui garder un rang
+faisait dire à la fiche « 12ᵉ sur 40 équipes classées » d'une liste qui n'en
+montre que 30, et le leaderboard de l'accueil pouvait afficher une équipe qui
+n'existe plus.
+
+Ses rencontres restent **comptées** dans le rejeu — les retirer réécrirait la
+cote de toutes celles qui l'ont affrontée le jour où elle se dissout, et une
+dissolution n'est pas un résultat sportif.
+
+Sa fiche, elle, reste consultable, et c'est ce qui a demandé une seconde
+décision : `getTeamRankingPosition` lit désormais la cote sur **l'état rejoué**
+quand l'équipe est hors liste, et non sur la valeur de départ. Sans cela, une
+dissoute affichait 500 à côté d'un bilan de vingt matchs — deux nombres de la
+même page qui se contredisent, exactement ce que ce classement existe pour
+éviter. Le rang, lui, vaut « — » : c'est la même réponse que pour une équipe qui
+n'a encore rien joué.
+
 ### Fantômes et entrées solo
 
 - Les **équipes fantômes** (`bg_teams.is_ghost`) sont des équipes du site,
@@ -226,8 +246,9 @@ puisque la cote en dépend directement.
   classement reste une fonction pure de ce que la base contient.
 - `tests/lib/server/ranking-service.test.ts` — la collecte (assiette,
   chronologie, fenêtre de tendance, fenêtres refusées), la mutualisation et son
-  invalidation, le découpage solo / non classées, `loadEntrantsBySiteRanking`, et
-  le rejeu après correction de score.
+  invalidation, le découpage solo / non classées / dissoutes, la cote rejouée
+  d'une équipe hors liste, `loadEntrantsBySiteRanking`, et le rejeu après
+  correction de score.
 - `tests/lib/server/team-points-consistency.test.ts` — l'ancre : un jeu de
   matchs, et la même cote lue sur la carte d'annuaire, sur la fiche, au
   classement et sur le leaderboard.
