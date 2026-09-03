@@ -1,5 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
-import { ERROR_MESSAGES, mapEntrantError, mapError } from "@/app/(secured)/tournois/[id]/_lib/error-map";
+import {
+  ERROR_MESSAGES,
+  mapBatchError,
+  mapEntrantError,
+  mapError,
+} from "@/app/(secured)/tournois/[id]/_lib/error-map";
 
 /**
  * Les codes que le serveur renvoie réellement doivent tous avoir une phrase
@@ -77,12 +82,28 @@ describe("mapError — inscription en lot d'engagés sans compte", () => {
     expect(mapError(code)).not.toBe(code);
   });
 
+});
+
+describe("mapBatchError", () => {
   it("dit qu'un lot refusé n'a rien enregistré", () => {
-    // Le lot est tout ou rien : sans cette précision, le staff ne sait pas s'il
-    // doit reprendre toute sa sélection ou seulement la fin.
-    for (const code of ["NOT_A_GHOST_TEAM", "TEAM_ALREADY_DELETED", "GHOST_REGISTRATION_FAILED"]) {
-      expect(mapError(code)).toMatch(/n'a été enregistré|rien n'a été enregistré/);
+    // Le tout-ou-rien doit se lire dans la phrase : sans cette précision, le
+    // staff ne sait pas s'il doit reprendre toute sa sélection ou seulement la
+    // fin. Ces mêmes codes servent aussi à l'inscription d'un seul, d'où la
+    // précision ajoutée ici et non dans la table.
+    for (const code of ["TOURNAMENT_FULL", "ALREADY_REGISTERED", "REGISTRATION_CLOSED"]) {
+      expect(mapBatchError(code, null, 25)).toBe(`${mapError(code)} Rien n'a été enregistré.`);
     }
+  });
+
+  it("se tait sur un lot d'un seul, où la précision n'apprend rien", () => {
+    expect(mapBatchError("TOURNAMENT_FULL", null, 1)).toBe(mapError("TOURNAMENT_FULL"));
+    expect(mapBatchError("TOURNAMENT_FULL", null, 0)).toBe(mapError("TOURNAMENT_FULL"));
+  });
+
+  it("nomme l'engagé et précise, quand le refus fait les deux", () => {
+    expect(mapBatchError("ALREADY_REGISTERED", "Alpha", 4)).toBe(
+      `Alpha — ${mapError("ALREADY_REGISTERED")} Rien n'a été enregistré.`,
+    );
   });
 });
 

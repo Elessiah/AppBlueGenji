@@ -3,10 +3,15 @@ import type { PoolConnection } from "mysql2/promise";
 
 jest.mock("@/lib/server/tournaments/bot-logs");
 jest.mock("@/lib/server/tournaments/state");
+jest.mock("@/lib/server/teams-service");
 
-import { registerTeamsByIds } from "@/lib/server/tournaments/registration";
+import {
+  registerCurrentUserTeam,
+  registerTeamsByIds,
+} from "@/lib/server/tournaments/registration";
 import { MAX_PENDING_PER_TRANSACTION, queueBotLog } from "@/lib/server/tournaments/bot-logs";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
+import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { GHOST_BATCH_MAX, registrationErrorTeamId } from "@/lib/shared/ghost-registration";
 
 /**
@@ -54,6 +59,8 @@ function fakeConnection(options: {
         return [{ affectedRows: 1, insertId: 1 }, []];
       }
       if (q.startsWith("SELECT id FROM bg_tournaments")) return [[{ id: 12 }], []];
+      // `loadTournamentRow` : la lecture complète du chemin joueur.
+      if (q.includes("FROM bg_tournaments")) return [[TOURNAMENT], []];
       if (q.includes("FROM bg_teams")) return [options.teams, []];
       if (q.includes("COUNT(*)") && q.includes("AND team_id = ?")) {
         return [[{ c: (options.alreadyRegistered ?? []).includes(Number(params[1])) ? 1 : 0 }], []];
@@ -302,5 +309,40 @@ describe("registerTeamsByIds", () => {
     const checks = sqlOf(connection).filter((q) => q.includes("SELECT id, is_ghost, deleted_at"));
     expect(checks).toHaveLength(1);
     expect(checks[0]).toContain("IN (?,?,?,?)");
+  });
+});
+
+/**
+ * Le verrou du tournoi doit être la **toute première** instruction de la
+ * transaction, et pas seulement précéder le comptage.
+ *
+ * Sous `REPEATABLE READ`, c'est la première lecture *ordinaire* qui fige
+ * l'instantané ; une lecture verrouillante n'en crée pas. Une lecture ordinaire
+ * placée avant le verrou — ne serait-ce que pour connaître le type de
+ * participant — fige donc le monde *avant* l'attente : la transaction obtient
+ * ensuite le verrou, puis compte un effectif périmé, et le plafond saute
+ * exactement comme s'il n'y avait pas de verrou.
+ */
+describe("ordre de verrouillage des points d'entrée", () => {
+  const firstStatement = (connection: PoolConnection) => sqlOf(connection)[0];
+
+  it("verrouille avant la moindre lecture, à l'inscription d'un joueur", async () => {
+    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 101 } as never);
+    const { connection } = fakeConnection({ teams: [] });
+
+    await registerCurrentUserTeam(connection, 12, 42);
+
+    expect(firstStatement(connection)).toMatch(/FROM bg_tournaments WHERE id = \? FOR UPDATE/);
+  });
+
+  it("verrouille avant la moindre lecture, à l'inscription d'un lot", async () => {
+    const { connection } = fakeConnection({ teams: [ghost(900)] });
+
+    await registerTeamsByIds(connection, 12, [900]);
+
+    // Le tournoi d'abord, les équipes ensuite : même ordre que le chemin joueur
+    // (qui ne verrouille, lui, que le tournoi), donc aucun cycle possible.
+    expect(firstStatement(connection)).toMatch(/FROM bg_tournaments WHERE id = \? FOR UPDATE/);
+    expect(sqlOf(connection)[1]).toContain("SELECT id, is_ghost, deleted_at");
   });
 });

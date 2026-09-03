@@ -106,22 +106,22 @@ export const ERROR_MESSAGES: Record<string, string> = {
   INVALID_SEED_ORDER: "Ordre invalide : la liste doit contenir tous les engagés, une seule fois.",
   SEEDING_REORDER_FAILED: "Erreur lors de l'enregistrement du nouvel ordre.",
   // Inscription en lot d'engagés sans compte
-  // (`POST /api/admin/tournaments/[id]/ghost-registrations`). Le lot est tout ou
-  // rien : chaque phrase le dit, sans quoi le staff ne saurait pas s'il doit
-  // reprendre toute sa sélection ou seulement la fin.
+  // (`POST /api/admin/tournaments/[id]/ghost-registrations`). Les phrases
+  // restent unitaires : le tout-ou-rien est ajouté par `mapBatchError`, qui seul
+  // sait combien d'engagés portait la requête — ces mêmes codes servent aussi à
+  // l'inscription d'un seul, où « rien n'a été enregistré » n'apprendrait rien.
   EMPTY_TEAM_SELECTION: "Sélectionne au moins un engagé à inscrire.",
   INVALID_TEAM_IDS: "Sélection illisible : recharge la page et recommence.",
   TOO_MANY_TEAMS: "Sélection trop large : inscris-les en plusieurs fois.",
   // Une fantôme attribuée à un joueur entre l'affichage de la liste et le clic
   // n'est plus une fantôme : le staff n'inscrit pas l'équipe d'un joueur à sa
   // place, ni une entrée solo.
-  NOT_A_GHOST_TEAM:
-    "Cet engagé n'est plus une équipe fantôme : aucune inscription n'a été enregistrée.",
-  TEAM_ALREADY_DELETED: "Cet engagé a été dissous : aucune inscription n'a été enregistrée.",
-  TEAM_NOT_FOUND: "Engagé introuvable : aucune inscription n'a été enregistrée.",
+  NOT_A_GHOST_TEAM: "Cet engagé n'est plus une équipe fantôme.",
+  TEAM_ALREADY_DELETED: "Cet engagé a été dissous.",
+  TEAM_NOT_FOUND: "Engagé introuvable.",
   GHOST_TEAMS_LOAD_FAILED: "Impossible de charger la liste des équipes fantômes.",
   GHOST_TEAM_CREATE_FAILED: "Erreur lors de la création de l'équipe fantôme.",
-  GHOST_REGISTRATION_FAILED: "Erreur lors de l'inscription : rien n'a été enregistré.",
+  GHOST_REGISTRATION_FAILED: "Erreur lors de l'inscription.",
 };
 
 export function mapError(errorCode: string): string {
@@ -140,4 +140,23 @@ export function mapError(errorCode: string): string {
 export function mapEntrantError(errorCode: string, entrantName: string | null): string {
   const message = mapError(errorCode);
   return entrantName ? `${entrantName} — ${message}` : message;
+}
+
+/**
+ * Message d'un refus portant sur un **lot**.
+ *
+ * Le tout-ou-rien doit se lire dans la phrase, et il ne peut pas l'être dans la
+ * table : « Ce tournoi est complet. » est juste pour l'inscription d'un seul,
+ * mais devant une sélection de vingt-cinq il laisse ouvert ce que le lot était
+ * censé éviter — le staff ne sait pas si les vingt-quatre premières sont
+ * passées. Seul l'appelant connaît la taille de la requête, la précision est
+ * donc ajoutée ici.
+ */
+export function mapBatchError(
+  errorCode: string,
+  entrantName: string | null,
+  batchSize: number,
+): string {
+  const message = mapEntrantError(errorCode, entrantName);
+  return batchSize > 1 ? `${message} Rien n'a été enregistré.` : message;
 }

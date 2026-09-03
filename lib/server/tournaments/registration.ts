@@ -15,25 +15,42 @@ import { loadTournamentRow } from "./repository";
  * @param byStaff Inscription faite *à la place* de l'engagé (équipe fantôme,
  *   joueur invité). Le journal Discord la distingue de celle d'un joueur.
  */
+/**
+ * Retient la ligne du tournoi jusqu'au commit. **À appeler en toute première
+ * instruction de la transaction d'inscription**, avant la moindre lecture.
+ *
+ * Le plafond d'effectif se contrôle en comptant les inscriptions puis en
+ * insérant : sans verrou, deux inscriptions simultanées lisent le même compte et
+ * passent toutes les deux — une place de plus que le maximum, deux `seed`
+ * identiques, et un plateau qui ne tombe plus juste. L'unicité
+ * `(tournament_id, team_id)` protège du doublon, pas du dépassement.
+ *
+ * « En première instruction » n'est pas une formule de style. Sous
+ * `REPEATABLE READ`, c'est la première lecture **ordinaire** qui fige
+ * l'instantané, et une lecture verrouillante n'en crée pas : une simple lecture
+ * faite avant le verrou — ne serait-ce que pour connaître le type de participant
+ * — fige le monde *avant* l'attente. La transaction obtient alors le verrou,
+ * puis compte un effectif périmé, et le plafond saute exactement comme s'il n'y
+ * avait pas de verrou du tout.
+ */
+async function lockTournamentRow(
+  connection: PoolConnection,
+  tournamentId: number,
+): Promise<void> {
+  await connection.execute(`SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE`, [tournamentId]);
+}
+
 async function registerTeam(
   connection: PoolConnection,
   tournamentId: number,
   teamId: number,
   byStaff: boolean,
 ): Promise<void> {
-  // Verrou sur la ligne du tournoi, avant toute lecture de l'effectif.
-  //
-  // Le plafond se contrôle en comptant les inscriptions puis en insérant : sans
-  // verrou, deux inscriptions simultanées lisent le même compte et passent
-  // toutes les deux — une place de plus que le maximum, et un plateau qui ne
-  // tombe plus juste. L'unicité `(tournament_id, team_id)` protège du doublon,
-  // pas du dépassement d'effectif. Le verrou est pris ici, dans le tronc commun,
-  // et non chez l'appelant : il vaut pour l'inscription d'un joueur comme pour
-  // un lot d'équipes fantômes, et un lot le prend une fois puis le garde.
-  //
-  // Première écriture de la transaction, donc ordre de verrouillage constant :
-  // deux inscriptions concurrentes se sérialisent au lieu de s'interbloquer.
-  await connection.execute(`SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE`, [tournamentId]);
+  // Plancher du tronc commun : les deux points d'entrée verrouillent déjà, plus
+  // tôt qu'ici (voir `lockTournamentRow`). Le reprendre ne coûte rien — la
+  // transaction tient déjà la ligne — et garantit qu'un appelant ajouté demain
+  // ne compte jamais un effectif sans verrou.
+  await lockTournamentRow(connection, tournamentId);
 
   const { row: tournament } = await syncTournamentState(connection, tournamentId);
   if (!tournament) {
@@ -107,6 +124,11 @@ export async function registerCurrentUserTeam(
   tournamentId: number,
   userId: number,
 ): Promise<void> {
+  // Avant la lecture ci-dessous, et non après : c'est elle qui figerait
+  // l'instantané `REPEATABLE READ` de la transaction, et le comptage d'effectif
+  // de `registerTeam` compterait alors un monde d'avant l'attente du verrou.
+  await lockTournamentRow(connection, tournamentId);
+
   const tournament = await loadTournamentRow(connection, tournamentId);
   if (!tournament) {
     throw new Error("TOURNAMENT_NOT_FOUND");
@@ -163,6 +185,11 @@ export async function registerTeamsByIds(
 ): Promise<void> {
   if (teamIds.length === 0) throw new Error("EMPTY_TEAM_SELECTION");
 
+  // Le tournoi d'abord, les équipes ensuite — même ordre que l'inscription d'un
+  // joueur (qui, elle, ne verrouille que le tournoi) : aucun cycle possible
+  // entre les deux chemins.
+  await lockTournamentRow(connection, tournamentId);
+
   // Lecture **verrouillante**, et pas seulement par prudence : c'est la
   // première lecture de la transaction, donc celle qui fige l'instantané
   // `REPEATABLE READ`. Une lecture ordinaire verrait l'état du monde à cet
@@ -173,9 +200,7 @@ export async function registerTeamsByIds(
   //
   // `ORDER BY id` fixe l'ordre de verrouillage : deux lots qui se recoupent
   // prennent leurs lignes dans le même ordre et s'attendent au lieu de
-  // s'interbloquer. Les équipes sont verrouillées **avant** le tournoi, ordre
-  // que suit aussi l'inscription d'un joueur (qui ne verrouille, elle, que le
-  // tournoi).
+  // s'interbloquer.
   const [teams] = await connection.execute<
     (RowDataPacket & { id: number; is_ghost: 0 | 1; deleted_at: Date | null })[]
   >(

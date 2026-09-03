@@ -12,7 +12,7 @@ import {
   registrationErrorTeamId,
 } from "@/lib/shared/ghost-registration";
 import { useParticipantWording } from "../_lib/entrant-link";
-import { mapEntrantError } from "../_lib/error-map";
+import { mapBatchError } from "../_lib/error-map";
 import styles from "./GhostRegistrationDialog.module.css";
 
 type GhostTeamOption = { id: number; name: string; logoUrl: string | null };
@@ -82,8 +82,11 @@ export function GhostRegistrationDialog({
         // vie du dialogue, l'onglet « Existantes » désactivé et aucun repli : il
         // fallait fermer et rouvrir pour retenter.
         setLoad("failed");
+        // On bascule sur la création — le seul chemin encore praticable —, mais
+        // l'onglet « Existantes » reste ouvert : c'est là que se lit *pourquoi*
+        // la liste est vide.
         setMode("new");
-        showError(mapEntrantError((e as Error).message, null));
+        showError(mapBatchError((e as Error).message, null, 1));
       }
     })();
     return () => {
@@ -159,6 +162,9 @@ export function GhostRegistrationDialog({
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
+    // Retenu avant le premier `await` : c'est la taille du lot *envoyé* qui dit
+    // si le refus doit préciser que rien n'a été enregistré.
+    const batchSize = mode === "new" ? 1 : selected.length;
     try {
       let teamIds = selected;
 
@@ -184,13 +190,19 @@ export function GhostRegistrationDialog({
       // inscrite » sans nom n'apprend rien.
       const teamId = registrationErrorTeamId(e);
       const name = teamId === undefined ? null : nameById.get(teamId) ?? null;
-      showError(mapEntrantError((e as Error).message, name));
+      showError(mapBatchError((e as Error).message, name, batchSize));
     } finally {
       setBusy(false);
     }
   };
 
+  // Le plafond vaut aussi pour la création : sans lui, `POST /api/teams` créait
+  // l'équipe fantôme *puis* l'inscription échouait en 409 — une ligne orpheline
+  // dans `bg_teams`, reproposée à tous les autres tournois, et une de plus à
+  // chaque nouvelle tentative.
+  const noSlot = capacity < 1;
   const submitDisabled = busy
+    || noSlot
     || (mode === "existing"
       ? selected.length === 0 || overCapacity
       : newName.trim().length < 3);
@@ -216,7 +228,6 @@ export function GhostRegistrationDialog({
             type="button"
             className={`${mode === "existing" ? "btn" : "btn ghost"} ${styles.modeButton}`}
             onClick={() => setMode("existing")}
-            disabled={teams.length === 0}
             aria-pressed={mode === "existing"}
           >
             Existantes
@@ -343,7 +354,9 @@ export function GhostRegistrationDialog({
             // Le bouton grisé doit dire pourquoi : le compteur passe à l'ambre,
             // encore faut-il faire le lien.
             title={
-              overCapacity
+              noSlot
+                ? "Ce tournoi est complet : il n'y a plus de place à prendre."
+                : overCapacity
                 ? remainingSlots <= GHOST_BATCH_MAX
                   ? `Il ne reste que ${remainingSlots} place${remainingSlots > 1 ? "s" : ""} dans ce tournoi.`
                   : `${GHOST_BATCH_MAX} engagés au maximum par inscription : recommencez pour les suivants.`

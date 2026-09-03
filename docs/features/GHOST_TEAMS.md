@@ -117,6 +117,12 @@ retrouve le nom dans sa propre liste. Les refus qui valent pour le lot entier
 (`REGISTRATION_CLOSED`, `TOURNAMENT_FULL`) n'en portent pas : les affubler d'un
 nom laisserait croire que les autres seraient passés.
 
+Le tout-ou-rien se lit aussi dans la phrase : `mapBatchError`
+(`_lib/error-map.ts`) ajoute « Rien n'a été enregistré. » dès que la requête
+portait plus d'un engagé. La précision n'est pas dans la table des messages, et
+pas par oubli : les mêmes codes servent à l'inscription d'un seul, où elle
+n'apprendrait rien, et seul l'appelant sait combien il en avait envoyé.
+
 ### Taille d'un lot : 32
 
 `GHOST_BATCH_MAX = 32`, et ce nombre n'est pas arbitraire : un lot est **une**
