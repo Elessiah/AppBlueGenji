@@ -10,7 +10,7 @@ import { queueBotLog, queueRefereeAlert } from "@/lib/server/tournaments/bot-log
 import { finalizeMatch, reportMatchScore } from "@/lib/server/tournaments/scoring";
 import { finishTournament } from "@/lib/server/tournaments/repository";
 import { finalizeUnderfilledTournament } from "@/lib/server/tournaments/finalization";
-import { registerCurrentUserTeam, registerTeamById } from "@/lib/server/tournaments/registration";
+import { registerCurrentUserTeam, registerTeamsByIds } from "@/lib/server/tournaments/registration";
 import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
@@ -107,7 +107,7 @@ describe("inscription", () => {
     return fakeConnection({
       rows: (q) => {
         if (q.includes("COUNT(*)")) return [{ c: 0 }];
-        if (q.includes("FROM bg_teams")) return [{ deleted_at: null }];
+        if (q.includes("FROM bg_teams")) return [{ id: 900, is_ghost: 1, deleted_at: null }];
         if (q.includes("FROM bg_tournaments")) return [TOURNAMENT];
         return [];
       },
@@ -129,7 +129,7 @@ describe("inscription", () => {
   });
 
   it("marque l'inscription d'une équipe fantôme comme venant du staff", async () => {
-    await registerTeamById(registrationConnection(), 12, 900);
+    await registerTeamsByIds(registrationConnection(), 12, [900]);
 
     expect(queued()).toEqual([
       { kind: "registration", tournamentId: 12, teamId: 900, byStaff: true },
