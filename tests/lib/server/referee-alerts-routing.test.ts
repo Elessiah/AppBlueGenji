@@ -8,6 +8,7 @@ import {
   discardBotLogs,
   dropQueuedRefereeAlerts,
   flushBotLogs,
+  markMatchResolved,
   queueBotLog,
   queueRefereeAlert,
   resolveBotLogs,
@@ -446,6 +447,58 @@ describe("manche tranchée dans la même transaction", () => {
     expect(pushRefereeAlert).not.toHaveBeenCalled();
   });
 
+  /**
+   * L'effacement des réservations en base suit la **marque** posée par
+   * `finalizeMatch`, jamais sa ligne de journal : celle-ci est plafonnée, et un
+   * balayage chargé l'abandonne.
+   */
+  it("efface les réservations d'une manche notée tranchée", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([]);
+
+    markMatchResolved(connection, 31);
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const deletes = execute.mock.calls
+      .map((call) => ({ sql: String(call[0]), params: (call[1] ?? []) as unknown[] }))
+      .filter((call) => call.sql.includes("bg_referee_alerts"));
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0].sql).toContain("match_id");
+    expect(deletes[0].params).toEqual([31]);
+  });
+
+  // Le ménage ne dépend pas du sort de la ligne `match_finished` : sans elle en
+  // file — plafond atteint — les réservations doivent tout de même partir, sans
+  // quoi la clé `SCORE_CONFLICT` resterait posée pour la vie du plateau.
+  it("efface les réservations même sans ligne de journal en file", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([]);
+
+    // Aucun `queueBotLog` : la file est vide, seule la marque subsiste.
+    markMatchResolved(connection, 31);
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(
+      execute.mock.calls.filter((call) => String(call[0]).includes("bg_referee_alerts")),
+    ).toHaveLength(1);
+  });
+
+  // Une transaction annulée n'a rien tranché : ses marques partent avec elle.
+  it("n'efface rien quand la transaction est annulée", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([]);
+
+    markMatchResolved(connection, 31);
+    discardBotLogs(connection);
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   // Les alertes des **autres** manches restent en file.
   it("ne retire que les alertes de la manche tranchée", async () => {
     const connection = fakeConnection();
@@ -476,6 +529,45 @@ describe("réservation d'une alerte arbitre", () => {
 
     expect(queuedNow).toBe(false);
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Le constat qui produit l'escalade se refait à chaque entretien : rejouer
+   * l'`INSERT IGNORE` serait sans effet, mais prendrait une intention de verrou
+   * et un `AUTO_INCREMENT` à chaque passage. Une lecture préalable l'écarte.
+   */
+  it("ne réserve pas deux fois une manche qui a déjà sa ligne", async () => {
+    const execute = jest.fn<() => Promise<unknown>>();
+    // La lecture trouve la réservation ; aucune écriture ne doit suivre.
+    execute.mockResolvedValue([[{ 1: 1 }], []] as never);
+    const connection = { execute } as unknown as PoolConnection;
+    mockDb([]);
+
+    const queuedNow = await queueRefereeAlert(connection, {
+      kind: "score_report_stalled",
+      matchId: 31,
+    });
+
+    expect(queuedNow).toBe(false);
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(String(execute.mock.calls[0][0])).toContain("SELECT");
+  });
+
+  // Manche vierge : la lecture ne trouve rien, la réservation est posée.
+  it("réserve quand la manche n'a pas encore sa ligne", async () => {
+    const execute = jest.fn<() => Promise<unknown>>();
+    execute.mockResolvedValueOnce([[], []] as never);
+    execute.mockResolvedValueOnce([{ affectedRows: 1, insertId: 501 }, []] as never);
+    const connection = { execute } as unknown as PoolConnection;
+    mockDb([]);
+
+    const queuedNow = await queueRefereeAlert(connection, {
+      kind: "score_report_stalled",
+      matchId: 31,
+    });
+
+    expect(queuedNow).toBe(true);
+    expect(String(execute.mock.calls[1][0])).toContain("INSERT IGNORE");
   });
 
   // Réservation inaccessible — table absente, verrou heurté. Le conflit part
