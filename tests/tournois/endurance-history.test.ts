@@ -56,8 +56,12 @@ describe("enduranceCellTitle", () => {
     );
   });
 
-  it("distingue une équipe déjà éliminée", () => {
-    expect(enduranceCellTitle("Charlie", out(6))).toBe("Charlie · manche 6 : déjà éliminée");
+  // « Sortie » et non « éliminée » : la case couvre aussi une équipe écartée
+  // faute de perspectives, qui gardait pourtant du capital.
+  it("distingue une équipe déjà sortie de la phase qualificative", () => {
+    expect(enduranceCellTitle("Charlie", out(6))).toBe(
+      "Charlie · manche 6 : déjà sortie de la phase qualificative",
+    );
   });
 });
 

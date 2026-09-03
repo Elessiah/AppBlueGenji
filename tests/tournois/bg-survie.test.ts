@@ -64,11 +64,20 @@ describe("resolveEnduranceConfig", () => {
   });
 
   it("accepte un barème personnalisé", () => {
-    expect(resolveEnduranceConfig({ startPoints: 12, winDelta: 2, lossDelta: 3, playoffSize: 4 })).toEqual({
+    expect(
+      resolveEnduranceConfig({
+        startPoints: 12,
+        winDelta: 2,
+        lossDelta: 3,
+        playoffSize: 4,
+        maxRounds: 6,
+      }),
+    ).toEqual({
       startPoints: 12,
       winDelta: 2,
       lossDelta: 3,
       playoffSize: 4,
+      maxRounds: 6,
     });
   });
 
