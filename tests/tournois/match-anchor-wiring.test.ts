@@ -86,6 +86,14 @@ describe("ancre d'un match — points de passage", () => {
     // même identifiant.
     expect(HOOK).toContain("}, [tournamentId]);");
     expect(PAGE).toMatch(/useMatchAnchor\(\{\s+tournamentId,/);
+    // La sélection de phase repart de zéro avec elle : elle appartient au
+    // tournoi qu'on quitte. Les deux repères partent **ensemble** — remettre le
+    // seul `lastCurrentPhaseId` ferait croire à un démarrage de phase au premier
+    // instantané, ce qui écraserait la phase que l'ancre vient de choisir ;
+    // remettre la seule sélection laisserait ce faux démarrage la reprendre.
+    expect(PAGE).toMatch(
+      /setSelectedPhaseId\(null\);\s+lastCurrentPhaseId\.current = undefined;\s+\}, \[tournamentId\]\);/,
+    );
   });
 
   it("ne reprend pas la main sur un lecteur qui l'a déjà prise", () => {

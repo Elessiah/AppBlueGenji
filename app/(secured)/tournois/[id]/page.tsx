@@ -129,6 +129,19 @@ export default function TournamentDetailPage() {
   // plus depuis qu'une ancre `#match-[id]` peut avoir déjà choisi une phase.
   const lastCurrentPhaseId = useRef<number | null | undefined>(undefined);
 
+  // Même précaution que les trois dialogues ci-dessus, et pour la même raison :
+  // la page n'est pas remontée d'un tournoi à l'autre. Une phase appartient à
+  // **son** tournoi — garder son identifiant laisserait `selectedPhase`
+  // introuvable, donc `filteredMatches` non filtré, et la fiche empilerait
+  // toutes les phases. Les deux repères partent ensemble : remettre le seul
+  // `lastCurrentPhaseId` ferait croire à un démarrage de phase au premier
+  // instantané du nouveau tournoi, ce qui écraserait la phase qu'une ancre
+  // `#match-[id]` vient de choisir.
+  useEffect(() => {
+    setSelectedPhaseId(null);
+    lastCurrentPhaseId.current = undefined;
+  }, [tournamentId]);
+
   useEffect(() => {
     const phases = detail?.phases;
     if (!phases) return;

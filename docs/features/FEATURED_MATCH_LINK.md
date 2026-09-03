@@ -111,6 +111,15 @@ navigation client passe par `history.pushState`, qui ne déclenche **pas** de
 second tournoi, et le halo du premier pourrait suivre sur une manche de même
 identifiant.
 
+La sélection de phase repart de zéro avec elle, et **les deux repères ensemble** :
+`selectedPhaseId` à `null` (une phase appartient à son tournoi — garder son
+identifiant laisserait `selectedPhase` introuvable, donc `filteredMatches` non
+filtré, et la fiche empilerait toutes les phases) et `lastCurrentPhaseId` à
+`undefined`. Remettre le seul second ferait passer le premier instantané du
+nouveau tournoi pour un démarrage de phase, qui écraserait la phase que l'ancre
+vient de choisir ; remettre la seule sélection laisserait ce faux démarrage la
+reprendre.
+
 ### Trois pièges, traités explicitement
 
 **Le contenu arrive après le premier rendu.** La page ouvre le flux SSE, et
