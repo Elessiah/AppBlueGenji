@@ -15,6 +15,7 @@ inchangé : ce sont deux formats distincts.
 | Gain par map gagnée | +1 | `endurance_win_delta` |
 | Perte par map perdue | −1 | `endurance_loss_delta` |
 | Effectif des play-offs | 8 | `endurance_playoff_size` |
+| Manches maximum | aucune | `endurance_max_rounds` (`NULL` = aucune) |
 
 - Le barème se compte **map par map**, dans les deux sens : un 3-0 rapporte
   trois points au vainqueur et en coûte trois au perdant, un 3-2 n'en déplace
@@ -28,8 +29,10 @@ inchangé : ce sont deux formats distincts.
   couple à **gauche** (`team1`).
 - Effectif impair : la dernière du classement **ne joue pas** et son capital
   reste intact. Contrairement au mode Survie, aucune victoire d'office.
-- La phase s'arrête dès que l'effectif actif retombe à `endurance_playoff_size`.
-  Aucune limite de manches : c'est l'endurance qui fait le tri.
+- La phase s'arrête dès que l'effectif actif retombe à `endurance_playoff_size`,
+  ou — si le tournoi fixe un plafond — à la manche `endurance_max_rounds`, au
+  premier des deux. Sans plafond (`NULL`, le défaut et le comportement de tous
+  les tournois antérieurs), c'est l'endurance seule qui fait le tri.
 
 ### Le départage n'est pas le seed
 
@@ -38,6 +41,76 @@ pas à « départage par le classement de départ » : deux équipes qui se croi
 en cours de route gardent leur ordre relatif **du moment**. Le rejeu recalcule
 donc l'ordre manche après manche et le reporte en entrée de la suivante
 (`previousRank`).
+
+## Plafond de manches et sorties « hors course »
+
+Un gros capital fait durer la phase : à neuf points et ±1 par map, trente
+équipes peuvent enchaîner les manches sans que l'effectif retombe à huit. Le
+réglage **Manches maximum** (`endurance_max_rounds`) borne la phase.
+
+Deux conséquences, portées par la même fonction pure
+(`enduranceEliminationCut`) et appliquées **dans le rejeu**, à la fin de chaque
+manche close :
+
+1. **À la dernière manche** (`remainingRounds === 0`) — les
+   `endurance_playoff_size` premières du classement sont qualifiées, **toutes
+   les autres sortent**, quel que soit leur capital. Sans ce trait, la phase
+   s'arrêterait en laissant trente équipes « en lice » dont huit seulement
+   disputent l'arbre.
+2. **Avant la fin** (`remainingRounds > 0`) — une équipe qui ne peut plus
+   **mathématiquement** rejoindre le plateau est écartée sans attendre.
+
+### Le critère mathématique
+
+Une manche déplace au plus `winDelta × maps` points vers le haut et
+`lossDelta × maps` vers le bas, où `maps` est le nombre de manches à gagner du
+**format de match** du tournoi (FT3 → 3). Un tournoi en **saisie libre** n'a pas
+de plafond de maps : plus rien n'y est arithmétiquement acquis, et aucune équipe
+n'est donc jamais écartée d'avance.
+
+Une équipe sort quand au moins `playoffSize` autres la devancent **quoi qu'il
+arrive** : leur **plancher** (elles perdent tout ce qui reste) dépasse
+strictement son **plafond** (elle gagne tout ce qui reste). Le critère est
+volontairement conservateur — mieux vaut garder une manche de trop une équipe
+condamnée que d'en sortir une qui pouvait encore revenir. Il se vérifie au
+passage qu'une adversaire ainsi « acquise » ne peut pas tomber à zéro en route :
+son plancher dépasse un plafond positif, donc elle reste en lice.
+
+Conséquence arithmétique : la coupe ne peut jamais tomber avant la **seconde
+moitié** de la phase — l'écart accumulé en `k` manches ne dépasse celui qui
+reste rattrapable en `R` manches que si `k > R`.
+
+### Parité — on ne pénalise pas une équipe en course
+
+Un effectif impair fait chômer une équipe à chaque manche. La coupe mathématique
+est donc **abandonnée** si elle laisse un nombre impair d'équipes *à qui il
+reste des manches à jouer* : les condamnées jouent une manche de plus, elles le
+resteront à la suivante. Le cas ne se pose pas quand la coupe ramène pile à
+`playoffSize` — plus personne ne dispute de manche qualificative derrière, donc
+personne n'est privé de rien.
+
+### `OUT_OF_CONTENTION` n'est pas `ELIMINATED`
+
+Le statut du classement (`bg_endurance_standings.status`) distingue les deux, et
+ce n'est pas cosmétique : une équipe écartée **garde son capital**. Afficher
+« Éliminée » à côté de neuf points restants serait un contresens ; la vue affiche
+« Hors course ». Le capital n'est pas remis à zéro — c'est l'horizon qui manque,
+pas les points.
+
+### Tout reste dérivé
+
+La coupe vit dans `replayEndurance`, jamais dans une écriture à part : corriger
+un score la défait comme il défait une élimination, et retirer le plafond la
+fait disparaître entièrement. Elle n'est appliquée qu'à la fin d'une manche
+**close** (tous ses matchs joués) — sur une manche entamée, une équipe qui n'a
+pas encore disputé la sienne serait jugée sur un capital amputé de ses gains à
+venir.
+
+Côté orchestration, le plafond n'a **aucune branche à lui** dans
+`reconcileEndurance` : le rejeu ayant déjà ramené l'effectif à `playoffSize` à
+la dernière manche, la bascule en play-offs se déclenche par le chemin habituel.
+`generateEnduranceRound` porte une garde (`roundLimitReached`) pour qu'aucun
+chemin — réappariement après correction compris — ne pose une manche de trop.
 
 ## Phase éliminatoire
 
@@ -88,6 +161,7 @@ décision humaine.
 | Vue | `app/(secured)/tournois/[id]/_components/EnduranceView.tsx` |
 | Verrouillage | `lib/shared/match-lock.ts` (format traité comme la Survie) |
 | Chiffre d'un forfait | `lib/shared/match-format.ts` (`forfeitMapCount`) |
+| Plafond de manches | `enduranceEliminationCut` / `roundLimitReached` (`lib/shared/bg-survie.ts`) |
 | Règles publiques | `/regles/bluegenji-survie` |
 
 Comme la Survie et la Ronde suisse, **tout est rejoué** depuis l'historique des
