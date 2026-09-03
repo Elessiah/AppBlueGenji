@@ -1,6 +1,5 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { MIN_ENTRANTS_FOR_MATCHES } from "@/lib/shared/constants";
-import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
+import { MIN_ENTRANTS_FOR_MATCHES, SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { queueBotLog, queueRefereeAlert } from "./bot-logs";
 import { resetRegistrationRanks, finishTournament } from "./repository";
 
@@ -270,9 +269,10 @@ export async function finalizeTournamentIfDone(
  * indéfiniment, et sont exactement celles qui attendent un humain.
  *
  * D'où une alerte, distincte de celle du conflit lui-même : la première part au
- * moment du désaccord, celle-ci constate qu'une demi-heure plus tard personne
- * n'a tranché. `claimRefereeAlert` la réserve dans la transaction en cours pour
- * qu'elle ne parte qu'une fois — la fonction est appelée à chaque entretien.
+ * moment du désaccord, celle-ci constate qu'un délai de report plus tard —
+ * `SCORE_REPORT_TIMEOUT_MINUTES`, la seule source — personne n'a tranché.
+ * `claimRefereeAlert` la réserve dans la transaction en cours pour qu'elle ne
+ * parte qu'une fois : la fonction, elle, est appelée à chaque entretien.
  *
  * L'escalade attend **un délai de plus** après `score_deadline_at`. Cette
  * colonne est posée au premier report et jamais réécrite tant que la manche

@@ -2,7 +2,12 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { checkMatchScores, parseMatchFormat } from "@/lib/shared/match-format";
 import { MatchRow } from "./_internal";
-import { dropQueuedRefereeAlerts, queueBotLog, queueRefereeAlert } from "./bot-logs";
+import {
+  dropQueuedRefereeAlerts,
+  markMatchResolved,
+  queueBotLog,
+  queueRefereeAlert,
+} from "./bot-logs";
 import { resolveUserEntrantTeamId } from "./registration";
 import { syncTournamentState } from "./state";
 import { tryAutoResolveByes } from "./byes";
@@ -122,9 +127,17 @@ export async function finalizeMatch(
   // rencontre déjà `COMPLETED` « n'est toujours pas tranchée ».
   //
   // Retrait **en mémoire seulement** : rien à écrire ici, donc aucun verrou de
-  // plus sur le chemin le plus chaud du moteur. L'effacement des lignes suit le
-  // commit, dans `flushBotLogs`, sur la trace `match_finished` posée ci-dessus.
+  // plus sur le chemin le plus chaud du moteur. L'effacement des lignes en base
+  // suit le commit, dans `flushBotLogs`.
   dropQueuedRefereeAlerts(connection, Number(match.id));
+
+  // Et la manche est notée tranchée, pour que ses réservations soient effacées
+  // après le commit. Une marque à part, et non la ligne de journal ci-dessus :
+  // la file est plafonnée, et un balayage chargé abandonne ses dernières entrées
+  // — le ménage, lui, ne peut pas être abandonné, sans quoi la clé
+  // `SCORE_CONFLICT` resterait posée et aucun désaccord né après cet arbitrage
+  // n'alerterait plus personne.
+  markMatchResolved(connection, Number(match.id));
 
   await pushTeamToTarget(
     connection,

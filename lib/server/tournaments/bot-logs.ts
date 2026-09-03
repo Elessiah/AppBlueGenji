@@ -184,6 +184,19 @@ const MAX_PENDING_PER_TRANSACTION = 32;
  */
 const pending = new WeakMap<PoolConnection, PendingBotLog[]>();
 
+/**
+ * Manches tranchées par la transaction en cours, dont les réservations d'alerte
+ * seront à effacer après le commit.
+ *
+ * Un **ensemble à part**, et non la trace `match_finished` de la file : celle-ci
+ * est plafonnée, et un balayage chargé l'abandonne (`queueBotLog` rend alors
+ * `false`). Perdre une ligne de journal ne coûte qu'une ligne d'historique ;
+ * perdre le nettoyage laisserait la clé `SCORE_CONFLICT` posée pour la vie du
+ * plateau, et plus aucun désaccord né après cet arbitrage n'alerterait
+ * quiconque. Le ménage n'a pas à dépendre du sort d'une ligne d'affichage.
+ */
+const resolvedMatches = new WeakMap<PoolConnection, Set<number>>();
+
 /** Deux entrées identiques dans une même transaction ne font qu'une ligne. */
 function entryKey(entry: PendingBotLog): string {
   return JSON.stringify(entry);
@@ -215,9 +228,26 @@ export function queueBotLog(connection: PoolConnection, entry: PendingBotLog): b
   return true;
 }
 
+/**
+ * Note que la transaction en cours vient de trancher une manche : ses
+ * réservations d'alerte seront effacées après le commit.
+ *
+ * En mémoire et **synchrone** : rien à écrire ici, donc aucun verrou de plus sur
+ * le chemin le plus chaud du moteur (`finalizeMatch`). L'effacement suit le
+ * commit, sur le pool (`clearRefereeAlertsOnPool`).
+ */
+export function markMatchResolved(connection: PoolConnection, matchId: number): void {
+  const marked = resolvedMatches.get(connection);
+  if (marked) marked.add(matchId);
+  else resolvedMatches.set(connection, new Set([matchId]));
+}
+
 /** Jette les lignes réservées : la transaction n'a pas abouti. */
 export function discardBotLogs(connection: PoolConnection): void {
   pending.delete(connection);
+  // Les manches notées tranchées ne l'ont pas été : leurs réservations gardent
+  // tout leur objet, et le prochain entretien les retrouvera telles quelles.
+  resolvedMatches.delete(connection);
 }
 
 /**
@@ -230,9 +260,11 @@ export function discardBotLogs(connection: PoolConnection): void {
  * À appeler juste après le commit ; `discardBotLogs` couvre le chemin d'échec.
  */
 export function flushBotLogs(connection: PoolConnection): void {
-  const queue = pending.get(connection);
+  const queue = pending.get(connection) ?? [];
   pending.delete(connection);
-  if (!queue || queue.length === 0) return;
+  const resolved = resolvedMatches.get(connection) ?? new Set<number>();
+  resolvedMatches.delete(connection);
+  if (queue.length === 0 && resolved.size === 0) return;
 
   // Une manche dont le désaccord vient d'être annoncé n'a pas besoin de son
   // escalade dans la même seconde : le téléphone de l'arbitre sonne déjà, et
@@ -323,18 +355,15 @@ export function flushBotLogs(connection: PoolConnection): void {
     // les matchs tranchés, et y poser un `DELETE` de plus ferait tenir un verrou
     // de plus sur son chemin le plus chaud — jusqu'à l'interblocage avec le
     // balayage qui, lui, réserve.
-    for (const entry of queue) {
-      if (entry.kind === "match_finished") await clearRefereeAlertsOnPool(entry.matchId);
-    }
+    //
+    // La liste vient de `markMatchResolved`, jamais des entrées `match_finished`
+    // de la file : celle-ci est plafonnée, et une manche tranchée par un
+    // balayage chargé perdrait alors son ménage — donc sa clé `SCORE_CONFLICT`,
+    // pour toujours.
+    for (const matchId of resolved) await clearRefereeAlertsOnPool(matchId);
   })().catch(() => undefined);
 }
 
-/**
- * Manche d'une entrée qui réserve une alerte.
- *
- * Les deux natures concernées portent un `matchId` ; le `switch` est là pour
- * que TypeScript le sache, pas pour trancher quoi que ce soit.
- */
 /**
  * Identifiant de la réservation portée par une entrée, `null` si elle n'en a
  * pas — évènement de journal, ou alerte mise en file sans passer par
@@ -350,6 +379,12 @@ function refereeAlertClaimId(entry: PendingBotLog): number | null {
   }
 }
 
+/**
+ * Manche d'une entrée qui réserve une alerte.
+ *
+ * Les deux natures concernées portent un `matchId` ; le `switch` est là pour
+ * que TypeScript le sache, pas pour trancher quoi que ce soit.
+ */
 function refereeAlertMatchId(entry: PendingBotLog): number {
   switch (entry.kind) {
     case "score_conflict":
@@ -383,6 +418,33 @@ function refereeAlertMatchId(entry: PendingBotLog): number {
  *          booléen : c'est **cette ligne-là** qu'il faudra rendre si l'alerte
  *          ne part pas, et pas celle qu'un autre balayage aura posée depuis.
  */
+/**
+ * Une manche a-t-elle **déjà** une réservation sous cette clé ?
+ *
+ * Lecture cohérente, sans verrou — et c'est tout l'intérêt : le constat qui
+ * produit l'escalade se refait à *chaque* entretien, donc à chaque
+ * reconstruction d'instantané tant que la manche est bloquée. Réserver de
+ * nouveau y serait sans effet (la clé unique le rejette), mais chaque
+ * `INSERT IGNORE` prend une intention de verrou sur l'index et consomme un
+ * `AUTO_INCREMENT`, dans la transaction du moteur. Un `SELECT` ne fait ni l'un
+ * ni l'autre.
+ *
+ * Ce n'est **pas** la garantie d'unicité : deux transactions simultanées peuvent
+ * toutes deux ne rien voir. C'est l'index unique qui tranche cette course, comme
+ * avant — cette lecture n'écarte que le cas nominal, celui qui se répète.
+ */
+async function refereeAlertExists(
+  connection: PoolConnection,
+  matchId: number,
+  alertKey: string,
+): Promise<boolean> {
+  const [rows] = await connection.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_referee_alerts WHERE match_id = ? AND alert_key = ? LIMIT 1`,
+    [matchId, alertKey],
+  );
+  return rows.length > 0;
+}
+
 export async function claimRefereeAlert(
   connection: PoolConnection,
   matchId: number,
@@ -489,6 +551,10 @@ export async function queueRefereeAlert(
 
   let claimId: number | null;
   try {
+    // Le cas nominal d'une manche bloquée est celui du *retour* : la réservation
+    // est déjà posée, et le sera jusqu'à l'arbitrage. On le règle par une
+    // lecture, pas par une écriture rejetée.
+    if (await refereeAlertExists(connection, entry.matchId, alertKey)) return false;
     claimId = await claimRefereeAlert(connection, entry.matchId, alertKey);
   } catch (error) {
     // Un interblocage n'est pas une écriture manquée : InnoDB vient d'annuler
