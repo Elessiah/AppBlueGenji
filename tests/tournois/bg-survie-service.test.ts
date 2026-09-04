@@ -45,14 +45,39 @@ function standingRow(teamId: number, overrides: Row = {}): Row {
 }
 
 /** Connexion mockée dont chaque `execute` renvoie la valeur programmée. */
-function makeConn(results: unknown[]) {
-  const execute = jest.fn();
-  for (const result of results) execute.mockResolvedValueOnce(result as never);
-  execute.mockResolvedValue([[]] as never);
+function makeConn(results: unknown[], overrides: [string, unknown][] = []) {
+  const queue = [...results];
+
+  // Les réponses reconnues **par leur SQL** passent avant la file positionnelle,
+  // et n'y consomment donc pas de rang : c'est ce qui permet à un cas de
+  // répondre à une requête d'entretien (achèvement de la manche) sans avoir à
+  // recompter tous les `INSERT` du classement qui la précèdent.
+  const execute = jest.fn(async (sql: unknown) => {
+    const query = String(sql);
+    const override = overrides.find(([needle]) => query.includes(needle));
+    if (override) return override[1];
+    return queue.length > 0 ? queue.shift() : [[]];
+  });
+
   return { execute } as never as Parameters<typeof generateEnduranceRound>[1] & {
     execute: jest.Mock;
   };
 }
+
+/**
+ * Manche courante **jouée**, pour les cas dont le scénario la suppose terminée.
+ *
+ * `reconcileEndurance` ne décide plus rien au milieu d'une manche : la bascule
+ * en play-offs, comme l'appariement de la suivante, passe par `roundIsComplete`.
+ * Un plateau dont toutes les rencontres sont `COMPLETED` dans l'historique doit
+ * donc le dire aussi aux deux requêtes d'entretien — elle porte des saisies
+ * (`roundHasScoreInput`, ce qui écarte le réappariement d'une manche périmée)
+ * et elle est complète.
+ */
+const ROUND_PLAYED: [string, unknown][] = [
+  ["SELECT COUNT(*) AS c FROM bg_matches", [[{ c: 2 }]]],
+  ["SELECT COUNT(*) AS total", [[{ total: 2, done: 2 }]]],
+];
 
 describe("initializeEnduranceTournament", () => {
   beforeEach(() => jest.clearAllMocks());
@@ -84,6 +109,20 @@ describe("initializeEnduranceTournament", () => {
     );
     // Barème par défaut rendu explicite : 9 / +1 / −1 / 8.
     expect((settings?.[1] as unknown[]).slice(0, 4)).toEqual([9, 1, 1, 8]);
+  });
+
+  it("fige le plafond de manches avec le reste du barème", async () => {
+    const conn = makeConn([
+      [[tournamentRow({ endurance_max_rounds: 5 })]],
+      [[{ team_id: 1 }, { team_id: 2 }]],
+    ]);
+
+    await initializeEnduranceTournament(5, conn);
+
+    const settings = conn.execute.mock.calls.find(([sql]) =>
+      String(sql).includes("endurance_max_rounds = ?"),
+    );
+    expect((settings?.[1] as unknown[]).slice(0, 5)).toEqual([9, 1, 1, 8, 5]);
   });
 
   it("ignore un tournoi d'un autre format", async () => {
@@ -125,6 +164,48 @@ describe("generateEnduranceRound", () => {
     await generateEnduranceRound(5, conn);
 
     expect(createMatch).not.toHaveBeenCalled();
+  });
+
+  // Le plafond ne se règle pas au moment d'apparier : le rejeu a déjà écarté
+  // les non-qualifiées à la dernière manche. La garde est là pour qu'aucun
+  // chemin — réappariement compris — ne pose une manche de trop.
+  it("ne pose jamais de manche au-delà du plafond", async () => {
+    const conn = makeConn([
+      [
+        [
+          tournamentRow({
+            endurance_playoff_size: 2,
+            endurance_max_rounds: 3,
+            endurance_current_round: 3,
+          }),
+        ],
+      ],
+      [[standingRow(1), standingRow(2), standingRow(3), standingRow(4)]],
+    ]);
+
+    await generateEnduranceRound(5, conn);
+
+    expect(createMatch).not.toHaveBeenCalled();
+  });
+
+  it("apparie encore la dernière manche autorisée", async () => {
+    (createMatch as jest.Mock).mockResolvedValue(77 as never);
+    const conn = makeConn([
+      [
+        [
+          tournamentRow({
+            endurance_playoff_size: 2,
+            endurance_max_rounds: 3,
+            endurance_current_round: 2,
+          }),
+        ],
+      ],
+      [[standingRow(1), standingRow(2), standingRow(3), standingRow(4)]],
+    ]);
+
+    await generateEnduranceRound(5, conn);
+
+    expect(createMatch).toHaveBeenCalledTimes(2);
   });
 
   it("ne génère rien une fois les play-offs lancés", async () => {
@@ -363,6 +444,115 @@ describe("reconcileEndurance", () => {
     const points = persistedPoints(conn);
     expect(points.get(1)).toBe(12);
     expect(points.get(2)).toBe(6);
+  });
+});
+
+describe("reconcileEndurance — plafond de manches", () => {
+  beforeEach(() => jest.clearAllMocks());
+  afterEach(() => jest.restoreAllMocks());
+
+  /** Un match joué, rangé par side comme le fait la base. */
+  function played(round: number, team1Id: number, team2Id: number, winnerTeamId: number) {
+    return {
+      round_number: round,
+      status: "COMPLETED",
+      team1_id: team1Id,
+      team2_id: team2Id,
+      team1_score: winnerTeamId === team1Id ? 3 : 0,
+      team2_score: winnerTeamId === team1Id ? 0 : 3,
+      winner_team_id: winnerTeamId,
+      loser_team_id: winnerTeamId === team1Id ? team2Id : team1Id,
+      forfeit_team_id: null,
+    };
+  }
+
+  /**
+   * Deux manches franches sur un plafond de deux, cible à deux équipes : la
+   * phase doit s'arrêter là, quel que soit le capital restant des sortantes.
+   */
+  function cappedState() {
+    return [
+      [
+        [
+          tournamentRow({
+            endurance_current_round: 2,
+            endurance_max_rounds: 2,
+            endurance_playoff_size: 2,
+            match_format_type: "FT",
+            match_format_value: 3,
+          }),
+        ],
+      ],
+      [[standingRow(1), standingRow(2), standingRow(3), standingRow(4)]],
+      [[played(1, 1, 2, 1), played(1, 3, 4, 3), played(2, 1, 3, 1), played(2, 2, 4, 2)]],
+      [[]], // forfaits
+      [{ affectedRows: 1 }],
+      [{ affectedRows: 1 }],
+      [{ affectedRows: 1 }],
+      [{ affectedRows: 1 }],
+      // startEndurancePlayoffs : tournoi relu, puis classement relu.
+      [
+        [
+          tournamentRow({
+            endurance_current_round: 2,
+            endurance_max_rounds: 2,
+            endurance_playoff_size: 2,
+          }),
+        ],
+      ],
+      [[standingRow(1, { points: 15, rank: 1 }), standingRow(3, { points: 9, rank: 2 })]],
+    ];
+  }
+
+  /** Statut persisté par la réconciliation, indexé par équipe. */
+  function persistedStatuses(conn: { execute: jest.Mock }): Map<unknown, unknown> {
+    return new Map(
+      conn.execute.mock.calls
+        .filter(([sql]) => String(sql).includes("INSERT INTO bg_endurance_standings"))
+        .map(([, params]) => {
+          const values = params as unknown[];
+          return [values[1], values[6]];
+        }),
+    );
+  }
+
+  it("écarte les non-qualifiées à la dernière manche sans vider leur capital", async () => {
+    (createMatch as jest.Mock).mockResolvedValue(77 as never);
+    const conn = makeConn(cappedState());
+
+    await reconcileEndurance(5, conn);
+
+    const statuses = persistedStatuses(conn);
+    expect(statuses.get(1)).toBe("ACTIVE");
+    expect(statuses.get(3)).toBe("ACTIVE");
+    // 2 sort avec neuf points en poche : « éliminée » serait un contresens.
+    expect(statuses.get(2)).toBe("OUT_OF_CONTENTION");
+    expect(statuses.get(4)).toBe("OUT_OF_CONTENTION");
+
+    const points = new Map(
+      conn.execute.mock.calls
+        .filter(([sql]) => String(sql).includes("INSERT INTO bg_endurance_standings"))
+        .map(([, params]) => {
+          const values = params as unknown[];
+          return [values[1], values[3]];
+        }),
+    );
+    expect(points.get(2)).toBe(9);
+  });
+
+  it("enchaîne sur les play-offs dès le plafond atteint", async () => {
+    (createMatch as jest.Mock).mockResolvedValue(77 as never);
+    // Les deux rencontres de la manche 2 sont jouées : la bascule attend
+    // l'achèvement de la manche, elle doit donc pouvoir le constater.
+    const conn = makeConn(cappedState(), ROUND_PLAYED);
+
+    await reconcileEndurance(5, conn);
+
+    expect(
+      conn.execute.mock.calls.some(([sql]) =>
+        String(sql).includes("endurance_playoffs_started = 1"),
+      ),
+    ).toBe(true);
   });
 });
 

@@ -40,6 +40,7 @@ export const ALL_TOURNAMENT_FIELDS = [
   "enduranceWinDelta",
   "enduranceLossDelta",
   "endurancePlayoffSize",
+  "enduranceMaxRounds",
   "matchFormat",
   "phases",
 ] as const;

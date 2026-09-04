@@ -265,6 +265,8 @@ export async function createTournament(
     enduranceWinDelta?: number | null;
     enduranceLossDelta?: number | null;
     endurancePlayoffSize?: number | null;
+    /** Plafond de manches qualificatives (null = phase à durée libre). */
+    enduranceMaxRounds?: number | null;
     /**
      * Phases du format MULTI, brutes (non normalisées : `position`, `name`…
      * peuvent être absents) — voir `normalizePhaseConfigs` juste en dessous,
@@ -367,9 +369,10 @@ export async function createTournament(
         endurance_win_delta,
         endurance_loss_delta,
         endurance_playoff_size,
+        endurance_max_rounds,
         match_format_type,
         match_format_value
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         organizerUserId,
         payload.name.trim(),
@@ -399,6 +402,7 @@ export async function createTournament(
         payload.enduranceWinDelta ?? null,
         payload.enduranceLossDelta ?? null,
         payload.endurancePlayoffSize ?? null,
+        payload.enduranceMaxRounds ?? null,
         // Les deux colonnes vont par paire : une seule renseignée décrirait un
         // format incomplet, que `parseMatchFormat` relirait comme « libre ».
         matchFormat?.type ?? null,

@@ -40,10 +40,30 @@ function rowClass(withActions: boolean): string {
 /** Première manche de play-offs (cf. `lib/server/tournaments/bg-survie.ts`). */
 const PLAYOFF_ROUND_OFFSET = 1000;
 
+/**
+ * « Éliminée » et « Hors course » ne disent pas la même chose et ne peuvent pas
+ * partager un libellé : la première a vidé son capital, la seconde en garde
+ * mais ne peut plus rejoindre les play-offs dans les manches restantes — sa
+ * ligne montre encore des points, et « Éliminée » à côté ne se lirait pas.
+ */
 const STATUS_LABELS: Record<EnduranceMeta["standings"][number]["status"], string> = {
   ACTIVE: "En lice",
   ELIMINATED: "Éliminée",
+  OUT_OF_CONTENTION: "Hors course",
   FORFEIT: "Forfait",
+};
+
+/**
+ * Une ligne sortie s'estompe, mais pas toutes au même degré : « Hors course »
+ * porte encore un capital à lire, là où une éliminée ou une partie n'affiche
+ * qu'un zéro. Les effacer pareil rendrait la moins lisible des trois celle qui
+ * a justement un chiffre à montrer.
+ */
+const ROW_OPACITY: Record<EnduranceMeta["standings"][number]["status"], number> = {
+  ACTIVE: 1,
+  OUT_OF_CONTENTION: 0.8,
+  ELIMINATED: 0.55,
+  FORFEIT: 0.55,
 };
 
 /** Habillage d'une case, selon le poids décidé par `_lib/endurance-history`. */
@@ -158,6 +178,14 @@ export function EnduranceView({
   const rounds = [...new Set(visible.map((match) => match.roundNumber))].sort((a, b) => b - a);
   const activeCount = endurance.standings.filter((s) => s.status === "ACTIVE").length;
 
+  // Sous plafond, la manche courante ne se lit qu'accompagnée de son total :
+  // « manche 4 » ne dit pas s'il en reste six ou une seule, et c'est justement
+  // ce qui décide qui est encore en course.
+  const roundLabel =
+    endurance.maxRounds === null
+      ? String(endurance.currentRound)
+      : `${endurance.currentRound}/${endurance.maxRounds}`;
+
   // Abandon : proposé sur les équipes encore en lice, à leurs représentants
   // comme à l'arbitrage (cf. `canForfeit` côté page).
   //
@@ -179,6 +207,11 @@ export function EnduranceView({
   const showActions = endurance.standings.some((s) => canForfeitRow(s.teamId, s.status));
   const rowClassName = rowClass(showActions);
 
+  // « Hors course » ne se devine pas : la ligne affiche encore un capital, et
+  // rien n'explique pourquoi elle n'est plus en lice. La légende n'apparaît
+  // qu'en présence d'une telle ligne, comme celle du forfait plus bas.
+  const showOutLegend = endurance.standings.some((s) => s.status === "OUT_OF_CONTENTION");
+
   return (
     <>
       {/*
@@ -191,10 +224,10 @@ export function EnduranceView({
         {endurance.lossDelta} PAR MAP PERDUE · FORFAIT COMPTÉ {endurance.forfeitMaps}-0 ·{" "}
         {endurance.playoffsStarted
           ? `PLAY-OFFS À ${endurance.playoffSize}`
-          : `MANCHE ${endurance.currentRound} · ${activeCount} ${wording.manyCapitalized.toUpperCase()} EN LICE → ${endurance.playoffSize}`}
+          : `MANCHE ${roundLabel} · ${activeCount} ${wording.manyCapitalized.toUpperCase()} EN LICE → ${endurance.playoffSize}`}
       </p>
 
-      <div className="table-like" style={{ marginBottom: 24 }}>
+      <div className="table-like" style={{ marginBottom: showOutLegend ? 8 : 24 }}>
         <div className={`${rowClassName} table-header`}>
           <span>#</span>
           <span>{wording.oneCapitalized}</span>
@@ -212,7 +245,7 @@ export function EnduranceView({
               key={standing.teamId}
               className={rowClassName}
               style={{
-                opacity: standing.status === "ACTIVE" ? 1 : 0.55,
+                opacity: ROW_OPACITY[standing.status],
                 background: isMine ? "rgba(89,212,255,0.06)" : undefined,
               }}
             >
@@ -274,6 +307,13 @@ export function EnduranceView({
           );
         })}
       </div>
+
+      {showOutLegend && (
+        <p className="mono" style={{ fontSize: 10, color: "var(--text-2)", margin: "0 0 24px" }}>
+          HORS COURSE = CAPITAL RESTANT, MAIS PLUS AUCUNE CHANCE D&apos;ATTEINDRE LES PLAY-OFFS
+          {endurance.maxRounds === null ? "" : ` DANS LES ${endurance.maxRounds} MANCHES PRÉVUES`}
+        </p>
+      )}
 
       <EnduranceHistory endurance={endurance} myTeamId={myTeamId} />
 

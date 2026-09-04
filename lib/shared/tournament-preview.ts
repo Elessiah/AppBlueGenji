@@ -84,6 +84,8 @@ export type TournamentPreviewInput = {
   survivalRoundsPerCut?: number | null;
   /** BlueGenji Survie : effectif de la phase éliminatoire. */
   endurancePlayoffSize?: number | null;
+  /** BG Survie : plafond de manches qualificatives (`null` = aucun). */
+  enduranceMaxRounds?: number | null;
   /** Multi-phases : configuration des phases, dans l'ordre. */
   phases?: readonly PhaseConfig[] | null;
 };
@@ -369,11 +371,14 @@ function previewEndurance(input: TournamentPreviewInput): TournamentPreview {
 
   // Même normalisation que `loadEnduranceMeta` : une valeur absurde en base
   // (< 2, nulle) retombe sur le défaut côté moteur, l'aperçu doit suivre.
-  const { playoffSize } = resolveEnduranceConfig({
+  const { playoffSize, maxRounds } = resolveEnduranceConfig({
     playoffSize: input.endurancePlayoffSize ?? undefined,
+    maxRounds: input.enduranceMaxRounds ?? undefined,
   });
   notes.push(
-    `La phase qualificative s'arrête à ${plural(playoffSize, "équipe")}, puis l'arbre imposé prend le relais.`,
+    maxRounds === null
+      ? `La phase qualificative s'arrête à ${plural(playoffSize, "équipe")}, puis l'arbre imposé prend le relais.`
+      : `La phase qualificative s'arrête à ${plural(playoffSize, "équipe")} ou au bout de ${plural(maxRounds, "manche")}, au premier des deux ; puis l'arbre imposé prend le relais.`,
   );
 
   return {
