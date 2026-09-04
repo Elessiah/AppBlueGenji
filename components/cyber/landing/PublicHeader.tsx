@@ -54,7 +54,12 @@ export async function PublicHeader() {
                 aria-label="Mon profil"
                 style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
               >
-                <UserAvatar src={user.avatarUrl} pseudo={user.pseudo} size={30} />
+                <UserAvatar
+                  src={user.avatarUrl}
+                  pseudo={user.pseudo}
+                  size={30}
+                  borderWidth={1.5}
+                />
                 <span>{user.pseudo}</span>
               </Link>
             </>

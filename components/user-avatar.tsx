@@ -13,6 +13,13 @@ type UserAvatarProps = {
   /** Côté du carré (px). L'avatar est toujours rond. */
   size: number;
   borderColor?: string;
+  /**
+   * Épaisseur du liseré, en pixels. Chaque écran avait la sienne avant ce
+   * composant (1 px dans la barre de navigation, 1,5 px dans l'en-tête public,
+   * 2 px sur le profil) : un défaut unique les aurait tous alignés au passage,
+   * ce qui n'est pas le rôle d'une correction de repli.
+   */
+  borderWidth?: number;
   className?: string;
   style?: CSSProperties;
   /**
@@ -37,6 +44,7 @@ export function UserAvatar({
   pseudo,
   size,
   borderColor = "rgba(89,212,255,0.35)",
+  borderWidth = 2,
   className,
   style,
   glow,
@@ -69,8 +77,11 @@ export function UserAvatar({
         style={{
           width: size,
           height: size,
+          // Un avatar ne se laisse pas comprimer par ses voisins de ligne : les
+          // en-têtes qui l'affichent sont des conteneurs flex.
+          flexShrink: 0,
           borderRadius: "50%",
-          border: `2px solid ${borderColor}`,
+          border: `${borderWidth}px solid ${borderColor}`,
           objectFit: "cover",
           ...style,
         }}
@@ -89,7 +100,7 @@ export function UserAvatar({
         height: size,
         flexShrink: 0,
         borderRadius: "50%",
-        border: `2px solid ${borderColor}`,
+        border: `${borderWidth}px solid ${borderColor}`,
         background: "var(--cyber-bg-2)",
         color: "var(--blue-300)",
         display: "inline-grid",

@@ -205,7 +205,6 @@ export default function ProfilePage() {
       <div className="ds-header">
         <div className="ds-header-body" style={{ display: "flex", alignItems: "center", gap: 20 }}>
           <UserAvatar
-            className="avatar"
             src={data.profile.avatarUrl}
             pseudo={data.profile.pseudo}
             size={60}

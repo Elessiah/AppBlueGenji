@@ -105,6 +105,7 @@ export default function PlayerDetailPage() {
                 pseudo={data.profile.pseudo}
                 size={64}
                 borderColor="rgba(89,212,255,0.3)"
+                borderWidth={1}
                 glow
               />
               <div>
