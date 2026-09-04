@@ -107,6 +107,7 @@ export default function PlayerDetailPage() {
                 borderColor="rgba(89,212,255,0.3)"
                 borderWidth={1}
                 glow
+                decorative
               />
               <div>
                 <h1 className="ds-title blue" style={{ fontSize: "clamp(26px, 3vw, 40px)", marginBottom: 6 }}>

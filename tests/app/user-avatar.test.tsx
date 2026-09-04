@@ -34,10 +34,29 @@ describe("UserAvatar", () => {
     expect(html).not.toContain("<img");
   });
 
-  // L'initiale double le pseudo déjà écrit à côté sur les quatre écrans.
-  it("masque l'initiale aux lecteurs d'écran", () => {
-    const html = renderToStaticMarkup(<UserAvatar src={null} pseudo="Nova" size={30} />);
-    expect(html).toContain('aria-hidden="true"');
+  // Les deux rendus doivent exposer le **même** nom accessible : une pastille
+  // annoncée d'un côté et muette de l'autre ferait changer de nom le contrôle
+  // qui la contient, selon qu'un avatar a été téléversé.
+  it("nomme le repli comme il nomme l'image", () => {
+    const withImage = renderToStaticMarkup(<UserAvatar src="/a.webp" pseudo="Nova" size={30} />);
+    const fallback = renderToStaticMarkup(<UserAvatar src={null} pseudo="Nova" size={30} />);
+    expect(withImage).toContain('alt="Nova"');
+    expect(fallback).toContain('aria-label="Nova"');
+    expect(fallback).toContain('role="img"');
+  });
+
+  it("masque les deux rendus quand l'avatar est décoratif", () => {
+    const withImage = renderToStaticMarkup(
+      <UserAvatar src="/a.webp" pseudo="Nova" size={30} decorative />,
+    );
+    const fallback = renderToStaticMarkup(
+      <UserAvatar src={null} pseudo="Nova" size={30} decorative />,
+    );
+    // Une image décorative porte un `alt` vide, pas un `alt` absent.
+    expect(withImage).toContain('alt=""');
+    expect(withImage).not.toContain('alt="Nova"');
+    expect(fallback).toContain('aria-hidden="true"');
+    expect(fallback).not.toContain('aria-label');
   });
 
   it("le halo n'est demandé que s'il y a une image à faire flotter", () => {

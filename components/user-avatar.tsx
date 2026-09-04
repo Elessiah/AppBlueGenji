@@ -28,6 +28,17 @@ type UserAvatarProps = {
    * flotter.
    */
   glow?: boolean;
+  /**
+   * L'avatar ne dit rien de plus que ce qui est déjà écrit à côté : le nom du
+   * compte figure dans le même lien, ou juste sous lui.
+   *
+   * Le réglage vaut pour les **deux** rendus — image et repli. Sans lui, la
+   * pastille de navigation se lisait « Nova Nova » quand le compte avait un
+   * avatar (`alt` + texte adjacent) et « Nova » quand il n'en avait pas (le
+   * repli étant masqué) : le même contrôle changeait de nom accessible selon
+   * qu'un fichier avait été téléversé.
+   */
+  decorative?: boolean;
 };
 
 /**
@@ -48,13 +59,19 @@ export function UserAvatar({
   className,
   style,
   glow,
+  decorative,
 }: UserAvatarProps) {
+  // Une image décorative porte un `alt` **vide** : c'est ce qui la retire de
+  // l'arbre d'accessibilité, là où l'omettre la ferait annoncer par son nom de
+  // fichier.
+  const alt = decorative ? "" : pseudo;
+
   if (src) {
     if (glow) {
       return (
         <LogoWithGlow
           src={src}
-          alt={pseudo}
+          alt={alt}
           width={size}
           height={size}
           size="sm"
@@ -69,7 +86,7 @@ export function UserAvatar({
       <Image
         className={className}
         src={src}
-        alt={pseudo}
+        alt={alt}
         width={size}
         height={size}
         unoptimized
@@ -92,9 +109,12 @@ export function UserAvatar({
   return (
     <span
       className={className}
-      // L'initiale est décorative : le nom du compte est déjà écrit à côté sur
-      // les quatre écrans, et le lire deux fois n'apprendrait rien.
-      aria-hidden="true"
+      // Le repli suit le même réglage que l'image : une pastille annoncée d'un
+      // côté et muette de l'autre ferait changer de nom accessible le contrôle
+      // qui la contient, selon qu'un avatar a été téléversé.
+      aria-hidden={decorative ? "true" : undefined}
+      role={decorative ? undefined : "img"}
+      aria-label={decorative ? undefined : pseudo}
       style={{
         width: size,
         height: size,

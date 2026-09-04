@@ -59,6 +59,7 @@ export async function PublicHeader() {
                   pseudo={user.pseudo}
                   size={30}
                   borderWidth={1.5}
+                  decorative
                 />
                 <span>{user.pseudo}</span>
               </Link>

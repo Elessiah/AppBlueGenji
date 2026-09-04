@@ -68,7 +68,7 @@ export function ArenaNav({ pseudo, avatarUrl, activeTeam }: ArenaNavProps) {
             </Link>
           )}
           <Link href="/profil" className={s.avatarChip}>
-            <UserAvatar src={avatarUrl} pseudo={pseudo} size={30} borderWidth={1} />
+            <UserAvatar src={avatarUrl} pseudo={pseudo} size={30} borderWidth={1} decorative />
             <span className={s.chipName}>{pseudo}</span>
           </Link>
         </div>
