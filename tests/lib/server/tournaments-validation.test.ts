@@ -52,6 +52,29 @@ describe("validateTournamentInput", () => {
     });
   });
 
+  it("laisse la phase d'endurance sans plafond par défaut", () => {
+    expect(value({ ...base, format: "BG_SURVIE" }).enduranceMaxRounds).toBeNull();
+  });
+
+  it("accepte un plafond de manches d'endurance", () => {
+    expect(value({ ...base, format: "BG_SURVIE", enduranceMaxRounds: 6 }).enduranceMaxRounds).toBe(6);
+  });
+
+  it("refuse un plafond de manches hors bornes", () => {
+    for (const enduranceMaxRounds of [0, -1, 51, 2.5]) {
+      expect(
+        validateTournamentInput({ ...base, format: "BG_SURVIE", enduranceMaxRounds }),
+      ).toEqual({ error: "INVALID_ENDURANCE_SETTINGS" });
+    }
+  });
+
+  // Le réglage n'appartient qu'au mode : l'envoyer sur un autre format ne doit
+  // pas s'écrire en base, sans quoi une bascule de format ressusciterait un
+  // plafond que personne n'a redemandé.
+  it("ignore un plafond de manches hors du mode BlueGenji Survie", () => {
+    expect(value({ ...base, format: "SINGLE", enduranceMaxRounds: 6 }).enduranceMaxRounds).toBeNull();
+  });
+
   it("refuse un demi-format de match", () => {
     expect(validateTournamentInput({ ...base, matchFormatType: "BO" })).toEqual({
       error: "INVALID_MATCH_FORMAT",

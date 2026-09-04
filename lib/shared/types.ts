@@ -1,4 +1,4 @@
-﻿import type { EnduranceRoundCell } from "./bg-survie";
+﻿import type { EnduranceRoundCell, EnduranceStatus } from "./bg-survie";
 import type { MatchFormat } from "./match-format";
 import type { MatchLiveTrigger } from "./live-streams";
 import type { ParticipantType } from "./participants";
@@ -85,7 +85,7 @@ export type EnduranceStandingRow = {
   points: number;
   wins: number;
   losses: number;
-  status: "ACTIVE" | "ELIMINATED" | "FORFEIT";
+  status: EnduranceStatus;
   eliminatedRound: number | null;
   rank: number;
   /**
@@ -110,6 +110,11 @@ export type EnduranceMeta = {
   forfeitMaps: number;
   /** Effectif de la phase éliminatoire (8 par le règlement). */
   playoffSize: number;
+  /**
+   * Plafond de manches qualificatives, `null` s'il n'y en a pas — la phase
+   * s'arrête alors sur le seul effectif.
+   */
+  maxRounds: number | null;
   /** Dernière manche générée en phase qualificative. */
   currentRound: number;
   /** Vrai dès que l'arbre des play-offs a été construit. */

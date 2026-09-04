@@ -65,6 +65,7 @@ export interface TournamentDef extends ReportStateCounts {
   forfeits?: number; // SURVIVAL / BG_SURVIE : équipes déclarant forfait après simulation
   endurancePoints?: number; // BG_SURVIE : capital de départ (défaut 9)
   endurancePlayoffSize?: number; // BG_SURVIE : effectif des play-offs (défaut 8)
+  enduranceMaxRounds?: number; // BG_SURVIE : plafond de manches qualificatives (absent = aucun)
   teamOffset?: number; // décale la tranche du pool (rosters variés d'un tournoi à l'autre)
   closesInHours?: number; // REGISTRATION : clôture imminente
   description?: string | null;
@@ -171,6 +172,12 @@ export const TOURNAMENTS: TournamentDef[] = [
   { name: "BG Survie Play-offs", game: "MR", state: "RUNNING", format: "BG_SURVIE", teamCount: 10, maxTeams: 16, daysOffset: -5, endurancePoints: 2, endurancePlayoffSize: 8, playWaves: 4, teamOffset: 21 },
   { name: "BG Survie Impaire + Forfait", game: "OW2", state: "RUNNING", format: "BG_SURVIE", teamCount: 11, maxTeams: 16, daysOffset: -4, endurancePoints: 3, endurancePlayoffSize: 8, playWaves: 2, forfeits: 1, teamOffset: 33 },
   { name: "BG Survie Terminée", game: "MR", state: "FINISHED", format: "BG_SURVIE", teamCount: 9, maxTeams: 16, daysOffset: -20, endurancePoints: 2, endurancePlayoffSize: 8, teamOffset: 45 },
+  // Plafond de manches : gros capital (personne ne tombe à zéro) et format de
+  // match connu, les deux conditions pour que la coupe mathématique se
+  // déclenche avant la dernière manche. Sans plafond, ce plateau tournerait
+  // indéfiniment sans jamais retomber à huit.
+  { name: "BG Survie Plafond Manches", game: "OW2", state: "RUNNING", format: "BG_SURVIE", teamCount: 20, maxTeams: 32, daysOffset: -3, endurancePoints: 20, endurancePlayoffSize: 8, enduranceMaxRounds: 4, playWaves: 2, matchFormat: { type: "FT", value: 3 }, teamOffset: 108 },
+  { name: "BG Survie Plafond Atteint", game: "MR", state: "FINISHED", format: "BG_SURVIE", teamCount: 16, maxTeams: 32, daysOffset: -18, endurancePoints: 20, endurancePlayoffSize: 8, enduranceMaxRounds: 3, matchFormat: { type: "FT", value: 3 }, teamOffset: 128 },
 
   // ---- RUNNING · coup d'envoi sans adversaires (clôture immédiate) ---------
   // Insérés « en cours » et sans le moindre match : le seed ne simule rien en

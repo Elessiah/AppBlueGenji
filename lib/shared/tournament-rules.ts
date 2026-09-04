@@ -205,7 +205,7 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
     principles: [
       "Chaque équipe démarre avec un capital d'endurance : une map gagnée le fait monter, une map perdue le fait descendre.",
       "Tomber à zéro élimine immédiatement — personne n'est éliminé par une coupe, seulement par ses propres résultats.",
-      "Quand il ne reste que huit équipes, la phase qualificative s'arrête et laisse place à un arbre à élimination directe.",
+      "Quand il ne reste que huit équipes — ou au bout du nombre de manches annoncé, si le tournoi en fixe un —, la phase qualificative s'arrête et laisse place à un arbre à élimination directe.",
     ],
     diagram: "BG_SURVIE",
     diagramCaption:
@@ -234,7 +234,14 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
       {
         title: "Fin de la phase qualificative",
         body: [
-          "La phase s'arrête dès qu'il ne reste plus que huit équipes (ou moins). Aucune durée maximale n'est imposée : c'est l'endurance qui fait le tri.",
+          "La phase s'arrête dès qu'il ne reste plus que huit équipes (ou moins). Sans autre réglage, aucune durée maximale n'est imposée : c'est l'endurance seule qui fait le tri.",
+          "Le tournoi peut cependant annoncer un **nombre maximal de manches**. La phase s'arrête alors à la manche dite, et les huit premières du classement sont qualifiées — même si elles étaient encore trente en lice. Les autres sortent avec le capital qu'il leur restait : elles ne sont pas « éliminées », elles sont **hors course**.",
+        ],
+        bullets: [
+          "Sous ce plafond, une équipe qui ne peut plus mathématiquement rejoindre les huit premières dans les manches restantes est écartée sans attendre la fin.",
+          "Le calcul est prudent : il faut que huit équipes la devancent quoi qu'il arrive, en supposant qu'elle gagne tout ce qui reste et qu'elles perdent tout ce qui reste.",
+          "Il suppose donc un format de match connu (BO/FT), qui borne le nombre de maps d'une manche. En saisie libre, aucune équipe n'est jamais écartée d'avance.",
+          "Si cette sortie devait laisser un nombre impair d'équipes en course, elle est reportée d'une manche : un effectif impair condamne une équipe au repos, et on ne pénalise pas une équipe en course pour sortir des équipes déjà condamnées.",
         ],
       },
       {

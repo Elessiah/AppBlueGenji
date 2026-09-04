@@ -45,6 +45,12 @@ export type TournamentFormValues = {
   enduranceWinDelta: number;
   enduranceLossDelta: number;
   endurancePlayoffSize: number;
+  /**
+   * Plafond de manches qualificatives, **0 valant « aucune limite »**. Le
+   * formulaire ne manipule que des nombres ; c'est `toApiPayload` qui traduit
+   * ce zéro en `null`, donc en `NULL` côté base.
+   */
+  enduranceMaxRounds: number;
   matchFormat: MatchFormat | null;
   phases: PhaseConfig[];
 };
@@ -77,6 +83,7 @@ export type TournamentApiValues = {
   enduranceWinDelta: number | null;
   enduranceLossDelta: number | null;
   endurancePlayoffSize: number | null;
+  enduranceMaxRounds: number | null;
   matchFormat: MatchFormat | null;
   phases: PhaseConfig[] | null;
 };
@@ -108,6 +115,9 @@ export function defaultTournamentFormValues(): TournamentFormValues {
     enduranceWinDelta: 1,
     enduranceLossDelta: 1,
     endurancePlayoffSize: 8,
+    // Aucun plafond de manches : la phase s'arrête sur l'effectif, comme elle
+    // l'a toujours fait.
+    enduranceMaxRounds: 0,
     // « Libre » (`null`) conserve la saisie de score sans contrainte, comme les
     // tournois créés avant la fonctionnalité.
     matchFormat: { ...DEFAULT_MATCH_FORMAT },
@@ -173,6 +183,16 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
     enduranceWinDelta: format === "BG_SURVIE" ? values.enduranceWinDelta : undefined,
     enduranceLossDelta: format === "BG_SURVIE" ? values.enduranceLossDelta : undefined,
     endurancePlayoffSize: format === "BG_SURVIE" ? values.endurancePlayoffSize : undefined,
+    // 0 n'est pas une valeur à enregistrer, c'est l'absence de plafond — et
+    // c'est `null` qui le dit, jamais `undefined` : la liste blanche de
+    // `PATCH .../edit` ne recopie que les champs dont `body[field] !==
+    // undefined`, et `updateTournament` fusionne le patch sur les valeurs
+    // courantes. Un champ omis vaut donc « on ne touche pas », si bien qu'un
+    // plafond une fois posé ne pourrait plus jamais être retiré. Hors du mode,
+    // en revanche, on ne touche effectivement à rien (comme le reste du barème
+    // d'endurance).
+    enduranceMaxRounds:
+      format === "BG_SURVIE" ? (values.enduranceMaxRounds > 0 ? values.enduranceMaxRounds : null) : undefined,
     matchFormatType: values.matchFormat?.type ?? null,
     matchFormatValue: values.matchFormat?.value ?? null,
   };
@@ -213,6 +233,8 @@ export function toFormValues(apiValues: TournamentApiValues): TournamentFormValu
     enduranceWinDelta: or(apiValues.enduranceWinDelta, defaults.enduranceWinDelta),
     enduranceLossDelta: or(apiValues.enduranceLossDelta, defaults.enduranceLossDelta),
     endurancePlayoffSize: or(apiValues.endurancePlayoffSize, defaults.endurancePlayoffSize),
+    // `null` en base = pas de plafond : le champ retombe sur 0, qui le dit.
+    enduranceMaxRounds: apiValues.enduranceMaxRounds ?? 0,
     matchFormat: apiValues.matchFormat,
     phases: apiValues.phases ?? defaults.phases,
   };

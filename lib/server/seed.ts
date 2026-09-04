@@ -1275,9 +1275,10 @@ async function createTournament(
     `INSERT INTO bg_tournaments
      (organizer_user_id, name, game, description, format, participant_type, has_third_place_match,
       survival_rounds_before_first_cut, survival_rounds_per_cut, swiss_total_rounds,
-      endurance_start_points, endurance_playoff_size, match_format_type, match_format_value,
+      endurance_start_points, endurance_playoff_size, endurance_max_rounds,
+      match_format_type, match_format_value,
       max_teams, state, start_visibility_at, registration_open_at, registration_close_at, start_at, finished_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       organizerId,
       `Test - ${def.name}`,
@@ -1293,6 +1294,7 @@ async function createTournament(
       swissTotalRounds,
       isEndurance ? def.endurancePoints ?? null : null,
       isEndurance ? def.endurancePlayoffSize ?? null : null,
+      isEndurance ? def.enduranceMaxRounds ?? null : null,
       matchFormat?.type ?? null,
       matchFormat?.value ?? null,
       def.maxTeams,

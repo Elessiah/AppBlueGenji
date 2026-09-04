@@ -75,6 +75,31 @@ describe("toApiPayload", () => {
     expect(toApiPayload({ ...values, format: "SINGLE" }).endurancePoints).toBeUndefined();
     expect(toApiPayload({ ...values, format: "BG_SURVIE" }).endurancePoints).toBeDefined();
   });
+
+  /**
+   * « Aucune limite » doit voyager comme `null`, jamais comme champ absent : la
+   * liste blanche de `PATCH .../edit` ignore les champs `undefined` et
+   * `updateTournament` fusionne le patch sur les valeurs courantes — un plafond
+   * une fois posé ne pourrait alors plus jamais être retiré.
+   */
+  it("envoie un plafond de manches absent comme null, pas comme champ omis", () => {
+    const payload = toApiPayload({ ...values, format: "BG_SURVIE", enduranceMaxRounds: 0 });
+    expect(payload.enduranceMaxRounds).toBeNull();
+    expect("enduranceMaxRounds" in payload).toBe(true);
+  });
+
+  it("envoie le plafond de manches quand il est fixé", () => {
+    expect(
+      toApiPayload({ ...values, format: "BG_SURVIE", enduranceMaxRounds: 6 }).enduranceMaxRounds,
+    ).toBe(6);
+  });
+
+  // Hors du mode, on ne touche à rien — comme le reste du barème d'endurance.
+  it("ne touche pas au plafond de manches hors BlueGenji Survie", () => {
+    expect(
+      toApiPayload({ ...values, format: "SINGLE", enduranceMaxRounds: 6 }).enduranceMaxRounds,
+    ).toBeUndefined();
+  });
 });
 
 describe("toFormValues", () => {

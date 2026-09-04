@@ -676,6 +676,10 @@ async function runMigrations(db: Pool): Promise<void> {
     ["endurance_win_delta", "INT NULL"],
     ["endurance_loss_delta", "INT NULL"],
     ["endurance_playoff_size", "INT NULL"],
+    // Plafond de manches qualificatives. NULL = aucun : la phase court jusqu'à
+    // ce que l'effectif retombe à `endurance_playoff_size`, comportement de
+    // tous les tournois créés avant ce réglage.
+    ["endurance_max_rounds", "INT NULL"],
     ["endurance_current_round", "INT NOT NULL DEFAULT 0"],
     // 1 dès que la phase éliminatoire a été générée : la phase qualificative
     // ne produit alors plus de manche.
@@ -697,7 +701,7 @@ async function runMigrations(db: Pool): Promise<void> {
       points INT NOT NULL DEFAULT 0,
       wins INT NOT NULL DEFAULT 0,
       losses INT NOT NULL DEFAULT 0,
-      status ENUM('ACTIVE', 'ELIMINATED', 'FORFEIT') NOT NULL DEFAULT 'ACTIVE',
+      status ENUM('ACTIVE', 'ELIMINATED', 'OUT_OF_CONTENTION', 'FORFEIT') NOT NULL DEFAULT 'ACTIVE',
       eliminated_round INT NULL,
       \`rank\` INT NOT NULL DEFAULT 0,
       PRIMARY KEY (tournament_id, team_id),
@@ -707,6 +711,20 @@ async function runMigrations(db: Pool): Promise<void> {
         REFERENCES bg_teams(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  // Migration: sortie « hors course » du classement d'endurance — une équipe
+  // qui garde du capital mais ne peut plus rejoindre les play-offs dans les
+  // manches restantes. Distincte d'`ELIMINATED`, qui dit un capital vidé : les
+  // deux sorties ne racontent pas la même chose et ne s'affichent pas pareil.
+  try {
+    await db.execute(`
+      ALTER TABLE bg_endurance_standings
+      MODIFY COLUMN status ENUM('ACTIVE', 'ELIMINATED', 'OUT_OF_CONTENTION', 'FORFEIT')
+        NOT NULL DEFAULT 'ACTIVE'
+    `);
+  } catch {
+    // Already done
+  }
 
   // Migration: format de match du tournoi (BO5, FT3…). Les deux colonnes vont
   // par paire : tant que l'une est NULL, la saisie des scores reste libre —
