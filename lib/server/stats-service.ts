@@ -340,19 +340,19 @@ function membershipOverlaps(memberships: Membership[], teamId: number, span: Spa
 }
 
 /**
- * Statistiques approfondies d'un joueur et son historique de tournois, cumulés
- * sur ses équipes successives.
+ * Retient, parmi les matchs et les inscriptions des équipes d'un joueur, ce qui
+ * lui revient — c'est ici que vivent les **fenêtres d'appartenance**.
+ *
+ * Extrait de `getPlayerEntityStats` pour que l'annuaire `/joueurs` en descende
+ * lui aussi (`loadPlayerRecords`) : la carte et la fiche ne peuvent donc plus
+ * annoncer deux bilans différents du même joueur.
  */
-export async function getPlayerEntityStats(userId: number): Promise<EntityStats> {
-  const db = await getDatabase();
-  const memberships = await loadMemberships(db, userId);
+function collectForPlayer(
+  memberships: Membership[],
+  matchRows: MatchStatRow[],
+  registrationRows: RegistrationStatRow[],
+): Collected {
   const teamIds = [...new Set(memberships.map((membership) => membership.teamId))];
-  if (teamIds.length === 0) return { stats: emptyDeepStats(), tournaments: [] };
-
-  const [matchRows, registrationRows] = await Promise.all([
-    loadMatchRows(db, teamIds),
-    loadRegistrationRows(db, teamIds),
-  ]);
 
   // Le crédit se décide **par tournoi**, jamais match par match : un joueur est
   // crédité d'une campagne entière ou d'aucune de ses rencontres.
@@ -403,10 +403,133 @@ export async function getPlayerEntityStats(userId: number): Promise<EntityStats>
     matches.push(toStatsMatch(row, side));
   }
 
-  return summarize({ matches, tournaments: [...tournaments.values()] });
+  return { matches, tournaments: [...tournaments.values()] };
+}
+
+/**
+ * Statistiques approfondies d'un joueur et son historique de tournois, cumulés
+ * sur ses équipes successives.
+ */
+export async function getPlayerEntityStats(userId: number): Promise<EntityStats> {
+  const db = await getDatabase();
+  const memberships = await loadMemberships(db, userId);
+  const teamIds = [...new Set(memberships.map((membership) => membership.teamId))];
+  if (teamIds.length === 0) return { stats: emptyDeepStats(), tournaments: [] };
+
+  const [matchRows, registrationRows] = await Promise.all([
+    loadMatchRows(db, teamIds),
+    loadRegistrationRows(db, teamIds),
+  ]);
+
+  return summarize(collectForPlayer(memberships, matchRows, registrationRows));
 }
 
 /** Raccourci quand seul l'agrégat est utile. */
 export async function getPlayerStats(userId: number): Promise<DeepStats> {
   return (await getPlayerEntityStats(userId)).stats;
+}
+
+/**
+ * Bilan résumé d'un joueur : ce que porte sa carte d'annuaire.
+ *
+ * Les trois nombres sont **ceux de sa fiche**, pris sur le même agrégat.
+ */
+export type PlayerRecord = {
+  wins: number;
+  losses: number;
+  /** Tournois disputés — une inscription à un tournoi pas encore lancé n'en est pas un. */
+  tournamentsPlayed: number;
+};
+
+type UserMembershipRow = MembershipRow & { user_id: number };
+
+/** Périodes d'appartenance de plusieurs joueurs, en une lecture. */
+async function loadMembershipsForUsers(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  userIds: number[],
+): Promise<Map<number, Membership[]>> {
+  const list = placeholders(userIds.length);
+  const [rows] = await db.execute<UserMembershipRow[]>(
+    // Le filtre vit **dans chaque branche** de l'union : posé au-dessus, il
+    // ferait scanner toutes les adhésions du site plutôt que d'attaquer
+    // l'index `user_id`. Comme dans `users-service`, les identifiants passent
+    // donc deux fois.
+    `SELECT user_id, team_id, joined_at, left_at
+     FROM bg_team_members
+     WHERE user_id IN (${list})
+     UNION ALL
+     SELECT solo_user_id AS user_id, id AS team_id, created_at AS joined_at, NULL AS left_at
+     FROM bg_teams
+     WHERE solo_user_id IN (${list})`,
+    [...userIds, ...userIds],
+  );
+
+  const byUser = new Map<number, Membership[]>();
+  for (const row of rows) {
+    const userId = Number(row.user_id);
+    const memberships = byUser.get(userId) ?? [];
+    memberships.push({
+      teamId: Number(row.team_id),
+      joinedAt: timestamp(row.joined_at) ?? 0,
+      leftAt: timestamp(row.left_at),
+    });
+    byUser.set(userId, memberships);
+  }
+  return byUser;
+}
+
+/**
+ * Bilans de plusieurs joueurs, en **trois requêtes** quel que soit leur nombre.
+ *
+ * L'annuaire `/joueurs` comptait ses victoires et ses défaites avec sa propre
+ * requête, et les trois divergences qu'elle portait se voyaient à l'œil nu en
+ * ouvrant la fiche : elle comptait les byes et les matchs fantômes (aucun
+ * filtre sur l'assiette partagée), lisait les défaites sur `loser_team_id` — que
+ * le moteur ne renseigne pas toujours —, et ignorait les fenêtres
+ * d'appartenance dont la fiche tient compte. Un chargeur unique règle les trois
+ * d'un coup : mêmes lignes, même crédit, même agrégat.
+ *
+ * Le coût reste borné : trois lectures pour toute la page, là où la fiche en
+ * fait deux pour un seul joueur. Le découpage par joueur se fait ensuite en
+ * mémoire, sur des listes déjà chargées.
+ */
+export async function loadPlayerRecords(userIds: number[]): Promise<Map<number, PlayerRecord>> {
+  const records = new Map<number, PlayerRecord>();
+  if (userIds.length === 0) return records;
+
+  const db = await getDatabase();
+  const membershipsByUser = await loadMembershipsForUsers(db, userIds);
+  const teamIds = [
+    ...new Set(
+      [...membershipsByUser.values()].flatMap((memberships) =>
+        memberships.map((membership) => membership.teamId),
+      ),
+    ),
+  ];
+  if (teamIds.length === 0) return records;
+
+  const [matchRows, registrationRows] = await Promise.all([
+    loadMatchRows(db, teamIds),
+    loadRegistrationRows(db, teamIds),
+  ]);
+
+  for (const [userId, memberships] of membershipsByUser) {
+    const own = new Set(memberships.map((membership) => membership.teamId));
+    const { stats } = summarize(
+      collectForPlayer(
+        memberships,
+        matchRows.filter(
+          (row) => own.has(Number(row.team1_id)) || own.has(Number(row.team2_id)),
+        ),
+        registrationRows.filter((row) => own.has(Number(row.team_id))),
+      ),
+    );
+    records.set(userId, {
+      wins: stats.matchesWon,
+      losses: stats.matchesLost,
+      tournamentsPlayed: stats.tournamentsPlayed,
+    });
+  }
+
+  return records;
 }

@@ -185,7 +185,7 @@
   border: 1px solid var(--line-strong-cy);
 }
 
-.avatarChip span {
+.avatarChip .chipName {
   font-size: 12px;
   font-weight: 500;
   color: var(--ink);

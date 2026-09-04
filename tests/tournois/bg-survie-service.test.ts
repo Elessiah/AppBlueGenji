@@ -45,14 +45,39 @@ function standingRow(teamId: number, overrides: Row = {}): Row {
 }
 
 /** Connexion mockée dont chaque `execute` renvoie la valeur programmée. */
-function makeConn(results: unknown[]) {
-  const execute = jest.fn();
-  for (const result of results) execute.mockResolvedValueOnce(result as never);
-  execute.mockResolvedValue([[]] as never);
+function makeConn(results: unknown[], overrides: [string, unknown][] = []) {
+  const queue = [...results];
+
+  // Les réponses reconnues **par leur SQL** passent avant la file positionnelle,
+  // et n'y consomment donc pas de rang : c'est ce qui permet à un cas de
+  // répondre à une requête d'entretien (achèvement de la manche) sans avoir à
+  // recompter tous les `INSERT` du classement qui la précèdent.
+  const execute = jest.fn(async (sql: unknown) => {
+    const query = String(sql);
+    const override = overrides.find(([needle]) => query.includes(needle));
+    if (override) return override[1];
+    return queue.length > 0 ? queue.shift() : [[]];
+  });
+
   return { execute } as never as Parameters<typeof generateEnduranceRound>[1] & {
     execute: jest.Mock;
   };
 }
+
+/**
+ * Manche courante **jouée**, pour les cas dont le scénario la suppose terminée.
+ *
+ * `reconcileEndurance` ne décide plus rien au milieu d'une manche : la bascule
+ * en play-offs, comme l'appariement de la suivante, passe par `roundIsComplete`.
+ * Un plateau dont toutes les rencontres sont `COMPLETED` dans l'historique doit
+ * donc le dire aussi aux deux requêtes d'entretien — elle porte des saisies
+ * (`roundHasScoreInput`, ce qui écarte le réappariement d'une manche périmée)
+ * et elle est complète.
+ */
+const ROUND_PLAYED: [string, unknown][] = [
+  ["SELECT COUNT(*) AS c FROM bg_matches", [[{ c: 2 }]]],
+  ["SELECT COUNT(*) AS total", [[{ total: 2, done: 2 }]]],
+];
 
 describe("initializeEnduranceTournament", () => {
   beforeEach(() => jest.clearAllMocks());
@@ -517,7 +542,9 @@ describe("reconcileEndurance — plafond de manches", () => {
 
   it("enchaîne sur les play-offs dès le plafond atteint", async () => {
     (createMatch as jest.Mock).mockResolvedValue(77 as never);
-    const conn = makeConn(cappedState());
+    // Les deux rencontres de la manche 2 sont jouées : la bascule attend
+    // l'achèvement de la manche, elle doit donc pouvoir le constater.
+    const conn = makeConn(cappedState(), ROUND_PLAYED);
 
     await reconcileEndurance(5, conn);
 

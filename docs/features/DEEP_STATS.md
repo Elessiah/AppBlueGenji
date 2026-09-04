@@ -141,6 +141,32 @@ Trois conséquences voulues :
 - un match opposant deux de ses équipes n'est compté qu'une fois, sinon il
   ajouterait à la fois une victoire et une défaite.
 
+### La carte d'annuaire descend du même chargeur
+
+`/joueurs` comptait ses victoires et ses défaites avec **sa propre requête**, et
+les trois divergences qu'elle portait se voyaient à l'œil nu en ouvrant la
+fiche du même joueur :
+
+- elle comptait les byes et les matchs fantômes (aucun filtre sur l'assiette
+  partagée `PLAYED_MATCH_SQL`) ;
+- elle lisait les défaites sur `loser_team_id`, que le moteur ne renseigne pas
+  toujours ;
+- elle ignorait les fenêtres d'appartenance ci-dessus, et comptait comme
+  « tournois » de simples inscriptions à des tournois pas encore lancés.
+
+Un barème partagé n'aurait pas suffi — c'est la leçon déjà tirée pour les points
+d'équipe (`TEAM_RANKING_POINTS.md`) : posé sur deux assiettes différentes, il
+rend encore deux nombres. `loadPlayerRecords` est donc **le** chargeur de bilan
+joueur : mêmes lignes, même crédit, même agrégat (`computeDeepStats`) que la
+fiche. La carte ne peut plus contredire la fiche parce qu'elle n'a plus de
+calcul à elle.
+
+Le coût reste borné : **trois requêtes pour toute la page**, quel que soit le
+nombre de joueurs listés — les appartenances de tous, puis les matchs et les
+inscriptions de leurs équipes. Le découpage par joueur se fait ensuite en
+mémoire, sur des listes déjà chargées. C'est `collectForPlayer`, extrait de
+`getPlayerEntityStats`, qui garantit l'identité du crédit.
+
 ## Classement du site
 
 `getTeamRankingPosition` (`lib/server/ranking-service.ts`) situe l'équipe dans le
@@ -182,3 +208,6 @@ joueur n'a aucune équipe.
   répartitions, adversaires, fenêtre d'activité, palmarès, formatage.
 - `tests/lib/server/stats-service.test.ts` — collecte : filtres SQL, côté du
   tableau, forfaits, fenêtres d'appartenance, dédoublonnage.
+- `tests/lib/server/player-records.test.ts` — le chargeur de l'annuaire : mêmes
+  nombres que la fiche, byes et matchs fantômes exclus, fenêtres d'appartenance
+  respectées, trois requêtes quel que soit l'effectif.

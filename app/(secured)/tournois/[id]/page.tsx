@@ -543,7 +543,11 @@ export default function TournamentDetailPage() {
                   onOpenAdminModal={openAdminScore}
                   allMatches={detail.matches}
                   roundNumber={match.roundNumber}
-                  format="SURVIVAL"
+                  // Le format du tournoi, pas « SURVIVAL » en dur : les deux
+                  // modes tombent aujourd'hui dans la même branche de
+                  // `dependentMatches`, mais un verrou de score se lirait faux
+                  // le jour où ils divergeraient.
+                  format={detail.card.format}
                 />
               )}
             />

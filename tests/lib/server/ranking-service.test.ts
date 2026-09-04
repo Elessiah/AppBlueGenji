@@ -262,6 +262,26 @@ describe("loadTeamRanking", () => {
     expect(rows[0].wins).toBe(1);
   });
 
+  // Une équipe dissoute ne figure plus à l'annuaire `/equipes` : lui garder un
+  // rang faisait annoncer un total d'équipes classées que la liste ne montre
+  // pas, et le leaderboard pouvait afficher une équipe qui n'existe plus.
+  it("exclut les équipes dissoutes de la liste, mais pas du rejeu", async () => {
+    const execute = await mockDb(
+      fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1, "Alpha")]),
+    );
+
+    const rows = await loadTeamRanking();
+
+    const teamSql = execute.mock.calls
+      .map((call) => String(call[0]))
+      .find((sql) => sql.includes("FROM bg_teams"))!;
+    expect(teamSql).toContain("deleted_at IS NULL");
+    // La rencontre a bien été rejouée : la cote d'Alpha porte sa victoire sur
+    // une équipe que la liste ne montre plus.
+    expect(rows).toHaveLength(1);
+    expect(rows[0].points).toBeGreaterThan(RANKING_BASE_POINTS);
+  });
+
   it("reporte le logo de chaque équipe", async () => {
     await mockDb(fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1, "Alpha", "/logo.webp"), teamRow(2)]));
 
@@ -307,6 +327,22 @@ describe("getTeamRankingPosition", () => {
       total: 2,
       points: RANKING_BASE_POINTS,
     });
+  });
+
+  // Une équipe hors liste qui a **joué** garde sa cote rejouée. Sans cela, la
+  // fiche d'une dissoute affichait 500 à côté d'un bilan de vingt matchs : deux
+  // nombres de la même page qui se contredisent, exactement ce que ce
+  // classement existe pour éviter.
+  it("rend la cote rejouée d'une équipe hors liste, pas la cote de départ", async () => {
+    // L'équipe 2 a joué (et perdu) mais n'est pas dans la liste des identités :
+    // c'est ce que produit une dissolution, comme une entrée solo.
+    await mockDb(fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1)]));
+
+    const ranking = await getTeamRankingPosition(2);
+
+    expect(ranking.position).toBeNull();
+    expect(ranking.total).toBe(1);
+    expect(ranking.points).toBeLessThan(RANKING_BASE_POINTS);
   });
 });
 

@@ -205,11 +205,14 @@ les listes de la même façon.
 
 ### Étranglement de la synchronisation d'états
 
-`syncVisibleTournaments()` ouvre une transaction et repasse sur **tous** les
-tournois non terminés. Son étranglement passe de **1 s à 15 s** : à une seconde,
-une poignée de visiteurs suffisait à la faire tourner en continu. L'affichage ne
-l'attend plus (points 3 et 5 ci-dessus), et la page d'un tournoi déclenche
-désormais sa propre bascule à la lecture.
+`syncVisibleTournaments()` entretient les tournois **qui ont quelque chose à
+faire**, une transaction par tournoi (voir `TOURNAMENT_SYNC_SCOPE.md` : la passe
+repassait auparavant sur tous les tournois non terminés, dans une transaction
+unique, et une base de démonstration lui faisait dépasser les cinq minutes). Son
+étranglement passe de **1 s à 15 s** : à une seconde, une poignée de visiteurs
+suffisait à la faire tourner en continu. L'affichage ne l'attend plus (points 3
+et 5 ci-dessus), et la page d'un tournoi déclenche désormais sa propre bascule à
+la lecture.
 
 Elle est appelée **hors** du chargeur mis en cache — dedans, les événements
 qu'elle publie invalideraient la liste qu'elle vient de rendre correcte — et son

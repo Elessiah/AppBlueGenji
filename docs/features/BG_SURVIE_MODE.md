@@ -144,6 +144,33 @@ donc que les équipes **encore en lice** — `assignRanks` rangeant les sorties
 juste après les actives, une tranche des `playoffSize` premières compléterait
 sinon l'arbre avec des éliminées à 0 point.
 
+### La bascule attend la fin de la manche
+
+`reconcileEndurance` ne décide **rien au milieu d'une manche**. Le contrôle
+d'achèvement (`roundIsComplete`) précède aussi bien la bascule en play-offs que
+l'appariement de la manche suivante.
+
+Il le précédait pour la seconde, pas pour la première, et l'ordre importait : un
+seul score reporté peut faire tomber l'effectif actif sur
+`endurance_playoff_size` alors que les autres rencontres de la manche sont
+encore `READY`. L'arbre partait alors sur-le-champ, et ces matchs restaient
+ouverts à jamais — `reconcileEndurance` repartant ensuite par la branche
+`playoffsStarted`, plus rien ne les regardait.
+
+Le retrait d'une équipe ne bloque pas cette attente : `forfeitEnduranceTeam`
+clôt la rencontre en cours de l'équipe partie avant de réconcilier, précisément
+pour que la manche puisse se terminer.
+
+Une **manche périmée** — posée mais jamais jouée, dont une correction de score en
+amont a réécrit les appariements — est défaite, comme en Survie et en Ronde
+suisse. Elle ne fait pas sortir pour autant : elle n'a jamais été jouée, la
+décision qui suit est donc celle d'après une manche terminée, prise sur la
+manche précédente. La défaire puis sortir laissait le tournoi **sans manche et
+sans arbre** dès que la correction achevait la qualification
+(`generateEnduranceRound` sortant alors sur `qualificationComplete` sans rien
+créer) — et rien ne l'aurait repris, `reconcileEndurance` n'étant atteignable
+que depuis un report de score alors qu'il ne restait plus un match à jouer.
+
 ## Classement de départ
 
 Il n'est **pas** calculé depuis le classement du site : il vient de l'ordre de
@@ -315,6 +342,9 @@ qui fasse avancer l'arbre.
 - `tests/tournois/bg-survie-forfeit.test.ts` — les deux forfaits : score plein
   écrit sur un forfait ponctuel, cases « FF » du tableau, bilan de maps des
   fiches.
+- `tests/tournois/bg-survie-playoff-timing.test.ts` — la bascule en play-offs
+  attend la fin de la manche, l'abandon ne la bloque pas, et une manche périmée
+  défaite ouvre l'arbre au lieu d'immobiliser le tournoi.
 
 ## Interactions avec le reste du moteur
 

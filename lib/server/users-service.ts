@@ -5,7 +5,7 @@ import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
 import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
 import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
-import { getPlayerEntityStats } from "@/lib/server/stats-service";
+import { getPlayerEntityStats, loadPlayerRecords } from "@/lib/server/stats-service";
 import type {
   FullProfileResponse,
   PersonalDataExport,
@@ -13,31 +13,6 @@ import type {
   TeamRole,
   UserTeamTimeline,
 } from "@/lib/shared/types";
-
-/**
- * Engagements d'un joueur en tournoi : ses équipes (passées et présentes) et
- * son entrée solo, s'il en a une (tournois individuels — voir
- * `lib/server/solo-entries-service.ts`). Un tournoi joué en individuel compte
- * donc dans son palmarès au même titre qu'un tournoi joué en équipe.
- *
- * Le filtre sur les joueurs est appliqué **dans chaque branche** de l'union :
- * une table dérivée n'a pas d'index, et filtrer à l'extérieur ferait scanner
- * toute la table d'adhésions à chaque affichage de `/joueurs` ou de profil.
- * L'appelant doit donc passer la liste d'identifiants **deux fois**.
- *
- * @param placeholders liste de `?` séparés par des virgules (un par joueur).
- */
-function userEntriesSql(placeholders: string): string {
-  return `(
-       SELECT user_id, team_id, left_at
-       FROM bg_team_members
-       WHERE user_id IN (${placeholders})
-       UNION ALL
-       SELECT solo_user_id AS user_id, id AS team_id, NULL AS left_at
-       FROM bg_teams
-       WHERE solo_user_id IN (${placeholders})
-     )`;
-}
 
 export type GoogleProfilePayload = {
   sub: string;
@@ -212,53 +187,23 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
 
   const membershipByUserId = new Map(teamMemberships.map((m) => [m.user_id, m]));
 
-  // Get tournament counts per user
-  const [tournamentsData] = await db.execute<
-    (RowDataPacket & {
-      user_id: number;
-      tournament_count: number;
-    })[]
-  >(
-    `SELECT tm.user_id, COUNT(DISTINCT tr.tournament_id) AS tournament_count
-     FROM ${userEntriesSql(userIds.map(() => "?").join(","))} tm
-     JOIN bg_tournament_registrations tr ON tr.team_id = tm.team_id
-     GROUP BY tm.user_id`,
-    [...userIds, ...userIds],
-  );
-
-  const tournamentsCountByUserId = new Map(
-    tournamentsData.map((t) => [t.user_id, Number(t.tournament_count)]),
-  );
-
-  // Get wins/losses per user (simplified: from their current team)
-  const [winsLossesData] = await db.execute<
-    (RowDataPacket & {
-      user_id: number;
-      wins: number;
-      losses: number;
-    })[]
-  >(
-    `SELECT tm.user_id,
-            COALESCE(SUM(CASE WHEN m.winner_team_id = tm.team_id THEN 1 ELSE 0 END), 0) AS wins,
-            COALESCE(SUM(CASE WHEN m.loser_team_id = tm.team_id THEN 1 ELSE 0 END), 0) AS losses
-     FROM ${userEntriesSql(userIds.map(() => "?").join(","))} tm
-     LEFT JOIN bg_tournament_registrations tr ON tr.team_id = tm.team_id
-     LEFT JOIN bg_matches m ON m.tournament_id = tr.tournament_id
-       AND (m.winner_team_id = tm.team_id OR m.loser_team_id = tm.team_id)
-     WHERE tm.left_at IS NULL
-     GROUP BY tm.user_id`,
-    [...userIds, ...userIds],
-  );
-
-  const winsLossesByUserId = new Map(
-    winsLossesData.map((wl) => [wl.user_id, { wins: Number(wl.wins), losses: Number(wl.losses) }]),
-  );
+  // Tournois disputés et bilan de matchs : **le même chargeur que la fiche**
+  // (`loadPlayerRecords`). Les deux requêtes d'agrégation qui vivaient ici
+  // rendaient trois nombres que la fiche contredisait — byes et matchs fantômes
+  // comptés, défaites lues sur `loser_team_id` (que le moteur ne renseigne pas
+  // toujours), fenêtres d'appartenance ignorées. Un seul chargeur, donc un seul
+  // bilan par joueur, quelle que soit la page qui l'affiche.
+  const recordsByUserId = await loadPlayerRecords(userIds);
 
   return baseUsers.map((user) => {
     const membership = membershipByUserId.get(user.id);
     const games = gamesByUserId.get(user.id) ?? [];
 
-    const wl = winsLossesByUserId.get(user.id) ?? { wins: 0, losses: 0 };
+    const record = recordsByUserId.get(user.id) ?? {
+      wins: 0,
+      losses: 0,
+      tournamentsPlayed: 0,
+    };
 
     return {
       ...user,
@@ -271,9 +216,9 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
         : null,
       roles: membership ? parseRoles(membership.roles_json) : [],
       games,
-      tournamentsCount: tournamentsCountByUserId.get(user.id) ?? 0,
-      wins: wl.wins,
-      losses: wl.losses,
+      tournamentsCount: record.tournamentsPlayed,
+      wins: record.wins,
+      losses: record.losses,
     };
   });
 }

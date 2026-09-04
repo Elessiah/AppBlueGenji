@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { CyberCard, Pill } from "@/components/cyber";
+import { EmphasisText } from "@/components/rules/EmphasisText";
 import {
   COMMON_RULES,
   availableRuleModes,
@@ -126,13 +127,15 @@ export default function ReglesPage() {
               <h3 className={styles.commonTitle}>{rule.title}</h3>
               {rule.body.map((paragraph) => (
                 <p key={paragraph} className={styles.commonBody}>
-                  {paragraph}
+                  <EmphasisText text={paragraph} />
                 </p>
               ))}
               {rule.bullets && (
                 <ul className={styles.bullets}>
                   {rule.bullets.map((bullet) => (
-                    <li key={bullet}>{bullet}</li>
+                    <li key={bullet}>
+                      <EmphasisText text={bullet} />
+                    </li>
                   ))}
                 </ul>
               )}

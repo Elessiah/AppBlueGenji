@@ -374,15 +374,6 @@ export async function reconcileEndurance(
   }
 
   const active = replayed.filter((standing) => standing.status === "ACTIVE");
-
-  // Le plafond de manches n'a pas de branche à lui : le rejeu écarte lui-même
-  // les non-qualifiées à la dernière manche, si bien que l'effectif retombe à
-  // `playoffSize` et que la bascule ci-dessous se déclenche comme d'habitude.
-  if (qualificationComplete(active.length, config)) {
-    await startEndurancePlayoffs(tournamentId, conn);
-    return;
-  }
-
   const currentRound = Number(tournament.endurance_current_round);
 
   // Une correction de score en amont réécrit le classement : la manche courante,
@@ -390,6 +381,15 @@ export async function reconcileEndurance(
   // périmés (voire une équipe éliminée entre-temps). On la défait pour la
   // reformer depuis le classement rejoué — c'est ce que font déjà la Survie et
   // la Ronde suisse.
+  //
+  // Une manche défaite n'est pas « une manche en cours » : elle n'a jamais été
+  // jouée. On repart donc de la précédente, et la décision qui suit est la même
+  // que si l'on venait d'en terminer une. La défaire puis **sortir** laissait le
+  // tournoi sans manche et sans arbre dès que la correction achevait la
+  // qualification — `generateEnduranceRound` sort alors sur
+  // `qualificationComplete` sans rien créer, et plus rien n'aurait repris le
+  // tournoi, faute d'un match sur lequel reporter un score.
+  let effectiveRound = currentRound;
   if (currentRound > 0 && !(await roundHasScoreInput(conn, tournamentId, currentRound))) {
     if (await roundPairingsAreStale(conn, tournamentId, currentRound, replayed)) {
       await conn.execute(
@@ -400,15 +400,28 @@ export async function reconcileEndurance(
         currentRound - 1,
         tournamentId,
       ]);
-      await generateEnduranceRound(tournamentId, conn);
-      return;
+      effectiveRound = currentRound - 1;
     }
   }
 
-  // Manche courante terminée → on apparie la suivante.
-  if (await roundIsComplete(conn, tournamentId, currentRound)) {
-    await generateEnduranceRound(tournamentId, conn);
+  // Rien ne se décide **au milieu d'une manche**. Un seul score reporté peut
+  // faire tomber l'effectif actif sur la cible des play-offs alors que les
+  // autres rencontres de la manche sont encore `READY` : bascule immédiate, et
+  // ces matchs restaient ouverts à jamais — `reconcileEndurance` repartant
+  // ensuite par la branche `playoffsStarted`, plus rien ne les regardait. La
+  // manche entière est donc jouée avant qu'on lise son classement, que ce soit
+  // pour clore la qualification ou pour apparier la suivante.
+  if (!(await roundIsComplete(conn, tournamentId, effectiveRound))) return;
+
+  // Le plafond de manches n'a pas de branche à lui : le rejeu écarte lui-même
+  // les non-qualifiées à la dernière manche, si bien que l'effectif retombe à
+  // `playoffSize` et que la bascule ci-dessous se déclenche comme d'habitude.
+  if (qualificationComplete(active.length, config)) {
+    await startEndurancePlayoffs(tournamentId, conn);
+    return;
   }
+
+  await generateEnduranceRound(tournamentId, conn);
 }
 
 /** Un match de la manche porte-t-il déjà une saisie ? */

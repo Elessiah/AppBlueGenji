@@ -157,22 +157,42 @@ import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
 import { getTournamentPreview } from "./preview-cache";
 import { dispatchDueMatchReminders } from "./match-reminders";
+import { findTournamentsNeedingSync } from "./sync-scope";
 
 let pendingSync: Promise<void> | null = null;
 let lastSyncAt = 0;
 /**
  * Étranglement de la synchronisation d'états.
  *
- * Chaque passe ouvre une transaction et repasse sur **tous** les tournois non
- * terminés (plateau manquant, byes, reports expirés, finalisation) : à une
- * seconde d'intervalle, une poignée de visiteurs suffisait à la faire tourner
- * en continu. Quinze secondes suffisent largement — l'affichage, lui, ne
- * l'attend plus : le client fait basculer l'état à l'heure exacte tout seul
+ * Chaque passe entretient les tournois qui ont quelque chose à faire (plateau
+ * manquant, byes, reports expirés, finalisation) : à une seconde d'intervalle,
+ * une poignée de visiteurs suffisait à la faire tourner en continu. Quinze
+ * secondes suffisent largement — l'affichage, lui, ne l'attend plus : le client
+ * fait basculer l'état à l'heure exacte tout seul
  * (`lib/shared/tournament-state.ts`), et la page d'un tournoi déclenche sa
  * propre bascule à la lecture (`./snapshot`).
  */
 const SYNC_THROTTLE_MS = 15_000;
 
+/**
+ * Entretien de fond des tournois.
+ *
+ * Deux principes, tirés d'une passe qui prenait des minutes sur une base de
+ * démonstration et tenait derrière elle toute écriture sur `bg_tournaments` :
+ *
+ * 1. **On ne visite que ce qui a quelque chose à faire.** `findTournamentsNeedingSync`
+ *    (`./sync-scope`) réduit la passe aux tournois dont un jalon de calendrier
+ *    est franchi ou dont une tâche d'entretien est réellement due. Un plateau
+ *    en cours, sans bye ni report expiré, ne coûte plus rien.
+ * 2. **Une transaction par tournoi.** L'ancienne passe n'en ouvrait qu'une, pour
+ *    tous : sa durée était la somme des entretiens, et un verrou de plusieurs
+ *    minutes en découlait. Les tournois sont indépendants — le découpage ne
+ *    perd aucune garantie, et il borne le verrou à un seul d'entre eux.
+ *
+ * L'échec d'un tournoi n'emporte donc pas les suivants : sa transaction est
+ * défaite, ses lignes de journal jetées, et la passe continue. L'entretien est
+ * de toute façon idempotent, le prochain balayage le retrouvera.
+ */
 async function syncVisibleTournaments(): Promise<void> {
   if (pendingSync) return pendingSync;
   if (Date.now() - lastSyncAt < SYNC_THROTTLE_MS) return;
@@ -183,24 +203,24 @@ async function syncVisibleTournaments(): Promise<void> {
     const changedIds: number[] = [];
 
     try {
-      await connection.beginTransaction();
+      // Hors transaction : c'est une lecture de repérage, et l'ouvrir dans une
+      // transaction rendrait à la première la durée qu'on vient de lui retirer.
+      const candidates = await findTournamentsNeedingSync(connection);
 
-      const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
-        `SELECT id FROM bg_tournaments WHERE state <> 'FINISHED'`,
-      );
-
-      for (const row of rows) {
-        const { stateChanged } = await syncTournamentState(connection, Number(row.id));
-        if (stateChanged) changedIds.push(Number(row.id));
+      for (const tournamentId of candidates) {
+        try {
+          await connection.beginTransaction();
+          const { stateChanged } = await syncTournamentState(connection, tournamentId);
+          await connection.commit();
+          flushBotLogs(connection);
+          if (stateChanged) changedIds.push(tournamentId);
+        } catch {
+          await connection.rollback().catch(() => undefined);
+        } finally {
+          discardBotLogs(connection);
+        }
       }
-
-      await connection.commit();
-      flushBotLogs(connection);
-    } catch (error) {
-      await connection.rollback();
-      throw error;
     } finally {
-      discardBotLogs(connection);
       connection.release();
     }
 
