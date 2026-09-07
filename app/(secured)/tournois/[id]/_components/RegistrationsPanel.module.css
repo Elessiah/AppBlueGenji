@@ -110,15 +110,6 @@
   color: var(--blue-200, var(--accent-blue));
 }
 
-/* Le survol reste une information utile, mais les fondus ne le sont plus dès
-   que la personne a demandé moins de mouvement. */
-@media (prefers-reduced-motion: reduce) {
-  .grip,
-  .arrow {
-    transition: none;
-  }
-}
-
 .row:first-child {
   border-top: none;
 }
@@ -241,5 +232,22 @@
   /* Une seule colonne : l'intitulé « Ordre » n'a plus de colonne à coiffer. */
   .actionsHead {
     display: none;
+  }
+}
+
+/*
+ * Le survol reste une information utile, mais les fondus ne le sont plus dès
+ * que la personne a demandé moins de mouvement.
+ *
+ * En **fin** de feuille, et pas à côté des règles qu'il annule : une media
+ * query n'ajoute aucune spécificité, donc `@media … { .arrow { … } }` pèse
+ * autant qu'un simple `.arrow` — placé avant lui, il ne s'appliquerait jamais.
+ * C'est le chemin du clavier qui en dépend : la personne qui a demandé moins
+ * de mouvement n'utilisera pas le glissement, elle utilisera les flèches.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .grip,
+  .arrow {
+    transition: none;
   }
 }

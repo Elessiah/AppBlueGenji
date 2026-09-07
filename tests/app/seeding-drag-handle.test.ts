@@ -98,6 +98,23 @@ describe("Feuille de la liste des inscrites", () => {
     expect(grabbing![1]).toMatch(/cursor:\s*grabbing/);
   });
 
+  it("annule bien les fondus sous `prefers-reduced-motion`, flèches comprises", () => {
+    // Une media query n'ajoute **aucune** spécificité : `@media … { .arrow }`
+    // pèse autant qu'un simple `.arrow`, et perd s'il est déclaré avant lui.
+    // Que la règle existe ne prouve donc rien — il faut qu'elle vienne après
+    // toutes celles qu'elle annule.
+    const body = stripComments(css);
+    const reduced = body.indexOf("prefers-reduced-motion");
+    expect(reduced).toBeGreaterThan(-1);
+    for (const selector of [".grip", ".arrow"]) {
+      // Dernière déclaration de la règle nommée, hors media query.
+      const last = body.lastIndexOf(`
+${selector} {`);
+      expect(last).toBeGreaterThan(-1);
+      expect(reduced).toBeGreaterThan(last);
+    }
+  });
+
   it("compte autant de colonnes que l'en-tête a de cellules quand on réordonne", () => {
     const columns = /grid-template-columns:([^;]*);/
       .exec(ruleBody(css, ".reorderable"))![1]

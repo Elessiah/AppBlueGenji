@@ -5,3 +5,4 @@
 #
 # Ajouter à la fin. Vérifier l'absence de doublon avant d'ajouter.
 # Retirer l'entrée dans le commit qui règle l'erreur.
+- [2026-09-07] lib/server/database.ts:245 (runMigrations, ALTER TABLE bg_tournaments ADD COLUMN game) — après ~20 min de `next dev`, toute page protégée tombe en « Application error » avec ER_LOCK_DEADLOCK ; l'échec est définitif (la promesse mémorisée par `ensureMigrations` reste rejetée, chaque requête suivante rejoue le même échec) et seul un redémarrage du serveur débloque — les migrations sont rejouées à chaque démarrage, sans verrou d'exclusion inter-processus ni reprise après un ER_LOCK_DEADLOCK, or MySQL déclare un interblocage entre deux ALTER TABLE concurrents sur la même table ; pistes : mémoriser la promesse seulement en cas de succès, et prendre un GET_LOCK() nommé autour de `runMigrations` — (rencontré sur : feature/seeding-drag-and-drop, PR #95)
