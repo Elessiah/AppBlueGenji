@@ -215,13 +215,20 @@ export function FormatSettings({
                 step={values.endurancePlayoffFormat.type === "BO" ? 2 : 1}
                 disabled={locked("endurancePlayoffFormat")}
                 value={values.endurancePlayoffFormat.value}
-                onChange={(e) =>
-                  values.endurancePlayoffFormat &&
-                  set("endurancePlayoffFormat", {
-                    type: values.endurancePlayoffFormat.type,
-                    value: Number(e.target.value),
-                  })
-                }
+                onChange={(e) => {
+                  if (!values.endurancePlayoffFormat) return;
+                  // Un champ vidé rend `0`, que le `?? null` de `toApiPayload`
+                  // ne rattrape pas : il partait au serveur et revenait en
+                  // `INVALID_ENDURANCE_PLAYOFF_FORMAT` brut dans un toast, là où
+                  // le format principal est intercepté avant l'aller-retour.
+                  const type = values.endurancePlayoffFormat.type;
+                  const bounds = MATCH_FORMAT_BOUNDS[type];
+                  const raw = Number(e.target.value);
+                  const value = Number.isInteger(raw)
+                    ? Math.min(Math.max(raw, bounds.min), bounds.max)
+                    : values.endurancePlayoffFormat.value;
+                  set("endurancePlayoffFormat", { type, value });
+                }}
                 {...lockedAttr("endurancePlayoffFormat")}
               />
               <p style={HINT}>{matchFormatDescription(values.endurancePlayoffFormat)}</p>

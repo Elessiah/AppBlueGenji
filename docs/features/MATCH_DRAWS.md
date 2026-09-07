@@ -65,6 +65,14 @@ aucun objectif à opposer.
 
 ## Un mode, deux formats
 
+L'en-tête de la fiche le dit aussi : dès qu'un format de play-offs est réglé,
+elle affiche **deux** cases et la première se renomme « Format des
+qualifications ». Une case unique aurait affirmé du tournoi entier ce qui n'est
+vrai que de sa première phase — une équipe préparant sa demi-finale y aurait lu
+le plafond de maps de la qualification, et l'infobulle lui aurait promis une
+égalité impossible.
+
+
 « BlueGenji Survie » est le seul mode du projet à jouer deux formats de match :
 
 - **qualification** — le format du tournoi, égalités éventuellement ouvertes ;

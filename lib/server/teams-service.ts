@@ -135,15 +135,17 @@ export async function listTeams(): Promise<TeamListItem[]> {
   );
 
   // Forme : les dix derniers résultats de chaque équipe, le plus récent en
-  // tête. Le **nul** a sa lettre : sans elle, un match sans vainqueur tombait
-  // dans la branche `ELSE` et s'affichait en défaite rouge sur la carte, quand
-  // la fiche de la même équipe l'annonçait « N » — deux écrans se contredisant
-  // sur la même rencontre (`lib/shared/match-format.ts`). Même assiette de matchs que le bilan (`playedMatchSql`) et même
+  // tête. Même assiette de matchs que le bilan (`playedMatchSql`) et même
   // chronologie que les fiches (`updated_at`, à défaut les dates du tournoi) :
   // la barre de forme de la carte est le début de celle de la fiche, pas une
   // autre lecture des mêmes matchs. Le découpage par équipe se fait en SQL, ce
   // qui évite aussi de ne servir que les 1000 derniers matchs du site — au-delà,
   // les équipes les moins actives n'avaient plus de forme du tout.
+  //
+  // Le **nul** a sa lettre, et c'est cette assiette partagée qui l'y oblige :
+  // depuis qu'elle admet les matchs sans vainqueur, un `CASE … ELSE 'l'` les
+  // rangeait en défaites, si bien que la carte affichait une case rouge là où la
+  // fiche de la même équipe annonçait « N ».
   const [formRows] = await db.execute<
     (RowDataPacket & { team_id: number; result: "w" | "l" | "d" })[]
   >(
