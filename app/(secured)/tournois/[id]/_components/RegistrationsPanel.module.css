@@ -40,13 +40,16 @@
   align-items: center;
   justify-content: center;
   width: 22px;
-  height: 28px;
+  /* Toute la hauteur de la ligne : viser six points de braille au doigt est
+     autrement plus difficile qu'au pointeur. */
+  min-height: 32px;
   color: var(--text-2);
   font-size: 15px;
   line-height: 1;
   cursor: grab;
   touch-action: none;
   user-select: none;
+  -webkit-tap-highlight-color: transparent;
   border-radius: var(--r-cy-sm, 6px);
   transition: color 0.15s ease, background 0.15s ease;
 }
@@ -56,9 +59,15 @@
   background: color-mix(in srgb, var(--blue-500, #5ac8ff) 12%, transparent);
 }
 
-/* Pendant le geste : le curseur reste « saisi » partout sur le tableau, et les
-   liens des noms ne doivent pas se comporter comme des liens. */
-.dragging .grip {
+/*
+ * Pendant le geste.
+ *
+ * Le curseur « saisi » vaut pour **tout** le tableau et pas seulement pour la
+ * poignée : le pointeur l'a quittée dès le premier centimètre, et un curseur qui
+ * redevient flèche au-dessus d'un nom donne à croire que le geste est terminé.
+ */
+.dragging,
+.dragging * {
   cursor: grabbing;
 }
 
@@ -66,15 +75,36 @@
   pointer-events: none;
 }
 
+/* Les flèches ne réagissent plus au survol tant qu'on tire : elles ne sont pas
+   la cible du geste, et leur halo bleu détournerait l'œil de la ligne. */
+.dragging .arrow:hover:not(:disabled) {
+  border-color: var(--line-strong-cy, var(--line));
+  color: var(--ink, var(--text-0));
+  background: transparent;
+}
+
 /* La ligne tirée : surélevée et teintée, pour qu'on la suive des yeux parmi les
    autres qui, elles, se contentent de coulisser. */
 .dragged {
+  position: relative;
+  z-index: 1;
   background: color-mix(in srgb, var(--blue-500, #5ac8ff) 10%, transparent);
-  box-shadow: 0 0 0 1px var(--blue-400, var(--accent-blue)) inset;
+  box-shadow:
+    0 0 0 1px var(--blue-400, var(--accent-blue)) inset,
+    0 6px 18px rgba(0, 0, 0, 0.35);
 }
 
 .dragged .grip {
   color: var(--blue-200, var(--accent-blue));
+}
+
+/* Le survol reste une information utile, mais les fondus ne le sont plus dès
+   que la personne a demandé moins de mouvement. */
+@media (prefers-reduced-motion: reduce) {
+  .grip,
+  .arrow {
+    transition: none;
+  }
 }
 
 .row:first-child {
@@ -182,12 +212,13 @@
     gap: 4px;
   }
 
-  /* Une seule colonne : la poignée reprend sa place au fil du texte, sur la
-     même ligne que le rang plutôt que seule au-dessus de lui. */
+  /* Une seule colonne : la poignée reprend sa place au fil du texte, alignée à
+     gauche comme le reste de la ligne plutôt que centrée dans le vide. */
   .grip {
     justify-content: flex-start;
     width: auto;
-    height: auto;
+    min-height: 0;
+    margin-bottom: 2px;
   }
 
   .actions {
