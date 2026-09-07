@@ -24,13 +24,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const section = findBotDocSection(slug?.[0]);
   if (!section) {
     return pageMetadata({
-      title: "Documentation — BlueGenji Bot",
+      title: "Documentation du bot",
       description: "La documentation du bot Discord BlueGenji.",
       path: "/bot/docs",
     });
   }
   return pageMetadata({
-    title: `${section.title} — Documentation BlueGenji Bot`,
+    title: `${section.title} — Documentation du bot`,
     description: section.summary,
     path: `/bot/docs/${section.slug}`,
   });

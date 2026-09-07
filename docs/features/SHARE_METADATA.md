@@ -181,6 +181,13 @@ en descend. Deux fonctions, deux exigences :
   pas l'absence : sans elle, Next avertit à chaque page et sert des `og:image`
   relatives, que les robots d'aperçu ne savent pas résoudre.
 
+**`APP_URL` doit être réglée au moment du `npm run build`**, pas seulement au
+démarrage : les pages pré-rendues (`/`, `/connexion`, `/regles/[slug]`) figent
+leurs URL absolues à la compilation. Bâtir sans elle produirait des encarts
+pointant sur `http://localhost:3000` — visible nulle part dans les journaux, et
+seulement une fois le lien collé quelque part. `start.sh` construit sur le
+serveur, où le `.env` est présent : la condition est déjà remplie.
+
 ## Le vocabulaire corrigé
 
 « BlueGenji, c'est surtout Overwatch puis Marvel Rivals » : `SITE_DESCRIPTION`
