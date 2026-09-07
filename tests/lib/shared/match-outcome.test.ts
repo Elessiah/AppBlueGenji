@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { isMatchDrawn, isMatchPlayed, type MatchOutcomeShape } from "@/lib/shared/match-outcome";
+import { playedMatchSql } from "@/lib/shared/ranking";
 
 function match(overrides: Partial<MatchOutcomeShape> = {}): MatchOutcomeShape {
   return {
@@ -51,5 +52,18 @@ describe("isMatchDrawn", () => {
   it("écarte byes et matchs fantômes, dont le score est posé par le moteur", () => {
     expect(isMatchDrawn(match({ status: "COMPLETED", team2Id: null }))).toBe(false);
     expect(isMatchDrawn(match({ status: "COMPLETED", team1Id: null, team2Id: null }))).toBe(false);
+  });
+});
+
+describe("le nul du rejeu et celui du classement disent la même chose", () => {
+  it("exige les mêmes traits que `playedMatchSql`", () => {
+    // Le SQL du classement reconnaît un nul à : clos, sans vainqueur, et deux
+    // scores non nuls **égaux**. `isMatchDrawn` doit s'aligner — sinon la même
+    // rencontre est jouée sur la page du tournoi et inexistante sur les fiches.
+    const sql = playedMatchSql();
+
+    expect(sql).toContain("m.team1_score = m.team2_score");
+    expect(sql).toContain("m.team1_score IS NOT NULL");
+    expect(sql).toContain("m.team2_score IS NOT NULL");
   });
 });

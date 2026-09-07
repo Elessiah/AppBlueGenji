@@ -4,7 +4,7 @@ import type { PoolConnection } from "mysql2/promise";
 jest.mock("@/lib/server/tournaments/scoring");
 jest.mock("@/lib/server/tournaments/byes");
 
-import { adminResolveMatch } from "@/lib/server/tournaments/admin";
+import { adminResolveMatch, adminSaveMatchScores } from "@/lib/server/tournaments/admin";
 import { finalizeMatch } from "@/lib/server/tournaments/scoring";
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
@@ -73,6 +73,7 @@ function fakeConnection(options: {
               next_winner_slot: null,
               next_loser_match_id: null,
               next_loser_slot: null,
+              status: "READY",
               winner_team_id: null,
             },
           ],
@@ -183,5 +184,79 @@ describe("adminResolveMatch — les autres formats ferment les égalités de for
     });
 
     await expect(adminResolveMatch(conn, 10, 2, 2)).rejects.toThrow("SCORE_BELOW_MATCH_FORMAT");
+  });
+});
+
+describe("adminSaveMatchScores — un match nul est tranché", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (tryAutoResolveByes as jest.Mock).mockResolvedValue(undefined as never);
+  });
+
+  /** Connexion factice rendant un match **déjà clos sans vainqueur**. */
+  function drawnConnection(): { conn: PoolConnection; writes: string[] } {
+    const writes: string[] = [];
+    const conn = {
+      execute: async (sql: string) => {
+        const q = sql.replace(/\s+/g, " ").trim();
+        if (q.startsWith("UPDATE")) {
+          writes.push(q);
+          return [{ affectedRows: 1 }, []];
+        }
+        if (q.includes("FROM bg_matches m JOIN bg_tournaments t")) {
+          return [[{ round_number: 3, winner_team_id: null, format: "BG_SURVIE" }], []];
+        }
+        if (q.includes("FROM bg_matches")) {
+          return [
+            [
+              {
+                id: 10,
+                tournament_id: 1,
+                round_number: 3,
+                team1_id: 100,
+                team2_id: 200,
+                next_winner_match_id: null,
+                next_winner_slot: null,
+                next_loser_match_id: null,
+                next_loser_slot: null,
+                status: "COMPLETED",
+                winner_team_id: null,
+              },
+            ],
+            [],
+          ];
+        }
+        return [[], []];
+      },
+    } as unknown as PoolConnection;
+
+    return { conn, writes };
+  }
+
+  it("refuse d'enregistrer un score par-dessus un match nul, sans rien écrire", async () => {
+    // La garde lisait « déjà tranché » sur `winner_team_id` : un nul y
+    // échappait, et un 2-2 se réécrivait en 3-0 en gardant `status = COMPLETED`
+    // et `winner_team_id = NULL` — la carte annonçait « 3 – 0 » sous la mention
+    // « Match nul », et le rejeu d'endurance en tirait trois maps de chaque
+    // côté, soit zéro point net au lieu de +3 / −3.
+    const { conn, writes } = drawnConnection();
+
+    await expect(adminSaveMatchScores(conn, 10, 3, 0)).rejects.toThrow("MATCH_ALREADY_COMPLETED");
+    expect(writes).toHaveLength(0);
+  });
+
+  it("refuse aussi un forfait par-dessus un match nul", async () => {
+    const { conn, writes } = drawnConnection();
+
+    await expect(adminSaveMatchScores(conn, 10, undefined, undefined, 100)).rejects.toThrow(
+      "MATCH_ALREADY_COMPLETED",
+    );
+    expect(writes).toHaveLength(0);
+  });
+
+  it("laisse enregistrer un score sur une rencontre encore en cours", async () => {
+    // Le contre-exemple qui rend la garde lisible : l'arbitrage note bien un
+    // 1-1 pendant que le match se joue.
+    await expect(adminSaveMatchScores(fakeConnection({ round: 3 }), 10, 1, 1)).resolves.toBeUndefined();
   });
 });

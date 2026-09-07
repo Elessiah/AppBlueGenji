@@ -331,15 +331,26 @@ async function loadQualificationOutcomes(
     const winnerScore = winnerIsTeam1 ? row.team1_score : row.team2_score;
     const loserScore = winnerIsTeam1 ? row.team2_score : row.team1_score;
 
-    // Match **nul** : clos, sans vainqueur, et pas par forfait. Les deux camps
-    // ne se lisent alors plus sur `winner_team_id` / `loser_team_id`, qui sont
-    // vides tous les deux — ils se lisent sur les sides, comme les scores.
+    // Match **nul** : clos, sans vainqueur, pas par forfait, et portant deux
+    // scores égaux. Les deux camps ne se lisent alors plus sur
+    // `winner_team_id` / `loser_team_id`, vides tous les deux — ils se lisent
+    // sur les sides, comme les scores.
+    //
+    // Les scores font partie du critère, et ce n'est pas de la ceinture-et-
+    // bretelles : c'est **exactement** la définition qu'applique
+    // `playedMatchSql` au classement du site. Sans eux, une ligne close sans
+    // vainqueur *ni* score — reprise de données, écriture à la main — comptait
+    // ici pour un nul 0-0 alors que les fiches l'ignoraient, et la même
+    // rencontre était jouée d'un côté, inexistante de l'autre.
     const drawn =
       row.status === "COMPLETED" &&
       winnerTeamId === null &&
       row.forfeit_team_id == null &&
       row.team1_id !== null &&
-      row.team2_id !== null;
+      row.team2_id !== null &&
+      row.team1_score !== null &&
+      row.team2_score !== null &&
+      Number(row.team1_score) === Number(row.team2_score);
 
     return {
       round: Number(row.round_number),
@@ -352,9 +363,9 @@ async function loadQualificationOutcomes(
       // information positive, jamais un défaut.
       isForfeit: row.forfeit_team_id != null,
       drawTeamIds: drawn ? ([Number(row.team1_id), Number(row.team2_id)] as const) : null,
-      // Les deux scores sont égaux sur un nul : un seul chiffre suffit, et
-      // `team1_score` fait foi. Un nul sans score enregistré ne déplace rien.
-      drawMaps: drawn && row.team1_score !== null ? Number(row.team1_score) : 0,
+      // Les deux scores sont égaux sur un nul — le critère ci-dessus l'exige —
+      // donc un seul chiffre suffit.
+      drawMaps: drawn ? Number(row.team1_score) : 0,
     };
   });
 }

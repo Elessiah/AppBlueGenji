@@ -188,3 +188,28 @@ describe("rejeu d'endurance — matchs nuls", () => {
     expect(enduranceEliminationCut(standings, config, 1, QUALIF)).toEqual([]);
   });
 });
+
+describe("rejeu d'endurance — ce qui n'est pas un nul", () => {
+  /**
+   * Le critère du nul doit être **celui de `playedMatchSql`**, mot pour mot :
+   * clos, sans vainqueur, sans forfait, deux équipes, et deux scores égaux non
+   * nuls. Sans les scores, une ligne abîmée comptait ici pour un nul 0-0 alors
+   * que les fiches l'ignoraient — la même rencontre jouée d'un côté, inexistante
+   * de l'autre.
+   */
+  it("ignore une manche close sans vainqueur ni score", () => {
+    const standings = replayEndurance({
+      teams: teams(2),
+      matches: [
+        { round: 1, completed: true, winnerTeamId: null, loserTeamId: null, drawTeamIds: null },
+      ],
+      forfeits: [],
+      config: CONFIG,
+      lastRound: 1,
+      matchFormat: QUALIF,
+    });
+
+    expect(pointsOf(standings).get(1)).toBe(CONFIG.startPoints);
+    expect(standings.every((s) => s.draws === 0)).toBe(true);
+  });
+});

@@ -11,6 +11,11 @@ import {
 } from "../_lib/score-form";
 import { useToast } from "@/components/ui/toast";
 import { useMatchFormat } from "../_lib/match-format-context";
+// « Tranché » se lit sur le statut, pas sur la présence d'un vainqueur : un
+// match nul n'en a pas et est pourtant terminé. Sur `winnerTeamId`,
+// « Enregistrer » restait actif sur une rencontre finie, et la route
+// d'enregistrement en réécrivait les scores sans toucher au vainqueur.
+import { isMatchPlayed } from "@/lib/shared/match-outcome";
 
 export function useScoreForm(match: BracketMatch | null) {
   const { showError, showSuccess } = useToast();
@@ -66,7 +71,7 @@ export function useScoreForm(match: BracketMatch | null) {
 
   const decision = decideScoreForm(state, {
     format: matchFormat,
-    decided: match?.winnerTeamId != null,
+    decided: match !== null && isMatchPlayed(match),
   });
 
   const submit = async (action: "save" | "resolve") => {

@@ -1,7 +1,11 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { dependentMatches, hasScoreInput, type MatchScoreState } from "@/lib/shared/match-lock";
-import { checkMatchScores } from "@/lib/shared/match-format";
+import {
+  checkMatchScores,
+  matchWinnerSide,
+  type MatchFormat,
+} from "@/lib/shared/match-format";
 import { MatchRow } from "./_internal";
 import { forfeitMatchScores, loadTournamentMatchFormat } from "./repository";
 import { finalizeMatch } from "./scoring";
@@ -188,12 +192,28 @@ async function checkScoresAgainstMatchFormat(
   team2Score: number,
   decisive: boolean,
 ): Promise<void> {
-  const violation = checkMatchScores(
+  assertScoresMatchFormat(
     await loadTournamentMatchFormat(connection, tournamentId, round),
     team1Score,
     team2Score,
-    { decisive },
+    decisive,
   );
+}
+
+/**
+ * Le même verdict, sur un format **déjà lu**.
+ *
+ * `adminResolveMatch` a besoin du format pour deux choses — refuser la saisie,
+ * puis en déduire le vainqueur — et le relire deux fois inviterait les deux
+ * décisions à diverger sur une ligne modifiée entre-temps.
+ */
+function assertScoresMatchFormat(
+  format: MatchFormat | null,
+  team1Score: number,
+  team2Score: number,
+  decisive: boolean,
+): void {
+  const violation = checkMatchScores(format, team1Score, team2Score, { decisive });
   if (violation) throw new Error(violation);
 }
 
@@ -252,6 +272,7 @@ export async function adminSaveMatchScores(
       team2_id,
       next_winner_match_id,
       next_loser_match_id,
+      status,
       winner_team_id
      FROM bg_matches
      WHERE id = ?
@@ -269,7 +290,14 @@ export async function adminSaveMatchScores(
   // restant l'ancienne — deux vérités contradictoires en base, sans une erreur.
   // Corriger un résultat acquis passe par `adminResolveMatch`, qui refait le
   // travail en entier.
-  if (match.winner_team_id !== null) throw new Error("MATCH_ALREADY_COMPLETED");
+  //
+  // « Tranché » se lit sur le **statut**, pas sur la présence d'un vainqueur :
+  // un match nul n'en a pas et est pourtant terminé. Sur `winner_team_id`, il
+  // échappait à cette garde — un 2-2 se réécrivait en 3-0 en gardant
+  // `status = COMPLETED` et `winner_team_id = NULL`, si bien que la carte
+  // annonçait « 3 – 0 » sous la mention « Match nul » et que le rejeu
+  // d'endurance en tirait trois maps **de chaque côté**, soit zéro point net.
+  if (match.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
 
   await checkDownstreamMatchesHaveNoScores(connection, match);
 
@@ -366,32 +394,25 @@ export async function adminResolveMatch(
     resultTeam1Score = scores.team1Score;
     resultTeam2Score = scores.team2Score;
   } else if (team1Score !== undefined && team2Score !== undefined) {
-    await checkScoresAgainstMatchFormat(
+    // Le format de la manche sert deux fois : à refuser la saisie, puis à en
+    // déduire l'issue. Une seule lecture, passée aux deux.
+    const format = await loadTournamentMatchFormat(
       connection,
       tournamentId,
       Number(match.round_number),
-      team1Score,
-      team2Score,
-      true,
     );
+    assertScoresMatchFormat(format, team1Score, team2Score, true);
 
-    // Match nul : le contrôle ci-dessus ne le laisse passer que sur un format
-    // qui l'autorise (aujourd'hui la seule qualification de BlueGenji Survie).
-    // Ni vainqueur ni perdant, donc rien à propager — ce qu'un arbre à
-    // élimination directe ne saurait pas faire, et pourquoi il ne l'ouvre pas.
-    const drawn = team1Score === team2Score;
+    // Le vainqueur — ou son absence — se dérive de `matchWinnerSide`, unique
+    // implémentation de la règle : elle seule sait qu'un match nul n'est un
+    // résultat que là où le format l'autorise, et le report d'équipe comme
+    // l'expiration du délai en descendent déjà. Ni vainqueur ni perdant sur un
+    // nul, donc rien à propager — ce qu'un arbre à élimination directe ne
+    // saurait pas faire, et pourquoi il n'ouvre pas les égalités.
+    const side = matchWinnerSide(format, team1Score, team2Score);
 
-    winnerTeamId = drawn
-      ? null
-      : team1Score > team2Score
-        ? Number(match.team1_id)
-        : Number(match.team2_id);
-    loserTeamId =
-      winnerTeamId === null
-        ? null
-        : winnerTeamId === Number(match.team1_id)
-          ? Number(match.team2_id)
-          : Number(match.team1_id);
+    winnerTeamId = side === null ? null : Number(side === 1 ? match.team1_id : match.team2_id);
+    loserTeamId = side === null ? null : Number(side === 1 ? match.team2_id : match.team1_id);
     resultTeam1Score = team1Score;
     resultTeam2Score = team2Score;
   } else {

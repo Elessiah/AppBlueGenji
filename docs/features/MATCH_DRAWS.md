@@ -158,6 +158,21 @@ forfait, deux équipes réelles). `MatchScoreState` gagne pour la même raison u
 champ `decided` : ni « a un vainqueur » (un nul en est un sans), ni « porte un
 score » (l'arbitrage peut noter un 1-1 en cours de rencontre).
 
+Deux gardes suivent la même règle, et pour la même raison :
+
+- `adminSaveMatchScores` refuse d'écrire par-dessus un match **terminé**, statut
+  à l'appui. Sur `winner_team_id`, un nul y échappait : un 2-2 se réécrivait en
+  3-0 en gardant `status = COMPLETED` et `winner_team_id = NULL`, la carte
+  annonçait « 3 – 0 » sous la mention « Match nul », et le rejeu en tirait trois
+  maps **de chaque côté** — zéro point net au lieu de +3 / −3.
+- `useScoreForm` en fait autant côté interface, sans quoi le bouton
+  « Enregistrer » restait actif sur une rencontre finie et menait à un 409.
+
+Et le nul du rejeu (`loadQualificationOutcomes`) exige **exactement** ce
+qu'exige `playedMatchSql` — deux scores non nuls et égaux en plus des trois
+autres traits. Sans eux, une ligne close sans vainqueur *ni* score comptait pour
+un nul 0-0 côté tournoi et n'existait pas côté fiches.
+
 ## Le classement du site
 
 Un nul **compte**. `playedMatchSql` — l'assiette partagée par le classement et le
@@ -235,13 +250,20 @@ et l'arbre reprend le format du tournoi.
 | Cas | Code |
 |---|---|
 | Plafond de maps hors de `[objectif, objectif × 2 − 1]` | `INVALID_MATCH_FORMAT_MAX_MAPS` (400) |
-| Égalités demandées hors `BG_SURVIE` | `DRAWS_NOT_SUPPORTED_BY_FORMAT` (400) |
+| Égalités demandées hors `BG_SURVIE` | *neutralisées* (voir ci-dessous) |
 | Égalités demandées en saisie libre | `INVALID_MATCH_FORMAT` (400) |
-| Format de play-offs à moitié renseigné, ou hors `BG_SURVIE` | `INVALID_ENDURANCE_PLAYOFF_FORMAT` (400) |
+| Format de play-offs à moitié renseigné | `INVALID_ENDURANCE_PLAYOFF_FORMAT` (400) |
 
-Le refus des égalités hors `BG_SURVIE` est de **forme**, pas de goût : un match
-sans vainqueur laisse le moteur sans qualifiée à propager. Le formulaire ne
-propose d'ailleurs la case que sur ce format.
+Hors `BG_SURVIE`, les égalités et le format de play-offs sont **neutralisés**,
+pas refusés — même choix que `hasThirdPlaceMatch` hors `SINGLE`, et pour la même
+raison : `updateTournament` fusionne un `PATCH` partiel sur les valeurs
+courantes, si bien qu'un `{ "format": "SINGLE" }` seul sur un tournoi BG Survie
+aurait échoué sur un réglage que le nouveau format ne relit même pas, avec un
+message ne désignant aucun champ à corriger. Le formulaire ne propose de toute
+façon ces réglages que sur ce format.
+
+La **paire incomplète** reste, elle, une vraie erreur de client : elle décrit un
+format à moitié défini, quel que soit le mode.
 
 ## Fichiers
 
@@ -251,6 +273,7 @@ propose d'ailleurs la case que sur ce format.
 | Règle « quel format pour cette manche » | `lib/shared/bg-survie.ts` (`tournamentMatchFormat`) |
 | Lecture serveur du format d'une manche | `lib/server/tournaments/repository.ts` |
 | Rejeu d'endurance (branche du nul) | `lib/shared/bg-survie.ts` |
+| Barre de forme de l'annuaire (lettre `d`) | `lib/server/teams-service.ts` |
 | « Jouée » / « nulle », partagés par les écrans | `lib/shared/match-outcome.ts` |
 | Verrou d'édition d'un score | `lib/shared/match-lock.ts` (`decided`) |
 | Cote de type Elo | `lib/shared/ranking.ts` (`ratingDrawTransfer`) |

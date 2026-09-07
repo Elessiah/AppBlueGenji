@@ -252,10 +252,19 @@ export function validateTournamentInput(
 
   // Égalités : réservées à « BlueGenji Survie », dont le capital se compte map
   // par map et absorbe un match nul. Ailleurs, un match sans vainqueur laisse
-  // le moteur sans qualifiée à propager — le refus est donc de forme, pas de
-  // goût. Sans format de match, il n'y a pas de réglage où l'inscrire.
-  if (body.matchFormatDraws) {
-    if (body.format !== "BG_SURVIE") return { error: "DRAWS_NOT_SUPPORTED_BY_FORMAT" };
+  // le moteur sans qualifiée à propager.
+  //
+  // Hors de ce format, le réglage est **neutralisé**, pas refusé — même choix
+  // que `hasThirdPlaceMatch` hors `SINGLE`, et pour la même raison : une
+  // édition qui bascule le format d'un tournoi ne doit pas échouer sur un
+  // réglage que le nouveau format ne relira même pas. `updateTournament`
+  // fusionne le patch sur les valeurs courantes, si bien qu'un
+  // `PATCH { format: "SINGLE" }` seul aurait sinon été refusé sans qu'aucun
+  // champ du corps ne le laisse deviner.
+  //
+  // Le refus subsiste dans le seul cas où le client se contredit : demander
+  // l'égalité sans format de match, alors que c'est lui qui borne la rencontre.
+  if (body.matchFormatDraws && body.format === "BG_SURVIE") {
     if (!matchFormat) return { error: "INVALID_MATCH_FORMAT" };
     matchFormat.drawsAllowed = true;
   }
@@ -268,8 +277,10 @@ export function validateTournamentInput(
   if (hasPlayoffType !== hasPlayoffValue) {
     return { error: "INVALID_ENDURANCE_PLAYOFF_FORMAT" };
   }
-  if (hasPlayoffType && hasPlayoffValue) {
-    if (body.format !== "BG_SURVIE") return { error: "INVALID_ENDURANCE_PLAYOFF_FORMAT" };
+  // Même neutralisation hors du mode : c'est un réglage sans objet ailleurs, pas
+  // une erreur du client. La **paire incomplète**, elle, en reste une (plus
+  // haut) : elle décrit un format à moitié défini, quel que soit le mode.
+  if (hasPlayoffType && hasPlayoffValue && body.format === "BG_SURVIE") {
     if (!isValidMatchFormat(body.endurancePlayoffFormatType, body.endurancePlayoffFormatValue)) {
       return { error: "INVALID_ENDURANCE_PLAYOFF_FORMAT" };
     }

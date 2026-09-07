@@ -135,20 +135,27 @@ export async function listTeams(): Promise<TeamListItem[]> {
   );
 
   // Forme : les dix derniers résultats de chaque équipe, le plus récent en
-  // tête. Même assiette de matchs que le bilan (`playedMatchSql`) et même
+  // tête. Le **nul** a sa lettre : sans elle, un match sans vainqueur tombait
+  // dans la branche `ELSE` et s'affichait en défaite rouge sur la carte, quand
+  // la fiche de la même équipe l'annonçait « N » — deux écrans se contredisant
+  // sur la même rencontre (`lib/shared/match-format.ts`). Même assiette de matchs que le bilan (`playedMatchSql`) et même
   // chronologie que les fiches (`updated_at`, à défaut les dates du tournoi) :
   // la barre de forme de la carte est le début de celle de la fiche, pas une
   // autre lecture des mêmes matchs. Le découpage par équipe se fait en SQL, ce
   // qui évite aussi de ne servir que les 1000 derniers matchs du site — au-delà,
   // les équipes les moins actives n'avaient plus de forme du tout.
   const [formRows] = await db.execute<
-    (RowDataPacket & { team_id: number; result: "w" | "l" })[]
+    (RowDataPacket & { team_id: number; result: "w" | "l" | "d" })[]
   >(
     `SELECT team_id, result
      FROM (
        SELECT
          t.id AS team_id,
-         CASE WHEN m.winner_team_id = t.id THEN 'w' ELSE 'l' END AS result,
+         CASE
+           WHEN m.winner_team_id IS NULL THEN 'd'
+           WHEN m.winner_team_id = t.id THEN 'w'
+           ELSE 'l'
+         END AS result,
          ROW_NUMBER() OVER (
            PARTITION BY t.id
            ORDER BY COALESCE(m.updated_at, tr.finished_at, tr.start_at) DESC, m.id DESC

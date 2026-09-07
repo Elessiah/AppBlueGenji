@@ -303,17 +303,25 @@ describe("validateTournamentInput — plafond de maps, égalités, format des pl
     });
   });
 
-  it("refuse les égalités sur tout autre format : le plateau a besoin d'un vainqueur", () => {
+  it("neutralise les égalités sur tout autre format : le plateau a besoin d'un vainqueur", () => {
+    // Neutralisé et non refusé, comme `hasThirdPlaceMatch` hors SINGLE : une
+    // édition qui bascule le format ne doit pas échouer sur un réglage que le
+    // nouveau format ne relit même pas — `updateTournament` fusionne le patch
+    // sur les valeurs courantes, un `PATCH { format }` seul le trimballerait.
     for (const format of ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL"] as const) {
-      expect(
-        validateTournamentInput({
-          ...base,
-          format,
-          matchFormatType: "FT",
-          matchFormatValue: 3,
-          matchFormatDraws: true,
-        }),
-      ).toEqual({ error: "DRAWS_NOT_SUPPORTED_BY_FORMAT" });
+      const v = value({
+        ...base,
+        format,
+        // La Survie exige sa cadence de coupes : le cas passait auparavant
+        // parce que le refus des égalités sortait avant ce contrôle.
+        ...(format === "SURVIVAL" ? { survivalRoundsPerCut: 2 } : {}),
+        matchFormatType: "FT",
+        matchFormatValue: 3,
+        matchFormatDraws: true,
+      });
+
+      expect(v.matchFormat).toEqual({ type: "FT", value: 3 });
+      expect(v.matchFormat?.drawsAllowed).toBeUndefined();
     }
   });
 
@@ -345,14 +353,24 @@ describe("validateTournamentInput — plafond de maps, égalités, format des pl
     });
   });
 
-  it("refuse un format de play-offs hors BlueGenji Survie", () => {
+  it("neutralise un format de play-offs hors BlueGenji Survie", () => {
+    // Même raison que les égalités : sans objet ailleurs, donc écarté en
+    // silence plutôt que refusé.
     expect(
-      validateTournamentInput({
+      value({
         ...base,
         format: "SINGLE",
         endurancePlayoffFormatType: "FT",
         endurancePlayoffFormatValue: 3,
-      }),
+      }).endurancePlayoffFormat,
+    ).toBeNull();
+  });
+
+  it("refuse toujours une paire de play-offs incomplète, quel que soit le format", () => {
+    // Elle décrit un format à moitié défini : c'est une erreur du client, pas
+    // un réglage sans objet.
+    expect(
+      validateTournamentInput({ ...base, format: "SINGLE", endurancePlayoffFormatType: "FT" }),
     ).toEqual({ error: "INVALID_ENDURANCE_PLAYOFF_FORMAT" });
   });
 
