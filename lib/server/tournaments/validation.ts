@@ -265,7 +265,18 @@ export function validateTournamentInput(
   // commodité : les deux réglages ne se valident pas séparément — abaisser le
   // plafond, c'est ouvrir la fenêtre du nul, et l'un sans l'autre laisserait des
   // rencontres sans issue légale (`matchMaxMapsNeedsDraws`).
-  if (matchFormat && body.matchFormatMaxMaps != null) {
+  //
+  // Hors d'un format qui propose les égalités, il tombe donc **avec** elles, en
+  // silence : même neutralisation qu'au-dessus, même raison — une édition qui
+  // bascule le format ne doit pas échouer sur un réglage que le nouveau format
+  // ne relit pas, d'autant que le formulaire vient d'en masquer le champ (il ne
+  // s'affiche qu'avec la case des égalités). C'est aussi ce que fait
+  // `withoutDraws` au repli de l'arbre final.
+  //
+  // Le refus ne subsiste donc que là où les égalités étaient **offertes et
+  // déclinées** : le client se contredit alors pour de bon, et sa rencontre
+  // arrivée à égalité n'aurait aucun score enregistrable.
+  if (matchFormat && body.matchFormatMaxMaps != null && body.format === "BG_SURVIE") {
     if (!isValidMatchMaxMaps(matchFormat, body.matchFormatMaxMaps)) {
       return { error: "INVALID_MATCH_FORMAT_MAX_MAPS" };
     }

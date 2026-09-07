@@ -46,10 +46,12 @@ export interface MatchFormat {
 il ne fait que retirer des issues — un FT3 plafonné à 4 maps refuse `3-2` (somme
 5, au-dessus du plafond) *comme* `2-2` (pas de vainqueur), si bien qu'une série
 arrivée à 2-2 n'a plus aucun score enregistrable et que son plateau reste bloqué
-pour de bon. La combinaison est donc refusée à la création
-(`MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS`), le champ ne s'affiche qu'une fois les
-égalités cochées, et `withoutDraws` **rend son plafond naturel** au format qu'il
-ferme — sans quoi le repli de l'arbre final fabriquerait lui-même l'impasse.
+pour de bon. La combinaison est donc refusée là où les égalités étaient **offertes et
+déclinées** (`MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS`) et simplement neutralisée
+ailleurs, où elles ne sont pas proposées — refuser y bloquerait une bascule de
+format sur un champ que le formulaire vient de masquer. Le champ ne s'affiche
+qu'une fois les égalités cochées, et `withoutDraws` **rend son plafond naturel**
+au format qu'il ferme — sans quoi le repli de l'arbre final fabriquerait lui-même l'impasse.
 
 **Ce que plafonne `maxMaps` : la somme des deux scores**, c'est-à-dire les maps
 qui ont désigné un vainqueur. Une map nulle ne figure dans aucun des deux
@@ -269,13 +271,13 @@ et l'arbre reprend le format du tournoi.
 | Cas | Code |
 |---|---|
 | Plafond de maps hors de `[objectif, objectif × 2 − 1]` | `INVALID_MATCH_FORMAT_MAX_MAPS` (400) |
-| Plafond abaissé sans les égalités | `MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS` (400) |
+| Plafond abaissé sans les égalités, **en BG Survie** | `MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS` (400) |
 | Égalités demandées hors `BG_SURVIE` | *neutralisées* (voir ci-dessous) |
 | Égalités demandées en saisie libre | `INVALID_MATCH_FORMAT` (400) |
 | Format de play-offs à moitié renseigné | `INVALID_ENDURANCE_PLAYOFF_FORMAT` (400) |
 
-Hors `BG_SURVIE`, les égalités et le format de play-offs sont **neutralisés**,
-pas refusés — même choix que `hasThirdPlaceMatch` hors `SINGLE`, et pour la même
+Hors `BG_SURVIE`, les égalités, **le plafond de maps** et le format de play-offs
+sont **neutralisés**, pas refusés — même choix que `hasThirdPlaceMatch` hors `SINGLE`, et pour la même
 raison : `updateTournament` fusionne un `PATCH` partiel sur les valeurs
 courantes, si bien qu'un `{ "format": "SINGLE" }` seul sur un tournoi BG Survie
 aurait échoué sur un réglage que le nouveau format ne relit même pas, avec un

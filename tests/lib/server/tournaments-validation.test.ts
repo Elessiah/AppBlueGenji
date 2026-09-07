@@ -275,36 +275,45 @@ describe("validateTournamentInput — plafond de maps, égalités, format des pl
     expect(v.matchFormat).toEqual({ type: "FT", value: 3, maxMaps: 4, drawsAllowed: true });
   });
 
-  it("refuse un plafond abaissé sans les égalités : la rencontre serait inachevable", () => {
+  it("refuse un plafond abaissé là où les égalités étaient offertes et déclinées", () => {
     // Un FT3 plafonné à 4 maps refuse `3-2` (somme 5) comme `2-2` (pas de
     // vainqueur) : une série arrivée à 2-2 n'a plus aucun score enregistrable,
-    // et son plateau reste bloqué pour de bon.
+    // et son plateau reste bloqué pour de bon. En BG Survie, le client avait la
+    // case sous la main : ne pas la cocher est une contradiction, pas un oubli.
     expect(
-      validateTournamentInput({
-        ...base,
-        matchFormatType: "FT",
-        matchFormatValue: 3,
-        matchFormatMaxMaps: 4,
-      }),
+      validateTournamentInput({ ...survie, matchFormatMaxMaps: 4 }),
     ).toEqual({ error: "MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS" });
   });
 
-  it("accepte le plafond naturel sans égalités : il ne retire aucune issue", () => {
-    expect(
-      value({ ...base, matchFormatType: "FT", matchFormatValue: 3, matchFormatMaxMaps: 5 })
-        .matchFormat,
-    ).toEqual({ type: "FT", value: 3, maxMaps: 5 });
+  it("neutralise le plafond hors du mode, avec les égalités qu'il accompagne", () => {
+    // Ailleurs les égalités ne sont pas proposées : le plafond n'est donc pas un
+    // choix contradictoire, c'est un réglage que le format ne relit pas. Le
+    // refuser bloquerait une simple bascule de format sur un champ que le
+    // formulaire vient de masquer — le piège que la neutralisation des égalités
+    // écarte déjà juste au-dessus.
+    const v = value({
+      ...base,
+      format: "SINGLE",
+      matchFormatType: "FT",
+      matchFormatValue: 3,
+      matchFormatMaxMaps: 4,
+      matchFormatDraws: true,
+    });
+
+    expect(v.matchFormat).toEqual({ type: "FT", value: 3 });
+  });
+
+  it("accepte le plafond naturel en BG Survie, égalités ouvertes", () => {
+    expect(value({ ...survie, matchFormatDraws: true, matchFormatMaxMaps: 5 }).matchFormat).toEqual(
+      { type: "FT", value: 3, maxMaps: 5, drawsAllowed: true },
+    );
   });
 
   it("refuse un plafond hors de [objectif, objectif × 2 − 1]", () => {
+    // Contrôlé là où le plafond est lu, donc sur le seul format qui le relit.
     for (const maxMaps of [2, 6]) {
       expect(
-        validateTournamentInput({
-          ...base,
-          matchFormatType: "FT",
-          matchFormatValue: 3,
-          matchFormatMaxMaps: maxMaps,
-        }),
+        validateTournamentInput({ ...survie, matchFormatDraws: true, matchFormatMaxMaps: maxMaps }),
       ).toEqual({ error: "INVALID_MATCH_FORMAT_MAX_MAPS" });
     }
   });
