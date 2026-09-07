@@ -21,8 +21,6 @@ export const ERROR_MESSAGES: Record<string, string> = {
   MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS:
     "Abaisser le plafond de maps suppose les égalités : sans elles, une rencontre arrivée à égalité n'aurait plus aucun score enregistrable.",
   INVALID_ENDURANCE_PLAYOFF_FORMAT: "Format des play-offs invalide.",
-  DRAWS_NOT_SUPPORTED_BY_FORMAT:
-    "Les égalités ne sont possibles qu'en qualification BlueGenji Survie : ailleurs, le plateau a besoin d'un vainqueur.",
   TOURNAMENT_NOT_FOUND: "Tournoi introuvable.",
   TOURNAMENT_NOT_RUNNING: "Le tournoi n'est pas en cours.",
   ADMIN_SAVE_SCORES_FAILED: "Erreur lors de la sauvegarde des scores.",

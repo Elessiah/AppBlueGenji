@@ -10,9 +10,11 @@ import {
   enduranceRoundOfMatch,
   enduranceRoundRegionLabel,
   enduranceRoundSections,
+  PLAYOFF_ROUND_OFFSET,
   splitEnduranceMatches,
   splitPlayoffBrackets,
 } from "@/app/(secured)/tournois/[id]/_lib/endurance-sections";
+import { PLAYOFF_ROUND_OFFSET as ENGINE_PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
 
 const mockMatch = (overrides: Partial<BracketMatch>): BracketMatch => ({
   id: 1,
@@ -369,5 +371,25 @@ describe("enduranceRoundSections — matchs nuls", () => {
 
     // Sa manche 1 s'est close sur un nul : c'est la 2 qui l'attend.
     expect(defaultOpenEnduranceRound(sections, 7, false)).toBe(2);
+  });
+});
+
+describe("frontière des play-offs — une seule source", () => {
+  it("réexporte la constante du moteur au lieu d'en tenir une copie", () => {
+    // Trois lectures partagent ce palier : le moteur qui numérote l'arbre, cette
+    // vue qui le découpe, et la résolution du format de match (le mode en joue
+    // deux). Une copie locale les laisserait diverger — remonter le palier côté
+    // moteur afficherait des manches qualificatives à l'intérieur de l'arbre.
+    expect(PLAYOFF_ROUND_OFFSET).toBe(ENGINE_PLAYOFF_ROUND_OFFSET);
+  });
+
+  it("découpe bien sur cette frontière, et pas une autre", () => {
+    const { qualification, playoffs } = splitEnduranceMatches([
+      mockMatch({ id: 1, roundNumber: ENGINE_PLAYOFF_ROUND_OFFSET - 1 }),
+      mockMatch({ id: 2, roundNumber: ENGINE_PLAYOFF_ROUND_OFFSET }),
+    ]);
+
+    expect(qualification.map((m) => m.id)).toEqual([1]);
+    expect(playoffs.map((m) => m.id)).toEqual([2]);
   });
 });

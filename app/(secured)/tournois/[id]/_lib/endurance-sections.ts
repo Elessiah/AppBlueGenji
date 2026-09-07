@@ -1,5 +1,6 @@
 import type { BracketMatch } from "@/lib/shared/types";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
+import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
 
 /**
  * Découpe du plateau « BlueGenji Survie » en volets, et reconstitution de
@@ -17,11 +18,16 @@ import { isMatchPlayed } from "@/lib/shared/match-outcome";
  */
 
 /**
- * Première manche de play-offs. Le moteur numérote l'arbre final à partir de
- * 1000 (cf. `lib/server/tournaments/bg-survie.ts`) : sous ce seuil, on est en
- * phase qualificative.
+ * Première manche de play-offs — **réexportée**, jamais redéclarée.
+ *
+ * La frontière entre les deux phases est partagée par trois lectures : le
+ * moteur qui numérote l'arbre, cette vue qui le découpe, et la résolution du
+ * format de match (`tournamentMatchFormat`, le mode en jouant deux). Une copie
+ * locale les laisserait diverger — remonter le palier côté moteur afficherait
+ * des manches qualificatives à l'intérieur de l'arbre, et leur appliquerait
+ * l'autre format que celui qu'annonce le volet qui les contient.
  */
-export const PLAYOFF_ROUND_OFFSET = 1000;
+export { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
 
 /** Un volet = une manche qualificative. */
 export interface EnduranceRoundSection {
