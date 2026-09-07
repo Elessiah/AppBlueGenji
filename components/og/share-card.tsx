@@ -73,6 +73,9 @@ export function ShareCard({ eyebrow, title, subtitle, facts = [] }: ShareCardPro
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
+        // Satori ne coupe pas dans un mot : un nom d'une seule pièce plus large
+        // que la carte en sortirait, et le PNG le montrerait tronqué au bord.
+        overflow: "hidden",
         padding: "64px 72px",
         backgroundColor: COLORS.background,
         // Deux halos plutôt qu'un aplat : la carte reste sombre mais cesse
@@ -112,6 +115,7 @@ export function ShareCard({ eyebrow, title, subtitle, facts = [] }: ShareCardPro
             fontSize: titleFontSize(title),
             lineHeight: 1.1,
             fontWeight: 700,
+            wordBreak: "break-word",
             // Satori ne coupe pas les mots : un nom d'équipe sans espace
             // déborderait sans cette limite de lignes.
             display: "-webkit-box",

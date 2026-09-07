@@ -127,8 +127,17 @@ Deux routes la servent :
 
 **Piège vérifié : la convention `opengraph-image` ne vaut que pour son propre
 segment.** Contrairement à `icon`, celle de la racine n'habille que `/` — les
-pages imbriquées repartaient sans image. `pageMetadata` désigne donc l'image par
-défaut explicitement, par la route qu'elle expose (`/opengraph-image`).
+pages imbriquées repartaient sans image. L'image par défaut est donc désignée
+explicitement, par la route qu'elle expose (`DEFAULT_SHARE_IMAGE`) : dans la mise
+en page racine, pour que **toute** page en hérite (`/connexion`, qui est une page
+cliente sans métadonnées à elle, en fait partie), et dans `pageMetadata`, dont le
+bloc `openGraph` remplacerait sinon celui de la racine. Un segment qui pose la
+sienne — la fiche d'un tournoi — garde la sienne.
+
+Le formulaire d'édition (`[id]/modifier`) est l'exception qui confirme la règle :
+il vit sous `[id]/`, donc il héritait de l'encart **du tournoi** — même titre,
+`og:url` pointant sur une autre page — sans hériter de son image. Il pose un
+`openGraph: null` / `twitter: null` : un écran de travail n'a pas d'encart.
 
 La route d'un tournoi est **servie sans passer par les mises en page**, donc sans
 la garde de l'espace sécurisé : elle porte sa propre application de la règle de

@@ -17,7 +17,12 @@ import { SITE_NAME, SITE_SHARE_CARD, tournamentShareCard } from "@/lib/shared/sh
  * Le robot qui la demande n'est jamais authentifié — elle ne montre donc que ce
  * que la liste publique montre déjà.
  */
-export const alt = SITE_NAME;
+/**
+ * `alt` est une constante de segment : Next ne la laisse pas dépendre du
+ * tournoi. On décrit donc ce que l'image **est** plutôt que d'y recopier le nom
+ * du site, qui ferait lire « BlueGenji Esport » sous la carte d'un tournoi.
+ */
+export const alt = `Aperçu du tournoi — ${SITE_NAME}`;
 export const size = SHARE_CARD_SIZE;
 export const contentType = SHARE_CARD_CONTENT_TYPE;
 

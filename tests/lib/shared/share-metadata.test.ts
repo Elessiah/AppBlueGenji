@@ -98,6 +98,16 @@ describe("truncateForShare", () => {
     expect(result.length).toBe(12);
   });
 
+  it("ne coupe pas au milieu d'un emoji", () => {
+    // `slice` travaille en unités UTF-16 : une coupe tombant entre les deux
+    // moitiés d'un emoji laisserait un demi-caractère dans la description.
+    const result = truncateForShare("aaaa 🏆🏆🏆🏆 bbbb", 8);
+    expect(result.endsWith("…")).toBe(true);
+    // Aucun demi-point-de-code : chaque unité UTF-16 esseulée en trahirait un.
+    const orphanSurrogate = [...result].some((glyph) => glyph.length === 1 && glyph >= "\ud800" && glyph <= "\udfff");
+    expect(orphanSurrogate).toBe(false);
+  });
+
   it("ne laisse pas de ponctuation orpheline devant l'ellipse", () => {
     expect(truncateForShare("Coupe d'été, saison six et suivantes", 18)).toBe("Coupe d'été…");
   });

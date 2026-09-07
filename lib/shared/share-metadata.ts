@@ -79,8 +79,14 @@ export function truncateForShare(text: string, maxLength: number): string {
   const flattened = text.replace(/\s+/gu, " ").trim();
   if (flattened.length <= maxLength) return flattened;
 
-  // −1 pour l'ellipse, qui compte dans la limite annoncée.
-  const hardCut = flattened.slice(0, Math.max(0, maxLength - 1));
+  // −1 pour l'ellipse, qui compte dans la limite annoncée. La coupe se fait en
+  // **caractères** et non en unités UTF-16 : un nom de tournoi contient volontiers
+  // un emoji, et `slice` tomberait un jour au milieu de son point de code — la
+  // description finirait alors sur un demi-caractère (même précaution que
+  // `avatarInitial`).
+  const hardCut = Array.from(flattened)
+    .slice(0, Math.max(0, maxLength - 1))
+    .join("");
   const lastSpace = hardCut.lastIndexOf(" ");
   // Un mot unique plus long que la limite n'a pas d'espace où se couper : on
   // tranche dedans plutôt que de rendre une ellipse seule.
@@ -257,8 +263,8 @@ export function tournamentShareDescription(
     `${card.registeredTeams}/${card.maxTeams} ${wording.manyEngaged}`,
   ];
 
-  const schedule = scheduleLine(card, now);
-  if (schedule) parts.push(schedule);
+  const next = scheduleLine(card, now);
+  if (next) parts.push(next);
 
   const facts = `${parts.join(" · ")}.`;
   const free = card.description ? truncateForShare(card.description, FREE_TEXT_MAX_LENGTH) : "";

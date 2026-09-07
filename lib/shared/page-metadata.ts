@@ -22,7 +22,7 @@ import { SITE_NAME } from "./share-metadata";
  * à ce qu'on attendrait d'une convention par ailleurs héritée (`icon`). Les
  * autres pages la désignent donc explicitement, par la route qu'elle expose.
  */
-const DEFAULT_SHARE_IMAGE = "/opengraph-image";
+export const DEFAULT_SHARE_IMAGE = "/opengraph-image";
 
 export type PageMetadataInput = {
   /** Titre de la page, **sans** le nom du site : le gabarit de la racine l'ajoute. */
