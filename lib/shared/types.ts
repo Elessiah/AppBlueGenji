@@ -96,8 +96,9 @@ export type EnduranceStandingRow = {
   rounds: EnduranceRoundCell[];
   /**
    * Points retirés par pénalité d'arbitrage, cumulés — `0` si l'engagé n'a
-   * jamais été sanctionné. Seules les pénalités **effectivement retirées** y
-   * figurent : une sanction visant une équipe déjà sortie n'ampute rien.
+   * jamais été sanctionné. C'est la **baisse réelle** du capital : une sanction
+   * visant une équipe déjà sortie n'ampute rien, et une sanction plus lourde
+   * que le capital n'en retire que ce qu'il restait.
    */
   penaltyPoints: number;
 };
@@ -120,6 +121,16 @@ export type EndurancePenaltyRow = {
   /** Arbitre qui l'a prononcée, `null` si son compte a été supprimé. */
   authorPseudo: string | null;
   createdAt: string | null;
+  /**
+   * La sanction peut-elle encore être retirée ?
+   *
+   * Faux dès qu'une manche **postérieure** porte une saisie : lui rendre ses
+   * points remettrait alors en lice une équipe qui n'a pas joué les manches
+   * écoulées depuis, et le moteur ne réapparie que la manche courante. C'est la
+   * règle de `lib/shared/match-lock.ts`, décidée par le serveur — le drapeau
+   * n'existe que pour ne pas proposer un bouton voué au refus.
+   */
+  removable: boolean;
 };
 
 export type EnduranceMeta = {

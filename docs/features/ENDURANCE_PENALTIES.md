@@ -63,6 +63,15 @@ prononcée au coup d'envoi doit peser dès le premier appariement.
 
 ## La fenêtre : la phase qualificative, et rien d'autre
 
+**Un tournoi en cours** (`TOURNAMENT_NOT_RUNNING`, 400), comme l'abandon en
+Survie et en Ronde suisse. Ce n'est pas une précaution de forme :
+`reconcileEndurance` s'arrête net sur un tournoi `FINISHED`, si bien qu'une
+sanction y serait écrite **sans jamais être rejouée** — `bg_endurance_standings`
+et `final_rank` garderaient leurs valeurs pendant que `loadEnduranceMeta`, qui
+rejoue toujours, afficherait une championne au capital amputé. Le cas est
+atteignable : un tournoi clos par `startEndurancePlayoffs` faute de qualifiées
+garde `endurance_playoffs_started` à 0.
+
 Infliger **et** retirer sont refusés une fois les play-offs lancés
 (`ENDURANCE_PLAYOFFS_STARTED`, 400), pour deux raisons distinctes :
 
@@ -81,6 +90,28 @@ a rien à lui retirer. Le rejeu tient la même règle de son côté (`applyPenal
 ne touche pas à une équipe sortie) — le cas est atteignable après coup, une
 correction de score pouvant faire tomber une équipe *avant* la manche où elle
 avait été sanctionnée.
+
+### Le retrait remonte le temps, donc il se verrouille
+
+Le retrait est le **seul geste du mode qui agit sur le passé** : il est refusé
+dès qu'une manche **postérieure** à la sanction porte la moindre saisie
+(`ENDURANCE_ROUND_ALREADY_PLAYED`, 409). C'est la règle de
+`lib/shared/match-lock.ts`, transposée : en survie, sans lien de bracket, toute
+manche ultérieure dépend des précédentes.
+
+Sans ce verrou : une pénalité de la manche 2 élimine une équipe, les manches 3 à
+6 se jouent sans elle, et lever la sanction à la manche 7 la remet `ACTIVE`
+**avec son capital intact** — elle n'a disputé aucun match depuis. Elle passe
+alors devant toutes celles qui ont réellement joué et perdu des maps, et le
+moteur ne réapparie que la manche courante : les quatre manches manquées restent
+telles quelles.
+
+Le `>` est strict — la manche de la sanction elle-même peut être entamée, la
+pénalité tombe de toute façon après ses matchs. Le prédicat « ce match porte une
+saisie » (`HAS_SCORE_INPUT_SQL`) est écrit **une seule fois** : trois lectures
+s'en servent, dont la borne `EndurancePenaltyRow.removable` que l'interface
+reçoit pour ne pas proposer un bouton voué au 409 (elle affiche « 🔒 Figée » à
+sa place).
 
 ## La forme d'une sanction
 
@@ -102,9 +133,11 @@ supprimé plus tard : le compte s'efface, la sanction reste due.
 
 ## Ce que le lecteur voit
 
-- **Classement** — un `−N` ambre à côté du capital, cumul des pénalités
-  **effectivement retirées**. Une sanction visant une équipe déjà sortie n'a
-  rien amputé : l'annoncer ferait mentir la colonne.
+- **Classement** — un `−N` ambre à côté du capital, cumul de la **baisse réelle**
+  du capital. Une sanction visant une équipe déjà sortie n'a rien amputé, et une
+  sanction de 5 sur une équipe à 2 points n'en retire que deux : annoncer la
+  sanction *demandée* ferait mentir la colonne pour qui recoupe la ligne avec la
+  manche précédente.
 - **Journal des sanctions** — sous le classement, visible de **tous** : montant,
   engagé, motif, manche, arbitre. Une sanction qui déplace un classement sans
   qu'aucun match ne l'explique doit être lisible par l'équipe qui la subit comme
@@ -114,10 +147,17 @@ supprimé plus tard : le compte s'efface, la sanction reste due.
   **soulignement ambre**, et garde son ton d'origine. La case dit un capital ;
   la pénalité explique seulement pourquoi il a bougé sans qu'un score ne
   l'explique — elle ne doit ni concurrencer le chiffre ni prendre la place du
-  rouge des forfaits, qui a un autre sens.
+  rouge des forfaits, qui a un autre sens. Sa légende est conditionnée à la
+  présence d'une **case marquée**, pas à celle d'une sanction : une pénalité qui
+  n'a rien pu retirer n'en marque aucune, et la légende annoncerait alors un
+  trait introuvable.
 - **Dialogue** — annonce le capital restant, et **nomme l'élimination** quand la
   sanction ramène à zéro : c'est la conséquence qui peut surprendre, elle se lit
-  avant le clic et non dans le classement après coup.
+  avant le clic et non dans le classement après coup. La page ne retient que
+  l'**identifiant** de l'engagé et relit sa ligne à chaque rendu (même motif que
+  les dialogues de score, de diffusion et de calendrier) : un capital capturé au
+  clic ferait annoncer un « capital restant » périmé dès le score suivant, et
+  tairait l'élimination.
 
 ## Journal Discord
 

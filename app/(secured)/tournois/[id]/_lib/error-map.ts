@@ -139,6 +139,8 @@ export const ERROR_MESSAGES: Record<string, string> = {
   INVALID_PENALTY: "Pénalité invalide.",
   INVALID_PENALTY_ID: "Identifiant de pénalité invalide.",
   PENALTY_NOT_FOUND: "Cette pénalité n'existe plus.",
+  ENDURANCE_ROUND_ALREADY_PLAYED:
+    "Une manche a été jouée depuis : cette pénalité ne peut plus être retirée.",
   NOT_BG_SURVIE: "Les pénalités d'endurance n'existent qu'en mode BlueGenji Survie.",
   PENALTY_FAILED: "Erreur lors de l'enregistrement de la pénalité.",
   PENALTY_LIFT_FAILED: "Erreur lors du retrait de la pénalité.",

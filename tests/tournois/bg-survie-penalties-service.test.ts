@@ -38,6 +38,8 @@ function makeConn(options: {
   tournament?: Row | null;
   standingStatus?: string | null;
   penalties?: Row[];
+  /** Dernière manche portant une saisie, pour le verrou du retrait. */
+  lastRoundWithInput?: number | null;
 } = {}) {
   const calls: [string, unknown[]][] = [];
 
@@ -49,10 +51,14 @@ function makeConn(options: {
       const row = options.tournament === undefined ? tournamentRow() : options.tournament;
       return [row === null ? [] : [row], []];
     }
-    if (query.startsWith("SELECT team_id, points FROM bg_endurance_penalties")) {
+    if (query.startsWith("SELECT team_id, points, round_number FROM bg_endurance_penalties")) {
       return [options.penalties ?? [], []];
     }
     if (query.includes("FROM bg_endurance_penalties")) return [[], []];
+    // Verrou du retrait : une manche postérieure porte-t-elle une saisie ?
+    if (query.startsWith("SELECT COUNT(*) AS c FROM bg_matches") && query.includes("round_number > ?")) {
+      return [[{ c: options.lastRoundWithInput ? 1 : 0 }], []];
+    }
     if (query.includes("SELECT status FROM bg_endurance_standings")) {
       const status = options.standingStatus === undefined ? "ACTIVE" : options.standingStatus;
       return [status === null ? [] : [{ status }], []];
@@ -142,6 +148,19 @@ describe("applyEndurancePenalty", () => {
     );
   });
 
+  it("refuse un tournoi qui n'est plus en cours", async () => {
+    // `reconcileEndurance` sort net sur un tournoi terminé : la sanction serait
+    // écrite sans jamais être rejouée, et la page afficherait alors un capital
+    // que le classement stocké contredit.
+    for (const state of ["FINISHED", "REGISTRATION", "UPCOMING"]) {
+      const { conn, calls } = makeConn({ tournament: tournamentRow({ state }) });
+      await expect(applyEndurancePenalty(7, 42, 3, "Motif", 9, conn)).rejects.toThrow(
+        "TOURNAMENT_NOT_RUNNING",
+      );
+      expect(inserted(calls)).toBeUndefined();
+    }
+  });
+
   it("refuse un engagé qui n'est plus en lice", async () => {
     for (const status of ["ELIMINATED", "OUT_OF_CONTENTION", "FORFEIT"]) {
       const { conn, calls } = makeConn({ standingStatus: status });
@@ -159,7 +178,9 @@ describe("liftEndurancePenalty", () => {
   it("efface la ligne et rend l'engagé et le montant à l'appelant", async () => {
     // Le journal Discord se rédige après le commit, quand la ligne n'existe
     // plus : c'est ici qu'elle doit être relue.
-    const { conn, calls } = makeConn({ penalties: [{ team_id: 42, points: 3 }] });
+    const { conn, calls } = makeConn({
+      penalties: [{ team_id: 42, points: 3, round_number: 2 }],
+    });
     const lifted = await liftEndurancePenalty(7, 15, conn);
 
     expect(lifted).toEqual({ teamId: 42, points: 3 });
@@ -168,11 +189,13 @@ describe("liftEndurancePenalty", () => {
   });
 
   it("relit la sanction par son tournoi, jamais par son seul identifiant", async () => {
-    const { conn, calls } = makeConn({ penalties: [{ team_id: 42, points: 3 }] });
+    const { conn, calls } = makeConn({
+      penalties: [{ team_id: 42, points: 3, round_number: 2 }],
+    });
     await liftEndurancePenalty(7, 15, conn);
 
     const select = calls.find(([query]) =>
-      query.startsWith("SELECT team_id, points FROM bg_endurance_penalties"),
+      query.startsWith("SELECT team_id, points, round_number FROM bg_endurance_penalties"),
     );
     expect(select?.[1]).toEqual([15, 7]);
   });
@@ -190,7 +213,7 @@ describe("liftEndurancePenalty", () => {
     // déjà tiré sans elle.
     const { conn, calls } = makeConn({
       tournament: tournamentRow({ endurance_playoffs_started: 1 }),
-      penalties: [{ team_id: 42, points: 3 }],
+      penalties: [{ team_id: 42, points: 3, round_number: 2 }],
     });
     await expect(liftEndurancePenalty(7, 15, conn)).rejects.toThrow(
       "ENDURANCE_PLAYOFFS_STARTED",
@@ -204,6 +227,31 @@ describe("liftEndurancePenalty", () => {
     const { conn } = makeConn({ tournament: tournamentRow({ format: "SURVIVAL" }) });
     await expect(liftEndurancePenalty(7, 15, conn)).rejects.toThrow("NOT_BG_SURVIE");
   });
+
+  it("refuse un tournoi qui n'est plus en cours", async () => {
+    const { conn } = makeConn({
+      tournament: tournamentRow({ state: "FINISHED" }),
+      penalties: [{ team_id: 42, points: 3, round_number: 2 }],
+    });
+    await expect(liftEndurancePenalty(7, 15, conn)).rejects.toThrow("TOURNAMENT_NOT_RUNNING");
+  });
+
+  it("refuse le retrait dès qu'une manche postérieure porte une saisie", async () => {
+    // Rendre ses points à une équipe qui n'a pas disputé les manches écoulées
+    // depuis la remettrait en lice à capital intact : c'est la règle de
+    // `match-lock`, que seul le retrait peut enfreindre puisqu'il remonte le
+    // temps.
+    const { conn, calls } = makeConn({
+      penalties: [{ team_id: 42, points: 3, round_number: 2 }],
+      lastRoundWithInput: 5,
+    });
+    await expect(liftEndurancePenalty(7, 15, conn)).rejects.toThrow(
+      "ENDURANCE_ROUND_ALREADY_PLAYED",
+    );
+    expect(
+      calls.find(([query]) => query.startsWith("DELETE FROM bg_endurance_penalties")),
+    ).toBeUndefined();
+  });
 });
 
 describe("loadEnduranceMeta — pénalités", () => {
@@ -215,6 +263,9 @@ describe("loadEnduranceMeta — pénalités", () => {
       const q = String(sql).replace(/\s+/g, " ").trim();
 
       if (q.includes("FROM bg_tournaments")) return [[tournamentRow()], []];
+
+      // Verrou du retrait : aucune manche postérieure n'a été jouée.
+      if (q.includes("MAX(round_number) AS last_round")) return [[{ last_round: 1 }], []];
 
       if (q.includes("FROM bg_endurance_penalties")) {
         return [
@@ -285,6 +336,7 @@ describe("loadEnduranceMeta — pénalités", () => {
         reason: "Retard au coup d'envoi",
         authorPseudo: "Arbitre",
         createdAt: "2026-09-07T10:00:00.000Z",
+        removable: true,
       },
     ]);
   });

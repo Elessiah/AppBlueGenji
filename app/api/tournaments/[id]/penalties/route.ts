@@ -47,6 +47,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     const message = (error as Error).message;
     if (
       message === "NOT_BG_SURVIE" ||
+      message === "TOURNAMENT_NOT_RUNNING" ||
       message === "ENDURANCE_PLAYOFFS_STARTED" ||
       message === "TEAM_ALREADY_OUT" ||
       message === "INVALID_PENALTY"

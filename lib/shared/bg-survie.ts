@@ -419,8 +419,14 @@ function applyMapDelta(
  * de sa sortie. Le cas est atteignable après coup — une correction de score
  * peut faire tomber une équipe *avant* la manche où elle avait été sanctionnée.
  */
-function applyPenalty(standing: EnduranceStanding, points: number, round: number): boolean {
-  if (standing.status !== "ACTIVE") return false;
+function applyPenalty(standing: EnduranceStanding, points: number, round: number): number {
+  if (standing.status !== "ACTIVE") return 0;
+
+  // Le retrait **rendu** est la baisse réelle du capital, pas la sanction
+  // demandée : une pénalité de 5 sur une équipe à 2 points n'en retire que
+  // deux, et annoncer « −5 » à côté d'un capital tombé de 2 ferait faux bond à
+  // qui recoupe la ligne avec la manche précédente.
+  const before = standing.points;
 
   standing.points -= points;
   if (standing.points <= 0) {
@@ -428,7 +434,7 @@ function applyPenalty(standing: EnduranceStanding, points: number, round: number
     standing.status = "ELIMINATED";
     standing.eliminatedRound = round;
   }
-  return true;
+  return before - standing.points;
 }
 
 /**
@@ -476,9 +482,9 @@ export type EnduranceReplay = {
   /** Cases du tableau, par équipe, alignées sur `rounds`. */
   history: Map<number, EnduranceRoundCell[]>;
   /**
-   * Points retirés par pénalité, cumulés par équipe — et seulement ceux qui ont
-   * réellement été retirés (cf. `applyPenalty`). Absent d'une équipe jamais
-   * sanctionnée, plutôt qu'un zéro pour tout le plateau.
+   * Points retirés par pénalité, cumulés par équipe — la **baisse réelle** du
+   * capital, jamais la sanction demandée (cf. `applyPenalty`). Absent d'une
+   * équipe jamais sanctionnée, plutôt qu'un zéro pour tout le plateau.
    */
   penaltyTotals: Map<number, number>;
 };
@@ -599,13 +605,16 @@ export function replayEnduranceDetailed(input: ReplayEnduranceInput): EnduranceR
     // `eliminatedThisRound` ci-dessous s'en charge, exactement comme pour une
     // élimination venue d'un score).
     //
-    // Seules les pénalités **effectivement retirées** sont retenues pour
-    // l'affichage : une sanction visant une équipe déjà sortie n'ampute rien, et
-    // annoncer « −3 » à côté d'un capital inchangé ferait douter du tableau.
+    // Seuls les points **effectivement retirés** sont retenus pour l'affichage :
+    // une sanction visant une équipe déjà sortie n'ampute rien, et une sanction
+    // plus lourde que le capital n'en retire que ce qu'il restait. Annoncer
+    // autre chose ferait douter du tableau.
     const applied = new Map<number, number>();
     for (const [teamId, points] of penaltiesByRound.get(round) ?? []) {
       const standing = standings.get(teamId);
-      if (standing && applyPenalty(standing, points, round)) applied.set(teamId, points);
+      if (!standing) continue;
+      const removed = applyPenalty(standing, points, round);
+      if (removed > 0) applied.set(teamId, removed);
     }
 
     for (const teamId of forfeitsByRound.get(round) ?? []) {

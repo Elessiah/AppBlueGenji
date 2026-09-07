@@ -46,7 +46,12 @@ interface EnduranceViewProps {
    * sont décidés ici, comme pour l'abandon.
    */
   canPenalize?: boolean;
-  onPenalize?: (teamId: number, teamName: string, points: number) => void;
+  /**
+   * Ouvre la saisie d'une sanction. Ne transporte que l'**identifiant** : le
+   * capital du dialogue se relit du flux à chaque rendu, un chiffre passé au
+   * clic serait périmé dès le score suivant.
+   */
+  onPenalize?: (teamId: number) => void;
   onLiftPenalty?: (penalty: EndurancePenaltyRow) => void;
   canReport: (match: BracketMatch) => boolean;
   adminResolvable: (match: BracketMatch) => boolean;
@@ -208,8 +213,13 @@ function EnduranceHistory({
         </p>
       )}
       {/* Un soulignement ambre ne se devine pas davantage qu'une case rouge :
-          la légende n'apparaît, elle aussi, que s'il y a quelque chose à lire. */}
-      {endurance.penalties.length > 0 && (
+          la légende n'apparaît, elle aussi, que s'il y a quelque chose à lire.
+          Le test porte sur les **cases**, pas sur la liste des sanctions : une
+          pénalité qui n'a rien pu retirer (équipe déjà sortie) n'en marque
+          aucune, et la légende annoncerait alors un trait introuvable. */}
+      {endurance.standings.some((standing) =>
+        standing.rounds.some((cell) => enduranceCellPenalty(cell) > 0),
+      ) && (
         <p className="mono" style={{ fontSize: 10, color: "var(--text-2)", margin: "8px 0 0" }}>
           SOULIGNÉ EN AMBRE = PÉNALITÉ D&apos;ARBITRAGE SUR CETTE MANCHE
         </p>
@@ -274,7 +284,20 @@ function PenaltyLog({
                   prononcée, ou rien si le compte a depuis été supprimé. */}
               {penalty.authorPseudo ? ` · ${penalty.authorPseudo}` : ""}
             </span>
-            {onLift !== undefined && (
+            {/*
+              Le verrou est celui de `match-lock` : une manche jouée depuis
+              fige la sanction. On le **dit** au lieu d'offrir un bouton voué au
+              refus — même motif que le « 🔒 Score verrouillé » des plateaux.
+            */}
+            {onLift !== undefined && !penalty.removable && (
+              <span
+                className={styles.penaltyMeta}
+                title="Une manche a été jouée depuis : rendre ces points remettrait en lice une équipe qui ne l'a pas disputée."
+              >
+                🔒 Figée
+              </span>
+            )}
+            {onLift !== undefined && penalty.removable && (
               <button
                 type="button"
                 onClick={() => onLift(penalty)}
@@ -466,9 +489,7 @@ export function EnduranceView({
                   {canPenalizeRow(standing.status) && onPenalize !== undefined && (
                     <button
                       type="button"
-                      onClick={() =>
-                        onPenalize(standing.teamId, standing.teamName, standing.points)
-                      }
+                      onClick={() => onPenalize(standing.teamId)}
                       className="btn"
                       title={`Retirer des points d'endurance à ${standing.teamName}`}
                       aria-label={`Infliger une pénalité d'endurance à ${standing.teamName}`}

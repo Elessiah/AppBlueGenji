@@ -112,6 +112,7 @@ describe("POST /api/tournaments/[id]/penalties", () => {
 
     const cases: [string, number][] = [
       ["NOT_BG_SURVIE", 400],
+      ["TOURNAMENT_NOT_RUNNING", 400],
       ["ENDURANCE_PLAYOFFS_STARTED", 400],
       ["TEAM_ALREADY_OUT", 400],
       ["INVALID_PENALTY", 400],
@@ -185,12 +186,31 @@ describe("DELETE /api/tournaments/[id]/penalties/[penaltyId]", () => {
     expect(await res.json()).toEqual({ error: "PENALTY_NOT_FOUND" });
   });
 
-  it("mappe le refus des play-offs en 400", async () => {
+  it("mappe les refus d'état en 400", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
+    for (const message of [
+      "ENDURANCE_PLAYOFFS_STARTED",
+      "TOURNAMENT_NOT_RUNNING",
+      "NOT_BG_SURVIE",
+    ]) {
+      (service.liftEndurancePenalty as jest.Mock).mockRejectedValueOnce(
+        new Error(message) as never,
+      );
+      const res = await DELETE(deleteReq(), deleteParams);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: message });
+    }
+  });
+
+  it("mappe le verrou de manche en 409, comme le verrou de score", async () => {
+    // La demande était licite, c'est l'état qui ne la permet plus : même
+    // famille que `CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES`.
     (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
     (service.liftEndurancePenalty as jest.Mock).mockRejectedValueOnce(
-      new Error("ENDURANCE_PLAYOFFS_STARTED") as never,
+      new Error("ENDURANCE_ROUND_ALREADY_PLAYED") as never,
     );
     const res = await DELETE(deleteReq(), deleteParams);
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "ENDURANCE_ROUND_ALREADY_PLAYED" });
   });
 });

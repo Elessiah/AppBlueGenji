@@ -32,9 +32,16 @@ export async function DELETE(
     return ok({ success: true });
   } catch (error) {
     const message = (error as Error).message;
-    if (message === "NOT_BG_SURVIE" || message === "ENDURANCE_PLAYOFFS_STARTED") {
+    if (
+      message === "NOT_BG_SURVIE" ||
+      message === "TOURNAMENT_NOT_RUNNING" ||
+      message === "ENDURANCE_PLAYOFFS_STARTED"
+    ) {
       return fail(message, 400);
     }
+    // Verrou de manche : même famille que `CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES`,
+    // donc même statut — la demande était licite, l'état ne la permet plus.
+    if (message === "ENDURANCE_ROUND_ALREADY_PLAYED") return fail(message, 409);
     if (message === "PENALTY_NOT_FOUND") return fail(message, 404);
     return fail(message || "PENALTY_LIFT_FAILED", 500);
   }

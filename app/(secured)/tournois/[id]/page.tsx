@@ -103,11 +103,11 @@ export default function TournamentDetailPage() {
   );
   const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
   // Pénalité d'endurance en cours de saisie : `null` = dialogue fermé. On retient
-  // l'engagé visé **et son capital du moment**, dont le dialogue se sert pour
-  // annoncer ce que la sanction laissera — et donc si elle élimine.
-  const [penaltyTarget, setPenaltyTarget] = useState<
-    { teamId: number; teamName: string; points: number } | null
-  >(null);
+  // l'**identifiant** de l'engagé visé, jamais sa ligne de classement — même
+  // raison que les trois dialogues ci-dessus : le flux réécrit le classement, et
+  // un capital capturé au clic ferait annoncer au dialogue un « capital
+  // restant » périmé, voire tairait l'élimination qu'une sanction provoque.
+  const [penaltyTeamId, setPenaltyTeamId] = useState<number | null>(null);
 
   // Lien profond `#match-[id]` : la fiche s'ouvre défilée sur le match désigné
   // (carte « en cours » de l'accueil, lien partagé). Le hook révèle au besoin la
@@ -130,7 +130,7 @@ export default function TournamentDetailPage() {
   useEffect(() => setIssueTarget(undefined), [tournamentId]);
   // Même précaution : une sanction ne doit pas se retrouver adressée à l'engagé
   // d'un autre tournoi parce que la page a changé de cible sous le dialogue.
-  useEffect(() => setPenaltyTarget(null), [tournamentId]);
+  useEffect(() => setPenaltyTeamId(null), [tournamentId]);
 
   // Dernière phase courante observée. On ne resynchronise la sélection que
   // lorsqu'elle change RÉELLEMENT (une phase vient de démarrer) : comparer
@@ -366,6 +366,14 @@ export default function TournamentDetailPage() {
     }
   };
 
+  // Ligne visée par le dialogue de pénalité, relue à chaque rendu depuis
+  // l'instantané : c'est ce qui garde le « capital restant » du dialogue aligné
+  // sur ce que le flux vient d'apporter.
+  const penaltyStanding =
+    penaltyTeamId === null
+      ? null
+      : detail.endurance?.standings.find((s) => s.teamId === penaltyTeamId) ?? null;
+
   const registerTeam = async () => {
     try {
       const response = await fetch(`/api/tournaments/${tournamentId}/register`, {
@@ -567,9 +575,7 @@ export default function TournamentDetailPage() {
               // `canForfeit`, qu'un capitaine porte aussi pour son propre
               // engagé. On ne se pénalise pas soi-même.
               canPenalize={!frozen && detail.isAdmin}
-              onPenalize={(teamId, teamName, points) =>
-                setPenaltyTarget({ teamId, teamName, points })
-              }
+              onPenalize={(teamId) => setPenaltyTeamId(teamId)}
               onLiftPenalty={liftPenalty}
               canReport={canReport}
               adminResolvable={canAdminResolve}
@@ -814,18 +820,19 @@ export default function TournamentDetailPage() {
       )}
 
       {/*
-        Le dialogue reste monté sur l'engagé choisi, pas sur une ligne du
-        classement : le flux SSE réordonne le tableau à chaque score, et une
-        sanction qui suivrait la ligne changerait de cible sous le curseur.
+        La cible est un **identifiant**, sa ligne se relit à chaque rendu depuis
+        le flux : le dialogue annonce donc le capital du moment, et l'élimination
+        quand la sanction y mène. Une ligne disparue (l'engagé vient de sortir)
+        referme le dialogue plutôt que d'ouvrir sur des chiffres inventés.
       */}
-      {penaltyTarget !== null && detail.isAdmin && !frozen && detail.endurance && (
+      {penaltyStanding !== null && detail.isAdmin && !frozen && detail.endurance && (
         <EndurancePenaltyDialog
           tournamentId={tournamentId}
-          teamId={penaltyTarget.teamId}
-          teamName={penaltyTarget.teamName}
-          currentPoints={penaltyTarget.points}
+          teamId={penaltyStanding.teamId}
+          teamName={penaltyStanding.teamName}
+          currentPoints={penaltyStanding.points}
           round={detail.endurance.currentRound}
-          onClose={() => setPenaltyTarget(null)}
+          onClose={() => setPenaltyTeamId(null)}
           onApplied={() => void refresh()}
         />
       )}
