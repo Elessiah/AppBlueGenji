@@ -393,7 +393,16 @@ export async function reconcileEndurance(
 ): Promise<void> {
   const tournament = await loadTournament(conn, tournamentId);
   if (!tournament || tournament.format !== "BG_SURVIE") return;
-  if (tournament.state === "FINISHED") return;
+  // Un tournoi terminé n'est **pas** hors de portée : corriger le score de la
+  // finale d'une archive doit se voir au palmarès, et `adminResolveMatch` le
+  // permet exprès (`finishTournament` prévoit d'ailleurs le rejeu de sa
+  // finalisation). Sortir ici laissait `final_rank` et le podium sur l'ancienne
+  // championne, que la page — qui rejoue toujours — contredisait ensuite.
+  //
+  // Ce qu'un tournoi clos ne fait pas, en revanche, c'est **rouvrir** : le rejeu
+  // et la finalisation sont rejoués, la pose d'une manche ou d'un arbre ne l'est
+  // pas. Voir `docs/features/FINISHED_TOURNAMENT_RECONCILIATION.md`.
+  const finished = tournament.state === "FINISHED";
 
   const config = configOf(tournament);
   const stored = await loadEnduranceStandings(conn, tournamentId);
@@ -417,6 +426,15 @@ export async function reconcileEndurance(
     // déjà posé, et rien d'autre ne le regarde.
     await repairPlayoffBracket(conn, tournamentId, assignRanks(replayed), config);
     await finalizePlayoffsIfDone(conn, tournamentId);
+    return;
+  }
+
+  // Clos sans arbre — la qualification n'a pas rendu deux qualifiées, et
+  // `startEndurancePlayoffs` a fini le tournoi sur place. Son classement se
+  // réécrit de la même façon qu'il a été écrit, et rien d'autre ne se rejoue :
+  // reprendre la qualification ici reposerait une manche à un tournoi terminé.
+  if (finished) {
+    await finalizeEndurance(conn, tournamentId, assignRanks(replayed));
     return;
   }
 
@@ -1084,12 +1102,13 @@ async function loadPenaltyRows(conn: PoolConnection, tournamentId: number) {
  * jamais jouée — exactement comme après une correction de score.
  *
  * **Sur un tournoi en cours seulement**, comme l'abandon en Survie et en Ronde
- * suisse : `reconcileEndurance` s'arrête net sur un tournoi `FINISHED`, si bien
- * qu'une sanction y serait écrite sans jamais être rejouée — le classement
- * stocké et le podium garderaient leurs valeurs pendant que `loadEnduranceMeta`,
- * qui rejoue toujours, afficherait une championne au capital amputé. Le cas est
- * atteignable : un tournoi clos par `startEndurancePlayoffs` faute de qualifiées
- * garde `endurance_playoffs_started` à 0.
+ * suisse. Depuis que la réconciliation rejoue aussi les tournois clos, une
+ * sanction tardive ne serait plus muette — elle serait pire : elle réécrirait un
+ * palmarès **déjà publié**, sans qu'aucune manche ne puisse plus être jouée pour
+ * en répondre. Corriger le score d'une archive répare une erreur d'arbitrage ;
+ * la sanctionner après coup en crée une. Le cas est atteignable : un tournoi
+ * clos par `startEndurancePlayoffs` faute de qualifiées garde
+ * `endurance_playoffs_started` à 0.
  *
  * @throws NOT_BG_SURVIE | TOURNAMENT_NOT_RUNNING | ENDURANCE_PLAYOFFS_STARTED
  *         | TEAM_NOT_IN_TOURNAMENT | TEAM_ALREADY_OUT | INVALID_PENALTY

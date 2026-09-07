@@ -577,7 +577,6 @@ export async function reconcileSwiss(
   // ronde suivante.
   const tournament = await loadTournament(conn, tournamentId, true, phaseId);
   if (!tournament || tournament.format !== "SWISS") return { done: false, ranked: [] };
-  if (tournament.state === "FINISHED") return { done: false, ranked: [] };
 
   const tiebreakers = parseTiebreakers(tournament.swiss_tiebreakers_json);
   const currentRound = Number(tournament.swiss_current_round);
@@ -588,6 +587,17 @@ export async function reconcileSwiss(
 
   const ranked = rankSwiss(state.standings, state.matches, tiebreakers);
   await persistStandings(conn, tournamentId, ranked, phaseId);
+
+  // Tournoi déjà clos : corriger le score de sa dernière ronde doit se voir au
+  // palmarès — `adminResolveMatch` l'autorise exprès, et sortir en tête laissait
+  // `final_rank` sur l'ancien classement. Celui-ci est donc réécrit depuis le
+  // rejeu, mais **aucune ronde n'est reposée** : un tournoi terminé ne se rouvre
+  // pas. Voir `docs/features/FINISHED_TOURNAMENT_RECONCILIATION.md`.
+  if (tournament.state === "FINISHED") {
+    // Dans une phase, la clôture appartient à l'orchestrateur.
+    if (phaseId === 0) await finalizeSwiss(tournamentId, conn, ranked);
+    return { done: true, ranked };
+  }
 
   const active = activeStandings(state.standings);
 
