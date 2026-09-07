@@ -82,6 +82,22 @@ describe("play-offs — le vrai arbre, et non une liste de cartes", () => {
     expect(SECTIONS).toContain("resolveNextMatchId={resolveNextMatchId}");
   });
 
+  it("nomme ses stades sur le tableau complet, pas sur les tours déjà posés", () => {
+    // L'arbre pousse un tour à la fois : sans ce compte, les quarts de finale
+    // s'appellent « Finale » tant qu'ils sont le seul tour posé.
+    expect(VIEW).toContain("endurancePlayoffRoundCount(");
+    expect(VIEW).toContain("plannedRounds={playoffRounds}");
+    expect(SECTIONS).toContain("buildSections(roundNums, bracketType, totalRounds)");
+  });
+
+  it("garde une clé de volet stable quand un tour rejoint la section", () => {
+    // Le titre change en grandissant (« Finale » → « Phase finale ») ; l'état
+    // ouvert est gardé par clé, et le volet se refermait donc tout seul.
+    const lib = readFileSync(join(ROOT, TOURNAMENT_DIR, "_lib", "bracket-sections.ts"), "utf8");
+    expect(lib).toContain("key: String(chunk[0])");
+    expect(lib).toContain("key: String(finalRounds[0])");
+  });
+
   it("laisse le comportement d'origine aux tableaux qui portent leurs liens", () => {
     // La prop est **optionnelle** : sans elle, l'arbre lit `nextWinnerMatchId`
     // comme il l'a toujours fait. Une élimination simple ne doit rien changer.
