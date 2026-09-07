@@ -41,6 +41,10 @@
  * - **Clôture faute d'adversaires** — un incident d'organisation, constaté après
  *   coup : rien à faire le soir même, et la ligne du journal suffit à en parler.
  * - **Suppression d'un tournoi** — un geste d'administrateur déjà accompli.
+ * - **Pénalité d'endurance, posée ou retirée** — c'est l'arbitre lui-même qui
+ *   vient de la prononcer. La lui renvoyer en message privé ne lui apprendrait
+ *   rien ; la ligne du journal, elle, explique à tout le monde pourquoi un
+ *   classement a bougé sans qu'aucun match ne l'ait fait bouger.
  *
  * ## Une seule règle, un seul transport
  *
@@ -100,6 +104,8 @@ export const BOT_EVENT_CHANNELS: Record<BotEventKind, BotEventChannel> = {
   tournament_started: "JOURNAL",
   tournament_finished: "JOURNAL",
   tournament_underfilled: "JOURNAL",
+  endurance_penalty: "JOURNAL",
+  endurance_penalty_lifted: "JOURNAL",
   score_conflict: "REFEREE",
   score_report_stalled: "REFEREE",
 };

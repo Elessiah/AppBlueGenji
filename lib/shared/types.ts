@@ -94,6 +94,32 @@ export type EnduranceStandingRow = {
    * sur la manche de sa sortie et sur toutes les suivantes.
    */
   rounds: EnduranceRoundCell[];
+  /**
+   * Points retirés par pénalité d'arbitrage, cumulés — `0` si l'engagé n'a
+   * jamais été sanctionné. Seules les pénalités **effectivement retirées** y
+   * figurent : une sanction visant une équipe déjà sortie n'ampute rien.
+   */
+  penaltyPoints: number;
+};
+
+/**
+ * Pénalité d'endurance telle qu'elle s'affiche (`lib/shared/endurance-penalty.ts`).
+ *
+ * Le motif et l'auteur ne sont pas décoratifs : une sanction se conteste, et
+ * « −3 » sans un mot ni un nom n'est adressable à personne.
+ */
+export type EndurancePenaltyRow = {
+  id: number;
+  teamId: number;
+  teamName: string;
+  /** Manche à laquelle la sanction a été prononcée. */
+  round: number;
+  /** Points retirés. */
+  points: number;
+  reason: string;
+  /** Arbitre qui l'a prononcée, `null` si son compte a été supprimé. */
+  authorPseudo: string | null;
+  createdAt: string | null;
 };
 
 export type EnduranceMeta = {
@@ -121,6 +147,11 @@ export type EnduranceMeta = {
   playoffsStarted: boolean;
   /** Manches qualificatives jouées, dans l'ordre : colonnes du tableau. */
   rounds: number[];
+  /**
+   * Pénalités infligées, de la plus ancienne manche à la plus récente. Vide
+   * dans l'immense majorité des tournois : une sanction reste l'exception.
+   */
+  penalties: EndurancePenaltyRow[];
   standings: EnduranceStandingRow[];
 };
 

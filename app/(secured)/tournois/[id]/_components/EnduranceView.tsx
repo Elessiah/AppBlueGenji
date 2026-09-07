@@ -2,9 +2,15 @@
 
 import { FormEvent } from "react";
 import { ScrollArea } from "@/components/cyber";
-import type { BracketMatch, EnduranceMeta, TournamentFormat } from "@/lib/shared/types";
+import type {
+  BracketMatch,
+  EnduranceMeta,
+  EndurancePenaltyRow,
+  TournamentFormat,
+} from "@/lib/shared/types";
 import {
   enduranceCellLabel,
+  enduranceCellPenalty,
   enduranceCellTitle,
   enduranceCellTone,
   enduranceHistoryColumns,
@@ -34,6 +40,14 @@ interface EnduranceViewProps {
   /** L'abandon est-il proposé pour cette équipe ? (cf. `_lib/forfeit.ts`) */
   canForfeit?: (teamId: number) => boolean;
   onForfeit?: (teamId: number, teamName: string) => void;
+  /**
+   * La pénalité d'endurance est-elle proposée ? Elle ne dépend que du lecteur
+   * (permission `tournaments`) : le statut de l'équipe et l'état des play-offs
+   * sont décidés ici, comme pour l'abandon.
+   */
+  canPenalize?: boolean;
+  onPenalize?: (teamId: number, teamName: string, points: number) => void;
+  onLiftPenalty?: (penalty: EndurancePenaltyRow) => void;
   canReport: (match: BracketMatch) => boolean;
   adminResolvable: (match: BracketMatch) => boolean;
   drafts: MatchScoreDraft;
@@ -67,8 +81,9 @@ const AMBER = "rgba(255,157,46,0.9)";
  * est une classe et non un style en ligne, sans quoi il l'emporterait sur le
  * repli mobile de `.table-row`.
  */
-function rowClass(withActions: boolean): string {
-  return `table-row ${withActions ? styles.rowWithActions : styles.row}`;
+function rowClass(withActions: boolean, wide: boolean): string {
+  if (!withActions) return `table-row ${styles.row}`;
+  return `table-row ${wide ? styles.rowWithWideActions : styles.rowWithActions}`;
 }
 
 /**
@@ -166,7 +181,16 @@ function EnduranceHistory({
               {standing.rounds.map((cell) => (
                 <span
                   key={cell.round}
-                  className={`${styles.historyCell} ${CELL_CLASS[enduranceCellTone(cell)]}`}
+                  className={[
+                    styles.historyCell,
+                    CELL_CLASS[enduranceCellTone(cell)],
+                    // La marque de pénalité s'**ajoute** au ton de la case : une
+                    // sanction qui vide le capital doit rester lisible comme un
+                    // zéro, tout en disant d'où vient ce zéro.
+                    enduranceCellPenalty(cell) > 0 ? styles.historyPenalty : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                   title={enduranceCellTitle(standing.teamName, cell)}
                 >
                   {enduranceCellLabel(cell)}
@@ -183,6 +207,87 @@ function EnduranceHistory({
           FF = FORFAIT SUR TOUT LE RESTE DU TOURNOI
         </p>
       )}
+      {/* Un soulignement ambre ne se devine pas davantage qu'une case rouge :
+          la légende n'apparaît, elle aussi, que s'il y a quelque chose à lire. */}
+      {endurance.penalties.length > 0 && (
+        <p className="mono" style={{ fontSize: 10, color: "var(--text-2)", margin: "8px 0 0" }}>
+          SOULIGNÉ EN AMBRE = PÉNALITÉ D&apos;ARBITRAGE SUR CETTE MANCHE
+        </p>
+      )}
+    </div>
+  );
+}
+
+
+/**
+ * Journal des pénalités d'endurance (`docs/features/ENDURANCE_PENALTIES.md`).
+ *
+ * Visible de **tous**, et pas seulement de l'arbitrage : une sanction qui
+ * déplace un classement sans qu'aucun match ne l'explique doit être lisible par
+ * l'équipe qui la subit et par celles qu'elle fait remonter. Seul le retrait
+ * est réservé à l'arbitrage.
+ *
+ * Le bloc n'existe pas quand il n'y a rien à lire : un intertitre « Pénalités »
+ * suivi du vide laisserait croire à une rubrique en panne.
+ */
+function PenaltyLog({
+  penalties,
+  onLift,
+}: {
+  penalties: EndurancePenaltyRow[];
+  /** Retrait proposé, `undefined` pour un lecteur sans droit d'arbitrage. */
+  onLift?: (penalty: EndurancePenaltyRow) => void;
+}) {
+  if (penalties.length === 0) return null;
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div className="mono" style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 8 }}>
+        PÉNALITÉS D&apos;ARBITRAGE
+      </div>
+      <ul className={styles.penaltyList}>
+        {penalties.map((penalty) => (
+          <li
+            key={penalty.id}
+            className={styles.penaltyItem}
+            title={
+              penalty.createdAt
+                ? new Date(penalty.createdAt).toLocaleString("fr-FR", {
+                    dateStyle: "full",
+                    timeStyle: "short",
+                  })
+                : undefined
+            }
+          >
+            <span className={styles.penaltyAmount}>−{penalty.points}</span>
+            <EntrantLink teamId={penalty.teamId}>{penalty.teamName}</EntrantLink>
+            <span className={styles.penaltyReason}>{penalty.reason}</span>
+            <span className={styles.penaltyMeta}>
+              M{penalty.round}
+              {/* Une sanction se conteste : elle porte le nom de qui l'a
+                  prononcée, ou rien si le compte a depuis été supprimé. */}
+              {penalty.authorPseudo ? ` · ${penalty.authorPseudo}` : ""}
+            </span>
+            {onLift !== undefined && (
+              <button
+                type="button"
+                onClick={() => onLift(penalty)}
+                className="btn ghost"
+                title={`Retirer cette pénalité : ${penalty.teamName} récupère ${penalty.points} point(s)`}
+                aria-label={`Retirer la pénalité de ${penalty.points} point(s) infligée à ${penalty.teamName}`}
+                style={{
+                  padding: "2px 8px",
+                  fontSize: 10,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                Retirer
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -199,6 +304,9 @@ export function EnduranceView({
   myTeamId = null,
   canForfeit,
   onForfeit,
+  canPenalize = false,
+  onPenalize,
+  onLiftPenalty,
   canReport,
   adminResolvable,
   drafts,
@@ -250,8 +358,22 @@ export function EnduranceView({
     onForfeit !== undefined &&
     canForfeit(teamId);
 
-  const showActions = endurance.standings.some((s) => canForfeitRow(s.teamId, s.status));
-  const rowClassName = rowClass(showActions);
+  // La pénalité suit exactement la même fenêtre que l'abandon : la phase
+  // qualificative d'un tournoi en cours. Passé le coup d'envoi des play-offs, le
+  // capital ne décide plus rien — une sanction y serait sans effet tout en
+  // figurant au tableau comme si elle en avait un. Même refus côté serveur.
+  const canPenalizeRow = (status: string): boolean =>
+    !isFinished &&
+    !endurance.playoffsStarted &&
+    status === "ACTIVE" &&
+    canPenalize &&
+    onPenalize !== undefined;
+
+  const showActions = endurance.standings.some(
+    (s) => canForfeitRow(s.teamId, s.status) || canPenalizeRow(s.status),
+  );
+  const showPenaltyAction = endurance.standings.some((s) => canPenalizeRow(s.status));
+  const rowClassName = rowClass(showActions, showPenaltyAction);
 
   // « Hors course » ne se devine pas : la ligne affiche encore un capital, et
   // rien n'explique pourquoi elle n'est plus en lice. La légende n'apparaît
@@ -302,7 +424,22 @@ export function EnduranceView({
               >
                 {standing.teamName}
               </EntrantLink>
-              <span className="num">{standing.points}</span>
+              <span className="num">
+                {standing.points}
+                {/*
+                  Le cumul des pénalités se lit à côté du capital, pas à sa
+                  place : c'est le capital qui décide du classement, la sanction
+                  explique seulement pourquoi il n'est pas celui qu'on attendait.
+                */}
+                {standing.penaltyPoints > 0 && (
+                  <span
+                    className={styles.penaltyBadge}
+                    title={`${standing.penaltyPoints} point(s) retiré(s) par pénalité d'arbitrage`}
+                  >
+                    −{standing.penaltyPoints}
+                  </span>
+                )}
+              </span>
               <span>
                 {standing.wins} / {standing.losses}
               </span>
@@ -311,7 +448,29 @@ export function EnduranceView({
                 {standing.eliminatedRound ? ` (M${standing.eliminatedRound})` : ""}
               </span>
               {showActions && (
-                <span>
+                <span className={styles.rowActions}>
+                  {canPenalizeRow(standing.status) && onPenalize !== undefined && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onPenalize(standing.teamId, standing.teamName, standing.points)
+                      }
+                      className="btn"
+                      title={`Retirer des points d'endurance à ${standing.teamName}`}
+                      aria-label={`Infliger une pénalité d'endurance à ${standing.teamName}`}
+                      style={{
+                        padding: "3px 8px",
+                        fontSize: 10,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
+                        background: "rgba(255,157,46,0.12)",
+                        borderColor: "rgba(255,157,46,0.4)",
+                        color: AMBER,
+                      }}
+                    >
+                      Pénalité
+                    </button>
+                  )}
                   {forfeitable && onForfeit !== undefined && (
                     <button
                       type="button"
@@ -360,6 +519,18 @@ export function EnduranceView({
           {endurance.maxRounds === null ? "" : ` DANS LES ${endurance.maxRounds} MANCHES PRÉVUES`}
         </p>
       )}
+
+      {/*
+        Le journal des sanctions vient **avant** le tableau manche par manche :
+        c'est lui qui explique les soulignements ambre qu'on y trouvera, et une
+        légende qui suit ce qu'elle légende se lit deux fois.
+      */}
+      <PenaltyLog
+        penalties={endurance.penalties}
+        onLift={
+          canPenalize && !endurance.playoffsStarted && !isFinished ? onLiftPenalty : undefined
+        }
+      />
 
       <EnduranceHistory endurance={endurance} myTeamId={myTeamId} />
 

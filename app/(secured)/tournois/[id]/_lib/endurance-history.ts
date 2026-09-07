@@ -52,7 +52,26 @@ export function enduranceCellTitle(teamName: string, cell: EnduranceRoundCell): 
   if (cell.kind === "OUT") return `${prefix} : déjà sortie de la phase qualificative`;
 
   const points = cell.points ?? 0;
-  return `${prefix} : ${points} point${points > 1 ? "s" : ""} d'endurance`;
+  const capital = `${prefix} : ${points} point${points > 1 ? "s" : ""} d'endurance`;
+
+  // La pénalité s'ajoute à l'infobulle plutôt que d'y remplacer le capital :
+  // c'est bien le capital que la case affiche, et la sanction explique
+  // seulement pourquoi il a bougé sans qu'un score ne l'explique.
+  const penalty = cell.penalty ?? 0;
+  if (penalty === 0) return capital;
+  return `${capital} (dont −${penalty} de pénalité)`;
+}
+
+/**
+ * La case porte-t-elle la marque d'une pénalité d'arbitrage ?
+ *
+ * Distinct du **ton** : une case pénalisée reste un capital ordinaire, elle ne
+ * change pas de poids de lecture — elle reçoit une marque en plus. Confondre
+ * les deux obligerait à choisir entre « capital vidé » et « sanction » sur la
+ * manche où une pénalité vide justement le capital.
+ */
+export function enduranceCellPenalty(cell: EnduranceRoundCell): number {
+  return cell.kind === "POINTS" ? cell.penalty ?? 0 : 0;
 }
 
 /**

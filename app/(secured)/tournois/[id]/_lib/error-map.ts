@@ -1,3 +1,5 @@
+import { endurancePenaltyMessage } from "@/lib/shared/endurance-penalty";
+
 export const ERROR_MESSAGES: Record<string, string> = {
   CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES: "Score verrouillé : la manche suivante a déjà des scores saisis.",
   MATCH_NOT_FOUND: "Match introuvable.",
@@ -33,8 +35,12 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // Formulations neutres : le forfait peut aussi être déclaré par l'arbitrage
   // pour une autre équipe que la sienne.
   TEAM_ALREADY_OUT: "Cette équipe n'est plus en lice dans ce tournoi.",
+  // Partagé par l'abandon **et** par les pénalités d'endurance : les deux se
+  // ferment au même instant, quand le capital cesse de décider quoi que ce
+  // soit. D'où une phrase qui dit d'abord la cause, puis le report du seul des
+  // deux gestes qui ait encore un chemin.
   ENDURANCE_PLAYOFFS_STARTED:
-    "Les play-offs ont commencé : un forfait se déclare désormais sur le match lui-même.",
+    "Les play-offs ont commencé : le capital d'endurance est figé. Un forfait se déclare désormais sur le match lui-même.",
   TEAM_NOT_IN_TOURNAMENT: "Cette équipe n'est pas inscrite à ce tournoi.",
   // Volontairement neutre : le même code remonte du forfait, de la diffusion et
   // de toute route protégée. Un message parlant de forfait sur un refus
@@ -122,6 +128,20 @@ export const ERROR_MESSAGES: Record<string, string> = {
   GHOST_TEAMS_LOAD_FAILED: "Impossible de charger la liste des équipes fantômes.",
   GHOST_TEAM_CREATE_FAILED: "Erreur lors de la création de l'équipe fantôme.",
   GHOST_REGISTRATION_FAILED: "Erreur lors de l'inscription.",
+  // Pénalités d'endurance (`docs/features/ENDURANCE_PENALTIES.md`). Les quatre
+  // refus de forme viennent du module partagé, phrases comprises : le dialogue
+  // les évite déjà, et les recopier ici ferait deux bornes à tenir d'accord —
+  // celle du code et celle du message qui l'annonce.
+  POINTS_NOT_POSITIVE: endurancePenaltyMessage("POINTS_NOT_POSITIVE"),
+  POINTS_TOO_HIGH: endurancePenaltyMessage("POINTS_TOO_HIGH"),
+  REASON_REQUIRED: endurancePenaltyMessage("REASON_REQUIRED"),
+  REASON_TOO_LONG: endurancePenaltyMessage("REASON_TOO_LONG"),
+  INVALID_PENALTY: "Pénalité invalide.",
+  INVALID_PENALTY_ID: "Identifiant de pénalité invalide.",
+  PENALTY_NOT_FOUND: "Cette pénalité n'existe plus.",
+  NOT_BG_SURVIE: "Les pénalités d'endurance n'existent qu'en mode BlueGenji Survie.",
+  PENALTY_FAILED: "Erreur lors de l'enregistrement de la pénalité.",
+  PENALTY_LIFT_FAILED: "Erreur lors du retrait de la pénalité.",
 };
 
 export function mapError(errorCode: string): string {
