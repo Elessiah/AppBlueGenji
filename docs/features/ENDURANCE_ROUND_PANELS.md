@@ -58,11 +58,18 @@ Décidé par `defaultOpenEnduranceRound` (module pur), par ordre de priorité :
    flottaison.
 
 Le volet à ouvrir **change en cours de tournoi** : une manche s'achève, la
-suivante arrive par le flux SSE. Un état figé au montage (ce que fait
-`BracketSections`, dont les volets ne bougent pas de la partie) laisserait le
-lecteur sur une manche close. `EnduranceRoundPanels` ouvre donc la nouvelle
-manche courante **à chaque fois qu'elle change**, et seulement alors — sinon un
-volet refermé à la main se rouvrirait au prochain instantané.
+suivante arrive par le flux SSE. Un état figé au montage laisserait le lecteur
+sur une manche close. On ouvre donc la nouvelle manche courante **à chaque fois
+qu'elle change**, et seulement alors — sinon un volet refermé à la main se
+rouvrirait au prochain instantané.
+
+`BracketSections` suit désormais **la même règle** : son état était lui aussi
+figé au montage, ce qui ne se voyait pas sur un tableau à élimination (le
+découpage y est acquis dès la génération du plateau) mais se voit sur l'arbre
+final, où le découpage se réorganise quand un tour s'ajoute — au-delà de trois
+tours, la « phase finale » glisse d'une section à l'autre, et la section qui
+venait de recevoir le tour vivant naissait repliée. Les deux composants
+partagent leur chrome ; leur ouverture ne pouvait pas suivre deux règles.
 
 ### Disposition des cartes
 

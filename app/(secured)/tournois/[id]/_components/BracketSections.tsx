@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
 import { BracketTree, MatchScoreDraft, ScrollRequest } from "./BracketTree";
 import { BoardPanel, PanelPill } from "./BoardPanel";
@@ -65,11 +65,30 @@ export function BracketSections({
   const myNextMatchId = myNext?.id ?? null;
   const regionBaseId = `bracket-${bracketType.toLowerCase()}`;
 
-  const [openKeys, setOpenKeys] = useState<Set<string>>(() => {
-    const initial = defaultOpenKey(sections, matches, myNext);
-    return new Set(initial ? [initial] : []);
-  });
+  const autoOpen = defaultOpenKey(sections, matches, myNext);
+
+  const [openKeys, setOpenKeys] = useState<Set<string>>(
+    () => new Set(autoOpen ? [autoOpen] : []),
+  );
   const [scrollRequest, setScrollRequest] = useState<ScrollRequest | null>(null);
+
+  // Le volet à ouvrir d'office **change en cours de tournoi** : le plateau
+  // avance, et l'arbre final de BlueGenji Survie voit même son découpage se
+  // réorganiser quand un tour s'ajoute (au-delà de trois tours, la « phase
+  // finale » glisse d'une section à l'autre). Un état figé au montage laissait
+  // alors naître repliée la section qui vient de recevoir le tour vivant, sans
+  // que rien ne l'ouvre.
+  //
+  // On **ajoute** sans jamais refermer, et seulement quand le défaut change :
+  // un volet replié à la main ne se rouvre pas au prochain instantané. Même
+  // règle que les manches d'endurance (`EnduranceRoundPanels`), avec qui ce
+  // composant partage déjà son chrome.
+  const lastAutoOpen = useRef(autoOpen);
+  useEffect(() => {
+    if (autoOpen === null || autoOpen === lastAutoOpen.current) return;
+    lastAutoOpen.current = autoOpen;
+    setOpenKeys((prev) => (prev.has(autoOpen) ? prev : new Set(prev).add(autoOpen)));
+  }, [autoOpen]);
 
   // Ancre `#match-[id]` : un gros tableau ne rend qu'un volet à la fois, et la
   // cible peut dormir dans un volet replié — le hook la chercherait alors dans

@@ -54,6 +54,17 @@ describe("volets de manche — câblage de la vue", () => {
     expect(PANELS).toContain("autoOpen === lastAutoOpen.current");
   });
 
+  it("applique la même règle aux volets des tableaux à élimination", () => {
+    // Les deux composants partagent leur chrome ; leur ouvrir un volet ne peut
+    // pas suivre deux règles. Sur l'arbre final, le découpage se réorganise
+    // même en cours de route (au-delà de trois tours, la « phase finale »
+    // glisse d'une section à l'autre) : la section qui reçoit le tour vivant
+    // naissait repliée, et rien ne l'ouvrait.
+    expect(SECTIONS).toContain("lastAutoOpen");
+    expect(SECTIONS).toContain("autoOpen === lastAutoOpen.current");
+    expect(SECTIONS).toContain("prev.has(autoOpen) ? prev :");
+  });
+
   it("partage le chrome des volets avec les tableaux à élimination", () => {
     // Deux copies du même en-tête auraient divergé au premier réglage.
     for (const source of [PANELS, SECTIONS]) {
