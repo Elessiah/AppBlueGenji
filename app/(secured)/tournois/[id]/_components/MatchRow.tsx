@@ -43,7 +43,7 @@ export function MatchRow({
 }: MatchRowProps) {
   // Format du tournoi (BO5, FT3…) : rappelé au-dessus des champs et appliqué
   // comme borne haute, pour que la saisie ne parte pas hors format.
-  const matchFormat = useMatchFormat();
+  const matchFormat = useMatchFormat(match);
   // Signalement : réservé aux engagés du tournoi, et seulement sur une manche
   // dont les deux adversaires sont connus — il n'y a rien à arbitrer sur une
   // case encore vide.
@@ -59,6 +59,17 @@ export function MatchRow({
   const team1Win = match.winnerTeamId !== null && match.winnerTeamId === match.team1Id;
   const team2Win = match.winnerTeamId !== null && match.winnerTeamId === match.team2Id;
   const hasWinner = match.winnerTeamId !== null;
+
+  // Match **nul** : clos, sans vainqueur, et pas par forfait. Une rencontre
+  // jouée qui ne teinte aucune des deux lignes se lit exactement comme une
+  // rencontre à venir — d'où la mention, seule chose qui distingue « 2 – 2 »
+  // de « pas encore joué ».
+  const isDraw =
+    match.status === "COMPLETED" &&
+    match.winnerTeamId === null &&
+    match.forfeitTeamId === null &&
+    match.team1Id !== null &&
+    match.team2Id !== null;
 
   // Même règle que le garde-fou serveur (`lib/shared/match-lock.ts`) : le score
   // n'est plus éditable dès que la manche suivante porte une saisie.
@@ -152,6 +163,24 @@ export function MatchRow({
           {team2Score}
         </strong>
       </div>
+
+      {isDraw && (
+        <p
+          style={{
+            margin: 0,
+            padding: "3px 8px",
+            fontSize: 10,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            textAlign: "center",
+            color: "var(--text-2)",
+            background: "rgba(255,255,255,0.03)",
+            borderTop: `1px solid ${BORDER}`,
+          }}
+        >
+          Match nul
+        </p>
+      )}
 
       <MatchLiveStrip match={match} />
 

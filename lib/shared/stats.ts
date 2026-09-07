@@ -23,6 +23,9 @@ export const FORM_LENGTH = 5;
 /** Nombre de mois couverts par la courbe d'activité. */
 export const ACTIVITY_MONTHS = 12;
 
+/** Issue d'un match vue depuis l'entité analysée. */
+export type StatsOutcome = "WIN" | "LOSS" | "DRAW";
+
 /** Un match terminé, vu depuis l'entité analysée. */
 export type StatsMatch = {
   matchId: number;
@@ -35,7 +38,16 @@ export type StatsMatch = {
   playedAt: string;
   opponentTeamId: number | null;
   opponentName: string | null;
-  won: boolean;
+  /**
+   * Issue de la rencontre, vue depuis l'entité.
+   *
+   * Ternaire, et non un booléen : une map nulle peut clore un match sans
+   * vainqueur là où le format l'autorise (`lib/shared/match-format.ts`), et un
+   * `won: false` aurait rangé ce match parmi les défaites — une équipe qui n'a
+   * jamais perdu aurait affiché des défaites, et ses séries auraient été
+   * brisées par des matchs qu'elle n'a pas perdus.
+   */
+  outcome: StatsOutcome;
   /** Maps gagnées par l'entité. */
   scoreFor: number;
   /** Maps gagnées par l'adversaire. */
@@ -85,7 +97,13 @@ export type StatsTournament = {
   playedAt: string;
 };
 
-export type StreakKind = "WIN" | "LOSS" | "NONE";
+/**
+ * `DRAW` n'est pas une série de nuls : un match nul **rompt** les deux séries,
+ * et la « série en cours » vaut alors 1 nul. Enchaîner des nuls n'a pas de
+ * lecture utile, et compter le nul comme neutre laisserait annoncer « 4
+ * victoires d'affilée » à une équipe qui vient de concéder un 2-2.
+ */
+export type StreakKind = "WIN" | "LOSS" | "DRAW" | "NONE";
 
 export type StatsStreak = {
   kind: StreakKind;
@@ -154,7 +172,14 @@ export type DeepStats = {
   matchesPlayed: number;
   matchesWon: number;
   matchesLost: number;
-  /** Ratio de victoires entre 0 et 1, `null` si aucun match joué. */
+  /** Matchs clos sans vainqueur — comptés dans `matchesPlayed`, pas ailleurs. */
+  matchesDrawn: number;
+  /**
+   * Ratio de victoires entre 0 et 1, `null` si aucun match joué.
+   *
+   * Les nuls sont au **dénominateur** : ce sont des matchs joués, et les
+   * retirer ferait remonter le ratio d'une équipe qui n'a pourtant pas gagné.
+   */
   winRate: number | null;
 
   // — Maps
@@ -168,7 +193,7 @@ export type DeepStats = {
   bestWinStreak: number;
   worstLossStreak: number;
   /** Jusqu'aux `FORM_LENGTH` derniers résultats, le plus récent en tête. */
-  form: ("W" | "L")[];
+  form: ("W" | "L" | "D")[];
 
   // — Forfaits
   forfeitsGiven: number;
@@ -233,6 +258,7 @@ export function emptyDeepStats(now: Date = new Date()): DeepStats {
     matchesPlayed: 0,
     matchesWon: 0,
     matchesLost: 0,
+    matchesDrawn: 0,
     winRate: null,
     mapsWon: 0,
     mapsLost: 0,
@@ -340,9 +366,13 @@ export function computeDeepStats(
   let runningLosses = 0;
 
   for (const match of ordered) {
+    const won = match.outcome === "WIN";
+    const lost = match.outcome === "LOSS";
+
     stats.matchesPlayed += 1;
-    if (match.won) stats.matchesWon += 1;
-    else stats.matchesLost += 1;
+    if (won) stats.matchesWon += 1;
+    else if (lost) stats.matchesLost += 1;
+    else stats.matchesDrawn += 1;
 
     stats.mapsWon += match.scoreFor;
     stats.mapsLost += match.scoreAgainst;
@@ -351,27 +381,32 @@ export function computeDeepStats(
     if (match.forfeit === "RECEIVED") stats.forfeitsReceived += 1;
 
     // Séries : les deux compteurs avancent en parallèle, une victoire remettant
-    // à zéro la série de défaites et inversement.
-    if (match.won) {
+    // à zéro la série de défaites et inversement. Un **nul les rompt toutes les
+    // deux** — il n'est ni l'une ni l'autre, et le laisser passer ferait
+    // annoncer une série de victoires qu'un 2-2 a pourtant interrompue.
+    if (won) {
       runningWins += 1;
       runningLosses = 0;
       if (runningWins > stats.bestWinStreak) stats.bestWinStreak = runningWins;
-    } else {
+    } else if (lost) {
       runningLosses += 1;
       runningWins = 0;
       if (runningLosses > stats.worstLossStreak) stats.worstLossStreak = runningLosses;
+    } else {
+      runningWins = 0;
+      runningLosses = 0;
     }
 
     const gameBucket = byGame.get(match.game) ?? { played: 0, won: 0, lost: 0 };
     gameBucket.played += 1;
-    if (match.won) gameBucket.won += 1;
-    else gameBucket.lost += 1;
+    if (won) gameBucket.won += 1;
+    else if (lost) gameBucket.lost += 1;
     byGame.set(match.game, gameBucket);
 
     const formatBucket = byFormat.get(match.format) ?? { played: 0, won: 0, lost: 0 };
     formatBucket.played += 1;
-    if (match.won) formatBucket.won += 1;
-    else formatBucket.lost += 1;
+    if (won) formatBucket.won += 1;
+    else if (lost) formatBucket.lost += 1;
     byFormat.set(match.format, formatBucket);
 
     if (match.opponentTeamId !== null) {
@@ -383,15 +418,15 @@ export function computeDeepStats(
         lost: 0,
       };
       entry.played += 1;
-      if (match.won) entry.won += 1;
-      else entry.lost += 1;
+      if (won) entry.won += 1;
+      else if (lost) entry.lost += 1;
       opponents.set(match.opponentTeamId, entry);
     }
 
     const bucketIndex = activityIndex.get(monthKey(match.playedAt));
     if (bucketIndex !== undefined) {
       stats.activity[bucketIndex].played += 1;
-      if (match.won) stats.activity[bucketIndex].won += 1;
+      if (won) stats.activity[bucketIndex].won += 1;
     }
   }
 
@@ -399,16 +434,18 @@ export function computeDeepStats(
     stats.firstMatchAt = ordered[0].playedAt;
     stats.lastMatchAt = ordered[ordered.length - 1].playedAt;
 
-    const lastWon = ordered[ordered.length - 1].won;
+    const last = ordered[ordered.length - 1].outcome;
     stats.currentStreak = {
-      kind: lastWon ? "WIN" : "LOSS",
-      length: lastWon ? runningWins : runningLosses,
+      kind: last,
+      // Un nul remet les deux compteurs à zéro : la série en cours vaut donc 1,
+      // le nul lui-même.
+      length: last === "WIN" ? runningWins : last === "LOSS" ? runningLosses : 1,
     };
 
     stats.form = ordered
       .slice(-FORM_LENGTH)
       .reverse()
-      .map((match) => (match.won ? "W" : "L"));
+      .map((match) => (match.outcome === "WIN" ? "W" : match.outcome === "LOSS" ? "L" : "D"));
   }
 
   stats.winRate = ratio(stats.matchesWon, stats.matchesPlayed);
@@ -461,6 +498,11 @@ export function formatDiff(diff: number): string {
 /** Libellé français d'une série en cours (`"4 victoires d'affilée"`). */
 export function formatStreak(streak: StatsStreak): string {
   if (streak.kind === "NONE" || streak.length === 0) return "Aucune série";
+
+  // Un nul rompt les deux séries : il n'y en a pas de troisième à annoncer, la
+  // phrase dit donc simplement que la série précédente s'est arrêtée là.
+  if (streak.kind === "DRAW") return "Série interrompue par un nul";
+
   const noun = streak.kind === "WIN"
     ? `victoire${streak.length > 1 ? "s" : ""}`
     : `défaite${streak.length > 1 ? "s" : ""}`;

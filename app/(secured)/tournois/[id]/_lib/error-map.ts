@@ -10,12 +10,17 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // bouton qu'il n'a pas — c'est `decideScoreForm` qui la donne, côté arbitrage,
   // avant même l'aller-retour.
   MATCH_ALREADY_COMPLETED: "Ce match est déjà tranché : son résultat ne peut plus être saisi.",
-  DRAW_NOT_ALLOWED: "Les scores ne peuvent pas être égaux.",
+  DRAW_NOT_ALLOWED: "Match nul impossible : ce tournoi exige un vainqueur.",
   // Formulations de repli : l'interface connaît le format du tournoi et
   // remplace ces messages par une version chiffrée (`matchScoreViolationMessage`).
   SCORE_EXCEEDS_MATCH_FORMAT: "Score impossible pour le format de match du tournoi.",
   SCORE_BELOW_MATCH_FORMAT: "Le vainqueur doit atteindre le nombre de manches du format.",
   INVALID_MATCH_FORMAT: "Format de match invalide.",
+  INVALID_MATCH_FORMAT_MAX_MAPS:
+    "Plafond de maps invalide : il doit rester entre l'objectif du format et son maximum naturel.",
+  INVALID_ENDURANCE_PLAYOFF_FORMAT: "Format des play-offs invalide.",
+  DRAWS_NOT_SUPPORTED_BY_FORMAT:
+    "Les égalités ne sont possibles qu'en qualification BlueGenji Survie : ailleurs, le plateau a besoin d'un vainqueur.",
   TOURNAMENT_NOT_FOUND: "Tournoi introuvable.",
   TOURNAMENT_NOT_RUNNING: "Le tournoi n'est pas en cours.",
   ADMIN_SAVE_SCORES_FAILED: "Erreur lors de la sauvegarde des scores.",

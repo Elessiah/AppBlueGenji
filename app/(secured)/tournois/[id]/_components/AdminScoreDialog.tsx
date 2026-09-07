@@ -129,7 +129,7 @@ function storedResultLabel(match: BracketMatch, team1: string, team2: string): s
  */
 export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDialogProps) {
   const form = useScoreForm(match);
-  const matchFormat = useMatchFormat();
+  const matchFormat = useMatchFormat(match);
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: form.submitting });

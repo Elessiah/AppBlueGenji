@@ -1,7 +1,12 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { MIN_ENTRANTS_FOR_MATCHES, SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { queueBotLog, queueRefereeAlert } from "./bot-logs";
-import { resetRegistrationRanks, finishTournament } from "./repository";
+import {
+  loadTournamentMatchFormat,
+  resetRegistrationRanks,
+  finishTournament,
+} from "./repository";
+import { matchWinnerSide, type MatchFormat } from "@/lib/shared/match-format";
 
 export async function isEliminationPhaseComplete(
   connection: PoolConnection,
@@ -286,6 +291,27 @@ export async function finalizeTournamentIfDone(
  * et une fois après, et une garde posée à la réservation ne verrait donc qu'un
  * des deux ordres. C'est `flushBotLogs` qui tranche, sur la file entière.
  */
+/**
+ * Les deux identifiants d'un résultat, depuis les scores et le format.
+ *
+ * `null` des deux côtés sur un match nul : `finalizeMatch` écrit alors deux
+ * colonnes vides et ne propage rien, ce qui est exactement ce qu'un nul veut
+ * dire — personne ne monte, personne ne tombe.
+ */
+function resolveSides(
+  match: { team1_id: number | null; team2_id: number | null },
+  format: MatchFormat | null,
+  team1Score: number,
+  team2Score: number,
+): { winnerTeamId: number | null; loserTeamId: number | null } {
+  const side = matchWinnerSide(format, team1Score, team2Score);
+  if (side === null) return { winnerTeamId: null, loserTeamId: null };
+
+  return side === 1
+    ? { winnerTeamId: Number(match.team1_id), loserTeamId: Number(match.team2_id) }
+    : { winnerTeamId: Number(match.team2_id), loserTeamId: Number(match.team1_id) };
+}
+
 export async function resolveExpiredScoreReports(
   connection: PoolConnection,
   tournamentId: number,
@@ -304,6 +330,7 @@ export async function resolveExpiredScoreReports(
       next_winner_slot,
       next_loser_match_id,
       next_loser_slot,
+      round_number,
       (score_deadline_at <= DATE_SUB(NOW(), INTERVAL ? MINUTE)) AS conflict_stalled
      FROM bg_matches
      WHERE tournament_id = ?
@@ -327,28 +354,24 @@ export async function resolveExpiredScoreReports(
     const team2Reported =
       match.team2_report_score !== null && match.team2_report_opponent_score !== null;
 
-    if (team1Reported && !team2Reported) {
-      const team1Score = Number(match.team1_report_score);
-      const team2Score = Number(match.team1_report_opponent_score);
-      const winnerTeamId = team1Score >= team2Score ? Number(match.team1_id) : Number(match.team2_id);
-      const loserTeamId =
-        winnerTeamId === Number(match.team1_id) ? Number(match.team2_id) : Number(match.team1_id);
+    // Un seul report : il fait foi. Le vainqueur se dérive du **format** de la
+    // manche, seul à savoir si un score nul est un résultat ou une aberration —
+    // la règle vit dans `matchWinnerSide`, partagée avec l'arbitrage et
+    // l'accord des deux engagés.
+    if (team1Reported !== team2Reported) {
+      const team1Score = team1Reported
+        ? Number(match.team1_report_score)
+        : Number(match.team2_report_opponent_score);
+      const team2Score = team1Reported
+        ? Number(match.team1_report_opponent_score)
+        : Number(match.team2_report_score);
 
-      await finalizeMatch(connection, tournamentId, match, {
-        team1Score,
-        team2Score,
-        winnerTeamId,
-        loserTeamId,
-      });
-      continue;
-    }
-
-    if (team2Reported && !team1Reported) {
-      const team1Score = Number(match.team2_report_opponent_score);
-      const team2Score = Number(match.team2_report_score);
-      const winnerTeamId = team1Score >= team2Score ? Number(match.team1_id) : Number(match.team2_id);
-      const loserTeamId =
-        winnerTeamId === Number(match.team1_id) ? Number(match.team2_id) : Number(match.team1_id);
+      const format = await loadTournamentMatchFormat(
+        connection,
+        tournamentId,
+        Number(match.round_number),
+      );
+      const { winnerTeamId, loserTeamId } = resolveSides(match, format, team1Score, team2Score);
 
       await finalizeMatch(connection, tournamentId, match, {
         team1Score,

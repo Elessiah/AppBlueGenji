@@ -14,7 +14,7 @@ import { useMatchFormat } from "../_lib/match-format-context";
 
 export function useScoreForm(match: BracketMatch | null) {
   const { showError, showSuccess } = useToast();
-  const matchFormat = useMatchFormat();
+  const matchFormat = useMatchFormat(match);
   const [state, setState] = useState<ScoreFormState>(() => scoreFormStateFor(match));
   const [submitting, setSubmitting] = useState(false);
 

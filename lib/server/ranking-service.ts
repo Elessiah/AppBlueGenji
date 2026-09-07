@@ -56,6 +56,8 @@ export type TeamRankingRow = {
   logoUrl: string | null;
   wins: number;
   losses: number;
+  /** Matchs clos sans vainqueur (map nulle) — comptés parmi les matchs joués. */
+  draws: number;
   /** Cote rejouée. Jamais recalculée ailleurs. */
   points: number;
 };
@@ -109,7 +111,8 @@ type RankedMatchRow = RowDataPacket & {
   id: number;
   team1_id: number;
   team2_id: number;
-  winner_team_id: number;
+  /** `null` = match nul : `PLAYED_MATCH_SQL` n'en laisse pas passer d'autre. */
+  winner_team_id: number | null;
   played_at: Date | string | null;
 };
 
@@ -165,6 +168,19 @@ async function loadRankedMatches(
   return rows.map((row) => {
     const team1 = Number(row.team1_id);
     const team2 = Number(row.team2_id);
+    // Match nul : aucun vainqueur à ranger en tête, les deux camps partent donc
+    // dans l'ordre des sides. Le rejeu ne s'en sert que pour nommer les deux
+    // cotes — le transfert, lui, se calcule sur l'espérance.
+    if (row.winner_team_id === null) {
+      return {
+        matchId: Number(row.id),
+        winnerTeamId: team1,
+        loserTeamId: team2,
+        drawn: true,
+        playedAt: isoOrEpoch(row.played_at),
+      };
+    }
+
     const winner = Number(row.winner_team_id);
     return {
       matchId: Number(row.id),
@@ -246,14 +262,15 @@ export async function loadTeamRanking(options: TeamRankingOptions = {}): Promise
       logoUrl: team.logo_url,
       wins: state.wins,
       losses: state.losses,
+      draws: state.draws,
       points: state.points,
     });
   }
 
   return rows.sort((a, b) =>
     compareRankedTeams(
-      { points: a.points, wins: a.wins, losses: a.losses, name: a.teamName },
-      { points: b.points, wins: b.wins, losses: b.losses, name: b.teamName },
+      { points: a.points, wins: a.wins, losses: a.losses, draws: a.draws, name: a.teamName },
+      { points: b.points, wins: b.wins, losses: b.losses, draws: b.draws, name: b.teamName },
     ),
   );
 }
@@ -318,12 +335,13 @@ export async function loadEntrantsBySiteRanking(
         points: state.points,
         wins: state.wins,
         losses: state.losses,
+        draws: state.draws,
       };
     })
     .sort((a, b) =>
       compareRankedTeams(
-        { points: a.points, wins: a.wins, losses: a.losses, name: a.teamName },
-        { points: b.points, wins: b.wins, losses: b.losses, name: b.teamName },
+        { points: a.points, wins: a.wins, losses: a.losses, draws: a.draws, name: a.teamName },
+        { points: b.points, wins: b.wins, losses: b.losses, draws: b.draws, name: b.teamName },
       ),
     )
     .map(({ teamId, teamName }) => ({ teamId, teamName }));

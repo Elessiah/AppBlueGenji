@@ -9,7 +9,11 @@
  * Le module ne connaît pas HTTP : il rend un **code d'erreur**, que l'appelant
  * traduit en statut (`fail(code, 400)`) ou en exception.
  */
-import { isValidMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
+import {
+  isValidMatchFormat,
+  isValidMatchMaxMaps,
+  type MatchFormat,
+} from "@/lib/shared/match-format";
 import { isParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import { DEFAULT_SWISS_POINTS } from "@/lib/shared/swiss";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
@@ -144,6 +148,10 @@ export type TournamentInputBody = {
   enduranceMaxRounds?: number;
   matchFormatType?: string | null;
   matchFormatValue?: number | null;
+  matchFormatMaxMaps?: number | null;
+  matchFormatDraws?: boolean | null;
+  endurancePlayoffFormatType?: string | null;
+  endurancePlayoffFormatValue?: number | null;
 };
 
 export type ValidatedTournamentInput = {
@@ -166,6 +174,12 @@ export type ValidatedTournamentInput = {
   endurancePlayoffSize: number | null;
   enduranceMaxRounds: number | null;
   matchFormat: MatchFormat | null;
+  /**
+   * Format de l'arbre final en « BlueGenji Survie » (`null` = celui du
+   * tournoi). Jamais d'égalité : la qualification peut clore un match sans
+   * vainqueur, l'arbre a besoin de savoir qui joue le tour suivant.
+   */
+  endurancePlayoffFormat: MatchFormat | null;
   /**
    * Phases du format MULTI, **brutes** (telles que reçues du client) : non
    * normalisées — `position`, `name`, `hasThirdPlaceMatch`… peuvent être
@@ -224,6 +238,44 @@ export function validateTournamentInput(
     matchFormat = {
       type: body.matchFormatType as MatchFormat["type"],
       value: Number(body.matchFormatValue),
+    };
+
+    // Plafond de maps décisives. Il se valide **contre le format** — entre
+    // l'objectif et le plafond naturel — donc seulement une fois celui-ci lu.
+    if (body.matchFormatMaxMaps != null) {
+      if (!isValidMatchMaxMaps(matchFormat, body.matchFormatMaxMaps)) {
+        return { error: "INVALID_MATCH_FORMAT_MAX_MAPS" };
+      }
+      matchFormat.maxMaps = Number(body.matchFormatMaxMaps);
+    }
+  }
+
+  // Égalités : réservées à « BlueGenji Survie », dont le capital se compte map
+  // par map et absorbe un match nul. Ailleurs, un match sans vainqueur laisse
+  // le moteur sans qualifiée à propager — le refus est donc de forme, pas de
+  // goût. Sans format de match, il n'y a pas de réglage où l'inscrire.
+  if (body.matchFormatDraws) {
+    if (body.format !== "BG_SURVIE") return { error: "DRAWS_NOT_SUPPORTED_BY_FORMAT" };
+    if (!matchFormat) return { error: "INVALID_MATCH_FORMAT" };
+    matchFormat.drawsAllowed = true;
+  }
+
+  // Format de l'arbre final (BG Survie). Même règle de paire que le format du
+  // tournoi ; les égalités n'y sont pas proposées, donc pas non plus lues.
+  let endurancePlayoffFormat: MatchFormat | null = null;
+  const hasPlayoffType = body.endurancePlayoffFormatType != null;
+  const hasPlayoffValue = body.endurancePlayoffFormatValue != null;
+  if (hasPlayoffType !== hasPlayoffValue) {
+    return { error: "INVALID_ENDURANCE_PLAYOFF_FORMAT" };
+  }
+  if (hasPlayoffType && hasPlayoffValue) {
+    if (body.format !== "BG_SURVIE") return { error: "INVALID_ENDURANCE_PLAYOFF_FORMAT" };
+    if (!isValidMatchFormat(body.endurancePlayoffFormatType, body.endurancePlayoffFormatValue)) {
+      return { error: "INVALID_ENDURANCE_PLAYOFF_FORMAT" };
+    }
+    endurancePlayoffFormat = {
+      type: body.endurancePlayoffFormatType as MatchFormat["type"],
+      value: Number(body.endurancePlayoffFormatValue),
     };
   }
 
@@ -354,6 +406,7 @@ export function validateTournamentInput(
       endurancePlayoffSize,
       enduranceMaxRounds,
       matchFormat,
+      endurancePlayoffFormat,
       // Les phases ne concernent que le format MULTI : on ne les transmet pas
       // aux autres formats, même si le client en a envoyé. Voir le
       // commentaire du champ `phases` de `ValidatedTournamentInput` ci-dessus :

@@ -19,6 +19,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import {
   assignRanks,
   forfeitMapCount,
+  PLAYOFF_ROUND_OFFSET,
   pairingsAreStale,
   planEnduranceRound,
   planNextPlayoffRound,
@@ -51,6 +52,8 @@ type TournamentEnduranceRow = RowDataPacket & {
   state: string;
   match_format_type: string | null;
   match_format_value: number | null;
+  match_format_max_maps: number | null;
+  match_format_draws: number;
   endurance_start_points: number | null;
   endurance_win_delta: number | null;
   endurance_loss_delta: number | null;
@@ -67,6 +70,7 @@ async function loadTournament(
 ): Promise<TournamentEnduranceRow | null> {
   const [rows] = await conn.execute<TournamentEnduranceRow[]>(
     `SELECT format, state, match_format_type, match_format_value,
+            match_format_max_maps, match_format_draws,
             endurance_start_points, endurance_win_delta, endurance_loss_delta,
             endurance_playoff_size, endurance_max_rounds, endurance_current_round,
             endurance_playoffs_started, has_third_place_match
@@ -87,22 +91,27 @@ function configOf(tournament: TournamentEnduranceRow): EnduranceConfig {
 }
 
 /**
- * Format de match du tournoi (`null` = score libre). C'est lui qui chiffre un
- * forfait : en FT3, l'équipe partie encaisse un 3-0.
+ * Format de la **phase qualificative** (`null` = score libre). C'est lui qui
+ * chiffre un forfait : en FT3, l'équipe partie encaisse un 3-0. C'est aussi le
+ * seul des deux qui puisse autoriser une égalité.
  */
 function matchFormatOf(tournament: TournamentEnduranceRow): MatchFormat | null {
-  return parseMatchFormat(tournament.match_format_type, tournament.match_format_value);
+  return parseMatchFormat(
+    tournament.match_format_type,
+    tournament.match_format_value,
+    tournament.match_format_max_maps,
+    tournament.match_format_draws,
+  );
 }
+
 
 /** Manches de la phase qualificative : bracket UPPER, phase_id 0. */
 const QUALIFICATION_BRACKET = "UPPER" as const;
 
-/**
- * Première manche de la phase éliminatoire. Les manches de qualification
- * occupent 1..N ; les play-offs repartent d'un palier élevé pour que les deux
- * phases restent lisibles côte à côte dans l'historique des matchs.
- */
-const PLAYOFF_ROUND_OFFSET = 1000;
+// `PLAYOFF_ROUND_OFFSET` vit dans le module pur (`lib/shared/bg-survie.ts`) :
+// la frontière entre les deux phases sert aussi à la vue et à la résolution du
+// format de match, elle n'appartient plus à cette orchestration.
+
 
 export async function loadEnduranceStandings(
   conn: PoolConnection,
@@ -115,12 +124,13 @@ export async function loadEnduranceStandings(
       points: number;
       wins: number;
       losses: number;
+      draws: number | null;
       status: EnduranceStatus;
       eliminated_round: number | null;
       rank: number;
     })[]
   >(
-    `SELECT team_id, seed, points, wins, losses, status, eliminated_round, \`rank\`
+    `SELECT team_id, seed, points, wins, losses, draws, status, eliminated_round, \`rank\`
      FROM bg_endurance_standings
      WHERE tournament_id = ?
      ORDER BY \`rank\` ASC, seed ASC`,
@@ -133,6 +143,7 @@ export async function loadEnduranceStandings(
     points: Number(row.points),
     wins: Number(row.wins),
     losses: Number(row.losses),
+    draws: Number(row.draws ?? 0),
     status: row.status,
     eliminatedRound: row.eliminated_round === null ? null : Number(row.eliminated_round),
     rank: Number(row.rank),
@@ -150,11 +161,11 @@ async function persistStandings(
   for (const standing of standings) {
     await conn.execute(
       `INSERT INTO bg_endurance_standings
-        (tournament_id, team_id, seed, points, wins, losses, status, eliminated_round, \`rank\`)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (tournament_id, team_id, seed, points, wins, losses, draws, status, eliminated_round, \`rank\`)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
         seed = VALUES(seed), points = VALUES(points), wins = VALUES(wins),
-        losses = VALUES(losses), status = VALUES(status),
+        losses = VALUES(losses), draws = VALUES(draws), status = VALUES(status),
         eliminated_round = VALUES(eliminated_round), \`rank\` = VALUES(\`rank\`)`,
       [
         tournamentId,
@@ -163,6 +174,7 @@ async function persistStandings(
         standing.points,
         standing.wins,
         standing.losses,
+        standing.draws,
         standing.status,
         standing.eliminatedRound,
         standing.rank,
@@ -199,6 +211,7 @@ export async function initializeEnduranceTournament(
     points: config.startPoints,
     wins: 0,
     losses: 0,
+    draws: 0,
     status: "ACTIVE",
     eliminatedRound: null,
     rank: index + 1,
@@ -318,6 +331,16 @@ async function loadQualificationOutcomes(
     const winnerScore = winnerIsTeam1 ? row.team1_score : row.team2_score;
     const loserScore = winnerIsTeam1 ? row.team2_score : row.team1_score;
 
+    // Match **nul** : clos, sans vainqueur, et pas par forfait. Les deux camps
+    // ne se lisent alors plus sur `winner_team_id` / `loser_team_id`, qui sont
+    // vides tous les deux — ils se lisent sur les sides, comme les scores.
+    const drawn =
+      row.status === "COMPLETED" &&
+      winnerTeamId === null &&
+      row.forfeit_team_id == null &&
+      row.team1_id !== null &&
+      row.team2_id !== null;
+
     return {
       round: Number(row.round_number),
       completed: row.status === "COMPLETED",
@@ -328,6 +351,10 @@ async function loadQualificationOutcomes(
       // `!= null` couvre aussi une colonne absente : un forfait doit être une
       // information positive, jamais un défaut.
       isForfeit: row.forfeit_team_id != null,
+      drawTeamIds: drawn ? ([Number(row.team1_id), Number(row.team2_id)] as const) : null,
+      // Les deux scores sont égaux sur un nul : un seul chiffre suffit, et
+      // `team1_score` fait foi. Un nul sans score enregistré ne déplace rien.
+      drawMaps: drawn && row.team1_score !== null ? Number(row.team1_score) : 0,
     };
   });
 }
@@ -1223,12 +1250,13 @@ export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: numb
       points: number;
       wins: number;
       losses: number;
+      draws: number | null;
       status: EnduranceStatus;
       eliminated_round: number | null;
       rank: number;
     })[]
   >(
-    `SELECT s.team_id, s.seed, s.points, s.wins, s.losses, s.status, s.eliminated_round, s.\`rank\`,
+    `SELECT s.team_id, s.seed, s.points, s.wins, s.losses, s.draws, s.status, s.eliminated_round, s.\`rank\`,
             t.name AS team_name, t.logo_url
      FROM bg_endurance_standings s
      JOIN bg_teams t ON t.id = s.team_id
@@ -1285,6 +1313,7 @@ export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: numb
       points: Number(row.points),
       wins: Number(row.wins),
       losses: Number(row.losses),
+      draws: Number(row.draws ?? 0),
       status: row.status,
       eliminatedRound: row.eliminated_round === null ? null : Number(row.eliminated_round),
       rank: Number(row.rank),

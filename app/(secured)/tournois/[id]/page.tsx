@@ -17,6 +17,7 @@ import { useTournamentLive } from "./_hooks/useTournamentLive";
 import { mapError } from "./_lib/error-map";
 import { checkMatchScores, matchScoreViolationMessage } from "@/lib/shared/match-format";
 import { MatchFormatProvider } from "./_lib/match-format-context";
+import { tournamentMatchFormat } from "@/lib/shared/bg-survie";
 import { canForfeitTeam } from "./_lib/forfeit";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { AdminScoreDialog } from "./_components/AdminScoreDialog";
@@ -266,17 +267,25 @@ export default function TournamentDetailPage() {
     event.preventDefault();
     const draft = drafts[match.id] || { myScore: "", opponentScore: "" };
 
-    // Contrôle local contre le format du tournoi : évite un aller-retour pour
-    // un score que le serveur refusera de toute façon, et permet un message
-    // chiffré (« le vainqueur doit atteindre 3 manches »).
-    const violation = checkMatchScores(
+    // Contrôle local contre le format **de la manche** : évite un aller-retour
+    // pour un score que le serveur refusera de toute façon, et permet un
+    // message chiffré (« le vainqueur doit atteindre 3 manches »). La manche
+    // compte : « BlueGenji Survie » joue deux formats, et sa qualification
+    // accepte un score que son arbre final refuse.
+    const format = tournamentMatchFormat(
+      detail.card.format,
       detail.card.matchFormat,
+      detail.card.endurancePlayoffFormat,
+      match.roundNumber,
+    );
+    const violation = checkMatchScores(
+      format,
       Number(draft.myScore),
       Number(draft.opponentScore),
       { decisive: true },
     );
     if (violation) {
-      showError(matchScoreViolationMessage(detail.card.matchFormat, violation));
+      showError(matchScoreViolationMessage(format, violation));
       return;
     }
 
@@ -468,7 +477,11 @@ export default function TournamentDetailPage() {
         targetMatchId={targetMatchId}
         highlightedMatchId={highlightedMatchId}
       >
-      <MatchFormatProvider format={detail.card.matchFormat}>
+      <MatchFormatProvider
+        format={detail.card.matchFormat}
+        playoffFormat={detail.card.endurancePlayoffFormat}
+        tournamentFormat={detail.card.format}
+      >
       <LiveProvider
         canManage={detail.canManageLive}
         canSchedule={detail.isAdmin}

@@ -182,12 +182,13 @@ export async function checkDownstreamMatchesHaveNoScores(
 async function checkScoresAgainstMatchFormat(
   connection: PoolConnection,
   tournamentId: number,
+  round: number,
   team1Score: number,
   team2Score: number,
   decisive: boolean,
 ): Promise<void> {
   const violation = checkMatchScores(
-    await loadTournamentMatchFormat(connection, tournamentId),
+    await loadTournamentMatchFormat(connection, tournamentId, round),
     team1Score,
     team2Score,
     { decisive },
@@ -212,7 +213,12 @@ async function forfeitScores(
   match: MatchRow,
   forfeitTeamId: number,
 ): Promise<{ team1Score: number; team2Score: number }> {
-  return forfeitMatchScores(connection, tournamentId, forfeitTeamId === Number(match.team1_id));
+  return forfeitMatchScores(
+    connection,
+    tournamentId,
+    forfeitTeamId === Number(match.team1_id),
+    Number(match.round_number),
+  );
 }
 
 /**
@@ -240,6 +246,7 @@ export async function adminSaveMatchScores(
     `SELECT
       id,
       tournament_id,
+      round_number,
       team1_id,
       team2_id,
       next_winner_match_id,
@@ -287,6 +294,7 @@ export async function adminSaveMatchScores(
     await checkScoresAgainstMatchFormat(
       connection,
       Number(match.tournament_id),
+      Number(match.round_number),
       team1Score,
       team2Score,
       false,
@@ -316,6 +324,7 @@ export async function adminResolveMatch(
     `SELECT
       id,
       tournament_id,
+      round_number,
       team1_id,
       team2_id,
       next_winner_match_id,
@@ -356,11 +365,32 @@ export async function adminResolveMatch(
     resultTeam1Score = scores.team1Score;
     resultTeam2Score = scores.team2Score;
   } else if (team1Score !== undefined && team2Score !== undefined) {
-    await checkScoresAgainstMatchFormat(connection, tournamentId, team1Score, team2Score, true);
+    await checkScoresAgainstMatchFormat(
+      connection,
+      tournamentId,
+      Number(match.round_number),
+      team1Score,
+      team2Score,
+      true,
+    );
 
-    winnerTeamId = team1Score > team2Score ? Number(match.team1_id) : Number(match.team2_id);
+    // Match nul : le contrôle ci-dessus ne le laisse passer que sur un format
+    // qui l'autorise (aujourd'hui la seule qualification de BlueGenji Survie).
+    // Ni vainqueur ni perdant, donc rien à propager — ce qu'un arbre à
+    // élimination directe ne saurait pas faire, et pourquoi il ne l'ouvre pas.
+    const drawn = team1Score === team2Score;
+
+    winnerTeamId = drawn
+      ? null
+      : team1Score > team2Score
+        ? Number(match.team1_id)
+        : Number(match.team2_id);
     loserTeamId =
-      winnerTeamId === Number(match.team1_id) ? Number(match.team2_id) : Number(match.team1_id);
+      winnerTeamId === null
+        ? null
+        : winnerTeamId === Number(match.team1_id)
+          ? Number(match.team2_id)
+          : Number(match.team1_id);
     resultTeam1Score = team1Score;
     resultTeam2Score = team2Score;
   } else {

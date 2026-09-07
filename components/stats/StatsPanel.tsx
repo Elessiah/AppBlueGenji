@@ -239,6 +239,12 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
           <Tile label="Matchs joués" value={stats.matchesPlayed} />
           <Tile label="Victoires" value={stats.matchesWon} />
           <Tile label="Défaites" value={stats.matchesLost} />
+          {/* Les nuls ne s'affichent que s'il y en a : ils n'existent que dans un
+              mode et un seul, et une tuile à zéro sur toutes les autres fiches
+              poserait une question que rien n'y répond. */}
+          {stats.matchesDrawn > 0 && (
+            <Tile label="Nuls" value={stats.matchesDrawn} hint="aucun vainqueur" />
+          )}
           <Tile label="Ratio de victoires" value={formatRate(stats.winRate)} />
           <Tile
             label="Maps"
@@ -257,17 +263,27 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
                 role="list"
                 aria-label={`${stats.form.length} derniers résultats, du plus récent au plus ancien`}
               >
-                {stats.form.map((result, index) => (
-                  <span
-                    key={`${result}-${index}`}
-                    role="listitem"
-                    className={`${s.formBadge} ${result === "W" ? s.formWin : s.formLoss}`}
-                    aria-label={result === "W" ? "Victoire" : "Défaite"}
-                    title={result === "W" ? "Victoire" : "Défaite"}
-                  >
-                    <span aria-hidden="true">{result === "W" ? "V" : "D"}</span>
-                  </span>
-                ))}
+                {stats.form.map((result, index) => {
+                  // « D » désigne déjà la **défaite** sur ces pastilles : un nul
+                  // porte donc « N », faute de quoi les deux issues se liraient
+                  // sous la même lettre.
+                  const label =
+                    result === "W" ? "Victoire" : result === "L" ? "Défaite" : "Match nul";
+                  const letter = result === "W" ? "V" : result === "L" ? "D" : "N";
+                  const tone = result === "W" ? s.formWin : result === "L" ? s.formLoss : s.formDraw;
+
+                  return (
+                    <span
+                      key={`${result}-${index}`}
+                      role="listitem"
+                      className={`${s.formBadge} ${tone}`}
+                      aria-label={label}
+                      title={label}
+                    >
+                      <span aria-hidden="true">{letter}</span>
+                    </span>
+                  );
+                })}
               </div>
               <span className={s.splitValue}>{formatStreak(stats.currentStreak)}</span>
             </div>

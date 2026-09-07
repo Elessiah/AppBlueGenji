@@ -14,7 +14,7 @@ import {
   type EditWindow,
   type TournamentField,
 } from "@/lib/shared/tournament-edit";
-import type { MatchFormat } from "@/lib/shared/match-format";
+import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import type { ParticipantType } from "@/lib/shared/participants";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import { normalizePhaseConfigs, validatePhases } from "@/lib/shared/tournament-phases";
@@ -49,6 +49,8 @@ export type EditableTournamentValues = {
   endurancePlayoffSize: number | null;
   enduranceMaxRounds: number | null;
   matchFormat: MatchFormat | null;
+  /** BG Survie : format de l'arbre final (`null` = celui du tournoi). */
+  endurancePlayoffFormat: MatchFormat | null;
   phases: PhaseConfig[] | null;
 };
 
@@ -72,7 +74,9 @@ async function loadEditRow(
       swiss_total_rounds, swiss_points_win, swiss_points_draw, swiss_points_loss,
       endurance_start_points, endurance_win_delta, endurance_loss_delta,
       endurance_playoff_size, endurance_max_rounds,
-      match_format_type, match_format_value
+      match_format_type, match_format_value,
+      match_format_max_maps, match_format_draws,
+      endurance_playoff_format_type, endurance_playoff_format_value
      FROM bg_tournaments
      WHERE id = ?
      LIMIT 1${forUpdate ? " FOR UPDATE" : ""}`,
@@ -111,13 +115,16 @@ function toValues(
     enduranceLossDelta: num(row.endurance_loss_delta),
     endurancePlayoffSize: num(row.endurance_playoff_size),
     enduranceMaxRounds: num(row.endurance_max_rounds),
-    matchFormat:
-      row.match_format_type === null || row.match_format_value === null
-        ? null
-        : {
-            type: row.match_format_type as MatchFormat["type"],
-            value: Number(row.match_format_value),
-          },
+    matchFormat: parseMatchFormat(
+      row.match_format_type,
+      row.match_format_value,
+      row.match_format_max_maps,
+      row.match_format_draws,
+    ),
+    endurancePlayoffFormat: parseMatchFormat(
+      row.endurance_playoff_format_type,
+      row.endurance_playoff_format_value,
+    ),
     phases,
   };
 }
@@ -241,6 +248,10 @@ export async function updateTournament(
       enduranceMaxRounds: next.enduranceMaxRounds ?? undefined,
       matchFormatType: next.matchFormat?.type ?? null,
       matchFormatValue: next.matchFormat?.value ?? null,
+      matchFormatMaxMaps: next.matchFormat?.maxMaps ?? null,
+      matchFormatDraws: next.matchFormat?.drawsAllowed ?? null,
+      endurancePlayoffFormatType: next.endurancePlayoffFormat?.type ?? null,
+      endurancePlayoffFormatValue: next.endurancePlayoffFormat?.value ?? null,
       phases: next.phases ?? undefined,
     });
     if ("error" in validation) throw new Error(validation.error);
@@ -276,7 +287,9 @@ export async function updateTournament(
         swiss_total_rounds = ?, swiss_points_win = ?, swiss_points_draw = ?, swiss_points_loss = ?,
         endurance_start_points = ?, endurance_win_delta = ?, endurance_loss_delta = ?,
         endurance_playoff_size = ?, endurance_max_rounds = ?,
-        match_format_type = ?, match_format_value = ?
+        match_format_type = ?, match_format_value = ?,
+        match_format_max_maps = ?, match_format_draws = ?,
+        endurance_playoff_format_type = ?, endurance_playoff_format_value = ?
        WHERE id = ?`,
       [
         valid.name,
@@ -303,6 +316,10 @@ export async function updateTournament(
         valid.enduranceMaxRounds,
         valid.matchFormat?.type ?? null,
         valid.matchFormat?.value ?? null,
+        valid.matchFormat?.maxMaps ?? null,
+        valid.matchFormat?.drawsAllowed ? 1 : 0,
+        valid.endurancePlayoffFormat?.type ?? null,
+        valid.endurancePlayoffFormat?.value ?? null,
         tournamentId,
       ],
     );

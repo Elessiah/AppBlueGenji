@@ -9,8 +9,13 @@ import {
   DEFAULT_MATCH_FORMAT,
   MATCH_FORMAT_BOUNDS,
   isValidMatchFormat,
+  isValidMatchMaxMaps,
   matchFormatDescription,
   matchFormatLabel,
+  matchMaxMaps,
+  matchWinsRequired,
+  naturalMaxMaps,
+  type MatchFormat,
   type MatchFormatType,
 } from "@/lib/shared/match-format";
 import { participantWording, type ParticipantType } from "@/lib/shared/participants";
@@ -99,8 +104,40 @@ export function TournamentForm({
   const matchFormatType: MatchFormatType | "LIBRE" = values.matchFormat?.type ?? "LIBRE";
   const matchFormatValue = values.matchFormat?.value ?? lastMatchFormatValue;
   const isLibre = matchFormatType === "LIBRE";
-  const matchFormat = isLibre ? null : { type: matchFormatType, value: matchFormatValue };
+  const matchFormat: MatchFormat | null = isLibre
+    ? null
+    : {
+        type: matchFormatType,
+        value: matchFormatValue,
+        maxMaps: values.matchFormat?.maxMaps ?? null,
+        drawsAllowed: values.matchFormat?.drawsAllowed ?? false,
+      };
   const matchFormatValid = isLibre || isValidMatchFormat(matchFormatType, matchFormatValue);
+
+  /**
+   * Modifie le format de match **sans perdre ses réglages voisins**.
+   *
+   * Le plafond de maps et les égalités vivent sur le même objet que le type et
+   * le nombre de manches : réécrire `{ type, value }` les effaçait à chaque
+   * frappe, et une case cochée se décochait dès qu'on touchait au FT.
+   *
+   * Le plafond est **revalidé** contre le nouveau format : il se borne à
+   * l'objectif et au plafond naturel, tous deux dérivés du nombre de manches.
+   * Passer d'un FT3 plafonné à 4 maps vers un FT2 laisserait sinon une valeur
+   * que le serveur refuse, sur un formulaire qui s'annonce valide.
+   */
+  const patchMatchFormat = (patch: Partial<MatchFormat>) => {
+    const next: MatchFormat = {
+      type: matchFormatType === "LIBRE" ? DEFAULT_MATCH_FORMAT.type : matchFormatType,
+      value: matchFormatValue,
+      maxMaps: values.matchFormat?.maxMaps ?? null,
+      drawsAllowed: values.matchFormat?.drawsAllowed ?? false,
+      ...patch,
+    };
+
+    if (!isValidMatchMaxMaps(next, next.maxMaps)) next.maxMaps = null;
+    set("matchFormat", next);
+  };
 
   const setMaxTeams = (value: number) =>
     setValues((prev) => ({
@@ -271,7 +308,7 @@ export function TournamentForm({
                   let value = Math.min(Math.max(matchFormatValue, bounds.min), bounds.max);
                   if (next === "BO" && value % 2 === 0) value -= 1;
                   setLastMatchFormatValue(value);
-                  set("matchFormat", { type: next, value });
+                  patchMatchFormat({ type: next, value });
                 }}
                 {...lockedAttr("matchFormat")}
               >
@@ -306,7 +343,7 @@ export function TournamentForm({
                   onChange={(e) => {
                     const value = Number(e.target.value);
                     setLastMatchFormatValue(value);
-                    set("matchFormat", { type: matchFormatType, value });
+                    patchMatchFormat({ value });
                   }}
                   {...lockedAttr("matchFormat")}
                 />
@@ -314,6 +351,36 @@ export function TournamentForm({
                   {matchFormatType === "BO"
                     ? "Le score d'une équipe ne peut pas dépasser la moitié supérieure : 3 en BO5."
                     : "Objectif à atteindre pour remporter le match : 3 en FT3."}
+                </p>
+              </div>
+            )}
+
+            {!isLibre && matchFormatValid && naturalMaxMaps(matchFormat!) > matchWinsRequired(matchFormat!) && (
+              <div className="field">
+                <label htmlFor="match-format-max-maps">Maps décisives au maximum</label>
+                <input
+                  id="match-format-max-maps"
+                  type="number"
+                  min={matchWinsRequired(matchFormat!)}
+                  max={naturalMaxMaps(matchFormat!)}
+                  disabled={locked("matchFormat")}
+                  value={matchMaxMaps(matchFormat!)}
+                  onChange={(e) => {
+                    const value = Number(e.target.value);
+                    // Le plafond naturel n'est pas un réglage : le stocker
+                    // ferait porter à la ligne une contrainte qui n'en est pas
+                    // une, et l'étiquette du tournoi afficherait « FT3 · 5 maps »
+                    // là où « FT3 » dit déjà tout.
+                    patchMatchFormat({
+                      maxMaps: value >= naturalMaxMaps(matchFormat!) ? null : value,
+                    });
+                  }}
+                  {...lockedAttr("matchFormat")}
+                />
+                <p style={HINT}>
+                  Somme des deux scores au maximum. Une map nulle ne compte dans aucun des deux et
+                  n&apos;entame donc pas ce plafond. L&apos;abaisser sous {naturalMaxMaps(matchFormat!)}{" "}
+                  rend l&apos;égalité possible.
                 </p>
               </div>
             )}
