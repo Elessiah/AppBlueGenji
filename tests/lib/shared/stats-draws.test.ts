@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   computeDeepStats,
+  formatRecord,
   formatStreak,
   type StatsMatch,
   type StatsOutcome,
@@ -140,5 +141,23 @@ describe("computeDeepStats — matchs nuls", () => {
     expect(stats.mapsWon).toBe(2);
     expect(stats.mapsLost).toBe(2);
     expect(stats.mapDiff).toBe(0);
+  });
+});
+
+describe("formatRecord", () => {
+  it("n'annonce que victoires et défaites quand il n'y a pas de nul", () => {
+    expect(formatRecord({ played: 5, won: 4, lost: 1 })).toBe("4V / 1D");
+    expect(formatRecord({ played: 0, won: 0, lost: 0 })).toBe("0V / 0D");
+  });
+
+  it("déduit le nul de l'écart, et le dit dès qu'il y en a un", () => {
+    // Sans lui la ligne ne s'additionnait plus : « 1V / 1D · 33 % » annonçait
+    // deux matchs pour un taux calculé sur trois.
+    expect(formatRecord({ played: 3, won: 1, lost: 1 })).toBe("1V / 1N / 1D");
+    expect(formatRecord({ played: 6, won: 2, lost: 1 })).toBe("2V / 3N / 1D");
+  });
+
+  it("ne rend jamais un compte négatif sur une ligne incohérente", () => {
+    expect(formatRecord({ played: 1, won: 2, lost: 2 })).toBe("2V / 2D");
   });
 });

@@ -6,6 +6,7 @@ import { formatLocalDate } from "@/lib/shared/dates";
 import {
   formatDiff,
   formatRate,
+  formatRecord,
   formatStreak,
   type DeepStats,
   type StatsOpponent,
@@ -76,7 +77,7 @@ function SplitBars({ splits, emptyLabel }: { splits: StatsSplit[]; emptyLabel: s
               <span className={s.splitLoss} style={{ width: `${(split.lost / total) * 100}%` }} />
             </span>
             <span className={s.splitValue}>
-              {split.won}V / {split.lost}D · {formatRate(split.winRate)}
+              {formatRecord(split)} · {formatRate(split.winRate)}
             </span>
           </div>
         );
@@ -103,7 +104,8 @@ function OpponentCard({
             <TeamLink teamId={opponent.teamId}>{opponent.teamName}</TeamLink>
           </div>
           <div className={s.opponentMeta}>
-            {opponent.played} confrontation{opponent.played > 1 ? "s" : ""} · {opponent.won}V / {opponent.lost}D
+            {opponent.played} confrontation{opponent.played > 1 ? "s" : ""} ·{" "}
+            {formatRecord(opponent)}
           </div>
         </>
       ) : (

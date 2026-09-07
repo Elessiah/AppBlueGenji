@@ -248,7 +248,9 @@ Conséquences, toutes tenues par des tests :
 - la forme porte « N » et non « D » — cette lettre désigne déjà la **défaite** sur
   ces pastilles ;
 - répartitions par jeu/format et adversaires comptent le nul dans `played` sans
-  l'ajouter à `won` ni à `lost`.
+  l'ajouter à `won` ni à `lost` — et `formatRecord` le **déduit** de l'écart pour
+  l'afficher (« 1V / 1N / 1D »), sans quoi la légende ne s'additionnait plus :
+  « 1V / 1D · 33 % » annonçait deux matchs pour un taux calculé sur trois.
 
 ## Stockage
 

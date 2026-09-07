@@ -496,6 +496,27 @@ export function formatDiff(diff: number): string {
 }
 
 /** Libellé français d'une série en cours (`"4 victoires d'affilée"`). */
+/**
+ * Bilan d'un sous-ensemble de matchs en une ligne : « 4V / 1D », ou
+ * « 4V / 1N / 1D » dès qu'il compte un match nul.
+ *
+ * Les nuls ne sont pas stockés dans les répartitions : ils s'en **déduisent**
+ * (`played − won − lost`), ce qui évite un troisième compteur à tenir dans
+ * quatre agrégats. Ils n'y apparaissent que lorsqu'il y en a — la mention vaut
+ * pour un mode et un seul, et l'ajouter partout alourdirait chaque fiche d'un
+ * zéro qui ne dit rien.
+ *
+ * Sans elle, la ligne ne s'additionnait plus : une répartition à 1 victoire,
+ * 1 défaite et 1 nul affichait « 1V / 1D · 33 % », deux matchs annoncés pour un
+ * taux calculé sur trois.
+ */
+export function formatRecord(record: { played: number; won: number; lost: number }): string {
+  const drawn = Math.max(0, record.played - record.won - record.lost);
+  return drawn > 0
+    ? `${record.won}V / ${drawn}N / ${record.lost}D`
+    : `${record.won}V / ${record.lost}D`;
+}
+
 export function formatStreak(streak: StatsStreak): string {
   if (streak.kind === "NONE" || streak.length === 0) return "Aucune série";
 
