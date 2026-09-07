@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 import { ShareCard, SHARE_CARD_SIZE, SHARE_CARD_CONTENT_TYPE } from "@/components/og/share-card";
-import { SITE_NAME, SITE_TAGLINE } from "@/lib/shared/share-metadata";
+import { SITE_NAME, SITE_SHARE_CARD } from "@/lib/shared/share-metadata";
 
 /**
  * Image d'aperçu par défaut du site.
@@ -15,7 +15,7 @@ export const contentType = SHARE_CARD_CONTENT_TYPE;
 
 export default function Image() {
   return new ImageResponse(
-    <ShareCard eyebrow="BlueGenji Esport" title={SITE_NAME} subtitle={SITE_TAGLINE} />,
+    <ShareCard {...SITE_SHARE_CARD} />,
     size,
   );
 }

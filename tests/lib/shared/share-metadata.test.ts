@@ -2,7 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   SITE_DESCRIPTION,
   SITE_NAME,
-  SITE_TAGLINE,
+  SITE_SHARE_CARD,
   formatShareDate,
   formatShareDateShort,
   tournamentShareCard,
@@ -57,11 +57,21 @@ describe("Textes du site", () => {
     expect(SITE_DESCRIPTION.indexOf("Overwatch")).toBeLessThan(
       SITE_DESCRIPTION.indexOf("Marvel Rivals"),
     );
-    expect(SITE_TAGLINE.indexOf("Overwatch")).toBeLessThan(SITE_TAGLINE.indexOf("Marvel Rivals"));
+    expect(SITE_SHARE_CARD.eyebrow.indexOf("Overwatch")).toBeLessThan(
+      SITE_SHARE_CARD.eyebrow.indexOf("Marvel Rivals"),
+    );
   });
 
   it("porte le nom du site tel qu'il doit apparaître dans un encart", () => {
     expect(SITE_NAME).toBe("BlueGenji Esport");
+  });
+
+  it("ne répète pas le nom du site dans les trois étages de sa carte", () => {
+    // Surtitre, titre et pied disaient tous « BlueGenji Esport » : la carte du
+    // site était trois fois la même ligne.
+    expect(SITE_SHARE_CARD.title).toBe(SITE_NAME);
+    expect(SITE_SHARE_CARD.eyebrow).not.toContain(SITE_NAME);
+    expect(SITE_SHARE_CARD.subtitle).not.toContain(SITE_NAME);
   });
 });
 

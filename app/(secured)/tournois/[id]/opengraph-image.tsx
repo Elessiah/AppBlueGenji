@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { ShareCard, SHARE_CARD_SIZE, SHARE_CARD_CONTENT_TYPE } from "@/components/og/share-card";
 import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
-import { SITE_NAME, SITE_TAGLINE, tournamentShareCard } from "@/lib/shared/share-metadata";
+import { SITE_NAME, SITE_SHARE_CARD, tournamentShareCard } from "@/lib/shared/share-metadata";
 
 /**
  * Image d'aperçu d'un tournoi — la carte qui s'affiche sous le lien partagé.
@@ -38,10 +38,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
       : null;
 
   if (!snapshot) {
-    return new ImageResponse(
-      <ShareCard eyebrow="BlueGenji Esport" title={SITE_NAME} subtitle={SITE_TAGLINE} />,
-      size,
-    );
+    return new ImageResponse(<ShareCard {...SITE_SHARE_CARD} />, size);
   }
 
   return new ImageResponse(<ShareCard {...tournamentShareCard(snapshot.card)} />, size);

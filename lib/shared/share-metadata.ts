@@ -36,8 +36,20 @@ export const SITE_NAME = "BlueGenji Esport";
 export const SITE_DESCRIPTION =
   "Tournois amateurs Overwatch et Marvel Rivals, brackets en direct, classement des équipes et bot Discord : la plateforme de l'association BlueGenji.";
 
-/** Accroche courte, pour les encarts qui n'ont la place que d'une ligne. */
-export const SITE_TAGLINE = "Esport amateur francophone · Overwatch & Marvel Rivals";
+/**
+ * Ce qu'affiche la carte d'aperçu du site — celle que reçoit toute page sans
+ * carte à elle, et celle sur laquelle retombe un tournoi illisible.
+ *
+ * Elle est bâtie comme celle d'un tournoi : le contexte en surtitre, le nom en
+ * grand, la phrase dessous. Sans ces trois rôles distincts, la carte répétait
+ * « BlueGenji Esport » en surtitre, en titre **et** en pied.
+ */
+export const SITE_SHARE_CARD = {
+  eyebrow: "Overwatch · Marvel Rivals",
+  title: SITE_NAME,
+  subtitle:
+    "Tournois amateurs francophones, brackets en direct, classement des équipes et bot Discord.",
+} as const;
 
 /** Fuseau de rédaction des dates partagées (voir l'en-tête du module). */
 const SHARE_TIME_ZONE = "Europe/Paris";

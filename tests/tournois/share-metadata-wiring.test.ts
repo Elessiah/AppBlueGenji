@@ -184,7 +184,7 @@ describe("route d'image d'un tournoi", () => {
     // afficher un encart sans image.
     expect(OG_ROUTE).toContain("catch(() => null)");
     expect(OG_ROUTE).toContain("if (!snapshot)");
-    expect(OG_ROUTE).toContain("title={SITE_NAME}");
+    expect(OG_ROUTE).toContain("<ShareCard {...SITE_SHARE_CARD} />");
   });
 
   it("annonce la taille attendue d'un aperçu Open Graph", () => {

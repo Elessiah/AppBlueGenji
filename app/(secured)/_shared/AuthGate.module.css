@@ -10,7 +10,9 @@
   gap: 18px;
   max-width: 560px;
   width: 100%;
-  padding: 32px;
+  /* Les encoches d'angle de `CyberCard` mordent sur le texte en dessous de
+     ~400 px : la carte respire moins, mais elle reste lisible. */
+  padding: clamp(22px, 6vw, 32px);
   text-align: center;
   align-items: center;
 }
@@ -36,6 +38,20 @@
   justify-content: center;
   gap: 12px;
   margin-top: 6px;
+}
+
+/* Deux boutons côte à côte deviennent illisibles sur un écran étroit : ils
+   passent alors l'un sous l'autre, sur toute la largeur, plutôt que de se
+   partager 300 px. */
+@media (max-width: 420px) {
+  .actions {
+    flex-direction: column;
+    align-self: stretch;
+  }
+
+  .actions > * {
+    width: 100%;
+  }
 }
 
 .back {

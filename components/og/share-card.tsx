@@ -183,7 +183,7 @@ export function ShareCard({ eyebrow, title, subtitle, facts = [] }: ShareCardPro
             BLUEGENJI
           </div>
           <div style={{ display: "flex", fontSize: 24, color: COLORS.inkMute }}>
-            Esport amateur francophone
+            Association loi 1901
           </div>
         </div>
       </div>
