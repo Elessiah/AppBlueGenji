@@ -135,7 +135,7 @@ export function BracketSections({
               onToggle={() => toggle(section.key)}
               panelId={panelId}
               highlighted={hasMyMatch}
-              flag={hasMyMatch ? "★ Votre match" : null}
+              flag={hasMyMatch ? "Votre match" : null}
               meta={<PanelPill>{matchCount} match{matchCount > 1 ? "s" : ""}</PanelPill>}
             >
               <BracketTree

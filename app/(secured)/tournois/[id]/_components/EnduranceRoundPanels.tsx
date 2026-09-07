@@ -11,6 +11,7 @@ import {
   type EnduranceRoundSection,
 } from "../_lib/endurance-sections";
 import { useMatchAnchorTarget } from "../_lib/match-anchor-context";
+import styles from "./EnduranceRoundPanels.module.css";
 
 interface EnduranceRoundPanelsProps {
   sections: EnduranceRoundSection[];
@@ -27,6 +28,19 @@ interface EnduranceRoundPanelsProps {
   onSubmit: (match: BracketMatch, e: FormEvent) => Promise<void>;
   onOpenAdminModal: (match: BracketMatch) => void;
   format: TournamentFormat;
+}
+
+/**
+ * Nom accessible du corps d'un volet. Le titre seul (« Manche 3 ») ne porte ni
+ * la taille de la manche ni son avancement — deux choses que les pastilles
+ * donnent à l'œil et qui, sans cela, ne seraient annoncées à personne.
+ */
+function roundRegionLabel(section: EnduranceRoundSection): string {
+  const size = `${section.totalCount} match${section.totalCount > 1 ? "s" : ""}`;
+  const progress = section.isComplete
+    ? "terminée"
+    : `${section.playedCount} sur ${section.totalCount} jouées`;
+  return `${section.title}, ${size}, ${progress}`;
 }
 
 /** Le lecteur a-t-il une rencontre à jouer dans cette manche ? */
@@ -99,7 +113,7 @@ export function EnduranceRoundPanels({
     });
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div className={styles.stack}>
       {sections.map((section) => {
         const mine = hasPendingMatchFor(section, myTeamId);
         return (
@@ -110,8 +124,9 @@ export function EnduranceRoundPanels({
             open={openRounds.has(section.round)}
             onToggle={() => toggle(section.round)}
             panelId={`endurance-${section.key}`}
+            ariaLabel={roundRegionLabel(section)}
             highlighted={mine}
-            flag={mine ? "★ Votre match" : null}
+            flag={mine ? "Votre match" : null}
             meta={
               <>
                 <PanelPill>
@@ -128,17 +143,7 @@ export function EnduranceRoundPanels({
               </>
             }
           >
-            {/* Grille souple plutôt qu'une colonne : les cartes de match ont une
-                largeur fixe, elles se rangent donc d'elles-mêmes en autant de
-                colonnes que la place le permet. */}
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 10,
-                paddingBottom: 14,
-              }}
-            >
+            <div className={styles.matchGrid}>
               {section.matches.map((match) => (
                 <MatchRow
                   key={match.id}

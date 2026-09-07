@@ -11,9 +11,19 @@ interface BoardPanelProps {
   onToggle: () => void;
   /** Identifiant du corps, cible de l'`aria-controls` de l'en-tête. */
   panelId: string;
+  /**
+   * Nom accessible du corps, quand le titre seul ne dit pas assez — « Manche 3 »
+   * ne porte ni la taille de la manche ni son avancement, que les pastilles
+   * donnent à l'œil.
+   */
+  ariaLabel?: string;
   /** Pastilles neutres à droite du titre (nombre de matchs, avancement…). */
   meta?: ReactNode;
-  /** Marque poussée à droite, dans l'accent (« ★ Votre match »). */
+  /**
+   * Marque poussée à droite, dans l'accent (« Votre match »). L'étoile qui la
+   * précède est posée par le composant et masquée aux lecteurs d'écran : elle
+   * n'ajoute rien au texte, qui se suffit.
+   */
   flag?: string | null;
   /**
    * Cadre mis en avant **même replié** : le volet contient quelque chose qui
@@ -38,6 +48,7 @@ export function BoardPanel({
   open,
   onToggle,
   panelId,
+  ariaLabel,
   meta,
   flag = null,
   highlighted = false,
@@ -60,11 +71,15 @@ export function BoardPanel({
         </span>
         <span className={styles.title}>{title}</span>
         {meta && <span className={styles.meta}>{meta}</span>}
-        {flag && <span className={styles.flag}>{flag}</span>}
+        {flag && (
+          <span className={styles.flag}>
+            <span aria-hidden>★</span> {flag}
+          </span>
+        )}
       </button>
 
       {open && (
-        <div id={panelId} role="region" aria-label={title} className={styles.body}>
+        <div id={panelId} role="region" aria-label={ariaLabel ?? title} className={styles.body}>
           {children}
         </div>
       )}

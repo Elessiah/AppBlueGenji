@@ -127,3 +127,15 @@
     margin-left: 0;
   }
 }
+
+/*
+ * Le chevron tourne et le fond s'éclaire : deux mouvements décoratifs, dont
+ * personne n'a besoin pour savoir qu'un volet est ouvert — l'`aria-expanded` et
+ * l'orientation du chevron le disent déjà.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .head,
+  .caret {
+    transition: none;
+  }
+}

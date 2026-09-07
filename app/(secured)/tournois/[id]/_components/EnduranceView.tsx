@@ -44,22 +44,17 @@ interface EnduranceViewProps {
   emptyLabel?: string;
 }
 
-/** Intitulé d'un bloc du plateau (« PLAY-OFFS », « MANCHES QUALIFICATIVES »). */
+/**
+ * Intitulé d'un bloc du plateau (« Play-offs », « Manches qualificatives »).
+ *
+ * Un `<h3>` et non un `<div>` : le plateau se parcourt au lecteur d'écran par
+ * ses titres, et deux blocs de volets côte à côte sans titre de niveau ne se
+ * distinguent plus l'un de l'autre. La casse est décidée par la feuille de
+ * style, pas écrite dans le texte.
+ */
 function BoardHeading({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className="mono"
-      style={{
-        fontSize: 11,
-        letterSpacing: "0.08em",
-        textTransform: "uppercase",
-        color: "var(--text-2)",
-        fontWeight: 600,
-        marginBottom: 10,
-      }}
-    >
-      {children}
-    </div>
+    <h3 className={`mono ${styles.boardHeading}`}>{children}</h3>
   );
 }
 
