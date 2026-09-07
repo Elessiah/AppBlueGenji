@@ -130,7 +130,19 @@ export async function checkDownstreamMatchesHaveNoScores(
     return;
   }
 
-  if (current.format === "SURVIVAL" || current.format === "SWISS") {
+  // Survie, ronde suisse et BlueGenji Survie n'ont aucun lien de bracket : les
+  // appariements de tout tour ultérieur sont recalculés depuis le classement (ou,
+  // en play-off d'endurance, depuis les vainqueurs du tour amont), donc tout ce
+  // qui suit dépend de ce résultat. Sans `BG_SURVIE` ici, le mode retombait sur
+  // la branche des liens `next_*_match_id` — que son moteur ne renseigne jamais —
+  // et le serveur n'opposait donc **aucun** verrou, là où l'interface masquait
+  // pourtant le bouton d'édition (`lib/shared/match-lock.ts` classe bien les
+  // trois formats ensemble).
+  if (
+    current.format === "SURVIVAL" ||
+    current.format === "SWISS" ||
+    current.format === "BG_SURVIE"
+  ) {
     const [rows] = await connection.execute<DependentMatchRow[]>(
       `SELECT ${DEPENDENT_COLUMNS}
        FROM bg_matches

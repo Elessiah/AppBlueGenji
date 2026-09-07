@@ -632,3 +632,142 @@ export function selectQualifiedTeamIds(
     .slice(0, config.playoffSize)
     .map((standing) => standing.teamId);
 }
+
+/**
+ * Une rencontre de l'arbre final, telle qu'elle doit être posée.
+ *
+ * Le `bracket` distingue la petite finale (`THIRD_PLACE`) des rencontres
+ * décisives (`UPPER`) — seules ces dernières qualifient pour le tour suivant.
+ */
+export type PlayoffMatchPlan = {
+  bracket: "UPPER" | "THIRD_PLACE";
+  pairing: EndurancePairing;
+};
+
+/** Un tour d'arbre final, dans l'ordre d'affichage (décisives puis petite finale). */
+export type PlayoffRoundPlan = PlayoffMatchPlan[];
+
+/**
+ * Appariement de repli haut contre bas, pour un plateau autre que huit
+ * (tournoi sous-rempli), faute de tableau imposé pour cet effectif.
+ */
+export function planPlayoffFallbackRound(qualified: number[]): EndurancePairing[] {
+  const pairings: EndurancePairing[] = [];
+  let left = 0;
+  let right = qualified.length - 1;
+
+  while (left < right) {
+    pairings.push({ teamAId: qualified[left], teamBId: qualified[right] });
+    left += 1;
+    right -= 1;
+  }
+
+  // Effectif impair : la mieux classée restante passe le tour.
+  if (left === right) pairings.push({ teamAId: qualified[left], teamBId: null });
+
+  return pairings;
+}
+
+/**
+ * Premier tour de l'arbre final : le tableau imposé à l'effectif prévu, un
+ * appariement haut contre bas en dessous.
+ *
+ * Cette fonction est la **seule** description du tirage : la création de
+ * l'arbre et sa relecture après une correction de score en descendent toutes
+ * les deux, faute de quoi une réparation pourrait poser un autre tableau que
+ * celui qu'un lancement aurait produit.
+ */
+export function planPlayoffFirstRound(
+  qualified: number[],
+  config: EnduranceConfig,
+): PlayoffRoundPlan {
+  const pairings =
+    qualified.length === config.playoffSize && config.playoffSize === PLAYOFF_QUARTER_PAIRINGS.length * 2
+      ? buildPlayoffPairings(qualified)
+      : planPlayoffFallbackRound(qualified);
+
+  return pairings.map((pairing) => ({ bracket: "UPPER" as const, pairing }));
+}
+
+/**
+ * Tour suivant de l'arbre final, dérivé des rencontres **décisives** du tour
+ * courant — la petite finale n'en fait pas partie, elle ne qualifie personne.
+ *
+ * Les vainqueurs s'apparient deux à deux dans l'ordre du tour ; un nombre impair
+ * (plateau qui n'est pas une puissance de deux) fait passer le dernier. Aux
+ * demi-finales — deux rencontres décisives — la petite finale se joue en
+ * parallèle de la finale.
+ *
+ * Un tour incomplet ne planifie rien : un vainqueur manquant vaudrait une
+ * rencontre sans engagée, et il vaut mieux ne rien poser que poser un match
+ * vide qui ne se refermerait jamais.
+ */
+export function planNextPlayoffRound(
+  decisive: { winnerTeamId: number | null; loserTeamId: number | null }[],
+): PlayoffRoundPlan {
+  const winners = decisive.map((match) => match.winnerTeamId);
+  if (winners.length < 2 || winners.some((teamId) => teamId === null)) return [];
+
+  const plan: PlayoffRoundPlan = [];
+  for (let index = 0; index < winners.length; index += 2) {
+    plan.push({
+      bracket: "UPPER",
+      pairing: {
+        teamAId: winners[index] as number,
+        teamBId: index + 1 < winners.length ? (winners[index + 1] as number) : null,
+      },
+    });
+  }
+
+  if (decisive.length === 2) {
+    const losers = decisive
+      .map((match) => match.loserTeamId)
+      .filter((teamId): teamId is number => teamId !== null);
+    if (losers.length === 2) {
+      plan.push({ bracket: "THIRD_PLACE", pairing: { teamAId: losers[0], teamBId: losers[1] } });
+    }
+  }
+
+  return plan;
+}
+
+/**
+ * Les appariements posés en base décrivent-ils encore le tirage attendu ?
+ *
+ * Comparaison couple par couple, **sides compris** : l'ordre gauche/droite est
+ * lui aussi dérivé du classement, et l'inverser change ce que lisent les
+ * engagées. Une liste vide en base n'est pas périmée — il n'y a rien à défaire.
+ */
+export function pairingsAreStale(
+  expected: EndurancePairing[],
+  actual: { teamAId: number | null; teamBId: number | null }[],
+): boolean {
+  if (actual.length === 0) return false;
+  if (expected.length !== actual.length) return true;
+
+  return expected.some(
+    (pairing, index) =>
+      pairing.teamAId !== actual[index].teamAId || pairing.teamBId !== actual[index].teamBId,
+  );
+}
+
+/**
+ * Le tour d'arbre final posé en base correspond-il au plan ?
+ *
+ * S'ajoute à la comparaison des couples celle des `bracket` : une petite finale
+ * et une demi-finale ne sont pas interchangeables, même entre les deux mêmes
+ * équipes.
+ */
+export function playoffRoundIsStale(
+  plan: PlayoffRoundPlan,
+  actual: { bracket: string; teamAId: number | null; teamBId: number | null }[],
+): boolean {
+  if (actual.length === 0) return false;
+  if (plan.length !== actual.length) return true;
+  if (plan.some((entry, index) => entry.bracket !== actual[index].bracket)) return true;
+
+  return pairingsAreStale(
+    plan.map((entry) => entry.pairing),
+    actual,
+  );
+}
