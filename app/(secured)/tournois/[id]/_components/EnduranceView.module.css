@@ -28,9 +28,31 @@
   grid-template-columns: 44px minmax(0, 1.6fr) 1fr 1fr 1fr 108px;
 }
 
+/*
+ * Colonne d'action de l'arbitrage, qui porte **deux** boutons (« Pénalité » et
+ * « Forfait »). Une classe à part plutôt qu'une largeur unique pour tout le
+ * monde : un engagé ne voit que son propre abandon, et lui réserver la place de
+ * deux boutons rognerait la colonne du nom pour une case à moitié vide.
+ */
+:global(.table-row).rowWithWideActions {
+  grid-template-columns: 44px minmax(0, 1.6fr) 1fr 1fr 1fr 190px;
+}
+
+/*
+ * Les deux boutons se replient l'un sous l'autre plutôt que de déborder de leur
+ * colonne : elle est de largeur fixe, et un nom d'équipe long ne doit pas
+ * décider de la place qui leur reste.
+ */
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 /* Repli mobile, comme toutes les autres tables de l'application. */
 @media (max-width: 920px) {
   :global(.table-row).row,
+  :global(.table-row).rowWithWideActions,
   :global(.table-row).rowWithActions {
     grid-template-columns: 1fr;
     align-items: start;
@@ -170,4 +192,74 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-2, #8c95a6);
+}
+
+/*
+ * Case d'une manche où une pénalité d'arbitrage est tombée
+ * (`docs/features/ENDURANCE_PENALTIES.md`).
+ *
+ * Un **soulignement ambre**, et non un fond ou une couleur de texte : la case
+ * garde son ton d'origine (capital ordinaire, ou zéro estompé si la sanction
+ * l'a vidée). Le capital est ce que la case dit ; la pénalité explique
+ * seulement pourquoi il a bougé sans qu'un score ne l'explique — la marque ne
+ * doit donc pas concurrencer le chiffre, ni prendre la place du rouge des
+ * forfaits, qui a un autre sens.
+ */
+.historyPenalty {
+  box-shadow: inset 0 -2px 0 rgba(255, 157, 46, 0.7);
+}
+
+/*
+ * Cumul des pénalités, à côté du capital dans le classement. Un ambre discret,
+ * la même teinte que le soulignement des cases : les deux racontent la même
+ * chose à deux endroits, et se rapprochent par la couleur.
+ */
+.penaltyBadge {
+  margin-left: 6px;
+  font-size: 10px;
+  color: rgba(255, 157, 46, 0.9);
+}
+
+/*
+ * Journal des sanctions, sous le classement. Une liste et non un tableau : les
+ * lignes sont rares (souvent zéro, parfois deux) et leur contenu est un texte
+ * libre de longueur très variable — un gabarit en colonnes fixes y laisserait
+ * un motif tronqué à côté de trois colonnes vides.
+ */
+.penaltyList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.penaltyItem {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-1, #c3cad6);
+  padding: 6px 10px;
+  border: 1px solid var(--line-soft, rgba(255, 255, 255, 0.08));
+  border-radius: var(--r-cy-sm, 6px);
+  background: rgba(255, 157, 46, 0.05);
+}
+
+.penaltyAmount {
+  font-weight: 700;
+  color: rgba(255, 157, 46, 0.95);
+}
+
+.penaltyMeta {
+  font-size: 11px;
+  color: var(--text-2, #8c95a6);
+}
+
+/* Le motif prend la place restante : c'est lui qu'on vient lire. */
+.penaltyReason {
+  flex: 1 1 220px;
+  min-width: 0;
 }

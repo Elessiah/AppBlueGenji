@@ -240,12 +240,16 @@ décision humaine.
 | Chiffre d'un forfait | `lib/shared/match-format.ts` (`forfeitMapCount`) |
 | Plafond de manches | `enduranceEliminationCut` / `roundLimitReached` (`lib/shared/bg-survie.ts`) |
 | Relecture de l'arbre | `repairPlayoffBracket` (`lib/server/tournaments/bg-survie.ts`) |
+| Pénalités d'arbitrage | `ENDURANCE_PENALTIES.md` (`lib/shared/endurance-penalty.ts`, table `bg_endurance_penalties`) |
 | Règles publiques | `/regles/bluegenji-survie` |
 
 Comme la Survie et la Ronde suisse, **tout est rejoué** depuis l'historique des
 matchs (`replayEndurance`) : endurance, éliminations et classement sont dérivés,
 jamais accumulés. Corriger un score défait donc l'élimination qu'il avait
-provoquée. Seuls le classement initial et les abandons sont stockés en entrée.
+provoquée. Seules les **décisions humaines** sont stockées en entrée : le
+classement initial, les abandons et les **pénalités d'endurance**
+(`ENDURANCE_PENALTIES.md`) — retirer une pénalité défait ainsi la sanction *et*
+ce qu'elle avait entraîné, exactement comme une correction de score.
 
 `reconcileEndurance` est idempotent et appelé après chaque saisie de score
 (report joueur, sauvegarde admin, résolution admin) : il persiste le classement,
@@ -413,3 +417,6 @@ qui fasse avancer l'arbre.
 - **Réordonnancement du seeding** — `reorderSeeding` réamorce explicitement le
   mode (classement resemé, première manche régénérée) : les seeds vivent dans
   `bg_endurance_standings`, ils ne se recalculent pas tout seuls.
+- **Pénalités d'endurance** — une entrée du rejeu au même titre qu'un abandon,
+  posée sur la manche courante et refusée dès les play-offs lancés, dans les deux
+  sens (poser comme retirer). Voir `ENDURANCE_PENALTIES.md`.

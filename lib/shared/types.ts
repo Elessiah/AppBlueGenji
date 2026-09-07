@@ -94,6 +94,43 @@ export type EnduranceStandingRow = {
    * sur la manche de sa sortie et sur toutes les suivantes.
    */
   rounds: EnduranceRoundCell[];
+  /**
+   * Points retirés par pénalité d'arbitrage, cumulés — `0` si l'engagé n'a
+   * jamais été sanctionné. C'est la **baisse réelle** du capital : une sanction
+   * visant une équipe déjà sortie n'ampute rien, et une sanction plus lourde
+   * que le capital n'en retire que ce qu'il restait.
+   */
+  penaltyPoints: number;
+};
+
+/**
+ * Pénalité d'endurance telle qu'elle s'affiche (`lib/shared/endurance-penalty.ts`).
+ *
+ * Le motif et l'auteur ne sont pas décoratifs : une sanction se conteste, et
+ * « −3 » sans un mot ni un nom n'est adressable à personne.
+ */
+export type EndurancePenaltyRow = {
+  id: number;
+  teamId: number;
+  teamName: string;
+  /** Manche à laquelle la sanction a été prononcée. */
+  round: number;
+  /** Points retirés. */
+  points: number;
+  reason: string;
+  /** Arbitre qui l'a prononcée, `null` si son compte a été supprimé. */
+  authorPseudo: string | null;
+  createdAt: string | null;
+  /**
+   * La sanction peut-elle encore être retirée ?
+   *
+   * Faux dès qu'une manche **postérieure** porte une saisie : lui rendre ses
+   * points remettrait alors en lice une équipe qui n'a pas joué les manches
+   * écoulées depuis, et le moteur ne réapparie que la manche courante. C'est la
+   * règle de `lib/shared/match-lock.ts`, décidée par le serveur — le drapeau
+   * n'existe que pour ne pas proposer un bouton voué au refus.
+   */
+  removable: boolean;
 };
 
 export type EnduranceMeta = {
@@ -121,6 +158,11 @@ export type EnduranceMeta = {
   playoffsStarted: boolean;
   /** Manches qualificatives jouées, dans l'ordre : colonnes du tableau. */
   rounds: number[];
+  /**
+   * Pénalités infligées, de la plus ancienne manche à la plus récente. Vide
+   * dans l'immense majorité des tournois : une sanction reste l'exception.
+   */
+  penalties: EndurancePenaltyRow[];
   standings: EnduranceStandingRow[];
 };
 

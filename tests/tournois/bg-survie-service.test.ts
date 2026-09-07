@@ -56,6 +56,10 @@ function makeConn(results: unknown[], overrides: [string, unknown][] = []) {
     const query = String(sql);
     const override = overrides.find(([needle]) => query.includes(needle));
     if (override) return override[1];
+    // Les pénalités d'endurance sont relues à chaque réconciliation : sans cette
+    // réponse par défaut, leur requête consommerait un rang de la file
+    // positionnelle et décalerait tous les cas qui n'en parlent pas.
+    if (query.includes("FROM bg_endurance_penalties")) return [[]];
     return queue.length > 0 ? queue.shift() : [[]];
   });
 

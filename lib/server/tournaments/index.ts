@@ -1048,6 +1048,99 @@ export async function forfeitTournamentTeamPublic(
   }
 }
 
+/**
+ * Inflige une pénalité de points d'endurance à un engagé (mode « BlueGenji
+ * Survie »). Ouvre sa propre transaction, journalise et publie la mise à jour.
+ *
+ * Le contrôle de permission appartient à la route : ici, on suppose l'arbitrage
+ * déjà établi — comme pour l'abandon forcé juste au-dessus.
+ */
+export async function applyEndurancePenaltyPublic(
+  tournamentId: number,
+  teamId: number,
+  points: number,
+  reason: string,
+  authorId: number | null,
+): Promise<void> {
+  const db = await getDatabase();
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const { applyEndurancePenalty } = await import("./bg-survie");
+    const applied = await applyEndurancePenalty(
+      tournamentId,
+      teamId,
+      points,
+      reason,
+      authorId,
+      connection,
+    );
+
+    // Le motif **tel qu'il est stocké** : le moteur l'a normalisé, et le canal
+    // Discord montrerait sinon un espacement que la page ne montre pas.
+    queueBotLog(connection, {
+      kind: "endurance_penalty",
+      tournamentId,
+      teamId,
+      points,
+      reason: applied.reason,
+    });
+
+    await connection.commit();
+    flushBotLogs(connection);
+
+    publishUpdatedEvent(tournamentId);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    discardBotLogs(connection);
+    connection.release();
+  }
+}
+
+/**
+ * Retire une pénalité d'endurance : le rejeu rend les points et défait tout ce
+ * que la sanction avait entraîné.
+ *
+ * La ligne du journal porte l'engagé et le montant **relus avant l'effacement** :
+ * la résolution des entrées se fait après le commit, où la ligne n'existe plus.
+ */
+export async function liftEndurancePenaltyPublic(
+  tournamentId: number,
+  penaltyId: number,
+): Promise<void> {
+  const db = await getDatabase();
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const { liftEndurancePenalty } = await import("./bg-survie");
+    const lifted = await liftEndurancePenalty(tournamentId, penaltyId, connection);
+
+    queueBotLog(connection, {
+      kind: "endurance_penalty_lifted",
+      tournamentId,
+      teamId: lifted.teamId,
+      points: lifted.points,
+    });
+
+    await connection.commit();
+    flushBotLogs(connection);
+
+    publishUpdatedEvent(tournamentId);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    discardBotLogs(connection);
+    connection.release();
+  }
+}
+
 export async function adminResolveMatchPublic(
   matchId: number,
   team1Score?: number,
