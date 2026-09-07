@@ -130,12 +130,17 @@ describe("play-offs — le vrai arbre, et non une liste de cartes", () => {
  */
 describe("endurancePlayoffLinks — accordé sur ce que crée le moteur", () => {
   const TOURNAMENT_ID = 7;
-  /** Quarts de finale : quatre rencontres, vainqueurs 1, 3, 5 et 7. */
+  /**
+   * Quarts de finale, tels que le tableau imposé les pose sur un classement
+   * 1..8 : 8v4, 6v2, 1v5 puis 3v7. Les appariements ne sont pas décoratifs —
+   * l'arbre est relu avant d'être enchaîné (`repairPlayoffBracket`), et un
+   * plateau qui ne descend pas du classement serait jugé périmé.
+   */
   const QUARTERS = [
-    { id: 101, match_number: 1, winner: 1, loser: 2 },
-    { id: 102, match_number: 2, winner: 3, loser: 4 },
-    { id: 103, match_number: 3, winner: 5, loser: 6 },
-    { id: 104, match_number: 4, winner: 7, loser: 8 },
+    { id: 101, match_number: 1, teams: [8, 4], winner: 8, loser: 4 },
+    { id: 102, match_number: 2, teams: [6, 2], winner: 6, loser: 2 },
+    { id: 103, match_number: 3, teams: [1, 5], winner: 1, loser: 5 },
+    { id: 104, match_number: 4, teams: [3, 7], winner: 3, loser: 7 },
   ];
 
   const mockMatch = (overrides: Partial<BracketMatch>): BracketMatch => ({
@@ -211,15 +216,20 @@ describe("endurancePlayoffLinks — accordé sur ce que crée le moteur", () => 
       if (query.includes("SELECT DISTINCT round_number FROM bg_matches")) {
         return [[{ round_number: 1000 }]];
       }
-      if (query.includes("SELECT id, match_number, status")) {
+      if (query.includes("SELECT id, bracket, status")) {
         return [
           QUARTERS.map((quarter) => ({
             id: quarter.id,
-            match_number: quarter.match_number,
+            bracket: "UPPER",
             status: "COMPLETED",
+            team1_id: quarter.teams[0],
+            team2_id: quarter.teams[1],
+            team1_score: 3,
+            team2_score: 0,
             winner_team_id: quarter.winner,
             loser_team_id: quarter.loser,
-            bracket: "UPPER",
+            forfeit_team_id: null,
+            is_bye: 0,
           })),
         ];
       }
@@ -252,14 +262,15 @@ describe("endurancePlayoffLinks — accordé sur ce que crée le moteur", () => 
     const semiIds = await Promise.all(created as Promise<number>[]);
     const teamsOf = new Map<number, number[]>();
     for (const [sql, params] of conn.execute.mock.calls as [string, unknown[]][]) {
-      if (!String(sql).includes("SET team1_id = ?, team2_id = ?")) continue;
-      const [team1, team2, , , id] = params as (number | null)[];
-      teamsOf.set(Number(id), [Number(team1), Number(team2)]);
+      if (!String(sql).includes("team1_id = ?, team2_id = ?")) continue;
+      // [team1, team2, statut, bye, score1, score2, vainqueur, id]
+      const values = params as (number | null)[];
+      teamsOf.set(Number(values[7]), [Number(values[0]), Number(values[1])]);
     }
 
     // Demi 1 = vainqueurs des quarts 1 et 2 ; demi 2 = ceux des quarts 3 et 4.
-    expect(teamsOf.get(semiIds[0])).toEqual([1, 3]);
-    expect(teamsOf.get(semiIds[1])).toEqual([5, 7]);
+    expect(teamsOf.get(semiIds[0])).toEqual([8, 6]);
+    expect(teamsOf.get(semiIds[1])).toEqual([1, 3]);
 
     // Et c'est exactement ce que le module pur annonce, sur le même plateau.
     const links = endurancePlayoffLinks([
