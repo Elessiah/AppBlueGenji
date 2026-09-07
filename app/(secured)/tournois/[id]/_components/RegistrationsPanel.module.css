@@ -20,9 +20,61 @@
   border-top: 1px solid var(--line, var(--line-soft));
 }
 
-/* Colonne d'actions : ajoutée seulement quand le staff peut réordonner. */
+/* Colonnes de poignée et d'actions : ajoutées seulement quand le staff peut
+   réordonner. La poignée ouvre la ligne, les flèches la ferment — le geste au
+   pointeur commence à gauche, la commande au clavier reste à droite. */
 .reorderable {
-  grid-template-columns: 56px minmax(0, 1.6fr) 1fr 1fr 92px;
+  grid-template-columns: 24px 56px minmax(0, 1.6fr) 1fr 1fr 92px;
+}
+
+/*
+ * Poignée de glissement.
+ *
+ * `touch-action: none` n'est pas décoratif : sans lui, le navigateur interprète
+ * le premier mouvement du doigt comme un défilement de la page et confisque la
+ * suite des évènements pointeur — le glisser-déposer ne fonctionnerait qu'à la
+ * souris.
+ */
+.grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 28px;
+  color: var(--text-2);
+  font-size: 15px;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  border-radius: var(--r-cy-sm, 6px);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.grip:hover {
+  color: var(--blue-200, var(--accent-blue));
+  background: color-mix(in srgb, var(--blue-500, #5ac8ff) 12%, transparent);
+}
+
+/* Pendant le geste : le curseur reste « saisi » partout sur le tableau, et les
+   liens des noms ne doivent pas se comporter comme des liens. */
+.dragging .grip {
+  cursor: grabbing;
+}
+
+.dragging .name {
+  pointer-events: none;
+}
+
+/* La ligne tirée : surélevée et teintée, pour qu'on la suive des yeux parmi les
+   autres qui, elles, se contentent de coulisser. */
+.dragged {
+  background: color-mix(in srgb, var(--blue-500, #5ac8ff) 10%, transparent);
+  box-shadow: 0 0 0 1px var(--blue-400, var(--accent-blue)) inset;
+}
+
+.dragged .grip {
+  color: var(--blue-200, var(--accent-blue));
 }
 
 .row:first-child {
@@ -128,6 +180,14 @@
   .reorderable {
     grid-template-columns: 1fr;
     gap: 4px;
+  }
+
+  /* Une seule colonne : la poignée reprend sa place au fil du texte, sur la
+     même ligne que le rang plutôt que seule au-dessus de lui. */
+  .grip {
+    justify-content: flex-start;
+    width: auto;
+    height: auto;
   }
 
   .actions {
