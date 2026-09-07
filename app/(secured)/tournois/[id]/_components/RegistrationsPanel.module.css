@@ -20,9 +20,94 @@
   border-top: 1px solid var(--line, var(--line-soft));
 }
 
-/* Colonne d'actions : ajoutée seulement quand le staff peut réordonner. */
+/* Colonnes de poignée et d'actions : ajoutées seulement quand le staff peut
+   réordonner. La poignée ouvre la ligne, les flèches la ferment — le geste au
+   pointeur commence à gauche, la commande au clavier reste à droite. */
 .reorderable {
-  grid-template-columns: 56px minmax(0, 1.6fr) 1fr 1fr 92px;
+  grid-template-columns: 24px 56px minmax(0, 1.6fr) 1fr 1fr 92px;
+}
+
+/*
+ * Poignée de glissement.
+ *
+ * `touch-action: none` n'est pas décoratif : sans lui, le navigateur interprète
+ * le premier mouvement du doigt comme un défilement de la page et confisque la
+ * suite des évènements pointeur — le glisser-déposer ne fonctionnerait qu'à la
+ * souris.
+ */
+.grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  /* Toute la hauteur de la ligne : viser six points de braille au doigt est
+     autrement plus difficile qu'au pointeur. */
+  min-height: 32px;
+  color: var(--text-2);
+  font-size: 15px;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: var(--r-cy-sm, 6px);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.grip:hover {
+  color: var(--blue-200, var(--accent-blue));
+  background: color-mix(in srgb, var(--blue-500, #5ac8ff) 12%, transparent);
+}
+
+/*
+ * Pendant le geste.
+ *
+ * Le curseur « saisi » vaut pour **tout** le tableau et pas seulement pour la
+ * poignée : le pointeur l'a quittée dès le premier centimètre, et un curseur qui
+ * redevient flèche au-dessus d'un nom donne à croire que le geste est terminé.
+ *
+ * `.dragging *` pèse autant qu'un simple `.arrow`, déclaré plus bas, qui
+ * l'emporterait donc au-dessus des flèches — soit précisément là où le
+ * malentendu coûte le plus cher. D'où la reprise explicite des règles qui
+ * posent un curseur : deux classes, et la question est tranchée.
+ */
+.dragging,
+.dragging * {
+  cursor: grabbing;
+}
+
+.dragging .grip,
+.dragging .arrow,
+.dragging .arrow:disabled,
+.dragging .name {
+  cursor: grabbing;
+}
+
+.dragging .name {
+  pointer-events: none;
+}
+
+/* Les flèches ne réagissent plus au survol tant qu'on tire : elles ne sont pas
+   la cible du geste, et leur halo bleu détournerait l'œil de la ligne. */
+.dragging .arrow:hover:not(:disabled) {
+  border-color: var(--line-strong-cy, var(--line));
+  color: var(--ink, var(--text-0));
+  background: transparent;
+}
+
+/* La ligne tirée : surélevée et teintée, pour qu'on la suive des yeux parmi les
+   autres qui, elles, se contentent de coulisser. */
+.dragged {
+  position: relative;
+  z-index: 1;
+  background: color-mix(in srgb, var(--blue-500, #5ac8ff) 10%, transparent);
+  box-shadow:
+    0 0 0 1px var(--blue-400, var(--accent-blue)) inset,
+    0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.dragged .grip {
+  color: var(--blue-200, var(--accent-blue));
 }
 
 .row:first-child {
@@ -130,6 +215,15 @@
     gap: 4px;
   }
 
+  /* Une seule colonne : la poignée reprend sa place au fil du texte, alignée à
+     gauche comme le reste de la ligne plutôt que centrée dans le vide. */
+  .grip {
+    justify-content: flex-start;
+    width: auto;
+    min-height: 0;
+    margin-bottom: 2px;
+  }
+
   .actions {
     justify-content: flex-start;
     margin-top: 6px;
@@ -138,5 +232,22 @@
   /* Une seule colonne : l'intitulé « Ordre » n'a plus de colonne à coiffer. */
   .actionsHead {
     display: none;
+  }
+}
+
+/*
+ * Le survol reste une information utile, mais les fondus ne le sont plus dès
+ * que la personne a demandé moins de mouvement.
+ *
+ * En **fin** de feuille, et pas à côté des règles qu'il annule : une media
+ * query n'ajoute aucune spécificité, donc `@media … { .arrow { … } }` pèse
+ * autant qu'un simple `.arrow` — placé avant lui, il ne s'appliquerait jamais.
+ * C'est le chemin du clavier qui en dépend : la personne qui a demandé moins
+ * de mouvement n'utilisera pas le glissement, elle utilisera les flèches.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .grip,
+  .arrow {
+    transition: none;
   }
 }
