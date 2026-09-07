@@ -131,6 +131,30 @@ matchs de ses équipes successives, ne correspondait à aucune cote.
 Inchangé depuis les PR #82/#84 : un forfait est une victoire pleine, et compte
 donc comme telle dans le transfert.
 
+## Le match nul
+
+Une rencontre peut se clore sans vainqueur là où le format l'autorise (voir
+[MATCH_DRAWS.md](./MATCH_DRAWS.md)). Elle **compte** : `playedMatchSql` l'admet
+explicitement — clos, sans vainqueur, deux scores égaux non nuls — et le rejeu la
+consomme par `ratingDrawTransfer` :
+
+```
+transfer = round(K × (expectedScore(a, b) − 0.5))
+```
+
+Le transfert va du **favori vers l'outsider** : positif quand `a` est le mieux
+coté, il en perd autant que `b` en gagne. Un nul dit que les deux équipes se
+valent, ce que les cotes annonçaient peut-être autrement.
+
+Toujours plus doux qu'une victoire, et par construction : l'écart à l'espérance
+vaut au plus ½ sur un nul contre 1 sur une surprise totale. Une équipe à 500 qui
+tient tête à une équipe à 900 lui prend **13** points, là où la battre lui en
+aurait pris 29. Deux cotes égales ne déplacent rien.
+
+Même symétrie qu'ailleurs : un seul calcul, appliqué avec les deux signes, et le
+plancher pour seule entorse. `isRankedTeam` compte le nul — une équipe dont
+l'unique rencontre s'est close sur 2-2 a bien joué, et sa cote a bougé.
+
 ## L'ordre chronologique — le point délicat
 
 Contrairement à une somme, **une cote dépend de l'ordre des rencontres** : les
