@@ -35,7 +35,6 @@ import { isValidSeedOrder } from "@/lib/shared/seeding";
 /** Marge de déclenchement : en-deçà, l'appui reste un clic (focus, menu, etc.). */
 const DRAG_THRESHOLD_PX = 4;
 
-
 type DragSession = {
   teamId: number;
   pointerId: number;
@@ -65,10 +64,16 @@ type DragSession = {
 export type SeedingDrag = {
   /** Ligne actuellement tirée, `null` hors geste. */
   draggingTeamId: number | null;
-  /** Ordre à afficher — l'aperçu pendant le geste, `null` sinon. */
+  /**
+   * Ordre à afficher — l'aperçu pendant le geste, `null` sinon.
+   *
+   * C'est **tout** ce que le geste rend à l'affichage : le rang d'accueil lui-
+   * même reste dans la session, et n'en sort pas. Il en existe bien une copie
+   * dans un `useState`, mais elle retarde d'un rendu — la sortir sous un nom
+   * public inviterait à la brancher sur une écriture, et à réintroduire le
+   * décalage qui avalait les gestes vifs.
+   */
   previewOrder: number[] | null;
-  /** Rang d'accueil courant (0-indexé), pour l'annonce vocale. */
-  targetIndex: number | null;
   /** Ref à poser sur chaque ligne, pour relever sa géométrie. */
   setRowRef: (teamId: number) => (node: HTMLElement | null) => void;
   /** Gestionnaires à poser sur la poignée de la ligne. */
@@ -277,5 +282,5 @@ export function useSeedingDrag({ order, enabled, onDrop }: UseSeedingDragOptions
     [onPointerDown],
   );
 
-  return { draggingTeamId, previewOrder, targetIndex, setRowRef, handleProps };
+  return { draggingTeamId, previewOrder, setRowRef, handleProps };
 }
