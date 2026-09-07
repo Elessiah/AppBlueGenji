@@ -136,7 +136,7 @@ describe("checkDownstreamMatchesHaveNoScores — élimination", () => {
   });
 });
 
-describe("checkDownstreamMatchesHaveNoScores — survie et ronde suisse", () => {
+describe("checkDownstreamMatchesHaveNoScores — formats sans liens de bracket", () => {
   // BlueGenji Survie a la même absence de liens de bracket : ses play-offs
   // s'enchaînent par le numéro de tour. Sans lui dans cette liste, le serveur
   // retombait sur `next_winner_match_id` — que son moteur ne renseigne jamais —
