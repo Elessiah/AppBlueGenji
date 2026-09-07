@@ -80,7 +80,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
         blocks: [
           {
             kind: "p",
-            text: "**BlueGenji Bot** est un bot Discord développé par Keryan HOUSSIN pour synchroniser les annonces et autres contenus liés à la communauté esport Marvel Rivals entre des serveurs affiliés. Ces Conditions régissent votre utilisation du Bot et de ses services.",
+            text: "**BlueGenji Bot** est un bot Discord développé par Keryan HOUSSIN pour synchroniser les annonces et autres contenus liés à la communauté esport BlueGenji — Overwatch et Marvel Rivals — entre des serveurs affiliés. Ces Conditions régissent votre utilisation du Bot et de ses services.",
           },
         ],
       },
@@ -240,7 +240,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
         blocks: [
           {
             kind: "p",
-            text: "**BlueGenji Bot** is a Discord bot developed by Keryan HOUSSIN to synchronize advertisements and other related content across affiliated servers for the Marvel Rivals Esport community. These Terms govern your use of the Bot and its services.",
+            text: "**BlueGenji Bot** is a Discord bot developed by Keryan HOUSSIN to synchronize advertisements and other related content across affiliated servers for the BlueGenji esport community (Overwatch and Marvel Rivals). These Terms govern your use of the Bot and its services.",
           },
         ],
       },

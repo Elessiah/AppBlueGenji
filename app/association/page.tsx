@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/shared/page-metadata";
 import Link from "next/link";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
@@ -17,16 +18,14 @@ import styles from "./page.module.css";
 const REGLEMENT_URL =
   "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
 
-export const metadata: Metadata = {
-  title: "BlueGenji - L'Association Esport",
-  description: "BlueGenji, association loi 1901 au service de la scène amateur française pour Overwatch et Marvel Rivals.",
-  openGraph: {
-    title: "BlueGenji - L'Association",
-    description: "Structure associative compétitive et inclusive pour la scène esport francophone.",
-    type: "website",
-    locale: "fr_FR",
-  },
-};
+export const metadata: Metadata = pageMetadata({
+  title: "L'Association Esport",
+  description:
+    "BlueGenji, association loi 1901 au service de la scène amateur française pour Overwatch et Marvel Rivals.",
+  shareDescription:
+    "Structure associative compétitive et inclusive pour la scène esport francophone.",
+  path: "/association",
+});
 
 export default async function AssociationPage() {
   const [user, bureauMembers, aboutStats, aboutPillars, copy] = await Promise.all([

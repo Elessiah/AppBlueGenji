@@ -4,6 +4,9 @@ import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
 import { RecruitmentHighlight } from "@/components/recruitment-highlight";
 import { VisitTracker } from "@/components/visit-tracker";
+import { siteMetadataBase } from "@/lib/server/site-url";
+import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/shared/share-metadata";
+import { DEFAULT_SHARE_IMAGE } from "@/lib/shared/page-metadata";
 
 const titleFont = Rajdhani({
   subsets: ["latin"],
@@ -35,10 +38,41 @@ const displayFont = Orbitron({
   variable: "--font-display",
 });
 
+/**
+ * Socle des métadonnées de partage, hérité par toutes les pages.
+ *
+ * `metadataBase` n'est pas un détail : sans elle, Next sert les `og:image` en
+ * chemin relatif et les robots d'aperçu — Discord le premier — ne savent pas les
+ * résoudre. Le gabarit de titre (`%s · BlueGenji Esport`) évite que chaque page
+ * réécrive le nom du site ; `title.default` sert celles qui n'en déclarent pas.
+ *
+ * L'image d'aperçu **est** déclarée ici, et pas laissée à la convention de
+ * fichier : `app/opengraph-image.tsx` ne vaut que pour son propre segment —
+ * contrairement à `icon`, elle n'est pas héritée par les pages imbriquées, si
+ * bien que `/connexion` ou `/partenaires` partaient sans image. La désigner par
+ * la route qu'elle expose la fait descendre partout ; un segment qui en pose une
+ * à lui (la fiche d'un tournoi) garde la sienne.
+ */
 export const metadata: Metadata = {
-  title: "BlueGenji Esport",
-  description:
-    "Plateforme BlueGenji pour l'esport amateur Marvel Rivals: bot Discord, association et gestion de tournois.",
+  metadataBase: siteMetadataBase(),
+  title: { default: SITE_NAME, template: `%s · ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    locale: "fr_FR",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    url: "/",
+    images: [{ url: DEFAULT_SHARE_IMAGE, width: 1200, height: 630, alt: SITE_NAME }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    images: [DEFAULT_SHARE_IMAGE],
+  },
   icons: {
     icon: "/favicon.png",
     apple: "/apple-touch-icon.png",

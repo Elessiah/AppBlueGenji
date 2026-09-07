@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/shared/page-metadata";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { getCurrentUser } from "@/lib/server/auth";
@@ -7,16 +8,13 @@ import { listBenevoles } from "@/lib/server/benevoles-service";
 import { BenevolesSection } from "./BenevolesSection";
 import styles from "./page.module.css";
 
-export const metadata: Metadata = {
-  title: "BlueGenji - Bénévoles",
+export const metadata: Metadata = pageMetadata({
+  title: "Bénévoles",
   description: "Découvrez les bénévoles qui font vivre BlueGenji Esport au quotidien.",
-  openGraph: {
-    title: "BlueGenji - Bénévoles",
-    description: "Les passionné·es qui organisent, animent et développent la scène esport francophone.",
-    type: "website",
-    locale: "fr_FR",
-  },
-};
+  shareDescription:
+    "Les passionné·es qui organisent, animent et développent la scène esport francophone.",
+  path: "/benevoles",
+});
 
 export default async function BenevolesPage() {
   const [user, benevoles] = await Promise.all([getCurrentUser(), listBenevoles()]);

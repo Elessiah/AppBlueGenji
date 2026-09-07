@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/shared/page-metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import "../../bot.css";
@@ -21,11 +22,18 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const section = findBotDocSection(slug?.[0]);
-  if (!section) return { title: "Documentation — BlueGenji Bot" };
-  return {
-    title: `${section.title} — Documentation BlueGenji Bot`,
+  if (!section) {
+    return pageMetadata({
+      title: "Documentation du bot",
+      description: "La documentation du bot Discord BlueGenji.",
+      path: "/bot/docs",
+    });
+  }
+  return pageMetadata({
+    title: `${section.title} — Documentation du bot`,
     description: section.summary,
-  };
+    path: `/bot/docs/${section.slug}`,
+  });
 }
 
 export default async function BotDocsPage({ params }: PageProps) {

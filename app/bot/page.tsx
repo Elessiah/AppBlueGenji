@@ -1,4 +1,6 @@
 import './bot.css';
+import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/shared/page-metadata";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { BotCrumb } from "@/components/bot/BotCrumb";
@@ -13,6 +15,15 @@ import { BotModules } from "@/components/bot/BotModules";
 import { BotCommands } from "@/components/bot/BotCommands";
 import { BotInviteCard } from "@/components/bot/BotInviteCard";
 import { fetchBotStats, fetchBotStatus, fetchBotKpis, fetchBotServers, fetchBotActivity, fetchBotModules } from '@/lib/server/bot-integration';
+
+export const metadata: Metadata = pageMetadata({
+  title: "BlueGenji Bot",
+  description:
+    "Le bot Discord de BlueGenji : annonces synchronisées entre serveurs affiliés, statistiques et commandes de tournoi.",
+  shareDescription:
+    "Annonces synchronisées, statistiques et commandes de tournoi, directement dans Discord.",
+  path: "/bot",
+});
 
 export const revalidate = 30;
 

@@ -1,7 +1,6 @@
 ﻿import crypto from "node:crypto";
 import * as React from "react";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import type { RowDataPacket, ResultSetHeader } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { normalizePseudo, slugifyPseudo } from "@/lib/server/serialization";
@@ -215,14 +214,6 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
 
   return fromRow(rows[0]);
 });
-
-export async function requireCurrentUser(): Promise<AuthUser> {
-  const user = await getCurrentUser();
-  if (!user) {
-    redirect("/connexion");
-  }
-  return user;
-}
 
 export async function saveGoogleOAuthState(state: string, redirectTo: string): Promise<void> {
   const cookieStore = await cookies();
