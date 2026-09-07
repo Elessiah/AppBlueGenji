@@ -82,7 +82,12 @@ Deux chemins entretiennent la mesure, et le premier suffit dans le cas nominal :
    flux SSE, et la rangée qui fait grandir une carte apparaît *dans* un rendu ;
    mesurer avant la peinture évite le saut de mise en page ;
 2. un **`ResizeObserver`** pour ce qui échappe à React : chargement d'une police,
-   redimensionnement de la fenêtre qui fait replier un nom.
+   redimensionnement de la fenêtre qui fait replier un nom. Il appartient à un
+   effet et non au `ref` — le mode strict de React démonte et remonte chaque
+   composant en développement *sans* rejouer les `ref`, et un observateur créé
+   là serait débranché pour de bon. Un onglet caché n'en délivre aucune
+   observation (le navigateur ne peint pas) : c'est sans conséquence, le retour
+   sur l'onglet provoque un rendu, donc une mesure.
 
 Aucune boucle à craindre : le contenu mesuré est de hauteur automatique et
 seulement *centré* dans son créneau, sa taille ne dépend donc pas de la hauteur

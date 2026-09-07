@@ -65,25 +65,31 @@ export function useSlotHeight(): SlotMeasure {
         return;
       }
       nodes.current.set(matchId, { roundNumber, element });
-      if (!observer.current && typeof ResizeObserver !== "undefined") {
-        observer.current = new ResizeObserver(recompute);
-      }
+      // Pas encore d'observateur au tout premier rendu : l'effet ci-dessous
+      // rattrape les créneaux déjà posés.
       observer.current?.observe(element);
     },
-    [recompute],
+    [],
   );
 
   // À chaque rendu : les cartes viennent d'être posées ou remplacées, et la
   // mesure doit précéder la peinture pour éviter un saut de mise en page.
   useIsomorphicLayoutEffect(recompute);
 
-  useEffect(
-    () => () => {
-      observer.current?.disconnect();
-      observer.current = null;
-    },
-    [],
-  );
+  // L'observateur appartient à un effet, et non au `ref` : c'est ce qui le fait
+  // renaître au remontage — le mode strict de React démonte et remonte chaque
+  // composant en développement *sans* rejouer les `ref`, et un observateur créé
+  // là serait débranché pour de bon.
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") return;
+    const resizeObserver = new ResizeObserver(recompute);
+    observer.current = resizeObserver;
+    for (const { element } of nodes.current.values()) resizeObserver.observe(element);
+    return () => {
+      resizeObserver.disconnect();
+      if (observer.current === resizeObserver) observer.current = null;
+    };
+  }, [recompute]);
 
   return { slotHeight, measureSlot };
 }
