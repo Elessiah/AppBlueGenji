@@ -87,6 +87,21 @@ describe("applyEndurancePenalty", () => {
     expect(insert?.[1]).toEqual([7, 42, 2, 3, "Retard au coup d'envoi", 9]);
   });
 
+  it("rend le motif **normalisé**, celui-là même qui est stocké", async () => {
+    // La ligne du journal Discord se rédige depuis cette valeur : le canal
+    // montrerait sinon un espacement que la page ne montre pas.
+    const { conn } = makeConn();
+    const applied = await applyEndurancePenalty(
+      7,
+      42,
+      3,
+      "  Retard   au coup d'envoi  ",
+      9,
+      conn,
+    );
+    expect(applied).toEqual({ reason: "Retard au coup d'envoi" });
+  });
+
   it("porte une sanction d'avant la première manche sur la manche 1", async () => {
     // Le rejeu ne connaît pas de manche 0, et la sanction doit peser dès le
     // premier appariement.

@@ -1069,9 +1069,24 @@ export async function applyEndurancePenaltyPublic(
     await connection.beginTransaction();
 
     const { applyEndurancePenalty } = await import("./bg-survie");
-    await applyEndurancePenalty(tournamentId, teamId, points, reason, authorId, connection);
+    const applied = await applyEndurancePenalty(
+      tournamentId,
+      teamId,
+      points,
+      reason,
+      authorId,
+      connection,
+    );
 
-    queueBotLog(connection, { kind: "endurance_penalty", tournamentId, teamId, points, reason });
+    // Le motif **tel qu'il est stocké** : le moteur l'a normalisé, et le canal
+    // Discord montrerait sinon un espacement que la page ne montre pas.
+    queueBotLog(connection, {
+      kind: "endurance_penalty",
+      tournamentId,
+      teamId,
+      points,
+      reason: applied.reason,
+    });
 
     await connection.commit();
     flushBotLogs(connection);

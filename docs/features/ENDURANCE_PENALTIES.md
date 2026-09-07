@@ -139,7 +139,10 @@ supprimé plus tard : le compte s'efface, la sanction reste due.
   sanction *demandée* ferait mentir la colonne pour qui recoupe la ligne avec la
   manche précédente.
 - **Journal des sanctions** — sous le classement, visible de **tous** : montant,
-  engagé, motif, manche, arbitre. Une sanction qui déplace un classement sans
+  engagé, motif, manche, arbitre. Son montant est la sanction **prononcée**, là
+  où le `−N` du classement est la baisse réelle du capital : les deux nombres
+  peuvent différer (une pénalité de 5 sur une équipe à 2 points), et c'est
+  voulu — le journal enregistre une décision, le classement enregistre un effet. Une sanction qui déplace un classement sans
   qu'aucun match ne l'explique doit être lisible par l'équipe qui la subit comme
   par celles qu'elle fait remonter. Seul le bouton « Retirer » est réservé à
   l'arbitrage.

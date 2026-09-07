@@ -1101,7 +1101,7 @@ export async function applyEndurancePenalty(
   reason: string,
   authorId: number | null,
   conn: PoolConnection,
-): Promise<void> {
+): Promise<{ reason: string }> {
   const tournament = await loadTournament(conn, tournamentId);
   if (!tournament || tournament.format !== "BG_SURVIE") throw new Error("NOT_BG_SURVIE");
   if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
@@ -1125,14 +1125,21 @@ export async function applyEndurancePenalty(
   // d'envoi doit peser dès le premier appariement.
   const round = Math.max(Number(tournament.endurance_current_round), 1);
 
+  // Le motif normalisé est **rendu** à l'appelant, et non renormalisé par lui :
+  // la ligne du journal Discord doit porter le texte tel qu'il est stocké, sans
+  // quoi le canal montrerait une espacement que la page ne montre pas.
+  const normalized = normalizePenaltyReason(reason);
+
   await conn.execute(
     `INSERT INTO bg_endurance_penalties
       (tournament_id, team_id, round_number, points, reason, created_by)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [tournamentId, teamId, round, Math.floor(points), normalizePenaltyReason(reason), authorId],
+    [tournamentId, teamId, round, Math.floor(points), normalized, authorId],
   );
 
   await reconcileEndurance(tournamentId, conn);
+
+  return { reason: normalized };
 }
 
 /**
