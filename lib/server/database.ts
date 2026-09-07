@@ -1137,6 +1137,45 @@ async function runMigrations(db: Pool): Promise<void> {
     // Table already exists
   }
 
+  // Pénalités d'endurance du mode « BlueGenji Survie »
+  // (`lib/shared/endurance-penalty.ts`).
+  //
+  // Une table à part, et non une colonne de plus sur `bg_endurance_standings` :
+  // le classement d'endurance est **rejoué** à chaque entretien, donc écrasé —
+  // un cumul qui y vivrait serait effacé au premier score corrigé. La pénalité
+  // est une décision humaine, au même titre qu'un abandon : elle est une
+  // *entrée* du rejeu, jamais un de ses résultats. La ligne porte sa manche,
+  // ce qui la place dans la chronologie du tournoi.
+  //
+  // `ON DELETE CASCADE` sur les deux clés : un tournoi ou une équipe effacés
+  // n'ont plus de sanction à porter.
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS bg_endurance_penalties (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        tournament_id BIGINT NOT NULL,
+        team_id BIGINT NOT NULL,
+        round_number INT NOT NULL,
+        points INT NOT NULL,
+        reason VARCHAR(255) NOT NULL,
+        created_by BIGINT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        KEY idx_bg_endurance_penalties_tournament (tournament_id),
+        CONSTRAINT fk_bg_endurance_penalties_tournament FOREIGN KEY (tournament_id)
+          REFERENCES bg_tournaments(id) ON DELETE CASCADE,
+        CONSTRAINT fk_bg_endurance_penalties_team FOREIGN KEY (team_id)
+          REFERENCES bg_teams(id) ON DELETE CASCADE,
+        -- L'auteur s'efface en NULL et n'emporte pas la sanction : un compte
+        -- supprimé ne doit pas rendre au classement des points retirés par
+        -- décision d'arbitrage.
+        CONSTRAINT fk_bg_endurance_penalties_author FOREIGN KEY (created_by)
+          REFERENCES bg_users(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+  } catch {
+    // Table already exists
+  }
+
   // Migration: sigle d'équipe (« trigramme », `lib/shared/team-tag.ts`).
   //
   // 2 à 4 caractères alphanumériques, en majuscules, **unique sur tout le

@@ -10,6 +10,10 @@
  * - `reconcileEndurance` — **rejoue** tout depuis l'historique, persiste le
  *   classement, enchaîne la manche suivante ou bascule en play-offs.
  * - `startEndurancePlayoffs` — construit l'arbre à 8 selon le tableau imposé.
+ * - `applyEndurancePenalty` / `liftEndurancePenalty` — sanction d'arbitrage sur
+ *   le capital d'endurance (`lib/shared/endurance-penalty.ts`). Elles n'écrivent
+ *   **que** la table des pénalités, puis laissent le rejeu en tirer les
+ *   conséquences : aucune des deux ne touche au classement.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import {
@@ -29,11 +33,17 @@ import {
   selectQualifiedTeamIds,
   type EnduranceConfig,
   type EnduranceMatchOutcome,
+  type EndurancePenalty,
   type EnduranceStanding,
   type EnduranceStatus,
   type PlayoffRoundPlan,
 } from "@/lib/shared/bg-survie";
+import {
+  checkEndurancePenalty,
+  normalizePenaltyReason,
+} from "@/lib/shared/endurance-penalty";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
+import { toIso } from "@/lib/server/serialization";
 import { createMatch, finishTournament } from "./repository";
 
 type TournamentEnduranceRow = RowDataPacket & {
@@ -322,6 +332,34 @@ async function loadQualificationOutcomes(
   });
 }
 
+/**
+ * Pénalités d'endurance du tournoi, telles qu'elles entrent dans le rejeu.
+ *
+ * Lues à chaque réconciliation plutôt que cumulées quelque part : le classement
+ * est écrasé à chaque entretien, un total qui y vivrait ne survivrait pas au
+ * premier score corrigé.
+ */
+async function loadPenalties(
+  conn: PoolConnection,
+  tournamentId: number,
+): Promise<EndurancePenalty[]> {
+  const [rows] = await conn.execute<
+    (RowDataPacket & { team_id: number; round_number: number; points: number })[]
+  >(
+    `SELECT team_id, round_number, points
+     FROM bg_endurance_penalties
+     WHERE tournament_id = ?
+     ORDER BY round_number ASC, id ASC`,
+    [tournamentId],
+  );
+
+  return rows.map((row) => ({
+    teamId: Number(row.team_id),
+    round: Number(row.round_number),
+    points: Number(row.points),
+  }));
+}
+
 /** Abandons déclarés, dérivés du statut FORFEIT déjà stocké. */
 async function loadForfeits(
   conn: PoolConnection,
@@ -365,6 +403,7 @@ export async function reconcileEndurance(
     teams: stored.map((standing) => ({ teamId: standing.teamId, seed: standing.seed })),
     matches: await loadQualificationOutcomes(conn, tournamentId),
     forfeits: await loadForfeits(conn, tournamentId),
+    penalties: await loadPenalties(conn, tournamentId),
     config,
     lastRound: Number(tournament.endurance_current_round),
     matchFormat: matchFormatOf(tournament),
@@ -432,6 +471,19 @@ export async function reconcileEndurance(
   await generateEnduranceRound(tournamentId, conn);
 }
 
+/**
+ * « Ce match porte une saisie » — le prédicat de `match-lock` en SQL.
+ *
+ * Écrit une seule fois : trois lectures s'en servent (réappariement d'une
+ * manche périmée, verrou du retrait d'une pénalité, et la borne que l'interface
+ * reçoit pour ne pas proposer un geste que le serveur refusera). Trois copies
+ * divergeraient au premier réglage, et l'interface offrirait alors un bouton
+ * voué au 409.
+ */
+const HAS_SCORE_INPUT_SQL = `(team1_score IS NOT NULL OR team2_score IS NOT NULL
+            OR winner_team_id IS NOT NULL OR forfeit_team_id IS NOT NULL
+            OR status = 'AWAITING_CONFIRMATION')`;
+
 /** Un match de la manche porte-t-il déjà une saisie ? */
 async function roundHasScoreInput(
   conn: PoolConnection,
@@ -441,10 +493,57 @@ async function roundHasScoreInput(
   const [rows] = await conn.execute<(RowDataPacket & { c: number })[]>(
     `SELECT COUNT(*) AS c FROM bg_matches
      WHERE tournament_id = ? AND phase_id = 0 AND round_number = ?
-       AND (team1_score IS NOT NULL OR team2_score IS NOT NULL
-            OR winner_team_id IS NOT NULL OR forfeit_team_id IS NOT NULL
-            OR status = 'AWAITING_CONFIRMATION')`,
+       AND ${HAS_SCORE_INPUT_SQL}`,
     [tournamentId, round],
+  );
+  return Number(rows[0]?.c ?? 0) > 0;
+}
+
+/**
+ * Dernière manche qualificative portant une saisie, `0` s'il n'y en a aucune.
+ *
+ * C'est la borne du retrait d'une pénalité, telle que l'interface la reçoit :
+ * une sanction de la manche N ne se retire plus dès qu'une manche strictement
+ * postérieure a été entamée. Une seule requête pour tout le tableau, là où
+ * `laterRoundHasScoreInput` en fait une par écriture.
+ */
+async function lastRoundWithScoreInput(
+  conn: PoolConnection,
+  tournamentId: number,
+): Promise<number> {
+  const [rows] = await conn.execute<(RowDataPacket & { last_round: number | null })[]>(
+    `SELECT MAX(round_number) AS last_round FROM bg_matches
+     WHERE tournament_id = ? AND phase_id = 0 AND round_number < ?
+       AND ${HAS_SCORE_INPUT_SQL}`,
+    [tournamentId, PLAYOFF_ROUND_OFFSET],
+  );
+  return Number(rows[0]?.last_round ?? 0);
+}
+
+/**
+ * Une manche **postérieure** à `round` porte-t-elle déjà une saisie ?
+ *
+ * C'est la règle de `lib/shared/match-lock.ts` appliquée aux sanctions : en
+ * survie, sans lien de bracket, toute manche ultérieure dépend des
+ * précédentes — leurs appariements se recalculent depuis le classement. Une
+ * pénalité retirée derrière une manche déjà jouée remettrait donc une équipe
+ * en lice sans que les manches qu'elle a manquées soient réappariées : elle
+ * rentrerait avec un capital intact devant celles qui ont réellement joué.
+ *
+ * Le `>` est strict : la manche de la sanction elle-même peut être entamée,
+ * la pénalité tombe de toute façon **après** ses matchs.
+ */
+async function laterRoundHasScoreInput(
+  conn: PoolConnection,
+  tournamentId: number,
+  round: number,
+): Promise<boolean> {
+  const [rows] = await conn.execute<(RowDataPacket & { c: number })[]>(
+    `SELECT COUNT(*) AS c FROM bg_matches
+     WHERE tournament_id = ? AND phase_id = 0 AND round_number > ?
+       AND round_number < ?
+       AND ${HAS_SCORE_INPUT_SQL}`,
+    [tournamentId, round, PLAYOFF_ROUND_OFFSET],
   );
   return Number(rows[0]?.c ?? 0) > 0;
 }
@@ -920,6 +1019,194 @@ export async function forfeitEnduranceTeam(
   await reconcileEndurance(tournamentId, conn);
 }
 
+/**
+ * Pénalités du tournoi telles qu'elles s'affichent : avec leur motif, l'engagé
+ * visé et l'auteur de la sanction.
+ *
+ * L'auteur est nommé parce qu'une sanction se conteste : « −3 » sans arbitre
+ * derrière n'est adressable à personne. Un compte effacé laisse la ligne en
+ * place (`created_by` passe à `NULL`) — la pénalité reste due.
+ */
+async function loadPenaltyRows(conn: PoolConnection, tournamentId: number) {
+  // Borne du retrait, relue une fois pour tout le tableau : une sanction de la
+  // manche N ne se retire plus dès qu'une manche postérieure a été entamée
+  // (même règle que `liftEndurancePenalty`, même prédicat).
+  const lockRound = await lastRoundWithScoreInput(conn, tournamentId);
+
+  const [rows] = await conn.execute<
+    (RowDataPacket & {
+      id: number;
+      team_id: number;
+      team_name: string;
+      round_number: number;
+      points: number;
+      reason: string;
+      author_pseudo: string | null;
+      created_at: Date | string;
+    })[]
+  >(
+    `SELECT p.id, p.team_id, p.round_number, p.points, p.reason, p.created_at,
+            t.name AS team_name, u.pseudo AS author_pseudo
+     FROM bg_endurance_penalties p
+     JOIN bg_teams t ON t.id = p.team_id
+     LEFT JOIN bg_users u ON u.id = p.created_by
+     WHERE p.tournament_id = ?
+     ORDER BY p.round_number ASC, p.id ASC`,
+    [tournamentId],
+  );
+
+  return rows.map((row) => ({
+    id: Number(row.id),
+    teamId: Number(row.team_id),
+    teamName: row.team_name,
+    round: Number(row.round_number),
+    points: Number(row.points),
+    reason: row.reason,
+    authorPseudo: row.author_pseudo,
+    createdAt: toIso(row.created_at),
+    // `>=` et non `>` : la manche de la sanction elle-même peut être entamée,
+    // la pénalité tombe de toute façon après ses matchs.
+    removable: Number(row.round_number) >= lockRound,
+  }));
+}
+
+/**
+ * Inflige une pénalité d'endurance à un engagé, puis rejoue le tournoi.
+ *
+ * **Réservé à la phase qualificative**, et pour la même raison que l'abandon :
+ * le capital d'endurance ne décide plus rien une fois l'arbre lancé — une
+ * sanction y serait sans effet, mais figurerait quand même au tableau comme si
+ * elle en avait un.
+ *
+ * La manche portée par la sanction est la **manche courante** : c'est ce qui la
+ * situe dans la chronologie. Elle pèse donc sur l'appariement de la suivante,
+ * et `reconcileEndurance` réapparie de lui-même une manche déjà posée mais
+ * jamais jouée — exactement comme après une correction de score.
+ *
+ * **Sur un tournoi en cours seulement**, comme l'abandon en Survie et en Ronde
+ * suisse : `reconcileEndurance` s'arrête net sur un tournoi `FINISHED`, si bien
+ * qu'une sanction y serait écrite sans jamais être rejouée — le classement
+ * stocké et le podium garderaient leurs valeurs pendant que `loadEnduranceMeta`,
+ * qui rejoue toujours, afficherait une championne au capital amputé. Le cas est
+ * atteignable : un tournoi clos par `startEndurancePlayoffs` faute de qualifiées
+ * garde `endurance_playoffs_started` à 0.
+ *
+ * @throws NOT_BG_SURVIE | TOURNAMENT_NOT_RUNNING | ENDURANCE_PLAYOFFS_STARTED
+ *         | TEAM_NOT_IN_TOURNAMENT | TEAM_ALREADY_OUT | INVALID_PENALTY
+ */
+export async function applyEndurancePenalty(
+  tournamentId: number,
+  teamId: number,
+  points: number,
+  reason: string,
+  authorId: number | null,
+  conn: PoolConnection,
+): Promise<{ reason: string }> {
+  const tournament = await loadTournament(conn, tournamentId);
+  if (!tournament || tournament.format !== "BG_SURVIE") throw new Error("NOT_BG_SURVIE");
+  if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
+  if (Number(tournament.endurance_playoffs_started) === 1) {
+    throw new Error("ENDURANCE_PLAYOFFS_STARTED");
+  }
+
+  // La même règle que le formulaire, appliquée par le même module : le serveur
+  // reste le juge, l'interface n'en est que la première passe.
+  if (checkEndurancePenalty(points, reason) !== null) throw new Error("INVALID_PENALTY");
+
+  const [rows] = await conn.execute<(RowDataPacket & { status: string })[]>(
+    `SELECT status FROM bg_endurance_standings WHERE tournament_id = ? AND team_id = ? LIMIT 1`,
+    [tournamentId, teamId],
+  );
+  if (rows.length === 0) throw new Error("TEAM_NOT_IN_TOURNAMENT");
+  if (rows[0].status !== "ACTIVE") throw new Error("TEAM_ALREADY_OUT");
+
+  // Avant la première manche, la sanction porte tout de même sur la manche 1 :
+  // le rejeu ne connaît pas de manche 0, et une pénalité prononcée au coup
+  // d'envoi doit peser dès le premier appariement.
+  const round = Math.max(Number(tournament.endurance_current_round), 1);
+
+  // Le motif normalisé est **rendu** à l'appelant, et non renormalisé par lui :
+  // la ligne du journal Discord doit porter le texte tel qu'il est stocké, sans
+  // quoi le canal montrerait une espacement que la page ne montre pas.
+  const normalized = normalizePenaltyReason(reason);
+
+  await conn.execute(
+    `INSERT INTO bg_endurance_penalties
+      (tournament_id, team_id, round_number, points, reason, created_by)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [tournamentId, teamId, round, Math.floor(points), normalized, authorId],
+  );
+
+  await reconcileEndurance(tournamentId, conn);
+
+  return { reason: normalized };
+}
+
+/**
+ * Retire une pénalité, puis rejoue le tournoi.
+ *
+ * C'est **la** façon de corriger une sanction saisie de travers : le rejeu
+ * défait le retrait de points et tout ce qu'il a entraîné — l'élimination qu'il
+ * avait provoquée, la coupe sous plafond qui en découlait, l'appariement de la
+ * manche suivante tant qu'elle n'est pas entamée. Une seconde pénalité de sens
+ * inverse ne saurait pas faire cela, et laisserait au classement deux sanctions
+ * dont l'une est un pansement.
+ *
+ * Refusé une fois l'arbre lancé, comme l'est l'application : le rejeu rendrait
+ * ses points à l'équipe, et pourrait la ramener « en lice » alors que le
+ * plateau des play-offs est déjà tiré sans elle — un classement qui contredit
+ * l'arbre affiché juste au-dessus. La sanction devient donc définitive au même
+ * instant que le capital cesse de décider quoi que ce soit.
+ *
+ * Refusé **aussi** dès qu'une manche postérieure porte une saisie
+ * (`ENDURANCE_ROUND_ALREADY_PLAYED`) : c'est la règle de `match-lock`, que le
+ * retrait est le seul geste du mode à pouvoir enfreindre puisqu'il remonte le
+ * temps. Sans elle, lever une sanction de la manche 2 à la manche 7 rendrait
+ * son capital **intact** à une équipe qui n'a pas joué les quatre manches
+ * entre-temps — le rejeu ne réapparie que la manche courante, les autres
+ * restent telles qu'elles ont été jouées, et l'équipe ressuscitée passerait
+ * devant toutes celles qui y ont perdu des maps.
+ *
+ * @throws NOT_BG_SURVIE | TOURNAMENT_NOT_RUNNING | ENDURANCE_PLAYOFFS_STARTED
+ *         | ENDURANCE_ROUND_ALREADY_PLAYED | PENALTY_NOT_FOUND
+ */
+export async function liftEndurancePenalty(
+  tournamentId: number,
+  penaltyId: number,
+  conn: PoolConnection,
+): Promise<{ teamId: number; points: number }> {
+  const tournament = await loadTournament(conn, tournamentId);
+  if (!tournament || tournament.format !== "BG_SURVIE") throw new Error("NOT_BG_SURVIE");
+  if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
+  if (Number(tournament.endurance_playoffs_started) === 1) {
+    throw new Error("ENDURANCE_PLAYOFFS_STARTED");
+  }
+
+  // La pénalité est relue **par son tournoi** : un identifiant de sanction
+  // appartenant à un autre plateau ne doit pas s'effacer depuis cette page.
+  const [rows] = await conn.execute<
+    (RowDataPacket & { team_id: number; points: number; round_number: number })[]
+  >(
+    `SELECT team_id, points, round_number FROM bg_endurance_penalties
+     WHERE id = ? AND tournament_id = ? LIMIT 1`,
+    [penaltyId, tournamentId],
+  );
+  if (rows.length === 0) throw new Error("PENALTY_NOT_FOUND");
+
+  if (await laterRoundHasScoreInput(conn, tournamentId, Number(rows[0].round_number))) {
+    throw new Error("ENDURANCE_ROUND_ALREADY_PLAYED");
+  }
+
+  await conn.execute(`DELETE FROM bg_endurance_penalties WHERE id = ? AND tournament_id = ?`, [
+    penaltyId,
+    tournamentId,
+  ]);
+
+  await reconcileEndurance(tournamentId, conn);
+
+  return { teamId: Number(rows[0].team_id), points: Number(rows[0].points) };
+}
+
 /** Métadonnées d'affichage : barème, manche courante, classement complet. */
 export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: number) {
   const tournament = await loadTournament(conn, tournamentId);
@@ -955,6 +1242,8 @@ export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: numb
   // produit, si bien qu'une correction de score le refait sans migration ni
   // colonne à tenir à jour. Les abandons se relisent ici depuis les lignes déjà
   // chargées, plutôt que par une seconde requête sur la même table.
+  const penalties = await loadPenaltyRows(conn, tournamentId);
+
   const detailed = replayEnduranceDetailed({
     teams: rows.map((row) => ({ teamId: Number(row.team_id), seed: Number(row.seed) })),
     matches: await loadQualificationOutcomes(conn, tournamentId),
@@ -964,6 +1253,14 @@ export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: numb
         teamId: Number(row.team_id),
         round: Number(row.eliminated_round ?? 1),
       })),
+    // Les mêmes lignes que le rejeu de `reconcileEndurance`, relues ici avec
+    // leur motif : deux requêtes diraient la même chose, une seule évite qu'un
+    // tableau et son classement divergent.
+    penalties: penalties.map((penalty) => ({
+      teamId: penalty.teamId,
+      round: penalty.round,
+      points: penalty.points,
+    })),
     config,
     lastRound: Number(tournament.endurance_current_round),
     matchFormat: matchFormatOf(tournament),
@@ -979,6 +1276,7 @@ export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: numb
     currentRound: Number(tournament.endurance_current_round),
     playoffsStarted: Number(tournament.endurance_playoffs_started) === 1,
     rounds: detailed.rounds,
+    penalties,
     standings: rows.map((row) => ({
       teamId: Number(row.team_id),
       teamName: row.team_name,
@@ -990,6 +1288,10 @@ export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: numb
       status: row.status,
       eliminatedRound: row.eliminated_round === null ? null : Number(row.eliminated_round),
       rank: Number(row.rank),
+      // Le cumul vient du **rejeu**, pas d'une somme des lignes : une sanction
+      // visant une équipe déjà sortie n'a rien retiré, et l'annoncer au
+      // classement ferait mentir la colonne d'endurance.
+      penaltyPoints: detailed.penaltyTotals.get(Number(row.team_id)) ?? 0,
       rounds: detailed.history.get(Number(row.team_id)) ?? [],
     })),
   };

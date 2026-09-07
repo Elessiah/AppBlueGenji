@@ -74,6 +74,18 @@ async function purgeTournamentRows(
   await connection.execute(`DELETE FROM bg_swiss_standings WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(`DELETE FROM bg_survival_standings WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(`DELETE FROM bg_endurance_standings WHERE tournament_id = ?`, [tournamentId]);
+  // Les pénalités d'endurance portent un `tournament_id` : elles font partie de
+  // la liste relisible de ce qui part, comme les classements au-dessus. Sous
+  // `try` pour la même raison que les alertes arbitre : sa création est avalée
+  // par un `catch` dans `database.ts`, et une base à qui la table manquerait
+  // rendrait sinon tous les tournois indéboulonnables.
+  try {
+    await connection.execute(`DELETE FROM bg_endurance_penalties WHERE tournament_id = ?`, [
+      tournamentId,
+    ]);
+  } catch (error) {
+    if (!isMissingTableError(error)) throw error;
+  }
   // Les rappels de match pendent aux manches, pas au tournoi : on les efface
   // avant elles, à la main comme le reste, plutôt que de compter sur la cascade
   // de `bg_match_reminders.match_id`.

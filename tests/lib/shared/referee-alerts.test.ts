@@ -27,6 +27,8 @@ describe("BOT_EVENT_CHANNELS", () => {
       "tournament_started",
       "tournament_finished",
       "tournament_underfilled",
+      "endurance_penalty",
+      "endurance_penalty_lifted",
     ];
 
     expect(Object.keys(BOT_EVENT_CHANNELS).sort()).toEqual([...expected].sort());
@@ -49,6 +51,10 @@ describe("BOT_EVENT_CHANNELS", () => {
       "tournament_started",
       "tournament_finished",
       "tournament_underfilled",
+      // Une pénalité, posée ou retirée, est le geste de l'arbitre lui-même :
+      // la lui renvoyer en message privé ne lui apprendrait rien.
+      "endurance_penalty",
+      "endurance_penalty_lifted",
     ];
 
     for (const kind of journalEvents) {

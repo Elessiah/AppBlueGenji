@@ -64,6 +64,7 @@ describe("deleteTournament", () => {
       "bg_swiss_standings",
       "bg_survival_standings",
       "bg_endurance_standings",
+      "bg_endurance_penalties",
       "bg_matches",
       "bg_tournament_phases",
       "bg_tournament_registrations",

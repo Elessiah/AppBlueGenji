@@ -3,7 +3,12 @@
 import { FormEvent, useCallback, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
+import type {
+  BracketMatch,
+  BracketType,
+  EndurancePenaltyRow,
+  TournamentFormat,
+} from "@/lib/shared/types";
 import { participantWording } from "@/lib/shared/participants";
 import { remainingSlots } from "@/lib/shared/ghost-registration";
 import { useToast } from "@/components/ui/toast";
@@ -39,6 +44,7 @@ import { MatchAnchorProvider } from "./_lib/match-anchor-context";
 import { useMatchAnchor } from "./_hooks/useMatchAnchor";
 import { TournamentProgress } from "./_components/TournamentProgress";
 import { DeleteTournamentDialog } from "./_components/DeleteTournamentDialog";
+import { EndurancePenaltyDialog } from "./_components/EndurancePenaltyDialog";
 import { LaunchTournamentDialog } from "./_components/LaunchTournamentDialog";
 import { TournamentHeader } from "./_components/TournamentHeader";
 
@@ -96,6 +102,12 @@ export default function TournamentDetailPage() {
     [],
   );
   const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
+  // Pénalité d'endurance en cours de saisie : `null` = dialogue fermé. On retient
+  // l'**identifiant** de l'engagé visé, jamais sa ligne de classement — même
+  // raison que les trois dialogues ci-dessus : le flux réécrit le classement, et
+  // un capital capturé au clic ferait annoncer au dialogue un « capital
+  // restant » périmé, voire tairait l'élimination qu'une sanction provoque.
+  const [penaltyTeamId, setPenaltyTeamId] = useState<number | null>(null);
 
   // Lien profond `#match-[id]` : la fiche s'ouvre défilée sur le match désigné
   // (carte « en cours » de l'accueil, lien partagé). Le hook révèle au besoin la
@@ -116,6 +128,9 @@ export default function TournamentDetailPage() {
   // encore qu'un dialogue de suppression laissé ouvert sur la mauvaise cible.
   useEffect(() => setLaunchDialogOpen(false), [tournamentId]);
   useEffect(() => setIssueTarget(undefined), [tournamentId]);
+  // Même précaution : une sanction ne doit pas se retrouver adressée à l'engagé
+  // d'un autre tournoi parce que la page a changé de cible sous le dialogue.
+  useEffect(() => setPenaltyTeamId(null), [tournamentId]);
 
   // Dernière phase courante observée. On ne resynchronise la sélection que
   // lorsqu'elle change RÉELLEMENT (une phase vient de démarrer) : comparer
@@ -332,6 +347,33 @@ export default function TournamentDetailPage() {
     }
   };
 
+  const liftPenalty = async (penalty: EndurancePenaltyRow) => {
+    const confirmation =
+      `Retirer la pénalité de ${penalty.points} point(s) infligée à ${penalty.teamName} ?` +
+      ` Son capital d'endurance et tout ce que la sanction avait entraîné seront rétablis.`;
+    if (!window.confirm(confirmation)) return;
+    try {
+      const response = await fetch(
+        `/api/tournaments/${tournamentId}/penalties/${penalty.id}`,
+        { method: "DELETE" },
+      );
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "PENALTY_LIFT_FAILED");
+      showSuccess(`Pénalité retirée : ${penalty.teamName} récupère ${penalty.points} point(s).`);
+      void refresh();
+    } catch (e) {
+      showError(mapError((e as Error).message));
+    }
+  };
+
+  // Ligne visée par le dialogue de pénalité, relue à chaque rendu depuis
+  // l'instantané : c'est ce qui garde le « capital restant » du dialogue aligné
+  // sur ce que le flux vient d'apporter.
+  const penaltyStanding =
+    penaltyTeamId === null
+      ? null
+      : detail.endurance?.standings.find((s) => s.teamId === penaltyTeamId) ?? null;
+
   const registerTeam = async () => {
     try {
       const response = await fetch(`/api/tournaments/${tournamentId}/register`, {
@@ -529,6 +571,12 @@ export default function TournamentDetailPage() {
               myTeamId={detail.myTeamId}
               canForfeit={canForfeit}
               onForfeit={forfeitTeam}
+              // La sanction est un geste d'**arbitrage** : elle ne suit pas
+              // `canForfeit`, qu'un capitaine porte aussi pour son propre
+              // engagé. On ne se pénalise pas soi-même.
+              canPenalize={!frozen && detail.isAdmin}
+              onPenalize={(teamId) => setPenaltyTeamId(teamId)}
+              onLiftPenalty={liftPenalty}
               canReport={canReport}
               adminResolvable={canAdminResolve}
               drafts={drafts}
@@ -768,6 +816,24 @@ export default function TournamentDetailPage() {
             showSuccess(`Tournoi « ${name} » supprimé définitivement.`);
             router.replace("/tournois");
           }}
+        />
+      )}
+
+      {/*
+        La cible est un **identifiant**, sa ligne se relit à chaque rendu depuis
+        le flux : le dialogue annonce donc le capital du moment, et l'élimination
+        quand la sanction y mène. Une ligne disparue (l'engagé vient de sortir)
+        referme le dialogue plutôt que d'ouvrir sur des chiffres inventés.
+      */}
+      {penaltyStanding !== null && detail.isAdmin && !frozen && detail.endurance && (
+        <EndurancePenaltyDialog
+          tournamentId={tournamentId}
+          teamId={penaltyStanding.teamId}
+          teamName={penaltyStanding.teamName}
+          currentPoints={penaltyStanding.points}
+          round={detail.endurance.currentRound}
+          onClose={() => setPenaltyTeamId(null)}
+          onApplied={() => void refresh()}
         />
       )}
 

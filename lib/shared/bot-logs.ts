@@ -54,7 +54,9 @@ export type BotEventKind =
   | "score_report_stalled"
   | "tournament_started"
   | "tournament_finished"
-  | "tournament_underfilled";
+  | "tournament_underfilled"
+  | "endurance_penalty"
+  | "endurance_penalty_lifted";
 
 /**
  * Titre d'un tournoi tel qu'il apparaît dans le journal.
@@ -208,6 +210,46 @@ export function formatUnderfilledTournamentLog(context: {
       ? "aucun engagement"
       : `1 seul${wording.one === "équipe" ? "e équipe engagée" : " joueur engagé"}`;
   return `${lead("🚫", "Tournoi clos faute d'adversaires", context.tournament)} : ${field}.`;
+}
+
+/**
+ * Pénalité de points d'endurance infligée par l'arbitrage (mode « BlueGenji
+ * Survie », `lib/shared/endurance-penalty.ts`).
+ *
+ * Au journal et non au canal arbitre : c'est *l'arbitre* qui vient de la
+ * prononcer, il n'a rien à faire de plus en lisant la ligne. Elle y figure
+ * quand même parce qu'elle déplace un classement sans qu'aucun match ne
+ * l'explique — la seule façon, depuis Discord, de comprendre pourquoi une
+ * équipe a perdu trois points sans jouer.
+ *
+ * Le motif est repris tel quel : une sanction sans son motif n'est pas
+ * contestable, et c'est justement ce qu'un capitaine cherchera dans le canal.
+ */
+export function formatEndurancePenaltyLog(context: {
+  tournament: BotLogTournament;
+  entrantName: string;
+  points: number;
+  reason: string;
+}): string {
+  const points = `${context.points} point${context.points > 1 ? "s" : ""} d'endurance`;
+  return `${lead("⛔", "Pénalité", context.tournament)} : ${context.entrantName} perd ${points} — ${context.reason}.`;
+}
+
+/**
+ * Pénalité retirée : le rejeu a rendu les points et défait ce qu'elle avait
+ * entraîné.
+ *
+ * Ligne distincte, et non un silence : sans elle, le canal garderait la trace
+ * d'une sanction qui n'existe plus, et le classement affiché sur la page ne
+ * s'accorderait plus avec ce qu'on y a lu.
+ */
+export function formatEndurancePenaltyLiftedLog(context: {
+  tournament: BotLogTournament;
+  entrantName: string;
+  points: number;
+}): string {
+  const points = `${context.points} point${context.points > 1 ? "s" : ""} d'endurance`;
+  return `${lead("↩️", "Pénalité annulée", context.tournament)} : ${context.entrantName} récupère ${points}.`;
 }
 
 /** Suppression définitive d'un tournoi (administrateur). */

@@ -79,6 +79,9 @@ export {
   adminResolveMatchPublic,
   // Abandon (Survie / Ronde suisse)
   forfeitTournamentTeamPublic as forfeitTournamentTeam,
+  // Pénalités d'endurance (BlueGenji Survie)
+  applyEndurancePenaltyPublic as applyEndurancePenalty,
+  liftEndurancePenaltyPublic as liftEndurancePenalty,
   // Édition
   loadEditableTournament,
   updateTournament,

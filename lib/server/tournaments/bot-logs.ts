@@ -41,6 +41,8 @@ import { isBotCircuitOpen, pushRefereeAlert, sendBotLog } from "@/lib/server/bot
 import { getDatabase } from "@/lib/server/database";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import {
+  formatEndurancePenaltyLiftedLog,
+  formatEndurancePenaltyLog,
   formatForfeitLog,
   formatMatchResultLog,
   formatRegistrationLog,
@@ -76,7 +78,20 @@ export type PendingBotLog =
   | { kind: "score_report_stalled"; matchId: number; claimId?: number }
   | { kind: "tournament_started"; tournamentId: number }
   | { kind: "tournament_finished"; tournamentId: number }
-  | { kind: "tournament_underfilled"; tournamentId: number };
+  | { kind: "tournament_underfilled"; tournamentId: number }
+  // Les deux seules entrées qui portent leur substance plutôt qu'un renvoi. Le
+  // motif et le montant sont **l'action elle-même**, pas un état à relire ; et
+  // la ligne d'une pénalité retirée n'existe plus au moment de la résolution,
+  // qui suit le commit. L'engagé, lui, reste un renvoi : c'est son nom
+  // d'aujourd'hui qu'il faut écrire.
+  | {
+      kind: "endurance_penalty";
+      tournamentId: number;
+      teamId: number;
+      points: number;
+      reason: string;
+    }
+  | { kind: "endurance_penalty_lifted"; tournamentId: number; teamId: number; points: number };
 
 /**
  * Garde de compilation : les natures d'entrée sont **exactement** celles que le
@@ -866,6 +881,33 @@ async function resolveOne(entry: PendingBotLog): Promise<string | null> {
         tournament: { id: Number(tournament.id), name: tournament.name },
         registeredTeams: Number(tournament.registered_teams),
         participantType: toParticipantType(tournament.participant_type),
+      });
+    }
+
+    case "endurance_penalty": {
+      const [tournament, entrantName] = await Promise.all([
+        loadTournament(entry.tournamentId),
+        loadEntrantName(entry.teamId),
+      ]);
+      if (!tournament || !entrantName) return null;
+      return formatEndurancePenaltyLog({
+        tournament: { id: Number(tournament.id), name: tournament.name },
+        entrantName,
+        points: entry.points,
+        reason: entry.reason,
+      });
+    }
+
+    case "endurance_penalty_lifted": {
+      const [tournament, entrantName] = await Promise.all([
+        loadTournament(entry.tournamentId),
+        loadEntrantName(entry.teamId),
+      ]);
+      if (!tournament || !entrantName) return null;
+      return formatEndurancePenaltyLiftedLog({
+        tournament: { id: Number(tournament.id), name: tournament.name },
+        entrantName,
+        points: entry.points,
       });
     }
   }
