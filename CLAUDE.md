@@ -247,7 +247,8 @@ Règle universelle : via `useToast()` (`@/components/ui/toast`), bottom-left ove
 - Retirer l'entrée du fichier dans le commit qui règle enfin l'erreur.
 
 ### Gestion de la complexité
-- Pour toute demande importante (≥ 2 features liées, refactoring architectural, intégration d'un nouveau service externe, ou tâche estimée > ~2h), utiliser le skill `/OpusLocalManager` pour planifier et orchestrer le travail.
+- Pour toute demande importante (≥ 2 features liées, refactoring architectural, intégration d'un nouveau service externe, ou tâche estimée > ~2h), établir d'abord un plan écrit (étapes ordonnées, fichiers touchés, points de vérification), puis l'exécuter dans cette session.
+- Ne pas déléguer ce travail à un pipeline d'exécution externe ou à un modèle local (`/OpusLocalManager`, `/opus-haiku-pipeline`) : la planification et l'exécution restent dans la session courante.
 
 ---
 
