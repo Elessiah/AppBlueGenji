@@ -137,8 +137,13 @@ describe("checkDownstreamMatchesHaveNoScores — élimination", () => {
 });
 
 describe("checkDownstreamMatchesHaveNoScores — survie et ronde suisse", () => {
+  // BlueGenji Survie a la même absence de liens de bracket : ses play-offs
+  // s'enchaînent par le numéro de tour. Sans lui dans cette liste, le serveur
+  // retombait sur `next_winner_match_id` — que son moteur ne renseigne jamais —
+  // et n'opposait donc aucun verrou, quand l'interface, elle, masquait bien le
+  // bouton d'édition.
   it("interroge les rounds ultérieurs plutôt que les liens de bracket", async () => {
-    for (const format of ["SURVIVAL", "SWISS"]) {
+    for (const format of ["SURVIVAL", "SWISS", "BG_SURVIE"]) {
       const { conn, dependentQuery } = fakeConnection({ format, dependents: [] });
       await checkDownstreamMatchesHaveNoScores(conn, editedMatch);
       expect(dependentQuery()).toContain("round_number > ?");
@@ -159,6 +164,27 @@ describe("checkDownstreamMatchesHaveNoScores — survie et ronde suisse", () => 
     const { conn } = fakeConnection({
       format: "SURVIVAL",
       dependents: [EMPTY_MATCH, { ...EMPTY_MATCH, id: 6 }],
+    });
+    await expect(checkDownstreamMatchesHaveNoScores(conn, editedMatch)).resolves.toBeUndefined();
+  });
+
+  it("refuse la correction d'un quart de finale dont la demie est déjà jouée", async () => {
+    const { conn } = fakeConnection({
+      format: "BG_SURVIE",
+      dependents: [{ ...EMPTY_MATCH, id: 6, team1_score: 3, team2_score: 1, winner_team_id: 10 }],
+    });
+    await expect(checkDownstreamMatchesHaveNoScores(conn, editedMatch)).rejects.toThrow(
+      "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES",
+    );
+  });
+
+  it("laisse corriger un quart de finale tant que la demie n'est pas jouée", async () => {
+    // Le cas nominal du mode : la demie existe (elle a été posée dès les quarts
+    // terminés) mais reste vierge — c'est `repairPlayoffBracket` qui la
+    // réapparie ensuite.
+    const { conn } = fakeConnection({
+      format: "BG_SURVIE",
+      dependents: [{ ...EMPTY_MATCH, id: 6 }],
     });
     await expect(checkDownstreamMatchesHaveNoScores(conn, editedMatch)).resolves.toBeUndefined();
   });
