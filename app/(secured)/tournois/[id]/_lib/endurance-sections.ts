@@ -145,6 +145,38 @@ export function splitPlayoffBrackets(playoffs: BracketMatch[]): {
 }
 
 /**
+ * Nombre de tours que l'arbre final comptera **une fois complet**.
+ *
+ * Le moteur ne pose que le premier tour à l'ouverture des play-offs, puis un
+ * tour à la fois. Nommer les stades sur les tours *posés* appelait donc les
+ * quarts de finale « Finale » tant qu'ils étaient seuls, puis « Demi-finales »
+ * une fois les demies créées : le tableau ne disait juste qu'au dernier tour.
+ *
+ * Le compte se déduit du **premier tour** : chaque tour divise l'effectif par
+ * deux, en arrondissant vers le haut (un vainqueur surnuméraire passe le tour
+ * au lieu d'être oublié, cf. `finalizePlayoffsIfDone`). On itère plutôt que de
+ * passer par `Math.log2`, dont l'arrondi flottant ferait basculer les puissances
+ * de deux d'un tour.
+ *
+ * `0` quand l'arbre n'a pas commencé — il n'y a alors rien à nommer.
+ */
+export function endurancePlayoffRoundCount(decisive: BracketMatch[]): number {
+  const rounds = [...new Set(decisive.map((match) => match.roundNumber))];
+  if (rounds.length === 0) return 0;
+
+  const firstRound = Math.min(...rounds);
+  let remaining = decisive.filter((match) => match.roundNumber === firstRound).length;
+
+  let count = 1;
+  while (remaining > 1) {
+    remaining = Math.ceil(remaining / 2);
+    count += 1;
+  }
+  // Un tour de plus que prévu ne se discute pas : il est là.
+  return Math.max(count, rounds.length);
+}
+
+/**
  * Liens « vainqueur → match suivant » de l'arbre final, **dérivés**.
  *
  * Le moteur ne pose pas de `next_winner_match_id` sur les play-offs : il crée le

@@ -26,6 +26,16 @@ interface BracketSectionsProps {
    * Voir {@link BracketTree} : seul l'arbre final de BlueGenji Survie s'en sert.
    */
   resolveNextMatchId?: (match: BracketMatch) => number | null;
+  /**
+   * Nombre de tours que ce tableau comptera **une fois complet**, quand il ne se
+   * lit pas sur les matchs déjà posés.
+   *
+   * Un tableau à élimination naît entier : compter ses tours suffit. L'arbre
+   * final de BlueGenji Survie pousse un tour à la fois — à l'ouverture des
+   * play-offs, seuls les quarts existent, et les nommer d'après ce seul tour les
+   * appelait « Finale ».
+   */
+  plannedRounds?: number;
 }
 
 export function BracketSections({
@@ -43,10 +53,13 @@ export function BracketSections({
   onOpenAdminModal,
   format,
   resolveNextMatchId,
+  plannedRounds,
 }: BracketSectionsProps) {
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
-  const totalRounds = roundNums.length;
-  const sections = buildSections(roundNums, bracketType);
+  // Les stades se nomment à partir de la **fin** du tableau : sur un arbre qui
+  // pousse un tour à la fois, ce repère ne peut pas venir des tours posés.
+  const totalRounds = Math.max(plannedRounds ?? roundNums.length, roundNums.length);
+  const sections = buildSections(roundNums, bracketType, totalRounds);
   const accent = ACCENT[bracketType];
   const myNext = findMyNextMatch(matches, myTeamId);
   const myNextMatchId = myNext?.id ?? null;

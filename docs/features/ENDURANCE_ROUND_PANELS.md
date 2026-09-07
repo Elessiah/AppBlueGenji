@@ -78,7 +78,7 @@ simple**, sans variante : mêmes volets, mêmes stades nommés (`Quarts de final
 `Demi-finales`, `Finale`), mêmes traits d'un tour à l'autre, même badge
 « ★ Votre match ».
 
-Deux points méritent une explication.
+Trois points méritent une explication.
 
 ### La petite finale est un tableau à part
 
@@ -88,6 +88,28 @@ dernière colonne de l'arbre, elle serait nommée « Finale 2 » et semblerait m
 quelque part. Elle est donc rendue par un second `BracketSections`, de type
 `THIRD_PLACE` — exactement ce que fait déjà la page pour les tableaux à
 élimination.
+
+### L'arbre pousse un tour à la fois — deux pièges
+
+`BracketSections` a été écrit pour des tableaux qui **naissent entiers** : il en
+déduisait tout des tours qu'on lui passe. BG Survie n'en pose qu'un à
+l'ouverture des play-offs, puis un de plus à chaque tour complété. D'où deux
+symptômes, de même cause :
+
+- **Les stades étaient nommés à l'envers.** `buildSections([1000], "UPPER")`
+  rendait un volet « Finale » et quatre cartes « Finale 1 » … « Finale 4 » ; une
+  fois les demies créées, les quarts devenaient « Demi-finales ». Le tableau ne
+  disait juste qu'au dernier tour. `BracketSections` prend donc un
+  `plannedRounds` — le nombre de tours **une fois complet** —, calculé par
+  `endurancePlayoffRoundCount` depuis l'effectif du premier tour. Il ne sert
+  qu'à nommer les stades ; le découpage en volets, lui, porte toujours sur les
+  tours réellement posés (on ne fait pas un volet pour ce qui n'existe pas).
+- **Le volet se refermait tout seul.** La clé de section était son titre, et le
+  titre change quand la section grandit (« Finale » → « Phase finale »).
+  `openKeys` n'étant écrit qu'au montage, plus aucune section ne correspondait
+  et l'arbre se repliait sous les yeux du lecteur, au moment précis où il venait
+  d'avancer. La clé est désormais le **numéro du premier tour** de la section —
+  stable tant que la section commence au même endroit.
 
 ### Les liens de l'arbre sont **dérivés**, pas lus en base
 
@@ -124,7 +146,7 @@ produite par le service.
 | Volets de manche | `app/(secured)/tournois/[id]/_components/EnduranceRoundPanels.tsx` |
 | Chrome partagé d'un volet | `app/(secured)/tournois/[id]/_components/BoardPanel.tsx` (+ `.module.css`) |
 | Vue du mode | `app/(secured)/tournois/[id]/_components/EnduranceView.tsx` |
-| Arbre | `BracketSections.tsx` → `BracketTree.tsx` (prop `resolveNextMatchId`) |
+| Arbre | `BracketSections.tsx` (props `plannedRounds`, `resolveNextMatchId`) → `BracketTree.tsx` |
 
 ### `BoardPanel` — un seul chrome de volet
 
@@ -162,11 +184,14 @@ L'arbre des play-offs hérite du même mécanisme, puisqu'il passe par
 - `tests/tournois/endurance-sections.test.ts` — module pur : découpage
   qualification / play-offs, avancement d'une manche, volet ouvert par défaut
   (les trois priorités et le silence sous play-offs), séparation de la petite
-  finale, et liens dérivés de l'arbre (y compris un tour incomplet et un
-  plateau impair).
+  finale, nombre de tours prévus d'un arbre incomplet, et liens dérivés (y
+  compris un tour incomplet et un plateau impair).
 - `tests/tournois/endurance-round-panels-wiring.test.ts` — câblage : les cartes
   passent par `MatchRow`, l'ancre déplie le volet, les play-offs empruntent
   `BracketSections` avec les liens dérivés, et le chrome des volets est partagé.
+- `tests/tournois/bracket-sections.test.ts` — un arbre qui ne porte pas encore
+  tous ses tours : stades nommés sur le compte prévu, clé de section stable
+  quand un tour la rejoint, et découpage inchangé pour les tableaux complets.
 - `tests/tournois/match-anchor-wiring.test.ts`,
   `tests/tournois/underfilled-start.test.ts`,
   `tests/tournois/forfeit-eligibility.test.ts` — invariants existants, mis à

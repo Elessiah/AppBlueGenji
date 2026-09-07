@@ -13,6 +13,7 @@ import {
 import { ACCENT } from "../_lib/bracket-sections";
 import {
   endurancePlayoffLinks,
+  endurancePlayoffRoundCount,
   enduranceRoundSections,
   splitEnduranceMatches,
   splitPlayoffBrackets,
@@ -217,6 +218,9 @@ export function EnduranceView({
   const { decisive, thirdPlace } = splitPlayoffBrackets(playoffs);
   const playoffLinks = endurancePlayoffLinks(decisive);
   const resolvePlayoffNext = (match: BracketMatch) => playoffLinks.get(match.id) ?? null;
+  // Les tours de l'arbre naissent un à un : sans ce compte, les quarts de finale
+  // s'appelleraient « Finale » tant qu'ils seraient le seul tour posé.
+  const playoffRounds = endurancePlayoffRoundCount(decisive);
 
   const activeCount = endurance.standings.filter((s) => s.status === "ACTIVE").length;
 
@@ -388,6 +392,7 @@ export function EnduranceView({
             onOpenAdminModal={onOpenAdminModal}
             format={format}
             resolveNextMatchId={resolvePlayoffNext}
+            plannedRounds={playoffRounds}
           />
           {thirdPlace.length > 0 && (
             <div style={{ marginTop: 10 }}>

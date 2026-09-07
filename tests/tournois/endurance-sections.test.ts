@@ -4,6 +4,7 @@ import {
   PLAYOFF_ROUND_OFFSET,
   defaultOpenEnduranceRound,
   endurancePlayoffLinks,
+  endurancePlayoffRoundCount,
   enduranceRoundOfMatch,
   enduranceRoundSections,
   splitEnduranceMatches,
@@ -241,5 +242,59 @@ describe("endurancePlayoffLinks", () => {
 
   it("ne rend aucun lien pour l'unique rencontre d'un arbre à deux", () => {
     expect(endurancePlayoffLinks(playoffRound(PLAYOFF_ROUND_OFFSET, [1])).size).toBe(0);
+  });
+});
+
+describe("endurancePlayoffRoundCount", () => {
+  const playoffRound = (roundNumber: number, count: number): BracketMatch[] =>
+    Array.from({ length: count }, (_, index) =>
+      mockMatch({
+        id: roundNumber * 10 + index,
+        roundNumber,
+        matchNumber: index + 1,
+        team1Id: index + 1,
+        team2Id: index + 100,
+      }),
+    );
+
+  it("annonce les trois tours d'un plateau à huit dès les seuls quarts", () => {
+    // Le cœur du problème : à l'ouverture des play-offs, seul le premier tour
+    // existe. Le compter naïvement nommait les quarts « Finale ».
+    expect(endurancePlayoffRoundCount(playoffRound(PLAYOFF_ROUND_OFFSET, 4))).toBe(3);
+  });
+
+  it("tient le même compte à mesure que les tours arrivent", () => {
+    const quarters = playoffRound(PLAYOFF_ROUND_OFFSET, 4);
+    const semis = playoffRound(PLAYOFF_ROUND_OFFSET + 1, 2);
+    const final = playoffRound(PLAYOFF_ROUND_OFFSET + 2, 1);
+
+    expect(endurancePlayoffRoundCount([...quarters, ...semis])).toBe(3);
+    expect(endurancePlayoffRoundCount([...quarters, ...semis, ...final])).toBe(3);
+  });
+
+  it("arrondit vers le haut sur un plateau qui n'est pas une puissance de deux", () => {
+    // Cinq qualifiées → trois rencontres au premier tour (dont une exemption),
+    // puis deux, puis une : trois tours.
+    expect(endurancePlayoffRoundCount(playoffRound(PLAYOFF_ROUND_OFFSET, 3))).toBe(3);
+  });
+
+  it("compte deux tours pour un demi-finales / finale, un pour une finale sèche", () => {
+    expect(endurancePlayoffRoundCount(playoffRound(PLAYOFF_ROUND_OFFSET, 2))).toBe(2);
+    expect(endurancePlayoffRoundCount(playoffRound(PLAYOFF_ROUND_OFFSET, 1))).toBe(1);
+  });
+
+  it("ne rend rien tant que l'arbre n'a pas commencé", () => {
+    expect(endurancePlayoffRoundCount([])).toBe(0);
+  });
+
+  it("ne sous-estime jamais le nombre de tours réellement posés", () => {
+    // Filet de sécurité : si le moteur créait un tour de plus que la déduction
+    // ne le prévoit, c'est le réel qui gagne — un tour posé doit être nommé.
+    expect(
+      endurancePlayoffRoundCount([
+        ...playoffRound(PLAYOFF_ROUND_OFFSET, 1),
+        ...playoffRound(PLAYOFF_ROUND_OFFSET + 1, 1),
+      ]),
+    ).toBe(2);
   });
 });
