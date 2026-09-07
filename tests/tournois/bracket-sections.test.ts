@@ -174,12 +174,20 @@ describe("defaultOpenKey", () => {
   const rounds = [1, 2, 3, 4, 5, 6]; // 64 équipes : premiers tours (1-3) + phase finale (4-6)
   const sections = buildSections(rounds, "UPPER");
 
+  /**
+   * La clé d'une section est son **premier tour**, et non son titre : un titre
+   * change quand la section grandit, et l'état ouvert, gardé par clé, ne
+   * correspondait alors plus à rien. Les tests désignent donc le volet par ce
+   * qu'il est (« la phase finale ») et laissent l'encodage de la clé au module.
+   */
+  const keyOf = (title: string) => sections.find((section) => section.title === title)!.key;
+
   it("ouvre la section du prochain match du joueur en priorité", () => {
     const matches = [
       mockMatch({ id: 1, roundNumber: 1, status: "COMPLETED", team1Id: 5, team2Id: 6, winnerTeamId: 5 }),
       mockMatch({ id: 2, roundNumber: 5, team1Id: 5, team2Id: 9, winnerTeamId: null }),
     ];
-    expect(defaultOpenKey(sections, matches, findMyNextMatch(matches, 5))).toBe("Phase finale");
+    expect(defaultOpenKey(sections, matches, findMyNextMatch(matches, 5))).toBe(keyOf("Phase finale"));
   });
 
   it("ouvre le volet du round actif si le joueur ne participe pas", () => {
@@ -187,14 +195,14 @@ describe("defaultOpenKey", () => {
       mockMatch({ id: 1, roundNumber: 1, status: "COMPLETED", winnerTeamId: 1 }),
       mockMatch({ id: 2, roundNumber: 2, status: "READY" }),
     ];
-    expect(defaultOpenKey(sections, matches, null)).toBe("Premiers tours");
+    expect(defaultOpenKey(sections, matches, null)).toBe(keyOf("Premiers tours"));
   });
 
   it("ouvre la phase finale quand tout est terminé", () => {
     const matches = rounds.map((r, i) =>
       mockMatch({ id: i, roundNumber: r, status: "COMPLETED", winnerTeamId: 1 }),
     );
-    expect(defaultOpenKey(sections, matches, null)).toBe("Phase finale");
+    expect(defaultOpenKey(sections, matches, null)).toBe(keyOf("Phase finale"));
   });
 
   it("retourne null sans section", () => {
@@ -218,5 +226,58 @@ describe("ACCENT", () => {
     const types: BracketType[] = ["UPPER", "LOWER", "GRAND", "THIRD_PLACE"];
     const colors = types.map((t) => ACCENT[t]);
     expect(new Set(colors).size).toBe(types.length);
+  });
+});
+
+/**
+ * Un tableau à élimination naît complet, et `buildSections` déduisait donc tout
+ * des tours qu'on lui passe : leur nombre nommait les stades, et le titre du
+ * volet lui servait de clé. L'arbre final de BlueGenji Survie pousse **un tour
+ * à la fois** — deux conséquences, toutes deux visibles à l'écran.
+ */
+describe("buildSections — arbre qui ne porte pas encore tous ses tours", () => {
+  it("nomme les stades sur le nombre de tours prévus, pas sur ceux déjà posés", () => {
+    // Seul le premier tour d'un plateau à huit est posé : sans le compte prévu,
+    // les quarts s'appelaient « Finale ».
+    expect(buildSections([1000], "UPPER", 3)[0].title).toBe("Quarts de finale");
+    expect(buildSections([1000], "UPPER")[0].title).toBe("Finale");
+  });
+
+  it("garde la même clé quand un tour rejoint la section", () => {
+    // L'état ouvert/fermé est gardé par clé : une clé qui change (« Finale »
+    // devenant « Phase finale ») refermait le volet sous les yeux du lecteur au
+    // moment précis où l'arbre avançait.
+    const one = buildSections([1000], "UPPER", 3);
+    const two = buildSections([1000, 1001], "UPPER", 3);
+    const three = buildSections([1000, 1001, 1002], "UPPER", 3);
+
+    expect(one[0].key).toBe("1000");
+    expect(two[0].key).toBe("1000");
+    expect(three[0].key).toBe("1000");
+    // Le titre, lui, a bien le droit de suivre le contenu du volet.
+    expect(three[0].title).toBe("Phase finale");
+  });
+
+  it("ne sous-estime pas les tours réellement posés", () => {
+    // Un compte prévu plus petit que la réalité renommerait les stades à l'envers.
+    expect(buildSections([1000, 1001, 1002], "UPPER", 1)[0].title).toBe("Phase finale");
+    expect(buildSections([1000, 1001, 1002], "UPPER", 1)[0].rounds).toEqual([1000, 1001, 1002]);
+  });
+
+  it("laisse les tableaux complets exactement où ils étaient", () => {
+    // Sans `plannedRounds`, le découpage et les titres sont ceux d'avant.
+    const rounds = [1, 2, 3, 4, 5, 6];
+    expect(buildSections(rounds, "UPPER").map((s) => s.title)).toEqual([
+      "Premiers tours",
+      "Phase finale",
+    ]);
+    expect(buildSections(rounds, "UPPER").map((s) => s.rounds)).toEqual([
+      [1, 2, 3],
+      [4, 5, 6],
+    ]);
+  });
+
+  it("donne aussi une clé de tour aux tableaux à match unique", () => {
+    expect(buildSections([9], "GRAND")[0]).toMatchObject({ key: "9", title: "Grande Finale" });
   });
 });

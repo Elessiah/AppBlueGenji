@@ -157,3 +157,17 @@
 .historyRowMine {
   --history-row-bg: rgba(89, 212, 255, 0.06);
 }
+
+/*
+ * Intitulé d'un bloc du plateau (« Play-offs », « Manches qualificatives »). Un
+ * titre de section, donc un `<h3>` : le poids visuel d'un intertitre discret est
+ * l'affaire de la feuille de style, pas une raison de le rétrograder en `<div>`.
+ */
+.boardHeading {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2, #8c95a6);
+}

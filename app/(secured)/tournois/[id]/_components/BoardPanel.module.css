@@ -1,0 +1,149 @@
+/*
+ * Volet de plateau — chrome partagé par les tableaux à élimination
+ * (`BracketSections`) et les manches de BlueGenji Survie
+ * (`EnduranceRoundPanels`).
+ *
+ * La couleur d'accent voyage par `--panel-accent` plutôt qu'en style en ligne
+ * sur chaque règle : le survol et le focus la réutilisent, et un style en ligne
+ * ne peut pas être lu par une pseudo-classe.
+ */
+/*
+ * `--border` n'est défini nulle part dans `app/globals.css` : la bordure d'un
+ * volet replié vaut donc `#444`, et c'est bien ce qu'affichaient les tableaux à
+ * élimination avant l'extraction de ce chrome. On garde la valeur telle quelle —
+ * l'harmoniser sur `--line` changerait tous ces volets au passage, ce qui n'est
+ * pas la question réglée ici.
+ */
+.panel {
+  border: 1px solid var(--border, #444);
+  border-left: 3px solid var(--panel-accent);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-0, rgba(255, 255, 255, 0.02));
+}
+
+/* Volet ouvert, ou replié sur quelque chose qui concerne le lecteur : le cadre
+   se teinte de l'accent pour se repérer dans une pile de volets. */
+.panelActive {
+  border-color: var(--panel-accent);
+}
+
+.head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-0);
+  font: inherit;
+  transition: background 0.15s ease;
+}
+
+.headOpen {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.head:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/*
+ * Le volet se pilote au clavier, et le contour du navigateur disparaissait sur
+ * un fond sombre : sans ce repère, on tabule à travers une pile de volets sans
+ * savoir lequel s'ouvrira.
+ */
+.head:focus-visible {
+  outline: 2px solid var(--panel-accent);
+  outline-offset: -2px;
+}
+
+.caret {
+  display: inline-block;
+  flex-shrink: 0;
+  color: var(--panel-accent);
+  font-size: 12px;
+  transition: transform 0.18s ease;
+}
+
+.caretOpen {
+  transform: rotate(90deg);
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Les pastilles neutres se replient sous le titre plutôt que d'écraser le nom
+   du volet sur un écran étroit. */
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.pill {
+  font-size: 11px;
+  color: var(--text-2);
+  font-weight: 500;
+  /* Même jeton que le cadre du volet, cf. plus haut. */
+  border: 1px solid var(--border, #444);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+/* Manche entièrement jouée : la pastille le dit en vert, sans concurrencer
+   l'accent du volet. */
+.pillDone {
+  color: var(--accent-green, #4fe0a2);
+  border-color: rgba(var(--green-rgb, 79, 224, 162), 0.4);
+}
+
+.flag {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--panel-accent);
+  border: 1px solid var(--panel-accent);
+  border-radius: 999px;
+  padding: 1px 10px;
+  white-space: nowrap;
+}
+
+.body {
+  padding: 4px 14px 0;
+}
+
+@media (max-width: 620px) {
+  .head {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .flag {
+    margin-left: 0;
+  }
+}
+
+/*
+ * Le chevron tourne et le fond s'éclaire : deux mouvements décoratifs, dont
+ * personne n'a besoin pour savoir qu'un volet est ouvert — l'`aria-expanded` et
+ * l'orientation du chevron le disent déjà.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .head,
+  .caret {
+    transition: none;
+  }
+}

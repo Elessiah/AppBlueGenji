@@ -1,0 +1,32 @@
+/*
+ * Manches de BlueGenji Survie — pile de volets et grille de cartes.
+ *
+ * Les styles vivent ici et non en `style` en ligne : la grille a besoin d'une
+ * media query (sur un écran étroit, une carte par ligne et des gouttières plus
+ * serrées), et un style en ligne l'emporterait sur elle.
+ */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/*
+ * Les cartes de match ont une largeur fixe (210 px) : en `flex-wrap`, elles se
+ * répartissent d'elles-mêmes en autant de colonnes que la place le permet — une
+ * manche de huit rencontres tient sur deux lignes au lieu de huit, et la même
+ * règle donne une colonne unique sur un mobile, sans cas particulier.
+ */
+.matchGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-bottom: 14px;
+}
+
+@media (max-width: 620px) {
+  .matchGrid {
+    gap: 8px;
+    padding-bottom: 10px;
+  }
+}

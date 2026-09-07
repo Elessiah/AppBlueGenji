@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
 import { BracketTree, MatchScoreDraft, ScrollRequest } from "./BracketTree";
+import { BoardPanel, PanelPill } from "./BoardPanel";
 import { ACCENT, buildSections, defaultOpenKey, findMyNextMatch, qualifyDestinationMatchId } from "../_lib/bracket-sections";
 import { useMatchAnchorTarget } from "../_lib/match-anchor-context";
 
@@ -20,6 +21,21 @@ interface BracketSectionsProps {
   onSubmit: (match: BracketMatch, e: FormEvent) => Promise<void>;
   onOpenAdminModal: (match: BracketMatch) => void;
   format: TournamentFormat;
+  /**
+   * Match d'arrivée du vainqueur, quand il ne se lit pas sur la ligne du match.
+   * Voir {@link BracketTree} : seul l'arbre final de BlueGenji Survie s'en sert.
+   */
+  resolveNextMatchId?: (match: BracketMatch) => number | null;
+  /**
+   * Nombre de tours que ce tableau comptera **une fois complet**, quand il ne se
+   * lit pas sur les matchs déjà posés.
+   *
+   * Un tableau à élimination naît entier : compter ses tours suffit. L'arbre
+   * final de BlueGenji Survie pousse un tour à la fois — à l'ouverture des
+   * play-offs, seuls les quarts existent, et les nommer d'après ce seul tour les
+   * appelait « Finale ».
+   */
+  plannedRounds?: number;
 }
 
 export function BracketSections({
@@ -36,20 +52,43 @@ export function BracketSections({
   onSubmit,
   onOpenAdminModal,
   format,
+  resolveNextMatchId,
+  plannedRounds,
 }: BracketSectionsProps) {
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
-  const totalRounds = roundNums.length;
-  const sections = buildSections(roundNums, bracketType);
+  // Les stades se nomment à partir de la **fin** du tableau : sur un arbre qui
+  // pousse un tour à la fois, ce repère ne peut pas venir des tours posés.
+  const totalRounds = Math.max(plannedRounds ?? roundNums.length, roundNums.length);
+  const sections = buildSections(roundNums, bracketType, totalRounds);
   const accent = ACCENT[bracketType];
   const myNext = findMyNextMatch(matches, myTeamId);
   const myNextMatchId = myNext?.id ?? null;
   const regionBaseId = `bracket-${bracketType.toLowerCase()}`;
 
-  const [openKeys, setOpenKeys] = useState<Set<string>>(() => {
-    const initial = defaultOpenKey(sections, matches, myNext);
-    return new Set(initial ? [initial] : []);
-  });
+  const autoOpen = defaultOpenKey(sections, matches, myNext);
+
+  const [openKeys, setOpenKeys] = useState<Set<string>>(
+    () => new Set(autoOpen ? [autoOpen] : []),
+  );
   const [scrollRequest, setScrollRequest] = useState<ScrollRequest | null>(null);
+
+  // Le volet à ouvrir d'office **change en cours de tournoi** : le plateau
+  // avance, et l'arbre final de BlueGenji Survie voit même son découpage se
+  // réorganiser quand un tour s'ajoute (au-delà de trois tours, la « phase
+  // finale » glisse d'une section à l'autre). Un état figé au montage laissait
+  // alors naître repliée la section qui vient de recevoir le tour vivant, sans
+  // que rien ne l'ouvre.
+  //
+  // On **ajoute** sans jamais refermer, et seulement quand le défaut change :
+  // un volet replié à la main ne se rouvre pas au prochain instantané. Même
+  // règle que les manches d'endurance (`EnduranceRoundPanels`), avec qui ce
+  // composant partage déjà son chrome.
+  const lastAutoOpen = useRef(autoOpen);
+  useEffect(() => {
+    if (autoOpen === null || autoOpen === lastAutoOpen.current) return;
+    lastAutoOpen.current = autoOpen;
+    setOpenKeys((prev) => (prev.has(autoOpen) ? prev : new Set(prev).add(autoOpen)));
+  }, [autoOpen]);
 
   // Ancre `#match-[id]` : un gros tableau ne rend qu'un volet à la fois, et la
   // cible peut dormir dans un volet replié — le hook la chercherait alors dans
@@ -79,7 +118,9 @@ export function BracketSections({
 
   // Clic sur un badge « Qualifié en X » : ouvre le volet du match d'arrivée et y défile.
   const handleQualifyClick = (sourceMatch: BracketMatch) => {
-    const destId = qualifyDestinationMatchId(sourceMatch);
+    const destId = resolveNextMatchId
+      ? resolveNextMatchId(sourceMatch)
+      : qualifyDestinationMatchId(sourceMatch);
     if (destId == null) return;
     const dest = matches.find((m) => m.id === destId);
     if (!dest) return;
@@ -118,112 +159,38 @@ export function BracketSections({
           const panelId = `${regionBaseId}-${section.key.replace(/\s+/g, "-")}`;
 
           return (
-            <div
+            <BoardPanel
               key={section.key}
-              style={{
-                border: `1px solid ${open || hasMyMatch ? accent : "var(--border, #444)"}`,
-                borderLeft: `3px solid ${accent}`,
-                borderRadius: 8,
-                overflow: "hidden",
-                background: "var(--surface-0, rgba(255,255,255,0.02))",
-              }}
+              accent={accent}
+              title={section.title}
+              open={open}
+              onToggle={() => toggle(section.key)}
+              panelId={panelId}
+              highlighted={hasMyMatch}
+              flag={hasMyMatch ? "Votre match" : null}
+              meta={<PanelPill>{matchCount} match{matchCount > 1 ? "s" : ""}</PanelPill>}
             >
-              <button
-                type="button"
-                onClick={() => toggle(section.key)}
-                aria-expanded={open}
-                aria-controls={panelId}
-                onMouseEnter={(e) => {
-                  if (!open) e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-                }}
-                onMouseLeave={(e) => {
-                  if (!open) e.currentTarget.style.background = "transparent";
-                }}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "10px 14px",
-                  background: open ? "rgba(255,255,255,0.03)" : "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  color: "var(--text-0)",
-                  transition: "background 0.15s ease",
-                }}
-              >
-                <span
-                  aria-hidden
-                  style={{
-                    display: "inline-block",
-                    transition: "transform 0.18s ease",
-                    transform: open ? "rotate(90deg)" : "rotate(0deg)",
-                    color: accent,
-                    fontSize: 12,
-                  }}
-                >
-                  ▶
-                </span>
-                <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                  {section.title}
-                </span>
-                <span
-                  style={{
-                    fontSize: 11,
-                    color: "var(--text-2)",
-                    fontWeight: 500,
-                    border: "1px solid var(--border, #444)",
-                    borderRadius: 999,
-                    padding: "1px 8px",
-                  }}
-                >
-                  {matchCount} match{matchCount > 1 ? "s" : ""}
-                </span>
-                {hasMyMatch && (
-                  <span
-                    style={{
-                      marginLeft: "auto",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      letterSpacing: "0.04em",
-                      textTransform: "uppercase",
-                      color: accent,
-                      border: `1px solid ${accent}`,
-                      borderRadius: 999,
-                      padding: "1px 10px",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    ★ Votre match
-                  </span>
-                )}
-              </button>
-
-              {open && (
-                <div id={panelId} role="region" aria-label={section.title} style={{ padding: "4px 14px 0" }}>
-                  <BracketTree
-                    matches={sectionMatches}
-                    allTournamentMatches={allTournamentMatches}
-                    bracketType={bracketType}
-                    totalRoundsGlobal={totalRounds}
-                    roundIdxBase={section.roundIdxBase}
-                    qualifyLabel={section.qualifyLabel}
-                    accentColor={accent}
-                    scrollTargetMatchId={myNextMatchId}
-                    scrollRequest={scrollRequest}
-                    onQualifyClick={handleQualifyClick}
-                    canReport={canReport}
-                    adminResolvable={adminResolvable}
-                    format={format}
-                    drafts={drafts}
-                    onScoreChange={onScoreChange}
-                    onSubmit={onSubmit}
-                    onOpenAdminModal={onOpenAdminModal}
-                  />
-                </div>
-              )}
-            </div>
+              <BracketTree
+                matches={sectionMatches}
+                allTournamentMatches={allTournamentMatches}
+                bracketType={bracketType}
+                totalRoundsGlobal={totalRounds}
+                roundIdxBase={section.roundIdxBase}
+                qualifyLabel={section.qualifyLabel}
+                accentColor={accent}
+                scrollTargetMatchId={myNextMatchId}
+                scrollRequest={scrollRequest}
+                onQualifyClick={handleQualifyClick}
+                canReport={canReport}
+                adminResolvable={adminResolvable}
+                format={format}
+                drafts={drafts}
+                onScoreChange={onScoreChange}
+                onSubmit={onSubmit}
+                onOpenAdminModal={onOpenAdminModal}
+                resolveNextMatchId={resolveNextMatchId}
+              />
+            </BoardPanel>
           );
         })}
       </div>

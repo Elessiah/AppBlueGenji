@@ -9,7 +9,16 @@ export const ACCENT: Record<BracketType, string> = {
 };
 
 export interface BracketSection {
-  /** Clé stable (nom du stade) pour piloter l'état ouvert/fermé. */
+  /**
+   * Clé d'identité du volet, pour piloter l'état ouvert/fermé.
+   *
+   * C'est le **numéro du premier tour** de la section, et non son titre : un
+   * titre change quand la section grandit (« Finale » devient « Phase finale »
+   * dès qu'un second tour la rejoint), et l'état ouvert, gardé par clé, ne
+   * correspondait alors plus à aucune section — le volet se refermait tout
+   * seul. Les tableaux à élimination naissent complets et n'ont jamais vu le
+   * problème ; l'arbre de BlueGenji Survie, lui, pousse un tour à la fois.
+   */
   key: string;
   title: string;
   rounds: number[];
@@ -77,13 +86,25 @@ function chunkEvenly<T>(items: T[], maxSize: number): T[][] {
  * paquet unique de premiers tours « Premiers tours », et plusieurs paquets
  * « Tours A à B ». Les tableaux à match unique (GRAND / THIRD_PLACE) restent uniques.
  */
-export function buildSections(roundNums: number[], bracketType: BracketType): BracketSection[] {
+export function buildSections(
+  roundNums: number[],
+  bracketType: BracketType,
+  plannedRounds?: number,
+): BracketSection[] {
   const totalRounds = roundNums.length;
   if (totalRounds === 0) return [];
 
+  // Le découpage porte sur les tours **posés** (on ne fait pas un volet pour ce
+  // qui n'existe pas), mais les stades se nomment sur le nombre de tours
+  // **prévus** : « quart de finale » n'a de sens que rapporté à la fin du
+  // tableau. Les deux ne coïncident que si le plateau naît complet.
+  const stageTotal = Math.max(plannedRounds ?? totalRounds, totalRounds);
+
   if (bracketType === "GRAND" || bracketType === "THIRD_PLACE") {
-    const title = stageName(0, totalRounds, bracketType);
-    return [{ key: title, title, rounds: [...roundNums], roundIdxBase: 0, qualifyLabel: null }];
+    const title = stageName(0, stageTotal, bracketType);
+    return [
+      { key: String(roundNums[0]), title, rounds: [...roundNums], roundIdxBase: 0, qualifyLabel: null },
+    ];
   }
 
   const finalCount = Math.min(FINAL_PHASE_ROUNDS, totalRounds);
@@ -97,20 +118,27 @@ export function buildSections(roundNums: number[], bracketType: BracketType): Br
   earlyChunks.forEach((chunk) => {
     const title =
       chunk.length === 1
-        ? stageName(base, totalRounds, bracketType)
+        ? stageName(base, stageTotal, bracketType)
         : singleEarly
           ? "Premiers tours"
           : `Tours ${chunk[0]} à ${chunk[chunk.length - 1]}`;
-    sections.push({ key: title, title, rounds: chunk, roundIdxBase: base, qualifyLabel: null });
+    sections.push({
+      key: String(chunk[0]),
+      title,
+      rounds: chunk,
+      roundIdxBase: base,
+      qualifyLabel: null,
+    });
     base += chunk.length;
   });
 
   // Phase finale (les 3 derniers tours).
-  const finalTitle = finalCount > 1 ? "Phase finale" : stageName(splitIdx, totalRounds, bracketType);
+  const finalTitle = finalCount > 1 ? "Phase finale" : stageName(splitIdx, stageTotal, bracketType);
+  const finalRounds = roundNums.slice(splitIdx);
   sections.push({
-    key: finalTitle,
+    key: String(finalRounds[0]),
     title: finalTitle,
-    rounds: roundNums.slice(splitIdx),
+    rounds: finalRounds,
     roundIdxBase: splitIdx,
     qualifyLabel: null,
   });
@@ -119,7 +147,7 @@ export function buildSections(roundNums: number[], bracketType: BracketType): Br
   // (ex. vainqueurs des 8èmes → « Qualifié en quart de finale » ; entre deux paquets
   // de premiers tours → « Qualifié au tour suivant »).
   for (let i = 0; i < sections.length - 1; i += 1) {
-    sections[i].qualifyLabel = qualifyLabelFor(stageName(sections[i + 1].roundIdxBase, totalRounds, bracketType));
+    sections[i].qualifyLabel = qualifyLabelFor(stageName(sections[i + 1].roundIdxBase, stageTotal, bracketType));
   }
 
   return sections;
