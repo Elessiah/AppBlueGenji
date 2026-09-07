@@ -10,6 +10,7 @@ import {
   type EnduranceCellTone,
 } from "../_lib/endurance-history";
 import { EntrantLink, useParticipantWording } from "../_lib/entrant-link";
+import { endurancePlayoffStage } from "../_lib/endurance-rounds";
 import styles from "./EnduranceView.module.css";
 
 interface EnduranceViewProps {
@@ -317,18 +318,19 @@ export function EnduranceView({
 
       <EnduranceHistory endurance={endurance} myTeamId={myTeamId} />
 
-      {rounds.map((round) => (
-        <div key={round} style={{ marginBottom: 20 }}>
-          <div className="mono" style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 8 }}>
-            {round >= PLAYOFF_ROUND_OFFSET
-              ? `PLAY-OFFS · TOUR ${round - PLAYOFF_ROUND_OFFSET + 1}`
-              : `MANCHE ${round}`}
+      {rounds.map((round) => {
+        const roundMatches = visible.filter((match) => match.roundNumber === round);
+        return (
+          <div key={round} style={{ marginBottom: 20 }}>
+            <div className="mono" style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 8 }}>
+              {round >= PLAYOFF_ROUND_OFFSET
+                ? `PLAY-OFFS · ${endurancePlayoffStage(roundMatches, round - PLAYOFF_ROUND_OFFSET + 1)}`
+                : `MANCHE ${round}`}
+            </div>
+            {roundMatches.map((match) => renderMatch(match))}
           </div>
-          {visible
-            .filter((match) => match.roundNumber === round)
-            .map((match) => renderMatch(match))}
-        </div>
-      ))}
+        );
+      })}
     </>
   );
 }
