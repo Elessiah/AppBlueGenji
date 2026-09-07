@@ -46,6 +46,17 @@ interface BracketTreeProps {
   onSubmit: (match: BracketMatch, e: FormEvent) => Promise<void>;
   onOpenAdminModal: (match: BracketMatch) => void;
   format: TournamentFormat;
+  /**
+   * Match d'arrivée du vainqueur, quand il ne se lit pas sur la ligne du match.
+   *
+   * L'élimination porte ses liens en base (`next_winner_match_id`), et c'est le
+   * repli par défaut. L'arbre final de BlueGenji Survie, lui, n'en a aucun : le
+   * moteur crée chaque tour une fois le précédent complet, en appariant les
+   * vainqueurs deux à deux. La règle est connue et rejouée côté interface
+   * (`_lib/endurance-sections.ts`) — sans quoi cet arbre se dessinerait sans un
+   * seul trait.
+   */
+  resolveNextMatchId?: (match: BracketMatch) => number | null;
 }
 
 export function BracketTree({
@@ -66,6 +77,7 @@ export function BracketTree({
   onSubmit,
   onOpenAdminModal,
   format,
+  resolveNextMatchId,
 }: BracketTreeProps) {
   const matchRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const didScrollRef = useRef(false);
@@ -96,6 +108,12 @@ export function BracketTree({
     if (!scrollRequest) return;
     return scrollToMatch(scrollRequest.matchId);
   }, [scrollRequest]);
+
+  /** Cible du trait sortant d'un match : lien de bracket, ou règle du mode. */
+  const nextMatchId = (match: BracketMatch): number | null =>
+    resolveNextMatchId
+      ? resolveNextMatchId(match)
+      : (match.nextWinnerMatchId ?? match.nextLoserMatchId);
 
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
   const totalRounds = roundNums.length;
@@ -239,7 +257,7 @@ export function BracketTree({
                       background: BORDER,
                     };
 
-                    const targetId = match.nextWinnerMatchId ?? match.nextLoserMatchId;
+                    const targetId = nextMatchId(match);
                     if (!targetId) {
                       return <div key={match.id} style={leftStub} />;
                     }
@@ -301,7 +319,7 @@ export function BracketTree({
               const lastGlobalIdx = roundIdxBase + roundNums.length - 1;
               return lastMatches.map((match, matchIdx) => {
                 const centerY = (matchIdx + 0.5) * lastSlotH + roundOffset(lastGlobalIdx);
-                const dest = match.nextWinnerMatchId ?? match.nextLoserMatchId;
+                const dest = nextMatchId(match);
                 const clickable = onQualifyClick != null && dest != null;
                 const badgeStyle: CSSProperties = {
                   position: "absolute",

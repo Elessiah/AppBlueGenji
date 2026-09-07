@@ -34,7 +34,6 @@ import {
 } from "./_lib/phases";
 import { SwissView } from "./_components/SwissView";
 import { EnduranceView } from "./_components/EnduranceView";
-import { MatchRow } from "./_components/MatchRow";
 import { EntrantProvider } from "./_lib/entrant-link";
 import { MatchAnchorProvider } from "./_lib/match-anchor-context";
 import { useMatchAnchor } from "./_hooks/useMatchAnchor";
@@ -530,26 +529,18 @@ export default function TournamentDetailPage() {
               myTeamId={detail.myTeamId}
               canForfeit={canForfeit}
               onForfeit={forfeitTeam}
-              renderMatch={(match) => (
-                <MatchRow
-                  key={match.id}
-                  match={match}
-                  reportable={canReport(match)}
-                  adminResolvable={canAdminResolve(match)}
-                  onScoreChange={handleScoreChange}
-                  myScore={drafts[match.id]?.myScore || ""}
-                  opponentScore={drafts[match.id]?.opponentScore || ""}
-                  onSubmit={submitScore}
-                  onOpenAdminModal={openAdminScore}
-                  allMatches={detail.matches}
-                  roundNumber={match.roundNumber}
-                  // Le format du tournoi, pas « SURVIVAL » en dur : les deux
-                  // modes tombent aujourd'hui dans la même branche de
-                  // `dependentMatches`, mais un verrou de score se lirait faux
-                  // le jour où ils divergeraient.
-                  format={detail.card.format}
-                />
-              )}
+              canReport={canReport}
+              adminResolvable={canAdminResolve}
+              drafts={drafts}
+              onScoreChange={handleScoreChange}
+              onSubmit={submitScore}
+              onOpenAdminModal={openAdminScore}
+              emptyLabel={noMatchesLabel}
+              // Le format du tournoi, pas « SURVIVAL » en dur : les deux modes
+              // tombent aujourd'hui dans la même branche de `dependentMatches`,
+              // mais un verrou de score se lirait faux le jour où ils
+              // divergeraient.
+              format={detail.card.format}
             />
           ) : detail.card.format === "SWISS" && detail.swiss ? (
             <SwissView
