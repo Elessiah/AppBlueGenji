@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/shared/page-metadata";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { getCurrentUser } from "@/lib/server/auth";
@@ -8,17 +9,14 @@ import type { RecruiterContactDefaults } from "@/lib/shared/recruitment";
 import { RecruitmentSection } from "./RecruitmentSection";
 import styles from "./page.module.css";
 
-export const metadata: Metadata = {
-  title: "BlueGenji - Recrutement",
+export const metadata: Metadata = pageMetadata({
+  title: "Recrutement",
   description:
     "Rejoins le staff bénévole de BlueGenji Esport : arbitrage, casting, développement, communication, design, modération et plus.",
-  openGraph: {
-    title: "BlueGenji - Recrutement",
-    description: "L'association recrute ses bénévoles pour faire vivre la scène esport francophone.",
-    type: "website",
-    locale: "fr_FR",
-  },
-};
+  shareDescription:
+    "L'association recrute ses bénévoles pour faire vivre la scène esport francophone.",
+  path: "/recrutement",
+});
 
 export default async function RecrutementPage() {
   const user = await getCurrentUser().catch(() => null);

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/shared/page-metadata";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import {
@@ -9,11 +10,12 @@ import {
 } from "@/lib/shared/rgpd-policy";
 import styles from "./page.module.css";
 
-export const metadata: Metadata = {
-  title: "BlueGenji — Politique de confidentialité (RGPD)",
+export const metadata: Metadata = pageMetadata({
+  title: "Politique de confidentialité (RGPD)",
   description:
     "Politique de confidentialité de BlueGenji : données collectées, droits des utilisateurs, durées de conservation et contact RGPD.",
-};
+  path: "/rgpd",
+});
 
 export default function RgpdPage() {
   const contactEmail = process.env.RGPD_CONTACT_EMAIL ?? RGPD_CONTACT_EMAIL_FALLBACK;

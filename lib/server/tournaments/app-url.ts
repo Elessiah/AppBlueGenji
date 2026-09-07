@@ -7,11 +7,14 @@
  * seule lecture d'`APP_URL` évite qu'un correctif (un chemin de base, un
  * changement de route) n'en oublie deux.
  *
- * `null` quand `APP_URL` n'est pas réglée : le site ne sait alors pas sous quel
- * nom il est servi, et un lien inventé vaut moins que pas de lien du tout — les
+ * Cette lecture vit désormais dans `lib/server/site-url.ts`, les métadonnées de
+ * partage en ayant besoin hors du domaine des tournois. La règle est inchangée :
+ * `null` quand `APP_URL` n'est pas réglée — le site ne sait alors pas sous quel
+ * nom il est servi, et un lien inventé vaut moins que pas de lien du tout ; les
  * rédactions savent toutes s'en passer.
  */
+import { siteUrl } from "../site-url";
+
 export function tournamentPageUrl(tournamentId: number): string | null {
-  const base = process.env.APP_URL?.trim().replace(/\/+$/, "");
-  return base ? `${base}/tournois/${tournamentId}` : null;
+  return siteUrl(`/tournois/${tournamentId}`);
 }

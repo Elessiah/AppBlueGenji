@@ -1,0 +1,49 @@
+.shell {
+  display: flex;
+  justify-content: center;
+  padding: clamp(48px, 12vh, 140px) 20px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 560px;
+  width: 100%;
+  padding: 32px;
+  text-align: center;
+  align-items: center;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-title), var(--font-sans), sans-serif;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+
+.body {
+  margin: 0;
+  max-width: 44ch;
+  color: var(--ink-mute);
+  line-height: 1.6;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.back {
+  color: var(--ink-dim);
+  font-size: 0.9rem;
+}
+
+.back:hover,
+.back:focus-visible {
+  color: var(--blue-100, #5ac8ff);
+}

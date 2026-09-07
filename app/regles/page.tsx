@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/shared/page-metadata";
 import Link from "next/link";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
@@ -12,18 +13,14 @@ import {
 } from "@/lib/shared/tournament-rules";
 import styles from "./page.module.css";
 
-export const metadata: Metadata = {
-  title: "BlueGenji - Règles des tournois",
+export const metadata: Metadata = pageMetadata({
+  title: "Règles des tournois",
   description:
     "Comment se joue un tournoi BlueGenji : élimination simple, double élimination, mode Survie et ronde suisse — règles, schémas et cas particuliers.",
-  openGraph: {
-    title: "BlueGenji - Règles des tournois",
-    description:
-      "Les règles de chaque mode de tournoi, expliquées avec des schémas : élimination simple, double élimination, Survie, ronde suisse.",
-    type: "website",
-    locale: "fr_FR",
-  },
-};
+  shareDescription:
+    "Les règles de chaque mode de tournoi, expliquées avec des schémas : élimination simple, double élimination, Survie, ronde suisse.",
+  path: "/regles",
+});
 
 function ModeCard({ mode }: { mode: TournamentRuleMode }) {
   const soon = mode.status === "SOON";

@@ -4,6 +4,8 @@ import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
 import { RecruitmentHighlight } from "@/components/recruitment-highlight";
 import { VisitTracker } from "@/components/visit-tracker";
+import { siteMetadataBase } from "@/lib/server/site-url";
+import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/shared/share-metadata";
 
 const titleFont = Rajdhani({
   subsets: ["latin"],
@@ -35,10 +37,36 @@ const displayFont = Orbitron({
   variable: "--font-display",
 });
 
+/**
+ * Socle des métadonnées de partage, hérité par toutes les pages.
+ *
+ * `metadataBase` n'est pas un détail : sans elle, Next sert les `og:image` en
+ * chemin relatif et les robots d'aperçu — Discord le premier — ne savent pas les
+ * résoudre. Le gabarit de titre (`%s · BlueGenji Esport`) évite que chaque page
+ * réécrive le nom du site ; `title.default` sert celles qui n'en déclarent pas.
+ *
+ * L'image d'aperçu, elle, n'est pas déclarée ici : `app/opengraph-image.tsx` est
+ * une convention de fichier, appliquée d'office à toute page qui n'en fournit
+ * pas une.
+ */
 export const metadata: Metadata = {
-  title: "BlueGenji Esport",
-  description:
-    "Plateforme BlueGenji pour l'esport amateur Marvel Rivals: bot Discord, association et gestion de tournois.",
+  metadataBase: siteMetadataBase(),
+  title: { default: SITE_NAME, template: `%s · ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    locale: "fr_FR",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+  },
   icons: {
     icon: "/favicon.png",
     apple: "/apple-touch-icon.png",

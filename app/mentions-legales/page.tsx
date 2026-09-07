@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/shared/page-metadata";
 import Link from "next/link";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
@@ -13,17 +14,13 @@ import styles from "./page.module.css";
 const REGLEMENT_URL =
   "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
 
-export const metadata: Metadata = {
-  title: "BlueGenji - Mentions légales",
+export const metadata: Metadata = pageMetadata({
+  title: "Mentions légales",
   description:
     "Mentions légales de la plateforme BlueGenji Esport, éditée par l'association Bluegenji Esport (loi 1901).",
-  openGraph: {
-    title: "BlueGenji - Mentions légales",
-    description: "Éditeur, hébergement, propriété intellectuelle et données personnelles.",
-    type: "website",
-    locale: "fr_FR",
-  },
-};
+  shareDescription: "Éditeur, hébergement, propriété intellectuelle et données personnelles.",
+  path: "/mentions-legales",
+});
 
 export default function MentionsLegalesPage() {
   return (

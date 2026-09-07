@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/shared/page-metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
@@ -24,17 +25,16 @@ export function generateStaticParams(): { slug: string }[] {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const mode = ruleModeBySlug(slug);
-  if (!mode) return { title: "BlueGenji - Règles des tournois" };
-  return {
-    title: `BlueGenji - Règles : ${mode.label}`,
+  if (!mode) return pageMetadata({
+    title: "Règles des tournois",
+    description: "Les règles de chaque mode de tournoi BlueGenji.",
+    path: "/regles",
+  });
+  return pageMetadata({
+    title: `Règles : ${mode.label}`,
     description: mode.tagline,
-    openGraph: {
-      title: `Règles du mode ${mode.label}`,
-      description: mode.tagline,
-      type: "article",
-      locale: "fr_FR",
-    },
-  };
+    path: `/regles/${mode.slug}`,
+  });
 }
 
 function RuleCard({ rule }: { rule: RuleSection }) {
