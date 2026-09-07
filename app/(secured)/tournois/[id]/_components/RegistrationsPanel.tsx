@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import { useToast } from "@/components/ui/toast";
 import { Pill } from "@/components/cyber";
@@ -15,6 +15,7 @@ import { fromBracketMatch } from "@/lib/shared/match-lock";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { EntrantLink, useParticipantWording } from "../_lib/entrant-link";
 import { mapError } from "../_lib/error-map";
+import { useSeedingDrag } from "../_hooks/useSeedingDrag";
 import styles from "./RegistrationsPanel.module.css";
 
 interface RegistrationsPanelProps {
@@ -34,14 +35,20 @@ const LOCK_MESSAGES: Record<NonNullable<SeedingLockReason>, string> = {
  * Liste des inscrites, et — pour le staff — l'endroit où l'on en règle l'ordre.
  *
  * Cette liste **est** le seeding : son rang décide des appariements de la
- * première manche. Les flèches vivent donc ici, sur les lignes elles-mêmes, et
+ * première manche. Les commandes vivent donc ici, sur les lignes elles-mêmes, et
  * non dans un second tableau des mêmes équipes ailleurs dans la page : deux
  * listes identiques dont une seule se manipule, c'est celle qu'on ne trouve pas.
  *
+ * **Deux gestes pour un même ordre.** La poignée de gauche se glisse : c'est le
+ * chemin rapide, un seul geste amenant le trentième rang en tête. Les flèches de
+ * droite restent le chemin du clavier — un glisser-déposer n'a pas d'équivalent
+ * au clavier, et les retirer priverait de l'ordre de départ qui ne tient pas une
+ * souris. Les deux écrivent par la même route, avec le même aperçu optimiste.
+ *
  * La fenêtre d'édition (jusqu'à la première saisie de score) est **déduite du
  * détail déjà reçu** — même règle pure que le serveur, `lib/shared/seeding.ts` —
- * plutôt que d'une requête à part : les flèches apparaissent avec la page, et le
- * serveur reste le juge, qui refuse en 409 une écriture devenue interdite.
+ * plutôt que d'une requête à part : les commandes apparaissent avec la page, et
+ * le serveur reste le juge, qui refuse en 409 une écriture devenue interdite.
  */
 export function RegistrationsPanel({ detail, canReorder, onReordered }: RegistrationsPanelProps) {
   const { showError, showSuccess } = useToast();
@@ -49,7 +56,7 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
   const [busy, setBusy] = useState(false);
 
   // Ordre affiché en attendant que le flux rapporte l'écriture : sans lui, la
-  // ligne resterait en place le temps d'un aller-retour et le clic semblerait
+  // ligne resterait en place le temps d'un aller-retour et le geste semblerait
   // sans effet. Il est abandonné dès que le serveur dit autre chose.
   const [pending, setPending] = useState<number[] | null>(null);
   const baseline = useRef<string>("");
@@ -72,7 +79,55 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
 
   const order = pending ?? serverOrder;
   const byId = new Map(detail.registrations.map((reg) => [reg.teamId, reg]));
-  const rows = order.flatMap((teamId) => {
+
+  const lockReason = seedingLockReason(detail.card.state, detail.matches.map(fromBracketMatch));
+  const staff = detail.isAdmin && canReorder;
+  const reorderable = staff && lockReason === null && detail.registrations.length > 1;
+
+  /** Écrit un ordre complet, avec aperçu optimiste et annonce vocale. */
+  const applyOrder = useCallback(
+    async (next: number[], teamId: number) => {
+      const name = detail.registrations.find((reg) => reg.teamId === teamId)?.teamName ?? "";
+      baseline.current = serverKey;
+      setPending(next);
+      setBusy(true);
+      try {
+        const res = await fetch(`/api/admin/tournaments/${detail.card.id}/seeding`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ teamIds: next }),
+        });
+        const payload = (await res.json()) as { error?: string };
+        if (!res.ok) throw new Error(payload.error || "SEEDING_REORDER_FAILED");
+        showSuccess("Ordre mis à jour.");
+        // Tournure neutre : le genre de « équipe » et de « joueur » diverge.
+        setAnnouncement(`Nouveau rang de ${name} : ${next.indexOf(teamId) + 1} sur ${next.length}.`);
+        onReordered();
+      } catch (e) {
+        // L'ordre du serveur fait foi : on lâche l'affichage optimiste plutôt que
+        // de laisser croire à une écriture qui n'a pas eu lieu.
+        setPending(null);
+        showError(mapError((e as Error).message));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [detail.card.id, detail.registrations, onReordered, serverKey, showError, showSuccess],
+  );
+
+  const onDrop = useCallback(
+    (next: number[], teamId: number) => {
+      void applyOrder(next, teamId);
+    },
+    [applyOrder],
+  );
+
+  const drag = useSeedingDrag({ order, enabled: reorderable && !busy, onDrop });
+
+  // L'aperçu du geste prime sur l'aperçu de l'écriture : tant qu'on tire une
+  // ligne, c'est la position sous le pointeur qui doit s'afficher.
+  const displayOrder = drag.previewOrder ?? order;
+  const rows = displayOrder.flatMap((teamId) => {
     const reg = byId.get(teamId);
     return reg ? [reg] : [];
   });
@@ -91,37 +146,9 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
     setRefocus(null);
   }, [refocus]);
 
-  const lockReason = seedingLockReason(detail.card.state, detail.matches.map(fromBracketMatch));
-  const staff = detail.isAdmin && canReorder;
-  const reorderable = staff && lockReason === null && rows.length > 1;
-
   const move = async (teamId: number, direction: "up" | "down") => {
-    const next = moveInOrder(order, teamId, direction);
-    const name = byId.get(teamId)?.teamName ?? "";
-    baseline.current = serverKey;
-    setPending(next);
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/admin/tournaments/${detail.card.id}/seeding`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ teamIds: next }),
-      });
-      const payload = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(payload.error || "SEEDING_REORDER_FAILED");
-      showSuccess("Ordre mis à jour.");
-      // Tournure neutre : le genre de « équipe » et de « joueur » diverge.
-      setAnnouncement(`Nouveau rang de ${name} : ${next.indexOf(teamId) + 1} sur ${next.length}.`);
-      onReordered();
-    } catch (e) {
-      // L'ordre du serveur fait foi : on lâche l'affichage optimiste plutôt que
-      // de laisser croire à une écriture qui n'a pas eu lieu.
-      setPending(null);
-      showError(mapError((e as Error).message));
-    } finally {
-      setBusy(false);
-      setRefocus({ teamId, direction });
-    }
+    await applyOrder(moveInOrder(order, teamId, direction), teamId);
+    setRefocus({ teamId, direction });
   };
 
   const source = detail.seedingSource;
@@ -140,14 +167,14 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
             {lockReason !== null
               ? LOCK_MESSAGES[lockReason]
               : reorderable
-                ? "Ce rang décide des appariements de la première manche. Réordonnez les lignes avec les flèches ci-contre, jusqu'à la première saisie de score."
+                ? "Ce rang décide des appariements de la première manche. Glissez une ligne par sa poignée pour la déplacer d'un bloc, ou utilisez les flèches ci-contre — jusqu'à la première saisie de score."
                 : `Ce rang décidera des appariements de la première manche. Il se règlera ici dès qu'il y aura deux ${wording.manyEngaged}.`}
           </p>
           {!showsRealDraw && rows.length > 0 && (
             <p className={styles.warning}>
               Ce format seede depuis le classement du site : les rangs ci-dessous ne sont
               que l&apos;ordre d&apos;arrivée des inscriptions et ne seront pas ceux du
-              tirage. Utilisez les flèches pour imposer votre propre ordre — il fera alors
+              tirage. Réordonnez la liste pour imposer votre propre ordre — il fera alors
               autorité.
             </p>
           )}
@@ -157,8 +184,9 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
       {rows.length === 0 ? (
         <p className={styles.empty}>Aucune inscription pour le moment.</p>
       ) : (
-        <div className={styles.table}>
+        <div className={`${styles.table} ${drag.draggingTeamId !== null ? styles.dragging : ""}`}>
           <div className={`${styles.row} ${styles.header} ${reorderable ? styles.reorderable : ""}`}>
+            {reorderable && <span aria-hidden="true" />}
             <span>Rang</span>
             <span>{wording.oneCapitalized}</span>
             <span>Inscription</span>
@@ -168,8 +196,28 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
           {rows.map((reg, index) => (
             <div
               key={reg.teamId}
-              className={`${styles.row} ${reorderable ? styles.reorderable : ""}`}
+              ref={drag.setRowRef(reg.teamId)}
+              className={[
+                styles.row,
+                reorderable ? styles.reorderable : "",
+                drag.draggingTeamId === reg.teamId ? styles.dragged : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
             >
+              {reorderable && (
+                /* Poignée purement pointeur : le clavier a les flèches, et un
+                   bouton qui ne répondrait pas à la barre d'espace serait un
+                   piège. D'où un `<span>` décoratif plutôt qu'un contrôle. */
+                <span
+                  aria-hidden="true"
+                  className={styles.grip}
+                  title="Glisser pour réordonner"
+                  {...drag.handleProps(reg.teamId)}
+                >
+                  ⠿
+                </span>
+              )}
               <span className={styles.seed}>#{index + 1}</span>
               <EntrantLink className={styles.name} teamId={reg.teamId}>
                 {reg.teamName}
