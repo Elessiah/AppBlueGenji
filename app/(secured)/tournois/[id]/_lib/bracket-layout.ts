@@ -37,23 +37,56 @@ export const MIN_SLOT_HEIGHT = 140;
  */
 export const SLOT_BREATHING_ROOM = 20;
 
+/** Ce qu'un round demande : combien de matchs, et la plus haute de leurs cartes. */
+export interface RoundMeasure {
+  /** Nombre de matchs rendus dans ce round. */
+  matchCount: number;
+  /** Hauteur du plus haut contenu de créneau du round (libellé compris). */
+  tallestContent: number;
+}
+
 /**
- * Hauteur uniforme d'un créneau, d'après les hauteurs mesurées de ses contenus.
+ * Hauteur unitaire d'un créneau, d'après ce que demande chaque round.
+ *
+ * Un round de `n` matchs ne reçoit pas la hauteur unitaire mais `hauteur totale
+ * / n`, la hauteur totale valant `plus grand effectif × unité` — c'est ainsi que
+ * les rounds s'alignent. Chaque round est donc large de son côté : la contrainte
+ * n'est pas « l'unité tient la plus haute carte du tableau » mais « le créneau
+ * *de ce round* tient la plus haute carte *de ce round* ».
+ *
+ * La différence n'est pas théorique. Un tableau à 128 équipes dont seule la
+ * finale est datée et castée verrait, sur la règle naïve, ses **soixante-quatre**
+ * créneaux de premier tour grandir de la hauteur qu'une seule carte réclame, à
+ * un endroit où le créneau fait déjà seize fois la taille demandée.
  *
  * Les valeurs nulles ou absurdes sont ignorées : une mesure vaut `0` tant que
- * l'élément n'est pas peint (rendu serveur, jsdom, onglet en arrière-plan), et
- * la retenir ferait retomber tout l'arbre sur le plancher au premier rendu.
+ * l'élément n'est pas peint (rendu serveur, jsdom), et la retenir ferait
+ * retomber tout l'arbre sur le plancher au premier rendu.
  */
 export function slotUnitHeight(
-  contentHeights: Iterable<number>,
+  rounds: Iterable<RoundMeasure>,
   minHeight: number = MIN_SLOT_HEIGHT,
   breathingRoom: number = SLOT_BREATHING_ROOM,
 ): number {
-  let tallest = 0;
-  for (const height of contentHeights) {
-    if (!Number.isFinite(height) || height <= 0) continue;
-    if (height > tallest) tallest = height;
+  const demands: Array<{ matchCount: number; needed: number }> = [];
+  let widestRound = 0;
+
+  for (const round of rounds) {
+    if (!Number.isFinite(round.matchCount) || round.matchCount <= 0) continue;
+    if (round.matchCount > widestRound) widestRound = round.matchCount;
+    if (!Number.isFinite(round.tallestContent) || round.tallestContent <= 0) continue;
+    demands.push({
+      matchCount: round.matchCount,
+      needed: Math.ceil(round.tallestContent) + breathingRoom,
+    });
   }
-  if (tallest === 0) return minHeight;
-  return Math.max(minHeight, Math.ceil(tallest) + breathingRoom);
+
+  if (widestRound === 0) return minHeight;
+
+  let unit = minHeight;
+  for (const { matchCount, needed } of demands) {
+    // `unité × plus grand effectif / effectif du round` doit couvrir `needed`.
+    unit = Math.max(unit, Math.ceil((needed * matchCount) / widestRound));
+  }
+  return unit;
 }

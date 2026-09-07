@@ -214,7 +214,7 @@ export function BracketTree({
                       style={{ height: slotH, display: "flex", alignItems: "center", justifyContent: "center", scrollMargin: 80 }}
                     >
                       <div
-                        ref={measureSlot(match.id)}
+                        ref={measureSlot(roundNum, match.id)}
                         style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: label || isTarget ? 2 : 0 }}
                       >
                         {(label || isTarget) && (
