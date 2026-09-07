@@ -171,6 +171,55 @@ sans arbre** dès que la correction achevait la qualification
 créer) — et rien ne l'aurait repris, `reconcileEndurance` n'étant atteignable
 que depuis un report de score alors qu'il ne restait plus un match à jouer.
 
+### L'arbre se relit avant de s'enchaîner
+
+Corriger le vainqueur d'un quart de finale ne changeait **rien** aux
+demi-finales. `finalizePlayoffsIfDone` ne sait que *poser* le tour suivant : une
+fois les demies créées, plus rien ne les relisait, et elles continuaient
+d'annoncer une équipe qui venait de perdre son quart.
+
+`repairPlayoffBracket` est le pendant exact de la manche périmée en
+qualification, appliqué à l'arbre. À chaque réconciliation, les tours de
+play-off sont parcourus **du premier au dernier** :
+
+| Tour | Ce qui le décrit |
+| --- | --- |
+| Premier (`1000`) | le **classement** : `selectQualifiedTeamIds` puis `planPlayoffFirstRound` |
+| Suivants | les **vainqueurs** du tour amont : `planNextPlayoffRound` |
+
+Au premier tour qui ne correspond plus à ce qu'il décrit, celui-ci est réécrit et
+**tout ce qui en descendait est supprimé** : le tour réécrit n'est plus joué, il
+ne qualifie donc plus personne. Ce qu'il faut reposer le sera par le chemin
+ordinaire, une fois ce tour terminé — aucun deuxième tirage à tenir à jour.
+
+Trois précisions qui ne sont pas des détails :
+
+- **Le tirage est décrit une seule fois.** Poser l'arbre et le réparer passent
+  par les mêmes fonctions pures (`planPlayoffFirstRound`, `planNextPlayoffRound`)
+  et par le même écrivain (`writePlayoffRound`). Une réparation ne peut donc pas
+  produire un autre tableau que celui qu'un lancement aurait produit.
+- **Les rencontres sont réécrites sur place** quand le plan garde la même forme.
+  L'identifiant d'un match est une adresse publique — lien profond
+  (`match-anchor.ts`), état de diffusion, horaire annoncé — et on ne la jette pas
+  pour un changement d'engagée. Les **rappels Discord** sont en revanche effacés
+  — mais seulement sur les rencontres dont l'engagée change : ils nommaient les
+  anciennes, et le cycle doit réannoncer (même raisonnement qu'une manche
+  reprogrammée). Un tour périmé n'en compte souvent qu'une, et effacer ceux du
+  tour entier renverrait le même message privé aux joueurs d'une demi-finale que
+  la correction n'a pas touchée.
+- **Un tour déjà entamé n'est jamais réécrit.** Le cas ne devrait pas se
+  présenter — `checkDownstreamMatchesHaveNoScores` refuse la correction en amont
+  —, mais entre un arbre périmé, qui se corrige, et un score attribué à une
+  équipe qui ne l'a pas disputé, qui ne se voit plus, le choix est fait.
+
+Ce dernier garde-fou manquait côté serveur : `checkDownstreamMatchesHaveNoScores`
+rangeait `SURVIVAL` et `SWISS` avec les formats sans liens de bracket, mais pas
+`BG_SURVIE` — qui retombait donc sur les liens `next_winner_match_id` /
+`next_loser_match_id`, que son moteur ne renseigne jamais, et n'opposait
+**aucun** verrou. L'interface, elle, masquait bien le bouton d'édition
+(`lib/shared/match-lock.ts` classe les trois formats ensemble) : la règle
+existait à l'écran et pas en base.
+
 ## Classement de départ
 
 Il n'est **pas** calculé depuis le classement du site : il vient de l'ordre de
@@ -190,6 +239,7 @@ décision humaine.
 | Verrouillage | `lib/shared/match-lock.ts` (format traité comme la Survie) |
 | Chiffre d'un forfait | `lib/shared/match-format.ts` (`forfeitMapCount`) |
 | Plafond de manches | `enduranceEliminationCut` / `roundLimitReached` (`lib/shared/bg-survie.ts`) |
+| Relecture de l'arbre | `repairPlayoffBracket` (`lib/server/tournaments/bg-survie.ts`) |
 | Règles publiques | `/regles/bluegenji-survie` |
 
 Comme la Survie et la Ronde suisse, **tout est rejoué** depuis l'historique des
@@ -204,8 +254,10 @@ puis enchaîne la manche suivante ou bascule en play-offs.
 Si une correction de score change le classement alors que la manche courante est
 posée mais **pas encore entamée**, ses appariements sont périmés : ils sont
 détruits et reformés depuis le classement rejoué — comme le font déjà la Survie
-et la Ronde suisse. Au-delà, `match-lock` interdit la correction : toute manche
-ultérieure portant une saisie verrouille les précédentes, play-offs compris.
+et la Ronde suisse. La même relecture vaut pour l'arbre final
+(`repairPlayoffBracket`, voir plus haut). Au-delà, `match-lock` interdit la
+correction : toute manche ultérieure portant une saisie verrouille les
+précédentes, play-offs compris.
 
 ## Forfait : un score plein, pas un match blanc
 
@@ -343,6 +395,9 @@ qui fasse avancer l'arbre.
 - `tests/tournois/bg-survie-forfeit.test.ts` — les deux forfaits : score plein
   écrit sur un forfait ponctuel, cases « FF » du tableau, bilan de maps des
   fiches.
+- `tests/tournois/bg-survie-playoff-repair.test.ts` — la relecture de l'arbre :
+  tirage d'un tour, réécriture d'une demi-finale après correction d'un quart,
+  suppression de ce qui en descendait, et refus de toucher à un tour entamé.
 - `tests/tournois/bg-survie-playoff-timing.test.ts` — la bascule en play-offs
   attend la fin de la manche, l'abandon ne la bloque pas, et une manche périmée
   défaite ouvre l'arbre au lieu d'immobiliser le tournoi.

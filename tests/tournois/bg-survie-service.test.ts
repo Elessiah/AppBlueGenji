@@ -233,7 +233,7 @@ describe("startEndurancePlayoffs", () => {
     await startEndurancePlayoffs(5, conn);
 
     const pairs = conn.execute.mock.calls
-      .filter(([sql]) => String(sql).includes("SET team1_id = ?, team2_id = ?, status = ?"))
+      .filter(([sql]) => String(sql).includes("team1_id = ?, team2_id = ?, status = ?"))
       .map(([, params]) => (params as unknown[]).slice(0, 2));
 
     expect(pairs).toEqual([
@@ -263,55 +263,98 @@ describe("enchaînement des tours de play-offs", () => {
   beforeEach(() => jest.clearAllMocks());
   afterEach(() => jest.restoreAllMocks());
 
-  /** Dernier tour de play-offs, avec `count` matchs décisifs terminés. */
-  function playoffRound(count: number, round = 1000) {
+  /**
+   * Arbre final en place, dont le premier tour est **conforme au classement**.
+   *
+   * L'arbre étant désormais relu avant d'être enchaîné (`repairPlayoffBracket`),
+   * un tour aux appariements arbitraires serait jugé périmé : ces cas décrivent
+   * donc un tirage que le classement fourni produit réellement.
+   */
+  function playoffRound(
+    qualified: number[],
+    winners: number[],
+    pairings: [number, number][],
+  ): [string, unknown][] {
     return [
-      [[tournamentRow({ endurance_playoffs_started: 1 })]], // loadTournament (reconcile)
-      [[standingRow(1)]], // classement stocké
-      [[]], // matchs de qualification
-      [[]], // forfaits
-      [{ affectedRows: 1 }], // persistStandings : une écriture pour l'unique équipe
-      [[{ round_number: round }]], // derniers tours
+      ["FROM bg_tournaments WHERE id = ?", [[tournamentRow({ endurance_playoffs_started: 1 })]]],
+      ["status = 'FORFEIT'", [[]]],
       [
-        Array.from({ length: count }, (_, index) => ({
-          id: 500 + index,
-          match_number: index + 1,
-          status: "COMPLETED",
-          winner_team_id: 10 + index,
-          loser_team_id: 90 + index,
-          bracket: "UPPER",
-        })),
+        "FROM bg_endurance_standings",
+        [qualified.map((teamId, index) => standingRow(teamId, { rank: index + 1 }))],
+      ],
+      ["SELECT round_number, status", [[]]],
+      ["SELECT DISTINCT round_number", [[{ round_number: 1000 }]]],
+      [
+        "SELECT id, bracket, status",
+        [
+          pairings.map(([teamAId, teamBId], index) => ({
+            id: 500 + index,
+            bracket: "UPPER",
+            status: "COMPLETED",
+            team1_id: teamAId,
+            team2_id: teamBId,
+            team1_score: 3,
+            team2_score: 0,
+            winner_team_id: winners[index],
+            loser_team_id: winners[index] === teamAId ? teamBId : teamAId,
+            forfeit_team_id: null,
+            is_bye: 0,
+          })),
+        ],
       ],
     ];
   }
 
+  /** Appariements posés en base par ce `reconcileEndurance`. */
+  function writtenPairings(conn: { execute: jest.Mock }) {
+    return conn.execute.mock.calls.filter(([sql]) =>
+      String(sql).includes("team1_id = ?, team2_id = ?, status = ?"),
+    );
+  }
+
   it("fait passer le tour au dernier vainqueur quand ils sont en nombre impair", async () => {
     (createMatch as jest.Mock).mockResolvedValue(77 as never);
-    const conn = makeConn(playoffRound(3));
+    // Six qualifiées : le tableau imposé ne s'applique pas, l'arbre part sur un
+    // appariement haut contre bas — 1v6, 2v5, 3v4 — et trois vainqueurs.
+    const conn = makeConn(
+      [],
+      playoffRound([1, 2, 3, 4, 5, 6], [1, 2, 3], [
+        [1, 6],
+        [2, 5],
+        [3, 4],
+      ]),
+    );
 
     await reconcileEndurance(5, conn);
 
-    const created = conn.execute.mock.calls.filter(([sql]) =>
-      String(sql).includes("SET team1_id = ?, team2_id = ?, status = ?"),
-    );
-    // Deux matchs : 10 vs 11, puis 12 seul (bye) — aucun vainqueur perdu.
+    const created = writtenPairings(conn);
+    // Deux matchs : 1 vs 2, puis 3 seul (bye) — aucun vainqueur perdu.
     expect(created).toHaveLength(2);
-    expect((created[0][1] as unknown[]).slice(0, 2)).toEqual([10, 11]);
-    expect((created[1][1] as unknown[]).slice(0, 4)).toEqual([12, null, "COMPLETED", 1]);
+    expect((created[0][1] as unknown[]).slice(0, 2)).toEqual([1, 2]);
+    expect((created[1][1] as unknown[]).slice(0, 4)).toEqual([3, null, "COMPLETED", 1]);
   });
 
   it("apparie normalement un nombre pair de vainqueurs", async () => {
     (createMatch as jest.Mock).mockResolvedValue(77 as never);
-    const conn = makeConn(playoffRound(4));
+    // Huit qualifiées : le tableau imposé 8v4, 6v2, 1v5, 3v7.
+    const conn = makeConn(
+      [],
+      playoffRound([1, 2, 3, 4, 5, 6, 7, 8], [8, 6, 1, 3], [
+        [8, 4],
+        [6, 2],
+        [1, 5],
+        [3, 7],
+      ]),
+    );
 
     await reconcileEndurance(5, conn);
 
-    const created = conn.execute.mock.calls.filter(([sql]) =>
-      String(sql).includes("SET team1_id = ?, team2_id = ?, status = ?"),
-    );
+    const created = writtenPairings(conn);
+    // Deux demi-finales : les quarts ne sont pas les demies, aucune petite
+    // finale n'est encore posée.
     expect(created).toHaveLength(2);
-    expect((created[0][1] as unknown[]).slice(0, 3)).toEqual([10, 11, "READY"]);
-    expect((created[1][1] as unknown[]).slice(0, 3)).toEqual([12, 13, "READY"]);
+    expect((created[0][1] as unknown[]).slice(0, 3)).toEqual([8, 6, "READY"]);
+    expect((created[1][1] as unknown[]).slice(0, 3)).toEqual([1, 3, "READY"]);
   });
 });
 

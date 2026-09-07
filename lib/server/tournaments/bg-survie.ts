@@ -14,9 +14,12 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import {
   assignRanks,
-  buildPlayoffPairings,
   forfeitMapCount,
+  pairingsAreStale,
   planEnduranceRound,
+  planNextPlayoffRound,
+  planPlayoffFirstRound,
+  playoffRoundIsStale,
   qualificationComplete,
   rankActiveTeams,
   roundLimitReached,
@@ -28,6 +31,7 @@ import {
   type EnduranceMatchOutcome,
   type EnduranceStanding,
   type EnduranceStatus,
+  type PlayoffRoundPlan,
 } from "@/lib/shared/bg-survie";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { createMatch, finishTournament } from "./repository";
@@ -369,6 +373,10 @@ export async function reconcileEndurance(
   await persistStandings(conn, tournamentId, assignRanks(replayed));
 
   if (Number(tournament.endurance_playoffs_started) === 1) {
+    // L'arbre se relit avant de s'enchaîner : une correction de score en amont
+    // (un quart de finale, voire une manche qualificative) a pu périmer un tour
+    // déjà posé, et rien d'autre ne le regarde.
+    await repairPlayoffBracket(conn, tournamentId, assignRanks(replayed), config);
     await finalizePlayoffsIfDone(conn, tournamentId);
     return;
   }
@@ -462,13 +470,12 @@ async function roundPairingsAreStale(
   );
   if (rows.length === 0) return false;
 
-  const expected = planEnduranceRound(standings).filter((pairing) => pairing.teamBId !== null);
-  if (expected.length !== rows.length) return true;
-
-  return expected.some(
-    (pairing, index) =>
-      Number(rows[index].team1_id) !== pairing.teamAId ||
-      Number(rows[index].team2_id) !== pairing.teamBId,
+  return pairingsAreStale(
+    planEnduranceRound(standings).filter((pairing) => pairing.teamBId !== null),
+    rows.map((row) => ({
+      teamAId: row.team1_id === null ? null : Number(row.team1_id),
+      teamBId: row.team2_id === null ? null : Number(row.team2_id),
+    })),
   );
 }
 
@@ -497,7 +504,10 @@ async function roundIsComplete(
  *
  * À huit qualifiées, le tableau imposé (8v4, 6v2, 1v5, 3v7) est appliqué tel
  * quel. En dessous — tournoi sous-rempli — on retombe sur un appariement
- * classique haut contre bas, faute de tableau défini pour cet effectif.
+ * classique haut contre bas, faute de tableau défini pour cet effectif. Le
+ * tirage lui-même vit dans le module pur (`planPlayoffFirstRound`), partagé avec
+ * la réparation de l'arbre : une correction de score ne doit jamais poser un
+ * autre tableau que celui qu'un lancement aurait produit.
  */
 export async function startEndurancePlayoffs(
   tournamentId: number,
@@ -516,33 +526,13 @@ export async function startEndurancePlayoffs(
     return;
   }
 
-  const pairings =
-    qualified.length === config.playoffSize && config.playoffSize === 8
-      ? buildPlayoffPairings(qualified)
-      : fallbackPairings(qualified);
-
-  const firstRound = PLAYOFF_ROUND_OFFSET;
-  let matchNumber = 1;
-  for (const pairing of pairings) {
-    const matchId = await createMatch(conn, tournamentId, "UPPER", firstRound, matchNumber, 0);
-    await conn.execute(
-      `UPDATE bg_matches SET team1_id = ?, team2_id = ?, status = ?, is_bye = ? WHERE id = ?`,
-      [
-        pairing.teamAId,
-        pairing.teamBId,
-        pairing.teamBId === null ? "COMPLETED" : "READY",
-        pairing.teamBId === null ? 1 : 0,
-        matchId,
-      ],
-    );
-    if (pairing.teamBId === null) {
-      await conn.execute(
-        `UPDATE bg_matches SET team1_score = 1, team2_score = 0, winner_team_id = ? WHERE id = ?`,
-        [pairing.teamAId, matchId],
-      );
-    }
-    matchNumber += 1;
-  }
+  await writePlayoffRound(
+    conn,
+    tournamentId,
+    PLAYOFF_ROUND_OFFSET,
+    planPlayoffFirstRound(qualified, config),
+    [],
+  );
 
   await conn.execute(
     `UPDATE bg_tournaments SET endurance_playoffs_started = 1 WHERE id = ?`,
@@ -550,55 +540,244 @@ export async function startEndurancePlayoffs(
   );
 }
 
-/** Appariement de repli haut contre bas, pour un plateau autre que huit. */
-function fallbackPairings(qualified: number[]): { teamAId: number; teamBId: number | null }[] {
-  const pairings: { teamAId: number; teamBId: number | null }[] = [];
-  let left = 0;
-  let right = qualified.length - 1;
+/** Une rencontre d'arbre final telle qu'elle est posée en base. */
+type PlayoffMatchRow = {
+  id: number;
+  bracket: string;
+  status: string;
+  teamAId: number | null;
+  teamBId: number | null;
+  winnerTeamId: number | null;
+  loserTeamId: number | null;
+  hasScoreInput: boolean;
+};
 
-  while (left < right) {
-    pairings.push({ teamAId: qualified[left], teamBId: qualified[right] });
-    left += 1;
-    right -= 1;
+/** Numéros des tours d'arbre final déjà posés, du premier au dernier. */
+async function loadPlayoffRoundNumbers(
+  conn: PoolConnection,
+  tournamentId: number,
+): Promise<number[]> {
+  const [rows] = await conn.execute<(RowDataPacket & { round_number: number })[]>(
+    `SELECT DISTINCT round_number FROM bg_matches
+     WHERE tournament_id = ? AND round_number >= ?
+     ORDER BY round_number ASC`,
+    [tournamentId, PLAYOFF_ROUND_OFFSET],
+  );
+  return rows.map((row) => Number(row.round_number));
+}
+
+/**
+ * Rencontres d'un tour d'arbre final, dans l'ordre d'affichage.
+ *
+ * `hasScoreInput` reprend mot pour mot la règle de `lib/shared/match-lock.ts` :
+ * un score (même nul), un vainqueur, un forfait ou un report en attente. C'est
+ * lui qui interdit de réécrire un tour déjà entamé — et il ignore les byes,
+ * dont le 1-0 est posé par le moteur et non saisi par une équipe.
+ */
+async function loadPlayoffRoundMatches(
+  conn: PoolConnection,
+  tournamentId: number,
+  round: number,
+): Promise<PlayoffMatchRow[]> {
+  const [rows] = await conn.execute<
+    (RowDataPacket & {
+      id: number;
+      bracket: string;
+      status: string;
+      team1_id: number | null;
+      team2_id: number | null;
+      team1_score: number | null;
+      team2_score: number | null;
+      winner_team_id: number | null;
+      loser_team_id: number | null;
+      forfeit_team_id: number | null;
+      is_bye: number | null;
+    })[]
+  >(
+    `SELECT id, bracket, status, team1_id, team2_id, team1_score, team2_score,
+            winner_team_id, loser_team_id, forfeit_team_id, is_bye
+     FROM bg_matches
+     WHERE tournament_id = ? AND round_number = ?
+     ORDER BY match_number ASC`,
+    [tournamentId, round],
+  );
+
+  return rows.map((row) => ({
+    id: Number(row.id),
+    bracket: String(row.bracket),
+    status: String(row.status),
+    teamAId: row.team1_id === null ? null : Number(row.team1_id),
+    teamBId: row.team2_id === null ? null : Number(row.team2_id),
+    winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
+    loserTeamId: row.loser_team_id === null ? null : Number(row.loser_team_id),
+    hasScoreInput:
+      Number(row.is_bye ?? 0) !== 1 &&
+      row.team1_id !== null &&
+      row.team2_id !== null &&
+      (row.team1_score !== null ||
+        row.team2_score !== null ||
+        row.winner_team_id !== null ||
+        row.forfeit_team_id != null ||
+        String(row.status) === "AWAITING_CONFIRMATION"),
+  }));
+}
+
+/**
+ * Pose un tour d'arbre final conformément au plan.
+ *
+ * Les rencontres déjà en place sont réécrites **sur place** quand le plan a la
+ * même forme : leur identifiant est une adresse publique (lien profond vers un
+ * match, diffusion, horaire annoncé), et la perdre pour un changement d'engagée
+ * serait payer cher une correction de score. Sinon — le plan n'a plus le même
+ * nombre de rencontres, ou plus les mêmes natures — le tour est refait à neuf.
+ */
+async function writePlayoffRound(
+  conn: PoolConnection,
+  tournamentId: number,
+  round: number,
+  plan: PlayoffRoundPlan,
+  existing: PlayoffMatchRow[],
+): Promise<void> {
+  const sameShape =
+    existing.length === plan.length &&
+    plan.every((entry, index) => entry.bracket === existing[index].bracket);
+
+  let reusable = existing;
+  if (!sameShape) {
+    if (existing.length > 0) {
+      await conn.execute(`DELETE FROM bg_matches WHERE tournament_id = ? AND round_number = ?`, [
+        tournamentId,
+        round,
+      ]);
+    }
+    reusable = [];
   }
 
-  // Effectif impair : la mieux classée restante passe le tour.
-  if (left === right) pairings.push({ teamAId: qualified[left], teamBId: null });
+  for (let index = 0; index < plan.length; index += 1) {
+    const { bracket, pairing } = plan[index];
+    const matchId =
+      reusable[index]?.id ?? (await createMatch(conn, tournamentId, bracket, round, index + 1, 0));
 
-  return pairings;
+    // Le résultat est remis à zéro en même temps que les engagées : un tour
+    // réécrit n'a pas été joué, et laisser un vainqueur derrière ferait avancer
+    // l'arbre sur une rencontre qui n'existe plus.
+    const isBye = pairing.teamBId === null;
+    await conn.execute(
+      `UPDATE bg_matches SET
+        team1_id = ?, team2_id = ?, status = ?, is_bye = ?,
+        team1_score = ?, team2_score = ?,
+        winner_team_id = ?, loser_team_id = NULL, forfeit_team_id = NULL
+       WHERE id = ?`,
+      [
+        pairing.teamAId,
+        pairing.teamBId,
+        isBye ? "COMPLETED" : "READY",
+        isBye ? 1 : 0,
+        isBye ? 1 : null,
+        isBye ? 0 : null,
+        isBye ? pairing.teamAId : null,
+        matchId,
+      ],
+    );
+  }
+
+  // Les rappels déjà partis nommaient les anciennes engagées : les effacer fait
+  // repartir le cycle (`lib/server/tournaments/match-reminders.ts`), donc
+  // réannoncer la rencontre à celles qui la disputent réellement — même
+  // raisonnement qu'une manche reprogrammée.
+  //
+  // Seules les rencontres dont le couple **change** sont concernées. Un tour
+  // périmé n'en compte souvent qu'une : effacer les rappels du tour entier
+  // renverrait le même message privé aux joueurs d'une demi-finale que la
+  // correction n'a pas touchée.
+  const rewritten = reusable
+    .filter(
+      (match, index) =>
+        index < plan.length &&
+        (match.teamAId !== plan[index].pairing.teamAId ||
+          match.teamBId !== plan[index].pairing.teamBId),
+    )
+    .map((match) => match.id);
+  if (rewritten.length > 0) {
+    await conn.execute(
+      `DELETE FROM bg_match_reminders WHERE match_id IN (${rewritten.map(() => "?").join(", ")})`,
+      rewritten,
+    );
+  }
+}
+
+/**
+ * Réaligne l'arbre final sur le résultat des tours amont.
+ *
+ * `finalizePlayoffsIfDone` ne sait que **poser** le tour suivant : une fois les
+ * demi-finales créées, corriger un quart de finale n'en changeait plus les
+ * participantes — le tour existait déjà, et plus rien ne le relisait. C'est
+ * l'exact pendant de `roundPairingsAreStale` en qualification, appliqué aux
+ * tours de play-off.
+ *
+ * Le premier tour se relit sur le **classement** (une correction en
+ * qualification peut réécrire qui est qualifiée, et dans quel ordre), les
+ * suivants sur les vainqueurs du tour précédent. Un tour périmé est réécrit, et
+ * tout ce qui en descendait est supprimé : le tour réécrit n'est plus joué, il
+ * ne qualifie donc plus personne. Ce qu'il faut reposer le sera par le chemin
+ * ordinaire, une fois ce tour terminé.
+ *
+ * Un tour portant la moindre saisie n'est **jamais** réécrit. Le cas ne devrait
+ * pas se présenter — `checkDownstreamMatchesHaveNoScores` refuse la correction
+ * amont —, mais entre un arbre périmé, qui se corrige, et un score attribué à
+ * une équipe qui ne l'a pas disputé, qui ne se voit plus, le choix est fait.
+ */
+async function repairPlayoffBracket(
+  conn: PoolConnection,
+  tournamentId: number,
+  standings: EnduranceStanding[],
+  config: EnduranceConfig,
+): Promise<void> {
+  const rounds = await loadPlayoffRoundNumbers(conn, tournamentId);
+  if (rounds.length === 0) return;
+
+  let plan = planPlayoffFirstRound(selectQualifiedTeamIds(standings, config), config);
+
+  for (const round of rounds) {
+    const matches = await loadPlayoffRoundMatches(conn, tournamentId, round);
+
+    if (playoffRoundIsStale(plan, matches)) {
+      if (matches.some((match) => match.hasScoreInput)) return;
+
+      await writePlayoffRound(conn, tournamentId, round, plan, matches);
+      await conn.execute(`DELETE FROM bg_matches WHERE tournament_id = ? AND round_number > ?`, [
+        tournamentId,
+        round,
+      ]);
+      return;
+    }
+
+    // Tour conforme : le suivant se déduit de ses résultats — encore faut-il
+    // qu'il soit joué. Une finale (une seule rencontre décisive) ne mène nulle
+    // part : `planNextPlayoffRound` rend un plan vide, et il n'y a plus rien à
+    // relire en aval.
+    const decisive = matches.filter((match) => match.bracket !== "THIRD_PLACE");
+    if (decisive.some((match) => match.status !== "COMPLETED")) return;
+
+    plan = planNextPlayoffRound(decisive);
+    if (plan.length === 0) return;
+  }
 }
 
 /**
  * Enchaîne les tours de play-offs : dès qu'un tour est complet, crée le suivant
  * avec les vainqueurs (et la petite finale lorsqu'il ne reste que les demies).
+ *
+ * Le tirage du tour suivant est celui du module pur (`planNextPlayoffRound`),
+ * le même que relit `repairPlayoffBracket` : poser un tour et le réparer ne
+ * peuvent pas diverger.
  */
 async function finalizePlayoffsIfDone(conn: PoolConnection, tournamentId: number): Promise<void> {
-  const [rounds] = await conn.execute<(RowDataPacket & { round_number: number })[]>(
-    `SELECT DISTINCT round_number FROM bg_matches
-     WHERE tournament_id = ? AND round_number >= ?
-     ORDER BY round_number DESC`,
-    [tournamentId, PLAYOFF_ROUND_OFFSET],
-  );
+  const rounds = await loadPlayoffRoundNumbers(conn, tournamentId);
   if (rounds.length === 0) return;
 
-  const lastRound = Number(rounds[0].round_number);
-
-  const [matches] = await conn.execute<
-    (RowDataPacket & {
-      id: number;
-      match_number: number;
-      status: string;
-      winner_team_id: number | null;
-      loser_team_id: number | null;
-      bracket: string;
-    })[]
-  >(
-    `SELECT id, match_number, status, winner_team_id, loser_team_id, bracket
-     FROM bg_matches
-     WHERE tournament_id = ? AND round_number = ?
-     ORDER BY match_number ASC`,
-    [tournamentId, lastRound],
-  );
+  const lastRound = rounds[rounds.length - 1];
+  const matches = await loadPlayoffRoundMatches(conn, tournamentId, lastRound);
 
   const decisive = matches.filter((match) => match.bracket !== "THIRD_PLACE");
   if (decisive.length === 0 || decisive.some((match) => match.status !== "COMPLETED")) return;
@@ -612,53 +791,10 @@ async function finalizePlayoffsIfDone(conn: PoolConnection, tournamentId: number
     return;
   }
 
-  const winners = decisive.map((match) => Number(match.winner_team_id));
-  const nextRound = lastRound + 1;
+  const plan = planNextPlayoffRound(decisive);
+  if (plan.length === 0) return;
 
-  let matchNumber = 1;
-  for (let index = 0; index < winners.length; index += 2) {
-    const matchId = await createMatch(conn, tournamentId, "UPPER", nextRound, matchNumber, 0);
-
-    // Nombre impair de vainqueurs (plateau qui n'est pas une puissance de deux) :
-    // le dernier passe le tour au lieu d'être oublié en route.
-    const isBye = index + 1 >= winners.length;
-    await conn.execute(
-      `UPDATE bg_matches SET team1_id = ?, team2_id = ?, status = ?, is_bye = ? WHERE id = ?`,
-      [
-        winners[index],
-        isBye ? null : winners[index + 1],
-        isBye ? "COMPLETED" : "READY",
-        isBye ? 1 : 0,
-        matchId,
-      ],
-    );
-    if (isBye) {
-      await conn.execute(
-        `UPDATE bg_matches SET team1_score = 1, team2_score = 0, winner_team_id = ? WHERE id = ?`,
-        [winners[index], matchId],
-      );
-    }
-    matchNumber += 1;
-  }
-
-  // Demi-finales terminées : la petite finale se joue en parallèle de la finale.
-  if (decisive.length === 2) {
-    const losers = decisive.map((match) => Number(match.loser_team_id)).filter(Boolean);
-    if (losers.length === 2) {
-      const matchId = await createMatch(
-        conn,
-        tournamentId,
-        "THIRD_PLACE",
-        nextRound,
-        matchNumber,
-        0,
-      );
-      await conn.execute(
-        `UPDATE bg_matches SET team1_id = ?, team2_id = ?, status = 'READY', is_bye = 0 WHERE id = ?`,
-        [losers[0], losers[1], matchId],
-      );
-    }
-  }
+  await writePlayoffRound(conn, tournamentId, lastRound + 1, plan, []);
 }
 
 /** Classement final : podium issu des play-offs, puis ordre d'élimination. */
@@ -666,17 +802,21 @@ async function finalizeEndurance(
   conn: PoolConnection,
   tournamentId: number,
   standings: EnduranceStanding[],
-  finalMatches: { bracket: string; winner_team_id: number | null; loser_team_id: number | null }[] = [],
+  finalMatches: {
+    bracket: string;
+    winnerTeamId: number | null;
+    loserTeamId: number | null;
+  }[] = [],
 ): Promise<void> {
   const podium: number[] = [];
 
   const final = finalMatches.find((match) => match.bracket !== "THIRD_PLACE");
   const thirdPlace = finalMatches.find((match) => match.bracket === "THIRD_PLACE");
 
-  if (final?.winner_team_id) podium.push(Number(final.winner_team_id));
-  if (final?.loser_team_id) podium.push(Number(final.loser_team_id));
-  if (thirdPlace?.winner_team_id) podium.push(Number(thirdPlace.winner_team_id));
-  if (thirdPlace?.loser_team_id) podium.push(Number(thirdPlace.loser_team_id));
+  if (final?.winnerTeamId) podium.push(final.winnerTeamId);
+  if (final?.loserTeamId) podium.push(final.loserTeamId);
+  if (thirdPlace?.winnerTeamId) podium.push(thirdPlace.winnerTeamId);
+  if (thirdPlace?.loserTeamId) podium.push(thirdPlace.loserTeamId);
 
   const ranked = assignRanks(standings)
     .map((standing) => standing.teamId)
