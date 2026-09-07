@@ -1,7 +1,8 @@
 "use client";
 
+import { FormEvent } from "react";
 import { ScrollArea } from "@/components/cyber";
-import type { BracketMatch, EnduranceMeta } from "@/lib/shared/types";
+import type { BracketMatch, EnduranceMeta, TournamentFormat } from "@/lib/shared/types";
 import {
   enduranceCellLabel,
   enduranceCellTitle,
@@ -9,14 +10,23 @@ import {
   enduranceHistoryColumns,
   type EnduranceCellTone,
 } from "../_lib/endurance-history";
+import { ACCENT } from "../_lib/bracket-sections";
+import {
+  endurancePlayoffLinks,
+  endurancePlayoffRoundCount,
+  enduranceRoundSections,
+  splitEnduranceMatches,
+  splitPlayoffBrackets,
+} from "../_lib/endurance-sections";
 import { EntrantLink, useParticipantWording } from "../_lib/entrant-link";
-import { endurancePlayoffGroups } from "../_lib/endurance-rounds";
+import { BracketSections } from "./BracketSections";
+import type { MatchScoreDraft } from "./BracketTree";
+import { EnduranceRoundPanels } from "./EnduranceRoundPanels";
 import styles from "./EnduranceView.module.css";
 
 interface EnduranceViewProps {
   endurance: EnduranceMeta;
   matches: BracketMatch[];
-  renderMatch: (match: BracketMatch) => React.ReactNode;
   /** Le tournoi est-il clos ? (plus aucun abandon possible) */
   isFinished?: boolean;
   /** Engagé du lecteur, mis en avant dans le classement. */
@@ -24,6 +34,29 @@ interface EnduranceViewProps {
   /** L'abandon est-il proposé pour cette équipe ? (cf. `_lib/forfeit.ts`) */
   canForfeit?: (teamId: number) => boolean;
   onForfeit?: (teamId: number, teamName: string) => void;
+  canReport: (match: BracketMatch) => boolean;
+  adminResolvable: (match: BracketMatch) => boolean;
+  drafts: MatchScoreDraft;
+  onScoreChange: (matchId: number, field: "myScore" | "opponentScore", value: string) => void;
+  onSubmit: (match: BracketMatch, e: FormEvent) => Promise<void>;
+  onOpenAdminModal: (match: BracketMatch) => void;
+  format: TournamentFormat;
+  /** Phrase affichée quand le plateau ne porte encore aucune rencontre. */
+  emptyLabel?: string;
+}
+
+/**
+ * Intitulé d'un bloc du plateau (« Play-offs », « Manches qualificatives »).
+ *
+ * Un `<h3>` et non un `<div>` : le plateau se parcourt au lecteur d'écran par
+ * ses titres, et deux blocs de volets côte à côte sans titre de niveau ne se
+ * distinguent plus l'un de l'autre. La casse est décidée par la feuille de
+ * style, pas écrite dans le texte.
+ */
+function BoardHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className={`mono ${styles.boardHeading}`}>{children}</h3>
+  );
 }
 
 const AMBER = "rgba(255,157,46,0.9)";
@@ -37,9 +70,6 @@ const AMBER = "rgba(255,157,46,0.9)";
 function rowClass(withActions: boolean): string {
   return `table-row ${withActions ? styles.rowWithActions : styles.row}`;
 }
-
-/** Première manche de play-offs (cf. `lib/server/tournaments/bg-survie.ts`). */
-const PLAYOFF_ROUND_OFFSET = 1000;
 
 /**
  * « Éliminée » et « Hors course » ne disent pas la même chose et ne peuvent pas
@@ -165,18 +195,33 @@ function EnduranceHistory({
 export function EnduranceView({
   endurance,
   matches,
-  renderMatch,
   isFinished = false,
   myTeamId = null,
   canForfeit,
   onForfeit,
+  canReport,
+  adminResolvable,
+  drafts,
+  onScoreChange,
+  onSubmit,
+  onOpenAdminModal,
+  format,
+  emptyLabel = "Aucun match pour l'instant.",
 }: EnduranceViewProps) {
   const wording = useParticipantWording();
-  const qualification = matches.filter((match) => match.roundNumber < PLAYOFF_ROUND_OFFSET);
-  const playoffs = matches.filter((match) => match.roundNumber >= PLAYOFF_ROUND_OFFSET);
-  const visible = endurance.playoffsStarted ? playoffs : qualification;
+  const { qualification, playoffs } = splitEnduranceMatches(matches);
+  const roundSections = enduranceRoundSections(qualification);
 
-  const rounds = [...new Set(visible.map((match) => match.roundNumber))].sort((a, b) => b - a);
+  // L'arbre final vit dans les mêmes manches que la petite finale, qui ne mène
+  // nulle part : les deux se dessinent séparément, comme dans les tableaux à
+  // élimination du site.
+  const { decisive, thirdPlace } = splitPlayoffBrackets(playoffs);
+  const playoffLinks = endurancePlayoffLinks(decisive);
+  const resolvePlayoffNext = (match: BracketMatch) => playoffLinks.get(match.id) ?? null;
+  // Les tours de l'arbre naissent un à un : sans ce compte, les quarts de finale
+  // s'appelleraient « Finale » tant qu'ils seraient le seul tour posé.
+  const playoffRounds = endurancePlayoffRoundCount(decisive);
+
   const activeCount = endurance.standings.filter((s) => s.status === "ACTIVE").length;
 
   // Sous plafond, la manche courante ne se lit qu'accompagnée de son total :
@@ -318,43 +363,82 @@ export function EnduranceView({
 
       <EnduranceHistory endurance={endurance} myTeamId={myTeamId} />
 
-      {rounds.map((round) => {
-        const roundMatches = visible.filter((match) => match.roundNumber === round);
+      {/*
+        Les play-offs passent devant les manches qualificatives dès qu'ils sont
+        lancés : c'est là que se joue le tournoi. Les manches restent en dessous
+        plutôt que d'être escamotées — l'ancienne vue les remplaçait purement, et
+        le parcours d'une équipe devenait alors illisible.
 
-        // Une manche qualificative n'a qu'un bloc ; un tour de play-off en a
-        // deux dès qu'il porte la petite finale — celle-ci ne se range pas sous
-        // le stade des décisives, faute de quoi « FINALE » coiffe deux
-        // rencontres que rien ne distingue.
-        const groups =
-          round >= PLAYOFF_ROUND_OFFSET
-            ? endurancePlayoffGroups(roundMatches, round - PLAYOFF_ROUND_OFFSET + 1).map(
-                (group) => ({ ...group, title: `PLAY-OFFS · ${group.title}` }),
-              )
-            : [{ key: "UPPER" as const, title: `MANCHE ${round}`, matches: roundMatches }];
+        L'arbre est celui de l'élimination simple, `BracketSections` : mêmes
+        volets, mêmes stades nommés, mêmes traits d'un tour à l'autre. Les liens
+        n'existant pas en base pour ce mode, ils sont rejoués depuis la règle
+        d'appariement du moteur (cf. `_lib/endurance-sections.ts`).
+      */}
+      {decisive.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <BoardHeading>Play-offs</BoardHeading>
+          <BracketSections
+            bracketType="UPPER"
+            bracketLabel="Play-offs"
+            showBracketLabel={false}
+            matches={decisive}
+            allTournamentMatches={matches}
+            myTeamId={myTeamId}
+            canReport={canReport}
+            adminResolvable={adminResolvable}
+            drafts={drafts}
+            onScoreChange={onScoreChange}
+            onSubmit={onSubmit}
+            onOpenAdminModal={onOpenAdminModal}
+            format={format}
+            resolveNextMatchId={resolvePlayoffNext}
+            plannedRounds={playoffRounds}
+          />
+          {thirdPlace.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <BracketSections
+                bracketType="THIRD_PLACE"
+                bracketLabel="Petite finale"
+                showBracketLabel={false}
+                matches={thirdPlace}
+                allTournamentMatches={matches}
+                myTeamId={myTeamId}
+                canReport={canReport}
+                adminResolvable={adminResolvable}
+                drafts={drafts}
+                onScoreChange={onScoreChange}
+                onSubmit={onSubmit}
+                onOpenAdminModal={onOpenAdminModal}
+                format={format}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
-        return (
-          <div key={round} style={{ marginBottom: 20 }}>
-            {groups.map((group, index) => (
-              // La marge sépare les blocs **entre eux** : la porter aussi sous
-              // le dernier l'ajouterait à celle du tour, et une manche
-              // qualificative — un seul bloc — s'en trouverait espacée sans
-              // raison.
-              <div
-                key={group.key}
-                style={{ marginBottom: index < groups.length - 1 ? 12 : 0 }}
-              >
-                <div
-                  className="mono"
-                  style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 8 }}
-                >
-                  {group.title}
-                </div>
-                {group.matches.map((match) => renderMatch(match))}
-              </div>
-            ))}
-          </div>
-        );
-      })}
+      {roundSections.length > 0 ? (
+        <>
+          {decisive.length > 0 && <BoardHeading>Manches qualificatives</BoardHeading>}
+          <EnduranceRoundPanels
+            sections={roundSections}
+            accent={ACCENT.UPPER}
+            myTeamId={myTeamId}
+            playoffsStarted={endurance.playoffsStarted}
+            allTournamentMatches={matches}
+            canReport={canReport}
+            adminResolvable={adminResolvable}
+            drafts={drafts}
+            onScoreChange={onScoreChange}
+            onSubmit={onSubmit}
+            onOpenAdminModal={onOpenAdminModal}
+            format={format}
+          />
+        </>
+      ) : (
+        decisive.length === 0 && (
+          <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>{emptyLabel}</p>
+        )
+      )}
     </>
   );
 }
