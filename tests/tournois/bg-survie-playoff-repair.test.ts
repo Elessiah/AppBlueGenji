@@ -423,7 +423,11 @@ describe("reconcileEndurance — réparation de l'arbre final", () => {
     expect(deletion?.[1]).toEqual([TOURNAMENT_ID, 1001]);
   });
 
-  it("efface les rappels des rencontres réécrites", async () => {
+  it("n'efface les rappels que des rencontres dont l'engagée change", async () => {
+    // Seule la première demie change d'engagée. Ses rappels partent (ils
+    // nommaient 8, qui vient de perdre son quart) ; ceux de la seconde restent
+    // — les réannoncer enverrait le même message privé à des joueurs dont rien
+    // n'a bougé.
     const conn = makeConn(
       {
         1000: [{ ...QUARTERS[0], winner: 4, loser: 8 }, ...QUARTERS.slice(1)],
@@ -440,7 +444,24 @@ describe("reconcileEndurance — réparation de l'arbre final", () => {
     const cleanup = conn.execute.mock.calls.find(([sql]) =>
       String(sql).includes("DELETE FROM bg_match_reminders"),
     );
-    expect(cleanup?.[1]).toEqual([601, 602]);
+    expect(cleanup?.[1]).toEqual([601]);
+  });
+
+  it("n'efface aucun rappel quand le tour est refait à neuf", async () => {
+    // Les anciennes rencontres sont supprimées : leurs rappels partent avec
+    // elles (`ON DELETE CASCADE`), il n'y a rien à effacer à part.
+    const conn = makeConn(
+      { 1000: QUARTERS.map((match) => ({ ...match, winner: null, loser: null })) },
+      [1, 2, 3, 4, 5, 6],
+    );
+
+    await reconcileEndurance(TOURNAMENT_ID, conn);
+
+    expect(
+      conn.execute.mock.calls.some(([sql]) =>
+        String(sql).includes("DELETE FROM bg_match_reminders"),
+      ),
+    ).toBe(false);
   });
 
   it("réécrit la finale et la petite finale quand une demie change de vainqueur", async () => {

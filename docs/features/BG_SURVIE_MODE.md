@@ -201,9 +201,12 @@ Trois précisions qui ne sont pas des détails :
 - **Les rencontres sont réécrites sur place** quand le plan garde la même forme.
   L'identifiant d'un match est une adresse publique — lien profond
   (`match-anchor.ts`), état de diffusion, horaire annoncé — et on ne la jette pas
-  pour un changement d'engagée. Les **rappels Discord** de ces rencontres sont en
-  revanche effacés : ils nommaient les anciennes engagées, et le cycle doit
-  réannoncer (même raisonnement qu'une manche reprogrammée).
+  pour un changement d'engagée. Les **rappels Discord** sont en revanche effacés
+  — mais seulement sur les rencontres dont l'engagée change : ils nommaient les
+  anciennes, et le cycle doit réannoncer (même raisonnement qu'une manche
+  reprogrammée). Un tour périmé n'en compte souvent qu'une, et effacer ceux du
+  tour entier renverrait le même message privé aux joueurs d'une demi-finale que
+  la correction n'a pas touchée.
 - **Un tour déjà entamé n'est jamais réécrit.** Le cas ne devrait pas se
   présenter — `checkDownstreamMatchesHaveNoScores` refuse la correction en amont
   —, mais entre un arbre périmé, qui se corrige, et un score attribué à une

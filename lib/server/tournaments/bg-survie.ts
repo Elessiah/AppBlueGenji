@@ -685,7 +685,19 @@ async function writePlayoffRound(
   // repartir le cycle (`lib/server/tournaments/match-reminders.ts`), donc
   // réannoncer la rencontre à celles qui la disputent réellement — même
   // raisonnement qu'une manche reprogrammée.
-  const rewritten = reusable.slice(0, plan.length).map((match) => match.id);
+  //
+  // Seules les rencontres dont le couple **change** sont concernées. Un tour
+  // périmé n'en compte souvent qu'une : effacer les rappels du tour entier
+  // renverrait le même message privé aux joueurs d'une demi-finale que la
+  // correction n'a pas touchée.
+  const rewritten = reusable
+    .filter(
+      (match, index) =>
+        index < plan.length &&
+        (match.teamAId !== plan[index].pairing.teamAId ||
+          match.teamBId !== plan[index].pairing.teamBId),
+    )
+    .map((match) => match.id);
   if (rewritten.length > 0) {
     await conn.execute(
       `DELETE FROM bg_match_reminders WHERE match_id IN (${rewritten.map(() => "?").join(", ")})`,
