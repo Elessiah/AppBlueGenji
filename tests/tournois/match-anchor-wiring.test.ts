@@ -46,10 +46,16 @@ describe("ancre d'un match — points de passage", () => {
       return readFileSync(join(components, file), "utf8").includes("<MatchRow");
     });
     expect(renderers).toEqual(
-      expect.arrayContaining(["BracketTree.tsx", "SurvivalView.tsx", "SwissView.tsx"]),
+      expect.arrayContaining([
+        "BracketTree.tsx",
+        "SurvivalView.tsx",
+        "SwissView.tsx",
+        // Les manches de BlueGenji Survie : la page ne rend plus de carte
+        // elle-même, la vue du mode a désormais ses propres volets.
+        "EnduranceRoundPanels.tsx",
+      ]),
     );
-    // La quatrième (`EnduranceView`) reçoit sa carte déjà rendue par la page.
-    expect(PAGE).toContain("<MatchRow");
+    expect(PAGE).not.toContain("<MatchRow");
   });
 
   it("branche le hook et le surlignage sur la page du tournoi", () => {
