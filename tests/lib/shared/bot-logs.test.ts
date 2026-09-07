@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 
 import {
+  formatEndurancePenaltyLiftedLog,
+  formatEndurancePenaltyLog,
   formatForfeitLog,
   formatMatchResultLog,
   formatRegistrationLog,
@@ -59,6 +61,17 @@ const ALL_LINES = () => [
     participantType: "TEAM",
   }),
   formatTournamentDeletedLog({ tournament: TOURNAMENT, actorPseudo: "Kiro", actorId: 3 }),
+  formatEndurancePenaltyLog({
+    tournament: TOURNAMENT,
+    entrantName: "Les Renards",
+    points: 3,
+    reason: "Retard au coup d'envoi",
+  }),
+  formatEndurancePenaltyLiftedLog({
+    tournament: TOURNAMENT,
+    entrantName: "Les Renards",
+    points: 3,
+  }),
 ];
 
 describe("règles de rédaction communes", () => {
@@ -339,5 +352,61 @@ describe("formatTournamentDeletedLog", () => {
     });
 
     expect(line).toContain("par Kiro (#3)");
+  });
+});
+
+describe("pénalités d'endurance", () => {
+  it("nomme l'engagé, le montant et le motif — c'est ce qu'on vient y chercher", () => {
+    const line = formatEndurancePenaltyLog({
+      tournament: TOURNAMENT,
+      entrantName: "Les Renards",
+      points: 3,
+      reason: "Retard au coup d'envoi",
+    });
+
+    expect(line).toContain("Les Renards");
+    expect(line).toContain("3 points");
+    expect(line).toContain("Retard au coup d'envoi");
+  });
+
+  it("accorde le singulier sur une sanction d'un point", () => {
+    const line = formatEndurancePenaltyLog({
+      tournament: TOURNAMENT,
+      entrantName: "Les Renards",
+      points: 1,
+      reason: "Motif",
+    });
+
+    expect(line).toContain("1 point d'endurance");
+    expect(line).not.toContain("1 points");
+  });
+
+  it("annonce le retrait comme une restitution, sans reprendre le motif", () => {
+    // La sanction n'existe plus : rappeler pourquoi elle avait été posée
+    // rouvrirait un débat que la ligne est justement là pour clore.
+    const line = formatEndurancePenaltyLiftedLog({
+      tournament: TOURNAMENT,
+      entrantName: "Les Renards",
+      points: 3,
+    });
+
+    expect(line).toContain("récupère 3 points");
+    expect(line).toContain("Pénalité annulée");
+  });
+
+  it("distingue les deux lignes à l'œil, dès le pictogramme", () => {
+    const applied = formatEndurancePenaltyLog({
+      tournament: TOURNAMENT,
+      entrantName: "Les Renards",
+      points: 3,
+      reason: "Motif",
+    });
+    const lifted = formatEndurancePenaltyLiftedLog({
+      tournament: TOURNAMENT,
+      entrantName: "Les Renards",
+      points: 3,
+    });
+
+    expect(applied.slice(0, 2)).not.toBe(lifted.slice(0, 2));
   });
 });
