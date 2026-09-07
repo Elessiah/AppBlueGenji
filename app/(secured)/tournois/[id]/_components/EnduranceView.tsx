@@ -334,8 +334,15 @@ export function EnduranceView({
 
         return (
           <div key={round} style={{ marginBottom: 20 }}>
-            {groups.map((group) => (
-              <div key={group.key} style={{ marginBottom: 12 }}>
+            {groups.map((group, index) => (
+              // La marge sépare les blocs **entre eux** : la porter aussi sous
+              // le dernier l'ajouterait à celle du tour, et une manche
+              // qualificative — un seul bloc — s'en trouverait espacée sans
+              // raison.
+              <div
+                key={group.key}
+                style={{ marginBottom: index < groups.length - 1 ? 12 : 0 }}
+              >
                 <div
                   className="mono"
                   style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 8 }}

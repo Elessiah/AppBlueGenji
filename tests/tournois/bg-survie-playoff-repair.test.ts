@@ -302,7 +302,7 @@ function makeConn(rounds: Record<number, PlayoffMatch[]>, standings: number[]) {
     if (query.includes("FROM bg_tournaments WHERE id = ?")) return [[tournamentRow()]];
     if (query.includes("status = 'FORFEIT'")) return [[]];
     if (query.includes("FROM bg_endurance_standings")) {
-      return [[standings.map((teamId, index) => standingRow(teamId, index + 1))]][0];
+      return [standings.map((teamId, index) => standingRow(teamId, index + 1))];
     }
     if (query.includes("SELECT round_number, status")) return [[]];
     if (query.includes("SELECT DISTINCT round_number")) {
