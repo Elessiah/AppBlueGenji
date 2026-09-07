@@ -25,6 +25,7 @@ function standing(overrides: Partial<EnduranceStanding> & { teamId: number }): E
     points: CONFIG.startPoints,
     wins: 0,
     losses: 0,
+    draws: 0,
     status: "ACTIVE",
     eliminatedRound: null,
     rank: overrides.teamId,

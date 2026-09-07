@@ -108,11 +108,17 @@ export function naturalMaxMaps(format: MatchFormat): number {
  */
 export function matchMaxMaps(format: MatchFormat): number {
   const natural = naturalMaxMaps(format);
-  const wins = matchWinsRequired(format);
-  const raw = Number(format.maxMaps);
 
+  // `null` est « pas de plafond », pas « zéro » : sans ce test, `Number(null)`
+  // vaut 0, passe pour un entier et ramenait le plafond à l'objectif — un FT3
+  // se serait arrêté à trois maps décisives. Le cas n'était pas théorique : le
+  // repli de l'arbre final (`withoutDraws`) écrit précisément `maxMaps: null`.
+  if (format.maxMaps === null || format.maxMaps === undefined) return natural;
+
+  const raw = Number(format.maxMaps);
   if (!Number.isInteger(raw)) return natural;
-  return Math.min(natural, Math.max(wins, raw));
+
+  return Math.min(natural, Math.max(matchWinsRequired(format), raw));
 }
 
 /** Le format tolère-t-il un match sans vainqueur ? (`null` = non : score libre) */

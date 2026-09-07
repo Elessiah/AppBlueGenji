@@ -266,3 +266,107 @@ describe("validateTournamentInput — petite finale", () => {
     },
   );
 });
+
+describe("validateTournamentInput — plafond de maps, égalités, format des play-offs", () => {
+  const survie = { ...base, format: "BG_SURVIE" as const, matchFormatType: "FT", matchFormatValue: 3 };
+
+  it("accepte un plafond de maps dans l'intervalle du format", () => {
+    const v = value({ ...base, matchFormatType: "FT", matchFormatValue: 3, matchFormatMaxMaps: 4 });
+    expect(v.matchFormat).toEqual({ type: "FT", value: 3, maxMaps: 4 });
+  });
+
+  it("refuse un plafond hors de [objectif, objectif × 2 − 1]", () => {
+    for (const maxMaps of [2, 6]) {
+      expect(
+        validateTournamentInput({
+          ...base,
+          matchFormatType: "FT",
+          matchFormatValue: 3,
+          matchFormatMaxMaps: maxMaps,
+        }),
+      ).toEqual({ error: "INVALID_MATCH_FORMAT_MAX_MAPS" });
+    }
+  });
+
+  it("laisse le plafond absent : ce n'est pas un réglage manquant", () => {
+    expect(value({ ...base, matchFormatType: "FT", matchFormatValue: 3 }).matchFormat).toEqual({
+      type: "FT",
+      value: 3,
+    });
+  });
+
+  it("ouvre les égalités en BlueGenji Survie", () => {
+    expect(value({ ...survie, matchFormatDraws: true }).matchFormat).toEqual({
+      type: "FT",
+      value: 3,
+      drawsAllowed: true,
+    });
+  });
+
+  it("refuse les égalités sur tout autre format : le plateau a besoin d'un vainqueur", () => {
+    for (const format of ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL"] as const) {
+      expect(
+        validateTournamentInput({
+          ...base,
+          format,
+          matchFormatType: "FT",
+          matchFormatValue: 3,
+          matchFormatDraws: true,
+        }),
+      ).toEqual({ error: "DRAWS_NOT_SUPPORTED_BY_FORMAT" });
+    }
+  });
+
+  it("refuse les égalités sans format de match : il n'y a rien à borner", () => {
+    expect(
+      validateTournamentInput({ ...base, format: "BG_SURVIE", matchFormatDraws: true }),
+    ).toEqual({ error: "INVALID_MATCH_FORMAT" });
+  });
+
+  it("accepte un format de play-offs propre à BlueGenji Survie", () => {
+    const v = value({
+      ...survie,
+      matchFormatDraws: true,
+      endurancePlayoffFormatType: "FT",
+      endurancePlayoffFormatValue: 3,
+    });
+
+    expect(v.endurancePlayoffFormat).toEqual({ type: "FT", value: 3 });
+    // Les égalités ne s'y propagent jamais : c'est le point du réglage.
+    expect(v.endurancePlayoffFormat?.drawsAllowed).toBeUndefined();
+  });
+
+  it("refuse un format de play-offs à moitié renseigné", () => {
+    expect(validateTournamentInput({ ...survie, endurancePlayoffFormatType: "FT" })).toEqual({
+      error: "INVALID_ENDURANCE_PLAYOFF_FORMAT",
+    });
+    expect(validateTournamentInput({ ...survie, endurancePlayoffFormatValue: 3 })).toEqual({
+      error: "INVALID_ENDURANCE_PLAYOFF_FORMAT",
+    });
+  });
+
+  it("refuse un format de play-offs hors BlueGenji Survie", () => {
+    expect(
+      validateTournamentInput({
+        ...base,
+        format: "SINGLE",
+        endurancePlayoffFormatType: "FT",
+        endurancePlayoffFormatValue: 3,
+      }),
+    ).toEqual({ error: "INVALID_ENDURANCE_PLAYOFF_FORMAT" });
+  });
+
+  it("refuse un BO pair en play-offs, comme partout", () => {
+    expect(
+      validateTournamentInput({
+        ...survie,
+        endurancePlayoffFormatType: "BO",
+        endurancePlayoffFormatValue: 4,
+      }),
+    ).toEqual({ error: "INVALID_ENDURANCE_PLAYOFF_FORMAT" });
+  });
+
+  it("laisse le format des play-offs à null quand rien n'est demandé", () => {
+    expect(value(survie).endurancePlayoffFormat).toBeNull();
+  });
+});
