@@ -59,6 +59,18 @@ export function EndurancePenaltyDialog({
     : currentPoints;
   const eliminates = violation === null && remaining === 0;
 
+  // Une ligne d'aide, trois messages, dans l'ordre de ce qui bloque : le refus
+  // en cours d'abord — le bouton étant désactivé tant qu'il y en a un, sans
+  // cette phrase l'arbitre n'aurait rien à corriger et rien à lire —, puis la
+  // conséquence quand elle surprend, puis le rappel de forme.
+  const hint =
+    violation !== null
+      ? endurancePenaltyMessage(violation)
+      : eliminates
+        ? `Capital ramené à 0 : ${teamName} sera éliminée du tournoi.`
+        : `Motif obligatoire, visible par tous. Capital restant : ${remaining}.`;
+  const hintIsWarning = violation !== null || eliminates;
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (violation !== null) {
@@ -139,6 +151,8 @@ export function EndurancePenaltyDialog({
               step={1}
               value={points}
               onChange={(e) => setPoints(e.target.value)}
+              aria-invalid={violation === "POINTS_NOT_POSITIVE" || violation === "POINTS_TOO_HIGH"}
+              aria-describedby="endurance-penalty-hint"
               style={{ width: 120, fontSize: 13 }}
             />
           </div>
@@ -151,27 +165,27 @@ export function EndurancePenaltyDialog({
               onChange={(e) => setReason(e.target.value)}
               rows={3}
               maxLength={MAX_ENDURANCE_PENALTY_REASON}
-              aria-invalid={reason.trim().length > 0 && violation === "REASON_TOO_LONG"}
+              aria-invalid={violation === "REASON_TOO_LONG"}
               aria-describedby="endurance-penalty-hint"
               placeholder="Retard au coup d'envoi, joueur non éligible aligné…"
               style={{ width: "100%", resize: "vertical", fontSize: 13 }}
             />
+            {/*
+              `aria-live` : la ligne change sous les doigts de l'arbitre (le
+              capital restant suit la saisie, l'élimination s'annonce), et un
+              lecteur d'écran qui ne la relit pas laisserait cette annonce à la
+              seule couleur.
+            */}
             <p
               id="endurance-penalty-hint"
+              aria-live="polite"
               style={{
                 margin: "6px 0 0",
                 fontSize: 12,
-                color: eliminates ? "rgba(255,74,92,0.95)" : "var(--text-2, #9aa4b2)",
+                color: hintIsWarning ? "rgba(255,74,92,0.95)" : "var(--text-2, #9aa4b2)",
               }}
             >
-              {/*
-                Le motif est obligatoire : la sanction est publique et sera
-                contestée. La ligne dit d'abord la conséquence — c'est elle qui
-                peut surprendre —, le rappel de forme ensuite.
-              */}
-              {eliminates
-                ? `Capital ramené à 0 : ${teamName} sera éliminée du tournoi.`
-                : `Motif obligatoire, visible par tous. Capital restant : ${remaining}.`}
+              {hint}
             </p>
           </div>
 

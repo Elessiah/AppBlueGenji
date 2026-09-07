@@ -242,10 +242,16 @@ function PenaltyLog({
 
   return (
     <div style={{ marginBottom: 24 }}>
-      <div className="mono" style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 8 }}>
+      <div
+        id="endurance-penalty-log"
+        className="mono"
+        style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 8 }}
+      >
         PÉNALITÉS D&apos;ARBITRAGE
       </div>
-      <ul className={styles.penaltyList}>
+      {/* La liste porte son intitulé : parcourue au lecteur d'écran, « liste de
+          deux éléments » sans nom ne dit pas de quoi elle parle. */}
+      <ul className={styles.penaltyList} aria-labelledby="endurance-penalty-log">
         {penalties.map((penalty) => (
           <li
             key={penalty.id}
@@ -436,7 +442,15 @@ export function EnduranceView({
                     className={styles.penaltyBadge}
                     title={`${standing.penaltyPoints} point(s) retiré(s) par pénalité d'arbitrage`}
                   >
-                    −{standing.penaltyPoints}
+                    {/*
+                      « −3 » seul se lit « moins trois » sans dire de quoi : le
+                      `title` d'un `<span>` n'étant pas annoncé de façon fiable,
+                      la phrase est écrite pour de bon, et masquée à l'œil.
+                    */}
+                    <span aria-hidden="true">−{standing.penaltyPoints}</span>
+                    <span className="sr-only">
+                      {` (${standing.penaltyPoints} point(s) retiré(s) par pénalité)`}
+                    </span>
                   </span>
                 )}
               </span>
