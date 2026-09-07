@@ -98,6 +98,11 @@ export function naturalMaxMaps(format: MatchFormat): number {
   return matchWinsRequired(format) * 2 - 1;
 }
 
+/** Le format tolère-t-il un match sans vainqueur ? (`null` = non : score libre) */
+export function matchAllowsDraw(format: MatchFormat | null | undefined): boolean {
+  return format?.drawsAllowed === true;
+}
+
 /**
  * Nombre maximal de maps décisives, donc plafond de la somme des deux scores.
  *
@@ -115,15 +120,19 @@ export function matchMaxMaps(format: MatchFormat): number {
   // repli de l'arbre final (`withoutDraws`) écrit précisément `maxMaps: null`.
   if (format.maxMaps === null || format.maxMaps === undefined) return natural;
 
+  // Et un plafond abaissé n'existe **qu'avec** les égalités : il est leur
+  // fenêtre. Sans elles il ne retire que des issues, au point qu'une série
+  // arrivée à égalité n'a plus aucun score enregistrable — `3-2` dépasse le
+  // plafond, `2-2` n'a pas de vainqueur, et le plateau se bloque. La validation
+  // refuse déjà la combinaison, et `withoutDraws` la défait au repli de l'arbre
+  // final ; ce test-ci la désarme aussi sur une ligne qu'aucun des deux n'a
+  // écrite — une correction à la main, une reprise de données.
+  if (!matchAllowsDraw(format)) return natural;
+
   const raw = Number(format.maxMaps);
   if (!Number.isInteger(raw)) return natural;
 
   return Math.min(natural, Math.max(matchWinsRequired(format), raw));
-}
-
-/** Le format tolère-t-il un match sans vainqueur ? (`null` = non : score libre) */
-export function matchAllowsDraw(format: MatchFormat | null | undefined): boolean {
-  return format?.drawsAllowed === true;
 }
 
 /**

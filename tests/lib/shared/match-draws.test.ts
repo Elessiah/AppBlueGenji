@@ -57,13 +57,23 @@ describe("plafond de maps décisives", () => {
 
   it("ramène un plafond aberrant dans l'intervalle plutôt que de rendre le tournoi injouable", () => {
     // Une ligne écrite à la main en base, ou avant la règle de validation.
-    expect(matchMaxMaps({ ...FT3, maxMaps: 99 })).toBe(5);
-    expect(matchMaxMaps({ ...FT3, maxMaps: 0 })).toBe(3);
-    expect(matchMaxMaps({ ...FT3, maxMaps: -4 })).toBe(3);
+    expect(matchMaxMaps({ ...QUALIF, maxMaps: 99 })).toBe(5);
+    expect(matchMaxMaps({ ...QUALIF, maxMaps: 0 })).toBe(3);
+    expect(matchMaxMaps({ ...QUALIF, maxMaps: -4 })).toBe(3);
+  });
+
+  it("ignore un plafond abaissé quand les égalités sont fermées", () => {
+    // L'invariant se tient **par construction**, pas seulement par la
+    // validation : un plafond sous le maximum naturel est la fenêtre du nul, et
+    // sans elle il ne retirerait que des issues — une série arrivée à 2-2
+    // n'aurait plus aucun score enregistrable et bloquerait son plateau. Une
+    // ligne écrite à la main ne doit pas pouvoir produire ça.
+    expect(matchMaxMaps({ ...FT3, maxMaps: 4 })).toBe(5);
+    expect(checkMatchScores({ ...FT3, maxMaps: 4 }, 3, 2, { decisive: true })).toBeNull();
   });
 
   it("borne la somme des deux scores, et elle seule", () => {
-    const capped: MatchFormat = { ...FT3, maxMaps: 4 };
+    const capped: MatchFormat = { ...QUALIF, maxMaps: 4 };
 
     // 2-2 tient dans quatre maps décisives.
     expect(checkMatchScores(capped, 2, 2, { decisive: false })).toBeNull();
@@ -74,9 +84,11 @@ describe("plafond de maps décisives", () => {
   });
 
   it("apparaît dans l'étiquette dès qu'il n'est plus le plafond naturel", () => {
-    expect(matchFormatLabel(FT3)).toBe("FT3");
-    expect(matchFormatLabel({ ...FT3, maxMaps: 5 })).toBe("FT3");
-    expect(matchFormatLabel({ ...FT3, maxMaps: 4 })).toBe("FT3 · 4 maps");
+    expect(matchFormatLabel(QUALIF)).toBe("FT3");
+    expect(matchFormatLabel({ ...QUALIF, maxMaps: 5 })).toBe("FT3");
+    expect(matchFormatLabel({ ...QUALIF, maxMaps: 4 })).toBe("FT3 · 4 maps");
+    // Égalités fermées : le plafond ne s'applique pas, donc il ne s'annonce pas.
+    expect(matchFormatLabel({ ...FT3, maxMaps: 4 })).toBe("FT3");
   });
 });
 

@@ -50,8 +50,10 @@ pour de bon. La combinaison est donc refusée là où les égalités étaient **
 déclinées** (`MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS`) et simplement neutralisée
 ailleurs, où elles ne sont pas proposées — refuser y bloquerait une bascule de
 format sur un champ que le formulaire vient de masquer. Le champ ne s'affiche
-qu'une fois les égalités cochées, et `withoutDraws` **rend son plafond naturel**
-au format qu'il ferme — sans quoi le repli de l'arbre final fabriquerait lui-même l'impasse.
+qu'une fois les égalités cochées, `withoutDraws` **rend son plafond naturel** au
+format qu'il ferme, et `matchMaxMaps` **ignore** un plafond abaissé sans
+égalités — l'invariant tient ainsi par construction, y compris sur une ligne
+qu'aucune écriture applicative n'a produite — sans quoi le repli de l'arbre final fabriquerait lui-même l'impasse.
 
 **Ce que plafonne `maxMaps` : la somme des deux scores**, c'est-à-dire les maps
 qui ont désigné un vainqueur. Une map nulle ne figure dans aucun des deux
