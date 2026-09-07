@@ -186,6 +186,7 @@ décision humaine.
 | Orchestration | `lib/server/tournaments/bg-survie.ts` |
 | Classement | table `bg_endurance_standings` |
 | Vue | `app/(secured)/tournois/[id]/_components/EnduranceView.tsx` |
+| Volets de manche + arbre des play-offs | `ENDURANCE_ROUND_PANELS.md` |
 | Verrouillage | `lib/shared/match-lock.ts` (format traité comme la Survie) |
 | Chiffre d'un forfait | `lib/shared/match-format.ts` (`forfeitMapCount`) |
 | Plafond de manches | `enduranceEliminationCut` / `roundLimitReached` (`lib/shared/bg-survie.ts`) |
