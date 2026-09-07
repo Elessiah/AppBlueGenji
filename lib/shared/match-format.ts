@@ -127,11 +127,38 @@ export function matchAllowsDraw(format: MatchFormat | null | undefined): boolean
 }
 
 /**
+ * Un plafond **abaissé** exige-t-il les égalités ?
+ *
+ * Oui, et c'est la même chose dite deux fois : abaisser le plafond, c'est
+ * ouvrir la fenêtre du nul. Sur un format qui exige un vainqueur, l'abaisser ne
+ * fait que **retirer des issues** — un FT3 plafonné à 4 maps refuse `3-2`
+ * (somme 5) comme `2-2` (pas de vainqueur), si bien qu'une série arrivée à 2-2
+ * n'a plus aucun score enregistrable et bloque son plateau. Les seuls résultats
+ * possibles y sont 3-0 et 3-1 : le format interdit à une rencontre d'aller au
+ * bout, sans que rien ne l'ait annoncé.
+ *
+ * Rendu séparément de {@link isValidMatchMaxMaps} : celle-ci juge la **valeur**
+ * contre le format, celle-ci la **combinaison**, et les deux refus ne disent pas
+ * la même chose à qui remplit le formulaire.
+ */
+export function matchMaxMapsNeedsDraws(format: MatchFormat, maxMaps: unknown): boolean {
+  if (maxMaps === null || maxMaps === undefined) return false;
+
+  const parsed = Number(maxMaps);
+  if (!Number.isInteger(parsed)) return false;
+
+  return parsed < naturalMaxMaps(format) && !matchAllowsDraw(format);
+}
+
+/**
  * Valide un plafond de maps pour un format donné.
  *
  * Il doit rester entre l'objectif (sans quoi personne ne peut l'atteindre, et
  * le match n'aurait jamais de vainqueur) et le plafond naturel (au-delà, la
  * valeur ne décrit plus rien : la course est déjà finie).
+ *
+ * Ne dit **rien** des égalités : c'est {@link matchMaxMapsNeedsDraws} qui juge
+ * la combinaison, et les deux refus ne se formulent pas pareil.
  */
 export function isValidMatchMaxMaps(format: MatchFormat, maxMaps: unknown): boolean {
   if (maxMaps === null || maxMaps === undefined) return true;
@@ -270,17 +297,23 @@ export function matchWinnerSide(
 }
 
 /**
- * Le même format, égalités fermées.
+ * Le même format, égalités fermées **et plafond rendu à son maximum naturel**.
  *
  * Sert au repli de l'arbre final de « BlueGenji Survie » : faute de format de
  * play-offs propre, il joue celui du tournoi — mais **jamais** ses égalités, un
- * match sans vainqueur ne désignant personne pour le tour suivant. Le plafond
- * de maps, lui, est conservé : il décrit la rencontre, pas son issue.
+ * match sans vainqueur ne désignant personne pour le tour suivant.
+ *
+ * Le plafond tombe avec elles, et ce n'est pas un oubli : un plafond sous le
+ * maximum naturel **est** la fenêtre du nul (voir {@link isValidMatchMaxMaps}).
+ * Le garder sans elles laisserait des rencontres sans issue légale — un FT3
+ * plafonné à 4 maps refuse `3-2` (somme 5, au-dessus du plafond) comme `2-2`
+ * (pas de vainqueur), si bien qu'une série arrivée à 2-2 ne pourrait plus être
+ * close et que l'arbre resterait bloqué à ce tour, sans qualifiée à propager.
  */
 export function withoutDraws(format: MatchFormat | null): MatchFormat | null {
   if (!format || !format.drawsAllowed) return format;
 
-  return { type: format.type, value: format.value, maxMaps: format.maxMaps ?? null };
+  return { type: format.type, value: format.value, maxMaps: null };
 }
 
 export type MatchScoreViolation =

@@ -270,9 +270,30 @@ describe("validateTournamentInput — petite finale", () => {
 describe("validateTournamentInput — plafond de maps, égalités, format des play-offs", () => {
   const survie = { ...base, format: "BG_SURVIE" as const, matchFormatType: "FT", matchFormatValue: 3 };
 
-  it("accepte un plafond de maps dans l'intervalle du format", () => {
-    const v = value({ ...base, matchFormatType: "FT", matchFormatValue: 3, matchFormatMaxMaps: 4 });
-    expect(v.matchFormat).toEqual({ type: "FT", value: 3, maxMaps: 4 });
+  it("accepte un plafond de maps dans l'intervalle du format, égalités ouvertes", () => {
+    const v = value({ ...survie, matchFormatDraws: true, matchFormatMaxMaps: 4 });
+    expect(v.matchFormat).toEqual({ type: "FT", value: 3, maxMaps: 4, drawsAllowed: true });
+  });
+
+  it("refuse un plafond abaissé sans les égalités : la rencontre serait inachevable", () => {
+    // Un FT3 plafonné à 4 maps refuse `3-2` (somme 5) comme `2-2` (pas de
+    // vainqueur) : une série arrivée à 2-2 n'a plus aucun score enregistrable,
+    // et son plateau reste bloqué pour de bon.
+    expect(
+      validateTournamentInput({
+        ...base,
+        matchFormatType: "FT",
+        matchFormatValue: 3,
+        matchFormatMaxMaps: 4,
+      }),
+    ).toEqual({ error: "MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS" });
+  });
+
+  it("accepte le plafond naturel sans égalités : il ne retire aucune issue", () => {
+    expect(
+      value({ ...base, matchFormatType: "FT", matchFormatValue: 3, matchFormatMaxMaps: 5 })
+        .matchFormat,
+    ).toEqual({ type: "FT", value: 3, maxMaps: 5 });
   });
 
   it("refuse un plafond hors de [objectif, objectif × 2 − 1]", () => {

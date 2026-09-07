@@ -41,6 +41,16 @@ export interface MatchFormat {
 }
 ```
 
+**Les deux vont ensemble.** Un plafond abaissé n'a de sens qu'avec les
+égalités : il **est** leur fenêtre. Posé sur un format qui exige un vainqueur,
+il ne fait que retirer des issues — un FT3 plafonné à 4 maps refuse `3-2` (somme
+5, au-dessus du plafond) *comme* `2-2` (pas de vainqueur), si bien qu'une série
+arrivée à 2-2 n'a plus aucun score enregistrable et que son plateau reste bloqué
+pour de bon. La combinaison est donc refusée à la création
+(`MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS`), le champ ne s'affiche qu'une fois les
+égalités cochées, et `withoutDraws` **rend son plafond naturel** au format qu'il
+ferme — sans quoi le repli de l'arbre final fabriquerait lui-même l'impasse.
+
 **Ce que plafonne `maxMaps` : la somme des deux scores**, c'est-à-dire les maps
 qui ont désigné un vainqueur. Une map nulle ne figure dans aucun des deux
 scores — les colonnes de `bg_matches` n'en gardent pas trace — elle allonge donc
@@ -81,8 +91,9 @@ le plafond de maps de la qualification, et l'infobulle lui aurait promis une
 La raison n'est pas de goût. Une élimination directe doit savoir qui joue le
 tour suivant : un match sans vainqueur y laisserait un demi-finaliste
 indéterminé. Sans format de play-offs propre, l'arbre rejoue celui du tournoi
-**égalités fermées** (`withoutDraws`) — le repli le moins surprenant, et le seul
-qui ne casse rien.
+**égalités fermées, plafond rendu à son maximum naturel** (`withoutDraws`) — le
+repli le moins surprenant, et le seul qui ne casse rien : garder le plafond sans
+les égalités laisserait une demi-finale arrivée à 2-2 sans issue enregistrable.
 
 La règle est écrite **une fois**, dans `lib/shared/bg-survie.ts` :
 
@@ -258,6 +269,7 @@ et l'arbre reprend le format du tournoi.
 | Cas | Code |
 |---|---|
 | Plafond de maps hors de `[objectif, objectif × 2 − 1]` | `INVALID_MATCH_FORMAT_MAX_MAPS` (400) |
+| Plafond abaissé sans les égalités | `MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS` (400) |
 | Égalités demandées hors `BG_SURVIE` | *neutralisées* (voir ci-dessous) |
 | Égalités demandées en saisie libre | `INVALID_MATCH_FORMAT` (400) |
 | Format de play-offs à moitié renseigné | `INVALID_ENDURANCE_PLAYOFF_FORMAT` (400) |

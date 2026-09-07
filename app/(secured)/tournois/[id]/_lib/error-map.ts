@@ -18,6 +18,8 @@ export const ERROR_MESSAGES: Record<string, string> = {
   INVALID_MATCH_FORMAT: "Format de match invalide.",
   INVALID_MATCH_FORMAT_MAX_MAPS:
     "Plafond de maps invalide : il doit rester entre l'objectif du format et son maximum naturel.",
+  MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS:
+    "Abaisser le plafond de maps suppose les égalités : sans elles, une rencontre arrivée à égalité n'aurait plus aucun score enregistrable.",
   INVALID_ENDURANCE_PLAYOFF_FORMAT: "Format des play-offs invalide.",
   DRAWS_NOT_SUPPORTED_BY_FORMAT:
     "Les égalités ne sont possibles qu'en qualification BlueGenji Survie : ailleurs, le plateau a besoin d'un vainqueur.",

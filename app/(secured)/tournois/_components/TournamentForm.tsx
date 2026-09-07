@@ -10,6 +10,7 @@ import {
   MATCH_FORMAT_BOUNDS,
   isValidMatchFormat,
   isValidMatchMaxMaps,
+  matchAllowsDraw,
   matchFormatDescription,
   matchFormatLabel,
   matchMaxMaps,
@@ -136,6 +137,11 @@ export function TournamentForm({
     };
 
     if (!isValidMatchMaxMaps(next, next.maxMaps)) next.maxMaps = null;
+    // Le plafond tombe avec les égalités, comme dans `withoutDraws` : décocher
+    // la case laisserait sinon un réglage que le serveur refuse
+    // (`MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS`), sur un champ que le formulaire
+    // vient de masquer — donc introuvable pour le corriger.
+    if (!next.drawsAllowed) next.maxMaps = null;
     set("matchFormat", next);
   };
 
@@ -355,7 +361,18 @@ export function TournamentForm({
               </div>
             )}
 
-            {!isLibre && matchFormatValid && naturalMaxMaps(matchFormat!) > matchWinsRequired(matchFormat!) && (
+            {/*
+              Le plafond de maps ne s'offre **qu'avec les égalités**, parce qu'il
+              n'est rien d'autre que leur fenêtre : l'abaisser sur un format qui
+              exige un vainqueur ne retire que des issues, au point qu'une
+              rencontre arrivée à égalité n'a plus aucun score enregistrable
+              (`matchMaxMapsNeedsDraws`, refusé côté serveur). La case qui
+              l'ouvre est plus bas, dans les réglages de BlueGenji Survie.
+            */}
+            {!isLibre &&
+              matchFormatValid &&
+              matchAllowsDraw(matchFormat) &&
+              naturalMaxMaps(matchFormat!) > matchWinsRequired(matchFormat!) && (
               <div className="field">
                 <label htmlFor="match-format-max-maps">Maps décisives au maximum</label>
                 <input

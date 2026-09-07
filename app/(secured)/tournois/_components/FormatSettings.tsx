@@ -153,10 +153,19 @@ export function FormatSettings({
                 type="checkbox"
                 disabled={locked("matchFormat") || values.matchFormat === null}
                 checked={values.matchFormat?.drawsAllowed ?? false}
-                onChange={(e) =>
-                  values.matchFormat &&
-                  set("matchFormat", { ...values.matchFormat, drawsAllowed: e.target.checked })
-                }
+                onChange={(e) => {
+                  if (!values.matchFormat) return;
+                  // Décocher rend aussi son plafond naturel au format : le
+                  // plafond **est** la fenêtre du nul, et le laisser posé sans
+                  // elle rendrait certaines rencontres inachevables — le serveur
+                  // le refuse (`MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS`) sur un
+                  // champ que le formulaire vient de masquer.
+                  set("matchFormat", {
+                    ...values.matchFormat,
+                    drawsAllowed: e.target.checked,
+                    ...(e.target.checked ? {} : { maxMaps: null }),
+                  });
+                }}
                 {...lockedAttr("matchFormat")}
               />
               Égalités autorisées en qualification
@@ -164,7 +173,7 @@ export function FormatSettings({
             <p style={HINT}>
               {values.matchFormat === null
                 ? "Indisponible en saisie de score libre : il faut un format de match pour borner la rencontre."
-                : "Une map nulle peut arrêter la rencontre avant l’objectif : le match se clôt alors sur 2-2, ou sur 2-1 si une seule map a été partagée. Le capital d’endurance se comptant map par map, il l’encaisse sans règle supplémentaire. L’arbre final, lui, exige toujours un vainqueur."}
+                : "Une map nulle peut arrêter la rencontre avant l’objectif : le match se clôt alors sur 2-2, ou sur 2-1 si une seule map a été partagée. Le capital d’endurance se comptant map par map, il l’encaisse sans règle supplémentaire. L’arbre final, lui, exige toujours un vainqueur. Cocher cette case ouvre aussi le réglage « Maps décisives au maximum », plus haut."}
             </p>
           </div>
 

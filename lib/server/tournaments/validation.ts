@@ -12,6 +12,7 @@
 import {
   isValidMatchFormat,
   isValidMatchMaxMaps,
+  matchMaxMapsNeedsDraws,
   type MatchFormat,
 } from "@/lib/shared/match-format";
 import { isParticipantType, type ParticipantType } from "@/lib/shared/participants";
@@ -239,15 +240,6 @@ export function validateTournamentInput(
       type: body.matchFormatType as MatchFormat["type"],
       value: Number(body.matchFormatValue),
     };
-
-    // Plafond de maps décisives. Il se valide **contre le format** — entre
-    // l'objectif et le plafond naturel — donc seulement une fois celui-ci lu.
-    if (body.matchFormatMaxMaps != null) {
-      if (!isValidMatchMaxMaps(matchFormat, body.matchFormatMaxMaps)) {
-        return { error: "INVALID_MATCH_FORMAT_MAX_MAPS" };
-      }
-      matchFormat.maxMaps = Number(body.matchFormatMaxMaps);
-    }
   }
 
   // Égalités : réservées à « BlueGenji Survie », dont le capital se compte map
@@ -267,6 +259,20 @@ export function validateTournamentInput(
   if (body.matchFormatDraws && body.format === "BG_SURVIE") {
     if (!matchFormat) return { error: "INVALID_MATCH_FORMAT" };
     matchFormat.drawsAllowed = true;
+  }
+
+  // Plafond de maps décisives. Il se lit **après** les égalités, et pas par
+  // commodité : les deux réglages ne se valident pas séparément — abaisser le
+  // plafond, c'est ouvrir la fenêtre du nul, et l'un sans l'autre laisserait des
+  // rencontres sans issue légale (`matchMaxMapsNeedsDraws`).
+  if (matchFormat && body.matchFormatMaxMaps != null) {
+    if (!isValidMatchMaxMaps(matchFormat, body.matchFormatMaxMaps)) {
+      return { error: "INVALID_MATCH_FORMAT_MAX_MAPS" };
+    }
+    if (matchMaxMapsNeedsDraws(matchFormat, body.matchFormatMaxMaps)) {
+      return { error: "MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS" };
+    }
+    matchFormat.maxMaps = Number(body.matchFormatMaxMaps);
   }
 
   // Format de l'arbre final (BG Survie). Même règle de paire que le format du

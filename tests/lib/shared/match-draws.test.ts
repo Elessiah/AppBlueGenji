@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   checkMatchScores,
   isValidMatchMaxMaps,
+  matchMaxMapsNeedsDraws,
   matchAllowsDraw,
   matchFormatDescription,
   matchFormatLabel,
@@ -79,6 +80,32 @@ describe("plafond de maps décisives", () => {
   });
 });
 
+describe("un plafond abaissé exige les égalités", () => {
+  it("le dit dès que le plafond descend sous le maximum naturel", () => {
+    // Sans égalités, un FT3 plafonné à 4 maps refuse `3-2` (somme 5) comme
+    // `2-2` (pas de vainqueur) : une série arrivée à 2-2 n'a plus aucun score
+    // enregistrable, et son plateau reste bloqué.
+    expect(matchMaxMapsNeedsDraws(FT3, 4)).toBe(true);
+    expect(matchMaxMapsNeedsDraws(FT3, 3)).toBe(true);
+  });
+
+  it("se tait sur le plafond naturel, qui ne retire aucune issue", () => {
+    expect(matchMaxMapsNeedsDraws(FT3, 5)).toBe(false);
+    expect(matchMaxMapsNeedsDraws(FT3, null)).toBe(false);
+    expect(matchMaxMapsNeedsDraws(FT3, undefined)).toBe(false);
+  });
+
+  it("se tait dès que les égalités sont ouvertes : c'est leur fenêtre", () => {
+    expect(matchMaxMapsNeedsDraws(QUALIF, 4)).toBe(false);
+  });
+
+  it("ne juge pas la valeur elle-même — c'est `isValidMatchMaxMaps` qui le fait", () => {
+    // Deux refus distincts, deux phrases distinctes à qui remplit le formulaire.
+    expect(matchMaxMapsNeedsDraws(FT3, "quatre")).toBe(false);
+    expect(isValidMatchMaxMaps(FT3, "quatre")).toBe(false);
+  });
+});
+
 describe("égalités autorisées", () => {
   it("n'est vraie que sur un `true` franc", () => {
     expect(matchAllowsDraw(QUALIF)).toBe(true);
@@ -125,11 +152,18 @@ describe("égalités autorisées", () => {
 });
 
 describe("withoutDraws", () => {
-  it("ferme l'égalité en gardant le reste du format", () => {
+  it("ferme l'égalité **et** rend son plafond naturel au format", () => {
     const closed = withoutDraws({ ...QUALIF, maxMaps: 4 });
 
     expect(matchAllowsDraw(closed)).toBe(false);
-    expect(closed).toEqual({ type: "FT", value: 3, maxMaps: 4 });
+    expect(closed).toEqual({ type: "FT", value: 3, maxMaps: null });
+
+    // Le plafond tombe avec les égalités parce qu'il **est** leur fenêtre : le
+    // garder rendrait des rencontres inachevables — `3-2` dépasse un plafond de
+    // 4, et `2-2` n'a pas de vainqueur, si bien qu'une série arrivée à 2-2
+    // n'aurait plus aucun score enregistrable.
+    expect(checkMatchScores(closed, 3, 2, { decisive: true })).toBeNull();
+    expect(matchMaxMaps(closed!)).toBe(5);
   });
 
   it("rend le format tel quel quand il n'y a rien à fermer", () => {
