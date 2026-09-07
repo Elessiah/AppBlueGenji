@@ -41,6 +41,13 @@ devenait intéressant.
 | `MANCHE 3` | le numéro de la manche |
 | `4 matchs` | la taille de la manche |
 | `2/4 jouées` ou `Terminée` (vert) | l'avancement — c'est ce qu'on vient regarder |
+
+Les libellés vivent dans le module pur (`enduranceMatchCountLabel`,
+`enduranceProgressLabel`, `enduranceRoundRegionLabel`) et **s'accordent** : un
+effectif actif impair fait chômer une équipe, si bien qu'une manche à une seule
+rencontre — « 1 match, 0/1 jouée » — est un cas courant du mode, pas une
+curiosité. Le nom accessible du volet énonce la même chose en toutes lettres,
+la barre oblique se lisant « zéro barre oblique un ».
 | `★ Votre match` | le lecteur a une rencontre **non jouée** dans cette manche |
 
 Le cadre du volet se teinte de l'accent quand il est ouvert **ou** qu'il porte la

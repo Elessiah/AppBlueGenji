@@ -116,6 +116,35 @@ export function defaultOpenEnduranceRound(
   return playoffsStarted ? null : sections[sections.length - 1].round;
 }
 
+/**
+ * Nombre de rencontres d'une manche, accordé. Un effectif actif impair fait
+ * chômer une équipe : à trois équipes en lice, la manche n'en porte **qu'une**,
+ * et l'accord n'est pas une coquetterie — c'est un cas courant du mode.
+ */
+export function enduranceMatchCountLabel(total: number): string {
+  return `${total} match${total > 1 ? "s" : ""}`;
+}
+
+/** Avancement d'une manche en cours, pour la pastille (« 0/1 jouée »). */
+export function enduranceProgressLabel(section: EnduranceRoundSection): string {
+  return `${section.playedCount}/${section.totalCount} jouée${section.totalCount > 1 ? "s" : ""}`;
+}
+
+/**
+ * Nom accessible du corps d'un volet. Le titre seul (« Manche 3 ») ne porte ni
+ * la taille de la manche ni son avancement — deux choses que les pastilles
+ * donnent à l'œil et qui, sans cela, ne seraient annoncées à personne.
+ *
+ * Le séparateur y est un mot et non une barre oblique, qu'un lecteur d'écran
+ * énonce « zéro barre oblique un ».
+ */
+export function enduranceRoundRegionLabel(section: EnduranceRoundSection): string {
+  const progress = section.isComplete
+    ? "terminée"
+    : `${section.playedCount} sur ${section.totalCount} jouée${section.totalCount > 1 ? "s" : ""}`;
+  return `${section.title}, ${enduranceMatchCountLabel(section.totalCount)}, ${progress}`;
+}
+
 /** Manche du volet contenant ce match, ou `null` s'il n'y est pas. */
 export function enduranceRoundOfMatch(
   sections: EnduranceRoundSection[],

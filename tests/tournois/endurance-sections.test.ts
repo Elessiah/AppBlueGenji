@@ -5,7 +5,10 @@ import {
   defaultOpenEnduranceRound,
   endurancePlayoffLinks,
   endurancePlayoffRoundCount,
+  enduranceMatchCountLabel,
+  enduranceProgressLabel,
   enduranceRoundOfMatch,
+  enduranceRoundRegionLabel,
   enduranceRoundSections,
   splitEnduranceMatches,
   splitPlayoffBrackets,
@@ -296,5 +299,38 @@ describe("endurancePlayoffRoundCount", () => {
         ...playoffRound(PLAYOFF_ROUND_OFFSET + 1, 1),
       ]),
     ).toBe(2);
+  });
+});
+
+describe("libellés d'un volet de manche", () => {
+  const sectionOf = (total: number, played: number) => {
+    const matches = Array.from({ length: total }, (_, index) =>
+      round(index + 1, 1, index + 1, index < played ? 10 : null),
+    );
+    return enduranceRoundSections(matches)[0];
+  };
+
+  it("accorde le nombre de rencontres", () => {
+    // Un effectif actif impair fait chômer une équipe : à trois équipes en
+    // lice, la manche n'en porte qu'une. Le singulier est un cas courant.
+    expect(enduranceMatchCountLabel(1)).toBe("1 match");
+    expect(enduranceMatchCountLabel(4)).toBe("4 matchs");
+  });
+
+  it("accorde aussi l'avancement, sur le total et non sur le joué", () => {
+    expect(enduranceProgressLabel(sectionOf(1, 0))).toBe("0/1 jouée");
+    expect(enduranceProgressLabel(sectionOf(4, 1))).toBe("1/4 jouées");
+    expect(enduranceProgressLabel(sectionOf(4, 0))).toBe("0/4 jouées");
+  });
+
+  it("énonce le volet en toutes lettres pour un lecteur d'écran", () => {
+    // Ni barre oblique (« zéro barre oblique un ») ni pastille muette : le
+    // titre seul ne porte ni la taille de la manche ni son avancement.
+    expect(enduranceRoundRegionLabel(sectionOf(1, 0))).toBe("Manche 1, 1 match, 0 sur 1 jouée");
+    expect(enduranceRoundRegionLabel(sectionOf(4, 2))).toBe("Manche 1, 4 matchs, 2 sur 4 jouées");
+  });
+
+  it("dit d'un mot qu'une manche est close, sans compter", () => {
+    expect(enduranceRoundRegionLabel(sectionOf(4, 4))).toBe("Manche 1, 4 matchs, terminée");
   });
 });
