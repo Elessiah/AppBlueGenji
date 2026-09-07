@@ -65,9 +65,21 @@
  * Le curseur « saisi » vaut pour **tout** le tableau et pas seulement pour la
  * poignée : le pointeur l'a quittée dès le premier centimètre, et un curseur qui
  * redevient flèche au-dessus d'un nom donne à croire que le geste est terminé.
+ *
+ * `.dragging *` pèse autant qu'un simple `.arrow`, déclaré plus bas, qui
+ * l'emporterait donc au-dessus des flèches — soit précisément là où le
+ * malentendu coûte le plus cher. D'où la reprise explicite des règles qui
+ * posent un curseur : deux classes, et la question est tranchée.
  */
 .dragging,
 .dragging * {
+  cursor: grabbing;
+}
+
+.dragging .grip,
+.dragging .arrow,
+.dragging .arrow:disabled,
+.dragging .name {
   cursor: grabbing;
 }
 

@@ -54,6 +54,22 @@ commande. Ce qu'elle offre au pointeur, les flèches l'offrent au clavier.
 | Comment atteindre un rang hors écran ? | `autoScrollVelocity` — la page défile aux **bords** de la fenêtre | sans quoi le geste ne porterait que sur ce qui tient à l'écran, et trente engagés n'y tiennent pas. Vitesse **linéaire** avec l'enfoncement dans la bande, en pixels par **seconde** : le geste se comporte pareil à 60 Hz et à 144 Hz |
 | Comment renoncer ? | Échap, ou un `pointercancel` | un glissement sans annulation oblige à relâcher quelque part, donc à écrire un ordre dont on ne veut pas |
 
+Deux refus, pour deux gestes qui ne peuvent pas aboutir :
+
+- le rang d'accueil vit dans la **session du geste**, pas dans un miroir de
+  `useState`. La mise à jour naît d'un `pointermove`, donc de priorité continue :
+  React la planifie sans la commiter dans la tâche courante, et le `pointerup`
+  d'un geste vif arrive avant ce rendu. Un miroir y vaudrait `null` — le geste
+  avalé en silence — ou le rang du geste *précédent*, soit un ordre que personne
+  n'a demandé. L'état React reste, mais pour l'affichage seul ;
+- un geste dont la **liste a changé sous lui** est abandonné. Le flux SSE tient
+  la page à jour, et le moment où l'on réordonne est précisément celui où les
+  inscriptions sont ouvertes : l'ordre construit sur l'ancienne liste n'est plus
+  une permutation, et le serveur le refuserait au nom d'une faute que personne
+  n'a commise. Le contrôle est celui du serveur, mot pour mot
+  (`isValidSeedOrder`) — en écrire un second ici donnerait deux définitions du
+  refus.
+
 Deux points de mise en œuvre qui ne se devinent pas :
 
 - les géométries sont relevées en coordonnées **page** (`clientY + scrollY`), pas

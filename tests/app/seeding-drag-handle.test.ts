@@ -87,6 +87,17 @@ describe("Feuille de la liste des inscrites", () => {
     expect(ruleBody(css, ".grip")).toMatch(/touch-action:\s*none/);
   });
 
+  it("impose le curseur « saisi » jusque sur les flèches pendant le geste", () => {
+    // `.dragging *` pèse autant qu'un simple `.arrow`, déclaré plus bas : à
+    // spécificité égale c'est le dernier qui gagne, et le curseur redeviendrait
+    // une main pointée au-dessus des flèches — soit là où l'on croit le plus
+    // volontiers le geste terminé. Il faut donc deux classes.
+    const body = stripComments(css);
+    const grabbing = /\.dragging \.grip,\s*\.dragging \.arrow,[\s\S]*?\{([^}]*)\}/.exec(body);
+    expect(grabbing).not.toBeNull();
+    expect(grabbing![1]).toMatch(/cursor:\s*grabbing/);
+  });
+
   it("compte autant de colonnes que l'en-tête a de cellules quand on réordonne", () => {
     const columns = /grid-template-columns:([^;]*);/
       .exec(ruleBody(css, ".reorderable"))![1]
@@ -113,6 +124,27 @@ describe("Hook du geste", () => {
       expect(hook).toContain(helper);
       expect(hook).not.toMatch(new RegExp(`function ${helper}\\b`));
     }
+  });
+
+  it("lit le rang d'accueil dans la session, jamais dans un miroir de `useState`", () => {
+    // `setTargetIndex` naît d'un `pointermove` — priorité continue, que React
+    // planifie sans la commiter dans la tâche courante. Un `pointerup` vif
+    // arrive avant ce rendu : un miroir affecté au rendu y vaudrait `null` (le
+    // geste avalé en silence) ou le rang du geste *précédent* (un ordre que
+    // personne n'a demandé). L'état React ne sert qu'à l'affichage.
+    expect(hook).toMatch(/current\.targetIndex = next/);
+    expect(hook).toMatch(/targetIndex: landing/);
+    expect(hook).not.toContain("targetIndexRef");
+  });
+
+  it("abandonne un geste dont la liste a changé sous lui", () => {
+    // Une inscription arrivée par le flux pendant le glissement rendrait
+    // l'ordre construit sur l'ancienne liste non permutant : le serveur le
+    // refuserait, au nom d'une faute que personne n'a commise.
+    expect(hook).toMatch(/isValidSeedOrder\(orderRef\.current, baseOrder\)/);
+    // Et c'est le contrôle du serveur, pas un second écrit sur place.
+    expect(hook).toMatch(/from "@\/lib\/shared\/seeding"/);
+    expect(hook).not.toMatch(/function \w*[Ss]ameEntrants/);
   });
 
   it("laisse une échappatoire au geste engagé", () => {

@@ -6,6 +6,7 @@ import {
   dropIndexAt,
   moveToIndex,
 } from "@/lib/shared/drag-reorder";
+import { isValidSeedOrder } from "@/lib/shared/seeding";
 
 /**
  * Glisser-déposer d'une liste verticale de rangs — la part qui touche au DOM.
@@ -34,6 +35,7 @@ import {
 /** Marge de déclenchement : en-deçà, l'appui reste un clic (focus, menu, etc.). */
 const DRAG_THRESHOLD_PX = 4;
 
+
 type DragSession = {
   teamId: number;
   pointerId: number;
@@ -47,6 +49,17 @@ type DragSession = {
   originClientY: number;
   /** Le seuil est-il franchi ? Avant cela, rien n'est déplacé. */
   active: boolean;
+  /**
+   * Rang d'accueil courant — **la** valeur que lit le relâchement.
+   *
+   * Elle ne peut pas vivre dans un `useState` : la mise à jour naît d'un
+   * `pointermove`, donc de priorité continue, que React planifie sans la
+   * commiter dans la tâche courante. Le `pointerup` d'un geste vif arrive
+   * avant ce rendu, et lirait le rang du geste *précédent* — ou rien du tout,
+   * et le geste serait avalé en silence. L'état React reste, mais seulement
+   * pour l'affichage, où un retard d'une image ne coûte rien.
+   */
+  targetIndex: number | null;
 };
 
 export type SeedingDrag = {
@@ -88,11 +101,6 @@ export function useSeedingDrag({ order, enabled, onDrop }: UseSeedingDragOptions
   const onDropRef = useRef(onDrop);
   onDropRef.current = onDrop;
 
-  // Le relâchement lit le rang d'accueil ; le garder en ref évite de réabonner
-  // les écouteurs à chaque survol d'une nouvelle ligne.
-  const targetIndexRef = useRef<number | null>(null);
-  targetIndexRef.current = targetIndex;
-
   const setRowRef = useCallback(
     (teamId: number) => (node: HTMLElement | null) => {
       if (node) rows.current.set(teamId, node);
@@ -112,7 +120,9 @@ export function useSeedingDrag({ order, enabled, onDrop }: UseSeedingDragOptions
     const current = session.current;
     if (!current || !current.active) return;
     const pageY = current.pointerClientY + window.scrollY;
-    setTargetIndex(dropIndexAt(current.slotMidpoints, pageY));
+    const next = dropIndexAt(current.slotMidpoints, pageY);
+    current.targetIndex = next;
+    setTargetIndex(next);
   }, []);
 
   const onPointerDown = useCallback(
@@ -137,6 +147,7 @@ export function useSeedingDrag({ order, enabled, onDrop }: UseSeedingDragOptions
         pointerClientY: event.clientY,
         originClientY: event.clientY,
         active: false,
+        targetIndex: null,
       };
 
       // Sans capture, sortir de la poignée (ce qui arrive dès le premier
@@ -178,12 +189,19 @@ export function useSeedingDrag({ order, enabled, onDrop }: UseSeedingDragOptions
       const current = session.current;
       if (!current || event.pointerId !== current.pointerId) return;
 
-      const { baseOrder, teamId, active } = current;
-      const landing = targetIndexRef.current;
+      const { baseOrder, teamId, active, targetIndex: landing } = current;
       endSession();
 
       if (!active || landing === null) return;
       if (baseOrder.indexOf(teamId) === landing) return;
+      // La liste a changé sous le geste (une inscription arrivée par le flux,
+      // un désengagement) : l'ordre construit sur l'ancienne n'est plus une
+      // permutation, et le serveur le refuserait en 400 — un « Ordre invalide »
+      // au nom d'une faute que personne n'a commise. Le flux a déjà réaffiché
+      // la bonne liste ; on abandonne le geste plutôt que d'écrire un ordre faux.
+      // Le contrôle est celui du serveur, mot pour mot (`isValidSeedOrder`) :
+      // en réécrire un second ici, c'est se donner deux définitions du refus.
+      if (!isValidSeedOrder(orderRef.current, baseOrder)) return;
 
       onDropRef.current(moveToIndex(baseOrder, teamId, landing), teamId, landing);
     };
@@ -227,11 +245,11 @@ export function useSeedingDrag({ order, enabled, onDrop }: UseSeedingDragOptions
       const current = session.current;
       if (current) {
         const velocity = autoScrollVelocity(current.pointerClientY, window.innerHeight);
-        if (velocity !== 0) {
-          window.scrollBy(0, velocity * elapsed);
-          // Le pointeur n'a pas bougé mais la page si : la cible change sous lui.
-          updateTarget();
-        }
+        if (velocity !== 0) window.scrollBy(0, velocity * elapsed);
+        // Relevé à chaque image, et pas seulement quand *nous* défilons : la
+        // molette du lecteur déplace elle aussi la cible sous un pointeur
+        // immobile, et aucun `pointermove` ne viendrait le rattraper.
+        updateTarget();
       }
 
       frame = window.requestAnimationFrame(step);
