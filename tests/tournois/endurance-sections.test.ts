@@ -20,7 +20,12 @@ const mockMatch = (overrides: Partial<BracketMatch>): BracketMatch => ({
   bracket: "UPPER",
   roundNumber: 1,
   matchNumber: 1,
-  status: "PENDING" as MatchStatus,
+  // « Jouée » se lit désormais sur le **statut**, plus sur la présence d'un
+  // vainqueur : un match nul n'en a pas et est pourtant terminé
+  // (`lib/shared/match-outcome.ts`). Le défaut dérive donc le statut du
+  // vainqueur, pour que les cas écrits avant disent exactement la même chose ;
+  // un cas qui vise le nul pose `status: "COMPLETED"` sans vainqueur.
+  status: (overrides.winnerTeamId != null ? "COMPLETED" : "PENDING") as MatchStatus,
   team1Id: null,
   team2Id: null,
   team1Name: null,
@@ -332,5 +337,37 @@ describe("libellés d'un volet de manche", () => {
 
   it("dit d'un mot qu'une manche est close, sans compter", () => {
     expect(enduranceRoundRegionLabel(sectionOf(4, 4))).toBe("Manche 1, 4 matchs, terminée");
+  });
+});
+
+describe("enduranceRoundSections — matchs nuls", () => {
+  it("compte un match nul parmi les rencontres jouées", () => {
+    // `winnerTeamId !== null` faisait annoncer « 1/2 jouées » à une manche
+    // complète, et `isComplete` restait faux : la manche ne se refermait jamais.
+    const sections = enduranceRoundSections([
+      mockMatch({ id: 1, roundNumber: 1, status: "COMPLETED", winnerTeamId: 1 }),
+      mockMatch({ id: 2, roundNumber: 1, status: "COMPLETED", team1Score: 2, team2Score: 2 }),
+    ]);
+
+    expect(sections[0].playedCount).toBe(2);
+    expect(sections[0].isComplete).toBe(true);
+  });
+
+  it("n'ouvre pas d'office une manche où le lecteur n'a plus rien à jouer", () => {
+    const sections = enduranceRoundSections([
+      mockMatch({
+        id: 1,
+        roundNumber: 1,
+        status: "COMPLETED",
+        team1Id: 7,
+        team2Id: 8,
+        team1Score: 2,
+        team2Score: 2,
+      }),
+      mockMatch({ id: 2, roundNumber: 2, team1Id: 7, team2Id: 9 }),
+    ]);
+
+    // Sa manche 1 s'est close sur un nul : c'est la 2 qui l'attend.
+    expect(defaultOpenEnduranceRound(sections, 7, false)).toBe(2);
   });
 });

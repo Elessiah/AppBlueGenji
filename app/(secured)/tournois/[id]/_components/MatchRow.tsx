@@ -5,6 +5,7 @@ import type { BracketMatch, TournamentFormat } from "@/lib/shared/types";
 import { fromBracketMatch, isScoreEditLocked } from "@/lib/shared/match-lock";
 import { matchFormatLabel, matchWinsRequired } from "@/lib/shared/match-format";
 import { matchAnchorId } from "@/lib/shared/match-anchor";
+import { isMatchDrawn } from "@/lib/shared/match-outcome";
 import { EntrantLink } from "../_lib/entrant-link";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { useIssueReport } from "../_lib/issue-report-context";
@@ -64,12 +65,7 @@ export function MatchRow({
   // jouée qui ne teinte aucune des deux lignes se lit exactement comme une
   // rencontre à venir — d'où la mention, seule chose qui distingue « 2 – 2 »
   // de « pas encore joué ».
-  const isDraw =
-    match.status === "COMPLETED" &&
-    match.winnerTeamId === null &&
-    match.forfeitTeamId === null &&
-    match.team1Id !== null &&
-    match.team2Id !== null;
+  const isDraw = isMatchDrawn(match);
 
   // Même règle que le garde-fou serveur (`lib/shared/match-lock.ts`) : le score
   // n'est plus éditable dès que la manche suivante porte une saisie.

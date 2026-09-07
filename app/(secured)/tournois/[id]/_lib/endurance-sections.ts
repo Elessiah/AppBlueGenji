@@ -1,4 +1,5 @@
 import type { BracketMatch } from "@/lib/shared/types";
+import { isMatchPlayed } from "@/lib/shared/match-outcome";
 
 /**
  * Découpe du plateau « BlueGenji Survie » en volets, et reconstitution de
@@ -68,7 +69,7 @@ export function enduranceRoundSections(qualification: BracketMatch[]): Endurance
     const matches = qualification
       .filter((match) => match.roundNumber === round)
       .sort((a, b) => a.matchNumber - b.matchNumber);
-    const playedCount = matches.filter((match) => match.winnerTeamId !== null).length;
+    const playedCount = matches.filter(isMatchPlayed).length;
     return {
       round,
       key: `manche-${round}`,
@@ -103,7 +104,7 @@ export function defaultOpenEnduranceRound(
     const mine = sections.find((section) =>
       section.matches.some(
         (match) =>
-          match.winnerTeamId === null &&
+          !isMatchPlayed(match) &&
           (match.team1Id === myTeamId || match.team2Id === myTeamId),
       ),
     );

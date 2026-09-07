@@ -5,6 +5,7 @@ import type { BracketMatch, TournamentFormat } from "@/lib/shared/types";
 import { BoardPanel, PanelPill } from "./BoardPanel";
 import { MatchRow } from "./MatchRow";
 import type { MatchScoreDraft } from "./BracketTree";
+import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import {
   defaultOpenEnduranceRound,
   enduranceMatchCountLabel,
@@ -38,7 +39,7 @@ function hasPendingMatchFor(section: EnduranceRoundSection, myTeamId: number | n
   if (myTeamId === null) return false;
   return section.matches.some(
     (match) =>
-      match.winnerTeamId === null && (match.team1Id === myTeamId || match.team2Id === myTeamId),
+      !isMatchPlayed(match) && (match.team1Id === myTeamId || match.team2Id === myTeamId),
   );
 }
 

@@ -21,7 +21,7 @@ interface DependentMatchRow extends RowDataPacket {
 }
 
 const DEPENDENT_COLUMNS = `id, round_number, team1_id, team2_id, team1_score, team2_score,
-   winner_team_id, forfeit_team_id, team1_reported_at, team2_reported_at`;
+   winner_team_id, forfeit_team_id, status, team1_reported_at, team2_reported_at`;
 
 /** Mêmes colonnes, qualifiées par l'alias `m` (requêtes avec jointure). */
 const DEPENDENT_COLUMNS_M = DEPENDENT_COLUMNS.split(",")
@@ -38,6 +38,7 @@ function toMatchScoreState(row: DependentMatchRow): MatchScoreState {
     team2Score: row.team2_score === null ? null : Number(row.team2_score),
     winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
     forfeitTeamId: row.forfeit_team_id === null ? null : Number(row.forfeit_team_id),
+    decided: row.status === "COMPLETED",
     hasPendingReport: row.team1_reported_at !== null || row.team2_reported_at !== null,
     nextWinnerMatchId: null,
     nextLoserMatchId: null,

@@ -18,6 +18,7 @@ import { mapError } from "./_lib/error-map";
 import { checkMatchScores, matchScoreViolationMessage } from "@/lib/shared/match-format";
 import { MatchFormatProvider } from "./_lib/match-format-context";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie";
+import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { canForfeitTeam } from "./_lib/forfeit";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { AdminScoreDialog } from "./_components/AdminScoreDialog";
@@ -248,7 +249,7 @@ export default function TournamentDetailPage() {
   const canReport = (match: BracketMatch): boolean => {
     if (frozen) return false;
     if (!detail?.myTeamId) return false;
-    if (match.winnerTeamId !== null) return false;
+    if (isMatchPlayed(match)) return false;
     if (match.team1Id === null || match.team2Id === null) return false;
     return (
       detail.canCreateReportsForTeamIds.includes(detail.myTeamId) &&

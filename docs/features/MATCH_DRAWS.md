@@ -139,6 +139,25 @@ La coupe mathématique sous plafond de manches (`enduranceEliminationCut`) est
 inchangée : le meilleur cas d'une équipe reste de gagner `matchWinsRequired`
 maps, son pire cas d'en perdre autant. Un nul tombe strictement entre les deux.
 
+## « Jouée » ne se lit plus sur le vainqueur
+
+Un match nul est **terminé**. Cinq écrans en jugeaient pourtant par
+`winnerTeamId !== null`, ce qui en faisait une rencontre à venir :
+
+- une manche complète annonçait « 5/6 jouées », et ne se refermait jamais ;
+- le volet ouvert d'office s'ouvrait sur une manche close ;
+- le formulaire de report se rouvrait sur une rencontre finie ;
+- l'arbre à élimination proposait « ton prochain match » sur un match joué ;
+- `isScoreEditLocked` déclarait le match « pas encore joué » et en rouvrait
+  l'édition, alors que le serveur la refusait ensuite en 409 — le bouton menait
+  à un mur.
+
+`lib/shared/match-outcome.ts` porte les deux prédicats, `isMatchPlayed` (le
+**statut** fait foi) et `isMatchDrawn` (terminé, sans vainqueur, pas par
+forfait, deux équipes réelles). `MatchScoreState` gagne pour la même raison un
+champ `decided` : ni « a un vainqueur » (un nul en est un sans), ni « porte un
+score » (l'arbitrage peut noter un 1-1 en cours de rencontre).
+
 ## Le classement du site
 
 Un nul **compte**. `playedMatchSql` — l'assiette partagée par le classement et le
@@ -232,6 +251,8 @@ propose d'ailleurs la case que sur ce format.
 | Règle « quel format pour cette manche » | `lib/shared/bg-survie.ts` (`tournamentMatchFormat`) |
 | Lecture serveur du format d'une manche | `lib/server/tournaments/repository.ts` |
 | Rejeu d'endurance (branche du nul) | `lib/shared/bg-survie.ts` |
+| « Jouée » / « nulle », partagés par les écrans | `lib/shared/match-outcome.ts` |
+| Verrou d'édition d'un score | `lib/shared/match-lock.ts` (`decided`) |
 | Cote de type Elo | `lib/shared/ranking.ts` (`ratingDrawTransfer`) |
 | Bilan des fiches | `lib/shared/stats.ts`, `lib/server/stats-service.ts` |
 | Validation création / édition | `lib/server/tournaments/validation.ts` |
