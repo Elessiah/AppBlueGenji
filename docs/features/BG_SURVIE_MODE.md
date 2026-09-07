@@ -239,6 +239,7 @@ décision humaine.
 | Chiffre d'un forfait | `lib/shared/match-format.ts` (`forfeitMapCount`) |
 | Plafond de manches | `enduranceEliminationCut` / `roundLimitReached` (`lib/shared/bg-survie.ts`) |
 | Relecture de l'arbre | `repairPlayoffBracket` (`lib/server/tournaments/bg-survie.ts`) |
+| Intitulés de l'arbre | `endurancePlayoffGroups` (`app/(secured)/tournois/[id]/_lib/endurance-rounds.ts`) |
 | Règles publiques | `/regles/bluegenji-survie` |
 
 Comme la Survie et la Ronde suisse, **tout est rejoué** depuis l'historique des
@@ -394,6 +395,9 @@ qui fasse avancer l'arbre.
 - `tests/tournois/bg-survie-forfeit.test.ts` — les deux forfaits : score plein
   écrit sur un forfait ponctuel, cases « FF » du tableau, bilan de maps des
   fiches.
+- `tests/tournois/endurance-rounds.test.ts` — le découpage d'un tour d'arbre à
+  l'affichage : stade déduit du nombre de rencontres décisives, petite finale
+  sortie du bloc de la finale.
 - `tests/tournois/bg-survie-playoff-repair.test.ts` — la relecture de l'arbre :
   tirage d'un tour, réécriture d'une demi-finale après correction d'un quart,
   suppression de ce qui en descendait, et refus de toucher à un tour entamé.

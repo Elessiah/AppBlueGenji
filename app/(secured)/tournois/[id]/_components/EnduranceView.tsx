@@ -10,7 +10,7 @@ import {
   type EnduranceCellTone,
 } from "../_lib/endurance-history";
 import { EntrantLink, useParticipantWording } from "../_lib/entrant-link";
-import { endurancePlayoffStage } from "../_lib/endurance-rounds";
+import { endurancePlayoffGroups } from "../_lib/endurance-rounds";
 import styles from "./EnduranceView.module.css";
 
 interface EnduranceViewProps {
@@ -320,14 +320,31 @@ export function EnduranceView({
 
       {rounds.map((round) => {
         const roundMatches = visible.filter((match) => match.roundNumber === round);
+
+        // Une manche qualificative n'a qu'un bloc ; un tour de play-off en a
+        // deux dès qu'il porte la petite finale — celle-ci ne se range pas sous
+        // le stade des décisives, faute de quoi « FINALE » coiffe deux
+        // rencontres que rien ne distingue.
+        const groups =
+          round >= PLAYOFF_ROUND_OFFSET
+            ? endurancePlayoffGroups(roundMatches, round - PLAYOFF_ROUND_OFFSET + 1).map(
+                (group) => ({ ...group, title: `PLAY-OFFS · ${group.title}` }),
+              )
+            : [{ key: "UPPER" as const, title: `MANCHE ${round}`, matches: roundMatches }];
+
         return (
           <div key={round} style={{ marginBottom: 20 }}>
-            <div className="mono" style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 8 }}>
-              {round >= PLAYOFF_ROUND_OFFSET
-                ? `PLAY-OFFS · ${endurancePlayoffStage(roundMatches, round - PLAYOFF_ROUND_OFFSET + 1)}`
-                : `MANCHE ${round}`}
-            </div>
-            {roundMatches.map((match) => renderMatch(match))}
+            {groups.map((group) => (
+              <div key={group.key} style={{ marginBottom: 12 }}>
+                <div
+                  className="mono"
+                  style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 8 }}
+                >
+                  {group.title}
+                </div>
+                {group.matches.map((match) => renderMatch(match))}
+              </div>
+            ))}
           </div>
         );
       })}
