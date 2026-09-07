@@ -79,9 +79,13 @@ aucun objectif à opposer.
 
 ## Un mode, deux formats
 
-L'en-tête de la fiche le dit aussi : dès qu'un format de play-offs est réglé,
-elle affiche **deux** cases et la première se renomme « Format des
-qualifications ». Une case unique aurait affirmé du tournoi entier ce qui n'est
+Deux écrans annoncent un format, et tous deux ont dû apprendre à distinguer les
+phases. L'en-tête de la fiche affiche **deux** cases dès qu'un format de
+play-offs est réglé, la première se renommant « Format des qualifications ». La
+carte « en cours » de l'accueil, elle, étiquette **un match précis** : son format
+lui est désormais servi résolu (`LandingLiveMatch.matchFormat`) plutôt que lu sur
+le tournoi, faute de quoi elle annonçait une demi-finale au plafond de maps de la
+qualification. Une case unique aurait affirmé du tournoi entier ce qui n'est
 vrai que de sa première phase — une équipe préparant sa demi-finale y aurait lu
 le plafond de maps de la qualification, et l'infobulle lui aurait promis une
 égalité impossible.

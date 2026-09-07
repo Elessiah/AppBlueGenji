@@ -45,7 +45,7 @@ function tournament(matchFormat: MatchFormat | null): TournamentCard {
   };
 }
 
-function match(roundLabel: string): LandingLiveMatch {
+function match(roundLabel: string, matchFormat: MatchFormat | null = null): LandingLiveMatch {
   return {
     id: 42,
     team1Name: "Alpha",
@@ -58,6 +58,10 @@ function match(roundLabel: string): LandingLiveMatch {
     team2Seed: null,
     bracket: "UPPER",
     roundLabel,
+    // Le format voyage désormais **sur le match**, résolu côté serveur : le mode
+    // « BlueGenji Survie » en joue deux, et une demi-finale ne se joue pas au
+    // format de la qualification.
+    matchFormat,
     liveState: "OFF",
     liveUrl: null,
   };
@@ -66,7 +70,7 @@ function match(roundLabel: string): LandingLiveMatch {
 function live(matchFormat: MatchFormat | null, roundLabel = "Quart de finale"): LandingLive {
   return {
     tournament: tournament(matchFormat),
-    currentMatch: match(roundLabel),
+    currentMatch: match(roundLabel, matchFormat),
     viewers: 12,
     game: "Overwatch",
     phase: "PHASE ÉLIMINATOIRE",
@@ -145,6 +149,21 @@ describe("LiveCard — notation du format de match", () => {
   it("ne rend aucune notation quand le tournoi n'a pas de match à montrer", () => {
     const html = render({ ...live({ type: "FT", value: 3 }), currentMatch: null });
     expect(html).not.toMatch(/\b(?:BO|FT)\d+\b/);
+  });
+
+  it("annonce le format **du match**, quand il diffère de celui du tournoi", () => {
+    // « BlueGenji Survie » joue deux formats : la carte étiquetait une
+    // demi-finale au plafond de maps de la qualification.
+    const playoff: MatchFormat = { type: "FT", value: 3 };
+    const qualification: MatchFormat = { type: "BO", value: 7 };
+    const board = live(qualification);
+
+    // Une demi-finale porte le format de l'arbre…
+    expect(notationOf(render({ ...board, currentMatch: match("Demi-finale", playoff) }))).toBe(
+      "FT3",
+    );
+    // …et une manche de qualification celui du tournoi.
+    expect(notationOf(render(board))).toBe("BO7");
   });
 
   it("lit le réglage du tournoi, pas celui d'un autre écran", () => {

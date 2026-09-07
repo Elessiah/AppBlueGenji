@@ -78,11 +78,15 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
   }
 
   const currentMatch = live.currentMatch;
-  // Le format des matchs est un réglage du tournoi, jamais une déduction du nom
-  // de la manche : un FT3 s'écrit « FT3 », un BO5 « BO5 ». Un tournoi en score
-  // libre n'a rien à annoncer — la ligne se réduit alors au numéro du match
-  // plutôt que d'afficher « Score libre » là où on attend une notation.
-  const matchFormat = live.tournament.matchFormat;
+  // Le format est un réglage, jamais une déduction du nom de la manche : un FT3
+  // s'écrit « FT3 », un BO5 « BO5 ». Un tournoi en score libre n'a rien à
+  // annoncer — la ligne se réduit alors au numéro du match plutôt que
+  // d'afficher « Score libre » là où on attend une notation.
+  //
+  // Et c'est le format **du match** qu'on lit, pas celui du tournoi : « BlueGenji
+  // Survie » en joue deux, si bien qu'une demi-finale s'annonçait au plafond de
+  // maps de la qualification. Le serveur l'a déjà résolu (`LandingLiveMatch`).
+  const matchFormat = currentMatch?.matchFormat ?? null;
   const title = live.tournament.name.toUpperCase();
   const matchIsLive = currentMatch?.liveState === "LIVE";
   const matchIsScheduled = currentMatch?.liveState === "SCHEDULED";
