@@ -6,9 +6,10 @@ import { test, expect } from "@playwright/test";
  * Couvre :
  *  - le rendu de la page de connexion (deux voies : Google + code Discord) ;
  *  - le flux Discord en deux étapes (demande d'ID → saisie du code) ;
- *  - la protection des routes `(secured)` : un visiteur non authentifié est
- *    redirigé vers /connexion (la garde `requireCurrentUser` ne touche pas la DB
- *    quand il n'y a ni cookie de session ni DEV_AUTH_USER_ID).
+ *  - la protection des routes `(secured)` : un visiteur non authentifié reçoit la
+ *    carte « Connexion requise », qui conserve l'URL demandée et la repasse à
+ *    /connexion (la garde ne touche pas la DB quand il n'y a ni cookie de session
+ *    ni DEV_AUTH_USER_ID).
  */
 
 test.describe("Consentement RGPD", () => {
@@ -90,16 +91,41 @@ test.describe("Connexion", () => {
 });
 
 test.describe("Protection des routes sécurisées", () => {
-  // Ces tests vérifient la redirection en l'ABSENCE de session. Si le bypass
-  // DEV_AUTH est actif (E2E_AUTH_USER défini), l'utilisateur est authentifié et
-  // les routes ne redirigent plus : on les ignore alors.
-  test.skip(!!process.env.E2E_AUTH_USER, "Bypass DEV_AUTH actif : pas de redirection attendue.");
+  // Ces tests vérifient la garde en l'ABSENCE de session. Si le bypass DEV_AUTH
+  // est actif (E2E_AUTH_USER défini), l'utilisateur est authentifié et les pages
+  // s'affichent normalement : on les ignore alors.
+  test.skip(!!process.env.E2E_AUTH_USER, "Bypass DEV_AUTH actif : pas de garde attendue.");
 
   for (const path of ["/tournois", "/equipes", "/joueurs", "/profil"]) {
-    test(`redirige ${path} vers /connexion sans session`, async ({ page }) => {
+    test(`garde ${path} derrière la connexion, sans perdre la destination`, async ({ page }) => {
       await page.context().clearCookies();
       await page.goto(path);
-      await expect(page).toHaveURL(/\/connexion/);
+
+      // L'URL est conservée : c'est elle que le bouton repasse à /connexion, et
+      // c'est elle qu'un robot d'aperçu lit pour composer l'encart du lien.
+      await expect(page).toHaveURL(new RegExp(`${path}$`));
+      await expect(page.getByRole("heading", { name: "Connexion requise" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Se connecter" })).toHaveAttribute(
+        "href",
+        `/connexion?redirect=${encodeURIComponent(path)}`,
+      );
     });
   }
+
+  test("la fiche d'un tournoi reste partageable pour un visiteur non connecté", async ({
+    page,
+  }) => {
+    await page.context().clearCookies();
+    // Le tournoi n'a pas besoin d'exister : ce qui est vérifié ici, c'est que la
+    // réponse est une page (avec son `<head>`) et non une redirection — sans
+    // quoi aucune métadonnée d'aperçu ne pourrait jamais être lue.
+    const response = await page.goto("/tournois/1");
+
+    expect(response?.status()).toBe(200);
+    await expect(page.locator('meta[property="og:image"]')).toHaveCount(1);
+    await expect(page.locator('meta[property="og:site_name"]')).toHaveAttribute(
+      "content",
+      "BlueGenji Esport",
+    );
+  });
 });

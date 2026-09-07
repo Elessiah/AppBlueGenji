@@ -43,9 +43,9 @@ restent déterministes.
 Ne dépend ni de la base ni d'une session (le serveur de test force
 `DEV_AUTH_USER_ID=""`). Couvre :
 - le rendu de `/connexion` (Google + flux Discord en 2 étapes) ;
-- la redirection des routes `(secured)` vers `/connexion` pour un visiteur non
-  authentifié (la garde `requireCurrentUser` court-circuite la DB quand il n'y a
-  ni cookie ni `DEV_AUTH_USER_ID`).
+- la carte « Connexion requise » servie par les routes `(secured)` à un visiteur
+  non authentifié, et le `?redirect=` qu'elle repasse à `/connexion` (la garde
+  court-circuite la DB quand il n'y a ni cookie ni `DEV_AUTH_USER_ID`).
 
 Ces tests tournent partout, y compris en CI sans base de données.
 
