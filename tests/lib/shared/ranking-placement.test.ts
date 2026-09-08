@@ -336,6 +336,16 @@ describe("rankingPointsHint", () => {
     );
   });
 
+  /**
+   * `getTeamRankingPosition` rend un rang nul pour **trois** situations — aucun
+   * match, entrée solo, équipe dissoute — et la dernière a joué. La légende ne
+   * se décide donc pas sur la présence d'un rang mais sur le **bilan** : une
+   * dissoute à vingt matchs doit lire le barème, pas « aucun match joué ».
+   */
+  it("annonce le barème à une équipe qui a joué mais ne figure plus à la liste", () => {
+    expect(rankingPointsHint(true, 712)).toBe(RANKING_POINTS_HINT);
+  });
+
   it("dit d'où vient la cote plutôt que de nier le classement", () => {
     expect(RANKING_PLACEMENT_ONLY_HINT).toContain("Aucun match joué");
     expect(RANKING_PLACEMENT_ONLY_HINT).toContain("tournoi");

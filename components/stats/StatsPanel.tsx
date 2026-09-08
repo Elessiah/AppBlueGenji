@@ -230,7 +230,13 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
               <Tile
                 label={RANKING_POINTS_LABEL}
                 value={ranking.points}
-                hint={rankingPointsHint(ranking.position !== null, ranking.points)}
+                /* Le bilan des matchs, et non `position` : celui-ci est nul
+                   pour trois situations distinctes — aucun match, entrée solo,
+                   équipe dissoute — et la dernière a joué. La tuile
+                   « Matchs joués » juste à côté sort de la même assiette
+                   (`PLAYED_MATCH_SQL`) que le classement : les deux ne peuvent
+                   pas se contredire. */
+                hint={rankingPointsHint(stats.matchesPlayed > 0, ranking.points)}
               />
               {/* La part de parcours ne s'affiche que si un tournoi clos l'a
                   fait bouger : une tuile à zéro sur la fiche d'une équipe qui
