@@ -208,9 +208,14 @@ export async function reconcilePhases(tournamentId: number, conn: PoolConnection
     [tournamentId],
   );
 
-  if (rows.length === 0 || rows[0].format !== "MULTI" || rows[0].state !== "RUNNING") {
-    return;
-  }
+  if (rows.length === 0 || rows[0].format !== "MULTI") return;
+
+  // Un tournoi **clos** se relit sans se rouvrir : corriger le score de sa
+  // finale doit se voir au palmarès, comme dans les trois modes à classement
+  // (`docs/features/FINISHED_TOURNAMENT_RECONCILIATION.md`). Les autres états
+  // n'ont ni phase courante ni match à relire.
+  const finished = rows[0].state === "FINISHED";
+  if (rows[0].state !== "RUNNING" && !finished) return;
 
   const phases = await loadPhases(conn, tournamentId);
   const tournament = await loadTournamentRow(conn, tournamentId);
@@ -221,7 +226,13 @@ export async function reconcilePhases(tournamentId: number, conn: PoolConnection
   if (!currentPhaseId) return;
 
   const currentPhase = await loadPhase(conn, currentPhaseId);
-  if (!currentPhase || currentPhase.state !== "RUNNING") return;
+  if (!currentPhase) return;
+
+  // Sur un tournoi clos, la phase courante est close elle aussi : c'est la
+  // dernière jouée, celle qui a désigné la championne. Attendre `RUNNING` ici
+  // était la seconde moitié du défaut — lever la seule garde du tournoi n'aurait
+  // rien changé.
+  if (currentPhase.state !== (finished ? "FINISHED" : "RUNNING")) return;
 
   // Vérifie si la phase est complète selon son format
   let isDone = false;
@@ -298,6 +309,23 @@ export async function reconcilePhases(tournamentId: number, conn: PoolConnection
   }));
 
   await savePhaseResults(conn, currentPhaseId, rankedStandings);
+
+  // Le classement se rejoue, le tournoi ne se rouvre pas. La phase reste close
+  // — son `finished_at` n'est pas réécrit —, le plan restant n'est pas
+  // re-résolu et aucune phase n'est lancée : il n'y en a plus. Seule la
+  // finalisation est rejouée, et elle est idempotente (`finishTournament` ne
+  // réécrit ni `finished_at` ni sa ligne de journal, grâce à sa clause
+  // `state <> 'FINISHED'`).
+  //
+  // Relire la **seule** phase courante suffit : `match-lock` verrouille toute
+  // phase qu'une phase ultérieure suit, et à l'intérieur de la dernière, la
+  // règle du format verrouille les manches amont — la dernière manche de la
+  // dernière phase est donc la seule chose qui reste corrigible.
+  if (finished) {
+    await finalizeMultiTournament(tournamentId, conn);
+    return;
+  }
+
   await setPhaseState(conn, currentPhaseId, "FINISHED", "finished_at");
 
   const qualifiedTeamIds = rankedStandings.filter((r) => r.qualified).map((r) => r.teamId);
