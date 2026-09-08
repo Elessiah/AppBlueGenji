@@ -591,3 +591,60 @@ describe("tournament-broadcast — version détenue par abonné", () => {
     expect(back.received).toEqual(["data: v1"]);
   });
 });
+
+/**
+ * La fenêtre de regroupement se compte **par connexion**, pas par palier.
+ *
+ * Partagée, elle se faisait remettre à zéro par le rattrapage d'un retardataire :
+ * un envoi qui n'avait servi qu'un abonné arrivé en retard repoussait d'une
+ * fenêtre entière celui de tous les autres. Sur un tournoi où les spectateurs
+ * arrivent en continu, la latence du palier doublait.
+ */
+describe("tournament-broadcast — la fenêtre appartient à la connexion", () => {
+  it("ne fait pas attendre les autres quand un retardataire est rattrapé", async () => {
+    const settled = subscriber("STANDARD", null);
+    joinTournamentRoom(1, settled.handle);
+
+    // Le spectateur en place reçoit v1 et cale sa fenêtre.
+    publish();
+    await advance(0);
+    expect(settled.received).toEqual(["data: v1"]);
+
+    // Sa fenêtre s'écoule, puis un retardataire arrive en tenant v0.
+    await advance(REFRESH_CADENCE.STANDARD.pushCoalesceMs);
+    const late = subscriber("STANDARD", "v0");
+    joinTournamentRoom(1, late.handle);
+
+    publish();
+    await advance(0);
+    expect(late.received).toEqual(["data: v1"]);
+    // Le spectateur en place tient déjà v1 : rien ne lui est réécrit.
+    expect(settled.received).toEqual(["data: v1"]);
+
+    // Un score tombe juste après ce rattrapage. La fenêtre du spectateur en
+    // place est écoulée depuis longtemps : il doit recevoir v2 tout de suite.
+    getFrame.mockResolvedValue(frameOf("v2"));
+    publish();
+    await advance(0);
+
+    expect(settled.received).toEqual(["data: v1", "data: v2"]);
+  });
+
+  it("garde la cadence du palier pour un abonné qui vient d'être servi", async () => {
+    const viewer = subscriber("STANDARD", null);
+    joinTournamentRoom(1, viewer.handle);
+
+    publish();
+    await advance(0);
+    expect(viewer.received).toEqual(["data: v1"]);
+
+    // Sa propre fenêtre, elle, tient toujours.
+    getFrame.mockResolvedValue(frameOf("v2"));
+    publish();
+    await advance(0);
+    expect(viewer.received).toEqual(["data: v1"]);
+
+    await advance(REFRESH_CADENCE.STANDARD.pushCoalesceMs);
+    expect(viewer.received).toEqual(["data: v1", "data: v2"]);
+  });
+});

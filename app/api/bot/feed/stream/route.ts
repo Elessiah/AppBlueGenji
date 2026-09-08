@@ -59,6 +59,20 @@ export async function GET(req: Request): Promise<Response> {
   const reader = upstream.body.getReader();
   req.signal.addEventListener('abort', release);
 
+  // Course résiduelle : le client a pu partir pendant que le `fetch` se
+  // résolvait. Un signal **déjà** avorté ne déclenche jamais son écouteur, et
+  // rien ne garantit que le runtime appellera `cancel()` sur un corps que
+  // personne ne consomme — la place fuirait alors définitivement, et quarante
+  // fuites referment le plafond pour tout le monde jusqu'au redémarrage. Même
+  // garde que la route du flux de tournoi.
+  if (req.signal.aborted) {
+    release();
+    void reader.cancel().catch(() => undefined);
+    // 204 plutôt que le 499 d'nginx : ce dernier est un code de journal, pas un
+    // statut HTTP.
+    return new Response(null, { status: 204 });
+  }
+
   const body = new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {

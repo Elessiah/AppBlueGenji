@@ -126,18 +126,22 @@ export type TournamentSubscriber = {
 };
 
 /**
- * État d'un palier : uniquement sa **fenêtre de regroupement**.
+ * Ce que la salle retient d'un abonné : la dernière version qu'il a reçue, et
+ * quand.
  *
- * La version reçue, elle, se suit par abonné (`Room.versions`) : c'est une
- * propriété de la connexion, pas du palier.
+ * **Les deux par abonné**, et non par palier. Le palier ne décide que de la
+ * *durée* de la fenêtre de regroupement ; le moment où elle a commencé
+ * appartient à la connexion. Partagée, elle se faisait remettre à zéro par le
+ * rattrapage d'un retardataire : un envoi qui n'avait servi qu'un abonné arrivé
+ * en retard repoussait d'une fenêtre entière celui de tous les autres, et sur un
+ * tournoi où les spectateurs arrivent en continu la latence du palier doublait.
  */
-type TierState = { lastSentAt: number };
+type SubscriberState = { version: string | null; lastSentAt: number };
 
 type Room = {
   subscribers: Set<TournamentSubscriber>;
-  /** Dernière version écrite à chaque abonné, ou `null` s'il n'a rien reçu. */
-  versions: Map<TournamentSubscriber, string | null>;
-  tiers: Map<RefreshTier, TierState>;
+  /** Ce que chaque abonné a reçu, et quand. */
+  states: Map<TournamentSubscriber, SubscriberState>;
   unsubscribe: () => void;
   maintenance: ReturnType<typeof setInterval>;
   flushTimer: ReturnType<typeof setTimeout> | null;
@@ -151,11 +155,15 @@ type Room = {
 const rooms = new Map<number, Room>();
 const streamsPerUser = new Map<number, number>();
 
-function tierState(room: Room, tier: RefreshTier): TierState {
-  let state = room.tiers.get(tier);
+/**
+ * État d'un abonné. Un abonné inconnu est réputé n'avoir rien reçu : il est donc
+ * dû sur-le-champ — mieux vaut un envoi de trop qu'un abonné muet.
+ */
+function subscriberState(room: Room, subscriber: TournamentSubscriber): SubscriberState {
+  let state = room.states.get(subscriber);
   if (!state) {
-    state = { lastSentAt: 0 };
-    room.tiers.set(tier, state);
+    state = { version: null, lastSentAt: 0 };
+    room.states.set(subscriber, state);
   }
   return state;
 }
@@ -247,44 +255,47 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
     // différentes, la lecture d'ouverture d'une connexion pouvant précéder une
     // diffusion qu'elle a manquée.
     const behind = (subscriber: TournamentSubscriber): boolean =>
-      room.versions.get(subscriber) !== frame.version;
+      subscriberState(room, subscriber).version !== frame.version;
 
     const dueAudience = [...room.subscribers].filter(
       (subscriber) =>
         behind(subscriber) &&
-        now - tierState(room, subscriber.tier).lastSentAt >=
+        now - subscriberState(room, subscriber).lastSentAt >=
           REFRESH_CADENCE[subscriber.tier].pushCoalesceMs,
     );
     const roomFloor = budgetDelayMs(frame.frame.byteLength, dueAudience.length);
 
     for (const tier of activeTiers(room)) {
-      const state = tierState(room, tier);
       const audience = [...room.subscribers].filter(
         (subscriber) => subscriber.tier === tier && behind(subscriber),
       );
       if (audience.length === 0) continue;
 
       // La fenêtre effective est la plus large des deux : celle du palier, et
-      // celle qu'impose le poids de ce que la salle entière écrit.
-      const elapsed = now - state.lastSentAt;
+      // celle qu'impose le poids de ce que la salle entière écrit. Sa *durée*
+      // vient du palier ; le moment où elle a commencé appartient, lui, à chaque
+      // connexion — partagé, le rattrapage d'un retardataire remettait à zéro la
+      // cadence de tous ses voisins et les faisait attendre une fenêtre de plus.
       const coalesceWindow = Math.max(REFRESH_CADENCE[tier].pushCoalesceMs, roomFloor);
-      if (elapsed < coalesceWindow) {
-        nextDelay = Math.min(nextDelay, coalesceWindow - elapsed);
-        continue;
-      }
 
       for (const subscriber of audience) {
+        const state = subscriberState(room, subscriber);
+        const elapsed = now - state.lastSentAt;
+        if (elapsed < coalesceWindow) {
+          nextDelay = Math.min(nextDelay, coalesceWindow - elapsed);
+          continue;
+        }
+
         try {
           subscriber.send(frame.frame);
-          room.versions.set(subscriber, frame.version);
+          state.version = frame.version;
+          state.lastSentAt = now;
         } catch {
           // Connexion fermée entre-temps : on la retire et on continue.
           room.subscribers.delete(subscriber);
-          room.versions.delete(subscriber);
+          room.states.delete(subscriber);
         }
       }
-
-      state.lastSentAt = now;
     }
 
     if (room.subscribers.size === 0) {
@@ -328,7 +339,7 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
 function closeGoneRoom(tournamentId: number, room: Room): void {
   for (const subscriber of [...room.subscribers]) {
     room.subscribers.delete(subscriber);
-    room.versions.delete(subscriber);
+    room.states.delete(subscriber);
     try {
       subscriber.close?.();
     } catch {
@@ -341,8 +352,7 @@ function closeGoneRoom(tournamentId: number, room: Room): void {
 function openRoom(tournamentId: number): Room {
   const room: Room = {
     subscribers: new Set<TournamentSubscriber>(),
-    versions: new Map<TournamentSubscriber, string | null>(),
-    tiers: new Map<RefreshTier, TierState>(),
+    states: new Map<TournamentSubscriber, SubscriberState>(),
     unsubscribe: () => undefined,
     maintenance: setInterval(() => {
       const current = rooms.get(tournamentId);
@@ -379,11 +389,11 @@ export function joinTournamentRoom(
   // Ce que l'abonné tient déjà : la salle ne lui réécrira cette version-là que
   // s'il ne l'a pas. Omettre `version` revient à dire « je n'ai rien » — le
   // premier envoi lui parviendra alors, quitte à faire double emploi.
-  room.versions.set(subscriber, subscriber.version ?? null);
+  room.states.set(subscriber, { version: subscriber.version ?? null, lastSentAt: 0 });
 
   return () => {
     room.subscribers.delete(subscriber);
-    room.versions.delete(subscriber);
+    room.states.delete(subscriber);
     if (room.subscribers.size === 0 && rooms.get(tournamentId) === room) {
       closeRoom(tournamentId, room);
     }

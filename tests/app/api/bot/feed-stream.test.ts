@@ -119,6 +119,29 @@ describe("GET /api/bot/feed/stream — garde-fous", () => {
     expect(botFeedStreamCount()).toBe(0);
   });
 
+  it("rend la place quand le client est parti pendant l'ouverture", async () => {
+    // Course résiduelle : le `fetch` vers le bot **réussit**, mais le client a
+    // fermé son onglet entre-temps. Un signal déjà avorté ne déclenche jamais
+    // son écouteur, et rien ne garantit que le runtime annulera un corps que
+    // personne ne consomme : sans garde, la place fuyait définitivement, et
+    // quarante fuites referment le plafond pour tout le monde.
+    const controller = new AbortController();
+    globalThis.fetch = jest.fn(async () => {
+      controller.abort();
+      return upstreamOk();
+    }) as never;
+
+    const response = await GET(
+      new Request("http://localhost/api/bot/feed/stream", {
+        headers: { "x-forwarded-for": CLIENT_IP },
+        signal: controller.signal,
+      }),
+    );
+
+    expect(response.status).toBe(204);
+    expect(botFeedStreamCount()).toBe(0);
+  });
+
   it("rend la place quand le bot refuse", async () => {
     globalThis.fetch = jest.fn(async () => new Response(null, { status: 401 })) as never;
 

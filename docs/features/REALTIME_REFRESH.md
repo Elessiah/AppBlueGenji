@@ -118,9 +118,17 @@ bougeait, avec un témoin de flux au vert.
 
 La route annonce donc à la salle ce qu'elle vient d'envoyer
 (`joinTournamentRoom(id, { version: snapshot.version, … })`), et la salle tient
-cette version par connexion. Le regroupement, lui, reste par palier : c'est une
-cadence, pas un contenu. Un abonné qui n'annonce aucune version est réputé
+cette version par connexion. Un abonné qui n'annonce aucune version est réputé
 n'avoir rien — on préfère un envoi de trop à un abonné muet.
+
+La **fenêtre de regroupement** suit la même règle, et pour une raison voisine :
+le palier en décide la *durée*, mais le moment où elle a commencé appartient à
+la connexion. Partagée, elle se faisait remettre à zéro par le rattrapage d'un
+retardataire — un envoi qui n'avait servi qu'un abonné arrivé en retard
+repoussait d'une fenêtre entière celui de tous les autres, et sur un tournoi où
+les spectateurs arrivent en continu la latence du palier doublait. Le budget de
+sortie, lui, reste bien commun à la salle : c'est un poids à écrire, pas une
+cadence.
 
 ### Budget de sortie
 
