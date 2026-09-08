@@ -177,7 +177,19 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
         // `close` sert au cas où le tournoi disparaît : la salle termine alors
         // le flux, et le client bascule sur son écran « Tournoi introuvable »
         // au lieu de contempler un plateau figé annoncé « Direct ».
-        leaveRoom = joinTournamentRoom(tournamentId, { tier, send: write, close: cleanup });
+        //
+        // `version` dit à la salle ce que ce lecteur vient de recevoir. Sans
+        // elle, elle ne connaissait que la dernière version *diffusée* à son
+        // palier : un abonné dont la lecture d'ouverture précédait de peu une
+        // diffusion en héritait sans l'avoir reçue, et restait sur un plateau
+        // périmé — jusqu'au prochain changement, c'est-à-dire indéfiniment sur
+        // un tournoi calme.
+        leaveRoom = joinTournamentRoom(tournamentId, {
+          tier,
+          version: snapshot.version,
+          send: write,
+          close: cleanup,
+        });
 
         heartbeat = setInterval(() => {
           try {
