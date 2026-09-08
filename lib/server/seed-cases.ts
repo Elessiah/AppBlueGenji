@@ -198,6 +198,15 @@ export const TOURNAMENTS: TournamentDef[] = [
   { name: "Suisse 8 Équipes", game: "OW2", state: "RUNNING", format: "SWISS", teamCount: 8, maxTeams: 8, daysOffset: -2, swissTotalRounds: 3, playWaves: 1 },
   { name: "Suisse 9 Équipes (bye)", game: "MR", state: "RUNNING", format: "SWISS", teamCount: 9, maxTeams: 16, daysOffset: -3, swissTotalRounds: 4, playWaves: 2, teamOffset: 14 },
   { name: "Suisse 16 Équipes (reports)", game: "OW2", state: "RUNNING", format: "SWISS", teamCount: 16, maxTeams: 16, daysOffset: -4, swissTotalRounds: 4, playWaves: 1, pendingReports: 2, conflicts: 1 },
+  // Ronde **entièrement** tranchée par le délai : les deux matchs de la ronde 1
+  // portent un report unique dont le délai a expiré, et aucun n'est joué. Rien
+  // ne rapportera donc plus de score ici — seul l'entretien passif peut faire
+  // avancer ce tournoi, et il doit réconcilier derrière lui pour poser la ronde
+  // suivante. Sans cela le tournoi reste « en cours » à jamais, et sort même du
+  // champ de `findTournamentsNeedingSync` : plus rien ne le revisite. Le cas
+  // n'existait pour aucun format à classement — le seul « délai expiré » de la
+  // matrice était en élimination, où le plateau se propage tout seul.
+  { name: "Suisse Ronde Expirée", game: "MR", state: "RUNNING", format: "SWISS", teamCount: 4, maxTeams: 4, daysOffset: -2, swissTotalRounds: 2, playWaves: 0, expiredReports: 2, teamOffset: 24 },
 
   // ---- RUNNING · survie : matrice effectif impair (barrage) × cadence ------
   { name: "Survie 3 Équipes (barrage)", game: "MR", state: "RUNNING", format: "SURVIVAL", teamCount: 3, maxTeams: 4, daysOffset: -1, survivalRoundsPerCut: 1, playWaves: 1 },
