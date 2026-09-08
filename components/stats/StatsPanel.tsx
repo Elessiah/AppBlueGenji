@@ -14,6 +14,8 @@ import {
   type TeamRankingPosition,
 } from "@/lib/shared/stats";
 import {
+  RANKING_PLACEMENT_HINT,
+  RANKING_PLACEMENT_LABEL,
   RANKING_POINTS_HINT,
   RANKING_POINTS_LABEL,
   RANKING_UNRANKED_HINT,
@@ -231,6 +233,18 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
                 value={ranking.points}
                 hint={ranking.position ? RANKING_POINTS_HINT : RANKING_UNRANKED_HINT}
               />
+              {/* La part de parcours ne s'affiche que si un tournoi clos l'a
+                  fait bouger : une tuile à zéro sur la fiche d'une équipe qui
+                  n'a encore fini aucun tournoi poserait une question que rien
+                  n'y répond — même règle que les nuls plus bas. Elle est
+                  **déjà** dans la cote au-dessus, d'où le signe explicite. */}
+              {ranking.placementPoints !== 0 && (
+                <Tile
+                  label={RANKING_PLACEMENT_LABEL}
+                  value={formatDiff(ranking.placementPoints)}
+                  hint={RANKING_PLACEMENT_HINT}
+                />
+              )}
             </>
           ) : null}
         </div>
