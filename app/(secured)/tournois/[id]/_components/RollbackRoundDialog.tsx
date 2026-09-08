@@ -16,10 +16,18 @@ interface RollbackRoundDialogProps {
    * textes sont tournés pour n'accorder avec lui ni article ni participe.
    */
   roundLabel: string;
+  /**
+   * Numéro de cette manche, tel qu'il est stocké. Renvoyé au serveur, qui refuse
+   * le geste si la manche courante a bougé entre l'ouverture et le clic : le
+   * dialogue *montre* les rencontres qu'il efface, et c'est là toute la
+   * sauvegarde de l'arbitre — il ne doit pas en effacer d'autres.
+   */
+  roundNumber: number;
   /** Rencontres de cette manche, telles qu'elles sont au moment du rendu. */
   matches: BracketMatch[];
   onClose: () => void;
-  onRolledBack: (roundLabel: string) => void;
+  /** Reçoit ce que le **serveur** dit avoir effacé, pas ce qui était affiché. */
+  onRolledBack: (roundNumber: number) => void;
 }
 
 /** Score affiché d'une rencontre, ou son absence, en une chaîne relisible. */
@@ -51,6 +59,7 @@ function scoreLabel(match: BracketMatch): string {
 export function RollbackRoundDialog({
   tournamentId,
   roundLabel,
+  roundNumber,
   matches,
   onClose,
   onRolledBack,
@@ -70,10 +79,18 @@ export function RollbackRoundDialog({
     try {
       const res = await fetch(`/api/admin/tournaments/${tournamentId}/rollback`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expectedRound: roundNumber }),
       });
-      const payload = (await res.json()) as { error?: string };
+      const payload = (await res.json()) as {
+        error?: string;
+        rolledBack?: { roundNumber: number };
+      };
       if (!res.ok) throw new Error(payload.error || "ROLLBACK_FAILED");
-      onRolledBack(roundLabel);
+      // La manche annoncée est celle que le serveur dit avoir effacée : la
+      // nôtre pouvait être périmée, et un message qui nomme la mauvaise manche
+      // serait pire qu'aucun message.
+      onRolledBack(payload.rolledBack?.roundNumber ?? roundNumber);
     } catch (e) {
       showError(mapError((e as Error).message));
       setBusy(false);

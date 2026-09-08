@@ -101,11 +101,21 @@ lui-même.
 | `ROLLBACK_UNSUPPORTED_FORMAT` | double élimination, multi-phases |
 | `ROLLBACK_NOTHING_TO_UNDO` | aucun score saisi sur le plateau |
 | `ROLLBACK_PLAYOFFS_STARTED` | BG Survie : l'arbre est tiré, les manches qualificatives ne se défont plus |
+| `ROLLBACK_ROUND_CHANGED` | la manche courante a bougé entre l'écran et le clic |
 
 **Tournoi terminé.** Corriger *un* score d'archive se rejoue et réécrit le
 palmarès (`FINISHED_TOURNAMENT_RECONCILIATION.md`) ; effacer la finale entière
 laisserait un tournoi « terminé » sans championne et sans manche pour en désigner
 une — la clôture, elle, ne se rejoue pas. Refusé, comme l'abandon et la pénalité.
+
+**La manche a bougé.** Le plan est recalculé côté serveur, sur une lecture
+verrouillée : il peut donc désigner une **autre** manche que celle affichée si un
+second arbitre a saisi un score entre l'ouverture du dialogue et le clic. Or le
+dialogue *montre* les rencontres qu'il efface, et c'est là toute la sauvegarde de
+l'arbitre. Il envoie donc la manche qu'il a promis d'effacer (`expectedRound`),
+et le serveur refuse plutôt que d'effacer des scores que personne n'a vus. Le
+garde-fou ne peut que faire **refuser** le geste, jamais le déplacer : un corps
+absent ou illisible retombe sur ce que la base désigne.
 
 **Double élimination.** Les manches du winner et du loser bracket avancent en
 parallèle et se numérotent chacune de leur côté. « Manche 3 » n'y désigne pas un
@@ -143,6 +153,11 @@ bouton qui disparaît laisse chercher, une phrase explique.
 Le plan est calculé côté client par le module que le serveur applique lui-même :
 le bouton ne s'arme donc jamais sur une manche que la route refuserait, et le
 motif affiché est exactement celui qu'elle rendrait.
+
+Le bouton refusé est `aria-disabled`, non `disabled` : un bouton désactivé n'est
+pas focalisable, si bien qu'un lecteur d'écran sautait le contrôle **et** le
+motif qui lui est rattaché. Il reste inerte par la garde du gestionnaire de clic,
+et `CyberButton` habille les deux attributs de la même façon.
 
 Le dialogue de confirmation ne se contente pas d'avertir, il **montre ce qui va
 disparaître** : chaque rencontre de la manche y figure avec son score. C'est la

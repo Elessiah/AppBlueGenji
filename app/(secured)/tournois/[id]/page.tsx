@@ -807,8 +807,15 @@ export default function TournamentDetailPage() {
                 </p>
                 <CyberButton
                   variant="ghost"
-                  onClick={() => setRollbackDialogOpen(true)}
-                  disabled={rollbackReady === null}
+                  onClick={() => {
+                    if (rollbackReady !== null) setRollbackDialogOpen(true);
+                  }}
+                  // `aria-disabled` et non `disabled` : un bouton désactivé n'est
+                  // pas focalisable, si bien qu'un lecteur d'écran sautait le
+                  // contrôle **et** le motif du refus qui lui est rattaché.
+                  // Focalisable, il reste inerte par la garde du clic — et le
+                  // style du refus vit sur le même attribut.
+                  aria-disabled={rollbackReady === null}
                   // La phrase à gauche dit ce que le geste efface, ou pourquoi il
                   // est refusé : elle fait partie du bouton, pas de son décor.
                   aria-describedby="rollback-hint"
@@ -909,11 +916,12 @@ export default function TournamentDetailPage() {
         <RollbackRoundDialog
           tournamentId={tournamentId}
           roundLabel={rollbackRoundLabelWithArticle(rollbackReady.roundNumber)}
+          roundNumber={rollbackReady.roundNumber}
           matches={rollbackMatches}
           onClose={() => setRollbackDialogOpen(false)}
-          onRolledBack={(label) => {
+          onRolledBack={(round) => {
             setRollbackDialogOpen(false);
-            showSuccess(`Résultats effacés : ${label}.`);
+            showSuccess(`Résultats effacés : ${rollbackRoundLabelWithArticle(round)}.`);
             // Le flux pousse déjà la nouvelle version ; on relit tout de même,
             // pour que celui qui vient d'agir voie le plateau à la seconde
             // plutôt qu'à la fenêtre de son palier de fraîcheur.

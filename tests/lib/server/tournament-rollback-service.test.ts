@@ -7,7 +7,6 @@ jest.mock("@/lib/server/tournaments/survival");
 jest.mock("@/lib/server/tournaments/swiss");
 jest.mock("@/lib/server/tournaments/bg-survie");
 jest.mock("@/lib/server/tournaments/notifications");
-jest.mock("@/lib/server/tournaments/list-cache");
 jest.mock("@/lib/server/tournaments/bot-logs");
 
 import { getDatabase } from "@/lib/server/database";
@@ -15,7 +14,6 @@ import { rollbackCurrentRound } from "@/lib/server/tournaments/rollback";
 import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie";
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
 import { flushBotLogs } from "@/lib/server/tournaments/bot-logs";
-import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
 import { reconcileSurvival } from "@/lib/server/tournaments/survival";
@@ -345,6 +343,46 @@ describe("rollbackCurrentRound — élimination simple", () => {
   });
 });
 
+describe("rollbackCurrentRound — manche annoncée", () => {
+  it("défait la manche annoncée quand elle est toujours la bonne", async () => {
+    const { execute } = setup({
+      format: "SWISS",
+      matches: [playedRow({ id: 1, round_number: 2 })],
+    });
+
+    await expect(rollbackCurrentRound(7, { expectedRound: 2 })).resolves.toMatchObject({
+      roundNumber: 2,
+    });
+    expect(statementWith(execute, "SET team1_score = NULL")?.[1]).toEqual([1]);
+  });
+
+  it("refuse quand la manche courante a bougé depuis l'écran", async () => {
+    // Le dialogue montre les rencontres qu'il efface : si un second arbitre a
+    // saisi un score sur la manche suivante entre l'ouverture et le clic, ce
+    // sont des scores que personne n'a vus qui partiraient.
+    const { connection, execute } = setup({
+      format: "SWISS",
+      matches: [playedRow({ id: 1, round_number: 2 }), playedRow({ id: 2, round_number: 3 })],
+    });
+
+    await expect(rollbackCurrentRound(7, { expectedRound: 2 })).rejects.toThrow(
+      "ROLLBACK_ROUND_CHANGED",
+    );
+    expect(statements(execute).join(" ")).not.toContain("SET team1_score = NULL");
+    expect(connection.commit).not.toHaveBeenCalled();
+  });
+
+  it("s'en remet à la base quand aucune manche n'est annoncée", async () => {
+    const { execute } = setup({
+      format: "SWISS",
+      matches: [playedRow({ id: 1, round_number: 2 })],
+    });
+
+    await expect(rollbackCurrentRound(7)).resolves.toMatchObject({ roundNumber: 2 });
+    expect(statementWith(execute, "SET team1_score = NULL")?.[1]).toEqual([1]);
+  });
+});
+
 describe("rollbackCurrentRound — après l'écriture", () => {
   it("rejoue le tournoi par la chaîne ordinaire, puis publie", async () => {
     const { connection } = setup({
@@ -364,8 +402,10 @@ describe("rollbackCurrentRound — après l'écriture", () => {
 
     expect(connection.commit).toHaveBeenCalledTimes(1);
     expect(flushBotLogs).toHaveBeenCalledWith(connection);
+    // Un seul point de passage : `publishUpdatedEvent` vide déjà l'instantané,
+    // l'aperçu, les listes, l'accueil et le classement du site.
+    expect(publishUpdatedEvent).toHaveBeenCalledTimes(1);
     expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
-    expect(invalidateTournamentLists).toHaveBeenCalledTimes(1);
     expect(connection.release).toHaveBeenCalledTimes(1);
   });
 

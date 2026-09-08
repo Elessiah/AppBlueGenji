@@ -15,12 +15,15 @@ import { rollbackRoundLabelWithArticle } from "@/lib/shared/tournament-rollback"
  * saisie sur de mauvais appariements. La suppression définitive reste le seul
  * geste du domaine à exiger `isAdmin`, parce qu'elle, rien ne la rejoue.
  *
- * `POST` sans corps : la manche défaite n'est pas choisie, elle est *déduite* du
- * plateau (`lib/shared/tournament-rollback.ts`). Laisser le client la désigner
- * ouvrirait la porte à défaire une manche du milieu du tournoi, que rien ne
- * rejouerait ensuite.
+ * La manche défaite n'est pas **choisie**, elle est *déduite* du plateau
+ * (`lib/shared/tournament-rollback.ts`) : laisser le client la désigner ouvrirait
+ * la porte à défaire une manche du milieu du tournoi, que rien ne rejouerait
+ * ensuite. Le corps ne porte donc qu'un `expectedRound` facultatif — la manche
+ * que l'écran a **montrée**, à confronter à celle que le verrou trouve. C'est un
+ * garde-fou de concurrence, pas un choix : il ne peut que faire refuser le
+ * geste, jamais le déplacer.
  */
-export async function POST(_: Request, context: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
@@ -31,8 +34,12 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     return fail("INVALID_TOURNAMENT_ID", 400);
   }
 
+  // Corps facultatif : un client qui n'en envoie pas (ou en envoie un illisible)
+  // s'en remet à la manche que la base désignera.
+  const expectedRound = await readExpectedRound(request);
+
   try {
-    const rolledBack = await rollbackCurrentRound(tournamentId);
+    const rolledBack = await rollbackCurrentRound(tournamentId, { expectedRound });
 
     // Après le commit, et au meilleur effort : le bot est optionnel, la manche
     // est déjà effacée, il n'y a rien à annuler si le message ne part pas.
@@ -56,6 +63,7 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     // qui la contredit.
     if (
       message === "TOURNAMENT_NOT_RUNNING" ||
+      message === "ROLLBACK_ROUND_CHANGED" ||
       message === "ROLLBACK_UNSUPPORTED_FORMAT" ||
       message === "ROLLBACK_NOTHING_TO_UNDO" ||
       message === "ROLLBACK_PLAYOFFS_STARTED"
@@ -68,5 +76,22 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     // serveur, où il sert à quelque chose.
     console.error(`[tournaments] retour en arrière du tournoi ${tournamentId} échoué :`, error);
     return fail("ROLLBACK_FAILED", 500);
+  }
+}
+
+/**
+ * Manche annoncée par le client, ou `undefined`.
+ *
+ * Tolérant par construction : ni corps, ni JSON valide, ni entier positif ne
+ * sont des erreurs — le geste retombe alors sur ce que la base désigne, ce qui
+ * est exactement le comportement d'avant le garde-fou.
+ */
+async function readExpectedRound(request: Request): Promise<number | undefined> {
+  try {
+    const body = (await request.json()) as { expectedRound?: unknown };
+    const round = Number(body?.expectedRound);
+    return Number.isInteger(round) && round > 0 ? round : undefined;
+  } catch {
+    return undefined;
   }
 }

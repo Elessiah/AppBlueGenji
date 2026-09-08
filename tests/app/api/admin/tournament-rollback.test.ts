@@ -24,9 +24,14 @@ const player = { id: 4, pseudo: "Joueur", isAdmin: false, roles: [] } as unknown
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
-function rollback(id: string) {
+function rollback(id: string, body?: unknown) {
   return POST(
-    new Request(`http://localhost/api/admin/tournaments/${id}/rollback`, { method: "POST" }),
+    new Request(`http://localhost/api/admin/tournaments/${id}/rollback`, {
+      method: "POST",
+      ...(body === undefined
+        ? {}
+        : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
+    }),
     params(id),
   );
 }
@@ -59,7 +64,30 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ rolledBack });
-    expect(rollbackCurrentRound).toHaveBeenCalledWith(7);
+    expect(rollbackCurrentRound).toHaveBeenCalledWith(7, { expectedRound: undefined });
+  });
+
+  it("transmet la manche annoncée par l'écran", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+
+    await rollback("7", { expectedRound: 4 });
+
+    expect(rollbackCurrentRound).toHaveBeenCalledWith(7, { expectedRound: 4 });
+  });
+
+  it.each([
+    ["un corps absent", undefined],
+    ["un corps sans la clé", { autre: 1 }],
+    ["une manche illisible", { expectedRound: "quatre" }],
+    ["une manche négative", { expectedRound: -1 }],
+  ])("s'en remet à la base sur %s", async (_label, body) => {
+    // Le garde-fou ne peut que faire refuser le geste, jamais le déplacer : un
+    // corps qu'on ne sait pas lire retombe donc sur le comportement d'origine.
+    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+
+    await rollback("7", body);
+
+    expect(rollbackCurrentRound).toHaveBeenCalledWith(7, { expectedRound: undefined });
   });
 
   it("rejette un visiteur anonyme avec 401", async () => {
@@ -111,6 +139,7 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
     "ROLLBACK_UNSUPPORTED_FORMAT",
     "ROLLBACK_NOTHING_TO_UNDO",
     "ROLLBACK_PLAYOFFS_STARTED",
+    "ROLLBACK_ROUND_CHANGED",
   ])("rend 409 sur %s", async (code) => {
     // La demande est bien formée : c'est l'état du tournoi, ou son format, qui
     // la contredit.

@@ -44,9 +44,21 @@ import {
 import type { BracketType, TournamentFormat } from "@/lib/shared/types";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { tryAutoResolveByes } from "./byes";
-import { invalidateTournamentLists } from "./list-cache";
 import { publishUpdatedEvent } from "./notifications";
 import { syncTournamentState } from "./state";
+
+/** Réglages du geste. */
+export type RollbackOptions = {
+  /**
+   * Manche que l'appelant croit effacer.
+   *
+   * Contrôle de concurrence optimiste : le plan est recalculé ici, sur une
+   * lecture verrouillée, et peut donc désigner une **autre** manche que celle
+   * montrée à l'écran. Omis, le geste porte sur ce que la base dit au moment du
+   * verrou.
+   */
+  expectedRound?: number;
+};
 
 /** Ce que le retour en arrière a défait, pour le message et le journal. */
 export type RolledBackRound = {
@@ -325,13 +337,19 @@ async function reconcileAfterRollback(
  * Défait la manche courante du tournoi.
  *
  * @param tournamentId Tournoi concerné.
+ * @param options `expectedRound` — la manche que l'appelant croit effacer. Voir
+ *   {@link RollbackOptions}.
  * @returns Ce qui a été défait, pour la confirmation et le journal.
  * @throws `TOURNAMENT_NOT_FOUND` — identifiant inconnu.
  * @throws `TOURNAMENT_NOT_RUNNING` — tournoi pas (ou plus) en cours.
+ * @throws `ROLLBACK_ROUND_CHANGED` — la manche courante a bougé depuis l'écran.
  * @throws `ROLLBACK_UNSUPPORTED_FORMAT` / `ROLLBACK_NOTHING_TO_UNDO` /
  *   `ROLLBACK_PLAYOFFS_STARTED` — motifs du module pur.
  */
-export async function rollbackCurrentRound(tournamentId: number): Promise<RolledBackRound> {
+export async function rollbackCurrentRound(
+  tournamentId: number,
+  options?: RollbackOptions,
+): Promise<RolledBackRound> {
   const db = await getDatabase();
   const connection = await db.getConnection();
 
@@ -360,6 +378,16 @@ export async function rollbackCurrentRound(tournamentId: number): Promise<Rolled
     );
     if (typeof plan === "string") throw new Error(plan);
 
+    // La manche courante a-t-elle bougé depuis l'écran qui a demandé le geste ?
+    // Le dialogue **montre** les rencontres qu'il va effacer, et c'est là toute
+    // la sauvegarde que l'arbitre aura : si un second arbitre saisit un score
+    // sur la manche suivante entre l'ouverture et le clic, le plan recalculé ici
+    // viserait des scores que personne n'a vus. On refuse plutôt que d'effacer
+    // à l'aveugle — l'écran se rafraîchit par le flux, et le geste se redemande.
+    if (options?.expectedRound !== undefined && options.expectedRound !== plan.roundNumber) {
+      throw new Error("ROLLBACK_ROUND_CHANGED");
+    }
+
     await applyRollback(connection, tournamentId, tournament.format, plan);
     await reconcileAfterRollback(connection, tournamentId);
 
@@ -370,11 +398,13 @@ export async function rollbackCurrentRound(tournamentId: number): Promise<Rolled
     // lignes (un bye reposé, par exemple).
     flushBotLogs(connection);
 
-    // Le plateau vient de changer pour tout le monde : instantané, aperçu et
-    // listes sont invalidés par le même point de passage que toute autre
-    // écriture, et le flux SSE pousse la nouvelle version.
+    // Le plateau vient de changer pour tout le monde. Un seul appel : c'est lui
+    // qui vide l'instantané, l'aperçu, les listes, les agrégats de l'accueil et
+    // le classement du site, puis réveille la salle du flux. Rejouter une
+    // invalidation ici donnerait à croire que ce module a une règle de cache à
+    // lui, et une règle ajoutée dans `./notifications` serait contredite en
+    // silence.
     publishUpdatedEvent(tournamentId);
-    invalidateTournamentLists();
 
     return {
       tournamentId: Number(tournament.id),

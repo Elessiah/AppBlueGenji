@@ -70,6 +70,8 @@ export const ERROR_MESSAGES: Record<string, string> = {
   ROLLBACK_NOTHING_TO_UNDO: "Aucune manche à défaire : aucun score n'a encore été saisi.",
   ROLLBACK_PLAYOFFS_STARTED:
     "Les play-offs sont tirés : les manches qualificatives ne se défont plus. Seuls les tours de l'arbre final peuvent être effacés.",
+  ROLLBACK_ROUND_CHANGED:
+    "La manche courante a changé pendant que le dialogue était ouvert : le plateau vient de se rafraîchir, relis les scores avant de recommencer.",
   ROLLBACK_FAILED: "Erreur lors du retour en arrière.",
   INVALID_DATE_ORDER:
     "Les dates doivent se suivre : visibilité, ouverture, clôture, puis début.",
