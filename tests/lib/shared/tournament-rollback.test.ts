@@ -1,25 +1,28 @@
 import { describe, expect, it } from "@jest/globals";
+
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
 import {
-  isRollbackSupported,
+  compareRollbackStages,
   planRoundRollback,
-  rollbackRoundLabel,
-  rollbackRoundLabelWithArticle,
+  rollbackStageKey,
+  rollbackStageLabel,
+  rollbackStageLabelWithArticle,
   type RollbackMatch,
   type RollbackPlan,
 } from "@/lib/shared/tournament-rollback";
-import type { BracketType, TournamentFormat } from "@/lib/shared/types";
 
 /**
- * Un match du plateau. Par défaut : deux équipes en place, rien de saisi — le
- * cas d'une rencontre créée mais pas encore jouée.
+ * Une rencontre du plateau, telle que le module la reçoit.
+ *
+ * Les valeurs par défaut décrivent une rencontre **posée mais pas jouée** : deux
+ * engagées, aucun score. C'est l'état dans lequel naît un plateau à élimination,
+ * et celui auquel un retour en arrière ramène une manche.
  */
-function match(overrides: Partial<RollbackMatch> & { id: number }): RollbackMatch {
+function match(seed: Partial<RollbackMatch> & { id: number; roundNumber: number }): RollbackMatch {
   return {
-    roundNumber: 1,
-    bracket: "UPPER" as BracketType,
-    team1Id: 10,
-    team2Id: 20,
+    bracket: "UPPER",
+    team1Id: seed.id * 10,
+    team2Id: seed.id * 10 + 1,
     team1Score: null,
     team2Score: null,
     winnerTeamId: null,
@@ -28,248 +31,396 @@ function match(overrides: Partial<RollbackMatch> & { id: number }): RollbackMatc
     hasPendingReport: false,
     nextWinnerMatchId: null,
     nextLoserMatchId: null,
-    ...overrides,
+    ...seed,
   };
 }
 
-/** Le même, joué : deux scores et un vainqueur. */
-function played(overrides: Partial<RollbackMatch> & { id: number }): RollbackMatch {
-  return play(match(overrides));
-}
-
 /**
- * Marque une rencontre existante comme jouée.
+ * La même rencontre, jouée.
  *
- * Distinct de {@link played}, qui part des valeurs par défaut : appliquer un
- * match complet en surcharge y réécrirait les scores avec ses `null`.
+ * Écrite comme une **surcouche** et non comme un second constructeur : appeler
+ * `match({ ...source, team1Score: 3 })` marcherait, mais laisserait la porte
+ * ouverte à un appel qui réétale les valeurs par défaut sur les liens du
+ * plateau — et effacerait donc silencieusement la structure qu'on teste.
  */
 function play(source: RollbackMatch): RollbackMatch {
-  return { ...source, team1Score: 3, team2Score: 1, winnerTeamId: 10, decided: true };
+  return { ...source, team1Score: 3, team2Score: 1, winnerTeamId: source.team1Id, decided: true };
 }
 
-/** Le plan, en refusant de continuer si le module a rendu un motif de refus. */
-function plan(matches: RollbackMatch[], format: TournamentFormat): RollbackPlan {
-  const result = planRoundRollback(matches, format);
+/** Le plan, ou l'échec du test : les refus sont vérifiés à part. */
+function plan(matches: readonly RollbackMatch[]): RollbackPlan {
+  const result = planRoundRollback(matches);
   if (typeof result === "string") throw new Error(`refus inattendu : ${result}`);
   return result;
 }
 
-describe("isRollbackSupported", () => {
-  it("couvre l'élimination simple et les trois formats à classement", () => {
-    expect(isRollbackSupported("SINGLE")).toBe(true);
-    expect(isRollbackSupported("SWISS")).toBe(true);
-    expect(isRollbackSupported("SURVIVAL")).toBe(true);
-    expect(isRollbackSupported("BG_SURVIE")).toBe(true);
+/** Manches d'un format à classement : `count` rencontres par manche, sans lien. */
+function rankingRounds(rounds: number[], perRound = 2): RollbackMatch[] {
+  const matches: RollbackMatch[] = [];
+  let id = 1;
+  for (const roundNumber of rounds) {
+    for (let n = 0; n < perRound; n += 1) matches.push(match({ id: id++, roundNumber }));
+  }
+  return matches;
+}
+
+/**
+ * Plateau à élimination simple pour quatre équipes, petite finale comprise.
+ *
+ * Reproduit ce qu'écrit `bracket-single.ts` : la petite finale porte le numéro
+ * de **manche 1** (elle n'a pas de tour amont à numéroter) alors qu'elle se joue
+ * avec la finale, et les deux demies y envoient leur perdant.
+ */
+function singleBracketOfFour(): {
+  semi1: RollbackMatch;
+  semi2: RollbackMatch;
+  final: RollbackMatch;
+  third: RollbackMatch;
+  all: RollbackMatch[];
+} {
+  const final = match({ id: 3, roundNumber: 2 });
+  const third = match({ id: 4, roundNumber: 1, bracket: "THIRD_PLACE" });
+  const semi1 = match({ id: 1, roundNumber: 1, nextWinnerMatchId: 3, nextLoserMatchId: 4 });
+  const semi2 = match({ id: 2, roundNumber: 1, nextWinnerMatchId: 3, nextLoserMatchId: 4 });
+  return { semi1, semi2, final, third, all: [semi1, semi2, final, third] };
+}
+
+/**
+ * Plateau à double élimination pour quatre équipes.
+ *
+ * Reproduit `bracket-double.ts` : deux manches de tableau principal, deux de
+ * repêchage, une grande finale. Les numéros de manche des deux tableaux ne se
+ * comparent pas — c'est tout l'intérêt du cas.
+ */
+function doubleBracketOfFour(): Record<
+  "u1a" | "u1b" | "u2" | "lb1" | "lb2" | "grand",
+  RollbackMatch
+> & { all: RollbackMatch[] } {
+  const grand = match({ id: 6, roundNumber: 1, bracket: "GRAND" });
+  const lb2 = match({ id: 5, roundNumber: 2, bracket: "LOWER", nextWinnerMatchId: 6 });
+  const lb1 = match({ id: 4, roundNumber: 1, bracket: "LOWER", nextWinnerMatchId: 5 });
+  const u2 = match({ id: 3, roundNumber: 2, nextWinnerMatchId: 6, nextLoserMatchId: 5 });
+  const u1a = match({ id: 1, roundNumber: 1, nextWinnerMatchId: 3, nextLoserMatchId: 4 });
+  const u1b = match({ id: 2, roundNumber: 1, nextWinnerMatchId: 3, nextLoserMatchId: 4 });
+  return { u1a, u1b, u2, lb1, lb2, grand, all: [u1a, u1b, u2, lb1, lb2, grand] };
+}
+
+describe("planRoundRollback — élimination simple", () => {
+  it("vise la dernière manche jouée, pas la dernière posée", () => {
+    // Tout le plateau naît au lancement : la finale existe dès la première
+    // rencontre. Viser la dernière manche *créée* ne défairait jamais rien.
+    const { semi1, semi2, final, third } = singleBracketOfFour();
+    const result = plan([play(semi1), semi2, final, third]);
+
+    expect(result.roundNumber).toBe(1);
+    expect(result.clearedMatchIds.sort()).toEqual([1, 2]);
   });
 
-  it("laisse dehors la double élimination et le multi-phases", () => {
-    // Les deux tableaux d'une double élimination se numérotent chacun de leur
-    // côté, et une phase close a déjà remis ses qualifiées à la suivante.
-    expect(isRollbackSupported("DOUBLE")).toBe(false);
-    expect(isRollbackSupported("MULTI")).toBe(false);
+  it("détache ce qui suit au lieu de le supprimer", () => {
+    // Un identifiant de match est une adresse publique : lien profond, horaire
+    // annoncé, diffusion programmée. La structure du plateau reste debout.
+    const { semi1, semi2, final, third } = singleBracketOfFour();
+    const result = plan([play(semi1), semi2, final, third]);
+
+    expect(result.detachedMatchIds.sort()).toEqual([3, 4]);
+    expect(result.deletedMatchIds).toEqual([]);
+  });
+
+  it("range la petite finale au stade de la finale", () => {
+    // Elle est créée en manche 1 mais se joue avec la finale : la ranger sur son
+    // numéro l'effacerait en défaisant le premier tour, et la laisserait debout
+    // en défaisant la finale.
+    const { semi1, semi2, final, third } = singleBracketOfFour();
+    const result = plan([semi1, semi2, play(final), play(third)]);
+
+    expect(result.clearedMatchIds.sort()).toEqual([3, 4]);
+    expect(result.roundNumber).toBe(2);
+  });
+
+  it("efface la petite finale avec la finale même si elle n'est pas jouée", () => {
+    const { semi1, semi2, final, third } = singleBracketOfFour();
+    const result = plan([semi1, semi2, play(final), third]);
+
+    expect(result.clearedMatchIds.sort()).toEqual([3, 4]);
+  });
+
+  it("recule d'une manche à chaque appel, jusqu'au premier tour", () => {
+    // Le geste est fait pour se répéter : on rattrape une erreur d'un cran ou
+    // deux, on ne recommence pas le tournoi.
+    const { semi1, semi2, final, third } = singleBracketOfFour();
+    const played = [play(semi1), play(semi2), play(final), play(third)];
+
+    const first = plan(played);
+    expect(first.roundNumber).toBe(2);
+
+    // Le stade effacé revient vierge, les suivants sont détachés.
+    const afterFirst = [played[0], played[1], final, third];
+    const second = plan(afterFirst);
+    expect(second.roundNumber).toBe(1);
+    expect(second.clearedMatchIds.sort()).toEqual([1, 2]);
+
+    const afterSecond = [semi1, semi2, final, third];
+    expect(planRoundRollback(afterSecond)).toBe("ROLLBACK_NOTHING_TO_UNDO");
+  });
+
+  it("ignore les byes, dont le score est posé par le moteur", () => {
+    const bye = match({
+      id: 1,
+      roundNumber: 1,
+      team2Id: null,
+      team1Score: 1,
+      team2Score: 0,
+      nextWinnerMatchId: 3,
+    });
+    const real = match({ id: 2, roundNumber: 1, nextWinnerMatchId: 3 });
+    const final = match({ id: 3, roundNumber: 2 });
+
+    expect(planRoundRollback([bye, real, final])).toBe("ROLLBACK_NOTHING_TO_UNDO");
+
+    // Une fois la manche réellement jouée, le bye est bien vidé avec elle : son
+    // 1-0 sera reposé par `tryAutoResolveByes`.
+    const result = plan([bye, play(real), final]);
+    expect(result.clearedMatchIds.sort()).toEqual([1, 2]);
+  });
+
+  it("traite un plateau d'une seule manche sans lien", () => {
+    // Deux équipes : la finale est le seul match, et il n'a rien à lier.
+    const only = match({ id: 1, roundNumber: 1 });
+    const result = plan([play(only)]);
+
+    expect(result.clearedMatchIds).toEqual([1]);
+    expect(result.roundNumber).toBe(1);
   });
 });
 
-describe("planRoundRollback — refus", () => {
-  it("refuse un format non couvert", () => {
-    const matches = [played({ id: 1 })];
-    expect(planRoundRollback(matches, "DOUBLE")).toBe("ROLLBACK_UNSUPPORTED_FORMAT");
-    expect(planRoundRollback(matches, "MULTI")).toBe("ROLLBACK_UNSUPPORTED_FORMAT");
+describe("planRoundRollback — double élimination", () => {
+  it("ordonne les deux tableaux par le graphe, pas par leurs numéros", () => {
+    // « Manche 2 » désigne ici deux stades sans rapport : la finale du tableau
+    // principal et le dernier tour du repêchage, qui se joue après elle.
+    const board = doubleBracketOfFour();
+    const played = board.all.map((entry) => (entry.id === 6 ? entry : play(entry)));
+
+    const result = plan(played);
+    expect(result.clearedMatchIds).toEqual([5]);
+    expect(result.detachedMatchIds).toEqual([6]);
   });
 
-  it("refuse un plateau sans la moindre saisie", () => {
-    expect(planRoundRollback([match({ id: 1 }), match({ id: 2 })], "SWISS")).toBe(
-      "ROLLBACK_NOTHING_TO_UNDO",
-    );
+  it("groupe les rencontres contemporaines des deux tableaux", () => {
+    // Le premier tour de repêchage se joue en même temps que la seconde manche
+    // du tableau principal : ni l'un ni l'autre ne dépend de l'autre.
+    const board = doubleBracketOfFour();
+    const played = [
+      play(board.u1a),
+      play(board.u1b),
+      play(board.u2),
+      play(board.lb1),
+      board.lb2,
+      board.grand,
+    ];
+
+    const result = plan(played);
+    expect(result.clearedMatchIds.sort()).toEqual([3, 4]);
+    expect(result.detachedMatchIds.sort()).toEqual([5, 6]);
   });
 
-  it("refuse un plateau vide", () => {
-    expect(planRoundRollback([], "SINGLE")).toBe("ROLLBACK_NOTHING_TO_UNDO");
-  });
+  it("remonte jusqu'au premier tour, un stade à la fois", () => {
+    const board = doubleBracketOfFour();
+    const stages: number[][] = [];
+    let current = board.all.map(play);
 
-  it("ne compte pas un bye comme une saisie", () => {
-    // Le 1-0 d'un bye est posé par le moteur, personne ne l'a saisi : une manche
-    // qui n'aurait que cela n'est pas une manche jouée.
-    const bye = played({ id: 1, team2Id: null, team1Score: 1, team2Score: 0 });
-    expect(planRoundRollback([bye], "SURVIVAL")).toBe("ROLLBACK_NOTHING_TO_UNDO");
+    for (let step = 0; step < 4; step += 1) {
+      const result = plan(current);
+      stages.push([...result.clearedMatchIds].sort());
+      const cleared = new Set(result.clearedMatchIds);
+      current = current.map((entry) =>
+        cleared.has(entry.id) ? board.all.find((m) => m.id === entry.id)! : entry,
+      );
+    }
+
+    expect(stages).toEqual([[6], [5], [3, 4], [1, 2]]);
+    expect(planRoundRollback(current)).toBe("ROLLBACK_NOTHING_TO_UNDO");
   });
 });
 
 describe("planRoundRollback — formats à classement", () => {
-  it("vise la dernière manche portant une saisie", () => {
-    const matches = [
-      played({ id: 1, roundNumber: 1 }),
-      played({ id: 2, roundNumber: 1 }),
-      played({ id: 3, roundNumber: 2 }),
-      // Rencontre de la même manche, encore à jouer : elle part avec sa manche.
-      match({ id: 4, roundNumber: 2 }),
-    ];
+  it("vise la dernière manche saisie", () => {
+    const matches = rankingRounds([1, 2, 3]);
+    const played = matches.map((entry) => (entry.roundNumber <= 2 ? play(entry) : entry));
 
-    const result = plan(matches, "SWISS");
-
+    const result = plan(played);
     expect(result.roundNumber).toBe(2);
     expect(result.clearedMatchIds.sort()).toEqual([3, 4]);
-    expect(result.laterMatchIds).toEqual([]);
-    expect(result.disposal).toBe("DELETE");
   });
 
-  it("emporte la manche déjà posée par le moteur au-delà de la manche visée", () => {
-    // Cas courant : la manche 2 est complète, le moteur a posé la 3 — que le
-    // retour en arrière rend caduque, ses appariements venant d'un classement
-    // qu'on défait.
-    const matches = [
-      played({ id: 1, roundNumber: 2 }),
-      match({ id: 2, roundNumber: 3 }),
-      match({ id: 3, roundNumber: 3 }),
-    ];
+  it("supprime les manches suivantes au lieu de les détacher", () => {
+    // Le moteur les pose une à une depuis un classement que le retour en arrière
+    // vient de défaire : leurs appariements sont périmés, il les reposera.
+    const matches = rankingRounds([1, 2, 3]);
+    const played = matches.map((entry) => (entry.roundNumber <= 2 ? play(entry) : entry));
 
-    const result = plan(matches, "SURVIVAL");
+    const result = plan(played);
+    expect(result.deletedMatchIds.sort()).toEqual([5, 6]);
+    expect(result.detachedMatchIds).toEqual([]);
+  });
 
-    expect(result.roundNumber).toBe(2);
-    expect(result.clearedMatchIds).toEqual([1]);
-    expect(result.laterMatchIds.sort()).toEqual([2, 3]);
-    expect(result.disposal).toBe("DELETE");
+  it("refuse quand plus rien n'est saisi", () => {
+    expect(planRoundRollback(rankingRounds([1, 2]))).toBe("ROLLBACK_NOTHING_TO_UNDO");
+    expect(planRoundRollback([])).toBe("ROLLBACK_NOTHING_TO_UNDO");
   });
 
   it("compte un report en attente comme une saisie", () => {
-    const matches = [
-      played({ id: 1, roundNumber: 1 }),
-      match({ id: 2, roundNumber: 2, hasPendingReport: true }),
-    ];
-
-    expect(plan(matches, "SWISS").roundNumber).toBe(2);
-  });
-
-  it("compte un forfait de match comme une saisie", () => {
-    const matches = [
-      played({ id: 1, roundNumber: 1 }),
-      match({ id: 2, roundNumber: 2, forfeitTeamId: 20 }),
-    ];
-
-    expect(plan(matches, "SWISS").roundNumber).toBe(2);
-  });
-});
-
-describe("planRoundRollback — élimination simple", () => {
-  /** Plateau à 8 : trois manches et une petite finale, créée en manche 1. */
-  function bracket(): RollbackMatch[] {
-    return [
-      match({ id: 1, roundNumber: 1 }),
-      match({ id: 2, roundNumber: 1 }),
-      match({ id: 3, roundNumber: 1 }),
-      match({ id: 4, roundNumber: 1 }),
-      match({ id: 5, roundNumber: 2 }),
-      match({ id: 6, roundNumber: 2 }),
-      match({ id: 7, roundNumber: 3 }),
-      match({ id: 8, roundNumber: 1, bracket: "THIRD_PLACE" }),
-    ];
-  }
-
-  it("détache ce qui descendait de la manche défaite, sans le supprimer", () => {
-    const matches = bracket().map((m) => (m.roundNumber === 1 && m.id <= 4 ? play(m) : m));
-
-    const result = plan(matches, "SINGLE");
+    const [first, second] = rankingRounds([1], 2);
+    const result = plan([{ ...first, hasPendingReport: true }, second]);
 
     expect(result.roundNumber).toBe(1);
-    expect(result.clearedMatchIds.sort()).toEqual([1, 2, 3, 4]);
-    // Le plateau à élimination est créé en entier au lancement : on vide les
-    // rencontres suivantes de leurs qualifiées, on ne détruit pas la structure.
-    expect(result.disposal).toBe("DETACH");
-    expect(result.laterMatchIds.sort()).toEqual([5, 6, 7, 8]);
-  });
-
-  it("laisse la petite finale hors de la manche 1 malgré son numéro", () => {
-    // `bracket-single.ts` crée la petite finale en manche 1 : la ranger sur son
-    // numéro effacerait la troisième place en défaisant le premier tour.
-    const matches = bracket().map((m) => (m.roundNumber === 1 && m.id <= 4 ? play(m) : m));
-
-    expect(plan(matches, "SINGLE").clearedMatchIds).not.toContain(8);
-  });
-
-  it("emporte la petite finale quand c'est la finale qu'on défait", () => {
-    const matches = bracket().map(play);
-
-    const result = plan(matches, "SINGLE");
-
-    expect(result.roundNumber).toBe(3);
-    expect(result.clearedMatchIds.sort()).toEqual([7, 8]);
-    expect(result.laterMatchIds).toEqual([]);
-  });
-
-  it("ne défait pas les demi-finales quand seule la petite finale est jouée", () => {
-    // La petite finale se joue au stade de la finale : elle ne peut pas ramener
-    // le tournoi à un stade antérieur.
-    const matches = bracket().map((m) => (m.id === 8 ? play(m) : m));
-
-    expect(plan(matches, "SINGLE").roundNumber).toBe(3);
   });
 });
 
 describe("planRoundRollback — BlueGenji Survie", () => {
-  it("refuse de défaire une manche qualificative une fois l'arbre tiré", () => {
-    const matches = [
-      played({ id: 1, roundNumber: 4 }),
-      match({ id: 2, roundNumber: PLAYOFF_ROUND_OFFSET }),
-      match({ id: 3, roundNumber: PLAYOFF_ROUND_OFFSET }),
-    ];
+  const qualification = rankingRounds([1, 2], 2);
+  const semis = [
+    match({ id: 10, roundNumber: PLAYOFF_ROUND_OFFSET }),
+    match({ id: 11, roundNumber: PLAYOFF_ROUND_OFFSET }),
+  ];
+  const finals = [
+    match({ id: 12, roundNumber: PLAYOFF_ROUND_OFFSET + 1 }),
+    match({ id: 13, roundNumber: PLAYOFF_ROUND_OFFSET + 1, bracket: "THIRD_PLACE" }),
+  ];
 
-    expect(planRoundRollback(matches, "BG_SURVIE")).toBe("ROLLBACK_PLAYOFFS_STARTED");
-  });
+  it("défait un tour d'arbre final sans toucher à la qualification", () => {
+    const board = [...qualification.map(play), ...semis.map(play), ...finals];
+    const result = plan(board);
 
-  it("défait un tour de l'arbre final", () => {
-    const matches = [
-      played({ id: 1, roundNumber: 4 }),
-      played({ id: 2, roundNumber: PLAYOFF_ROUND_OFFSET }),
-      played({ id: 3, roundNumber: PLAYOFF_ROUND_OFFSET }),
-      match({ id: 4, roundNumber: PLAYOFF_ROUND_OFFSET + 1 }),
-    ];
-
-    const result = plan(matches, "BG_SURVIE");
-
+    expect(result.playoffRound).toBe(true);
     expect(result.roundNumber).toBe(PLAYOFF_ROUND_OFFSET);
-    expect(result.clearedMatchIds.sort()).toEqual([2, 3]);
-    expect(result.laterMatchIds).toEqual([4]);
-    expect(result.disposal).toBe("DELETE");
+    expect(result.clearedMatchIds.sort()).toEqual([10, 11]);
+    expect(result.deletedMatchIds.sort()).toEqual([12, 13]);
   });
 
-  it("défait la finale et sa petite finale ensemble", () => {
-    // Le mode range déjà les deux dans la même manche : le repère de la petite
-    // finale ne change alors rien.
-    const finalRound = PLAYOFF_ROUND_OFFSET + 2;
-    const matches = [
-      played({ id: 1, roundNumber: PLAYOFF_ROUND_OFFSET }),
-      played({ id: 2, roundNumber: finalRound }),
-      played({ id: 3, roundNumber: finalRound, bracket: "THIRD_PLACE" }),
-    ];
+  it("efface la petite finale avec la finale, elles partagent leur manche", () => {
+    const board = [...qualification.map(play), ...semis.map(play), ...finals.map(play)];
+    const result = plan(board);
 
-    const result = plan(matches, "BG_SURVIE");
-
-    expect(result.roundNumber).toBe(finalRound);
-    expect(result.clearedMatchIds.sort()).toEqual([2, 3]);
+    expect(result.clearedMatchIds.sort()).toEqual([12, 13]);
   });
 
-  it("défait normalement une manche qualificative tant que l'arbre n'est pas tiré", () => {
-    const matches = [played({ id: 1, roundNumber: 3 }), played({ id: 2, roundNumber: 3 })];
+  it("rend la main à la qualification une fois l'arbre vierge", () => {
+    // Deux pas et non un seul : le premier vide le tour d'arbre, le second vise
+    // la dernière manche qualificative et emporte l'arbre entier. C'est ce qui
+    // rend le geste stable — la qualification achevée reposerait sinon l'arbre
+    // dans la foulée.
+    const board = [...qualification.map(play), ...semis, ...finals];
+    const result = plan(board);
 
-    expect(plan(matches, "BG_SURVIE").roundNumber).toBe(3);
+    expect(result.playoffRound).toBe(false);
+    expect(result.roundNumber).toBe(2);
+    expect(result.clearedMatchIds.sort()).toEqual([3, 4]);
+    expect(result.deletedMatchIds.sort()).toEqual([10, 11, 12, 13]);
   });
 });
 
-describe("rollbackRoundLabel", () => {
-  it("nomme une manche qualificative par son numéro", () => {
-    expect(rollbackRoundLabel(4)).toBe("manche 4");
+describe("planRoundRollback — multi-phases", () => {
+  /** Ronde suisse en phase 1, élimination simple en phase 2. */
+  function twoPhases() {
+    const swiss = rankingRounds([1, 2], 2).map((entry) => ({
+      ...entry,
+      phaseId: 30,
+      phasePosition: 1,
+    }));
+    const final = match({ id: 20, roundNumber: 2, phaseId: 31, phasePosition: 2 });
+    const semis = [
+      match({ id: 21, roundNumber: 1, phaseId: 31, phasePosition: 2, nextWinnerMatchId: 20 }),
+      match({ id: 22, roundNumber: 1, phaseId: 31, phasePosition: 2, nextWinnerMatchId: 20 }),
+    ];
+    return { swiss, final, semis };
+  }
+
+  it("classe une phase ultérieure après la précédente, quels que soient les numéros", () => {
+    const { swiss, final, semis } = twoPhases();
+    const result = plan([...swiss.map(play), ...semis.map(play), final]);
+
+    expect(result.stage).toEqual({ phaseRank: 2, index: 0 });
+    expect(result.clearedMatchIds.sort()).toEqual([21, 22]);
+    expect(result.detachedMatchIds).toEqual([20]);
+  });
+
+  it("supprime toute phase ultérieure quand on rouvre celle d'avant", () => {
+    // Son plateau a été posé avec les qualifiées de la phase qu'on rouvre : le
+    // moteur le reposera avec les nouvelles.
+    const { swiss, final, semis } = twoPhases();
+    const result = plan([...swiss.map(play), ...semis, final]);
+
+    expect(result.stage).toEqual({ phaseRank: 1, index: 2 });
+    expect(result.clearedMatchIds.sort()).toEqual([3, 4]);
+    expect(result.deletedMatchIds.sort()).toEqual([20, 21, 22]);
+  });
+
+  it("retombe sur l'identifiant de phase quand la position manque", () => {
+    const early = rankingRounds([1], 1).map((entry) => ({ ...entry, phaseId: 30 }));
+    const late = [match({ id: 9, roundNumber: 1, phaseId: 31 })];
+    const result = plan([...early.map(play), ...late.map(play)]);
+
+    expect(result.stage.phaseRank).toBe(31);
+  });
+});
+
+describe("stades", () => {
+  it("ordonne la phase avant l'index", () => {
+    expect(compareRollbackStages({ phaseRank: 1, index: 9 }, { phaseRank: 2, index: 0 })).toBeLessThan(0);
+    expect(compareRollbackStages({ phaseRank: 2, index: 1 }, { phaseRank: 2, index: 1 })).toBe(0);
+  });
+
+  it("porte une clé lisible et stable", () => {
+    expect(rollbackStageKey({ phaseRank: 0, index: 3 })).toBe("0:3");
+    expect(plan(rankingRounds([1, 2]).map(play)).stageKey).toBe("0:2");
+  });
+});
+
+describe("libellés", () => {
+  const stage = (phaseRank: number) => ({ phaseRank, index: 0 });
+
+  it("nomme une manche ordinaire", () => {
+    expect(rollbackStageLabel({ stage: stage(0), roundNumber: 4, playoffRound: false })).toBe(
+      "manche 4",
+    );
   });
 
   it("ramène les tours de l'arbre final à leur rang", () => {
     // Sans cela, le premier tour s'annoncerait « manche 1000 ».
-    expect(rollbackRoundLabel(PLAYOFF_ROUND_OFFSET)).toBe("tour 1 des play-offs");
-    expect(rollbackRoundLabel(PLAYOFF_ROUND_OFFSET + 2)).toBe("tour 3 des play-offs");
+    expect(
+      rollbackStageLabel({
+        stage: stage(0),
+        roundNumber: PLAYOFF_ROUND_OFFSET,
+        playoffRound: true,
+      }),
+    ).toBe("tour 1 des play-offs");
+    expect(
+      rollbackStageLabel({
+        stage: stage(0),
+        roundNumber: PLAYOFF_ROUND_OFFSET + 2,
+        playoffRound: true,
+      }),
+    ).toBe("tour 3 des play-offs");
+  });
+
+  it("nomme la phase quand il y en a une", () => {
+    expect(rollbackStageLabel({ stage: stage(2), roundNumber: 3, playoffRound: false })).toBe(
+      "manche 3 de la phase 2",
+    );
   });
 
   it("accorde l'article au genre du libellé", () => {
     // Une manche est féminine, un tour masculin : une seule forme se tromperait
     // une fois sur deux, sur un texte affiché à l'arbitre juste avant le geste.
-    expect(rollbackRoundLabelWithArticle(4)).toBe("la manche 4");
-    expect(rollbackRoundLabelWithArticle(PLAYOFF_ROUND_OFFSET)).toBe("le tour 1 des play-offs");
+    expect(
+      rollbackStageLabelWithArticle({ stage: stage(0), roundNumber: 4, playoffRound: false }),
+    ).toBe("la manche 4");
+    expect(
+      rollbackStageLabelWithArticle({
+        stage: stage(0),
+        roundNumber: PLAYOFF_ROUND_OFFSET,
+        playoffRound: true,
+      }),
+    ).toBe("le tour 1 des play-offs");
   });
 });

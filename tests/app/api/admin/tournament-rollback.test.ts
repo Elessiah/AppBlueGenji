@@ -8,7 +8,6 @@ import { POST } from "@/app/api/admin/tournaments/[id]/rollback/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { rollbackCurrentRound } from "@/lib/server/tournaments/rollback";
-import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
 
 type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
 
@@ -19,7 +18,12 @@ const arbitre = {
   isAdmin: false,
   roles: ["ARBITRE"],
 } as unknown as SessionUser;
-const caster = { id: 3, pseudo: "Micro", isAdmin: false, roles: ["CASTER"] } as unknown as SessionUser;
+const caster = {
+  id: 3,
+  pseudo: "Micro",
+  isAdmin: false,
+  roles: ["CASTER"],
+} as unknown as SessionUser;
 const player = { id: 4, pseudo: "Joueur", isAdmin: false, roles: [] } as unknown as SessionUser;
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
@@ -39,8 +43,12 @@ function rollback(id: string, body?: unknown) {
 const rolledBack = {
   tournamentId: 7,
   tournamentName: "BlueGenji Open",
+  stageKey: "0:4",
   roundNumber: 4,
+  phaseRank: 0,
+  label: "la manche 4",
   clearedMatches: 3,
+  reopenedTournament: false,
 };
 
 describe("POST /api/admin/tournaments/[id]/rollback", () => {
@@ -57,29 +65,30 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
     // correction de score que l'arbitre fait déjà. La suppression définitive
     // reste, elle, réservée aux administrateurs.
     ["un arbitre", arbitre],
-  ])("défait la manche courante pour %s", async (_label, user) => {
+  ])("défait le stade courant pour %s", async (_label, user) => {
     (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
 
     const res = await rollback("7");
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ rolledBack });
-    expect(rollbackCurrentRound).toHaveBeenCalledWith(7, { expectedRound: undefined });
+    expect(rollbackCurrentRound).toHaveBeenCalledWith(7, { expectedStage: undefined });
   });
 
-  it("transmet la manche annoncée par l'écran", async () => {
+  it("transmet le stade annoncé par l'écran", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
 
-    await rollback("7", { expectedRound: 4 });
+    await rollback("7", { expectedStage: "0:4" });
 
-    expect(rollbackCurrentRound).toHaveBeenCalledWith(7, { expectedRound: 4 });
+    expect(rollbackCurrentRound).toHaveBeenCalledWith(7, { expectedStage: "0:4" });
   });
 
   it.each([
     ["un corps absent", undefined],
     ["un corps sans la clé", { autre: 1 }],
-    ["une manche illisible", { expectedRound: "quatre" }],
-    ["une manche négative", { expectedRound: -1 }],
+    ["un stade qui n'est pas une chaîne", { expectedStage: 4 }],
+    ["une chaîne vide", { expectedStage: "" }],
+    ["une chaîne démesurée", { expectedStage: "0:".padEnd(200, "9") }],
   ])("s'en remet à la base sur %s", async (_label, body) => {
     // Le garde-fou ne peut que faire refuser le geste, jamais le déplacer : un
     // corps qu'on ne sait pas lire retombe donc sur le comportement d'origine.
@@ -87,7 +96,7 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
 
     await rollback("7", body);
 
-    expect(rollbackCurrentRound).toHaveBeenCalledWith(7, { expectedRound: undefined });
+    expect(rollbackCurrentRound).toHaveBeenCalledWith(7, { expectedStage: undefined });
   });
 
   it("rejette un visiteur anonyme avec 401", async () => {
@@ -135,14 +144,11 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
   });
 
   it.each([
-    "TOURNAMENT_NOT_RUNNING",
-    "ROLLBACK_UNSUPPORTED_FORMAT",
+    "ROLLBACK_TOURNAMENT_NOT_STARTED",
     "ROLLBACK_NOTHING_TO_UNDO",
-    "ROLLBACK_PLAYOFFS_STARTED",
     "ROLLBACK_ROUND_CHANGED",
   ])("rend 409 sur %s", async (code) => {
-    // La demande est bien formée : c'est l'état du tournoi, ou son format, qui
-    // la contredit.
+    // La demande est bien formée : c'est l'état du tournoi qui la contredit.
     (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
     (rollbackCurrentRound as jest.Mock).mockRejectedValue(new Error(code) as never);
 
@@ -165,7 +171,7 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
     expect(await res.json()).toEqual({ error: "ROLLBACK_FAILED" });
   });
 
-  it("journalise le geste avec son auteur et la manche défaite", async () => {
+  it("journalise le geste avec son auteur et le stade défait", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
 
     await rollback("7");
@@ -173,16 +179,19 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
     const line = String((sendBotLog as jest.Mock).mock.calls[0]?.[0]);
     expect(line).toContain("Retour en arrière");
     expect(line).toContain("« BlueGenji Open » (#7)");
-    expect(line).toContain("manche 4");
+    expect(line).toContain("la manche 4");
     expect(line).toContain("3 rencontres effacées");
     expect(line).toContain("Sifflet");
+    expect(line).not.toContain("rouvert");
   });
 
-  it("nomme un tour d'arbre final par son rang, pas par son numéro interne", async () => {
+  it("reprend le libellé du serveur, jamais un libellé reconstruit", async () => {
+    // Le stade que l'écran croyait effacer pouvait être périmé : seul le serveur
+    // sait ce qu'il a réellement vidé.
     (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
     (rollbackCurrentRound as jest.Mock).mockResolvedValue({
       ...rolledBack,
-      roundNumber: PLAYOFF_ROUND_OFFSET + 1,
+      label: "le tour 2 des play-offs",
       clearedMatches: 1,
     } as never);
 
@@ -191,6 +200,20 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
     const line = String((sendBotLog as jest.Mock).mock.calls[0]?.[0]);
     expect(line).toContain("tour 2 des play-offs");
     expect(line).toContain("1 rencontre effacée");
+  });
+
+  it("dit au journal qu'un tournoi terminé vient d'être rouvert", async () => {
+    // Un palmarès annoncé sur ce même canal quelques lignes plus haut ne vaut
+    // plus : la clôture qui suivra en annoncera un autre.
+    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    (rollbackCurrentRound as jest.Mock).mockResolvedValue({
+      ...rolledBack,
+      reopenedTournament: true,
+    } as never);
+
+    await rollback("7");
+
+    expect(String((sendBotLog as jest.Mock).mock.calls[0]?.[0])).toContain("tournoi rouvert");
   });
 
   it("n'échoue pas parce que le bot dort", async () => {
