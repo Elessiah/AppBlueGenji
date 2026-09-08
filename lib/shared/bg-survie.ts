@@ -39,12 +39,83 @@
  * Module pur : aucune dépendance base de données, entièrement testable.
  */
 
-import { forfeitMapCount, matchWinsRequired, type MatchFormat } from "./match-format";
+import {
+  forfeitMapCount,
+  matchWinsRequired,
+  withoutDraws,
+  type MatchFormat,
+} from "./match-format";
 
 // Le chiffre d'un forfait appartient au format de match, pas au mode : il est
 // défini une seule fois dans `match-format.ts` et réexporté ici, où l'appelaient
 // déjà l'orchestration et la vue.
 export { forfeitMapCount };
+
+/**
+ * Première manche de la phase éliminatoire.
+ *
+ * Les manches de qualification occupent 1..N ; les play-offs repartent d'un
+ * palier élevé pour que les deux phases restent lisibles côte à côte dans
+ * l'historique des matchs. Le nombre était recopié à trois endroits — le
+ * moteur, la vue, et désormais la résolution du format de match : c'est une
+ * frontière entre deux phases, pas un détail d'implémentation de l'une d'elles.
+ */
+export const PLAYOFF_ROUND_OFFSET = 1000;
+
+/** Cette manche appartient-elle à l'arbre final ? */
+export function isEndurancePlayoffRound(round: number): boolean {
+  return round >= PLAYOFF_ROUND_OFFSET;
+}
+
+/**
+ * Format de match applicable à une manche donnée.
+ *
+ * Le mode est le seul du projet à jouer **deux formats** : la phase
+ * qualificative peut clore un match sans vainqueur (une map nulle arrête un BO5
+ * sur 2-2, et le capital s'en accommode — il se compte map par map), l'arbre
+ * final ne le peut pas — il lui faut savoir qui joue le tour suivant.
+ *
+ * Sans format de play-offs propre, l'arbre rejoue celui du tournoi **égalités
+ * fermées** : c'est le repli le moins surprenant, et le seul qui ne laisse pas
+ * un demi-finaliste indéterminé.
+ */
+export function enduranceMatchFormat(
+  qualification: MatchFormat | null,
+  playoff: MatchFormat | null,
+  round: number,
+): MatchFormat | null {
+  if (!isEndurancePlayoffRound(round)) return qualification;
+  return playoff ?? withoutDraws(qualification);
+}
+
+/**
+ * **La** règle du format d'un match, tous modes confondus.
+ *
+ * Un seul mode joue deux formats — voir {@link enduranceMatchFormat} — et
+ * partout ailleurs les égalités sont fermées de force : la validation les
+ * refuse déjà à la création, mais une ligne écrite avant cette règle (ou à la
+ * main en base) ne doit pas rendre un tableau à élimination directe indécidable.
+ *
+ * Écrite ici plutôt que deux fois : le serveur la relit à chaque saisie
+ * (`loadTournamentMatchFormat`), l'interface s'en sert pour borner les champs et
+ * activer « Valider le résultat ». Deux copies auraient divergé au premier
+ * réglage, et la divergence se serait vue en 400 sur un formulaire qui
+ * s'annonçait valide.
+ *
+ * `round` omis (`null`) rend le format de la **qualification** : c'est ce que
+ * demandent les appelants qui ne visent pas un match précis.
+ */
+export function tournamentMatchFormat(
+  tournamentFormat: string,
+  qualification: MatchFormat | null,
+  playoff: MatchFormat | null,
+  round?: number | null,
+): MatchFormat | null {
+  if (tournamentFormat !== "BG_SURVIE") return withoutDraws(qualification);
+  if (round === null || round === undefined) return qualification;
+
+  return enduranceMatchFormat(qualification, playoff, round);
+}
 
 /**
  * Sortie d'une équipe de la phase qualificative.
@@ -94,6 +165,14 @@ export type EnduranceStanding = {
   points: number;
   wins: number;
   losses: number;
+  /**
+   * Matchs clos sans vainqueur.
+   *
+   * Ni une demi-victoire ni une demi-défaite : le capital, lui, a déjà bougé
+   * map par map — un 2-2 en barème ±1 ne déplace rien, un barème asymétrique le
+   * fera bouger. Compté à part pour que « matchs joués » reste juste.
+   */
+  draws: number;
   status: EnduranceStatus;
   /** Manche à laquelle l'équipe est tombée à 0 (ou a abandonné). */
   eliminatedRound: number | null;
@@ -132,6 +211,21 @@ export type EnduranceMatchOutcome = {
    * l'arbitrage : le barème se dérive alors du format, jamais des colonnes.
    */
   isForfeit?: boolean;
+  /**
+   * Match clos **sans vainqueur** : les deux engagés, dans l'ordre des sides.
+   *
+   * Une map nulle peut arrêter la rencontre avant l'objectif (2-2 en BO5) quand
+   * le format l'autorise — `winner_team_id` reste alors `NULL` en base, et
+   * l'outcome n'a plus de vainqueur d'où tirer les deux camps. Le champ ne vaut
+   * que pour ce cas : ailleurs, les identifiants se lisent sur
+   * `winnerTeamId` / `loserTeamId`.
+   */
+  drawTeamIds?: readonly [number, number] | null;
+  /**
+   * Maps gagnées par **chacune** des deux engagées d'un match nul. Une seule
+   * valeur : elles sont égales par définition, c'est ce qui fait le nul.
+   */
+  drawMaps?: number | null;
 };
 
 /**
@@ -520,6 +614,7 @@ export function replayEnduranceDetailed(input: ReplayEnduranceInput): EnduranceR
         points: config.startPoints,
         wins: 0,
         losses: 0,
+        draws: 0,
         status: "ACTIVE" as EnduranceStatus,
         eliminatedRound: null,
         rank: team.seed,
@@ -576,6 +671,25 @@ export function replayEnduranceDetailed(input: ReplayEnduranceInput): EnduranceR
   for (let round = 1; round <= maxRound; round += 1) {
     for (const match of matches) {
       if (match.round !== round || !match.completed) continue;
+
+      // Match nul : ni vainqueur ni perdant, mais des maps de part et d'autre.
+      // Le capital bouge quand même — le barème est map par map, pas match par
+      // match : à ±1 un 2-2 ne déplace rien, à +2/−1 il rapporte deux points à
+      // chacune. Le cas passe **avant** la lecture vainqueur/perdant, qui n'a
+      // rien à lire ici.
+      if (match.winnerTeamId === null && match.drawTeamIds) {
+        const [aId, bId] = match.drawTeamIds;
+        const a = standings.get(aId);
+        const b = standings.get(bId);
+        if (!a || !b || a.status !== "ACTIVE" || b.status !== "ACTIVE") continue;
+
+        const maps = Math.max(0, Math.floor(Number(match.drawMaps ?? 0)));
+        a.draws += 1;
+        b.draws += 1;
+        applyMapDelta(a, maps, maps, config, round);
+        applyMapDelta(b, maps, maps, config, round);
+        continue;
+      }
 
       const winner = match.winnerTeamId === null ? null : standings.get(match.winnerTeamId);
       const loser = match.loserTeamId === null ? null : standings.get(match.loserTeamId);

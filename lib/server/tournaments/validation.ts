@@ -9,7 +9,12 @@
  * Le module ne connaît pas HTTP : il rend un **code d'erreur**, que l'appelant
  * traduit en statut (`fail(code, 400)`) ou en exception.
  */
-import { isValidMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
+import {
+  isValidMatchFormat,
+  isValidMatchMaxMaps,
+  matchMaxMapsNeedsDraws,
+  type MatchFormat,
+} from "@/lib/shared/match-format";
 import { isParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import { DEFAULT_SWISS_POINTS } from "@/lib/shared/swiss";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
@@ -144,6 +149,10 @@ export type TournamentInputBody = {
   enduranceMaxRounds?: number;
   matchFormatType?: string | null;
   matchFormatValue?: number | null;
+  matchFormatMaxMaps?: number | null;
+  matchFormatDraws?: boolean | null;
+  endurancePlayoffFormatType?: string | null;
+  endurancePlayoffFormatValue?: number | null;
 };
 
 export type ValidatedTournamentInput = {
@@ -166,6 +175,12 @@ export type ValidatedTournamentInput = {
   endurancePlayoffSize: number | null;
   enduranceMaxRounds: number | null;
   matchFormat: MatchFormat | null;
+  /**
+   * Format de l'arbre final en « BlueGenji Survie » (`null` = celui du
+   * tournoi). Jamais d'égalité : la qualification peut clore un match sans
+   * vainqueur, l'arbre a besoin de savoir qui joue le tour suivant.
+   */
+  endurancePlayoffFormat: MatchFormat | null;
   /**
    * Phases du format MULTI, **brutes** (telles que reçues du client) : non
    * normalisées — `position`, `name`, `hasThirdPlaceMatch`… peuvent être
@@ -224,6 +239,71 @@ export function validateTournamentInput(
     matchFormat = {
       type: body.matchFormatType as MatchFormat["type"],
       value: Number(body.matchFormatValue),
+    };
+  }
+
+  // Égalités : réservées à « BlueGenji Survie », dont le capital se compte map
+  // par map et absorbe un match nul. Ailleurs, un match sans vainqueur laisse
+  // le moteur sans qualifiée à propager.
+  //
+  // Hors de ce format, le réglage est **neutralisé**, pas refusé — même choix
+  // que `hasThirdPlaceMatch` hors `SINGLE`, et pour la même raison : une
+  // édition qui bascule le format d'un tournoi ne doit pas échouer sur un
+  // réglage que le nouveau format ne relira même pas. `updateTournament`
+  // fusionne le patch sur les valeurs courantes, si bien qu'un
+  // `PATCH { format: "SINGLE" }` seul aurait sinon été refusé sans qu'aucun
+  // champ du corps ne le laisse deviner.
+  //
+  // Le refus subsiste dans le seul cas où le client se contredit : demander
+  // l'égalité sans format de match, alors que c'est lui qui borne la rencontre.
+  if (body.matchFormatDraws && body.format === "BG_SURVIE") {
+    if (!matchFormat) return { error: "INVALID_MATCH_FORMAT" };
+    matchFormat.drawsAllowed = true;
+  }
+
+  // Plafond de maps décisives. Il se lit **après** les égalités, et pas par
+  // commodité : les deux réglages ne se valident pas séparément — abaisser le
+  // plafond, c'est ouvrir la fenêtre du nul, et l'un sans l'autre laisserait des
+  // rencontres sans issue légale (`matchMaxMapsNeedsDraws`).
+  //
+  // Hors d'un format qui propose les égalités, il tombe donc **avec** elles, en
+  // silence : même neutralisation qu'au-dessus, même raison — une édition qui
+  // bascule le format ne doit pas échouer sur un réglage que le nouveau format
+  // ne relit pas, d'autant que le formulaire vient d'en masquer le champ (il ne
+  // s'affiche qu'avec la case des égalités). C'est aussi ce que fait
+  // `withoutDraws` au repli de l'arbre final.
+  //
+  // Le refus ne subsiste donc que là où les égalités étaient **offertes et
+  // déclinées** : le client se contredit alors pour de bon, et sa rencontre
+  // arrivée à égalité n'aurait aucun score enregistrable.
+  if (matchFormat && body.matchFormatMaxMaps != null && body.format === "BG_SURVIE") {
+    if (!isValidMatchMaxMaps(matchFormat, body.matchFormatMaxMaps)) {
+      return { error: "INVALID_MATCH_FORMAT_MAX_MAPS" };
+    }
+    if (matchMaxMapsNeedsDraws(matchFormat, body.matchFormatMaxMaps)) {
+      return { error: "MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS" };
+    }
+    matchFormat.maxMaps = Number(body.matchFormatMaxMaps);
+  }
+
+  // Format de l'arbre final (BG Survie). Même règle de paire que le format du
+  // tournoi ; les égalités n'y sont pas proposées, donc pas non plus lues.
+  let endurancePlayoffFormat: MatchFormat | null = null;
+  const hasPlayoffType = body.endurancePlayoffFormatType != null;
+  const hasPlayoffValue = body.endurancePlayoffFormatValue != null;
+  if (hasPlayoffType !== hasPlayoffValue) {
+    return { error: "INVALID_ENDURANCE_PLAYOFF_FORMAT" };
+  }
+  // Même neutralisation hors du mode : c'est un réglage sans objet ailleurs, pas
+  // une erreur du client. La **paire incomplète**, elle, en reste une (plus
+  // haut) : elle décrit un format à moitié défini, quel que soit le mode.
+  if (hasPlayoffType && hasPlayoffValue && body.format === "BG_SURVIE") {
+    if (!isValidMatchFormat(body.endurancePlayoffFormatType, body.endurancePlayoffFormatValue)) {
+      return { error: "INVALID_ENDURANCE_PLAYOFF_FORMAT" };
+    }
+    endurancePlayoffFormat = {
+      type: body.endurancePlayoffFormatType as MatchFormat["type"],
+      value: Number(body.endurancePlayoffFormatValue),
     };
   }
 
@@ -354,6 +434,7 @@ export function validateTournamentInput(
       endurancePlayoffSize,
       enduranceMaxRounds,
       matchFormat,
+      endurancePlayoffFormat,
       // Les phases ne concernent que le format MULTI : on ne les transmet pas
       // aux autres formats, même si le client en a envoyé. Voir le
       // commentaire du champ `phases` de `ValidatedTournamentInput` ci-dessus :

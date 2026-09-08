@@ -52,6 +52,15 @@ export type TournamentFormValues = {
    */
   enduranceMaxRounds: number;
   matchFormat: MatchFormat | null;
+  /**
+   * BG Survie : format de l'**arbre final**. `null` = le même que la
+   * qualification, égalités en moins.
+   *
+   * Il existe parce que le règlement distingue les deux : la qualification se
+   * joue en BO5 **sans tiebreaker** (une map nulle peut l'arrêter sur 2-2), les
+   * play-offs en vrai FT3 — une élimination directe a besoin d'un vainqueur.
+   */
+  endurancePlayoffFormat: MatchFormat | null;
   phases: PhaseConfig[];
 };
 
@@ -85,6 +94,7 @@ export type TournamentApiValues = {
   endurancePlayoffSize: number | null;
   enduranceMaxRounds: number | null;
   matchFormat: MatchFormat | null;
+  endurancePlayoffFormat: MatchFormat | null;
   phases: PhaseConfig[] | null;
 };
 
@@ -121,6 +131,9 @@ export function defaultTournamentFormValues(): TournamentFormValues {
     // « Libre » (`null`) conserve la saisie de score sans contrainte, comme les
     // tournois créés avant la fonctionnalité.
     matchFormat: { ...DEFAULT_MATCH_FORMAT },
+    // `null` = l'arbre final reprend le format du tournoi. C'est le défaut, et
+    // il vaut pour tous les tournois créés avant ce réglage.
+    endurancePlayoffFormat: null,
     phases: [createDefaultPhase(1, "SWISS"), createDefaultPhase(2, "DOUBLE")],
   };
 }
@@ -195,6 +208,19 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
       format === "BG_SURVIE" ? (values.enduranceMaxRounds > 0 ? values.enduranceMaxRounds : null) : undefined,
     matchFormatType: values.matchFormat?.type ?? null,
     matchFormatValue: values.matchFormat?.value ?? null,
+    // Le plafond de maps et les égalités voyagent **aplatis** eux aussi, comme
+    // le type et le nombre de manches : un seul champ éditable, `matchFormat`,
+    // quatre clés dans le corps.
+    matchFormatMaxMaps: values.matchFormat?.maxMaps ?? null,
+    // Les égalités n'ont de sens qu'en qualification de BG Survie : ailleurs,
+    // la validation les refuse, et les envoyer ferait échouer la création d'un
+    // tournoi dont le formulaire n'affiche même pas la case.
+    matchFormatDraws:
+      format === "BG_SURVIE" ? (values.matchFormat?.drawsAllowed ?? false) : false,
+    endurancePlayoffFormatType:
+      format === "BG_SURVIE" ? (values.endurancePlayoffFormat?.type ?? null) : null,
+    endurancePlayoffFormatValue:
+      format === "BG_SURVIE" ? (values.endurancePlayoffFormat?.value ?? null) : null,
   };
 }
 
@@ -236,6 +262,7 @@ export function toFormValues(apiValues: TournamentApiValues): TournamentFormValu
     // `null` en base = pas de plafond : le champ retombe sur 0, qui le dit.
     enduranceMaxRounds: apiValues.enduranceMaxRounds ?? 0,
     matchFormat: apiValues.matchFormat,
+    endurancePlayoffFormat: apiValues.endurancePlayoffFormat,
     phases: apiValues.phases ?? defaults.phases,
   };
 }

@@ -53,6 +53,7 @@ const FIELD_LABELS: Partial<Record<TournamentField, string>> = {
   endurancePlayoffSize: "Équipes en play-offs",
   enduranceMaxRounds: "Manches maximum",
   matchFormat: "Format de match",
+  endurancePlayoffFormat: "Format des play-offs",
   phases: "Phases du tournoi",
 };
 
@@ -168,15 +169,32 @@ export default function EditTournamentPage() {
           const body: Record<string, unknown> = {};
           for (const field of editableFields) {
             if (field === "matchFormat") {
-              // `toApiPayload` aplatit le format de match en deux clés
-              // (`matchFormatType` / `matchFormatValue`) alors que la route
-              // d'édition n'en connaît qu'une, `matchFormat` : on les
+              // `toApiPayload` aplatit le format de match en quatre clés
+              // (type, nombre de manches, plafond de maps, égalités) alors que
+              // la route d'édition n'en connaît qu'une, `matchFormat` : on les
               // recompose ici plutôt que de recopier `payload.matchFormat`,
               // qui n'existe pas.
               body.matchFormat =
                 payload.matchFormatType === null
                   ? null
-                  : { type: payload.matchFormatType, value: payload.matchFormatValue };
+                  : {
+                      type: payload.matchFormatType,
+                      value: payload.matchFormatValue,
+                      maxMaps: payload.matchFormatMaxMaps,
+                      drawsAllowed: payload.matchFormatDraws,
+                    };
+              continue;
+            }
+            if (field === "endurancePlayoffFormat") {
+              // Même recomposition, pour le format de l'arbre final de BG
+              // Survie. `null` = l'arbre reprend celui du tournoi.
+              body.endurancePlayoffFormat =
+                payload.endurancePlayoffFormatType === null
+                  ? null
+                  : {
+                      type: payload.endurancePlayoffFormatType,
+                      value: payload.endurancePlayoffFormatValue,
+                    };
               continue;
             }
             body[field] = payload[field];

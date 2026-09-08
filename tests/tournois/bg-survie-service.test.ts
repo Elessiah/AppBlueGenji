@@ -558,7 +558,7 @@ describe("reconcileEndurance — plafond de manches", () => {
         .filter(([sql]) => String(sql).includes("INSERT INTO bg_endurance_standings"))
         .map(([, params]) => {
           const values = params as unknown[];
-          return [values[1], values[6]];
+          return [values[1], values[7]];
         }),
     );
   }

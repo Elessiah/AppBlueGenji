@@ -223,3 +223,62 @@ describe("scoreBlockerMessage", () => {
     expect(scoreBlockerMessage("ALREADY_DECIDED", null)).toContain("Valider le résultat");
   });
 });
+
+describe("decideScoreForm — égalités autorisées", () => {
+  /** Le format du règlement BG Survie : premier à 3, égalité possible. */
+  const QUALIF: MatchFormat = { type: "FT", value: 3, drawsAllowed: true };
+
+  function state(score1: string, score2: string): ScoreFormState {
+    return { score1, score2 };
+  }
+
+  it("laisse valider un score nul", () => {
+    const decision = decideScoreForm(state("2", "2"), { format: QUALIF, decided: false });
+
+    expect(decision.canResolve).toBe(true);
+    expect(decision.resolveBlocker).toBeNull();
+    expect(decision.scores).toEqual({ team1: 2, team2: 2 });
+  });
+
+  it("laisse valider un score sous l'objectif — une map nulle a arrêté la rencontre", () => {
+    expect(decideScoreForm(state("2", "1"), { format: QUALIF, decided: false }).canResolve).toBe(
+      true,
+    );
+    expect(decideScoreForm(state("0", "0"), { format: QUALIF, decided: false }).canResolve).toBe(
+      true,
+    );
+  });
+
+  it("garde le plafond : un score impossible reste refusé", () => {
+    const decision = decideScoreForm(state("4", "0"), { format: QUALIF, decided: false });
+
+    expect(decision.canResolve).toBe(false);
+    expect(decision.resolveBlocker).toBe("EXCEEDS_FORMAT");
+  });
+
+  it("refuse toujours l'égalité là où le format exige un vainqueur", () => {
+    // Et le refus dit « score incomplet » plutôt que « scores égaux » : le
+    // message renvoie au bon geste, saisir le vrai score.
+    const decision = decideScoreForm(state("2", "2"), { format: BO5, decided: false });
+
+    expect(decision.canResolve).toBe(false);
+    expect(decision.resolveBlocker).toBe("BELOW_FORMAT");
+  });
+
+  it("refuse l'égalité en saisie libre, seul cas sans objectif à opposer", () => {
+    const decision = decideScoreForm(state("2", "2"), { format: null, decided: false });
+
+    expect(decision.canResolve).toBe(false);
+    expect(decision.resolveBlocker).toBe("DRAW");
+    expect(scoreBlockerMessage("DRAW", null)).toContain("vainqueur");
+  });
+
+  it("n'ouvre pas l'enregistrement d'un match déjà tranché, égalités ou non", () => {
+    const decision = decideScoreForm(state("2", "2"), { format: QUALIF, decided: true });
+
+    expect(decision.canSave).toBe(false);
+    expect(decision.saveBlocker).toBe("ALREADY_DECIDED");
+    // Le corriger reste possible par « Valider le résultat ».
+    expect(decision.canResolve).toBe(true);
+  });
+});

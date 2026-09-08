@@ -23,6 +23,20 @@ export interface MatchScoreState {
   team2Score: number | null;
   winnerTeamId: number | null;
   forfeitTeamId: number | null;
+  /**
+   * Le match est-il **tranché** ?
+   *
+   * Ce n'est pas « il a un vainqueur » : une rencontre peut se clore sans
+   * vainqueur là où le format autorise l'égalité
+   * (`lib/shared/match-format.ts`). C'était pourtant la lecture de
+   * {@link isScoreEditLocked}, qui déclarait un match nul « pas encore joué » et
+   * en rouvrait l'édition alors que le serveur, lui, la refusait en 409 : le
+   * bouton menait à un mur.
+   *
+   * Ni « il porte un score » : l'arbitrage peut noter un 1-1 pendant que le
+   * match se joue, et cette saisie-là n'a rien de définitif.
+   */
+  decided: boolean;
   /** Au moins une équipe a saisi un score en attente de confirmation. */
   hasPendingReport: boolean;
   nextWinnerMatchId: number | null;
@@ -63,6 +77,7 @@ export function fromBracketMatch(match: BracketMatch): MatchScoreState {
     team2Score: match.team2Score,
     winnerTeamId: match.winnerTeamId,
     forfeitTeamId: match.forfeitTeamId,
+    decided: match.status === "COMPLETED",
     hasPendingReport: match.status === "AWAITING_CONFIRMATION",
     nextWinnerMatchId: match.nextWinnerMatchId,
     nextLoserMatchId: match.nextLoserMatchId,
@@ -142,6 +157,8 @@ export function isScoreEditLocked(
   format: TournamentFormat,
   phaseFormat?: PhaseFormat,
 ): boolean {
-  if (match.winnerTeamId === null) return false;
+  // Rien à protéger tant que la rencontre n'est pas tranchée — et « tranchée »
+  // n'est pas « a un vainqueur » : un match nul en est un.
+  if (!match.decided) return false;
   return dependentMatches(match, allMatches, format, phaseFormat).some(hasScoreInput);
 }

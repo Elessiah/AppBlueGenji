@@ -28,6 +28,7 @@ import {
 import { loadTeamRanking } from "@/lib/server/ranking-service";
 import { entrantHref } from "@/lib/shared/participants";
 import { isSeedOrderEffective, seedingSource } from "@/lib/shared/seeding";
+import { tournamentMatchFormat } from "@/lib/shared/bg-survie";
 
 const DEFAULT_STATS: LandingStats = {
   players: 0,
@@ -238,6 +239,15 @@ async function loadLandingLive(): Promise<LandingLive | null> {
             currentRow.bracket,
             Number(currentRow.round_number),
             rows.filter((row) => row.bracket === currentRow.bracket).length,
+          ),
+          // Le format **de cette manche** : « BlueGenji Survie » en joue deux,
+          // et une demi-finale ne se joue pas au format de la qualification.
+          // Même règle que la fiche du tournoi et que le garde-fou de saisie.
+          matchFormat: tournamentMatchFormat(
+            tournament.format,
+            tournament.matchFormat,
+            tournament.endurancePlayoffFormat,
+            Number(currentRow.round_number),
           ),
           liveState: resolveMatchLiveState(toLiveInput(currentRow)),
           liveUrl: normalizeStreamUrl(currentRow.live_url),

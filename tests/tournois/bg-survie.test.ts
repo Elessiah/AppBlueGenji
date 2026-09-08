@@ -25,6 +25,7 @@ function standing(overrides: Partial<EnduranceStanding> & { teamId: number }): E
     points: CONFIG.startPoints,
     wins: 0,
     losses: 0,
+    draws: 0,
     status: "ACTIVE",
     eliminatedRound: null,
     rank: overrides.teamId,
@@ -560,6 +561,11 @@ describe("verrouillage des scores en BlueGenji Survie", () => {
       team2Score: null,
       winnerTeamId: null,
       forfeitTeamId: null,
+      // Un match a longtemps été « tranché » dès qu'il portait un vainqueur ; il
+      // peut désormais l'être **sans** (match nul), d'où le champ explicite. Le
+      // défaut suit l'ancienne lecture pour que les cas existants disent la même
+      // chose, et un test qui vise le nul le pose à la main.
+      decided: overrides.winnerTeamId !== undefined && overrides.winnerTeamId !== null,
       hasPendingReport: false,
       nextWinnerMatchId: null,
       nextLoserMatchId: null,

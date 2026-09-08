@@ -72,6 +72,25 @@ récent, avec matchs joués et gagnés par mois. Un match plus ancien reste comp
 dans le bilan global mais sort de la fenêtre. `firstMatchAt` / `lastMatchAt`
 bornent l'historique complet.
 
+## Le match nul
+
+`StatsMatch` porte une issue **ternaire** (`outcome: "WIN" | "LOSS" | "DRAW"`) et
+non un booléen : un match clos sans vainqueur existe désormais (voir
+[MATCH_DRAWS.md](./MATCH_DRAWS.md)), et `won: false` l'aurait rangé parmi les
+défaites — une équipe qui n'a jamais perdu aurait affiché des défaites, et ses
+séries auraient été brisées par des matchs qu'elle n'a pas perdus.
+
+- `matchesDrawn` s'affiche **seulement s'il est non nul** : le nul n'existe que
+  dans un mode, une tuile à zéro sur toutes les autres fiches poserait une
+  question que rien n'y répond.
+- `winRate` garde les nuls au **dénominateur** — ce sont des matchs joués.
+- Un nul **rompt les deux séries** : `StreakKind` gagne `"DRAW"`, et la série en
+  cours vaut alors 1.
+- La forme porte « **N** » et non « D », cette lettre désignant déjà la défaite
+  sur ces pastilles.
+- Répartitions et adversaires le comptent dans `played`, sans l'ajouter à `won`
+  ni à `lost`.
+
 ## Ce qui est exclu du décompte
 
 Les **byes** (`bg_matches.is_bye = 1`) et les **matchs fantômes** (une équipe

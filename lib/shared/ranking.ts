@@ -113,13 +113,44 @@ export function ratingTransfer(winnerRating: number, loserRating: number): numbe
 }
 
 /**
- * Un match tel que le rejeu le consomme. Deux équipes réelles, une gagnante, et
- * la date qui le situe dans l'histoire du site.
+ * Points transférés du **premier** camp au second sur un match nul — négatif
+ * quand c'est le premier qui en gagne.
+ *
+ * Un nul n'est pas un non-évènement : il dit que les deux équipes se valent, ce
+ * que les cotes annonçaient peut-être autrement. La favorite en perd donc, et
+ * son adversaire en gagne autant — d'autant plus que l'écart était grand. Deux
+ * cotes égales ne déplacent rien.
+ *
+ * Toujours plus doux qu'une victoire, et par construction : l'écart à
+ * l'espérance vaut au plus ½ sur un nul, contre 1 sur une surprise totale. Une
+ * équipe à 500 qui tient tête à une équipe à 900 lui prend 13 points, là où la
+ * battre lui en aurait pris 29.
+ *
+ * **Un seul calcul pour les deux camps**, comme {@link ratingTransfer} : c'est
+ * ce qui garantit la symétrie.
+ */
+export function ratingDrawTransfer(firstRating: number, secondRating: number): number {
+  return Math.round(RANKING_K_FACTOR * (expectedScore(firstRating, secondRating) - 0.5));
+}
+
+/**
+ * Un match tel que le rejeu le consomme. Deux équipes réelles et la date qui le
+ * situe dans l'histoire du site.
  */
 export type RankedMatch = {
   matchId: number;
+  /** Gagnante — ou, sur un match nul, simplement le camp du side 1. */
   winnerTeamId: number;
+  /** Perdante — ou, sur un match nul, le camp du side 2. */
   loserTeamId: number;
+  /**
+   * Match clos **sans vainqueur** : une map nulle a arrêté la rencontre avant
+   * l'objectif, sur un format qui l'autorise (`lib/shared/match-format.ts`).
+   * Les deux champs ci-dessus ne nomment alors que les deux camps, dans l'ordre
+   * des sides — d'où le drapeau plutôt qu'un `null` qui les effacerait tous les
+   * deux, et le rejeu n'aurait plus personne à créditer.
+   */
+  drawn?: boolean;
   /** Date ISO du résultat. Une date illisible range le match en tête. */
   playedAt: string;
 };
@@ -129,13 +160,15 @@ export type RankedTeamState = {
   points: number;
   wins: number;
   losses: number;
+  /** Matchs clos sans vainqueur. */
+  draws: number;
   /** Matchs comptés. Zéro = équipe non classée, encore à la cote de départ. */
   matchesPlayed: number;
 };
 
 /** L'état d'une équipe qui n'a encore rien joué. */
 export function baseRankedTeamState(): RankedTeamState {
-  return { points: RANKING_BASE_POINTS, wins: 0, losses: 0, matchesPlayed: 0 };
+  return { points: RANKING_BASE_POINTS, wins: 0, losses: 0, draws: 0, matchesPlayed: 0 };
 }
 
 function playedTimestamp(value: string): number {
@@ -186,6 +219,22 @@ export function replayRanking(matches: RankedMatch[]): Map<number, RankedTeamSta
 
     const winner = stateOf(match.winnerTeamId);
     const loser = stateOf(match.loserTeamId);
+
+    if (match.drawn) {
+      // Le transfert va du premier camp au second, et peut être négatif : c'est
+      // la favorite qui paie un nul, quel que soit le side qu'elle occupait.
+      const transfer = ratingDrawTransfer(winner.points, loser.points);
+
+      winner.points = Math.max(RANKING_FLOOR_POINTS, winner.points - transfer);
+      loser.points = Math.max(RANKING_FLOOR_POINTS, loser.points + transfer);
+
+      winner.draws += 1;
+      loser.draws += 1;
+      winner.matchesPlayed += 1;
+      loser.matchesPlayed += 1;
+      continue;
+    }
+
     const transfer = ratingTransfer(winner.points, loser.points);
 
     winner.points += transfer;
@@ -206,10 +255,16 @@ export function rankedPointsOf(states: Map<number, RankedTeamState>, teamId: num
 }
 
 /**
- * Assiette du classement : les matchs qui comptent réellement. Terminés, avec
- * un vainqueur et deux équipes réelles — byes (`is_bye`) et matchs fantômes
- * (une équipe manquante) écartés, leur score étant posé par le moteur de
- * tournoi et non joué.
+ * Assiette du classement : les matchs qui comptent réellement. Terminés, entre
+ * deux équipes réelles — byes (`is_bye`) et matchs fantômes (une équipe
+ * manquante) écartés, leur score étant posé par le moteur de tournoi et non
+ * joué.
+ *
+ * **Avec un vainqueur, ou nuls.** Un match nul se reconnaît à ce qu'il est clos
+ * sans vainqueur *et* porte deux scores égaux — un match clos sans vainqueur ni
+ * score n'est pas un nul, c'est une ligne abîmée, et elle reste dehors. Le
+ * distinguer coûte une condition ; ne pas le faire ferait disparaître des
+ * fiches une rencontre pourtant jouée.
  *
  * `match` est l'alias de `bg_matches` dans la requête appelante.
  */
@@ -218,7 +273,14 @@ export function playedMatchSql(match = "m"): string {
        AND ${match}.is_bye = 0
        AND ${match}.team1_id IS NOT NULL
        AND ${match}.team2_id IS NOT NULL
-       AND ${match}.winner_team_id IS NOT NULL`;
+       AND (
+         ${match}.winner_team_id IS NOT NULL
+         OR (
+           ${match}.team1_score IS NOT NULL
+           AND ${match}.team2_score IS NOT NULL
+           AND ${match}.team1_score = ${match}.team2_score
+         )
+       )`;
 }
 
 /** L'assiette par défaut, pour les requêtes qui aliasent `bg_matches` en `m`. */
@@ -243,8 +305,11 @@ export function rankingMatchJoinSql(teamExpr: string, match = "m"): string {
  * leaderboard de l'accueil, qui n'affiche que les huit premières, se serait
  * rempli d'équipes de remplissage devant des équipes qui jouent.
  */
-export function isRankedTeam(team: { wins: number; losses: number }): boolean {
-  return team.wins + team.losses > 0;
+export function isRankedTeam(team: { wins: number; losses: number; draws?: number }): boolean {
+  // Le nul compte : une équipe dont l'unique rencontre s'est close sur 2-2 a
+  // bien joué, et sa cote a bougé. `draws` est facultatif — les vues qui n'en
+  // portent pas (une ligne SQL antérieure) se lisent exactement comme avant.
+  return team.wins + team.losses + (team.draws ?? 0) > 0;
 }
 
 /**
@@ -257,8 +322,8 @@ export function isRankedTeam(team: { wins: number; losses: number }): boolean {
  * vues triées chacune de son côté finiraient par afficher deux ordres.
  */
 export function compareRankedTeams(
-  a: { points: number; wins: number; losses: number; name: string },
-  b: { points: number; wins: number; losses: number; name: string },
+  a: { points: number; wins: number; losses: number; draws?: number; name: string },
+  b: { points: number; wins: number; losses: number; draws?: number; name: string },
 ): number {
   const rankedA = isRankedTeam(a);
   const rankedB = isRankedTeam(b);

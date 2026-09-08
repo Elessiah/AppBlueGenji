@@ -51,6 +51,10 @@ function fakeConnection(options: { winnerTeamId?: number | null } = {}): {
               next_loser_match_id: null,
               next_loser_slot: null,
               winner_team_id: options.winnerTeamId ?? null,
+              // « Déjà tranché » se lit sur le statut : un match nul est
+              // terminé sans avoir de vainqueur. Le fake dérive donc l'un de
+              // l'autre pour que les cas écrits avant disent la même chose.
+              status: options.winnerTeamId != null ? "COMPLETED" : "READY",
             },
           ],
           [],

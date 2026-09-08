@@ -408,6 +408,7 @@ export function EnduranceView({
   // rien n'explique pourquoi elle n'est plus en lice. La légende n'apparaît
   // qu'en présence d'une telle ligne, comme celle du forfait plus bas.
   const showOutLegend = endurance.standings.some((s) => s.status === "OUT_OF_CONTENTION");
+  const hasDraws = endurance.standings.some((s) => s.draws > 0);
 
   return (
     <>
@@ -425,11 +426,14 @@ export function EnduranceView({
       </p>
 
       <div className="table-like" style={{ marginBottom: showOutLegend ? 8 : 24 }}>
+        {/* La colonne des nuls n'apparaît que si le tournoi en a produit un :
+            « V / N / D » sur un plateau qui n'en connaît aucun ferait porter au
+            classement une colonne de zéros, et la ligne est déjà dense. */}
         <div className={`${rowClassName} table-header`}>
           <span>#</span>
           <span>{wording.oneCapitalized}</span>
           <span>Endurance</span>
-          <span>V / D</span>
+          <span>{hasDraws ? "V / N / D" : "V / D"}</span>
           <span>Statut</span>
           {showActions && <span className="sr-only">Actions</span>}
         </div>
@@ -478,7 +482,9 @@ export function EnduranceView({
                 )}
               </span>
               <span>
-                {standing.wins} / {standing.losses}
+                {hasDraws
+                  ? `${standing.wins} / ${standing.draws} / ${standing.losses}`
+                  : `${standing.wins} / ${standing.losses}`}
               </span>
               <span>
                 {STATUS_LABELS[standing.status]}
