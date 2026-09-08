@@ -264,6 +264,11 @@ type RankedEvent =
  * l'inverse.
  */
 function compareRankedEvents(a: RankedEvent, b: RankedEvent): number {
+  // Entre deux rencontres, la règle est celle de {@link compareRankedMatches} et
+  // pas une seconde copie : la réécrire ici la ferait diverger en silence le
+  // jour où quelqu'un règle la chronologie là où le JSDoc et les tests disent
+  // qu'elle vit.
+  if (a.order === 0 && b.order === 0) return compareRankedMatches(a.match, b.match);
   if (a.at !== b.at) return a.at - b.at;
   if (a.order !== b.order) return a.order - b.order;
   return a.id - b.id;
@@ -504,6 +509,32 @@ export const RANKING_PLACEMENT_HINT = "compris dans la cote · rang final des to
 
 /** Ce qu'affiche une équipe qui n'a encore disputé aucun match compté. */
 export const RANKING_UNRANKED_HINT = "Aucun match joué : cote de départ";
+
+/**
+ * Le cas que les points de parcours ont ouvert : aucun match compté, et
+ * pourtant une cote qui n'est plus celle du départ.
+ *
+ * Il est atteignable — une équipe qui abandonne tout un tournoi avant sa
+ * première manche n'a rien joué mais reçoit un rang final à la clôture, donc sa
+ * part de cagnotte. Lui servir « cote de départ » à côté de 486 ferait dire deux
+ * choses à la même ligne.
+ */
+export const RANKING_PLACEMENT_ONLY_HINT =
+  "Aucun match joué · cote issue de ses classements de tournoi";
+
+/**
+ * **La** règle qui choisit la légende du total de points, pour que les trois vues
+ * qui l'affichent (annuaire, bandeau de tête, fiche) ne recopient pas chacune
+ * son ternaire — la troisième formulation ci-dessus serait sinon oubliée dans
+ * deux d'entre elles.
+ *
+ * `ranked` se lit sur le bilan des matchs ({@link isRankedTeam}) ou, pour la
+ * fiche, sur la présence d'un rang : les deux disent la même chose.
+ */
+export function rankingPointsHint(ranked: boolean, points: number): string {
+  if (ranked) return RANKING_POINTS_HINT;
+  return points === RANKING_BASE_POINTS ? RANKING_UNRANKED_HINT : RANKING_PLACEMENT_ONLY_HINT;
+}
 
 /**
  * La règle de seeding, telle qu'on l'explique au visiteur sur les pages

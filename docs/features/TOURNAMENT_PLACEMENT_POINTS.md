@@ -185,3 +185,15 @@ Les légendes partagées suivent la règle depuis les constantes, sans être
 réécrites à la main : `RANKING_POINTS_HINT` (annuaire, leaderboard, fiche) et
 `RANKING_SEEDING_RULE` (pages `/regles` des modes qui seedent au classement)
 annoncent désormais la redistribution de fin de tournoi.
+
+Le total de points a par ailleurs gagné une **troisième** légende, et le choix
+entre les trois est écrit une seule fois (`rankingPointsHint`). La cagnotte a
+ouvert un cas qui n'existait pas : **aucun match compté, et pourtant une cote qui
+n'est plus celle du départ** — une équipe qui abandonne tout un tournoi avant sa
+première manche n'a rien joué mais reçoit un rang final à la clôture, donc sa
+part. `isRankedTeam` la laisse délibérément non classée (un rang ne remplace pas
+un bilan), mais lui servir « Aucun match joué : cote de départ » à côté de 486
+ferait dire deux choses à la même ligne : elle lit
+`RANKING_PLACEMENT_ONLY_HINT`. Les trois vues qui affichent un total (annuaire,
+bandeau de tête, fiche) recopiaient chacune leur ternaire — la troisième
+formulation y aurait été oubliée deux fois sur trois.

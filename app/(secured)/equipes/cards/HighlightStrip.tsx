@@ -1,9 +1,8 @@
 import type { TeamListItem } from "@/lib/shared/types";
 import {
   isRankedTeam,
-  RANKING_POINTS_HINT,
   RANKING_POINTS_LABEL,
-  RANKING_UNRANKED_HINT,
+  rankingPointsHint,
 } from "@/lib/shared/ranking";
 import s from "./HighlightStrip.module.css";
 
@@ -28,9 +27,7 @@ export function HighlightStrip({ teams }: { teams: TeamListItem[] }) {
               gagnée sur ce nombre-là, c'est expliquer deux fois le même chiffre
               de deux façons contradictoires sur la même page. */}
           <div
-            title={`${RANKING_POINTS_LABEL} · ${
-              isRankedTeam(t) ? RANKING_POINTS_HINT : RANKING_UNRANKED_HINT
-            }`}
+            title={`${RANKING_POINTS_LABEL} · ${rankingPointsHint(isRankedTeam(t), t.points)}`}
           >
             <div className={s.pts}>{t.points}</div>
             {/* Même règle que sur la carte : le mot complet est lu, l'abréviation

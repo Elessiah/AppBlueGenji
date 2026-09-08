@@ -1,8 +1,14 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  compareRankedMatches,
+  isRankedTeam,
   RANKING_BASE_POINTS,
   RANKING_FLOOR_POINTS,
+  RANKING_PLACEMENT_ONLY_HINT,
+  RANKING_POINTS_HINT,
+  RANKING_UNRANKED_HINT,
   rankedPointsOf,
+  rankingPointsHint,
   replayRanking,
   type RankedMatch,
   type RankedPlacement,
@@ -280,5 +286,59 @@ describe("le problème que la feature corrige", () => {
     const after = replayRanking([...history, ...matches], [final]);
 
     expect(after.get(LUCKY)!.points).toBeGreaterThan(beforeTournament(LUCKY));
+  });
+});
+
+describe("l'ordre des rencontres n'est écrit qu'une fois", () => {
+  /**
+   * `replayRanking` trie des évènements de deux natures, mais la règle qui
+   * range **deux rencontres** appartient à `compareRankedMatches` — celle que
+   * son JSDoc et ses tests annoncent. La réécrire dans le comparateur
+   * d'évènements la ferait diverger en silence.
+   */
+  it("range deux matchs exactement comme compareRankedMatches", () => {
+    const instant = "2026-06-10T18:00:00.000Z";
+    const first: RankedMatch = { matchId: 4, winnerTeamId: 1, loserTeamId: 2, playedAt: instant };
+    const second: RankedMatch = { matchId: 9, winnerTeamId: 2, loserTeamId: 3, playedAt: instant };
+
+    // Le rejeu doit produire l'état de « 4 puis 9 », l'ordre que dicte le
+    // comparateur — quel que soit l'ordre du tableau reçu.
+    expect(compareRankedMatches(first, second)).toBeLessThan(0);
+    expect(replayRanking([second, first])).toEqual(replayRanking([first, second]));
+    expect(replayRanking([second, first]).get(2)!.points).toBe(
+      replayRanking([first, second]).get(2)!.points,
+    );
+  });
+});
+
+describe("rankingPointsHint", () => {
+  it("annonce le barème à une équipe classée", () => {
+    expect(rankingPointsHint(true, 640)).toBe(RANKING_POINTS_HINT);
+  });
+
+  it("annonce la cote de départ à une équipe qui n'a rien joué du tout", () => {
+    expect(rankingPointsHint(false, RANKING_BASE_POINTS)).toBe(RANKING_UNRANKED_HINT);
+  });
+
+  /**
+   * Le cas ouvert par les points de parcours : aucun match compté, et pourtant
+   * une cote qui a bougé. Atteignable — une équipe qui abandonne tout un
+   * tournoi avant sa première manche reçoit un rang final à la clôture, donc sa
+   * part de cagnotte, sans avoir disputé la moindre rencontre.
+   */
+  it("ne dit pas « cote de départ » à une équipe dont le parcours a bougé la cote", () => {
+    const state = replayRanking([], [placement(1, [10, 20, 30, 40])]).get(40)!;
+
+    expect(isRankedTeam(state)).toBe(false);
+    expect(state.points).not.toBe(RANKING_BASE_POINTS);
+    expect(rankingPointsHint(isRankedTeam(state), state.points)).toBe(
+      RANKING_PLACEMENT_ONLY_HINT,
+    );
+  });
+
+  it("dit d'où vient la cote plutôt que de nier le classement", () => {
+    expect(RANKING_PLACEMENT_ONLY_HINT).toContain("Aucun match joué");
+    expect(RANKING_PLACEMENT_ONLY_HINT).toContain("tournoi");
+    expect(RANKING_PLACEMENT_ONLY_HINT).not.toContain("cote de départ");
   });
 });
