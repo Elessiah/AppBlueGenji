@@ -35,14 +35,25 @@ function teamRow(id: number, name = `Test - ${id}`, logo: string | null = null):
   return { id, name, logo_url: logo };
 }
 
+/** Une ligne de classement final, telle que la requête des points de parcours la rend. */
+function placementRow(tournamentId: number, teamId: number, rank: number, day = 20): Row {
+  return {
+    tournament_id: tournamentId,
+    team_id: teamId,
+    final_rank: rank,
+    awarded_at: new Date(`2026-06-${String(day).padStart(2, "0")}T20:00:00.000Z`),
+  };
+}
+
 /**
  * Base factice routée **par le SQL** : le service enchaîne des requêtes dont
  * l'ordre n'a pas à être figé par un test.
  */
-function fakeDb(matches: Row[], teams: Row[], entrants: Row[] = []) {
+function fakeDb(matches: Row[], teams: Row[], entrants: Row[] = [], placements: Row[] = []) {
   return jest.fn(async (sql: unknown) => {
     const text = String(sql);
     if (text.includes("AS played_at")) return [matches];
+    if (text.includes("AS awarded_at")) return [placements];
     if (text.includes("FROM bg_tournament_registrations")) return [entrants];
     if (text.includes("FROM bg_teams")) return [teams];
     return [[]];
@@ -205,7 +216,8 @@ describe("loadRankingState — mutualisation", () => {
     await loadRankingState({ connection });
     await loadRankingState({ connection });
 
-    expect(connection.execute).toHaveBeenCalledTimes(2);
+    // Deux lectures par rejeu — les rencontres, puis les classements finaux.
+    expect(connection.execute).toHaveBeenCalledTimes(4);
   });
 });
 
@@ -326,6 +338,7 @@ describe("getTeamRankingPosition", () => {
       position: null,
       total: 2,
       points: RANKING_BASE_POINTS,
+      placementPoints: 0,
     });
   });
 
@@ -419,7 +432,7 @@ describe("loadEntrantsBySiteRanking", () => {
     // à chaque fois : c'est le classement qui est mutualisé, pas la lecture du
     // tournoi.
     expect(sql.filter((text) => text.includes("AS played_at"))).toHaveLength(1);
-    expect(sql.filter((text) => text.includes("bg_tournament_registrations"))).toHaveLength(2);
+    expect(sql.filter((text) => text.includes("FROM bg_tournament_registrations"))).toHaveLength(2);
   });
 
   // La connexion reste la source de données dans les deux cas : le cache décide
@@ -539,5 +552,181 @@ describe("rejeu — le classement est une fonction de ce que la base contient", 
 
     expect(withMatch.get(1)).toBe(RANKING_BASE_POINTS + ratingTransfer(500, 500));
     expect(without.get(1)).toBe(RANKING_BASE_POINTS);
+  });
+});
+
+/**
+ * Les points de parcours n'ajoutent pas un second calcul : ils ajoutent une
+ * **collecte**. Ce bloc ne vérifie donc que ça — la bonne assiette, la bonne
+ * chronologie, le bon regroupement — le barème étant tenu par
+ * `tests/lib/shared/tournament-placement.test.ts`.
+ */
+describe("loadRankingState — classements finaux", () => {
+  it("ne collecte que les tournois clos qui ont un classement", async () => {
+    const execute = await mockDb(fakeDb([], []));
+
+    await loadRankingState();
+
+    const sql = execute.mock.calls
+      .map((call) => String(call[0]))
+      .find((text) => text.includes("AS awarded_at"))!;
+
+    expect(sql).toContain("t.state = 'FINISHED'");
+    expect(sql).toContain("r.final_rank IS NOT NULL");
+  });
+
+  it("date la cagnotte sur la clôture du tournoi", async () => {
+    const execute = await mockDb(fakeDb([], []));
+
+    await loadRankingState();
+
+    const sql = execute.mock.calls
+      .map((call) => String(call[0]))
+      .find((text) => text.includes("AS awarded_at"))!;
+
+    expect(sql).toContain("COALESCE(t.finished_at, t.updated_at, t.start_at)");
+  });
+
+  it("redistribue la cagnotte du tournoi, sans compter de match joué", async () => {
+    await mockDb(
+      fakeDb(
+        [],
+        [],
+        [],
+        [
+          placementRow(1, 10, 1),
+          placementRow(1, 20, 2),
+          placementRow(1, 30, 3),
+          placementRow(1, 40, 4),
+        ],
+      ),
+    );
+
+    const states = await loadRankingState();
+
+    expect(states.get(10)!.points).toBeGreaterThan(RANKING_BASE_POINTS);
+    expect(states.get(40)!.points).toBeLessThan(RANKING_BASE_POINTS);
+    expect(states.get(10)!.matchesPlayed).toBe(0);
+    // Somme nulle : la collecte ne doit pas casser ce que le module pur tient.
+    expect(
+      [...states.values()].reduce((total, state) => total + state.points, 0),
+    ).toBe(RANKING_BASE_POINTS * 4);
+  });
+
+  it("regroupe les lignes par tournoi", async () => {
+    await mockDb(
+      fakeDb(
+        [],
+        [],
+        [],
+        [
+          // Deux tournois entrelacés dans la même lecture : chacun doit
+          // redistribuer sa propre cagnotte, jamais celle de l'autre.
+          placementRow(1, 10, 1, 10),
+          placementRow(2, 30, 1, 20),
+          placementRow(1, 20, 2, 10),
+          placementRow(2, 40, 2, 20),
+        ],
+      ),
+    );
+
+    const states = await loadRankingState();
+    const solo = replayRanking(
+      [],
+      [
+        {
+          tournamentId: 1,
+          entrants: [
+            { teamId: 10, rank: 1 },
+            { teamId: 20, rank: 2 },
+          ],
+          awardedAt: new Date("2026-06-10T20:00:00.000Z").toISOString(),
+        },
+      ],
+    );
+
+    expect(states.get(10)!.points).toBe(solo.get(10)!.points);
+  });
+
+  // Un tournoi clos faute d'adversaires déclare pourtant son unique inscrite
+  // première : il ne doit rien lui rapporter.
+  it("écarte un tournoi à une seule classée", async () => {
+    await mockDb(fakeDb([], [], [], [placementRow(1, 10, 1)]));
+
+    const states = await loadRankingState();
+
+    expect(states.get(10)?.points ?? RANKING_BASE_POINTS).toBe(RANKING_BASE_POINTS);
+  });
+
+  it("borne les classements finaux sur la même fenêtre que les matchs", async () => {
+    const execute = await mockDb(fakeDb([], []));
+
+    await loadRankingState({ completedMoreThanDaysAgo: 7 });
+
+    const call = execute.mock.calls.find((entry) => String(entry[0]).includes("AS awarded_at"))!;
+    expect(String(call[0])).toContain("DATE_SUB(NOW(), INTERVAL ? DAY)");
+    expect(call[1]).toEqual([7]);
+  });
+
+  it("ne borne rien, et ne lie aucun paramètre, sans fenêtre", async () => {
+    const execute = await mockDb(fakeDb([], []));
+
+    await loadRankingState();
+
+    const call = execute.mock.calls.find((entry) => String(entry[0]).includes("AS awarded_at"))!;
+    expect(String(call[0])).not.toContain("DATE_SUB");
+    expect(call[1]).toEqual([]);
+  });
+
+  it("répercute une correction de classement final sans rien accumuler", async () => {
+    const podium = async (order: number[]) => {
+      clearCache();
+      invalidateTeamRanking();
+      await mockDb(
+        fakeDb(
+          [],
+          [],
+          [],
+          order.map((teamId, index) => placementRow(1, teamId, index + 1)),
+        ),
+      );
+      return loadRankingState();
+    };
+
+    const before = await podium([10, 20, 30, 40]);
+    const corrected = await podium([20, 10, 30, 40]);
+    const restored = await podium([10, 20, 30, 40]);
+
+    expect(corrected.get(20)!.points).toBe(before.get(10)!.points);
+    expect([...restored.entries()]).toEqual([...before.entries()]);
+  });
+});
+
+/**
+ * La part de parcours voyage jusqu'à la fiche : elle est **déjà** dans la cote,
+ * et la fiche l'affiche pour dire d'où celle-ci vient.
+ */
+describe("getTeamRankingPosition — part de parcours", () => {
+  it("rend la part venue des classements finaux", async () => {
+    await mockDb(
+      fakeDb(
+        [matchRow(1, 10, 20, 10)],
+        [teamRow(10), teamRow(20)],
+        [],
+        [placementRow(1, 10, 1), placementRow(1, 20, 2)],
+      ),
+    );
+
+    const position = await getTeamRankingPosition(10);
+
+    expect(position.placementPoints).toBeGreaterThan(0);
+    // Jamais en plus de la cote : elle en fait partie.
+    expect(position.points).toBeGreaterThan(position.placementPoints);
+  });
+
+  it("rend zéro pour une équipe qu'aucun tournoi clos n'a classée", async () => {
+    await mockDb(fakeDb([matchRow(1, 10, 20, 10)], [teamRow(10), teamRow(20)]));
+
+    expect((await getTeamRankingPosition(10)).placementPoints).toBe(0);
   });
 });

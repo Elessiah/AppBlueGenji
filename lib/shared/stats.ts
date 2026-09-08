@@ -151,6 +151,12 @@ export type TeamRankingPosition = {
   total: number;
   /** Cote rejouée. Cote de départ pour une équipe non classée. */
   points: number;
+  /**
+   * Part de la cote qui vient des **classements finaux de tournoi** et non des
+   * rencontres — négative pour qui sort tôt. Déjà comprise dans `points` : la
+   * fiche l'affiche pour dire d'où vient la cote, jamais pour l'y ajouter.
+   */
+  placementPoints: number;
 };
 
 /** États d'un tournoi effectivement disputé : un plateau existe. */

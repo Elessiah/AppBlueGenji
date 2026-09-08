@@ -7,8 +7,10 @@
  * Ronde suisse, du Multi-phases et de l'aperçu du plateau.
  *
  * Le module ne calcule rien : il **collecte** les rencontres comptées
- * (`playedMatchSql` — byes et matchs fantômes exclus) et délègue le rejeu à
- * `replayRanking` (`lib/shared/ranking.ts`, pur et testable sans base).
+ * (`playedMatchSql` — byes et matchs fantômes exclus) **et les classements
+ * finaux des tournois clos**, puis délègue le rejeu à `replayRanking`
+ * (`lib/shared/ranking.ts`, pur et testable sans base). Les deux entrent dans la
+ * même chronologie : voir `docs/features/TOURNAMENT_PLACEMENT_POINTS.md`.
  *
  * ## Pourquoi le SQL ne peut plus rendre les points
  *
@@ -40,8 +42,10 @@ import {
   RANKING_BASE_POINTS,
   replayRanking,
   type RankedMatch,
+  type RankedPlacement,
   type RankedTeamState,
 } from "@/lib/shared/ranking";
+import { MIN_PLACEMENT_ENTRANTS } from "@/lib/shared/tournament-placement";
 import type { TeamRankingPosition } from "@/lib/shared/stats";
 
 export type { TeamRankingPosition };
@@ -114,6 +118,13 @@ type RankedMatchRow = RowDataPacket & {
   /** `null` = match nul : `PLAYED_MATCH_SQL` n'en laisse pas passer d'autre. */
   winner_team_id: number | null;
   played_at: Date | string | null;
+};
+
+type PlacementRow = RowDataPacket & {
+  tournament_id: number;
+  team_id: number;
+  final_rank: number;
+  awarded_at: Date | string | null;
 };
 
 type TeamIdentityRow = RowDataPacket & {
@@ -192,6 +203,65 @@ async function loadRankedMatches(
 }
 
 /**
+ * Classements finaux des tournois clos, prêts pour le rejeu.
+ *
+ * Une seule requête pour tout le site, regroupée en mémoire par tournoi : le
+ * calcul de la cagnotte a besoin du plateau **entier** d'un coup, une ligne
+ * isolée ne dit rien.
+ *
+ * La date retenue est celle de la clôture (`finished_at`), avec les mêmes replis
+ * que la chronologie des matchs — un tournoi clos par une migration ancienne
+ * peut n'en porter aucune, et le rejeu doit tout de même savoir où le ranger.
+ *
+ * La fenêtre `completedMoreThanDaysAgo` s'applique sur cette même date : la
+ * tendance du leaderboard compare deux photos du site, et une photo d'il y a une
+ * semaine ne connaît pas les tournois clos depuis.
+ *
+ * Les tournois à moins de {@link MIN_PLACEMENT_ENTRANTS} classées sont écartés
+ * **ici** plutôt que dans le rejeu : c'est du bruit qui n'a pas à traverser le
+ * module pur — un tournoi clos faute d'adversaires déclare pourtant son unique
+ * inscrite première.
+ */
+async function loadRankedPlacements(
+  db: Queryable,
+  days: number | undefined,
+): Promise<RankedPlacement[]> {
+  const awardedAt = "COALESCE(t.finished_at, t.updated_at, t.start_at)";
+  const before = days === undefined ? "" : `
+       AND ${awardedAt} < DATE_SUB(NOW(), INTERVAL ? DAY)`;
+
+  const [rows] = await db.execute<PlacementRow[]>(
+    `SELECT
+      t.id AS tournament_id,
+      r.team_id,
+      r.final_rank,
+      ${awardedAt} AS awarded_at
+     FROM bg_tournaments t
+     JOIN bg_tournament_registrations r ON r.tournament_id = t.id
+     WHERE t.state = 'FINISHED'
+       AND r.final_rank IS NOT NULL${before}
+     ORDER BY awarded_at ASC, t.id ASC, r.final_rank ASC`,
+    days === undefined ? [] : [days],
+  );
+
+  const byTournament = new Map<number, RankedPlacement>();
+  for (const row of rows) {
+    const tournamentId = Number(row.tournament_id);
+    const placement = byTournament.get(tournamentId) ?? {
+      tournamentId,
+      entrants: [],
+      awardedAt: isoOrEpoch(row.awarded_at),
+    };
+    placement.entrants.push({ teamId: Number(row.team_id), rank: Number(row.final_rank) });
+    byTournament.set(tournamentId, placement);
+  }
+
+  return [...byTournament.values()].filter(
+    (placement) => placement.entrants.length >= MIN_PLACEMENT_ENTRANTS,
+  );
+}
+
+/**
  * État rejoué du classement : une cote par équipe ayant disputé un match
  * compté.
  *
@@ -213,7 +283,12 @@ export async function loadRankingState(
   // accepte le cache, le seeding lit sur la sienne et le refuse.
   const replay = async () => {
     const db = options.connection ?? (await getDatabase());
-    return replayRanking(await loadRankedMatches(db, days));
+    // Deux lectures **enchaînées** et non parallèles : `db` peut être la
+    // connexion d'une transaction en cours (le seeding), qui n'exécute qu'une
+    // requête à la fois.
+    const matches = await loadRankedMatches(db, days);
+    const placements = await loadRankedPlacements(db, days);
+    return replayRanking(matches, placements);
   };
 
   // Sans connexion, on lit pour afficher : mutualisé par défaut.
@@ -362,9 +437,16 @@ export async function getTeamRankingPosition(teamId: number): Promise<TeamRankin
   const scored = await loadTeamRanking();
   const self = scored.find((row) => row.teamId === teamId);
 
+  const states = await loadRankingState();
+
   if (self) {
     const ahead = scored.filter((row) => row.points > self.points).length;
-    return { position: ahead + 1, total: scored.length, points: self.points };
+    return {
+      position: ahead + 1,
+      total: scored.length,
+      points: self.points,
+      placementPoints: states.get(teamId)?.placementPoints ?? 0,
+    };
   }
 
   // Hors liste : équipe sans match, entrée solo, ou équipe dissoute. La cote se
@@ -372,10 +454,10 @@ export async function getTeamRankingPosition(teamId: number): Promise<TeamRankin
   // joué, et afficher 500 sur sa fiche à côté d'un bilan de vingt matchs ferait
   // dire deux choses à la même page. Les deux lectures passent par la photo
   // mutualisée : c'est le même rejeu, pas un second.
-  const states = await loadRankingState();
   return {
     position: null,
     total: scored.length,
     points: states.get(teamId)?.points ?? RANKING_BASE_POINTS,
+    placementPoints: states.get(teamId)?.placementPoints ?? 0,
   };
 }

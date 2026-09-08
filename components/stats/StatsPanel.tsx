@@ -14,9 +14,10 @@ import {
   type TeamRankingPosition,
 } from "@/lib/shared/stats";
 import {
-  RANKING_POINTS_HINT,
+  RANKING_PLACEMENT_HINT,
+  RANKING_PLACEMENT_LABEL,
   RANKING_POINTS_LABEL,
-  RANKING_UNRANKED_HINT,
+  rankingPointsHint,
 } from "@/lib/shared/ranking";
 import s from "./StatsPanel.module.css";
 
@@ -229,8 +230,26 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
               <Tile
                 label={RANKING_POINTS_LABEL}
                 value={ranking.points}
-                hint={ranking.position ? RANKING_POINTS_HINT : RANKING_UNRANKED_HINT}
+                /* Le bilan des matchs, et non `position` : celui-ci est nul
+                   pour trois situations distinctes — aucun match, entrée solo,
+                   équipe dissoute — et la dernière a joué. La tuile
+                   « Matchs joués » juste à côté sort de la même assiette
+                   (`PLAYED_MATCH_SQL`) que le classement : les deux ne peuvent
+                   pas se contredire. */
+                hint={rankingPointsHint(stats.matchesPlayed > 0, ranking.points)}
               />
+              {/* La part de parcours ne s'affiche que si un tournoi clos l'a
+                  fait bouger : une tuile à zéro sur la fiche d'une équipe qui
+                  n'a encore fini aucun tournoi poserait une question que rien
+                  n'y répond — même règle que les nuls plus bas. Elle est
+                  **déjà** dans la cote au-dessus, d'où le signe explicite. */}
+              {ranking.placementPoints !== 0 && (
+                <Tile
+                  label={RANKING_PLACEMENT_LABEL}
+                  value={formatDiff(ranking.placementPoints)}
+                  hint={RANKING_PLACEMENT_HINT}
+                />
+              )}
             </>
           ) : null}
         </div>

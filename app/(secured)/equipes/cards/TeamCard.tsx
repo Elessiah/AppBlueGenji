@@ -8,9 +8,8 @@ import { PlayerLink } from "@/components/entity-link";
 import { displayTeamTag } from "@/lib/shared/team-tag";
 import {
   isRankedTeam,
-  RANKING_POINTS_HINT,
   RANKING_POINTS_LABEL,
-  RANKING_UNRANKED_HINT,
+  rankingPointsHint,
 } from "@/lib/shared/ranking";
 import s from "./TeamCard.module.css";
 
@@ -110,9 +109,7 @@ export function TeamCard({ team }: { team: TeamListItem }) {
             qui n'a jamais joué afficherait le même nombre qu'une équipe qui l'a
             gagné, et rien ne dirait la différence. */}
         <div
-          title={`${RANKING_POINTS_LABEL} · ${
-            isRankedTeam(team) ? RANKING_POINTS_HINT : RANKING_UNRANKED_HINT
-          }`}
+          title={`${RANKING_POINTS_LABEL} · ${rankingPointsHint(isRankedTeam(team), team.points)}`}
         >
           <div className={s.statLbl}>
             <span aria-hidden="true">Pts</span>
