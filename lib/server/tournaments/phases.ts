@@ -188,7 +188,13 @@ export async function startPhase(
 }
 
 /**
- * Réconciliation des phases : idempotent et sans effet si le tournoi n'est pas MULTI+RUNNING.
+ * Réconciliation des phases : idempotente et sans effet si le tournoi n'est pas MULTI.
+ *
+ * Deux états seulement l'occupent. **`RUNNING`** : le chemin ordinaire décrit
+ * ci-dessous. **`FINISHED`** : le tournoi est clos, mais la finale de sa
+ * dernière phase reste corrigible (`adminResolveMatch` n'a aucune garde d'état,
+ * par choix) — on rejoue alors le classement de cette phase et la finalisation,
+ * sans rien reposer. Voir `docs/features/FINISHED_TOURNAMENT_RECONCILIATION.md`.
  *
  * Vérrouille la ligne du tournoi (FOR UPDATE) pour sérialiser les opérations concurrentes :
  * deux reconcilePhases() ne se chevauchent jamais. Charge la phase active, demande à son
