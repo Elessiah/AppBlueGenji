@@ -312,10 +312,25 @@ function resolveSides(
     : { winnerTeamId: Number(match.team2_id), loserTeamId: Number(match.team1_id) };
 }
 
+/**
+ * Tranche les reports de score dont le délai a expiré.
+ *
+ * Renvoie le **nombre de manches réellement closes** — et non `void` : c'est la
+ * seule information qui distingue un balayage sans effet d'un balayage qui vient
+ * d'écrire un résultat, et l'appelant en a besoin. Les modes à classement
+ * (Survie, Ronde suisse, BlueGenji Survie) et le multi-phases ne posent leur
+ * manche suivante qu'en réconciliant ; sans ce compte, l'entretien passif ne
+ * saurait pas qu'il doit les rappeler, et une manche close par le délai — la
+ * dernière de sa ronde — laisserait le tournoi sans suite (voir
+ * `./state.ts`).
+ *
+ * Un désaccord entre les deux engagés ne compte pas : il n'est pas tranché, il
+ * est escaladé à l'arbitrage.
+ */
 export async function resolveExpiredScoreReports(
   connection: PoolConnection,
   tournamentId: number,
-): Promise<void> {
+): Promise<number> {
   const [rows] = await connection.execute<ExpiredMatchRow[]>(
     `SELECT
       id,
@@ -343,6 +358,8 @@ export async function resolveExpiredScoreReports(
 
   // Import at runtime to avoid circular deps
   const { finalizeMatch } = await import("./scoring");
+
+  let resolved = 0;
 
   for (const match of rows) {
     if (match.team1_id === null || match.team2_id === null) {
@@ -379,6 +396,7 @@ export async function resolveExpiredScoreReports(
         winnerTeamId,
         loserTeamId,
       });
+      resolved += 1;
       continue;
     }
 
@@ -396,6 +414,8 @@ export async function resolveExpiredScoreReports(
       matchId: Number(match.id),
     });
   }
+
+  return resolved;
 }
 
 // Import MatchRow type

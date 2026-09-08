@@ -134,7 +134,7 @@ describe("syncTournamentState — entretien d'un tournoi en cours", () => {
 
     const result = await syncTournamentState(connection, 5);
 
-    expect(result).toEqual({ row: null, stateChanged: false });
+    expect(result).toEqual({ row: null, stateChanged: false, contentChanged: false });
     expect(createBracketIfMissing).not.toHaveBeenCalled();
   });
 });

@@ -203,6 +203,25 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     expect(syncTournamentState).toHaveBeenCalled();
   });
 
+  it.each(["MULTI", "SWISS", "SURVIVAL", "BG_SURVIE"])(
+    "n'ouvre aucune transaction pour un tournoi %s dont `bracket_size` est nul",
+    async (format) => {
+      // `bracket_size` ne décrit que les formats à plateau, et seul l'un d'eux
+      // le renseigne : en `MULTI` la taille vit sur `bg_tournament_phases`, si
+      // bien que cette colonne reste **définitivement** nulle. Sans filtre de
+      // format, chaque reconstruction d'instantané d'un multi-phases en cours
+      // ouvrait une transaction d'entretien — juste ce que ce module promet
+      // d'éviter.
+      (loadTournamentRow as jest.Mock).mockResolvedValue(
+        runningRow({ format, bracket_size: null }) as never,
+      );
+
+      await getTournamentSnapshotFrame(TOURNAMENT_ID);
+
+      expect(syncTournamentState).not.toHaveBeenCalled();
+    },
+  );
+
   it("arbitre un report de score expiré", async () => {
     expiredRows = [{ 1: 1 }];
 
@@ -219,6 +238,24 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     (syncTournamentState as jest.Mock).mockResolvedValue({
       row: runningRow(),
       stateChanged: true,
+    } as never);
+
+    await getTournamentSnapshotFrame(TOURNAMENT_ID);
+
+    expect(invalidateTournamentLists).toHaveBeenCalled();
+  });
+
+  it("fait connaître aux listes un plateau créé à la lecture", async () => {
+    // Le moteur ne publie plus depuis le fond de sa transaction : il rend
+    // `contentChanged`, et c'est ici — après le commit — que la liste apprend
+    // que `bracket_size` a bougé.
+    (loadTournamentRow as jest.Mock).mockResolvedValue(
+      runningRow({ bracket_size: null }) as never,
+    );
+    (syncTournamentState as jest.Mock).mockResolvedValue({
+      row: runningRow({ bracket_size: 8 }),
+      stateChanged: false,
+      contentChanged: true,
     } as never);
 
     await getTournamentSnapshotFrame(TOURNAMENT_ID);

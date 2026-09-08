@@ -10,8 +10,21 @@ import {
 import { loadPhaseTeamIds } from "./phases-repository";
 import { createSingleEliminationBracket } from "./bracket-single";
 import { createDoubleEliminationBracket } from "./bracket-double";
-import { publishUpdatedEvent } from "./notifications";
 
+/**
+ * Crée le plateau d'élimination s'il manque (ou si l'effectif l'a périmé).
+ *
+ * **Ne publie aucun événement**, et ce n'est pas un oubli : cette fonction
+ * s'exécute toujours dans la transaction de son appelant, et publier ici
+ * invalidait les caches puis réveillait la salle SSE **avant le commit** — la
+ * salle reconstruisait alors l'instantané sur une autre connexion, qui ne voit
+ * pas le plateau en cours d'écriture, et diffusait « en cours, sans plateau »
+ * pour trois secondes de cache et jusqu'au battement d'entretien suivant. Sur
+ * un rollback, elle aurait annoncé un plateau qui n'a jamais existé.
+ *
+ * `created` remonte donc l'information à l'appelant, à charge pour lui de
+ * publier **après** son commit — c'est ce que fait tout le reste du moteur.
+ */
 export async function createBracketIfMissing(
   connection: PoolConnection,
   tournament: TournamentRow,
@@ -22,7 +35,7 @@ export async function createBracketIfMissing(
     format?: "SINGLE" | "DOUBLE";
     hasThirdPlaceMatch?: boolean;
   },
-): Promise<{ finished: boolean }> {
+): Promise<{ finished: boolean; created: boolean }> {
   const phaseId = options?.phaseId ?? 0;
 
   // Dans une phase, le plateau est celui de la phase (les qualifiées de la phase
@@ -56,7 +69,7 @@ export async function createBracketIfMissing(
   const bracketSizeChanged = currentBracketSize !== expectedBracketSize;
 
   if (hasExisting && !bracketSizeChanged) {
-    return { finished: false };
+    return { finished: false, created: false };
   }
 
   if (hasExisting && bracketSizeChanged) {
@@ -70,7 +83,7 @@ export async function createBracketIfMissing(
   // Handle single or zero teams (do not finish tournament inside a phase)
   if (registeredTeamIds.length <= 1) {
     if (phaseId > 0) {
-      return { finished: false };
+      return { finished: false, created: false };
     }
 
     if (registeredTeamIds.length === 1) {
@@ -89,7 +102,7 @@ export async function createBracketIfMissing(
       [registeredTeamIds.length, tournament.id],
     );
 
-    return { finished: true };
+    return { finished: true, created: false };
   }
 
   // Le format d'une phase prime sur celui du tournoi : ce dernier vaut « MULTI »
@@ -107,6 +120,5 @@ export async function createBracketIfMissing(
     await createSingleEliminationBracket(connection, bracketTournament, registeredTeamIds, options);
   }
 
-  publishUpdatedEvent(tournament.id);
-  return { finished: false };
+  return { finished: false, created: true };
 }

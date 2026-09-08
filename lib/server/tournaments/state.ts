@@ -34,9 +34,9 @@ export function computeTournamentState(
 export async function syncTournamentState(
   connection: PoolConnection,
   tournamentId: number,
-): Promise<{ row: TournamentRow | null; stateChanged: boolean }> {
+): Promise<{ row: TournamentRow | null; stateChanged: boolean; contentChanged: boolean }> {
   const tournament = await loadTournamentRow(connection, tournamentId);
-  if (!tournament) return { row: null, stateChanged: false };
+  if (!tournament) return { row: null, stateChanged: false, contentChanged: false };
 
   // Retenu pour la comparaison finale : l'entretien qui suit peut clore le
   // tournoi de son côté, et ses appelants s'appuient sur `stateChanged` pour
@@ -60,7 +60,11 @@ export async function syncTournamentState(
   if (computed === "RUNNING") {
     const { finalizeUnderfilledTournament } = await import("./finalization");
     if (await finalizeUnderfilledTournament(connection, tournamentId)) {
-      return { row: await loadTournamentRow(connection, tournamentId), stateChanged: true };
+      return {
+        row: await loadTournamentRow(connection, tournamentId),
+        stateChanged: true,
+        contentChanged: false,
+      };
     }
   }
 
@@ -155,16 +159,37 @@ export async function syncTournamentState(
   if (tournament.state === "RUNNING") {
     // Réservé aux formats à plateau : la survie, la ronde suisse et le
     // multi-phases construisent leurs matchs par leur propre orchestration.
+    let bracketCreated = false;
     if (tournament.format === "SINGLE" || tournament.format === "DOUBLE") {
       const { createBracketIfMissing } = await import("./bracket-generator");
-      await createBracketIfMissing(connection, tournament);
+      // Le plateau se crée dans **cette** transaction ; l'annonce, elle, revient
+      // à l'appelant qui la commite (`contentChanged` ci-dessous).
+      bracketCreated = (await createBracketIfMissing(connection, tournament)).created;
     }
 
     const { resolveExpiredScoreReports, finalizeTournamentIfDone } = await import("./finalization");
     const { tryAutoResolveByes } = await import("./byes");
 
-    await resolveExpiredScoreReports(connection, tournamentId);
+    const resolvedByTimeout = await resolveExpiredScoreReports(connection, tournamentId);
     await tryAutoResolveByes(connection, tournamentId);
+
+    // Une manche close par le **délai** n'a traversé aucun chemin d'écriture :
+    // personne n'a rapporté de score, donc personne n'a réconcilié derrière.
+    // `finalizeMatch` sait pousser une équipe le long des liens de bracket, et
+    // c'est tout ce dont l'élimination a besoin — mais la Survie, la Ronde
+    // suisse, la BlueGenji Survie et le multi-phases ne posent leur manche
+    // suivante qu'en réconciliant. Sans ce rappel, la dernière manche d'une
+    // ronde tranchée par le délai laissait le tournoi **définitivement** en
+    // cours : plus aucun score à rapporter, donc plus aucun déclencheur, et le
+    // tournoi quittait même `findDueMaintenance` (`./sync-scope`) — plus rien
+    // ne le revisitait.
+    //
+    // Conditionné à un résultat réellement écrit : ces réconciliations rejouent
+    // le tournoi entier, et l'entretien passif repasse, lui, à chaque balayage.
+    if (resolvedByTimeout > 0) {
+      await reconcileFormat(connection, tournamentId, tournament.format);
+    }
+
     await finalizeTournamentIfDone(connection, tournamentId);
 
     // `finalizeTournamentIfDone` a pu passer le tournoi à `FINISHED` : le
@@ -176,10 +201,47 @@ export async function syncTournamentState(
     return {
       row: refreshed,
       stateChanged: stateChanged || (refreshed !== null && refreshed.state !== stateAtEntry),
+      contentChanged: bracketCreated || resolvedByTimeout > 0,
     };
   }
 
-  return { row: tournament, stateChanged };
+  return { row: tournament, stateChanged, contentChanged: false };
+}
+
+/**
+ * Rappelle le moteur du format après une écriture qui ne vient d'aucun de ses
+ * chemins d'entrée.
+ *
+ * Même chaîne que `reportMatchScorePublic`, dans le même ordre — modes à
+ * classement d'abord, phases ensuite. Chacune sort immédiatement si le format
+ * ne la concerne pas, mais on n'appelle que celle qui peut faire quelque chose :
+ * l'entretien passif est un chemin chaud, et quatre imports dynamiques par
+ * balayage se paient.
+ */
+async function reconcileFormat(
+  connection: PoolConnection,
+  tournamentId: number,
+  format: TournamentRow["format"],
+): Promise<void> {
+  if (format === "SURVIVAL") {
+    const { reconcileSurvival } = await import("./survival");
+    await reconcileSurvival(tournamentId, connection);
+    return;
+  }
+  if (format === "SWISS") {
+    const { reconcileSwiss } = await import("./swiss");
+    await reconcileSwiss(tournamentId, connection);
+    return;
+  }
+  if (format === "BG_SURVIE") {
+    const { reconcileEndurance } = await import("./bg-survie");
+    await reconcileEndurance(tournamentId, connection);
+    return;
+  }
+  if (format === "MULTI") {
+    const { reconcilePhases } = await import("./phases");
+    await reconcilePhases(tournamentId, connection);
+  }
 }
 
 export async function hasPendingStateTransition(row: TournamentRow): Promise<boolean> {

@@ -81,6 +81,20 @@ export const VISIT_REQUEST_RULE: RateLimitRule = {
 };
 
 /**
+ * Ouvertures du flux d'activité du bot, par IP.
+ *
+ * Par IP et non par utilisateur : `/bot` est une page de vitrine, ouverte aux
+ * visiteurs sans compte. Distinct du plafond de flux *simultanés*
+ * (`lib/server/bot-feed-guard.ts`), qui borne ce qui reste ouvert quand
+ * celui-ci ne voit qu'un rythme.
+ */
+export const BOT_FEED_OPEN_RULE: RateLimitRule = {
+  name: "bot-feed-open",
+  limit: 30,
+  windowMs: 60_000,
+};
+
+/**
  * Signalements de problème, par utilisateur.
  *
  * Étroit, à rebours des autres plafonds : chaque appel envoie un message privé
