@@ -58,13 +58,7 @@
  * Voir `docs/features/ELO_RANKING.md`.
  */
 
-import {
-  MIN_PLACEMENT_ENTRANTS,
-  placementDeltas,
-  type PlacementEntrant,
-} from "./tournament-placement";
-
-export type { PlacementEntrant };
+import { MIN_PLACEMENT_ENTRANTS, placementDeltas } from "./tournament-placement";
 
 /**
  * Cote de départ, commune à tout le monde. Une équipe qui n'a jamais joué vaut
