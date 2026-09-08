@@ -277,7 +277,9 @@ export async function reconcilePhases(tournamentId: number, conn: PoolConnection
     // moteur travaillent sur `phase_id = 0`, où il n'y a rien à résoudre en
     // MULTI), le plateau se fige sur des matchs PENDING sans adversaire et la
     // phase n'est jamais complète — le tournoi ne se termine donc jamais.
-    await tryAutoResolveByes(conn, tournamentId, currentPhaseId);
+    // Sur un tournoi clos, il n'y a rien à résoudre — la phase s'est terminée
+    // — et surtout rien à écrire : on relit, on ne pose pas.
+    if (!finished) await tryAutoResolveByes(conn, tournamentId, currentPhaseId);
 
     isDone = await isEliminationPhaseComplete(conn, tournamentId, currentPhaseId);
 

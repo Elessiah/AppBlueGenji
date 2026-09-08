@@ -27,6 +27,7 @@ import {
   rankEliminationPhase,
 } from "@/lib/server/tournaments/finalization";
 import { loadSwissRanking, reconcileSwiss } from "@/lib/server/tournaments/swiss";
+import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
 
 /**
  * Corriger le score de la finale d'un tournoi **MULTI** terminé.
@@ -258,6 +259,9 @@ describe("reconcilePhases sur un tournoi MULTI terminé", () => {
     expect(updatePhaseResolution).not.toHaveBeenCalled();
     expect(insertPhaseTeams).not.toHaveBeenCalled();
     expect(setCurrentPhase).not.toHaveBeenCalled();
+    // Pas même la résolution des exemptions : sur une archive, elle n'a rien à
+    // résoudre et n'aurait que le pouvoir d'écrire.
+    expect(tryAutoResolveByes).not.toHaveBeenCalled();
   });
 
   it("est idempotente : un second passage écrit le même palmarès", async () => {
