@@ -61,6 +61,16 @@ export const ERROR_MESSAGES: Record<string, string> = {
     "La clôture des inscriptions ne peut pas être placée dans le passé.",
   EMPTY_PATCH: "Aucune modification à enregistrer.",
   TOURNAMENT_UPDATE_FAILED: "Erreur lors de la modification du tournoi.",
+  // Retour en arrière (`lib/shared/tournament-rollback.ts`). Les trois refus
+  // servent deux fois : en toast si la route tranche, et tels quels sous le
+  // bouton désarmé de la zone de danger — d'où des phrases qui expliquent, et
+  // non des constats.
+  ROLLBACK_UNSUPPORTED_FORMAT:
+    "Le retour en arrière ne couvre pas ce format : en double élimination les deux tableaux avancent en parallèle, et en multi-phases une manche appartient à une phase dont la clôture a déjà distribué ses qualifiées.",
+  ROLLBACK_NOTHING_TO_UNDO: "Aucune manche à défaire : aucun score n'a encore été saisi.",
+  ROLLBACK_PLAYOFFS_STARTED:
+    "Les play-offs sont tirés : les manches qualificatives ne se défont plus. Seuls les tours de l'arbre final peuvent être effacés.",
+  ROLLBACK_FAILED: "Erreur lors du retour en arrière.",
   INVALID_DATE_ORDER:
     "Les dates doivent se suivre : visibilité, ouverture, clôture, puis début.",
   INVALID_DATES: "Une des dates est illisible.",

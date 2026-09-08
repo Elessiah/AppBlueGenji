@@ -260,3 +260,28 @@ export function formatTournamentDeletedLog(context: {
 }): string {
   return `${lead("🗑️", "Tournoi supprimé définitivement", context.tournament)}, par ${context.actorPseudo} (#${context.actorId}).`;
 }
+
+/**
+ * Retour en arrière : la manche courante d'un tournoi vient d'être effacée.
+ *
+ * Ligne de journal et non alerte arbitre : c'est le staff qui vient de faire le
+ * geste, il n'y a rien à lui demander. Mais elle *doit* figurer au canal — c'est
+ * la seule action du site qui efface des résultats déjà annoncés, et une équipe
+ * qui retrouve sa manche vierge doit pouvoir lire pourquoi, et par qui.
+ *
+ * `roundLabel` est rédigé par `lib/shared/tournament-rollback.ts`, qui seul sait
+ * qu'un tour d'arbre de BlueGenji Survie ne s'annonce pas « manche 1002 » — et
+ * qui porte l'article, une manche étant féminine et un tour masculin. Rien n'est
+ * accordé avec lui ici : le compte des rencontres suit, séparé par un tiret.
+ */
+export function formatRoundRolledBackLog(context: {
+  tournament: BotLogTournament;
+  roundLabel: string;
+  clearedMatches: number;
+  actorPseudo: string;
+  actorId: number;
+}): string {
+  const plural = context.clearedMatches > 1 ? "s" : "";
+  const matches = `${context.clearedMatches} rencontre${plural} effacée${plural}`;
+  return `${lead("⏪", "Retour en arrière", context.tournament)} : ${context.roundLabel} — ${matches}, par ${context.actorPseudo} (#${context.actorId}).`;
+}
