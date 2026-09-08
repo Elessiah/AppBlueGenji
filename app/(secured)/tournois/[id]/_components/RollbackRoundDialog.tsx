@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { isMatchDrawn } from "@/lib/shared/match-outcome";
@@ -201,42 +202,53 @@ export function RollbackRoundDialog({
           l&apos;état actuel.
         </div>
 
-        <ul
-          aria-label="Scores qui vont être effacés"
-          style={{
-            listStyle: "none",
-            margin: "12px 0 0",
-            padding: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: 6,
-            maxHeight: 220,
-            overflow: "auto",
-          }}
+        {/* Une manche à seize équipes déborde des 220 pixels : la zone passe par
+            `ScrollArea`, comme toute zone défilante du projet — c'est ce qui lui
+            donne sa barre discrète et, surtout, l'accès au clavier qu'un
+            `overflow: auto` posé à la main ne donne pas. La liste garde ses
+            propres sémantiques à l'intérieur. */}
+        <ScrollArea
+          orientation="y"
+          ariaLabel="Scores qui vont être effacés"
+          style={{ maxHeight: 220, marginTop: 12 }}
         >
-          {matches.map((match) => (
-            <li
-              key={match.id}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 12,
-                fontSize: 12.5,
-                padding: "6px 10px",
-                borderRadius: "var(--r-cy-sm, 8px)",
-                background: "var(--cyber-bg-3, #1b2029)",
-              }}
-            >
-              <span style={{ color: "var(--text-2, #9aa4b2)" }}>
-                {match.team1Name ?? match.team1Placeholder ?? "À venir"} vs{" "}
-                {match.team2Name ?? match.team2Placeholder ?? "À venir"}
-              </span>
-              <span className="mono" style={{ color: "var(--ink, #e7ecf3)", whiteSpace: "nowrap" }}>
-                {scoreLabel(match)}
-              </span>
-            </li>
-          ))}
-        </ul>
+          <ul
+            style={{
+              listStyle: "none",
+              margin: 0,
+              padding: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+            }}
+          >
+            {matches.map((match) => (
+              <li
+                key={match.id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  fontSize: 12.5,
+                  padding: "6px 10px",
+                  borderRadius: "var(--r-cy-sm, 8px)",
+                  background: "var(--cyber-bg-3, #1b2029)",
+                }}
+              >
+                <span style={{ color: "var(--text-2, #9aa4b2)" }}>
+                  {match.team1Name ?? match.team1Placeholder ?? "À venir"} vs{" "}
+                  {match.team2Name ?? match.team2Placeholder ?? "À venir"}
+                </span>
+                <span
+                  className="mono"
+                  style={{ color: "var(--ink, #e7ecf3)", whiteSpace: "nowrap" }}
+                >
+                  {scoreLabel(match)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </ScrollArea>
 
         <form onSubmit={submit}>
           <label
@@ -282,7 +294,10 @@ export function RollbackRoundDialog({
                 color: acknowledged && !busy ? "var(--red-live, #ff4d4d)" : undefined,
               }}
             >
-              {busy ? "Effacement…" : "Effacer cette manche"}
+              {/* Neutre, et pas « cette manche » : le stade peut être un *tour*
+                  d'arbre final, et le libellé se serait trompé de genre une fois
+                  sur deux. Le titre du dialogue, lui, porte déjà le nom exact. */}
+              {busy ? "Effacement…" : "Effacer et reculer"}
             </button>
           </div>
         </form>
