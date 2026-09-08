@@ -797,9 +797,16 @@ export default function TournamentDetailPage() {
                   gap: 16,
                   alignItems: "center",
                   justifyContent: "space-between",
-                  paddingBottom: 16,
-                  marginBottom: 16,
-                  borderBottom: "1px solid var(--line-soft, rgba(255,255,255,0.08))",
+                  // Le trait sépare les deux blocs : il n'a pas lieu d'être quand
+                  // il n'y a rien dessous. Un arbitre ne voit pas la suppression,
+                  // et il y gagnait une ligne de séparation qui ne séparait rien.
+                  ...(detail.canDelete
+                    ? {
+                        paddingBottom: 16,
+                        marginBottom: 16,
+                        borderBottom: "1px solid var(--line-soft, rgba(255,255,255,0.08))",
+                      }
+                    : null),
                 }}
               >
                 <p
