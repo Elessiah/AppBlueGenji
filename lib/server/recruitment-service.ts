@@ -1,5 +1,6 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "./database";
+import { cachedShowcase, invalidateShowcase } from "./showcase-cache";
 import { applyDisplayOrder } from "./reorder";
 import {
   type RecruiterContactDefaults,
@@ -55,16 +56,27 @@ const SELECT_COLUMNS = `id, title, team_name, domain, roles, body, contact_url, 
  * `includeInactive` permet à un administrateur de gérer aussi les brouillons.
  * Retourne `[]` si la base est injoignable.
  */
+async function loadRecruitmentAds(includeInactive: boolean): Promise<RecruitmentAd[]> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<RecruitmentRow[]>(
+    `SELECT ${SELECT_COLUMNS}
+     FROM bg_recruitment_ads
+     ${includeInactive ? "" : "WHERE active = 1"}
+     ORDER BY display_order ASC, id ASC`,
+  );
+  return (rows ?? []).map(fromRow);
+}
+
 export async function listRecruitmentAds(includeInactive = false): Promise<RecruitmentAd[]> {
   try {
-    const db = await getDatabase();
-    const [rows] = await db.execute<RecruitmentRow[]>(
-      `SELECT ${SELECT_COLUMNS}
-       FROM bg_recruitment_ads
-       ${includeInactive ? "" : "WHERE active = 1"}
-       ORDER BY display_order ASC, id ASC`,
-    );
-    return (rows ?? []).map(fromRow);
+    // Seule la **vue publique** est mutualisée : `/recrutement` est rendue à
+    // chaque visite (elle lit la session) et n'est pas une route API, donc
+    // aucun plafond de débit ne peut la protéger. La vue du staff, brouillons
+    // compris, passe droit en base — elle est rare, et la mettre en cache sous
+    // la même clé servirait des brouillons au public (même règle que la portée
+    // `hiddenOnly` de la liste des tournois).
+    if (includeInactive) return await loadRecruitmentAds(true);
+    return await cachedShowcase("recruitment-ads", () => loadRecruitmentAds(false));
   } catch {
     return [];
   }
@@ -84,14 +96,23 @@ export async function listRecruitmentAds(includeInactive = false): Promise<Recru
  */
 export async function getHighlightedAd(): Promise<RecruitmentAd | null> {
   try {
-    const db = await getDatabase();
-    const [rows] = await db.execute<RecruitmentRow[]>(
-      `SELECT ${SELECT_COLUMNS}
-       FROM bg_recruitment_ads
-       WHERE active = 1 AND highlight <> 'NONE'
-       ORDER BY display_order ASC, id ASC`,
-    );
-    return selectHighlightedAd((rows ?? []).map(fromRow));
+    // La banderole est montée dans la **mise en page racine** : elle est donc
+    // demandée à chaque arrivée sur le site, par chaque visiteur. L'en-tête
+    // `Cache-Control` de la route épargne les rechargements d'un même
+    // navigateur, mais rien ne protégeait d'une arrivée groupée — cent
+    // visiteurs, cent requêtes, sur la lecture la plus fréquente du site après
+    // la liste des tournois. Le cache à vol unique les ramène à une, sur la
+    // même fenêtre que l'en-tête (60 s).
+    return await cachedShowcase("recruitment-highlight", async () => {
+      const db = await getDatabase();
+      const [rows] = await db.execute<RecruitmentRow[]>(
+        `SELECT ${SELECT_COLUMNS}
+         FROM bg_recruitment_ads
+         WHERE active = 1 AND highlight <> 'NONE'
+         ORDER BY display_order ASC, id ASC`,
+      );
+      return selectHighlightedAd((rows ?? []).map(fromRow));
+    });
   } catch {
     return null;
   }
@@ -159,6 +180,8 @@ export async function createRecruitmentAd(input: RecruitmentAdInput): Promise<Re
     ],
   );
 
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
   return {
     id: Number(res.insertId),
     title,
@@ -226,6 +249,8 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
     ],
   );
 
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
   return {
     id,
     title,
@@ -248,6 +273,8 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
  */
 export async function reorderRecruitmentAds(ids: number[]): Promise<void> {
   await applyDisplayOrder("bg_recruitment_ads", ids);
+  // L'ordre décide aussi de l'annonce mise en avant : la vitrine doit suivre.
+  invalidateShowcase();
 }
 
 /** Supprime une annonce. Lève `RECRUITMENT_NOT_FOUND` si l'id n'existe pas. */
@@ -258,4 +285,6 @@ export async function deleteRecruitmentAd(id: number): Promise<void> {
     [id],
   );
   if (res.affectedRows === 0) throw new Error("RECRUITMENT_NOT_FOUND");
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
 }

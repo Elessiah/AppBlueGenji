@@ -7,6 +7,7 @@ import {
   updateRecruitmentAd,
 } from "@/lib/server/recruitment-service";
 import { selectHighlightedAd } from "@/lib/shared/recruitment";
+import { clearCache } from "@/lib/server/cache";
 
 jest.mock("@/lib/server/database");
 
@@ -32,8 +33,16 @@ const HIGHLIGHT_ROW = {
 };
 
 describe("recruitment-service", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  // Les lectures publiques sont mutualisées (`showcase-cache`) : sans cette
+  // remise à zéro, le premier cas resservirait sa réponse à tous les suivants.
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
+  afterEach(() => {
+    clearCache();
+    jest.restoreAllMocks();
+  });
 
   describe("listRecruitmentAds", () => {
     it("returns mapped rows and filters inactive by default", async () => {
@@ -233,5 +242,110 @@ describe("recruitment-service", () => {
       await mockDb(jest.fn().mockResolvedValue([{ affectedRows: 0 }]));
       await expect(deleteRecruitmentAd(999)).rejects.toThrow("RECRUITMENT_NOT_FOUND");
     });
+  });
+});
+
+/**
+ * Deux lectures publiques, deux fréquences très différentes.
+ *
+ * `getHighlightedAd` est appelée par la **mise en page racine** : elle est donc
+ * demandée à chaque arrivée sur le site, par chaque visiteur. L'en-tête
+ * `Cache-Control` de sa route épargne les rechargements d'un même navigateur,
+ * mais rien ne protégeait d'une arrivée groupée. `listRecruitmentAds` sert la
+ * page `/recrutement`, rendue à chaque visite et hors de portée d'un plafond de
+ * débit — c'est un composant serveur, il ne peut pas répondre 429.
+ */
+describe("recruitment-service — mutualisation des lectures publiques", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
+  afterEach(() => {
+    clearCache();
+    jest.restoreAllMocks();
+  });
+
+  it("ne lit qu'une fois la bannière pour cent arrivées simultanées", async () => {
+    const execute = jest.fn().mockResolvedValue([[HIGHLIGHT_ROW]]);
+    await mockDb(execute);
+
+    const results = await Promise.all(Array.from({ length: 100 }, () => getHighlightedAd()));
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    for (const ad of results) expect(ad?.id).toBe(5);
+  });
+
+  it("ne lit qu'une fois la liste publique pour cent visiteurs simultanés", async () => {
+    const execute = jest.fn().mockResolvedValue([[HIGHLIGHT_ROW]]);
+    await mockDb(execute);
+
+    await Promise.all(Array.from({ length: 100 }, () => listRecruitmentAds()));
+
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("ne met jamais la vue du staff en cache", async () => {
+    // Elle contient les brouillons : partager sa réponse sous la même clé que la
+    // liste publique les servirait à tout le monde. Même règle que la portée
+    // `hiddenOnly` de la liste des tournois.
+    const execute = jest.fn().mockResolvedValue([[HIGHLIGHT_ROW]]);
+    await mockDb(execute);
+
+    await listRecruitmentAds(true);
+    await listRecruitmentAds(true);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("ne sert pas la liste du staff au public", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([[HIGHLIGHT_ROW, { ...HIGHLIGHT_ROW, id: 6, active: 0 }]])
+      .mockResolvedValueOnce([[HIGHLIGHT_ROW]]);
+    await mockDb(execute);
+
+    const staff = await listRecruitmentAds(true);
+    const publicList = await listRecruitmentAds();
+
+    expect(staff).toHaveLength(2);
+    expect(publicList).toHaveLength(1);
+  });
+
+  it.each([
+    [
+      "createRecruitmentAd",
+      () =>
+        createRecruitmentAd({
+          title: "Titre",
+          teamName: null,
+          domain: "AUTRE",
+          roles: null,
+          body: null,
+          contactUrl: null,
+          contactDiscord: null,
+          contactDiscordId: null,
+          contactPreferred: "AUTO",
+          highlight: "NONE",
+          active: true,
+        }),
+    ],
+    ["deleteRecruitmentAd", () => deleteRecruitmentAd(5)],
+  ])("oublie la bannière après %s", async (_name, write) => {
+    const execute = jest.fn().mockImplementation(async (sql: string) =>
+      String(sql).trim().startsWith("SELECT")
+        ? [[HIGHLIGHT_ROW]]
+        : [{ insertId: 9, affectedRows: 1 }],
+    );
+    await mockDb(execute);
+
+    await getHighlightedAd();
+    execute.mockClear();
+
+    // Le staff vient d'écrire : la bannière du site doit suivre sans attendre la
+    // fin de la fenêtre de cache.
+    await write();
+    await getHighlightedAd();
+
+    expect(execute.mock.calls.some(([sql]) => String(sql).trim().startsWith("SELECT"))).toBe(true);
   });
 });

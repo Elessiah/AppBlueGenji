@@ -1,5 +1,6 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "./database";
+import { cachedShowcase, invalidateShowcase } from "./showcase-cache";
 import {
   type Benevole,
   type BenevoleInput,
@@ -32,16 +33,29 @@ function fromRow(row: BenevoleRow): Benevole {
   };
 }
 
-/** Liste tous les bénévoles triés par ordre de catégorie puis d'affichage. Retourne [] si la DB est injoignable. */
+async function loadBenevoles(): Promise<Benevole[]> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<BenevoleRow[]>(
+    `SELECT id, first_name, pseudo, last_name, category, photo_url, joined_at
+     FROM bg_benevoles
+     ORDER BY category_order ASC, category ASC, display_order ASC, id ASC`,
+  );
+  return (rows ?? []).map(fromRow);
+}
+
+/**
+ * Liste tous les bénévoles triés par ordre de catégorie puis d'affichage.
+ * Retourne [] si la DB est injoignable.
+ *
+ * Mutualisée : `/benevoles` est une page de vitrine rendue à chaque visite (elle
+ * lit la session), et ce n'est pas une route API — aucun plafond de débit ne
+ * peut la protéger, la mutualisation est le seul garde-fou disponible
+ * (`./showcase-cache`). La liste est la même pour tout le monde et change
+ * quelques fois par an.
+ */
 export async function listBenevoles(): Promise<Benevole[]> {
   try {
-    const db = await getDatabase();
-    const [rows] = await db.execute<BenevoleRow[]>(
-      `SELECT id, first_name, pseudo, last_name, category, photo_url, joined_at
-       FROM bg_benevoles
-       ORDER BY category_order ASC, category ASC, display_order ASC, id ASC`,
-    );
-    return (rows ?? []).map(fromRow);
+    return await cachedShowcase("benevoles", loadBenevoles);
   } catch {
     return [];
   }
@@ -91,6 +105,8 @@ export async function createBenevole(input: BenevoleInput): Promise<Benevole> {
     [firstName, pseudo || null, lastName, category, photoUrl || null, joinedAt, categoryOrder, category],
   );
 
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
   return {
     id: Number(res.insertId),
     firstName,
@@ -120,6 +136,8 @@ export async function updateBenevole(id: number, input: BenevoleInput): Promise<
   );
   if (res.affectedRows === 0) throw new Error("BENEVOLE_NOT_FOUND");
 
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
   return {
     id,
     firstName,
@@ -154,6 +172,8 @@ export async function reorderBenevoleCategories(categories: string[]): Promise<v
   } finally {
     connection.release();
   }
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
 }
 
 /** Supprime un bénévole. Lève `BENEVOLE_NOT_FOUND` si l'id n'existe pas. */
@@ -164,4 +184,6 @@ export async function deleteBenevole(id: number): Promise<void> {
     [id],
   );
   if (res.affectedRows === 0) throw new Error("BENEVOLE_NOT_FOUND");
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
 }
