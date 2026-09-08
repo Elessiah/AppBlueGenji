@@ -16,7 +16,12 @@ const mockMatch = (overrides: Partial<BracketMatch>): BracketMatch => ({
   bracket: "UPPER",
   roundNumber: 1,
   matchNumber: 1,
-  status: "PENDING" as MatchStatus,
+  // « Jouée » se lit désormais sur le **statut**, plus sur la présence d'un
+  // vainqueur : un match nul n'en a pas et est pourtant terminé
+  // (`lib/shared/match-outcome.ts`). Le défaut dérive donc le statut du
+  // vainqueur, pour que les cas écrits avant disent exactement la même chose ;
+  // un cas qui vise le nul pose `status: "COMPLETED"` sans vainqueur.
+  status: (overrides.winnerTeamId != null ? "COMPLETED" : "PENDING") as MatchStatus,
   team1Id: null,
   team2Id: null,
   team1Name: null,

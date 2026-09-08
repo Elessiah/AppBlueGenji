@@ -39,7 +39,10 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
       return fail("INVALID_SCORES", 400);
     }
 
-    if (team1Score === team2Score) return fail("DRAW_NOT_ALLOWED", 400);
+    // L'égalité n'est plus refusée d'office : c'est le **format de la manche**
+    // qui tranche (`checkMatchScores`), et lui seul sait qu'une qualification
+    // de « BlueGenji Survie » peut se clore sur un 2-2. Le refus arrive donc du
+    // service, en `DRAW_NOT_ALLOWED` comme avant, mais avec la bonne règle.
   } else {
     return fail("MISSING_SCORES_OR_FORFEIT", 400);
   }
@@ -52,7 +55,9 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
     const status =
       msg === "MATCH_NOT_FOUND" ? 404
       : msg === "MATCH_ALREADY_COMPLETED" || msg === "MATCH_NOT_READY" || msg === "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES" ? 409
-      : msg === "SCORE_EXCEEDS_MATCH_FORMAT" || msg === "SCORE_BELOW_MATCH_FORMAT" ? 400
+      : msg === "SCORE_EXCEEDS_MATCH_FORMAT" ||
+        msg === "SCORE_BELOW_MATCH_FORMAT" ||
+        msg === "DRAW_NOT_ALLOWED" ? 400
       // Forfait déclaré pour une équipe qui ne joue pas ce match : corps
       // invalide, pas une panne — le contrôle n'est possible qu'une fois le
       // match chargé, donc à l'intérieur du service.

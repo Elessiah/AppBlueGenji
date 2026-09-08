@@ -3,11 +3,11 @@
 import { CSSProperties, FormEvent, Fragment, useEffect, useRef } from "react";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
 import { ScrollArea } from "@/components/cyber";
+import { useSlotHeight } from "../_hooks/useSlotHeight";
 import { MatchRow } from "./MatchRow";
 
 export type MatchScoreDraft = Record<number, { myScore: string; opponentScore: string }>;
 
-const SLOT_H = 140;
 const CARD_W = 210;
 const CONN_W = 40;
 const BADGE_W = 190;
@@ -79,6 +79,10 @@ export function BracketTree({
   format,
   resolveNextMatchId,
 }: BracketTreeProps) {
+  // La hauteur d'un créneau se **mesure** : une carte grandit d'une rangée par
+  // action offerte au lecteur, et une hauteur figée la laissait déborder sur le
+  // libellé du match voisin. Voir `_lib/bracket-layout.ts`.
+  const { slotHeight, measureSlot } = useSlotHeight();
   const matchRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const didScrollRef = useRef(false);
   const setMatchRef = (id: number) => (el: HTMLDivElement | null) => {
@@ -126,7 +130,7 @@ export function BracketTree({
   );
 
   const maxMatchCount = Math.max(...[...matchesByRound.values()].map((ms) => ms.length));
-  const totalH = maxMatchCount * SLOT_H;
+  const totalH = maxMatchCount * slotHeight;
 
   const slotHByRound = new Map(
     roundNums.map((rn) => [rn, totalH / matchesByRound.get(rn)!.length]),
@@ -207,36 +211,41 @@ export function BracketTree({
                     <div
                       key={match.id}
                       ref={setMatchRef(match.id)}
-                      style={{ height: slotH, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: label || isTarget ? 2 : 0, scrollMargin: 80 }}
+                      style={{ height: slotH, display: "flex", alignItems: "center", justifyContent: "center", scrollMargin: 80 }}
                     >
-                      {(label || isTarget) && (
-                        <div style={{ fontSize: 11, color: isTarget ? accentColor : "var(--text-2)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", lineHeight: 1 }}>
-                          {isTarget ? `★ ${label ?? "Votre match"}` : label}
-                        </div>
-                      )}
                       <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          borderRadius: 8,
-                          ...(isTarget
-                            ? { boxShadow: `0 0 0 2px ${accentColor}, 0 0 14px ${accentColor}` }
-                            : {}),
-                        }}
+                        ref={measureSlot(roundNum, match.id)}
+                        style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: label || isTarget ? 2 : 0 }}
                       >
-                        <MatchRow
-                          match={match}
-                          reportable={canReport(match)}
-                          adminResolvable={adminResolvable(match)}
-                          onScoreChange={onScoreChange}
-                          myScore={drafts[match.id]?.myScore || ""}
-                          opponentScore={drafts[match.id]?.opponentScore || ""}
-                          onSubmit={onSubmit}
-                          onOpenAdminModal={onOpenAdminModal}
-                          allMatches={allTournamentMatches}
-                          roundNumber={roundNum}
-                          format={format}
-                        />
+                        {(label || isTarget) && (
+                          <div style={{ fontSize: 11, color: isTarget ? accentColor : "var(--text-2)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", lineHeight: 1 }}>
+                            {isTarget ? `★ ${label ?? "Votre match"}` : label}
+                          </div>
+                        )}
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            borderRadius: 8,
+                            ...(isTarget
+                              ? { boxShadow: `0 0 0 2px ${accentColor}, 0 0 14px ${accentColor}` }
+                              : {}),
+                          }}
+                        >
+                          <MatchRow
+                            match={match}
+                            reportable={canReport(match)}
+                            adminResolvable={adminResolvable(match)}
+                            onScoreChange={onScoreChange}
+                            myScore={drafts[match.id]?.myScore || ""}
+                            opponentScore={drafts[match.id]?.opponentScore || ""}
+                            onSubmit={onSubmit}
+                            onOpenAdminModal={onOpenAdminModal}
+                            allMatches={allTournamentMatches}
+                            roundNumber={roundNum}
+                            format={format}
+                          />
+                        </div>
                       </div>
                     </div>
                   );

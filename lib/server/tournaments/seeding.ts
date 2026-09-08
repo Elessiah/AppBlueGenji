@@ -38,6 +38,7 @@ function toScoreStates(rows: Awaited<ReturnType<typeof getMatchRows>>): MatchSco
     team2Score: row.team2_score === null ? null : Number(row.team2_score),
     winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
     forfeitTeamId: row.forfeit_team_id === null ? null : Number(row.forfeit_team_id),
+    decided: row.status === "COMPLETED",
     hasPendingReport: row.status === "AWAITING_CONFIRMATION",
     nextWinnerMatchId: row.next_winner_match_id === null ? null : Number(row.next_winner_match_id),
     nextLoserMatchId: row.next_loser_match_id === null ? null : Number(row.next_loser_match_id),

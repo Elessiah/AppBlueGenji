@@ -61,8 +61,11 @@ function summarize(collected: Collected): EntityStats {
   const perTournament = new Map<number, { wins: number; losses: number }>();
   for (const match of collected.matches) {
     const entry = perTournament.get(match.tournamentId) ?? { wins: 0, losses: 0 };
-    if (match.won) entry.wins += 1;
-    else entry.losses += 1;
+    // Un match nul n'est ni l'un ni l'autre : il ne s'ajoute à aucune colonne.
+    // Le compter en défaite ferait mentir la ligne du tournoi, seul endroit où
+    // le bilan par tournoi s'affiche.
+    if (match.outcome === "WIN") entry.wins += 1;
+    else if (match.outcome === "LOSS") entry.losses += 1;
     perTournament.set(match.tournamentId, entry);
   }
 
@@ -98,10 +101,13 @@ type MatchStatRow = RowDataPacket & {
   team2_name: string | null;
   team1_score: number | null;
   team2_score: number | null;
-  winner_team_id: number;
+  /** `null` = match nul : `PLAYED_MATCH_SQL` n'en laisse pas passer d'autre. */
+  winner_team_id: number | null;
   forfeit_team_id: number | null;
   match_format_type: "BO" | "FT" | null;
   match_format_value: number | null;
+  match_format_max_maps: number | null;
+  match_format_draws: number | null;
 };
 
 type RegistrationStatRow = RowDataPacket & {
@@ -181,7 +187,9 @@ async function loadMatchRows(
       m.winner_team_id,
       m.forfeit_team_id,
       t.match_format_type,
-      t.match_format_value
+      t.match_format_value,
+      t.match_format_max_maps,
+      t.match_format_draws
      FROM bg_matches m
      JOIN bg_tournaments t ON t.id = m.tournament_id
      LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
@@ -234,7 +242,12 @@ function toStatsMatch(row: MatchStatRow, teamId: number): StatsMatch {
   // colonnes : elles sont vides sur les forfaits antérieurs à la règle.
   const maps = forfeitAwareMapScore(
     forfeit,
-    parseMatchFormat(row.match_format_type, row.match_format_value),
+    parseMatchFormat(
+      row.match_format_type,
+      row.match_format_value,
+      row.match_format_max_maps,
+      row.match_format_draws,
+    ),
     isTeam1 ? row.team1_score : row.team2_score,
     isTeam1 ? row.team2_score : row.team1_score,
   );
@@ -249,7 +262,12 @@ function toStatsMatch(row: MatchStatRow, teamId: number): StatsMatch {
     playedAt: isoOrEpoch(row.played_at),
     opponentTeamId: opponentId,
     opponentName,
-    won: Number(row.winner_team_id) === teamId,
+    outcome:
+      row.winner_team_id === null
+        ? "DRAW"
+        : Number(row.winner_team_id) === teamId
+          ? "WIN"
+          : "LOSS",
     scoreFor: maps.scoreFor,
     scoreAgainst: maps.scoreAgainst,
     forfeit,

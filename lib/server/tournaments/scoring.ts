@@ -1,6 +1,6 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
-import { checkMatchScores, parseMatchFormat } from "@/lib/shared/match-format";
+import { checkMatchScores, matchWinnerSide } from "@/lib/shared/match-format";
 import { MatchRow } from "./_internal";
 import {
   dropQueuedRefereeAlerts,
@@ -9,6 +9,7 @@ import {
   queueRefereeAlert,
 } from "./bot-logs";
 import { resolveUserEntrantTeamId } from "./registration";
+import { loadTournamentMatchFormat } from "./repository";
 import { syncTournamentState } from "./state";
 import { tryAutoResolveByes } from "./byes";
 
@@ -175,10 +176,6 @@ export async function reportMatchScore(
   const myScore = validateScoreValue(myScoreRaw);
   const opponentScore = validateScoreValue(opponentScoreRaw);
 
-  if (myScore === opponentScore) {
-    throw new Error("DRAW_NOT_ALLOWED");
-  }
-
   const { row: tournament } = await syncTournamentState(connection, tournamentId);
   if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
   if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
@@ -190,21 +187,11 @@ export async function reportMatchScore(
     throw new Error("NO_ACTIVE_TEAM");
   }
 
-  // Un report d'équipe désigne toujours un vainqueur (l'égalité est déjà
-  // refusée) : le score doit donc respecter l'objectif du format — 3 manches en
-  // BO5 comme en FT3 — et non seulement son plafond.
-  const matchFormatViolation = checkMatchScores(
-    parseMatchFormat(tournament.match_format_type, tournament.match_format_value),
-    myScore,
-    opponentScore,
-    { decisive: true },
-  );
-  if (matchFormatViolation) throw new Error(matchFormatViolation);
-
   const [matches] = await connection.execute<MatchRow[]>(
     `SELECT
       id,
       tournament_id,
+      round_number,
       team1_id,
       team2_id,
       team1_report_score,
@@ -244,6 +231,22 @@ export async function reportMatchScore(
   if (!isTeam1Reporter && !isTeam2Reporter) {
     throw new Error("NOT_IN_MATCH");
   }
+
+  // Un report d'équipe **clôt** la rencontre : le score doit donc constituer un
+  // résultat final, et pas seulement respecter le plafond. Ce qu'est un
+  // résultat final dépend du format de la manche — « BlueGenji Survie » joue
+  // deux formats, et sa qualification tolère l'égalité (`checkMatchScores`).
+  // D'où le contrôle **ici** et non avant le chargement du match : il lui faut
+  // le numéro de manche.
+  const matchFormat = await loadTournamentMatchFormat(
+    connection,
+    tournamentId,
+    Number(match.round_number),
+  );
+  const matchFormatViolation = checkMatchScores(matchFormat, myScore, opponentScore, {
+    decisive: true,
+  });
+  if (matchFormatViolation) throw new Error(matchFormatViolation);
 
   if (isTeam1Reporter) {
     await connection.execute(
@@ -309,9 +312,13 @@ export async function reportMatchScore(
     if (consistent) {
       const team1Score = Number(updated.team1_report_score);
       const team2Score = Number(updated.team1_report_opponent_score);
-      const winnerTeamId = team1Score > team2Score ? Number(updated.team1_id) : Number(updated.team2_id);
+      // Les deux engagés s'accordent, y compris sur un nul : `matchWinnerSide`
+      // est la seule règle, partagée avec l'arbitrage et l'expiration du délai.
+      const side = matchWinnerSide(matchFormat, team1Score, team2Score);
+      const winnerTeamId =
+        side === null ? null : Number(side === 1 ? updated.team1_id : updated.team2_id);
       const loserTeamId =
-        winnerTeamId === Number(updated.team1_id) ? Number(updated.team2_id) : Number(updated.team1_id);
+        side === null ? null : Number(side === 1 ? updated.team2_id : updated.team1_id);
 
       await finalizeMatch(connection, tournamentId, updated, {
         team1Score,

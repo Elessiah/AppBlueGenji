@@ -16,13 +16,30 @@ jouable, `FT` compte l'objectif. Tout le code ne manipule donc que deux
 grandeurs dérivées :
 
 - `matchWinsRequired(format)` — le score du vainqueur : `⌈N/2⌉` en `BO`, `N` en `FT` ;
-- `matchMaxMaps(format)` — le plafond de la somme des deux scores : `2 × wins − 1`.
+- `matchMaxMaps(format)` — le plafond de la somme des deux scores, `2 × wins − 1`
+  sauf réglage contraire (voir ci-dessous).
 
 Un `BO` **pair** est refusé à la création : « best of 4 » pourrait finir 2-2,
 sans vainqueur.
 
 Un tournoi sans format défini reste en **score libre** (0-99), ce qui est l'état
 de tous les tournois créés avant cette fonctionnalité.
+
+## Deux réglages qui séparent enfin BO et FT
+
+Longtemps, « BO5 » et « FT3 » ont désigné le même objet ici. Deux champs
+facultatifs les distinguent — absents, rien ne change :
+
+- **`maxMaps`** — plafond de maps *décisives*, réglable en deçà de son plafond
+  naturel. Un FT3 plafonné à 4 s'arrête sur 2-2.
+- **`drawsAllowed`** — n'importe quel score tenant dans le plafond clôt la
+  rencontre, vainqueur ou non.
+
+Ils existent pour une raison précise : Overwatch et Marvel Rivals connaissent la
+**map nulle**, et la phase qualificative de « BlueGenji Survie » se joue en BO5
+*sans tiebreaker*. Tout est décrit dans
+[MATCH_DRAWS.md](./MATCH_DRAWS.md), y compris pourquoi ce mode joue **deux**
+formats — sa qualification tolère le nul, son arbre final exige un vainqueur.
 
 ## Règles appliquées à la saisie
 
@@ -34,6 +51,13 @@ Le module pur `lib/shared/match-format.ts` porte l'unique implémentation
 | Un score dépasse l'objectif (4-1 en BO5) | `SCORE_EXCEEDS_MATCH_FORMAT` |
 | La somme dépasse les manches jouables (3-3 en BO5) | `SCORE_EXCEEDS_MATCH_FORMAT` |
 | Aucun des deux n'atteint l'objectif alors qu'il faut trancher (2-1 en BO5) | `SCORE_BELOW_MATCH_FORMAT` |
+| Scores égaux alors qu'il faut trancher, **en saisie libre** | `DRAW_NOT_ALLOWED` |
+
+Le dernier ne vaut que pour la saisie libre, et ce n'est pas un oubli : avec un
+format, une égalité *sous* l'objectif est d'abord un score incomplet (le refus
+renvoie alors au bon geste), et une égalité *à* l'objectif dépasse déjà le
+plafond. Sur un format qui autorise l'égalité, le contrôle décisif ne s'applique
+plus du tout — voir [MATCH_DRAWS.md](./MATCH_DRAWS.md).
 
 Le dernier contrôle ne s'applique qu'aux saisies **décisives** :
 
@@ -130,8 +154,10 @@ dans les modes à classement (Survie, Ronde suisse, BlueGenji Survie).
 Deux colonnes sur `bg_tournaments`, ajoutées par migration :
 
 ```sql
-match_format_type  ENUM('BO', 'FT') NULL
-match_format_value INT NULL
+match_format_type      ENUM('BO', 'FT') NULL
+match_format_value     INT NULL
+match_format_max_maps  INT NULL            -- plafond de maps décisives
+match_format_draws     TINYINT(1) NOT NULL DEFAULT 0
 ```
 
 Elles vont **par paire** : tant que l'une est `NULL`, `parseMatchFormat` renvoie
@@ -150,6 +176,7 @@ générés sont toujours saisissables dans l'interface.
 | Rôle | Fichier |
 |---|---|
 | Logique pure (validation, libellés, contrôles) | `lib/shared/match-format.ts` |
+| Format applicable à une manche (BG Survie en joue deux) | `lib/shared/bg-survie.ts`, `lib/server/tournaments/repository.ts` |
 | Migration des colonnes | `lib/server/database.ts` |
 | Création du tournoi | `app/api/tournaments/route.ts`, `lib/server/tournaments/index.ts` |
 | Garde-fou report d'équipe | `lib/server/tournaments/scoring.ts` |

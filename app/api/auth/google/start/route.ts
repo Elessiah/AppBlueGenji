@@ -2,10 +2,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildGoogleAuthorizationUrl, getAppBaseUrl } from "@/lib/server/google-oauth";
 import { saveGoogleOAuthState } from "@/lib/server/auth";
+import { safeRedirectPath } from "@/lib/shared/safe-redirect";
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const base = getAppBaseUrl(req.url);
-  const redirectTo = req.nextUrl.searchParams.get("redirect") || "/tournois";
+  // Filtrée dès l'aller : rien d'étranger au site n'entre dans le cookie d'état.
+  const redirectTo = safeRedirectPath(req.nextUrl.searchParams.get("redirect"));
   const state = crypto.randomBytes(24).toString("hex");
 
   try {

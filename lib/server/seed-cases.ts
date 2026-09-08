@@ -66,6 +66,10 @@ export interface TournamentDef extends ReportStateCounts {
   endurancePoints?: number; // BG_SURVIE : capital de départ (défaut 9)
   endurancePlayoffSize?: number; // BG_SURVIE : effectif des play-offs (défaut 8)
   enduranceMaxRounds?: number; // BG_SURVIE : plafond de manches qualificatives (absent = aucun)
+  // BG_SURVIE : la qualification peut se clore sur un match nul (map nulle), pas
+  // l'arbre final. Exige un `matchFormat` : c'est lui qui borne la rencontre.
+  matchFormatDraws?: boolean;
+  endurancePlayoffFormat?: MatchFormat; // BG_SURVIE : format de l'arbre final (absent = celui du tournoi)
   teamOffset?: number; // décale la tranche du pool (rosters variés d'un tournoi à l'autre)
   closesInHours?: number; // REGISTRATION : clôture imminente
   description?: string | null;
@@ -176,6 +180,9 @@ export const TOURNAMENTS: TournamentDef[] = [
   // match connu, les deux conditions pour que la coupe mathématique se
   // déclenche avant la dernière manche. Sans plafond, ce plateau tournerait
   // indéfiniment sans jamais retomber à huit.
+  // Le cas du règlement : BO5 sans tiebreaker en qualification (une map nulle
+  // peut arrêter la rencontre sur 2-2), vrai FT3 en play-offs.
+  { name: "BG Survie Égalités", game: "OW2", state: "RUNNING", format: "BG_SURVIE", teamCount: 12, maxTeams: 16, daysOffset: -3, endurancePoints: 9, endurancePlayoffSize: 8, playWaves: 3, matchFormat: { type: "FT", value: 3 }, matchFormatDraws: true, endurancePlayoffFormat: { type: "FT", value: 3 }, teamOffset: 66 },
   { name: "BG Survie Plafond Manches", game: "OW2", state: "RUNNING", format: "BG_SURVIE", teamCount: 20, maxTeams: 32, daysOffset: -3, endurancePoints: 20, endurancePlayoffSize: 8, enduranceMaxRounds: 4, playWaves: 2, matchFormat: { type: "FT", value: 3 }, teamOffset: 108 },
   { name: "BG Survie Plafond Atteint", game: "MR", state: "FINISHED", format: "BG_SURVIE", teamCount: 16, maxTeams: 32, daysOffset: -18, endurancePoints: 20, endurancePlayoffSize: 8, enduranceMaxRounds: 3, matchFormat: { type: "FT", value: 3 }, teamOffset: 128 },
 

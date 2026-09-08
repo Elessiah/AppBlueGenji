@@ -105,6 +105,17 @@
   color: var(--danger);
 }
 
+/*
+ * Match nul : ni la teinte de la victoire ni celle de la défaite. Un ton neutre
+ * plutôt qu'une troisième couleur — le nul est rare, il doit se distinguer sans
+ * réclamer l'attention.
+ */
+.formDraw {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--line-soft);
+  color: var(--text-2);
+}
+
 .empty {
   color: var(--text-2);
   font-size: 13px;

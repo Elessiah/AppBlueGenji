@@ -42,6 +42,29 @@ en cours de route gardent leur ordre relatif **du moment**. Le rejeu recalcule
 donc l'ordre manche après manche et le reporte en entrée de la suivante
 (`previousRank`).
 
+## Le match nul en qualification
+
+Overwatch et Marvel Rivals connaissent la **map nulle** : un BO5 peut donc
+s'arrêter sur 2-2 sans que personne n'atteigne les trois manches. Le tournoi peut
+ouvrir cette possibilité sur sa phase qualificative — c'est un réglage du format
+de match (`drawsAllowed`), pas du mode.
+
+Le capital n'a besoin d'aucune règle supplémentaire, et c'est le mérite du barème
+map par map : un 2-2 rapporte deux points à chacune et leur en retire deux, donc
+rien au barème par défaut. Le rejeu porte une branche dédiée, et le classement
+une colonne `draws` — un nul n'est ni une victoire ni une défaite, mais c'est un
+match joué.
+
+**L'arbre final, lui, n'accepte jamais d'égalité** : il lui faut savoir qui joue
+le tour suivant. Le mode est donc le seul du projet à jouer **deux formats de
+match**, la qualification et les play-offs
+(`endurance_playoff_format_type` / `_value`, `NULL` = celui du tournoi, égalités
+fermées). La règle tient dans `tournamentMatchFormat` (`lib/shared/bg-survie.ts`),
+partagée par le serveur et l'interface.
+
+Tout le détail — plafond de maps, propagation au classement du site et aux
+fiches — est dans [MATCH_DRAWS.md](./MATCH_DRAWS.md).
+
 ## Plafond de manches et sorties « hors course »
 
 Un gros capital fait durer la phase : à neuf points et ±1 par map, trente

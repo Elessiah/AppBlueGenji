@@ -107,13 +107,36 @@ export function headerMetaItems(
     }
   }
 
+  // « BlueGenji Survie » est le seul mode à jouer **deux** formats de match : sa
+  // qualification peut clore une rencontre sans vainqueur, son arbre final non
+  // (`lib/shared/bg-survie.ts`). Une case unique intitulée « Format des matchs »
+  // affirmerait donc du tournoi entier ce qui n'est vrai que de sa première
+  // phase — une équipe qui prépare sa demi-finale y lirait le plafond de maps de
+  // la qualification, et l'infobulle lui promettrait une égalité impossible.
+  //
+  // Les deux cases n'apparaissent donc **qu'ensemble**, et le libellé de gauche
+  // se précise quand la seconde est là : seul, « Format des matchs » se lit très
+  // bien ; à côté d'un « Format des play-offs », il faut qu'il dise laquelle des
+  // deux phases il décrit.
+  const playoffFormat = card.endurancePlayoffFormat;
+
   if (card.matchFormat) {
     items.push({
       key: "match-format",
-      label: "Format des matchs",
+      label: playoffFormat ? "Format des qualifications" : "Format des matchs",
       value: matchFormatLabel(card.matchFormat),
       kind: "text",
       hint: matchFormatDescription(card.matchFormat),
+    });
+  }
+
+  if (playoffFormat) {
+    items.push({
+      key: "playoff-match-format",
+      label: "Format des play-offs",
+      value: matchFormatLabel(playoffFormat),
+      kind: "text",
+      hint: matchFormatDescription(playoffFormat),
     });
   }
 
