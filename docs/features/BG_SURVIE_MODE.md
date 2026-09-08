@@ -388,6 +388,24 @@ Un forfait de play-off se tranche donc **sur le match lui-même**, par
 l'arbitrage (`adminResolveMatch` avec `forfeitTeamId`) : c'est le seul chemin
 qui fasse avancer l'arbre.
 
+### Et à un tournoi en cours
+
+`forfeitSurvivalTeam` et `forfeitSwissTeam` refusent tous deux un tournoi qui
+n'est pas `RUNNING` ; la garde manquait au seul mode endurance. Le contrôle des
+play-offs ci-dessus ne la remplace pas : un tournoi **clos faute de qualifiées**
+garde `endurance_playoffs_started` à 0 (`startEndurancePlayoffs` le finit sur
+place quand la qualification n'en rend pas deux), et l'abandon passait donc.
+
+Il s'écrivait alors sur une archive — statut `FORFEIT`, capital à 0, manche
+courante close — pour un tournoi que plus personne ne joue. L'interface refusait
+déjà (`canForfeitTeam` exige `RUNNING`) : il n'y avait que le serveur à
+convaincre, pour qui appelle la route directement.
+
+Le contrôle d'état passe **avant** celui des play-offs, comme dans les deux
+autres modes : sur un tournoi terminé — qui a presque toujours son arbre lancé —
+« le tournoi n'est pas en cours » est le vrai motif, et c'est celui que
+l'interface affiche (`TOURNAMENT_NOT_RUNNING` → 400).
+
 ## Tests
 
 - `tests/tournois/bg-survie.test.ts` — logique pure : barème, endurance,
