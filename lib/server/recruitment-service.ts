@@ -50,12 +50,7 @@ function fromRow(row: RecruitmentRow): RecruitmentAd {
 
 const SELECT_COLUMNS = `id, title, team_name, domain, roles, body, contact_url, contact_discord, contact_discord_id, contact_preferred, highlight, active`;
 
-/**
- * Liste les annonces de recrutement, triées par ordre d'affichage. Par défaut
- * seules les annonces actives sont renvoyées (vue publique) ; passer
- * `includeInactive` permet à un administrateur de gérer aussi les brouillons.
- * Retourne `[]` si la base est injoignable.
- */
+/** Lecture nue, sans cache : l'assiette dépend de `includeInactive`. */
 async function loadRecruitmentAds(includeInactive: boolean): Promise<RecruitmentAd[]> {
   const db = await getDatabase();
   const [rows] = await db.execute<RecruitmentRow[]>(
@@ -67,6 +62,12 @@ async function loadRecruitmentAds(includeInactive: boolean): Promise<Recruitment
   return (rows ?? []).map(fromRow);
 }
 
+/**
+ * Liste les annonces de recrutement, triées par ordre d'affichage. Par défaut
+ * seules les annonces actives sont renvoyées (vue publique) ; passer
+ * `includeInactive` permet à un administrateur de gérer aussi les brouillons.
+ * Retourne `[]` si la base est injoignable.
+ */
 export async function listRecruitmentAds(includeInactive = false): Promise<RecruitmentAd[]> {
   try {
     // Seule la **vue publique** est mutualisée : `/recrutement` est rendue à

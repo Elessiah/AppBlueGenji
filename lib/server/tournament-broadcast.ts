@@ -245,11 +245,6 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
     const now = Date.now();
     let nextDelay = Number.POSITIVE_INFINITY;
 
-    // Plancher commun à toute la salle, calculé sur les seuls abonnés que la
-    // cadence de leur palier rend dus : réserver du budget pour des spectateurs
-    // qui ne recevront rien retarderait les joueurs pour rien. Commun, parce
-    // qu'un plancher par palier ferait attendre les 128 inscrits d'un gros
-    // tournoi plus longtemps que la poignée de spectateurs qui les regarde.
     // « À qui doit-on cette version ? » se demande **par abonné**, et non par
     // palier : deux connexions d'un même palier peuvent tenir deux versions
     // différentes, la lecture d'ouverture d'une connexion pouvant précéder une
@@ -257,6 +252,11 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
     const behind = (subscriber: TournamentSubscriber): boolean =>
       subscriberState(room, subscriber).version !== frame.version;
 
+    // Plancher commun à toute la salle, calculé sur les seuls abonnés que la
+    // cadence de leur palier rend dus : réserver du budget pour des spectateurs
+    // qui ne recevront rien retarderait les joueurs pour rien. Commun, parce
+    // qu'un plancher par palier ferait attendre les 128 inscrits d'un gros
+    // tournoi plus longtemps que la poignée de spectateurs qui les regarde.
     const dueAudience = [...room.subscribers].filter(
       (subscriber) =>
         behind(subscriber) &&
