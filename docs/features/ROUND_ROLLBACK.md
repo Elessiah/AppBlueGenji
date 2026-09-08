@@ -99,7 +99,7 @@ vierge. Le retour en arrière n'efface jamais un résultat qu'il n'a pas montré
 | Ce qui est touché | Écriture |
 | --- | --- |
 | Rencontres du stade | scores, vainqueur, perdant, forfait, reports en attente et délai effacés ; statut recalculé (`READY` si deux engagées, `PENDING` sinon) |
-| Ce qui suit — **plateau** | qualifiées vidées, statut `PENDING`, antenne refermée |
+| Ce qui suit — **plateau** | résultat effacé, qualifiées vidées, statut `PENDING`, antenne refermée, puis créneaux **re-remplis** (ci-dessous) |
 | Ce qui suit — **format à classement** | manches supprimées (matchs, rappels, réservations d'alerte) |
 | Ce qui suit — **phase ultérieure** | supprimé de la même façon, quel que soit son format |
 
@@ -110,6 +110,36 @@ et la rencontre va se rejouer entre les mêmes équipes. Seul ce que le moteur
 sait **reposer** est supprimé : les manches à venir d'un format à classement
 (leurs appariements viennent d'un classement qu'on vient de défaire) et le
 plateau d'une phase ultérieure (posé avec des qualifiées qu'on vient d'annuler).
+
+### Le plateau se relit, il ne s'écrit pas juste du premier coup
+
+Le détachement est **volontairement large** — tout ce qui suit le stade défait —
+et il le faut : décider créneau par créneau demanderait de suivre les liens de
+plateau à la main. Mais large veut dire qu'il vide aussi des créneaux que le
+stade défait n'alimentait pas, et rien ne les reposerait : `pushTeamToTarget`
+n'est appelé qu'à la **résolution** d'un match, jamais après coup.
+
+Le cas n'est pas de coin, il est ordinaire en double élimination, où un match
+peut être alimenté par un match situé **deux stades plus haut**. Sur un plateau à
+huit, la finale du tableau principal (stade 3) est alimentée par le deuxième tour
+du tableau principal (stade 1) : défaire le deuxième tour de repêchage (stade 2)
+la détachait, et ses deux engagées — venues d'un match joué et non effacé —
+disparaissaient sans retour. La grande finale perdait de même son finaliste du
+tableau principal chaque fois qu'on défaisait le dernier tour de repêchage.
+
+D'où un passage de **re-remplissage**, qui est au plateau ce que le rejeu est aux
+modes à classement : on ne cherche pas à écrire juste du premier coup, on relit
+ce qui reste. Toute rencontre encore tranchée dont la cible vient d'être détachée
+y repose son vainqueur et son perdant, par `pushTeamToTarget` — la même fonction
+que l'arbitrage, pour que la règle d'antenne et le recalcul du statut ne se
+dédoublent pas. Les byes qui en naissent sont résolus juste après par
+`tryAutoResolveByes`, comme après n'importe quelle correction.
+
+Corollaire : une rencontre détachée est vidée de son **résultat** au même titre
+que le stade défait. Elle n'a pas été jouée, mais le moteur a pu la *résoudre* —
+un bye —, et lui retirer ses engagées en lui laissant son vainqueur donnerait une
+ligne qui annonce un gagnant sans participante, que `isEliminationPhaseComplete`
+compterait pour jouée.
 
 **Ce qui n'est pas touché** : les abandons (`forfeit`), les pénalités
 d'endurance, les inscriptions, le seeding. Ce sont des *entrées* du rejeu au même

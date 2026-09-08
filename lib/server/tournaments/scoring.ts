@@ -13,7 +13,15 @@ import { loadTournamentMatchFormat } from "./repository";
 import { syncTournamentState } from "./state";
 import { tryAutoResolveByes } from "./byes";
 
-async function pushTeamToTarget(
+/**
+ * Pose une équipe dans le créneau qu'un résultat lui ouvre en aval.
+ *
+ * Exporté pour le retour en arrière (`./rollback.ts`), qui doit **re-remplir**
+ * un plateau détaché depuis les résultats qui subsistent : une seconde
+ * implémentation y perdrait la règle d'antenne ci-dessous, et le recalcul du
+ * statut avec elle.
+ */
+export async function pushTeamToTarget(
   connection: PoolConnection,
   targetMatchId: number | null,
   targetSlot: number | null,

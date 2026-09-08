@@ -65,8 +65,10 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // servent deux fois : en toast si la route tranche, et tels quels sous le
   // bouton désarmé de la zone de danger — d'où des phrases qui expliquent, et
   // non des constats.
-  ROLLBACK_NOTHING_TO_UNDO:
-    "Plus rien à défaire : le tournoi est revenu à l'instant de son coup d'envoi, aucun score n'y est saisi.",
+  // Vrai aussi bien d'un tournoi ramené à son coup d'envoi que d'un tournoi clos
+  // faute d'adversaires, qui n'a jamais eu de plateau : c'est le même refus, et
+  // parler d'un retour au coup d'envoi mentirait au second.
+  ROLLBACK_NOTHING_TO_UNDO: "Plus rien à défaire : aucun score n'est saisi sur ce plateau.",
   ROLLBACK_TOURNAMENT_NOT_STARTED:
     "Le tournoi n'a pas encore commencé : il n'a aucune manche à défaire.",
   ROLLBACK_ROUND_CHANGED:

@@ -231,6 +231,12 @@ async function clearMatchResults(
  * pas supprimer ces lignes sans détruire le tournoi, mais les laisser garnies
  * afficherait au tour suivant une équipe qui n'a plus rien gagné.
  *
+ * Appelé **après** {@link clearMatchResults}, qui a déjà effacé leur résultat :
+ * une rencontre en aval du stade défait n'a pas été jouée, mais elle peut avoir
+ * été *résolue* — un bye posé par `tryAutoResolveByes`. Lui retirer ses engagées
+ * en lui laissant son vainqueur donnerait une ligne qui annonce un gagnant sans
+ * participante, et `isEliminationPhaseComplete` la compterait pour jouée.
+ *
  * L'antenne est refermée pour la même raison que dans `pushTeamToTarget` : une
  * affiche qui perd ses deux camps n'est plus l'affiche qu'on diffusait.
  */
@@ -248,6 +254,87 @@ async function detachMatchParticipants(
        WHERE id IN (${ids.map(() => "?").join(", ")})`,
       ids,
     );
+  }
+}
+
+/**
+ * Re-remplit les créneaux détachés depuis les résultats qui subsistent.
+ *
+ * Le détachement est **volontairement large** — tout ce qui suit le stade défait
+ * —, et il le faut : décider créneau par créneau demanderait de suivre les liens
+ * de plateau à la main. Mais large veut dire qu'il vide aussi des créneaux que le
+ * stade défait n'alimentait pas, et rien ne les reposerait : `pushTeamToTarget`
+ * n'est appelé qu'à la **résolution** d'un match, jamais après coup.
+ *
+ * Le cas n'est pas de coin, il est ordinaire en double élimination, où un match
+ * peut être alimenté par un match situé deux stades plus haut. Sur un plateau à
+ * huit, la finale du tableau principal se joue *après* le deuxième tour de
+ * repêchage : défaire ce tour la détachait, et ses deux engagées — venues du
+ * deuxième tour du tableau principal, joué et non effacé — disparaissaient sans
+ * retour. La grande finale perdait de même son finaliste du tableau principal
+ * chaque fois qu'on défaisait le dernier tour de repêchage.
+ *
+ * D'où ce passage, qui est au plateau ce que le rejeu est aux modes à classement
+ * : on ne cherche pas à écrire juste du premier coup, on **relit** ce qui reste.
+ * Toute rencontre encore tranchée dont la cible vient d'être détachée y repose
+ * son vainqueur et son perdant. Les byes qui en naissent seront résolus par
+ * `tryAutoResolveByes`, juste après, comme après n'importe quelle correction.
+ */
+async function repopulateDetachedMatches(
+  connection: PoolConnection,
+  tournamentId: number,
+  matchIds: readonly number[],
+): Promise<void> {
+  const { pushTeamToTarget } = await import("./scoring");
+
+  for (const ids of chunk(matchIds)) {
+    const placeholders = ids.map(() => "?").join(", ");
+    const [feeders] = await connection.execute<
+      (RowDataPacket & {
+        winner_team_id: number | null;
+        loser_team_id: number | null;
+        next_winner_match_id: number | null;
+        next_winner_slot: number | null;
+        next_loser_match_id: number | null;
+        next_loser_slot: number | null;
+      })[]
+    >(
+      `SELECT winner_team_id, loser_team_id,
+              next_winner_match_id, next_winner_slot,
+              next_loser_match_id, next_loser_slot
+       FROM bg_matches
+       WHERE tournament_id = ?
+         AND (winner_team_id IS NOT NULL OR loser_team_id IS NOT NULL)
+         AND (next_winner_match_id IN (${placeholders})
+              OR next_loser_match_id IN (${placeholders}))
+       ORDER BY round_number ASC, match_number ASC`,
+      [tournamentId, ...ids, ...ids],
+    );
+
+    const detached = new Set(ids);
+    for (const feeder of feeders) {
+      const winnerTarget =
+        feeder.next_winner_match_id === null ? null : Number(feeder.next_winner_match_id);
+      if (winnerTarget !== null && detached.has(winnerTarget)) {
+        await pushTeamToTarget(
+          connection,
+          winnerTarget,
+          feeder.next_winner_slot === null ? null : Number(feeder.next_winner_slot),
+          feeder.winner_team_id === null ? null : Number(feeder.winner_team_id),
+        );
+      }
+
+      const loserTarget =
+        feeder.next_loser_match_id === null ? null : Number(feeder.next_loser_match_id);
+      if (loserTarget !== null && detached.has(loserTarget)) {
+        await pushTeamToTarget(
+          connection,
+          loserTarget,
+          feeder.next_loser_slot === null ? null : Number(feeder.next_loser_slot),
+          feeder.loser_team_id === null ? null : Number(feeder.loser_team_id),
+        );
+      }
+    }
   }
 }
 
@@ -496,10 +583,13 @@ async function applyRollback(
   plan: RollbackPlan,
   phases: readonly RollbackPhase[],
 ): Promise<void> {
-  await clearMatchResults(connection, plan.clearedMatchIds);
+  // Les détachés sont vidés de leur résultat au même titre que le stade défait :
+  // ils n'ont pas été joués, mais le moteur a pu en *résoudre* certains (byes).
+  await clearMatchResults(connection, [...plan.clearedMatchIds, ...plan.detachedMatchIds]);
 
   if (plan.detachedMatchIds.length > 0) {
     await detachMatchParticipants(connection, plan.detachedMatchIds);
+    await repopulateDetachedMatches(connection, tournamentId, plan.detachedMatchIds);
   }
   if (plan.deletedMatchIds.length > 0) {
     await deleteMatches(connection, plan.deletedMatchIds);

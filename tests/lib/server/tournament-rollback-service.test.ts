@@ -9,6 +9,7 @@ jest.mock("@/lib/server/tournaments/bg-survie");
 jest.mock("@/lib/server/tournaments/phases");
 jest.mock("@/lib/server/tournaments/phases-repository");
 jest.mock("@/lib/server/tournaments/repository");
+jest.mock("@/lib/server/tournaments/scoring");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/bot-logs");
 
@@ -21,6 +22,7 @@ import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { reconcilePhases } from "@/lib/server/tournaments/phases";
 import { loadPhases } from "@/lib/server/tournaments/phases-repository";
 import { resetRegistrationRanks } from "@/lib/server/tournaments/repository";
+import { pushTeamToTarget } from "@/lib/server/tournaments/scoring";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
 import { reconcileSurvival } from "@/lib/server/tournaments/survival";
 import { reconcileSwiss } from "@/lib/server/tournaments/swiss";
@@ -111,6 +113,8 @@ function setup(options: {
   phases?: Array<{ id: number; position: number; format: PhaseFormat }>;
   /** Rencontres d'arbre final restant après suppression (BG Survie). */
   remainingPlayoffMatches?: number;
+  /** Rencontres encore tranchées qui alimentent un créneau détaché. */
+  feeders?: Array<Record<string, number | null>>;
 }) {
   const execute = jest.fn(async (sql: string) => {
     if (/SELECT id, name, format FROM bg_tournaments/.test(sql)) {
@@ -123,6 +127,7 @@ function setup(options: {
     if (/COUNT\(\*\) AS remaining/.test(sql)) {
       return [[{ remaining: options.remainingPlayoffMatches ?? 0 }]];
     }
+    if (/next_winner_slot/.test(sql)) return [options.feeders ?? []];
     if (/LEFT JOIN bg_tournament_phases/.test(sql)) return [options.matches];
     return [{ affectedRows: 1 }];
   }) as unknown as ExecuteMock;
@@ -156,6 +161,7 @@ beforeEach(() => {
     reconcileEndurance,
     reconcilePhases,
     resetRegistrationRanks,
+    pushTeamToTarget,
   ]) {
     (fn as jest.Mock).mockResolvedValue(undefined as never);
   }
@@ -296,6 +302,24 @@ describe("rollbackCurrentRound — écritures", () => {
     expect(statements(execute).some((sql) => sql.startsWith("DELETE FROM bg_matches"))).toBe(false);
   });
 
+  it("efface aussi le résultat des rencontres détachées", async () => {
+    // Elles n'ont pas été jouées, mais le moteur a pu en *résoudre* certaines :
+    // un bye détaché qui garderait son vainqueur annoncerait un gagnant sans
+    // participante, et `isEliminationPhaseComplete` le compterait pour joué.
+    const { execute } = setup({
+      format: "SINGLE",
+      matches: [
+        playedRow({ id: 1, round_number: 1, next_winner_match_id: 3 }),
+        playedRow({ id: 2, round_number: 1, next_winner_match_id: 3 }),
+        row({ id: 3, round_number: 2 }),
+      ],
+    });
+
+    await rollbackCurrentRound(7);
+
+    expect(statementWith(execute, "SET team1_score = NULL")?.[1]).toEqual([1, 2, 3]);
+  });
+
   it("supprime les manches suivantes d'un format à classement, rappels compris", async () => {
     const { execute } = setup({
       format: "SURVIVAL",
@@ -312,6 +336,85 @@ describe("rollbackCurrentRound — écritures", () => {
     expect(statementWith(execute, "DELETE FROM bg_referee_alerts")?.[1]).toEqual([2, 3]);
     expect(statementWith(execute, "DELETE FROM bg_matches")?.[1]).toEqual([2, 3]);
     expect(statements(execute).some((sql) => sql.includes("SET team1_id = NULL"))).toBe(false);
+  });
+});
+
+describe("rollbackCurrentRound — re-remplissage du plateau", () => {
+  /**
+   * Plateau à double élimination réduit au cas qui pose problème : la finale du
+   * tableau principal (id 3) est alimentée par un match du **stade précédent**
+   * celui qu'on efface, et se retrouve pourtant détachée.
+   */
+  const doubleBoard = [
+    playedRow({ id: 1, round_number: 1, next_winner_match_id: 3, next_loser_match_id: 4 }),
+    playedRow({ id: 2, round_number: 1, next_winner_match_id: 3, next_loser_match_id: 4 }),
+    row({ id: 3, round_number: 2, next_winner_match_id: 6, next_loser_match_id: 5 }),
+    playedRow({ id: 4, round_number: 1, bracket: "LOWER", next_winner_match_id: 5 }),
+    row({ id: 5, round_number: 2, bracket: "LOWER", next_winner_match_id: 6 }),
+    row({ id: 6, round_number: 1, bracket: "GRAND" }),
+  ];
+
+  it("repose vainqueur et perdant dans les créneaux détachés", async () => {
+    // Le détachement est volontairement large ; sans ce passage, la grande
+    // finale perdait le finaliste du tableau principal — venu d'un match joué et
+    // **non effacé** — et rien ne le reposait : le tournoi ne pouvait plus finir.
+    const { execute } = setup({
+      format: "DOUBLE",
+      matches: doubleBoard,
+      feeders: [
+        {
+          winner_team_id: 11,
+          loser_team_id: 12,
+          next_winner_match_id: 6,
+          next_winner_slot: 1,
+          next_loser_match_id: 5,
+          next_loser_slot: 2,
+        },
+      ],
+    });
+
+    await rollbackCurrentRound(7);
+
+    // Le plan détache 5 et 6 : ce sont les deux créneaux à reposer.
+    expect(statementWith(execute, "SET team1_id = NULL")?.[1]).toEqual([5, 6]);
+    expect(pushTeamToTarget).toHaveBeenCalledTimes(2);
+    expect(pushTeamToTarget).toHaveBeenCalledWith(expect.anything(), 6, 1, 11);
+    expect(pushTeamToTarget).toHaveBeenCalledWith(expect.anything(), 5, 2, 12);
+    expect(statementWith(execute, "next_winner_slot")?.[1]).toEqual([7, 5, 6, 5, 6]);
+  });
+
+  it("ne repose rien dans une rencontre que le plan efface", async () => {
+    // La cible est au stade défait : elle garde ses engagées et va se rejouer.
+    // La repousser y remettrait un vainqueur que le geste vient d'effacer.
+    setup({
+      format: "DOUBLE",
+      matches: doubleBoard,
+      feeders: [
+        {
+          winner_team_id: 11,
+          loser_team_id: 12,
+          next_winner_match_id: 3,
+          next_winner_slot: 1,
+          next_loser_match_id: 4,
+          next_loser_slot: 1,
+        },
+      ],
+    });
+
+    await rollbackCurrentRound(7);
+
+    expect(pushTeamToTarget).not.toHaveBeenCalled();
+  });
+
+  it("ne repose rien quand rien n'est détaché", async () => {
+    setup({
+      format: "SWISS",
+      matches: [playedRow({ id: 1, round_number: 1 })],
+    });
+
+    await rollbackCurrentRound(7);
+
+    expect(pushTeamToTarget).not.toHaveBeenCalled();
   });
 });
 
