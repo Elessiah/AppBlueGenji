@@ -366,12 +366,23 @@ describe("reconcileEndurance", () => {
   beforeEach(() => jest.clearAllMocks());
   afterEach(() => jest.restoreAllMocks());
 
-  it("ne touche à rien sur un tournoi terminé", async () => {
-    const conn = makeConn([[[tournamentRow({ state: "FINISHED" })]]]);
+  it("ne repose ni manche ni arbre sur un tournoi terminé", async () => {
+    // Un tournoi clos rejoue bien son classement — corriger le score d'une
+    // archive doit se voir au palmarès —, mais il ne se rouvre pas. Le détail du
+    // rejeu est couvert par `finished-reconciliation.test.ts`.
+    const conn = makeConn([
+      [[tournamentRow({ state: "FINISHED", endurance_current_round: 1 })]],
+      [[standingRow(1), standingRow(2), standingRow(3), standingRow(4)]],
+    ]);
 
     await reconcileEndurance(5, conn);
 
-    expect(conn.execute).toHaveBeenCalledTimes(1);
+    expect(createMatch).not.toHaveBeenCalled();
+    expect(
+      conn.execute.mock.calls.some(([sql]) =>
+        String(sql).includes("endurance_playoffs_started = 1"),
+      ),
+    ).toBe(false);
   });
 
   it("persiste le classement rejoué depuis l'historique", async () => {
@@ -558,7 +569,7 @@ describe("reconcileEndurance — plafond de manches", () => {
         .filter(([sql]) => String(sql).includes("INSERT INTO bg_endurance_standings"))
         .map(([, params]) => {
           const values = params as unknown[];
-          return [values[1], values[6]];
+          return [values[1], values[7]];
         }),
     );
   }

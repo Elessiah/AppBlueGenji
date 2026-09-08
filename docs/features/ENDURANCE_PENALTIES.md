@@ -64,11 +64,12 @@ prononcée au coup d'envoi doit peser dès le premier appariement.
 ## La fenêtre : la phase qualificative, et rien d'autre
 
 **Un tournoi en cours** (`TOURNAMENT_NOT_RUNNING`, 400), comme l'abandon en
-Survie et en Ronde suisse. Ce n'est pas une précaution de forme :
-`reconcileEndurance` s'arrête net sur un tournoi `FINISHED`, si bien qu'une
-sanction y serait écrite **sans jamais être rejouée** — `bg_endurance_standings`
-et `final_rank` garderaient leurs valeurs pendant que `loadEnduranceMeta`, qui
-rejoue toujours, afficherait une championne au capital amputé. Le cas est
+Survie et en Ronde suisse. Ce n'est pas une précaution de forme : depuis que la
+réconciliation rejoue aussi les tournois clos (voir
+`FINISHED_TOURNAMENT_RECONCILIATION.md`), une sanction tardive ne serait pas
+ignorée — elle **réécrirait un palmarès déjà publié**, sans qu'aucune manche ne
+puisse plus être jouée pour en répondre. Corriger le score d'une archive répare
+une erreur d'arbitrage ; la sanctionner après coup en crée une. Le cas est
 atteignable : un tournoi clos par `startEndurancePlayoffs` faute de qualifiées
 garde `endurance_playoffs_started` à 0.
 

@@ -222,3 +222,81 @@ describe("format de match — les deux notations", () => {
     expect(isFieldEditable("matchFormat", { ...announced, state: "RUNNING" })).toBe(false);
   });
 });
+
+describe("toApiPayload — réglages du match nul", () => {
+  const values = defaultTournamentFormValues();
+  const survie = {
+    ...values,
+    format: "BG_SURVIE" as const,
+    matchFormat: { type: "FT" as const, value: 3, drawsAllowed: true },
+    endurancePlayoffFormat: { type: "FT" as const, value: 3 },
+  };
+
+  it("aplatit le format de match en quatre clés", () => {
+    const payload = toApiPayload({
+      ...values,
+      matchFormat: { type: "FT", value: 3, maxMaps: 4 },
+    });
+
+    expect(payload.matchFormatType).toBe("FT");
+    expect(payload.matchFormatValue).toBe(3);
+    expect(payload.matchFormatMaxMaps).toBe(4);
+  });
+
+  it("porte les égalités et le format des play-offs en BlueGenji Survie", () => {
+    const payload = toApiPayload(survie);
+
+    expect(payload.matchFormatDraws).toBe(true);
+    expect(payload.endurancePlayoffFormatType).toBe("FT");
+    expect(payload.endurancePlayoffFormatValue).toBe(3);
+  });
+
+  it("ne les envoie pas hors du mode, même si le formulaire les a gardés en mémoire", () => {
+    // Basculer le format ne vide pas l'état du formulaire : c'est `toApiPayload`
+    // qui décide de ce qui part, comme pour la cadence de survie.
+    const payload = toApiPayload({ ...survie, format: "SINGLE" });
+
+    expect(payload.matchFormatDraws).toBe(false);
+    expect(payload.endurancePlayoffFormatType).toBeNull();
+    expect(payload.endurancePlayoffFormatValue).toBeNull();
+  });
+
+  it("laisse le plafond de maps absent quand il n'est pas réglé", () => {
+    expect(toApiPayload({ ...values, matchFormat: { type: "FT", value: 3 } }).matchFormatMaxMaps).toBeNull();
+  });
+
+  it("fait l'aller-retour sans perdre les deux réglages", () => {
+    const back = toFormValues({
+      ...toFormValues({
+        name: "Coupe",
+        description: null,
+        game: "OW2",
+        format: "BG_SURVIE",
+        participantType: "TEAM",
+        maxTeams: 16,
+        startVisibilityAt: "2026-08-01T10:00:00.000Z",
+        registrationOpenAt: "2026-08-05T10:00:00.000Z",
+        registrationCloseAt: "2026-08-20T10:00:00.000Z",
+        startAt: "2026-08-25T18:00:00.000Z",
+        hasThirdPlaceMatch: false,
+        survivalRoundsBeforeFirstCut: null,
+        survivalRoundsPerCut: null,
+        swissTotalRounds: null,
+        swissPointsWin: null,
+        swissPointsDraw: null,
+        swissPointsLoss: null,
+        endurancePoints: null,
+        enduranceWinDelta: null,
+        enduranceLossDelta: null,
+        endurancePlayoffSize: null,
+        enduranceMaxRounds: null,
+        matchFormat: { type: "FT", value: 3, maxMaps: 4, drawsAllowed: true },
+        endurancePlayoffFormat: { type: "BO", value: 5 },
+        phases: null,
+      }),
+    } as never);
+
+    expect(back.matchFormat).toEqual({ type: "FT", value: 3, maxMaps: 4, drawsAllowed: true });
+    expect(back.endurancePlayoffFormat).toEqual({ type: "BO", value: 5 });
+  });
+});

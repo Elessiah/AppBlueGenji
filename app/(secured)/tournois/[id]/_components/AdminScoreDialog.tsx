@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { Pill } from "@/components/cyber";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
+import { isMatchDrawn } from "@/lib/shared/match-outcome";
 import {
   forfeitMapCount,
   matchFormatDescription,
@@ -100,6 +101,9 @@ function storedResultLabel(match: BracketMatch, team1: string, team2: string): s
   if (match.team1Score === null && match.team2Score === null) return null;
 
   const score = `${match.team1Score ?? 0} – ${match.team2Score ?? 0}`;
+  // Un nul est un résultat, pas une saisie en attente : le dire « non tranché »
+  // enverrait l'arbitrage chercher un vainqueur qu'il n'y a pas.
+  if (isMatchDrawn(match)) return `Tranché : ${score}, match nul.`;
   if (match.winnerTeamId === null) return `Enregistré : ${score}, non tranché.`;
 
   const winner = match.winnerTeamId === match.team1Id ? team1 : team2;
@@ -129,7 +133,7 @@ function storedResultLabel(match: BracketMatch, team1: string, team2: string): s
  */
 export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDialogProps) {
   const form = useScoreForm(match);
-  const matchFormat = useMatchFormat();
+  const matchFormat = useMatchFormat(match);
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: form.submitting });
@@ -158,7 +162,9 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
   // champs : un match tranché (les champs ne disent pas qui a gagné), ou une
   // saisie en cours qui recouvre l'ancienne valeur.
   const stored =
-    match.winnerTeamId !== null || form.dirty ? storedResultLabel(match, team1, team2) : null;
+    match.winnerTeamId !== null || isMatchDrawn(match) || form.dirty
+      ? storedResultLabel(match, team1, team2)
+      : null;
   const blocker = form.decision.resolveBlocker ?? form.decision.saveBlocker;
 
   const run = async (action: "save" | "resolve") => {

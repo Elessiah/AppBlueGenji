@@ -14,7 +14,14 @@ import {
 
 const NOW = new Date("2026-06-15T12:00:00Z");
 
-function match(overrides: Partial<StatsMatch> = {}): StatsMatch {
+/**
+ * `won` est une commodité d'écriture : l'immense majorité des cas ne connaît
+ * que la victoire et la défaite, et `outcome: "WIN"` alourdirait chaque ligne.
+ * Un cas qui vise le match nul passe `outcome: "DRAW"` directement.
+ */
+function match(overrides: Partial<StatsMatch> & { won?: boolean } = {}): StatsMatch {
+  const { won, ...rest } = overrides;
+
   return {
     matchId: 1,
     tournamentId: 10,
@@ -25,11 +32,11 @@ function match(overrides: Partial<StatsMatch> = {}): StatsMatch {
     playedAt: "2026-06-01T18:00:00Z",
     opponentTeamId: 99,
     opponentName: "Adversaire",
-    won: true,
+    outcome: won === false ? "LOSS" : "WIN",
     scoreFor: 2,
     scoreAgainst: 1,
     forfeit: "NONE",
-    ...overrides,
+    ...rest,
   };
 }
 

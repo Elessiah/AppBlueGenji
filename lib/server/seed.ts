@@ -28,6 +28,7 @@ import { normalizeStreamUrl } from "@/lib/shared/live-streams";
 import { initializeMultiTournament, startPhase, reconcilePhases } from "./tournaments/phases";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { matchWinsRequired } from "@/lib/shared/match-format";
+import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
 import { soloEntryNameCandidates } from "@/lib/shared/participants";
 import {
   TOURNAMENTS,
@@ -60,12 +61,28 @@ function rng(): number {
 // `winsRequired` = nombre de manches à gagner, dicté par le format de match du
 // tournoi (3 en BO5/FT3, 2 par défaut). Sans ça, un tournoi seedé en BO5
 // afficherait des scores impossibles à saisir dans l'interface.
-function playMatch(team1Id: number, team2Id: number, winsRequired = 2): {
+function playMatch(
+  team1Id: number,
+  team2Id: number,
+  winsRequired = 2,
+  // Probabilité qu'une map nulle arrête la rencontre avant l'objectif. Réservée
+  // aux tournois dont le format ouvre l'égalité : ailleurs, un score nul serait
+  // refusé à la saisie, et le jeu de test montrerait un match impossible à
+  // reproduire dans l'interface.
+  drawChance = 0
+): {
   team1Score: number;
   team2Score: number;
-  winnerTeamId: number;
-  loserTeamId: number;
+  winnerTeamId: number | null;
+  loserTeamId: number | null;
 } {
+  if (drawChance > 0 && rng() < drawChance) {
+    // Le score d'un nul est le même des deux côtés, par définition : une manche
+    // de moins que l'objectif, la dernière map ayant été partagée.
+    const maps = Math.max(0, winsRequired - 1);
+    return { team1Score: maps, team2Score: maps, winnerTeamId: null, loserTeamId: null };
+  }
+
   const team1Wins = rng() < 0.7;
   const tight = rng() < 0.5;
   const winnerScore = winsRequired;
@@ -832,7 +849,9 @@ async function generateEnduranceTournament(
   finish: boolean,
   playWaves: number,
   forfeits: number,
-  winsRequired: number
+  winsRequired: number,
+  /** Le format du tournoi ouvre-t-il l'égalité en qualification ? */
+  drawsAllowed = false
 ): Promise<void> {
   const connection = await db.getConnection();
   try {
@@ -848,11 +867,19 @@ async function generateEnduranceTournament(
       if (!finish && waves >= playWaves) break;
 
       for (const m of ready) {
+        // L'égalité ne vaut que pour la **qualification** : l'arbre final doit
+        // savoir qui joue le tour suivant, et un nul l'y laisserait indécis.
+        const qualification = Number(m.round_number) < PLAYOFF_ROUND_OFFSET;
         await finalizeMatch(
           connection,
           tournamentId,
           m,
-          playMatch(Number(m.team1_id), Number(m.team2_id), winsRequired)
+          playMatch(
+            Number(m.team1_id),
+            Number(m.team2_id),
+            winsRequired,
+            drawsAllowed && qualification ? 0.2 : 0
+          )
         );
         played++;
       }
@@ -1270,15 +1297,19 @@ async function createTournament(
   // pour que le jeu de test reste cohérent avec ce que l'interface autorise.
   const matchFormat = def.matchFormat ?? null;
   const winsRequired = matchFormat ? matchWinsRequired(matchFormat) : 2;
+  // Les égalités n'ont de sens qu'en BG Survie, et pas sans format de match :
+  // c'est lui qui borne la rencontre. Même règle que `validateTournamentInput`.
+  const matchFormatDraws = isEndurance && matchFormat !== null && def.matchFormatDraws === true;
 
   const [result] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_tournaments
      (organizer_user_id, name, game, description, format, participant_type, has_third_place_match,
       survival_rounds_before_first_cut, survival_rounds_per_cut, swiss_total_rounds,
       endurance_start_points, endurance_playoff_size, endurance_max_rounds,
-      match_format_type, match_format_value,
+      match_format_type, match_format_value, match_format_draws,
+      endurance_playoff_format_type, endurance_playoff_format_value,
       max_teams, state, start_visibility_at, registration_open_at, registration_close_at, start_at, finished_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       organizerId,
       `Test - ${def.name}`,
@@ -1297,6 +1328,9 @@ async function createTournament(
       isEndurance ? def.enduranceMaxRounds ?? null : null,
       matchFormat?.type ?? null,
       matchFormat?.value ?? null,
+      matchFormatDraws ? 1 : 0,
+      isEndurance ? def.endurancePlayoffFormat?.type ?? null : null,
+      isEndurance ? def.endurancePlayoffFormat?.value ?? null : null,
       def.maxTeams,
       insertState,
       regOpenAt,
@@ -1353,7 +1387,7 @@ async function createTournament(
     if (isMulti && def.phases) {
       await generateMultiPhaseTournament(db, tournamentId, def.phases, finish, def.playWaves ?? 2, winsRequired);
     } else if (isEndurance) {
-      await generateEnduranceTournament(db, tournamentId, finish, def.playWaves ?? 3, def.forfeits ?? 0, winsRequired);
+      await generateEnduranceTournament(db, tournamentId, finish, def.playWaves ?? 3, def.forfeits ?? 0, winsRequired, matchFormatDraws);
     } else if (isSurvival) {
       await generateSurvivalTournament(db, tournamentId, finish, def.playWaves ?? 3, def.forfeits ?? 0, winsRequired);
     } else if (isSwiss) {

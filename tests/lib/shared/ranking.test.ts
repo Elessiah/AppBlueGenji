@@ -46,6 +46,7 @@ describe("cote de départ", () => {
       points: 500,
       wins: 0,
       losses: 0,
+      draws: 0,
       matchesPlayed: 0,
     });
   });

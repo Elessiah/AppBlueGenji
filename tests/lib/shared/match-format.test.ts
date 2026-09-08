@@ -363,11 +363,14 @@ describe("match-format — une seule écriture de la notation", () => {
     expect(code).not.toContain("toBestOfLabel");
   });
 
-  it("la carte de l'accueil lit le réglage du tournoi et passe par le module partagé", () => {
+  it("la carte de l'accueil lit un réglage et passe par le module partagé", () => {
     const file = join("components", "cyber", "landing", "LiveCard.tsx");
     const code = stripComments(read(file), file);
     expect(code).toContain("matchFormatLabel");
-    expect(code).toContain("tournament.matchFormat");
+    // Le format lu est celui **du match**, résolu côté serveur : le tournoi en
+    // joue deux en « BlueGenji Survie », et l'étiquette d'une demi-finale ne
+    // doit pas venir de la qualification.
+    expect(code).toContain("currentMatch?.matchFormat");
   });
 
   it("rend bien type + nombre, sur tout le domaine de saisie", () => {

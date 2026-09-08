@@ -37,6 +37,7 @@ function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
     survivalRoundsPerCut: null,
     phases: null,
     matchFormat: null,
+    endurancePlayoffFormat: null,
     liveUrl: null,
     ...overrides,
   };
@@ -141,6 +142,52 @@ describe("en-tête de tournoi — faits affichés", () => {
     const item = find(withFormat, "match-format");
     expect(item?.value).toBe("FT3");
     expect(item?.hint).toContain("3 manches");
+    // Format unique : l'intitulé reste celui du tournoi entier, il n'y a rien à
+    // départager.
+    expect(item?.label).toBe("Format des matchs");
+  });
+
+  it("annonce les deux formats d'un BlueGenji Survie, et précise alors le premier", () => {
+    // Le mode joue deux formats : sa qualification tolère l'égalité, son arbre
+    // final non. Une case unique aurait affirmé du tournoi entier ce qui n'est
+    // vrai que de la première phase — une équipe qui prépare sa demi-finale y
+    // lisait le plafond de maps de la qualification, et l'infobulle lui
+    // promettait une égalité impossible.
+    const items = headerMetaItems(
+      card({
+        format: "BG_SURVIE",
+        matchFormat: { type: "FT", value: 3, maxMaps: 4, drawsAllowed: true },
+        endurancePlayoffFormat: { type: "FT", value: 3 },
+      }),
+      null,
+      null,
+      NOW,
+    );
+
+    const qualification = find(items, "match-format");
+    const playoffs = find(items, "playoff-match-format");
+
+    expect(qualification?.label).toBe("Format des qualifications");
+    expect(qualification?.value).toBe("FT3 · 4 maps");
+    expect(qualification?.hint).toContain("sans vainqueur");
+
+    expect(playoffs?.label).toBe("Format des play-offs");
+    expect(playoffs?.value).toBe("FT3");
+    expect(playoffs?.hint).not.toContain("sans vainqueur");
+  });
+
+  it("ne montre le format des play-offs que lorsqu'il diffère de celui du tournoi", () => {
+    // `null` = l'arbre rejoue le format du tournoi : une seconde case répéterait
+    // la première, à l'égalité près, et brouillerait la lecture pour rien.
+    const items = headerMetaItems(
+      card({ format: "BG_SURVIE", matchFormat: { type: "FT", value: 3 } }),
+      null,
+      null,
+      NOW,
+    );
+
+    expect(keys(items)).not.toContain("playoff-match-format");
+    expect(find(items, "match-format")?.label).toBe("Format des matchs");
   });
 
   it("ne montre la petite finale que si elle est programmée", () => {

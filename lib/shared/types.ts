@@ -85,6 +85,8 @@ export type EnduranceStandingRow = {
   points: number;
   wins: number;
   losses: number;
+  /** Manches closes sans vainqueur (map nulle). */
+  draws: number;
   status: EnduranceStatus;
   eliminatedRound: number | null;
   rank: number;
@@ -345,6 +347,16 @@ export type TournamentCard = {
    * score libre, comme les tournois créés avant cette fonctionnalité.
    */
   matchFormat: MatchFormat | null;
+  /**
+   * « BlueGenji Survie » : format de l'**arbre final**, quand il diffère de
+   * celui de la qualification. `null` = celui du tournoi, égalités fermées.
+   *
+   * Le mode est le seul à en jouer deux : sa qualification peut clore un match
+   * sans vainqueur (map nulle), pas son élimination directe. Voir
+   * `tournamentMatchFormat` (`lib/shared/bg-survie.ts`), qui tranche pour les
+   * deux côtés.
+   */
+  endurancePlayoffFormat: MatchFormat | null;
   /**
    * Chaîne officielle du tournoi (Twitch, YouTube, Kick). `null` = pas de
    * diffusion annoncée. Les matchs n'en héritent jamais (`lib/shared/live-streams.ts`).

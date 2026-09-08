@@ -33,6 +33,13 @@ export type TournamentRow = RowDataPacket & {
   /** Format des matchs (`BO`/`FT`) ; NULL = saisie de score libre. */
   match_format_type: "BO" | "FT" | null;
   match_format_value: number | null;
+  /** Plafond de maps décisives ; NULL = le plafond naturel du format. */
+  match_format_max_maps: number | null;
+  /** 1 = un match peut se clore sans vainqueur (map nulle). */
+  match_format_draws: number;
+  /** Format de l'arbre final en BG Survie ; NULL = celui du tournoi. */
+  endurance_playoff_format_type: "BO" | "FT" | null;
+  endurance_playoff_format_value: number | null;
   /** Chaîne officielle du tournoi ; NULL = aucune diffusion annoncée. */
   live_url: string | null;
 };
@@ -167,7 +174,16 @@ export function mapCard(row: TournamentListRow): TournamentCard {
     survivalRoundsPerCut:
       row.survival_rounds_per_cut === null ? null : Number(row.survival_rounds_per_cut),
     phases: null,
-    matchFormat: parseMatchFormat(row.match_format_type, row.match_format_value),
+    matchFormat: parseMatchFormat(
+      row.match_format_type,
+      row.match_format_value,
+      row.match_format_max_maps,
+      row.match_format_draws,
+    ),
+    endurancePlayoffFormat: parseMatchFormat(
+      row.endurance_playoff_format_type,
+      row.endurance_playoff_format_value,
+    ),
     // Revalidé à la lecture, comme dans `findBroadcastingTournament` : une ligne
     // posée avant la liste blanche (ou éditée à la main en base) ne doit jamais
     // ressortir en `href`. Une URL sans schéma, notamment, deviendrait un lien

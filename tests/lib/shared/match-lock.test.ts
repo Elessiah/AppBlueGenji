@@ -18,6 +18,11 @@ function match(overrides: Partial<MatchScoreState> = {}): MatchScoreState {
     team2Score: null,
     winnerTeamId: null,
     forfeitTeamId: null,
+    // Un match a longtemps été « tranché » dès qu'il portait un vainqueur ; il
+    // peut désormais l'être **sans** (match nul), d'où le champ explicite. Le
+    // défaut suit l'ancienne lecture pour que les cas existants disent la même
+    // chose, et un test qui vise le nul le pose à la main.
+    decided: overrides.winnerTeamId !== undefined && overrides.winnerTeamId !== null,
     hasPendingReport: false,
     nextWinnerMatchId: null,
     nextLoserMatchId: null,
@@ -177,5 +182,40 @@ describe("match-lock — adaptation depuis BracketMatch", () => {
   it("traduit AWAITING_CONFIRMATION en report en attente", () => {
     expect(fromBracketMatch({ ...base, status: "AWAITING_CONFIRMATION" }).hasPendingReport).toBe(true);
     expect(hasScoreInput(fromBracketMatch({ ...base, status: "AWAITING_CONFIRMATION" }))).toBe(true);
+  });
+});
+
+describe("match-lock — match nul", () => {
+  /** Une manche close sur 2-2 : tranchée, mais sans vainqueur. */
+  const drawn = { team1Score: 2, team2Score: 2, winnerTeamId: null, decided: true };
+
+  it("verrouille un match nul dont la manche suivante porte une saisie", () => {
+    // `isScoreEditLocked` lisait « tranché » sur `winnerTeamId` : un nul passait
+    // donc pour une manche pas encore jouée, l'interface rouvrait l'édition, et
+    // le serveur la refusait ensuite en 409 — le bouton menait à un mur.
+    const first = match({ id: 1, roundNumber: 1, ...drawn });
+    const second = match({ id: 2, roundNumber: 2, team1Score: 3, team2Score: 0, winnerTeamId: 10 });
+
+    expect(isScoreEditLocked(first, [first, second], "BG_SURVIE")).toBe(true);
+  });
+
+  it("le laisse modifiable tant que rien ne suit", () => {
+    const first = match({ id: 1, roundNumber: 1, ...drawn });
+    const second = match({ id: 2, roundNumber: 2 });
+
+    expect(isScoreEditLocked(first, [first, second], "BG_SURVIE")).toBe(false);
+  });
+
+  it("compte un match nul comme une saisie pour la manche amont", () => {
+    expect(hasScoreInput(match({ ...drawn }))).toBe(true);
+  });
+
+  it("ne verrouille rien sur un score noté en cours de rencontre", () => {
+    // L'arbitrage peut noter un 1-1 pendant que le match se joue : cette saisie
+    // n'est pas un résultat, et le match reste modifiable.
+    const first = match({ id: 1, roundNumber: 1, team1Score: 1, team2Score: 1 });
+    const second = match({ id: 2, roundNumber: 2, team1Score: 3, team2Score: 0, winnerTeamId: 10 });
+
+    expect(isScoreEditLocked(first, [first, second], "BG_SURVIE")).toBe(false);
   });
 });
