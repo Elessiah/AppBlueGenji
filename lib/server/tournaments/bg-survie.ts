@@ -64,9 +64,20 @@ type TournamentEnduranceRow = RowDataPacket & {
   has_third_place_match: number;
 };
 
+/**
+ * Lit la ligne du tournoi.
+ *
+ * `forUpdate` la **verrouille** — à réserver aux écritures dont une garde
+ * dépend de l'état lu (abandon, pénalités). Une lecture ordinaire sert
+ * l'instantané de la transaction, qui peut dater d'avant la clôture du tournoi
+ * par une transaction voisine ; une lecture verrouillante rend, elle, la
+ * dernière version validée et fait attendre l'écrivain concurrent. C'est ce que
+ * font déjà `forfeitSurvivalTeam` et `forfeitSwissTeam`.
+ */
 async function loadTournament(
   conn: PoolConnection,
   tournamentId: number,
+  forUpdate = false,
 ): Promise<TournamentEnduranceRow | null> {
   const [rows] = await conn.execute<TournamentEnduranceRow[]>(
     `SELECT format, state, match_format_type, match_format_value,
@@ -74,7 +85,7 @@ async function loadTournament(
             endurance_start_points, endurance_win_delta, endurance_loss_delta,
             endurance_playoff_size, endurance_max_rounds, endurance_current_round,
             endurance_playoffs_started, has_third_place_match
-     FROM bg_tournaments WHERE id = ? LIMIT 1`,
+     FROM bg_tournaments WHERE id = ? LIMIT 1${forUpdate ? " FOR UPDATE" : ""}`,
     [tournamentId],
   );
   return rows.length === 0 ? null : rows[0];
@@ -1002,15 +1013,30 @@ async function finalizeEndurance(
  * Un forfait de play-off se tranche sur le match lui-même (`adminResolveMatch`
  * avec `forfeitTeamId`), qui fait avancer l'arbre.
  *
- * @throws NOT_BG_SURVIE | ENDURANCE_PLAYOFFS_STARTED | TEAM_NOT_IN_TOURNAMENT | TEAM_ALREADY_OUT
+ * **Et à un tournoi en cours**, comme `forfeitSurvivalTeam` et
+ * `forfeitSwissTeam`. La garde manquait au seul mode endurance, et le cas est
+ * atteignable : un tournoi clos par `startEndurancePlayoffs` faute de qualifiées
+ * garde `endurance_playoffs_started` à 0, si bien que le contrôle suivant le
+ * laissait passer. L'abandon s'écrivait alors sur une archive — statut
+ * `FORFEIT`, capital à 0, manche courante close — pour un tournoi que plus
+ * personne ne joue. L'interface refusait déjà (`canForfeitTeam` exige
+ * `RUNNING`) ; il n'y avait que le serveur à convaincre.
+ *
+ * @throws NOT_BG_SURVIE | TOURNAMENT_NOT_RUNNING | ENDURANCE_PLAYOFFS_STARTED
+ *         | TEAM_NOT_IN_TOURNAMENT | TEAM_ALREADY_OUT
  */
 export async function forfeitEnduranceTeam(
   tournamentId: number,
   teamId: number,
   conn: PoolConnection,
 ): Promise<void> {
-  const tournament = await loadTournament(conn, tournamentId);
+  const tournament = await loadTournament(conn, tournamentId, true);
   if (!tournament || tournament.format !== "BG_SURVIE") throw new Error("NOT_BG_SURVIE");
+  // Avant le contrôle des play-offs, comme en Survie et en Ronde suisse : sur un
+  // tournoi clos, « le tournoi n'est pas en cours » est le vrai motif, et il
+  // reste juste dans le cas que le contrôle suivant ne voit pas — un tournoi
+  // fini faute de qualifiées garde `endurance_playoffs_started` à 0.
+  if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
   if (Number(tournament.endurance_playoffs_started) === 1) {
     throw new Error("ENDURANCE_PLAYOFFS_STARTED");
   }
@@ -1159,7 +1185,7 @@ export async function applyEndurancePenalty(
   authorId: number | null,
   conn: PoolConnection,
 ): Promise<{ reason: string }> {
-  const tournament = await loadTournament(conn, tournamentId);
+  const tournament = await loadTournament(conn, tournamentId, true);
   if (!tournament || tournament.format !== "BG_SURVIE") throw new Error("NOT_BG_SURVIE");
   if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
   if (Number(tournament.endurance_playoffs_started) === 1) {
@@ -1232,7 +1258,7 @@ export async function liftEndurancePenalty(
   penaltyId: number,
   conn: PoolConnection,
 ): Promise<{ teamId: number; points: number }> {
-  const tournament = await loadTournament(conn, tournamentId);
+  const tournament = await loadTournament(conn, tournamentId, true);
   if (!tournament || tournament.format !== "BG_SURVIE") throw new Error("NOT_BG_SURVIE");
   if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
   if (Number(tournament.endurance_playoffs_started) === 1) {

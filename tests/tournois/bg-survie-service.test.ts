@@ -826,4 +826,63 @@ describe("forfeitEnduranceTeam", () => {
     // Refus avant toute écriture : ni classement touché, ni match clos.
     expect(conn.execute.mock.calls).toHaveLength(1);
   });
+
+  // Même garde que `forfeitSurvivalTeam` et `forfeitSwissTeam`, qui l'avaient
+  // toutes deux : elle manquait au seul mode endurance. Un abandon sur une
+  // archive écrivait un statut FORFEIT et un capital à zéro sur un tournoi que
+  // plus personne ne joue.
+  it("refuse un abandon sur un tournoi terminé", async () => {
+    const conn = makeConn([[[tournamentRow({ state: "FINISHED", endurance_current_round: 4 })]]]);
+
+    await expect(forfeitEnduranceTeam(5, 42, conn)).rejects.toThrow("TOURNAMENT_NOT_RUNNING");
+    expect(conn.execute.mock.calls).toHaveLength(1);
+  });
+
+  it("refuse aussi un tournoi qui n'a pas encore commencé", async () => {
+    const conn = makeConn([[[tournamentRow({ state: "REGISTRATION" })]]]);
+
+    await expect(forfeitEnduranceTeam(5, 42, conn)).rejects.toThrow("TOURNAMENT_NOT_RUNNING");
+  });
+
+  // Le cas que le contrôle des play-offs ne voyait pas : clos par
+  // `startEndurancePlayoffs` faute de qualifiées, `endurance_playoffs_started`
+  // est resté à 0. C'est ce qui rendait la faille atteignable.
+  it("refuse un tournoi clos faute de qualifiées, sans arbre lancé", async () => {
+    const conn = makeConn([
+      [[tournamentRow({ state: "FINISHED", endurance_playoffs_started: 0 })]],
+      [[{ status: "ACTIVE" }]],
+    ]);
+
+    await expect(forfeitEnduranceTeam(5, 42, conn)).rejects.toThrow("TOURNAMENT_NOT_RUNNING");
+    // Le classement n'est même pas lu : rien n'est écrit sur une archive.
+    expect(conn.execute.mock.calls).toHaveLength(1);
+  });
+
+  it("nomme l'état plutôt que l'arbre quand les deux sont en cause", async () => {
+    // Un tournoi terminé a presque toujours ses play-offs lancés : c'est « le
+    // tournoi n'est pas en cours » qui est le vrai motif, et le message que
+    // l'interface affiche.
+    const conn = makeConn([
+      [[tournamentRow({ state: "FINISHED", endurance_playoffs_started: 1 })]],
+    ]);
+
+    await expect(forfeitEnduranceTeam(5, 42, conn)).rejects.toThrow("TOURNAMENT_NOT_RUNNING");
+  });
+
+  // La garde ne vaut que si l'état lu est le dernier validé : une lecture
+  // ordinaire sert l'instantané de la transaction, qui peut dater d'avant la
+  // clôture du tournoi par une transaction voisine. Même verrou que
+  // `forfeitSurvivalTeam` et `forfeitSwissTeam`.
+  it("lit la ligne du tournoi sous verrou", async () => {
+    const conn = makeConn([
+      [[tournamentRow({ endurance_current_round: 3 })]],
+      [[{ status: "ACTIVE" }]],
+      [{ affectedRows: 1 }],
+      [[]],
+    ]);
+
+    await forfeitEnduranceTeam(5, 42, conn);
+
+    expect(String(conn.execute.mock.calls[0][0])).toContain("FOR UPDATE");
+  });
 });
