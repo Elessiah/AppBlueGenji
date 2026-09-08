@@ -48,6 +48,7 @@ describe("cote de départ", () => {
       losses: 0,
       draws: 0,
       matchesPlayed: 0,
+      placementPoints: 0,
     });
   });
 
@@ -400,7 +401,9 @@ describe("légendes", () => {
     expect(RANKING_POINTS_HINT).not.toContain("par défaite");
     // Elle tient sur une ligne de tuile : la légende voisine (« sur N équipes
     // classées ») fait 24 signes, celle-ci ne doit pas déformer la grille.
-    expect(RANKING_POINTS_HINT.length).toBeLessThan(90);
+    // Deux clauses depuis les points de parcours — la légende doit encore tenir
+    // sous une tuile, elle n'a plus à tenir sur une seule ligne.
+    expect(RANKING_POINTS_HINT.length).toBeLessThan(140);
     expect(RANKING_POINTS_LABEL).toBe("Points de classement");
     expect(RANKING_UNRANKED_HINT).toContain("Aucun match joué");
   });
