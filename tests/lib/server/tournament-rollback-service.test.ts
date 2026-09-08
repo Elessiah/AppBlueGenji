@@ -252,6 +252,53 @@ describe("rollbackCurrentRound — formats à classement", () => {
     expect(sql).toContain("DELETE FROM bg_referee_alerts WHERE match_id IN");
   });
 
+  it.each([
+    ["SWISS", "swiss_current_round"],
+    ["SURVIVAL", "survival_current_round"],
+    ["BG_SURVIE", "endurance_current_round"],
+  ] as const)("ramène le curseur de manche de %s sur la manche défaite", async (format, column) => {
+    // Le curseur n'est pas dérivé des matchs : le moteur pose la manche
+    // « curseur + 1 ». Sans ce recul, défaire la manche 1 d'une ronde suisse à
+    // huit y crée une « ronde 3 » pendant que la 1 reste vierge — vu en base.
+    const { execute } = setup({
+      format,
+      matches: [playedRow({ id: 1, round_number: 1 }), row({ id: 2, round_number: 2 })],
+    });
+
+    await rollbackCurrentRound(7);
+
+    const cursor = statementWith(execute, `SET ${column} = ?`);
+    expect(cursor?.[1]).toEqual([1, 7]);
+  });
+
+  it("ne touche à aucun curseur en élimination simple", async () => {
+    // Le plateau naît entier : il n'a pas de manche courante à retenir.
+    const { execute } = setup({
+      format: "SINGLE",
+      matches: [playedRow({ id: 1, round_number: 1 }), row({ id: 2, round_number: 2 })],
+    });
+
+    await rollbackCurrentRound(7);
+
+    expect(statements(execute).join(" ")).not.toContain("_current_round = ?");
+  });
+
+  it("laisse le curseur qualificatif tranquille en défaisant un tour d'arbre", async () => {
+    // L'arbre final vit à partir de `PLAYOFF_ROUND_OFFSET` : y ramener le
+    // compteur ferait repartir la qualification mille manches plus loin.
+    const { execute } = setup({
+      format: "BG_SURVIE",
+      matches: [
+        playedRow({ id: 1, round_number: 4 }),
+        playedRow({ id: 2, round_number: PLAYOFF_ROUND_OFFSET }),
+      ],
+    });
+
+    await rollbackCurrentRound(7);
+
+    expect(statements(execute).join(" ")).not.toContain("endurance_current_round = ?");
+  });
+
   it("refuse de défaire une manche qualificative une fois l'arbre tiré", async () => {
     setup({
       format: "BG_SURVIE",

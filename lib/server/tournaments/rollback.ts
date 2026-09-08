@@ -6,14 +6,17 @@
  * l'interface. Ici, deux choses seulement : l'écriture, et l'entretien qui la
  * suit.
  *
- * **Le moteur n'a rien à apprendre.** On ne défait ni classement, ni
+ * **Le moteur n'a presque rien à apprendre.** On ne défait ni classement, ni
  * élimination, ni qualification : les trois modes à classement *rejouent* tout
  * depuis l'historique des matchs (`replaySwiss`, `replaySurvival`,
  * `replayEndurance`), et une manche effacée disparaît donc du rejeu comme si
  * elle n'avait jamais été jouée. Il suffit d'effacer les saisies puis d'appeler
  * la réconciliation ordinaire, celle-là même qu'une correction de score
  * déclenche. Aucun mode n'a de branche « retour en arrière », et un mode ajouté
- * demain en héritera pour peu qu'il rejoue son classement.
+ * demain en héritera pour peu qu'il rejoue son classement. *Presque* : le
+ * curseur de manche des formats à classement n'est pas dérivé des matchs, et
+ * c'est la seule chose que ce module ait à reculer lui-même
+ * ({@link rewindRoundCursor}).
  *
  * **Les identifiants de match survivent.** La manche est *vidée*, pas
  * supprimée : un identifiant de match est une adresse publique — lien profond
@@ -32,6 +35,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
+import { isEndurancePlayoffRound } from "@/lib/shared/bg-survie";
 import {
   planRoundRollback,
   type RollbackMatch,
@@ -231,16 +235,66 @@ async function deleteMatches(
   }
 }
 
+/**
+ * Colonne où chaque format à classement retient **la manche où il en est**.
+ *
+ * Le nombre n'est pas dérivé des matchs : `generateSwissRound` et ses jumelles
+ * posent la manche `compteur + 1` puis incrémentent. Un retour en arrière qui
+ * n'y touche pas laisse donc le moteur reprendre *après* les manches qu'on vient
+ * d'effacer — c'est le seul état du moteur que ce module doive connaître, et il
+ * s'est vu en conditions réelles : défaire la manche 1 d'une ronde suisse à huit
+ * y créait une « ronde 3 » pendant que la 1 restait vierge.
+ *
+ * `SINGLE` n'y figure pas : son plateau naît entier, il n'a pas de curseur. La
+ * BlueGenji Survie ne compte que ses manches **qualificatives** — l'arbre final
+ * vit à partir de `PLAYOFF_ROUND_OFFSET` et n'a pas de compteur à reculer.
+ */
+const ROUND_CURSOR_COLUMN: Partial<Record<TournamentFormat, string>> = {
+  SWISS: "swiss_current_round",
+  SURVIVAL: "survival_current_round",
+  BG_SURVIE: "endurance_current_round",
+};
+
+/**
+ * Ramène le curseur de manche du format sur la manche défaite.
+ *
+ * Elle existe toujours — vidée, pas supprimée : le moteur la retrouve donc
+ * incomplète et la réapparie si le rejeu l'a rendue caduque, exactement comme
+ * après une correction de score.
+ */
+async function rewindRoundCursor(
+  connection: PoolConnection,
+  tournamentId: number,
+  format: TournamentFormat,
+  roundNumber: number,
+): Promise<void> {
+  const column = ROUND_CURSOR_COLUMN[format];
+  // Un tour d'arbre final n'est pas compté par le curseur qualificatif : le
+  // ramener à 1002 ferait repartir la phase de qualification mille manches plus
+  // loin.
+  if (!column || isEndurancePlayoffRound(roundNumber)) return;
+
+  await connection.execute(
+    `UPDATE bg_tournaments SET ${column} = ? WHERE id = ?`,
+    [roundNumber, tournamentId],
+  );
+}
+
 /** Applique le plan : la manche est vidée, ce qui en descendait est traité. */
 async function applyRollback(
   connection: PoolConnection,
+  tournamentId: number,
+  format: TournamentFormat,
   plan: RollbackPlan,
 ): Promise<void> {
   await clearMatchResults(connection, plan.clearedMatchIds);
 
-  if (plan.laterMatchIds.length === 0) return;
-  if (plan.disposal === "DETACH") await detachMatchParticipants(connection, plan.laterMatchIds);
-  else await deleteMatches(connection, plan.laterMatchIds);
+  if (plan.laterMatchIds.length > 0) {
+    if (plan.disposal === "DETACH") await detachMatchParticipants(connection, plan.laterMatchIds);
+    else await deleteMatches(connection, plan.laterMatchIds);
+  }
+
+  await rewindRoundCursor(connection, tournamentId, format, plan.roundNumber);
 }
 
 /**
@@ -306,7 +360,7 @@ export async function rollbackCurrentRound(tournamentId: number): Promise<Rolled
     );
     if (typeof plan === "string") throw new Error(plan);
 
-    await applyRollback(connection, plan);
+    await applyRollback(connection, tournamentId, tournament.format, plan);
     await reconcileAfterRollback(connection, tournamentId);
 
     await connection.commit();

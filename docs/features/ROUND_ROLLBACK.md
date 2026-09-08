@@ -63,12 +63,22 @@ manche va se rejouer entre les mêmes équipes. Seules les manches **ultérieure
 des formats à classement sont supprimées : le moteur les pose au fur et à mesure,
 leurs appariements sont périmés par le retour en arrière, et il les reposera.
 
+**Le curseur de manche recule.** `swiss_current_round`,
+`survival_current_round` et `endurance_current_round` ne sont **pas** dérivés des
+matchs : le moteur pose la manche « curseur + 1 » puis incrémente. C'est le seul
+état du moteur que ce module doive connaître, et il s'est vu en conditions
+réelles — défaire la manche 1 d'une ronde suisse à huit y créait une « ronde 3 »
+pendant que la 1 restait vierge. Le curseur est donc ramené sur la manche
+défaite ; l'élimination simple n'en a pas (son plateau naît entier), et un tour
+d'arbre de BG Survie n'y touche pas non plus (l'arbre vit à partir de
+`PLAYOFF_ROUND_OFFSET`, le curseur ne compte que les qualifications).
+
 **Ce qui n'est pas touché** : les abandons (`forfeit`), les pénalités
 d'endurance, les inscriptions, le seeding. Ce sont des *entrées* du rejeu au même
 titre que les matchs, et ils restent en vigueur — les défaire serait une autre
 décision, prise par un autre geste.
 
-## Le moteur n'a rien à apprendre
+## Le moteur n'a presque rien à apprendre
 
 Aucun mode n'a de branche « retour en arrière ». Les trois formats à classement
 **rejouent** tout depuis l'historique des matchs (`replaySwiss`,
@@ -78,6 +88,10 @@ d'appeler la réconciliation ordinaire — exactement la chaîne d'une correctio
 score (`tryAutoResolveByes`, `reconcileSurvival`, `reconcileSwiss`,
 `reconcileEndurance`). Un format ajouté demain en hérite pour peu qu'il rejoue
 son classement.
+
+*Presque* : le curseur de manche, ci-dessus, est le seul état du moteur qui ne se
+déduit pas des matchs, et donc la seule chose que ce module ait à reculer
+lui-même.
 
 ## Les refus, et pourquoi
 
