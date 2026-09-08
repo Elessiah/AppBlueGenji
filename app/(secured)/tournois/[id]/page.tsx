@@ -19,6 +19,11 @@ import { checkMatchScores, matchScoreViolationMessage } from "@/lib/shared/match
 import { MatchFormatProvider } from "./_lib/match-format-context";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
+import { fromBracketMatch } from "@/lib/shared/match-lock";
+import {
+  planRoundRollback,
+  rollbackStageLabelWithArticle,
+} from "@/lib/shared/tournament-rollback";
 import { canForfeitTeam } from "./_lib/forfeit";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { AdminScoreDialog } from "./_components/AdminScoreDialog";
@@ -46,6 +51,7 @@ import { MatchAnchorProvider } from "./_lib/match-anchor-context";
 import { useMatchAnchor } from "./_hooks/useMatchAnchor";
 import { TournamentProgress } from "./_components/TournamentProgress";
 import { DeleteTournamentDialog } from "./_components/DeleteTournamentDialog";
+import { RollbackRoundDialog } from "./_components/RollbackRoundDialog";
 import { EndurancePenaltyDialog } from "./_components/EndurancePenaltyDialog";
 import { LaunchTournamentDialog } from "./_components/LaunchTournamentDialog";
 import { TournamentHeader } from "./_components/TournamentHeader";
@@ -75,6 +81,7 @@ export default function TournamentDetailPage() {
   const [selectedMatchForAdminId, setSelectedMatchForAdminId] = useState<number | null>(null);
   const [ghostRegistrationOpen, setGhostRegistrationOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [rollbackDialogOpen, setRollbackDialogOpen] = useState(false);
   const [launchDialogOpen, setLaunchDialogOpen] = useState(false);
   // On retient l'**identifiant** du match en cours de configuration, pas l'objet :
   // la page se recharge par SSE, et un objet capturé à l'ouverture deviendrait
@@ -234,6 +241,40 @@ export default function TournamentDetailPage() {
    * plateau date de plusieurs minutes.
    */
   const frozen = fatal !== null;
+
+  /**
+   * Retour en arrière : le stade que le geste effacerait, ou le motif du refus.
+   *
+   * Décidé côté client par le module que le serveur applique lui-même
+   * (`lib/shared/tournament-rollback.ts`) : le bouton ne s'arme donc jamais sur
+   * un stade que la route refuserait, et le motif affiché est exactement celui
+   * qu'elle rendrait. Deux lectures de la même règle, une seule implémentation.
+   *
+   * Un tournoi **terminé** y a droit comme un tournoi en cours : c'est même le
+   * cas qui manquait le plus, l'erreur de finale étant la seule que `match-lock`
+   * ne laisse plus corriger. Le geste le rouvrira, et le dialogue le dit.
+   */
+  const rollbackTargetState =
+    detail.card.state === "RUNNING" || detail.card.state === "FINISHED";
+  const rollbackPlan =
+    detail.isAdmin && !frozen && rollbackTargetState
+      ? planRoundRollback(
+          detail.matches.map((match) => ({
+            ...fromBracketMatch(match),
+            bracket: match.bracket,
+          })),
+        )
+      : null;
+  const rollbackRefusal = typeof rollbackPlan === "string" ? rollbackPlan : null;
+  const rollbackReady =
+    rollbackPlan !== null && typeof rollbackPlan !== "string" ? rollbackPlan : null;
+  // Les rencontres de la manche, relues à chaque rendu depuis le flux : le
+  // dialogue annonce les scores du moment, pas ceux d'une photo prise à
+  // l'ouverture.
+  const rollbackMatches =
+    rollbackReady === null
+      ? []
+      : detail.matches.filter((match) => rollbackReady.clearedMatchIds.includes(match.id));
 
   // Vocabulaire de l'affichage : un tournoi individuel parle de joueurs, pas
   // d'équipes (`lib/shared/participants.ts`).
@@ -723,10 +764,15 @@ export default function TournamentDetailPage() {
 
         <TournamentProgress detail={detail} />
 
-        {/* Zone de danger : réservée aux administrateurs stricts (`canDelete`),
-            et volontairement isolée en bas de page, loin des actions courantes.
-            Retirée comme les autres actions quand le suivi est arrêté. */}
-        {detail.canDelete && !frozen && (
+        {/* Zone de danger : les gestes qu'on ne défait pas, volontairement isolés
+            en bas de page, loin des actions courantes. Retirés comme les autres
+            quand le suivi est arrêté.
+
+            Deux publics, et non un seul : le retour en arrière est un acte
+            d'arbitrage (staff `tournaments`), la suppression définitive reste
+            réservée aux administrateurs stricts (`canDelete`). La section
+            s'ouvre donc au premier, chaque bloc gardant sa propre garde. */}
+        {(detail.isAdmin || detail.canDelete) && !frozen && (
           <div
             className="ds-block"
             style={{
@@ -739,6 +785,65 @@ export default function TournamentDetailPage() {
             <div className="ds-section-title">
               <h2 style={{ color: "var(--red-live, #ff4d4d)" }}>Zone de danger</h2>
             </div>
+            {/* Retour en arrière — au-dessus de la suppression : c'est le geste
+                qu'un arbitre vient chercher ici, et le seul des deux qui se
+                rejoue. Rendu même quand il est refusé, avec son motif : un
+                bouton qui disparaît laisse chercher, une phrase explique. */}
+            {detail.isAdmin && rollbackPlan !== null && (
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 16,
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  // Le trait sépare les deux blocs : il n'a pas lieu d'être quand
+                  // il n'y a rien dessous. Un arbitre ne voit pas la suppression,
+                  // et il y gagnait une ligne de séparation qui ne séparait rien.
+                  ...(detail.canDelete
+                    ? {
+                        paddingBottom: 16,
+                        marginBottom: 16,
+                        borderBottom: "1px solid var(--line-soft, rgba(255,255,255,0.08))",
+                      }
+                    : null),
+                }}
+              >
+                <p
+                  id="rollback-hint"
+                  style={{ margin: 0, fontSize: 13, color: "var(--text-2, #9aa4b2)", maxWidth: 560, lineHeight: 1.55 }}
+                >
+                  {rollbackReady
+                    ? `Effacer ${rollbackStageLabelWithArticle(rollbackReady)} rouvre la manche précédente à la correction. Le geste se répète : de manche en manche, on remonte jusqu'au début du tournoi.${detail.card.state === "FINISHED" ? " Le tournoi étant terminé, il sera rouvert et son classement final effacé." : ""} Pense à noter les scores avant : rien n'est archivé.`
+                    : mapError(rollbackRefusal ?? "")}
+                </p>
+                <CyberButton
+                  variant="ghost"
+                  onClick={() => {
+                    if (rollbackReady !== null) setRollbackDialogOpen(true);
+                  }}
+                  // `aria-disabled` et non `disabled` : un bouton désactivé n'est
+                  // pas focalisable, si bien qu'un lecteur d'écran sautait le
+                  // contrôle **et** le motif du refus qui lui est rattaché.
+                  // Focalisable, il reste inerte par la garde du clic — et le
+                  // style du refus vit sur le même attribut.
+                  aria-disabled={rollbackReady === null}
+                  // La phrase à gauche dit ce que le geste efface, ou pourquoi il
+                  // est refusé : elle fait partie du bouton, pas de son décor.
+                  aria-describedby="rollback-hint"
+                  style={{
+                    fontSize: 13,
+                    padding: "8px 18px",
+                    borderColor: "var(--amber, #ffb020)",
+                    color: rollbackReady === null ? undefined : "var(--amber, #ffb020)",
+                  }}
+                >
+                  Revenir en arrière d&apos;une manche
+                </CyberButton>
+              </div>
+            )}
+
+            {detail.canDelete && (
             <div
               style={{
                 display: "flex",
@@ -765,6 +870,7 @@ export default function TournamentDetailPage() {
                 Supprimer le tournoi
               </CyberButton>
             </div>
+            )}
           </div>
         )}
       </section>
@@ -813,6 +919,25 @@ export default function TournamentDetailPage() {
                 ? "Tournoi clos : il n'y avait pas assez d'engagés pour jouer un match."
                 : `Tournoi lancé avec ${entrantCount} engagés.`,
             );
+            void refresh();
+          }}
+        />
+      )}
+
+      {rollbackDialogOpen && rollbackReady !== null && (
+        <RollbackRoundDialog
+          tournamentId={tournamentId}
+          stageLabel={rollbackStageLabelWithArticle(rollbackReady)}
+          stageKey={rollbackReady.stageKey}
+          matches={rollbackMatches}
+          tournamentFinished={detail.card.state === "FINISHED"}
+          onClose={() => setRollbackDialogOpen(false)}
+          onRolledBack={(label) => {
+            setRollbackDialogOpen(false);
+            showSuccess(`Résultats effacés : ${label}.`);
+            // Le flux pousse déjà la nouvelle version ; on relit tout de même,
+            // pour que celui qui vient d'agir voie le plateau à la seconde
+            // plutôt qu'à la fenêtre de son palier de fraîcheur.
             void refresh();
           }}
         />
