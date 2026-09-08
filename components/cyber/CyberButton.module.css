@@ -22,7 +22,7 @@
       rgba(90, 200, 255, calc(0.2 * var(--glow, 1)));
 }
 
-.primary:hover {
+.primary:hover:not(:disabled) {
   transform: translateY(-1px);
 }
 
@@ -32,7 +32,28 @@
   color: var(--ink);
 }
 
-.ghost:hover {
+.ghost:hover:not(:disabled) {
   border-color: var(--blue-500);
   color: var(--blue-300);
+}
+
+/*
+ * État désactivé.
+ *
+ * Il manquait : un `disabled` posé sur un `CyberButton` en changeait le
+ * comportement sans rien changer à son aspect — le bouton restait plein, se
+ * soulevait au survol et gardait le curseur de la main, alors qu'aucun clic ne
+ * passait. C'est exactement le cas d'un refus expliqué à côté du bouton (le
+ * retour en arrière sur un format non couvert) : la phrase disait non, le bouton
+ * disait oui.
+ *
+ * L'opacité plutôt qu'une couleur figée : le composant est habillé en ligne par
+ * ses appelants (bordure rouge de la zone de danger, ambre du retour en
+ * arrière), et une couleur écrite ici serait tantôt écrasée, tantôt gagnante
+ * selon la propriété.
+ */
+.root:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
 }

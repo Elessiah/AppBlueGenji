@@ -797,7 +797,10 @@ export default function TournamentDetailPage() {
                   borderBottom: "1px solid var(--line-soft, rgba(255,255,255,0.08))",
                 }}
               >
-                <p style={{ margin: 0, fontSize: 13, color: "var(--text-2, #9aa4b2)", maxWidth: 560, lineHeight: 1.55 }}>
+                <p
+                  id="rollback-hint"
+                  style={{ margin: 0, fontSize: 13, color: "var(--text-2, #9aa4b2)", maxWidth: 560, lineHeight: 1.55 }}
+                >
                   {rollbackReady
                     ? `Effacer ${rollbackRoundLabelWithArticle(rollbackReady.roundNumber)} ramène le tournoi juste avant son coup d'envoi, et rouvre la manche précédente à la correction. Pense à noter les scores avant : rien n'est archivé.`
                     : mapError(rollbackRefusal ?? "")}
@@ -806,6 +809,9 @@ export default function TournamentDetailPage() {
                   variant="ghost"
                   onClick={() => setRollbackDialogOpen(true)}
                   disabled={rollbackReady === null}
+                  // La phrase à gauche dit ce que le geste efface, ou pourquoi il
+                  // est refusé : elle fait partie du bouton, pas de son décor.
+                  aria-describedby="rollback-hint"
                   style={{
                     fontSize: 13,
                     padding: "8px 18px",
