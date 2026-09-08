@@ -857,4 +857,21 @@ describe("forfeitEnduranceTeam", () => {
 
     await expect(forfeitEnduranceTeam(5, 42, conn)).rejects.toThrow("TOURNAMENT_NOT_RUNNING");
   });
+
+  // La garde ne vaut que si l'état lu est le dernier validé : une lecture
+  // ordinaire sert l'instantané de la transaction, qui peut dater d'avant la
+  // clôture du tournoi par une transaction voisine. Même verrou que
+  // `forfeitSurvivalTeam` et `forfeitSwissTeam`.
+  it("lit la ligne du tournoi sous verrou", async () => {
+    const conn = makeConn([
+      [[tournamentRow({ endurance_current_round: 3 })]],
+      [[{ status: "ACTIVE" }]],
+      [{ affectedRows: 1 }],
+      [[]],
+    ]);
+
+    await forfeitEnduranceTeam(5, 42, conn);
+
+    expect(String(conn.execute.mock.calls[0][0])).toContain("FOR UPDATE");
+  });
 });

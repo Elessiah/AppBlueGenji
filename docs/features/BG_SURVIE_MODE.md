@@ -406,6 +406,14 @@ autres modes : sur un tournoi terminé — qui a presque toujours son arbre lanc
 « le tournoi n'est pas en cours » est le vrai motif, et c'est celui que
 l'interface affiche (`TOURNAMENT_NOT_RUNNING` → 400).
 
+La ligne du tournoi est lue **sous verrou** (`FOR UPDATE`), comme dans les deux
+autres modes : une lecture ordinaire sert l'instantané de la transaction, qui
+peut dater d'avant la clôture du tournoi par une transaction voisine — le
+capitaine qui abandonne pendant que le dernier score se valide passerait la
+garde. Une lecture verrouillante rend la dernière version validée et fait
+attendre l'écrivain concurrent. Les deux gestes de **pénalité**, gardés par le
+même état, la prennent aussi.
+
 ## Tests
 
 - `tests/tournois/bg-survie.test.ts` — logique pure : barème, endurance,

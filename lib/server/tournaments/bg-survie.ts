@@ -61,16 +61,27 @@ type TournamentEnduranceRow = RowDataPacket & {
   has_third_place_match: number;
 };
 
+/**
+ * Lit la ligne du tournoi.
+ *
+ * `forUpdate` la **verrouille** — à réserver aux écritures dont une garde
+ * dépend de l'état lu (abandon, pénalités). Une lecture ordinaire sert
+ * l'instantané de la transaction, qui peut dater d'avant la clôture du tournoi
+ * par une transaction voisine ; une lecture verrouillante rend, elle, la
+ * dernière version validée et fait attendre l'écrivain concurrent. C'est ce que
+ * font déjà `forfeitSurvivalTeam` et `forfeitSwissTeam`.
+ */
 async function loadTournament(
   conn: PoolConnection,
   tournamentId: number,
+  forUpdate = false,
 ): Promise<TournamentEnduranceRow | null> {
   const [rows] = await conn.execute<TournamentEnduranceRow[]>(
     `SELECT format, state, match_format_type, match_format_value,
             endurance_start_points, endurance_win_delta, endurance_loss_delta,
             endurance_playoff_size, endurance_max_rounds, endurance_current_round,
             endurance_playoffs_started, has_third_place_match
-     FROM bg_tournaments WHERE id = ? LIMIT 1`,
+     FROM bg_tournaments WHERE id = ? LIMIT 1${forUpdate ? " FOR UPDATE" : ""}`,
     [tournamentId],
   );
   return rows.length === 0 ? null : rows[0];
@@ -963,7 +974,7 @@ export async function forfeitEnduranceTeam(
   teamId: number,
   conn: PoolConnection,
 ): Promise<void> {
-  const tournament = await loadTournament(conn, tournamentId);
+  const tournament = await loadTournament(conn, tournamentId, true);
   if (!tournament || tournament.format !== "BG_SURVIE") throw new Error("NOT_BG_SURVIE");
   // Avant le contrôle des play-offs, comme en Survie et en Ronde suisse : sur un
   // tournoi clos, « le tournoi n'est pas en cours » est le vrai motif, et il
@@ -1117,7 +1128,7 @@ export async function applyEndurancePenalty(
   authorId: number | null,
   conn: PoolConnection,
 ): Promise<{ reason: string }> {
-  const tournament = await loadTournament(conn, tournamentId);
+  const tournament = await loadTournament(conn, tournamentId, true);
   if (!tournament || tournament.format !== "BG_SURVIE") throw new Error("NOT_BG_SURVIE");
   if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
   if (Number(tournament.endurance_playoffs_started) === 1) {
@@ -1190,7 +1201,7 @@ export async function liftEndurancePenalty(
   penaltyId: number,
   conn: PoolConnection,
 ): Promise<{ teamId: number; points: number }> {
-  const tournament = await loadTournament(conn, tournamentId);
+  const tournament = await loadTournament(conn, tournamentId, true);
   if (!tournament || tournament.format !== "BG_SURVIE") throw new Error("NOT_BG_SURVIE");
   if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
   if (Number(tournament.endurance_playoffs_started) === 1) {
