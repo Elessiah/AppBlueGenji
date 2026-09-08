@@ -946,7 +946,17 @@ async function finalizeEndurance(
  * Un forfait de play-off se tranche sur le match lui-même (`adminResolveMatch`
  * avec `forfeitTeamId`), qui fait avancer l'arbre.
  *
- * @throws NOT_BG_SURVIE | ENDURANCE_PLAYOFFS_STARTED | TEAM_NOT_IN_TOURNAMENT | TEAM_ALREADY_OUT
+ * **Et à un tournoi en cours**, comme `forfeitSurvivalTeam` et
+ * `forfeitSwissTeam`. La garde manquait au seul mode endurance, et le cas est
+ * atteignable : un tournoi clos par `startEndurancePlayoffs` faute de qualifiées
+ * garde `endurance_playoffs_started` à 0, si bien que le contrôle suivant le
+ * laissait passer. L'abandon s'écrivait alors sur une archive — statut
+ * `FORFEIT`, capital à 0, manche courante close — pour un tournoi que plus
+ * personne ne joue. L'interface refusait déjà (`canForfeitTeam` exige
+ * `RUNNING`) ; il n'y avait que le serveur à convaincre.
+ *
+ * @throws NOT_BG_SURVIE | TOURNAMENT_NOT_RUNNING | ENDURANCE_PLAYOFFS_STARTED
+ *         | TEAM_NOT_IN_TOURNAMENT | TEAM_ALREADY_OUT
  */
 export async function forfeitEnduranceTeam(
   tournamentId: number,
@@ -955,6 +965,11 @@ export async function forfeitEnduranceTeam(
 ): Promise<void> {
   const tournament = await loadTournament(conn, tournamentId);
   if (!tournament || tournament.format !== "BG_SURVIE") throw new Error("NOT_BG_SURVIE");
+  // Avant le contrôle des play-offs, comme en Survie et en Ronde suisse : sur un
+  // tournoi clos, « le tournoi n'est pas en cours » est le vrai motif, et il
+  // reste juste dans le cas que le contrôle suivant ne voit pas — un tournoi
+  // fini faute de qualifiées garde `endurance_playoffs_started` à 0.
+  if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
   if (Number(tournament.endurance_playoffs_started) === 1) {
     throw new Error("ENDURANCE_PLAYOFFS_STARTED");
   }
