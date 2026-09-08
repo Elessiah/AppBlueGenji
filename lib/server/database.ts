@@ -1,8 +1,9 @@
 ﻿import "dotenv/config";
 import mysql, { type Pool, type PoolConnection } from "mysql2/promise";
+import { createOnceGate, withMigrationLock } from "@/lib/server/migration-lock";
 
 let pool: Pool | null = null;
-let migrationPromise: Promise<void> | null = null;
+const migrationGate = createOnceGate();
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -1267,11 +1268,16 @@ async function runMigrations(db: Pool): Promise<void> {
   }
 }
 
+/**
+ * Joue le schéma une fois par processus, et une seule à la fois sur la base.
+ *
+ * Les deux garanties viennent de `migration-lock` : la porte oublie ses échecs
+ * (une migration ratée ne condamne plus le processus jusqu'au redémarrage) et le
+ * verrou nommé empêche deux processus d'exécuter les mêmes `ALTER TABLE` en même
+ * temps, ce dont MySQL faisait un interblocage.
+ */
 async function ensureMigrations(db: Pool): Promise<void> {
-  if (!migrationPromise) {
-    migrationPromise = runMigrations(db).then();
-  }
-  await migrationPromise;
+  await migrationGate.run(() => withMigrationLock(db, () => runMigrations(db)));
 }
 
 /**
