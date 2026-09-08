@@ -141,14 +141,23 @@ export async function listTeams(): Promise<TeamListItem[]> {
   // autre lecture des mêmes matchs. Le découpage par équipe se fait en SQL, ce
   // qui évite aussi de ne servir que les 1000 derniers matchs du site — au-delà,
   // les équipes les moins actives n'avaient plus de forme du tout.
+  //
+  // Le **nul** a sa lettre, et c'est cette assiette partagée qui l'y oblige :
+  // depuis qu'elle admet les matchs sans vainqueur, un `CASE … ELSE 'l'` les
+  // rangeait en défaites, si bien que la carte affichait une case rouge là où la
+  // fiche de la même équipe annonçait « N ».
   const [formRows] = await db.execute<
-    (RowDataPacket & { team_id: number; result: "w" | "l" })[]
+    (RowDataPacket & { team_id: number; result: "w" | "l" | "d" })[]
   >(
     `SELECT team_id, result
      FROM (
        SELECT
          t.id AS team_id,
-         CASE WHEN m.winner_team_id = t.id THEN 'w' ELSE 'l' END AS result,
+         CASE
+           WHEN m.winner_team_id IS NULL THEN 'd'
+           WHEN m.winner_team_id = t.id THEN 'w'
+           ELSE 'l'
+         END AS result,
          ROW_NUMBER() OVER (
            PARTITION BY t.id
            ORDER BY COALESCE(m.updated_at, tr.finished_at, tr.start_at) DESC, m.id DESC

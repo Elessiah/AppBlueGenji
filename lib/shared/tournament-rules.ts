@@ -232,6 +232,19 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
         ],
       },
       {
+        title: "Le match nul en qualification",
+        body: [
+          "Overwatch et Marvel Rivals connaissent la **map nulle**. Le tournoi peut donc ouvrir l'égalité sur sa phase qualificative : un BO5 s'y joue **sans tiebreaker**, et s'arrête quand les maps sont épuisées — même si personne n'a atteint les trois manches.",
+          "Le capital n'a besoin d'aucune règle de plus : il se compte **map par map**. Un 2-2 rapporte deux points à chacune et leur en retire deux — donc rien, au barème par défaut. Un 2-1 suit le même calcul, un point net pour la gagnante.",
+        ],
+        bullets: [
+          "N'importe quel score tenant dans le plafond de maps clôt la rencontre : 2-2, 2-1, et jusqu'à 0-0 si aucune map n'a été départagée.",
+          "Une map nulle ne figure dans aucun des deux scores — elle allonge la rencontre sans entamer le plafond.",
+          "Un match nul ne compte ni victoire ni défaite : il apparaît à part au classement, et rompt les séries des fiches d'équipe.",
+          "**L'arbre final n'accepte jamais d'égalité**, quel que soit le réglage : il lui faut savoir qui joue le tour suivant. Le tournoi peut lui donner son propre format — un vrai FT3, là où la qualification tolère le nul.",
+        ],
+      },
+      {
         title: "Fin de la phase qualificative",
         body: [
           "La phase s'arrête dès qu'il ne reste plus que huit équipes (ou moins). Sans autre réglage, aucune durée maximale n'est imposée : c'est l'endurance seule qui fait le tri.",

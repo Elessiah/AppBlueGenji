@@ -1,23 +1,47 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { TournamentState } from "@/lib/shared/types";
 import { forfeitMapCount, parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
+import { tournamentMatchFormat } from "@/lib/shared/bg-survie";
 import { TournamentRow, RegistrationRow, MatchRow, TournamentListRow } from "./_internal";
 import { queueBotLog } from "./bot-logs";
 
 /**
- * Format de match du tournoi (`null` = saisie libre).
+ * Format de match applicable à une manche (`null` = saisie libre).
  *
  * Il se lit sur le **tournoi**, phases comprises : le réglage vaut pour toute la
  * compétition (`docs/features/MATCH_FORMAT.md`), une phase n'en redéfinit pas.
+ *
+ * **Une seule exception, et elle est de nature.** « BlueGenji Survie » joue deux
+ * formats : la phase qualificative peut clore un match sans vainqueur (une map
+ * nulle arrête un BO5 sur 2-2, et le capital, compté map par map, s'en
+ * accommode), l'arbre final ne le peut pas — il lui faut savoir qui joue le
+ * tour suivant. `round` désigne la manche du match ; l'omettre rend le format
+ * de la **qualification**, ce qui convient à tous les autres modes.
+ *
+ * Partout ailleurs les égalités sont fermées de force : la validation les refuse
+ * déjà à la création, mais une ligne écrite avant cette règle — ou à la main —
+ * ne doit pas rendre un tableau à élimination directe indécidable.
  */
 export async function loadTournamentMatchFormat(
   connection: PoolConnection,
   tournamentId: number,
+  round?: number | null,
 ): Promise<MatchFormat | null> {
   const [rows] = await connection.execute<
-    (RowDataPacket & { match_format_type: "BO" | "FT" | null; match_format_value: number | null })[]
+    (RowDataPacket & {
+      format: string;
+      match_format_type: "BO" | "FT" | null;
+      match_format_value: number | null;
+      match_format_max_maps: number | null;
+      match_format_draws: number | null;
+      endurance_playoff_format_type: "BO" | "FT" | null;
+      endurance_playoff_format_value: number | null;
+    })[]
   >(
-    `SELECT match_format_type, match_format_value
+    `SELECT format,
+            match_format_type, match_format_value,
+            match_format_max_maps, match_format_draws,
+            endurance_playoff_format_type, endurance_playoff_format_value
      FROM bg_tournaments
      WHERE id = ?
      LIMIT 1`,
@@ -26,7 +50,20 @@ export async function loadTournamentMatchFormat(
 
   const row = rows[0];
   if (!row) return null;
-  return parseMatchFormat(row.match_format_type, row.match_format_value);
+
+  const qualification = parseMatchFormat(
+    row.match_format_type,
+    row.match_format_value,
+    row.match_format_max_maps,
+    row.match_format_draws,
+  );
+
+  return tournamentMatchFormat(
+    row.format,
+    qualification,
+    parseMatchFormat(row.endurance_playoff_format_type, row.endurance_playoff_format_value),
+    round,
+  );
 }
 
 /**
@@ -47,8 +84,9 @@ export async function forfeitMatchScores(
   connection: PoolConnection,
   tournamentId: number,
   team1Forfeits: boolean,
+  round?: number | null,
 ): Promise<{ team1Score: number; team2Score: number }> {
-  const maps = forfeitMapCount(await loadTournamentMatchFormat(connection, tournamentId));
+  const maps = forfeitMapCount(await loadTournamentMatchFormat(connection, tournamentId, round));
 
   return {
     team1Score: team1Forfeits ? 0 : maps,
@@ -86,6 +124,10 @@ export async function loadTournamentRow(
       participant_type,
       match_format_type,
       match_format_value,
+      match_format_max_maps,
+      match_format_draws,
+      endurance_playoff_format_type,
+      endurance_playoff_format_value,
       live_url
      FROM bg_tournaments
      WHERE id = ?
@@ -304,6 +346,10 @@ export async function getTournamentListRow(
       t.participant_type,
       t.match_format_type,
       t.match_format_value,
+      t.match_format_max_maps,
+      t.match_format_draws,
+      t.endurance_playoff_format_type,
+      t.endurance_playoff_format_value,
       t.live_url,
       COALESCE(COUNT(r.id), 0) AS registered_teams
      FROM bg_tournaments t
@@ -333,6 +379,10 @@ export async function getTournamentListRow(
       t.participant_type,
       t.match_format_type,
       t.match_format_value,
+      t.match_format_max_maps,
+      t.match_format_draws,
+      t.endurance_playoff_format_type,
+      t.endurance_playoff_format_value,
       t.live_url`,
     [tournamentId],
   );

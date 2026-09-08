@@ -164,9 +164,19 @@ export function decideScoreForm(
     };
   }
 
+  // `checkMatchScores` porte **toute** la règle, égalité comprise : c'est lui
+  // qui sait qu'une qualification de « BlueGenji Survie » peut se clore sur un
+  // 2-2, et un second test `team1 === team2` posé ici aurait rouvert le refus
+  // que le format vient d'ouvrir — l'interface et le serveur auraient divergé.
   const decisive = checkMatchScores(format, team1, team2, { decisive: true });
   const resolveBlocker: ScoreFormBlocker | null =
-    team1 === team2 ? "DRAW" : decisive ? "BELOW_FORMAT" : null;
+    decisive === "DRAW_NOT_ALLOWED"
+      ? "DRAW"
+      : decisive === "SCORE_BELOW_MATCH_FORMAT"
+        ? "BELOW_FORMAT"
+        : decisive
+          ? "EXCEEDS_FORMAT"
+          : null;
 
   return {
     scores,

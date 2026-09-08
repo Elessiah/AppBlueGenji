@@ -91,13 +91,21 @@ function fakeDb(options: {
 
       if (q.startsWith("SELECT format, state")) return [[{ ...tournament }], []];
 
-      // Format de match du tournoi : c'est lui qui chiffre un forfait.
-      if (q.startsWith("SELECT match_format_type")) {
+      // Format de match du tournoi : c'est lui qui chiffre un forfait. La
+      // requête lit aussi le format **du tournoi** depuis que « BlueGenji
+      // Survie » joue deux formats de match (qualification / play-offs) : la
+      // Ronde suisse, elle, n'en a qu'un.
+      if (q.includes("match_format_type") && q.includes("FROM bg_tournaments")) {
         return [
           [
             {
+              format: "SWISS",
               match_format_type: options.matchFormat?.type ?? null,
               match_format_value: options.matchFormat?.value ?? null,
+              match_format_max_maps: null,
+              match_format_draws: 0,
+              endurance_playoff_format_type: null,
+              endurance_playoff_format_value: null,
             },
           ],
           [],

@@ -701,6 +701,7 @@ async function runMigrations(db: Pool): Promise<void> {
       points INT NOT NULL DEFAULT 0,
       wins INT NOT NULL DEFAULT 0,
       losses INT NOT NULL DEFAULT 0,
+      draws INT NOT NULL DEFAULT 0,
       status ENUM('ACTIVE', 'ELIMINATED', 'OUT_OF_CONTENTION', 'FORFEIT') NOT NULL DEFAULT 'ACTIVE',
       eliminated_round INT NULL,
       \`rank\` INT NOT NULL DEFAULT 0,
@@ -711,6 +712,18 @@ async function runMigrations(db: Pool): Promise<void> {
         REFERENCES bg_teams(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  // Migration: matchs nuls du classement d'endurance. Une map nulle peut clore
+  // une rencontre de qualification sans vainqueur (2-2 en BO5) : ce n'est ni une
+  // victoire ni une defaite, et le total « matchs joues » serait faux sans elle.
+  try {
+    await db.execute(`
+      ALTER TABLE bg_endurance_standings
+      ADD COLUMN draws INT NOT NULL DEFAULT 0
+    `);
+  } catch {
+    // Column already exists
+  }
 
   // Migration: sortie « hors course » du classement d'endurance — une équipe
   // qui garde du capital mais ne peut plus rejoindre les play-offs dans les
@@ -732,6 +745,19 @@ async function runMigrations(db: Pool): Promise<void> {
   for (const [column, definition] of [
     ["match_format_type", "ENUM('BO', 'FT') NULL"],
     ["match_format_value", "INT NULL"],
+    // Plafond de maps **décisives** (somme des deux scores). NULL = le plafond
+    // naturel du format (objectif x 2 - 1), seule valeur qu'aient connue les
+    // tournois d'avant ce reglage.
+    ["match_format_max_maps", "INT NULL"],
+    // 1 = un match peut se clore sans vainqueur (map nulle). Reserve a la phase
+    // qualificative de « BlueGenji Survie », dont le capital se compte map par
+    // map : un arbre a elimination directe a besoin d'un vainqueur.
+    ["match_format_draws", "TINYINT(1) NOT NULL DEFAULT 0"],
+    // Format propre a l'arbre final de « BlueGenji Survie ». NULL = celui du
+    // tournoi, egalites en moins. Les deux colonnes vont par paire, comme
+    // celles du tournoi.
+    ["endurance_playoff_format_type", "ENUM('BO', 'FT') NULL"],
+    ["endurance_playoff_format_value", "INT NULL"],
   ] as const) {
     try {
       await db.execute(`ALTER TABLE bg_tournaments ADD COLUMN ${column} ${definition}`);

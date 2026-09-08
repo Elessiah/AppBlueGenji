@@ -1,6 +1,11 @@
 "use client";
 
 import { computeRecommendedRounds } from "@/lib/shared/swiss";
+import {
+  DEFAULT_MATCH_FORMAT,
+  MATCH_FORMAT_BOUNDS,
+  matchFormatDescription,
+} from "@/lib/shared/match-format";
 import { participantWording } from "@/lib/shared/participants";
 import type { TournamentField } from "@/lib/shared/tournament-edit";
 import { PhaseBuilder } from "../creer/PhaseBuilder";
@@ -140,6 +145,104 @@ export function FormatSettings({
               avant la fin.
             </p>
           </div>
+
+          <div className="field" style={FULL_WIDTH}>
+            <label htmlFor="endurance-draws" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                id="endurance-draws"
+                type="checkbox"
+                disabled={locked("matchFormat") || values.matchFormat === null}
+                checked={values.matchFormat?.drawsAllowed ?? false}
+                onChange={(e) => {
+                  if (!values.matchFormat) return;
+                  // Décocher rend aussi son plafond naturel au format : le
+                  // plafond **est** la fenêtre du nul, et le laisser posé sans
+                  // elle rendrait certaines rencontres inachevables — le serveur
+                  // le refuse (`MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS`) sur un
+                  // champ que le formulaire vient de masquer.
+                  set("matchFormat", {
+                    ...values.matchFormat,
+                    drawsAllowed: e.target.checked,
+                    ...(e.target.checked ? {} : { maxMaps: null }),
+                  });
+                }}
+                {...lockedAttr("matchFormat")}
+              />
+              Égalités autorisées en qualification
+            </label>
+            <p style={HINT}>
+              {values.matchFormat === null
+                ? "Indisponible en saisie de score libre : il faut un format de match pour borner la rencontre."
+                : "Une map nulle peut arrêter la rencontre avant l’objectif : le match se clôt alors sur 2-2, ou sur 2-1 si une seule map a été partagée. Le capital d’endurance se comptant map par map, il l’encaisse sans règle supplémentaire. L’arbre final, lui, exige toujours un vainqueur. Cocher cette case ouvre aussi le réglage « Maps décisives au maximum », plus haut."}
+            </p>
+          </div>
+
+          <div className="field">
+            <label htmlFor="endurance-playoff-format-type">Format des play-offs</label>
+            <select
+              id="endurance-playoff-format-type"
+              disabled={locked("endurancePlayoffFormat")}
+              value={values.endurancePlayoffFormat?.type ?? "MEME"}
+              onChange={(e) => {
+                const next = e.target.value;
+                if (next === "MEME") {
+                  set("endurancePlayoffFormat", null);
+                  return;
+                }
+                const type = next as "BO" | "FT";
+                const bounds = MATCH_FORMAT_BOUNDS[type];
+                let value = values.endurancePlayoffFormat?.value ?? DEFAULT_MATCH_FORMAT.value;
+                value = Math.min(Math.max(value, bounds.min), bounds.max);
+                if (type === "BO" && value % 2 === 0) value -= 1;
+                set("endurancePlayoffFormat", { type, value });
+              }}
+              {...lockedAttr("endurancePlayoffFormat")}
+            >
+              <option value="MEME">Le même qu’en qualification</option>
+              <option value="BO">Best of (BO)</option>
+              <option value="FT">First to (FT)</option>
+            </select>
+            <p style={HINT}>
+              L’arbre final n’accepte jamais d’égalité, quel que soit ce réglage : il lui faut savoir
+              qui joue le tour suivant. Le poser ici sert à jouer un vrai FT3 en play-offs quand la
+              qualification tolère le nul.
+            </p>
+          </div>
+
+          {values.endurancePlayoffFormat && (
+            <div className="field">
+              <label htmlFor="endurance-playoff-format-value">
+                {values.endurancePlayoffFormat.type === "BO"
+                  ? "Play-offs : manches jouées (impair)"
+                  : "Play-offs : manches à gagner"}
+              </label>
+              <input
+                id="endurance-playoff-format-value"
+                type="number"
+                min={MATCH_FORMAT_BOUNDS[values.endurancePlayoffFormat.type].min}
+                max={MATCH_FORMAT_BOUNDS[values.endurancePlayoffFormat.type].max}
+                step={values.endurancePlayoffFormat.type === "BO" ? 2 : 1}
+                disabled={locked("endurancePlayoffFormat")}
+                value={values.endurancePlayoffFormat.value}
+                onChange={(e) => {
+                  if (!values.endurancePlayoffFormat) return;
+                  // Un champ vidé rend `0`, que le `?? null` de `toApiPayload`
+                  // ne rattrape pas : il partait au serveur et revenait en
+                  // `INVALID_ENDURANCE_PLAYOFF_FORMAT` brut dans un toast, là où
+                  // le format principal est intercepté avant l'aller-retour.
+                  const type = values.endurancePlayoffFormat.type;
+                  const bounds = MATCH_FORMAT_BOUNDS[type];
+                  const raw = Number(e.target.value);
+                  const value = Number.isInteger(raw)
+                    ? Math.min(Math.max(raw, bounds.min), bounds.max)
+                    : values.endurancePlayoffFormat.value;
+                  set("endurancePlayoffFormat", { type, value });
+                }}
+                {...lockedAttr("endurancePlayoffFormat")}
+              />
+              <p style={HINT}>{matchFormatDescription(values.endurancePlayoffFormat)}</p>
+            </div>
+          )}
         </>
       )}
 

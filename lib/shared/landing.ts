@@ -1,4 +1,5 @@
 import type { MatchLiveState } from "@/lib/shared/live-streams";
+import type { MatchFormat } from "@/lib/shared/match-format";
 import type { TournamentCard } from "@/lib/shared/types";
 
 export type LandingStats = {
@@ -34,6 +35,18 @@ export type LandingLiveMatch = {
   team2Seed: number | null;
   bracket: string;
   roundLabel: string;
+  /**
+   * Format **de ce match**, et non du tournoi : « BlueGenji Survie » en joue
+   * deux — sa qualification, qui tolère l'égalité, et son arbre final, qui
+   * exige un vainqueur (`tournamentMatchFormat`, `lib/shared/bg-survie.ts`).
+   * Lire `TournamentCard.matchFormat` étiquetait une demi-finale avec le
+   * plafond de maps de la qualification.
+   *
+   * Résolu côté serveur, comme le reste de cette charge utile (`team1Href`,
+   * `team1Seed`, `roundLabel`) : la carte n'a pas à connaître les phases.
+   * `null` = tournoi en score libre.
+   */
+  matchFormat: MatchFormat | null;
   /** État de diffusion du match, dérivé (`lib/shared/live-streams.ts`). */
   liveState: MatchLiveState;
   /** Chaîne diffusant ce match ; `null` = casté sans lien, ou non casté. */

@@ -1,4 +1,5 @@
 import type { BracketMatch, BracketType } from "@/lib/shared/types";
+import { isMatchPlayed } from "@/lib/shared/match-outcome";
 
 /** Couleur d'accent par tableau — distingue d'un coup d'œil principal / perdants / finale. */
 export const ACCENT: Record<BracketType, string> = {
@@ -168,7 +169,7 @@ export function findMyNextMatch(matches: BracketMatch[], myTeamId: number | null
   if (myTeamId === null) return null;
   return (
     matches
-      .filter((m) => (m.team1Id === myTeamId || m.team2Id === myTeamId) && m.winnerTeamId === null)
+      .filter((m) => (m.team1Id === myTeamId || m.team2Id === myTeamId) && !isMatchPlayed(m))
       .sort((a, b) => a.roundNumber - b.roundNumber)[0] ?? null
   );
 }

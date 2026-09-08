@@ -42,6 +42,7 @@ export const ALL_TOURNAMENT_FIELDS = [
   "endurancePlayoffSize",
   "enduranceMaxRounds",
   "matchFormat",
+  "endurancePlayoffFormat",
   "phases",
 ] as const;
 

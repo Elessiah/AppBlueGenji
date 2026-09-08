@@ -266,3 +266,155 @@ describe("validateTournamentInput — petite finale", () => {
     },
   );
 });
+
+describe("validateTournamentInput — plafond de maps, égalités, format des play-offs", () => {
+  const survie = { ...base, format: "BG_SURVIE" as const, matchFormatType: "FT", matchFormatValue: 3 };
+
+  it("accepte un plafond de maps dans l'intervalle du format, égalités ouvertes", () => {
+    const v = value({ ...survie, matchFormatDraws: true, matchFormatMaxMaps: 4 });
+    expect(v.matchFormat).toEqual({ type: "FT", value: 3, maxMaps: 4, drawsAllowed: true });
+  });
+
+  it("refuse un plafond abaissé là où les égalités étaient offertes et déclinées", () => {
+    // Un FT3 plafonné à 4 maps refuse `3-2` (somme 5) comme `2-2` (pas de
+    // vainqueur) : une série arrivée à 2-2 n'a plus aucun score enregistrable,
+    // et son plateau reste bloqué pour de bon. En BG Survie, le client avait la
+    // case sous la main : ne pas la cocher est une contradiction, pas un oubli.
+    expect(
+      validateTournamentInput({ ...survie, matchFormatMaxMaps: 4 }),
+    ).toEqual({ error: "MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS" });
+  });
+
+  it("neutralise le plafond hors du mode, avec les égalités qu'il accompagne", () => {
+    // Ailleurs les égalités ne sont pas proposées : le plafond n'est donc pas un
+    // choix contradictoire, c'est un réglage que le format ne relit pas. Le
+    // refuser bloquerait une simple bascule de format sur un champ que le
+    // formulaire vient de masquer — le piège que la neutralisation des égalités
+    // écarte déjà juste au-dessus.
+    const v = value({
+      ...base,
+      format: "SINGLE",
+      matchFormatType: "FT",
+      matchFormatValue: 3,
+      matchFormatMaxMaps: 4,
+      matchFormatDraws: true,
+    });
+
+    expect(v.matchFormat).toEqual({ type: "FT", value: 3 });
+  });
+
+  it("accepte le plafond naturel en BG Survie, égalités ouvertes", () => {
+    expect(value({ ...survie, matchFormatDraws: true, matchFormatMaxMaps: 5 }).matchFormat).toEqual(
+      { type: "FT", value: 3, maxMaps: 5, drawsAllowed: true },
+    );
+  });
+
+  it("refuse un plafond hors de [objectif, objectif × 2 − 1]", () => {
+    // Contrôlé là où le plafond est lu, donc sur le seul format qui le relit.
+    for (const maxMaps of [2, 6]) {
+      expect(
+        validateTournamentInput({ ...survie, matchFormatDraws: true, matchFormatMaxMaps: maxMaps }),
+      ).toEqual({ error: "INVALID_MATCH_FORMAT_MAX_MAPS" });
+    }
+  });
+
+  it("laisse le plafond absent : ce n'est pas un réglage manquant", () => {
+    expect(value({ ...base, matchFormatType: "FT", matchFormatValue: 3 }).matchFormat).toEqual({
+      type: "FT",
+      value: 3,
+    });
+  });
+
+  it("ouvre les égalités en BlueGenji Survie", () => {
+    expect(value({ ...survie, matchFormatDraws: true }).matchFormat).toEqual({
+      type: "FT",
+      value: 3,
+      drawsAllowed: true,
+    });
+  });
+
+  it("neutralise les égalités sur tout autre format : le plateau a besoin d'un vainqueur", () => {
+    // Neutralisé et non refusé, comme `hasThirdPlaceMatch` hors SINGLE : une
+    // édition qui bascule le format ne doit pas échouer sur un réglage que le
+    // nouveau format ne relit même pas — `updateTournament` fusionne le patch
+    // sur les valeurs courantes, un `PATCH { format }` seul le trimballerait.
+    for (const format of ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL"] as const) {
+      const v = value({
+        ...base,
+        format,
+        // La Survie exige sa cadence de coupes : le cas passait auparavant
+        // parce que le refus des égalités sortait avant ce contrôle.
+        ...(format === "SURVIVAL" ? { survivalRoundsPerCut: 2 } : {}),
+        matchFormatType: "FT",
+        matchFormatValue: 3,
+        matchFormatDraws: true,
+      });
+
+      expect(v.matchFormat).toEqual({ type: "FT", value: 3 });
+      expect(v.matchFormat?.drawsAllowed).toBeUndefined();
+    }
+  });
+
+  it("refuse les égalités sans format de match : il n'y a rien à borner", () => {
+    expect(
+      validateTournamentInput({ ...base, format: "BG_SURVIE", matchFormatDraws: true }),
+    ).toEqual({ error: "INVALID_MATCH_FORMAT" });
+  });
+
+  it("accepte un format de play-offs propre à BlueGenji Survie", () => {
+    const v = value({
+      ...survie,
+      matchFormatDraws: true,
+      endurancePlayoffFormatType: "FT",
+      endurancePlayoffFormatValue: 3,
+    });
+
+    expect(v.endurancePlayoffFormat).toEqual({ type: "FT", value: 3 });
+    // Les égalités ne s'y propagent jamais : c'est le point du réglage.
+    expect(v.endurancePlayoffFormat?.drawsAllowed).toBeUndefined();
+  });
+
+  it("refuse un format de play-offs à moitié renseigné", () => {
+    expect(validateTournamentInput({ ...survie, endurancePlayoffFormatType: "FT" })).toEqual({
+      error: "INVALID_ENDURANCE_PLAYOFF_FORMAT",
+    });
+    expect(validateTournamentInput({ ...survie, endurancePlayoffFormatValue: 3 })).toEqual({
+      error: "INVALID_ENDURANCE_PLAYOFF_FORMAT",
+    });
+  });
+
+  it("neutralise un format de play-offs hors BlueGenji Survie", () => {
+    // Même raison que les égalités : sans objet ailleurs, donc écarté en
+    // silence plutôt que refusé.
+    expect(
+      value({
+        ...base,
+        format: "SINGLE",
+        endurancePlayoffFormatType: "FT",
+        endurancePlayoffFormatValue: 3,
+      }).endurancePlayoffFormat,
+    ).toBeNull();
+  });
+
+  it("refuse toujours une paire de play-offs incomplète, quel que soit le format", () => {
+    // Elle décrit un format à moitié défini : c'est une erreur du client, pas
+    // un réglage sans objet.
+    expect(
+      validateTournamentInput({ ...base, format: "SINGLE", endurancePlayoffFormatType: "FT" }),
+    ).toEqual({ error: "INVALID_ENDURANCE_PLAYOFF_FORMAT" });
+  });
+
+  it("refuse un BO pair en play-offs, comme partout", () => {
+    expect(
+      validateTournamentInput({
+        ...survie,
+        endurancePlayoffFormatType: "BO",
+        endurancePlayoffFormatValue: 4,
+      }),
+    ).toEqual({ error: "INVALID_ENDURANCE_PLAYOFF_FORMAT" });
+  });
+
+  it("laisse le format des play-offs à null quand rien n'est demandé", () => {
+    expect(value(survie).endurancePlayoffFormat).toBeNull();
+  });
+});

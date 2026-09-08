@@ -260,6 +260,12 @@ export async function createTournament(
     swissPointsLoss?: number | null;
     /** Format des matchs (BO5, FT3…) ; `null` = saisie de score libre. */
     matchFormat?: MatchFormat | null;
+    /**
+     * BlueGenji Survie : format de l'arbre final (`null` = celui du tournoi).
+     * Il existe parce que la phase qualificative peut, elle, se jouer avec des
+     * égalités — ce qu'une élimination directe ne sait pas trancher.
+     */
+    endurancePlayoffFormat?: MatchFormat | null;
     /** BlueGenji Survie : capital d'endurance et barème (null = défauts). */
     endurancePoints?: number | null;
     enduranceWinDelta?: number | null;
@@ -341,7 +347,20 @@ export async function createTournament(
     const matchFormat = parseMatchFormat(
       payload.matchFormat?.type ?? null,
       payload.matchFormat?.value ?? null,
+      payload.matchFormat?.maxMaps ?? null,
+      payload.matchFormat?.drawsAllowed ?? null,
     );
+
+    // Format de l'arbre final en BlueGenji Survie. `null` = celui du tournoi,
+    // et jamais d'égalité : la phase qualificative peut clore un match sans
+    // vainqueur, l'arbre a besoin de savoir qui joue le tour suivant.
+    const playoffFormat =
+      payload.format === "BG_SURVIE"
+        ? parseMatchFormat(
+            payload.endurancePlayoffFormat?.type ?? null,
+            payload.endurancePlayoffFormat?.value ?? null,
+          )
+        : null;
 
     const [insert] = await connection.execute<ResultSetHeader>(
       `INSERT INTO bg_tournaments (
@@ -371,8 +390,12 @@ export async function createTournament(
         endurance_playoff_size,
         endurance_max_rounds,
         match_format_type,
-        match_format_value
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        match_format_value,
+        match_format_max_maps,
+        match_format_draws,
+        endurance_playoff_format_type,
+        endurance_playoff_format_value
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         organizerUserId,
         payload.name.trim(),
@@ -407,6 +430,10 @@ export async function createTournament(
         // format incomplet, que `parseMatchFormat` relirait comme « libre ».
         matchFormat?.type ?? null,
         matchFormat?.value ?? null,
+        matchFormat?.maxMaps ?? null,
+        matchFormat?.drawsAllowed ? 1 : 0,
+        playoffFormat?.type ?? null,
+        playoffFormat?.value ?? null,
       ],
     );
 
@@ -544,6 +571,10 @@ async function loadTournamentBuckets(
       t.participant_type,
       t.match_format_type,
       t.match_format_value,
+      t.match_format_max_maps,
+      t.match_format_draws,
+      t.endurance_playoff_format_type,
+      t.endurance_playoff_format_value,
       t.live_url,
       COALESCE(COUNT(r.id), 0) AS registered_teams
      FROM bg_tournaments t
@@ -572,6 +603,10 @@ async function loadTournamentBuckets(
       t.participant_type,
       t.match_format_type,
       t.match_format_value,
+      t.match_format_max_maps,
+      t.match_format_draws,
+      t.endurance_playoff_format_type,
+      t.endurance_playoff_format_value,
       t.live_url
      ORDER BY t.start_at DESC`,
     params,
