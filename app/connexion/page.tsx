@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/toast";
 import { CyberButton } from "@/components/cyber/CyberButton";
 import { CyberCard } from "@/components/cyber/CyberCard";
 import { RgpdConsentModal } from "@/components/cyber/RgpdConsentModal";
+import { DEFAULT_REDIRECT, safeRedirectPath } from "@/lib/shared/safe-redirect";
 
 const CONSENT_STORAGE_KEY = "bg_rgpd_consent";
 
@@ -25,7 +26,10 @@ function mapDiscordError(errorCode: string): string {
 export default function LoginPage() {
   const router = useRouter();
   const { showError, showSuccess } = useToast();
-  const [redirect, setRedirect] = useState("/tournois");
+  // Destination d'après connexion. Toujours **filtrée** : la valeur vient de
+  // l'URL, et une redirection ouverte est l'appât classique du hameçonnage
+  // (`lib/shared/safe-redirect.ts`).
+  const [redirect, setRedirect] = useState(DEFAULT_REDIRECT);
 
   const [handle, setHandle] = useState("");
   const [resolvedId, setResolvedId] = useState("");
@@ -63,7 +67,7 @@ export default function LoginPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    setRedirect(params.get("redirect") || "/tournois");
+    setRedirect(safeRedirectPath(params.get("redirect")));
     const routeError = params.get("error");
     if (routeError === "google_not_configured") showError("Connexion Google indisponible: configuration manquante.");
     else if (routeError === "google_unavailable") showError("Connexion Google temporairement indisponible.");
