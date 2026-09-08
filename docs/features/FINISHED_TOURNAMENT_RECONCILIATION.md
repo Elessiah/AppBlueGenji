@@ -9,6 +9,7 @@ seconde date de clôture, pas de seconde annonce Discord de la championne).
 - Endurance : `reconcileEndurance` (`lib/server/tournaments/bg-survie.ts`)
 - Survie : `reconcileSurvival` (`lib/server/tournaments/survival.ts`)
 - Ronde suisse : `reconcileSwiss` (`lib/server/tournaments/swiss.ts`)
+- Multi-phases : `reconcilePhases` (`lib/server/tournaments/phases.ts`)
 
 ## Le symptôme
 
@@ -71,10 +72,41 @@ sans effet.
   Corriger le score d'une archive répare une erreur d'arbitrage ; la sanctionner
   après coup en crée une.
 
-## Reste à faire
+## Le cas `MULTI`, à deux gardes
 
-Le mode **`MULTI`** garde le défaut : `reconcilePhases` sort sur
-`state !== "RUNNING"`, et sa phase finale est de toute façon close elle aussi
-(`currentPhase.state !== "RUNNING"`). Le rétablir demande de rejouer la
-finalisation d'une phase terminée, pas seulement de lever une garde — c'est une
-tâche à part, notée dans `ERREUR.txt`.
+Le mode multi-phases portait le même défaut, mais il ne se levait pas d'une
+seule main : `reconcilePhases` sort **deux fois**, sur l'état du tournoi puis
+sur celui de la phase courante.
+
+```ts
+if (rows[0].state !== "RUNNING") return;          // le tournoi
+if (currentPhase.state !== "RUNNING") return;     // la phase
+```
+
+Or la phase finale d'un tournoi clos est close elle aussi — c'est
+`reconcilePhases` lui-même qui l'a fermée juste avant d'appeler
+`finalizeMultiTournament`. Ne lever que la première garde n'aurait donc rien
+changé.
+
+Les deux acceptent désormais l'état terminal, et **seulement lui** : sur un
+tournoi `FINISHED`, la phase courante doit être `FINISHED`. Un tournoi clos dont
+la phase courante serait encore `RUNNING` est une incohérence — on ne la répare
+pas ici, on ne la relit pas.
+
+La suite est celle des autres modes, à un détail près : c'est le **moteur de la
+phase** qui rend le classement (survie, ronde suisse ou bracket, exactement les
+trois branches du chemin ordinaire), on le réécrit avec `savePhaseResults`, puis
+on rejoue `finalizeMultiTournament` — et on s'arrête là. Ce qui est **sauté**
+sur un tournoi clos :
+
+- `setPhaseState(..., "FINISHED", "finished_at")`, qui redaterait la clôture
+  d'une phase déjà close ;
+- la re-résolution du plan des phases restantes, qui n'a plus d'objet ;
+- le démarrage de la phase suivante et la récursion qui l'accompagne — c'est le
+  « le tournoi ne se rouvre pas » du mode.
+
+Relire la seule phase courante suffit, et pour la même raison qu'ailleurs :
+`match-lock` verrouille toute phase qu'une phase ultérieure suit, et à
+l'intérieur de la dernière, la règle du format verrouille les manches amont. La
+dernière manche de la dernière phase est la seule chose qui reste corrigible —
+c'est précisément celle que l'on rejoue.
