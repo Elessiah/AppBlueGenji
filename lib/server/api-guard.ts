@@ -81,6 +81,20 @@ export const VISIT_REQUEST_RULE: RateLimitRule = {
 };
 
 /**
+ * Lectures relayées vers le bot (`/api/bot/*`), par IP.
+ *
+ * Ces routes ne touchent pas la base : elles rouvrent une requête vers le bot,
+ * qui tourne sur la même machine. Le coupe-circuit de `bot-integration` couvre
+ * la panne, pas l'affluence — d'où ce plafond, large comme les autres, sur une
+ * page de vitrine ouverte sans compte.
+ */
+export const BOT_READ_RULE: RateLimitRule = {
+  name: "bot-read",
+  limit: 60,
+  windowMs: 60_000,
+};
+
+/**
  * Ouvertures du flux d'activité du bot, par IP.
  *
  * Par IP et non par utilisateur : `/bot` est une page de vitrine, ouverte aux

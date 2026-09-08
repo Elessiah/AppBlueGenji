@@ -7,6 +7,7 @@ import {
   FALLBACK_BUREAU,
   validateBureauInput,
 } from "@/lib/shared/bureau";
+import { cachedShowcase, invalidateShowcase } from "./showcase-cache";
 
 export type { BureauMember, BureauMemberInput } from "@/lib/shared/bureau";
 export { FALLBACK_BUREAU } from "@/lib/shared/bureau";
@@ -29,21 +30,31 @@ function fromRow(row: BureauRow): BureauMember {
   };
 }
 
+async function loadBureauMembers(): Promise<BureauMember[]> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<BureauRow[]>(
+    `SELECT id, name, role, initials, color
+     FROM bg_bureau_members
+     ORDER BY display_order ASC, id ASC`,
+  );
+  if (!rows || rows.length === 0) return FALLBACK_BUREAU;
+  return rows.map(fromRow);
+}
+
 /**
  * Liste les membres du bureau triés par ordre d'affichage. Renvoie le bureau
  * de secours si la base ne contient aucune ligne ou est injoignable, afin que
  * la page association reste toujours peuplée.
+ *
+ * Mutualisée comme ses quatre voisines de `/association` : cette page est rendue
+ * à chaque visite (elle lit la session) et n'est pas une route API — aucun
+ * plafond de débit ne peut donc la protéger, la mutualisation est le seul
+ * garde-fou disponible (`./showcase-cache`). Le bureau change quelques fois par
+ * an ; il était pourtant relu à chaque arrivée, seul de la page à l'être.
  */
 export async function listBureauMembers(): Promise<BureauMember[]> {
   try {
-    const db = await getDatabase();
-    const [rows] = await db.execute<BureauRow[]>(
-      `SELECT id, name, role, initials, color
-       FROM bg_bureau_members
-       ORDER BY display_order ASC, id ASC`,
-    );
-    if (!rows || rows.length === 0) return FALLBACK_BUREAU;
-    return rows.map(fromRow);
+    return await cachedShowcase("bureau", loadBureauMembers);
   } catch {
     return FALLBACK_BUREAU;
   }
@@ -62,6 +73,8 @@ export async function createBureauMember(input: BureauMemberInput): Promise<Bure
     [name, role, initials, color],
   );
 
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
   return { id: Number(res.insertId), name, role, initials, color };
 }
 
@@ -80,6 +93,8 @@ export async function updateBureauMember(id: number, input: BureauMemberInput): 
   );
   if (res.affectedRows === 0) throw new Error("BUREAU_MEMBER_NOT_FOUND");
 
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
   return { id, name, role, initials, color };
 }
 
@@ -89,6 +104,8 @@ export async function updateBureauMember(id: number, input: BureauMemberInput): 
  */
 export async function reorderBureauMembers(ids: number[]): Promise<void> {
   await applyDisplayOrder("bg_bureau_members", ids);
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
 }
 
 /** Supprime un membre du bureau. Lève `BUREAU_MEMBER_NOT_FOUND` si l'id n'existe pas. */
@@ -99,4 +116,6 @@ export async function deleteBureauMember(id: number): Promise<void> {
     [id],
   );
   if (res.affectedRows === 0) throw new Error("BUREAU_MEMBER_NOT_FOUND");
+  // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
+  invalidateShowcase();
 }
