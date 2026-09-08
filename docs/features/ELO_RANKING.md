@@ -5,6 +5,12 @@ défaite) mais une **notation de force** : chacune part de 500 points, et chaque
 match **transfère** des points du perdant au vainqueur — beaucoup quand le
 résultat était improbable, presque rien quand il était attendu.
 
+> Un transfert de match ne dit pourtant rien du **parcours** : à sa clôture, un
+> tournoi redistribue en plus une cagnotte selon le classement final et la
+> difficulté du plateau — voir
+> [`TOURNAMENT_PLACEMENT_POINTS.md`](./TOURNAMENT_PLACEMENT_POINTS.md). Le rejeu
+> décrit ici fond les deux dans la même chronologie.
+
 ## Ce que le barème additif ne pouvait pas dire
 
 Le cumul comptait des rencontres sans jamais regarder **qui** était en face.
