@@ -533,10 +533,6 @@ export async function reconcileSurvival(
   if (!tournament || tournament.format !== "SURVIVAL") {
     return { done: false, standings: [] };
   }
-  if (tournament.state === "FINISHED") {
-    return { done: false, standings: [] };
-  }
-
   const schedule = resolveCutSchedule(tournament);
   const currentRound = Number(tournament.survival_current_round);
 
@@ -550,6 +546,20 @@ export async function reconcileSurvival(
     },
     phaseId,
   );
+
+  // Tournoi déjà clos : corriger le score de sa finale doit se voir au
+  // palmarès — `adminResolveMatch` l'autorise exprès, et sortir en tête laissait
+  // `final_rank` sur l'ancienne championne. Le classement est donc réécrit
+  // depuis le rejeu, mais **rien n'est reposé** : un tournoi terminé ne se
+  // rouvre pas, et seule sa dernière manche est corrigible de toute façon (les
+  // précédentes sont verrouillées par `match-lock`).
+  // Voir `docs/features/FINISHED_TOURNAMENT_RECONCILIATION.md`.
+  if (tournament.state === "FINISHED") {
+    // Dans une phase, la clôture appartient à l'orchestrateur, comme partout
+    // ailleurs dans ce module.
+    if (phaseId === 0) await finalizeSurvival(tournamentId, conn, standings);
+    return { done: true, standings };
+  }
 
   // Aucun round généré (départ avec 0 ou targetTeams équipes) : clôture immédiate.
   if (currentRound === 0) {
