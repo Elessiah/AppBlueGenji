@@ -19,6 +19,20 @@
  * rien quand il était attendu. Une équipe à 500 qui bat une équipe à 900 prend
  * l'essentiel de l'écart ; l'inverse ne déplace presque rien.
  *
+ * ## Ce que le transfert de match ne pouvait pas dire non plus
+ *
+ * Une cote de type Elo ne connaît que des rencontres, et chacune ne paie qu'à
+ * hauteur de sa surprise : une équipe forte qui gagne un tournoi en battant plus
+ * faible qu'elle n'y gagne presque rien, quand une équipe faible sortie au
+ * deuxième tour sur une seule victoire improbable en encaisse trois fois plus.
+ * Le classement disait alors qu'aller au bout coûte moins qu'être éliminé tôt.
+ *
+ * Chaque tournoi terminé redistribue donc en plus une **cagnotte** entre ses
+ * engagées, selon leur **rang final** et la difficulté du plateau
+ * (`lib/shared/tournament-placement.ts`). C'est un évènement du rejeu comme un
+ * autre, à sa date, et de somme nulle : voir
+ * `docs/features/TOURNAMENT_PLACEMENT_POINTS.md`.
+ *
  * ## Trois propriétés que le module tient
  *
  * 1. **Symétrie.** Ce que le vainqueur gagne, le perdant le perd, au point
@@ -43,6 +57,14 @@
  *
  * Voir `docs/features/ELO_RANKING.md`.
  */
+
+import {
+  MIN_PLACEMENT_ENTRANTS,
+  placementDeltas,
+  type PlacementEntrant,
+} from "./tournament-placement";
+
+export type { PlacementEntrant };
 
 /**
  * Cote de départ, commune à tout le monde. Une équipe qui n'a jamais joué vaut
@@ -155,6 +177,22 @@ export type RankedMatch = {
   playedAt: string;
 };
 
+/**
+ * Le classement final d'un tournoi terminé, tel que le rejeu le consomme.
+ *
+ * C'est un **évènement de plus** dans la même histoire que les matchs, à sa
+ * date, et non un total posé à côté : les cotes qu'il redistribue sont celles
+ * de l'instant de la clôture, donc celles que les rencontres du tournoi
+ * viennent d'écrire.
+ */
+export type RankedPlacement = {
+  tournamentId: number;
+  /** Engagées **classées**, dans n'importe quel ordre. */
+  entrants: { teamId: number; rank: number }[];
+  /** Date ISO de la clôture. Une date illisible range le tournoi en tête. */
+  awardedAt: string;
+};
+
 /** Cote et bilan d'une équipe à l'issue du rejeu. */
 export type RankedTeamState = {
   points: number;
@@ -164,11 +202,27 @@ export type RankedTeamState = {
   draws: number;
   /** Matchs comptés. Zéro = équipe non classée, encore à la cote de départ. */
   matchesPlayed: number;
+  /**
+   * Part de la cote qui vient des **classements finaux** et non des rencontres
+   * — positive pour qui va loin, négative pour qui sort tôt.
+   *
+   * Elle n'est pas une seconde monnaie : elle est **déjà** dans `points`. On la
+   * garde à part pour pouvoir dire à une équipe d'où vient sa cote, ce qu'un
+   * total seul ne dit pas.
+   */
+  placementPoints: number;
 };
 
 /** L'état d'une équipe qui n'a encore rien joué. */
 export function baseRankedTeamState(): RankedTeamState {
-  return { points: RANKING_BASE_POINTS, wins: 0, losses: 0, draws: 0, matchesPlayed: 0 };
+  return {
+    points: RANKING_BASE_POINTS,
+    wins: 0,
+    losses: 0,
+    draws: 0,
+    matchesPlayed: 0,
+    placementPoints: 0,
+  };
 }
 
 function playedTimestamp(value: string): number {
@@ -191,16 +245,90 @@ export function compareRankedMatches(a: RankedMatch, b: RankedMatch): number {
 }
 
 /**
- * **Le** calcul du classement : rejoue toutes les rencontres dans l'ordre et
- * rend la cote de chaque équipe qui en a disputé une.
+ * Un pas du rejeu : une rencontre, ou le classement final d'un tournoi.
+ *
+ * Les deux se rangent dans la **même** chronologie, sans quoi la cagnotte d'un
+ * tournoi se redistribuerait sur des cotes d'avant ses propres matchs.
+ */
+type RankedEvent =
+  | { at: number; order: 0; id: number; match: RankedMatch }
+  | { at: number; order: 1; id: number; placement: RankedPlacement };
+
+/**
+ * Ordre du rejeu tous évènements confondus : la date, puis les matchs **avant**
+ * les classements finaux, puis l'identifiant.
+ *
+ * Le critère du milieu n'est pas décoratif : la clôture d'un tournoi est écrite
+ * dans la même transaction que son dernier score, donc à la même seconde. Le
+ * classement final doit se lire sur les cotes que ce match vient d'écrire, pas
+ * l'inverse.
+ */
+function compareRankedEvents(a: RankedEvent, b: RankedEvent): number {
+  if (a.at !== b.at) return a.at - b.at;
+  if (a.order !== b.order) return a.order - b.order;
+  return a.id - b.id;
+}
+
+/**
+ * Redistribue la cagnotte d'un tournoi qui vient de se clore.
+ *
+ * Le calcul lui-même vit dans `lib/shared/tournament-placement.ts`, pur et
+ * ignorant tout du classement du site : ici, on ne fait que lui donner les cotes
+ * **du moment** et appliquer ce qu'il rend.
+ *
+ * Une équipe qui n'a encore aucun état en prend un : elle a bien participé, et
+ * sa cagnotte se lit sur la cote de départ, comme sa première rencontre se
+ * lirait dessus. Elle reste pour autant **non classée** tant qu'elle n'a pas
+ * disputé de match compté ({@link isRankedTeam}) — un classement final ne
+ * remplace pas un bilan.
+ */
+function applyPlacement(
+  placement: RankedPlacement,
+  stateOf: (teamId: number) => RankedTeamState,
+): void {
+  if (placement.entrants.length < MIN_PLACEMENT_ENTRANTS) return;
+
+  const deltas = placementDeltas(
+    placement.entrants.map((entrant) => ({
+      teamId: entrant.teamId,
+      rank: entrant.rank,
+      rating: stateOf(entrant.teamId).points,
+    })),
+    RANKING_BASE_POINTS,
+  );
+
+  for (const [teamId, delta] of deltas) {
+    const state = stateOf(teamId);
+    // Le plancher s'applique comme sur une défaite — et pour la même raison :
+    // une cote négative n'est ni affichable ni rattrapable. C'est la seule
+    // entorse à la somme nulle, la même que celle des transferts de match.
+    const next = Math.max(RANKING_FLOOR_POINTS, state.points + delta);
+    state.placementPoints += next - state.points;
+    state.points = next;
+  }
+}
+
+/**
+ * **Le** calcul du classement : rejoue toutes les rencontres — et tous les
+ * classements finaux de tournoi — dans l'ordre, et rend la cote de chaque
+ * équipe concernée.
  *
  * L'ordre est imposé ici et non laissé au SQL appelant : la chronologie fait
- * partie de la règle, pas de la requête. Le tableau reçu n'est pas modifié.
+ * partie de la règle, pas de la requête. Les tableaux reçus ne sont pas
+ * modifiés.
  *
- * Une équipe absente du résultat n'a joué aucun match compté : sa cote est
- * {@link RANKING_BASE_POINTS} — voir {@link rankedPointsOf}.
+ * Les `placements` sont facultatifs : un appelant qui n'en fournit aucun obtient
+ * exactement le classement d'avant les points de parcours — c'est ce qui rend le
+ * transfert de match testable seul.
+ *
+ * Une équipe absente du résultat n'a joué aucun match compté ni figuré à aucun
+ * classement final : sa cote est {@link RANKING_BASE_POINTS} — voir
+ * {@link rankedPointsOf}.
  */
-export function replayRanking(matches: RankedMatch[]): Map<number, RankedTeamState> {
+export function replayRanking(
+  matches: RankedMatch[],
+  placements: RankedPlacement[] = [],
+): Map<number, RankedTeamState> {
   const states = new Map<number, RankedTeamState>();
 
   const stateOf = (teamId: number): RankedTeamState => {
@@ -211,7 +339,28 @@ export function replayRanking(matches: RankedMatch[]): Map<number, RankedTeamSta
     return created;
   };
 
-  for (const match of [...matches].sort(compareRankedMatches)) {
+  const events: RankedEvent[] = [
+    ...matches.map<RankedEvent>((match) => ({
+      at: playedTimestamp(match.playedAt),
+      order: 0,
+      id: match.matchId,
+      match,
+    })),
+    ...placements.map<RankedEvent>((placement) => ({
+      at: playedTimestamp(placement.awardedAt),
+      order: 1,
+      id: placement.tournamentId,
+      placement,
+    })),
+  ].sort(compareRankedEvents);
+
+  for (const event of events) {
+    if (event.order === 1) {
+      applyPlacement(event.placement, stateOf);
+      continue;
+    }
+
+    const match = event.match;
     // Un match contre soi-même n'a pas de perdant : le rejouer transférerait
     // des points d'une équipe à elle-même, et le plancher les ferait
     // apparaître de nulle part.
@@ -342,7 +491,16 @@ export const RANKING_POINTS_LABEL = "Points de classement";
  */
 export const RANKING_POINTS_HINT =
   `Base ${RANKING_BASE_POINTS} · plus la victoire est improbable, plus elle rapporte `
-  + `(plancher ${RANKING_FLOOR_POINTS})`;
+  + `· le rang final d'un tournoi en redistribue aussi (plancher ${RANKING_FLOOR_POINTS})`;
+
+/** Intitulé de la part de cote qui vient des classements finaux de tournoi. */
+export const RANKING_PLACEMENT_LABEL = "Points de parcours";
+
+/**
+ * Ce que dit la tuile des points de parcours — et surtout ce qu'elle ne dit
+ * pas : ces points ne s'ajoutent pas à la cote, ils en font partie.
+ */
+export const RANKING_PLACEMENT_HINT = "compris dans la cote · rang final des tournois";
 
 /** Ce qu'affiche une équipe qui n'a encore disputé aucun match compté. */
 export const RANKING_UNRANKED_HINT = "Aucun match joué : cote de départ";
@@ -364,4 +522,6 @@ export const RANKING_SEEDING_RULE =
   `Le seeding initial vient du classement du site : chaque équipe part de `
   + `${RANKING_BASE_POINTS} points, et chaque match en transfère du perdant au `
   + `vainqueur — d'autant plus que le résultat était improbable. `
+  + `À sa clôture, un tournoi en redistribue à nouveau selon le classement final, `
+  + `d'autant plus que son plateau était relevé. `
   + `Seed 1 = meilleure équipe.`;
