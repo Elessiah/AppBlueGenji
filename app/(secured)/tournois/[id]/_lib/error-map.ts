@@ -65,11 +65,10 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // servent deux fois : en toast si la route tranche, et tels quels sous le
   // bouton désarmé de la zone de danger — d'où des phrases qui expliquent, et
   // non des constats.
-  ROLLBACK_UNSUPPORTED_FORMAT:
-    "Le retour en arrière ne couvre pas ce format : en double élimination les deux tableaux avancent en parallèle, et en multi-phases une manche appartient à une phase dont la clôture a déjà distribué ses qualifiées.",
-  ROLLBACK_NOTHING_TO_UNDO: "Aucune manche à défaire : aucun score n'a encore été saisi.",
-  ROLLBACK_PLAYOFFS_STARTED:
-    "Les play-offs sont tirés : les manches qualificatives ne se défont plus. Seuls les tours de l'arbre final peuvent être effacés.",
+  ROLLBACK_NOTHING_TO_UNDO:
+    "Plus rien à défaire : le tournoi est revenu à l'instant de son coup d'envoi, aucun score n'y est saisi.",
+  ROLLBACK_TOURNAMENT_NOT_STARTED:
+    "Le tournoi n'a pas encore commencé : il n'a aucune manche à défaire.",
   ROLLBACK_ROUND_CHANGED:
     "La manche courante a changé pendant que le dialogue était ouvert : le plateau vient de se rafraîchir, relis les scores avant de recommencer.",
   ROLLBACK_FAILED: "Erreur lors du retour en arrière.",

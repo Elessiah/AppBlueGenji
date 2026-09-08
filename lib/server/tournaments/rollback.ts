@@ -1,79 +1,104 @@
 /**
- * Retour en arrière : effacer la manche courante d'un tournoi en cours.
+ * Retour en arrière : effacer le dernier stade joué d'un tournoi, à répétition.
  *
- * La décision — quelle manche, et ce qu'il advient de ce qui en descendait —
- * appartient au module pur `lib/shared/tournament-rollback.ts`, partagé avec
- * l'interface. Ici, deux choses seulement : l'écriture, et l'entretien qui la
- * suit.
+ * La décision — quel stade, et ce qu'il advient de ce qui le suit — appartient
+ * au module pur `lib/shared/tournament-rollback.ts`, partagé avec l'interface.
+ * Ici, trois choses : l'écriture, les quelques états du moteur qui ne se
+ * déduisent pas des matchs, et l'entretien qui suit.
  *
  * **Le moteur n'a presque rien à apprendre.** On ne défait ni classement, ni
  * élimination, ni qualification : les trois modes à classement *rejouent* tout
  * depuis l'historique des matchs (`replaySwiss`, `replaySurvival`,
- * `replayEndurance`), et une manche effacée disparaît donc du rejeu comme si
- * elle n'avait jamais été jouée. Il suffit d'effacer les saisies puis d'appeler
- * la réconciliation ordinaire, celle-là même qu'une correction de score
- * déclenche. Aucun mode n'a de branche « retour en arrière », et un mode ajouté
- * demain en héritera pour peu qu'il rejoue son classement. *Presque* : le
- * curseur de manche des formats à classement n'est pas dérivé des matchs, et
- * c'est la seule chose que ce module ait à reculer lui-même
- * ({@link rewindRoundCursor}).
+ * `replayEndurance`), et un stade effacé disparaît donc du rejeu comme s'il
+ * n'avait jamais été joué. Il suffit d'effacer les saisies puis d'appeler la
+ * réconciliation ordinaire, celle-là même qu'une correction de score déclenche.
+ * Aucun mode n'a de branche « retour en arrière ».
  *
- * **Les identifiants de match survivent.** La manche est *vidée*, pas
- * supprimée : un identifiant de match est une adresse publique — lien profond
- * (`lib/shared/match-anchor.ts`), horaire annoncé, diffusion programmée — et la
- * manche va se rejouer entre les mêmes équipes. Seules les manches *ultérieures*
- * des formats à classement sont supprimées : le moteur les pose au fur et à
- * mesure, leurs appariements sont périmés par le retour en arrière, et il les
- * reposera.
+ * *Presque* : quatre états ne se déduisent pas des matchs, et ce module est seul
+ * à devoir les reculer.
  *
- * **Tournoi en cours seulement.** Un tournoi terminé est refusé, comme il l'est
- * pour un abandon ou une pénalité : corriger *un* score d'archive se rejoue et
- * réécrit un palmarès (`docs/features/FINISHED_TOURNAMENT_RECONCILIATION.md`),
- * mais effacer la finale entière laisserait un tournoi « terminé » sans
- * championne et sans manche pour en désigner une — la clôture ne se rejoue pas.
+ * · le **curseur de manche** d'un format à classement ({@link rewindRoundCursor}),
+ *   posé sur le tournoi ou sur la phase selon où le format est joué ;
+ * · le drapeau **`endurance_playoffs_started`**, qui doit retomber quand le
+ *   dernier tour de l'arbre final vient d'être supprimé
+ *   ({@link rewindEndurancePlayoffs}) ;
+ * · l'**état des phases** d'un tournoi multi-phases, dont la clôture a distribué
+ *   des qualifiées ({@link reopenPhases}) ;
+ * · l'**état du tournoi** lui-même, quand il était terminé
+ *   ({@link reopenTournament}).
+ *
+ * **Les identifiants de match survivent** partout où c'est possible. Le stade
+ * visé est *vidé*, jamais supprimé : un identifiant de match est une adresse
+ * publique — lien profond (`lib/shared/match-anchor.ts`), horaire annoncé,
+ * diffusion programmée — et les rencontres vont se rejouer entre les mêmes
+ * équipes. Ce qui suit n'a pas cette chance dans les formats à classement, ni
+ * dans une phase ultérieure : le moteur y pose ses manches au fur et à mesure,
+ * leurs appariements sont périmés, et il les reposera.
+ *
+ * **Un tournoi terminé se défait aussi**, et c'est la raison d'être de
+ * {@link reopenTournament} : sans lui, la seule erreur qu'on ne pouvait plus
+ * rattraper était celle de la finale — exactement celle qui compte le plus.
+ * Corriger *un* score d'archive se rejoue déjà et réécrit un palmarès
+ * (`docs/features/FINISHED_TOURNAMENT_RECONCILIATION.md`) ; effacer la finale
+ * entière demande une chose de plus, rouvrir, parce qu'une clôture, elle, ne se
+ * rejoue pas.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
-import { isEndurancePlayoffRound } from "@/lib/shared/bg-survie";
+import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
 import {
   planRoundRollback,
+  rollbackStageLabelWithArticle,
   type RollbackMatch,
   type RollbackPlan,
 } from "@/lib/shared/tournament-rollback";
-import type { BracketType, TournamentFormat } from "@/lib/shared/types";
+import type { BracketType, PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { tryAutoResolveByes } from "./byes";
 import { publishUpdatedEvent } from "./notifications";
+import { loadPhases } from "./phases-repository";
+import { resetRegistrationRanks } from "./repository";
 import { syncTournamentState } from "./state";
 
 /** Réglages du geste. */
 export type RollbackOptions = {
   /**
-   * Manche que l'appelant croit effacer.
+   * Stade que l'appelant croit effacer, sous sa forme de chaîne
+   * (`RollbackPlan.stageKey`).
    *
    * Contrôle de concurrence optimiste : le plan est recalculé ici, sur une
-   * lecture verrouillée, et peut donc désigner une **autre** manche que celle
-   * montrée à l'écran. Omis, le geste porte sur ce que la base dit au moment du
+   * lecture verrouillée, et peut donc désigner un **autre** stade que celui
+   * montré à l'écran. Omis, le geste porte sur ce que la base dit au moment du
    * verrou.
    */
-  expectedRound?: number;
+  expectedStage?: string;
 };
 
 /** Ce que le retour en arrière a défait, pour le message et le journal. */
 export type RolledBackRound = {
   tournamentId: number;
   tournamentName: string;
-  /** Numéro de manche tel qu'il est stocké (offset des play-offs compris). */
+  /** Stade défait, sous la forme échangée avec l'interface. */
+  stageKey: string;
+  /** Numéro affiché de la manche défaite (voir `RollbackPlan.roundNumber`). */
   roundNumber: number;
+  /** Rang de la phase concernée (0 = tournoi sans phases). */
+  phaseRank: number;
+  /** Libellé complet, article compris : « la manche 4 », « le tour 2 des play-offs ». */
+  label: string;
   /** Nombre de rencontres vidées de leur résultat. */
   clearedMatches: number;
+  /** Le tournoi était terminé : il vient d'être rouvert. */
+  reopenedTournament: boolean;
 };
 
 interface RollbackMatchRow extends RowDataPacket {
   id: number;
   bracket: BracketType;
   round_number: number;
+  phase_id: number;
+  phase_position: number | null;
   team1_id: number | null;
   team2_id: number | null;
   team1_score: number | null;
@@ -83,20 +108,24 @@ interface RollbackMatchRow extends RowDataPacket {
   status: string;
   team1_reported_at: string | null;
   team2_reported_at: string | null;
+  next_winner_match_id: number | null;
+  next_loser_match_id: number | null;
 }
 
 /**
  * Le plateau, dans le vocabulaire du module pur.
  *
- * `nextWinnerMatchId` / `nextLoserMatchId` restent à `null` : le plan ne suit
- * pas les liens de bracket, il range les matchs par stade. Les charger ferait
- * croire qu'ils comptent.
+ * Les liens de plateau comptent, désormais : c'est d'eux que le module tire
+ * l'ordre de déroulement d'une double élimination, où les numéros de manche des
+ * deux tableaux ne se comparent pas.
  */
 function toRollbackMatch(row: RollbackMatchRow): RollbackMatch {
   return {
     id: Number(row.id),
     bracket: row.bracket,
     roundNumber: Number(row.round_number),
+    phaseId: Number(row.phase_id),
+    phasePosition: row.phase_position === null ? null : Number(row.phase_position),
     team1Id: row.team1_id === null ? null : Number(row.team1_id),
     team2Id: row.team2_id === null ? null : Number(row.team2_id),
     team1Score: row.team1_score === null ? null : Number(row.team1_score),
@@ -105,20 +134,33 @@ function toRollbackMatch(row: RollbackMatchRow): RollbackMatch {
     forfeitTeamId: row.forfeit_team_id === null ? null : Number(row.forfeit_team_id),
     decided: row.status === "COMPLETED",
     hasPendingReport: row.team1_reported_at !== null || row.team2_reported_at !== null,
-    nextWinnerMatchId: null,
-    nextLoserMatchId: null,
+    nextWinnerMatchId: row.next_winner_match_id === null ? null : Number(row.next_winner_match_id),
+    nextLoserMatchId: row.next_loser_match_id === null ? null : Number(row.next_loser_match_id),
   };
 }
 
+/**
+ * Tout le plateau, phase comprise.
+ *
+ * La **position** de la phase est jointe plutôt que déduite de son identifiant :
+ * c'est elle qui ordonne les phases entre elles, et c'est aussi elle que le
+ * libellé annonce (« la manche 2 de la phase 3 »). Un match hors phase porte
+ * `phase_id = 0`, que la jointure laisse à `NULL` — le module pur retombe alors
+ * sur le rang 0, commun à tout le tournoi.
+ */
 async function loadRollbackMatches(
   connection: PoolConnection,
   tournamentId: number,
 ): Promise<RollbackMatch[]> {
   const [rows] = await connection.execute<RollbackMatchRow[]>(
-    `SELECT id, bracket, round_number, team1_id, team2_id, team1_score, team2_score,
-            winner_team_id, forfeit_team_id, status, team1_reported_at, team2_reported_at
-     FROM bg_matches
-     WHERE tournament_id = ?`,
+    `SELECT m.id, m.bracket, m.round_number, m.phase_id, p.position AS phase_position,
+            m.team1_id, m.team2_id, m.team1_score, m.team2_score,
+            m.winner_team_id, m.forfeit_team_id, m.status,
+            m.team1_reported_at, m.team2_reported_at,
+            m.next_winner_match_id, m.next_loser_match_id
+     FROM bg_matches m
+     LEFT JOIN bg_tournament_phases p ON p.id = m.phase_id
+     WHERE m.tournament_id = ?`,
     [tournamentId],
   );
   return rows.map(toRollbackMatch);
@@ -183,11 +225,11 @@ async function clearMatchResults(
 }
 
 /**
- * Vide de leurs qualifiées les rencontres qui descendaient de la manche défaite.
+ * Vide de leurs qualifiées les rencontres qui suivaient le stade défait.
  *
- * Réservé aux plateaux à élimination, dont la structure est créée au lancement :
- * on ne peut pas supprimer ces lignes sans détruire le tournoi, mais les laisser
- * garnies afficherait au tour suivant une équipe qui n'a plus rien gagné.
+ * Réservé aux plateaux, dont la structure est créée au lancement : on ne peut
+ * pas supprimer ces lignes sans détruire le tournoi, mais les laisser garnies
+ * afficherait au tour suivant une équipe qui n'a plus rien gagné.
  *
  * L'antenne est refermée pour la même raison que dans `pushTeamToTarget` : une
  * affiche qui perd ses deux camps n'est plus l'affiche qu'on diffusait.
@@ -210,11 +252,11 @@ async function detachMatchParticipants(
 }
 
 /**
- * Supprime les manches postérieures d'un format à classement.
+ * Supprime les manches que le moteur reposera.
  *
  * Elles n'ont plus d'objet : leurs appariements ont été tirés d'un classement
- * que le retour en arrière vient de défaire, et le moteur les reposera quand la
- * manche courante sera de nouveau complète.
+ * que le retour en arrière vient de défaire — ou, pour une phase ultérieure,
+ * d'une liste de qualifiées qu'il vient d'annuler.
  *
  * Les tables qui pendent à une manche partent avec elle, écrites à la main
  * plutôt que laissées aux cascades — même raison que la suppression d'un tournoi
@@ -247,82 +289,242 @@ async function deleteMatches(
   }
 }
 
+/** Phase d'un tournoi multi-phases, réduite à ce que ce module en fait. */
+type RollbackPhase = { id: number; position: number; format: PhaseFormat };
+
 /**
- * Colonne où chaque format à classement retient **la manche où il en est**.
+ * Colonne où chaque format à classement retient **la manche où il en est**,
+ * quand il est joué comme un tournoi entier.
  *
  * Le nombre n'est pas dérivé des matchs : `generateSwissRound` et ses jumelles
- * posent la manche `compteur + 1` puis incrémentent. Un retour en arrière qui
+ * posent la manche « compteur + 1 » puis incrémentent. Un retour en arrière qui
  * n'y touche pas laisse donc le moteur reprendre *après* les manches qu'on vient
- * d'effacer — c'est le seul état du moteur que ce module doive connaître, et il
- * s'est vu en conditions réelles : défaire la manche 1 d'une ronde suisse à huit
- * y créait une « ronde 3 » pendant que la 1 restait vierge.
+ * d'effacer — cela s'est vu en conditions réelles : défaire la manche 1 d'une
+ * ronde suisse à huit y créait une « ronde 3 » pendant que la 1 restait vierge.
  *
- * `SINGLE` n'y figure pas : son plateau naît entier, il n'a pas de curseur. La
- * BlueGenji Survie ne compte que ses manches **qualificatives** — l'arbre final
- * vit à partir de `PLAYOFF_ROUND_OFFSET` et n'a pas de compteur à reculer.
+ * Les formats à plateau n'y figurent pas : leur plateau naît entier, ils n'ont
+ * pas de curseur.
  */
-const ROUND_CURSOR_COLUMN: Partial<Record<TournamentFormat, string>> = {
+const TOURNAMENT_ROUND_CURSOR: Partial<Record<TournamentFormat, string>> = {
   SWISS: "swiss_current_round",
   SURVIVAL: "survival_current_round",
   BG_SURVIE: "endurance_current_round",
 };
 
 /**
- * Ramène le curseur de manche du format sur la manche défaite.
+ * La même chose pour une **phase**, qui tient son curseur sur sa propre ligne.
  *
- * Elle existe toujours — vidée, pas supprimée : le moteur la retrouve donc
+ * La BlueGenji Survie n'est pas un format de phase (`PhaseFormat`), elle n'a donc
+ * rien à faire ici.
+ */
+const PHASE_ROUND_CURSOR: Partial<Record<PhaseFormat, string>> = {
+  SWISS: "swiss_current_round",
+  SURVIVAL: "survival_current_round",
+};
+
+/**
+ * Ramène le curseur de manche sur le stade défait.
+ *
+ * La manche existe toujours — vidée, pas supprimée : le moteur la retrouve donc
  * incomplète et la réapparie si le rejeu l'a rendue caduque, exactement comme
  * après une correction de score.
+ *
+ * Rien à faire sur un plateau (aucune colonne ne lui correspond) ni sur un tour
+ * de l'arbre final d'une BlueGenji Survie : le curseur ne compte que les manches
+ * **qualificatives**, et le ramener à 1002 ferait repartir la qualification mille
+ * manches plus loin.
  */
 async function rewindRoundCursor(
   connection: PoolConnection,
   tournamentId: number,
   format: TournamentFormat,
-  roundNumber: number,
+  plan: RollbackPlan,
+  phases: readonly RollbackPhase[],
 ): Promise<void> {
-  const column = ROUND_CURSOR_COLUMN[format];
-  // Un tour d'arbre final n'est pas compté par le curseur qualificatif : le
-  // ramener à 1002 ferait repartir la phase de qualification mille manches plus
-  // loin.
-  if (!column || isEndurancePlayoffRound(roundNumber)) return;
+  if (plan.playoffRound) return;
 
-  await connection.execute(
-    `UPDATE bg_tournaments SET ${column} = ? WHERE id = ?`,
-    [roundNumber, tournamentId],
-  );
+  if (plan.stage.phaseRank > 0) {
+    const phase = phases.find((candidate) => candidate.position === plan.stage.phaseRank);
+    const column = phase === undefined ? undefined : PHASE_ROUND_CURSOR[phase.format];
+    if (phase === undefined || column === undefined) return;
+
+    await connection.execute(`UPDATE bg_tournament_phases SET ${column} = ? WHERE id = ?`, [
+      plan.roundNumber,
+      phase.id,
+    ]);
+    return;
+  }
+
+  const column = TOURNAMENT_ROUND_CURSOR[format];
+  if (column === undefined) return;
+
+  await connection.execute(`UPDATE bg_tournaments SET ${column} = ? WHERE id = ?`, [
+    plan.roundNumber,
+    tournamentId,
+  ]);
 }
 
-/** Applique le plan : la manche est vidée, ce qui en descendait est traité. */
+/**
+ * Referme la phase éliminatoire d'une BlueGenji Survie qui n'a plus d'arbre.
+ *
+ * Le drapeau est le seul état que `reconcileEndurance` consulte pour savoir s'il
+ * doit relire un arbre ou apparier une manche. Défaire le **premier** tour de
+ * l'arbre n'y touche pas — le tour reste posé, simplement vierge —, mais le pas
+ * suivant, qui vise la dernière manche qualificative, supprime l'arbre entier :
+ * le laisser levé ferait alors relire un arbre qui n'existe plus.
+ *
+ * Le drapeau est **relu sur ce qui reste** plutôt que déduit du plan : c'est la
+ * seule lecture qui ne puisse pas se tromper, et elle rattrape aussi un arbre
+ * effacé par un autre chemin.
+ */
+async function rewindEndurancePlayoffs(
+  connection: PoolConnection,
+  tournamentId: number,
+  format: TournamentFormat,
+): Promise<void> {
+  if (format !== "BG_SURVIE") return;
+
+  const [rows] = await connection.execute<(RowDataPacket & { remaining: number })[]>(
+    `SELECT COUNT(*) AS remaining FROM bg_matches
+     WHERE tournament_id = ? AND round_number >= ?`,
+    [tournamentId, PLAYOFF_ROUND_OFFSET],
+  );
+  if (Number(rows[0]?.remaining ?? 0) > 0) return;
+
+  await connection.execute(`UPDATE bg_tournaments SET endurance_playoffs_started = 0 WHERE id = ?`, [
+    tournamentId,
+  ]);
+}
+
+/**
+ * Rouvre la phase visée et remet à zéro celles qui la suivaient.
+ *
+ * C'est le seul endroit du projet qui fasse **reculer** un tournoi multi-phases,
+ * et il faut bien le faire ici : `reconcilePhases` ne sait qu'avancer — il relit
+ * un classement, clôt une phase, en lance une autre, jamais l'inverse.
+ *
+ * Une phase ultérieure retourne à `PENDING` avec ses compteurs, et surtout **son
+ * plateau d'engagées est effacé** : `insertPhaseTeams` étant un upsert, une
+ * ancienne liste de qualifiées survivrait à la nouvelle et la phase repartirait
+ * avec des équipes que plus rien ne qualifie. Les classements que ses moteurs
+ * tiennent (`bg_swiss_standings`, `bg_survival_standings`) partent pour la même
+ * raison : leurs initialisations sont des upserts, elles ne suppriment pas une
+ * ligne devenue orpheline.
+ *
+ * La phase visée, elle, redevient celle qu'on joue, et perd ses rangs et ses
+ * qualifications — ils seront réécrits quand elle s'achèvera de nouveau, et les
+ * laisser afficherait des qualifiées que plus rien ne désigne.
+ */
+async function reopenPhases(
+  connection: PoolConnection,
+  tournamentId: number,
+  plan: RollbackPlan,
+  phases: readonly RollbackPhase[],
+): Promise<void> {
+  const target = phases.find((phase) => phase.position === plan.stage.phaseRank);
+  if (target === undefined) return;
+
+  const later = phases.filter((phase) => phase.position > target.position);
+  if (later.length > 0) {
+    const ids = later.map((phase) => phase.id);
+    const placeholders = ids.map(() => "?").join(", ");
+
+    await connection.execute(
+      `DELETE FROM bg_tournament_phase_teams WHERE phase_id IN (${placeholders})`,
+      ids,
+    );
+    await connection.execute(
+      `DELETE FROM bg_swiss_standings WHERE tournament_id = ? AND phase_id IN (${placeholders})`,
+      [tournamentId, ...ids],
+    );
+    await connection.execute(
+      `DELETE FROM bg_survival_standings WHERE tournament_id = ? AND phase_id IN (${placeholders})`,
+      [tournamentId, ...ids],
+    );
+    await connection.execute(
+      `UPDATE bg_tournament_phases
+       SET state = 'PENDING',
+           started_at = NULL,
+           finished_at = NULL,
+           bracket_size = NULL,
+           swiss_current_round = 0,
+           survival_current_round = 0,
+           survival_barrage_rounds = 0
+       WHERE id IN (${placeholders})`,
+      ids,
+    );
+  }
+
+  await connection.execute(
+    `UPDATE bg_tournament_phases SET state = 'RUNNING', finished_at = NULL WHERE id = ?`,
+    [target.id],
+  );
+  await connection.execute(
+    "UPDATE bg_tournament_phase_teams SET `rank` = NULL, qualified = 0 WHERE phase_id = ?",
+    [target.id],
+  );
+  await connection.execute(`UPDATE bg_tournaments SET current_phase_id = ? WHERE id = ?`, [
+    target.id,
+    tournamentId,
+  ]);
+}
+
+/**
+ * Rouvre un tournoi terminé.
+ *
+ * `finishTournament` est écrit pour ne clore qu'une fois (`state <> 'FINISHED'`) :
+ * remettre l'état et effacer la date de clôture suffisent à lui rendre son effet,
+ * et le tournoi sera reclos — avec sa ligne de journal et sa nouvelle championne
+ * — dès que le stade rouvert aura été rejoué.
+ *
+ * Le classement final part avec : il désignait une championne que plus aucun
+ * match ne désigne. Chaque mode réécrira le sien à la clôture suivante.
+ */
+async function reopenTournament(connection: PoolConnection, tournamentId: number): Promise<void> {
+  await connection.execute(
+    `UPDATE bg_tournaments SET state = 'RUNNING', finished_at = NULL WHERE id = ?`,
+    [tournamentId],
+  );
+  await resetRegistrationRanks(connection, tournamentId);
+}
+
+/** Applique le plan : le stade est vidé, ce qui le suivait est traité. */
 async function applyRollback(
   connection: PoolConnection,
   tournamentId: number,
   format: TournamentFormat,
   plan: RollbackPlan,
+  phases: readonly RollbackPhase[],
 ): Promise<void> {
   await clearMatchResults(connection, plan.clearedMatchIds);
 
-  if (plan.laterMatchIds.length > 0) {
-    if (plan.disposal === "DETACH") await detachMatchParticipants(connection, plan.laterMatchIds);
-    else await deleteMatches(connection, plan.laterMatchIds);
+  if (plan.detachedMatchIds.length > 0) {
+    await detachMatchParticipants(connection, plan.detachedMatchIds);
+  }
+  if (plan.deletedMatchIds.length > 0) {
+    await deleteMatches(connection, plan.deletedMatchIds);
   }
 
-  await rewindRoundCursor(connection, tournamentId, format, plan.roundNumber);
+  await rewindRoundCursor(connection, tournamentId, format, plan, phases);
+  await rewindEndurancePlayoffs(connection, tournamentId, format);
+  await reopenPhases(connection, tournamentId, plan, phases);
 }
 
 /**
  * Rejoue le tournoi sur son nouvel historique.
  *
  * Exactement la chaîne d'une correction de score (`adminSaveMatchScoresPublic`),
- * et c'est le but : le retour en arrière n'est qu'une correction de plus, en
- * gros. Chaque réconciliation sort d'elle-même si le format ne la concerne pas.
- * `reconcilePhases` n'y figure pas — le multi-phases est refusé en amont
- * (`lib/shared/tournament-rollback.ts`).
+ * `reconcilePhases` en plus, et c'est le but : le retour en arrière n'est qu'une
+ * correction de plus, en gros. Chaque réconciliation sort d'elle-même si le
+ * format ne la concerne pas.
  */
 async function reconcileAfterRollback(
   connection: PoolConnection,
   tournamentId: number,
 ): Promise<void> {
-  // Les byes de la manche vidée ont perdu leur 1-0 : le moteur les repose.
+  // Les byes du stade vidé ont perdu leur 1-0 : le moteur les repose. En
+  // multi-phases, ceux de la phase courante sont l'affaire de `reconcilePhases`,
+  // qui les résout dans le bon périmètre.
   await tryAutoResolveByes(connection, tournamentId);
 
   const { reconcileSurvival } = await import("./survival");
@@ -331,20 +533,25 @@ async function reconcileAfterRollback(
   await reconcileSwiss(tournamentId, connection);
   const { reconcileEndurance } = await import("./bg-survie");
   await reconcileEndurance(tournamentId, connection);
+  const { reconcilePhases } = await import("./phases");
+  await reconcilePhases(tournamentId, connection);
 }
 
 /**
- * Défait la manche courante du tournoi.
+ * Défait le dernier stade joué du tournoi.
+ *
+ * Le geste est **répétable** : chaque appel recule d'un stade, du dernier joué
+ * jusqu'au premier, et le tournoi finit par se retrouver à l'instant de son coup
+ * d'envoi (`ROLLBACK_NOTHING_TO_UNDO`).
  *
  * @param tournamentId Tournoi concerné.
- * @param options `expectedRound` — la manche que l'appelant croit effacer. Voir
+ * @param options `expectedStage` — le stade que l'appelant croit effacer. Voir
  *   {@link RollbackOptions}.
  * @returns Ce qui a été défait, pour la confirmation et le journal.
  * @throws `TOURNAMENT_NOT_FOUND` — identifiant inconnu.
- * @throws `TOURNAMENT_NOT_RUNNING` — tournoi pas (ou plus) en cours.
- * @throws `ROLLBACK_ROUND_CHANGED` — la manche courante a bougé depuis l'écran.
- * @throws `ROLLBACK_UNSUPPORTED_FORMAT` / `ROLLBACK_NOTHING_TO_UNDO` /
- *   `ROLLBACK_PLAYOFFS_STARTED` — motifs du module pur.
+ * @throws `ROLLBACK_TOURNAMENT_NOT_STARTED` — tournoi pas encore lancé.
+ * @throws `ROLLBACK_ROUND_CHANGED` — le stade courant a bougé depuis l'écran.
+ * @throws `ROLLBACK_NOTHING_TO_UNDO` — plus aucune saisie sur le plateau.
  */
 export async function rollbackCurrentRound(
   tournamentId: number,
@@ -366,29 +573,47 @@ export async function rollbackCurrentRound(
     if (rows.length === 0) throw new Error("TOURNAMENT_NOT_FOUND");
     const tournament = rows[0];
 
-    // L'entretien d'abord : un tournoi dont l'heure de clôture est passée doit
-    // être refusé sur son état réel, pas sur celui que la base traîne.
+    // L'entretien d'abord : un tournoi dont l'heure de coup d'envoi est passée
+    // doit être jugé sur son état réel, pas sur celui que la base traîne.
     const { row: synced } = await syncTournamentState(connection, tournamentId);
     if (!synced) throw new Error("TOURNAMENT_NOT_FOUND");
-    if (synced.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
 
-    const plan = planRoundRollback(
-      await loadRollbackMatches(connection, tournamentId),
-      tournament.format,
-    );
+    // Un tournoi **terminé** se défait : c'est même le cas qui manquait le plus,
+    // l'erreur de finale étant la seule que `match-lock` ne laisse plus corriger.
+    // Un tournoi qui n'a jamais commencé, lui, n'a rien à défaire.
+    const finished = synced.state === "FINISHED";
+    if (synced.state !== "RUNNING" && !finished) {
+      throw new Error("ROLLBACK_TOURNAMENT_NOT_STARTED");
+    }
+
+    const phases: RollbackPhase[] =
+      tournament.format === "MULTI"
+        ? (await loadPhases(connection, tournamentId)).map((phase) => ({
+            id: Number(phase.id),
+            position: Number(phase.position),
+            format: phase.format as PhaseFormat,
+          }))
+        : [];
+
+    const plan = planRoundRollback(await loadRollbackMatches(connection, tournamentId));
     if (typeof plan === "string") throw new Error(plan);
 
-    // La manche courante a-t-elle bougé depuis l'écran qui a demandé le geste ?
-    // Le dialogue **montre** les rencontres qu'il va effacer, et c'est là toute
-    // la sauvegarde que l'arbitre aura : si un second arbitre saisit un score
-    // sur la manche suivante entre l'ouverture et le clic, le plan recalculé ici
-    // viserait des scores que personne n'a vus. On refuse plutôt que d'effacer
-    // à l'aveugle — l'écran se rafraîchit par le flux, et le geste se redemande.
-    if (options?.expectedRound !== undefined && options.expectedRound !== plan.roundNumber) {
+    // Le stade courant a-t-il bougé depuis l'écran qui a demandé le geste ? Le
+    // dialogue **montre** les rencontres qu'il va effacer, et c'est là toute la
+    // sauvegarde que l'arbitre aura : si un second arbitre saisit un score sur la
+    // manche suivante entre l'ouverture et le clic, le plan recalculé ici viserait
+    // des scores que personne n'a vus. On refuse plutôt que d'effacer à l'aveugle
+    // — l'écran se rafraîchit par le flux, et le geste se redemande.
+    if (options?.expectedStage !== undefined && options.expectedStage !== plan.stageKey) {
       throw new Error("ROLLBACK_ROUND_CHANGED");
     }
 
-    await applyRollback(connection, tournamentId, tournament.format, plan);
+    // Rouvrir **avant** d'écrire : la réconciliation qui suit lit l'état du
+    // tournoi pour décider ce qu'elle a le droit de reposer, et un tournoi resté
+    // « terminé » se contenterait d'y réécrire un palmarès.
+    if (finished) await reopenTournament(connection, tournamentId);
+
+    await applyRollback(connection, tournamentId, tournament.format, plan, phases);
     await reconcileAfterRollback(connection, tournamentId);
 
     await connection.commit();
@@ -399,8 +624,8 @@ export async function rollbackCurrentRound(
     flushBotLogs(connection);
 
     // Le plateau vient de changer pour tout le monde. Un seul appel : c'est lui
-    // qui vide l'instantané, l'aperçu, les listes, les agrégats de l'accueil et
-    // le classement du site, puis réveille la salle du flux. Rejouter une
+    // qui vide l'instantané, l'aperçu, les listes, les agrégats de l'accueil et le
+    // classement du site, puis réveille la salle du flux. Rejouter une
     // invalidation ici donnerait à croire que ce module a une règle de cache à
     // lui, et une règle ajoutée dans `./notifications` serait contredite en
     // silence.
@@ -409,8 +634,12 @@ export async function rollbackCurrentRound(
     return {
       tournamentId: Number(tournament.id),
       tournamentName: tournament.name,
+      stageKey: plan.stageKey,
       roundNumber: plan.roundNumber,
+      phaseRank: plan.stage.phaseRank,
+      label: rollbackStageLabelWithArticle(plan),
       clearedMatches: plan.clearedMatchIds.length,
+      reopenedTournament: finished,
     };
   } catch (error) {
     await connection.rollback();

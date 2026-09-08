@@ -22,7 +22,7 @@ import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { fromBracketMatch } from "@/lib/shared/match-lock";
 import {
   planRoundRollback,
-  rollbackRoundLabelWithArticle,
+  rollbackStageLabelWithArticle,
 } from "@/lib/shared/tournament-rollback";
 import { canForfeitTeam } from "./_lib/forfeit";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
@@ -243,21 +243,26 @@ export default function TournamentDetailPage() {
   const frozen = fatal !== null;
 
   /**
-   * Retour en arrière : la manche que le geste effacerait, ou le motif du refus.
+   * Retour en arrière : le stade que le geste effacerait, ou le motif du refus.
    *
    * Décidé côté client par le module que le serveur applique lui-même
    * (`lib/shared/tournament-rollback.ts`) : le bouton ne s'arme donc jamais sur
-   * une manche que la route refuserait, et le motif affiché est exactement celui
+   * un stade que la route refuserait, et le motif affiché est exactement celui
    * qu'elle rendrait. Deux lectures de la même règle, une seule implémentation.
+   *
+   * Un tournoi **terminé** y a droit comme un tournoi en cours : c'est même le
+   * cas qui manquait le plus, l'erreur de finale étant la seule que `match-lock`
+   * ne laisse plus corriger. Le geste le rouvrira, et le dialogue le dit.
    */
+  const rollbackTargetState =
+    detail.card.state === "RUNNING" || detail.card.state === "FINISHED";
   const rollbackPlan =
-    detail.isAdmin && !frozen && detail.card.state === "RUNNING"
+    detail.isAdmin && !frozen && rollbackTargetState
       ? planRoundRollback(
           detail.matches.map((match) => ({
             ...fromBracketMatch(match),
             bracket: match.bracket,
           })),
-          detail.card.format,
         )
       : null;
   const rollbackRefusal = typeof rollbackPlan === "string" ? rollbackPlan : null;
@@ -802,7 +807,7 @@ export default function TournamentDetailPage() {
                   style={{ margin: 0, fontSize: 13, color: "var(--text-2, #9aa4b2)", maxWidth: 560, lineHeight: 1.55 }}
                 >
                   {rollbackReady
-                    ? `Effacer ${rollbackRoundLabelWithArticle(rollbackReady.roundNumber)} ramène le tournoi juste avant son coup d'envoi, et rouvre la manche précédente à la correction. Pense à noter les scores avant : rien n'est archivé.`
+                    ? `Effacer ${rollbackStageLabelWithArticle(rollbackReady)} rouvre la manche précédente à la correction. Le geste se répète : de manche en manche, on remonte jusqu'au début du tournoi.${detail.card.state === "FINISHED" ? " Le tournoi étant terminé, il sera rouvert et son classement final effacé." : ""} Pense à noter les scores avant : rien n'est archivé.`
                     : mapError(rollbackRefusal ?? "")}
                 </p>
                 <CyberButton
@@ -915,13 +920,14 @@ export default function TournamentDetailPage() {
       {rollbackDialogOpen && rollbackReady !== null && (
         <RollbackRoundDialog
           tournamentId={tournamentId}
-          roundLabel={rollbackRoundLabelWithArticle(rollbackReady.roundNumber)}
-          roundNumber={rollbackReady.roundNumber}
+          stageLabel={rollbackStageLabelWithArticle(rollbackReady)}
+          stageKey={rollbackReady.stageKey}
           matches={rollbackMatches}
+          tournamentFinished={detail.card.state === "FINISHED"}
           onClose={() => setRollbackDialogOpen(false)}
-          onRolledBack={(round) => {
+          onRolledBack={(label) => {
             setRollbackDialogOpen(false);
-            showSuccess(`Résultats effacés : ${rollbackRoundLabelWithArticle(round)}.`);
+            showSuccess(`Résultats effacés : ${label}.`);
             // Le flux pousse déjà la nouvelle version ; on relit tout de même,
             // pour que celui qui vient d'agir voie le plateau à la seconde
             // plutôt qu'à la fenêtre de son palier de fraîcheur.

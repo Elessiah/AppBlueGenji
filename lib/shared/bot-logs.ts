@@ -278,10 +278,19 @@ export function formatRoundRolledBackLog(context: {
   tournament: BotLogTournament;
   roundLabel: string;
   clearedMatches: number;
+  /**
+   * Le tournoi était **terminé** et vient d'être rouvert.
+   *
+   * Le fait mérite d'être dit, et pas seulement pour la forme : un palmarès
+   * annoncé sur ce même canal quelques lignes plus haut ne vaut plus, et la
+   * clôture qui suivra en annoncera un autre.
+   */
+  reopenedTournament?: boolean;
   actorPseudo: string;
   actorId: number;
 }): string {
   const plural = context.clearedMatches > 1 ? "s" : "";
   const matches = `${context.clearedMatches} rencontre${plural} effacée${plural}`;
-  return `${lead("⏪", "Retour en arrière", context.tournament)} : ${context.roundLabel} — ${matches}, par ${context.actorPseudo} (#${context.actorId}).`;
+  const reopened = context.reopenedTournament ? ", tournoi rouvert" : "";
+  return `${lead("⏪", "Retour en arrière", context.tournament)} : ${context.roundLabel} — ${matches}${reopened}, par ${context.actorPseudo} (#${context.actorId}).`;
 }

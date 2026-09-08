@@ -4,10 +4,15 @@ import { fail, ok } from "@/lib/server/http";
 import { rollbackCurrentRound } from "@/lib/server/tournaments/rollback";
 import { formatRoundRolledBackLog } from "@/lib/shared/bot-logs";
 import { can } from "@/lib/shared/permissions";
-import { rollbackRoundLabelWithArticle } from "@/lib/shared/tournament-rollback";
 
 /**
- * Efface la manche courante du tournoi et le ramène à l'instant qui la précède.
+ * Efface le dernier stade joué du tournoi et le ramène à l'instant qui le
+ * précède.
+ *
+ * Le geste est **répétable** : chaque appel recule d'un stade, du dernier joué
+ * jusqu'au premier. C'est ce qui en fait un outil de rattrapage plutôt qu'un
+ * bouton de dernier recours — une erreur se répare d'un cran ou deux, on ne
+ * recommence pas un tournoi.
  *
  * Réservé au staff `tournaments` (administrateur ou arbitre), comme l'arbitrage
  * des scores dont ce geste n'est que la version en gros : c'est l'arbitre qui
@@ -15,11 +20,11 @@ import { rollbackRoundLabelWithArticle } from "@/lib/shared/tournament-rollback"
  * saisie sur de mauvais appariements. La suppression définitive reste le seul
  * geste du domaine à exiger `isAdmin`, parce qu'elle, rien ne la rejoue.
  *
- * La manche défaite n'est pas **choisie**, elle est *déduite* du plateau
- * (`lib/shared/tournament-rollback.ts`) : laisser le client la désigner ouvrirait
+ * Le stade défait n'est pas **choisi**, il est *déduit* du plateau
+ * (`lib/shared/tournament-rollback.ts`) : laisser le client le désigner ouvrirait
  * la porte à défaire une manche du milieu du tournoi, que rien ne rejouerait
- * ensuite. Le corps ne porte donc qu'un `expectedRound` facultatif — la manche
- * que l'écran a **montrée**, à confronter à celle que le verrou trouve. C'est un
+ * ensuite. Le corps ne porte donc qu'un `expectedStage` facultatif — le stade
+ * que l'écran a **montré**, à confronter à celui que le verrou trouve. C'est un
  * garde-fou de concurrence, pas un choix : il ne peut que faire refuser le
  * geste, jamais le déplacer.
  */
@@ -35,19 +40,20 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
 
   // Corps facultatif : un client qui n'en envoie pas (ou en envoie un illisible)
-  // s'en remet à la manche que la base désignera.
-  const expectedRound = await readExpectedRound(request);
+  // s'en remet au stade que la base désignera.
+  const expectedStage = await readExpectedStage(request);
 
   try {
-    const rolledBack = await rollbackCurrentRound(tournamentId, { expectedRound });
+    const rolledBack = await rollbackCurrentRound(tournamentId, { expectedStage });
 
-    // Après le commit, et au meilleur effort : le bot est optionnel, la manche
-    // est déjà effacée, il n'y a rien à annuler si le message ne part pas.
+    // Après le commit, et au meilleur effort : le bot est optionnel, le stade
+    // est déjà effacé, il n'y a rien à annuler si le message ne part pas.
     void sendBotLog(
       formatRoundRolledBackLog({
         tournament: { id: rolledBack.tournamentId, name: rolledBack.tournamentName },
-        roundLabel: rollbackRoundLabelWithArticle(rolledBack.roundNumber),
+        roundLabel: rolledBack.label,
         clearedMatches: rolledBack.clearedMatches,
+        reopenedTournament: rolledBack.reopenedTournament,
         actorPseudo: user.pseudo,
         actorId: user.id,
       }),
@@ -59,14 +65,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
     if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);
 
-    // 409 : la demande est bien formée, c'est l'état du tournoi (ou son format)
-    // qui la contredit.
+    // 409 : la demande est bien formée, c'est l'état du tournoi qui la contredit.
     if (
-      message === "TOURNAMENT_NOT_RUNNING" ||
+      message === "ROLLBACK_TOURNAMENT_NOT_STARTED" ||
       message === "ROLLBACK_ROUND_CHANGED" ||
-      message === "ROLLBACK_UNSUPPORTED_FORMAT" ||
-      message === "ROLLBACK_NOTHING_TO_UNDO" ||
-      message === "ROLLBACK_PLAYOFFS_STARTED"
+      message === "ROLLBACK_NOTHING_TO_UNDO"
     ) {
       return fail(message, 409);
     }
@@ -80,17 +83,28 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 }
 
 /**
- * Manche annoncée par le client, ou `undefined`.
+ * Longueur maximale d'une clé de stade.
  *
- * Tolérant par construction : ni corps, ni JSON valide, ni entier positif ne
+ * Une clé s'écrit `"<rang de phase>:<index>"` — huit caractères en pratique. La
+ * borne n'est pas une validation de forme (le serveur se contente de comparer
+ * deux chaînes) mais une limite de ce qu'on accepte de lire d'un corps de
+ * requête ; une clé plus longue ne peut de toute façon correspondre à rien.
+ */
+const MAX_STAGE_KEY_LENGTH = 32;
+
+/**
+ * Stade annoncé par le client, ou `undefined`.
+ *
+ * Tolérant par construction : ni corps, ni JSON valide, ni chaîne plausible ne
  * sont des erreurs — le geste retombe alors sur ce que la base désigne, ce qui
  * est exactement le comportement d'avant le garde-fou.
  */
-async function readExpectedRound(request: Request): Promise<number | undefined> {
+async function readExpectedStage(request: Request): Promise<string | undefined> {
   try {
-    const body = (await request.json()) as { expectedRound?: unknown };
-    const round = Number(body?.expectedRound);
-    return Number.isInteger(round) && round > 0 ? round : undefined;
+    const body = (await request.json()) as { expectedStage?: unknown };
+    const stage = body?.expectedStage;
+    if (typeof stage !== "string") return undefined;
+    return stage.length > 0 && stage.length <= MAX_STAGE_KEY_LENGTH ? stage : undefined;
   } catch {
     return undefined;
   }
