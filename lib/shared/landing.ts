@@ -1,6 +1,6 @@
 import type { MatchLiveState } from "@/lib/shared/live-streams";
 import type { MatchFormat } from "@/lib/shared/match-format";
-import type { TournamentCard } from "@/lib/shared/types";
+import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 
 export type LandingStats = {
   players: number;
@@ -106,6 +106,44 @@ export type LandingCalendarEvent = {
 export type LandingTickerPayload = {
   items: string[];
 };
+
+/*
+ * Ce que l'accueil a le droit de présenter sous « Tournois en cours et à venir ».
+ *
+ * La section concaténait les **quatre** paniers, panier `finished` compris, si
+ * bien qu'un tournoi terminé figurait dans la grille — et, la carte mise en
+ * avant tombant sur le même repli, pouvait devenir le « PROCHAIN TOURNOI » du
+ * compte à rebours du hero, dont la cible est alors une date passée. Un
+ * tournoi clos n'est ni en cours ni à venir : il n'appartient à aucune des
+ * deux vues, et son écran est le palmarès.
+ *
+ * La règle est écrite ici, une fois, plutôt qu'à chacun des deux endroits qui
+ * lisent les paniers : une exclusion recopiée est une exclusion qu'on oublie
+ * au troisième appelant. `getLandingCalendar` suit déjà la même règle.
+ */
+
+/**
+ * Tournois affichables par la grille de l'accueil, dans l'ordre où elle les
+ * range : en cours d'abord (ce qui se joue maintenant), puis à venir, puis
+ * ouverts aux inscriptions. Jamais un tournoi terminé.
+ */
+export function activeTournamentCards(buckets: TournamentBuckets): TournamentCard[] {
+  return [...buckets.running, ...buckets.upcoming, ...buckets.registration];
+}
+
+/**
+ * Tournoi mis en avant sur l'accueil : la grande carte de la section, et la
+ * cible du compte à rebours « PROCHAIN TOURNOI » du hero.
+ *
+ * L'ordre de préférence n'est pas celui de la grille : le hero décompte
+ * jusqu'à `startAt`, donc un tournoi **à venir** passe avant un tournoi déjà
+ * lancé, dont le coup d'envoi est derrière nous. `null` quand rien n'est
+ * visible — la carte affiche alors son état vide, plutôt que de repêcher une
+ * archive.
+ */
+export function chooseFeaturedTournament(buckets: TournamentBuckets): TournamentCard | null {
+  return buckets.upcoming[0] ?? buckets.registration[0] ?? buckets.running[0] ?? null;
+}
 
 export function inferGameLabel(value: string | null | undefined): "Overwatch" | "Marvel Rivals" {
   const text = (value ?? "").toLowerCase();

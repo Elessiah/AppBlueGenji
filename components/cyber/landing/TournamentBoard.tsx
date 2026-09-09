@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CyberButton, CyberCard, MiniBracket, Pill } from "@/components/cyber";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
-import { inferGameCode, inferGameLabel, inferGameShortLabel } from "@/lib/shared/landing";
+import { activeTournamentCards, inferGameCode, inferGameLabel, inferGameShortLabel } from "@/lib/shared/landing";
 import styles from "./TournamentBoard.module.css";
 
 type TournamentBoardProps = {
@@ -16,7 +16,7 @@ function makeTitle(tournament: TournamentCard | null): string {
 }
 
 export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBoardProps) {
-  const upcomingCards = [...buckets.running, ...buckets.upcoming, ...buckets.registration, ...buckets.finished]
+  const upcomingCards = activeTournamentCards(buckets)
     .filter((card) => !featured || card.id !== featured.id)
     .slice(0, 3);
 
