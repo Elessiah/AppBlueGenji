@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   acceptedLogoContentType,
+  logoVersion,
   isPrivateLogoHostname,
   isStoredSponsorLogo,
   parseRemoteLogoUrl,
@@ -29,13 +30,25 @@ describe("sponsorLogoSrc", () => {
 
   it("routes a pasted remote url through the proxy, never to the third party", () => {
     const src = sponsorLogoSrc({ id: 42, logoUrl: "https://cdn.example.com/logo.png" });
-    expect(src).toBe("/api/landing/sponsors/42/logo");
+    expect(src).toMatch(/^\/api\/landing\/sponsors\/42\/logo\?v=[0-9a-z]+$/);
     expect(src).not.toContain("example.com");
   });
 
   it("trims the stored value before deciding", () => {
     expect(sponsorLogoSrc({ id: 42, logoUrl: "  https://cdn.example.com/logo.png  " })).toBe(
-      "/api/landing/sponsors/42/logo",
+      sponsorLogoSrc({ id: 42, logoUrl: "https://cdn.example.com/logo.png" }),
+    );
+  });
+
+  it("changes the src when the pasted url changes — sinon le logo édité reste périmé 24 h", () => {
+    const before = sponsorLogoSrc({ id: 42, logoUrl: "https://cdn.example.com/old.png" });
+    const after = sponsorLogoSrc({ id: 42, logoUrl: "https://cdn.example.com/new.png" });
+    expect(after).not.toBe(before);
+  });
+
+  it("keeps the src stable while the url does not move", () => {
+    expect(sponsorLogoSrc({ id: 42, logoUrl: "https://cdn.example.com/logo.png" })).toBe(
+      sponsorLogoSrc({ id: 42, logoUrl: "https://cdn.example.com/logo.png" }),
     );
   });
 
@@ -47,8 +60,10 @@ describe("sponsorLogoSrc", () => {
     );
   });
 
-  it("builds the proxy path from the sponsor id", () => {
-    expect(sponsorLogoProxyPath(12)).toBe("/api/landing/sponsors/12/logo");
+  it("builds the proxy path from the sponsor id and a version of its url", () => {
+    expect(sponsorLogoProxyPath(12, "https://cdn.example.com/logo.png")).toBe(
+      `/api/landing/sponsors/12/logo?v=${logoVersion("https://cdn.example.com/logo.png")}`,
+    );
   });
 });
 
@@ -126,7 +141,16 @@ describe("isPrivateLogoHostname", () => {
   });
 
   it("rejects IPv6 loopback, link-local and unique-local addresses", () => {
-    for (const host of ["::1", "[::1]", "fe80::1", "fd00::1", "fc00::1", "::ffff:127.0.0.1"]) {
+    for (const host of [
+      "::1",
+      "[::1]",
+      "0:0:0:0:0:0:0:1",
+      "0:0:0:0:0:0:0:0",
+      "fe80::1",
+      "fd00::1",
+      "fc00::1",
+      "::ffff:127.0.0.1",
+    ]) {
       expect(isPrivateLogoHostname(host)).toBe(true);
     }
   });
@@ -156,5 +180,28 @@ describe("acceptedLogoContentType", () => {
     expect(acceptedLogoContentType("application/octet-stream")).toBeNull();
     expect(acceptedLogoContentType(null)).toBeNull();
     expect(acceptedLogoContentType("")).toBeNull();
+  });
+});
+
+describe("logoVersion", () => {
+  it("is stable for a given url", () => {
+    expect(logoVersion("https://cdn.example.com/logo.png")).toBe(
+      logoVersion("https://cdn.example.com/logo.png"),
+    );
+  });
+
+  it("differs for urls that differ, down to a single character", () => {
+    expect(logoVersion("https://cdn.example.com/a.png")).not.toBe(
+      logoVersion("https://cdn.example.com/b.png"),
+    );
+  });
+
+  it("stays short and url-safe", () => {
+    const long = `https://cdn.example.com/${"x".repeat(2000)}.png`;
+    expect(logoVersion(long)).toMatch(/^[0-9a-z]{1,7}$/);
+  });
+
+  it("handles the empty string without throwing", () => {
+    expect(typeof logoVersion("")).toBe("string");
   });
 });

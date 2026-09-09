@@ -28,9 +28,36 @@ import { toServedUploadUrl } from "./uploads";
 const UPLOAD_DISK_PREFIX = "/uploads/";
 const UPLOAD_SERVED_PREFIX = "/api/uploads/";
 
-/** Chemin du relais pour le logo distant d'un partenaire. */
-export function sponsorLogoProxyPath(sponsorId: number): string {
-  return `/api/landing/sponsors/${sponsorId}/logo`;
+/**
+ * Chemin du relais pour le logo distant d'un partenaire.
+ *
+ * Le `?v=` n'est pas décoratif et la route l'ignore : c'est l'**optimiseur
+ * d'images et le navigateur** qui le lisent, tous deux mettant en cache par
+ * URL. Sans lui, le chemin ne dépendrait que de l'identifiant, qui ne change
+ * pas quand le staff change l'URL du logo — la page continuerait d'afficher
+ * l'ancienne image pendant les vingt-quatre heures annoncées par le relais,
+ * alors même que la liste, elle, est rafraîchie sur-le-champ
+ * (`invalidateShowcase`). Le rendu direct d'avant n'avait pas ce défaut :
+ * l'adresse *était* le logo.
+ */
+export function sponsorLogoProxyPath(sponsorId: number, logoUrl: string): string {
+  return `/api/landing/sponsors/${sponsorId}/logo?v=${logoVersion(logoUrl)}`;
+}
+
+/**
+ * Empreinte courte et stable d'une URL de logo — FNV-1a 32 bits en base 36.
+ *
+ * Aucune propriété cryptographique n'est demandée : deux URL différentes
+ * doivent seulement donner deux adresses différentes. Une collision se paierait
+ * d'un logo périmé pendant une journée, jamais d'une fuite.
+ */
+export function logoVersion(logoUrl: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < logoUrl.length; i += 1) {
+    hash ^= logoUrl.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
 }
 
 /** Vrai si l'URL désigne un fichier que nous avons nous-mêmes stocké. */
@@ -52,7 +79,7 @@ export function sponsorLogoSrc(sponsor: { id: number; logoUrl: string | null }):
   if (!logoUrl) return null;
   if (isStoredSponsorLogo(logoUrl)) return toServedUploadUrl(logoUrl);
   if (!Number.isInteger(sponsor.id) || sponsor.id <= 0) return logoUrl;
-  return sponsorLogoProxyPath(sponsor.id);
+  return sponsorLogoProxyPath(sponsor.id, logoUrl);
 }
 
 /**
@@ -72,6 +99,9 @@ export function isPrivateLogoHostname(hostname: string): boolean {
 
   // IPv6 : bouclage, lien-local (fe80::/10) et adresses uniques locales (fc00::/7).
   if (host === "::1" || host === "::") return true;
+  // Formes développées : `0:0:0:0:0:0:0:1` (bouclage) et `0:0:0:0:0:0:0:0`
+  // (adresse indéterminée) ne correspondent à aucune abréviation ci-dessus.
+  if (/^(0+:){7}0*1?$/.test(host)) return true;
   if (/^fe[89ab][0-9a-f]:/.test(host)) return true;
   if (/^f[cd][0-9a-f]{2}:/.test(host)) return true;
   // IPv4 encapsulée en IPv6 (`::ffff:127.0.0.1`).

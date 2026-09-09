@@ -34,7 +34,8 @@ durée de cache, ni ce que son serveur dépose dans le navigateur du visiteur.
 `sponsorLogoSrc` (`lib/shared/sponsor-logo.ts`, pur) est la porte unique :
 
 - logo **importé** → le chemin d'upload (`/api/uploads/...`) ;
-- logo **collé** → le chemin du relais (`/api/landing/sponsors/<id>/logo`).
+- logo **collé** → le chemin du relais
+  (`/api/landing/sponsors/<id>/logo?v=<empreinte de l'URL>`).
 
 Dans les deux cas l'image devient une image du site, donc une image que
 `next/image` sait redimensionner (`srcset` complet), convertir en WebP et mettre
@@ -64,7 +65,9 @@ le même fait — il n'y a pas d'image à cette adresse) :
 - **hôte refusé** s'il désigne la machine ou son réseau (`localhost`, `.local`,
   `.internal`, `.home.arpa`, IPv4 privées et lien-local — dont `169.254.169.254`,
   l'adresse des services de métadonnées cloud —, CGNAT, multicast, bouclage et
-  adresses uniques locales IPv6). La requête part **depuis le serveur**, là où le
+  adresses uniques locales IPv6, **formes développées comprises** :
+  `0:0:0:0:0:0:0:1` ne s'écrit pas `::1` et passerait sinon).
+  La requête part **depuis le serveur**, là où le
   navigateur la faisait depuis le poste du visiteur : une adresse interne devient
   joignable, ce qu'elle n'était pas. L'URL vient du staff, mais la confiance qu'on
   lui accorde porte sur la vitrine, pas sur le réseau de la machine ;
@@ -87,14 +90,26 @@ tiers, le navigateur ne doit ni deviner un type plus permissif que celui qu'on
 annonce, ni accorder le moindre droit à la ressource si elle était ouverte
 directement.
 
-### La durée de cache n'est pas décorative
+### La durée de cache n'est pas décorative — le `?v=` non plus
 
 Le relais annonce `public, max-age=86400`. L'optimiseur d'images de Next la
 respecte : **un logo distant n'est rechargé qu'une fois par jour et par
 variante**, et non à chaque visite — sans quoi le relais aurait remplacé quatre
-requêtes du navigateur par quatre requêtes du serveur, à chaque page vue. Elle
-n'est pas `immutable` : le staff peut changer l'URL d'une ligne sans que son
-identifiant, lui, ne change.
+requêtes du navigateur par quatre requêtes du serveur, à chaque page vue.
+
+Mais une durée de cache posée sur une adresse qui ne bouge pas retarde aussi les
+**éditions** : un chemin bâti sur le seul identifiant reste le même quand le
+staff change l'URL du logo, et la page montrerait l'ancienne image pendant une
+journée — alors que la liste, elle, est rafraîchie sur-le-champ
+(`invalidateShowcase`). Le rendu direct d'avant n'avait pas ce défaut :
+l'adresse *était* le logo.
+
+D'où le `?v=`, une empreinte FNV-1a 32 bits de l'URL stockée (`logoVersion`,
+courte et en base 36). Aucune propriété cryptographique n'est demandée : deux URL
+différentes doivent seulement donner deux adresses différentes, et une collision
+se paierait d'un logo périmé pendant une journée, jamais d'une fuite. **La route
+ignore ce paramètre** — ce sont l'optimiseur et le navigateur qui le lisent, tous
+deux mettant en cache par URL.
 
 ## Partenaires de secours
 

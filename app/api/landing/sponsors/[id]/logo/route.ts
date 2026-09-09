@@ -39,8 +39,13 @@ const MAX_REDIRECTS = 3;
 /**
  * Durée de cache annoncée à l'optimiseur d'images, qui la respecte : un logo
  * distant n'est donc rechargé qu'une fois par jour et par variante, et non à
- * chaque visite. Elle n'est pas `immutable` — le staff peut changer l'URL d'une
- * ligne sans que son identifiant, lui, ne change.
+ * chaque visite — sans quoi le relais aurait remplacé quatre requêtes du
+ * navigateur par quatre requêtes du serveur, à chaque page vue.
+ *
+ * Ce qu'elle ne retarde **pas**, c'est l'édition : le `?v=` posé par
+ * `sponsorLogoProxyPath` change avec l'URL du logo, donc un logo remplacé
+ * s'affiche aussitôt sous une autre adresse. La route, elle, ignore ce
+ * paramètre — c'est l'optimiseur et le navigateur qui le lisent.
  */
 const CACHE_SECONDS = 86_400;
 

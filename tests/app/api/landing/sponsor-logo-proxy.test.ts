@@ -194,6 +194,17 @@ describe("GET /api/landing/sponsors/[id]/logo", () => {
     expect((await call()).status).toBe(404);
   });
 
+  it("ignores the `v` cache-busting parameter — it is read by the optimiser, not by us", async () => {
+    (getSponsorLogoUrl as jest.Mock).mockResolvedValue("https://cdn.example.com/logo.png" as never);
+    mockFetch(upstream(PNG, { headers: { "content-type": "image/png" } }));
+
+    const res = await GET(
+      new Request("http://localhost/api/landing/sponsors/7/logo?v=zzz"),
+      { params: Promise.resolve({ id: "7" }) },
+    );
+    expect(res.status).toBe(200);
+  });
+
   it("returns the rate limiter's answer before touching the database", async () => {
     const tooMany = new Response(null, { status: 429 });
     (enforceRateLimit as jest.Mock).mockReturnValue(tooMany as never);
