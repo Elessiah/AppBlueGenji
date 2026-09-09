@@ -140,6 +140,13 @@ export function activeTournamentCards(buckets: TournamentBuckets): TournamentCar
  * lancé, dont le coup d'envoi est derrière nous. `null` quand rien n'est
  * visible — la carte affiche alors son état vide, plutôt que de repêcher une
  * archive.
+ *
+ * Attention : à l'intérieur d'un panier, c'est le **premier** élément qui est
+ * pris, et `listTournamentBuckets` trie `start_at` **décroissant** — donc le
+ * tournoi retenu est le plus lointain, pas le plus proche. Défaut préexistant,
+ * consigné dans `ERREUR.txt` : le corriger revient à trier ici par `startAt`
+ * croissant (l'`ORDER BY` est partagé avec la liste des tournois terminés de
+ * `/tournois`, qui le veut décroissant).
  */
 export function chooseFeaturedTournament(buckets: TournamentBuckets): TournamentCard | null {
   return buckets.upcoming[0] ?? buckets.registration[0] ?? buckets.running[0] ?? null;
