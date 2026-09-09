@@ -92,7 +92,7 @@ export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy
             </div>
             <span className={styles.sep} />
             <div className={styles.stat}>
-              <div className="num" style={{ fontSize: 28, color: "var(--blue-500)" }}>{11 + stats.tournaments}</div>
+              <div className="num" style={{ fontSize: 28, color: "var(--blue-500)" }}>{19 + stats.tournaments}</div>
               <div className="mono">Tournois organisés</div>
             </div>
           </div>
