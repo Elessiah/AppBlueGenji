@@ -5,3 +5,5 @@
 #
 # Ajouter à la fin. Vérifier l'absence de doublon avant d'ajouter.
 # Retirer l'entrée dans le commit qui règle l'erreur.
+
+- [2026-09-09] lib/shared/landing.ts:chooseFeaturedTournament + composants de l'accueil — le hero annonce « PROCHAIN TOURNOI · <nom> » et décompte jusqu'au tournoi à venir le plus LOINTAIN, pas le plus proche ; la grille de la section montre de même les trois tournois qui démarrent le plus tard — `listTournamentBuckets` trie `ORDER BY t.start_at DESC` (correct pour la liste des terminés de /tournois), et l'accueil lit `buckets.upcoming[0]` puis `.slice(0, 3)` sans retrier ; piste : trier par `startAt` croissant dans le module pur `lib/shared/landing.ts` (ne pas toucher à l'ORDER BY, partagé avec /tournois) — (rencontré sur : feature/finished-tournament-active-list-4f09e8 / PR #112)
