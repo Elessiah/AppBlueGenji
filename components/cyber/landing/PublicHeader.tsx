@@ -29,9 +29,18 @@ export async function PublicHeader() {
       <div className={styles.inner}>
         <div className={styles.left}>
           <PublicNavMenu />
-          <Link href="/" className={styles.brand} aria-label="BlueGenji Esport">
+          {/*
+            Aucun `aria-label` ici, et l'emblème est décoratif : le nom
+            accessible du lien doit **descendre de son contenu visible**. Un
+            libellé posé à la main (« BlueGenji Esport ») ne recouvrait pas le
+            texte affiché — « BlueGenji » et « ESPORT » sont deux éléments, donc
+            deux mots collés à la lecture —, et un lien dont le nom accessible ne
+            contient pas ce qu'on lit dessus est inutilisable à la commande
+            vocale : on prononce ce qui est écrit, rien ne répond (WCAG 2.5.3).
+          */}
+          <Link href="/" className={styles.brand}>
             <span className={styles.logo}>
-              <Image src="/logo_bg.webp" alt="BlueGenji" width={28} height={28} />
+              <Image src="/logo_bg.webp" alt="" width={28} height={28} />
             </span>
             <span className={styles.brandText}>
               <span className="logotype">BlueGenji</span>

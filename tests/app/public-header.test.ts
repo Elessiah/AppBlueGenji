@@ -36,3 +36,24 @@ describe("PublicHeader — bouton « partie compétitive »", () => {
     expect(source).toContain("user.pseudo");
   });
 });
+
+// Le nom accessible d'un lien doit **contenir** son texte visible (WCAG 2.5.3) :
+// un `aria-label` posé à la main le remplace, et la commande vocale ne répond
+// alors plus à ce qu'on lit sur le lien. Ces deux liens l'avaient perdu, chacun
+// à sa façon — audit Lighthouse `label-content-name-mismatch`.
+describe("nom accessible des liens de la vitrine", () => {
+  it("laisse le lien de marque tirer son nom de son contenu visible", () => {
+    const brand = source.slice(source.indexOf("className={styles.brand}"));
+    const link = brand.slice(0, brand.indexOf("</Link>"));
+    expect(link).not.toContain("aria-label");
+    // L'emblème est décoratif : à côté du mot-symbole, son `alt` ferait lire
+    // « BlueGenji BlueGenji ESPORT ».
+    expect(link).toContain('alt=""');
+  });
+
+  it("fait commencer le libellé du bouton de direct par son texte affiché", () => {
+    const hero = readFileSync(join(ROOT, "components/cyber/landing/Hero.tsx"), "utf8");
+    expect(hero).toContain("Regarder le live");
+    expect(hero).toMatch(/aria-label=\{`Regarder le live/);
+  });
+});

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import { CyberButton } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import {
@@ -11,6 +12,7 @@ import {
   SPONSOR_TIERS,
   SPONSOR_TIER_LABELS,
 } from "@/lib/shared/sponsors";
+import { sponsorLogoSrc } from "@/lib/shared/sponsor-logo";
 import { toServedUploadUrl } from "@/lib/shared/uploads";
 import styles from "./SponsorsGrid.module.css";
 
@@ -263,77 +265,88 @@ export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
       </div>
 
       <div className={styles.grid}>
-        {displaySponsors.map((sponsor, index) => (
-          <div key={sponsor.id} className={styles.slotWrap}>
-            <a
-              href={sponsor.websiteUrl ?? "#"}
-              target="_blank"
-              rel="noreferrer"
-              className={styles.slot}
-            >
-              {sponsor.logoUrl ? (
-                // Logos externes fournis par les admins : <img> simple (pas
-                // d'allowlist de domaines requise par next/image).
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={toServedUploadUrl(sponsor.logoUrl)} alt={sponsor.name} className={styles.logo} />
-              ) : (
-                <>
-                  <svg className={styles.pattern} viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">
-                    <defs>
-                      <pattern id={`hatch-${sponsor.slug}`} width="10" height="10" patternUnits="userSpaceOnUse">
-                        <path d="M-1 1 l2 -2 M0 10 l10 -10 M8 12 l4 -4" stroke="rgba(180,210,230,0.12)" strokeWidth="1" />
-                      </pattern>
-                    </defs>
-                    <rect width="300" height="100" fill={`url(#hatch-${sponsor.slug})`} />
-                  </svg>
-                  <span className="mono">{sponsor.name}</span>
-                </>
+        {displaySponsors.map((sponsor, index) => {
+          // Toujours une adresse du site — chemin d'upload pour un logo importé,
+          // relais pour une URL collée par le staff (voir `sponsor-logo.ts`) —
+          // donc une image que `next/image` sait redimensionner et convertir.
+          const logoSrc = sponsorLogoSrc(sponsor);
+          return (
+            <div key={sponsor.id} className={styles.slotWrap}>
+              <a
+                href={sponsor.websiteUrl ?? "#"}
+                target="_blank"
+                rel="noreferrer"
+                className={styles.slot}
+              >
+                {logoSrc ? (
+                  <Image
+                    src={logoSrc}
+                    alt={sponsor.name}
+                    fill
+                    // Grille à 3 colonnes dans un conteneur de 1240 px au plus,
+                    // 2 colonnes sous 900 px (cf. SponsorsGrid.module.css).
+                    sizes="(max-width: 900px) 50vw, 400px"
+                    className={styles.logo}
+                  />
+                ) : (
+                  <>
+                    <svg className={styles.pattern} viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">
+                      <defs>
+                        <pattern id={`hatch-${sponsor.slug}`} width="10" height="10" patternUnits="userSpaceOnUse">
+                          <path d="M-1 1 l2 -2 M0 10 l10 -10 M8 12 l4 -4" stroke="rgba(180,210,230,0.12)" strokeWidth="1" />
+                        </pattern>
+                      </defs>
+                      <rect width="300" height="100" fill={`url(#hatch-${sponsor.slug})`} />
+                    </svg>
+                    <span className="mono">{sponsor.name}</span>
+                  </>
+                )}
+              </a>
+              {canManage(sponsor) && (
+                <div className={styles.slotActions}>
+                  <button
+                    type="button"
+                    className={`${styles.slotAction} ${styles.moveAction}`}
+                    onClick={() => move(index, -1)}
+                    disabled={busy || !canMoveUp(index)}
+                    aria-label={`Déplacer ${sponsor.name} vers le haut`}
+                    title="Monter"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.slotAction} ${styles.moveAction}`}
+                    onClick={() => move(index, 1)}
+                    disabled={busy || !canMoveDown(index)}
+                    aria-label={`Déplacer ${sponsor.name} vers le bas`}
+                    title="Descendre"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.slotAction}
+                    onClick={() => openEdit(sponsor)}
+                    disabled={busy}
+                    aria-label={`Modifier ${sponsor.name}`}
+                  >
+                    Modifier
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.slotAction} ${styles.slotActionDanger}`}
+                    onClick={() => remove(sponsor)}
+                    disabled={busy}
+                    aria-label={`Supprimer ${sponsor.name}`}
+                  >
+                    Supprimer
+                  </button>
+                </div>
               )}
-            </a>
-            {canManage(sponsor) && (
-              <div className={styles.slotActions}>
-                <button
-                  type="button"
-                  className={`${styles.slotAction} ${styles.moveAction}`}
-                  onClick={() => move(index, -1)}
-                  disabled={busy || !canMoveUp(index)}
-                  aria-label={`Déplacer ${sponsor.name} vers le haut`}
-                  title="Monter"
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.slotAction} ${styles.moveAction}`}
-                  onClick={() => move(index, 1)}
-                  disabled={busy || !canMoveDown(index)}
-                  aria-label={`Déplacer ${sponsor.name} vers le bas`}
-                  title="Descendre"
-                >
-                  ↓
-                </button>
-                <button
-                  type="button"
-                  className={styles.slotAction}
-                  onClick={() => openEdit(sponsor)}
-                  disabled={busy}
-                  aria-label={`Modifier ${sponsor.name}`}
-                >
-                  Modifier
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.slotAction} ${styles.slotActionDanger}`}
-                  onClick={() => remove(sponsor)}
-                  disabled={busy}
-                  aria-label={`Supprimer ${sponsor.name}`}
-                >
-                  Supprimer
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
 
       {open && mounted && createPortal(

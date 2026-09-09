@@ -20,7 +20,9 @@ export async function PublicFooter() {
       <div className={styles.inner}>
         <div className={styles.brand}>
           <div className={styles.brandTop}>
-            <Image src="/logo_bg.webp" alt="BlueGenji" width={24} height={24} />
+            {/* Décoratif : le mot-symbole qui suit dit déjà le nom, un `alt`
+                le ferait lire deux fois. Même règle que dans l'en-tête. */}
+            <Image src="/logo_bg.webp" alt="" width={24} height={24} />
             <span className="logotype">BlueGenji</span>
           </div>
           <p>
