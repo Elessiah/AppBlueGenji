@@ -159,6 +159,15 @@ async function fetchLogo(url: URL): Promise<FetchedLogo | null> {
       return { body, contentType };
     } finally {
       clearTimeout(timer);
+      // Referme le saut, quoi qu'il advienne. Sur les chemins de refus (statut
+      // non 2xx, type non image, taille annoncée excessive, redirection sans
+      // destination) la réponse est abandonnée sans que son corps ait été lu :
+      // la connexion resterait occupée jusqu'au ramasse-miettes, et c'est le
+      // chemin le plus chaud — un logo distant qui répond 404 y passe à chaque
+      // page vue, l'optimiseur ne mettant pas les erreurs amont en cache. Sur
+      // le chemin nominal, le corps est déjà entièrement matérialisé : abandonner
+      // le flux après coup ne coûte rien.
+      controller.abort();
     }
   }
 
