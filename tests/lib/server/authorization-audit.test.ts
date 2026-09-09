@@ -124,6 +124,16 @@ describe("§4.3 — un engagé ne peut pas écraser un résultat déjà validé"
     expect(writes).toHaveLength(0);
   });
 
+  it("laisse passer le second report d'une rencontre en attente de confirmation", async () => {
+    // Le garde-fou porte sur `COMPLETED`, et sur lui seul : une rencontre dont
+    // une équipe a déjà saisi son score est `AWAITING_CONFIRMATION`, et c'est
+    // exactement le report qu'il faut laisser passer — c'est lui qui la clôt.
+    const { conn, writes } = fakeConnection({ status: "AWAITING_CONFIRMATION" });
+
+    await expect(reportMatchScore(conn, 1, 10, 42, 2, 2)).resolves.toBeUndefined();
+    expect(writes.some((q) => q.includes("team1_report_score"))).toBe(true);
+  });
+
   it("laisse passer le report d'une rencontre encore ouverte", async () => {
     // Le garde-fou ne doit pas se refermer sur le cas nominal.
     const { conn, writes } = fakeConnection();
