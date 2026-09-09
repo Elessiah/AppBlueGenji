@@ -168,8 +168,8 @@ export function TeamCard({ team }: { team: TeamListItem }) {
       {team.games.length > 0 && (
         <div className={s.games}>
           {team.games.map((g) => (
-            <span key={g} className={`${s.gamePill} ${g === "OW2" ? s.ow : s.mr}`}>
-              {g === "OW2" ? "Overwatch" : "Marvel Rivals"}
+            <span key={g} className={`${s.gamePill} ${g === "OW" ? s.ow : s.mr}`}>
+              {g === "OW" ? "Overwatch" : "Marvel Rivals"}
             </span>
           ))}
         </div>

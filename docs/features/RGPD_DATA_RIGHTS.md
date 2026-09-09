@@ -64,4 +64,4 @@ affichées dans le tableau « Données collectées ») :
 | `app/connexion/page.tsx` | Montage du consentement avant login |
 | `app/api/profile/export/route.ts` | Endpoint d'export RGPD |
 | `lib/server/users-service.ts` | `exportOwnData()` / `anonymizeOwnAccount()` |
-| `app/(secured)/profil/page.tsx` | Bouton d'export + mentions OW2/Marvel |
+| `app/(secured)/profil/page.tsx` | Bouton d'export + mentions OW/Marvel |

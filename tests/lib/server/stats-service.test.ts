@@ -18,7 +18,7 @@ function matchRow(overrides: Record<string, unknown> = {}) {
     id: 1,
     tournament_id: 10,
     tournament_name: "Test - Coupe",
-    game: "OW2",
+    game: "OW",
     format: "SINGLE",
     bracket: "UPPER",
     played_at: new Date("2026-06-01T18:00:00Z"),
@@ -46,7 +46,7 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
     tournament_id: 10,
     tournament_name: "Test - Coupe",
     state: "FINISHED",
-    game: "OW2",
+    game: "OW",
     format: "SINGLE",
     final_rank: 2,
     played_at: new Date("2026-06-02T18:00:00Z"),
@@ -233,7 +233,7 @@ describe("getTeamStats", () => {
 
     const stats = await getTeamStats(5);
 
-    expect(stats.byGame[0].key).toBe("OW2");
+    expect(stats.byGame[0].key).toBe("OW");
     expect(stats.byFormat[0].key).toBe("SINGLE");
   });
 

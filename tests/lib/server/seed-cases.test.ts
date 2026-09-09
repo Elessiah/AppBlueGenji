@@ -34,7 +34,7 @@ describe("seed — couverture de la matrice", () => {
   });
 
   it("couvre les deux jeux", () => {
-    expect(TOURNAMENTS.some((t) => t.game === "OW2")).toBe(true);
+    expect(TOURNAMENTS.some((t) => t.game === "OW")).toBe(true);
     expect(TOURNAMENTS.some((t) => t.game === "MR")).toBe(true);
   });
 

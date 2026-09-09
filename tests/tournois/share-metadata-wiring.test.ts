@@ -44,7 +44,7 @@ function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
     name: "OW Open Cup",
     description: null,
     format: "SINGLE",
-    game: "OW2",
+    game: "OW",
     participantType: "TEAM",
     maxTeams: 16,
     registeredTeams: 5,
@@ -122,8 +122,8 @@ describe("generateMetadata de la fiche", () => {
 
     const meta = await generateMetadata(params("42") as never);
 
-    expect(meta.title).toEqual({ absolute: "OW Open Cup · Overwatch 2" });
-    expect(meta.openGraph?.title).toBe("OW Open Cup · Overwatch 2");
+    expect(meta.title).toEqual({ absolute: "OW Open Cup · Overwatch" });
+    expect(meta.openGraph?.title).toBe("OW Open Cup · Overwatch");
     expect(meta.openGraph?.url).toBe("/tournois/42");
     expect(meta.twitter?.card).toBe("summary_large_image");
     expect(String(meta.description)).toContain("Inscriptions ouvertes");

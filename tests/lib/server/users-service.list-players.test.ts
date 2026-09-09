@@ -122,6 +122,6 @@ describe("listPlayers visibility", () => {
     // La chaîne exacte du tag est privée…
     expect(players[0].overwatchBattletag).toBeNull();
     // …mais le fait de jouer au jeu reste public (badges dérivés des tags bruts).
-    expect(players[0].games).toEqual(["OW2", "MR"]);
+    expect(players[0].games).toEqual(["OW", "MR"]);
   });
 });

@@ -63,7 +63,7 @@ function listRow(overrides: Record<string, unknown> = {}) {
     name: "Tournoi",
     description: null,
     format: "SINGLE",
-    game: "OW2",
+    game: "OW",
     max_teams: 8,
     state: "RUNNING",
     start_visibility_at: past,

@@ -18,8 +18,8 @@ function jsonReq(body: unknown) {
 }
 
 const base = {
-  name: "Survie OW2",
-  game: "OW2",
+  name: "Survie OW",
+  game: "OW",
   maxTeams: 16,
   startVisibilityAt: new Date().toISOString(),
   registrationOpenAt: new Date().toISOString(),

@@ -10,7 +10,7 @@ const cardRow = (overrides: Partial<TournamentListRow> = {}): TournamentListRow 
     name: "Cup",
     description: null,
     format: "SINGLE",
-    game: "OW2",
+    game: "OW",
     max_teams: 8,
     registered_teams: 4,
     state: "RUNNING",

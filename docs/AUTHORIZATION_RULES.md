@@ -124,7 +124,7 @@ seulement caché à l'affichage.
 
 Deux points volontaires, à ne pas prendre pour des fuites :
 
-- Les **badges de jeu** (OW2 / MR) restent affichés même quand le tag exact est
+- Les **badges de jeu** (OW / MR) restent affichés même quand le tag exact est
   masqué. « Joue à Overwatch » est une information d'appariement ; le battletag
   exact, qui permet de contacter le joueur hors du site, est une donnée de
   contact. Le réglage protège le second, pas le premier.

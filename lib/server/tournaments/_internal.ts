@@ -10,7 +10,7 @@ export type TournamentRow = RowDataPacket & {
   name: string;
   description: string | null;
   format: "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL" | "MULTI" | "BG_SURVIE";
-  game: "OW2" | "MR";
+  game: "OW" | "MR";
   max_teams: number;
   state: "UPCOMING" | "REGISTRATION" | "RUNNING" | "FINISHED";
   start_visibility_at: Date;

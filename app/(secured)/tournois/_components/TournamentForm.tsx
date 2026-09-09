@@ -217,7 +217,7 @@ export function TournamentForm({
                 onChange={(e) => set("game", e.target.value as TournamentGame)}
                 {...lockedAttr("game")}
               >
-                <option value="OW2">Overwatch</option>
+                <option value="OW">Overwatch</option>
                 <option value="MR">Marvel Rivals</option>
               </select>
             </div>

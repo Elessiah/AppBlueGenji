@@ -27,7 +27,7 @@ function tournament(matchFormat: MatchFormat | null): TournamentCard {
     name: "Coupe Genji",
     description: null,
     format: "SINGLE",
-    game: "OW2",
+    game: "OW",
     participantType: "TEAM",
     maxTeams: 8,
     registeredTeams: 8,

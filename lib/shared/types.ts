@@ -203,7 +203,7 @@ export type SwissMeta = {
 
 export type TournamentState = "UPCOMING" | "REGISTRATION" | "RUNNING" | "FINISHED";
 
-export type TournamentGame = "OW2" | "MR";
+export type TournamentGame = "OW" | "MR";
 
 export type BracketType = "UPPER" | "LOWER" | "GRAND" | "THIRD_PLACE";
 
@@ -258,7 +258,7 @@ export type PublicUserProfile = {
     colorIndex: number;
   } | null;
   roles?: PlayerRole[];
-  games?: ("OW2" | "MR")[];
+  games?: ("OW" | "MR")[];
   tournamentsCount?: number;
   wins?: number;
   losses?: number;
@@ -281,7 +281,7 @@ export type TeamListItem = {
   wins: number;
   losses: number;
   form: ("w" | "l" | "d")[];
-  games: ("OW2" | "MR")[];
+  games: ("OW" | "MR")[];
   rosterPreview: { userId: number; pseudo: string; avatarUrl: string | null }[];
   region: string | null;
   /** Équipe fantôme : créée par le staff, sans joueur rattaché. */

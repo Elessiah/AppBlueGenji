@@ -154,13 +154,13 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
   );
   const userIds = baseUsers.map((u) => u.id);
 
-  // Les badges de jeu se dérivent des tags bruts : jouer à OW2/MR n'est pas
+  // Les badges de jeu se dérivent des tags bruts : jouer à OW/MR n'est pas
   // une donnée privée (seule la chaîne exacte du battletag l'est), donc ils
   // restent affichés même si `visible_overwatch`/`visible_marvel` masque le tag.
-  const gamesByUserId = new Map<number, ("OW2" | "MR")[]>(
+  const gamesByUserId = new Map<number, ("OW" | "MR")[]>(
     rows.map((row) => {
-      const games: ("OW2" | "MR")[] = [];
-      if (row.overwatch_battletag) games.push("OW2");
+      const games: ("OW" | "MR")[] = [];
+      if (row.overwatch_battletag) games.push("OW");
       if (row.marvel_rivals_tag) games.push("MR");
       return [Number(row.id), games];
     }),

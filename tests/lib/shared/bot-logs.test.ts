@@ -24,7 +24,7 @@ const ALL_LINES = () => [
   formatTournamentCreatedLog({
     tournament: TOURNAMENT,
     format: "SWISS",
-    game: "OW2",
+    game: "OW",
     maxTeams: 16,
     participantType: "TEAM",
     organizerPseudo: "Kiro",
@@ -107,14 +107,14 @@ describe("formatTournamentCreatedLog", () => {
     const line = formatTournamentCreatedLog({
       tournament: TOURNAMENT,
       format: "SWISS",
-      game: "OW2",
+      game: "OW",
       maxTeams: 16,
       participantType: "TEAM",
       organizerPseudo: "Kiro",
       startAt: "2026-03-14T18:00:00.000Z",
     });
 
-    expect(line).toContain("Ronde suisse · Overwatch 2");
+    expect(line).toContain("Ronde suisse · Overwatch");
     expect(line).toContain("16 équipes max");
     expect(line).toContain("créé par Kiro");
     expect(line).toContain("début le");
@@ -154,7 +154,7 @@ describe("formatTournamentCreatedLog", () => {
     const line = formatTournamentCreatedLog({
       tournament: TOURNAMENT,
       format: "LEGACY_MODE",
-      game: "OW2",
+      game: "OW",
       maxTeams: 8,
       participantType: "TEAM",
       organizerPseudo: "Kiro",

@@ -56,7 +56,7 @@ nombre, aucune divergence possible avec le rang affiché juste à côté. Voir
 tête**.
 
 ### Répartitions
-`byGame` et `byFormat` : un `StatsSplit` par jeu (OW2 / Marvel Rivals) et par
+`byGame` et `byFormat` : un `StatsSplit` par jeu (OW / Marvel Rivals) et par
 format de tournoi rencontré, trié par volume décroissant, avec ratio de
 victoires. Seules les clés effectivement jouées apparaissent.
 

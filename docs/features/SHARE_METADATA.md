@@ -76,7 +76,7 @@ serveur.
 
 | Fonction | Rend |
 | --- | --- |
-| `tournamentShareTitle` | « Nom du tournoi · Overwatch 2 » |
+| `tournamentShareTitle` | « Nom du tournoi · Overwatch » |
 | `tournamentShareDescription` | Le texte de l'organisateur (borné), puis les faits |
 | `tournamentShareCard` | Surtitre / titre / sous-titre / faits, pour l'image |
 | `tournamentShareState` | « Inscriptions ouvertes », « Tournoi en cours »… |

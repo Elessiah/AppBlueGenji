@@ -14,7 +14,7 @@ jamais le site en retour.
 
 | Évènement | Ligne | Déclencheur |
 | --- | --- | --- |
-| Création d'un tournoi | `📅 Nouveau tournoi — « … » (#12) : Ronde suisse · Overwatch 2, 16 équipes max, créé par …, début le …` | `createTournament` |
+| Création d'un tournoi | `📅 Nouveau tournoi — « … » (#12) : Ronde suisse · Overwatch, 16 équipes max, créé par …, début le …` | `createTournament` |
 | Inscription | `✅ Inscription — « … » (#12) : Alpha. 3/16 équipes.` | `registerTeam` (joueur ou staff) |
 | Abandon | `🚪 Abandon — « … » (#12) : Alpha quitte la compétition.` | `forfeitTournamentTeamPublic` |
 | Coup d'envoi | `🚀 Coup d'envoi — « … » (#12) : 8 équipes, Survie.` | bascule vers `RUNNING` |

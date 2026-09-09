@@ -33,8 +33,8 @@ describe("inferGameLabel", () => {
 describe("inferGameCode", () => {
   it("maps to the filter keys used by the landing endpoints", () => {
     expect(inferGameCode("Marvel Rivals Cup S1")).toBe("mr");
-    expect(inferGameCode("OW Champions League")).toBe("ow2");
-    expect(inferGameCode(null)).toBe("ow2");
+    expect(inferGameCode("OW Champions League")).toBe("ow");
+    expect(inferGameCode(null)).toBe("ow");
   });
 });
 

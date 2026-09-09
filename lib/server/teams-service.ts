@@ -215,7 +215,7 @@ export async function listTeams(): Promise<TeamListItem[]> {
   const [gameRows] = await db.execute<
     (RowDataPacket & {
       team_id: number;
-      game: "OW2" | "MR";
+      game: "OW" | "MR";
     })[]
   >(
     `SELECT DISTINCT
@@ -243,7 +243,7 @@ export async function listTeams(): Promise<TeamListItem[]> {
   }
 
   // Organize games by team
-  const gamesByTeam = new Map<number, ("OW2" | "MR")[]>();
+  const gamesByTeam = new Map<number, ("OW" | "MR")[]>();
   for (const row of gameRows) {
     if (!gamesByTeam.has(row.team_id)) {
       gamesByTeam.set(row.team_id, []);

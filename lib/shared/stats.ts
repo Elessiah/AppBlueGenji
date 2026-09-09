@@ -223,7 +223,7 @@ export type DeepStats = {
 };
 
 export const GAME_STAT_LABELS: Record<TournamentGame, string> = {
-  OW2: "Overwatch",
+  OW: "Overwatch",
   MR: "Marvel Rivals",
 };
 

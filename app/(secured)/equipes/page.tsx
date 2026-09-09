@@ -16,7 +16,7 @@ const ACCENT_RGB = "255, 157, 46";
 const ACCENT_300 = "#ffc18a";
 const ACCENT_500 = "#ff9d2e";
 
-type GameFilter = "all" | "ow2" | "mr";
+type GameFilter = "all" | "ow" | "mr";
 type SortKey = "rank" | "name" | "wins" | "members";
 
 const TICKER_ITEMS = [
@@ -66,7 +66,7 @@ export default function TeamsPage() {
       // son nom complet.
       if (q && !`${t.name} ${t.tag || ""} ${t.region || ""}`.toLowerCase().includes(q)) return false;
       if (gameFilter === "all") return true;
-      if (gameFilter === "ow2") return t.games.includes("OW2");
+      if (gameFilter === "ow") return t.games.includes("OW");
       if (gameFilter === "mr") return t.games.includes("MR");
       return true;
     });
@@ -79,7 +79,7 @@ export default function TeamsPage() {
   }, [teams, query, gameFilter, sort]);
 
   const totalMembers = teams.reduce((sum, t) => sum + t.membersCount, 0);
-  const countOw2 = teams.filter((t) => t.games.includes("OW2")).length;
+  const countOw = teams.filter((t) => t.games.includes("OW")).length;
   const countMr = teams.filter((t) => t.games.includes("MR")).length;
 
   const accentStyle = {
@@ -139,7 +139,7 @@ export default function TeamsPage() {
               <div className={s.metricLbl}>Joueurs sous roster</div>
             </div>
             <div className={s.metric}>
-              <div className={s.metricNum}>{countOw2}</div>
+              <div className={s.metricNum}>{countOw}</div>
               <div className={s.metricLbl}>Équipes Overwatch</div>
             </div>
             <div className={s.metric}>
@@ -158,7 +158,7 @@ export default function TeamsPage() {
               {(
                 [
                   ["all", "Toutes", teams.length],
-                  ["ow2", "Overwatch", countOw2],
+                  ["ow", "Overwatch", countOw],
                   ["mr", "Marvel Rivals", countMr],
                 ] as const
               ).map(([k, label, n]) => (

@@ -18,7 +18,7 @@ function match(
     matchId,
     tournamentId: 10,
     tournamentName: "Test - Coupe",
-    game: "OW2",
+    game: "OW",
     format: "BG_SURVIE",
     bracket: "UPPER",
     playedAt: `2026-06-${String(matchId).padStart(2, "0")}T18:00:00Z`,

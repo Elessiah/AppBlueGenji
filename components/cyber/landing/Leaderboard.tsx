@@ -16,7 +16,7 @@ type LeaderboardResponse = {
 };
 
 export function Leaderboard({ initialRows }: LeaderboardProps) {
-  const [game, setGame] = useState<"all" | "ow2" | "mr">("all");
+  const [game, setGame] = useState<"all" | "ow" | "mr">("all");
   const [rows, setRows] = useState(initialRows);
 
   useEffect(() => {
@@ -43,7 +43,7 @@ export function Leaderboard({ initialRows }: LeaderboardProps) {
 
   const chips = [
     { id: "all" as const, label: "Général" },
-    { id: "ow2" as const, label: "Overwatch" },
+    { id: "ow" as const, label: "Overwatch" },
     { id: "mr" as const, label: "Marvel Rivals" },
   ];
 

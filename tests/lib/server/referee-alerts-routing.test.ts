@@ -59,7 +59,7 @@ const TOURNAMENT_ROW = {
   id: 12,
   name: "Coupe BlueGenji",
   format: "SWISS",
-  game: "OW2",
+  game: "OW",
   max_teams: 16,
   participant_type: "TEAM",
   start_at: new Date("2026-03-14T18:00:00.000Z"),
