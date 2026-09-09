@@ -35,6 +35,17 @@ l'`APP_URL` de la machine qui compile — `http://localhost:3000` si elle n'en a
 pas — et publieraient un sitemap entier que le moteur rejetterait en bloc, sans
 que rien sur le site ne le laisse voir. Les deux réponses sont minuscules.
 
+À l'inverse, les pages **prérendues** (`/regles/[slug]`) capturent bien la racine
+du site à la compilation, pour leur fil d'Ariane comme pour l'URL canonique que
+Next y écrit déjà : `APP_URL` doit être réglée au moment du `build`, pas
+seulement au démarrage. La différence de traitement est assumée — sur un fichier
+entier, une racine fausse ne dégrade pas le résultat, elle l'invalide.
+
+`robots.txt` ne porte que les deux directives que les moteurs lisent vraiment.
+Pas de `Host:` en particulier : extension Yandex abandonnée depuis 2018, dont la
+forme attendue est un nom d'hôte — l'émettre avec un schéma ajouterait une ligne
+qu'un outil d'audit signale sans qu'elle serve à personne.
+
 Le registre de ce qui entre au sitemap est **pur** (`lib/shared/sitemap.ts`), pour
 que la liste se relise et se teste sans monter un serveur. Trois exclusions,
 chacune pour sa raison :

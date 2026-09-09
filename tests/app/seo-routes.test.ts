@@ -42,6 +42,13 @@ describe("robots.txt", () => {
     expect(robots().sitemap).toBe("https://bluegenji-esport.fr/sitemap.xml");
   });
 
+  it("n'écrit pas de directive `Host`, dépréciée et jamais lue", () => {
+    // Extension Yandex abandonnée depuis 2018, dont la forme attendue est un
+    // nom d'hôte : l'émettre avec un schéma ajoutait une ligne qu'un outil
+    // d'audit signale sans qu'elle serve à personne.
+    expect(robots().host).toBeUndefined();
+  });
+
   it("reste servable sans `APP_URL`, plutôt que de faire échouer la route", () => {
     delete process.env.APP_URL;
     expect(robots().sitemap).toMatch(/^https?:\/\/[^/]+\/sitemap\.xml$/);

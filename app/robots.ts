@@ -10,20 +10,22 @@ import { SITEMAP_DISALLOWED_PATHS } from "@/lib/shared/sitemap";
  * pages autrement qu'en suivant des liens. Ce qui doit rester hors de l'index
  * l'annonce lui-même par un `noindex` — voir la note de
  * `lib/shared/sitemap.ts` sur la raison de ne *pas* les interdire ici.
- */
-/**
- * Rendu à la demande, pour la même raison que le sitemap : préremplie à la
- * compilation, l'adresse du site y serait figée, et un `robots.txt` qui désigne
- * un sitemap sur `localhost` ne désigne rien.
+ *
+ * **Rendu à la demande, et pas à la compilation** (`dynamic`, ci-dessous), pour
+ * la même raison que le sitemap : préremplie, l'adresse du site y serait figée,
+ * et un `robots.txt` qui désigne un sitemap sur `localhost` ne désigne rien.
+ *
+ * Le fichier ne porte que les deux directives que les moteurs lisent
+ * réellement. Pas de `Host:` en particulier : c'est une extension Yandex
+ * abandonnée depuis 2018, qu'aucun moteur majeur ne lit et dont la forme
+ * attendue est un nom d'hôte — l'écrire avec un schéma ajouterait une ligne
+ * qu'un outil d'audit signalerait sans qu'elle serve à personne.
  */
 export const dynamic = "force-dynamic";
 
 export default function robots(): MetadataRoute.Robots {
-  const base = siteCanonicalBase();
-
   return {
     rules: [{ userAgent: "*", allow: "/", disallow: [...SITEMAP_DISALLOWED_PATHS] }],
-    sitemap: `${base}/sitemap.xml`,
-    host: base,
+    sitemap: `${siteCanonicalBase()}/sitemap.xml`,
   };
 }

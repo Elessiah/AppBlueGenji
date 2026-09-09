@@ -76,6 +76,11 @@ export default async function RuleModePage({ params }: PageProps) {
         l'adresse brute par « bluegenji-esport.fr › Règles › Ronde suisse ».
         Une page de règles arrive rarement par l'accueil : elle doit dire seule
         d'où elle vient.
+
+        La page étant prérendue, la racine du site est lue **à la compilation** —
+        comme l'est déjà l'URL canonique que Next écrit ici : `APP_URL` doit donc
+        être réglée au moment du `build`, pas seulement au démarrage. Voir
+        `siteCanonicalBase()`.
       */}
       <JsonLd
         data={breadcrumbJsonLd(siteCanonicalBase(), [
