@@ -16,7 +16,7 @@ const card = (overrides: Partial<TournamentCard> = {}): TournamentCard =>
     name: "Tournoi",
     description: null,
     format: "SINGLE",
-    game: "OW2",
+    game: "OW",
     participantType: "TEAM",
     maxTeams: 8,
     registeredTeams: 0,

@@ -21,7 +21,7 @@ export const FORMAT_LABELS: Record<TournamentFormat, string> = {
 };
 
 export const GAME_LABELS: Record<TournamentGame, string> = {
-  OW2: "Overwatch",
+  OW: "Overwatch",
   MR: "Marvel Rivals",
 };
 

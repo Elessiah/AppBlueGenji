@@ -59,7 +59,7 @@ export default function PlayersPage() {
   }, [players, query, roleFilter, statusFilter, sort]);
 
   const freeAgents = players.filter((p) => !p.team && p.openToRecruitment !== false).length;
-  const ow2Count = players.filter((p) => (p.games || []).includes("OW2")).length;
+  const owCount = players.filter((p) => (p.games || []).includes("OW")).length;
   const mrCount = players.filter((p) => (p.games || []).includes("MR")).length;
 
   const accentStyle = {
@@ -108,7 +108,7 @@ export default function PlayersPage() {
               <div className={s.metricLbl}>Free agents · sans roster</div>
             </div>
             <div className={s.metric}>
-              <div className={s.metricNum}>{ow2Count}</div>
+              <div className={s.metricNum}>{owCount}</div>
               <div className={s.metricLbl}>Joueurs Overwatch</div>
             </div>
             <div className={s.metric}>

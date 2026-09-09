@@ -103,7 +103,7 @@ export function defaultTournamentFormValues(): TournamentFormValues {
   return {
     name: "",
     description: "",
-    game: "OW2",
+    game: "OW",
     format: "SINGLE",
     // Équipes (défaut) ou joueurs inscrits individuellement. Le format de
     // bracket est indépendant : tous fonctionnent dans les deux cas.

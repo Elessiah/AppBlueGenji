@@ -109,8 +109,8 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
       {(player.games || []).length > 0 && (
         <div className={s.plTags}>
           {(player.games || []).map((g) => (
-            <span key={g} className={`${s.plTag} ${g === "OW2" ? s.ow : s.mr}`}>
-              {g === "OW2" ? "OW" : g}
+            <span key={g} className={`${s.plTag} ${g === "OW" ? s.ow : s.mr}`}>
+              {g}
             </span>
           ))}
         </div>

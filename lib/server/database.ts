@@ -245,7 +245,7 @@ async function runMigrations(db: Pool): Promise<void> {
   try {
     await db.execute(`
       ALTER TABLE bg_tournaments
-      ADD COLUMN game ENUM('OW2', 'MR') NOT NULL DEFAULT 'OW2'
+      ADD COLUMN game ENUM('OW', 'MR') NOT NULL DEFAULT 'OW'
       AFTER description
     `);
   } catch (err: unknown) {
@@ -254,6 +254,32 @@ async function runMigrations(db: Pool): Promise<void> {
     if (!error.message?.includes("Duplicate column name")) {
       throw err;
     }
+  }
+
+  // Migration: le jeu s'appelle « OW » et non plus « OW2 ». Un ENUM ne se
+  // réécrit pas d'un coup : retirer une valeur encore portée par des lignes les
+  // vide (ou fait échouer l'ALTER en mode strict). On élargit donc à trois
+  // valeurs, on convertit les lignes, puis on reverrouille sur deux.
+  // La condition n'est pas une optimisation : sans elle, la première étape
+  // **réintroduirait** `OW2` à chaque démarrage sur une base déjà migrée.
+  const [gameColumnRows] = await db.execute(
+    `SELECT COLUMN_TYPE AS columnType
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'bg_tournaments'
+       AND COLUMN_NAME = 'game'`
+  );
+  const gameColumnType = (gameColumnRows as { columnType?: string }[])[0]?.columnType ?? "";
+  if (gameColumnType.includes("'OW2'")) {
+    await db.execute(`
+      ALTER TABLE bg_tournaments
+      MODIFY COLUMN game ENUM('OW2', 'MR', 'OW') NOT NULL DEFAULT 'OW2'
+    `);
+    await db.execute(`UPDATE bg_tournaments SET game = 'OW' WHERE game = 'OW2'`);
+    await db.execute(`
+      ALTER TABLE bg_tournaments
+      MODIFY COLUMN game ENUM('OW', 'MR') NOT NULL DEFAULT 'OW'
+    `);
   }
 
   await db.execute(`
@@ -920,7 +946,7 @@ async function runMigrations(db: Pool): Promise<void> {
   `);
 
   // Migration: réorientation « staff associatif » — l'ancienne colonne `game`
-  // (jeu : OW2/MR/ANY) devient `domain` (pôle de bénévolat). On élargit d'abord
+  // (jeu : OW/MR/ANY) devient `domain` (pôle de bénévolat). On élargit d'abord
   // en VARCHAR pour renommer sans erreur de conversion d'ENUM, on neutralise les
   // anciennes valeurs, puis on reverrouille sur le nouvel ENUM. Chaque étape est
   // tolérante : sur une base récente `domain` existe déjà et les ALTER échouent

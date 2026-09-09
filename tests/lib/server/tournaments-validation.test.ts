@@ -7,7 +7,7 @@ import {
 
 const base = {
   name: "Coupe test",
-  game: "OW2" as const,
+  game: "OW" as const,
   format: "SINGLE" as const,
   maxTeams: 16,
 };
@@ -22,7 +22,7 @@ describe("validateTournamentInput", () => {
   it("normalise les défauts d'un tournoi minimal", () => {
     const v = value(base);
     expect(v.name).toBe("Coupe test");
-    expect(v.game).toBe("OW2");
+    expect(v.game).toBe("OW");
     expect(v.participantType).toBe("TEAM");
     expect(v.description).toBeNull();
     expect(v.matchFormat).toBeNull();
@@ -41,6 +41,19 @@ describe("validateTournamentInput", () => {
     expect(validateTournamentInput({ ...base, format: "TRIPLE" as never })).toEqual({
       error: "INVALID_FORMAT",
     });
+  });
+
+  it("refuse un jeu inconnu, l'ancien code « OW2 » compris", () => {
+    // Le code du jeu est une valeur d'ENUM (`bg_tournaments.game`), désormais
+    // `OW`. Un client resté sur l'ancien onglet posterait « OW2 » : la
+    // validation doit le refuser plutôt que laisser MySQL trancher.
+    expect(validateTournamentInput({ ...base, game: "OW2" as never })).toEqual({
+      error: "INVALID_GAME",
+    });
+    expect(validateTournamentInput({ ...base, game: "LOL" as never })).toEqual({
+      error: "INVALID_GAME",
+    });
+    expect(value({ ...base, game: "MR" }).game).toBe("MR");
   });
 
   it("refuse un effectif hors bornes", () => {

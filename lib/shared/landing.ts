@@ -160,8 +160,8 @@ export function inferGameLabel(value: string | null | undefined): "Overwatch" | 
   return "Overwatch";
 }
 
-export function inferGameCode(value: string | null | undefined): "ow2" | "mr" {
-  return inferGameLabel(value) === "Marvel Rivals" ? "mr" : "ow2";
+export function inferGameCode(value: string | null | undefined): "ow" | "mr" {
+  return inferGameLabel(value) === "Marvel Rivals" ? "mr" : "ow";
 }
 
 /** Abréviation du jeu, pour les pastilles trop étroites pour le libellé complet. */

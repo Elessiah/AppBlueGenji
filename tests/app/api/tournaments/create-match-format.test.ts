@@ -19,7 +19,7 @@ function jsonReq(body: unknown) {
 
 const base = {
   name: "Coupe BO5",
-  game: "OW2",
+  game: "OW",
   format: "SINGLE",
   maxTeams: 16,
   startVisibilityAt: new Date().toISOString(),

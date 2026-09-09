@@ -18,7 +18,7 @@ function hiddenRow(over: Record<string, unknown> = {}) {
     name: "Coupe test",
     description: null,
     format: "SINGLE",
-    game: "OW2",
+    game: "OW",
     participant_type: "TEAM",
     max_teams: 16,
     state: "UPCOMING",

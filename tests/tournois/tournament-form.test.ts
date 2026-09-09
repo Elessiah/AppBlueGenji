@@ -16,7 +16,7 @@ describe("defaultTournamentFormValues", () => {
     const v = defaultTournamentFormValues();
     expect(v.format).toBe("SINGLE");
     expect(v.participantType).toBe("TEAM");
-    expect(v.game).toBe("OW2");
+    expect(v.game).toBe("OW");
     expect(v.maxTeams).toBe(16);
   });
 
@@ -270,7 +270,7 @@ describe("toApiPayload — réglages du match nul", () => {
       ...toFormValues({
         name: "Coupe",
         description: null,
-        game: "OW2",
+        game: "OW",
         format: "BG_SURVIE",
         participantType: "TEAM",
         maxTeams: 16,

@@ -26,7 +26,7 @@ function match(overrides: Partial<StatsMatch> & { won?: boolean } = {}): StatsMa
     matchId: 1,
     tournamentId: 10,
     tournamentName: "Test - Coupe",
-    game: "OW2",
+    game: "OW",
     format: "SINGLE",
     bracket: "UPPER",
     playedAt: "2026-06-01T18:00:00Z",
@@ -46,7 +46,7 @@ function tournament(overrides: Partial<StatsTournament> = {}): StatsTournament {
     tournamentName: "Test - Coupe",
     state: "FINISHED",
     format: "SINGLE",
-    game: "OW2",
+    game: "OW",
     finalRank: 4,
     playedAt: "2026-06-02T18:00:00Z",
     ...overrides,
@@ -197,15 +197,15 @@ describe("computeDeepStats", () => {
       const stats = computeDeepStats(
         [
           match({ matchId: 1, game: "MR", won: true }),
-          match({ matchId: 2, game: "OW2", won: true }),
-          match({ matchId: 3, game: "OW2", won: false }),
-          match({ matchId: 4, game: "OW2", won: true }),
+          match({ matchId: 2, game: "OW", won: true }),
+          match({ matchId: 3, game: "OW", won: false }),
+          match({ matchId: 4, game: "OW", won: true }),
         ],
         [],
         NOW,
       );
 
-      expect(stats.byGame.map((split) => split.key)).toEqual(["OW2", "MR"]);
+      expect(stats.byGame.map((split) => split.key)).toEqual(["OW", "MR"]);
       expect(stats.byGame[0]).toMatchObject({ played: 3, won: 2, lost: 1 });
       expect(stats.byGame[0].label).toBe("Overwatch");
       expect(stats.byGame[1].winRate).toBe(1);

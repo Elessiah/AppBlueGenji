@@ -7,7 +7,7 @@
 L'en-tête alignait **huit pastilles bleues identiques** sur une seule ligne :
 
 ```
-[À JOUR] [OW2] [TERMINÉ] [DOUBLE ÉLIM.] [BLUEGENJI SURVIE] [FT3] [0/24] [⚙ ADMIN]
+[À JOUR] [OW] [TERMINÉ] [DOUBLE ÉLIM.] [BLUEGENJI SURVIE] [FT3] [0/24] [⚙ ADMIN]
 ```
 
 Trois défauts, qui s'aggravent à chaque fonctionnalité ajoutée :

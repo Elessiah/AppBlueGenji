@@ -37,7 +37,7 @@ function team(overrides: Partial<TeamListItem> = {}): TeamListItem {
     wins: 6,
     losses: 3,
     form: ["w", "l", "w"],
-    games: ["OW2"],
+    games: ["OW"],
     rosterPreview: [{ userId: 1, pseudo: "Kite", avatarUrl: null }],
     region: "FR",
     isGhost: false,

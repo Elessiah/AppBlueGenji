@@ -113,7 +113,7 @@ describe("listTournamentBuckets — portée", () => {
       name: `Tournoi ${id}`,
       description: null,
       format: "SINGLE",
-      game: "OW2",
+      game: "OW",
       max_teams: 8,
       state,
       start_visibility_at: "2030-01-01T00:00:00Z",

@@ -253,7 +253,7 @@ export default function TournamentsPage() {
           <div className={s.filterRow}>
             {[
               ["all", "Tous"],
-              ["ow2", "Overwatch"],
+              ["ow", "Overwatch"],
               ["mr", "Marvel Rivals"],
             ].map(([key, label]) => (
               <button

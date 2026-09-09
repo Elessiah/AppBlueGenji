@@ -49,7 +49,7 @@ export interface SeedPhase {
 
 export interface TournamentDef extends ReportStateCounts {
   name: string;
-  game: "OW2" | "MR";
+  game: "OW" | "MR";
   /** « SOLO » = tournoi individuel : les engagés sont des joueurs (défaut « TEAM »). */
   participantType?: "TEAM" | "SOLO";
   state: "UPCOMING" | "REGISTRATION" | "RUNNING" | "FINISHED";
@@ -118,53 +118,53 @@ export interface SeedMatchSchedule {
 // × situation de match. Les commentaires disent ce que la ligne couvre.
 export const TOURNAMENTS: TournamentDef[] = [
   // ---- UPCOMING : annoncés, inscriptions pas encore ouvertes ---------------
-  { name: "Vitrine Automne (à venir)", game: "OW2", state: "UPCOMING", format: "SINGLE", teamCount: 0, maxTeams: 16, daysOffset: 30 },
+  { name: "Vitrine Automne (à venir)", game: "OW", state: "UPCOMING", format: "SINGLE", teamCount: 0, maxTeams: 16, daysOffset: 30 },
   { name: "Annonce Double (à venir)", game: "MR", state: "UPCOMING", format: "DOUBLE", teamCount: 0, maxTeams: 32, daysOffset: 45, description: null },
-  { name: "Survie Hiver (à venir)", game: "OW2", state: "UPCOMING", format: "SURVIVAL", teamCount: 0, maxTeams: 16, daysOffset: 38, survivalRoundsPerCut: 2 },
+  { name: "Survie Hiver (à venir)", game: "OW", state: "UPCOMING", format: "SURVIVAL", teamCount: 0, maxTeams: 16, daysOffset: 38, survivalRoundsPerCut: 2 },
   { name: "Ronde Suisse (à venir)", game: "MR", state: "UPCOMING", format: "SWISS", teamCount: 0, maxTeams: 16, daysOffset: 52, swissTotalRounds: 5 },
 
   // ---- REGISTRATION : remplissage de 0 à complet --------------------------
-  { name: "Inscriptions Vides", game: "OW2", state: "REGISTRATION", format: "DOUBLE", teamCount: 0, maxTeams: 16, daysOffset: 21 },
+  { name: "Inscriptions Vides", game: "OW", state: "REGISTRATION", format: "DOUBLE", teamCount: 0, maxTeams: 16, daysOffset: 21 },
   { name: "Inscriptions Une Seule", game: "MR", state: "REGISTRATION", format: "SINGLE", teamCount: 1, maxTeams: 8, daysOffset: 12 },
-  { name: "OW Open Cup S1", game: "OW2", state: "REGISTRATION", format: "SINGLE", teamCount: 5, maxTeams: 8, daysOffset: 10, teamOffset: 2 },
+  { name: "OW Open Cup S1", game: "OW", state: "REGISTRATION", format: "SINGLE", teamCount: 5, maxTeams: 8, daysOffset: 10, teamOffset: 2 },
   { name: "Marvel Rivals Cup S1", game: "MR", state: "REGISTRATION", format: "DOUBLE", teamCount: 3, maxTeams: 8, daysOffset: 14, teamOffset: 5 },
-  { name: "Inscriptions Complètes 8/8", game: "OW2", state: "REGISTRATION", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: 9, teamOffset: 3 },
+  { name: "Inscriptions Complètes 8/8", game: "OW", state: "REGISTRATION", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: 9, teamOffset: 3 },
   { name: "Clôture Imminente", game: "MR", state: "REGISTRATION", format: "DOUBLE", teamCount: 7, maxTeams: 8, daysOffset: 2, closesInHours: 3, teamOffset: 7 },
-  { name: "11 Équipes + Petite Finale", game: "OW2", state: "REGISTRATION", format: "SINGLE", hasThirdPlaceMatch: true, teamCount: 11, maxTeams: 16, daysOffset: 18 },
+  { name: "11 Équipes + Petite Finale", game: "OW", state: "REGISTRATION", format: "SINGLE", hasThirdPlaceMatch: true, teamCount: 11, maxTeams: 16, daysOffset: 18 },
   { name: "Survie Inscriptions Impaires", game: "MR", state: "REGISTRATION", format: "SURVIVAL", teamCount: 9, maxTeams: 16, daysOffset: 16, survivalRoundsPerCut: 2 },
-  { name: "Suisse Inscriptions", game: "OW2", state: "REGISTRATION", format: "SWISS", teamCount: 10, maxTeams: 16, daysOffset: 20, swissTotalRounds: 4 },
+  { name: "Suisse Inscriptions", game: "OW", state: "REGISTRATION", format: "SWISS", teamCount: 10, maxTeams: 16, daysOffset: 20, swissTotalRounds: 4 },
   { name: "BG Survie Inscriptions", game: "MR", state: "REGISTRATION", format: "BG_SURVIE", teamCount: 12, maxTeams: 16, daysOffset: 22 },
 
   // ---- RUNNING · élimination simple (couverture des byes) ------------------
-  { name: "Finale Sèche (2 équipes)", game: "OW2", state: "RUNNING", format: "SINGLE", teamCount: 2, maxTeams: 2, daysOffset: -1, playWaves: 0 },
+  { name: "Finale Sèche (2 équipes)", game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 2, maxTeams: 2, daysOffset: -1, playWaves: 0 },
   { name: "3 Équipes (1 bye)", game: "MR", state: "RUNNING", format: "SINGLE", teamCount: 3, maxTeams: 4, daysOffset: -1, playWaves: 1, teamOffset: 4 },
-  { name: "5 Équipes (3 byes)", game: "OW2", state: "RUNNING", format: "SINGLE", teamCount: 5, maxTeams: 8, daysOffset: -2, playWaves: 1, teamOffset: 6 },
+  { name: "5 Équipes (3 byes)", game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 5, maxTeams: 8, daysOffset: -2, playWaves: 1, teamOffset: 6 },
   { name: "8 Équipes + Petite Finale", game: "MR", state: "RUNNING", format: "SINGLE", hasThirdPlaceMatch: true, teamCount: 8, maxTeams: 8, daysOffset: -2, playWaves: 2 },
-  { name: "16 Équipes (conflits de score)", game: "OW2", state: "RUNNING", format: "SINGLE", teamCount: 16, maxTeams: 16, daysOffset: -3, playWaves: 1, conflicts: 2, pendingReports: 2, expiredReports: 1 },
+  { name: "16 Équipes (conflits de score)", game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 16, maxTeams: 16, daysOffset: -3, playWaves: 1, conflicts: 2, pendingReports: 2, expiredReports: 1 },
   { name: "17 Équipes (bracket 32)", game: "MR", state: "RUNNING", format: "SINGLE", teamCount: 17, maxTeams: 32, daysOffset: -2, playWaves: 1, teamOffset: 20 },
 
   // ---- RUNNING · double élimination ---------------------------------------
   { name: "6 Équipes Double", game: "MR", state: "RUNNING", format: "DOUBLE", teamCount: 6, maxTeams: 8, daysOffset: -2, playWaves: 2, teamOffset: 9 },
-  { name: "11 Équipes Double", game: "OW2", state: "RUNNING", format: "DOUBLE", teamCount: 11, maxTeams: 16, daysOffset: -3, playWaves: 3 },
+  { name: "11 Équipes Double", game: "OW", state: "RUNNING", format: "DOUBLE", teamCount: 11, maxTeams: 16, daysOffset: -3, playWaves: 3 },
   { name: "12 Équipes Double (reports)", game: "MR", state: "RUNNING", format: "DOUBLE", teamCount: 12, maxTeams: 16, daysOffset: -4, playWaves: 2, pendingReports: 3, teamOffset: 12 },
-  { name: "OW Champions League", game: "OW2", state: "RUNNING", format: "DOUBLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1 },
+  { name: "OW Champions League", game: "OW", state: "RUNNING", format: "DOUBLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1 },
 
   // ---- RUNNING · diffusion en direct ---------------------------------------
   // Le cas nominal du bouton « Regarder le live » de l'accueil : chaîne
   // officielle + manches castées en automatique, donc réellement à l'antenne.
-  { name: "Live Auto (à l'antenne)", game: "OW2", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 60, live: { url: "https://www.twitch.tv/bluegenji", trigger: "AUTO", matchUrl: "https://www.twitch.tv/bluegenji" } },
+  { name: "Live Auto (à l'antenne)", game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 60, live: { url: "https://www.twitch.tv/bluegenji", trigger: "AUTO", matchUrl: "https://www.twitch.tv/bluegenji" } },
   // Chaîne renseignée mais antenne fermée : les matchs restent « programmés »
   // et ce tournoi ne doit PAS faire apparaître le bouton d'accueil.
   { name: "Live Manuel (hors antenne)", game: "MR", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -2, playWaves: 1, teamOffset: 68, live: { url: "https://www.youtube.com/@bluegenji", trigger: "MANUAL" } },
   // Antenne ouverte à la main, sans lien sur les matchs : badge « en direct »
   // seul, le spectateur passe par la chaîne officielle.
-  { name: "Live Manuel (antenne ouverte)", game: "OW2", state: "RUNNING", format: "DOUBLE", teamCount: 8, maxTeams: 8, daysOffset: -3, playWaves: 1, teamOffset: 76, live: { url: "https://kick.com/bluegenji", trigger: "MANUAL", onAir: true } },
+  { name: "Live Manuel (antenne ouverte)", game: "OW", state: "RUNNING", format: "DOUBLE", teamCount: 8, maxTeams: 8, daysOffset: -3, playWaves: 1, teamOffset: 76, live: { url: "https://kick.com/bluegenji", trigger: "MANUAL", onAir: true } },
   // Antenne pilotée par le calendrier : l'heure de la manche restante est déjà
   // passée, donc le match est à l'antenne sans que personne n'ait cliqué.
   { name: "Live Horaire (heure passée)", game: "MR", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -2, playWaves: 1, teamOffset: 84, matchSchedule: { firstRoundHours: -3, hoursPerRound: 1 }, live: { url: "https://www.twitch.tv/bluegenji", trigger: "START_TIME", matchUrl: "https://www.twitch.tv/bluegenji" } },
   // Même configuration, heure à venir : le match reste « programmé » et
   // basculera tout seul à l'horaire — sans requête, minuteur côté client.
-  { name: "Live Horaire (heure à venir)", game: "OW2", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 92, matchSchedule: { firstRoundHours: 3, hoursPerRound: 1 }, live: { url: "https://www.youtube.com/@bluegenji", trigger: "START_TIME" } },
+  { name: "Live Horaire (heure à venir)", game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 92, matchSchedule: { firstRoundHours: 3, hoursPerRound: 1 }, live: { url: "https://www.youtube.com/@bluegenji", trigger: "START_TIME" } },
   // Calendrier seul, sans diffusion : le cas le plus courant — l'arbitre
   // annonce les horaires d'un plateau étalé sur la journée.
   { name: "Plateau Horaires (sans live)", game: "MR", state: "RUNNING", format: "DOUBLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 100, matchSchedule: { firstRoundHours: -1, hoursPerRound: 2 } },
@@ -172,9 +172,9 @@ export const TOURNAMENTS: TournamentDef[] = [
   // ---- RUNNING · BlueGenji Survie (endurance puis play-offs) ---------------
   // Capital réduit pour que des éliminations tombent vite, et petit plateau de
   // play-offs pour atteindre la phase finale en quelques vagues.
-  { name: "BG Survie 12 Équipes", game: "OW2", state: "RUNNING", format: "BG_SURVIE", teamCount: 12, maxTeams: 16, daysOffset: -3, endurancePoints: 3, endurancePlayoffSize: 8, playWaves: 2, teamOffset: 9 },
+  { name: "BG Survie 12 Équipes", game: "OW", state: "RUNNING", format: "BG_SURVIE", teamCount: 12, maxTeams: 16, daysOffset: -3, endurancePoints: 3, endurancePlayoffSize: 8, playWaves: 2, teamOffset: 9 },
   { name: "BG Survie Play-offs", game: "MR", state: "RUNNING", format: "BG_SURVIE", teamCount: 10, maxTeams: 16, daysOffset: -5, endurancePoints: 2, endurancePlayoffSize: 8, playWaves: 4, teamOffset: 21 },
-  { name: "BG Survie Impaire + Forfait", game: "OW2", state: "RUNNING", format: "BG_SURVIE", teamCount: 11, maxTeams: 16, daysOffset: -4, endurancePoints: 3, endurancePlayoffSize: 8, playWaves: 2, forfeits: 1, teamOffset: 33 },
+  { name: "BG Survie Impaire + Forfait", game: "OW", state: "RUNNING", format: "BG_SURVIE", teamCount: 11, maxTeams: 16, daysOffset: -4, endurancePoints: 3, endurancePlayoffSize: 8, playWaves: 2, forfeits: 1, teamOffset: 33 },
   { name: "BG Survie Terminée", game: "MR", state: "FINISHED", format: "BG_SURVIE", teamCount: 9, maxTeams: 16, daysOffset: -20, endurancePoints: 2, endurancePlayoffSize: 8, teamOffset: 45 },
   // Plafond de manches : gros capital (personne ne tombe à zéro) et format de
   // match connu, les deux conditions pour que la coupe mathématique se
@@ -182,8 +182,8 @@ export const TOURNAMENTS: TournamentDef[] = [
   // indéfiniment sans jamais retomber à huit.
   // Le cas du règlement : BO5 sans tiebreaker en qualification (une map nulle
   // peut arrêter la rencontre sur 2-2), vrai FT3 en play-offs.
-  { name: "BG Survie Égalités", game: "OW2", state: "RUNNING", format: "BG_SURVIE", teamCount: 12, maxTeams: 16, daysOffset: -3, endurancePoints: 9, endurancePlayoffSize: 8, playWaves: 3, matchFormat: { type: "FT", value: 3 }, matchFormatDraws: true, endurancePlayoffFormat: { type: "FT", value: 3 }, teamOffset: 66 },
-  { name: "BG Survie Plafond Manches", game: "OW2", state: "RUNNING", format: "BG_SURVIE", teamCount: 20, maxTeams: 32, daysOffset: -3, endurancePoints: 20, endurancePlayoffSize: 8, enduranceMaxRounds: 4, playWaves: 2, matchFormat: { type: "FT", value: 3 }, teamOffset: 108 },
+  { name: "BG Survie Égalités", game: "OW", state: "RUNNING", format: "BG_SURVIE", teamCount: 12, maxTeams: 16, daysOffset: -3, endurancePoints: 9, endurancePlayoffSize: 8, playWaves: 3, matchFormat: { type: "FT", value: 3 }, matchFormatDraws: true, endurancePlayoffFormat: { type: "FT", value: 3 }, teamOffset: 66 },
+  { name: "BG Survie Plafond Manches", game: "OW", state: "RUNNING", format: "BG_SURVIE", teamCount: 20, maxTeams: 32, daysOffset: -3, endurancePoints: 20, endurancePlayoffSize: 8, enduranceMaxRounds: 4, playWaves: 2, matchFormat: { type: "FT", value: 3 }, teamOffset: 108 },
   { name: "BG Survie Plafond Atteint", game: "MR", state: "FINISHED", format: "BG_SURVIE", teamCount: 16, maxTeams: 32, daysOffset: -18, endurancePoints: 20, endurancePlayoffSize: 8, enduranceMaxRounds: 3, matchFormat: { type: "FT", value: 3 }, teamOffset: 128 },
 
   // ---- RUNNING · coup d'envoi sans adversaires (clôture immédiate) ---------
@@ -191,13 +191,13 @@ export const TOURNAMENTS: TournamentDef[] = [
   // dessous de deux engagées. C'est la première synchronisation qui les clôt et
   // sacre l'unique engagée, quel que soit le format — voir
   // `docs/features/UNDERFILLED_TOURNAMENTS.md`.
-  { name: "Départ Sans Inscrit", game: "OW2", state: "RUNNING", format: "SWISS", teamCount: 0, maxTeams: 8, daysOffset: -1, swissTotalRounds: 3 },
+  { name: "Départ Sans Inscrit", game: "OW", state: "RUNNING", format: "SWISS", teamCount: 0, maxTeams: 8, daysOffset: -1, swissTotalRounds: 3 },
   { name: "Départ à Une Seule Engagée", game: "MR", state: "RUNNING", format: "BG_SURVIE", teamCount: 1, maxTeams: 8, daysOffset: -1, teamOffset: 90 },
 
   // ---- RUNNING · ronde suisse ---------------------------------------------
-  { name: "Suisse 8 Équipes", game: "OW2", state: "RUNNING", format: "SWISS", teamCount: 8, maxTeams: 8, daysOffset: -2, swissTotalRounds: 3, playWaves: 1 },
+  { name: "Suisse 8 Équipes", game: "OW", state: "RUNNING", format: "SWISS", teamCount: 8, maxTeams: 8, daysOffset: -2, swissTotalRounds: 3, playWaves: 1 },
   { name: "Suisse 9 Équipes (bye)", game: "MR", state: "RUNNING", format: "SWISS", teamCount: 9, maxTeams: 16, daysOffset: -3, swissTotalRounds: 4, playWaves: 2, teamOffset: 14 },
-  { name: "Suisse 16 Équipes (reports)", game: "OW2", state: "RUNNING", format: "SWISS", teamCount: 16, maxTeams: 16, daysOffset: -4, swissTotalRounds: 4, playWaves: 1, pendingReports: 2, conflicts: 1 },
+  { name: "Suisse 16 Équipes (reports)", game: "OW", state: "RUNNING", format: "SWISS", teamCount: 16, maxTeams: 16, daysOffset: -4, swissTotalRounds: 4, playWaves: 1, pendingReports: 2, conflicts: 1 },
   // Ronde **entièrement** tranchée par le délai : les deux matchs de la ronde 1
   // portent un report unique dont le délai a expiré, et aucun n'est joué. Rien
   // ne rapportera donc plus de score ici — seul l'entretien passif peut faire
@@ -210,48 +210,48 @@ export const TOURNAMENTS: TournamentDef[] = [
 
   // ---- RUNNING · survie : matrice effectif impair (barrage) × cadence ------
   { name: "Survie 3 Équipes (barrage)", game: "MR", state: "RUNNING", format: "SURVIVAL", teamCount: 3, maxTeams: 4, daysOffset: -1, survivalRoundsPerCut: 1, playWaves: 1 },
-  { name: "Survie 5 Équipes (barrage)", game: "OW2", state: "RUNNING", format: "SURVIVAL", teamCount: 5, maxTeams: 8, daysOffset: -1, survivalRoundsPerCut: 2, playWaves: 2, teamOffset: 3 },
+  { name: "Survie 5 Équipes (barrage)", game: "OW", state: "RUNNING", format: "SURVIVAL", teamCount: 5, maxTeams: 8, daysOffset: -1, survivalRoundsPerCut: 2, playWaves: 2, teamOffset: 3 },
   { name: "Survie 7 Équipes (barrage)", game: "MR", state: "RUNNING", format: "SURVIVAL", teamCount: 7, maxTeams: 8, daysOffset: -2, survivalRoundsPerCut: 1, playWaves: 2 },
-  { name: "Survie 9 Équipes (cadence 3)", game: "OW2", state: "RUNNING", format: "SURVIVAL", teamCount: 9, maxTeams: 16, daysOffset: -2, survivalRoundsPerCut: 3, playWaves: 3, teamOffset: 8 },
+  { name: "Survie 9 Équipes (cadence 3)", game: "OW", state: "RUNNING", format: "SURVIVAL", teamCount: 9, maxTeams: 16, daysOffset: -2, survivalRoundsPerCut: 3, playWaves: 3, teamOffset: 8 },
   { name: "Survie 11 Équipes (barrage)", game: "MR", state: "RUNNING", format: "SURVIVAL", teamCount: 11, maxTeams: 16, daysOffset: -3, survivalRoundsPerCut: 2, playWaves: 3 },
-  { name: "Survie 15 Équipes (barrage)", game: "OW2", state: "RUNNING", format: "SURVIVAL", teamCount: 15, maxTeams: 16, daysOffset: -3, survivalRoundsPerCut: 2, playWaves: 2, teamOffset: 11 },
+  { name: "Survie 15 Équipes (barrage)", game: "OW", state: "RUNNING", format: "SURVIVAL", teamCount: 15, maxTeams: 16, daysOffset: -3, survivalRoundsPerCut: 2, playWaves: 2, teamOffset: 11 },
   { name: "Survie 21 Équipes (barrage)", game: "MR", state: "RUNNING", format: "SURVIVAL", teamCount: 21, maxTeams: 32, daysOffset: -4, survivalRoundsPerCut: 1, playWaves: 2, teamOffset: 25 },
   // Effectifs pairs : aucun barrage, coupe classique par deux
-  { name: "Survie 8 Équipes (pair)", game: "OW2", state: "RUNNING", format: "SURVIVAL", teamCount: 8, maxTeams: 8, daysOffset: -2, survivalRoundsPerCut: 1, playWaves: 2 },
+  { name: "Survie 8 Équipes (pair)", game: "OW", state: "RUNNING", format: "SURVIVAL", teamCount: 8, maxTeams: 8, daysOffset: -2, survivalRoundsPerCut: 1, playWaves: 2 },
   { name: "Survie 10 Équipes (reports)", game: "MR", state: "RUNNING", format: "SURVIVAL", teamCount: 10, maxTeams: 16, daysOffset: -2, survivalRoundsPerCut: 2, playWaves: 2, pendingReports: 2, conflicts: 1, teamOffset: 30 },
   // Cadence en deux temps : première coupe retardée, puis intervalle plus court
-  { name: "Survie 1re Coupe Tardive", game: "OW2", state: "RUNNING", format: "SURVIVAL", teamCount: 12, maxTeams: 16, daysOffset: -3, survivalRoundsBeforeFirstCut: 4, survivalRoundsPerCut: 1, playWaves: 3, teamOffset: 40 },
+  { name: "Survie 1re Coupe Tardive", game: "OW", state: "RUNNING", format: "SURVIVAL", teamCount: 12, maxTeams: 16, daysOffset: -3, survivalRoundsBeforeFirstCut: 4, survivalRoundsPerCut: 1, playWaves: 3, teamOffset: 40 },
   { name: "Survie 1re Coupe Immédiate", game: "MR", state: "RUNNING", format: "SURVIVAL", teamCount: 10, maxTeams: 16, daysOffset: -2, survivalRoundsBeforeFirstCut: 1, survivalRoundsPerCut: 3, playWaves: 2, teamOffset: 52 },
   // Forfaits : rééquilibrage à la coupe suivante
-  { name: "Survie 12 Équipes (1 forfait)", game: "OW2", state: "RUNNING", format: "SURVIVAL", teamCount: 12, maxTeams: 16, daysOffset: -3, survivalRoundsPerCut: 2, playWaves: 2, forfeits: 1 },
+  { name: "Survie 12 Équipes (1 forfait)", game: "OW", state: "RUNNING", format: "SURVIVAL", teamCount: 12, maxTeams: 16, daysOffset: -3, survivalRoundsPerCut: 2, playWaves: 2, forfeits: 1 },
   { name: "Survie 16 Équipes (2 forfaits)", game: "MR", state: "RUNNING", format: "SURVIVAL", teamCount: 16, maxTeams: 16, daysOffset: -4, survivalRoundsPerCut: 2, playWaves: 3, forfeits: 2, teamOffset: 18 },
 
   // ---- RUNNING · gros brackets (perf + scroll) ----------------------------
-  { name: "64 Équipes Simple (en cours)", game: "OW2", state: "RUNNING", format: "SINGLE", teamCount: 64, maxTeams: 64, daysOffset: -2, playWaves: 3 },
+  { name: "64 Équipes Simple (en cours)", game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 64, maxTeams: 64, daysOffset: -2, playWaves: 3 },
   { name: "64 Équipes Double (en cours)", game: "MR", state: "RUNNING", format: "DOUBLE", teamCount: 64, maxTeams: 64, daysOffset: -2, playWaves: 4 },
-  { name: "128 Équipes Simple (en cours)", game: "OW2", state: "RUNNING", format: "SINGLE", teamCount: 128, maxTeams: 128, daysOffset: -3, playWaves: 4 },
+  { name: "128 Équipes Simple (en cours)", game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 128, maxTeams: 128, daysOffset: -3, playWaves: 4 },
   { name: "128 Équipes Double (en cours)", game: "MR", state: "RUNNING", format: "DOUBLE", teamCount: 128, maxTeams: 128, daysOffset: -3, playWaves: 5 },
 
   // ---- FINISHED : palmarès, leaderboard, ticker ---------------------------
-  { name: "OW Spring Clash", game: "OW2", state: "FINISHED", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -30 },
+  { name: "OW Spring Clash", game: "OW", state: "FINISHED", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -30 },
   { name: "Marvel Rivals Open", game: "MR", state: "FINISHED", format: "SINGLE", hasThirdPlaceMatch: true, teamCount: 4, maxTeams: 4, daysOffset: -20, teamOffset: 4 },
-  { name: "OW Winter Cup", game: "OW2", state: "FINISHED", format: "DOUBLE", teamCount: 8, maxTeams: 8, daysOffset: -60, teamOffset: 6 },
+  { name: "OW Winter Cup", game: "OW", state: "FINISHED", format: "DOUBLE", teamCount: 8, maxTeams: 8, daysOffset: -60, teamOffset: 6 },
   { name: "Marvel Rivals Pro Series", game: "MR", state: "FINISHED", format: "DOUBLE", teamCount: 16, maxTeams: 16, daysOffset: -45 },
-  { name: "Legacy 11 Équipes (byes)", game: "OW2", state: "FINISHED", format: "SINGLE", teamCount: 11, maxTeams: 16, daysOffset: -75, teamOffset: 10 },
+  { name: "Legacy 11 Équipes (byes)", game: "OW", state: "FINISHED", format: "SINGLE", teamCount: 11, maxTeams: 16, daysOffset: -75, teamOffset: 10 },
   { name: "Suisse Finale 8", game: "MR", state: "FINISHED", format: "SWISS", teamCount: 8, maxTeams: 8, daysOffset: -35, swissTotalRounds: 3, teamOffset: 2 },
-  { name: "Survie Championnat 12", game: "OW2", state: "FINISHED", format: "SURVIVAL", teamCount: 12, maxTeams: 16, daysOffset: -40, survivalRoundsPerCut: 2 },
+  { name: "Survie Championnat 12", game: "OW", state: "FINISHED", format: "SURVIVAL", teamCount: 12, maxTeams: 16, daysOffset: -40, survivalRoundsPerCut: 2 },
   { name: "Survie Last Stand 8", game: "MR", state: "FINISHED", format: "SURVIVAL", teamCount: 8, maxTeams: 8, daysOffset: -28, survivalRoundsPerCut: 1, teamOffset: 8 },
-  { name: "Survie Barrage 7 (terminé)", game: "OW2", state: "FINISHED", format: "SURVIVAL", teamCount: 7, maxTeams: 8, daysOffset: -15, survivalRoundsPerCut: 2, teamOffset: 13 },
+  { name: "Survie Barrage 7 (terminé)", game: "OW", state: "FINISHED", format: "SURVIVAL", teamCount: 7, maxTeams: 8, daysOffset: -15, survivalRoundsPerCut: 2, teamOffset: 13 },
 
   // ---- SOLO : tournois individuels (les joueurs s'inscrivent eux-mêmes) ---
-  { name: "Solo Inscriptions Ouvertes", game: "OW2", state: "REGISTRATION", participantType: "SOLO", format: "SINGLE", teamCount: 6, maxTeams: 16, daysOffset: 11 },
+  { name: "Solo Inscriptions Ouvertes", game: "OW", state: "REGISTRATION", participantType: "SOLO", format: "SINGLE", teamCount: 6, maxTeams: 16, daysOffset: 11 },
   { name: "Solo 8 Joueurs (simple élim.)", game: "MR", state: "RUNNING", participantType: "SOLO", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -2, playWaves: 2, teamOffset: 8 },
-  { name: "Solo Suisse Terminé", game: "OW2", state: "FINISHED", participantType: "SOLO", format: "SWISS", teamCount: 8, maxTeams: 8, daysOffset: -18, swissTotalRounds: 3, teamOffset: 16 },
+  { name: "Solo Suisse Terminé", game: "OW", state: "FINISHED", participantType: "SOLO", format: "SWISS", teamCount: 8, maxTeams: 8, daysOffset: -18, swissTotalRounds: 3, teamOffset: 16 },
 
   // ---- MULTI : tournois multi-phases -------------------------------------------
   {
     name: "Multi Inscriptions (Suisse → Survie → Double)",
-    game: "OW2",
+    game: "OW",
     state: "REGISTRATION",
     format: "MULTI",
     teamCount: 32,
@@ -310,7 +310,7 @@ export const TOURNAMENTS: TournamentDef[] = [
   },
   {
     name: "Multi En Cours Phase Finale (Double)",
-    game: "OW2",
+    game: "OW",
     state: "RUNNING",
     format: "MULTI",
     teamCount: 8,
@@ -369,7 +369,7 @@ export const TOURNAMENTS: TournamentDef[] = [
   },
   {
     name: "Multi Phase Zéro Sautée (COUNT > pool)",
-    game: "OW2",
+    game: "OW",
     state: "REGISTRATION",
     format: "MULTI",
     teamCount: 12,
@@ -395,7 +395,7 @@ export const TOURNAMENTS: TournamentDef[] = [
   // Trois tournois pour vérifier que la contrainte de score suit le tournoi et
   // pas le format de bracket : elle s'applique aussi bien à un arbre qu'à une
   // ronde suisse ou à la survie, et cohabite avec les tournois en score libre.
-  { name: "BO5 Élimination", game: "OW2", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -2, playWaves: 2, teamOffset: 30, matchFormat: { type: "BO", value: 5 } },
+  { name: "BO5 Élimination", game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -2, playWaves: 2, teamOffset: 30, matchFormat: { type: "BO", value: 5 } },
   { name: "FT3 Ronde Suisse", game: "MR", state: "RUNNING", format: "SWISS", teamCount: 8, maxTeams: 8, daysOffset: -3, playWaves: 2, swissTotalRounds: 3, teamOffset: 44, matchFormat: { type: "FT", value: 3 } },
-  { name: "BO3 Survie (terminé)", game: "OW2", state: "FINISHED", format: "SURVIVAL", teamCount: 8, maxTeams: 8, daysOffset: -20, survivalRoundsPerCut: 2, teamOffset: 58, matchFormat: { type: "BO", value: 3 } },
+  { name: "BO3 Survie (terminé)", game: "OW", state: "FINISHED", format: "SURVIVAL", teamCount: 8, maxTeams: 8, daysOffset: -20, survivalRoundsPerCut: 2, teamOffset: 58, matchFormat: { type: "BO", value: 3 } },
 ];

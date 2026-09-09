@@ -212,7 +212,7 @@ export function validateTournamentInput(
     const phaseError = validateRawPhases(body.phases);
     if (phaseError) return { error: phaseError };
   }
-  if (body.game && body.game !== "OW2" && body.game !== "MR") return { error: "INVALID_GAME" };
+  if (body.game && body.game !== "OW" && body.game !== "MR") return { error: "INVALID_GAME" };
   // Type de participant : équipes (défaut) ou joueurs inscrits individuellement.
   if (body.participantType !== undefined && !isParticipantType(body.participantType)) {
     return { error: "INVALID_PARTICIPANT_TYPE" };
@@ -410,7 +410,7 @@ export function validateTournamentInput(
       name: body.name.trim(),
       description: body.description ?? null,
       format: body.format,
-      game: body.game ?? "OW2",
+      game: body.game ?? "OW",
       participantType: body.participantType ?? "TEAM",
       maxTeams,
       // La petite finale n'a de sens qu'en élimination simple : on la neutralise

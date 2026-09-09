@@ -17,7 +17,7 @@ function tournamentRow(liveUrl: string | null) {
     name: "Coupe",
     description: null,
     format: "SINGLE",
-    game: "OW2",
+    game: "OW",
     max_teams: 8,
     registered_teams: 8,
     state: "RUNNING",

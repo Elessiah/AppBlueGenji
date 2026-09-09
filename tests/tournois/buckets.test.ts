@@ -12,7 +12,7 @@ const mockCard = (overrides?: Partial<TournamentCard>): TournamentCard => ({
   id: "1",
   name: "Test Tournament",
   description: "A test tournament",
-  game: "OW2",
+  game: "OW",
   state: "UPCOMING",
   startAt: "2026-05-20T10:00:00Z",
   registeredTeams: 4,
@@ -62,20 +62,20 @@ describe("buckets", () => {
 
   describe("filterTournamentsByGame", () => {
     it("returns all tournaments when gameFilter is 'all'", () => {
-      const cards = [mockCard({ game: "OW2" }), mockCard({ game: "MR" })];
+      const cards = [mockCard({ game: "OW" }), mockCard({ game: "MR" })];
       const result = filterTournamentsByGame(cards, "all");
       expect(result).toEqual(cards);
     });
 
-    it("filters tournaments by OW2 game", () => {
-      const cards = [mockCard({ game: "OW2" }), mockCard({ game: "MR" })];
-      const result = filterTournamentsByGame(cards, "ow2");
+    it("filters tournaments by OW game", () => {
+      const cards = [mockCard({ game: "OW" }), mockCard({ game: "MR" })];
+      const result = filterTournamentsByGame(cards, "ow");
       expect(result).toHaveLength(1);
-      expect(result[0].game).toBe("OW2");
+      expect(result[0].game).toBe("OW");
     });
 
     it("filters tournaments by MR game", () => {
-      const cards = [mockCard({ game: "OW2" }), mockCard({ game: "MR" })];
+      const cards = [mockCard({ game: "OW" }), mockCard({ game: "MR" })];
       const result = filterTournamentsByGame(cards, "mr");
       expect(result).toHaveLength(1);
       expect(result[0].game).toBe("MR");
@@ -87,7 +87,7 @@ describe("buckets", () => {
       const buckets = mockBuckets({
         upcoming: [
           mockCard({ name: "Marvel Cup", game: "MR" }),
-          mockCard({ name: "OW2 Championship", game: "OW2" }),
+          mockCard({ name: "OW Championship", game: "OW" }),
         ],
       });
       const result = filterBuckets(buckets, "marvel", "all");
@@ -99,12 +99,12 @@ describe("buckets", () => {
       const buckets = mockBuckets({
         registration: [
           mockCard({ name: "Marvel Cup", game: "MR" }),
-          mockCard({ name: "Marvel OW2", game: "OW2" }),
+          mockCard({ name: "Marvel OW", game: "OW" }),
         ],
       });
-      const result = filterBuckets(buckets, "marvel", "ow2");
+      const result = filterBuckets(buckets, "marvel", "ow");
       expect(result.registration).toHaveLength(1);
-      expect(result.registration[0].game).toBe("OW2");
+      expect(result.registration[0].game).toBe("OW");
     });
 
     it("preserves all bucket categories", () => {
@@ -134,18 +134,18 @@ describe("buckets", () => {
       expect(result).toBe(4);
     });
 
-    it("counts OW2 tournaments", () => {
+    it("counts OW tournaments", () => {
       const buckets = mockBuckets({
-        upcoming: [mockCard({ game: "OW2" }), mockCard({ game: "MR" })],
-        registration: [mockCard({ game: "OW2" })],
+        upcoming: [mockCard({ game: "OW" }), mockCard({ game: "MR" })],
+        registration: [mockCard({ game: "OW" })],
       });
-      const result = countByGame(buckets, "ow2");
+      const result = countByGame(buckets, "ow");
       expect(result).toBe(2);
     });
 
     it("counts MR tournaments", () => {
       const buckets = mockBuckets({
-        upcoming: [mockCard({ game: "MR" }), mockCard({ game: "OW2" })],
+        upcoming: [mockCard({ game: "MR" }), mockCard({ game: "OW" })],
         finished: [mockCard({ game: "MR" })],
       });
       const result = countByGame(buckets, "mr");

@@ -23,7 +23,7 @@ function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
     name: "BlueGenji Slash Tournament",
     description: "saison 6",
     format: "DOUBLE",
-    game: "OW2",
+    game: "OW",
     participantType: "TEAM",
     maxTeams: 24,
     registeredTeams: 0,
@@ -100,7 +100,7 @@ describe("en-tête de tournoi — libellés", () => {
   });
 
   it("écrit le nom du jeu en toutes lettres", () => {
-    expect(GAME_LABELS.OW2).toBe("Overwatch");
+    expect(GAME_LABELS.OW).toBe("Overwatch");
     expect(GAME_LABELS.MR).toBe("Marvel Rivals");
   });
 

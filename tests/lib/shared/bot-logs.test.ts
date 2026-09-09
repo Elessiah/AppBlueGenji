@@ -24,7 +24,7 @@ const ALL_LINES = () => [
   formatTournamentCreatedLog({
     tournament: TOURNAMENT,
     format: "SWISS",
-    game: "OW2",
+    game: "OW",
     maxTeams: 16,
     participantType: "TEAM",
     organizerPseudo: "Kiro",
@@ -107,7 +107,7 @@ describe("formatTournamentCreatedLog", () => {
     const line = formatTournamentCreatedLog({
       tournament: TOURNAMENT,
       format: "SWISS",
-      game: "OW2",
+      game: "OW",
       maxTeams: 16,
       participantType: "TEAM",
       organizerPseudo: "Kiro",
@@ -154,7 +154,7 @@ describe("formatTournamentCreatedLog", () => {
     const line = formatTournamentCreatedLog({
       tournament: TOURNAMENT,
       format: "LEGACY_MODE",
-      game: "OW2",
+      game: "OW",
       maxTeams: 8,
       participantType: "TEAM",
       organizerPseudo: "Kiro",

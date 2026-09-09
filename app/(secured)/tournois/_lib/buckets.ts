@@ -1,6 +1,6 @@
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 
-export type GameFilter = "all" | "ow2" | "mr";
+export type GameFilter = "all" | "ow" | "mr";
 
 export function filterTournamentsByQuery(tournaments: TournamentCard[], query: string): TournamentCard[] {
   if (!query) return tournaments;
@@ -14,7 +14,7 @@ export function filterTournamentsByQuery(tournaments: TournamentCard[], query: s
 
 export function filterTournamentsByGame(tournaments: TournamentCard[], gameFilter: GameFilter): TournamentCard[] {
   if (gameFilter === "all") return tournaments;
-  if (gameFilter === "ow2") return tournaments.filter((t) => t.game === "OW2");
+  if (gameFilter === "ow") return tournaments.filter((t) => t.game === "OW");
   if (gameFilter === "mr") return tournaments.filter((t) => t.game === "MR");
   return tournaments;
 }
@@ -47,7 +47,7 @@ export function flattenBuckets(buckets: TournamentBuckets): TournamentCard[] {
 export function countByGame(buckets: TournamentBuckets, gameFilter: GameFilter): number {
   const allTournaments = flattenBuckets(buckets);
   if (gameFilter === "all") return allTournaments.length;
-  if (gameFilter === "ow2") return allTournaments.filter((t) => t.game === "OW2").length;
+  if (gameFilter === "ow") return allTournaments.filter((t) => t.game === "OW").length;
   if (gameFilter === "mr") return allTournaments.filter((t) => t.game === "MR").length;
   return 0;
 }

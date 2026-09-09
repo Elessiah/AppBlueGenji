@@ -252,7 +252,7 @@ export async function createTournament(
     name: string;
     description: string | null;
     format: TournamentFormat;
-    game?: "OW2" | "MR";
+    game?: "OW" | "MR";
     /** `SOLO` = tournoi individuel (défaut `TEAM`). */
     participantType?: ParticipantType;
     maxTeams: number;
@@ -321,7 +321,7 @@ export async function createTournament(
     // La neutralisation hors `SINGLE` vit dans `validateTournamentInput`, seul
     // endroit où création et édition la partagent (`./validation`).
     const hasThirdPlaceMatch = Boolean(payload.hasThirdPlaceMatch);
-    const game = payload.game ?? "OW2";
+    const game = payload.game ?? "OW";
     const participantType = toParticipantType(payload.participantType);
 
     // Mode Survie : cadence des coupes (min. 1 manche). Ignorée pour les autres

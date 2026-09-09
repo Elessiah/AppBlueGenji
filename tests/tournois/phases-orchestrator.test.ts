@@ -27,7 +27,7 @@ class PhasesTestDatabase {
       current_phase_id: currentPhaseId,
       name: `Test Tournament ${id}`,
       description: null,
-      game: "OW2",
+      game: "OW",
       max_teams: 128,
       bracket_size: null,
       has_third_place_match: 0,

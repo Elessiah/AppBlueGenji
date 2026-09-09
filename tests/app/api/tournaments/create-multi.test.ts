@@ -22,7 +22,7 @@ function jsonReq(body: unknown) {
 
 const baseMulti = {
   name: "Multi-phase Tournament",
-  game: "OW2",
+  game: "OW",
   maxTeams: 128,
   startVisibilityAt: new Date().toISOString(),
   registrationOpenAt: new Date().toISOString(),

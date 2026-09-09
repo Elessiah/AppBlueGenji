@@ -44,7 +44,7 @@ function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
     name: "OW Open Cup",
     description: null,
     format: "SINGLE",
-    game: "OW2",
+    game: "OW",
     participantType: "TEAM",
     maxTeams: 16,
     registeredTeams: 5,

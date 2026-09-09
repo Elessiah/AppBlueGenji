@@ -32,7 +32,7 @@ Table `bg_recruitment_ads` (migration auto dans `lib/server/database.ts`) :
 | `active`        | `TINYINT(1)`                           | Visible publiquement (`0` = brouillon) |
 | `display_order` | `INT`                                  | Ordre d'affichage (réordonnable) |
 
-> La colonne `domain` remplace l'ancienne colonne `game` (jeu OW2/MR/ANY) : une
+> La colonne `domain` remplace l'ancienne colonne `game` (jeu OW/MR/ANY) : une
 > migration renomme et reconvertit automatiquement la colonne, les anciennes
 > valeurs étant ramenées à `AUTRE`.
 

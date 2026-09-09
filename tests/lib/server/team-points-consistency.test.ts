@@ -92,7 +92,7 @@ function matchRows() {
     id: match.id,
     tournament_id: 100,
     tournament_name: "Test - Coupe",
-    game: "OW2",
+    game: "OW",
     format: "SINGLE",
     bracket: "UPPER",
     played_at: new Date(`2026-06-0${match.id}T18:00:00Z`),

@@ -16,7 +16,7 @@ function card(id: number, name: string, format: TournamentFormat = "SINGLE"): To
     name,
     description: null,
     format,
-    game: "OW2",
+    game: "OW",
     participantType: "TEAM",
     maxTeams: 8,
     registeredTeams: 8,

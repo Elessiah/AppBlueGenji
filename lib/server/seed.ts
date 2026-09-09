@@ -1411,7 +1411,7 @@ async function createTournament(
   await applyMatchSchedule(db, tournamentId, def);
   await applyLiveStreams(db, tournamentId, def);
 
-  const gameLabel = def.game === "OW2" ? "Overwatch" : "Marvel Rivals";
+  const gameLabel = def.game === "OW" ? "Overwatch" : "Marvel Rivals";
   console.log(
     `  ✓ #${tournamentId} [${def.state}/${format}] ${gameLabel} · ${def.name} (${teamsToUse.length}/${def.maxTeams})`
   );

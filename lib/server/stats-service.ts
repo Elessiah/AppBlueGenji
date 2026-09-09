@@ -256,7 +256,7 @@ function toStatsMatch(row: MatchStatRow, teamId: number): StatsMatch {
     matchId: Number(row.id),
     tournamentId: Number(row.tournament_id),
     tournamentName: row.tournament_name,
-    game: row.game ?? "OW2",
+    game: row.game ?? "OW",
     format: row.format ?? "SINGLE",
     bracket: row.bracket,
     playedAt: isoOrEpoch(row.played_at),
@@ -280,7 +280,7 @@ function toStatsTournament(row: RegistrationStatRow): StatsTournament {
     tournamentName: row.tournament_name,
     state: row.state,
     format: row.format ?? "SINGLE",
-    game: row.game ?? "OW2",
+    game: row.game ?? "OW",
     finalRank: row.final_rank === null ? null : Number(row.final_rank),
     playedAt: isoOrEpoch(row.played_at),
   };
