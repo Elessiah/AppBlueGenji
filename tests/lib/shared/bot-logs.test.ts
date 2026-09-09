@@ -114,7 +114,7 @@ describe("formatTournamentCreatedLog", () => {
       startAt: "2026-03-14T18:00:00.000Z",
     });
 
-    expect(line).toContain("Ronde suisse · Overwatch 2");
+    expect(line).toContain("Ronde suisse · Overwatch");
     expect(line).toContain("16 équipes max");
     expect(line).toContain("créé par Kiro");
     expect(line).toContain("début le");

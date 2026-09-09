@@ -100,13 +100,13 @@ describe("en-tête de tournoi — libellés", () => {
   });
 
   it("écrit le nom du jeu en toutes lettres", () => {
-    expect(GAME_LABELS.OW2).toBe("Overwatch 2");
+    expect(GAME_LABELS.OW2).toBe("Overwatch");
     expect(GAME_LABELS.MR).toBe("Marvel Rivals");
   });
 
   it("ajoute « Individuel » à la ligne d'identité d'un tournoi solo, jamais à celle d'un tournoi par équipes", () => {
-    expect(headerIdentityLine(card({ participantType: "SOLO" }))).toBe("Overwatch 2 · Individuel");
-    expect(headerIdentityLine(card({ participantType: "TEAM" }))).toBe("Overwatch 2");
+    expect(headerIdentityLine(card({ participantType: "SOLO" }))).toBe("Overwatch · Individuel");
+    expect(headerIdentityLine(card({ participantType: "TEAM" }))).toBe("Overwatch");
   });
 
   it("ne peint jamais un état de tournoi en rouge d'antenne", () => {

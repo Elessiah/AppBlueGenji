@@ -142,7 +142,7 @@ describe("Dates rédigées", () => {
 
 describe("tournamentShareTitle", () => {
   it("porte le nom du tournoi puis son jeu", () => {
-    expect(tournamentShareTitle(card())).toBe("OW Open Cup · Overwatch 2");
+    expect(tournamentShareTitle(card())).toBe("OW Open Cup · Overwatch");
     expect(tournamentShareTitle(card({ game: "MR" }))).toBe("OW Open Cup · Marvel Rivals");
   });
 });
@@ -212,7 +212,7 @@ describe("tournamentShareDescription", () => {
 describe("tournamentShareCard", () => {
   it("remonte le jeu dans le surtitre : le titre appartient au nom du tournoi", () => {
     const built = tournamentShareCard(card(), NOW);
-    expect(built.eyebrow).toBe("Overwatch 2 · Inscriptions ouvertes");
+    expect(built.eyebrow).toBe("Overwatch · Inscriptions ouvertes");
     expect(built.title).toBe("OW Open Cup");
   });
 

@@ -200,7 +200,7 @@ function registrationDateItem(card: TournamentCard, now: number): HeaderMetaItem
   };
 }
 
-/** Sous-titre d'identité : « Overwatch 2 · Individuel ». */
+/** Sous-titre d'identité : « Overwatch · Individuel ». */
 export function headerIdentityLine(card: TournamentCard): string {
   const wording = participantWording(card.participantType);
   return [GAME_LABELS[card.game] ?? card.game, wording.badge].filter(Boolean).join(" · ");
