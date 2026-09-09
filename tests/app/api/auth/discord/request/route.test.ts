@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { POST } from "@/app/api/auth/discord/request/route";
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
 import { createDiscordLoginChallenge, discordAccountExists } from "@/lib/server/users-service";
+import { resetRateLimit } from "@/lib/server/rate-limit";
+import { DISCORD_CODE_REQUEST_RULE } from "@/lib/server/api-guard";
 
 jest.mock("@/lib/server/bot-integration", () => ({
   resolveDiscordUser: jest.fn(),
@@ -34,6 +36,9 @@ describe("POST /api/auth/discord/request", () => {
     createDiscordLoginChallengeMock.mockReset();
     discordAccountExistsMock.mockReset();
     discordAccountExistsMock.mockResolvedValue(false);
+    // Le plafond est par compte Discord visé et vit en mémoire du processus :
+    // sans remise à zéro, les cas suivants héritent des demandes des premiers.
+    resetRateLimit(DISCORD_CODE_REQUEST_RULE.name);
     // Par défaut, resolve renvoie l'identifiant tel quel (cas ID numérique).
     resolveDiscordUserMock.mockImplementation(async (handle: string) => handle);
   });

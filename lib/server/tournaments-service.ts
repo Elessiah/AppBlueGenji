@@ -22,7 +22,7 @@ export {
   registerCurrentUserTeam,
   registerGhostTeams,
   canUserRegister,
-  getUserEntrantTeamId,
+  getUserEntrant,
   // Bracket
   createBracketIfMissing,
   // Scoring (internal)

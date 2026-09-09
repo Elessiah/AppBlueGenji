@@ -1,6 +1,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { checkMatchScores, matchWinnerSide } from "@/lib/shared/match-format";
+import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { MatchRow } from "./_internal";
 import {
   dropQueuedRefereeAlerts,
@@ -225,7 +226,15 @@ export async function reportMatchScore(
   if (matches.length === 0) throw new Error("MATCH_NOT_FOUND");
   const match = matches[0];
 
-  if (match.winner_team_id !== null) {
+  // « Déjà tranché » se lit sur le **statut**, jamais sur la présence d'un
+  // vainqueur : un match nul n'en a pas et est pourtant terminé
+  // (`lib/shared/match-outcome.ts`). Sur `winner_team_id`, un 2-2 validé se
+  // rouvrait au premier report — le statut repassait en
+  // `AWAITING_CONFIRMATION`, deux reports concordants réécrivaient le score
+  // d'une rencontre close, et le verrou de manche n'y opposait rien : il ne
+  // vit que du côté de l'arbitrage, ce chemin-ci s'appuyant justement sur
+  // « on ne reporte pas un match fini ».
+  if (isMatchPlayed({ status: match.status })) {
     throw new Error("MATCH_ALREADY_COMPLETED");
   }
 

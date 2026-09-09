@@ -26,6 +26,7 @@ export { computeTournamentState, syncTournamentState, hasPendingStateTransition 
 
 // Registration (registerCurrentUserTeam is wrapped as public API function)
 export { canUserRegister, resolveUserEntrantTeamId } from "./registration";
+export type { UserEntrant } from "./registration";
 
 // Bracket generation
 export { createBracketIfMissing } from "./bracket-generator";
@@ -145,7 +146,9 @@ import { syncTournamentState } from "./state";
 import {
   registerCurrentUserTeam as registerTeamInternal,
   registerTeamsByIds as registerTeamsByIdsInternal,
+  resolveUserEntrant,
   resolveUserEntrantTeamId,
+  type UserEntrant,
 } from "./registration";
 import { resolveExpiredScoreReports, finalizeTournamentIfDone } from "./finalization";
 import { tryAutoResolveByes } from "./byes";
@@ -661,22 +664,23 @@ export async function registerCurrentUserTeam(tournamentId: number, userId: numb
 
 /**
  * Engagé du joueur dans un tournoi, vu de l'extérieur du module (routes API) :
- * son équipe active, ou son entrée solo si le tournoi est individuel. `null`
- * signifie « rien à engager » — un tournoi inconnu lève, pour que l'appelant
- * puisse répondre 404 plutôt que de parler d'équipe manquante.
+ * son équipe active, ou son entrée solo si le tournoi est individuel — avec sa
+ * qualité pour agir au nom de cet engagé. `teamId: null` signifie « rien à
+ * engager » ; un tournoi inconnu lève, pour que l'appelant puisse répondre 404
+ * plutôt que de parler d'équipe manquante.
  *
  * @throws TOURNAMENT_NOT_FOUND
  */
-export async function getUserEntrantTeamId(
+export async function getUserEntrant(
   tournamentId: number,
   userId: number,
-): Promise<number | null> {
+): Promise<UserEntrant> {
   const db = await getDatabase();
   const connection = await db.getConnection();
   try {
     const tournament = await loadTournamentRow(connection, tournamentId);
     if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
-    return await resolveUserEntrantTeamId(connection, tournament, userId);
+    return await resolveUserEntrant(connection, tournament, userId);
   } finally {
     connection.release();
   }

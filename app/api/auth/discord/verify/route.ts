@@ -1,4 +1,5 @@
 ﻿import { createSession } from "@/lib/server/auth";
+import { DISCORD_CODE_VERIFY_RULE, enforceRateLimit } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { createOrGetDiscordUser, verifyDiscordChallenge } from "@/lib/server/users-service";
 
@@ -19,6 +20,13 @@ export async function POST(req: Request) {
     if (!/^\d{6}$/.test(code)) {
       return fail("INVALID_CODE", 400);
     }
+
+    // Plafonné sur le compte visé, une fois sa forme validée : c'est le seul
+    // axe qu'un attaquant ne peut pas faire tourner (viser quelqu'un d'autre,
+    // c'est attaquer quelqu'un d'autre). Le code porte déjà son propre quota
+    // d'essais ; ce plafond borne ce que la demande de codes neufs rouvrirait.
+    const throttled = enforceRateLimit(DISCORD_CODE_VERIFY_RULE, discordId);
+    if (throttled) return throttled;
 
     const valid = await verifyDiscordChallenge(discordId, code);
     if (!valid) {

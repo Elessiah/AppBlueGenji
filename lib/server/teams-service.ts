@@ -532,45 +532,6 @@ export async function canManageTeam(teamId: number, userId: number): Promise<boo
   return userCanManageTeam(teamId, userId);
 }
 
-export async function addTeamMember(
-  requesterId: number,
-  teamId: number,
-  memberPseudo: string,
-  roles: TeamRole[],
-): Promise<void> {
-  const db = await getDatabase();
-  if (!(await userOwnsTeam(teamId, requesterId))) {
-    throw new Error("FORBIDDEN");
-  }
-
-  const userId = await getUserIdByPseudo(memberPseudo);
-  if (!userId) {
-    throw new Error("USER_NOT_FOUND");
-  }
-
-  const [activeMembership] = await db.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id
-     FROM bg_team_members
-     WHERE user_id = ?
-       AND left_at IS NULL
-     LIMIT 1`,
-    [userId],
-  );
-
-  if (activeMembership.length > 0) {
-    throw new Error("USER_ALREADY_IN_TEAM");
-  }
-
-  const filteredRoles = sanitizeRoles(roles).filter((role) => role !== "OWNER");
-  const payload = filteredRoles.length === 0 ? ["DPS"] : filteredRoles;
-
-  await db.execute(
-    `INSERT INTO bg_team_members (team_id, user_id, roles_json)
-     VALUES (?, ?, ?)`,
-    [teamId, userId, JSON.stringify(payload)],
-  );
-}
-
 export async function updateTeamMemberRoles(
   requesterId: number,
   teamId: number,
@@ -938,12 +899,28 @@ export async function requestToJoinTeam(userId: number, teamId: number): Promise
   if (await userHasActiveTeam(userId)) throw new Error("USER_ALREADY_IN_TEAM");
 
   const db = await getDatabase();
-  const [teams] = await db.execute<(RowDataPacket & { id: number; deleted_at: Date | null })[]>(
-    `SELECT id, deleted_at FROM bg_teams WHERE id = ? LIMIT 1`,
+  const [teams] = await db.execute<
+    (RowDataPacket & {
+      id: number;
+      deleted_at: Date | null;
+      is_ghost: 0 | 1;
+      solo_user_id: number | null;
+    })[]
+  >(
+    `SELECT id, deleted_at, is_ghost, solo_user_id FROM bg_teams WHERE id = ? LIMIT 1`,
     [teamId],
   );
   if (teams.length === 0) throw new Error("TEAM_NOT_FOUND");
   if (teams[0].deleted_at !== null) throw new Error("TEAM_DELETED");
+  // Ni une fantôme ni une entrée solo ne se rejoignent. Ni l'une ni l'autre n'a
+  // de membre, donc personne n'a qualité pour répondre : la demande restait
+  // en attente à jamais, et son auteur se voyait ensuite refuser toute autre
+  // équipe par `ALREADY_REQUESTED`. Une fantôme s'attribue par
+  // `POST /api/teams/[id]/claim` (staff `tournaments`) ; une entrée solo n'est
+  // pas une équipe, c'est l'identité d'un joueur en tournoi individuel.
+  if (teams[0].is_ghost === 1 || teams[0].solo_user_id !== null) {
+    throw new Error("TEAM_NOT_JOINABLE");
+  }
 
   const existing = await findPendingInvitation(teamId, userId);
   if (existing?.kind === "INVITE") {

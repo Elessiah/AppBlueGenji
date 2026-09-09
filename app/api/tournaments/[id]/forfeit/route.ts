@@ -1,13 +1,18 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { forfeitTournamentTeam, getUserEntrantTeamId } from "@/lib/server/tournaments-service";
+import { forfeitTournamentTeam, getUserEntrant } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
 
 /**
  * Déclare le forfait d'un engagé dans un tournoi « Survie » ou « Ronde suisse »
  * — les formats où l'on reste en lice sans être éliminé par une défaite.
  * - Un joueur déclare le forfait de son engagé : son équipe active, ou lui-même
- *   si le tournoi est individuel.
+ *   si le tournoi est individuel. **Il lui faut la charge de l'équipe**
+ *   (`OWNER` ou `MANAGER`), comme pour l'inscrire : retirer une équipe d'un
+ *   tournoi la condamne — capital à zéro en BG Survie, éliminée ailleurs — et
+ *   c'est irréversible. Un joueur du roster ne pouvait pas engager son équipe,
+ *   mais pouvait la désengager : le geste le plus lourd des deux était le moins
+ *   gardé. En individuel la question ne se pose pas, l'engagé est le joueur.
  * - Un arbitre/admin peut forcer le forfait de n'importe quel engagé (`teamId`).
  */
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
@@ -27,9 +32,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (isReferee && body.teamId) {
     teamId = Number(body.teamId);
   } else {
-    let entrantTeamId: number | null;
+    let entrant: Awaited<ReturnType<typeof getUserEntrant>>;
     try {
-      entrantTeamId = await getUserEntrantTeamId(tournamentId, user.id);
+      entrant = await getUserEntrant(tournamentId, user.id);
     } catch (error) {
       // Tournoi inconnu : ne pas le maquiller en problème d'équipe.
       if ((error as Error).message === "TOURNAMENT_NOT_FOUND") {
@@ -37,8 +42,11 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       }
       throw error;
     }
-    if (entrantTeamId === null) return fail("NO_ACTIVE_TEAM", 400);
-    teamId = entrantTeamId;
+    if (entrant.teamId === null) return fail("NO_ACTIVE_TEAM", 400);
+    // Même refus et même code que l'inscription : c'est la même qualité qu'on
+    // exige, pour la même raison — l'acte engage l'équipe entière.
+    if (!entrant.canActForEntrant) return fail("NOT_TEAM_MANAGER", 403);
+    teamId = entrant.teamId;
     // Un non-arbitre ne peut forfaiter que son propre engagé.
     if (body.teamId && Number(body.teamId) !== teamId) {
       return fail("FORBIDDEN", 403);

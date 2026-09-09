@@ -1,6 +1,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
+import type { MatchStatus, PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { dependentMatches, hasScoreInput, type MatchScoreState } from "@/lib/shared/match-lock";
+import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import {
   checkMatchScores,
   matchWinnerSide,
@@ -67,7 +68,7 @@ export async function checkDownstreamMatchesHaveNoScores(
   const [currentRows] = await connection.execute<
     (RowDataPacket & {
       round_number: number;
-      winner_team_id: number | null;
+      status: MatchStatus;
       next_winner_match_id: number | null;
       next_loser_match_id: number | null;
       tournament_id: number;
@@ -75,7 +76,7 @@ export async function checkDownstreamMatchesHaveNoScores(
       format: TournamentFormat;
     })[]
   >(
-    `SELECT m.round_number, m.winner_team_id, m.next_winner_match_id, m.next_loser_match_id,
+    `SELECT m.round_number, m.status, m.next_winner_match_id, m.next_loser_match_id,
             m.tournament_id, m.phase_id, t.format
      FROM bg_matches m
      JOIN bg_tournaments t ON t.id = m.tournament_id
@@ -86,7 +87,15 @@ export async function checkDownstreamMatchesHaveNoScores(
 
   const current = currentRows[0];
   // Match indécis : rien n'a encore été propagé, la saisie reste ouverte.
-  if (!current || current.winner_team_id === null) return;
+  //
+  // « Indécis » se lit sur le **statut**, et non sur l'absence de vainqueur : un
+  // match nul est terminé sans en avoir un (`lib/shared/match-outcome.ts`).
+  // Lu sur `winner_team_id`, ce garde-fou sortait ici sur toute rencontre close
+  // par une égalité — l'arbitrage pouvait donc réécrire un 2-2 de la manche 1
+  // alors que la manche 2 était déjà jouée, exactement ce que le verrou
+  // interdit, et exactement ce que l'interface annonçait comme verrouillé
+  // (`isScoreEditLocked` juge, lui, sur `decided`).
+  if (!current || !isMatchPlayed({ status: current.status })) return;
 
   let dependents: DependentMatchRow[];
 

@@ -22,7 +22,11 @@ const EMPTY_MATCH: Row = {
 // format du tournoi), la seconde renvoie les matchs dépendants.
 function fakeConnection(options: {
   format: string;
-  winnerTeamId?: number | null;
+  /**
+   * Statut du match édité. C'est lui — et non la présence d'un vainqueur — qui
+   * dit si le résultat a été propagé : un match nul est terminé sans vainqueur.
+   */
+  status?: "PENDING" | "READY" | "AWAITING_CONFIRMATION" | "COMPLETED";
   nextWinnerMatchId?: number | null;
   nextLoserMatchId?: number | null;
   dependents: Row[];
@@ -36,7 +40,7 @@ function fakeConnection(options: {
           [
             {
               round_number: 1,
-              winner_team_id: options.winnerTeamId === undefined ? 10 : options.winnerTeamId,
+              status: options.status ?? "COMPLETED",
               next_winner_match_id: options.nextWinnerMatchId ?? null,
               next_loser_match_id: options.nextLoserMatchId ?? null,
               tournament_id: 42,
@@ -122,11 +126,38 @@ describe("checkDownstreamMatchesHaveNoScores — élimination", () => {
   it("laisse passer la toute première saisie (match encore indécis)", async () => {
     const { conn } = fakeConnection({
       format: "SINGLE",
-      winnerTeamId: null,
+      status: "READY",
       nextWinnerMatchId: 5,
       dependents: [{ ...EMPTY_MATCH, team1_score: 2, team2_score: 1 }],
     });
     await expect(checkDownstreamMatchesHaveNoScores(conn, editedMatch)).resolves.toBeUndefined();
+  });
+
+  it("verrouille un match nul comme n'importe quel match tranché", async () => {
+    // Un nul est `COMPLETED` **sans** vainqueur. Lu sur `winner_team_id`, le
+    // garde-fou le prenait pour un match encore indécis et sortait aussitôt :
+    // l'arbitrage pouvait réécrire un 2-2 dont la suite était déjà jouée, alors
+    // que l'interface annonçait le score verrouillé.
+    const { conn } = fakeConnection({
+      format: "SINGLE",
+      status: "COMPLETED",
+      nextWinnerMatchId: 5,
+      dependents: [{ ...EMPTY_MATCH, team1_score: 2, team2_score: 1 }],
+    });
+    await expect(checkDownstreamMatchesHaveNoScores(conn, editedMatch)).rejects.toThrow(
+      "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES",
+    );
+  });
+
+  it("verrouille un match nul aussi dans les formats à classement", async () => {
+    const { conn } = fakeConnection({
+      format: "SWISS",
+      status: "COMPLETED",
+      dependents: [{ ...EMPTY_MATCH, round_number: 3, team1_score: 2, team2_score: 1 }],
+    });
+    await expect(checkDownstreamMatchesHaveNoScores(conn, editedMatch)).rejects.toThrow(
+      "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES",
+    );
   });
 
   it("n'interroge personne quand le match n'a pas de suite", async () => {
