@@ -5,7 +5,18 @@ jest.mock("@/lib/server/database");
 
 async function mockDb(execute: jest.Mock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute });
+  // `getConnection` sert à la resynchronisation de l'entrée solo, que
+  // `updateOwnProfile` déclenche dès que le pseudo ou la visibilité de l'avatar
+  // change : la ligne de l'entrée solo porte une copie des deux. Connexion
+  // distincte, et sans entrée solo à resynchroniser : les assertions portent
+  // sur l'écriture du profil, pas sur ce ménage.
+  (getDatabase as jest.Mock).mockResolvedValue({
+    execute,
+    getConnection: async () => ({
+      execute: jest.fn<() => Promise<unknown>>().mockResolvedValue([[], []]),
+      release: () => undefined,
+    }),
+  });
 }
 
 describe("updateOwnProfile — pseudo non masquable + ouverture au recrutement", () => {

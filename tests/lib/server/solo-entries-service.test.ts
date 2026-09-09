@@ -23,7 +23,12 @@ function duplicateName(): Error {
   return error;
 }
 
-const USER = [[{ pseudo: "ShadowNinja", avatar_url: "/u/1.png" }], []];
+const USER = [[{ pseudo: "ShadowNinja", avatar_url: "/u/1.png", visible_avatar: 1 }], []];
+/** Même compte, avatar masqué (`visible_avatar = 0`). */
+const USER_HIDDEN_AVATAR = [
+  [{ pseudo: "ShadowNinja", avatar_url: "/u/1.png", visible_avatar: 0 }],
+  [],
+];
 const NO_ROW = [[], []];
 
 describe("ensureSoloEntry", () => {

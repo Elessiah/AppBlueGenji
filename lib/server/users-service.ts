@@ -4,6 +4,7 @@ import { getDatabase } from "@/lib/server/database";
 import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
 import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
+import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 import { getPlayerEntityStats, loadPlayerRecords } from "@/lib/server/stats-service";
 import type {
@@ -84,8 +85,11 @@ function mapPublicUser(row: UserRow): PublicUserProfile {
  * les rosters et les feuilles de match, où l'anonymat n'a pas de sens.
  */
 function applyVisibility<T extends PublicUserProfile>(profile: T, isSelf: boolean): T {
+  // L'avatar passe par la règle partagée (`lib/shared/avatar.ts`) : le roster
+  // d'une équipe et le logo d'une entrée solo la posent aussi, et trois copies
+  // divergeraient — la première l'avait déjà fait en ne la posant pas du tout.
+  profile.avatarUrl = visibleAvatarUrl(profile.avatarUrl, profile.visibility.avatar, isSelf);
   if (isSelf) return profile;
-  if (!profile.visibility.avatar) profile.avatarUrl = null;
   if (!profile.visibility.overwatch) profile.overwatchBattletag = null;
   if (!profile.visibility.marvel) profile.marvelRivalsTag = null;
   if (!profile.visibility.major) profile.isAdult = null;
@@ -491,9 +495,11 @@ export async function updateOwnProfile(
     ],
   );
 
-  // L'entrée solo (tournois individuels) affiche le pseudo du joueur dans les
-  // brackets : elle suit le renommage.
-  if (patch.pseudo) {
+  // L'entrée solo (tournois individuels) affiche le pseudo **et l'avatar** du
+  // joueur dans les brackets : elle suit le renommage, et aussi la bascule de
+  // visibilité de l'avatar — sans quoi masquer son image n'aurait effacé que la
+  // fiche de profil, l'entrée solo continuant de la servir à tout le site.
+  if (patch.pseudo || patch.visibility?.avatar !== undefined) {
     await syncSoloEntryIdentity(userId);
   }
 }

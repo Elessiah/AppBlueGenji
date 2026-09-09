@@ -23,11 +23,30 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { soloEntryNameCandidates } from "@/lib/shared/participants";
+import { visibleAvatarUrl } from "@/lib/shared/avatar";
 
 type UserIdentityRow = RowDataPacket & {
   pseudo: string;
   avatar_url: string | null;
+  visible_avatar: 0 | 1;
 };
+
+/**
+ * Logo à recopier sur l'entrée solo.
+ *
+ * L'entrée solo est affichée partout où l'engagé l'est — plateau, classement,
+ * et jusqu'à la **carte du match en direct de l'accueil**, que lit un visiteur
+ * sans compte. Recopier l'avatar sans consulter `visible_avatar` publiait donc
+ * plus largement que la fiche de profil ne l'aurait jamais fait, et le
+ * réglage s'en trouvait entièrement contourné pour qui joue en individuel.
+ *
+ * Pas d'exception pour le propriétaire, à la différence d'un roster : la valeur
+ * est **stockée** puis servie à tout le monde, elle ne peut pas dépendre du
+ * lecteur.
+ */
+function soloEntryLogo(user: UserIdentityRow): string | null {
+  return visibleAvatarUrl(user.avatar_url, user.visible_avatar === 1);
+}
 
 function isDuplicateNameError(error: unknown): boolean {
   const code = (error as { code?: string } | null)?.code;
@@ -39,7 +58,7 @@ async function loadUserIdentity(
   userId: number,
 ): Promise<UserIdentityRow | null> {
   const [rows] = await connection.execute<UserIdentityRow[]>(
-    `SELECT pseudo, avatar_url FROM bg_users WHERE id = ? LIMIT 1`,
+    `SELECT pseudo, avatar_url, visible_avatar FROM bg_users WHERE id = ? LIMIT 1`,
     [userId],
   );
   return rows.length === 0 ? null : rows[0];
@@ -72,7 +91,7 @@ async function applyIdentity(
     try {
       await connection.execute(`UPDATE bg_teams SET name = ?, logo_url = ? WHERE id = ?`, [
         name,
-        user.avatar_url,
+        soloEntryLogo(user),
         entryId,
       ]);
       return;
@@ -110,7 +129,7 @@ export async function ensureSoloEntry(
       const [insert] = await connection.execute<ResultSetHeader>(
         `INSERT INTO bg_teams (name, logo_url, description, is_ghost, solo_user_id)
          VALUES (?, ?, NULL, 0, ?)`,
-        [name, user.avatar_url, userId],
+        [name, soloEntryLogo(user), userId],
       );
       return Number(insert.insertId);
     } catch (error) {

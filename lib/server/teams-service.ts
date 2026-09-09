@@ -7,6 +7,7 @@ import { getTeamEntityStats } from "@/lib/server/stats-service";
 import { getTeamRankingPosition, loadTeamRanking } from "@/lib/server/ranking-service";
 import { compareRankedTeams, rankingMatchJoinSql } from "@/lib/shared/ranking";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
+import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { assertTeamTagAvailable, mapTeamTagConflict, resolveTeamTag } from "@/lib/server/team-tags";
 
 /**
@@ -21,16 +22,26 @@ type TeamMemberRow = RowDataPacket & {
   user_id: number;
   pseudo: string;
   avatar_url: string | null;
+  visible_avatar: 0 | 1;
   roles_json: string;
   joined_at: Date;
 };
 
-function mapMember(row: TeamMemberRow): TeamMember {
+/**
+ * @param viewerUserId Lecteur du roster, pour qu'il continue de voir son propre
+ *   avatar même masqué au reste du site (`visibleAvatarUrl`).
+ */
+function mapMember(row: TeamMemberRow, viewerUserId: number | null): TeamMember {
+  const userId = Number(row.user_id);
   return {
     membershipId: Number(row.membership_id),
-    userId: Number(row.user_id),
+    userId,
     pseudo: row.pseudo,
-    avatarUrl: row.avatar_url,
+    avatarUrl: visibleAvatarUrl(
+      row.avatar_url,
+      row.visible_avatar === 1,
+      userId === viewerUserId,
+    ),
     roles: parseRoles(row.roles_json),
     joinedAt: toIso(row.joined_at) ?? new Date().toISOString(),
   };
@@ -98,7 +109,14 @@ async function ghostAdminOverride(teamId: number, viewerManagesGhostTeams: boole
   return isGhostTeam(teamId);
 }
 
-export async function listTeams(): Promise<TeamListItem[]> {
+/**
+ * Annuaire des équipes.
+ *
+ * @param viewerId Lecteur de la liste. Sert au seul masquage d'avatar : sans
+ *   lui, un joueur qui a masqué le sien ne le verrait pas non plus sur la carte
+ *   de sa propre équipe.
+ */
+export async function listTeams(viewerId: number | null = null): Promise<TeamListItem[]> {
   const db = await getDatabase();
 
   // Effectif et identité de chaque équipe. Le bilan (victoires, défaites,
@@ -193,13 +211,15 @@ export async function listTeams(): Promise<TeamListItem[]> {
       user_id: number;
       pseudo: string;
       avatar_url: string | null;
+      visible_avatar: 0 | 1;
     })[]
   >(
     `SELECT
       tm.team_id,
       u.id AS user_id,
       u.pseudo,
-      u.avatar_url
+      u.avatar_url,
+      u.visible_avatar
      FROM (
        SELECT team_id, user_id, ROW_NUMBER() OVER (PARTITION BY team_id ORDER BY joined_at ASC) as rn
        FROM bg_team_members
@@ -235,10 +255,14 @@ export async function listTeams(): Promise<TeamListItem[]> {
     if (!rosterByTeam.has(row.team_id)) {
       rosterByTeam.set(row.team_id, []);
     }
+    const memberId = Number(row.user_id);
     rosterByTeam.get(row.team_id)!.push({
-      userId: Number(row.user_id),
+      userId: memberId,
       pseudo: row.pseudo,
-      avatarUrl: row.avatar_url,
+      // Le réglage `visible_avatar` vaut ici comme sur une fiche de profil : la
+      // vignette du roster lisait `avatar_url` sans le consulter, et rendait
+      // donc à tout le site l'image que son propriétaire avait masquée.
+      avatarUrl: visibleAvatarUrl(row.avatar_url, row.visible_avatar === 1, memberId === viewerId),
     });
   }
 
@@ -388,6 +412,7 @@ export async function getTeamDetail(
       tm.user_id,
       u.pseudo,
       u.avatar_url,
+      u.visible_avatar,
       tm.roles_json,
       tm.joined_at
      FROM bg_team_members tm
@@ -444,7 +469,7 @@ export async function getTeamDetail(
       deletedAt: toIso(teams[0].deleted_at),
       isGhost,
     },
-    members: membersRows.map(mapMember),
+    members: membersRows.map((row) => mapMember(row, viewerUserId)),
     tournaments,
     stats,
     ranking,
