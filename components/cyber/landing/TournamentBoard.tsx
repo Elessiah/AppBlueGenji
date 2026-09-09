@@ -59,7 +59,13 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
           ) : (
             <div className={styles.emptyState}>
               <span className="eyebrow">TOURNAMENTS</span>
-              <h3>Aucun tournoi public n&apos;est encore visible.</h3>
+              {/*
+                * « Encore » dirait que le site n'a jamais rien organisé, ce qui
+                * est faux dès qu'un tournoi s'est terminé : la section ne
+                * montrant que ce qui est en cours ou à venir, son état vide est
+                * atteint aussi bien par un site neuf que par une saison close.
+                */}
+              <h3>Aucun tournoi en cours ni à venir pour le moment.</h3>
             </div>
           )}
         </CyberCard>
