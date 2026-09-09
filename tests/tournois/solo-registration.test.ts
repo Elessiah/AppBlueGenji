@@ -51,7 +51,7 @@ describe("resolveUserEntrantTeamId", () => {
   beforeEach(() => jest.clearAllMocks());
 
   it("prend l'équipe active en tournoi par équipes", async () => {
-    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 12 } as never);
+    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 12, roles: ["OWNER"] } as never);
     const { connection } = fakeConnection();
 
     await expect(resolveUserEntrantTeamId(connection, tournament(), 3)).resolves.toBe(12);
@@ -86,7 +86,7 @@ describe("registerCurrentUserTeam", () => {
   });
 
   it("inscrit l'équipe active du joueur en tournoi par équipes", async () => {
-    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 12 } as never);
+    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 12, roles: ["OWNER"] } as never);
     const { connection, inserts } = fakeConnection({ registered: 3 });
 
     await registerCurrentUserTeam(connection, 5, 3);
@@ -201,5 +201,87 @@ describe("canUserRegister", () => {
 
     await expect(canUserRegister(connection, 5, 3)).resolves.toBe(false);
     expect(findSoloEntry).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Engager une équipe demande d'en avoir la charge : `OWNER` ou `MANAGER`. Le
+ * refus est écrit **dans la transaction**, sur les rôles relus avec l'équipe
+ * active — et `canUserRegister` le rejoue, pour ne pas annoncer un bouton que
+ * l'écriture refuserait.
+ */
+describe("qualité pour engager son équipe", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (loadTournamentRow as jest.Mock).mockResolvedValue(tournament() as never);
+    (syncTournamentState as jest.Mock).mockImplementation(
+      async () => ({ row: await (loadTournamentRow as jest.Mock)() }) as never,
+    );
+  });
+
+  it.each([["OWNER"], ["MANAGER"]])("accepte un %s", async (role) => {
+    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 12, roles: [role] } as never);
+    const { connection, inserts } = fakeConnection();
+
+    await registerCurrentUserTeam(connection, 5, 3);
+    expect(inserts).toHaveLength(1);
+  });
+
+  it("accepte un cumul qui contient un rôle de gestion", async () => {
+    (getUserActiveTeam as jest.Mock).mockResolvedValue({
+      teamId: 12,
+      roles: ["DPS", "MANAGER"],
+    } as never);
+    const { connection, inserts } = fakeConnection();
+
+    await registerCurrentUserTeam(connection, 5, 3);
+    expect(inserts).toHaveLength(1);
+  });
+
+  it.each([[["CAPITAINE"]], [["TANK", "COACH"]], [[]]])(
+    "refuse un membre sans rôle de gestion (%j) sans rien écrire",
+    async (roles) => {
+      (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 12, roles } as never);
+      const { connection, inserts } = fakeConnection();
+
+      await expect(registerCurrentUserTeam(connection, 5, 3)).rejects.toThrow("NOT_TEAM_MANAGER");
+      expect(inserts).toHaveLength(0);
+    },
+  );
+
+  it("distingue le refus de qualité de l'absence d'équipe", async () => {
+    (getUserActiveTeam as jest.Mock).mockResolvedValue(null as never);
+    const { connection } = fakeConnection();
+
+    // Deux refus distincts : l'un dit de rejoindre une équipe, l'autre de
+    // s'adresser à celui qui la dirige.
+    await expect(registerCurrentUserTeam(connection, 5, 3)).rejects.toThrow("NO_ACTIVE_TEAM");
+  });
+
+  it("ne s'applique pas au tournoi individuel : le joueur n'engage que lui-même", async () => {
+    (loadTournamentRow as jest.Mock).mockResolvedValue(
+      tournament({ participant_type: "SOLO" }) as never,
+    );
+    (ensureSoloEntry as jest.Mock).mockResolvedValue(88 as never);
+    const { connection, inserts } = fakeConnection();
+
+    await registerCurrentUserTeam(connection, 5, 3);
+
+    expect(getUserActiveTeam).not.toHaveBeenCalled();
+    expect(inserts).toHaveLength(1);
+  });
+
+  it("ferme le bouton d'inscription au membre sans rôle de gestion", async () => {
+    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 12, roles: ["HEAL"] } as never);
+    const { connection } = fakeConnection();
+
+    await expect(canUserRegister(connection, 5, 3)).resolves.toBe(false);
+  });
+
+  it("laisse le bouton au propriétaire d'une équipe pas encore engagée", async () => {
+    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 12, roles: ["OWNER"] } as never);
+    const { connection } = fakeConnection();
+
+    await expect(canUserRegister(connection, 5, 3)).resolves.toBe(true);
   });
 });
