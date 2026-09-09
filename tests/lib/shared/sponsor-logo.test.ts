@@ -52,12 +52,26 @@ describe("sponsorLogoSrc", () => {
     );
   });
 
-  it("keeps the raw url for fallback sponsors, which have no row to read back", () => {
+  it("gives up on a fallback sponsor rather than hand out a foreign origin", () => {
     // `FALLBACK_SPONSORS` porte des identifiants négatifs : le relais ne
-    // trouverait rien en base et répondrait 404.
-    expect(sponsorLogoSrc({ id: -3, logoUrl: "https://cdn.example.com/logo.png" })).toBe(
-      "https://cdn.example.com/logo.png",
-    );
+    // trouverait rien en base. Rendre l'URL brute la passerait à `next/image`,
+    // qui lève faute de `remotePatterns` et emporterait la page.
+    expect(sponsorLogoSrc({ id: -3, logoUrl: "https://cdn.example.com/logo.png" })).toBeNull();
+    expect(sponsorLogoSrc({ id: 0, logoUrl: "https://cdn.example.com/logo.png" })).toBeNull();
+  });
+
+  it("never yields an absolute url — l'invariant du module", () => {
+    const cases = [
+      { id: 1, logoUrl: "https://cdn.example.com/logo.png" },
+      { id: -1, logoUrl: "https://cdn.example.com/logo.png" },
+      { id: 1, logoUrl: "/uploads/sponsors/a.webp" },
+      { id: 1, logoUrl: "/api/uploads/sponsors/a.webp" },
+      { id: 1.5, logoUrl: "https://cdn.example.com/logo.png" },
+    ];
+    for (const sponsor of cases) {
+      const src = sponsorLogoSrc(sponsor);
+      if (src !== null) expect(src.startsWith("/")).toBe(true);
+    }
   });
 
   it("builds the proxy path from the sponsor id and a version of its url", () => {

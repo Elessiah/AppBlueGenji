@@ -69,16 +69,20 @@ export function isStoredSponsorLogo(logoUrl: string | null | undefined): boolean
 /**
  * Adresse à mettre dans le `src` du logo, ou `null` s'il n'y en a pas.
  *
- * Les partenaires de secours (`FALLBACK_SPONSORS`, identifiants négatifs) ne
- * sont pas en base : le relais ne saurait rien y relire. Ils n'ont pas de logo
- * aujourd'hui, mais la fonction reste totale et rend alors l'URL telle quelle
- * plutôt qu'un chemin qui répondrait 404.
+ * **Jamais une origine étrangère** : c'est tout l'objet du module, et ce n'est
+ * une garantie que si elle vaut sur *toutes* les branches. Les partenaires de
+ * secours (`FALLBACK_SPONSORS`, identifiants négatifs) ne sont pas en base, donc
+ * le relais ne saurait rien y relire — la fonction rend `null`, et la case
+ * retombe sur la plaque hachurée portant le nom, ce que font déjà les six.
+ * Rendre l'URL brute les aurait fait passer à `next/image`, qui **lève** au
+ * rendu faute de `remotePatterns` : donner un logo à un partenaire de secours
+ * ressemble à une édition d'une ligne, elle aurait emporté l'accueil entier.
  */
 export function sponsorLogoSrc(sponsor: { id: number; logoUrl: string | null }): string | null {
   const logoUrl = sponsor.logoUrl?.trim();
   if (!logoUrl) return null;
   if (isStoredSponsorLogo(logoUrl)) return toServedUploadUrl(logoUrl);
-  if (!Number.isInteger(sponsor.id) || sponsor.id <= 0) return logoUrl;
+  if (!Number.isInteger(sponsor.id) || sponsor.id <= 0) return null;
   return sponsorLogoProxyPath(sponsor.id, logoUrl);
 }
 

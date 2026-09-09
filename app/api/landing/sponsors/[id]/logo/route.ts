@@ -103,55 +103,63 @@ async function fetchLogo(url: URL): Promise<FetchedLogo | null> {
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
     const controller = new AbortController();
+    // Le minuteur couvre **aussi la lecture du corps**, et pas seulement les
+    // en-têtes : un hôte qui répond aussitôt puis distille ses octets sans fin
+    // tiendrait sinon le gestionnaire indéfiniment — le plafond de taille n'est
+    // vérifié qu'une fois la lecture achevée, il n'aurait jamais l'occasion de
+    // servir. D'où un unique `clearTimeout`, en sortie de saut.
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    let res: Response;
     try {
-      res = await fetch(target, {
-        redirect: "manual",
-        signal: controller.signal,
-        headers: { Accept: "image/*" },
-        cache: "no-store",
-      });
-    } catch {
-      return null;
-    } finally {
-      clearTimeout(timer);
-    }
-
-    if (res.status >= 300 && res.status < 400) {
-      const location = res.headers.get("location");
-      if (!location) return null;
-      let next: URL;
+      let res: Response;
       try {
-        next = new URL(location, target);
+        res = await fetch(target, {
+          redirect: "manual",
+          signal: controller.signal,
+          headers: { Accept: "image/*" },
+          cache: "no-store",
+        });
       } catch {
         return null;
       }
-      const revalidated = parseRemoteLogoUrl(next.toString());
-      if (!revalidated) return null;
-      target = revalidated;
-      continue;
+
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get("location");
+        if (!location) return null;
+        let next: URL;
+        try {
+          next = new URL(location, target);
+        } catch {
+          return null;
+        }
+        const revalidated = parseRemoteLogoUrl(next.toString());
+        if (!revalidated) return null;
+        target = revalidated;
+        continue;
+      }
+
+      if (!res.ok) return null;
+
+      const contentType = acceptedLogoContentType(res.headers.get("content-type"));
+      if (!contentType) return null;
+
+      // Refus avant lecture quand le serveur annonce la taille ; le contrôle
+      // après lecture reste nécessaire, un en-tête absent ou menteur étant
+      // possible.
+      const declared = Number(res.headers.get("content-length"));
+      if (Number.isFinite(declared) && declared > MAX_LOGO_BYTES) return null;
+
+      let body: ArrayBuffer;
+      try {
+        body = await res.arrayBuffer();
+      } catch {
+        return null;
+      }
+      if (body.byteLength === 0 || body.byteLength > MAX_LOGO_BYTES) return null;
+
+      return { body, contentType };
+    } finally {
+      clearTimeout(timer);
     }
-
-    if (!res.ok) return null;
-
-    const contentType = acceptedLogoContentType(res.headers.get("content-type"));
-    if (!contentType) return null;
-
-    // Refus avant lecture quand le serveur annonce la taille ; le contrôle après
-    // lecture reste nécessaire, un en-tête absent ou menteur étant possible.
-    const declared = Number(res.headers.get("content-length"));
-    if (Number.isFinite(declared) && declared > MAX_LOGO_BYTES) return null;
-
-    let body: ArrayBuffer;
-    try {
-      body = await res.arrayBuffer();
-    } catch {
-      return null;
-    }
-    if (body.byteLength === 0 || body.byteLength > MAX_LOGO_BYTES) return null;
-
-    return { body, contentType };
   }
 
   return null;

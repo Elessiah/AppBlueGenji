@@ -114,9 +114,15 @@ deux mettant en cache par URL.
 ## Partenaires de secours
 
 `FALLBACK_SPONSORS` (identifiants **négatifs**) n'est pas en base : le relais ne
-saurait rien y relire. `sponsorLogoSrc` reste totale et rend alors l'URL telle
-quelle plutôt qu'un chemin qui répondrait 404. Ces partenaires n'ont pas de logo
-aujourd'hui ; la branche existe pour que la fonction ne mente pas.
+saurait rien y relire. `sponsorLogoSrc` rend donc `null`, et la case retombe sur
+la plaque hachurée portant le nom — ce que font déjà les six.
+
+Rendre l'URL brute aurait été la solution évidente, et c'est un piège : elle
+serait passée à `next/image`, qui **lève** au rendu faute de `remotePatterns`.
+Donner un logo à un partenaire de secours ressemble à une édition d'une ligne
+dans une constante, sans danger ; elle aurait emporté l'accueil entier. Le `null`
+rend au passage l'invariant du module vrai sur **toutes** les branches : la
+fonction ne produit jamais une origine étrangère.
 
 ## Ce que le relais ne fait pas
 
