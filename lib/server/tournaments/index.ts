@@ -12,6 +12,7 @@ import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { isSoloTournament, toParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
+import { hasTeamManagementRole } from "@/lib/shared/team-roles";
 import { canViewTournament } from "@/lib/shared/tournament-visibility";
 import { parseTournamentDates } from "./validation";
 import type { TournamentListRow } from "./_internal";
@@ -772,6 +773,7 @@ export async function getTournamentViewerContext(
   // `resolveUserEntrantTeamId` s'en serve : en tournoi par équipes,
   // `getUserActiveTeam` ouvre sa propre requête, et réserver une place du pool
   // (25) pour ne rien en faire doublerait la pression à chaque connexion SSE.
+  const activeTeam = isSolo ? null : await getUserActiveTeam(userId);
   const myTeamId = isSolo
     ? await withConnection((connection) =>
         resolveUserEntrantTeamId(
@@ -780,7 +782,16 @@ export async function getTournamentViewerContext(
           userId,
         ),
       )
-    : (await getUserActiveTeam(userId))?.teamId ?? null;
+    : activeTeam?.teamId ?? null;
+
+  // Qualité pour **engager** son équipe : `OWNER` ou `MANAGER`
+  // (`lib/shared/team-roles.ts`). En individuel, le joueur n'engage que lui-même.
+  //
+  // Ce fait tient à la personne et non au plateau : il voyage donc dans le
+  // contexte du lecteur, comme `canManageLive` ou `canDelete`, et le client le
+  // rejoue tel quel à chaque instantané plutôt que de le recalculer — un
+  // instantané ne connaît pas les rosters.
+  const canRegisterEntrant = isSolo || hasTeamManagementRole(activeTeam?.roles);
 
   const alreadyRegistered =
     myTeamId !== null && snapshot.registrations.some((row) => row.teamId === myTeamId);
@@ -797,9 +808,11 @@ export async function getTournamentViewerContext(
     canRegister:
       snapshot.card.state === "REGISTRATION" &&
       !alreadyRegistered &&
+      canRegisterEntrant &&
       // En individuel, un joueur sans entrée solo peut s'inscrire : elle sera
       // créée à ce moment-là.
       (isSolo || myTeamId !== null),
+    canRegisterEntrant,
     myTeamId,
     canCreateReportsForTeamIds: myTeamId ? [myTeamId] : [],
     isAdmin: canManage,

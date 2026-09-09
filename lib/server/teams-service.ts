@@ -6,6 +6,7 @@ import { getUserIdByPseudo, sanitizeRoles } from "@/lib/server/users-service";
 import { getTeamEntityStats } from "@/lib/server/stats-service";
 import { getTeamRankingPosition, loadTeamRanking } from "@/lib/server/ranking-service";
 import { compareRankedTeams, rankingMatchJoinSql } from "@/lib/shared/ranking";
+import { hasTeamManagementRole } from "@/lib/shared/team-roles";
 import { assertTeamTagAvailable, mapTeamTagConflict, resolveTeamTag } from "@/lib/server/team-tags";
 
 /**
@@ -68,9 +69,7 @@ async function getMemberRoles(teamId: number, userId: number): Promise<TeamRole[
 }
 
 async function userCanManageTeam(teamId: number, userId: number): Promise<boolean> {
-  const roles = await getMemberRoles(teamId, userId);
-  if (!roles) return false;
-  return roles.includes("OWNER") || roles.includes("MANAGER");
+  return hasTeamManagementRole(await getMemberRoles(teamId, userId));
 }
 
 /**
@@ -676,7 +675,13 @@ export async function leaveTeam(userId: number, teamId: number): Promise<void> {
 }
 
 /**
- * Équipe active d'un joueur (une seule, invariant du projet).
+ * Équipe active d'un joueur (une seule, invariant du projet), **avec les rôles
+ * qu'il y porte**.
+ *
+ * Les rôles voyagent avec l'équipe, et pas par un second appel : ils vivent sur
+ * la ligne d'appartenance déjà lue, et l'appelant qui en a besoin est justement
+ * celui qui ne peut pas se permettre une requête de plus — l'inscription les lit
+ * sous le verrou du tournoi (voir `connection` ci-dessous).
  *
  * @param connection Connexion sur laquelle lire. **À fournir dès que l'appelant
  *   est dans une transaction** : sans elle, la fonction emprunte une *seconde*
@@ -689,10 +694,12 @@ export async function leaveTeam(userId: number, teamId: number): Promise<void> {
 export async function getUserActiveTeam(
   userId: number,
   connection?: Pick<PoolConnection, "execute">,
-): Promise<{ teamId: number; teamName: string } | null> {
+): Promise<{ teamId: number; teamName: string; roles: TeamRole[] } | null> {
   const db = connection ?? (await getDatabase());
-  const [rows] = await db.execute<(RowDataPacket & { team_id: number; team_name: string })[]>(
-    `SELECT tm.team_id, t.name AS team_name
+  const [rows] = await db.execute<
+    (RowDataPacket & { team_id: number; team_name: string; roles_json: string })[]
+  >(
+    `SELECT tm.team_id, t.name AS team_name, tm.roles_json
      FROM bg_team_members tm
      JOIN bg_teams t ON t.id = tm.team_id
      WHERE tm.user_id = ?
@@ -706,6 +713,7 @@ export async function getUserActiveTeam(
   return {
     teamId: Number(rows[0].team_id),
     teamName: rows[0].team_name,
+    roles: parseRoles(rows[0].roles_json),
   };
 }
 

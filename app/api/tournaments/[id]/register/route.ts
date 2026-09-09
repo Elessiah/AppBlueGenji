@@ -17,6 +17,11 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     return ok({ success: true });
   } catch (error) {
     const message = (error as Error).message;
+    // Le refus de qualité est un refus de **droits**, pas de forme : le joueur
+    // a bien une équipe, il n'a simplement pas la charge de l'engager
+    // (`OWNER`/`MANAGER`, voir `lib/shared/team-roles.ts`).
+    if (message === "NOT_TEAM_MANAGER") return fail(message, 403);
+
     if (
       message === "NO_ACTIVE_TEAM"
       || message === "REGISTRATION_CLOSED"
