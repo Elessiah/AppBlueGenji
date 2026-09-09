@@ -64,7 +64,12 @@ export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy
                   href={stream.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label={`Regarder ${stream.tournamentName} en direct${
+                  /* Le libellé **commence par le texte affiché**, puis ajoute
+                     ce que l'écran donne à voir autour du bouton (le tournoi,
+                     la plateforme) : un lien dont le nom accessible ne contient
+                     pas ce qu'on lit dessus ne répond pas à la commande vocale,
+                     puisqu'on prononce ce qui est écrit (WCAG 2.5.3). */
+                  aria-label={`Regarder le live — ${stream.tournamentName} en direct${
                     platform ? ` sur ${PLATFORM_LABELS[platform]}` : ""
                   } (nouvel onglet)`}
                 >
