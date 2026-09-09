@@ -28,13 +28,25 @@ export const SITE_NAME = "BlueGenji Esport";
 /**
  * Phrase d'accroche du site.
  *
- * L'ordre des deux jeux n'est pas cosmétique : BlueGenji est d'abord une
- * structure Overwatch, Marvel Rivals est venu ensuite. La racine annonçait
+ * Elle est **recalée sur ce que la vitrine dit réellement**, et c'est tout son
+ * sujet : les textes de l'accueil et de la page association s'éditent depuis
+ * l'interface (`site-copy.ts`), celle-ci est écrite en dur, et les deux avaient
+ * divergé. Le hero de production annonce une communauté « principalement autour
+ * d'Overwatch » et l'association décrit des événements « en ligne et en LAN »,
+ * quand la description de référencement mettait encore les deux jeux sur le même
+ * plan et ignorait la LAN. Un moteur qui lit une promesse absente de la page la
+ * retient contre elle.
+ *
+ * L'ordre des jeux n'est pas cosmétique pour autant : BlueGenji est d'abord une
+ * structure Overwatch, Marvel Rivals est venu ensuite — la racine annonçait
  * « l'esport amateur Marvel Rivals » tout court, ce qui décrivait mal
  * l'association et son historique.
+ *
+ * La longueur est tenue sous ~160 caractères : au-delà, un moteur coupe
+ * lui-même, et la coupe tombe au milieu de ce qu'on voulait dire.
  */
 export const SITE_DESCRIPTION =
-  "Tournois amateurs Overwatch et Marvel Rivals, brackets en direct, classement des équipes et bot Discord : la plateforme de l'association BlueGenji.";
+  "Tournois esport amateurs en ligne et en LAN, principalement Overwatch : brackets en direct, classement des équipes, arbitrage bénévole — association BlueGenji.";
 
 /**
  * Ce qu'affiche la carte d'aperçu du site — celle que reçoit toute page sans

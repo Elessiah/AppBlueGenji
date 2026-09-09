@@ -36,6 +36,19 @@ export type PageMetadataInput = {
   shareDescription?: string;
   /** Chemin absolu de la page (« /association »), pour l'URL canonique. */
   path: string;
+  /**
+   * Écrire le nom du site dans le `<title>` plutôt que de le laisser au gabarit
+   * de la racine.
+   *
+   * Le gabarit `%s · BlueGenji Esport` ne s'applique qu'aux **segments
+   * enfants** : la page racine partage le segment de la mise en page qui le
+   * déclare, elle ne le reçoit donc pas. L'accueil s'annonçait ainsi
+   * « Tournois esport amateurs Overwatch » tout court, sans un mot de la marque
+   * — le seul endroit du site où le nom manquait était celui où il compte le
+   * plus. Aucune autre page n'a besoin de ce drapeau : elles sont toutes des
+   * enfants.
+   */
+  selfTitled?: boolean;
 };
 
 export function pageMetadata({
@@ -43,6 +56,7 @@ export function pageMetadata({
   description,
   shareDescription,
   path,
+  selfTitled = false,
 }: PageMetadataInput): Metadata {
   const share = shareDescription ?? description;
   // L'encart, lui, n'hérite d'aucun gabarit : son titre porte le nom du site,
@@ -50,7 +64,9 @@ export function pageMetadata({
   const shareTitle = `${title} · ${SITE_NAME}`;
 
   return {
-    title,
+    // `absolute` court-circuite le gabarit : ici non pour l'éviter — il ne
+    // s'appliquerait pas — mais pour écrire à la main ce qu'il aurait écrit.
+    title: selfTitled ? { absolute: shareTitle } : title,
     description,
     alternates: { canonical: path },
     openGraph: {

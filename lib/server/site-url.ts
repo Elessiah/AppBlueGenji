@@ -46,6 +46,20 @@ export function siteMetadataBase(): URL {
   return new URL(DEV_FALLBACK_URL);
 }
 
+/**
+ * Racine publique, **toujours** rendue — repli compris.
+ *
+ * {@link siteBaseUrl} rend `null` quand `APP_URL` manque, ce qui convient à un
+ * message Discord (mieux vaut pas de lien qu'un lien inventé) mais pas à ce qui
+ * doit produire une URL absolue quoi qu'il arrive : un `sitemap.xml` n'accepte
+ * que des adresses complètes, et un `@id` de données structurées relatif ne
+ * désigne rien. On y reprend donc le repli de {@link siteMetadataBase}, sans sa
+ * barre oblique finale.
+ */
+export function siteCanonicalBase(): string {
+  return siteMetadataBase().href.replace(/\/+$/, "");
+}
+
 /** URL absolue d'un chemin du site, ou `null` si la racine est inconnue. */
 export function siteUrl(path: string): string | null {
   const base = siteBaseUrl();

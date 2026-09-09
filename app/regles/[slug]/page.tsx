@@ -13,6 +13,9 @@ import {
   ruleModeBySlug,
   type RuleSection,
 } from "@/lib/shared/tournament-rules";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { siteCanonicalBase } from "@/lib/server/site-url";
+import { breadcrumbJsonLd } from "@/lib/shared/structured-data";
 import styles from "./page.module.css";
 
 type PageProps = { params: Promise<{ slug: string }> };
@@ -68,6 +71,19 @@ export default async function RuleModePage({ params }: PageProps) {
 
   return (
     <main style={{ position: "relative", zIndex: 1 }}>
+      {/*
+        Le fil d'Ariane est ce qui remplace, dans un résultat de recherche,
+        l'adresse brute par « bluegenji-esport.fr › Règles › Ronde suisse ».
+        Une page de règles arrive rarement par l'accueil : elle doit dire seule
+        d'où elle vient.
+      */}
+      <JsonLd
+        data={breadcrumbJsonLd(siteCanonicalBase(), [
+          { name: "Accueil", path: "/" },
+          { name: "Règles des tournois", path: "/regles" },
+          { name: mode.label, path: `/regles/${mode.slug}` },
+        ])}
+      />
       <PublicHeader />
 
       <section className={`${styles.section} ${styles.heroSection}`}>

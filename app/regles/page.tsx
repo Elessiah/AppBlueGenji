@@ -13,12 +13,19 @@ import {
 } from "@/lib/shared/tournament-rules";
 import styles from "./page.module.css";
 
+/**
+ * La description ne citait que quatre modes sur les six que le registre expose
+ * depuis : « BlueGenji Survie » et le multi-phases y manquaient, alors que ce
+ * sont justement les deux qui n'existent nulle part ailleurs et qu'on cherche
+ * par leur nom. Une description qui n'annonce pas ce que la page contient prive
+ * la page des recherches qu'elle mérite.
+ */
 export const metadata: Metadata = pageMetadata({
   title: "Règles des tournois",
   description:
-    "Comment se joue un tournoi BlueGenji : élimination simple, double élimination, mode Survie et ronde suisse — règles, schémas et cas particuliers.",
+    "Les règles de chaque mode BlueGenji : élimination simple et double, BlueGenji Survie, Survie, ronde suisse et multi-phases — schémas et cas particuliers.",
   shareDescription:
-    "Les règles de chaque mode de tournoi, expliquées avec des schémas : élimination simple, double élimination, Survie, ronde suisse.",
+    "Les règles de chaque mode de tournoi, expliquées avec des schémas : élimination simple et double, BlueGenji Survie, Survie, ronde suisse, multi-phases.",
   path: "/regles",
 });
 
