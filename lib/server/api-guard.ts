@@ -123,6 +123,42 @@ export const ISSUE_REPORT_RULE: RateLimitRule = {
 };
 
 /**
+ * Demandes d'un code de connexion Discord, **par compte Discord visé**.
+ *
+ * Étroit, comme le signalement de problème et pour une raison voisine : chaque
+ * appel envoie un message privé à quelqu'un — ici, à la personne dont on
+ * prétend être. Un joueur en demande un, deux si le premier s'est perdu.
+ *
+ * Le plafond porte sur l'identifiant Discord **résolu par le bot**, et non sur
+ * l'IP : c'est le seul axe qu'un attaquant ne peut pas faire tourner, puisqu'il
+ * lui faut précisément viser sa victime. Il borne donc deux choses à la fois —
+ * le harcèlement par messages privés, et le nombre de codes neufs qu'on peut
+ * mettre en jeu (chacun rouvrant un quota d'essais).
+ */
+export const DISCORD_CODE_REQUEST_RULE: RateLimitRule = {
+  name: "discord-code-request",
+  limit: 3,
+  windowMs: 15 * 60_000,
+};
+
+/**
+ * Vérifications d'un code de connexion Discord, **par compte Discord visé**.
+ *
+ * Second garde-fou du même secret : le premier est le quota d'essais porté par
+ * le code lui-même (`MAX_DISCORD_CODE_ATTEMPTS`), qui le brûle au cinquième
+ * échec. Celui-ci borne ce que la répétition de codes neufs rouvrirait — deux
+ * codes épuisés dans la fenêtre, et plus rien ne passe.
+ *
+ * Même axe que la demande, et pour la même raison : l'identifiant visé ne se
+ * change pas sans changer de victime.
+ */
+export const DISCORD_CODE_VERIFY_RULE: RateLimitRule = {
+  name: "discord-code-verify",
+  limit: 10,
+  windowMs: 15 * 60_000,
+};
+
+/**
  * Applique un plafond. Renvoie la réponse 429 à retourner tel quel, ou `null`
  * si la requête peut continuer.
  *

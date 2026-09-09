@@ -373,6 +373,7 @@ export default function TournamentDetailPage() {
         isAdmin: detail.isAdmin,
         myTeamId: detail.myTeamId,
         canCreateReportsForTeamIds: detail.canCreateReportsForTeamIds,
+        canActForEntrant: detail.canRegisterEntrant,
       },
       teamId,
     );

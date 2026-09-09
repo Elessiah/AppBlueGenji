@@ -4,6 +4,7 @@ import { getDatabase } from "@/lib/server/database";
 import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
 import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
+import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 import { getPlayerEntityStats, loadPlayerRecords } from "@/lib/server/stats-service";
 import type {
@@ -84,8 +85,11 @@ function mapPublicUser(row: UserRow): PublicUserProfile {
  * les rosters et les feuilles de match, où l'anonymat n'a pas de sens.
  */
 function applyVisibility<T extends PublicUserProfile>(profile: T, isSelf: boolean): T {
+  // L'avatar passe par la règle partagée (`lib/shared/avatar.ts`) : le roster
+  // d'une équipe et le logo d'une entrée solo la posent aussi, et trois copies
+  // divergeraient — la première l'avait déjà fait en ne la posant pas du tout.
+  profile.avatarUrl = visibleAvatarUrl(profile.avatarUrl, profile.visibility.avatar, isSelf);
   if (isSelf) return profile;
-  if (!profile.visibility.avatar) profile.avatarUrl = null;
   if (!profile.visibility.overwatch) profile.overwatchBattletag = null;
   if (!profile.visibility.marvel) profile.marvelRivalsTag = null;
   if (!profile.visibility.major) profile.isAdult = null;
@@ -94,6 +98,22 @@ function applyVisibility<T extends PublicUserProfile>(profile: T, isSelf: boolea
 
 function hashCode(code: string): string {
   return crypto.createHash("sha256").update(code).digest("hex");
+}
+
+/**
+ * Compare deux empreintes en temps constant.
+ *
+ * Les deux opérandes sont des SHA-256 en hexadécimal, donc de longueur fixe et
+ * connue : la comparaison ne fuit rien de plus que « égales ou non ». On
+ * n'aurait pas pu extraire le code d'une fuite de temps sur `===` en pratique,
+ * mais une comparaison de secret se fait en temps constant, sans exception à
+ * évaluer au cas par cas.
+ */
+function timingSafeEquals(left: string, right: string): boolean {
+  const a = Buffer.from(left, "utf8");
+  const b = Buffer.from(right, "utf8");
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }
 
 function randomCode(): string {
@@ -307,9 +327,35 @@ export async function discordAccountExists(discordId: string): Promise<boolean> 
   return rows.length > 0;
 }
 
+/**
+ * Nombre d'essais accordés à un code de connexion Discord avant qu'il ne soit
+ * brûlé.
+ *
+ * Le code fait six chiffres : un million de combinaisons, ce qui n'est un
+ * secret que si l'on **compte les essais**. La colonne `attempts` existait
+ * depuis toujours et n'était lue nulle part — elle s'incrémentait sans jamais
+ * rien refuser —, si bien qu'un tiers connaissant le pseudo Discord d'un joueur
+ * (une information publique sur n'importe quel serveur) pouvait demander un
+ * code puis énumérer les six chiffres jusqu'à ouvrir sa session. Cinq essais
+ * suffisent à qui a lu son message privé, et ramènent l'attaque à une chance
+ * sur deux cent mille par code.
+ */
+export const MAX_DISCORD_CODE_ATTEMPTS = 5;
+
 export async function createDiscordLoginChallenge(discordId: string): Promise<DiscordChallenge> {
   const db = await getDatabase();
   const code = randomCode();
+
+  // Un nouveau code périme le précédent. Sans cela, deux codes valides
+  // coexistent — et surtout, `verifyDiscordChallenge` ne lisant que le plus
+  // récent, l'ancien resterait ouvert sans que ses essais soient jamais
+  // décomptés.
+  await db.execute(
+    `UPDATE bg_discord_login_challenges
+     SET consumed_at = NOW()
+     WHERE discord_id = ? AND consumed_at IS NULL`,
+    [discordId],
+  );
 
   const [insert] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_discord_login_challenges (discord_id, code_hash, expires_at)
@@ -356,11 +402,28 @@ export async function verifyDiscordChallenge(discordId: string, code: string): P
   const challenge = rows[0];
   if (challenge.consumed_at !== null) return false;
   if (new Date(challenge.expires_at).getTime() < Date.now()) return false;
+  // Le quota est relu **avant** la comparaison : un code déjà épuisé ne doit
+  // même pas être testé, sinon le dernier essai resterait toujours gratuit.
+  if (Number(challenge.attempts) >= MAX_DISCORD_CODE_ATTEMPTS) return false;
 
-  const valid = challenge.code_hash === hashCode(code);
+  const valid = timingSafeEquals(challenge.code_hash, hashCode(code));
 
   if (!valid) {
-    await db.execute(`UPDATE bg_discord_login_challenges SET attempts = attempts + 1 WHERE id = ?`, [challenge.id]);
+    // Le compteur est incrémenté **et** le code brûlé au dernier essai, dans la
+    // même écriture : laisser la ligne ouverte obligerait chaque lecture à
+    // refaire le calcul, et une course entre deux essais simultanés pourrait en
+    // accorder un de trop.
+    await db.execute(
+      // `consumed_at` **avant** `attempts` : MySQL évalue les affectations de
+      // gauche à droite et les suivantes lisent déjà la nouvelle valeur. Dans
+      // l'autre ordre, le `CASE` compterait un essai de trop et brûlerait le
+      // code une tentative trop tôt.
+      `UPDATE bg_discord_login_challenges
+       SET consumed_at = CASE WHEN attempts + 1 >= ? THEN NOW() ELSE consumed_at END,
+           attempts = attempts + 1
+       WHERE id = ?`,
+      [MAX_DISCORD_CODE_ATTEMPTS, challenge.id],
+    );
     return false;
   }
 
@@ -432,9 +495,11 @@ export async function updateOwnProfile(
     ],
   );
 
-  // L'entrée solo (tournois individuels) affiche le pseudo du joueur dans les
-  // brackets : elle suit le renommage.
-  if (patch.pseudo) {
+  // L'entrée solo (tournois individuels) affiche le pseudo **et l'avatar** du
+  // joueur dans les brackets : elle suit le renommage, et aussi la bascule de
+  // visibilité de l'avatar — sans quoi masquer son image n'aurait effacé que la
+  // fiche de profil, l'entrée solo continuant de la servir à tout le site.
+  if (patch.pseudo || patch.visibility?.avatar !== undefined) {
     await syncSoloEntryIdentity(userId);
   }
 }
@@ -690,12 +755,18 @@ export async function getUserIdByPseudo(pseudo: string): Promise<number | null> 
   return rows.length === 0 ? null : Number(rows[0].id);
 }
 
+/**
+ * Ne garde d'une liste de rôles d'équipe que les valeurs connues, dédupliquées.
+ *
+ * **Aucun repli** : une entrée vide ou entièrement invalide rend une liste
+ * vide, et c'est à l'appelant de dire ce qu'il en fait — `MISSING_ROLE` quand
+ * on modifie un membre existant, `DPS` quand on en accueille un nouveau. La
+ * fonction repliait jusqu'ici sur `["OWNER"]`, ce que ses appelants
+ * annulaient aussitôt en filtrant ce rôle : le repli n'a donc jamais rien
+ * accordé, mais il attendait le premier appelant qui oublierait le filtre pour
+ * faire d'un corps de requête vide une prise de propriété.
+ */
 export function sanitizeRoles(roles: TeamRole[]): TeamRole[] {
-  const parsed = parseRoles(roles);
-  const unique = new Set(parsed);
-  if (unique.size === 0) {
-    unique.add("OWNER");
-  }
-  return Array.from(unique);
+  return Array.from(new Set(parseRoles(roles)));
 }
 

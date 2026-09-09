@@ -1,3 +1,4 @@
+import { DISCORD_CODE_REQUEST_RULE, enforceRateLimit } from "@/lib/server/api-guard";
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
 import { fail, ok } from "@/lib/server/http";
 import { createDiscordLoginChallenge, discordAccountExists } from "@/lib/server/users-service";
@@ -33,6 +34,14 @@ export async function POST(req: Request) {
     }
 
     const discordId = await resolveDiscordUser(handle);
+
+    // Plafonné sur le compte visé, et non sur l'appelant : chaque appel envoie
+    // un message privé à quelqu'un et remet en jeu un code neuf. C'est aussi le
+    // seul axe qu'un attaquant ne peut pas faire tourner — l'IP, elle, se
+    // renouvelle, et l'en-tête qui la porte n'est pas toujours posé par un
+    // relais de confiance.
+    const throttled = enforceRateLimit(DISCORD_CODE_REQUEST_RULE, discordId);
+    if (throttled) return throttled;
 
     // Un compte déjà rattaché à ce Discord a forcément un pseudo : le client
     // masque alors le champ « pseudo site », réservé à la première connexion.

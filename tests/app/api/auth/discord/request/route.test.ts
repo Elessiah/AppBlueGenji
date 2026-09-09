@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { POST } from "@/app/api/auth/discord/request/route";
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
 import { createDiscordLoginChallenge, discordAccountExists } from "@/lib/server/users-service";
+import { resetRateLimit } from "@/lib/server/rate-limit";
+import { DISCORD_CODE_REQUEST_RULE } from "@/lib/server/api-guard";
 
 jest.mock("@/lib/server/bot-integration", () => ({
   resolveDiscordUser: jest.fn(),
@@ -34,6 +36,9 @@ describe("POST /api/auth/discord/request", () => {
     createDiscordLoginChallengeMock.mockReset();
     discordAccountExistsMock.mockReset();
     discordAccountExistsMock.mockResolvedValue(false);
+    // Le plafond est par compte Discord visé et vit en mémoire du processus :
+    // sans remise à zéro, les cas suivants héritent des demandes des premiers.
+    resetRateLimit(DISCORD_CODE_REQUEST_RULE.name);
     // Par défaut, resolve renvoie l'identifiant tel quel (cas ID numérique).
     resolveDiscordUserMock.mockImplementation(async (handle: string) => handle);
   });
@@ -71,6 +76,47 @@ describe("POST /api/auth/discord/request", () => {
     expect(payload.expiresAt).toBe("2030-01-01T10:00:00.000Z");
     expect(payload.isNewAccount).toBe(true);
     expect(sendDiscordLoginCodeMock).toHaveBeenCalledWith("123456789012345678", "123456");
+  });
+
+  it("plafonne les demandes par compte visé, message privé compris", async () => {
+    // Chaque appel envoie un message privé à quelqu'un et remet un code neuf en
+    // jeu — donc rouvre un quota d'essais. Sans ce plafond, la demande en
+    // boucle rendait le décompte des essais purement décoratif.
+    createDiscordLoginChallengeMock.mockResolvedValue({
+      challengeId: 1,
+      code: "123456",
+      expiresAt: new Date("2030-01-01T10:00:00.000Z"),
+    });
+    sendDiscordLoginCodeMock.mockResolvedValue();
+
+    for (let i = 0; i < DISCORD_CODE_REQUEST_RULE.limit; i += 1) {
+      const ok = await POST(buildRequest({ discordId: "123456789012345678" }));
+      expect(ok.status).toBe(200);
+    }
+
+    const blocked = await POST(buildRequest({ discordId: "123456789012345678" }));
+    expect(blocked.status).toBe(429);
+    // Ni code neuf, ni message privé : le plafond est posé avant les deux.
+    expect(createDiscordLoginChallengeMock).toHaveBeenCalledTimes(
+      DISCORD_CODE_REQUEST_RULE.limit,
+    );
+    expect(sendDiscordLoginCodeMock).toHaveBeenCalledTimes(DISCORD_CODE_REQUEST_RULE.limit);
+  });
+
+  it("ne plafonne pas un second compte au passage", async () => {
+    createDiscordLoginChallengeMock.mockResolvedValue({
+      challengeId: 1,
+      code: "123456",
+      expiresAt: new Date("2030-01-01T10:00:00.000Z"),
+    });
+    sendDiscordLoginCodeMock.mockResolvedValue();
+
+    for (let i = 0; i < DISCORD_CODE_REQUEST_RULE.limit; i += 1) {
+      await POST(buildRequest({ discordId: "123456789012345678" }));
+    }
+
+    const other = await POST(buildRequest({ discordId: "111222333444555666" }));
+    expect(other.status).toBe(200);
   });
 
   it("signale isNewAccount=false quand un compte est déjà rattaché au Discord", async () => {

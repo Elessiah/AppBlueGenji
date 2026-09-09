@@ -22,11 +22,16 @@ function req(body: unknown = {}) {
 
 const params = { params: Promise.resolve({ id: "5" }) };
 
+/** Engagé du joueur tel que le rend `getUserEntrant`. */
+function entrant(teamId: number | null, canActForEntrant = true) {
+  return { teamId, canActForEntrant };
+}
+
 describe("POST /api/tournaments/[id]/forfeit", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (service.forfeitTournamentTeam as jest.Mock).mockResolvedValue(undefined as never);
-    (service.getUserEntrantTeamId as jest.Mock).mockResolvedValue(null as never);
+    (service.getUserEntrant as jest.Mock).mockResolvedValue(entrant(null) as never);
   });
   afterEach(() => jest.restoreAllMocks());
 
@@ -39,7 +44,7 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
 
   it("un membre déclare le forfait de son engagé (équipe active ou entrée solo)", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(member as never);
-    (service.getUserEntrantTeamId as jest.Mock).mockResolvedValue(77 as never);
+    (service.getUserEntrant as jest.Mock).mockResolvedValue(entrant(77) as never);
     const res = await POST(req(), params);
     expect(res.status).toBe(200);
     expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 77);
@@ -47,7 +52,7 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
 
   it("refuse un membre sans engagé dans ce tournoi (400)", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(member as never);
-    (service.getUserEntrantTeamId as jest.Mock).mockResolvedValue(null as never);
+    (service.getUserEntrant as jest.Mock).mockResolvedValue(entrant(null) as never);
     const res = await POST(req(), params);
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "NO_ACTIVE_TEAM" });
@@ -56,7 +61,7 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
   it("accepte qu'un membre cible explicitement sa propre équipe", async () => {
     // Le bouton du classement envoie toujours l'identifiant de l'équipe.
     (getCurrentUser as jest.Mock).mockResolvedValue(member as never);
-    (service.getUserEntrantTeamId as jest.Mock).mockResolvedValue(77 as never);
+    (service.getUserEntrant as jest.Mock).mockResolvedValue(entrant(77) as never);
     const res = await POST(req({ teamId: 77 }), params);
     expect(res.status).toBe(200);
     expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 77);
@@ -64,8 +69,27 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
 
   it("empêche un membre de forfaiter une autre équipe (403)", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(member as never);
-    (service.getUserEntrantTeamId as jest.Mock).mockResolvedValue(77 as never);
+    (service.getUserEntrant as jest.Mock).mockResolvedValue(entrant(77) as never);
     const res = await POST(req({ teamId: 88 }), params);
+    expect(res.status).toBe(403);
+    expect(service.forfeitTournamentTeam).not.toHaveBeenCalled();
+  });
+
+  it("refuse au joueur du roster sans rôle de gestion (403 NOT_TEAM_MANAGER)", async () => {
+    // Même qualité que pour inscrire l'équipe : retirer l'équipe du tournoi
+    // l'engage tout entière, et sans retour.
+    (getCurrentUser as jest.Mock).mockResolvedValue(member as never);
+    (service.getUserEntrant as jest.Mock).mockResolvedValue(entrant(77, false) as never);
+    const res = await POST(req({ teamId: 77 }), params);
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "NOT_TEAM_MANAGER" });
+    expect(service.forfeitTournamentTeam).not.toHaveBeenCalled();
+  });
+
+  it("refuse aussi sans corps : le refus tient à la personne, pas à la cible", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(member as never);
+    (service.getUserEntrant as jest.Mock).mockResolvedValue(entrant(77, false) as never);
+    const res = await POST(req(), params);
     expect(res.status).toBe(403);
     expect(service.forfeitTournamentTeam).not.toHaveBeenCalled();
   });
@@ -81,7 +105,7 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
   // joueur a bien un engagé, c'est la cible qui n'existe pas.
   it("répond 404 quand le tournoi n'existe pas", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(member as never);
-    (service.getUserEntrantTeamId as jest.Mock).mockRejectedValue(
+    (service.getUserEntrant as jest.Mock).mockRejectedValue(
       new Error("TOURNAMENT_NOT_FOUND") as never,
     );
     const res = await POST(req(), params);

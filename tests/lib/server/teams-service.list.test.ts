@@ -15,6 +15,9 @@ jest.mock("@/lib/server/database");
 const TEAM_QUERY = /AS members_count/;
 const IDENTITY_QUERY = /FROM bg_teams\s+WHERE solo_user_id IS NULL/;
 const REPLAY_QUERY = /AS played_at/;
+// `limited_members` et non `ROW_NUMBER` : la requête de forme en emploie une
+// aussi, et la distinguer par sa fenêtre attraperait les deux.
+const ROSTER_QUERY = /limited_members/;
 
 /**
  * `listTeams` enchaîne plusieurs lectures : équipes, forme, classement (rejeu
@@ -30,7 +33,10 @@ const REPLAY_QUERY = /AS played_at/;
  * dans le rejeu : chacune est une rencontre gagnée contre une équipe de passage,
  * ce qui monte la cote sans polluer la liste.
  */
-async function mockDb(teamRows: Record<string, unknown>[]) {
+async function mockDb(
+  teamRows: Record<string, unknown>[],
+  rosterRows: Record<string, unknown>[] = [],
+) {
   let matchId = 0;
   let sparringId = 10_000;
   const matches = teamRows.flatMap((row) =>
@@ -54,6 +60,7 @@ async function mockDb(teamRows: Record<string, unknown>[]) {
     if (IDENTITY_QUERY.test(text)) {
       return [teamRows.map((row) => ({ id: row.id, name: row.name, logo_url: row.logo_url }))];
     }
+    if (ROSTER_QUERY.test(text)) return [rosterRows];
     return [[]];
   });
   const { getDatabase } = await import("@/lib/server/database");
@@ -127,5 +134,92 @@ describe("listTeams — logo des équipes", () => {
 
     const sql = execute.mock.calls.map((call) => String(call[0])).find((s) => TEAM_QUERY.test(s))!;
     expect(sql).toMatch(/t\.logo_url/);
+  });
+});
+
+/** Ligne de roster telle que la rend la requête d'aperçu de `listTeams`. */
+function rosterRow(overrides: Record<string, unknown> = {}) {
+  return {
+    team_id: 12,
+    user_id: 7,
+    pseudo: "Nova",
+    avatar_url: "/api/uploads/avatars/7.webp",
+    visible_avatar: 1,
+    ...overrides,
+  };
+}
+
+/**
+ * `visible_avatar` vaut aussi dans la vignette d'un roster.
+ *
+ * La requête lisait `u.avatar_url` sans jamais consulter le réglage : un joueur
+ * qui avait masqué son avatar le voyait quand même s'afficher à tout le site,
+ * sur la carte de son équipe. Voir `docs/AUTHORIZATION_RULES.md` §2.3.
+ */
+describe("listTeams — avatar masqué dans l'aperçu du roster", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    clearCache();
+  });
+
+  it("masque l'avatar d'un joueur qui l'a rendu privé", async () => {
+    await mockDb([teamRow()], [rosterRow({ visible_avatar: 0 })]);
+
+    const teams = await listTeams();
+
+    expect(teams[0].rosterPreview).toEqual([{ userId: 7, pseudo: "Nova", avatarUrl: null }]);
+  });
+
+  it("le laisse à son propriétaire, qui doit voir le sien", async () => {
+    await mockDb([teamRow()], [rosterRow({ visible_avatar: 0 })]);
+
+    const teams = await listTeams(7);
+
+    expect(teams[0].rosterPreview[0].avatarUrl).toBe("/api/uploads/avatars/7.webp");
+  });
+
+  it("laisse passer un avatar public", async () => {
+    await mockDb([teamRow()], [rosterRow({ visible_avatar: 1 })]);
+
+    const teams = await listTeams();
+
+    expect(teams[0].rosterPreview[0].avatarUrl).toBe("/api/uploads/avatars/7.webp");
+  });
+
+  it("ne masque pas l'avatar d'un tiers au lecteur, seulement le sien", async () => {
+    await mockDb(
+      [teamRow()],
+      [
+        rosterRow({ user_id: 7, pseudo: "Nova", visible_avatar: 0 }),
+        rosterRow({
+          user_id: 8,
+          pseudo: "Kite",
+          avatar_url: "/api/uploads/avatars/8.webp",
+          visible_avatar: 0,
+        }),
+      ],
+    );
+
+    const teams = await listTeams(7);
+
+    expect(teams[0].rosterPreview.map((member) => member.avatarUrl)).toEqual([
+      "/api/uploads/avatars/7.webp",
+      null,
+    ]);
+  });
+
+  it("sélectionne `visible_avatar` dans la requête du roster", async () => {
+    // Sans la colonne, le masquage retomberait sur `undefined === 1` — donc sur
+    // « masqué » pour tout le monde, panne aussi silencieuse que l'inverse.
+    const execute = await mockDb([teamRow()], [rosterRow()]);
+
+    await listTeams();
+
+    const sql = execute.mock.calls.map((call) => String(call[0])).find((s) => ROSTER_QUERY.test(s))!;
+    expect(sql).toMatch(/u\.visible_avatar/);
   });
 });
