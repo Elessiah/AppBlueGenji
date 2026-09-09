@@ -103,3 +103,18 @@ export function publicSitemapRoutes(botDocSlugs: readonly string[] = []): Sitema
  * balise, et leur exploration n'apporte rien à personne.
  */
 export const SITEMAP_DISALLOWED_PATHS: readonly string[] = ["/api/"];
+
+/**
+ * Ce qui reste explorable **malgré** l'interdiction ci-dessus.
+ *
+ * `/api/uploads/` n'est une route d'API que par accident d'implémentation : le
+ * serveur statique ne sert pas les fichiers écrits après son démarrage, si bien
+ * que **toutes** les images téléversées du site y passent (`toServedUploadUrl`)
+ * — logos de partenaires et d'équipes sur l'accueil, photos des bénévoles. Les
+ * laisser sous `Disallow: /api/` interdisait à un moteur de charger les images
+ * des deux pages que le sitemap met justement en avant.
+ *
+ * La règle la plus spécifique l'emporte dans le protocole : une autorisation
+ * plus longue que l'interdiction qui la couvre suffit à rouvrir le sous-arbre.
+ */
+export const SITEMAP_ALLOWED_PATHS: readonly string[] = ["/", "/api/uploads/"];

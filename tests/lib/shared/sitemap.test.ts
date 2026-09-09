@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  SITEMAP_ALLOWED_PATHS,
   SITEMAP_DISALLOWED_PATHS,
   publicSitemapRoutes,
 } from "@/lib/shared/sitemap";
@@ -98,5 +99,23 @@ describe("SITEMAP_DISALLOWED_PATHS", () => {
     // alors indexer l'URL seule, sans titre ni description.
     expect(SITEMAP_DISALLOWED_PATHS).not.toContain("/tournois");
     expect(SITEMAP_DISALLOWED_PATHS).not.toContain("/connexion");
+  });
+});
+
+describe("SITEMAP_ALLOWED_PATHS", () => {
+  it("rouvre les images téléversées, que l'interdiction des API recouvrait", () => {
+    // `/api/uploads/` n'est une route d'API que par accident d'implémentation :
+    // c'est par là que passent tous les logos et toutes les photos du site.
+    expect([...SITEMAP_ALLOWED_PATHS]).toEqual(["/", "/api/uploads/"]);
+  });
+
+  it("autorise plus précisément qu'elle n'interdit, sinon la règle ne s'applique pas", () => {
+    // Dans le protocole, la règle la plus spécifique l'emporte : une
+    // autorisation plus courte que l'interdiction qui la couvre ne rouvrirait
+    // rien du tout.
+    for (const allowed of SITEMAP_ALLOWED_PATHS) {
+      const covering = SITEMAP_DISALLOWED_PATHS.find((path) => allowed.startsWith(path));
+      if (covering) expect(allowed.length).toBeGreaterThan(covering.length);
+    }
   });
 });

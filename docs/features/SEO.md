@@ -65,7 +65,13 @@ contresens classique qu'on évite : un robot à qui l'on interdit de lire la pag
 ne lit pas non plus le `noindex` qu'elle porte, et peut donc indexer l'URL seule,
 sans titre ni description. On laisse ces pages accessibles pour que la directive
 soit lue et obéie. Ne restent interdites que les routes d'API, qui ne rendent
-aucune page.
+aucune page — **à une exception près**, rouverte explicitement :
+`/api/uploads/` n'est une route d'API que par accident d'implémentation (le
+serveur statique ne sert pas les fichiers écrits après son démarrage), et c'est
+par là que passent **toutes** les images téléversées du site : logos de
+partenaires sur l'accueil, photos des bénévoles. La règle la plus spécifique
+l'emporte, une autorisation plus longue que l'interdiction qui la couvre suffit
+donc à rouvrir le sous-arbre.
 
 Les pages de règles descendent du **registre des modes** et les pages de doc du
 bot de `BOT_DOC_SECTIONS` : ajouter un mode ou une section ajoute son entrée au

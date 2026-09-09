@@ -33,8 +33,17 @@ describe("robots.txt", () => {
     const rules = robots().rules;
     const rule = Array.isArray(rules) ? rules[0] : rules;
     expect(rule?.userAgent).toBe("*");
-    expect(rule?.allow).toBe("/");
     expect(rule?.disallow).toEqual(["/api/"]);
+  });
+
+  it("laisse explorer les images téléversées, qui passent par une route d'API", () => {
+    // `/api/uploads/` sert **toutes** les images téléversées du site : logos de
+    // partenaires sur l'accueil, photos des bénévoles. Les laisser sous
+    // `Disallow: /api/` interdisait à un moteur de charger les images des deux
+    // pages que le sitemap met en avant.
+    const rules = robots().rules;
+    const rule = Array.isArray(rules) ? rules[0] : rules;
+    expect(rule?.allow).toEqual(["/", "/api/uploads/"]);
   });
 
   it("ne double pas la barre oblique quand `APP_URL` en porte une", () => {

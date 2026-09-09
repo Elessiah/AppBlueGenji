@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { siteCanonicalBase } from "@/lib/server/site-url";
-import { SITEMAP_DISALLOWED_PATHS } from "@/lib/shared/sitemap";
+import { SITEMAP_ALLOWED_PATHS, SITEMAP_DISALLOWED_PATHS } from "@/lib/shared/sitemap";
 
 /**
  * `robots.txt`, qui n'existait pas — la route répondait `404` en production.
@@ -25,7 +25,13 @@ export const dynamic = "force-dynamic";
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: [{ userAgent: "*", allow: "/", disallow: [...SITEMAP_DISALLOWED_PATHS] }],
+    rules: [
+      {
+        userAgent: "*",
+        allow: [...SITEMAP_ALLOWED_PATHS],
+        disallow: [...SITEMAP_DISALLOWED_PATHS],
+      },
+    ],
     sitemap: `${siteCanonicalBase()}/sitemap.xml`,
   };
 }
