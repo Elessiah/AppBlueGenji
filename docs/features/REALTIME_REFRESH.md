@@ -100,6 +100,36 @@ distinction qui n'aurait aucun effet.
 Le palier est décidé **par le serveur** à la connexion du flux et annoncé au
 client : il ne se déclare pas.
 
+### La version se suit par abonné, pas par palier
+
+La salle ne renvoie pas un instantané que son destinataire tient déjà : elle
+compare les empreintes. Cette comparaison porte sur **l'abonné**, et non sur son
+palier.
+
+Elle a longtemps porté sur le palier — « quelle version lui a été diffusée en
+dernier ? » —, ce qui laissait un trou étroit mais réel. La route lit
+l'instantané, résout le contexte du lecteur (une requête), son palier, sa place
+de flux, lui écrit sa première trame, **puis** l'abonne. Une diffusion glissée
+dans cet intervalle marquait le palier comme servi sans que le nouvel abonné
+l'ait reçue : sa lecture d'ouverture ayant précédé l'écriture, il tenait la
+version d'avant. Au tour suivant, `lastVersion === frame.version` faisait sauter
+tout son palier — il restait sur un plateau périmé, indéfiniment si plus rien ne
+bougeait, avec un témoin de flux au vert.
+
+La route annonce donc à la salle ce qu'elle vient d'envoyer
+(`joinTournamentRoom(id, { version: snapshot.version, … })`), et la salle tient
+cette version par connexion. Un abonné qui n'annonce aucune version est réputé
+n'avoir rien — on préfère un envoi de trop à un abonné muet.
+
+La **fenêtre de regroupement** suit la même règle, et pour une raison voisine :
+le palier en décide la *durée*, mais le moment où elle a commencé appartient à
+la connexion. Partagée, elle se faisait remettre à zéro par le rattrapage d'un
+retardataire — un envoi qui n'avait servi qu'un abonné arrivé en retard
+repoussait d'une fenêtre entière celui de tous les autres, et sur un tournoi où
+les spectateurs arrivent en continu la latence du palier doublait. Le budget de
+sortie, lui, reste bien commun à la salle : c'est un poids à écrire, pas une
+cadence.
+
 ### Budget de sortie
 
 Le regroupement borne la *fréquence* des envois, pas leur *poids*. Mesure faite
@@ -203,6 +233,45 @@ remonter un « ça a fini » à travers les cinq orchestrations qui peuvent clor
 La bascule d'état déclenchée par une simple lecture (`snapshot.ts`) rafraîchit
 les listes de la même façon.
 
+### L'entretien passif réconcilie ce qu'il tranche
+
+`syncTournamentState` arbitre les reports de score dont le délai a expiré. En
+élimination cela suffit : `finalizeMatch` pousse la gagnante le long des liens
+de bracket. Les modes à classement — Survie, Ronde suisse, BlueGenji Survie — et
+le multi-phases, eux, ne posent leur manche suivante qu'en **réconciliant**, et
+une manche close par le délai ne traverse aucun de leurs chemins d'entrée :
+personne n'a rapporté de score, donc personne n'a réconcilié derrière.
+
+Sans ce rappel, une manche tranchée par le délai alors qu'elle était la dernière
+de sa ronde laissait le tournoi **définitivement** en cours : plus aucun score à
+rapporter, donc plus aucun déclencheur — et le tournoi quittait au passage le
+champ de `findTournamentsNeedingSync`, si bien que plus rien ne le revisitait.
+
+`resolveExpiredScoreReports` rend donc le **nombre de manches réellement
+closes** plutôt que `void`, et l'entretien ne rappelle le moteur du format que
+si ce nombre est non nul : ces réconciliations rejouent le tournoi entier, et
+l'entretien passif repasse à chaque balayage. Un désaccord entre les deux
+engagés ne compte pas — il n'est pas tranché, il est escaladé à l'arbitrage.
+
+Le cas est couvert par le jeu de test (`Suisse Ronde Expirée` :
+quatre équipes, ronde 1 entièrement portée par des reports expirés).
+
+### Rien ne se publie depuis une transaction ouverte
+
+Tous les chemins d'écriture publient **après leur commit**. Un seul ne le
+faisait pas : `createBracketIfMissing`, qui s'exécute dans la transaction de son
+appelant et appelait pourtant `publishUpdatedEvent`. L'invalidation et
+l'événement partaient avant le commit, la salle se réveillait aussitôt,
+reconstruisait l'instantané sur une **autre** connexion — qui ne voit pas le
+plateau en cours d'écriture — et mettait en cache puis diffusait « en cours,
+sans plateau ». Aucun second événement ne venait le corriger, l'état du tournoi
+n'ayant pas changé : la trame périmée tenait jusqu'au battement d'entretien de
+la salle. Sur un rollback, elle aurait annoncé un plateau qui n'a jamais existé.
+
+L'information remonte désormais à l'appelant : `createBracketIfMissing` rend
+`{ finished, created }`, `syncTournamentState` rend `contentChanged`, et c'est
+la passe d'entretien qui publie, une fois commitée.
+
 ### Étranglement de la synchronisation d'états
 
 `syncVisibleTournaments()` entretient les tournois **qui ont quelque chose à
@@ -231,11 +300,26 @@ Fenêtre fixe, en mémoire, volontairement approximative. Les plafonds sont
 | `POST /api/visits` | 60 / min | IP |
 | `GET /api/tournaments/:id/stream` (ouvertures) | 30 / min | utilisateur |
 | Flux SSE simultanés | 4 | utilisateur |
+| `GET /api/bot/*` | 60 / min | IP |
+| `GET /api/bot/feed/stream` (ouvertures) | 30 / min | IP |
+| Flux du bot simultanés | 3 par IP, **40 au total** | IP + global |
 
 Le plafond d'**ouvertures** du flux est distinct de celui des flux
 *simultanés* : une fermeture libère aussitôt la place, si bien qu'une boucle
 ouverture/fermeture échapperait au second tout en refaisant à chaque tour le
 travail le plus cher de la route.
+
+Le relais du flux d'activité du bot (`/api/bot/feed/stream`, bandeau de la page
+`/bot`) est la seule connexion longue du site **sans compte** : `/bot` est une
+page de vitrine. Les trois gardes du flux de tournoi ne s'y transposent donc pas
+telles quelles — `getCurrentUser` en fermerait la porte, `acquireStreamSlot`
+compte par utilisateur. Or chaque lecteur y fait tenir *deux* connexions : la
+sienne, et celle que l'app ouvre vers le bot pour l'alimenter. D'où un plafond
+par IP **et** un plafond global (`lib/server/bot-feed-guard.ts`) : le second
+n'est pas une ceinture de plus, c'est le seul qui tienne là où l'identité manque.
+La place réservée est rendue par toutes les portes de sortie — fin de l'amont,
+erreur de lecture, annulation du corps, abandon de la requête —, une seule
+oubliée refermant définitivement le plafond au bout de quelques visites.
 
 L'IP retenue est celle **ajoutée par le proxy** (`X-Forwarded-For` lu depuis la
 droite sur `TRUSTED_PROXY_HOPS` relais) : un en-tête forgé ne permet pas de se
@@ -262,6 +346,17 @@ main dans `site-visits-service.ts`, s'appuie maintenant sur le même module.
   spectateur (5 min), et **ne demande rien quand l'onglet est caché**.
 - `export const revalidate` était mort à côté de `force-dynamic` sur les routes
   de la vitrine : supprimé, la mutualisation se fait en amont.
+- **Toutes** les lectures des pages de vitrine passent par `showcase-cache`.
+  Cinq y manquaient encore, dont les deux plus chaudes : `getContactInfo`,
+  appelée par `PublicFooter` — donc par *chaque* page publique, à chaque rendu —
+  et `getHighlightedAd`, appelée par la mise en page racine. Les trois autres
+  sont le bureau (`/association`), les bénévoles et la liste publique des
+  annonces de recrutement. Ces pages sont rendues à chaque visite (elles lisent
+  la session) et ne sont pas des routes API : elles ne peuvent pas répondre 429,
+  la mutualisation est le seul garde-fou disponible. La vue **staff** des
+  annonces, brouillons compris, reste hors cache — la partager sous la même clé
+  que la liste publique les servirait à tout le monde, exactement comme la
+  portée `hiddenOnly` de la liste des tournois.
 
 ## Carte des fichiers
 
@@ -286,6 +381,8 @@ main dans `site-visits-service.ts`, s'appuie maintenant sur le même module.
 | `tournaments/snapshot.ts` | Construction et mise en cache de l'instantané. |
 | `tournaments/list-cache.ts` | Cache de la liste publique. |
 | `tournaments/notifications.ts` | Publication d'événement **et** invalidation des caches. |
+| `bot-feed-guard.ts` | Plafonds du relais SSE du bot : par IP et global. |
+| `showcase-cache.ts` | Cache des lectures de vitrine (pied de page, bannière, listes). |
 
 ### Client
 

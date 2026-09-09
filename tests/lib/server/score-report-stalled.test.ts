@@ -337,3 +337,59 @@ describe("resolveExpiredScoreReports", () => {
     expect(queueRefereeAlert).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * Le compte rendu de la fonction — et non `void`.
+ *
+ * C'est la seule information qui distingue un balayage sans effet d'un balayage
+ * qui vient d'écrire un résultat. `syncTournamentState` s'en sert pour rappeler
+ * le moteur du format : les modes à classement et le multi-phases ne posent leur
+ * manche suivante qu'en réconciliant, et une manche close par le délai ne
+ * traverse aucun de leurs chemins d'entrée.
+ */
+describe("resolveExpiredScoreReports — ce qu'elle rapporte", () => {
+  function oneSidedRow(id: number): Record<string, unknown> {
+    return expiredRow({
+      id,
+      team1_report_score: 2,
+      team1_report_opponent_score: 1,
+      team2_report_score: null,
+      team2_report_opponent_score: null,
+    });
+  }
+
+  it("compte les manches réellement closes", async () => {
+    const connection = fakeConnection({
+      rows: (q) => (q.includes("FROM bg_matches") ? [oneSidedRow(31), oneSidedRow(32)] : []),
+    });
+
+    expect(await resolveExpiredScoreReports(connection, 12)).toBe(2);
+  });
+
+  it("rend zéro quand aucun délai n'a expiré", async () => {
+    const connection = fakeConnection({ rows: () => [] });
+
+    expect(await resolveExpiredScoreReports(connection, 12)).toBe(0);
+  });
+
+  it("ne compte pas un désaccord : il est escaladé, pas tranché", async () => {
+    // Les deux engagés se contredisent — le délai ne débloque rien, l'arbitrage
+    // prend la main. Le compter reviendrait à réconcilier pour rien à chaque
+    // balayage, sur un tournoi qui n'a pas bougé.
+    const connection = fakeConnection({
+      rows: (q) => (q.includes("FROM bg_matches") ? [expiredRow({ id: 33 })] : []),
+    });
+
+    expect(await resolveExpiredScoreReports(connection, 12)).toBe(0);
+    expect(queueRefereeAlert).toHaveBeenCalled();
+  });
+
+  it("ne compte pas une manche sans adversaire", async () => {
+    const connection = fakeConnection({
+      rows: (q) =>
+        q.includes("FROM bg_matches") ? [expiredRow({ id: 34, team2_id: null })] : [],
+    });
+
+    expect(await resolveExpiredScoreReports(connection, 12)).toBe(0);
+  });
+});

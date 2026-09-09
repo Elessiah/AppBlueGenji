@@ -30,13 +30,28 @@ async function runSweep(options: {
   candidates: number[];
   failOn?: number[];
   changed?: number[];
-}): Promise<{ connection: Connection; synced: number[] }> {
+  contentChanged?: number[];
+}): Promise<{
+  connection: Connection;
+  synced: number[];
+  /** Publications observées, avec le nombre de commits déjà faits à cet instant. */
+  published: { tournamentId: number; commits: number }[];
+}> {
   const synced: number[] = [];
+  const published: { tournamentId: number; commits: number }[] = [];
   let connection!: Connection;
 
   await jest.isolateModulesAsync(async () => {
     jest.doMock("@/lib/server/tournaments/sync-scope", () => ({
       findTournamentsNeedingSync: jest.fn(async () => options.candidates),
+    }));
+
+    jest.doMock("@/lib/server/tournaments/notifications", () => ({
+      publishUpdatedEvent: jest.fn((tournamentId: number) => {
+        published.push({ tournamentId, commits: connection.commit.mock.calls.length });
+      }),
+      publishScoreReportedEvent: jest.fn(),
+      publishScoreResolvedEvent: jest.fn(),
     }));
 
     jest.doMock("@/lib/server/tournaments/state", () => ({
@@ -45,7 +60,11 @@ async function runSweep(options: {
       syncTournamentState: jest.fn(async (_conn: unknown, tournamentId: number) => {
         synced.push(tournamentId);
         if (options.failOn?.includes(tournamentId)) throw new Error("BOOM");
-        return { row: null, stateChanged: options.changed?.includes(tournamentId) ?? false };
+        return {
+          row: null,
+          stateChanged: options.changed?.includes(tournamentId) ?? false,
+          contentChanged: options.contentChanged?.includes(tournamentId) ?? false,
+        };
       }),
     }));
 
@@ -73,7 +92,7 @@ async function runSweep(options: {
     clearCache();
   });
 
-  return { connection, synced };
+  return { connection, synced, published };
 }
 
 beforeEach(() => jest.clearAllMocks());
@@ -104,6 +123,44 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
     expect(synced).toEqual([1, 2, 3]);
     expect(connection.rollback).toHaveBeenCalledTimes(1);
     expect(connection.commit).toHaveBeenCalledTimes(2);
+  });
+
+  // Le moteur ne publiait pas seulement à la bascule d'état : `createBracketIfMissing`
+  // appelait `publishUpdatedEvent` **depuis la transaction ouverte**, si bien que
+  // la salle SSE reconstruisait l'instantané sur une autre connexion — qui ne
+  // voit pas le plateau en cours d'écriture — et diffusait « en cours, sans
+  // plateau ». L'information remonte désormais par `contentChanged`, et c'est
+  // ici qu'elle est publiée : après le commit.
+  it("publie ce qu'un entretien a écrit sans changer l'état", async () => {
+    const { published } = await runSweep({ candidates: [4], contentChanged: [4] });
+
+    expect(published).toEqual([{ tournamentId: 4, commits: 1 }]);
+  });
+
+  it("publie une seule fois un tournoi dont l'état ET le contenu ont bougé", async () => {
+    const { published } = await runSweep({
+      candidates: [4],
+      changed: [4],
+      contentChanged: [4],
+    });
+
+    expect(published).toHaveLength(1);
+  });
+
+  it("ne publie rien quand l'entretien n'a rien fait", async () => {
+    const { published } = await runSweep({ candidates: [4, 5] });
+
+    expect(published).toEqual([]);
+  });
+
+  it("ne publie pas un tournoi dont la transaction a échoué", async () => {
+    const { published } = await runSweep({
+      candidates: [1, 2],
+      contentChanged: [1, 2],
+      failOn: [2],
+    });
+
+    expect(published).toEqual([{ tournamentId: 1, commits: 1 }]);
   });
 
   it("rend toujours la connexion au pool", async () => {

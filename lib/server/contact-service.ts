@@ -1,5 +1,6 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "./database";
+import { cachedShowcase, invalidateShowcase } from "./showcase-cache";
 import {
   CONTACT_DISCORD_TAG_KEY,
   CONTACT_DISCORD_URL_KEY,
@@ -23,28 +24,39 @@ const KEY_BY_FIELD: Record<keyof ContactInfo, string> = {
   discordUrl: CONTACT_DISCORD_URL_KEY,
 };
 
+async function loadContactInfo(): Promise<ContactInfo> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<SettingRow[]>(
+    `SELECT setting_key, setting_value FROM bg_settings WHERE setting_key IN (?, ?, ?)`,
+    [CONTACT_EMAIL_KEY, CONTACT_DISCORD_TAG_KEY, CONTACT_DISCORD_URL_KEY],
+  );
+  const stored = new Map(rows.map((r) => [r.setting_key, r.setting_value?.trim() ?? ""]));
+  // On distingue « jamais configuré » (clé absente → valeur par défaut) de
+  // « explicitement vidé » (clé présente à `""` → canal retiré). Sinon un admin
+  // ne pourrait jamais supprimer un canal : il réapparaîtrait au défaut.
+  const pick = (key: string, fallback: string) => (stored.has(key) ? stored.get(key)! : fallback);
+  return {
+    email: pick(CONTACT_EMAIL_KEY, DEFAULT_CONTACT.email),
+    discordTag: pick(CONTACT_DISCORD_TAG_KEY, DEFAULT_CONTACT.discordTag),
+    discordUrl: pick(CONTACT_DISCORD_URL_KEY, DEFAULT_CONTACT.discordUrl),
+  };
+}
+
 /**
  * Renvoie les coordonnées de contact stockées en base. Chaque canal absent
  * retombe sur sa valeur par défaut ; si la base est injoignable on renvoie
  * l'ensemble par défaut — la section contact reste ainsi toujours peuplée.
+ *
+ * Mutualisée, et c'est ici que cela compte le plus : `PublicFooter` l'appelle,
+ * donc **chaque page publique** du site la demande à chaque rendu — accueil,
+ * association, bénévoles, recrutement, bot, règles. Trois canaux qui changent
+ * une fois par an valaient une requête par visite, sur une machine qui n'a pas
+ * les moyens de la gaspiller, et sans qu'aucun plafond de débit ne puisse s'y
+ * opposer (c'est un composant serveur, il ne répond pas 429).
  */
 export async function getContactInfo(): Promise<ContactInfo> {
   try {
-    const db = await getDatabase();
-    const [rows] = await db.execute<SettingRow[]>(
-      `SELECT setting_key, setting_value FROM bg_settings WHERE setting_key IN (?, ?, ?)`,
-      [CONTACT_EMAIL_KEY, CONTACT_DISCORD_TAG_KEY, CONTACT_DISCORD_URL_KEY],
-    );
-    const stored = new Map(rows.map((r) => [r.setting_key, r.setting_value?.trim() ?? ""]));
-    // On distingue « jamais configuré » (clé absente → valeur par défaut) de
-    // « explicitement vidé » (clé présente à `""` → canal retiré). Sinon un admin
-    // ne pourrait jamais supprimer un canal : il réapparaîtrait au défaut.
-    const pick = (key: string, fallback: string) => (stored.has(key) ? stored.get(key)! : fallback);
-    return {
-      email: pick(CONTACT_EMAIL_KEY, DEFAULT_CONTACT.email),
-      discordTag: pick(CONTACT_DISCORD_TAG_KEY, DEFAULT_CONTACT.discordTag),
-      discordUrl: pick(CONTACT_DISCORD_URL_KEY, DEFAULT_CONTACT.discordUrl),
-    };
+    return await cachedShowcase("contact", loadContactInfo);
   } catch {
     return { ...DEFAULT_CONTACT };
   }
@@ -68,5 +80,8 @@ export async function setContactInfo(input: Partial<ContactInfo>): Promise<Conta
     ],
   );
 
+  // Le staff vient d'écrire : le pied de page de tout le site doit le montrer
+  // sans attendre la fin de la fenêtre de cache.
+  invalidateShowcase();
   return value;
 }

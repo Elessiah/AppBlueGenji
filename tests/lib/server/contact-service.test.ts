@@ -5,6 +5,7 @@ import {
   CONTACT_DISCORD_TAG_KEY,
   CONTACT_DISCORD_URL_KEY,
 } from "@/lib/shared/contact";
+import { clearCache } from "@/lib/server/cache";
 
 jest.mock("@/lib/server/database");
 
@@ -14,8 +15,16 @@ async function mockDb(execute: jest.Mock) {
 }
 
 describe("contact-service", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  // La lecture est mutualisée (`showcase-cache`) : sans cette remise à zéro, le
+  // premier cas resservirait sa réponse à tous les suivants.
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
+  afterEach(() => {
+    clearCache();
+    jest.restoreAllMocks();
+  });
 
   describe("getContactInfo", () => {
     it("falls back to defaults when no row is configured", async () => {
@@ -86,5 +95,70 @@ describe("contact-service", () => {
       await expect(setContactInfo({ discordUrl: "https://evil.com" })).rejects.toThrow("DISCORD_URL_INVALID");
       expect(execute).not.toHaveBeenCalled();
     });
+  });
+});
+
+/**
+ * `PublicFooter` appelle `getContactInfo` : **chaque page publique** du site la
+ * demande donc à chaque rendu — accueil, association, bénévoles, recrutement,
+ * bot, règles. Trois canaux qui changent une fois par an valaient une requête
+ * par visite, sans qu'aucun plafond de débit ne puisse s'y opposer : c'est un
+ * composant serveur, il ne répond pas 429.
+ */
+describe("contact-service — mutualisation de la lecture", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
+  afterEach(() => {
+    clearCache();
+    jest.restoreAllMocks();
+  });
+
+  it("ne lit la base qu'une fois pour cent arrivées simultanées", async () => {
+    const execute = jest.fn().mockResolvedValue([[]]);
+    await mockDb(execute);
+
+    await Promise.all(Array.from({ length: 100 }, () => getContactInfo()));
+
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("resert les coordonnées en cache aux visites suivantes", async () => {
+    const execute = jest.fn().mockResolvedValue([[]]);
+    await mockDb(execute);
+
+    await getContactInfo();
+    await getContactInfo();
+
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("ne met pas un échec en cache", async () => {
+    const execute = jest
+      .fn()
+      .mockRejectedValueOnce(new Error("DOWN"))
+      .mockResolvedValue([[{ setting_key: CONTACT_EMAIL_KEY, setting_value: "a@bg.fr" }]]);
+    await mockDb(execute);
+
+    expect(await getContactInfo()).toEqual(DEFAULT_CONTACT);
+    expect((await getContactInfo()).email).toBe("a@bg.fr");
+  });
+
+  it("oublie les coordonnées après une écriture du staff", async () => {
+    const execute = jest.fn().mockResolvedValue([[]]);
+    await mockDb(execute);
+
+    await getContactInfo();
+    execute.mockClear();
+
+    await setContactInfo({
+      email: "a@bg.fr",
+      discordTag: "bluegenji",
+      discordUrl: "https://discord.gg/x",
+    });
+    await getContactInfo();
+
+    expect(execute.mock.calls.some(([sql]) => String(sql).trim().startsWith("SELECT"))).toBe(true);
   });
 });

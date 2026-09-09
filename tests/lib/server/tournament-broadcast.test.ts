@@ -68,7 +68,11 @@ async function advance(ms: number): Promise<void> {
   await settle();
 }
 
-function subscriber(tier: "PRIORITY" | "STANDARD" = "PRIORITY") {
+function subscriber(
+  tier: "PRIORITY" | "STANDARD" = "PRIORITY",
+  /** Version que l'abonné tient déjà, telle que la route la lui a envoyée. */
+  version: string | null = null,
+) {
   const received: string[] = [];
   let closedTimes = 0;
   return {
@@ -78,6 +82,7 @@ function subscriber(tier: "PRIORITY" | "STANDARD" = "PRIORITY") {
     },
     handle: {
       tier,
+      version,
       send: (frame: Uint8Array) => {
         received.push(new TextDecoder().decode(frame).trim());
       },
@@ -490,5 +495,156 @@ describe("tournament-broadcast — budget de sortie", () => {
 
     await advance(budgetDelayMs(heavy, 8));
     expect(viewers[0].received).toHaveLength(2);
+  });
+});
+
+/**
+ * La salle ne suivait qu'une chose par palier : « quelle version a été diffusée
+ * en dernier ». Un abonné qui rejoignait juste **après** une diffusion en
+ * héritait donc sans avoir rien reçu — sa lecture d'ouverture ayant précédé
+ * l'écriture, il tenait la version d'avant — et la comparaison de version
+ * faisait sauter tout son palier au tour suivant. Il restait sur un plateau
+ * périmé, indéfiniment si plus rien ne bougeait, avec un témoin de flux au vert.
+ *
+ * La fenêtre est étroite mais réelle : entre la lecture de l'instantané et
+ * l'abonnement, la route résout encore le contexte du lecteur (une requête),
+ * son palier, sa place de flux, et lui écrit sa première trame.
+ */
+describe("tournament-broadcast — version détenue par abonné", () => {
+  it("rattrape un abonné arrivé avec une version périmée", async () => {
+    const early = subscriber("PRIORITY", "v1");
+    joinTournamentRoom(1, early.handle);
+
+    // Première diffusion : le palier passe à v2.
+    getFrame.mockResolvedValue(frameOf("v2"));
+    publish();
+    await advance(0);
+    expect(early.received).toEqual(["data: v2"]);
+
+    // Le retardataire a lu v1 avant l'écriture, et rejoint après la diffusion.
+    const late = subscriber("PRIORITY", "v1");
+    joinTournamentRoom(1, late.handle);
+
+    await advance(REFRESH_CADENCE.PRIORITY.pushCoalesceMs);
+    publish();
+    await advance(0);
+
+    expect(late.received).toEqual(["data: v2"]);
+    // Et celui qui l'avait déjà ne la reçoit pas deux fois.
+    expect(early.received).toEqual(["data: v2"]);
+  });
+
+  it("ne renvoie rien à un abonné déjà à jour", async () => {
+    const viewer = subscriber("PRIORITY", "v1");
+    joinTournamentRoom(1, viewer.handle);
+
+    publish();
+    await advance(0);
+
+    expect(viewer.received).toEqual([]);
+  });
+
+  it("sert un abonné qui n'annonce aucune version", async () => {
+    // Omettre `version` revient à dire « je n'ai rien » : on préfère un envoi de
+    // trop à un abonné muet.
+    const viewer = subscriber("PRIORITY");
+    joinTournamentRoom(1, viewer.handle);
+
+    publish();
+    await advance(0);
+
+    expect(viewer.received).toEqual(["data: v1"]);
+  });
+
+  it("n'ouvre pas la fenêtre de regroupement d'un palier pour un retardataire", async () => {
+    // Le rattrapage ne doit pas court-circuiter la cadence : un spectateur qui
+    // arrive en retard attend la fenêtre de son palier comme les autres.
+    const viewer = subscriber("STANDARD", "v0");
+    joinTournamentRoom(1, viewer.handle);
+
+    publish();
+    await advance(0);
+    expect(viewer.received).toEqual(["data: v1"]);
+
+    getFrame.mockResolvedValue(frameOf("v2"));
+    publish();
+    await advance(0);
+    expect(viewer.received).toEqual(["data: v1"]);
+
+    await advance(REFRESH_CADENCE.STANDARD.pushCoalesceMs);
+    expect(viewer.received).toEqual(["data: v1", "data: v2"]);
+  });
+
+  it("oublie la version d'un abonné parti", async () => {
+    const viewer = subscriber("PRIORITY", "v1");
+    const leave = joinTournamentRoom(1, viewer.handle);
+    leave();
+
+    // La salle s'est refermée : rien ne doit subsister d'un abonné disparu.
+    expect(tournamentAudience(1)).toBe(0);
+
+    const back = subscriber("PRIORITY", null);
+    joinTournamentRoom(1, back.handle);
+    publish();
+    await advance(0);
+
+    expect(back.received).toEqual(["data: v1"]);
+  });
+});
+
+/**
+ * La fenêtre de regroupement se compte **par connexion**, pas par palier.
+ *
+ * Partagée, elle se faisait remettre à zéro par le rattrapage d'un retardataire :
+ * un envoi qui n'avait servi qu'un abonné arrivé en retard repoussait d'une
+ * fenêtre entière celui de tous les autres. Sur un tournoi où les spectateurs
+ * arrivent en continu, la latence du palier doublait.
+ */
+describe("tournament-broadcast — la fenêtre appartient à la connexion", () => {
+  it("ne fait pas attendre les autres quand un retardataire est rattrapé", async () => {
+    const settled = subscriber("STANDARD", null);
+    joinTournamentRoom(1, settled.handle);
+
+    // Le spectateur en place reçoit v1 et cale sa fenêtre.
+    publish();
+    await advance(0);
+    expect(settled.received).toEqual(["data: v1"]);
+
+    // Sa fenêtre s'écoule, puis un retardataire arrive en tenant v0.
+    await advance(REFRESH_CADENCE.STANDARD.pushCoalesceMs);
+    const late = subscriber("STANDARD", "v0");
+    joinTournamentRoom(1, late.handle);
+
+    publish();
+    await advance(0);
+    expect(late.received).toEqual(["data: v1"]);
+    // Le spectateur en place tient déjà v1 : rien ne lui est réécrit.
+    expect(settled.received).toEqual(["data: v1"]);
+
+    // Un score tombe juste après ce rattrapage. La fenêtre du spectateur en
+    // place est écoulée depuis longtemps : il doit recevoir v2 tout de suite.
+    getFrame.mockResolvedValue(frameOf("v2"));
+    publish();
+    await advance(0);
+
+    expect(settled.received).toEqual(["data: v1", "data: v2"]);
+  });
+
+  it("garde la cadence du palier pour un abonné qui vient d'être servi", async () => {
+    const viewer = subscriber("STANDARD", null);
+    joinTournamentRoom(1, viewer.handle);
+
+    publish();
+    await advance(0);
+    expect(viewer.received).toEqual(["data: v1"]);
+
+    // Sa propre fenêtre, elle, tient toujours.
+    getFrame.mockResolvedValue(frameOf("v2"));
+    publish();
+    await advance(0);
+    expect(viewer.received).toEqual(["data: v1"]);
+
+    await advance(REFRESH_CADENCE.STANDARD.pushCoalesceMs);
+    expect(viewer.received).toEqual(["data: v1", "data: v2"]);
   });
 });

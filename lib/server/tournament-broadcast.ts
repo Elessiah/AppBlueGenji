@@ -102,6 +102,19 @@ export function budgetDelayMs(frameBytes: number, subscribers: number): number {
 /** Un abonné : son palier de fraîcheur et par où lui écrire. */
 export type TournamentSubscriber = {
   tier: RefreshTier;
+  /**
+   * Version de l'instantané que cet abonné **détient déjà** au moment où il
+   * rejoint la salle — la route en envoie un à la connexion, avant de s'abonner.
+   *
+   * Sans elle, la salle ne savait qu'une chose par palier : « quelle version a
+   * été diffusée en dernier ». Un abonné qui rejoignait juste après une
+   * diffusion héritait donc de ce constat sans avoir rien reçu : sa lecture
+   * ayant précédé l'écriture, il tenait la version d'avant, et la comparaison
+   * `lastVersion === frame.version` faisait sauter **tout son palier** au tour
+   * suivant. Il restait sur un plateau périmé — indéfiniment si plus rien ne
+   * bougeait — avec un témoin de flux au vert.
+   */
+  version?: string | null;
   /** Écrit une trame déjà encodée. Doit lever si la connexion est fermée. */
   send: (frame: Uint8Array) => void;
   /**
@@ -112,11 +125,23 @@ export type TournamentSubscriber = {
   close?: () => void;
 };
 
-type TierState = { lastSentAt: number; lastVersion: string | null };
+/**
+ * Ce que la salle retient d'un abonné : la dernière version qu'il a reçue, et
+ * quand.
+ *
+ * **Les deux par abonné**, et non par palier. Le palier ne décide que de la
+ * *durée* de la fenêtre de regroupement ; le moment où elle a commencé
+ * appartient à la connexion. Partagée, elle se faisait remettre à zéro par le
+ * rattrapage d'un retardataire : un envoi qui n'avait servi qu'un abonné arrivé
+ * en retard repoussait d'une fenêtre entière celui de tous les autres, et sur un
+ * tournoi où les spectateurs arrivent en continu la latence du palier doublait.
+ */
+type SubscriberState = { version: string | null; lastSentAt: number };
 
 type Room = {
   subscribers: Set<TournamentSubscriber>;
-  tiers: Map<RefreshTier, TierState>;
+  /** Ce que chaque abonné a reçu, et quand. */
+  states: Map<TournamentSubscriber, SubscriberState>;
   unsubscribe: () => void;
   maintenance: ReturnType<typeof setInterval>;
   flushTimer: ReturnType<typeof setTimeout> | null;
@@ -130,11 +155,15 @@ type Room = {
 const rooms = new Map<number, Room>();
 const streamsPerUser = new Map<number, number>();
 
-function tierState(room: Room, tier: RefreshTier): TierState {
-  let state = room.tiers.get(tier);
+/**
+ * État d'un abonné. Un abonné inconnu est réputé n'avoir rien reçu : il est donc
+ * dû sur-le-champ — mieux vaut un envoi de trop qu'un abonné muet.
+ */
+function subscriberState(room: Room, subscriber: TournamentSubscriber): SubscriberState {
+  let state = room.states.get(subscriber);
   if (!state) {
-    state = { lastSentAt: 0, lastVersion: null };
-    room.tiers.set(tier, state);
+    state = { version: null, lastSentAt: 0 };
+    room.states.set(subscriber, state);
   }
   return state;
 }
@@ -216,46 +245,57 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
     const now = Date.now();
     let nextDelay = Number.POSITIVE_INFINITY;
 
+    // « À qui doit-on cette version ? » se demande **par abonné**, et non par
+    // palier : deux connexions d'un même palier peuvent tenir deux versions
+    // différentes, la lecture d'ouverture d'une connexion pouvant précéder une
+    // diffusion qu'elle a manquée.
+    const behind = (subscriber: TournamentSubscriber): boolean =>
+      subscriberState(room, subscriber).version !== frame.version;
+
     // Plancher commun à toute la salle, calculé sur les seuls abonnés que la
     // cadence de leur palier rend dus : réserver du budget pour des spectateurs
     // qui ne recevront rien retarderait les joueurs pour rien. Commun, parce
     // qu'un plancher par palier ferait attendre les 128 inscrits d'un gros
     // tournoi plus longtemps que la poignée de spectateurs qui les regarde.
-    const dueAudience = [...room.subscribers].filter((subscriber) => {
-      const state = tierState(room, subscriber.tier);
-      return (
-        state.lastVersion !== frame.version &&
-        now - state.lastSentAt >= REFRESH_CADENCE[subscriber.tier].pushCoalesceMs
-      );
-    });
+    const dueAudience = [...room.subscribers].filter(
+      (subscriber) =>
+        behind(subscriber) &&
+        now - subscriberState(room, subscriber).lastSentAt >=
+          REFRESH_CADENCE[subscriber.tier].pushCoalesceMs,
+    );
     const roomFloor = budgetDelayMs(frame.frame.byteLength, dueAudience.length);
 
     for (const tier of activeTiers(room)) {
-      const state = tierState(room, tier);
-      if (state.lastVersion === frame.version) continue;
-
-      const audience = [...room.subscribers].filter((subscriber) => subscriber.tier === tier);
+      const audience = [...room.subscribers].filter(
+        (subscriber) => subscriber.tier === tier && behind(subscriber),
+      );
+      if (audience.length === 0) continue;
 
       // La fenêtre effective est la plus large des deux : celle du palier, et
-      // celle qu'impose le poids de ce que la salle entière écrit.
-      const elapsed = now - state.lastSentAt;
+      // celle qu'impose le poids de ce que la salle entière écrit. Sa *durée*
+      // vient du palier ; le moment où elle a commencé appartient, lui, à chaque
+      // connexion — partagé, le rattrapage d'un retardataire remettait à zéro la
+      // cadence de tous ses voisins et les faisait attendre une fenêtre de plus.
       const coalesceWindow = Math.max(REFRESH_CADENCE[tier].pushCoalesceMs, roomFloor);
-      if (elapsed < coalesceWindow) {
-        nextDelay = Math.min(nextDelay, coalesceWindow - elapsed);
-        continue;
-      }
 
       for (const subscriber of audience) {
+        const state = subscriberState(room, subscriber);
+        const elapsed = now - state.lastSentAt;
+        if (elapsed < coalesceWindow) {
+          nextDelay = Math.min(nextDelay, coalesceWindow - elapsed);
+          continue;
+        }
+
         try {
           subscriber.send(frame.frame);
+          state.version = frame.version;
+          state.lastSentAt = now;
         } catch {
           // Connexion fermée entre-temps : on la retire et on continue.
           room.subscribers.delete(subscriber);
+          room.states.delete(subscriber);
         }
       }
-
-      state.lastSentAt = now;
-      state.lastVersion = frame.version;
     }
 
     if (room.subscribers.size === 0) {
@@ -299,6 +339,7 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
 function closeGoneRoom(tournamentId: number, room: Room): void {
   for (const subscriber of [...room.subscribers]) {
     room.subscribers.delete(subscriber);
+    room.states.delete(subscriber);
     try {
       subscriber.close?.();
     } catch {
@@ -311,7 +352,7 @@ function closeGoneRoom(tournamentId: number, room: Room): void {
 function openRoom(tournamentId: number): Room {
   const room: Room = {
     subscribers: new Set<TournamentSubscriber>(),
-    tiers: new Map<RefreshTier, TierState>(),
+    states: new Map<TournamentSubscriber, SubscriberState>(),
     unsubscribe: () => undefined,
     maintenance: setInterval(() => {
       const current = rooms.get(tournamentId);
@@ -345,9 +386,14 @@ export function joinTournamentRoom(
 ): () => void {
   const room = rooms.get(tournamentId) ?? openRoom(tournamentId);
   room.subscribers.add(subscriber);
+  // Ce que l'abonné tient déjà : la salle ne lui réécrira cette version-là que
+  // s'il ne l'a pas. Omettre `version` revient à dire « je n'ai rien » — le
+  // premier envoi lui parviendra alors, quitte à faire double emploi.
+  room.states.set(subscriber, { version: subscriber.version ?? null, lastSentAt: 0 });
 
   return () => {
     room.subscribers.delete(subscriber);
+    room.states.delete(subscriber);
     if (room.subscribers.size === 0 && rooms.get(tournamentId) === room) {
       closeRoom(tournamentId, room);
     }

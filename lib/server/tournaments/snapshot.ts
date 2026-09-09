@@ -108,11 +108,21 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
   // aux inscriptions jusqu'à ce que quelqu'un aille voir ailleurs. La bascule
   // est désormais déclenchée d'ici, et le vol unique du cache garantit qu'une
   // seule transaction part, même avec cent spectateurs sur la page.
+  // `bracket_size` ne décrit que les formats à plateau, et il n'est renseigné
+  // que par eux : en `MULTI` la taille vit sur `bg_tournament_phases` et cette
+  // colonne reste **définitivement** nulle, si bien que sans ce filtre de format
+  // chaque reconstruction d'instantané d'un multi-phases en cours ouvrait une
+  // transaction d'entretien — juste ce que ce module promet d'éviter. Même
+  // restriction que `findDueMaintenance` (`./sync-scope`), qui pose déjà la
+  // condition sur les seuls `SINGLE`/`DOUBLE`.
+  const missingBracket =
+    (tournamentRow.format === "SINGLE" || tournamentRow.format === "DOUBLE") &&
+    tournamentRow.bracket_size === null;
+
   const needsSync =
     (await hasPendingStateTransition(tournamentRow)) ||
     (tournamentRow.state === "RUNNING" &&
-      (tournamentRow.bracket_size === null ||
-        (await hasExpiredScoreReports(db, tournamentId))));
+      (missingBracket || (await hasExpiredScoreReports(db, tournamentId))));
 
   if (!needsSync) return tournamentRow;
 
@@ -129,7 +139,11 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
     // — le tournoi qui démarre parce qu'un spectateur a ouvert sa page laisserait
     // sinon la liste en cache l'annoncer « Inscriptions ». On n'oublie que les
     // listes : l'instantané, lui, est précisément en train d'être reconstruit.
-    if (syncResult.stateChanged) invalidateTournamentLists();
+    // `contentChanged` aussi : un plateau créé ou une manche tranchée par le
+    // délai change `bracket_size` et l'avancement lus par la liste. L'instantané,
+    // lui, n'est pas invalidé — il est justement en train d'être reconstruit,
+    // et l'oublier ici jetterait le calcul qu'on vient de faire.
+    if (syncResult.stateChanged || syncResult.contentChanged) invalidateTournamentLists();
 
     return syncResult.row;
   } catch (error) {

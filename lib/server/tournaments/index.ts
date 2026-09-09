@@ -210,10 +210,18 @@ async function syncVisibleTournaments(): Promise<void> {
       for (const tournamentId of candidates) {
         try {
           await connection.beginTransaction();
-          const { stateChanged } = await syncTournamentState(connection, tournamentId);
+          const { stateChanged, contentChanged } = await syncTournamentState(
+            connection,
+            tournamentId,
+          );
           await connection.commit();
           flushBotLogs(connection);
-          if (stateChanged) changedIds.push(tournamentId);
+          // `contentChanged` autant que `stateChanged` : un plateau créé ou une
+          // manche tranchée par le délai ne déplace pas le tournoi d'un état,
+          // mais c'est bien ce que les spectateurs attendent de voir. La
+          // publication reste **après le commit** — c'est tout l'objet de ce
+          // retour plutôt qu'un événement publié depuis le fond du moteur.
+          if (stateChanged || contentChanged) changedIds.push(tournamentId);
         } catch {
           await connection.rollback().catch(() => undefined);
         } finally {
