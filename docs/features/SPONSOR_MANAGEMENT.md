@@ -65,10 +65,18 @@ et le flag `isAdmin` (`getCurrentUser()`). Pour les admins :
 
 ### Logos externes
 
-Les logos sont rendus via une balise `<img>` simple (et non `next/image`) :
-les URLs étant fournies librement par les admins, cela évite d'avoir à
-maintenir une allowlist de domaines (`images.remotePatterns`) et la surface
-d'optimisation côté serveur. La page `/partenaires` a été alignée sur ce choix.
+Une URL de logo saisie librement par le staff **n'est jamais mise telle quelle
+dans le `src`**. Elle passe par un relais borné par la base
+(`/api/landing/sponsors/<id>/logo`), si bien que l'image devient une image du
+site : `next/image` la redimensionne, la convertit en WebP et la met en cache,
+et la page n'appelle plus aucun serveur tiers. C'est ce qui a fait remonter la
+note « Bonnes pratiques » de l'accueil de 78 à 100 — voir
+[SPONSOR_LOGO_PROXY.md](SPONSOR_LOGO_PROXY.md), qui détaille les refus du relais
+(https seulement, hôtes internes écartés, redirections revalidées, SVG exclu).
+
+Ce choix remplace celui de la première version (`<img>` brut pour éviter une
+allowlist `images.remotePatterns`) : l'allowlist est bien évitée, mais parce que
+l'image est devenue locale, pas parce qu'on renonce à l'optimiser.
 
 ## Tests
 
