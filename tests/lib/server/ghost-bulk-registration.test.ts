@@ -341,7 +341,7 @@ describe("ordre de verrouillage des points d'entrée", () => {
   const firstStatement = (connection: PoolConnection) => sqlOf(connection)[0];
 
   it("verrouille avant la moindre lecture, à l'inscription d'un joueur", async () => {
-    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 101 } as never);
+    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 101, roles: ["OWNER"] } as never);
     const { connection } = fakeConnection({ teams: [] });
 
     await registerCurrentUserTeam(connection, 12, 42);
@@ -353,7 +353,7 @@ describe("ordre de verrouillage des points d'entrée", () => {
     // Verrou du tournoi en main, emprunter une *seconde* place du pool arme un
     // convoi : le porteur du verrou attend une connexion que les transactions
     // bloquées sur son verrou ne rendront pas avant `innodb_lock_wait_timeout`.
-    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 101 } as never);
+    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 101, roles: ["OWNER"] } as never);
     const { connection } = fakeConnection({ teams: [] });
 
     await registerCurrentUserTeam(connection, 12, 42);

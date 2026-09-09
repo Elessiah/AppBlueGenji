@@ -100,6 +100,9 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
 
   const viewer: TournamentViewerContext = {
     canRegister: state.detail.canRegister,
+    // Qualité pour engager son équipe (`OWNER`/`MANAGER`) : elle tient au
+    // roster, pas au plateau — un instantané ne la connaît pas.
+    canRegisterEntrant: state.detail.canRegisterEntrant,
     myTeamId: state.detail.myTeamId,
     canCreateReportsForTeamIds: state.detail.canCreateReportsForTeamIds,
     isAdmin: state.detail.isAdmin,
@@ -120,7 +123,7 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
     detail: {
       ...message.snapshot,
       ...viewer,
-      canRegister: canRegisterIn(message.snapshot, viewer.myTeamId),
+      canRegister: canRegisterIn(message.snapshot, viewer.myTeamId, viewer.canRegisterEntrant),
     },
   };
 }
@@ -133,8 +136,15 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
  * d'elles-mêmes, dans les deux sens. Le bouton reste évidemment sous le contrôle
  * du serveur — c'est lui qui accepte ou refuse l'inscription.
  */
-function canRegisterIn(snapshot: TournamentSnapshot, myTeamId: number | null): boolean {
+function canRegisterIn(
+  snapshot: TournamentSnapshot,
+  myTeamId: number | null,
+  canRegisterEntrant: boolean,
+): boolean {
   if (snapshot.card.state !== "REGISTRATION") return false;
+  // Qualité pour engager (`OWNER`/`MANAGER`) : elle vient du contexte du
+  // lecteur et se rejoue telle quelle — l'instantané ne connaît pas les rosters.
+  if (!canRegisterEntrant) return false;
   if (myTeamId !== null && snapshot.registrations.some((row) => row.teamId === myTeamId)) {
     return false;
   }

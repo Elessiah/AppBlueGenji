@@ -16,6 +16,7 @@ import {
   getLandingStats,
   getLandingTicker,
 } from "@/lib/server/landing-service";
+import { chooseFeaturedTournament } from "@/lib/shared/landing";
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import { listSponsors } from "@/lib/server/sponsors-service";
 import { listAboutStats } from "@/lib/server/about-stats-service";
@@ -28,7 +29,6 @@ import { siteCanonicalBase } from "@/lib/server/site-url";
 import { pageMetadata } from "@/lib/shared/page-metadata";
 import { SITE_DESCRIPTION } from "@/lib/shared/share-metadata";
 import { organizationJsonLd, webSiteJsonLd } from "@/lib/shared/structured-data";
-import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 
 export const dynamic = "force-dynamic";
 
@@ -55,10 +55,6 @@ export const metadata: Metadata = pageMetadata({
   selfTitled: true,
 });
 
-function chooseNextTournament(buckets: TournamentBuckets): TournamentCard | null {
-  return buckets.upcoming[0] ?? buckets.registration[0] ?? buckets.running[0] ?? buckets.finished[0] ?? null;
-}
-
 export default async function HomePage() {
   const buckets = await listTournamentBuckets(null).catch(() => ({
     upcoming: [],
@@ -67,7 +63,7 @@ export default async function HomePage() {
     finished: [],
   }));
 
-  const featured = chooseNextTournament(buckets);
+  const featured = chooseFeaturedTournament(buckets);
   const [stats, live, leaderboard, events, ticker, sponsors, aboutStats, aboutPillars, miniBracket, user, copy] =
     await Promise.all([
       getLandingStats(),
