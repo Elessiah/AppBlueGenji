@@ -67,3 +67,33 @@ describe("pageMetadata", () => {
     expect(withShare.twitter?.description).toBe("Éditeur, hébergement et données personnelles.");
   });
 });
+
+/**
+ * Le drapeau `selfTitled` ferme une panne propre à Next : le gabarit de titre
+ * déclaré dans une mise en page ne s'applique qu'à ses **segments enfants**, et
+ * la page qui partage son segment — l'accueil — ne le reçoit pas. Elle était
+ * donc la seule page du site dont le `<title>` ne portait pas le nom du site.
+ */
+describe("pageMetadata — titre de la page racine", () => {
+  it("laisse le gabarit faire son travail par défaut", () => {
+    const built = pageMetadata({ title: "Bénévoles", description: "…", path: "/benevoles" });
+    expect(built.title).toBe("Bénévoles");
+  });
+
+  it("écrit le nom du site quand le gabarit ne s'appliquera pas", () => {
+    const built = pageMetadata({
+      title: "Tournois esport amateurs Overwatch",
+      description: "…",
+      path: "/",
+      selfTitled: true,
+    });
+    expect(built.title).toEqual({
+      absolute: `Tournois esport amateurs Overwatch · ${SITE_NAME}`,
+    });
+  });
+
+  it("écrit le même titre dans la page et dans l'encart", () => {
+    const built = pageMetadata({ title: "Accueil", description: "…", path: "/", selfTitled: true });
+    expect(built.title).toEqual({ absolute: built.openGraph?.title });
+  });
+});
