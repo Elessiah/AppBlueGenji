@@ -12,16 +12,36 @@ import { listAboutStats } from "@/lib/server/about-stats-service";
 import { listAboutPillars } from "@/lib/server/about-pillars-service";
 import { getSiteCopy } from "@/lib/server/site-copy-service";
 import { EditableCopy } from "@/components/cyber/landing/EditableCopy";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { siteCanonicalBase } from "@/lib/server/site-url";
+import { organizationJsonLd } from "@/lib/shared/structured-data";
 import { BureauSection } from "./BureauSection";
 import styles from "./page.module.css";
 
 const REGLEMENT_URL =
   "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
 
+/**
+ * Objet de l'association, tel qu'il figure dans ses statuts et sur cette page.
+ *
+ * Distinct de la description de référencement : celle-ci est rédigée pour un
+ * moteur et bornée en longueur, celui-là est ce que l'association dit d'elle.
+ */
+const ASSOCIATION_DESCRIPTION =
+  "Association loi 1901 fondée en 2020, BlueGenji Esport organise des événements et tournois esport en ligne et en LAN, fédère les équipes participantes, et forme les acteurs de la scène amateur francophone pour les mettre en avant.";
+
+/**
+ * La description était écrite en dur alors que la page, elle, se rédige depuis
+ * l'interface (`site-copy.ts`) : elle annonçait « pour Overwatch et Marvel
+ * Rivals » quand la production ne mentionne plus Marvel Rivals nulle part sur
+ * cette page, et taisait l'objet statutaire qui y est désormais affiché — des
+ * événements « en ligne et en LAN », la fédération des équipes, la formation des
+ * acteurs. Elle est recalée sur ce que la page dit réellement.
+ */
 export const metadata: Metadata = pageMetadata({
   title: "L'Association Esport",
   description:
-    "BlueGenji, association loi 1901 au service de la scène amateur française pour Overwatch et Marvel Rivals.",
+    "Association loi 1901 fondée en 2020, BlueGenji organise des tournois esport en ligne et en LAN, fédère les équipes et met en avant la scène amateur française.",
   shareDescription:
     "Structure associative compétitive et inclusive pour la scène esport francophone.",
   path: "/association",
@@ -40,6 +60,12 @@ export default async function AssociationPage() {
 
   return (
     <main style={{ position: "relative", zIndex: 1 }}>
+        {/*
+          Le même nœud qu'à l'accueil, à la même identité : c'est *la* page qui
+          parle de l'association, et un moteur doit y retrouver la structure
+          qu'il connaît déjà plutôt qu'une seconde du même nom.
+        */}
+        <JsonLd data={organizationJsonLd(siteCanonicalBase(), ASSOCIATION_DESCRIPTION)} />
         <PublicHeader />
 
         {/* HERO */}

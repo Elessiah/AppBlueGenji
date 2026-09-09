@@ -49,17 +49,30 @@ function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
 }
 
 describe("Textes du site", () => {
-  it("nomme les deux jeux, Overwatch d'abord", () => {
+  it("met Overwatch en avant, comme la vitrine en production", () => {
     // BlueGenji est d'abord une structure Overwatch : la racine annonçait
-    // « l'esport amateur Marvel Rivals » tout court.
+    // « l'esport amateur Marvel Rivals » tout court. Le hero de production dit
+    // désormais « principalement autour d'Overwatch » — la description de
+    // référencement, elle, mettait encore les deux jeux sur le même plan.
     expect(SITE_DESCRIPTION).toContain("Overwatch");
-    expect(SITE_DESCRIPTION).toContain("Marvel Rivals");
-    expect(SITE_DESCRIPTION.indexOf("Overwatch")).toBeLessThan(
-      SITE_DESCRIPTION.indexOf("Marvel Rivals"),
-    );
+    expect(SITE_DESCRIPTION).not.toContain("Marvel Rivals");
+    // La carte d'aperçu, elle, nomme bien les deux jeux : ils sont tous deux
+    // proposés, et l'ordre y reste le même.
     expect(SITE_SHARE_CARD.eyebrow.indexOf("Overwatch")).toBeLessThan(
       SITE_SHARE_CARD.eyebrow.indexOf("Marvel Rivals"),
     );
+  });
+
+  it("annonce ce que l'association organise vraiment : en ligne et en LAN", () => {
+    // La page association affiche son objet statutaire — des événements « en
+    // ligne et en LAN » —, que la description de référencement taisait.
+    expect(SITE_DESCRIPTION).toContain("LAN");
+  });
+
+  it("tient la description sous la coupe d'un moteur", () => {
+    // Au-delà de ~160 caractères, le moteur tranche lui-même, et la coupe tombe
+    // au milieu de ce qu'on voulait dire.
+    expect(SITE_DESCRIPTION.length).toBeLessThanOrEqual(165);
   });
 
   it("porte le nom du site tel qu'il doit apparaître dans un encart", () => {

@@ -46,6 +46,29 @@ export function siteMetadataBase(): URL {
   return new URL(DEV_FALLBACK_URL);
 }
 
+/**
+ * Racine publique, **toujours** rendue — repli compris.
+ *
+ * {@link siteBaseUrl} rend `null` quand `APP_URL` manque, ce qui convient à un
+ * message Discord (mieux vaut pas de lien qu'un lien inventé) mais pas à ce qui
+ * doit produire une URL absolue quoi qu'il arrive : un `sitemap.xml` n'accepte
+ * que des adresses complètes, et un `@id` de données structurées relatif ne
+ * désigne rien. On y reprend donc le repli de {@link siteMetadataBase}, sans sa
+ * barre oblique finale.
+ *
+ * **Quand la valeur est lue dépend de l'appelant, et il faut le savoir.** Sur
+ * une page prérendue (`/regles/[slug]`, qui a un `generateStaticParams`), elle
+ * est capturée **à la compilation** : une compilation sans `APP_URL` figerait
+ * `http://localhost:3000` dans le HTML publié. Ce n'est pas propre à cette
+ * fonction — Next résout déjà `alternates.canonical` et `metadataBase` au même
+ * moment sur ces pages —, mais c'est la raison pour laquelle `robots.ts` et
+ * `sitemap.ts` sont, eux, rendus à la demande : sur un fichier entier, une
+ * racine fausse ne dégrade pas le résultat, elle l'invalide.
+ */
+export function siteCanonicalBase(): string {
+  return siteMetadataBase().href.replace(/\/+$/, "");
+}
+
 /** URL absolue d'un chemin du site, ou `null` si la racine est inconnue. */
 export function siteUrl(path: string): string | null {
   const base = siteBaseUrl();
