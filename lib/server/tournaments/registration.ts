@@ -2,6 +2,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { ensureSoloEntry, findSoloEntry } from "@/lib/server/solo-entries-service";
 import { isSoloTournament } from "@/lib/shared/participants";
+import { hasTeamManagementRole } from "@/lib/shared/team-roles";
 import type { TournamentRow } from "./_internal";
 import { queueBotLog } from "./bot-logs";
 import { syncTournamentState } from "./state";
@@ -122,6 +123,13 @@ export async function resolveUserEntrantTeamId(
 /**
  * Inscription à l'initiative du joueur : son équipe active, ou lui-même via son
  * entrée solo si le tournoi est individuel.
+ *
+ * **Engager une équipe demande d'en avoir la charge** (`OWNER` ou `MANAGER`) :
+ * une inscription vaut promesse de se présenter, elle expose l'équipe entière à
+ * un forfait et occupe une place que d'autres attendent. Un joueur du roster
+ * n'a pas à pouvoir la prendre seul, pas plus qu'il ne peut inviter ou exclure.
+ * En **tournoi individuel** la question ne se pose pas : le joueur n'engage que
+ * lui-même, par une entrée solo qui n'a ni membre ni rôle.
  */
 export async function registerCurrentUserTeam(
   connection: PoolConnection,
@@ -143,15 +151,25 @@ export async function registerCurrentUserTeam(
   // Sur la connexion de la transaction, verrou du tournoi en main : ouvrir une
   // seconde connexion ici attendrait une place du pool que les transactions
   // bloquées sur ce verrou ne rendront pas (voir `getUserActiveTeam`).
-  const teamId = isSoloTournament(tournament.participant_type)
-    ? await ensureSoloEntry(connection, userId)
-    : (await getUserActiveTeam(userId, connection))?.teamId ?? null;
+  if (isSoloTournament(tournament.participant_type)) {
+    const soloTeamId = await ensureSoloEntry(connection, userId);
+    await registerTeam(connection, tournamentId, soloTeamId, false);
+    return;
+  }
 
-  if (teamId === null) {
+  const activeTeam = await getUserActiveTeam(userId, connection);
+  if (!activeTeam) {
     throw new Error("NO_ACTIVE_TEAM");
   }
 
-  await registerTeam(connection, tournamentId, teamId, false);
+  // Les rôles sont relus **dans la transaction**, sur la ligne d'appartenance
+  // que `getUserActiveTeam` vient de lire : le droit d'engager se juge à
+  // l'instant de l'écriture, pas à celui où la page a été rendue.
+  if (!hasTeamManagementRole(activeTeam.roles)) {
+    throw new Error("NOT_TEAM_MANAGER");
+  }
+
+  await registerTeam(connection, tournamentId, activeTeam.teamId, false);
 }
 
 /**
@@ -251,7 +269,17 @@ export async function canUserRegister(
   if (!tournament || tournament.state !== "REGISTRATION") return false;
 
   const solo = isSoloTournament(tournament.participant_type);
-  const teamId = await resolveUserEntrantTeamId(connection, tournament, userId);
+
+  let teamId: number | null;
+  if (solo) {
+    teamId = await findSoloEntry(connection, userId);
+  } else {
+    const activeTeam = await getUserActiveTeam(userId, connection);
+    // Même refus que `registerCurrentUserTeam`, pour ne pas annoncer un bouton
+    // que l'écriture rejetterait en 403.
+    if (activeTeam && !hasTeamManagementRole(activeTeam.roles)) return false;
+    teamId = activeTeam?.teamId ?? null;
+  }
 
   // En individuel, l'absence d'entrée solo n'est pas un obstacle : elle sera
   // créée à l'inscription. En tournoi par équipes, il faut une équipe active.

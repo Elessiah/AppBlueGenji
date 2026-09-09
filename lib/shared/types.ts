@@ -480,6 +480,23 @@ export type TournamentViewerContext = {
   preview: TournamentPreview | null;
   canRegister: boolean;
   /**
+   * Le viewer a-t-il **qualité pour engager** son engagé ? En tournoi par
+   * équipes : porte-t-il `OWNER` ou `MANAGER` dans son équipe active
+   * (`lib/shared/team-roles.ts`) ? En individuel : toujours vrai, il n'engage
+   * que lui-même.
+   *
+   * Distinct de `canRegister`, qui y ajoute l'état du tournoi et l'absence
+   * d'inscription préalable. Ce champ-ci ne dépend que de la personne : un
+   * instantané ne connaît pas les rosters, il ne peut donc ni l'accorder ni le
+   * retirer — le client le rejoue tel quel d'un instantané à l'autre, comme
+   * `canManageLive` ou `canDelete`.
+   *
+   * Sert aussi à **expliquer** l'absence de bouton : un joueur du roster doit
+   * lire pourquoi il ne peut pas inscrire son équipe, plutôt que de chercher un
+   * bouton qui n'apparaît pas.
+   */
+  canRegisterEntrant: boolean;
+  /**
    * Engagé du viewer dans **ce** tournoi : son équipe active en tournoi par
    * équipes, son entrée solo en tournoi individuel (null s'il n'est pas
    * inscrit).

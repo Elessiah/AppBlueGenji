@@ -238,6 +238,17 @@
   display: none;
 }
 
+/* Phrase qui prend la place du bouton d'inscription quand le lecteur n'a pas la
+   charge de son équipe. Ton discret : c'est une explication, pas une erreur —
+   le rouge est réservé à ce qui est réellement à l'antenne. */
+.registerNotice {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-mute);
+  max-width: 46ch;
+}
+
 @media (max-width: 640px) {
   .shell {
     gap: 18px;

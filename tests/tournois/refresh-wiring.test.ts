@@ -231,9 +231,11 @@ describe("lectures serveur — ce qui garde le cache utile", () => {
   it("ne réserve une connexion que là où elle sert", () => {
     // En tournoi par équipes, `getUserActiveTeam` ouvre sa propre requête :
     // réserver une place d'un pool de 25 pour ne rien en faire doublerait la
-    // pression à chaque connexion SSE.
+    // pression à chaque connexion SSE. La lecture d'équipe reste donc **hors**
+    // de `withConnection`, qui n'habille que la branche individuelle.
+    expect(index).toContain("const activeTeam = isSolo ? null : await getUserActiveTeam(userId);");
     expect(index).toContain("const myTeamId = isSolo");
-    expect(index).toContain("(await getUserActiveTeam(userId))?.teamId ?? null;");
+    expect(index).toMatch(/const myTeamId = isSolo\s*\?\s*await withConnection\(/);
   });
 });
 describe("compteur de visites — déduplication dans l'onglet", () => {

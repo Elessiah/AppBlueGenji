@@ -32,6 +32,10 @@ export const ERROR_MESSAGES: Record<string, string> = {
   ALREADY_REGISTERED: "Inscription déjà enregistrée pour ce tournoi.",
   REGISTRATION_CLOSED: "Les inscriptions ne sont pas ouvertes.",
   NO_ACTIVE_TEAM: "Tu dois d'abord créer ou rejoindre une équipe.",
+  // Le joueur a bien une équipe : ce qui lui manque est la charge de l'engager.
+  // La phrase nomme donc les rôles, et dit à qui s'adresser.
+  NOT_TEAM_MANAGER:
+    "Seuls le propriétaire et les managers de l'équipe peuvent l'inscrire à un tournoi.",
   // Tournoi individuel : le nom d'inscription du joueur est déjà pris.
   SOLO_ENTRY_NAME_UNAVAILABLE:
     "Ton pseudo est déjà utilisé comme nom d'équipe : change-le avant de t'inscrire.",

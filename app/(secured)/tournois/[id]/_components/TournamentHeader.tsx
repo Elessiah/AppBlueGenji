@@ -8,6 +8,7 @@ import { participantWording } from "@/lib/shared/participants";
 import { canLaunchNow } from "@/lib/shared/tournament-launch";
 import type { LiveFailure } from "../_lib/live-state";
 import { canShowEditButton } from "../_lib/edit-entry";
+import { registerBlockedNotice } from "../_lib/register-entry";
 import {
   headerIdentityLine,
   headerMetaItems,
@@ -80,6 +81,9 @@ export function TournamentHeader({
   const wording = participantWording(card.participantType);
   const state = STATE_META[card.state] ?? { label: card.state, tone: "neutral" as HeaderTone };
   const items = headerMetaItems(card, detail.phases, detail.currentPhaseId);
+  // Le seul refus d'inscription qui ne se lise pas tout seul sur la page :
+  // avoir une équipe sans en avoir la charge (`_lib/register-entry.ts`).
+  const registerNotice = frozen ? null : registerBlockedNotice(detail);
 
   return (
     <div className="ds-header green">
@@ -141,6 +145,9 @@ export function TournamentHeader({
               {wording.registerCta}
             </CyberButton>
           )}
+          {/* À la place du bouton, et non à côté : le lecteur cherche là où
+              l'action devrait être. */}
+          {registerNotice && <p className={s.registerNotice}>{registerNotice}</p>}
           {detail.isAdmin && !frozen && card.state === "REGISTRATION" && (
             <CyberButton
               variant="ghost"
