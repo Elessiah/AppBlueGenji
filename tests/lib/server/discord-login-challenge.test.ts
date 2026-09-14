@@ -6,10 +6,10 @@ jest.mock("@/lib/server/solo-entries-service");
 
 import {
   createDiscordLoginChallenge,
+  discardDiscordChallenge,
   DISCORD_CODE_WINDOW_MINUTES,
   MAX_DISCORD_CODE_ATTEMPTS,
   MAX_DISCORD_CODES_PER_WINDOW,
-  retireOtherDiscordChallenges,
   verifyDiscordChallenge,
 } from "@/lib/server/users-service";
 import { getDatabase } from "@/lib/server/database";
@@ -40,57 +40,92 @@ const hash = (code: string) => crypto.createHash("sha256").update(code).digest("
  * décompte est la règle elle-même, un espion sur `execute` ne dirait pas si elle
  * tient. La réservation d'essai est rejouée avec sa clause `WHERE`, seule façon
  * de voir qu'elle est atomique.
+ *
+ * La trace distingue ce qui passe par le **pool** de ce qui passe par la
+ * **connexion du verrou**, et garde `GET_LOCK`/`RELEASE_LOCK` à leur place :
+ * l'exclusion mutuelle de l'émission de codes est un verrou de MySQL, qu'aucune
+ * fausse base ne peut imiter — ce qu'on peut vérifier ici, c'est que le code lui
+ * en donne les moyens (un verrou nommé par compte, rendu quoi qu'il arrive, et
+ * le comptage comme l'insertion **dedans**).
  */
-function fakeDb(challenge: Challenge | null, recentCodes = 0) {
+function fakeDb(challenge: Challenge | null, recentCodes = 0, lockAcquired = true) {
   const state = challenge;
-  const execute = jest.fn(async (sql: string, params: unknown[] = []) => {
-    const q = String(sql).replace(/\s+/g, " ").trim();
+  const trace: { origin: "pool" | "tx"; sql: string }[] = [];
+  const lifecycle: string[] = [];
 
-    if (q.startsWith("SELECT id, code_hash")) {
-      return [state === null ? [] : [{ ...state }], []];
-    }
+  const runner = (origin: "pool" | "tx") =>
+    jest.fn(async (sql: string, params: unknown[] = []) => {
+      const q = String(sql).replace(/\s+/g, " ").trim();
+      trace.push({ origin, sql: q });
 
-    if (q.startsWith("SELECT COUNT(*) AS c FROM bg_discord_login_challenges")) {
-      return [[{ c: recentCodes }], []];
-    }
+      if (q.startsWith("SELECT id, code_hash")) {
+        return [state === null ? [] : [{ ...state }], []];
+      }
 
-    // Réservation d'un essai : la clause `WHERE attempts < ?` décide, et
-    // `affectedRows` la rapporte — comme le fait MySQL sous le verrou de ligne.
-    if (q.startsWith("UPDATE bg_discord_login_challenges SET consumed_at = CASE")) {
-      if (state === null) return [{ affectedRows: 0 }, []];
-      const limit = Number(params[0]);
-      if (state.consumed_at !== null || state.attempts >= limit) {
+      // Comptage des codes délivrés dans la fenêtre.
+      if (q.startsWith("SELECT COUNT(*) AS c FROM bg_discord_login_challenges")) {
+        return [[{ c: recentCodes }], []];
+      }
+
+      // Réservation d'un essai : la clause `WHERE attempts < ?` décide, et
+      // `affectedRows` la rapporte — comme le fait MySQL sous le verrou de ligne.
+      if (q.startsWith("UPDATE bg_discord_login_challenges SET consumed_at = CASE")) {
+        if (state === null) return [{ affectedRows: 0 }, []];
+        const limit = Number(params[0]);
+        if (state.consumed_at !== null || state.attempts >= limit) {
+          return [{ affectedRows: 0 }, []];
+        }
+        // `consumed_at` lit `attempts` **avant** l'incrément, comme MySQL évalue
+        // les affectations de gauche à droite.
+        if (state.attempts + 1 >= limit) state.consumed_at = new Date();
+        state.attempts += 1;
+        return [{ affectedRows: 1 }, []];
+      }
+
+      if (q.startsWith("UPDATE bg_discord_login_challenges SET consumed_at = NOW()")) {
+        if (state !== null) state.consumed_at = new Date();
+        return [{ affectedRows: 1 }, []];
+      }
+
+      if (q.startsWith("DELETE FROM bg_discord_login_challenges")) {
         return [{ affectedRows: 0 }, []];
       }
-      // `consumed_at` lit `attempts` **avant** l'incrément, comme MySQL évalue
-      // les affectations de gauche à droite.
-      if (state.attempts + 1 >= limit) state.consumed_at = new Date();
-      state.attempts += 1;
-      return [{ affectedRows: 1 }, []];
-    }
 
-    if (q.startsWith("UPDATE bg_discord_login_challenges SET consumed_at = NOW()")) {
-      if (state !== null) state.consumed_at = new Date();
-      return [{ affectedRows: 1 }, []];
-    }
+      if (q.startsWith("INSERT INTO bg_discord_login_challenges")) {
+        return [{ insertId: 7 }, []];
+      }
 
-    if (q.startsWith("DELETE FROM bg_discord_login_challenges")) {
-      return [{ affectedRows: 0 }, []];
-    }
+      if (q.startsWith("SELECT expires_at")) {
+        return [[{ expires_at: new Date(Date.now() + 600_000) }], []];
+      }
 
-    if (q.startsWith("INSERT INTO bg_discord_login_challenges")) {
-      return [{ insertId: 7 }, []];
-    }
+      return [[], []];
+    });
 
-    if (q.startsWith("SELECT expires_at")) {
-      return [[{ expires_at: new Date(Date.now() + 600_000) }], []];
-    }
+  const execute = runner("pool");
+  const connectionExecute = runner("tx");
+  const connection = {
+    execute: connectionExecute,
+    // `withNamedLock` prend et rend le verrou par `query`, pas par `execute`.
+    query: jest.fn(async (sql: string) => {
+      const text = String(sql);
+      if (text.includes("GET_LOCK")) {
+        lifecycle.push("GET_LOCK");
+        return [[{ acquired: lockAcquired ? 1 : 0 }], []];
+      }
+      if (text.includes("RELEASE_LOCK")) {
+        lifecycle.push("RELEASE_LOCK");
+        return [[{}], []];
+      }
+      return [[], []];
+    }),
+    release: jest.fn(() => void lifecycle.push("RELEASE")),
+    destroy: jest.fn(() => void lifecycle.push("DESTROY")),
+  };
+  const getConnection = jest.fn(async () => connection);
 
-    return [[], []];
-  });
-
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
-  return { execute, state };
+  (getDatabase as jest.Mock).mockResolvedValue({ execute, getConnection } as never);
+  return { execute, connection, trace, lifecycle, state };
 }
 
 function pendingChallenge(overrides: Partial<Challenge> = {}): Challenge {
@@ -187,6 +222,19 @@ describe("verifyDiscordChallenge — quota d'essais", () => {
     fakeDb(null);
     await expect(verifyDiscordChallenge("123", "424242")).resolves.toBe(false);
   });
+
+  it("ne lit que le **dernier** code émis", async () => {
+    // C'est ce qui rend un code neuf suffisant pour périmer le précédent, sans
+    // aucune écriture — et ce qui oblige, symétriquement, à supprimer la ligne
+    // d'un envoi raté (voir `discardDiscordChallenge`).
+    const { execute } = fakeDb(pendingChallenge());
+
+    await verifyDiscordChallenge("123", "424242");
+
+    const read = statementsOf(execute).find((q) => q.startsWith("SELECT id, code_hash"))!;
+    expect(read).toContain("ORDER BY id DESC");
+    expect(read).toContain("LIMIT 1");
+  });
 });
 
 describe("createDiscordLoginChallenge — nombre de codes délivrables", () => {
@@ -201,42 +249,103 @@ describe("createDiscordLoginChallenge — nombre de codes délivrables", () => {
   it("refuse au-delà, et n'écrit alors aucune ligne", async () => {
     // C'est **cette** borne qui tient la force brute : le plafond en mémoire se
     // laisse vider (`bucket.clear()`) par qui lui fabrique assez de clés.
-    const { execute } = fakeDb(null, MAX_DISCORD_CODES_PER_WINDOW);
+    const { trace } = fakeDb(null, MAX_DISCORD_CODES_PER_WINDOW);
 
     await expect(createDiscordLoginChallenge("123")).rejects.toThrow("TOO_MANY_CODE_REQUESTS");
+    expect(trace.some(({ sql }) => sql.startsWith("INSERT"))).toBe(false);
+  });
+
+  it("rend le verrou et la connexion quand il refuse", async () => {
+    const { lifecycle } = fakeDb(null, MAX_DISCORD_CODES_PER_WINDOW);
+
+    await expect(createDiscordLoginChallenge("123")).rejects.toThrow("TOO_MANY_CODE_REQUESTS");
+
+    // Un verrou nommé survit à la requête : non rendu, il ferait attendre le
+    // prochain appelant jusqu'au délai complet.
+    expect(lifecycle).toEqual(["GET_LOCK", "RELEASE_LOCK", "RELEASE"]);
+  });
+
+  it("compte et insère **sous le verrou du compte**", async () => {
+    // La borne était un `SELECT COUNT(*)` puis, un `await` plus loin, un
+    // `INSERT` : des demandes lancées de front lisaient toutes le même compte et
+    // inséraient chacune leur ligne — autant de codes en jeu, chacun rouvrant
+    // cinq essais. L'exclusion elle-même appartient à MySQL, qu'une fausse base
+    // ne peut pas imiter ; ce qui se vérifie ici, c'est que le code la demande :
+    // un verrou pris, les deux instructions **dedans** et sur sa connexion, le
+    // verrou rendu.
+    const { trace, lifecycle, connection, execute } = fakeDb(null, 0);
+
+    await createDiscordLoginChallenge("123");
+
+    const count = trace.find(({ sql }) => sql.startsWith("SELECT COUNT(*) AS c"))!;
+    const insert = trace.find(({ sql }) => sql.startsWith("INSERT"))!;
+
+    expect(count.origin).toBe("tx");
+    expect(insert.origin).toBe("tx");
+    expect(lifecycle).toEqual(["GET_LOCK", "RELEASE_LOCK", "RELEASE"]);
+    expect(connection.execute.mock.calls.length).toBeGreaterThanOrEqual(2);
+    // Ni l'un ni l'autre ne doit repasser par le pool : la connexion empruntée
+    // est la seule qui porte le verrou.
+    expect(statementsOf(execute).some((q) => q.startsWith("SELECT COUNT(*) AS c"))).toBe(false);
     expect(statementsOf(execute).some((q) => q.startsWith("INSERT"))).toBe(false);
   });
 
+  it("porte le verrou sur **le compte visé**, pas sur la table", async () => {
+    // Deux joueurs qui demandent un code au même instant ne s'attendent pas.
+    const { connection } = fakeDb(null, 0);
+
+    await createDiscordLoginChallenge("123456789012345678");
+
+    const [, params] = connection.query.mock.calls[0] as [string, unknown[]];
+    expect(String(params[0])).toContain("123456789012345678");
+  });
+
+  it("refuse comme un plafond quand le verrou ne vient pas", async () => {
+    // Cinq secondes d'attente sur un compte dont deux instructions font tout le
+    // travail, c'est une avalanche de demandes pour ce compte. On la refuse
+    // comme telle plutôt que de rendre une panne interne — et refuser est le
+    // sens sûr : passer outre délivrerait un code de plus sans l'avoir compté.
+    const { trace } = fakeDb(null, 0, false);
+
+    await expect(createDiscordLoginChallenge("123")).rejects.toThrow("TOO_MANY_CODE_REQUESTS");
+    expect(trace.some(({ sql }) => sql.startsWith("INSERT"))).toBe(false);
+  });
+
   it("compte sur la fenêtre annoncée", async () => {
-    const { execute } = fakeDb(null, 0);
+    const { connection } = fakeDb(null, 0);
     await createDiscordLoginChallenge("123");
 
-    const count = execute.mock.calls.find(([sql]) =>
-      String(sql).replace(/\s+/g, " ").includes("SELECT COUNT(*) AS c FROM bg_discord_login_challenges"),
+    const count = connection.execute.mock.calls.find(([sql]) =>
+      String(sql)
+        .replace(/\s+/g, " ")
+        .includes("SELECT COUNT(*) AS c FROM bg_discord_login_challenges"),
     ) as [string, unknown[]];
     expect(count[1]).toEqual(["123", DISCORD_CODE_WINDOW_MINUTES]);
   });
 
-  it("fait le ménage des codes expirés de longue date", async () => {
+  it("fait le ménage des codes expirés de longue date, hors verrou", async () => {
     // Rien n'effaçait jamais une ligne : la table grossissait d'une ligne par
-    // demande, dont celles fabriquées avec des identifiants inventés.
-    const { execute } = fakeDb(null, 0);
+    // demande, dont celles fabriquées avec des identifiants inventés. Le ménage
+    // ne vise aucun compte en particulier : il n'a rien à faire sous un verrou
+    // qui, lui, en désigne un.
+    const { trace } = fakeDb(null, 0);
     await createDiscordLoginChallenge("123");
 
-    expect(statementsOf(execute).some((q) => q.startsWith("DELETE FROM bg_discord_login_challenges")))
-      .toBe(true);
+    const purge = trace.find(({ sql }) => sql.startsWith("DELETE FROM bg_discord_login_challenges"))!;
+    expect(purge.origin).toBe("pool");
   });
 
-  it("ne périme **pas** les codes précédents : l'envoi n'a pas encore eu lieu", async () => {
-    // Les invalider ici laissait le joueur sans code du tout quand le bot était
-    // injoignable : l'ancien tué, le neuf jamais reçu. C'est l'appelant qui
-    // appelle `retireOtherDiscordChallenges`, une fois l'envoi réussi.
-    const { execute } = fakeDb(null, 0);
+  it("ne périme **pas** les codes précédents : il n'y a rien à écrire", async () => {
+    // `verifyDiscordChallenge` ne lit que le dernier émis : le précédent est
+    // déjà inatteignable, marquer son `consumed_at` ne changerait rien
+    // d'observable. Les périmer *avant* l'envoi laissait en revanche le joueur
+    // sans code du tout quand le bot était injoignable.
+    const { trace } = fakeDb(null, 0);
     await createDiscordLoginChallenge("123");
 
     expect(
-      statementsOf(execute).some((q) =>
-        q.startsWith("UPDATE bg_discord_login_challenges SET consumed_at = NOW()"),
+      trace.some(({ sql }) =>
+        sql.startsWith("UPDATE bg_discord_login_challenges SET consumed_at = NOW()"),
       ),
     ).toBe(false);
   });
@@ -248,19 +357,22 @@ describe("createDiscordLoginChallenge — nombre de codes délivrables", () => {
   });
 });
 
-describe("retireOtherDiscordChallenges", () => {
+describe("discardDiscordChallenge", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("périme les autres codes en attente, en épargnant celui qu'on vient d'envoyer", async () => {
-    // `verifyDiscordChallenge` ne lit que le plus récent : sans cette purge, un
-    // ancien code resterait ouvert sans que ses essais soient jamais décomptés,
-    // et demander un code neuf rouvrirait le quota indéfiniment.
+  it("supprime la ligne, plutôt que de la marquer consommée", async () => {
+    // Le comptage de la fenêtre porte sur `created_at` sans regarder
+    // `consumed_at` : un message privé jamais parti dépenserait sinon le budget
+    // de codes de la victime. Et c'est la suppression, non la consommation, qui
+    // rend au code précédent sa place de dernier émis.
     const { execute } = fakeDb(null, 0);
 
-    await retireOtherDiscordChallenges("123", 7);
+    await discardDiscordChallenge(42);
 
     const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
-    expect(String(sql).replace(/\s+/g, " ")).toContain("consumed_at IS NULL AND id <> ?");
-    expect(params).toEqual(["123", 7]);
+    expect(String(sql).replace(/\s+/g, " ")).toContain(
+      "DELETE FROM bg_discord_login_challenges WHERE id = ?",
+    );
+    expect(params).toEqual([42]);
   });
 });

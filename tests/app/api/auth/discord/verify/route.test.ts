@@ -9,22 +9,44 @@ import { createOrGetDiscordUser, verifyDiscordChallenge } from "@/lib/server/use
 import { DISCORD_CODE_VERIFY_RULE } from "@/lib/server/api-guard";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 
+/**
+ * Le plafond de vérification, et **l'axe sur lequel il est posé**.
+ *
+ * La route est anonyme et l'identifiant Discord d'un joueur se lit dans la
+ * réponse de `/api/auth/discord/request` : un plafond porté sur le seul compte
+ * visé désigne donc la **victime**, et dix codes bidon suffisent à lui fermer sa
+ * propre connexion pour un quart d'heure. La clé est le couple
+ * (compte visé, IP appelante) — l'attaquant ne ferme la porte qu'à lui-même.
+ * Voir `docs/AUTHORIZATION_RULES.md` §1.1.
+ */
+
 const verifyMock = verifyDiscordChallenge as jest.MockedFunction<typeof verifyDiscordChallenge>;
 const createUserMock = createOrGetDiscordUser as jest.MockedFunction<typeof createOrGetDiscordUser>;
 const createSessionMock = createSession as jest.MockedFunction<typeof createSession>;
 
 const VICTIM = "999888777666555444";
 const OTHER = "111222333444555666";
+const ATTACKER_IP = "203.0.113.7";
+const VICTIM_IP = "198.51.100.42";
 
-function attempt(discordId: string, code: string) {
+function attempt(discordId: string, code: string, ip: string | null = ATTACKER_IP) {
   return POST(
     new Request("http://localhost:3000/api/auth/discord/verify", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(ip === null ? {} : { "x-forwarded-for": ip }),
+      },
       body: JSON.stringify({ discordId, code }),
     }),
   );
 }
+
+const exhaust = async (discordId: string, ip: string) => {
+  for (let i = 0; i < DISCORD_CODE_VERIFY_RULE.limit; i += 1) {
+    await attempt(discordId, "000000", ip);
+  }
+};
 
 describe("POST /api/auth/discord/verify — plafond d'énumération", () => {
   beforeEach(() => {
@@ -46,25 +68,43 @@ describe("POST /api/auth/discord/verify — plafond d'énumération", () => {
   });
 
   it("ne consulte plus la base une fois le plafond atteint", async () => {
-    for (let i = 0; i < DISCORD_CODE_VERIFY_RULE.limit; i += 1) {
-      await attempt(VICTIM, "000000");
-    }
+    await exhaust(VICTIM, ATTACKER_IP);
     verifyMock.mockClear();
 
     await attempt(VICTIM, "000000");
     expect(verifyMock).not.toHaveBeenCalled();
   });
 
-  it("ne plafonne que le compte visé : viser quelqu'un d'autre, c'est l'attaquer", async () => {
-    // Le seau porte sur l'identifiant Discord, pas sur l'appelant. C'est le
-    // seul axe qu'un attaquant ne peut pas faire tourner — et le corollaire est
-    // qu'un joueur ne peut pas verrouiller la connexion de tout le monde en
-    // épuisant un seau partagé.
-    for (let i = 0; i < DISCORD_CODE_VERIFY_RULE.limit; i += 1) {
-      await attempt(VICTIM, "000000");
-    }
+  it("laisse la victime se connecter pendant qu'un tiers épuise son quota", async () => {
+    // **Le cœur de la règle.** Sur l'axe du seul compte visé, cette ligne
+    // rendait 429 : l'attaquant fermait la connexion de quelqu'un d'autre avec
+    // dix requêtes non authentifiées, sans jamais rien tenter de plausible.
+    await exhaust(VICTIM, ATTACKER_IP);
+    verifyMock.mockResolvedValue(true);
 
-    expect((await attempt(OTHER, "000000")).status).toBe(401);
+    const res = await attempt(VICTIM, "424242", VICTIM_IP);
+
+    expect(res.status).toBe(200);
+    expect(createSessionMock).toHaveBeenCalledWith(42);
+  });
+
+  it("ne rend pas un essai de plus à l'attaquant qui change de victime", async () => {
+    // L'autre moitié du couple : les seaux restent distincts par compte visé,
+    // sans quoi un joueur épuiserait le seau de tout le monde.
+    await exhaust(VICTIM, ATTACKER_IP);
+
+    expect((await attempt(OTHER, "000000", ATTACKER_IP)).status).toBe(401);
+    expect((await attempt(VICTIM, "000000", ATTACKER_IP)).status).toBe(429);
+  });
+
+  it("ne plafonne pas du tout quand aucune IP n'est lisible", async () => {
+    // Règle de la maison (`enforceRateLimit`) : une identité absente n'est pas
+    // plafonnée. Retomber sur le compte visé rouvrirait la fermeture ci-dessus
+    // dès qu'un relais oublie `X-Forwarded-For`. Le quota d'essais du code, lui,
+    // reste en base et ne dépend d'aucun en-tête.
+    for (let i = 0; i < DISCORD_CODE_VERIFY_RULE.limit * 2; i += 1) {
+      expect((await attempt(VICTIM, "000000", null)).status).toBe(401);
+    }
   });
 
   it("laisse passer le bon code tant que le plafond n'est pas atteint", async () => {
@@ -76,8 +116,8 @@ describe("POST /api/auth/discord/verify — plafond d'énumération", () => {
   });
 
   it("plafonne après la validation de forme, pas avant", async () => {
-    // Un corps mal formé ne doit pas consommer le quota du compte visé : sinon
-    // n'importe qui épuiserait les essais d'autrui sans même tenter un code.
+    // Un corps mal formé ne doit pas consommer le quota : sinon n'importe qui
+    // épuiserait les essais d'autrui sans même tenter un code.
     for (let i = 0; i < DISCORD_CODE_VERIFY_RULE.limit * 2; i += 1) {
       expect((await attempt(VICTIM, "12")).status).toBe(400);
     }
