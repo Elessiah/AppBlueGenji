@@ -46,11 +46,27 @@ pouvoir sur la plateforme.
   Deux bornes tiennent désormais le secret, **toutes deux en base** :
   `MAX_DISCORD_CODE_ATTEMPTS` (5 essais par code, après quoi il est **brûlé**,
   correct ou non) et `MAX_DISCORD_CODES_PER_WINDOW` (5 codes par compte et par
-  quart d'heure). L'essai se **réserve** en une seule instruction —
-  `UPDATE … SET attempts = attempts + 1 WHERE id = ? AND attempts < ?`, puis
-  `affectedRows` — et non par une lecture suivie d'une écriture : séparées par un
-  `await`, dix vérifications lancées de front lisaient toutes `attempts = 0` et
-  comparaient toutes une combinaison.
+  quart d'heure).
+
+  **Les deux se réservent, elles ne se relisent pas.** L'essai tient en une seule
+  instruction — `UPDATE … SET attempts = attempts + 1 WHERE id = ? AND
+  attempts < ?`, puis `affectedRows` — et non en une lecture suivie d'une
+  écriture : séparées par un `await`, dix vérifications lancées de front lisaient
+  toutes `attempts = 0` et comparaient toutes une combinaison. L'émission d'un
+  code avait exactement la même forme (`SELECT COUNT(*)`, `await`, `INSERT`), sur
+  la borne que ce document présente comme *celle qui tient réellement la force
+  brute* : comptage et insertion vivent donc sous un **verrou nommé** porté par
+  le compte visé (`lib/server/named-lock.ts`), ce qui fait attendre toute demande
+  concurrente visant ce même compte — et aucune autre.
+
+  Le remède évident, une transaction à `SELECT … FOR UPDATE`, **ne convient pas
+  ici**, et il a fallu une vraie base pour le voir : sur la plage vide d'un
+  compte sans ligne, chaque transaction pose un verrou d'intervalle sur la même
+  plage puis demande, pour insérer, une intention qui entre en conflit avec celui
+  des autres. Douze demandes lancées de front rendaient onze `ER_LOCK_DEADLOCK`
+  et **un** code, là où cinq étaient attendus. C'est la raison d'être de la règle
+  de travail « valider aussi en conditions réelles » : aucun test à base simulée
+  ne pouvait montrer cela.
 
   Les plafonds de débit (`DISCORD_CODE_VERIFY_RULE`, `DISCORD_CODE_REQUEST_RULE`,
   `DISCORD_CODE_REQUEST_IP_RULE`) sont une première ligne gratuite, **pas** la
@@ -58,12 +74,50 @@ pouvoir sur la plateforme.
   entièrement dès qu'on lui fabrique dix mille clés (`rate-limit.ts`), et la clé
   est justement un identifiant que l'appelant choisit. Celui par IP a un rôle
   propre : il est posé **avant** la résolution du pseudo, seul moyen de borner
-  l'appel sortant vers le bot que cette route anonyme déclenche.
+  l'appel sortant vers le bot que cette route anonyme déclenche — et il est
+  **large**, une IP n'étant pas une personne (un tournoi en réseau local sort
+  tout entier par la même).
 
-  Un code neuf **périme les précédents** — sans quoi la demande en boucle
-  rouvrirait indéfiniment le quota d'essais — mais seulement **une fois le
-  message privé parti** (`retireOtherDiscordChallenges`) : les périmer avant
-  l'envoi laissait le joueur sans code du tout quand le bot était injoignable.
+  **L'axe d'un plafond dit qui il refuse.** Celui de la *demande* porte sur le
+  compte visé, à dessein : ce qu'il protège est le téléphone de la victime, que
+  chaque appel fait vibrer. Celui de la *vérification* a été posé sur le même
+  axe, et s'est retourné contre elle — la route est anonyme, l'identifiant
+  Discord d'un joueur se lit dans la réponse de la demande, et dix codes bidon
+  fermaient sa connexion pour un quart d'heure. Sa clé est donc le **couple
+  (compte visé, IP appelante)** : l'attaquant ne plafonne que lui-même, et le
+  décompte des essais reste, lui, porté par le code en base — changer d'IP n'en
+  donne pas un de plus.
+
+  Un code neuf **rend le précédent inatteignable par sa seule existence** :
+  `verifyDiscordChallenge` ne lit que le **dernier émis**. Rien n'est écrit, donc
+  rien ne peut échouer à mi-chemin — et le geste symétrique est ce qui compte :
+  un envoi raté **supprime** sa ligne (`discardDiscordChallenge`), sans quoi la
+  mort-née resterait la dernière et masquerait le code que le joueur tient de sa
+  demande précédente, refusé comme invalide en lui brûlant ses cinq essais. Rien
+  n'est invalidé *avant* l'envoi, pour la même raison inverse : l'ancien tué et
+  le neuf jamais reçu laissaient le joueur sans rien du tout.
+
+- **Un compte ne se revendique que sur une adresse vérifiée.** La connexion
+  Google rattache une identité neuve (`google_sub` inconnu) à un compte du site
+  sur la seule **égalité de chaîne** de l'adresse e-mail. Sans consulter
+  `email_verified` — que l'`userinfo` de Google renvoie et qu'on jetait —, il
+  suffisait d'obtenir une identité Google affirmant l'adresse d'un membre pour
+  ouvrir sa session en un clic : ni code, ni plafond, ni courriel de
+  confirmation. C'était le chemin d'entrée le plus court du site, plus court que
+  la force brute sur le code Discord, et le seul qui ne demandait aucun secret.
+
+  La règle tient en une phrase : **`bg_users.email` ne contient qu'une adresse
+  vérifiée**, et un seul endroit en décide (`verifiedEmail`, dans
+  `createOrGetGoogleUser`). Le corollaire n'est pas décoratif — la colonne est
+  **unique** : y écrire une adresse non vérifiée détenue par quelqu'un d'autre ne
+  la volait pas, elle faisait échouer l'insertion, `ER_DUP_ENTRY` avalé en
+  `/connexion?error=oauth` à chaque essai. Une identité non vérifiée pouvait donc
+  ni revendiquer un compte (ce qui est voulu) ni s'en créer un (ce qui ne l'est
+  pas) ; elle en crée un désormais, simplement sans adresse. `emailVerified` est
+  un champ **obligatoire** de `GoogleProfilePayload` : facultatif, un appelant
+  qui l'oublie ferait tomber la preuve à « absente », et chaque connexion d'un
+  compte dont le `sub` n'est pas encore enregistré créerait un **doublon** —
+  équipe, historique et rôles laissés derrière, sans le moindre message.
 
   **Le revers, assumé :** qui connaît le pseudo Discord d'un joueur peut brûler
   ses codes et épuiser ses quotas, donc le tenir hors de son compte par fenêtres
