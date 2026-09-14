@@ -425,11 +425,20 @@ const DISCORD_CODE_LOCK_PREFIX = "bg_discord_code:";
 /**
  * Attente maximale du verrou, en secondes.
  *
- * Court : sous le verrou il n'y a que deux instructions, un compte et une
- * insertion. Passé ce délai, ce n'est plus une file d'attente, c'est une
- * avalanche — et c'est exactement ce que le plafond refuse.
+ * **Très court, et le chiffre compte.** `GET_LOCK` attend sur une connexion du
+ * pool, qui n'en a que 25 : chaque demande en attente en immobilise une, et
+ * elles manquent alors à *tout le site*, pas seulement à la connexion Discord.
+ * Une attente de cinq secondes suffisait à ce que vingt-cinq demandes visant le
+ * même compte fassent patienter l'accueil, les tournois et toute écriture
+ * derrière elles — le verrou qui protège le plafond aurait fabriqué une panne
+ * plus large que celle qu'il évite.
+ *
+ * Une seconde est déjà mille fois la durée de la section protégée (un comptage
+ * et une insertion). Ce qui attend plus longtemps que cela n'est plus une file,
+ * c'est une avalanche sur un seul compte — et une avalanche sur un seul compte
+ * est exactement ce que le plafond refuse.
  */
-const DISCORD_CODE_LOCK_TIMEOUT_SECONDS = 5;
+const DISCORD_CODE_LOCK_TIMEOUT_SECONDS = 1;
 
 /**
  * Émet un code de connexion.
