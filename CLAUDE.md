@@ -273,6 +273,15 @@ Règle universelle : via `useToast()` (`@/components/ui/toast`), bottom-left ove
 - Pour toute demande importante (≥ 2 features liées, refactoring architectural, intégration d'un nouveau service externe, ou tâche estimée > ~2h), établir d'abord un plan écrit (étapes ordonnées, fichiers touchés, points de vérification), puis l'exécuter dans cette session.
 - Ne pas déléguer ce travail à un pipeline d'exécution externe ou à un modèle local (`/OpusLocalManager`, `/opus-haiku-pipeline`) : la planification et l'exécution restent dans la session courante.
 
+### Dépôt voisin `blueGenjiBot`
+
+Une partie du travail de ce projet se fait dans le dépôt du bot (`../blueGenjiBot`, surchargeable par `BOT_DOCS_PATH`). Deux obligations y suivent le code, et elles ne se recouvrent pas :
+
+- **La doc Markdown du bot est en ligne sans déploiement.** `doc/*.md`, `help.md` et `helpfr.md` sont lus **à chaud** par `lib/server/bot-docs.ts` et publiés sur `/bot/docs` (registre `BOT_DOC_SECTIONS`, revalidation 60 s). Toucher une commande du bot sans corriger son Markdown met le site en contradiction avec le bot dans la minute qui suit — aucun rebuild ne fait écran, et aucun test ne le verra.
+- **La référence JSDoc (`docs/`) se régénère dans la même PR que le code.** Toute PR du bot qui touche `src/` — ajout, renommage, suppression d'un module, ou réécriture d'un bloc JSDoc — vide `docs/` puis relance `npm run docs`, et commite le résultat **à part** (chaque page porte son horodatage de génération, l'arbre entier ressort modifié à chaque passage). Sans le ménage préalable, la page d'un module supprimé survit indéfiniment. Détail des pièges : section « Documentation » du `CLAUDE.md` du bot.
+
+Ne pas confondre les deux dossiers : `doc/` est le Markdown servi par le site, `docs/` la référence HTML générée.
+
 ---
 
 ## Pipeline Git (workflow de livraison)
