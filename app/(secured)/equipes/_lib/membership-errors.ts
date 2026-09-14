@@ -12,6 +12,16 @@
  */
 
 const MEMBERSHIP_ERRORS: Record<string, string> = {
+  // Le refus le plus banal des trois routes, et le seul que le joueur puisse
+  // corriger tout seul : la session dure trente jours, elle finit par tomber —
+  // ou l'onglet voisin s'est déconnecté. Sans cette ligne, un clic sur « Quitter
+  // l'équipe » ne disait plus que « L'opération a échoué », sans jamais nommer
+  // la seule chose à faire.
+  UNAUTHORIZED: "Ta session a expiré : reconnecte-toi pour continuer.",
+  // Identifiant hors d'un entier positif : l'URL a été bricolée, ou un lien est
+  // périmé. Rien à corriger dans le formulaire.
+  INVALID_TEAM_ID: "Cette équipe n'existe pas.",
+  INVALID_INVITATION_ID: "Cette invitation n'existe pas.",
   // La ligne existe dans `bg_teams`, mais elle ne représente pas une équipe
   // qu'on rejoint : une fantôme n'a aucun membre — elle s'attribue par
   // l'arbitrage —, et une entrée solo est l'identité d'un joueur en tournoi
@@ -32,6 +42,8 @@ const MEMBERSHIP_ERRORS: Record<string, string> = {
   INVITATION_NOT_PENDING: "Cette invitation a déjà reçu une réponse.",
   TEAM_JOIN_FAILED: "La demande n'a pas pu être envoyée.",
   TEAM_LEAVE_FAILED: "Le départ n'a pas pu être enregistré.",
+  // Le repli de la troisième route, oublié quand ses deux sœurs y figuraient.
+  INVITATION_RESPOND_FAILED: "La réponse à l'invitation n'a pas pu être enregistrée.",
 };
 
 /**

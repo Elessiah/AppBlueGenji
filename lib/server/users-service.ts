@@ -1,6 +1,7 @@
 ﻿import crypto from "node:crypto";
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
 import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
@@ -18,8 +19,18 @@ import type {
 export type GoogleProfilePayload = {
   sub: string;
   email?: string;
-  /** `email_verified` de l'`userinfo` Google. Voir `createOrGetGoogleUser`. */
-  emailVerified?: boolean;
+  /**
+   * `email_verified` de l'`userinfo` Google. Voir `createOrGetGoogleUser`.
+   *
+   * **Obligatoire, et c'est le compilateur qui tient la règle.** Facultatif, il
+   * valait `undefined` dès qu'un appelant l'oubliait — donc « non vérifiée »,
+   * donc plus aucun rattachement : chaque connexion Google d'un compte dont le
+   * `sub` n'est pas encore enregistré aurait créé un **doublon**, équipe,
+   * historique et rôles laissés derrière. Une panne sans message, qu'un
+   * `profile` passé tel quel au refactor suivant suffisait à provoquer, et
+   * qu'aucun test ne peut voir puisque la valeur manquante est un cas légitime.
+   */
+  emailVerified: boolean;
   name?: string;
   picture?: string;
 };
@@ -248,6 +259,22 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
 export async function createOrGetGoogleUser(profile: GoogleProfilePayload): Promise<number> {
   const db = await getDatabase();
 
+  // **`bg_users.email` ne contient qu'une adresse vérifiée**, et cette ligne est
+  // le seul endroit qui en décide — les trois écritures en dessous n'en voient
+  // pas d'autre.
+  //
+  // Deux raisons, de deux ordres. La colonne est une **preuve d'identité** : la
+  // branche de rattachement ci-dessous lie un `sub` Google neuf à un compte du
+  // site sur la seule égalité de chaîne, donc ce qui s'y écrit doit valoir ce
+  // qu'elle y lit. Et la colonne est **unique** (`database.ts`) : écrire une
+  // adresse non vérifiée que quelqu'un d'autre détient déjà ne la volait pas,
+  // elle faisait échouer l'écriture — `ER_DUP_ENTRY` avalé en
+  // `/connexion?error=oauth` par la route de rappel, à chaque essai,
+  // indéfiniment. Une identité Google non vérifiée ne pouvait donc ni
+  // revendiquer un compte (ce qui est voulu) ni s'en créer un (ce qui ne l'est
+  // pas). Elle en crée un désormais, simplement sans adresse.
+  const verifiedEmail = profile.emailVerified === true ? (profile.email ?? null) : null;
+
   const [existing] = await db.execute<(RowDataPacket & { id: number })[]>(
     `SELECT id FROM bg_users WHERE google_sub = ? LIMIT 1`,
     [profile.sub],
@@ -259,7 +286,7 @@ export async function createOrGetGoogleUser(profile: GoogleProfilePayload): Prom
        SET email = COALESCE(?, email),
            avatar_url = COALESCE(?, avatar_url)
        WHERE id = ?`,
-      [profile.email ?? null, profile.picture ?? null, existing[0].id],
+      [verifiedEmail, profile.picture ?? null, existing[0].id],
     );
     return Number(existing[0].id);
   }
@@ -275,11 +302,12 @@ export async function createOrGetGoogleUser(profile: GoogleProfilePayload): Prom
   // aucun.
   //
   // Une adresse non vérifiée n'interdit pas de **créer** un compte plus bas :
-  // elle interdit d'en revendiquer un.
-  if (profile.email && profile.emailVerified === true) {
+  // elle interdit d'en revendiquer un — et elle ne s'y écrit pas (voir
+  // `verifiedEmail`).
+  if (verifiedEmail) {
     const [emailMatch] = await db.execute<(RowDataPacket & { id: number })[]>(
       `SELECT id FROM bg_users WHERE email = ? LIMIT 1`,
-      [profile.email],
+      [verifiedEmail],
     );
 
     if (emailMatch.length > 0) {
@@ -294,7 +322,7 @@ export async function createOrGetGoogleUser(profile: GoogleProfilePayload): Prom
   const [created] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_users (pseudo, avatar_url, google_sub, email)
      VALUES (?, ?, ?, ?)`,
-    [pseudo, profile.picture ?? null, profile.sub, profile.email ?? null],
+    [pseudo, profile.picture ?? null, profile.sub, verifiedEmail],
   );
 
   return Number(created.insertId);
@@ -386,84 +414,140 @@ export const DISCORD_CODE_WINDOW_MINUTES = 15;
 const DISCORD_CHALLENGE_RETENTION_HOURS = 24;
 
 /**
+ * Préfixe du verrou nommé qui sérialise l'émission de codes d'un compte.
+ *
+ * Le verrou porte sur **un compte Discord**, pas sur la table : deux joueurs qui
+ * demandent un code au même instant ne s'attendent pas. `discord_id` tient en 40
+ * caractères, le nom reste donc loin des 64 que MySQL accorde.
+ */
+const DISCORD_CODE_LOCK_PREFIX = "bg_discord_code:";
+
+/**
+ * Attente maximale du verrou, en secondes.
+ *
+ * Court : sous le verrou il n'y a que deux instructions, un compte et une
+ * insertion. Passé ce délai, ce n'est plus une file d'attente, c'est une
+ * avalanche — et c'est exactement ce que le plafond refuse.
+ */
+const DISCORD_CODE_LOCK_TIMEOUT_SECONDS = 5;
+
+/**
  * Émet un code de connexion.
  *
- * **Ne périme pas les codes précédents** : c'est
- * {@link retireOtherDiscordChallenges} qui le fait, et l'appelant ne l'invoque
- * qu'une fois le message privé **parti**. L'invalidation était ici, en première
- * instruction — un envoi qui échouait (bot en redémarrage) laissait alors le
- * joueur sans code du tout : l'ancien tué, le neuf jamais reçu.
+ * **Ne périme pas les codes précédents**, et n'a pas à le faire :
+ * {@link verifyDiscordChallenge} ne lit que le **dernier émis**, si bien qu'un
+ * code neuf rend le précédent inatteignable par sa seule existence. Rien à
+ * écrire, donc rien qui puisse échouer à mi-chemin. Le corollaire est tenu à
+ * l'autre bout : un envoi raté **supprime** sa ligne
+ * ({@link discardDiscordChallenge}), faute de quoi la mort-née resterait la
+ * dernière et masquerait le code que le joueur tient réellement.
+ *
+ * **Comptage et insertion se font sous un verrou nommé.** Le plafond était un
+ * `SELECT COUNT(*)` puis, un `await` plus loin, un `INSERT` : la forme exacte
+ * que le quota d'essais vient d'abandonner un cran plus bas, et pour la même
+ * raison. Des demandes lancées de front lisaient toutes le même compte et
+ * inséraient chacune leur ligne — autant de codes en jeu, chacun rouvrant cinq
+ * essais, sur la borne que ce module présente comme *celle qui tient réellement
+ * la force brute*.
+ *
+ * Le remède évident — `SELECT … FOR UPDATE` dans une transaction — **ne marche
+ * pas ici**, et il a fallu une vraie base pour le voir : sur la plage vide d'un
+ * compte sans ligne, chaque transaction pose un verrou d'intervalle sur la même
+ * plage puis demande, pour insérer, une intention qui entre en conflit avec
+ * celui des autres. Douze demandes de front rendaient onze `ER_LOCK_DEADLOCK`
+ * et **un** code, là où cinq étaient attendus. Le verrou nommé
+ * (`lib/server/named-lock.ts`) n'a ni intervalle ni ordre de prise : il
+ * sérialise les demandes d'un même compte, et ne gêne aucun autre.
  *
  * @throws TOO_MANY_CODE_REQUESTS quand le compte a déjà reçu
- *   {@link MAX_DISCORD_CODES_PER_WINDOW} codes dans la fenêtre.
+ *   {@link MAX_DISCORD_CODES_PER_WINDOW} codes dans la fenêtre — ou quand la
+ *   file d'attente sur son verrou ne se vide pas dans le délai, ce qui est le
+ *   même fait vu d'un peu plus loin.
  */
 export async function createDiscordLoginChallenge(discordId: string): Promise<DiscordChallenge> {
   const db = await getDatabase();
   const code = randomCode();
 
-  // Ménage d'abord : une ligne expirée depuis un jour n'intéresse plus personne,
-  // et surtout elle ne doit pas peser sur le comptage ci-dessous.
+  // Ménage d'abord, et **hors verrou** : il ne regarde aucun compte en
+  // particulier, et il ne pèse pas sur le comptage — une ligne expirée depuis un
+  // jour est née bien avant la fenêtre de quinze minutes. Il borne la croissance
+  // de la table, qui n'effaçait rien, jamais.
   await db.execute(
     `DELETE FROM bg_discord_login_challenges
      WHERE expires_at < DATE_SUB(NOW(), INTERVAL ? HOUR)`,
     [DISCORD_CHALLENGE_RETENTION_HOURS],
   );
 
-  // La borne qui tient réellement la force brute (voir
-  // `MAX_DISCORD_CODES_PER_WINDOW`) : en base, donc commune à tous les
-  // processus et insensible à la fabrication de clés.
-  const [recent] = await db.execute<(RowDataPacket & { c: number })[]>(
-    `SELECT COUNT(*) AS c
-     FROM bg_discord_login_challenges
-     WHERE discord_id = ?
-       AND created_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)`,
-    [discordId, DISCORD_CODE_WINDOW_MINUTES],
-  );
-  if (Number(recent[0]?.c ?? 0) >= MAX_DISCORD_CODES_PER_WINDOW) {
-    throw new Error("TOO_MANY_CODE_REQUESTS");
+  try {
+    return await withNamedLock(
+      db,
+      `${DISCORD_CODE_LOCK_PREFIX}${discordId}`,
+      DISCORD_CODE_LOCK_TIMEOUT_SECONDS,
+      async (connection) => {
+        // La borne qui tient réellement la force brute (voir
+        // `MAX_DISCORD_CODES_PER_WINDOW`) : en base, donc commune à tous les
+        // processus et insensible à la fabrication de clés.
+        const [recent] = await connection.execute<(RowDataPacket & { c: number })[]>(
+          `SELECT COUNT(*) AS c
+           FROM bg_discord_login_challenges
+           WHERE discord_id = ?
+             AND created_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)`,
+          [discordId, DISCORD_CODE_WINDOW_MINUTES],
+        );
+        if (Number(recent[0]?.c ?? 0) >= MAX_DISCORD_CODES_PER_WINDOW) {
+          throw new Error("TOO_MANY_CODE_REQUESTS");
+        }
+
+        const [insert] = await connection.execute<ResultSetHeader>(
+          `INSERT INTO bg_discord_login_challenges (discord_id, code_hash, expires_at)
+           VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))`,
+          [discordId, hashCode(code)],
+        );
+
+        const [rows] = await connection.execute<(RowDataPacket & { expires_at: Date | string })[]>(
+          `SELECT expires_at FROM bg_discord_login_challenges WHERE id = ? LIMIT 1`,
+          [insert.insertId],
+        );
+
+        const rawExpiresAt = rows[0]?.expires_at;
+        return {
+          challengeId: Number(insert.insertId),
+          code,
+          // mysql2 peut renvoyer expires_at en string selon la config du pool : on normalise en Date.
+          expiresAt: rawExpiresAt ? new Date(rawExpiresAt) : new Date(Date.now() + 10 * 60 * 1000),
+        };
+      },
+    );
+  } catch (error) {
+    // Le verrou qui ne se libère pas en cinq secondes, sur un compte dont deux
+    // instructions font tout le travail, **est** une avalanche de demandes pour
+    // ce compte : on la refuse comme telle, plutôt que de rendre une panne
+    // interne à un joueur qui n'y peut rien. Refuser est aussi le sens sûr — le
+    // contraire délivrerait un code de plus sans l'avoir compté.
+    if (error instanceof NamedLockUnavailableError) {
+      throw new Error("TOO_MANY_CODE_REQUESTS");
+    }
+    throw error;
   }
-
-  const [insert] = await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_discord_login_challenges (discord_id, code_hash, expires_at)
-     VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))`,
-    [discordId, hashCode(code)],
-  );
-
-  const [rows] = await db.execute<(RowDataPacket & { expires_at: Date | string })[]>(
-    `SELECT expires_at FROM bg_discord_login_challenges WHERE id = ? LIMIT 1`,
-    [insert.insertId],
-  );
-
-  const rawExpiresAt = rows[0]?.expires_at;
-  return {
-    challengeId: Number(insert.insertId),
-    code,
-    // mysql2 peut renvoyer expires_at en string selon la config du pool : on normalise en Date.
-    expiresAt: rawExpiresAt ? new Date(rawExpiresAt) : new Date(Date.now() + 10 * 60 * 1000),
-  };
 }
 
 /**
- * Périme tous les codes en attente d'un compte **sauf** celui qu'on vient
- * d'envoyer.
+ * Efface un code dont l'envoi a échoué.
  *
- * Appelé après l'envoi, et pas avant : voir
- * {@link createDiscordLoginChallenge}. Sans lui, `verifyDiscordChallenge` ne
- * lisant que le plus récent, un ancien code resterait ouvert sans que ses
- * essais soient jamais décomptés — et demander un code neuf rouvrirait le quota
- * indéfiniment.
+ * **Un code qui n'est pas parti ne doit pas survivre à son échec.**
+ * `verifyDiscordChallenge` ne lit que le plus récent : la ligne mort-née
+ * masquerait celui que le joueur a réellement reçu, qui serait alors refusé
+ * comme invalide — et chaque essai brûlerait le quota de la mauvaise ligne
+ * jusqu'à ce qu'elle se consume.
+ *
+ * **Supprimée et non consommée** : le comptage de
+ * {@link MAX_DISCORD_CODES_PER_WINDOW} porte sur `created_at`, sans regarder
+ * `consumed_at`. Un message privé jamais parti n'a spammé personne, il ne doit
+ * pas dépenser le budget de codes de la victime.
  */
-export async function retireOtherDiscordChallenges(
-  discordId: string,
-  keepChallengeId: number,
-): Promise<void> {
+export async function discardDiscordChallenge(challengeId: number): Promise<void> {
   const db = await getDatabase();
-  await db.execute(
-    `UPDATE bg_discord_login_challenges
-     SET consumed_at = NOW()
-     WHERE discord_id = ? AND consumed_at IS NULL AND id <> ?`,
-    [discordId, keepChallengeId],
-  );
+  await db.execute(`DELETE FROM bg_discord_login_challenges WHERE id = ?`, [challengeId]);
 }
 
 export async function verifyDiscordChallenge(discordId: string, code: string): Promise<boolean> {

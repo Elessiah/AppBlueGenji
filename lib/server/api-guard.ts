@@ -154,15 +154,24 @@ export const DISCORD_CODE_REQUEST_RULE: RateLimitRule = {
  * qui existe pour la même raison, avec la même faiblesse assumée (une identité
  * absente n'est pas plafonnée) : c'est une borne de coût, pas la garantie de
  * sécurité, qui vit en base (`MAX_DISCORD_CODES_PER_WINDOW`).
+ *
+ * **Large, et délibérément.** Une IP n'est pas une personne : un tournoi joué en
+ * réseau local, un internat, un lycée sortent tous par la même adresse, et
+ * quarante joueurs qui se connectent au coup d'envoi sont un usage normal, pas
+ * une attaque. Les bornes étroites de cette route sont posées sur le compte
+ * visé, là où elles désignent quelque chose ; celle-ci ne borne que la dépense
+ * (un aller-retour vers le bot), et un plafond qui refuse la connexion à la
+ * moitié d'un plateau coûterait plus cher que ce qu'il économise.
  */
 export const DISCORD_CODE_REQUEST_IP_RULE: RateLimitRule = {
   name: "discord-code-request-ip",
-  limit: 20,
+  limit: 120,
   windowMs: 15 * 60_000,
 };
 
 /**
- * Vérifications d'un code de connexion Discord, **par compte Discord visé**.
+ * Vérifications d'un code de connexion Discord, **par couple (compte visé, IP
+ * appelante)**.
  *
  * Première ligne, gratuite — **pas** la garantie. Le secret est tenu par deux
  * bornes en base : le quota d'essais porté par le code lui-même
@@ -173,8 +182,16 @@ export const DISCORD_CODE_REQUEST_IP_RULE: RateLimitRule = {
  * clés (`rate-limit.ts`, `bucket.clear()`) — et la clé est justement un
  * identifiant que l'appelant choisit. Il écarte le bruit ; il ne prouve rien.
  *
- * Même axe que la demande, et pour la même raison : l'identifiant visé ne se
- * change pas sans changer de victime.
+ * **L'IP appelante est dans la clé, et ce n'est pas cosmétique.** Posé sur le
+ * seul compte visé — l'axe de la demande de code —, ce plafond désignait la
+ * **victime** : la route est anonyme, l'identifiant Discord d'un joueur se lit
+ * dans la réponse de `/api/auth/discord/request`, et dix codes bidon suffisaient
+ * alors à fermer la connexion Discord d'un joueur nommé pendant un quart
+ * d'heure. Le compte visé est bien le seul axe qu'un attaquant ne peut pas
+ * faire tourner — mais c'est précisément ce qui fait de lui un mauvais axe
+ * *ici* : le refus retombe sur la personne visée, pas sur l'appelant. Le
+ * décompte des essais, lui, reste porté par le code en base, où changer d'IP
+ * n'y donne pas droit.
  */
 export const DISCORD_CODE_VERIFY_RULE: RateLimitRule = {
   name: "discord-code-verify",

@@ -8,8 +8,8 @@ import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integ
 import { fail, ok } from "@/lib/server/http";
 import {
   createDiscordLoginChallenge,
+  discardDiscordChallenge,
   discordAccountExists,
-  retireOtherDiscordChallenges,
 } from "@/lib/server/users-service";
 
 function mapRequestError(message: string): { code: string; status: number } {
@@ -69,13 +69,25 @@ export async function POST(req: Request) {
     const isNewAccount = !(await discordAccountExists(discordId));
 
     const challenge = await createDiscordLoginChallenge(discordId);
-    await sendDiscordLoginCode(discordId, challenge.code);
 
-    // Les codes précédents ne meurent qu'**une fois celui-ci parti**. Les périmer
-    // avant l'envoi laissait le joueur sans rien du tout quand le bot était
-    // injoignable : l'ancien tué, le neuf jamais reçu. Deux codes se chevauchent
-    // donc le temps d'un aller-retour, chacun avec son propre quota d'essais.
-    await retireOtherDiscordChallenges(discordId, challenge.challengeId);
+    try {
+      await sendDiscordLoginCode(discordId, challenge.code);
+    } catch (error) {
+      // **Un envoi raté n'a produit aucun code**, et la base doit le dire.
+      //
+      // `verifyDiscordChallenge` ne lit que le **dernier émis** : laissée là, la
+      // ligne mort-née ferait refuser le code que le joueur tient de la demande
+      // précédente — refusé comme invalide, et chaque essai brûlant le quota de
+      // la mauvaise ligne. Le supprimer rend au code déjà reçu sa place de
+      // dernier, sans rien écrire d'autre. C'est aussi pourquoi rien n'est
+      // invalidé avant l'envoi : l'ancien tué, le neuf jamais reçu, le joueur
+      // n'avait plus rien du tout dès que le bot redémarrait.
+      await discardDiscordChallenge(challenge.challengeId).catch(() => {
+        // Ménage impossible : on rend quand même l'échec d'envoi, qui est
+        // l'erreur que le joueur doit lire.
+      });
+      throw error;
+    }
 
     return ok({
       success: true,
