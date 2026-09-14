@@ -33,7 +33,11 @@ function fakeConnection(matchFormat: { type: string; value: number } | null): {
 
       // Verrou aval : match indécis → la saisie reste ouverte.
       if (q.includes("FROM bg_matches m JOIN bg_tournaments t")) {
-        return [[{ round_number: 1, winner_team_id: null, format: "SINGLE" }], []];
+        // `status` autant que `winner_team_id` : depuis que le verrou lit le statut
+        // (`isMatchPlayed`), une ligne factice sans cette colonne le fait sortir
+        // aussitôt — le garde-fou était donc neutralisé dans tous les tests qui
+        // l'atteignent. Ici le match édité n'est pas tranché : rien à verrouiller.
+        return [[{ round_number: 1, status: "READY", winner_team_id: null, format: "SINGLE" }], []];
       }
 
       if (q.includes("match_format_type")) {

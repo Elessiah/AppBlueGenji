@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { POST } from "@/app/api/auth/discord/request/route";
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
-import { createDiscordLoginChallenge, discordAccountExists } from "@/lib/server/users-service";
+import {
+  createDiscordLoginChallenge,
+  discordAccountExists,
+  retireOtherDiscordChallenges,
+} from "@/lib/server/users-service";
 import { resetRateLimit } from "@/lib/server/rate-limit";
-import { DISCORD_CODE_REQUEST_RULE } from "@/lib/server/api-guard";
+import { DISCORD_CODE_REQUEST_IP_RULE, DISCORD_CODE_REQUEST_RULE } from "@/lib/server/api-guard";
 
 jest.mock("@/lib/server/bot-integration", () => ({
   resolveDiscordUser: jest.fn(),
@@ -13,6 +17,7 @@ jest.mock("@/lib/server/bot-integration", () => ({
 jest.mock("@/lib/server/users-service", () => ({
   createDiscordLoginChallenge: jest.fn(),
   discordAccountExists: jest.fn(),
+  retireOtherDiscordChallenges: jest.fn(),
 }));
 
 const resolveDiscordUserMock = resolveDiscordUser as jest.MockedFunction<typeof resolveDiscordUser>;
@@ -20,6 +25,8 @@ const sendDiscordLoginCodeMock = sendDiscordLoginCode as jest.MockedFunction<typ
 const createDiscordLoginChallengeMock =
   createDiscordLoginChallenge as jest.MockedFunction<typeof createDiscordLoginChallenge>;
 const discordAccountExistsMock = discordAccountExists as jest.MockedFunction<typeof discordAccountExists>;
+const retireOtherChallengesMock =
+  retireOtherDiscordChallenges as jest.MockedFunction<typeof retireOtherDiscordChallenges>;
 
 function buildRequest(body: Record<string, unknown>): Request {
   return new Request("http://localhost:3000/api/auth/discord/request", {
@@ -36,9 +43,12 @@ describe("POST /api/auth/discord/request", () => {
     createDiscordLoginChallengeMock.mockReset();
     discordAccountExistsMock.mockReset();
     discordAccountExistsMock.mockResolvedValue(false);
+    retireOtherChallengesMock.mockReset();
+    retireOtherChallengesMock.mockResolvedValue();
     // Le plafond est par compte Discord visé et vit en mémoire du processus :
     // sans remise à zéro, les cas suivants héritent des demandes des premiers.
     resetRateLimit(DISCORD_CODE_REQUEST_RULE.name);
+    resetRateLimit(DISCORD_CODE_REQUEST_IP_RULE.name);
     // Par défaut, resolve renvoie l'identifiant tel quel (cas ID numérique).
     resolveDiscordUserMock.mockImplementation(async (handle: string) => handle);
   });
@@ -117,6 +127,84 @@ describe("POST /api/auth/discord/request", () => {
 
     const other = await POST(buildRequest({ discordId: "111222333444555666" }));
     expect(other.status).toBe(200);
+  });
+
+  it("ne périme les codes précédents qu'une fois le message privé parti", async () => {
+    // L'ordre est la correction : invalider avant l'envoi laissait le joueur
+    // sans code du tout quand le bot était injoignable.
+    createDiscordLoginChallengeMock.mockResolvedValue({
+      challengeId: 42,
+      code: "123456",
+      expiresAt: new Date("2030-01-01T10:00:00.000Z"),
+    });
+    let sentBeforeRetire = false;
+    sendDiscordLoginCodeMock.mockImplementation(async () => {
+      sentBeforeRetire = retireOtherChallengesMock.mock.calls.length === 0;
+    });
+
+    await POST(buildRequest({ discordId: "123456789012345678" }));
+
+    expect(sentBeforeRetire).toBe(true);
+    expect(retireOtherChallengesMock).toHaveBeenCalledWith("123456789012345678", 42);
+  });
+
+  it("laisse le code précédent vivant quand l'envoi échoue", async () => {
+    createDiscordLoginChallengeMock.mockResolvedValue({
+      challengeId: 42,
+      code: "123456",
+      expiresAt: new Date("2030-01-01T10:00:00.000Z"),
+    });
+    sendDiscordLoginCodeMock.mockRejectedValue(new Error("BOT_INTERNAL_UNREACHABLE"));
+
+    const response = await POST(buildRequest({ discordId: "123456789012345678" }));
+
+    expect(response.status).toBe(503);
+    expect(retireOtherChallengesMock).not.toHaveBeenCalled();
+  });
+
+  it("remonte le plafond de codes en 429", async () => {
+    createDiscordLoginChallengeMock.mockRejectedValue(new Error("TOO_MANY_CODE_REQUESTS"));
+
+    const response = await POST(buildRequest({ discordId: "123456789012345678" }));
+    const payload = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(429);
+    expect(payload.error).toBe("TOO_MANY_CODE_REQUESTS");
+    expect(sendDiscordLoginCodeMock).not.toHaveBeenCalled();
+  });
+
+  it("plafonne par IP **avant** de résoudre le pseudo auprès du bot", async () => {
+    // Le plafond par compte visé ne peut être posé qu'après la résolution :
+    // sans celui-ci, la route anonyme faisait sortir une requête par appel.
+    createDiscordLoginChallengeMock.mockResolvedValue({
+      challengeId: 1,
+      code: "123456",
+      expiresAt: new Date("2030-01-01T10:00:00.000Z"),
+    });
+    sendDiscordLoginCodeMock.mockResolvedValue();
+
+    const fromSameIp = (handle: string) =>
+      POST(
+        new Request("http://localhost:3000/api/auth/discord/request", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.7" },
+          body: JSON.stringify({ handle }),
+        }),
+      );
+
+    // Des pseudos tous différents : seul le plafond par IP peut les arrêter.
+    // Composés en **chaîne** : un identifiant Discord dépasse 2^53, et
+    // `100000000000000000 + i` rendrait la même valeur pour tout `i`.
+    for (let i = 0; i < DISCORD_CODE_REQUEST_IP_RULE.limit; i += 1) {
+      const ok = await fromSameIp(`1000000000000000${String(i).padStart(2, "0")}`);
+      expect(ok.status).toBe(200);
+    }
+
+    resolveDiscordUserMock.mockClear();
+    const blocked = await fromSameIp("999888777666555444");
+
+    expect(blocked.status).toBe(429);
+    expect(resolveDiscordUserMock).not.toHaveBeenCalled();
   });
 
   it("signale isNewAccount=false quand un compte est déjà rattaché au Discord", async () => {

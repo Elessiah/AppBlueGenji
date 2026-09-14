@@ -34,8 +34,13 @@ export const ERROR_MESSAGES: Record<string, string> = {
   NO_ACTIVE_TEAM: "Tu dois d'abord créer ou rejoindre une équipe.",
   // Le joueur a bien une équipe : ce qui lui manque est la charge de l'engager.
   // La phrase nomme donc les rôles, et dit à qui s'adresser.
+  //
+  // Formulation neutre quant à l'acte : le même code refuse l'inscription **et**
+  // l'abandon, qui exigent la même qualité pour la même raison (§4.2 et §4.7 de
+  // `docs/AUTHORIZATION_RULES.md`). Nommer l'inscription faisait lire « peuvent
+  // l'inscrire à un tournoi » à qui venait de cliquer « Déclarer forfait ».
   NOT_TEAM_MANAGER:
-    "Seuls le propriétaire et les managers de l'équipe peuvent l'inscrire à un tournoi.",
+    "Seuls le propriétaire et les managers de l'équipe peuvent l'engager dans un tournoi ou l'en retirer.",
   // Tournoi individuel : le nom d'inscription du joueur est déjà pris.
   SOLO_ENTRY_NAME_UNAVAILABLE:
     "Ton pseudo est déjà utilisé comme nom d'équipe : change-le avant de t'inscrire.",

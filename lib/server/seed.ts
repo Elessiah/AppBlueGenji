@@ -1,6 +1,7 @@
 import "dotenv/config";
 import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "./database";
+import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { loadTournamentRow, loadRegisteredTeamIds, getMatchRows } from "./tournaments/repository";
 import { createSingleEliminationBracket } from "./tournaments/bracket-single";
 import { createDoubleEliminationBracket } from "./tournaments/bracket-double";
@@ -588,18 +589,28 @@ async function createSoloEntries(db: Pool, userIds: number[]): Promise<number[]>
   const entryIds: number[] = [];
 
   for (const userId of userIds) {
-    const [users] = await db.execute<(RowDataPacket & { pseudo: string; avatar_url: string | null })[]>(
-      `SELECT pseudo, avatar_url FROM bg_users WHERE id = ? LIMIT 1`,
+    const [users] = await db.execute<
+      (RowDataPacket & { pseudo: string; avatar_url: string | null; visible_avatar: 0 | 1 })[]
+    >(
+      `SELECT pseudo, avatar_url, visible_avatar FROM bg_users WHERE id = ? LIMIT 1`,
       [userId],
     );
     if (users.length === 0) continue;
+
+    // Le logo d'une entrée solo est servi à tout le monde, jusque sur la carte
+    // du match en direct de l'accueil : il obéit donc au réglage d'avatar comme
+    // partout ailleurs (`lib/shared/avatar.ts`). Cette boucle recopiait
+    // `avatar_url` brut, si bien que chaque exécution du jeu de test
+    // republiait l'avatar des comptes « profil privé » — et que le contrôle en
+    // conditions réelles montrait la fuite qu'on venait de fermer.
+    const logoUrl = visibleAvatarUrl(users[0].avatar_url, users[0].visible_avatar === 1);
 
     for (const name of soloEntryNameCandidates(users[0].pseudo, userId)) {
       try {
         const [result] = await db.execute<ResultSetHeader>(
           `INSERT INTO bg_teams (name, logo_url, description, is_ghost, solo_user_id)
            VALUES (?, ?, NULL, 0, ?)`,
-          [name, users[0].avatar_url, userId],
+          [name, logoUrl, userId],
         );
         entryIds.push(result.insertId as number);
         break;

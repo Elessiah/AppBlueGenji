@@ -36,18 +36,43 @@ pouvoir sur la plateforme.
   domaine tiers.
 - `DEV_AUTH_USER_ID` court-circuite la session **uniquement** si
   `NODE_ENV === "development"`. Jamais en production, en test ni en staging.
-- **Le code Discord se compte.** Six chiffres ne sont un secret que si les
-  essais sont bornés : `bg_discord_login_challenges.attempts` existait sans être
-  jamais relu, et rien ne plafonnait `/api/auth/discord/verify` — un tiers
-  connaissant le pseudo Discord d'un joueur (public sur n'importe quel serveur)
-  pouvait énumérer le million de combinaisons jusqu'à ouvrir sa session. Trois
-  bornes désormais, toutes portées par le **compte visé** et non par l'IP, le
-  seul axe qu'un attaquant ne peut pas faire tourner : `MAX_DISCORD_CODE_ATTEMPTS`
-  (5 essais, après quoi le code est **brûlé**, correct ou non), `DISCORD_CODE_VERIFY_RULE`
-  (10 vérifications par quart d'heure) et `DISCORD_CODE_REQUEST_RULE` (3 demandes
-  par quart d'heure — chacune envoyant un message privé à la victime). Un code
-  neuf **périme le précédent**, faute de quoi la demande en boucle rouvrirait
-  indéfiniment le quota d'essais.
+- **Le code Discord se compte, et il se compte en base.** Six chiffres ne sont
+  un secret que si les essais sont bornés : `bg_discord_login_challenges.attempts`
+  existait sans être jamais relu, et rien ne plafonnait
+  `/api/auth/discord/verify` — un tiers connaissant le pseudo Discord d'un joueur
+  (public sur n'importe quel serveur) pouvait énumérer le million de
+  combinaisons jusqu'à ouvrir sa session.
+
+  Deux bornes tiennent désormais le secret, **toutes deux en base** :
+  `MAX_DISCORD_CODE_ATTEMPTS` (5 essais par code, après quoi il est **brûlé**,
+  correct ou non) et `MAX_DISCORD_CODES_PER_WINDOW` (5 codes par compte et par
+  quart d'heure). L'essai se **réserve** en une seule instruction —
+  `UPDATE … SET attempts = attempts + 1 WHERE id = ? AND attempts < ?`, puis
+  `affectedRows` — et non par une lecture suivie d'une écriture : séparées par un
+  `await`, dix vérifications lancées de front lisaient toutes `attempts = 0` et
+  comparaient toutes une combinaison.
+
+  Les plafonds de débit (`DISCORD_CODE_VERIFY_RULE`, `DISCORD_CODE_REQUEST_RULE`,
+  `DISCORD_CODE_REQUEST_IP_RULE`) sont une première ligne gratuite, **pas** la
+  garantie : ils vivent dans une `Map` d'un seul processus dont le seau se vide
+  entièrement dès qu'on lui fabrique dix mille clés (`rate-limit.ts`), et la clé
+  est justement un identifiant que l'appelant choisit. Celui par IP a un rôle
+  propre : il est posé **avant** la résolution du pseudo, seul moyen de borner
+  l'appel sortant vers le bot que cette route anonyme déclenche.
+
+  Un code neuf **périme les précédents** — sans quoi la demande en boucle
+  rouvrirait indéfiniment le quota d'essais — mais seulement **une fois le
+  message privé parti** (`retireOtherDiscordChallenges`) : les périmer avant
+  l'envoi laissait le joueur sans code du tout quand le bot était injoignable.
+
+  **Le revers, assumé :** qui connaît le pseudo Discord d'un joueur peut brûler
+  ses codes et épuiser ses quotas, donc le tenir hors de son compte par fenêtres
+  d'un quart d'heure. C'est le prix de tout plafonnement d'un code à usage
+  unique, et il est très inférieur à celui d'une session ouverte par énumération
+  — mais il est réel : un compte né par Discord n'a pas d'autre voie d'entrée.
+  Les bornes sont donc réglées assez haut pour qu'un usage normal ne s'en
+  approche jamais, et chaque demande laisse une trace chez la victime, qui reçoit
+  le message privé.
 
 ### 1.2 Les six permissions
 
@@ -144,9 +169,18 @@ d'annuaire (`listTeams`), celui d'une fiche d'équipe (`getTeamDetail`), et le
 **logo d'une entrée solo**, recopié dans `bg_teams` puis servi jusqu'à la carte
 du match en direct de l'accueil, que lit un visiteur sans compte. La règle est
 donc écrite une seule fois, `visibleAvatarUrl` (`lib/shared/avatar.ts`), et les
-quatre lectures y passent. Le propriétaire continue de voir la sienne ; l'entrée
-solo, elle, est une valeur **stockée** servie à tout le monde, elle n'a pas de
-lecteur à qui faire exception.
+cinq lectures y passent — les quatre du site et celle du jeu de test, qui
+reproduisait la fuite à chaque exécution. Le propriétaire continue de voir la
+sienne ; l'entrée solo, elle, est une valeur **stockée** servie à tout le monde,
+elle n'a pas de lecteur à qui faire exception.
+
+Une valeur stockée demande un **rattrapage**, et pas seulement une règle à
+l'écriture : les entrées solo créées avant cette passe portaient déjà la copie,
+et rien ne les aurait réécrites avant la prochaine inscription ou la prochaine
+édition de profil de leur joueur. `lib/server/database.ts` vide donc ces
+logos-là au démarrage, en une écriture idempotente rejouée à chaque fois — un
+filet, pas une migration à cocher. Le chemin inverse (l'avatar redevient public)
+est tenu par `syncSoloEntryIdentity`, appelé sur la bascule du réglage.
 
 Deux points volontaires, à ne pas prendre pour des fuites :
 

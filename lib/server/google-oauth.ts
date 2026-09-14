@@ -1,6 +1,14 @@
 ﻿export type GoogleUserInfo = {
   sub: string;
   email?: string;
+  /**
+   * Google a-t-il vérifié cette adresse ?
+   *
+   * Le champ est renvoye par `userinfo` et etait jete : voir
+   * `createOrGetGoogleUser`, qui refuse desormais de rattacher un `sub` neuf a
+   * un compte existant sans lui.
+   */
+  email_verified?: boolean;
   name?: string;
   picture?: string;
 };

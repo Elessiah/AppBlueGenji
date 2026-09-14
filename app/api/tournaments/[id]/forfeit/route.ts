@@ -29,6 +29,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const isReferee = can(user, "tournaments");
 
   let teamId: number | null = null;
+  // `null` = arbitrage : le service ne revérifie alors aucun engagé.
+  let actingUserId: number | null = null;
   if (isReferee && body.teamId) {
     teamId = Number(body.teamId);
   } else {
@@ -45,8 +47,12 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     if (entrant.teamId === null) return fail("NO_ACTIVE_TEAM", 400);
     // Même refus et même code que l'inscription : c'est la même qualité qu'on
     // exige, pour la même raison — l'acte engage l'équipe entière.
+    //
+    // Ce contrôle-ci sert à répondre vite et juste ; le service le rejoue dans
+    // sa transaction, seul endroit où le droit fasse foi.
     if (!entrant.canActForEntrant) return fail("NOT_TEAM_MANAGER", 403);
     teamId = entrant.teamId;
+    actingUserId = user.id;
     // Un non-arbitre ne peut forfaiter que son propre engagé.
     if (body.teamId && Number(body.teamId) !== teamId) {
       return fail("FORBIDDEN", 403);
@@ -56,7 +62,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!Number.isInteger(teamId) || teamId <= 0) return fail("INVALID_TEAM", 400);
 
   try {
-    await forfeitTournamentTeam(tournamentId, teamId);
+    await forfeitTournamentTeam(tournamentId, teamId, actingUserId);
     return ok({ success: true });
   } catch (error) {
     const message = (error as Error).message;
@@ -72,6 +78,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       return fail(message, 400);
     }
     if (message === "TEAM_NOT_IN_TOURNAMENT") return fail(message, 404);
+    // Le droit a changé entre la lecture ci-dessus et l'écriture : le service
+    // tranche, la route se contente de traduire.
+    if (message === "NOT_TEAM_MANAGER" || message === "FORBIDDEN") return fail(message, 403);
+    if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);
     return fail(message || "FORFEIT_FAILED", 500);
   }
 }

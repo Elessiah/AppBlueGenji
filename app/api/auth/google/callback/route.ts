@@ -20,7 +20,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   try {
     const profile = await fetchGoogleUser(code);
-    const userId = await createOrGetGoogleUser(profile);
+    // `email_verified` traverse explicitement : `createOrGetGoogleUser` s'en
+    // sert pour decider s'il a le droit de rattacher ce `sub` a un compte qui
+    // existe deja, et le nom du champ change de casse en passant du protocole
+    // au vocabulaire du projet.
+    const userId = await createOrGetGoogleUser({
+      sub: profile.sub,
+      email: profile.email,
+      emailVerified: profile.email_verified === true,
+      name: profile.name,
+      picture: profile.picture,
+    });
     await createSession(userId);
 
     // Filtrée de nouveau à la sortie : le cookie d'état n'est pas signé, il ne

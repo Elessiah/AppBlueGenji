@@ -18,6 +18,8 @@ import type {
 export type GoogleProfilePayload = {
   sub: string;
   email?: string;
+  /** `email_verified` de l'`userinfo` Google. Voir `createOrGetGoogleUser`. */
+  emailVerified?: boolean;
   name?: string;
   picture?: string;
 };
@@ -262,7 +264,19 @@ export async function createOrGetGoogleUser(profile: GoogleProfilePayload): Prom
     return Number(existing[0].id);
   }
 
-  if (profile.email) {
+  // **Rattachement à un compte existant : uniquement sur une adresse vérifiée.**
+  //
+  // Cette branche lie un `sub` Google neuf à un compte du site sur la seule
+  // égalité de chaîne de l'adresse. Sans consulter `email_verified` — que
+  // `userinfo` renvoie et qu'on jetait —, il suffisait d'obtenir une identité
+  // Google affirmant l'adresse d'un membre pour ouvrir sa session en un clic :
+  // ni code, ni plafond, ni courriel de confirmation. Plus court que la force
+  // brute sur le code Discord, et le seul chemin d'entrée qui n'en demande
+  // aucun.
+  //
+  // Une adresse non vérifiée n'interdit pas de **créer** un compte plus bas :
+  // elle interdit d'en revendiquer un.
+  if (profile.email && profile.emailVerified === true) {
     const [emailMatch] = await db.execute<(RowDataPacket & { id: number })[]>(
       `SELECT id FROM bg_users WHERE email = ? LIMIT 1`,
       [profile.email],
@@ -342,20 +356,72 @@ export async function discordAccountExists(discordId: string): Promise<boolean> 
  */
 export const MAX_DISCORD_CODE_ATTEMPTS = 5;
 
+/**
+ * Codes délivrables à un même compte Discord sur {@link DISCORD_CODE_WINDOW_MINUTES}.
+ *
+ * C'est **cette** borne, et non le plafond de débit en mémoire, qui tient la
+ * force brute : `lib/server/rate-limit.ts` compte dans une `Map` d'un seul
+ * processus, dont le seau se vide entièrement (`bucket.clear()`) dès qu'on lui
+ * fabrique dix mille clés — et la clé est ici un identifiant Discord que
+ * l'appelant choisit. Le plafond en mémoire reste utile comme première ligne,
+ * gratuite ; la garantie, elle, est en base.
+ *
+ * Cinq codes par quart d'heure : cinq essais chacun, soit vingt-cinq
+ * combinaisons sur un million, et cinq messages privés que la victime voit
+ * arriver.
+ */
+export const MAX_DISCORD_CODES_PER_WINDOW = 5;
+
+/** Fenêtre de {@link MAX_DISCORD_CODES_PER_WINDOW}, en minutes. */
+export const DISCORD_CODE_WINDOW_MINUTES = 15;
+
+/**
+ * Durée de rétention d'un code déjà expiré.
+ *
+ * Rien n'effaçait jamais une ligne de `bg_discord_login_challenges` : la table
+ * grossissait d'une ligne par demande, définitivement. Le ménage se fait à la
+ * création, comme celui des sessions dans `auth.ts`, et laisse largement de
+ * quoi compter la fenêtre ci-dessus.
+ */
+const DISCORD_CHALLENGE_RETENTION_HOURS = 24;
+
+/**
+ * Émet un code de connexion.
+ *
+ * **Ne périme pas les codes précédents** : c'est
+ * {@link retireOtherDiscordChallenges} qui le fait, et l'appelant ne l'invoque
+ * qu'une fois le message privé **parti**. L'invalidation était ici, en première
+ * instruction — un envoi qui échouait (bot en redémarrage) laissait alors le
+ * joueur sans code du tout : l'ancien tué, le neuf jamais reçu.
+ *
+ * @throws TOO_MANY_CODE_REQUESTS quand le compte a déjà reçu
+ *   {@link MAX_DISCORD_CODES_PER_WINDOW} codes dans la fenêtre.
+ */
 export async function createDiscordLoginChallenge(discordId: string): Promise<DiscordChallenge> {
   const db = await getDatabase();
   const code = randomCode();
 
-  // Un nouveau code périme le précédent. Sans cela, deux codes valides
-  // coexistent — et surtout, `verifyDiscordChallenge` ne lisant que le plus
-  // récent, l'ancien resterait ouvert sans que ses essais soient jamais
-  // décomptés.
+  // Ménage d'abord : une ligne expirée depuis un jour n'intéresse plus personne,
+  // et surtout elle ne doit pas peser sur le comptage ci-dessous.
   await db.execute(
-    `UPDATE bg_discord_login_challenges
-     SET consumed_at = NOW()
-     WHERE discord_id = ? AND consumed_at IS NULL`,
-    [discordId],
+    `DELETE FROM bg_discord_login_challenges
+     WHERE expires_at < DATE_SUB(NOW(), INTERVAL ? HOUR)`,
+    [DISCORD_CHALLENGE_RETENTION_HOURS],
   );
+
+  // La borne qui tient réellement la force brute (voir
+  // `MAX_DISCORD_CODES_PER_WINDOW`) : en base, donc commune à tous les
+  // processus et insensible à la fabrication de clés.
+  const [recent] = await db.execute<(RowDataPacket & { c: number })[]>(
+    `SELECT COUNT(*) AS c
+     FROM bg_discord_login_challenges
+     WHERE discord_id = ?
+       AND created_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)`,
+    [discordId, DISCORD_CODE_WINDOW_MINUTES],
+  );
+  if (Number(recent[0]?.c ?? 0) >= MAX_DISCORD_CODES_PER_WINDOW) {
+    throw new Error("TOO_MANY_CODE_REQUESTS");
+  }
 
   const [insert] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_discord_login_challenges (discord_id, code_hash, expires_at)
@@ -375,6 +441,29 @@ export async function createDiscordLoginChallenge(discordId: string): Promise<Di
     // mysql2 peut renvoyer expires_at en string selon la config du pool : on normalise en Date.
     expiresAt: rawExpiresAt ? new Date(rawExpiresAt) : new Date(Date.now() + 10 * 60 * 1000),
   };
+}
+
+/**
+ * Périme tous les codes en attente d'un compte **sauf** celui qu'on vient
+ * d'envoyer.
+ *
+ * Appelé après l'envoi, et pas avant : voir
+ * {@link createDiscordLoginChallenge}. Sans lui, `verifyDiscordChallenge` ne
+ * lisant que le plus récent, un ancien code resterait ouvert sans que ses
+ * essais soient jamais décomptés — et demander un code neuf rouvrirait le quota
+ * indéfiniment.
+ */
+export async function retireOtherDiscordChallenges(
+  discordId: string,
+  keepChallengeId: number,
+): Promise<void> {
+  const db = await getDatabase();
+  await db.execute(
+    `UPDATE bg_discord_login_challenges
+     SET consumed_at = NOW()
+     WHERE discord_id = ? AND consumed_at IS NULL AND id <> ?`,
+    [discordId, keepChallengeId],
+  );
 }
 
 export async function verifyDiscordChallenge(discordId: string, code: string): Promise<boolean> {
@@ -402,30 +491,37 @@ export async function verifyDiscordChallenge(discordId: string, code: string): P
   const challenge = rows[0];
   if (challenge.consumed_at !== null) return false;
   if (new Date(challenge.expires_at).getTime() < Date.now()) return false;
-  // Le quota est relu **avant** la comparaison : un code déjà épuisé ne doit
-  // même pas être testé, sinon le dernier essai resterait toujours gratuit.
-  if (Number(challenge.attempts) >= MAX_DISCORD_CODE_ATTEMPTS) return false;
 
-  const valid = timingSafeEquals(challenge.code_hash, hashCode(code));
+  // **L'essai se réserve avant d'être joué**, en une seule instruction.
+  //
+  // Le quota était relu sur la ligne déjà chargée, puis décompté par une
+  // écriture séparée : entre les deux, un `await`. Dix vérifications lancées de
+  // front lisaient donc toutes `attempts = 0`, passaient toutes le contrôle et
+  // comparaient toutes une combinaison — cinq essais annoncés, dix accordés, et
+  // jusqu'à la taille du pool. La course était sur la **lecture**, que le `CASE`
+  // de l'écriture ne pouvait pas fermer.
+  //
+  // Ici c'est le `WHERE attempts < ?` qui tranche, sous le verrou de ligne de
+  // l'`UPDATE` : chaque réservation voit le compte des précédentes, et
+  // `affectedRows` dit si celle-ci a eu lieu. Un essai est donc décompté même
+  // quand le code est bon — sans conséquence, la réussite consommant la ligne.
+  //
+  // `consumed_at` **avant** `attempts` : MySQL évalue les affectations de
+  // gauche à droite et les suivantes lisent déjà la nouvelle valeur. Dans
+  // l'autre ordre, le `CASE` compterait un essai de trop et brûlerait le code
+  // une tentative trop tôt.
+  const [reserved] = await db.execute<ResultSetHeader>(
+    `UPDATE bg_discord_login_challenges
+     SET consumed_at = CASE WHEN attempts + 1 >= ? THEN NOW() ELSE consumed_at END,
+         attempts = attempts + 1
+     WHERE id = ?
+       AND consumed_at IS NULL
+       AND attempts < ?`,
+    [MAX_DISCORD_CODE_ATTEMPTS, challenge.id, MAX_DISCORD_CODE_ATTEMPTS],
+  );
+  if (Number(reserved.affectedRows) === 0) return false;
 
-  if (!valid) {
-    // Le compteur est incrémenté **et** le code brûlé au dernier essai, dans la
-    // même écriture : laisser la ligne ouverte obligerait chaque lecture à
-    // refaire le calcul, et une course entre deux essais simultanés pourrait en
-    // accorder un de trop.
-    await db.execute(
-      // `consumed_at` **avant** `attempts` : MySQL évalue les affectations de
-      // gauche à droite et les suivantes lisent déjà la nouvelle valeur. Dans
-      // l'autre ordre, le `CASE` compterait un essai de trop et brûlerait le
-      // code une tentative trop tôt.
-      `UPDATE bg_discord_login_challenges
-       SET consumed_at = CASE WHEN attempts + 1 >= ? THEN NOW() ELSE consumed_at END,
-           attempts = attempts + 1
-       WHERE id = ?`,
-      [MAX_DISCORD_CODE_ATTEMPTS, challenge.id],
-    );
-    return false;
-  }
+  if (!timingSafeEquals(challenge.code_hash, hashCode(code))) return false;
 
   await db.execute(
     `UPDATE bg_discord_login_challenges

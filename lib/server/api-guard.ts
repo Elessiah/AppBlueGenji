@@ -142,12 +142,36 @@ export const DISCORD_CODE_REQUEST_RULE: RateLimitRule = {
 };
 
 /**
+ * Demandes d'un code de connexion Discord, **par IP appelante**.
+ *
+ * Le plafond par compte visé ne peut être posé qu'**après** avoir résolu le
+ * pseudo en identifiant — c'est-à-dire après un aller-retour vers le bot, qui
+ * interroge Discord à son tour. Cette route anonyme ouvrait donc une requête
+ * sortante par appel, sans borne : celui-ci la ferme au plus tôt, avant la
+ * moindre dépense.
+ *
+ * Par IP, faute de compte à qui l'imputer — le même axe que `BOT_READ_RULE`,
+ * qui existe pour la même raison, avec la même faiblesse assumée (une identité
+ * absente n'est pas plafonnée) : c'est une borne de coût, pas la garantie de
+ * sécurité, qui vit en base (`MAX_DISCORD_CODES_PER_WINDOW`).
+ */
+export const DISCORD_CODE_REQUEST_IP_RULE: RateLimitRule = {
+  name: "discord-code-request-ip",
+  limit: 20,
+  windowMs: 15 * 60_000,
+};
+
+/**
  * Vérifications d'un code de connexion Discord, **par compte Discord visé**.
  *
- * Second garde-fou du même secret : le premier est le quota d'essais porté par
- * le code lui-même (`MAX_DISCORD_CODE_ATTEMPTS`), qui le brûle au cinquième
- * échec. Celui-ci borne ce que la répétition de codes neufs rouvrirait — deux
- * codes épuisés dans la fenêtre, et plus rien ne passe.
+ * Première ligne, gratuite — **pas** la garantie. Le secret est tenu par deux
+ * bornes en base : le quota d'essais porté par le code lui-même
+ * (`MAX_DISCORD_CODE_ATTEMPTS`, réservé par un `UPDATE … WHERE attempts < ?`)
+ * et le nombre de codes délivrables à un compte
+ * (`MAX_DISCORD_CODES_PER_WINDOW`). Ce plafond-ci vit dans une `Map` d'un seul
+ * processus dont le seau se vide entièrement dès qu'on lui fabrique dix mille
+ * clés (`rate-limit.ts`, `bucket.clear()`) — et la clé est justement un
+ * identifiant que l'appelant choisit. Il écarte le bruit ; il ne prouve rien.
  *
  * Même axe que la demande, et pour la même raison : l'identifiant visé ne se
  * change pas sans changer de victime.

@@ -1040,12 +1040,32 @@ export async function adminSaveMatchScoresPublic(
 export async function forfeitTournamentTeamPublic(
   tournamentId: number,
   teamId: number,
+  actingUserId: number | null = null,
 ): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
 
   try {
     await connection.beginTransaction();
+
+    // Droit relu **dans la transaction**, comme à l'inscription
+    // (`registerCurrentUserTeam`) : la route l'a déjà lu pour décider quoi
+    // afficher, mais elle l'a fait sur une connexion rendue depuis. Entre les
+    // deux, l'appelant a pu être rétrogradé ou sorti du roster — et le geste,
+    // lui, ne se défait pas : l'équipe quitte le tournoi, capital à zéro en BG
+    // Survie. Le droit d'engager comme celui de désengager se juge à l'instant
+    // de l'écriture, pas à celui où la page a été rendue.
+    //
+    // `null` = arbitrage : le staff `tournaments` forfaite n'importe quel
+    // engagé, il n'a pas d'engagé à lui à comparer.
+    if (actingUserId !== null) {
+      const tournament = await loadTournamentRow(connection, tournamentId);
+      if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
+
+      const entrant = await resolveUserEntrant(connection, tournament, actingUserId);
+      if (entrant.teamId === null || entrant.teamId !== teamId) throw new Error("FORBIDDEN");
+      if (!entrant.canActForEntrant) throw new Error("NOT_TEAM_MANAGER");
+    }
 
     const [formatRows] = await connection.execute<(RowDataPacket & { format: string })[]>(
       `SELECT format FROM bg_tournaments WHERE id = ? LIMIT 1`,

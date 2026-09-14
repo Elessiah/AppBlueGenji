@@ -47,7 +47,7 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
     (service.getUserEntrant as jest.Mock).mockResolvedValue(entrant(77) as never);
     const res = await POST(req(), params);
     expect(res.status).toBe(200);
-    expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 77);
+    expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 77, 2);
   });
 
   it("refuse un membre sans engagé dans ce tournoi (400)", async () => {
@@ -64,7 +64,7 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
     (service.getUserEntrant as jest.Mock).mockResolvedValue(entrant(77) as never);
     const res = await POST(req({ teamId: 77 }), params);
     expect(res.status).toBe(200);
-    expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 77);
+    expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 77, 2);
   });
 
   it("empêche un membre de forfaiter une autre équipe (403)", async () => {
@@ -98,7 +98,8 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
     const res = await POST(req({ teamId: 88 }), params);
     expect(res.status).toBe(200);
-    expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 88);
+    // `null` : l'arbitrage ne se revérifie pas contre un engagé à lui.
+    expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 88, null);
   });
 
   // Un tournoi inconnu ne doit pas être maquillé en problème d'équipe : le
@@ -112,6 +113,20 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: "TOURNAMENT_NOT_FOUND" });
     expect(service.forfeitTournamentTeam).not.toHaveBeenCalled();
+  });
+
+  it("traduit en 403 le refus que le service oppose dans sa transaction", async () => {
+    // Le droit est relu à l'instant de l'écriture : un OWNER rétrogradé entre
+    // la lecture de la route et le commit doit être arrêté là, pas avant.
+    (getCurrentUser as jest.Mock).mockResolvedValue(member as never);
+    (service.getUserEntrant as jest.Mock).mockResolvedValue(entrant(77) as never);
+    (service.forfeitTournamentTeam as jest.Mock).mockRejectedValue(
+      new Error("NOT_TEAM_MANAGER") as never,
+    );
+
+    const res = await POST(req({ teamId: 77 }), params);
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "NOT_TEAM_MANAGER" });
   });
 
   it("remonte TEAM_ALREADY_OUT en 400", async () => {

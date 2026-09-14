@@ -40,7 +40,11 @@ function fakeConnection(options: {
 
       // Verrou aval : match indécis → la saisie reste ouverte.
       if (q.includes("FROM bg_matches m JOIN bg_tournaments t")) {
-        return [[{ round_number: round, winner_team_id: null, format: tournamentFormat }], []];
+        // `status` autant que `winner_team_id` : depuis que le verrou lit le statut
+        // (`isMatchPlayed`), une ligne factice sans cette colonne le fait sortir
+        // aussitôt — le garde-fou était donc neutralisé dans tous les tests qui
+        // l'atteignent. Ici le match édité n'est pas tranché : rien à verrouiller.
+        return [[{ round_number: round, status: "READY", winner_team_id: null, format: tournamentFormat }], []];
       }
 
       if (q.includes("match_format_type") && q.includes("FROM bg_tournaments")) {
@@ -204,7 +208,7 @@ describe("adminSaveMatchScores — un match nul est tranché", () => {
           return [{ affectedRows: 1 }, []];
         }
         if (q.includes("FROM bg_matches m JOIN bg_tournaments t")) {
-          return [[{ round_number: 3, winner_team_id: null, format: "BG_SURVIE" }], []];
+          return [[{ round_number: 3, status: "READY", winner_team_id: null, format: "BG_SURVIE" }], []];
         }
         if (q.includes("FROM bg_matches")) {
           return [
