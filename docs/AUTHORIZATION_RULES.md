@@ -36,6 +36,97 @@ pouvoir sur la plateforme.
   domaine tiers.
 - `DEV_AUTH_USER_ID` court-circuite la session **uniquement** si
   `NODE_ENV === "development"`. Jamais en production, en test ni en staging.
+- **Le code Discord se compte, et il se compte en base.** Six chiffres ne sont
+  un secret que si les essais sont bornés : `bg_discord_login_challenges.attempts`
+  existait sans être jamais relu, et rien ne plafonnait
+  `/api/auth/discord/verify` — un tiers connaissant le pseudo Discord d'un joueur
+  (public sur n'importe quel serveur) pouvait énumérer le million de
+  combinaisons jusqu'à ouvrir sa session.
+
+  Deux bornes tiennent désormais le secret, **toutes deux en base** :
+  `MAX_DISCORD_CODE_ATTEMPTS` (5 essais par code, après quoi il est **brûlé**,
+  correct ou non) et `MAX_DISCORD_CODES_PER_WINDOW` (5 codes par compte et par
+  quart d'heure).
+
+  **Les deux se réservent, elles ne se relisent pas.** L'essai tient en une seule
+  instruction — `UPDATE … SET attempts = attempts + 1 WHERE id = ? AND
+  attempts < ?`, puis `affectedRows` — et non en une lecture suivie d'une
+  écriture : séparées par un `await`, dix vérifications lancées de front lisaient
+  toutes `attempts = 0` et comparaient toutes une combinaison. L'émission d'un
+  code avait exactement la même forme (`SELECT COUNT(*)`, `await`, `INSERT`), sur
+  la borne que ce document présente comme *celle qui tient réellement la force
+  brute* : comptage et insertion vivent donc sous un **verrou nommé** porté par
+  le compte visé (`lib/server/named-lock.ts`), ce qui fait attendre toute demande
+  concurrente visant ce même compte — et aucune autre.
+
+  Le remède évident, une transaction à `SELECT … FOR UPDATE`, **ne convient pas
+  ici**, et il a fallu une vraie base pour le voir : sur la plage vide d'un
+  compte sans ligne, chaque transaction pose un verrou d'intervalle sur la même
+  plage puis demande, pour insérer, une intention qui entre en conflit avec celui
+  des autres. Douze demandes lancées de front rendaient onze `ER_LOCK_DEADLOCK`
+  et **un** code, là où cinq étaient attendus. C'est la raison d'être de la règle
+  de travail « valider aussi en conditions réelles » : aucun test à base simulée
+  ne pouvait montrer cela.
+
+  Les plafonds de débit (`DISCORD_CODE_VERIFY_RULE`, `DISCORD_CODE_REQUEST_RULE`,
+  `DISCORD_CODE_REQUEST_IP_RULE`) sont une première ligne gratuite, **pas** la
+  garantie : ils vivent dans une `Map` d'un seul processus dont le seau se vide
+  entièrement dès qu'on lui fabrique dix mille clés (`rate-limit.ts`), et la clé
+  est justement un identifiant que l'appelant choisit. Celui par IP a un rôle
+  propre : il est posé **avant** la résolution du pseudo, seul moyen de borner
+  l'appel sortant vers le bot que cette route anonyme déclenche — et il est
+  **large**, une IP n'étant pas une personne (un tournoi en réseau local sort
+  tout entier par la même).
+
+  **L'axe d'un plafond dit qui il refuse.** Celui de la *demande* porte sur le
+  compte visé, à dessein : ce qu'il protège est le téléphone de la victime, que
+  chaque appel fait vibrer. Celui de la *vérification* a été posé sur le même
+  axe, et s'est retourné contre elle — la route est anonyme, l'identifiant
+  Discord d'un joueur se lit dans la réponse de la demande, et dix codes bidon
+  fermaient sa connexion pour un quart d'heure. Sa clé est donc le **couple
+  (compte visé, IP appelante)** : l'attaquant ne plafonne que lui-même, et le
+  décompte des essais reste, lui, porté par le code en base — changer d'IP n'en
+  donne pas un de plus.
+
+  Un code neuf **rend le précédent inatteignable par sa seule existence** :
+  `verifyDiscordChallenge` ne lit que le **dernier émis**. Rien n'est écrit, donc
+  rien ne peut échouer à mi-chemin — et le geste symétrique est ce qui compte :
+  un envoi raté **supprime** sa ligne (`discardDiscordChallenge`), sans quoi la
+  mort-née resterait la dernière et masquerait le code que le joueur tient de sa
+  demande précédente, refusé comme invalide en lui brûlant ses cinq essais. Rien
+  n'est invalidé *avant* l'envoi, pour la même raison inverse : l'ancien tué et
+  le neuf jamais reçu laissaient le joueur sans rien du tout.
+
+- **Un compte ne se revendique que sur une adresse vérifiée.** La connexion
+  Google rattache une identité neuve (`google_sub` inconnu) à un compte du site
+  sur la seule **égalité de chaîne** de l'adresse e-mail. Sans consulter
+  `email_verified` — que l'`userinfo` de Google renvoie et qu'on jetait —, il
+  suffisait d'obtenir une identité Google affirmant l'adresse d'un membre pour
+  ouvrir sa session en un clic : ni code, ni plafond, ni courriel de
+  confirmation. C'était le chemin d'entrée le plus court du site, plus court que
+  la force brute sur le code Discord, et le seul qui ne demandait aucun secret.
+
+  La règle tient en une phrase : **`bg_users.email` ne contient qu'une adresse
+  vérifiée**, et un seul endroit en décide (`verifiedEmail`, dans
+  `createOrGetGoogleUser`). Le corollaire n'est pas décoratif — la colonne est
+  **unique** : y écrire une adresse non vérifiée détenue par quelqu'un d'autre ne
+  la volait pas, elle faisait échouer l'insertion, `ER_DUP_ENTRY` avalé en
+  `/connexion?error=oauth` à chaque essai. Une identité non vérifiée pouvait donc
+  ni revendiquer un compte (ce qui est voulu) ni s'en créer un (ce qui ne l'est
+  pas) ; elle en crée un désormais, simplement sans adresse. `emailVerified` est
+  un champ **obligatoire** de `GoogleProfilePayload` : facultatif, un appelant
+  qui l'oublie ferait tomber la preuve à « absente », et chaque connexion d'un
+  compte dont le `sub` n'est pas encore enregistré créerait un **doublon** —
+  équipe, historique et rôles laissés derrière, sans le moindre message.
+
+  **Le revers, assumé :** qui connaît le pseudo Discord d'un joueur peut brûler
+  ses codes et épuiser ses quotas, donc le tenir hors de son compte par fenêtres
+  d'un quart d'heure. C'est le prix de tout plafonnement d'un code à usage
+  unique, et il est très inférieur à celui d'une session ouverte par énumération
+  — mais il est réel : un compte né par Discord n'a pas d'autre voie d'entrée.
+  Les bornes sont donc réglées assez haut pour qu'un usage normal ne s'en
+  approche jamais, et chaque demande laisse une trace chez la victime, qui reçoit
+  le message privé.
 
 ### 1.2 Les six permissions
 
@@ -76,7 +167,10 @@ if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
 ```
 
 **Une seule exception dans tout le projet** : la suppression définitive d'un
-tournoi teste `user.isAdmin === true` (§4.6).
+tournoi teste `user.isAdmin === true` (§4.6). L'attribution des rôles (§7) est
+elle aussi réservée à `ADMIN`, mais elle l'exprime par sa permission —
+`can(user, "roles")`, que seul `ADMIN` porte : même public, même règle
+d'écriture que partout ailleurs.
 
 ---
 
@@ -118,9 +212,29 @@ modifier le profil d'autrui.
 | Pseudo Discord              | —         | **jamais exposé** à un tiers |
 | Pseudo                      | ❌        | jamais masqué — il identifie le joueur en bracket, roster et feuille de match |
 
-Le masquage est appliqué **côté serveur, à la source** (`getFullProfile`,
-`listUsers`) : le champ masqué vaut `null` dans la réponse, il n'est pas
-seulement caché à l'affichage.
+Le masquage est appliqué **côté serveur, à la source** : le champ masqué vaut
+`null` dans la réponse, il n'est pas seulement caché à l'affichage.
+
+« À la source » veut dire **partout où le champ est lu**, et pas seulement dans
+les deux lectures de profil. L'avatar en donne la mesure : `getFullProfile` et
+`listPlayers` le masquaient bien, mais trois autres lectures allaient chercher
+`bg_users.avatar_url` sans consulter le réglage — le roster d'une carte
+d'annuaire (`listTeams`), celui d'une fiche d'équipe (`getTeamDetail`), et le
+**logo d'une entrée solo**, recopié dans `bg_teams` puis servi jusqu'à la carte
+du match en direct de l'accueil, que lit un visiteur sans compte. La règle est
+donc écrite une seule fois, `visibleAvatarUrl` (`lib/shared/avatar.ts`), et les
+cinq lectures y passent — les quatre du site et celle du jeu de test, qui
+reproduisait la fuite à chaque exécution. Le propriétaire continue de voir la
+sienne ; l'entrée solo, elle, est une valeur **stockée** servie à tout le monde,
+elle n'a pas de lecteur à qui faire exception.
+
+Une valeur stockée demande un **rattrapage**, et pas seulement une règle à
+l'écriture : les entrées solo créées avant cette passe portaient déjà la copie,
+et rien ne les aurait réécrites avant la prochaine inscription ou la prochaine
+édition de profil de leur joueur. `lib/server/database.ts` vide donc ces
+logos-là au démarrage, en une écriture idempotente rejouée à chaque fois — un
+filet, pas une migration à cocher. Le chemin inverse (l'avatar redevient public)
+est tenu par `syncSoloEntryIdentity`, appelé sur la bascule du réglage.
 
 Deux points volontaires, à ne pas prendre pour des fuites :
 
@@ -149,12 +263,12 @@ propriétaire.
 | Modifier / retirer le logo            | ✅ | ✅   | ❌ | ❌ |
 | Inviter un joueur                     | ✅ | ✅   | ❌ | ❌ |
 | Répondre à une demande d'adhésion     | ✅ | ✅   | ❌ | ❌ |
-| Ajouter un membre directement         | ✅ | ✅   | ❌ | ❌ |
 | Changer les rôles d'un membre         | ✅ | ✅ \* | ❌ | ❌ |
 | Exclure un membre                     | ✅ | ✅   | ❌ | ❌ |
 | **Inscrire l'équipe à un tournoi**    | ✅ | ✅   | ❌ | ❌ |
 | Transférer la propriété               | ✅ | ❌   | ❌ | ❌ |
 | Dissoudre l'équipe                    | ✅ | ❌   | ❌ | ❌ |
+| **Retirer l'équipe d'un tournoi**      | ✅ | ✅   | ❌ | ❌ |
 | Quitter l'équipe                      | ❌ \*\* | ✅ | ✅ | — |
 | Demander à rejoindre                  | — | —     | —  | ✅ |
 
@@ -184,6 +298,16 @@ Règles structurelles qui tiennent quel que soit le rôle :
   demande d'adhésion et à l'acceptation.
 - Une équipe dissoute (`deleted_at`) n'est plus gérable : son nom et son sigle
   sont libérés, ses membres détachés, mais son historique de matchs demeure.
+- Il n'existe **aucun ajout direct** d'un membre : on invite, et l'invité
+  accepte (`inviteToTeam`) — sauf si une demande de sa part était déjà en
+  attente, que l'invitation valide alors sur-le-champ. Une fonction d'ajout
+  forcé subsistait dans le service, sans route ni appelant, avec une règle qui
+  n'était plus celle du document ; elle a été retirée plutôt que réparée.
+- Ni une **équipe fantôme** ni une **entrée solo** ne se rejoint
+  (`TEAM_NOT_JOINABLE`, 409) : ni l'une ni l'autre n'a de membre, donc personne
+  n'a qualité pour répondre — la demande restait en attente à jamais et son
+  auteur se voyait refuser toute autre équipe par `ALREADY_REQUESTED`. Une
+  fantôme s'attribue par `POST /api/teams/[id]/claim` (§5).
 
 ### 3.2 Ce qu'un joueur ne peut pas faire
 
@@ -256,7 +380,13 @@ toujours `UPCOMING`.
   Le score est écrit dans la colonne de *son* camp (`team1_report_*` ou
   `team2_report_*`), déduite du match, jamais du corps de la requête ;
 - ✅ le match n'est pas déjà tranché (`MATCH_ALREADY_COMPLETED`) et a bien deux
-  engagées (`MATCH_NOT_READY`) ;
+  engagées (`MATCH_NOT_READY`). « Tranché » se lit sur le **statut**
+  (`isMatchPlayed`, `lib/shared/match-outcome.ts`), jamais sur la présence d'un
+  vainqueur : un match nul n'en a pas et est pourtant terminé. Lu sur
+  `winner_team_id`, ce refus laissait rouvrir toute rencontre close par une
+  égalité — le statut repassait en `AWAITING_CONFIRMATION`, deux reports
+  concordants réécrivaient le score, et le verrou de manche n'y opposait rien
+  puisqu'il ne vit que du côté de l'arbitrage ;
 - ✅ le score constitue un **résultat final** au format de la manche
   (`checkMatchScores`).
 
@@ -320,7 +450,16 @@ portant un `tournament_id`, plus les rappels de match.
 
 - un joueur ne peut forfaiter **que son propre engagé** — passer un `teamId`
   différent du sien est refusé en `403 FORBIDDEN` ;
-- le staff `tournaments` peut forfaiter n'importe quel engagé ;
+- **et il lui faut la charge de l'équipe** (`OWNER` ou `MANAGER`,
+  `hasTeamManagementRole`) : un joueur du roster est refusé en
+  `403 NOT_TEAM_MANAGER`, exactement comme à l'inscription (§4.2). C'est la même
+  règle parce que c'est le même engagement : retirer une équipe d'un tournoi la
+  condamne — capital à zéro en BG Survie, éliminée ailleurs — et rien ne le
+  défait. Un `DPS` ne pouvait pas engager son équipe mais pouvait la désengager :
+  le geste le plus lourd des deux était le moins gardé. En **tournoi individuel**
+  la question ne se pose pas, l'engagé est le joueur lui-même ;
+- le staff `tournaments` peut forfaiter n'importe quel engagé, sans cette
+  qualité ;
 - dans tous les cas, refusé hors `RUNNING`, et dès les play-offs d'endurance
   lancés.
 
@@ -401,7 +540,9 @@ Volontairement ouvert, à connaître pour ne pas le confondre avec un trou :
   plafond de 30 insertions par IP et par minute.
 - `GET /api/uploads/[...path]` — sert `public/uploads/`, avec refus de toute
   remontée de dossier et liste blanche d'extensions.
-- Les routes d'authentification (`/api/auth/*`), par nature.
+- Les routes d'authentification (`/api/auth/*`), par nature — ouvertes, mais
+  **plafonnées** : voir §1.1 pour le code Discord, qui est un secret et se
+  compte comme tel.
 
 En revanche, l'annuaire des joueurs (`/api/players`) et celui des équipes
 (`/api/teams`) **exigent une session** : ce sont des données de membres.
@@ -416,13 +557,22 @@ Des refus légitimes ne relèvent pas des permissions, et ne doivent pas être
 - **Verrou de score** (`lib/shared/match-lock.ts`) — un score n'est plus
   modifiable, **y compris par un administrateur**, dès que la manche suivante
   porte la moindre saisie. La sortie est le retour en arrière (§4.4), pas un
-  privilège.
+  privilège. Le verrou ne se déclenche que sur un match **tranché**, et là aussi
+  « tranché » se lit sur le statut : `checkDownstreamMatchesHaveNoScores`
+  sortait sur `winner_team_id === null`, donc n'opposait **rien** à la réécriture
+  d'un match nul — l'interface, elle, le donnait pour verrouillé
+  (`isScoreEditLocked` juge sur `decided`), et c'était l'interface qui avait
+  raison.
 - **Fenêtres d'édition d'un tournoi** — `FULL` / `RESTRICTED` / `LOCKED` : aucun
   rôle n'ouvre `LOCKED`.
 - **États du tournoi** — abandon et pénalités sont refusés hors `RUNNING` ; la
   correction d'un score, elle, reste permise sur un tournoi terminé (le
   classement se rejoue, le tournoi ne se rouvre pas).
-- **Plafonds de débit** (`lib/server/rate-limit.ts`) — indépendants des rôles.
+- **Plafonds de débit** (`lib/server/rate-limit.ts`, réglages dans
+  `lib/server/api-guard.ts`) — indépendants des rôles. Deux d'entre eux ne sont
+  pas de simples garde-fous de charge mais des **contrôles d'accès** : ceux du
+  code de connexion Discord (§1.1), qui portent sur le compte visé et non sur
+  l'appelant, précisément parce qu'une identité d'appelant se renouvelle.
 
 ---
 

@@ -1063,6 +1063,40 @@ async function runMigrations(db: Pool): Promise<void> {
     // Index already exists
   }
 
+  // Rattrapage : le logo d'une entrée solo est une **copie** de l'avatar du
+  // joueur, et elle se recopiait sans consulter `visible_avatar`. Le masquage
+  // posé dans `solo-entries-service` ne vaut que pour les écritures à venir —
+  // la prochaine inscription ou la prochaine édition de profil —, si bien que
+  // les lignes déjà écrites auraient continué de publier un avatar masqué,
+  // jusque sur la carte « match en direct » de l'accueil que lit un visiteur
+  // sans compte.
+  //
+  // Idempotent, et volontairement rejoué à chaque démarrage : c'est un filet,
+  // pas une migration à cocher. Le chemin inverse (l'avatar redevient public)
+  // est tenu par `syncSoloEntryIdentity`, appelé sur la bascule du réglage.
+  //
+  // Rattrapé comme ses voisines, et ici ce n'est pas une formalité : c'est la
+  // seule instruction de cette passe qui prenne des **verrous de ligne** sur une
+  // table chaude — `registerGhostTeams` tient `bg_teams` sous
+  // `SELECT … FOR UPDATE` le temps de 32 insertions. Un lot d'inscriptions qui
+  // chevauche un démarrage à froid rendrait `ER_LOCK_WAIT_TIMEOUT`, et
+  // l'exception emporterait **tout ce qui suit** : `bg_site_visits`, l'horaire
+  // et la diffusion d'un match, le sigle d'équipe et son index. Un filet qui
+  // casse le schéma est pire que le trou qu'il bouche ; il se rejouera au
+  // prochain démarrage.
+  try {
+    await db.execute(`
+      UPDATE bg_teams t
+        JOIN bg_users u ON u.id = t.solo_user_id
+         SET t.logo_url = NULL
+       WHERE t.solo_user_id IS NOT NULL
+         AND u.visible_avatar = 0
+         AND t.logo_url IS NOT NULL
+    `);
+  } catch {
+    // Rattrapage remis au prochain démarrage.
+  }
+
   // Fréquentation du site. Une ligne = une visite (arrivée d'un visiteur, les
   // chargements suivants d'une même fenêtre de session étant regroupés côté
   // service). `visitor_key` est un SHA-256 salé : ni IP ni user-agent ne sont

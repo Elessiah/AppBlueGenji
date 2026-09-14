@@ -123,6 +123,83 @@ export const ISSUE_REPORT_RULE: RateLimitRule = {
 };
 
 /**
+ * Demandes d'un code de connexion Discord, **par compte Discord visé**.
+ *
+ * Étroit, comme le signalement de problème et pour une raison voisine : chaque
+ * appel envoie un message privé à quelqu'un — ici, à la personne dont on
+ * prétend être. Un joueur en demande un, deux si le premier s'est perdu.
+ *
+ * Le plafond porte sur l'identifiant Discord **résolu par le bot**, et non sur
+ * l'IP : c'est le seul axe qu'un attaquant ne peut pas faire tourner, puisqu'il
+ * lui faut précisément viser sa victime. Il borne donc deux choses à la fois —
+ * le harcèlement par messages privés, et le nombre de codes neufs qu'on peut
+ * mettre en jeu (chacun rouvrant un quota d'essais).
+ */
+export const DISCORD_CODE_REQUEST_RULE: RateLimitRule = {
+  name: "discord-code-request",
+  limit: 3,
+  windowMs: 15 * 60_000,
+};
+
+/**
+ * Demandes d'un code de connexion Discord, **par IP appelante**.
+ *
+ * Le plafond par compte visé ne peut être posé qu'**après** avoir résolu le
+ * pseudo en identifiant — c'est-à-dire après un aller-retour vers le bot, qui
+ * interroge Discord à son tour. Cette route anonyme ouvrait donc une requête
+ * sortante par appel, sans borne : celui-ci la ferme au plus tôt, avant la
+ * moindre dépense.
+ *
+ * Par IP, faute de compte à qui l'imputer — le même axe que `BOT_READ_RULE`,
+ * qui existe pour la même raison, avec la même faiblesse assumée (une identité
+ * absente n'est pas plafonnée) : c'est une borne de coût, pas la garantie de
+ * sécurité, qui vit en base (`MAX_DISCORD_CODES_PER_WINDOW`).
+ *
+ * **Large, et délibérément.** Une IP n'est pas une personne : un tournoi joué en
+ * réseau local, un internat, un lycée sortent tous par la même adresse, et
+ * quarante joueurs qui se connectent au coup d'envoi sont un usage normal, pas
+ * une attaque. Les bornes étroites de cette route sont posées sur le compte
+ * visé, là où elles désignent quelque chose ; celle-ci ne borne que la dépense
+ * (un aller-retour vers le bot), et un plafond qui refuse la connexion à la
+ * moitié d'un plateau coûterait plus cher que ce qu'il économise.
+ */
+export const DISCORD_CODE_REQUEST_IP_RULE: RateLimitRule = {
+  name: "discord-code-request-ip",
+  limit: 120,
+  windowMs: 15 * 60_000,
+};
+
+/**
+ * Vérifications d'un code de connexion Discord, **par couple (compte visé, IP
+ * appelante)**.
+ *
+ * Première ligne, gratuite — **pas** la garantie. Le secret est tenu par deux
+ * bornes en base : le quota d'essais porté par le code lui-même
+ * (`MAX_DISCORD_CODE_ATTEMPTS`, réservé par un `UPDATE … WHERE attempts < ?`)
+ * et le nombre de codes délivrables à un compte
+ * (`MAX_DISCORD_CODES_PER_WINDOW`). Ce plafond-ci vit dans une `Map` d'un seul
+ * processus dont le seau se vide entièrement dès qu'on lui fabrique dix mille
+ * clés (`rate-limit.ts`, `bucket.clear()`) — et la clé est justement un
+ * identifiant que l'appelant choisit. Il écarte le bruit ; il ne prouve rien.
+ *
+ * **L'IP appelante est dans la clé, et ce n'est pas cosmétique.** Posé sur le
+ * seul compte visé — l'axe de la demande de code —, ce plafond désignait la
+ * **victime** : la route est anonyme, l'identifiant Discord d'un joueur se lit
+ * dans la réponse de `/api/auth/discord/request`, et dix codes bidon suffisaient
+ * alors à fermer la connexion Discord d'un joueur nommé pendant un quart
+ * d'heure. Le compte visé est bien le seul axe qu'un attaquant ne peut pas
+ * faire tourner — mais c'est précisément ce qui fait de lui un mauvais axe
+ * *ici* : le refus retombe sur la personne visée, pas sur l'appelant. Le
+ * décompte des essais, lui, reste porté par le code en base, où changer d'IP
+ * n'y donne pas droit.
+ */
+export const DISCORD_CODE_VERIFY_RULE: RateLimitRule = {
+  name: "discord-code-verify",
+  limit: 10,
+  windowMs: 15 * 60_000,
+};
+
+/**
  * Applique un plafond. Renvoie la réponse 429 à retourner tel quel, ou `null`
  * si la requête peut continuer.
  *

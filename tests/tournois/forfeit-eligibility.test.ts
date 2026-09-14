@@ -16,6 +16,7 @@ function context(overrides: Partial<ForfeitContext> = {}): ForfeitContext {
     isAdmin: false,
     myTeamId: MY_TEAM,
     canCreateReportsForTeamIds: [MY_TEAM],
+    canActForEntrant: true,
     ...overrides,
   };
 }
@@ -31,6 +32,19 @@ describe("forfait — éligibilité du bouton", () => {
 
   it("refuse à un simple membre, qui ne représente pas l'équipe", () => {
     expect(canForfeitTeam(context({ canCreateReportsForTeamIds: [] }), MY_TEAM)).toBe(false);
+  });
+
+  it("refuse au joueur du roster sans rôle de gestion", () => {
+    // Même qualité que pour inscrire l'équipe : `OWNER` ou `MANAGER`. Un `DPS`
+    // ne pouvait pas engager son équipe mais pouvait la retirer — le bouton
+    // s'affichait, et le serveur répond désormais 403 NOT_TEAM_MANAGER.
+    expect(canForfeitTeam(context({ canActForEntrant: false }), MY_TEAM)).toBe(false);
+  });
+
+  it("laisse l'arbitrage passer outre la qualité de gestion", () => {
+    const referee = context({ canActForEntrant: false, isAdmin: true });
+    expect(canForfeitTeam(referee, MY_TEAM)).toBe(true);
+    expect(canForfeitTeam(referee, OTHER_TEAM)).toBe(true);
   });
 
   it("refuse à un spectateur sans équipe", () => {

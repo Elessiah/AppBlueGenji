@@ -23,7 +23,12 @@ function duplicateName(): Error {
   return error;
 }
 
-const USER = [[{ pseudo: "ShadowNinja", avatar_url: "/u/1.png" }], []];
+const USER = [[{ pseudo: "ShadowNinja", avatar_url: "/u/1.png", visible_avatar: 1 }], []];
+/** Même compte, avatar masqué (`visible_avatar = 0`). */
+const USER_HIDDEN_AVATAR = [
+  [{ pseudo: "ShadowNinja", avatar_url: "/u/1.png", visible_avatar: 0 }],
+  [],
+];
 const NO_ROW = [[], []];
 
 describe("ensureSoloEntry", () => {
@@ -257,5 +262,79 @@ describe("findSoloEntryUser", () => {
     // `/joueurs/"77"` construirait la même URL, mais le typage mentirait.
     await withRows([{ solo_user_id: "77" }]);
     await expect(findSoloEntryUser(15245)).resolves.toBe(77);
+  });
+});
+
+/**
+ * Le logo d'une entrée solo est une **copie stockée** de l'avatar du joueur,
+ * servie à tout le monde — jusqu'à la carte du match en direct de l'accueil,
+ * que lit un visiteur sans compte. Elle était recopiée sans jamais consulter
+ * `visible_avatar` : le réglage était donc entièrement contourné pour qui joue
+ * en individuel. Voir `docs/AUTHORIZATION_RULES.md` §2.3.
+ */
+describe("entrée solo — avatar masqué", () => {
+  beforeEach(() => jest.clearAllMocks());
+  afterEach(() => jest.restoreAllMocks());
+
+  it("n'écrit aucun logo quand le joueur a masqué son avatar", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce(USER_HIDDEN_AVATAR as never)
+      .mockResolvedValueOnce(NO_ROW as never)
+      .mockResolvedValueOnce([{ insertId: 77 }] as never);
+
+    await expect(ensureSoloEntry(fakeConnection(execute), 1)).resolves.toBe(77);
+
+    const [, params] = execute.mock.calls[2] as [string, unknown[]];
+    expect(params).toEqual(["ShadowNinja", null, 1]);
+  });
+
+  it("efface le logo déjà posé à la resynchronisation", async () => {
+    // Le geste qui compte : masquer son avatar après coup doit **retirer**
+    // l'image de l'entrée solo, pas seulement cesser de la reposer.
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([[{ id: 55 }], []] as never) // findSoloEntry
+      .mockResolvedValueOnce(USER_HIDDEN_AVATAR as never)
+      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+    (getDatabase as jest.Mock).mockResolvedValue({
+      getConnection: jest.fn(async () => ({ execute, release: jest.fn() })),
+    } as never);
+
+    await syncSoloEntryIdentity(1);
+
+    const update = execute.mock.calls.find(([sql]) =>
+      String(sql).includes("UPDATE bg_teams SET name = ?, logo_url = ?"),
+    ) as [string, unknown[]];
+    expect(update[1]).toEqual(["ShadowNinja", null, 55]);
+  });
+
+  it("garde le pseudo : lui n'est jamais masquable", async () => {
+    // Le pseudo identifie le joueur en bracket, en roster et en feuille de
+    // match : `applyVisibility` ne le masque pas non plus.
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce(USER_HIDDEN_AVATAR as never)
+      .mockResolvedValueOnce(NO_ROW as never)
+      .mockResolvedValueOnce([{ insertId: 77 }] as never);
+
+    await ensureSoloEntry(fakeConnection(execute), 1);
+
+    const [, params] = execute.mock.calls[2] as [string, unknown[]];
+    expect(params[0]).toBe("ShadowNinja");
+  });
+
+  it("lit `visible_avatar` avec l'identité du compte", async () => {
+    // Colonne absente → `undefined === 1` est faux → tout logo disparaîtrait.
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce(USER as never)
+      .mockResolvedValueOnce(NO_ROW as never)
+      .mockResolvedValueOnce([{ insertId: 77 }] as never);
+
+    await ensureSoloEntry(fakeConnection(execute), 1);
+
+    const [sql] = execute.mock.calls[0] as [string];
+    expect(sql).toMatch(/visible_avatar/);
   });
 });

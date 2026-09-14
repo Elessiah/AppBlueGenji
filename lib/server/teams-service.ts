@@ -7,6 +7,7 @@ import { getTeamEntityStats } from "@/lib/server/stats-service";
 import { getTeamRankingPosition, loadTeamRanking } from "@/lib/server/ranking-service";
 import { compareRankedTeams, rankingMatchJoinSql } from "@/lib/shared/ranking";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
+import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { assertTeamTagAvailable, mapTeamTagConflict, resolveTeamTag } from "@/lib/server/team-tags";
 
 /**
@@ -21,16 +22,26 @@ type TeamMemberRow = RowDataPacket & {
   user_id: number;
   pseudo: string;
   avatar_url: string | null;
+  visible_avatar: 0 | 1;
   roles_json: string;
   joined_at: Date;
 };
 
-function mapMember(row: TeamMemberRow): TeamMember {
+/**
+ * @param viewerUserId Lecteur du roster, pour qu'il continue de voir son propre
+ *   avatar même masqué au reste du site (`visibleAvatarUrl`).
+ */
+function mapMember(row: TeamMemberRow, viewerUserId: number | null): TeamMember {
+  const userId = Number(row.user_id);
   return {
     membershipId: Number(row.membership_id),
-    userId: Number(row.user_id),
+    userId,
     pseudo: row.pseudo,
-    avatarUrl: row.avatar_url,
+    avatarUrl: visibleAvatarUrl(
+      row.avatar_url,
+      row.visible_avatar === 1,
+      userId === viewerUserId,
+    ),
     roles: parseRoles(row.roles_json),
     joinedAt: toIso(row.joined_at) ?? new Date().toISOString(),
   };
@@ -98,7 +109,14 @@ async function ghostAdminOverride(teamId: number, viewerManagesGhostTeams: boole
   return isGhostTeam(teamId);
 }
 
-export async function listTeams(): Promise<TeamListItem[]> {
+/**
+ * Annuaire des équipes.
+ *
+ * @param viewerId Lecteur de la liste. Sert au seul masquage d'avatar : sans
+ *   lui, un joueur qui a masqué le sien ne le verrait pas non plus sur la carte
+ *   de sa propre équipe.
+ */
+export async function listTeams(viewerId: number | null = null): Promise<TeamListItem[]> {
   const db = await getDatabase();
 
   // Effectif et identité de chaque équipe. Le bilan (victoires, défaites,
@@ -193,13 +211,15 @@ export async function listTeams(): Promise<TeamListItem[]> {
       user_id: number;
       pseudo: string;
       avatar_url: string | null;
+      visible_avatar: 0 | 1;
     })[]
   >(
     `SELECT
       tm.team_id,
       u.id AS user_id,
       u.pseudo,
-      u.avatar_url
+      u.avatar_url,
+      u.visible_avatar
      FROM (
        SELECT team_id, user_id, ROW_NUMBER() OVER (PARTITION BY team_id ORDER BY joined_at ASC) as rn
        FROM bg_team_members
@@ -235,10 +255,14 @@ export async function listTeams(): Promise<TeamListItem[]> {
     if (!rosterByTeam.has(row.team_id)) {
       rosterByTeam.set(row.team_id, []);
     }
+    const memberId = Number(row.user_id);
     rosterByTeam.get(row.team_id)!.push({
-      userId: Number(row.user_id),
+      userId: memberId,
       pseudo: row.pseudo,
-      avatarUrl: row.avatar_url,
+      // Le réglage `visible_avatar` vaut ici comme sur une fiche de profil : la
+      // vignette du roster lisait `avatar_url` sans le consulter, et rendait
+      // donc à tout le site l'image que son propriétaire avait masquée.
+      avatarUrl: visibleAvatarUrl(row.avatar_url, row.visible_avatar === 1, memberId === viewerId),
     });
   }
 
@@ -388,6 +412,7 @@ export async function getTeamDetail(
       tm.user_id,
       u.pseudo,
       u.avatar_url,
+      u.visible_avatar,
       tm.roles_json,
       tm.joined_at
      FROM bg_team_members tm
@@ -444,7 +469,7 @@ export async function getTeamDetail(
       deletedAt: toIso(teams[0].deleted_at),
       isGhost,
     },
-    members: membersRows.map(mapMember),
+    members: membersRows.map((row) => mapMember(row, viewerUserId)),
     tournaments,
     stats,
     ranking,
@@ -530,45 +555,6 @@ export async function getTeamLogoUrl(teamId: number): Promise<string | null> {
 
 export async function canManageTeam(teamId: number, userId: number): Promise<boolean> {
   return userCanManageTeam(teamId, userId);
-}
-
-export async function addTeamMember(
-  requesterId: number,
-  teamId: number,
-  memberPseudo: string,
-  roles: TeamRole[],
-): Promise<void> {
-  const db = await getDatabase();
-  if (!(await userOwnsTeam(teamId, requesterId))) {
-    throw new Error("FORBIDDEN");
-  }
-
-  const userId = await getUserIdByPseudo(memberPseudo);
-  if (!userId) {
-    throw new Error("USER_NOT_FOUND");
-  }
-
-  const [activeMembership] = await db.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id
-     FROM bg_team_members
-     WHERE user_id = ?
-       AND left_at IS NULL
-     LIMIT 1`,
-    [userId],
-  );
-
-  if (activeMembership.length > 0) {
-    throw new Error("USER_ALREADY_IN_TEAM");
-  }
-
-  const filteredRoles = sanitizeRoles(roles).filter((role) => role !== "OWNER");
-  const payload = filteredRoles.length === 0 ? ["DPS"] : filteredRoles;
-
-  await db.execute(
-    `INSERT INTO bg_team_members (team_id, user_id, roles_json)
-     VALUES (?, ?, ?)`,
-    [teamId, userId, JSON.stringify(payload)],
-  );
 }
 
 export async function updateTeamMemberRoles(
@@ -938,12 +924,28 @@ export async function requestToJoinTeam(userId: number, teamId: number): Promise
   if (await userHasActiveTeam(userId)) throw new Error("USER_ALREADY_IN_TEAM");
 
   const db = await getDatabase();
-  const [teams] = await db.execute<(RowDataPacket & { id: number; deleted_at: Date | null })[]>(
-    `SELECT id, deleted_at FROM bg_teams WHERE id = ? LIMIT 1`,
+  const [teams] = await db.execute<
+    (RowDataPacket & {
+      id: number;
+      deleted_at: Date | null;
+      is_ghost: 0 | 1;
+      solo_user_id: number | null;
+    })[]
+  >(
+    `SELECT id, deleted_at, is_ghost, solo_user_id FROM bg_teams WHERE id = ? LIMIT 1`,
     [teamId],
   );
   if (teams.length === 0) throw new Error("TEAM_NOT_FOUND");
   if (teams[0].deleted_at !== null) throw new Error("TEAM_DELETED");
+  // Ni une fantôme ni une entrée solo ne se rejoignent. Ni l'une ni l'autre n'a
+  // de membre, donc personne n'a qualité pour répondre : la demande restait
+  // en attente à jamais, et son auteur se voyait ensuite refuser toute autre
+  // équipe par `ALREADY_REQUESTED`. Une fantôme s'attribue par
+  // `POST /api/teams/[id]/claim` (staff `tournaments`) ; une entrée solo n'est
+  // pas une équipe, c'est l'identité d'un joueur en tournoi individuel.
+  if (teams[0].is_ghost === 1 || teams[0].solo_user_id !== null) {
+    throw new Error("TEAM_NOT_JOINABLE");
+  }
 
   const existing = await findPendingInvitation(teamId, userId);
   if (existing?.kind === "INVITE") {

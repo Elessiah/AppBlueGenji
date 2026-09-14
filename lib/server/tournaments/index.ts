@@ -26,6 +26,7 @@ export { computeTournamentState, syncTournamentState, hasPendingStateTransition 
 
 // Registration (registerCurrentUserTeam is wrapped as public API function)
 export { canUserRegister, resolveUserEntrantTeamId } from "./registration";
+export type { UserEntrant } from "./registration";
 
 // Bracket generation
 export { createBracketIfMissing } from "./bracket-generator";
@@ -145,7 +146,9 @@ import { syncTournamentState } from "./state";
 import {
   registerCurrentUserTeam as registerTeamInternal,
   registerTeamsByIds as registerTeamsByIdsInternal,
+  resolveUserEntrant,
   resolveUserEntrantTeamId,
+  type UserEntrant,
 } from "./registration";
 import { resolveExpiredScoreReports, finalizeTournamentIfDone } from "./finalization";
 import { tryAutoResolveByes } from "./byes";
@@ -661,22 +664,23 @@ export async function registerCurrentUserTeam(tournamentId: number, userId: numb
 
 /**
  * Engagé du joueur dans un tournoi, vu de l'extérieur du module (routes API) :
- * son équipe active, ou son entrée solo si le tournoi est individuel. `null`
- * signifie « rien à engager » — un tournoi inconnu lève, pour que l'appelant
- * puisse répondre 404 plutôt que de parler d'équipe manquante.
+ * son équipe active, ou son entrée solo si le tournoi est individuel — avec sa
+ * qualité pour agir au nom de cet engagé. `teamId: null` signifie « rien à
+ * engager » ; un tournoi inconnu lève, pour que l'appelant puisse répondre 404
+ * plutôt que de parler d'équipe manquante.
  *
  * @throws TOURNAMENT_NOT_FOUND
  */
-export async function getUserEntrantTeamId(
+export async function getUserEntrant(
   tournamentId: number,
   userId: number,
-): Promise<number | null> {
+): Promise<UserEntrant> {
   const db = await getDatabase();
   const connection = await db.getConnection();
   try {
     const tournament = await loadTournamentRow(connection, tournamentId);
     if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
-    return await resolveUserEntrantTeamId(connection, tournament, userId);
+    return await resolveUserEntrant(connection, tournament, userId);
   } finally {
     connection.release();
   }
@@ -1036,12 +1040,32 @@ export async function adminSaveMatchScoresPublic(
 export async function forfeitTournamentTeamPublic(
   tournamentId: number,
   teamId: number,
+  actingUserId: number | null = null,
 ): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
 
   try {
     await connection.beginTransaction();
+
+    // Droit relu **dans la transaction**, comme à l'inscription
+    // (`registerCurrentUserTeam`) : la route l'a déjà lu pour décider quoi
+    // afficher, mais elle l'a fait sur une connexion rendue depuis. Entre les
+    // deux, l'appelant a pu être rétrogradé ou sorti du roster — et le geste,
+    // lui, ne se défait pas : l'équipe quitte le tournoi, capital à zéro en BG
+    // Survie. Le droit d'engager comme celui de désengager se juge à l'instant
+    // de l'écriture, pas à celui où la page a été rendue.
+    //
+    // `null` = arbitrage : le staff `tournaments` forfaite n'importe quel
+    // engagé, il n'a pas d'engagé à lui à comparer.
+    if (actingUserId !== null) {
+      const tournament = await loadTournamentRow(connection, tournamentId);
+      if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
+
+      const entrant = await resolveUserEntrant(connection, tournament, actingUserId);
+      if (entrant.teamId === null || entrant.teamId !== teamId) throw new Error("FORBIDDEN");
+      if (!entrant.canActForEntrant) throw new Error("NOT_TEAM_MANAGER");
+    }
 
     const [formatRows] = await connection.execute<(RowDataPacket & { format: string })[]>(
       `SELECT format FROM bg_tournaments WHERE id = ? LIMIT 1`,

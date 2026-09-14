@@ -21,6 +21,8 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     if (message === "USER_ALREADY_IN_TEAM") return fail(message, 409);
     if (message === "ALREADY_REQUESTED") return fail(message, 409);
     if (message === "TEAM_NOT_FOUND") return fail(message, 404);
+    // Fantôme ou entrée solo : la ligne existe, mais elle ne se rejoint pas.
+    if (message === "TEAM_NOT_JOINABLE") return fail(message, 409);
     return fail(message || "TEAM_JOIN_FAILED", 400);
   }
 }

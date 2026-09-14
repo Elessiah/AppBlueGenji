@@ -8,20 +8,9 @@ import { CyberButton } from "@/components/cyber/CyberButton";
 import { CyberCard } from "@/components/cyber/CyberCard";
 import { RgpdConsentModal } from "@/components/cyber/RgpdConsentModal";
 import { DEFAULT_REDIRECT, safeRedirectPath } from "@/lib/shared/safe-redirect";
+import { loginErrorMessage } from "./_lib/login-errors";
 
 const CONSENT_STORAGE_KEY = "bg_rgpd_consent";
-
-function mapDiscordError(errorCode: string): string {
-  if (errorCode === "BOT_INTERNAL_UNREACHABLE") return "Connexion Discord indisponible (bot non joignable).";
-  if (errorCode === "BOT_INTERNAL_UNAUTHORIZED") return "Connexion Discord indisponible (token interne invalide).";
-  if (errorCode === "DISCORD_DM_FAILED") return "Impossible d'envoyer le code en DM Discord.";
-  if (errorCode === "CODE_INVALID_OR_EXPIRED") return "Code invalide ou expiré.";
-  if (errorCode === "INVALID_DISCORD_ID") return "Identifiant Discord invalide.";
-  if (errorCode === "INVALID_DISCORD_HANDLE") return "Renseigne ton tag Discord ou ton ID.";
-  if (errorCode === "DISCORD_USER_NOT_FOUND") return "Tag introuvable : le bot doit partager un serveur avec toi. Utilise plutôt ton ID Discord.";
-  if (errorCode === "INVALID_CODE") return "Le code doit contenir 6 chiffres.";
-  return errorCode || "Une erreur interne est survenue.";
-}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -91,7 +80,7 @@ export default function LoginPage() {
         discordId?: string;
         isNewAccount?: boolean;
       };
-      if (!response.ok) throw new Error(mapDiscordError(payload.error || "FAILED"));
+      if (!response.ok) throw new Error(loginErrorMessage(payload.error || "FAILED"));
       setResolvedId(payload.discordId || "");
       setIsNewAccount(payload.isNewAccount !== false);
       if (payload.isNewAccount === false) setPseudo("");
@@ -114,7 +103,7 @@ export default function LoginPage() {
         body: JSON.stringify({ discordId: resolvedId, code, pseudo: isNewAccount ? pseudo : undefined }),
       });
       const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(mapDiscordError(payload.error || "FAILED"));
+      if (!response.ok) throw new Error(loginErrorMessage(payload.error || "FAILED"));
       router.push(redirect);
       router.refresh();
     } catch (e) {

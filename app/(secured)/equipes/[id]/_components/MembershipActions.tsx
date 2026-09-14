@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { TeamDetailResponse } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { PlayerLink } from "@/components/entity-link";
+import { membershipErrorMessage } from "../../_lib/membership-errors";
 
 interface MembershipActionsProps {
   team: TeamDetailResponse;
@@ -46,7 +47,7 @@ export function MembershipActions({ team, onChanged }: MembershipActionsProps) {
       );
       onChanged();
     } catch (e) {
-      showError((e as Error).message);
+      showError(membershipErrorMessage((e as Error).message));
     } finally {
       setBusy(false);
     }
@@ -62,7 +63,7 @@ export function MembershipActions({ team, onChanged }: MembershipActionsProps) {
       showSuccess("Tu as quitté l'équipe.");
       onChanged();
     } catch (e) {
-      showError((e as Error).message);
+      showError(membershipErrorMessage((e as Error).message));
     } finally {
       setBusy(false);
     }
@@ -82,7 +83,7 @@ export function MembershipActions({ team, onChanged }: MembershipActionsProps) {
       await loadRequests();
       onChanged();
     } catch (e) {
-      showError((e as Error).message);
+      showError(membershipErrorMessage((e as Error).message));
     } finally {
       setBusy(false);
     }

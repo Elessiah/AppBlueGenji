@@ -9,7 +9,9 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
 
-  const teams = await listTeams();
+  // Le lecteur voyage jusqu'à la liste pour le seul masquage d'avatar : il doit
+  // voir le sien même s'il l'a masqué au reste du site.
+  const teams = await listTeams(user.id);
   const activeTeam = await getUserActiveTeam(user.id);
 
   // Pilote l'affichage des contrôles d'équipes fantômes côté client.

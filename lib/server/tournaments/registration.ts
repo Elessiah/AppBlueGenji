@@ -108,8 +108,35 @@ export async function resolveUserEntrantTeamId(
   tournament: Pick<TournamentRow, "participant_type">,
   userId: number,
 ): Promise<number | null> {
+  return (await resolveUserEntrant(connection, tournament, userId)).teamId;
+}
+
+/**
+ * L'engagé d'un joueur **et sa qualité pour agir en son nom**.
+ *
+ * Les deux voyagent ensemble parce qu'ils se lisent sur la même ligne
+ * d'appartenance : demander les rôles par un second appel, c'est accepter
+ * qu'ils soient relus dans un autre état que l'équipe.
+ */
+export type UserEntrant = {
+  /** Engagé du joueur, ou `null` quand il n'a rien à engager. */
+  teamId: number | null;
+  /**
+   * A-t-il qualité pour **engager ou désengager** cet engagé ? `OWNER` ou
+   * `MANAGER` en tournoi par équipes (`hasTeamManagementRole`), toujours vrai
+   * en individuel — l'engagé y est le joueur lui-même, il n'a personne d'autre
+   * à représenter.
+   */
+  canActForEntrant: boolean;
+};
+
+export async function resolveUserEntrant(
+  connection: PoolConnection,
+  tournament: Pick<TournamentRow, "participant_type">,
+  userId: number,
+): Promise<UserEntrant> {
   if (isSoloTournament(tournament.participant_type)) {
-    return findSoloEntry(connection, userId);
+    return { teamId: await findSoloEntry(connection, userId), canActForEntrant: true };
   }
 
   // Sur la connexion de l'appelant : cette résolution est appelée depuis des
@@ -117,7 +144,10 @@ export async function resolveUserEntrantTeamId(
   // seconde place du pool sous un verrou de ligne arme un convoi (voir
   // `getUserActiveTeam`).
   const activeTeam = await getUserActiveTeam(userId, connection);
-  return activeTeam?.teamId ?? null;
+  return {
+    teamId: activeTeam?.teamId ?? null,
+    canActForEntrant: hasTeamManagementRole(activeTeam?.roles),
+  };
 }
 
 /**

@@ -14,7 +14,20 @@ import { adminResolveMatch, adminSaveMatchScores } from "@/lib/server/tournament
  * descendant sort donc immédiatement, et il ne reste à observer que les deux
  * contrôles ajoutés ici.
  */
-function fakeConnection(options: { winnerTeamId?: number | null } = {}): {
+function fakeConnection(
+  options: {
+    winnerTeamId?: number | null;
+    /**
+     * Statut du match **tel que le verrou aval le lit** (première requête, celle
+     * qui joint `bg_tournaments`). Par défaut `READY` : rien de propagé, donc
+     * rien à verrouiller, et les cas écrits avant n'observent que les contrôles
+     * qui les intéressent.
+     */
+    lockStatus?: "READY" | "COMPLETED";
+    /** Manche suivante, telle que la rend la seconde requête du verrou. */
+    dependents?: Record<string, unknown>[];
+  } = {},
+): {
   conn: PoolConnection;
   writes: string[];
 } {
@@ -29,9 +42,31 @@ function fakeConnection(options: { winnerTeamId?: number | null } = {}): {
         return [{ affectedRows: 1 }, []];
       }
 
-      // Verrou aval : les dépendants sont vierges.
+      // Verrou aval, premier temps : le match édité, avec le format du tournoi.
       if (q.includes("FROM bg_matches m JOIN bg_tournaments t")) {
-        return [[{ round_number: 1, winner_team_id: null, format: "SINGLE" }], []];
+        // `status` autant que `winner_team_id` : depuis que le verrou lit le statut
+        // (`isMatchPlayed`), une ligne factice sans cette colonne le fait sortir
+        // aussitôt — le garde-fou était donc neutralisé dans tous les tests qui
+        // l'atteignent.
+        return [
+          [
+            {
+              round_number: 1,
+              status: options.lockStatus ?? "READY",
+              winner_team_id: options.lockStatus === "COMPLETED" ? 100 : null,
+              next_winner_match_id: options.dependents ? 11 : null,
+              next_loser_match_id: null,
+              tournament_id: 1,
+              format: "SINGLE",
+            },
+          ],
+          [],
+        ];
+      }
+
+      // Verrou aval, second temps : la manche suivante.
+      if (q.includes("FROM bg_matches WHERE id IN")) {
+        return [options.dependents ?? [], []];
       }
 
       if (q.includes("match_format_type")) {
@@ -135,5 +170,82 @@ describe("forfait — l'équipe doit jouer le match", () => {
       ).resolves.toBeUndefined();
       expect(writes).toHaveLength(1);
     }
+  });
+});
+
+/**
+ * Le verrou de manche **atteint par les points d'entrée de l'arbitrage**, et
+ * pas seulement par son helper.
+ *
+ * Les connexions factices de ce fichier et de ses voisins rendaient la ligne du
+ * verrou sans colonne `status` : depuis le passage à `isMatchPlayed`, le
+ * garde-fou sortait donc aussitôt, et on aurait pu retirer entièrement son
+ * appel d'`adminSaveMatchScores` et d'`adminResolveMatch` sans qu'un seul test
+ * bronche. Ces deux cas ferment le trou du côté du chemin réel.
+ */
+describe("verrou de manche — depuis l'arbitrage, pas depuis l'helper", () => {
+  /** Manche suivante déjà saisie : rien en amont ne doit plus bouger. */
+  const PLAYED_NEXT_ROUND = [
+    {
+      id: 11,
+      round_number: 2,
+      team1_id: 100,
+      team2_id: 300,
+      team1_score: 3,
+      team2_score: 1,
+      winner_team_id: 100,
+      forfeit_team_id: null,
+      status: "COMPLETED",
+      team1_reported_at: null,
+      team2_reported_at: null,
+    },
+  ];
+
+  it("refuse l'enregistrement quand la manche suivante porte une saisie", async () => {
+    const { conn, writes } = fakeConnection({
+      lockStatus: "COMPLETED",
+      dependents: PLAYED_NEXT_ROUND,
+    });
+
+    await expect(adminSaveMatchScores(conn, 10, 2, 1)).rejects.toThrow(
+      "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES",
+    );
+    expect(writes).toHaveLength(0);
+  });
+
+  it("refuse la validation du résultat dans le même cas", async () => {
+    const { conn, writes } = fakeConnection({
+      lockStatus: "COMPLETED",
+      dependents: PLAYED_NEXT_ROUND,
+    });
+
+    await expect(adminResolveMatch(conn, 10, 2, 1)).rejects.toThrow(
+      "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES",
+    );
+    expect(writes).toHaveLength(0);
+  });
+
+  it("laisse passer tant que la manche suivante est vierge", async () => {
+    const { conn, writes } = fakeConnection({
+      lockStatus: "COMPLETED",
+      dependents: [
+        {
+          id: 11,
+          round_number: 2,
+          team1_id: 100,
+          team2_id: null,
+          team1_score: null,
+          team2_score: null,
+          winner_team_id: null,
+          forfeit_team_id: null,
+          status: "PENDING",
+          team1_reported_at: null,
+          team2_reported_at: null,
+        },
+      ],
+    });
+
+    await expect(adminResolveMatch(conn, 10, 2, 1)).resolves.toBeUndefined();
+    expect(writes.length).toBeGreaterThan(0);
   });
 });

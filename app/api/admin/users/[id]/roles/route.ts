@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { setUserRoles } from "@/lib/server/users-service";
-import { isPlatformRole } from "@/lib/shared/permissions";
+import { can, isPlatformRole } from "@/lib/shared/permissions";
 
 /**
  * Remplace l'ensemble des rôles de permission d'un utilisateur cible.
@@ -18,7 +18,12 @@ import { isPlatformRole } from "@/lib/shared/permissions";
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  if (!user.isAdmin) return fail("FORBIDDEN", 403);
+  // `can(user, "roles")` et non `user.isAdmin` : la permission n'est accordée
+  // qu'à `ADMIN`, les deux tests sont donc équivalents — mais la règle du
+  // projet est qu'un domaine se protège par sa permission (§1.4 de
+  // `docs/AUTHORIZATION_RULES.md`), et la suppression d'un tournoi doit rester
+  // le seul endroit qui déroge.
+  if (!can(user, "roles")) return fail("FORBIDDEN", 403);
 
   const { id } = await context.params;
   const targetId = Number(id);

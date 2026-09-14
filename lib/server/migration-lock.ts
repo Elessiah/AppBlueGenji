@@ -1,4 +1,5 @@
-import type { Pool, RowDataPacket } from "mysql2/promise";
+import type { Pool } from "mysql2/promise";
+import { withNamedLock } from "@/lib/server/named-lock";
 
 /**
  * Rejouer le schéma au démarrage, sans se condamner et sans se marcher dessus.
@@ -17,7 +18,10 @@ import type { Pool, RowDataPacket } from "mysql2/promise";
  * Ensuite la concurrence elle-même : {@link withMigrationLock} sérialise les
  * migrations derrière un verrou **nommé** (`GET_LOCK`), qui vaut entre
  * processus — un verrou en mémoire ne protégerait que le sien, et c'est
- * précisément entre deux processus que l'interblocage se produit.
+ * précisément entre deux processus que l'interblocage se produit. Le mécanisme
+ * lui-même vit dans `named-lock.ts` depuis qu'il a un second usage (l'émission
+ * des codes de connexion Discord) ; il ne reste ici que ce qui regarde les
+ * migrations.
  */
 
 /** Nom du verrou consultatif MySQL qui sérialise les migrations. */
@@ -33,53 +37,15 @@ export const MIGRATION_LOCK_NAME = "bg_migrations";
 export const MIGRATION_LOCK_TIMEOUT_SECONDS = 60;
 
 /**
- * Joue `run` sous le verrou nommé, une instance à la fois.
+ * Joue `run` sous le verrou des migrations, une instance à la fois.
  *
- * Le verrou est lié à la **session** MySQL, pas à la requête : il faut donc
- * tenir la même connexion du `GET_LOCK` au `RELEASE_LOCK`, une connexion
- * empruntée au pool à chaque instruction relâcherait le verrou aussitôt pris.
- * Les migrations, elles, continuent de passer par le pool — le verrou n'a pas à
- * être la connexion qui travaille.
- *
- * Si le verrou ne peut pas être relâché (connexion morte), la connexion est
- * **détruite** plutôt que rendue au pool : c'est la fin de la session qui libère
- * alors le verrou, sans quoi une connexion recyclée le garderait et le prochain
- * démarrage attendrait soixante secondes pour rien.
+ * Voir `named-lock.ts` pour la mécanique (session MySQL, connexion tenue,
+ * destruction si le verrou ne peut pas être rendu).
  */
-export async function withMigrationLock<T>(pool: Pool, run: () => Promise<T>): Promise<T> {
-  const connection = await pool.getConnection();
-  let held = false;
-  try {
-    const [rows] = await connection.query<RowDataPacket[]>(
-      "SELECT GET_LOCK(?, ?) AS acquired",
-      [MIGRATION_LOCK_NAME, MIGRATION_LOCK_TIMEOUT_SECONDS],
-    );
-    // `GET_LOCK` rend 1 (obtenu), 0 (délai dépassé) ou NULL (erreur).
-    held = Number(rows?.[0]?.acquired ?? 0) === 1;
-    if (!held) {
-      throw new Error(
-        `Migrations: verrou « ${MIGRATION_LOCK_NAME} » indisponible après ${MIGRATION_LOCK_TIMEOUT_SECONDS} s`,
-      );
-    }
-    return await run();
-  } finally {
-    let released = false;
-    if (held) {
-      try {
-        await connection.query("SELECT RELEASE_LOCK(?)", [MIGRATION_LOCK_NAME]);
-        released = true;
-      } catch {
-        // Connexion perdue : la destruction ci-dessous rendra le verrou.
-      }
-    } else {
-      released = true;
-    }
-    if (released) {
-      connection.release();
-    } else {
-      connection.destroy();
-    }
-  }
+export function withMigrationLock<T>(pool: Pool, run: () => Promise<T>): Promise<T> {
+  // La connexion du verrou n'est **pas** celle qui travaille : les migrations
+  // sont longues, elles continuent de passer par le pool.
+  return withNamedLock(pool, MIGRATION_LOCK_NAME, MIGRATION_LOCK_TIMEOUT_SECONDS, () => run());
 }
 
 /** Porte d'entrée qui ne joue sa tâche qu'une fois — tant qu'elle réussit. */

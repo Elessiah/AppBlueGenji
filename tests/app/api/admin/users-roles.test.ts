@@ -40,6 +40,38 @@ describe("POST /api/admin/users/[id]/roles", () => {
     expect(service.setUserRoles).not.toHaveBeenCalled();
   });
 
+  it("refuse un cumul de rôles qui ne comprend pas ADMIN", async () => {
+    // La garde s'écrit `can(user, "roles")`, la permission que seul `ADMIN`
+    // porte : un arbitre qui est aussi caster et community manager n'approche
+    // pas plus de l'attribution des rôles qu'un compte nu. Le test tient
+    // l'équivalence entre la permission et `isAdmin` — c'est elle qui permet à
+    // §1.4 de n'avoir qu'une seule exception, la suppression d'un tournoi.
+    const staff = {
+      id: 3,
+      isAdmin: false,
+      roles: ["ARBITRE", "CASTER", "COMMUNITY_MANAGER", "RECRUTEUR"],
+    } as Awaited<ReturnType<typeof getCurrentUser>>;
+
+    (getCurrentUser as jest.Mock).mockResolvedValue(staff as never);
+    const res = await POST(jsonReq({ roles: ["ADMIN"] }), params("7"));
+    expect(res.status).toBe(403);
+    expect(service.setUserRoles).not.toHaveBeenCalled();
+  });
+
+  it("accepte un ADMIN porté par `roles` sans le drapeau `isAdmin`", async () => {
+    // L'autre face de l'équivalence : `can()` lit les deux, le contrôle ne doit
+    // pas dépendre de la seule colonne.
+    const rolesAdmin = { id: 4, isAdmin: false, roles: ["ADMIN"] } as Awaited<
+      ReturnType<typeof getCurrentUser>
+    >;
+
+    (getCurrentUser as jest.Mock).mockResolvedValue(rolesAdmin as never);
+    (service.setUserRoles as jest.Mock).mockResolvedValue(["ARBITRE"] as never);
+    const res = await POST(jsonReq({ roles: ["ARBITRE"] }), params("7"));
+    expect(res.status).toBe(200);
+    expect(service.setUserRoles).toHaveBeenCalledWith(7, ["ARBITRE"]);
+  });
+
   it("rejects invalid ids with 400", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
     const res = await POST(jsonReq({ roles: [] }), params("abc"));
