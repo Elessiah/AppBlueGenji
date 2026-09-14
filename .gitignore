@@ -23,11 +23,21 @@ pnpm-debug.log*
 Thumbs.db
 
 # Env files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+#
+# La liste nominative laissait passer le seul fichier qui porte de vrais
+# secrets : `.env.production` (mot de passe MySQL, secret OAuth Google, jeton
+# interne du bot, clé de chiffrement des Server Actions) n'y figurait pas, pas
+# plus que les sauvegardes `~` laissées par un éditeur. Sur le serveur de
+# production, `git status` les annonçait donc en « untracked » : un seul
+# `git add -A` aurait suffi à les publier.
+#
+# D'où la règle prise par l'autre bout — **tout** `.env*` est exclu, et seuls
+# les gabarits sont rouverts, qui ne portent aucune valeur. Une variable
+# ajoutée demain dans un fichier au nom imprévu est ainsi couverte d'avance ;
+# c'est bien l'oubli, et non la négligence, qui a créé le trou.
+.env*
+!.env.example
+!.env.production.example
 
 # TypeScript
 *.tsbuildinfo
