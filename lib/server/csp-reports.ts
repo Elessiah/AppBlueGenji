@@ -43,6 +43,18 @@ export const CSP_DEDUPE_WINDOW_MS = 60 * 60_000;
 export const CSP_MAX_TRACKED_CAUSES = 200;
 
 /**
+ * Borne dure du nombre de violations lues **par requête**.
+ *
+ * Le dédoublonnage par cause protège des rechargements répétés, pas d'une
+ * requête unique qui fabrique d'un coup des milliers de causes distinctes
+ * (un `blocked-uri` différent à chaque entrée du tableau du Reporting API) :
+ * chacune serait « nouvelle » et journalisée une fois, avant même que
+ * `CSP_MAX_TRACKED_CAUSES` n'ait de quoi purger. Un vrai navigateur ne
+ * regroupe jamais autant de violations dans un seul envoi.
+ */
+export const CSP_MAX_VIOLATIONS_PER_REPORT = 25;
+
+/**
  * Réduit une URL à son origine, ou au mot-clé que le navigateur a employé.
  *
  * Les navigateurs ne renvoient pas toujours une URL : `inline`, `eval` et
@@ -107,6 +119,7 @@ export function parseCspReport(payload: unknown): CspViolation[] {
 
   if (Array.isArray(payload)) {
     for (const entry of payload) {
+      if (bodies.length >= CSP_MAX_VIOLATIONS_PER_REPORT) break;
       if (typeof entry !== "object" || entry === null) continue;
       const record = entry as Record<string, unknown>;
       if (record.type !== undefined && record.type !== "csp-violation") continue;

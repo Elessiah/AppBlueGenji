@@ -1,6 +1,7 @@
 import {
   CSP_DEDUPE_WINDOW_MS,
   CSP_MAX_TRACKED_CAUSES,
+  CSP_MAX_VIOLATIONS_PER_REPORT,
   admitViolation,
   blockedOriginOf,
   documentPathOf,
@@ -101,6 +102,21 @@ describe("parseCspReport", () => {
     expect(parseCspReport({})).toEqual([]);
     expect(parseCspReport({ "csp-report": [] })).toEqual([]);
     expect(parseCspReport({ "csp-report": { "blocked-uri": "inline" } })).toEqual([]);
+  });
+
+  it("borne le nombre de violations lues à une seule requête, même fabriquée", () => {
+    // Le dédoublonnage par cause ne protège que des rechargements répétés :
+    // une requête unique portant des milliers de causes distinctes fabriquées
+    // (un `blocked-uri` différent à chaque entrée) serait journalisée en
+    // entier avant que `CSP_MAX_TRACKED_CAUSES` n'ait de quoi purger.
+    const entries = Array.from({ length: CSP_MAX_VIOLATIONS_PER_REPORT * 3 }, (_, i) => ({
+      type: "csp-violation",
+      body: {
+        effectiveDirective: "img-src",
+        blockedURL: `https://cause-${i}.exemple.invalid`,
+      },
+    }));
+    expect(parseCspReport(entries)).toHaveLength(CSP_MAX_VIOLATIONS_PER_REPORT);
   });
 
   it("ne remonte jamais l'extrait de script ni la requête de la page", () => {
