@@ -13,9 +13,9 @@ describe("google-oauth helpers", () => {
   });
 
   it("uses GOOGLE_REDIRECT_URI when provided", () => {
-    process.env.GOOGLE_REDIRECT_URI = "https://arena.bluegenji.fr/api/auth/google/callback";
+    process.env.GOOGLE_REDIRECT_URI = "https://bluegenji-esport.fr/api/auth/google/callback";
 
-    expect(getGoogleRedirectUri()).toBe("https://arena.bluegenji.fr/api/auth/google/callback");
+    expect(getGoogleRedirectUri()).toBe("https://bluegenji-esport.fr/api/auth/google/callback");
   });
 
   it("builds redirect URI from APP_URL when GOOGLE_REDIRECT_URI is missing", () => {
