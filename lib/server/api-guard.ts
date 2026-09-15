@@ -109,6 +109,21 @@ export const BOT_FEED_OPEN_RULE: RateLimitRule = {
 };
 
 /**
+ * Rapports de violation de la politique de sécurité du contenu, par IP.
+ *
+ * Large, parce que le navigateur décide seul quand envoyer : une page qui
+ * viole la politique à trois endroits produit trois rapports par chargement,
+ * sans que le visiteur y soit pour rien. Le plafond ne protège donc pas une
+ * intention, il borne le travail que peut coûter une origine — le
+ * dédoublonnage côté journal fait le reste.
+ */
+export const CSP_REPORT_RULE: RateLimitRule = {
+  name: "csp-report",
+  limit: 60,
+  windowMs: 60_000,
+};
+
+/**
  * Signalements de problème, par utilisateur.
  *
  * Étroit, à rebours des autres plafonds : chaque appel envoie un message privé
