@@ -3,16 +3,16 @@ import mysql, { type ExecuteValues, type Pool, type PoolConnection } from "mysql
 import { createOnceGate, withMigrationLock } from "@/lib/server/migration-lock";
 
 /**
- * Paramètres liés d une requête préparée.
+ * Paramètres liés d'une requête préparée.
  *
- * `mysql2` typait ses paramètres en `any` jusqu en 3.23 : un tableau déclaré
- * `unknown[]` — la forme qu on écrivait partout — passait sans rien dire. Depuis,
- * `execute` n accepte plus qu `ExecuteValues`, et les quatorze tableaux qui
+ * `mysql2` typait ses paramètres en `any` jusqu'en 3.23 : un tableau déclaré
+ * `unknown[]` — la forme qu'on écrivait partout — passait sans rien dire. Depuis,
+ * `execute` n'accepte plus qu'`ExecuteValues`, et les quatorze tableaux qui
  * construisent une requête à rallonge ne satisfaisaient plus la signature.
  *
- * L alias vit ici plutôt que recopié dans les sept modules concernés : c est
+ * L'alias vit ici plutôt que recopié dans les sept modules concernés : c'est
  * `database.ts` qui possède la couche MySQL, et le jour où le type amont change
- * de nom il n y aura qu un endroit à corriger. `import type` étant effacé à la
+ * de nom il n'y aura qu'un endroit à corriger. `import type` étant effacé à la
  * compilation, y recourir ne charge pas ce module.
  */
 export type SqlParam = ExecuteValues;

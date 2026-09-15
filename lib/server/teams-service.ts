@@ -1,6 +1,5 @@
 ﻿import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import { getDatabase } from "@/lib/server/database";
-import type { SqlParams } from "@/lib/server/database";
+import { getDatabase, type SqlParams } from "@/lib/server/database";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import type { TeamDetailResponse, TeamListItem, TeamMember, TeamRole } from "@/lib/shared/types";
 import { getUserIdByPseudo, sanitizeRoles } from "@/lib/server/users-service";

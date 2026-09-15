@@ -7,8 +7,7 @@ import type {
   TournamentState,
   TournamentViewerContext,
 } from "@/lib/shared/types";
-import { getDatabase, withConnection } from "@/lib/server/database";
-import type { SqlParams } from "@/lib/server/database";
+import { getDatabase, withConnection, type SqlParams } from "@/lib/server/database";
 import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { isSoloTournament, toParticipantType, type ParticipantType } from "@/lib/shared/participants";
