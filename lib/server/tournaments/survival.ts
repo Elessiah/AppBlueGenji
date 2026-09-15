@@ -1,4 +1,5 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { SqlParam, SqlParams } from "@/lib/server/database";
 import {
   compareStanding,
   computeFinalRanks,
@@ -85,7 +86,7 @@ async function loadTournament(
   const scope = buildSurvivalScope(tournamentId, phaseId);
   const suffix = forUpdate ? " FOR UPDATE" : "";
   let sql: string;
-  let params: unknown[];
+  let params: SqlParams;
 
   if (scope.table === "bg_tournaments") {
     sql = `SELECT format, state, survival_rounds_before_first_cut, survival_rounds_per_cut,
@@ -207,9 +208,9 @@ async function replayAndPersist(
 }
 
 /** Construit un `CASE team_id WHEN … THEN …` et alimente le tableau de paramètres. */
-function caseExpression<T>(
+function caseExpression<T extends SqlParam>(
   standings: SurvivalStanding[],
-  params: unknown[],
+  params: SqlParams,
   value: (s: SurvivalStanding) => T,
 ): string {
   const branches = standings
@@ -235,7 +236,7 @@ async function persistStandings(
   if (standings.length === 0) return;
 
   const ranks = computeFinalRanks(standings);
-  const params: unknown[] = [];
+  const params: SqlParams = [];
   const wins = caseExpression(standings, params, (s) => s.wins);
   const losses = caseExpression(standings, params, (s) => s.losses);
   const status = caseExpression(standings, params, (s) => s.status);
@@ -386,7 +387,7 @@ async function finalizeSurvival(
 ): Promise<void> {
   if (standings.length > 0) {
     const ranks = computeFinalRanks(standings);
-    const params: unknown[] = [];
+    const params: SqlParams = [];
     const rank = caseExpression(standings, params, (s) => ranks.get(s.teamId) ?? 0);
     const teamIds = standings.map((s) => s.teamId);
     params.push(tournamentId, ...teamIds);

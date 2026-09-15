@@ -7,7 +7,7 @@ import type {
   TournamentState,
   TournamentViewerContext,
 } from "@/lib/shared/types";
-import { getDatabase, withConnection } from "@/lib/server/database";
+import { getDatabase, withConnection, type SqlParams } from "@/lib/server/database";
 import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { isSoloTournament, toParticipantType, type ParticipantType } from "@/lib/shared/participants";
@@ -552,7 +552,7 @@ async function loadTournamentBuckets(
   const now = new Date();
 
   const where: string[] = [scope.hiddenOnly ? `t.start_visibility_at > ?` : `t.start_visibility_at <= ?`];
-  const params: unknown[] = [now];
+  const params: SqlParams = [now];
 
   if (searchTerm && searchTerm.trim()) {
     where.push(`LOWER(t.name) LIKE ?`);

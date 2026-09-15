@@ -13,6 +13,7 @@
  * envelopper son écriture dans `mapTeamTagConflict`.
  */
 import type { RowDataPacket } from "mysql2/promise";
+import type { SqlParams } from "@/lib/server/database";
 import { TEAM_TAG_ALREADY_USED, checkTeamTag } from "@/lib/shared/team-tag";
 
 /** Nom de l'index unique posé par la migration (`lib/server/database.ts`). */
@@ -24,7 +25,7 @@ const TAG_INDEX = "uniq_bg_teams_tag";
  * indifféremment hors transaction ou dans celle de la création.
  */
 type Executor = {
-  execute<T extends RowDataPacket[]>(sql: string, params?: unknown[]): Promise<[T, unknown]>;
+  execute<T extends RowDataPacket[]>(sql: string, params?: SqlParams): Promise<[T, unknown]>;
 };
 
 /**
@@ -53,7 +54,7 @@ export async function assertTeamTagAvailable(
 ): Promise<void> {
   if (tag === null) return;
 
-  const params: unknown[] = [tag];
+  const params: SqlParams = [tag];
   let sql = `SELECT id FROM bg_teams WHERE tag = ?`;
   if (excludeTeamId !== undefined) {
     sql += ` AND id <> ?`;
