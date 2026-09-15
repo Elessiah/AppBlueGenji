@@ -1,4 +1,5 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { SqlParams } from "@/lib/server/database";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import type { TournamentPhaseStanding } from "@/lib/shared/types";
 import { PhaseRow } from "./_internal";
@@ -99,7 +100,7 @@ export async function updatePhaseResolution(
   },
 ): Promise<void> {
   const updates: string[] = [];
-  const values: unknown[] = [];
+  const values: SqlParams = [];
 
   if ("entrants" in params && params.entrants !== undefined) {
     updates.push("entrants = ?");
@@ -165,7 +166,7 @@ export async function insertPhaseTeams(
 ): Promise<void> {
   if (teams.length === 0) return;
 
-  const values: unknown[] = [];
+  const values: SqlParams = [];
   const placeholders: string[] = [];
 
   for (const team of teams) {

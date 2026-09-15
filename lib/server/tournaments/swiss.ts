@@ -1,4 +1,5 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { SqlParam, SqlParams } from "@/lib/server/database";
 import {
   DEFAULT_SWISS_POINTS,
   DEFAULT_SWISS_TIEBREAKERS,
@@ -227,9 +228,9 @@ async function deriveState(
 }
 
 /** Construit un `CASE team_id WHEN … THEN …` et alimente le tableau de paramètres. */
-function caseExpression<T>(
+function caseExpression<T extends SqlParam>(
   standings: SwissRankedStanding[],
-  params: unknown[],
+  params: SqlParams,
   value: (s: SwissRankedStanding) => T,
 ): string {
   const branches = standings
@@ -254,7 +255,7 @@ async function persistStandings(
 ): Promise<void> {
   if (ranked.length === 0) return;
 
-  const params: unknown[] = [];
+  const params: SqlParams = [];
   const points = caseExpression(ranked, params, (s) => s.points);
   const wins = caseExpression(ranked, params, (s) => s.wins);
   const draws = caseExpression(ranked, params, (s) => s.draws);
@@ -543,7 +544,7 @@ async function finalizeSwiss(
   ranked: SwissRankedStanding[],
 ): Promise<void> {
   if (ranked.length > 0) {
-    const params: unknown[] = [];
+    const params: SqlParams = [];
     const rank = caseExpression(ranked, params, (s) => s.rank);
     const teamIds = ranked.map((s) => s.teamId);
     params.push(tournamentId, ...teamIds);

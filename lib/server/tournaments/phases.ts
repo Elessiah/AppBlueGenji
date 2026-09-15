@@ -1,4 +1,5 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { SqlParams } from "@/lib/server/database";
 import { resolvePhasePlan } from "@/lib/shared/tournament-phases";
 import type { TournamentPhaseStanding } from "@/lib/shared/types";
 import {
@@ -445,7 +446,7 @@ export async function finalizeMultiTournament(
 
   // Génère le CASE WHEN pour les ranks
   const caseStmt: string[] = [];
-  const values: unknown[] = [];
+  const values: SqlParams = [];
 
   for (let i = 0; i < finalOrder.length; i++) {
     const ranking = finalOrder[i];
