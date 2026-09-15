@@ -22,11 +22,14 @@ import type { NextConfig } from "next";
  *   encadrée s'y affiche déconnectée) ; celui-ci ferme le cas résiduel et ne
  *   coûte rien.
  *
- * Volontairement **pas** de `Content-Security-Policy` : Next injecte ses
- * propres scripts en ligne, une politique écrite à l'aveugle casserait la page
- * sans qu'aucun test ne le voie. Ni de `Strict-Transport-Security` : le
- * chiffrement se termine au reverse proxy, c'est à lui de l'annoncer — et posé
- * ici, il s'appliquerait aussi à un déploiement servi en clair.
+ * La `Content-Security-Policy` n'est **pas** ici, et pas par omission : elle
+ * porte un nonce qui change à chaque réponse, alors que cette liste est
+ * statique. Elle vit donc dans le middleware, seul endroit qui voie une
+ * requête — voir `middleware.ts` et `lib/shared/csp.ts`.
+ *
+ * Toujours pas de `Strict-Transport-Security` : le chiffrement se termine au
+ * reverse proxy, c'est à lui de l'annoncer — et posé ici, il s'appliquerait
+ * aussi à un déploiement servi en clair.
  */
 const SECURITY_HEADERS = [
   { key: "X-Content-Type-Options", value: "nosniff" },
