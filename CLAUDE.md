@@ -16,6 +16,7 @@ npm test             # Jest test suite
 npm run test:coverage
 npm run seed         # Populate MySQL with test data (matrice de cas, voir ci-dessous)
 npm run seed:view    # Inspect seeded test data
+npm run backfill:avatars  # Rapatrie les photos restées chez leur hébergeur (prévu pour la prod)
 ```
 
 Running a single test file:
@@ -139,6 +140,8 @@ TRUSTED_PROXY_HOPS=1                       # optional — proxys de confiance de
 Pour vérifier les pages protégées (`/tournois`, `/equipes`, `/joueurs`, `/profil`, etc.) sans passer par Google OAuth ni le code Discord, définir `DEV_AUTH_USER_ID=<id>` dans `.env` (par exemple `321` pour le user admin). La fonction `getCurrentUser()` dans `lib/server/auth.ts` retournera ce user **uniquement si `NODE_ENV === "development"`** (c.-à-d. `next dev`), en court-circuitant le cookie de session — toutes les routes API et le `app/(secured)/layout.tsx` s'authentifient automatiquement. **Redémarre le dev server après modification de `.env`** pour que Next.js prenne en compte la nouvelle valeur. Désactiver = supprimer/vider la var. La garde-fou est double et en **liste blanche** (`NODE_ENV === "development"` ET ID entier valide) : le bypass est donc inactif en prod, en `test`, en `staging`, ou si `NODE_ENV` n'est pas défini. Ne JAMAIS définir cette var en prod.
 
 ## Jeu de test (`npm run seed`)
+
+**Le seed refuse de tourner en production** (`NODE_ENV=production` → sortie 1). Il ne viderait pas grand-chose là-bas — aucune donnée de prod ne porte les préfixes de test — mais il **créerait** la matrice entière dans la base que le site sert. Le refus porte sur `NODE_ENV` et non sur `DB_HOST` : la base écoute sur `127.0.0.1` des deux côtés, l'hôte ne distingue rien. Ce refus **remplace une protection accidentelle** : le script n'importe que `dotenv/config`, qui ne lit que `.env`, si bien qu'il mourait sur le serveur faute de configuration — jusqu'au jour où quelqu'un y poserait un `.env`. Les scripts faits **pour** la production importent, eux, `lib/server/script-env.ts` (ordre des fichiers dans `lib/shared/env-files.ts`, calqué sur Next : `.env.<env>.local`, `.env.local`, `.env.<env>`, `.env`).
 
 `npm run seed` **écrase** les données de test (tout ce qui est préfixé `Test_` / `Test - `, plus la table `bg_bureau_members`) puis régénère une matrice de cas destinée à couvrir un maximum de combinaisons en une exécution :
 

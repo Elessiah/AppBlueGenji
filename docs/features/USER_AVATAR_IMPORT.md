@@ -137,6 +137,13 @@ qu'une fois la ligne écrite.
 npm run backfill:avatars
 ```
 
+Il est fait pour tourner **sur le serveur**, et il importe `lib/server/script-env.ts`
+pour cela : `dotenv/config`, qu'emploient les autres scripts `tsx`, ne connaît que
+`.env` — or la production n'en a pas, sa configuration vit dans `.env.production`,
+que Next charge seul. Lancé en production le 16/09/2026 dans sa première version,
+le script est mort sur `Missing required environment variable DB_HOST` avant
+d'avoir rien lu.
+
 Rapatrie d'un coup les photos des comptes dont l'avatar est resté une URL
 étrangère. Séquentiel à dessein — ouvrir des dizaines de connexions simultanées
 chez un tiers est la façon la plus sûre de se faire plafonner au milieu du lot.

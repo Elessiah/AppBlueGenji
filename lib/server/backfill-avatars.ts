@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./script-env";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "./database";
 import { syncSoloEntryIdentity } from "./solo-entries-service";
@@ -22,6 +22,12 @@ import { importRemoteAvatar } from "./user-avatar-import";
  * exactement dans l'état où il l'a trouvée.
  *
  *     npm run backfill:avatars
+ *
+ * Il est fait pour tourner **en production**, d'où `./script-env` à la place de
+ * `dotenv/config` : ce dernier ne lit que `.env`, que le serveur n'a pas — sa
+ * configuration vit dans `.env.production`, que Next charge seul et qu'un
+ * script lancé par `tsx` ne voit pas. Le script mourait donc sur
+ * `Missing required environment variable DB_HOST` avant d'avoir rien lu.
  */
 
 type UserRow = RowDataPacket & { id: number; pseudo: string; avatar_url: string | null };
