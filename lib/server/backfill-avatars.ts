@@ -1,6 +1,7 @@
 import "dotenv/config";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "./database";
+import { syncSoloEntryIdentity } from "./solo-entries-service";
 import { importRemoteAvatar } from "./user-avatar-import";
 
 /**
@@ -53,14 +54,25 @@ async function main(): Promise<void> {
     // la façon la plus sûre de se faire plafonner au milieu du lot.
     for (const row of rows) {
       const stored = await importRemoteAvatar(row.avatar_url, row.id);
-      if (!stored) {
+      if (stored) {
+        await db.execute(`UPDATE bg_users SET avatar_url = ? WHERE id = ?`, [stored, row.id]);
+        done += 1;
+        console.log(`  · ${row.pseudo} (#${row.id}) → ${stored}`);
+      } else {
         failed += 1;
         console.warn(`  ✗ ${row.pseudo} (#${row.id}) — non rapatrié, avatar inchangé`);
-        continue;
       }
-      await db.execute(`UPDATE bg_users SET avatar_url = ? WHERE id = ?`, [stored, row.id]);
-      done += 1;
-      console.log(`  · ${row.pseudo} (#${row.id}) → ${stored}`);
+
+      // **Dans les deux cas**, et c'est le point le moins évident du script : le
+      // logo d'une entrée solo est une **copie** de l'avatar du joueur
+      // (`docs/features/SOLO_TOURNAMENTS.md`), si bien que l'URL étrangère s'est
+      // aussi recopiée dans `bg_teams.logo_url` — d'où elle ressort par les
+      // composants de logo d'équipe, qui ne passent par aucune garde d'avatar.
+      // La resynchronisation relit l'avatar au travers de `visibleAvatarUrl` :
+      // elle repose le fichier rapatrié, ou efface le logo quand il n'y en a
+      // pas eu. Sans cette ligne, rapatrier l'avatar laisserait la fuite en
+      // place là où elle est le moins visible.
+      await syncSoloEntryIdentity(row.id);
     }
 
     console.log(`\n${done} rapatrié(s), ${failed} en échec.`);

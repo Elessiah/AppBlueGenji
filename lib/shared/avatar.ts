@@ -39,6 +39,24 @@ export function isLocalAvatarUrl(avatarUrl: string | null | undefined): boolean 
 }
 
 /**
+ * L'avatar s'il vient de chez nous, `null` sinon.
+ *
+ * `visibleAvatarUrl` n'est pas la seule porte : `getCurrentUser` en est une
+ * seconde, et elle **n'a pas à consulter la visibilité** — c'est son propre
+ * avatar que le titulaire voit dans la barre de navigation et dans l'en-tête
+ * public. Elle doit en revanche poser la même règle d'origine, sans quoi la
+ * seule chose que la correction aurait changée pour un compte Google est que
+ * `next/image` **lève** au lieu de laisser fuiter : le drapeau `unoptimized`
+ * partant, une URL étrangère n'est plus tolérée par le rendu, elle le casse.
+ *
+ * D'où cette fonction plutôt qu'un second test recopié : la question « cette
+ * adresse est-elle la nôtre » ne doit avoir qu'une réponse.
+ */
+export function localAvatarUrl(avatarUrl: string | null | undefined): string | null {
+  return isLocalAvatarUrl(avatarUrl) ? (avatarUrl as string) : null;
+}
+
+/**
  * L'avatar qu'un lecteur a le droit de voir, **et qui vient de chez nous**.
  *
  * Deux règles, au même endroit parce qu'elles gardent la même porte — c'est la
@@ -77,7 +95,7 @@ export function visibleAvatarUrl(
   visibleAvatar: boolean,
   isSelf = false,
 ): string | null {
-  if (!avatarUrl) return null;
-  if (!isLocalAvatarUrl(avatarUrl)) return null;
-  return visibleAvatar || isSelf ? avatarUrl : null;
+  const local = localAvatarUrl(avatarUrl);
+  if (!local) return null;
+  return visibleAvatar || isSelf ? local : null;
 }

@@ -220,7 +220,6 @@ export function MembersSection({
                               alt={player.pseudo}
                               width={24}
                               height={24}
-                              unoptimized
                               style={{ borderRadius: "50%", objectFit: "cover" }}
                             />
                           ) : (
