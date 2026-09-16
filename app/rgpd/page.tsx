@@ -194,19 +194,27 @@ export default function RgpdPage() {
             service de fingerprinting.
           </p>
           <p>
-            Un seul cookie technique est déposé lors de la connexion :
+            Seuls des cookies techniques sont déposés :
           </p>
           <ul>
             <li>
               <strong>bg_session</strong> — cookie de session httpOnly, sameSite=lax,
-              durée 30 jours. Il contient uniquement un jeton opaque haché (SHA-256)
-              permettant de vous identifier sur la plateforme. Il est supprimé à la
-              déconnexion.
+              durée 30 jours, déposé <strong>à la connexion</strong>. Il contient
+              uniquement un jeton opaque haché (SHA-256) permettant de vous identifier
+              sur la plateforme. Il est supprimé à la déconnexion.
+            </li>
+            <li>
+              <strong>bg_recr_modal</strong> et <strong>bg_recr_banner</strong> — déposés
+              uniquement <strong>si vous fermez une annonce de recrutement</strong> mise en
+              avant, pour ne pas vous la réafficher. Ils ne contiennent que le numéro de
+              l'annonce concernée, jamais d'identifiant de personne : ils ne permettent ni de
+              vous reconnaître, ni de vous suivre d'un site à l'autre (sameSite=strict). Le
+              premier dure sept jours, le second le temps de votre visite.
             </li>
           </ul>
           <p>
-            Aucun bandeau de consentement cookies n'est requis pour ce cookie strictement
-            nécessaire au fonctionnement du service (directive ePrivacy, art. 5.3, exemption
+            Aucun bandeau de consentement cookies n'est requis pour ces cookies strictement
+            nécessaires au fonctionnement du service (directive ePrivacy, art. 5.3, exemption
             cookies fonctionnels).
           </p>
         </div>
