@@ -32,7 +32,7 @@ type LiveCardProps = {
 function EntrantName({ href, name }: { href: string | null; name: string }) {
   if (!href) return <>{name}</>;
   return (
-    <EntityLink href={href} className={styles.nested} title={`Voir la fiche de ${name}`}>
+    <EntityLink href={href} className={`${styles.nested} ${styles.entrantLink}`} title={`Voir la fiche de ${name}`}>
       {name}
     </EntityLink>
   );

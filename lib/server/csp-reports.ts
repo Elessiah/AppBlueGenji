@@ -1,10 +1,12 @@
 /**
  * Lecture et journalisation des violations de CSP remontées par les navigateurs.
  *
- * La politique part en `Report-Only` ({@link lib/shared/csp}) : elle ne refuse
- * rien, elle **raconte**. Encore faut-il que quelqu'un l'écoute — sans
- * collecteur, les violations ne vivent que dans la console du visiteur, où
- * personne ne les lira jamais.
+ * Le collecteur a été écrit pour le mode `Report-Only`, où la politique ne
+ * refuse rien et se contente de **raconter** ; il vaut tel quel en application,
+ * où il devient plus précieux encore — une ligne n'y annonce plus un risque,
+ * elle signale quelque chose de cassé chez un visiteur, maintenant. Encore
+ * faut-il que quelqu'un l'écoute : sans collecteur, les violations ne vivent
+ * que dans la console du visiteur, où personne ne les lira jamais.
  *
  * Deux contraintes gouvernent ce module, et elles tirent dans le même sens.
  *
@@ -25,6 +27,8 @@
  * Aucun stockage : la sortie est la console du processus, que pm2 capture.
  * Une table grandirait, et ce que l'on cherche ici tient en quelques lignes.
  */
+
+import { CSP_MODE } from "@/lib/shared/csp";
 
 /** Ce qu'un rapport de violation apprend, une fois débarrassé du reste. */
 export interface CspViolation {
@@ -209,8 +213,13 @@ export function logCspViolations(violations: CspViolation[], now: number = Date.
     const suppressed = admitViolation(tracker, violationCause(violation), now);
     if (suppressed === null) continue;
     const repeated = suppressed > 0 ? ` (+${suppressed} identique(s) depuis)` : "";
+    // Le temps du verbe suit le mode : en `Report-Only` le navigateur annonce ce
+    // qu'il **aurait** refusé, en application il dit ce qu'il **a** refusé —
+    // c'est-à-dire quelque chose de cassé, à l'instant, chez un visiteur. Lire
+    // « refuserait » sur une page en panne enverrait chercher au mauvais endroit.
+    const verbe = CSP_MODE === "enforce" ? "a refusé" : "refuserait";
     console.warn(
-      `[csp] ${violation.directive} refuserait ${violation.blockedOrigin} sur ${violation.documentPath}${repeated}`,
+      `[csp] ${violation.directive} ${verbe} ${violation.blockedOrigin} sur ${violation.documentPath}${repeated}`,
     );
   }
 }
