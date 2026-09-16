@@ -19,7 +19,13 @@
   display: flex;
   justify-content: space-between;
   gap: 24px;
-  align-items: end;
+  /* `flex-end` et non `end` : dans un conteneur flex, les deux rendent la même
+     chose, mais `end` vient de la spec Box Alignment et n'a pas d'équivalent
+     dans les implémentations préfixées — autoprefixer le signale à chaque
+     compilation, et webpack ne sachant pas sérialiser l'objet Warning, il
+     renonçait au passage à mettre ce module en cache. Les autres `end` du
+     projet sont dans des `display: grid`, où c'est le mot juste. */
+  align-items: flex-end;
 }
 
 .copy {
