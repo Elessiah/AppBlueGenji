@@ -1,4 +1,10 @@
 import "dotenv/config";
+// `dotenv/config` et non `./script-env`, à dessein : ce script **écrase** des
+// données, et son incapacité à lire `.env.production` a longtemps été sa seule
+// protection contre une exécution sur le serveur — une protection accidentelle,
+// qu'un `.env` posé là un jour ferait disparaître sans bruit. Le refus
+// ci-dessous la rend explicite, et l'import reste étroit pour ne pas la
+// reprendre d'une main après l'avoir donnée de l'autre.
 import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "./database";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
@@ -1434,6 +1440,19 @@ async function createTournament(
 
 async function main(): Promise<void> {
   console.log("🚀 Seed BlueGenji Esport\n");
+
+  // Ce script commence par **effacer**, et `clearDatabase` ne demande rien à
+  // personne. En production il ne viderait pas grand-chose (aucune donnée n'y
+  // porte les préfixes de test) mais il **créerait** la matrice entière — une
+  // centaine d'équipes de remplissage et des dizaines de tournois, dans la base
+  // que le site sert. Le refus porte sur `NODE_ENV` et non sur `DB_HOST` : la
+  // base écoute sur `127.0.0.1` des deux côtés, l'hôte ne distingue donc rien.
+  if (process.env.NODE_ENV === "production") {
+    console.error(
+      "Refus: NODE_ENV=production. Le jeu de test ne se pose jamais sur la production.",
+    );
+    process.exit(1);
+  }
 
   try {
     const db = await getDatabase();
