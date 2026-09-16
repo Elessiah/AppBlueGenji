@@ -13,57 +13,68 @@
  * le navigateur ne considère pas comme du script exécutable et n'inspecte donc
  * pas. Il n'y a rien à deviner de ce côté.
  *
- * Reste l'aveuglement, et c'est le mode qui y répond : la politique part en
- * **`Content-Security-Policy-Report-Only`**. Le navigateur applique tout le
- * raisonnement, signale ce qu'il aurait refusé, et ne refuse rien. La page ne
- * peut pas casser ; ce que les tests ne voient pas, les rapports le disent.
- * Passer en application se fera d'un seul mot ({@link CSP_MODE}), une fois les
- * rapports silencieux — et la machinerie aura déjà tourné en production.
+ * Reste l'aveuglement, et c'est le mode qui y a répondu : la politique est
+ * partie en **`Report-Only`**, où le navigateur applique tout le raisonnement,
+ * signale ce qu'il aurait refusé et ne refuse rien. Elle est depuis **en
+ * application** ({@link CSP_MODE}) : les deux obstacles que ce mode avait
+ * révélés sont levés, et voici comment, parce que les deux réponses sont moins
+ * évidentes que les problèmes.
  *
- * **Deux choses restent à régler avant ce mot, et les deux sont mesurées, pas
- * supposées** — c'est précisément ce que le mode rapport a apporté :
+ * **1. Les pages prérendues n'avaient pas de nonce, et ne pouvaient pas en
+ * avoir.** Un nonce change à chaque réponse ; un HTML bâti à la compilation est
+ * le même pour tout le monde. Or un nonce présent dans la politique fait
+ * **ignorer** `'unsafe-inline'` : en application, leurs scripts en ligne
+ * auraient été refusés — sur `/connexion`, la page qui ouvre les sessions.
  *
- * 1. **Les pages prérendues n'ont pas de nonce, et ne peuvent pas en avoir.**
- *    Un nonce change à chaque réponse ; un HTML bâti à la compilation est le
- *    même pour tout le monde. Or un nonce présent dans la politique fait
- *    **ignorer** `'unsafe-inline'` : en application, ces scripts-là seraient
- *    refusés.
+ * La liste de ces pages a été fausse longtemps, et c'est le cœur de l'affaire.
+ * On la lisait sur le résumé de `next build` ; elle se lit dans
+ * `.next/prerender-manifest.json`, qui seul dit ce qui est réellement bâti à la
+ * compilation. Elle annonçait cinq routes ; il y en avait **trois**, dont une
+ * inoffensive :
  *
- *    Elles sont **trois**, et non les cinq longtemps listées ici — la liste se
- *    lisait sur le résumé de `next build`, elle se lit en fait dans
- *    `.next/prerender-manifest.json`, qui seul dit ce qui est réellement bâti à
- *    la compilation :
+ * | route | en ligne | nommés | |
+ * |---|---|---|---|
+ * | `/connexion` | 8 | 0 | le vrai problème |
+ * | `/_not-found` | 7 | 0 | hydratation morte sur les 404 |
+ * | `/partenaires` | 8 | 0 | **inoffensif** : la route répond `308`, son corps n'est jamais rendu |
  *
- *    | route | `<script>` en ligne | nommés |
- *    |---|---|---|
- *    | `/connexion` | 8 | 0 |
- *    | `/partenaires` | 8 | 0 |
- *    | `/_not-found` | 7 | 0 |
+ * Les deux qui n'y étaient pas n'y étaient pas pour des raisons différentes.
+ * **`/regles/[slug]`** s'affiche `●` au résumé mais n'écrit aucun HTML et ne
+ * figure pas au manifeste : elle est rendue à la demande, ce que la production
+ * confirmait déjà — deux requêtes rendent deux nonces différents, et ses 26
+ * scripts en ligne sont tous nommés. L'arbitrage qu'on croyait devoir trancher
+ * à son sujet (« elle est pré-générée à dessein ») n'a jamais existé.
+ * **`/opengraph-image`** rend un PNG : `script-src` n'a rien à y dire, et elle
+ * reste prérendue — c'est la seule qui le soit encore, et tant mieux, la
+ * fabriquer à chaque requête coûterait cher pour chaque robot d'aperçu.
  *
- *    Les deux qui en sortent en sortent pour des raisons différentes.
- *    **`/regles/[slug]`** s'affiche `●` au résumé du build, mais n'écrit aucun
- *    HTML et ne figure pas au manifeste : elle est rendue à la demande, et la
- *    production le confirme — ses **26** scripts en ligne portent leurs 26
- *    nonces. Elle n'a donc jamais été un obstacle, et l'arbitrage qu'on croyait
- *    devoir trancher à son sujet n'existe pas. **`/opengraph-image`** rend un
- *    PNG : `script-src` n'a rien à y dire.
+ * La levée ne se fait donc **pas** route par route : elle se fait à la cause.
+ * Le HTML de chaque page dépend d'un en-tête de requête — le nonce —, Next ne
+ * compte pas cette lecture comme une dépendance dynamique, et `app/layout.tsx`
+ * la lui **déclare** d'un `await headers()`. Une liste de routes à annoter
+ * aurait dérivé comme celle-ci a dérivé ; une dépendance déclarée à la racine
+ * couvre la page qu'on ajoutera demain. Résultat au manifeste : plus une seule
+ * page prérendue, `/opengraph-image` exceptée.
  *
- *    Rendre une de ces trois routes dynamique lève l'obstacle pour elle, et
- *    c'est mesuré : `/connexion` passe de **0 nonce sur 8** à **10 sur 10**.
- *    Coût relevé sur la même compilation, à chaud, `/partenaires` (restée
- *    statique) servant de témoin — médiane **8,3 ms** contre **3,8 ms**, soit
- *    ~4,5 ms de rendu serveur par requête, sans accès base ni entrée-sortie.
- *    Le paquet client ne bouge pas (5,33 ko / 111 ko de premier chargement).
- *    Ce qui se perd est la mise en cache du **document** : il passe sous
- *    `private, no-cache, no-store`, ce qui est déjà le régime de toutes les
- *    autres pages du site, l'en-tête de session s'y trouvant.
- * 2. **L'avatar d'un compte Google est servi par Google** — voir `img-src`
- *    ci-dessous et `ERREUR.txt`.
+ * Le coût est mesuré, `/partenaires` encore statique ayant servi de témoin sur
+ * la même compilation, à chaud : médiane **8,3 ms** contre **3,8 ms**, soit
+ * ~4,5 ms de rendu serveur par requête, sans accès base ni entrée-sortie, et à
+ * paquet client inchangé. Ce qui se perd est la mise en cache du **document**,
+ * qui passe sous `private, no-cache, no-store` — déjà le régime de toutes les
+ * autres pages, l'en-tête de session s'y trouvant.
+ *
+ * **2. L'avatar d'un compte Google était servi par Google** — levé par ailleurs
+ * (voir `img-src` ci-dessous), la photo étant désormais copiée chez nous.
  *
  * Pour le reste, le site s'y prête mieux qu'il n'y paraît : **aucune iframe**,
  * polices auto-hébergées, appels à Google partant du **serveur**, et toutes
  * les autres images passant par son origine (relais de logos partenaires,
  * `/api/uploads/…`). `'self'` couvre le reste.
+ *
+ * **Si une page casse après un ajout**, le réflexe est de lire le collecteur
+ * (`/api/csp-report`) avant de toucher à la politique : en application, un
+ * refus est visible tout de suite, et c'est le seul avantage que ce mode a sur
+ * l'autre. Repasser en `Report-Only` reste un mot, le temps d'un diagnostic.
  */
 
 /** Les deux façons de poser la politique : la faire appliquer, ou l'écouter. */
@@ -72,10 +83,13 @@ export type CspMode = "enforce" | "report-only";
 /**
  * Mode de pose de la politique.
  *
- * `"report-only"` tant que les rapports ne sont pas silencieux. Le jour où ils
- * le sont, ce mot devient `"enforce"` : c'est le seul changement à faire.
+ * `"enforce"` : le navigateur **refuse** ce que la politique interdit. On y est
+ * passé après que le mode rapport eut tourné en production et que ses deux
+ * obstacles eurent été levés (voir l'en-tête du module). Repasser à
+ * `"report-only"` reste un mot, le temps d'un diagnostic — c'est la sortie de
+ * secours, pas une position de repli permanente.
  */
-export const CSP_MODE: CspMode = "report-only";
+export const CSP_MODE: CspMode = "enforce";
 
 /**
  * En-tête correspondant au mode courant.

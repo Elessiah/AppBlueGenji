@@ -1,4 +1,5 @@
 ﻿import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Exo_2, Rajdhani, Inter, JetBrains_Mono, Orbitron } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
@@ -79,7 +80,33 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+/**
+ * Mise en page racine.
+ *
+ * Elle est `async` et lit les en-têtes de requête sans rien en faire, et c'est
+ * **la** ligne qui permet à la politique de sécurité d'être appliquée. Le
+ * raisonnement tient en trois temps.
+ *
+ * Le middleware tire un nonce par requête et le pose en en-tête ; Next le relit
+ * et l'appose lui-même sur chacun de ses `<script>` en ligne. Le HTML de chaque
+ * page **dépend donc d'un en-tête de requête** — il ne peut pas être le même
+ * pour tout le monde. Seulement Next ne compte pas cette lecture-là comme une
+ * dépendance dynamique : il prérendait les pages dont rien *d'autre* n'était
+ * dynamique, et leurs scripts en ligne partaient alors **sans nonce**. En
+ * `Report-Only` cela ne se voyait pas ; en application, un nonce dans la
+ * politique fait ignorer `'unsafe-inline'`, donc ces scripts-là auraient été
+ * refusés — sur `/connexion`, la page qui ouvre les sessions.
+ *
+ * `headers()` déclare cette dépendance, qui est réelle. On la pose **ici**
+ * plutôt qu'un `dynamic = "force-dynamic"` sur chaque route concernée, pour la
+ * raison même qui a produit le défaut : cette liste **dérive**. Elle était
+ * écrite « cinq routes » dans deux fichiers alors qu'elles étaient trois, et
+ * rien ne l'aurait signalé — la page qui s'y ajoute demain hérite au contraire
+ * de cette ligne sans qu'on ait à y penser. Voir `lib/shared/csp.ts`.
+ */
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  await headers();
+
   return (
     <html lang="fr">
       <body className={`${titleFont.variable} ${bodyFont.variable} ${sansFont.variable} ${monoFont.variable} ${displayFont.variable}`}>
