@@ -49,6 +49,16 @@ type UserAvatarProps = {
  * fichier absent de `public/`, donc un 404 et une image cassée pour tout compte
  * sans avatar. Le repli est ici la pastille à initiale des cartes d'annuaire, et
  * il n'y a plus qu'un endroit où il puisse se tromper.
+ *
+ * **Plus de `unoptimized`.** Il était là parce qu'un avatar pouvait être une
+ * URL Google : `next/image` lève au rendu sur une origine absente de
+ * `remotePatterns`, et le drapeau contournait la vérification — donc aussi tout
+ * ce qu'elle protège. Un `src` est désormais toujours un fichier du site
+ * (`visibleAvatarUrl` écarte le reste, `user-avatar-import.ts` copie la photo
+ * Google à la connexion), si bien que l'avatar profite enfin du
+ * redimensionnement, du WebP et du cache long comme n'importe quelle image
+ * d'ici. Le `referrerPolicy="no-referrer"` part avec : il ne servait qu'à
+ * limiter ce qu'on disait au tiers, et il n'y a plus de tiers.
  */
 export function UserAvatar({
   src,
@@ -77,7 +87,6 @@ export function UserAvatar({
           size="sm"
           borderRadius={999}
           borderColor={borderColor}
-          unoptimized
         />
       );
     }
@@ -89,8 +98,6 @@ export function UserAvatar({
         alt={alt}
         width={size}
         height={size}
-        unoptimized
-        referrerPolicy="no-referrer"
         style={{
           width: size,
           height: size,

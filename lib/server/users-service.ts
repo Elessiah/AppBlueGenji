@@ -5,6 +5,7 @@ import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-loc
 import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
 import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
+import { importRemoteAvatar, shouldImportGoogleAvatar } from "@/lib/server/user-avatar-import";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 import { getPlayerEntityStats, loadPlayerRecords } from "@/lib/server/stats-service";
@@ -281,14 +282,13 @@ export async function createOrGetGoogleUser(profile: GoogleProfilePayload): Prom
   );
 
   if (existing.length > 0) {
-    await db.execute(
-      `UPDATE bg_users
-       SET email = COALESCE(?, email),
-           avatar_url = COALESCE(?, avatar_url)
-       WHERE id = ?`,
-      [verifiedEmail, profile.picture ?? null, existing[0].id],
-    );
-    return Number(existing[0].id);
+    const userId = Number(existing[0].id);
+    await db.execute(`UPDATE bg_users SET email = COALESCE(?, email) WHERE id = ?`, [
+      verifiedEmail,
+      userId,
+    ]);
+    await adoptGoogleAvatar(userId, profile.picture);
+    return userId;
   }
 
   // **Rattachement à un compte existant : uniquement sur une adresse vérifiée.**
@@ -319,13 +319,48 @@ export async function createOrGetGoogleUser(profile: GoogleProfilePayload): Prom
   const pseudoSource = profile.name ?? profile.email?.split("@")[0] ?? `player${Date.now().toString().slice(-5)}`;
   const pseudo = await ensureUniquePseudo(pseudoSource);
 
+  // L'avatar n'est pas posé ici : le nom du fichier porte l'identifiant du
+  // compte, qui n'existe qu'une fois la ligne écrite. La photo est copiée juste
+  // après, et son échec ne remet pas la création en cause.
   const [created] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_users (pseudo, avatar_url, google_sub, email)
-     VALUES (?, ?, ?, ?)`,
-    [pseudo, profile.picture ?? null, profile.sub, verifiedEmail],
+     VALUES (?, NULL, ?, ?)`,
+    [pseudo, profile.sub, verifiedEmail],
   );
 
-  return Number(created.insertId);
+  const userId = Number(created.insertId);
+  await adoptGoogleAvatar(userId, profile.picture);
+  return userId;
+}
+
+/**
+ * Copie la photo de profil Google du compte, si elle a lieu d'être.
+ *
+ * L'ancienne écriture rangeait l'URL de Google telle quelle, si bien que chaque
+ * page portant cet avatar annonçait l'IP du **visiteur** à Google. La photo est
+ * désormais copiée chez nous, et `avatar_url` ne porte plus que des fichiers du
+ * site — c'est ce que `visibleAvatarUrl` exige à la sortie.
+ *
+ * Silencieux par construction : un CDN indisponible ne doit pas faire échouer
+ * une connexion. Le compte reste alors sans avatar — pastille à initiale — et
+ * la tentative sera refaite au prochain passage, `shouldImportGoogleAvatar`
+ * n'ayant toujours rien de local à constater.
+ */
+async function adoptGoogleAvatar(userId: number, picture: string | undefined): Promise<void> {
+  if (!picture) return;
+
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { avatar_url: string | null })[]>(
+    `SELECT avatar_url FROM bg_users WHERE id = ? LIMIT 1`,
+    [userId],
+  );
+  if (rows.length === 0) return;
+  if (!shouldImportGoogleAvatar(rows[0].avatar_url)) return;
+
+  const stored = await importRemoteAvatar(picture, userId);
+  if (!stored) return;
+
+  await db.execute(`UPDATE bg_users SET avatar_url = ? WHERE id = ?`, [stored, userId]);
 }
 
 export async function createOrGetDiscordUser(discordId: string, pseudoInput?: string): Promise<number> {

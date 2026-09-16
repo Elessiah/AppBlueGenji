@@ -87,87 +87,21 @@ export function sponsorLogoSrc(sponsor: { id: number; logoUrl: string | null }):
 }
 
 /**
- * Hôtes qu'un logo distant ne peut pas désigner.
+ * Les gardes ci-dessous ne sont plus écrites ici.
  *
- * Le relais fait une requête **depuis le serveur**, là où le navigateur la
- * faisait depuis le poste du visiteur : une adresse interne devient donc
- * joignable, ce qu'elle n'était pas. L'URL vient du staff `showcase`, mais la
- * confiance qu'on lui accorde porte sur la vitrine, pas sur le réseau de la
- * machine — d'où ce filtre, posé sur le nom d'hôte littéral.
- */
-export function isPrivateLogoHostname(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (!host) return true;
-  if (host === "localhost" || host.endsWith(".localhost")) return true;
-  if (host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".home.arpa")) return true;
-
-  // IPv6 : bouclage, lien-local (fe80::/10) et adresses uniques locales (fc00::/7).
-  if (host === "::1" || host === "::") return true;
-  // Formes développées : `0:0:0:0:0:0:0:1` (bouclage) et `0:0:0:0:0:0:0:0`
-  // (adresse indéterminée) ne correspondent à aucune abréviation ci-dessus.
-  if (/^(0+:){7}0*1?$/.test(host)) return true;
-  if (/^fe[89ab][0-9a-f]:/.test(host)) return true;
-  if (/^f[cd][0-9a-f]{2}:/.test(host)) return true;
-  // IPv4 encapsulée en IPv6 (`::ffff:127.0.0.1`).
-  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(host);
-  if (mapped) return isPrivateIpv4(mapped[1]);
-
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return isPrivateIpv4(host);
-  return false;
-}
-
-function isPrivateIpv4(address: string): boolean {
-  const parts = address.split(".").map((p) => Number(p));
-  if (parts.length !== 4 || parts.some((p) => !Number.isInteger(p) || p < 0 || p > 255)) return true;
-  const [a, b] = parts;
-  if (a === 0 || a === 10 || a === 127) return true;
-  if (a === 169 && b === 254) return true; // lien-local, dont le service de métadonnées cloud
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  if (a === 192 && b === 168) return true;
-  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
-  if (a >= 224) return true; // multicast et réservé
-  return false;
-}
-
-/**
- * URL distante exploitable par le relais, ou `null`.
+ * Elles ne parlaient de logos que par accident de naissance : un import de
+ * photo de profil Google (`lib/server/user-avatar-import.ts`) pose exactement
+ * les mêmes questions — cette URL est-elle exploitable, cet hôte est-il le
+ * nôtre, ce type est-il bien une image. Elles vivent donc dans
+ * `lib/shared/remote-image.ts`, sous des noms qui parlent d'images distantes.
  *
- * `https` seulement : une image chargée en clair déclencherait de toute façon un
- * avertissement de contenu mixte côté navigateur, et le relais n'a pas à aller
- * chercher en clair ce que le site sert en chiffré.
+ * Les anciens noms restent exportés d'ici : c'est le vocabulaire du relais
+ * partenaires, que sa route et ses tests emploient, et rien n'obligeait à le
+ * réécrire pour déplacer une implémentation.
  */
-export function parseRemoteLogoUrl(logoUrl: string | null | undefined): URL | null {
-  if (!logoUrl) return null;
-  let url: URL;
-  try {
-    url = new URL(logoUrl.trim());
-  } catch {
-    return null;
-  }
-  if (url.protocol !== "https:") return null;
-  if (isPrivateLogoHostname(url.hostname)) return null;
-  return url;
-}
-
-/**
- * Types d'image que le relais accepte de renvoyer.
- *
- * SVG en est **volontairement absent** : un SVG est un document scriptable, et
- * le servir depuis notre origine reviendrait à laisser un tiers exécuter du
- * script sur `bluegenji-esport.fr`. Le format n'a jamais été accepté à l'import
- * non plus (`lib/server/image-upload.ts`).
- */
-export const SPONSOR_LOGO_CONTENT_TYPES = [
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/gif",
-  "image/avif",
-] as const;
-
-/** Type d'image renvoyable par le relais, ou `null` si l'en-tête ne convient pas. */
-export function acceptedLogoContentType(header: string | null | undefined): string | null {
-  if (!header) return null;
-  const type = header.split(";")[0].trim().toLowerCase();
-  return (SPONSOR_LOGO_CONTENT_TYPES as readonly string[]).includes(type) ? type : null;
-}
+export {
+  isPrivateImageHostname as isPrivateLogoHostname,
+  parseRemoteImageUrl as parseRemoteLogoUrl,
+  acceptedRemoteImageContentType as acceptedLogoContentType,
+  REMOTE_IMAGE_CONTENT_TYPES as SPONSOR_LOGO_CONTENT_TYPES,
+} from "./remote-image";
