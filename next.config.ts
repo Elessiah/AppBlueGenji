@@ -38,6 +38,24 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  /**
+   * Ne pas annoncer le serveur qui rend la page.
+   *
+   * Next pose `X-Powered-By: Next.js` sur **toutes** ses réponses, et la
+   * production le servait à chaque visiteur. Ce n'est pas une faille : c'est un
+   * renseignement offert, qui dit quelle famille d'avis de sécurité consulter
+   * avant même d'avoir sondé le site.
+   *
+   * Corrigé **ici** et non dans nginx, alors que le reverse proxy sait le
+   * retirer (`proxy_hide_header`) : cette configuration-là n'est pas versionnée
+   * dans ce dépôt, elle est partagée avec un autre site, et elle ne suivrait
+   * pas un déploiement fait ailleurs. Les trois `proxy_hide_header` qui y
+   * figurent servent d'ailleurs un tout autre but — ils écartent les doublons
+   * des en-têtes que nginx repose lui-même, pas celui-ci, qu'aucun des deux
+   * n'émettait.
+   */
+  poweredByHeader: false,
+
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },
