@@ -64,6 +64,54 @@ export function shouldShowRecruitmentModal(seenAt: number | null, now: number): 
 }
 
 /**
+ * Cookies de la mise en avant, et pourquoi ce n'est plus `localStorage`.
+ *
+ * La modale etait peinte **par du JavaScript** : le composant montait, lisait
+ * `localStorage`, puis decidait. Elle arrivait donc apres l'hydratation, et
+ * comme c'est le plus gros bloc de l'accueil sur mobile, elle en **etait** le
+ * LCP — 4,4 s, dont 3,8 s de seul delai de rendu. Aucun reglage du composant ne
+ * pouvait y changer quoi que ce soit : ce qui est peint tard est peint tard.
+ *
+ * La seule issue est de la rendre dans le **HTML initial**, ce qui suppose que
+ * le serveur sache qui l'a deja ecartee — d'ou un cookie, seul etat de
+ * navigateur qu'une requete transporte. Le `localStorage` ne pouvait pas le
+ * faire : il ne quitte jamais l'onglet.
+ *
+ * La valeur est l'**identifiant de l'annonce**, et il n'y a pas d'horodatage a
+ * cote : la peremption du cookie *est* la fenetre. Changer l'annonce mise en
+ * avant repart donc avec une valeur neuve, exactement comme la cle par annonce
+ * de l'ancien stockage.
+ */
+export const RECRUITMENT_MODAL_COOKIE = "bg_recr_modal";
+
+/** Meme contrat, mais cookie de session : la banderole ne se tait que le temps de la visite. */
+export const RECRUITMENT_BANNER_COOKIE = "bg_recr_banner";
+
+/**
+ * L'annonce a-t-elle deja ete ecartee par ce visiteur ?
+ *
+ * Compare l'identifiant porte par le cookie a celui de l'annonce servie. Une
+ * valeur absente, vide ou portant un autre identifiant rend `false` : dans le
+ * doute on **affiche**, une mise en avant tue a tort ne se rattrape pas.
+ *
+ * @param cookieValue Valeur brute du cookie, ou `undefined` s'il est absent.
+ * @param adId Identifiant de l'annonce actuellement mise en avant.
+ */
+export function recruitmentDismissed(cookieValue: string | undefined, adId: number): boolean {
+  if (typeof cookieValue !== "string" || cookieValue.length === 0) return false;
+  return cookieValue.trim() === String(adId);
+}
+
+/**
+ * Duree de vie du cookie de la modale, en secondes.
+ *
+ * Tiree de {@link RECRUITMENT_MODAL_INTERVAL_MS} plutot que reecrite : deux
+ * nombres a tenir d'accord auraient diverge, et la fenetre de 7 jours est la
+ * meme notion des deux cotes.
+ */
+export const RECRUITMENT_MODAL_COOKIE_MAX_AGE = Math.floor(RECRUITMENT_MODAL_INTERVAL_MS / 1000);
+
+/**
  * Canal de contact mis en avant sur l'annonce. `AUTO` : aucun canal privilégié,
  * tous les tags sont équivalents. Les autres valeurs stylent le tag correspondant
  * en primaire pour guider les intéressés vers le canal préféré du recruteur.

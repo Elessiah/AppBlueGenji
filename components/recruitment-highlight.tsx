@@ -2,15 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { CyberButton } from "@/components/cyber";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
+  RECRUITMENT_BANNER_COOKIE,
   RECRUITMENT_DOMAIN_LABELS,
+  RECRUITMENT_MODAL_COOKIE,
+  RECRUITMENT_MODAL_COOKIE_MAX_AGE,
   type RecruitmentAd,
   buildRecruitmentPreview,
   recruitmentAdAnchor,
-  shouldShowRecruitmentModal,
 } from "@/lib/shared/recruitment";
 import styles from "./recruitment-highlight.module.css";
 
@@ -18,85 +19,67 @@ import styles from "./recruitment-highlight.module.css";
 const MODAL_PREVIEW_MAX = 320;
 
 /**
- * Page où la modale d'accueil n'a plus lieu d'être : le visiteur y lit déjà les
- * annonces. La lui imposer serait doublement fautif — elle relance quelqu'un de
- * déjà venu, et elle se superpose à la modale de lecture d'une annonce ouverte
- * par lien profond, deux boîtes de dialogue empilées dont l'ordre visuel et
- * l'ordre d'ouverture ne coïncident pas. La banderole, non modale, reste
- * affichée.
+ * Met en avant l'annonce de recrutement urgente — banderole discrète
+ * (`highlight = "BANNER"`) ou modale (`highlight = "MODAL"`).
+ *
+ * **Tout est décidé côté serveur**, et c'est le changement qui compte. Le
+ * composant allait chercher l'annonce lui-même (`fetch` dans un `useEffect`)
+ * puis lisait `localStorage` pour savoir s'il devait l'afficher : il ne
+ * peignait donc rien avant l'hydratation. La modale étant le plus gros bloc de
+ * l'accueil sur mobile, elle en **était** le LCP — 4,4 s, dont 3,8 s de seul
+ * délai de rendu. Ce qui est peint tard est peint tard ; seul l'endroit du
+ * rendu pouvait y changer quelque chose, pas un réglage du composant.
+ *
+ * La mise en page racine résout donc l'annonce **et** la décision d'affichage,
+ * et les passe en props : le balisage part dans le HTML initial. Le prix est un
+ * **cookie** à la place de `localStorage` — c'est le seul état de navigateur
+ * qu'une requête transporte, et le serveur doit savoir qui a déjà écarté
+ * l'annonce pour ne pas la réafficher. Il est documenté sur `/rgpd`.
+ *
+ * L'endpoint `/api/recruitment/highlight` reste en place : il ne sert plus au
+ * premier rendu, mais la page de gestion s'en sert encore.
+ *
+ * La banderole se referme pour la visite (cookie de session), la modale pour
+ * sept jours ({@link RECRUITMENT_MODAL_COOKIE_MAX_AGE}). La valeur est
+ * l'identifiant de l'annonce : changer l'annonce mise en avant repart donc avec
+ * une clé neuve, et une annonce urgente peut réapparaître aussitôt.
+ *
+ * Les deux formes ne montrent qu'un **aperçu** ; la lecture complète se fait
+ * sur `/recrutement#annonce-<id>`.
  */
-const AD_PAGE_PATH = "/recrutement";
-
-/**
- * Met en avant, sur l'ensemble du site, l'annonce de recrutement urgente
- * renvoyée par `/api/recruitment/highlight` — soit une banderole discrète
- * (`highlight = "BANNER"`), soit une modale (`highlight = "MODAL"`).
- *
- * L'endpoint ne renvoie **qu'une** annonce, quel que soit le nombre d'annonces
- * marquées urgentes : la plus haute active l'emporte, les autres attendent leur
- * tour. Empiler des modales à l'arrivée d'un visiteur serait insupportable.
- *
- * La banderole se ferme pour la session courante (`sessionStorage`, par annonce).
- * La modale est plus intrusive : une fois affichée, elle ne réapparaît pas avant
- * 7 jours pour le même utilisateur (`localStorage`, horodatage par annonce), même
- * s'il quitte la page sans la fermer. Changer l'annonce mise en avant repart avec
- * une clé neuve, donc une nouvelle annonce urgente peut réapparaître aussitôt.
- *
- * Les deux formes ne montrent qu'un **aperçu** de la description : la lecture
- * complète se fait sur `/recrutement#annonce-<id>`, qui ouvre l'annonce en grand.
- */
-export function RecruitmentHighlight() {
-  const [ad, setAd] = useState<RecruitmentAd | null>(null);
-  const [dismissed, setDismissed] = useState(false);
-  const onAdPage = usePathname() === AD_PAGE_PATH;
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/recruitment/highlight")
-      .then((res) => (res.ok ? res.json() : { ad: null }))
-      .then((data: { ad: RecruitmentAd | null }) => {
-        if (cancelled || !data.ad) return;
-        const found = data.ad;
-        // La décision de masquer est prise **avant** de publier l'annonce, dans
-        // le même lot de mises à jour : un aller-retour par effet laisserait la
-        // modale peindre une image avant de se refermer.
-        let hidden = false;
-        try {
-          if (found.highlight === "MODAL") {
-            // Fenêtre hebdomadaire : horodatage du dernier affichage.
-            const raw = localStorage.getItem(seenKey(found.id));
-            hidden = !shouldShowRecruitmentModal(raw === null ? null : Number(raw), Date.now());
-          } else {
-            // La banderole se referme pour la seule session courante.
-            hidden = sessionStorage.getItem(dismissKey(found.id)) === "1";
-          }
-        } catch {
-          // Stockage indisponible (mode privé) : on affiche l'annonce.
-        }
-        setAd(found);
-        if (hidden) setDismissed(true);
-      })
-      .catch(() => {
-        // Réseau indisponible : pas de mise en avant, sans bloquer la page.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+export function RecruitmentHighlight({
+  ad,
+  dismissed: dismissedByCookie,
+  onAdPage,
+}: {
+  /** Annonce à mettre en avant, résolue par la mise en page racine. */
+  ad: RecruitmentAd | null;
+  /** Le cookie dit que ce visiteur l'a déjà écartée. */
+  dismissed: boolean;
+  /** On est sur `/recrutement`, où la modale se tait (le visiteur y lit déjà les annonces). */
+  onAdPage: boolean;
+}) {
+  // Seul l'état *postérieur au rendu* vit ici : la fermeture faite à l'instant.
+  // La décision initiale vient du serveur, sinon on reviendrait à peindre
+  // après coup — c'est-à-dire au défaut qu'on corrige.
+  const [dismissedNow, setDismissedNow] = useState(false);
+  const dismissed = dismissedByCookie || dismissedNow;
 
   function dismiss() {
     if (ad) {
+      // `document.cookie` plutôt qu'un aller-retour : la fermeture est locale,
+      // le serveur n'a rien à en faire avant le prochain chargement. `SameSite`
+      // strict — ce cookie ne dit rien d'utile à une requête tierce.
+      const maxAge =
+        ad.highlight === "MODAL" ? `; max-age=${RECRUITMENT_MODAL_COOKIE_MAX_AGE}` : "";
+      const name = ad.highlight === "MODAL" ? RECRUITMENT_MODAL_COOKIE : RECRUITMENT_BANNER_COOKIE;
       try {
-        // La banderole se referme pour la session courante. La modale est déjà
-        // horodatée à l'affichage (fenêtre hebdomadaire) : rien à mémoriser ici.
-        if (ad.highlight === "BANNER") {
-          sessionStorage.setItem(dismissKey(ad.id), "1");
-        }
+        document.cookie = `${name}=${ad.id}; path=/; samesite=strict${maxAge}`;
       } catch {
-        // Ignore : la fermeture reste effective pour la vue courante.
+        // Cookies refusés : la fermeture reste effective pour la vue courante.
       }
     }
-    setDismissed(true);
+    setDismissedNow(true);
   }
 
   const visible = Boolean(ad) && !dismissed && ad?.highlight === "MODAL" && !onAdPage;
@@ -107,21 +90,23 @@ export function RecruitmentHighlight() {
   const recordedFor = useRef<number | null>(null);
 
   // La modale « compte » comme vue dès qu'elle est affichée, même si le visiteur
-  // quitte la page sans la fermer. L'horodatage n'est donc posé qu'ici, à
+  // quitte la page sans la fermer. La marque n'est donc posée qu'ici, à
   // l'affichage réel : traverser la page de recrutement, où elle est tue, ne
-  // doit pas brûler la fenêtre de 7 jours sans que rien n'ait été montré.
+  // doit pas brûler la fenêtre de sept jours sans que rien n'ait été montré.
   useEffect(() => {
     if (!visible || !ad || recordedFor.current === ad.id) return;
     recordedFor.current = ad.id;
     try {
-      localStorage.setItem(seenKey(ad.id), String(Date.now()));
+      document.cookie =
+        `${RECRUITMENT_MODAL_COOKIE}=${ad.id}; path=/; samesite=strict` +
+        `; max-age=${RECRUITMENT_MODAL_COOKIE_MAX_AGE}`;
     } catch {
-      // Stockage indisponible : l'affichage reste correct, la fenêtre non tenue.
+      // Cookies refusés : l'affichage reste correct, la fenêtre non tenue.
     }
   }, [visible, ad]);
 
   if (!ad || dismissed || ad.highlight === "NONE") return null;
-  // La modale se tait sur la page de recrutement (voir `AD_PAGE_PATH`).
+  // La modale se tait sur la page de recrutement (décidé côté serveur).
   if (ad.highlight === "MODAL" && onAdPage) return null;
 
   const meta = [ad.teamName, RECRUITMENT_DOMAIN_LABELS[ad.domain], ad.roles]
@@ -129,7 +114,7 @@ export function RecruitmentHighlight() {
     .join(" · ");
   // Lien profond : la page de recrutement ouvre directement l'annonce en grand.
   const anchor = recruitmentAdAnchor(ad.id);
-  const adHref = `${AD_PAGE_PATH}#${anchor}`;
+  const adHref = `/recrutement#${anchor}`;
 
   if (ad.highlight === "BANNER") {
     return (
@@ -205,12 +190,4 @@ export function RecruitmentHighlight() {
       </div>
     </div>
   );
-}
-
-function dismissKey(id: number): string {
-  return `bg_recr_highlight_dismissed_${id}`;
-}
-
-function seenKey(id: number): string {
-  return `bg_recr_highlight_seen_${id}`;
 }

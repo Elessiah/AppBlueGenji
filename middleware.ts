@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { CSP_HEADER, CSP_NONCE_HEADER, contentSecurityPolicy } from "@/lib/shared/csp";
+import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER, contentSecurityPolicy } from "@/lib/shared/csp";
 
 /**
  * Pose la politique de sécurité du contenu, avec un nonce par requête.
@@ -32,6 +32,12 @@ export function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set(CSP_NONCE_HEADER, nonce);
   requestHeaders.set("content-security-policy", policy);
+  // Le chemin demandé, que Next n'expose à aucun composant serveur — seul
+  // `usePathname()` le connaît, et il est client. Or la mise en avant de
+  // recrutement se tait sur `/recrutement`, et cette décision doit être prise
+  // **avant** le rendu : la prendre après l'hydratation ferait clignoter la
+  // modale sur la page même où elle n'a rien à faire.
+  requestHeaders.set(PATHNAME_HEADER, request.nextUrl.pathname);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set(CSP_HEADER, policy);

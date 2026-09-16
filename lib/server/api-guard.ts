@@ -22,20 +22,48 @@ import {
 import { clientIpFromForwardedFor, parseTrustedProxyHops } from "@/lib/shared/site-visits";
 
 /**
+ * Le proxy de cette installation écrit-il `X-Real-IP` ?
+ *
+ * Répond `false` par défaut, et ce défaut est le fond de l'affaire — voir
+ * {@link requestClientIp}. La valeur est lue à chaque appel, pas figée à
+ * l'import : un test qui la change doit pouvoir le faire sans recharger le
+ * module, et le coût d'une lecture d'environnement est nul devant celui d'une
+ * requête.
+ */
+function trustsRealIpHeader(): boolean {
+  return process.env.TRUSTED_PROXY_REAL_IP === "true";
+}
+
+/**
  * IP du client telle que l'a vue le proxy de confiance.
  *
  * Même lecture que le compteur de fréquentation (`X-Forwarded-For` parcouru
  * depuis la droite sur `TRUSTED_PROXY_HOPS` relais) : un en-tête forgé par le
  * client ne doit pas permettre de se fabriquer une identité neuve à chaque
  * requête, sans quoi le plafond ne borne plus rien.
+ *
+ * **`X-Real-IP` n'est plus un repli silencieux**, et le raisonnement vaut d'être
+ * gardé parce qu'il est contre-intuitif. Ce repli ne se déclenchait que là où
+ * `X-Forwarded-For` manquait — c'est-à-dire précisément là où **aucun relais de
+ * confiance n'avait écrit quoi que ce soit**, donc là où l'en-tête est forgeable
+ * par l'appelant. Il n'aidait jamais un déploiement correctement mandaté (dans
+ * lequel il est mort, `X-Forwarded-For` étant toujours présent) et offrait à un
+ * appelant non mandaté un **seau neuf à chaque requête** : il affaiblissait le
+ * plafond au lieu de le servir, exactement à l'envers de son intention.
+ *
+ * Il est donc devenu un choix déclaré, `TRUSTED_PROXY_REAL_IP=true`, que seul
+ * l'exploitant d'une installation dont le proxy pose `X-Real-IP` et **pas**
+ * `X-Forwarded-For` a une raison de poser. Sans déclaration, une identité qu'on
+ * ne peut pas établir n'est pas plafonnée — ce que ce module tient déjà par
+ * ailleurs : on préfère ne pas compter que compter faux.
  */
 export function requestClientIp(req: Request): string | null {
-  return (
-    clientIpFromForwardedFor(
-      req.headers.get("x-forwarded-for"),
-      parseTrustedProxyHops(process.env.TRUSTED_PROXY_HOPS),
-    ) ?? req.headers.get("x-real-ip")
+  const forwarded = clientIpFromForwardedFor(
+    req.headers.get("x-forwarded-for"),
+    parseTrustedProxyHops(process.env.TRUSTED_PROXY_HOPS),
   );
+  if (forwarded !== null) return forwarded;
+  return trustsRealIpHeader() ? req.headers.get("x-real-ip") : null;
 }
 
 /** Lectures d'un utilisateur connecté : liste et détail des tournois. */
