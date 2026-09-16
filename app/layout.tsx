@@ -1,11 +1,18 @@
 ﻿import type { Metadata } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { Exo_2, Rajdhani, Inter, JetBrains_Mono, Orbitron } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
 import { RecruitmentHighlight } from "@/components/recruitment-highlight";
 import { VisitTracker } from "@/components/visit-tracker";
+import { getHighlightedAd } from "@/lib/server/recruitment-service";
 import { siteMetadataBase } from "@/lib/server/site-url";
+import { PATHNAME_HEADER } from "@/lib/shared/csp";
+import {
+  RECRUITMENT_BANNER_COOKIE,
+  RECRUITMENT_MODAL_COOKIE,
+  recruitmentDismissed,
+} from "@/lib/shared/recruitment";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/shared/share-metadata";
 import { DEFAULT_SHARE_IMAGE } from "@/lib/shared/page-metadata";
 
@@ -80,12 +87,15 @@ export const metadata: Metadata = {
   },
 };
 
+/** Page où la mise en avant se tait : le visiteur y lit déjà les annonces. */
+const RECRUITMENT_PAGE = "/recrutement";
+
 /**
  * Mise en page racine.
  *
- * Elle est `async` et lit les en-têtes de requête sans rien en faire, et c'est
- * **la** ligne qui permet à la politique de sécurité d'être appliquée. Le
- * raisonnement tient en trois temps.
+ * Elle est `async` et lit les en-têtes de requête, et c'est **cette lecture**
+ * qui permet à la politique de sécurité d'être appliquée — elle le ferait même
+ * si personne n'en consommait la valeur. Le raisonnement tient en trois temps.
  *
  * Le middleware tire un nonce par requête et le pose en en-tête ; Next le relit
  * et l'appose lui-même sur chacun de ses `<script>` en ligne. Le HTML de chaque
@@ -105,14 +115,34 @@ export const metadata: Metadata = {
  * de cette ligne sans qu'on ait à y penser. Voir `lib/shared/csp.ts`.
  */
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  await headers();
+  const requestHeaders = await headers();
+
+  // L'annonce est résolue **ici**, côté serveur, et non plus par un `fetch`
+  // du composant monté. Deux gains, et le second est le vrai.
+  //
+  // Le petit : cet aller-retour partait de **chaque page** du site, à chaque
+  // visiteur, pour ne presque jamais rien rapporter.
+  //
+  // Le grand : la modale peut désormais être **dans le HTML initial**. Peinte
+  // par du JavaScript, elle arrivait après l'hydratation, et comme c'est le
+  // plus gros bloc de l'accueil sur mobile, elle en était le LCP — 4,4 s dont
+  // 3,8 s de seul délai de rendu. Ce qui est peint tard est peint tard : aucun
+  // réglage du composant n'y pouvait rien, seul l'endroit du rendu le pouvait.
+  //
+  // `getHighlightedAd` est déjà en cache à vol unique (60 s) et avale ses
+  // erreurs en `null` : la mise en page ne peut pas tomber à cause d'elle.
+  const cookieStore = await cookies();
+  const ad = await getHighlightedAd();
+  const onRecruitmentPage = requestHeaders.get(PATHNAME_HEADER) === RECRUITMENT_PAGE;
+  const cookieName = ad?.highlight === "MODAL" ? RECRUITMENT_MODAL_COOKIE : RECRUITMENT_BANNER_COOKIE;
+  const dismissed = ad === null || recruitmentDismissed(cookieStore.get(cookieName)?.value, ad.id);
 
   return (
     <html lang="fr">
       <body className={`${titleFont.variable} ${bodyFont.variable} ${sansFont.variable} ${monoFont.variable} ${displayFont.variable}`}>
         <ToastProvider>
           <VisitTracker />
-          <RecruitmentHighlight />
+          <RecruitmentHighlight ad={ad} dismissed={dismissed} onAdPage={onRecruitmentPage} />
           {children}
         </ToastProvider>
       </body>

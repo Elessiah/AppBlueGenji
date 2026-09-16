@@ -112,6 +112,18 @@ export const CSP_HEADER = CSP_HEADERS[CSP_MODE];
 /** Chemin de collecte des violations, cité par la politique elle-même. */
 export const CSP_REPORT_PATH = "/api/csp-report";
 
+/**
+ * Nom de l'en-tête de requête par lequel le **chemin demandé** atteint les
+ * composants serveur.
+ *
+ * Next ne l'expose nulle part côté serveur — `usePathname()` est un hook
+ * client. Le middleware le connaît (`request.nextUrl.pathname`) et le pose,
+ * pour que la mise en page racine puisse décider avant de rendre. Il vit ici
+ * parce que le middleware est déjà le seul écrivain de ces en-têtes et que ce
+ * module est le seul que middleware et composants serveur partagent.
+ */
+export const PATHNAME_HEADER = "x-pathname";
+
 /** Nom de l'en-tête de requête par lequel le nonce atteint les composants serveur. */
 export const CSP_NONCE_HEADER = "x-nonce";
 
