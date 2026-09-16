@@ -43,5 +43,8 @@
     "ts-jest": "^29.3.3",
     "tsx": "^4.19.4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "postcss": "^8.5.28"
   }
 }

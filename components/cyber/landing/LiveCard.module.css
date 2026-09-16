@@ -54,6 +54,31 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* La ligne doit contenir la cible agrandie ci-dessous : `overflow: hidden`
+     rogne la zone cliquable comme il rogne le texte. 28 px pour ~26 px de
+     cible, le reste etant la demi-interligne. */
+  line-height: 28px;
+}
+
+/*
+ * Taille de cible (WCAG 2.5.8, minimum 24 x 24 px).
+ *
+ * Le nom d'un engage est un lien de 15 px : sa boite en ligne mesure ~18 px de
+ * haut, seuls points de l'accueil sous le seuil — ils tenaient a eux deux
+ * l'accessibilite de la page a 96.
+ *
+ * Le rembourrage vertical d'un element **en ligne** agrandit sa zone cliquable
+ * sans pousser la ligne : il deborde la boite de ligne, ce que la
+ * `line-height` ci-dessus vient accueillir. Et il faut qu'il reste en ligne —
+ * un `inline-block` en ferait une boite atomique que `text-overflow: ellipsis`
+ * ne saurait plus couper, echangeant un defaut d'accessibilite contre un nom
+ * d'equipe long qui deborde sa carte.
+ */
+.entrantLink {
+  /* 4 px et non 5 : ~18,4 px de boite en ligne + 8 donnent 26,4 px, sous les
+     28 px de la ligne — rien ne deborde, donc rien n'est rogne. A 5 px la
+     cible faisait 28,4 px et perdait deux dixiemes de pixel en haut et en bas. */
+  padding-block: 4px;
 }
 
 .vs {
@@ -208,7 +233,9 @@
   gap: 6px;
   border: 1px solid currentColor;
   border-radius: var(--r-cy-sm);
-  padding: 4px 10px;
+  /* 5 px et non 4 : 11 px de texte + 2 x 4 + 2 de bordure donnaient ~23 px,
+     sous le minimum de 24 px (WCAG 2.5.8), comme les noms d'engages. */
+  padding: 5px 10px;
   color: inherit;
   font-family: inherit;
   font-size: inherit;

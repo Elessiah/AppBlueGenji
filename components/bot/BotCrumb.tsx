@@ -9,7 +9,7 @@ export function BotCrumb() {
       <span className="endpoint">
         <span className="dot" />
         <span className="mono" style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--fg)" }}>
-          api.bluegenji.fr/bot/v2
+          bluegenji-esport.fr/bot
         </span>
       </span>
     </div>
