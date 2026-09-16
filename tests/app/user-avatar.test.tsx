@@ -19,8 +19,25 @@ describe("UserAvatar", () => {
     const html = renderToStaticMarkup(
       <UserAvatar src="/api/uploads/avatars/x.webp" pseudo="Nova" size={60} />,
     );
-    expect(html).toContain("/api/uploads/avatars/x.webp");
+    expect(html).toContain(encodeURIComponent("/api/uploads/avatars/x.webp"));
     expect(html).toContain('alt="Nova"');
+  });
+
+  /**
+   * L'avatar passait en `unoptimized`, drapeau posé pour qu'une URL Google ne
+   * fasse pas lever `next/image` faute de `remotePatterns` — donc en
+   * contournant aussi tout ce que cette vérification protège. La source étant
+   * désormais toujours un fichier du site, le drapeau est parti, et ce test
+   * garde la porte : c'est l'optimiseur qui doit servir l'image, avec ses
+   * variantes de taille.
+   */
+  it("passe par l'optimiseur d'images, et non par la source brute", () => {
+    const html = renderToStaticMarkup(
+      <UserAvatar src="/api/uploads/avatars/x.webp" pseudo="Nova" size={60} />,
+    );
+    expect(html).toContain("/_next/image?url=");
+    expect(html).toContain("srcSet=");
+    expect(html).not.toContain('src="/api/uploads/avatars/x.webp"');
   });
 
   it("retombe sur l'initiale, sans aucune balise <img>", () => {

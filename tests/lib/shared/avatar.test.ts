@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { avatarInitial } from "@/lib/shared/avatar";
+import { avatarInitial, isLocalAvatarUrl, visibleAvatarUrl } from "@/lib/shared/avatar";
 
 /**
  * L'initiale est le **seul** repli d'avatar du site : il n'existe pas de
@@ -32,5 +32,63 @@ describe("avatarInitial", () => {
 
   it("laisse tel quel ce qui n'a pas de majuscule", () => {
     expect(avatarInitial("42e régiment")).toBe("4");
+  });
+});
+
+/**
+ * La règle des logos partenaires, appliquée aux comptes : **le `src` d'une
+ * image est toujours une adresse du site**. La photo de profil d'un compte
+ * Google y échappait — rendue depuis `lh3.googleusercontent.com`, elle
+ * annonçait l'IP du **visiteur** à Google sur chaque page qui la portait.
+ *
+ * La garantie est posée ici, à la sortie, et non au rendu : `visibleAvatarUrl`
+ * est la dernière porte que franchit un avatar avant d'atteindre un client, et
+ * c'est ce qui la rend totale — filtrer écran par écran l'aurait fait dépendre
+ * du prochain écran écrit.
+ */
+describe("isLocalAvatarUrl", () => {
+  it("reconnaît les deux formes que la colonne a portées", () => {
+    // Forme servie, écrite par `/api/profile/avatar` depuis que l'import passe
+    // par un route handler…
+    expect(isLocalAvatarUrl("/api/uploads/avatars/12-ab.webp")).toBe(true);
+    // …et forme disque, telle qu'elle subsiste en base ancienne.
+    expect(isLocalAvatarUrl("/uploads/avatars/12-ab.webp")).toBe(true);
+  });
+
+  it("refuse une origine étrangère, quelle qu'elle soit", () => {
+    expect(isLocalAvatarUrl("https://lh3.googleusercontent.com/a/ACg8ocK=s96-c")).toBe(false);
+    expect(isLocalAvatarUrl("https://exemple.invalid/photo.png")).toBe(false);
+    // Une adresse protocole-relative n'est pas un chemin : elle désigne un
+    // autre hôte, et c'est justement la forme qu'on ne voit pas passer.
+    expect(isLocalAvatarUrl("//exemple.invalid/photo.png")).toBe(false);
+  });
+
+  it("traite l'absence comme une absence", () => {
+    expect(isLocalAvatarUrl(null)).toBe(false);
+    expect(isLocalAvatarUrl(undefined)).toBe(false);
+    expect(isLocalAvatarUrl("")).toBe(false);
+  });
+});
+
+describe("visibleAvatarUrl", () => {
+  const local = "/api/uploads/avatars/12-ab.webp";
+  const google = "https://lh3.googleusercontent.com/a/ACg8ocK=s96-c";
+
+  it("laisse passer un fichier à nous quand le réglage l'autorise", () => {
+    expect(visibleAvatarUrl(local, true)).toBe(local);
+  });
+
+  it("le retient quand le compte l'a masqué, sauf pour son propriétaire", () => {
+    expect(visibleAvatarUrl(local, false)).toBeNull();
+    expect(visibleAvatarUrl(local, false, true)).toBe(local);
+  });
+
+  // Le cœur de la correction : même autorisé, même pour son propriétaire, un
+  // avatar hébergé ailleurs ne sort pas. L'écran retombe sur la pastille à
+  // initiale, et le compte retrouve sa photo à sa prochaine connexion.
+  it("n'émet jamais une URL étrangère, même au propriétaire du compte", () => {
+    expect(visibleAvatarUrl(google, true)).toBeNull();
+    expect(visibleAvatarUrl(google, true, true)).toBeNull();
+    expect(visibleAvatarUrl(google, false, true)).toBeNull();
   });
 });
