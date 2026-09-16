@@ -17,6 +17,7 @@ npm run test:coverage
 npm run seed         # Populate MySQL with test data (matrice de cas, voir ci-dessous)
 npm run seed:view    # Inspect seeded test data
 npm run backfill:avatars  # Rapatrie les photos restées chez leur hébergeur (prévu pour la prod)
+./update.sh          # Déploiement (voir docs/DEPLOYMENT.md — et n'effacez jamais les journaux pm2 à la main)
 ```
 
 Running a single test file:
