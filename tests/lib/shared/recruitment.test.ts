@@ -1,10 +1,14 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  RECRUITMENT_BANNER_COOKIE,
   RECRUITMENT_BODY_MAX,
   RECRUITMENT_CONTACT_CHANNELS,
   RECRUITMENT_DOMAINS,
   RECRUITMENT_HIGHLIGHTS,
+  RECRUITMENT_MODAL_COOKIE,
+  RECRUITMENT_MODAL_COOKIE_MAX_AGE,
   RECRUITMENT_MODAL_INTERVAL_MS,
+  recruitmentDismissed,
   shouldShowRecruitmentModal,
   validateRecruitmentAdInput,
 } from "@/lib/shared/recruitment";
@@ -213,5 +217,57 @@ describe("shouldShowRecruitmentModal", () => {
 
   it("spans exactly seven days", () => {
     expect(RECRUITMENT_MODAL_INTERVAL_MS).toBe(7 * 24 * 60 * 60 * 1000);
+  });
+});
+
+/**
+ * Le cookie qui a remplacé `localStorage`.
+ *
+ * Ce n'est pas un changement de stockage par goût : le serveur doit savoir qui a
+ * déjà écarté l'annonce pour pouvoir rendre la modale **dans le HTML initial**,
+ * et `localStorage` ne quitte jamais l'onglet. C'est ce qui fait tomber le LCP
+ * de l'accueil, la modale n'étant plus peinte après l'hydratation.
+ */
+describe("recruitmentDismissed", () => {
+  it("reconnaît l'annonce que le visiteur a fermée", () => {
+    expect(recruitmentDismissed("42", 42)).toBe(true);
+  });
+
+  it("réaffiche dès que l'annonce mise en avant change", () => {
+    // La valeur est l'identifiant : changer d'annonce repart avec une clé
+    // neuve, exactement comme la clé par annonce de l'ancien stockage.
+    expect(recruitmentDismissed("41", 42)).toBe(false);
+  });
+
+  it("affiche quand aucun cookie n'a été posé", () => {
+    expect(recruitmentDismissed(undefined, 42)).toBe(false);
+    expect(recruitmentDismissed("", 42)).toBe(false);
+  });
+
+  it("tolère les espaces que peut laisser un client", () => {
+    expect(recruitmentDismissed(" 42 ", 42)).toBe(true);
+  });
+
+  it("affiche sur une valeur incompréhensible plutôt que de se taire", () => {
+    // Dans le doute on montre : une mise en avant tue à tort ne se rattrape
+    // pas, alors qu'une modale montrée une fois de trop se referme.
+    for (const valeur of ["abc", "4 2", "[]", "42x", "0x2a"]) {
+      expect(recruitmentDismissed(valeur, 42)).toBe(false);
+    }
+  });
+
+  it("ne confond pas deux identifiants dont l'un préfixe l'autre", () => {
+    expect(recruitmentDismissed("4", 42)).toBe(false);
+    expect(recruitmentDismissed("420", 42)).toBe(false);
+  });
+
+  it("tire la durée du cookie de la fenêtre, sans la réécrire", () => {
+    // Deux nombres à tenir d'accord auraient divergé : la fenêtre de sept jours
+    // est la même notion des deux côtés.
+    expect(RECRUITMENT_MODAL_COOKIE_MAX_AGE).toBe(RECRUITMENT_MODAL_INTERVAL_MS / 1000);
+  });
+
+  it("nomme deux cookies distincts, la banderole et la modale ne durant pas pareil", () => {
+    expect(RECRUITMENT_MODAL_COOKIE).not.toBe(RECRUITMENT_BANNER_COOKIE);
   });
 });

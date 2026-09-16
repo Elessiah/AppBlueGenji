@@ -72,10 +72,26 @@ describe("POST /api/visits", () => {
     }
   });
 
-  it("retombe sur X-Real-IP quand X-Forwarded-For manque", async () => {
+  it("ignore X-Real-IP quand X-Forwarded-For manque", async () => {
+    // Ce test affirmait l'inverse — il **encodait le défaut**. Ce repli ne se
+    // déclenche que là où aucun relais de confiance n'a écrit
+    // `X-Forwarded-For`, donc là où `X-Real-IP` est forgeable par l'appelant :
+    // il donnait une empreinte de visiteur neuve à chaque requête, gonflant le
+    // compte de « visiteurs uniques » au lieu de le servir.
     await POST(visitReq({ path: "/" }, { "x-real-ip": "198.51.100.4" }));
 
-    expect(lastCall().ip).toBe("198.51.100.4");
+    expect(lastCall().ip).toBeNull();
+  });
+
+  it("accepte X-Real-IP sur une installation qui le déclare", async () => {
+    // La capacité reste, mais par une décision écrite de l'exploitant.
+    process.env.TRUSTED_PROXY_REAL_IP = "true";
+    try {
+      await POST(visitReq({ path: "/" }, { "x-real-ip": "198.51.100.4" }));
+      expect(lastCall().ip).toBe("198.51.100.4");
+    } finally {
+      delete process.env.TRUSTED_PROXY_REAL_IP;
+    }
   });
 
   it("enregistre quand même la visite si le corps est illisible", async () => {

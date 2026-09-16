@@ -14,6 +14,7 @@ const RULE: RateLimitRule = { name: "guard-test", limit: 2, windowMs: 60_000 };
 afterEach(() => {
   resetRateLimit();
   delete process.env.TRUSTED_PROXY_HOPS;
+  delete process.env.TRUSTED_PROXY_REAL_IP;
 });
 
 const request = (headers: Record<string, string>) =>
@@ -41,8 +42,39 @@ describe("requestClientIp", () => {
     expect(requestClientIp(request({ "x-forwarded-for": "1.1.1.1" }))).toBe("1.1.1.1");
   });
 
-  it("retombe sur x-real-ip à défaut", () => {
+  it("ignore x-real-ip tant que l'exploitant ne l'a pas déclaré", () => {
+    // Le cœur du correctif, et il est contre-intuitif. Ce repli ne se
+    // déclenchait que là où `X-Forwarded-For` manquait — donc là où aucun relais
+    // de confiance n'avait rien écrit, donc là où l'en-tête est forgeable par
+    // l'appelant. Il n'aidait jamais un déploiement mandaté (l'en-tête y est
+    // toujours présent) et donnait à un appelant non mandaté un seau neuf à
+    // chaque requête : il affaiblissait le plafond au lieu de le servir.
+    expect(requestClientIp(request({ "x-real-ip": "3.3.3.3" }))).toBeNull();
+  });
+
+  it("accepte x-real-ip lorsqu'il est déclaré", () => {
+    // Une installation dont le proxy pose `X-Real-IP` et pas `X-Forwarded-For`
+    // garde la capacité — mais par une décision écrite, pas par un repli.
+    process.env.TRUSTED_PROXY_REAL_IP = "true";
     expect(requestClientIp(request({ "x-real-ip": "3.3.3.3" }))).toBe("3.3.3.3");
+  });
+
+  it("ne prend x-real-ip que si le proxy n'a rien dit", () => {
+    // Déclaré ou non, l'en-tête du relais l'emporte : c'est le seul des deux
+    // qu'un tiers ne peut pas choisir.
+    process.env.TRUSTED_PROXY_REAL_IP = "true";
+    expect(
+      requestClientIp(request({ "x-forwarded-for": "1.1.1.1, 2.2.2.2", "x-real-ip": "3.3.3.3" })),
+    ).toBe("2.2.2.2");
+  });
+
+  it("n'accepte que la déclaration exacte", () => {
+    // Un `TRUSTED_PROXY_REAL_IP=1` ou `=yes` posé de mémoire ne doit pas
+    // rouvrir la porte sans qu'on s'en aperçoive.
+    for (const valeur of ["1", "yes", "TRUE", "", "false"]) {
+      process.env.TRUSTED_PROXY_REAL_IP = valeur;
+      expect(requestClientIp(request({ "x-real-ip": "3.3.3.3" }))).toBeNull();
+    }
   });
 
   it("rend null quand rien n'identifie le client", () => {
