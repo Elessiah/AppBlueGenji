@@ -125,8 +125,12 @@ describe("aucun avatar ne contourne la vérification d'origine", () => {
     const source = readFileSync(join(process.cwd(), file), "utf8");
 
     // On ne regarde que les balises dont la source **est** un avatar : la carte
-    // d'équipe rend aussi un logo, qui garde son drapeau — `bg_teams.logo_url`
-    // n'a pas d'équivalent de `visibleAvatarUrl` pour lui garantir une origine.
+    // d'équipe rend aussi un logo, dont l'origine est tenue par un autre chemin
+    // (`localUploadUrl`, posé à l'émission) et gardée par son propre test. La
+    // visée étroite de ce test-ci est délibérée : ce qu'il surveille, c'est que
+    // **l'avatar** ne reprenne pas le drapeau, pas l'absence du mot dans le
+    // fichier — un jour où la carte rendrait une image légitimement non
+    // optimisée, un test écrit sur le fichier entier s'éteindrait en silence.
     const avatarTags = [...source.matchAll(/src=\{[^}]*avatarUrl\}([\s\S]{0,400}?)\/>/g)];
     expect(avatarTags.length).toBeGreaterThan(0);
     for (const [, attributes] of avatarTags) {

@@ -11,7 +11,6 @@ interface LogoWithGlowProps {
   size?: "sm" | "md" | "lg";
   borderRadius?: number;
   borderColor?: string;
-  unoptimized?: boolean;
 }
 
 const sizeConfigs = {
@@ -28,7 +27,6 @@ export function LogoWithGlow({
   size = "sm",
   borderRadius = 12,
   borderColor = "rgba(89,212,255,0.3)",
-  unoptimized,
 }: LogoWithGlowProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const target = useRef({ x: 0, y: 0 });
@@ -176,7 +174,6 @@ export function LogoWithGlow({
           alt={alt}
           width={width}
           height={height}
-          unoptimized={unoptimized}
           style={{
             width,
             height,

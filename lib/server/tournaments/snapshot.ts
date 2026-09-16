@@ -43,6 +43,7 @@ import {
 import { invalidateTournamentLists } from "./list-cache";
 import { hasPendingStateTransition, syncTournamentState } from "./state";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
+import { localUploadUrl } from "@/lib/shared/uploads";
 
 /**
  * Durée de vie d'un instantané. Volontairement courte : elle ne sert qu'à
@@ -261,7 +262,7 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
       registrations: registrations.map((row) => ({
         teamId: Number(row.team_id),
         teamName: row.team_name,
-        logoUrl: row.logo_url,
+        logoUrl: localUploadUrl(row.logo_url),
         seed: row.seed === null ? null : Number(row.seed),
         registeredAt: toIso(row.registered_at)!,
         finalRank: row.final_rank === null ? null : Number(row.final_rank),

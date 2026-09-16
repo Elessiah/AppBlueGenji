@@ -3,6 +3,7 @@ import type { SqlParams } from "@/lib/server/database";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import type { TournamentPhaseStanding } from "@/lib/shared/types";
 import { PhaseRow } from "./_internal";
+import { localUploadUrl } from "@/lib/shared/uploads";
 
 /** Insère les phases dans la base de données dans l'ordre de position. */
 export async function insertPhases(
@@ -249,7 +250,7 @@ export async function loadPhaseStandings(
   return rows.map((row) => ({
     teamId: Number(row.teamId),
     teamName: row.teamName,
-    logoUrl: row.logoUrl,
+    logoUrl: localUploadUrl(row.logoUrl),
     seed: Number(row.seed),
     rank: row.rank === null ? null : Number(row.rank),
     qualified: Boolean(row.qualified),

@@ -30,6 +30,7 @@ import { loadTeamRanking } from "@/lib/server/ranking-service";
 import { entrantHref } from "@/lib/shared/participants";
 import { isSeedOrderEffective, seedingSource } from "@/lib/shared/seeding";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie";
+import { localUploadUrl } from "@/lib/shared/uploads";
 
 const DEFAULT_STATS: LandingStats = {
   players: 0,
@@ -321,7 +322,7 @@ async function loadLandingLeaderboard(safeLimit: number): Promise<LandingLeaderb
         rank,
         teamId,
         teamName: row.teamName,
-        logoUrl: row.logoUrl,
+        logoUrl: localUploadUrl(row.logoUrl),
         wins: row.wins,
         losses: row.losses,
         points,

@@ -324,8 +324,6 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
                             alt={formatDisplayName(b)}
                             width={80}
                             height={80}
-                            unoptimized
-                            referrerPolicy="no-referrer"
                             className={styles.avatar}
                           />
                         ) : (
@@ -393,8 +391,6 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
                   alt="Aperçu"
                   width={56}
                   height={56}
-                  unoptimized
-                  referrerPolicy="no-referrer"
                   className={styles.avatar}
                 />
               ) : (
