@@ -141,10 +141,23 @@ publique.
 
 | Fichier                                       | Rôle                                    |
 | --------------------------------------------- | --------------------------------------- |
-| `lib/shared/sponsor-logo.ts`                   | pur — choix du `src`, filtres d'URL      |
+| `lib/shared/sponsor-logo.ts`                   | pur — choix du `src` ; réexporte les filtres |
+| `lib/shared/remote-image.ts`                   | pur — filtres d'URL, d'hôte et de type   |
+| `lib/server/remote-image-fetch.ts`             | le téléchargement durci                  |
 | `app/api/landing/sponsors/[id]/logo/route.ts`  | le relais                                |
 | `components/cyber/landing/SponsorsGrid.tsx`    | `<Image fill sizes=…>` sur ce `src`      |
 | `tests/lib/shared/sponsor-logo.test.ts`        | logique pure                             |
 | `tests/app/api/landing/sponsor-logo-proxy.test.ts` | la route, refus compris              |
 
-Voir aussi [SPONSOR_MANAGEMENT.md](SPONSOR_MANAGEMENT.md).
+Les filtres et le téléchargement ne vivent plus dans ce périmètre : l'import de
+la photo de profil d'un compte Google pose exactement les mêmes questions —
+cette URL est-elle exploitable, cet hôte est-il le nôtre, ce type est-il bien
+une image — et deux copies auraient divergé du côté où une garde manque. Ils
+sont donc dans `lib/shared/remote-image.ts` et
+`lib/server/remote-image-fetch.ts`, sous des noms qui parlent d'images
+distantes ; `sponsor-logo.ts` les réexporte sous ses anciens noms, si bien que
+le vocabulaire du relais est inchangé.
+
+Voir aussi [SPONSOR_MANAGEMENT.md](SPONSOR_MANAGEMENT.md) et
+[USER_AVATAR_IMPORT.md](USER_AVATAR_IMPORT.md), qui explique pourquoi les
+avatars sont **copiés** là où les logos sont **relayés**.
