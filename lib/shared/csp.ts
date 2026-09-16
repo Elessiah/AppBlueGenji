@@ -25,15 +25,38 @@
  *
  * 1. **Les pages prérendues n'ont pas de nonce, et ne peuvent pas en avoir.**
  *    Un nonce change à chaque réponse ; un HTML bâti à la compilation est le
- *    même pour tout le monde. `/connexion` porte 18 balises `<script>` dont
- *    **8 en ligne**, aucune nommée ; `/partenaires` en porte 13 dont 8. Or un
- *    nonce présent dans la politique fait **ignorer** `'unsafe-inline'` : en
- *    application, ces huit-là seraient refusées. Cela vaut pour les cinq
- *    routes prérendues (`/connexion`, `/partenaires`, `/regles/[slug]`,
- *    `/_not-found`, `/opengraph-image`). Les rendre dynamiques lèverait
- *    l'obstacle, mais `/regles/[slug]` est pré-générée à dessein
- *    (`generateStaticParams`) : c'est un arbitrage à trancher, pas un détail
- *    d'en-tête.
+ *    même pour tout le monde. Or un nonce présent dans la politique fait
+ *    **ignorer** `'unsafe-inline'` : en application, ces scripts-là seraient
+ *    refusés.
+ *
+ *    Elles sont **trois**, et non les cinq longtemps listées ici — la liste se
+ *    lisait sur le résumé de `next build`, elle se lit en fait dans
+ *    `.next/prerender-manifest.json`, qui seul dit ce qui est réellement bâti à
+ *    la compilation :
+ *
+ *    | route | `<script>` en ligne | nommés |
+ *    |---|---|---|
+ *    | `/connexion` | 8 | 0 |
+ *    | `/partenaires` | 8 | 0 |
+ *    | `/_not-found` | 7 | 0 |
+ *
+ *    Les deux qui en sortent en sortent pour des raisons différentes.
+ *    **`/regles/[slug]`** s'affiche `●` au résumé du build, mais n'écrit aucun
+ *    HTML et ne figure pas au manifeste : elle est rendue à la demande, et la
+ *    production le confirme — ses **26** scripts en ligne portent leurs 26
+ *    nonces. Elle n'a donc jamais été un obstacle, et l'arbitrage qu'on croyait
+ *    devoir trancher à son sujet n'existe pas. **`/opengraph-image`** rend un
+ *    PNG : `script-src` n'a rien à y dire.
+ *
+ *    Rendre une de ces trois routes dynamique lève l'obstacle pour elle, et
+ *    c'est mesuré : `/connexion` passe de **0 nonce sur 8** à **10 sur 10**.
+ *    Coût relevé sur la même compilation, à chaud, `/partenaires` (restée
+ *    statique) servant de témoin — médiane **8,3 ms** contre **3,8 ms**, soit
+ *    ~4,5 ms de rendu serveur par requête, sans accès base ni entrée-sortie.
+ *    Le paquet client ne bouge pas (5,33 ko / 111 ko de premier chargement).
+ *    Ce qui se perd est la mise en cache du **document** : il passe sous
+ *    `private, no-cache, no-store`, ce qui est déjà le régime de toutes les
+ *    autres pages du site, l'en-tête de session s'y trouvant.
  * 2. **L'avatar d'un compte Google est servi par Google** — voir `img-src`
  *    ci-dessous et `ERREUR.txt`.
  *
