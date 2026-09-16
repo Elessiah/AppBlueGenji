@@ -123,12 +123,42 @@ export type LandingTickerPayload = {
  */
 
 /**
+ * Ordre du calendrier : ce qui commence le plus tôt d'abord.
+ *
+ * `listTournamentBuckets` trie `start_at` **décroissant**, et c'est le bon
+ * ordre pour ce qu'il sert d'abord — la liste des tournois terminés de
+ * `/tournois`, où la dernière édition se lit en haut. L'accueil, lui, parle de
+ * ce qui **arrive** : il lisait donc systématiquement le tournoi le plus
+ * lointain, et le hero décomptait jusqu'à lui. On retrie ici plutôt que de
+ * toucher à l'`ORDER BY`, qui est partagé.
+ *
+ * Une date illisible est renvoyée en fin de liste au lieu de rendre `NaN` : un
+ * comparateur qui rend `NaN` ne trie plus rien du tout, silencieusement, et ce
+ * serait toute la section qui reviendrait à l'ordre d'origine.
+ */
+export function compareByStartAt(left: TournamentCard, right: TournamentCard): number {
+  const leftAt = new Date(left.startAt).getTime();
+  const rightAt = new Date(right.startAt).getTime();
+  if (Number.isNaN(leftAt)) return Number.isNaN(rightAt) ? 0 : 1;
+  if (Number.isNaN(rightAt)) return -1;
+  return leftAt - rightAt;
+}
+
+/**
  * Tournois affichables par la grille de l'accueil, dans l'ordre où elle les
  * range : en cours d'abord (ce qui se joue maintenant), puis à venir, puis
  * ouverts aux inscriptions. Jamais un tournoi terminé.
+ *
+ * Les paniers gardent cet ordre-là — il dit un état, pas une date — mais
+ * **à l'intérieur** de chacun, le plus proche passe devant : la grille montrait
+ * les trois tournois qui démarrent le plus tard.
  */
 export function activeTournamentCards(buckets: TournamentBuckets): TournamentCard[] {
-  return [...buckets.running, ...buckets.upcoming, ...buckets.registration];
+  return [
+    ...[...buckets.running].sort(compareByStartAt),
+    ...[...buckets.upcoming].sort(compareByStartAt),
+    ...[...buckets.registration].sort(compareByStartAt),
+  ];
 }
 
 /**
@@ -141,15 +171,16 @@ export function activeTournamentCards(buckets: TournamentBuckets): TournamentCar
  * visible — la carte affiche alors son état vide, plutôt que de repêcher une
  * archive.
  *
- * Attention : à l'intérieur d'un panier, c'est le **premier** élément qui est
- * pris, et `listTournamentBuckets` trie `start_at` **décroissant** — donc le
- * tournoi retenu est le plus lointain, pas le plus proche. Défaut préexistant,
- * consigné dans `ERREUR.txt` : le corriger revient à trier ici par `startAt`
- * croissant (l'`ORDER BY` est partagé avec la liste des tournois terminés de
- * `/tournois`, qui le veut décroissant).
+ * À l'intérieur d'un panier, c'est le tournoi **le plus proche** qui est pris
+ * (`compareByStartAt`) et non le premier venu : les paniers arrivent triés
+ * `start_at` décroissant, si bien que le hero annonçait « PROCHAIN TOURNOI »
+ * en décomptant jusqu'au plus lointain — celui qu'on verrait en dernier.
  */
 export function chooseFeaturedTournament(buckets: TournamentBuckets): TournamentCard | null {
-  return buckets.upcoming[0] ?? buckets.registration[0] ?? buckets.running[0] ?? null;
+  const soonest = (cards: TournamentCard[]): TournamentCard | undefined =>
+    cards.length === 0 ? undefined : [...cards].sort(compareByStartAt)[0];
+
+  return soonest(buckets.upcoming) ?? soonest(buckets.registration) ?? soonest(buckets.running) ?? null;
 }
 
 export function inferGameLabel(value: string | null | undefined): "Overwatch" | "Marvel Rivals" {

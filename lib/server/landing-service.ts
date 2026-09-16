@@ -8,6 +8,7 @@ import {
 } from "@/lib/server/landing-cache";
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import {
+  compareByStartAt,
   inferGameLabel,
   inferPhaseLabel,
   type LandingCalendarEvent,
@@ -364,7 +365,7 @@ export async function getLandingCalendar(bucketsOrLimit?: TournamentBuckets | nu
   try {
     const tournamentBuckets = buckets ?? await listTournamentBuckets(null);
     return [...tournamentBuckets.upcoming, ...tournamentBuckets.registration, ...tournamentBuckets.running]
-      .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime())
+      .sort(compareByStartAt)
       .slice(0, safeLimit)
       .map(toCalendarEvent);
   } catch {
