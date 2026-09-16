@@ -89,19 +89,49 @@ export async function processAndStoreImage(
   if (file.size > MAX_BYTES) {
     throw new Error("IMAGE_TOO_LARGE");
   }
-  if (!ALLOWED_MIME.has(file.type)) {
-    throw new Error("IMAGE_FORMAT_INVALID");
-  }
 
   const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
+  return storeImageBuffer(Buffer.from(arrayBuffer), file.type, kind, ownerId);
+}
+
+/**
+ * Le même traitement, à partir d'octets déjà en main.
+ *
+ * Tout ce qui suit la lecture du fichier vaut mot pour mot pour une image
+ * **téléchargée** : la photo de profil d'un compte Google, copiée chez nous à
+ * la connexion (`lib/server/user-avatar-import.ts`), doit subir les mêmes
+ * contrôles de format et la même normalisation qu'un téléversement — c'est un
+ * octet venu d'ailleurs dans les deux cas.
+ *
+ * Le corps a été extrait plutôt que recopié : une seconde implémentation aurait
+ * fini par accepter ce que celle-ci refuse, et l'écart se serait creusé du côté
+ * qui ne passe par aucun formulaire.
+ *
+ * @param buffer Octets de l'image.
+ * @param declaredMime Type annoncé par la source ; confronté aux octets réels.
+ * @param kind Gabarit de sortie (dimensions, cadrage, qualité).
+ * @param ownerId Identifiant repris dans le nom du fichier.
+ * @returns Le chemin disque relatif (`/uploads/...`) du fichier écrit.
+ */
+export async function storeImageBuffer(
+  buffer: Buffer,
+  declaredMime: string,
+  kind: UploadKind,
+  ownerId: number,
+): Promise<string> {
+  if (buffer.byteLength > MAX_BYTES) {
+    throw new Error("IMAGE_TOO_LARGE");
+  }
+  if (!ALLOWED_MIME.has(declaredMime)) {
+    throw new Error("IMAGE_FORMAT_INVALID");
+  }
 
   const detected = detectFormat(buffer);
   if (!detected) {
     throw new Error("IMAGE_FORMAT_INVALID");
   }
   const declaredFromMime =
-    file.type === "image/png" ? "png" : file.type === "image/jpeg" ? "jpeg" : "webp";
+    declaredMime === "image/png" ? "png" : declaredMime === "image/jpeg" ? "jpeg" : "webp";
   if (detected !== declaredFromMime) {
     throw new Error("IMAGE_FORMAT_INVALID");
   }

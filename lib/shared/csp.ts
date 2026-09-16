@@ -110,16 +110,17 @@ export function contentSecurityPolicy(nonce: string, options: { dev: boolean }):
     "default-src 'self'",
     `script-src ${scriptSrc.join(" ")}`,
     "style-src 'self' 'unsafe-inline'",
-    // L'avatar d'un compte Google est servi par Google : `createOrGetGoogleUser`
-    // stocke l'URL de `picture` telle quelle, et `UserAvatar` la rend en
-    // `unoptimized`, donc le navigateur du visiteur va la chercher là-bas. Le
-    // mode rapport l'a signalé dès le premier chargement, ce qu'aucune lecture
-    // du code n'avait vu. L'hôte est donc admis — une politique qui décrit un
-    // site qui n'existe pas ne pourra jamais être appliquée, et c'est
-    // l'application qui est le but. Le proxifier comme on proxifie déjà les
-    // logos partenaires reste la bonne fin de l'histoire (voir `ERREUR.txt`) ;
-    // ce jour-là, cette ligne redevient `'self' data: blob:`.
-    "img-src 'self' data: blob: https://lh3.googleusercontent.com",
+    // `https://lh3.googleusercontent.com` a été admis ici le temps d'une PR :
+    // l'avatar d'un compte Google était servi par Google, et le mode rapport
+    // l'avait signalé dès le premier chargement — ce qu'aucune lecture du code
+    // n'avait vu. La photo est désormais **copiée** chez nous à la connexion
+    // (`lib/server/user-avatar-import.ts`), et `visibleAvatarUrl` écarte toute
+    // URL qui ne serait pas la nôtre : plus aucune image du site ne vient d'une
+    // origine étrangère, donc la ligne est redevenue ce qu'elle décrit.
+    //
+    // Elle sert maintenant de détecteur : si un écran réintroduisait une image
+    // tierce, le collecteur le dirait au premier chargement.
+    "img-src 'self' data: blob:",
     "font-src 'self' data:",
     "connect-src 'self'",
     "media-src 'self'",

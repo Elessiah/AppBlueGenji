@@ -23,10 +23,16 @@ function duplicateName(): Error {
   return error;
 }
 
-const USER = [[{ pseudo: "ShadowNinja", avatar_url: "/u/1.png", visible_avatar: 1 }], []];
+// L'avatar est un **chemin d'upload** et non une adresse quelconque : depuis
+// que `visibleAvatarUrl` refuse tout ce qui n'est pas un fichier du site, une
+// valeur d'essai arbitraire ne traverserait plus — et c'est voulu. Le logo
+// d'une entrée solo étant une copie de cet avatar, l'URL Google d'un compte y
+// serait sinon recopiée, puis rendue par les composants de logo d'équipe, qui
+// ne passent par aucune de ces gardes.
+const USER = [[{ pseudo: "ShadowNinja", avatar_url: "/api/uploads/avatars/1-ab.webp", visible_avatar: 1 }], []];
 /** Même compte, avatar masqué (`visible_avatar = 0`). */
 const USER_HIDDEN_AVATAR = [
-  [{ pseudo: "ShadowNinja", avatar_url: "/u/1.png", visible_avatar: 0 }],
+  [{ pseudo: "ShadowNinja", avatar_url: "/api/uploads/avatars/1-ab.webp", visible_avatar: 0 }],
   [],
 ];
 const NO_ROW = [[], []];
@@ -47,7 +53,7 @@ describe("ensureSoloEntry", () => {
     const [sql, params] = execute.mock.calls[2] as [string, unknown[]];
     expect(sql).toMatch(/INSERT INTO bg_teams .*solo_user_id/s);
     expect(sql).toMatch(/VALUES \(\?, \?, NULL, 0, \?\)/);
-    expect(params).toEqual(["ShadowNinja", "/u/1.png", 1]);
+    expect(params).toEqual(["ShadowNinja", "/api/uploads/avatars/1-ab.webp", 1]);
   });
 
   it("réutilise l'entrée existante et resynchronise son identité", async () => {
@@ -61,7 +67,7 @@ describe("ensureSoloEntry", () => {
 
     const [sql, params] = execute.mock.calls[2] as [string, unknown[]];
     expect(sql).toMatch(/UPDATE bg_teams SET name = \?, logo_url = \?/);
-    expect(params).toEqual(["ShadowNinja", "/u/1.png", 55]);
+    expect(params).toEqual(["ShadowNinja", "/api/uploads/avatars/1-ab.webp", 55]);
     // Une seule entrée solo par joueur : jamais de seconde création.
     expect(execute.mock.calls.some(([query]) => String(query).includes("INSERT"))).toBe(false);
   });
@@ -78,7 +84,7 @@ describe("ensureSoloEntry", () => {
     await expect(ensureSoloEntry(fakeConnection(execute), 4)).resolves.toBe(91);
 
     const [, params] = execute.mock.calls[4] as [string, unknown[]];
-    expect(params).toEqual(["ShadowNinja #4", "/u/1.png", 4]);
+    expect(params).toEqual(["ShadowNinja #4", "/api/uploads/avatars/1-ab.webp", 4]);
   });
 
   it("récupère l'entrée gagnante en cas d'inscription concurrente", async () => {

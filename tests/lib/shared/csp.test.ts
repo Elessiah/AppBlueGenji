@@ -47,13 +47,14 @@ describe("contentSecurityPolicy", () => {
     );
   });
 
-  it("admet l'hôte des avatars Google, que le site ne relaie pas encore", () => {
-    // Relevé par le mode rapport dès le premier chargement : `UserAvatar` rend
-    // l'URL de `picture` en `unoptimized`, donc le navigateur va la chercher
-    // chez Google. Une politique qui décrit un site qui n'existe pas ne pourra
-    // jamais être appliquée. Voir `ERREUR.txt`.
-    expect(directive(contentSecurityPolicy("n", { dev: false }), "img-src")).toContain(
-      "https://lh3.googleusercontent.com",
+  it("n'admet aucune origine étrangère en image", () => {
+    // L'hôte des avatars Google y a figuré le temps d'une PR, le mode rapport
+    // l'ayant relevé dès le premier chargement. La photo est désormais copiée
+    // chez nous à la connexion (`user-avatar-import.ts`) et `visibleAvatarUrl`
+    // écarte toute URL qui ne serait pas la nôtre : la directive est redevenue
+    // le détecteur qu'elle doit être, et ce test la garde fermée.
+    expect(directive(contentSecurityPolicy("n", { dev: false }), "img-src")).toBe(
+      "'self' data: blob:",
     );
   });
 

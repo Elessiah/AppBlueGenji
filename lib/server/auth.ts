@@ -3,6 +3,7 @@ import * as React from "react";
 import { cookies } from "next/headers";
 import type { RowDataPacket, ResultSetHeader } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { localAvatarUrl } from "@/lib/shared/avatar";
 import { normalizePseudo, slugifyPseudo } from "@/lib/server/serialization";
 import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 
@@ -66,7 +67,12 @@ function fromRow(row: UserRow): AuthUser {
   return {
     id: Number(row.id),
     pseudo: row.pseudo,
-    avatarUrl: row.avatar_url,
+    // Le compte voit **son** avatar, sans passer par la visibilité — mais la
+    // règle d'origine s'applique ici aussi : `ArenaNav` et `PublicHeader` le
+    // rendent par `next/image`, qui lève sur une origine absente de
+    // `remotePatterns`. Une URL Google restée en base casserait donc toutes
+    // les pages de ce compte, au lieu de simplement fuiter comme avant.
+    avatarUrl: localAvatarUrl(row.avatar_url),
     discordId: row.discord_id,
     googleSub: row.google_sub,
     email: row.email,

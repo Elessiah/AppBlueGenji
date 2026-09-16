@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/auth");
@@ -28,7 +28,10 @@ import { ensureUniquePseudo } from "@/lib/server/auth";
 type Statement = { sql: string; params: unknown[] };
 
 /** Base factice : une table de comptes, adressée par `google_sub` ou `email`. */
-function fakeDb(rows: { id: number; google_sub: string | null; email: string | null }[]) {
+function fakeDb(
+  rows: { id: number; google_sub: string | null; email: string | null }[],
+  currentAvatar: string | null | undefined = undefined,
+) {
   const statements: Statement[] = [];
 
   const execute = jest.fn(async (sql: string, params: unknown[] = []) => {
@@ -47,6 +50,14 @@ function fakeDb(rows: { id: number; google_sub: string | null; email: string | n
 
     if (q.startsWith("INSERT INTO bg_users")) {
       return [{ insertId: 4242 }, []];
+    }
+
+    // Lecture de l'avatar en place, faite juste avant de décider si la photo
+    // Google doit être copiée. `undefined` = le compte n'est pas trouvé, donc
+    // rien n'est tenté : c'est le défaut, et il garde les cas ci-dessous hors
+    // du réseau.
+    if (q.startsWith("SELECT avatar_url FROM bg_users WHERE id = ?")) {
+      return [currentAvatar === undefined ? [] : [{ avatar_url: currentAvatar }], []];
     }
 
     return [[], []];
@@ -103,7 +114,7 @@ describe("createOrGetGoogleUser — rattachement d'un compte existant", () => {
     await expect(createOrGetGoogleUser(profile({ emailVerified: false }))).resolves.toBe(4242);
 
     const insert = find(statements, "INSERT INTO bg_users")!;
-    expect(insert.params).toEqual(["Nova", null, "google-sub-neuf", null]);
+    expect(insert.params).toEqual(["Nova", "google-sub-neuf", null]);
   });
 
   it("écrit l'adresse à la création quand elle est vérifiée", async () => {
@@ -112,12 +123,12 @@ describe("createOrGetGoogleUser — rattachement d'un compte existant", () => {
     await createOrGetGoogleUser(profile({ picture: "https://exemple.test/a.png" }));
 
     const insert = find(statements, "INSERT INTO bg_users")!;
-    expect(insert.params).toEqual([
-      "Nova",
-      "https://exemple.test/a.png",
-      "google-sub-neuf",
-      "nova@exemple.test",
-    ]);
+    // La photo **n'est pas** un paramètre de l'insertion : la colonne naît à
+    // `NULL` et ne reçoit qu'un fichier copié chez nous, jamais l'URL de
+    // Google. Le nom du fichier portant l'identifiant du compte, il faut de
+    // toute façon que la ligne existe d'abord.
+    expect(insert.params).toEqual(["Nova", "google-sub-neuf", "nova@exemple.test"]);
+    expect(insert.sql).toContain("NULL");
   });
 
   it("ne met pas à jour l'adresse d'un compte connu sur une identité non vérifiée", async () => {
@@ -167,6 +178,83 @@ describe("createOrGetGoogleUser — rattachement d'un compte existant", () => {
     });
 
     const insert = find(statements, "INSERT INTO bg_users")!;
-    expect(insert.params[3]).toBeNull();
+    expect(insert.params[2]).toBeNull();
+  });
+});
+
+/**
+ * **La photo de profil ne vient plus de chez Google au moment de l'affichage.**
+ *
+ * `createOrGetGoogleUser` rangeait l'URL de `picture` telle quelle : chaque
+ * page portant cet avatar faisait partir une requête du navigateur du
+ * **visiteur** vers `lh3.googleusercontent.com` — l'IP de qui regarde, pas
+ * celle du titulaire du compte, et à chaque vue.
+ *
+ * Elle est désormais copiée à la connexion, et seulement quand il y a lieu.
+ */
+describe("createOrGetGoogleUser — photo de profil", () => {
+  const realFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // L'import ne doit pas aboutir : ce qui est vérifié ici est **s'il est
+    // tenté**, pas ce qu'il écrit. Un échec laisse la colonne intacte, ce qui
+    // est justement le comportement attendu d'un CDN indisponible.
+    globalThis.fetch = jest.fn(async () => {
+      throw new Error("réseau coupé");
+    }) as never;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  it("va chercher la photo quand le compte n'a pas encore d'avatar", async () => {
+    fakeDb([{ id: 7, google_sub: "google-sub-neuf", email: "nova@exemple.test" }], null);
+
+    await createOrGetGoogleUser(profile({ picture: "https://exemple.test/a.png" }));
+
+    expect(globalThis.fetch).toHaveBeenCalled();
+  });
+
+  // Les comptes d'avant la correction se réparent d'eux-mêmes : leur URL
+  // Google n'est pas un fichier à nous, donc elle est traitée comme une absence.
+  it("rapatrie une URL Google restée en base", async () => {
+    fakeDb(
+      [{ id: 7, google_sub: "google-sub-neuf", email: "nova@exemple.test" }],
+      "https://lh3.googleusercontent.com/a/ACg8ocK=s96-c",
+    );
+
+    await createOrGetGoogleUser(profile({ picture: "https://exemple.test/a.png" }));
+
+    expect(globalThis.fetch).toHaveBeenCalled();
+  });
+
+  /**
+   * Le défaut préexistant que cette correction referme : l'ancien
+   * `avatar_url = COALESCE(?, avatar_url)` remplaçait à **chaque** connexion
+   * Google la photo choisie sur `/profil`. Il ne pouvait pas survivre au
+   * passage à une copie — resservir Google à chaque connexion aurait laissé un
+   * fichier orphelin par connexion, et l'effacer aurait détruit la photo
+   * choisie.
+   */
+  it("ne touche pas à un avatar téléversé, et ne va même pas le chercher", async () => {
+    const { statements } = fakeDb(
+      [{ id: 7, google_sub: "google-sub-neuf", email: "nova@exemple.test" }],
+      "/api/uploads/avatars/7-ab.webp",
+    );
+
+    await createOrGetGoogleUser(profile({ picture: "https://exemple.test/a.png" }));
+
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(find(statements, "UPDATE bg_users SET avatar_url = ?")).toBeUndefined();
+  });
+
+  it("ne tente rien quand Google ne donne aucune photo", async () => {
+    fakeDb([{ id: 7, google_sub: "google-sub-neuf", email: "nova@exemple.test" }], null);
+
+    await createOrGetGoogleUser(profile({ picture: undefined }));
+
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });

@@ -149,8 +149,6 @@ export function TeamCard({ team }: { team: TeamListItem }) {
                 alt=""
                 width={26}
                 height={26}
-                unoptimized
-                referrerPolicy="no-referrer"
                 className={s.avatar}
               />
             ) : (

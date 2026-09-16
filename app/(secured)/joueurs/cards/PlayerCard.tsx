@@ -56,8 +56,6 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
                 alt={player.pseudo}
                 width={64}
                 height={64}
-                unoptimized
-                referrerPolicy="no-referrer"
               />
             ) : (
               <span className={s.plAvatarFallback}>{avatarInitial(player.pseudo)}</span>
