@@ -24,14 +24,24 @@ describe("en-têtes de sécurité", () => {
   });
 
   it("n'annonce ni CSP ni HSTS", async () => {
-    // Les deux sont volontairement absents : une politique de contenu écrite à
-    // l'aveugle casserait les scripts en ligne de Next sans qu'un test le voie,
-    // et HSTS s'appliquerait à un déploiement servi en clair — c'est au reverse
-    // proxy, qui termine le chiffrement, de l'annoncer.
+    // Les deux sont absents de **cette** liste, et pour deux raisons opposées.
+    // La CSP existe bel et bien (`middleware.ts`), mais elle porte un nonce qui
+    // change à chaque réponse : elle ne peut pas vivre dans une liste statique.
+    // HSTS, lui, n'existe nulle part côté application — le chiffrement se
+    // termine au reverse proxy, c'est à lui de l'annoncer, et posé ici il
+    // s'appliquerait aussi à un déploiement servi en clair.
     const rules = await nextConfig.headers!();
     const keys = rules[0].headers.map((header) => header.key);
 
     expect(keys).not.toContain("Content-Security-Policy");
+    expect(keys).not.toContain("Content-Security-Policy-Report-Only");
     expect(keys).not.toContain("Strict-Transport-Security");
+  });
+
+  it("n'annonce pas le serveur qui rend la page", () => {
+    // Next pose `X-Powered-By: Next.js` par défaut, et la production le servait
+    // à chaque visiteur. Le drapeau est l'unique façon de le taire à la source ;
+    // le retirer du reverse proxy ne suivrait pas un déploiement fait ailleurs.
+    expect(nextConfig.poweredByHeader).toBe(false);
   });
 });
