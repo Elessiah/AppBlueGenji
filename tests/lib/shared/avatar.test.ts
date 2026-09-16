@@ -1,5 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
-import { avatarInitial, isLocalAvatarUrl, visibleAvatarUrl } from "@/lib/shared/avatar";
+import {
+  avatarInitial,
+  isLocalAvatarUrl,
+  localAvatarUrl,
+  visibleAvatarUrl,
+} from "@/lib/shared/avatar";
 
 /**
  * L'initiale est le **seul** repli d'avatar du site : il n'existe pas de
@@ -90,5 +95,44 @@ describe("visibleAvatarUrl", () => {
     expect(visibleAvatarUrl(google, true)).toBeNull();
     expect(visibleAvatarUrl(google, true, true)).toBeNull();
     expect(visibleAvatarUrl(google, false, true)).toBeNull();
+  });
+});
+
+/**
+ * `visibleAvatarUrl` n'est pas la seule porte : `getCurrentUser` en est une
+ * seconde, et elle ne consulte **pas** la visibilité — c'est son propre avatar
+ * que le titulaire voit dans la barre de navigation et dans l'en-tête public.
+ * Elle doit poser la même règle d'origine, faute de quoi la correction aurait
+ * seulement transformé une fuite en **panne** : `unoptimized` retiré,
+ * `next/image` lève sur une origine absente de `remotePatterns`, donc toutes
+ * les pages du compte casseraient.
+ */
+describe("localAvatarUrl", () => {
+  it("rend le fichier tel quel quand il vient de chez nous", () => {
+    expect(localAvatarUrl("/api/uploads/avatars/12-ab.webp")).toBe(
+      "/api/uploads/avatars/12-ab.webp",
+    );
+    expect(localAvatarUrl("/uploads/avatars/12-ab.webp")).toBe("/uploads/avatars/12-ab.webp");
+  });
+
+  it("rend null sur tout le reste", () => {
+    expect(localAvatarUrl("https://lh3.googleusercontent.com/a/ACg8ocK=s96-c")).toBeNull();
+    expect(localAvatarUrl("//exemple.invalid/p.png")).toBeNull();
+    expect(localAvatarUrl(null)).toBeNull();
+    expect(localAvatarUrl("")).toBeNull();
+  });
+
+  // Une seule réponse à « cette adresse est-elle la nôtre » : le prédicat et la
+  // fonction qui filtre ne peuvent pas diverger.
+  it("s'accorde avec le prédicat", () => {
+    for (const url of [
+      "/api/uploads/avatars/1.webp",
+      "/uploads/avatars/1.webp",
+      "https://lh3.googleusercontent.com/a/x",
+      "",
+      null,
+    ]) {
+      expect(localAvatarUrl(url) !== null).toBe(isLocalAvatarUrl(url));
+    }
   });
 });

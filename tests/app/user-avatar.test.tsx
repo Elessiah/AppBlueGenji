@@ -96,3 +96,53 @@ describe("écrans qui affichent un avatar", () => {
     expect(source).toContain("UserAvatar");
   });
 });
+
+/**
+ * **Le drapeau qui cachait la fuite.**
+ *
+ * `unoptimized` a été posé sur chaque avatar parce qu'un compte Google en
+ * portait une URL distante : `next/image` lève au rendu sur une origine absente
+ * de `remotePatterns`, et le drapeau contournait la vérification — donc aussi
+ * tout ce qu'elle protège. Le site rendait ainsi des images de
+ * `lh3.googleusercontent.com` alors qu'aucune origine n'était déclarée, ce que
+ * seul le mode rapport de la CSP a fini par montrer.
+ *
+ * La source étant désormais toujours un fichier du site, le drapeau doit rester
+ * parti. Ce test le garde pour les **sept** rendus d'avatar — les quatre qui
+ * passent par `UserAvatar` et les trois qui appellent `<Image>` directement, que
+ * la première passe de correction avait manqués.
+ */
+describe("aucun avatar ne contourne la vérification d'origine", () => {
+  // Les trois écrans qui appellent `<Image>` directement, sans passer par
+  // `UserAvatar` — ceux que la première passe de correction avait manqués.
+  const directRenders = [
+    "app/(secured)/equipes/cards/TeamCard.tsx",
+    "app/(secured)/equipes/[id]/_components/MembersSection.tsx",
+    "app/(secured)/joueurs/cards/PlayerCard.tsx",
+  ];
+
+  it.each(directRenders)("%s : aucun <Image> d'avatar en `unoptimized`", (file) => {
+    const source = readFileSync(join(process.cwd(), file), "utf8");
+
+    // On ne regarde que les balises dont la source **est** un avatar : la carte
+    // d'équipe rend aussi un logo, qui garde son drapeau — `bg_teams.logo_url`
+    // n'a pas d'équivalent de `visibleAvatarUrl` pour lui garantir une origine.
+    const avatarTags = [...source.matchAll(/src=\{[^}]*avatarUrl\}([\s\S]{0,400}?)\/>/g)];
+    expect(avatarTags.length).toBeGreaterThan(0);
+    for (const [, attributes] of avatarTags) {
+      expect(attributes).not.toContain("unoptimized");
+    }
+  });
+
+  /**
+   * La seconde porte, et celle qui aurait fait le plus de dégâts : le compte
+   * voit **son** avatar sans passer par la visibilité, donc sans passer par
+   * `visibleAvatarUrl`. Sans la même règle d'origine ici, une URL Google restée
+   * en base ne fuirait plus — elle **casserait** la barre de navigation et
+   * l'en-tête public, c'est-à-dire toutes les pages de ce compte.
+   */
+  it("le compte de session ne sort jamais avec un avatar d'une autre origine", () => {
+    const source = readFileSync(join(process.cwd(), "lib/server/auth.ts"), "utf8");
+    expect(source).toContain("avatarUrl: localAvatarUrl(row.avatar_url)");
+  });
+});
