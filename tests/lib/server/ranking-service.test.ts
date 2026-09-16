@@ -295,9 +295,24 @@ describe("loadTeamRanking", () => {
   });
 
   it("reporte le logo de chaque équipe", async () => {
-    await mockDb(fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1, "Alpha", "/logo.webp"), teamRow(2)]));
+    // Un chemin de téléversement, et non un `/logo.webp` inventif : c'est la
+    // seule forme que `bg_teams.logo_url` prend réellement, et la seule que
+    // `localUploadUrl` laisse passer.
+    const stored = "/api/uploads/teams/1-ab12cd34.webp";
+    await mockDb(fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1, "Alpha", stored), teamRow(2)]));
 
-    expect((await loadTeamRanking())[0].logoUrl).toBe("/logo.webp");
+    expect((await loadTeamRanking())[0].logoUrl).toBe(stored);
+  });
+
+  it("n'émet pas un logo d'origine étrangère", async () => {
+    // Le leaderboard est sur la page la plus vue du site, et `next/image`
+    // **lève** au rendu sur un hôte absent de `remotePatterns` — dont le projet
+    // ne déclare aucun. Laisser passer l'URL casserait l'accueil entier.
+    await mockDb(
+      fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1, "Alpha", "https://placehold.co/128x128"), teamRow(2)]),
+    );
+
+    expect((await loadTeamRanking())[0].logoUrl).toBeNull();
   });
 });
 

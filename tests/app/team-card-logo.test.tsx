@@ -61,16 +61,34 @@ describe("TeamCard — logo d'équipe dans l'annuaire", () => {
       <TeamCard team={team({ logoUrl: "/api/uploads/team-logos/12.webp" })} />,
     );
 
-    const logo = imgTags(markup).find((tag) => tag.includes("/api/uploads/team-logos/12.webp"));
+    // Le chemin ressort **encodé dans l'URL de l'optimiseur** et non tel quel :
+    // c'est précisément ce que le retrait d'`unoptimized` a rendu à ce logo —
+    // redimensionnement, WebP et cache, comme n'importe quelle image du site.
+    const logo = imgTags(markup).find((tag) =>
+      tag.includes(encodeURIComponent("/api/uploads/team-logos/12.webp")),
+    );
     expect(logo).toBeDefined();
   });
 
-  it("accepte une URL de logo externe (les équipes du jeu de test en ont)", () => {
-    const markup = renderToStaticMarkup(
-      <TeamCard team={team({ logoUrl: "https://placehold.co/128x128" })} />,
+  it("ne contourne plus la vérification d'origine de `next/image`", () => {
+    // Le drapeau `unoptimized` était ici pour une raison précise : les équipes
+    // du jeu de test portaient un logo `https://placehold.co/...`, et
+    // `next/image` **lève** au rendu sur un hôte absent de `remotePatterns` —
+    // dont le projet ne déclare aucun. Le drapeau désarmait ce contrôle, donc
+    // aussi tout ce qu'il protège, exactement comme il l'avait fait pour les
+    // avatars Google.
+    //
+    // Il n'y a plus rien à contourner : `localUploadUrl` filtre à l'émission et
+    // le seed écrit un vrai fichier. Le drapeau doit donc rester parti — le
+    // reposer reviendrait à rouvrir la porte sans que rien ne casse, ce qui est
+    // la forme de panne que ce test existe pour rendre visible.
+    const source = readFileSync(
+      join(__dirname, "..", "..", "app", "(secured)", "equipes", "cards", "TeamCard.tsx"),
+      "utf8",
     );
 
-    expect(markup).toContain("https://placehold.co/128x128");
+    expect(source).toContain("logoUrl");
+    expect(source).not.toContain("unoptimized");
   });
 
   it("n'affiche plus l'initiale du nom lorsqu'un logo est présent", () => {

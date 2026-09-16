@@ -174,14 +174,23 @@ describe("listGhostTeams", () => {
   afterEach(() => jest.restoreAllMocks());
 
   it("ne renvoie que les fantômes encore actives", async () => {
-    const execute = jest
-      .fn()
-      .mockResolvedValue([[{ id: 1, name: "Alpha", logo_url: null }, { id: 2, name: "Beta", logo_url: "/a.webp" }]]);
+    // La troisième ligne porte une URL étrangère : une fantôme est créée par le
+    // staff, son logo se colle comme celui d'une équipe réelle, et rien
+    // n'empêche d'y saisir n'importe quelle adresse. Elle doit ressortir à
+    // `null`, pas atteindre un `<Image>`.
+    const execute = jest.fn().mockResolvedValue([
+      [
+        { id: 1, name: "Alpha", logo_url: null },
+        { id: 2, name: "Beta", logo_url: "/api/uploads/teams/2-ab12cd34.webp" },
+        { id: 3, name: "Gamma", logo_url: "https://placehold.co/128x128" },
+      ],
+    ]);
     await mockDb(execute);
 
     await expect(listGhostTeams()).resolves.toEqual([
       { id: 1, name: "Alpha", logoUrl: null },
-      { id: 2, name: "Beta", logoUrl: "/a.webp" },
+      { id: 2, name: "Beta", logoUrl: "/api/uploads/teams/2-ab12cd34.webp" },
+      { id: 3, name: "Gamma", logoUrl: null },
     ]);
 
     const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
