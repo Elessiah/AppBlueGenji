@@ -46,6 +46,7 @@ import {
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { toIso } from "@/lib/server/serialization";
 import { createMatch, finishTournament } from "./repository";
+import { localUploadUrl } from "@/lib/shared/uploads";
 
 type TournamentEnduranceRow = RowDataPacket & {
   format: string;
@@ -1364,7 +1365,7 @@ export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: numb
     standings: rows.map((row) => ({
       teamId: Number(row.team_id),
       teamName: row.team_name,
-      logoUrl: row.logo_url,
+      logoUrl: localUploadUrl(row.logo_url),
       seed: Number(row.seed),
       points: Number(row.points),
       wins: Number(row.wins),

@@ -6,6 +6,7 @@ import {
   type BenevoleInput,
   validateBenevoleInput,
 } from "@/lib/shared/benevoles";
+import { localUploadUrl } from "@/lib/shared/uploads";
 
 export type { Benevole, BenevoleInput } from "@/lib/shared/benevoles";
 
@@ -26,7 +27,7 @@ function fromRow(row: BenevoleRow): Benevole {
     pseudo: row.pseudo || null,
     lastName: row.last_name,
     category: row.category,
-    photoUrl: row.photo_url || null,
+    photoUrl: localUploadUrl(row.photo_url),
     joinedAt: typeof row.joined_at === "string"
       ? row.joined_at.slice(0, 10)
       : new Date(row.joined_at).toISOString().slice(0, 10),

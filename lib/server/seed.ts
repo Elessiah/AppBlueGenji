@@ -39,6 +39,10 @@ import {
   type TournamentDef,
   type SeedPhase,
 } from "./seed-cases";
+import path from "node:path";
+import { mkdir, writeFile } from "node:fs/promises";
+import sharp from "sharp";
+import { toServedUploadUrl } from "@/lib/shared/uploads";
 
 // ---------------------------------------------------------------------------
 // Déterminisme
@@ -524,15 +528,55 @@ async function createSpecialUsers(db: Pool): Promise<Map<string, number>> {
   return ids;
 }
 
+/**
+ * Fabrique le logo d'équipe du jeu de test, et rend son URL servie.
+ *
+ * Le seed écrivait `https://placehold.co/128x128/...` dans `bg_teams.logo_url`.
+ * C'était le **seul** chemin du projet qui produisait réellement un logo
+ * d'origine étrangère, et il suffisait à rendre le défaut reproductible : trois
+ * lignes sur une base seedée, servies à tout visiteur de l'annuaire, et
+ * couvertes par le drapeau `unoptimized` qui désarmait `remotePatterns`.
+ *
+ * Un `NULL` aurait fermé la fuite mais fait disparaître le cas « équipe avec
+ * logo » de la matrice, qui existe exprès. On écrit donc un vrai fichier, une
+ * fois, dans le même dossier et au même format qu'un téléversement : le jeu de
+ * test couvre alors le cas **tel qu'il se présente en production**, ce que
+ * l'URL étrangère ne faisait pas.
+ */
+async function ensureSeedTeamLogo(): Promise<string> {
+  const dir = path.join(process.cwd(), "public", "uploads", "teams");
+  const filename = "seed-team-logo.webp";
+  await mkdir(dir, { recursive: true });
+  const logo = await sharp({
+    create: { width: 128, height: 128, channels: 4, background: { r: 11, g: 18, b: 32, alpha: 1 } },
+  })
+    .composite([
+      {
+        input: Buffer.from(
+          `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128">` +
+            `<text x="64" y="80" font-family="sans-serif" font-size="46" font-weight="700"` +
+            ` fill="#5ac8ff" text-anchor="middle">BG</text></svg>`,
+        ),
+        top: 0,
+        left: 0,
+      },
+    ])
+    .webp({ quality: 82 })
+    .toBuffer();
+  await writeFile(path.join(dir, filename), logo);
+  return toServedUploadUrl(`/uploads/teams/${filename}`);
+}
+
 async function createTeams(db: Pool, userIds: number[]): Promise<number[]> {
   console.log("🏆 Création des équipes...");
   const teamIds: number[] = [];
+  const seedLogoUrl = await ensureSeedTeamLogo();
   for (const team of FICTIONAL_TEAMS) {
     const teamName = `Test - ${team.name}`;
     try {
       const [result] = await db.execute<ResultSetHeader>(
         `INSERT INTO bg_teams (name, tag, logo_url) VALUES (?, ?, ?)`,
-        [teamName, team.tag, team.logo ? "https://placehold.co/128x128/0b1220/5ac8ff?text=BG" : null]
+        [teamName, team.tag, team.logo ? seedLogoUrl : null]
       );
       const teamId = result.insertId as number;
       teamIds.push(teamId);

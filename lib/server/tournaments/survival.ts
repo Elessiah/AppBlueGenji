@@ -14,6 +14,7 @@ import {
 } from "@/lib/shared/survival";
 import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import { createMatch, finishTournament, forfeitMatchScores } from "./repository";
+import { localUploadUrl } from "@/lib/shared/uploads";
 
 const DEFAULT_ROUNDS_PER_CUT = 3;
 
@@ -725,7 +726,7 @@ export async function loadSurvivalMeta(
     standings: rows.map((row) => ({
       teamId: Number(row.team_id),
       teamName: row.team_name,
-      logoUrl: row.logo_url,
+      logoUrl: localUploadUrl(row.logo_url),
       seed: Number(row.seed),
       wins: Number(row.wins),
       losses: Number(row.losses),

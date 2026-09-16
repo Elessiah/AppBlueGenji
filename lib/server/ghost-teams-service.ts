@@ -16,6 +16,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { assertTeamTagAvailable, mapTeamTagConflict, resolveTeamTag } from "@/lib/server/team-tags";
+import { localUploadUrl } from "@/lib/shared/uploads";
 
 export const GHOST_TEAM_NAME_MIN = 3;
 export const GHOST_TEAM_NAME_MAX = 60;
@@ -147,6 +148,6 @@ export async function listGhostTeams(
   return rows.map((row) => ({
     id: Number(row.id),
     name: row.name,
-    logoUrl: row.logo_url,
+    logoUrl: localUploadUrl(row.logo_url),
   }));
 }

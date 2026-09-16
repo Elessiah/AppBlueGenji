@@ -24,6 +24,7 @@ import {
 import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import type { SwissMeta, SwissTiebreaker } from "@/lib/shared/types";
 import { createMatch, finishTournament, forfeitMatchScores } from "./repository";
+import { localUploadUrl } from "@/lib/shared/uploads";
 
 interface TournamentSwissRow extends RowDataPacket {
   format: string;
@@ -778,7 +779,7 @@ export async function loadSwissMeta(
     standings: rows.map((row) => ({
       teamId: Number(row.team_id),
       teamName: row.team_name,
-      logoUrl: row.logo_url,
+      logoUrl: localUploadUrl(row.logo_url),
       seed: Number(row.seed),
       points: Number(row.points),
       wins: Number(row.wins),

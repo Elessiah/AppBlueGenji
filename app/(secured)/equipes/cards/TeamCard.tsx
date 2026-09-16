@@ -61,8 +61,6 @@ export function TeamCard({ team }: { team: TeamListItem }) {
               alt=""
               width={56}
               height={56}
-              unoptimized
-              referrerPolicy="no-referrer"
               className={s.sigilLogo}
             />
           ) : (

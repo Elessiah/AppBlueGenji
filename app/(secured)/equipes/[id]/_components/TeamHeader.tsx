@@ -143,7 +143,6 @@ export function TeamHeader({ team, onChanged, canManage, viewerIsOwner }: TeamHe
                   size="sm"
                   borderRadius={12}
                   borderColor="rgba(255,157,46,0.3)"
-                  unoptimized
                 />
               ) : (
                 <div

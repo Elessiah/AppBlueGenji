@@ -9,6 +9,7 @@ import { compareRankedTeams, rankingMatchJoinSql } from "@/lib/shared/ranking";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { assertTeamTagAvailable, mapTeamTagConflict, resolveTeamTag } from "@/lib/server/team-tags";
+import { localUploadUrl } from "@/lib/shared/uploads";
 
 /**
  * Longueur de la barre de forme des cartes d'annuaire. Les fiches en montrent
@@ -283,7 +284,7 @@ export async function listTeams(viewerId: number | null = null): Promise<TeamLis
       id,
       name: row.name,
       tag: row.tag,
-      logoUrl: row.logo_url,
+      logoUrl: localUploadUrl(row.logo_url),
       membersCount: Number(row.members_count),
       createdAt: toIso(row.created_at)!,
       wins: ranked?.wins ?? 0,
@@ -463,7 +464,7 @@ export async function getTeamDetail(
       id: Number(teams[0].id),
       name: teams[0].name,
       tag: teams[0].tag,
-      logoUrl: teams[0].logo_url,
+      logoUrl: localUploadUrl(teams[0].logo_url),
       description: teams[0].description,
       createdAt: toIso(teams[0].created_at)!,
       deletedAt: toIso(teams[0].deleted_at),

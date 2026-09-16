@@ -47,6 +47,7 @@ import {
 } from "@/lib/shared/ranking";
 import { MIN_PLACEMENT_ENTRANTS } from "@/lib/shared/tournament-placement";
 import type { TeamRankingPosition } from "@/lib/shared/stats";
+import { localUploadUrl } from "@/lib/shared/uploads";
 
 export type { TeamRankingPosition };
 
@@ -334,7 +335,7 @@ export async function loadTeamRanking(options: TeamRankingOptions = {}): Promise
     rows.push({
       teamId,
       teamName: team.name,
-      logoUrl: team.logo_url,
+      logoUrl: localUploadUrl(team.logo_url),
       wins: state.wins,
       losses: state.losses,
       draws: state.draws,

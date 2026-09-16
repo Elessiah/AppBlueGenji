@@ -1,4 +1,4 @@
-import { toDiskUploadPath } from "./uploads";
+import { localUploadUrl, toDiskUploadPath } from "./uploads";
 
 /**
  * Repli d'avatar : l'initiale d'un pseudo.
@@ -53,7 +53,7 @@ export function isLocalAvatarUrl(avatarUrl: string | null | undefined): boolean 
  * adresse est-elle la nôtre » ne doit avoir qu'une réponse.
  */
 export function localAvatarUrl(avatarUrl: string | null | undefined): string | null {
-  return isLocalAvatarUrl(avatarUrl) ? (avatarUrl as string) : null;
+  return localUploadUrl(avatarUrl);
 }
 
 /**
