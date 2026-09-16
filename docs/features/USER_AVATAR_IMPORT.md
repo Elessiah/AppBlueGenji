@@ -58,21 +58,46 @@ des noms parlant de logos ; `sponsor-logo.ts` les réexporte sous ses anciens
 noms. Deux copies auraient divergé, et la divergence se serait vue du mauvais
 côté — celui où une garde manque.
 
-## La garantie est posée à la sortie
+## La garantie est posée à la sortie — aux **deux** portes
 
 `visibleAvatarUrl` est la dernière porte que franchit un avatar avant
 d'atteindre un client : quatre modules serveur l'appellent, c'est déjà là que
 vit le réglage de visibilité. Une URL qui n'est pas un fichier à nous y rend
 **`null`**, et l'écran retombe sur la pastille à initiale.
 
+Mais ce n'est pas la seule. **`getCurrentUser` en est une seconde**, et elle ne
+consulte pas la visibilité — à raison : c'est son propre avatar que le titulaire
+voit dans la barre de navigation et dans l'en-tête public. Elle passe donc par
+`localAvatarUrl`, qui pose la même règle d'origine sans la question de la
+visibilité. Les deux descendent d'`isLocalAvatarUrl` : « cette adresse est-elle
+la nôtre » n'a qu'une réponse.
+
+Oublier cette seconde porte n'aurait pas laissé une fuite, mais fabriqué une
+**panne** : `unoptimized` retiré, `next/image` lève sur une origine absente de
+`remotePatterns` — toutes les pages d'un compte dont l'avatar est resté une URL
+Google auraient cassé.
+
 Filtrer au rendu aurait fait dépendre la règle du prochain écran écrit. Posée
 là, elle est totale : il n'existe pas de chemin par lequel une adresse étrangère
 sorte du serveur dans un champ d'avatar.
 
-Corollaire utile : `UserAvatar` n'a plus besoin de `unoptimized`. L'avatar
-profite enfin du redimensionnement, du WebP et du cache long — et `next/image`
-**lèverait** si une origine étrangère réapparaissait, ce qui est le bon
-comportement pour une régression de ce genre.
+## Sept rendus, pas quatre
+
+`UserAvatar` se présente comme le passage unique des avatars, et il ne l'est
+pas : **trois écrans appellent `<Image>` directement**, chacun avec son
+`unoptimized` — la carte d'équipe (roster), la section des membres d'une fiche
+d'équipe, et la carte d'annuaire d'un joueur. Ils rendaient donc des URL Google
+exactement comme les quatre autres.
+
+Le drapeau est retiré des sept. Il ne reste que sur le **logo d'équipe** de la
+carte d'annuaire : `bg_teams.logo_url` n'a pas d'équivalent de
+`visibleAvatarUrl` pour lui garantir une origine (voir `ERREUR.txt`).
+
+Corollaire utile : les avatars profitent enfin du redimensionnement, du WebP et
+du cache long — et `next/image` **lèverait** si une origine étrangère
+réapparaissait, ce qui est le bon comportement pour une régression de ce genre.
+Un test de source garde les trois rendus directs, qu'aucun test de rendu ne
+couvre.
 
 ## Ce qui déclenche une copie
 
@@ -118,6 +143,15 @@ chez un tiers est la façon la plus sûre de se faire plafonner au milieu du lot
 Sans danger à relancer : il ne regarde que les lignes dont l'avatar n'est pas
 déjà un fichier à nous, et une ligne qu'il n'a pas su rapatrier reste dans
 l'état où il l'a trouvée.
+
+Il **resynchronise aussi les entrées solo**, et c'est son point le moins
+évident : le logo d'une entrée solo est une copie de l'avatar du joueur, si bien
+que l'URL étrangère s'est aussi recopiée dans `bg_teams.logo_url` — d'où elle
+ressort par les composants de logo d'équipe, qui ne passent par aucune garde
+d'avatar. La resynchronisation relit l'avatar au travers de `visibleAvatarUrl` :
+elle repose le fichier rapatrié, ou efface le logo quand il n'y en a pas eu.
+Sans elle, rapatrier l'avatar laisserait la fuite là où elle est le moins
+visible.
 
 Sans lui, rien n'est cassé : les comptes concernés affichent leur initiale
 jusqu'à leur prochaine connexion.
