@@ -293,11 +293,13 @@ Ne pas confondre les deux dossiers : `doc/` est le Markdown servi par le site, `
 Chaque tâche : quatre commits sur une branche de feature, puis une revue de PR.
 
 **Règle Co-Authored-By :**
-- **Tous** les commits (fonctionnel, docs, tests, polish) portent le trailer `Co-authored-by: Claude Opus 4.8 <noreply@anthropic.com>`.
+- **Tous** les commits (fonctionnel, docs, tests, polish) portent un trailer `Co-authored-by: <modèle> <noreply@anthropic.com>`.
+- **`<modèle>` est le modèle qui écrit réellement le commit**, jamais une valeur recopiée : `Claude Opus 5`, `Claude Sonnet 5`, `Claude Opus 4.8`, selon le cas. Cette ligne a longtemps nommé `Claude Opus 4.8` en dur, et elle a continué d'être suivie à la lettre bien après : des commits écrits par un autre modèle portent donc une attribution fausse. Un co-auteur inexact vaut moins qu'aucun — c'est précisément ce que le trailer sert à dire.
+- Se relire sur ce point **au premier commit d'une session**, pas au cinquième : quatre commits à réécrire, c'est un historique qu'on ne corrige plus.
 
 Enchaîner la pipeline **sans s'arrêter** : ne pas attendre de validation de l'utilisateur après le commit fonctionnel — dérouler les commits, le push et la PR d'affilée.
 
-Ajouter le trailer avec `git commit --trailer 'Co-authored-by: Claude Opus 4.8 <noreply@anthropic.com>'`.
+Ajouter le trailer avec `git commit --trailer 'Co-authored-by: <modèle> <noreply@anthropic.com>'` — par exemple `git commit --trailer 'Co-authored-by: Claude Opus 5 <noreply@anthropic.com>'`.
 
 1. **Branche de feature** : `git checkout -b feature/<short-name>`
 2. **Commit fonctionnel** : ≤ 5 mots, impératif minuscule — `add swiss pairing` — *avec Co-Authored-By*
