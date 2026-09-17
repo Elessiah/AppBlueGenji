@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
+import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -99,8 +100,11 @@ describe("terms of service specifics", () => {
 
 describe("privacy policy specifics", () => {
   it("references the Discord server for change announcements", () => {
+    // L'adresse est celle de `lib/shared/discord.ts` : les pages légales du bot
+    // renvoient vers le serveur de l'association, pas vers un second serveur
+    // dont personne ne saurait plus qui le tient.
     const flat = JSON.stringify(PRIVACY_POLICY);
-    expect(flat).toContain("https://discord.gg/5kG9DDKx");
+    expect(flat).toContain(DISCORD_INVITE_URL);
   });
 });
 

@@ -5,6 +5,7 @@ import { type ContactInfo, validateContactInfo } from "@/lib/shared/contact";
 import { useToast } from "@/components/ui/toast";
 import { CyberButton } from "@/components/cyber";
 import styles from "./FooterContact.module.css";
+import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 
 interface FooterContactProps {
   initialContact: ContactInfo;
@@ -154,7 +155,7 @@ export function FooterContact({ initialContact, isAdmin }: FooterContactProps) {
                 className={styles.input}
                 value={form.discordUrl}
                 maxLength={200}
-                placeholder="https://discord.gg/bluegenji"
+                placeholder={DISCORD_INVITE_URL}
                 onChange={(e) => setForm((f) => ({ ...f, discordUrl: e.target.value }))}
               />
             </label>

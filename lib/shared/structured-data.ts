@@ -17,6 +17,7 @@
  * page d'accueil et à la page association de parler de la *même* association au
  * lieu d'en déclarer deux.
  */
+import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 
 /** Raison sociale telle qu'elle figure aux mentions légales. */
 export const ORGANIZATION_LEGAL_NAME = "Bluegenji Esport";
@@ -35,8 +36,15 @@ export const ORGANIZATION_ADDRESS = {
 /** Année de création, telle qu'affichée sur la page association. */
 export const ORGANIZATION_FOUNDING_YEAR = "2020";
 
-/** Le seul lien public de l'association, hors site. */
-export const ORGANIZATION_DISCORD_URL = "https://discord.gg/bluegenji";
+/**
+ * Le seul lien public de l'association, hors site.
+ *
+ * Réexporté depuis `lib/shared/discord.ts` plutôt que recopié : ce nœud JSON-LD
+ * déclare le `sameAs` de l'association, et une invitation qui y divergerait de
+ * celle des boutons enverrait les moteurs vers un autre serveur que les
+ * visiteurs.
+ */
+export const ORGANIZATION_DISCORD_URL = DISCORD_INVITE_URL;
 
 /** Un objet JSON-LD : une valeur sérialisable, rien de plus précis. */
 export type JsonLdNode = Record<string, unknown>;

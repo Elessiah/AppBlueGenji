@@ -31,8 +31,9 @@ import { entrantHref } from "@/lib/shared/participants";
 import { isSeedOrderEffective, seedingSource } from "@/lib/shared/seeding";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie";
 import { localUploadUrl } from "@/lib/shared/uploads";
+import { getDiscordCommunity } from "@/lib/server/discord-community";
 
-const DEFAULT_STATS: LandingStats = {
+const DEFAULT_SITE_COUNTS: SiteCounts = {
   players: 0,
   teams: 0,
   tournaments: 0,
@@ -57,7 +58,24 @@ export async function getLandingStats(): Promise<LandingStats> {
   return cachedLanding("stats", LANDING_TTL_MS, loadLandingStats);
 }
 
+/**
+ * Les chiffres du site et ceux du Discord se chargent **côte à côte et se
+ * dégradent séparément** : une base injoignable ne doit pas emporter le
+ * compteur de membres, ni Discord absent remettre les compteurs du site à zéro.
+ *
+ * Le décompte Discord porte son propre cache (`discord-community.ts`), hors du
+ * préfixe `landing:` : une écriture de tournoi invalide bien cette entrée-ci,
+ * mais le rechargement qui suit resservira la valeur Discord déjà en main sans
+ * refaire d'appel sortant.
+ */
 async function loadLandingStats(): Promise<LandingStats> {
+  const [counts, discord] = await Promise.all([loadSiteCounts(), getDiscordCommunity()]);
+  return { ...counts, discord };
+}
+
+type SiteCounts = Omit<LandingStats, "discord">;
+
+async function loadSiteCounts(): Promise<SiteCounts> {
   try {
     const db = await getDatabase();
     const [rows] = await db.execute<StatsRow[]>(`
@@ -73,7 +91,7 @@ async function loadLandingStats(): Promise<LandingStats> {
       tournaments: Number(row?.tournaments ?? 0),
     };
   } catch {
-    return DEFAULT_STATS;
+    return DEFAULT_SITE_COUNTS;
   }
 }
 

@@ -11,6 +11,8 @@
  * La partie « hébergeur » n'est pas dupliquée ici : chaque document renvoie vers la
  * section Hébergement des mentions légales du site (`/mentions-legales#hebergement`).
  */
+import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
+
 
 export type Lang = "fr" | "en";
 
@@ -53,7 +55,8 @@ export interface BilingualDoc {
   en: LegalDoc;
 }
 
-const DISCORD_INVITE = "https://discord.gg/5kG9DDKx";
+/** Même serveur que le reste du site : voir `lib/shared/discord.ts`. */
+const DISCORD_INVITE = DISCORD_INVITE_URL;
 const DISCORD_TERMS = "https://discord.com/terms";
 const DISCORD_GUIDELINES = "https://discord.com/guidelines";
 const PRIVACY_HREF = "/privacy-policy-bot";

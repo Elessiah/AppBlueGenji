@@ -3,6 +3,7 @@ import { CyberButton, CyberCard } from "@/components/cyber";
 import type { SiteCopy } from "@/lib/shared/site-copy";
 import { EditableCopy } from "./EditableCopy";
 import styles from "./JoinCTA.module.css";
+import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 
 type JoinCTAProps = {
   /**
@@ -63,7 +64,7 @@ export function JoinCTA({ isAuthenticated = false, copy, canEditCopy = false }: 
               )}
             </CyberButton>
             <CyberButton variant="ghost" asChild>
-              <a href="https://discord.gg/bluegenji" target="_blank" rel="noreferrer">
+              <a href={DISCORD_INVITE_URL} target="_blank" rel="noreferrer">
                 Rejoindre le Discord
               </a>
             </CyberButton>
