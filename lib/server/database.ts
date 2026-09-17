@@ -1,6 +1,8 @@
 ﻿import "dotenv/config";
 import mysql, { type ExecuteValues, type Pool, type PoolConnection } from "mysql2/promise";
 import { createOnceGate, withMigrationLock } from "@/lib/server/migration-lock";
+import { CONTACT_DISCORD_URL_KEY } from "@/lib/shared/contact";
+import { DISCORD_INVITE_URL, SUPERSEDED_DISCORD_INVITE_URLS } from "@/lib/shared/discord";
 
 /**
  * Paramètres liés d'une requête préparée.
@@ -906,6 +908,30 @@ async function runMigrations(db: Pool): Promise<void> {
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  // Rattrapage : l'invitation Discord est une constante partout **sauf** en pied
+  // de page, où elle est une donnée que le staff peut modifier
+  // (`contact_discord_url`). Changer de serveur ne suffisait donc pas à changer
+  // ce lien-là, et l'écran qui l'affiche est justement celui qu'on ne relit
+  // jamais — la panne serait muette, l'ancienne adresse menant toujours
+  // quelque part.
+  //
+  // Seules les adresses **périmées connues** sont remplacées : une invitation
+  // que le staff a saisie lui appartient, et l'écraser à chaque démarrage
+  // ferait de ce champ un leurre. Après un passage, l'instruction ne trouve
+  // plus rien — elle est rejouée sans coût, comme ses voisines.
+  try {
+    const placeholders = SUPERSEDED_DISCORD_INVITE_URLS.map(() => "?").join(", ");
+    await db.execute(
+      `UPDATE bg_settings
+          SET setting_value = ?
+        WHERE setting_key = ?
+          AND setting_value IN (${placeholders})`,
+      [DISCORD_INVITE_URL, CONTACT_DISCORD_URL_KEY, ...SUPERSEDED_DISCORD_INVITE_URLS],
+    );
+  } catch {
+    // Rattrapage remis au prochain démarrage.
+  }
 
   // Migration: Bénévoles de l'association, groupés par catégorie dynamique
   await db.execute(`

@@ -49,6 +49,7 @@ import path from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import sharp from "sharp";
 import { toServedUploadUrl } from "@/lib/shared/uploads";
+import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 
 // ---------------------------------------------------------------------------
 // Déterminisme
@@ -349,7 +350,7 @@ const FICTIONAL_RECRUITMENT_ADS = [
     roles: "Identité visuelle, affiches, overlays",
     body: "Suite à une reprise de nos événements, nous recherchons un graphiste pour assurer nos besoins visuels.\n\nCe que nous offrons:\nUn cadre bienveillant, des projets variés et une vraie liberté créative sur la direction artistique de la saison.\n\nEn quoi consiste le rôle:\n\n- Collaborer avec le pôle communication pour définir les besoins visuels.\n\n- Élaborer un cahier des normes graphiques pour l'association.\n\n- Créer les éléments de communication visuelle : logos, affiches, brochures.\n\n- Pouvoir effectuer des modifications de dernière minute sur un visuel.\n\n- Mettre en place et tenir un espace de travail partagé bien organisé.\n\nLes outils à disposition:\nUn outil de ticketing externe pour le suivi des tâches, et des points réguliers avec le pôle communication.\n\nSi le rôle t'intéresse:\nPostule via le lien, ou viens en parler sur Discord.",
     contact_url: "https://example.com/ticket/design",
-    contact_discord: "https://discord.gg/bluegenji",
+    contact_discord: DISCORD_INVITE_URL,
     contact_discord_id: null,
     contact_preferred: "LINK" as const,
     // Deuxième « modale à l'arrivée » : masquée par celle du dessus.

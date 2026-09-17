@@ -5,6 +5,8 @@
  * défaut servent de secours tant que rien n'a été enregistré. Partagé
  * client/serveur.
  */
+import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
+
 export type ContactInfo = {
   email: string;
   discordTag: string;
@@ -16,10 +18,15 @@ export const CONTACT_EMAIL_KEY = "contact_email";
 export const CONTACT_DISCORD_TAG_KEY = "contact_discord_tag";
 export const CONTACT_DISCORD_URL_KEY = "contact_discord_url";
 
+/**
+ * Secours tant que rien n'a été enregistré en base. Le lien Discord y est
+ * l'invitation canonique du site : un défaut qui pointerait ailleurs ferait
+ * mentir la page contact de toute installation neuve.
+ */
 export const DEFAULT_CONTACT: ContactInfo = {
   email: "presse@bluegenji-esport.fr",
   discordTag: "",
-  discordUrl: "https://discord.gg/bluegenji",
+  discordUrl: DISCORD_INVITE_URL,
 };
 
 export const EMAIL_MAX = 254;

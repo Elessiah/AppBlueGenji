@@ -5,6 +5,7 @@ import { CountdownStrip, CyberButton } from "@/components/cyber";
 import type { LandingLive, LandingStats } from "@/lib/shared/landing";
 import type { TournamentCard } from "@/lib/shared/types";
 import { PLATFORM_LABELS, streamPlatform } from "@/lib/shared/live-streams";
+import { DiscordCommunity } from "./DiscordCommunity";
 import { LiveCard } from "./LiveCard";
 import { useLandingLive } from "./useLandingLive";
 import { EditableCopy } from "./EditableCopy";
@@ -96,6 +97,11 @@ export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy
               <div className="mono">Tournois organisés</div>
             </div>
           </div>
+
+          {/* Quatrième chiffre, mais d'une autre nature : les trois précédents
+              se lisent en base, celui-ci vient de Discord et peut manquer. Il
+              vit donc dans son propre bloc, qui porte aussi l'invitation. */}
+          <DiscordCommunity stats={stats.discord} />
         </div>
 
         <div className={styles.right}>

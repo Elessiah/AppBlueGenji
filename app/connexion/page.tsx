@@ -9,6 +9,7 @@ import { CyberCard } from "@/components/cyber/CyberCard";
 import { RgpdConsentModal } from "@/components/cyber/RgpdConsentModal";
 import { DEFAULT_REDIRECT, safeRedirectPath } from "@/lib/shared/safe-redirect";
 import { loginErrorMessage } from "./_lib/login-errors";
+import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 
 const CONSENT_STORAGE_KEY = "bg_rgpd_consent";
 
@@ -161,7 +162,7 @@ export default function LoginPage() {
                 <span className="mono" style={{ fontSize: 10, color: "var(--ink-dim)", letterSpacing: "0.08em", marginTop: 4, lineHeight: 1.5 }}>
                   Le tag fonctionne si le bot partage un serveur avec toi, sinon utilise ton ID Discord ou{" "}
                   <Link
-                    href="https://discord.gg/VPGZ4eBfwN"
+                    href={DISCORD_INVITE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ color: "var(--blue-300)", textDecoration: "underline" }}

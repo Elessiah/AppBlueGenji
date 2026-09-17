@@ -17,6 +17,7 @@ import { siteCanonicalBase } from "@/lib/server/site-url";
 import { organizationJsonLd } from "@/lib/shared/structured-data";
 import { BureauSection } from "./BureauSection";
 import styles from "./page.module.css";
+import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 
 const REGLEMENT_URL =
   "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
@@ -203,7 +204,7 @@ export default async function AssociationPage() {
                   )}
                 </CyberButton>
                 <CyberButton variant="ghost" asChild>
-                  <a href="https://discord.gg/bluegenji" target="_blank" rel="noreferrer">
+                  <a href={DISCORD_INVITE_URL} target="_blank" rel="noreferrer">
                     Rejoindre le Discord
                   </a>
                 </CyberButton>

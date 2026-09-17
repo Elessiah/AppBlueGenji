@@ -1,3 +1,4 @@
+import type { DiscordCommunityStats } from "@/lib/shared/discord";
 import type { MatchLiveState } from "@/lib/shared/live-streams";
 import type { MatchFormat } from "@/lib/shared/match-format";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
@@ -6,6 +7,13 @@ export type LandingStats = {
   players: number;
   teams: number;
   tournaments: number;
+  /**
+   * Fréquentation du serveur Discord, à côté des chiffres du site.
+   *
+   * `null` quand Discord n'a pas répondu : le bloc de l'accueil garde alors son
+   * bouton et se tait sur le nombre, plutôt que d'annoncer zéro membre.
+   */
+  discord: DiscordCommunityStats | null;
 };
 
 export type LandingLiveMatch = {

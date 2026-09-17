@@ -5,6 +5,7 @@ import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { CyberButton } from "@/components/cyber";
 import styles from "./page.module.css";
+import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 
 /**
  * Lien externe vers le règlement intérieur (Google Docs).
@@ -152,7 +153,7 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
         </p>
         <p>
           <strong>Contact :</strong> via le serveur{" "}
-          <a href="https://discord.gg/bluegenji" target="_blank" rel="noreferrer">
+          <a href={DISCORD_INVITE_URL} target="_blank" rel="noreferrer">
             Discord de l&apos;association
           </a>
           .
