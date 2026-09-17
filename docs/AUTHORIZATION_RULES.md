@@ -409,6 +409,9 @@ Réservé à `ADMIN` et `ARBITRE` :
 - le lancer par anticipation (`POST /api/admin/tournaments/[id]/launch`) ;
 - réordonner le seeding (`PATCH .../seeding`), jusqu'à la première saisie de
   score ;
+- **retirer un engagé du plateau**
+  (`DELETE /api/admin/tournaments/[id]/registrations/[teamId]`), jusqu'au début
+  du tournoi (§4.8) ;
 - enregistrer un score en cours de rencontre
   (`PATCH /api/admin/matches/[id]/scores`) et **valider un résultat**
   (`POST /api/admin/matches/[id]/resolve`), forfait d'une manche compris ;
@@ -462,6 +465,26 @@ portant un `tournament_id`, plus les rappels de match.
   qualité ;
 - dans tous les cas, refusé hors `RUNNING`, et dès les play-offs d'endurance
   lancés.
+
+### 4.8 Retirer un engagé (avant le coup d'envoi)
+
+`DELETE /api/admin/tournaments/[id]/registrations/[teamId]`, permission
+`tournaments` — et **elle seule** : un engagé ne peut pas se retirer lui-même,
+pas plus qu'un capitaine ne peut retirer son équipe. L'inscription est effacée,
+la place rendue.
+
+La fenêtre s'arrête **au début du tournoi**, bornes comprises
+(`lib/shared/entrant-removal.ts`) : au coup d'envoi le tirage est fait, et retirer
+une inscrite laisserait un match sans adversaire. Après, la seule sortie est
+l'abandon (§4.7) — d'où deux gestes qui ne se recouvrent jamais, l'un avant et
+l'autre après la même borne.
+
+L'état est lu **deux fois**, stocké et calculé : le premier rattrape un tournoi
+lancé par anticipation ou clos à la main, le second un tournoi dont l'heure de
+début est passée sans que la colonne ait été recalée. Refus en `409`.
+
+Aucune équipe ni aucun joueur n'est supprimé : ni la fantôme retirée du plateau,
+ni l'entrée solo d'un joueur. Voir `docs/features/ENTRANT_REMOVAL.md`.
 
 ---
 

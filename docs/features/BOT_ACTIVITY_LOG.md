@@ -16,12 +16,19 @@ jamais le site en retour.
 | --- | --- | --- |
 | Création d'un tournoi | `📅 Nouveau tournoi — « … » (#12) : Ronde suisse · Overwatch, 16 équipes max, créé par …, début le …` | `createTournament` |
 | Inscription | `✅ Inscription — « … » (#12) : Alpha. 3/16 équipes.` | `registerTeam` (joueur ou staff) |
+| Retrait d'un engagé | `➖ Inscription retirée — « … » (#12) : Alpha, par … (#3). 2/16 équipes.` | `DELETE /api/admin/tournaments/[id]/registrations/[teamId]` |
 | Abandon | `🚪 Abandon — « … » (#12) : Alpha quitte la compétition.` | `forfeitTournamentTeamPublic` |
 | Coup d'envoi | `🚀 Coup d'envoi — « … » (#12) : 8 équipes, Survie.` | bascule vers `RUNNING` |
 | Fin d'un match | `🏁 Match terminé — « … » (#12) · Manche 2 : Alpha 2–1 Bêta.` | `finalizeMatch` |
 | Clôture | `🏆 Tournoi terminé — « … » (#12) : Alpha l'emporte.` | `finishTournament` |
 | Clôture sans adversaires | `🚫 Tournoi clos faute d'adversaires — « … » (#12) : aucun engagement.` | `finalizeUnderfilledTournament` |
 | Suppression définitive | `🗑️ Tournoi supprimé définitivement — « … » (#12), par … (#3).` | `DELETE /api/admin/tournaments/[id]` |
+
+Le **retrait d'un engagé** et l'**abandon** sont deux lignes et non une, parce
+que ce sont deux faits : l'abandon laisse l'engagé au classement avec un forfait
+à son nom, le retrait efface son inscription avant le coup d'envoi — après quoi
+rien, sur la page, ne dira qu'il a été inscrit. Le canal est alors la **seule**
+trace qui subsiste, d'où l'auteur nommé (voir `docs/features/ENTRANT_REMOVAL.md`).
 
 Le **conflit de score** n'y figure plus : c'est le premier évènement du site à
 appeler une intervention humaine, il part donc au **canal arbitre**
