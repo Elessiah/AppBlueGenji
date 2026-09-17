@@ -19,6 +19,7 @@ import {
 import type { TournamentDetail } from "@/lib/shared/types";
 import { EntrantLink, useParticipantWording } from "../_lib/entrant-link";
 import { mapError } from "../_lib/error-map";
+import { useTournamentNow } from "@/lib/shared/hooks/useTournamentNow";
 import { useSeedingDrag } from "../_hooks/useSeedingDrag";
 import { RemoveEntrantDialog } from "./RemoveEntrantDialog";
 import styles from "./RegistrationsPanel.module.css";
@@ -97,7 +98,14 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
   // encore après le coup d'envoi, alors qu'un engagé ne se retire que tant que
   // le tirage n'est pas fait (`lib/shared/entrant-removal.ts`). Les deux
   // commandes partagent une cellule mais pas une condition.
-  const removalBlock = entrantRemovalBlockReason(detail.card);
+  //
+  // L'heure vient d'un minuteur posé sur la prochaine bascule d'état du tournoi,
+  // et non d'un `Date.now()` au rendu : la fenêtre de retrait se ferme au coup
+  // d'envoi, une seconde connue d'avance qu'aucune écriture n'annonce — le flux
+  // ne pousse un instantané que si quelqu'un a écrit. Sans cela le bouton
+  // resterait offert après l'heure, pour un refus en 409 au clic.
+  const now = useTournamentNow(detail.card);
+  const removalBlock = entrantRemovalBlockReason(detail.card, now);
   const removable = staff && removalBlock === null;
   const showActions = reorderable || removable;
 

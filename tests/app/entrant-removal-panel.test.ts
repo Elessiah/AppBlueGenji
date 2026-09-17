@@ -69,7 +69,11 @@ describe("Bouton de retrait dans la liste des inscrites", () => {
     // `removable` descend du module pur appliqué à la carte du tournoi, jamais
     // de `lockReason` : l'ordre de départ reste réglable jusqu'au premier score,
     // le retrait s'arrête au coup d'envoi.
-    expect(panel).toMatch(/const removalBlock = entrantRemovalBlockReason\(detail\.card\);/);
+    expect(panel).toMatch(/const removalBlock = entrantRemovalBlockReason\(detail\.card, now\);/);
+    // Et l'heure vient d'un minuteur posé sur la prochaine bascule d'état, non
+    // d'un `Date.now()` au rendu : la fenêtre se ferme au coup d'envoi, une
+    // seconde connue d'avance qu'aucune écriture n'annonce.
+    expect(panel).toMatch(/const now = useTournamentNow\(detail\.card\);/);
     expect(panel).toMatch(/const removable = staff && removalBlock === null;/);
     expect(panel).toMatch(/\{removable && \(/);
     expect(panel).not.toMatch(/removable\s*=\s*reorderable/);

@@ -199,14 +199,16 @@
  * Voisin des flèches, donc à distinguer d'elles : un geste qu'on ne défait pas
  * d'un clic n'a pas à ressembler à un geste qu'on répète. D'où le mot en toutes
  * lettres (une icône seule ne dirait pas lequel des deux on s'apprête à faire),
- * le rouge au survol et au focus, et la marge qui l'écarte des flèches — trente
- * pixels, la largeur d'un pouce manqué.
+ * le rouge au survol et au focus, et la marge qui l'écarte des flèches : 20 px,
+ * de quoi rater le bouton plutôt que de le toucher par erreur — les cibles
+ * elles-mêmes font 32 px de haut, et ce qu'on veut éviter est le pouce qui
+ * dépasse d'un cran à droite de « ↓ ».
  *
  * Le rouge n'apparaît **qu'**au survol : au repos, une ligne d'inscriptions ne
  * doit pas se lire comme une liste d'avertissements.
  */
 .remove {
-  margin-left: 8px;
+  margin-left: 20px;
   padding: 0 10px;
   height: 32px;
   border: 1px solid var(--line-strong-cy, var(--line));

@@ -136,6 +136,15 @@ Le bouton vit **sur la ligne de l'engagé**, dans le bloc « Inscriptions · ord
 de départ » (`RegistrationsPanel.tsx`), à côté des flèches de réordonnancement :
 c'est la liste qu'on regarde quand on cherche qui retirer.
 
+La fenêtre se ferme **à la seconde dite**, sans requête : `useTournamentNow`
+(`lib/shared/hooks/useTournamentNow.ts`) pose un unique `setTimeout` sur la
+prochaine bascule d'état du tournoi, et le bouton disparaît au coup d'envoi.
+C'est l'idiome de `useScheduledBuckets` (la liste) et de `useMatchLiveState` (un
+match), appliqué à une fiche — sans lui, l'heure du rendu ferait foi jusqu'au
+prochain instantané, et le flux ne pousse que si quelqu'un a écrit : le bouton
+resterait offert une quinzaine de secondes après l'heure, pour un refus en 409
+au clic.
+
 Deux fenêtres, une cellule. L'ordre de départ reste réglable jusqu'à la première
 saisie de score — donc encore **après** le coup d'envoi —, le retrait s'arrête au
 coup d'envoi. Les deux commandes partagent la cellule d'actions mais pas la

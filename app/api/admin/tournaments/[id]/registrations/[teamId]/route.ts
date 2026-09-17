@@ -69,7 +69,11 @@ export async function DELETE(
     // 409 : la demande est bien formée, c'est l'état du tournoi qui la
     // contredit. La liste des codes vient du module pur, et non d'une énumération
     // recopiée : un refus ajouté demain est traduit sans qu'on y pense.
-    if (message in ENTRANT_REMOVAL_BLOCK_MESSAGES) return fail(message, 409);
+    //
+    // `Object.hasOwn` et non `in`, qui remonte la chaîne de prototypes : un
+    // message valant `constructor` ou `toString` passerait le test et ressortirait
+    // en 409 sous son propre nom, sans que la panne réelle atteigne le journal.
+    if (Object.hasOwn(ENTRANT_REMOVAL_BLOCK_MESSAGES, message)) return fail(message, 409);
 
     // Même précaution que la suppression et le retour en arrière : le texte
     // d'une erreur mysql2 est anglais et parle du moteur. Il reste au journal du
