@@ -144,16 +144,32 @@ condition, d'où trois gabarits de grille exclusifs (`.row`, `.withActions`,
 réellement : « Ordre », « Retrait », ou « Actions ».
 
 Quand la fenêtre est fermée, le bouton disparaît **et la phrase du module pur
-prend sa place** sous la liste : rien sur la ligne ne dirait pourquoi.
+prend sa place** sous la liste : rien sur la ligne ne dirait pourquoi. Sauf
+lorsqu'elle ferait doublon — sur un tournoi terminé, « l'ordre n'a plus d'effet »
+et « la liste est un palmarès » énoncent le même fait, et trois paragraphes
+empilés au-dessus d'une liste ne se lisent plus. Le verrou de l'ordre parle le
+premier, il garde la parole.
 
 Le bouton ouvre une confirmation (`RemoveEntrantDialog.tsx`) — pas de recopie du
-nom, contrairement à la suppression d'un tournoi : rien n'est détruit, et
-l'engagé peut se réinscrire l'instant d'après. Mais le bouton voisine des flèches
-à trente-deux pixels d'un geste anodin, et la confirmation nommant l'engagé est
-ce qui distingue les deux. Elle dit les deux choses qu'on ne devine pas : que
-l'inscription est **effacée** (à la différence d'un abandon) et que la **place
-est rendue** — souvent la raison même du geste, sur un plateau complet dont on
-attend un désistement.
+nom, contrairement à la suppression d'un tournoi : aucun historique n'est
+détruit, il n'y en a pas encore. Mais le bouton voisine des flèches à
+trente-deux pixels d'un geste anodin, et la confirmation nommant l'engagé est ce
+qui distingue les deux.
+
+Elle dit les deux choses qu'on ne devine pas. La première : l'inscription est
+**effacée**, à la différence d'un abandon. La seconde **dépend de l'étape**, et
+c'est pourquoi elle est calculée :
+
+| Étape | Ce que le dialogue annonce |
+| --- | --- |
+| Inscriptions **ouvertes** | la place libérée peut être reprise, et l'engagé réinscrit — souvent la raison même du geste, sur un plateau complet dont on attend un désistement. |
+| Inscriptions **closes** (entre-deux) | le geste **ne se défait plus** : `registerTeam` exige l'état `REGISTRATION`, donc ni l'engagé ni le staff ne peuvent revenir en arrière sans rouvrir les inscriptions par l'édition du tournoi. En ambre, avec un `role="note"` : la couleur ne dit rien à qui ne la voit pas. |
+
+C'est exactement dans le second cas qu'on retire un désistement de dernière
+minute, et ce n'est pas au clic de l'apprendre. L'étape se lit sur les dates
+(`computeTournamentState`), comme partout ailleurs côté client — l'état stocké
+retombe à `UPCOMING` dans cet entre-deux, et le serveur, lui, accepte toujours le
+retrait.
 
 ## Tests
 

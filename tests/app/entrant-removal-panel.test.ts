@@ -100,8 +100,17 @@ describe("Bouton de retrait dans la liste des inscrites", () => {
 
   it("met la phrase du refus là où le bouton aurait été", () => {
     // Rien sur la ligne ne dirait pourquoi la commande a disparu.
-    expect(panel).toMatch(/\{removalBlock !== null && rows\.length > 0 && \(/);
-    expect(panel).toMatch(/entrantRemovalBlockMessage\(removalBlock\)/);
+    expect(panel).toMatch(/\{removalNotice !== null && rows\.length > 0 && \(/);
+    expect(panel).toMatch(/entrantRemovalBlockMessage\(removalNotice\)/);
+  });
+
+  it("ne répète pas le verrou du seeding quand les deux disent la même chose", () => {
+    // Sur un tournoi terminé, « l'ordre n'a plus d'effet » et « la liste est un
+    // palmarès » énoncent le même fait : trois paragraphes empilés au-dessus
+    // d'une liste ne se lisent plus. Le verrou de l'ordre parle le premier.
+    expect(panel).toMatch(
+      /lockReason === "FINISHED" && removalBlock === "ENTRANT_REMOVAL_TOURNAMENT_FINISHED"/,
+    );
   });
 
   it("annonce le retrait à l'oreille, comme le réordonnancement", () => {
@@ -178,13 +187,29 @@ describe("Dialogue de confirmation", () => {
 
   it("appelle la route de retrait, en DELETE", () => {
     expect(dialog).toMatch(
-      /fetch\(\s*`\/api\/admin\/tournaments\/\$\{tournamentId\}\/registrations\/\$\{teamId\}`,\s*\{\s*method: "DELETE"/,
+      /fetch\(\s*`\/api\/admin\/tournaments\/\$\{card\.id\}\/registrations\/\$\{teamId\}`,\s*\{\s*method: "DELETE"/,
     );
   });
 
   it("nomme l'engagé et traduit le refus", () => {
     expect(dialog).toMatch(/Retirer \{entrantName\} du tournoi/);
     expect(dialog).toMatch(/mapError\(\(e as Error\)\.message\)/);
+  });
+
+  it("dit si la place libérée pourra être reprise", () => {
+    // La seule conséquence qui dépend de l'étape : `registerTeam` exige l'état
+    // `REGISTRATION`, donc un retrait fait après la clôture ne se défait plus —
+    // ni par l'engagé, ni par le staff — sans rouvrir les inscriptions. C'est
+    // exactement le moment où l'on retire un désistement de dernière minute.
+    expect(dialog).toMatch(
+      /const \[registrationOpen\] = useState\(\(\) => computeTournamentState\(card\) === "REGISTRATION"\);/,
+    );
+    expect(dialog).toMatch(/\{registrationOpen \? \(/);
+    expect(dialog).toMatch(/Les inscriptions sont ouvertes/);
+    expect(dialog).toMatch(/Les inscriptions sont closes/);
+    // L'ambre est la seule chose qui distingue l'avertissement du paragraphe
+    // voisin : il ne dit rien à qui ne le voit pas.
+    expect(dialog).toMatch(/role="note"/);
   });
 
   it("est une modale dans les règles de la page", () => {

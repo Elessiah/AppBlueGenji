@@ -101,6 +101,18 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
   const removable = staff && removalBlock === null;
   const showActions = reorderable || removable;
 
+  // Deux refus, une seule cause : sur un tournoi terminé, « l'ordre n'a plus
+  // d'effet » et « la liste est un palmarès » disent le même fait, et trois
+  // paragraphes empilés au-dessus d'une liste ne se lisent plus. Le verrou de
+  // l'ordre parle le premier, il garde la parole ; la phrase du retrait ne
+  // s'affiche que lorsqu'elle apprend quelque chose — typiquement sur un
+  // tournoi lancé, où l'ordre reste réglable mais où le retrait, lui, est clos.
+  const removalNotice =
+    removalBlock !== null
+    && !(lockReason === "FINISHED" && removalBlock === "ENTRANT_REMOVAL_TOURNAMENT_FINISHED")
+      ? removalBlock
+      : null;
+
   // Engagé dont on confirme le retrait. La ligne est gardée en entier plutôt
   // que son seul identifiant : le dialogue reste monté pendant que le flux
   // redessine la page, et c'est le nom vu au moment du clic qu'il doit annoncer.
@@ -203,11 +215,11 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
                 ? "Ce rang décide des appariements de la première manche. Glissez une ligne par sa poignée pour la déplacer d'un bloc, ou utilisez les flèches ci-contre — jusqu'à la première saisie de score."
                 : `Ce rang décidera des appariements de la première manche. Il se règlera ici dès qu'il y aura deux ${wording.manyEngaged}.`}
           </p>
-          {removalBlock !== null && rows.length > 0 && (
+          {removalNotice !== null && rows.length > 0 && (
             /* Le bouton « Retirer » a disparu, et rien sur la ligne ne dit
                pourquoi : la phrase vient du module pur, celle-là même que le
                serveur renverrait sur une écriture tardive. */
-            <p className={styles.hint}>{entrantRemovalBlockMessage(removalBlock)}</p>
+            <p className={styles.hint}>{entrantRemovalBlockMessage(removalNotice)}</p>
           )}
           {!showsRealDraw && rows.length > 0 && (
             <p className={styles.warning}>
@@ -325,7 +337,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
 
       {removing !== null && (
         <RemoveEntrantDialog
-          tournamentId={detail.card.id}
+          card={detail.card}
           teamId={removing.teamId}
           entrantName={removing.teamName}
           onClose={() => setRemoving(null)}
