@@ -1,4 +1,5 @@
 import { endurancePenaltyMessage } from "@/lib/shared/endurance-penalty";
+import { ENTRANT_REMOVAL_BLOCK_MESSAGES } from "@/lib/shared/entrant-removal";
 
 export const ERROR_MESSAGES: Record<string, string> = {
   CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES: "Score verrouillé : la manche suivante a déjà des scores saisis.",
@@ -138,6 +139,15 @@ export const ERROR_MESSAGES: Record<string, string> = {
   SEEDING_LOCKED: "Un score a été saisi : l'ordre de départ est désormais figé.",
   INVALID_SEED_ORDER: "Ordre invalide : la liste doit contenir tous les engagés, une seule fois.",
   SEEDING_REORDER_FAILED: "Erreur lors de l'enregistrement du nouvel ordre.",
+  // Retrait d'un engagé avant le coup d'envoi
+  // (`DELETE /api/admin/tournaments/[id]/registrations/[teamId]`). Les deux
+  // refus de fenêtre viennent du module partagé, phrases comprises : l'interface
+  // les affiche déjà sous la liste quand elle ferme le bouton, et les recopier
+  // ici ferait deux formulations du même refus.
+  ...ENTRANT_REMOVAL_BLOCK_MESSAGES,
+  ENTRANT_REMOVAL_FAILED: "Erreur lors du retrait de l'engagé.",
+  // Émis par le retrait et par l'abandon : un identifiant d'engagé illisible.
+  INVALID_TEAM: "Identifiant d'engagé invalide.",
   // Inscription en lot d'engagés sans compte
   // (`POST /api/admin/tournaments/[id]/ghost-registrations`). Les phrases
   // restent unitaires : le tout-ou-rien est ajouté par `mapBatchError`, qui seul

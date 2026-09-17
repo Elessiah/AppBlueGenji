@@ -33,8 +33,13 @@ import { loadTournamentRow } from "./repository";
  * — fige le monde *avant* l'attente. La transaction obtient alors le verrou,
  * puis compte un effectif périmé, et le plafond saute exactement comme s'il n'y
  * avait pas de verrou du tout.
+ *
+ * Exporté pour le **retrait** d'une inscription (`./registration-removal`), qui
+ * a le même besoin et le même piège : il relit l'état du tournoi pour décider
+ * s'il a le droit d'écrire, et cette lecture-là ne doit pas non plus précéder le
+ * verrou.
  */
-async function lockTournamentRow(
+export async function lockTournamentRow(
   connection: PoolConnection,
   tournamentId: number,
 ): Promise<void> {

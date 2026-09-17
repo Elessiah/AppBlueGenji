@@ -21,10 +21,22 @@
 }
 
 /* Colonnes de poignée et d'actions : ajoutées seulement quand le staff peut
-   réordonner. La poignée ouvre la ligne, les flèches la ferment — le geste au
-   pointeur commence à gauche, la commande au clavier reste à droite. */
+   agir. La poignée ouvre la ligne, les commandes la ferment — le geste au
+   pointeur commence à gauche, la commande au clavier reste à droite.
+
+   Deux gabarits **exclusifs** plutôt qu'une classe par commande : les deux
+   fenêtres ne s'ouvrent pas ensemble (l'ordre reste réglable jusqu'au premier
+   score, le retrait s'arrête au coup d'envoi), et deux classes de même poids
+   posant `grid-template-columns` se départageraient par l'ordre de la feuille.
+
+   La colonne d'actions est en `auto` et non en largeur fixe : elle porte tantôt
+   deux flèches, tantôt un bouton de texte, tantôt les trois. */
+.withActions {
+  grid-template-columns: 56px minmax(0, 1.6fr) 1fr 1fr auto;
+}
+
 .reorderable {
-  grid-template-columns: 24px 56px minmax(0, 1.6fr) 1fr 1fr 92px;
+  grid-template-columns: 24px 56px minmax(0, 1.6fr) 1fr 1fr auto;
 }
 
 /*
@@ -79,6 +91,7 @@
 .dragging .grip,
 .dragging .arrow,
 .dragging .arrow:disabled,
+.dragging .remove,
 .dragging .name {
   cursor: grabbing;
 }
@@ -180,6 +193,49 @@
   cursor: not-allowed;
 }
 
+/*
+ * Retrait d'un engagé.
+ *
+ * Voisin des flèches, donc à distinguer d'elles : un geste qu'on ne défait pas
+ * d'un clic n'a pas à ressembler à un geste qu'on répète. D'où le mot en toutes
+ * lettres (une icône seule ne dirait pas lequel des deux on s'apprête à faire),
+ * le rouge au survol et au focus, et la marge qui l'écarte des flèches — trente
+ * pixels, la largeur d'un pouce manqué.
+ *
+ * Le rouge n'apparaît **qu'**au survol : au repos, une ligne d'inscriptions ne
+ * doit pas se lire comme une liste d'avertissements.
+ */
+.remove {
+  margin-left: 8px;
+  padding: 0 10px;
+  height: 32px;
+  border: 1px solid var(--line-strong-cy, var(--line));
+  border-radius: var(--r-cy-sm, 6px);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.remove:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--red-live, #ff4d4d) 60%, transparent);
+  color: var(--red-live, #ff4d4d);
+  background: color-mix(in srgb, var(--red-live, #ff4d4d) 12%, transparent);
+}
+
+.remove:focus-visible {
+  outline: 2px solid var(--red-live, #ff4d4d);
+  outline-offset: 2px;
+}
+
+.remove:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .hint {
   margin: 0 0 14px;
   font-size: 12.5px;
@@ -229,6 +285,12 @@
     margin-top: 6px;
   }
 
+  /* Une seule colonne : la marge qui écartait « Retirer » des flèches n'a plus
+     rien à écarter quand il est seul en tête de ligne. */
+  .actions > .remove:first-child {
+    margin-left: 0;
+  }
+
   /* Une seule colonne : l'intitulé « Ordre » n'a plus de colonne à coiffer. */
   .actionsHead {
     display: none;
@@ -247,7 +309,8 @@
  */
 @media (prefers-reduced-motion: reduce) {
   .grip,
-  .arrow {
+  .arrow,
+  .remove {
     transition: none;
   }
 }
