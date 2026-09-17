@@ -161,8 +161,9 @@ attend un désistement.
 | --- | --- |
 | `tests/lib/shared/entrant-removal.test.ts` | la fenêtre : les deux lectures de l'état, la borne au coup d'envoi bornes comprises, les phrases. |
 | `tests/lib/server/entrant-removal-service.test.ts` | l'ordre des instructions (verrou d'abord), le refus hors fenêtre, l'effacement, la renumérotation, la publication. |
-| `tests/app/api/entrant-removal-route.test.ts` | les gardes de la route et la traduction des refus en statuts. |
+| `tests/app/api/admin/entrant-removal.test.ts` | les gardes de la route, la traduction des refus en statuts, la ligne de journal. |
 | `tests/app/entrant-removal-panel.test.ts` | le câblage de l'interface : bouton sous sa propre condition, phrase de repli, gabarits de grille. |
+| `tests/lib/shared/bot-logs.test.ts` | la ligne de journal, et son pictogramme distinct de celui de l'abandon. |
 
 ## Voir aussi
 
