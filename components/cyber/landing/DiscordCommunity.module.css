@@ -41,6 +41,13 @@
   outline-offset: 3px;
 }
 
+/* La barre entière étant la cible, l'enfoncement doit se voir sur elle et non
+   sur le seul libellé : au doigt, on appuie rarement sur le bouton dessiné. */
+.root:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 14px rgba(88, 101, 242, 0.18);
+}
+
 /* Cadre de l'emblème : dimensionné ici pour que l'image n'impose pas sa taille
    intrinsèque au conteneur flex (`min-width: auto` vaut le contenu). */
 .mark {
@@ -67,6 +74,7 @@
 
 .label {
   font-size: 11px;
+  line-height: 1.4;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-mute);
@@ -134,6 +142,9 @@
 @media (max-width: 520px) {
   .root {
     width: 100%;
+    /* Une fois le libellé passé à la ligne, l'emblème doit s'aligner sur le
+       nombre et non sur le milieu du bloc devenu haut. */
+    align-items: flex-start;
   }
 
   /* Le libellé passe sous les chiffres plutôt que de rétrécir la colonne du
@@ -142,5 +153,7 @@
     margin-left: 0;
     width: 100%;
     justify-content: center;
+    /* Cible pleine largeur : on lui donne aussi la hauteur d'un vrai bouton. */
+    padding-block: 11px;
   }
 }
