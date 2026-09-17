@@ -47,10 +47,19 @@ const CACHE_KEY = "discord:community";
 const TTL_MS = 5 * 60_000;
 
 /**
- * Court, et volontairement : ce chiffre est un ornement de l'accueil. Discord
- * lent ne doit pas retarder le rendu de la page pour autant.
+ * Court, et ce n'est pas un réglage de confort : cet appel est **sur le chemin
+ * de rendu de l'accueil**. `loadLandingStats` l'attend, donc un Discord qui ne
+ * répond pas — sans reset TCP, simplement muet — retient la page entière le
+ * temps du délai, sur le visiteur qui tombe sur le cache froid. L'API des
+ * invitations répond en moins de 300 ms en temps normal ; 1,2 s laisse une
+ * marge de quatre fois et borne l'attente bien en deçà du budget de rendu de
+ * cette page, réglé à la milliseconde ailleurs (voir la mise en avant du
+ * recrutement, passée côté serveur pour 3,8 s de LCP).
+ *
+ * Le refus étant mis en cache, un Discord durablement muet ne coûte cette
+ * attente qu'une fois par fenêtre de cinq minutes.
  */
-const TIMEOUT_MS = 2_500;
+const TIMEOUT_MS = 1_200;
 
 const ENDPOINT = `https://discord.com/api/v10/invites/${encodeURIComponent(
   DISCORD_INVITE_CODE,

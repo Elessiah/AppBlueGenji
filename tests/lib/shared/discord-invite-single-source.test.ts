@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { join, relative } from "node:path";
 import { describe, expect, it } from "@jest/globals";
 import { DEFAULT_CONTACT } from "@/lib/shared/contact";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
@@ -51,7 +51,9 @@ describe("invitation Discord : une seule source", () => {
     for (const entry of SCANNED) {
       for (const file of sourceFiles(entry)) {
         const path = relative(ROOT, file);
-        if (path.split(sep).join(sep) === SOURCE_OF_TRUTH) continue;
+        // `relative` et `join` emploient tous deux le séparateur de la
+        // plateforme : la comparaison est juste sous Windows comme sous POSIX.
+        if (path === SOURCE_OF_TRUTH) continue;
         if (INVITE_LITERAL.test(readFileSync(file, "utf8"))) offenders.push(path);
       }
     }
