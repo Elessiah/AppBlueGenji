@@ -130,6 +130,25 @@ Deux raisons de verrouillage, exposées à l'interface :
 Tant que personne n'a réordonné, chaque format garde donc exactement le
 comportement qu'il avait.
 
+## Refermer un trou : `resequenceSeeds`
+
+Retirer un engagé du plateau (`docs/features/ENTRANT_REMOVAL.md`) efface une
+ligne au milieu de la suite : le troisième de huit s'en va, et la suite reste en
+4, 5, 6, 7, 8. Rien ne s'en casse — tout le moteur lit ces rangs par `ORDER BY`,
+jamais par leur valeur — mais la colonne cesse de dire ce qu'elle promet, et le
+rang affiché à l'écran (renuméroté à la volée par `loadEntries`) ne serait plus
+celui qui est en base.
+
+`resequenceSeeds` renumérote donc de 1 à N **sans changer l'ordre**, sur la
+connexion de l'appelant. Elle vit ici, où vit déjà la règle d'ordre, et non chez
+le retrait : deux endroits qui décident du même tri finiraient par ne plus
+trier pareil.
+
+Elle ne touche **pas** `manual_seeding` : refermer un trou n'est pas un ordre
+choisi par le staff, et le poser ferait basculer un tournoi qui seedait depuis le
+classement du site vers l'ordre d'inscription, sans que personne ne l'ait
+demandé.
+
 ## Reconstruction du plateau
 
 Si des matchs ont déjà été générés (tournoi lancé mais vierge de scores), ils

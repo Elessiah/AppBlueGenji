@@ -3,6 +3,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   formatEndurancePenaltyLiftedLog,
   formatEndurancePenaltyLog,
+  formatEntrantRemovedLog,
   formatForfeitLog,
   formatMatchResultLog,
   formatRegistrationLog,
@@ -39,6 +40,15 @@ const ALL_LINES = () => [
     byStaff: false,
   }),
   formatForfeitLog({ tournament: TOURNAMENT, entrantName: "Les Renards" }),
+  formatEntrantRemovedLog({
+    tournament: TOURNAMENT,
+    entrantName: "Les Renards",
+    registeredTeams: 2,
+    maxTeams: 16,
+    participantType: "TEAM",
+    actorPseudo: "Kiro",
+    actorId: 3,
+  }),
   formatMatchResultLog({
     tournament: TOURNAMENT,
     bracket: "UPPER",
@@ -99,6 +109,59 @@ describe("règles de rédaction communes", () => {
     const emojis = ALL_LINES().map((line) => line.split(" ")[0]);
 
     expect(new Set(emojis).size).toBe(emojis.length);
+  });
+});
+
+describe("formatEntrantRemovedLog", () => {
+  it("nomme l'engagé, son auteur et l'effectif restant", () => {
+    // Le canal est la **seule** trace qui subsiste d'une inscription effacée :
+    // après coup, rien sur la page ne dira que cet engagé a été inscrit.
+    const line = formatEntrantRemovedLog({
+      tournament: TOURNAMENT,
+      entrantName: "Les Renards",
+      registeredTeams: 2,
+      maxTeams: 16,
+      participantType: "TEAM",
+      actorPseudo: "Kiro",
+      actorId: 3,
+    });
+
+    expect(line).toContain("Inscription retirée");
+    expect(line).toContain("Les Renards");
+    expect(line).toContain("par Kiro (#3)");
+    expect(line).toContain("2/16 équipes");
+  });
+
+  it("parle de joueurs pour un tournoi individuel", () => {
+    const line = formatEntrantRemovedLog({
+      tournament: TOURNAMENT,
+      entrantName: "Nova",
+      registeredTeams: 7,
+      maxTeams: 32,
+      participantType: "SOLO",
+      actorPseudo: "Kiro",
+      actorId: 3,
+    });
+
+    expect(line).toContain("7/32 joueurs");
+  });
+
+  it("ne se confond pas avec un abandon", () => {
+    // Deux faits distincts : l'abandon laisse l'engagé au classement avec un
+    // forfait à son nom, le retrait efface son inscription avant le tirage.
+    const removed = formatEntrantRemovedLog({
+      tournament: TOURNAMENT,
+      entrantName: "Les Renards",
+      registeredTeams: 2,
+      maxTeams: 16,
+      participantType: "TEAM",
+      actorPseudo: "Kiro",
+      actorId: 3,
+    });
+    const forfeit = formatForfeitLog({ tournament: TOURNAMENT, entrantName: "Les Renards" });
+
+    expect(removed.split(" ")[0]).not.toBe(forfeit.split(" ")[0]);
+    expect(removed).not.toContain("Abandon");
   });
 });
 

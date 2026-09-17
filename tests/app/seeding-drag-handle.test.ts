@@ -51,8 +51,17 @@ describe("Poignée de glissement du seeding", () => {
     // `reorderable` = staff + ordre non figé + au moins deux lignes. La poignée
     // et les flèches doivent vivre et mourir ensemble : une poignée qui
     // survivrait au verrou offrirait un geste que le serveur refuse.
+    //
+    // La **cellule** d'actions, elle, a sa propre condition depuis qu'elle
+    // héberge aussi le retrait d'un engagé (`showActions`) : ce qui doit rester
+    // accroché à `reorderable` est le couple poignée / flèches, pas le conteneur.
     expect(panel).toMatch(/\{reorderable && \(\s*<span[\s\S]*?className=\{styles\.grip\}/);
-    expect(panel).toMatch(/\{reorderable && \(\s*<span className=\{styles\.actions\}>/);
+    expect(panel).toMatch(/\{showActions && \(\s*<span className=\{styles\.actions\}>/);
+    expect(panel).toMatch(/const showActions = reorderable \|\| removable;/);
+    // Les flèches sont bien sous `reorderable`, à l'intérieur de la cellule.
+    expect(panel).toMatch(
+      /<span className=\{styles\.actions\}>\s*\{reorderable && \(\s*<>[\s\S]*?styles\.arrow/,
+    );
   });
 
   it("laisse les flèches en place : le clavier garde son chemin", () => {
@@ -122,7 +131,7 @@ ${selector} {`);
       // `minmax(0, 1.6fr)` est une seule colonne : la virgule interne ne compte pas.
       .replace(/\([^)]*\)/g, "()")
       .split(/\s+/);
-    // poignée, rang, engagé, inscription, classement final, flèches
+    // poignée, rang, engagé, inscription, classement final, commandes
     expect(columns).toHaveLength(6);
   });
 });

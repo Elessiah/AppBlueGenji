@@ -66,6 +66,38 @@ async function loadEntries(connection: PoolConnection, tournamentId: number): Pr
   }));
 }
 
+/**
+ * Renumérote les seeds de 1 à N sans changer l'ordre, sur la connexion de
+ * l'appelant.
+ *
+ * Sert au **retrait** d'une inscription (`./registration-removal`) : effacer la
+ * troisième ligne d'un plateau de huit laisse la suite en 4, 5, 6, 7, 8. Rien ne
+ * s'en casse — tout le moteur lit ces rangs par `ORDER BY`, jamais par leur
+ * valeur — mais la colonne cesse de dire ce qu'elle promet, et le prochain
+ * réordonnancement la réécrirait en silence. On referme donc le trou tout de
+ * suite, ici, où vit la règle d'ordre (`loadEntries`) : le rang affiché à
+ * l'écran est celui qui est en base.
+ *
+ * Ne touche pas `manual_seeding` : refermer un trou n'est pas un ordre choisi
+ * par le staff, et le poser ferait basculer un tournoi qui seedait depuis le
+ * classement du site vers l'ordre d'inscription, sans que personne ne l'ait
+ * demandé.
+ */
+export async function resequenceSeeds(
+  connection: PoolConnection,
+  tournamentId: number,
+): Promise<void> {
+  const entries = await loadEntries(connection, tournamentId);
+  for (const entry of entries) {
+    await connection.execute(
+      `UPDATE bg_tournament_registrations
+       SET seed = ?
+       WHERE tournament_id = ? AND team_id = ?`,
+      [entry.seed, tournamentId, entry.teamId],
+    );
+  }
+}
+
 /** État du seeding d'un tournoi : ordre courant et fenêtre d'édition. */
 export async function loadSeedingBoard(tournamentId: number): Promise<SeedingBoard | null> {
   const db = await getDatabase();

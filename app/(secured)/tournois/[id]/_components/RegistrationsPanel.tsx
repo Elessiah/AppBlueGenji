@@ -12,18 +12,27 @@ import {
   type SeedingLockReason,
 } from "@/lib/shared/seeding";
 import { fromBracketMatch } from "@/lib/shared/match-lock";
+import {
+  entrantRemovalBlockMessage,
+  entrantRemovalBlockReason,
+} from "@/lib/shared/entrant-removal";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { EntrantLink, useParticipantWording } from "../_lib/entrant-link";
 import { mapError } from "../_lib/error-map";
+import { useTournamentNow } from "@/lib/shared/hooks/useTournamentNow";
 import { useSeedingDrag } from "../_hooks/useSeedingDrag";
+import { RemoveEntrantDialog } from "./RemoveEntrantDialog";
 import styles from "./RegistrationsPanel.module.css";
 
 interface RegistrationsPanelProps {
   detail: TournamentDetail;
   /** Le staff peut-il agir ? Faux quand le suivi du tournoi est en échec. */
-  canReorder: boolean;
-  /** Rafraîchit le détail après réordonnancement (le plateau est régénéré). */
-  onReordered: () => void;
+  canAct: boolean;
+  /**
+   * Rafraîchit le détail après une écriture du staff — réordonnancement (le
+   * plateau est régénéré) ou retrait d'un engagé.
+   */
+  onChanged: () => void;
 }
 
 const LOCK_MESSAGES: Record<NonNullable<SeedingLockReason>, string> = {
@@ -50,7 +59,7 @@ const LOCK_MESSAGES: Record<NonNullable<SeedingLockReason>, string> = {
  * plutôt que d'une requête à part : les commandes apparaissent avec la page, et
  * le serveur reste le juge, qui refuse en 409 une écriture devenue interdite.
  */
-export function RegistrationsPanel({ detail, canReorder, onReordered }: RegistrationsPanelProps) {
+export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsPanelProps) {
   const { showError, showSuccess } = useToast();
   const wording = useParticipantWording();
   const [busy, setBusy] = useState(false);
@@ -81,8 +90,41 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
   const byId = new Map(detail.registrations.map((reg) => [reg.teamId, reg]));
 
   const lockReason = seedingLockReason(detail.card.state, detail.matches.map(fromBracketMatch));
-  const staff = detail.isAdmin && canReorder;
+  const staff = detail.isAdmin && canAct;
   const reorderable = staff && lockReason === null && detail.registrations.length > 1;
+
+  // Le retrait a sa **propre** fenêtre, plus courte que celle de l'ordre de
+  // départ : celui-ci reste réglable jusqu'à la première saisie de score, donc
+  // encore après le coup d'envoi, alors qu'un engagé ne se retire que tant que
+  // le tirage n'est pas fait (`lib/shared/entrant-removal.ts`). Les deux
+  // commandes partagent une cellule mais pas une condition.
+  //
+  // L'heure vient d'un minuteur posé sur la prochaine bascule d'état du tournoi,
+  // et non d'un `Date.now()` au rendu : la fenêtre de retrait se ferme au coup
+  // d'envoi, une seconde connue d'avance qu'aucune écriture n'annonce — le flux
+  // ne pousse un instantané que si quelqu'un a écrit. Sans cela le bouton
+  // resterait offert après l'heure, pour un refus en 409 au clic.
+  const now = useTournamentNow(detail.card);
+  const removalBlock = entrantRemovalBlockReason(detail.card, now);
+  const removable = staff && removalBlock === null;
+  const showActions = reorderable || removable;
+
+  // Deux refus, une seule cause : sur un tournoi terminé, « l'ordre n'a plus
+  // d'effet » et « la liste est un palmarès » disent le même fait, et trois
+  // paragraphes empilés au-dessus d'une liste ne se lisent plus. Le verrou de
+  // l'ordre parle le premier, il garde la parole ; la phrase du retrait ne
+  // s'affiche que lorsqu'elle apprend quelque chose — typiquement sur un
+  // tournoi lancé, où l'ordre reste réglable mais où le retrait, lui, est clos.
+  const removalNotice =
+    removalBlock !== null
+    && !(lockReason === "FINISHED" && removalBlock === "ENTRANT_REMOVAL_TOURNAMENT_FINISHED")
+      ? removalBlock
+      : null;
+
+  // Engagé dont on confirme le retrait. La ligne est gardée en entier plutôt
+  // que son seul identifiant : le dialogue reste monté pendant que le flux
+  // redessine la page, et c'est le nom vu au moment du clic qu'il doit annoncer.
+  const [removing, setRemoving] = useState<{ teamId: number; teamName: string } | null>(null);
 
   /** Écrit un ordre complet, avec aperçu optimiste et annonce vocale. */
   const applyOrder = useCallback(
@@ -102,7 +144,7 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
         showSuccess("Ordre mis à jour.");
         // Tournure neutre : le genre de « équipe » et de « joueur » diverge.
         setAnnouncement(`Nouveau rang de ${name} : ${next.indexOf(teamId) + 1} sur ${next.length}.`);
-        onReordered();
+        onChanged();
       } catch (e) {
         // L'ordre du serveur fait foi : on lâche l'affichage optimiste plutôt que
         // de laisser croire à une écriture qui n'a pas eu lieu.
@@ -112,7 +154,7 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
         setBusy(false);
       }
     },
-    [detail.card.id, detail.registrations, onReordered, serverKey, showError, showSuccess],
+    [detail.card.id, detail.registrations, onChanged, serverKey, showError, showSuccess],
   );
 
   const onDrop = useCallback(
@@ -154,6 +196,17 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
   const source = detail.seedingSource;
   const showsRealDraw = isSeedOrderEffective(source);
 
+  // Une seule cellule d'actions, trois gabarits de grille : la poignée n'existe
+  // qu'avec le réordonnancement, la cellule d'actions dès que l'une des deux
+  // commandes est là. Les gabarits sont exclusifs — deux classes de même poids
+  // sur la même propriété se départageraient par l'ordre de la feuille, ce qui
+  // n'est pas une règle qu'on veut avoir à relire.
+  const gridClass = reorderable ? styles.reorderable : removable ? styles.withActions : "";
+  // L'intitulé nomme ce que la colonne contient réellement, et il n'y a pas
+  // toujours les deux : « Ordre » seul sur un tournoi lancé sans score,
+  // « Retrait » seul sur un plateau d'un unique engagé.
+  const actionsLabel = reorderable && removable ? "Actions" : reorderable ? "Ordre" : "Retrait";
+
   return (
     <div className="ds-block">
       <div className="ds-section-title green" style={{ alignItems: "center" }}>
@@ -170,6 +223,12 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
                 ? "Ce rang décide des appariements de la première manche. Glissez une ligne par sa poignée pour la déplacer d'un bloc, ou utilisez les flèches ci-contre — jusqu'à la première saisie de score."
                 : `Ce rang décidera des appariements de la première manche. Il se règlera ici dès qu'il y aura deux ${wording.manyEngaged}.`}
           </p>
+          {removalNotice !== null && rows.length > 0 && (
+            /* Le bouton « Retirer » a disparu, et rien sur la ligne ne dit
+               pourquoi : la phrase vient du module pur, celle-là même que le
+               serveur renverrait sur une écriture tardive. */
+            <p className={styles.hint}>{entrantRemovalBlockMessage(removalNotice)}</p>
+          )}
           {!showsRealDraw && rows.length > 0 && (
             <p className={styles.warning}>
               Ce format seede depuis le classement du site : les rangs ci-dessous ne sont
@@ -185,13 +244,13 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
         <p className={styles.empty}>Aucune inscription pour le moment.</p>
       ) : (
         <div className={`${styles.table} ${drag.draggingTeamId !== null ? styles.dragging : ""}`}>
-          <div className={`${styles.row} ${styles.header} ${reorderable ? styles.reorderable : ""}`}>
+          <div className={`${styles.row} ${styles.header} ${gridClass}`}>
             {reorderable && <span aria-hidden="true" />}
             <span>Rang</span>
             <span>{wording.oneCapitalized}</span>
             <span>Inscription</span>
             <span>Classement final</span>
-            {reorderable && <span className={styles.actionsHead}>Ordre</span>}
+            {showActions && <span className={styles.actionsHead}>{actionsLabel}</span>}
           </div>
           {rows.map((reg, index) => (
             <div
@@ -199,7 +258,7 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
               ref={drag.setRowRef(reg.teamId)}
               className={[
                 styles.row,
-                reorderable ? styles.reorderable : "",
+                gridClass,
                 drag.draggingTeamId === reg.teamId ? styles.dragged : "",
               ]
                 .filter(Boolean)
@@ -224,34 +283,53 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
               </EntrantLink>
               <span className={styles.muted}>{formatLocalDateTime(reg.registeredAt)}</span>
               <span className={styles.muted}>{reg.finalRank ?? "-"}</span>
-              {reorderable && (
+              {showActions && (
                 <span className={styles.actions}>
-                  <button
-                    type="button"
-                    ref={(node) => {
-                      buttons.current.set(`${reg.teamId}:up`, node);
-                    }}
-                    className={styles.arrow}
-                    aria-label={`Monter ${reg.teamName} d'un rang`}
-                    title="Monter d'un rang"
-                    disabled={busy || index === 0}
-                    onClick={() => move(reg.teamId, "up")}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    ref={(node) => {
-                      buttons.current.set(`${reg.teamId}:down`, node);
-                    }}
-                    className={styles.arrow}
-                    aria-label={`Descendre ${reg.teamName} d'un rang`}
-                    title="Descendre d'un rang"
-                    disabled={busy || index === rows.length - 1}
-                    onClick={() => move(reg.teamId, "down")}
-                  >
-                    ↓
-                  </button>
+                  {reorderable && (
+                    <>
+                      <button
+                        type="button"
+                        ref={(node) => {
+                          buttons.current.set(`${reg.teamId}:up`, node);
+                        }}
+                        className={styles.arrow}
+                        aria-label={`Monter ${reg.teamName} d'un rang`}
+                        title="Monter d'un rang"
+                        disabled={busy || index === 0}
+                        onClick={() => move(reg.teamId, "up")}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        ref={(node) => {
+                          buttons.current.set(`${reg.teamId}:down`, node);
+                        }}
+                        className={styles.arrow}
+                        aria-label={`Descendre ${reg.teamName} d'un rang`}
+                        title="Descendre d'un rang"
+                        disabled={busy || index === rows.length - 1}
+                        onClick={() => move(reg.teamId, "down")}
+                      >
+                        ↓
+                      </button>
+                    </>
+                  )}
+                  {removable && (
+                    /* Le nom est dans le libellé accessible, pas seulement dans
+                       la ligne : trente boutons « Retirer » identiques ne se
+                       distinguent pas à la voix ni au lecteur d'écran. */
+                    <button
+                      type="button"
+                      className={styles.remove}
+                      aria-label={`Retirer ${reg.teamName} du tournoi`}
+                      title="Retirer du tournoi"
+                      disabled={busy}
+                      onClick={() => setRemoving({ teamId: reg.teamId, teamName: reg.teamName })}
+                    >
+                      Retirer
+                    </button>
+                  )}
                 </span>
               )}
             </div>
@@ -264,6 +342,20 @@ export function RegistrationsPanel({ detail, canReorder, onReordered }: Registra
       <p aria-live="polite" className="sr-only">
         {announcement}
       </p>
+
+      {removing !== null && (
+        <RemoveEntrantDialog
+          card={detail.card}
+          teamId={removing.teamId}
+          entrantName={removing.teamName}
+          onClose={() => setRemoving(null)}
+          onRemoved={() => {
+            setRemoving(null);
+            setAnnouncement(`${removing.teamName} ne figure plus parmi les engagés.`);
+            onChanged();
+          }}
+        />
+      )}
     </div>
   );
 }

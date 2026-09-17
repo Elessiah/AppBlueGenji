@@ -131,15 +131,45 @@ export function formatRegistrationLog(context: {
 /**
  * Abandon d'un engagé en cours de tournoi.
  *
- * C'est la seule sortie possible du plateau : une inscription ne se retire
- * jamais une fois posée (c'est sur quoi s'appuie `finalizeUnderfilledTournament`),
- * un engagé qui s'en va le fait par forfait.
+ * C'est la seule sortie possible **une fois le tournoi lancé** : le staff peut
+ * retirer une inscription tant que le coup d'envoi n'a pas eu lieu
+ * ({@link formatEntrantRemovedLog}), mais pas une seconde après — c'est sur
+ * cette borne que s'appuie `finalizeUnderfilledTournament`, qui compte
+ * l'effectif au départ et n'a pas à le recompter ensuite.
  */
 export function formatForfeitLog(context: {
   tournament: BotLogTournament;
   entrantName: string;
 }): string {
   return `${lead("🚪", "Abandon", context.tournament)} : ${context.entrantName} quitte la compétition.`;
+}
+
+/**
+ * Retrait d'une inscription par le staff, avant le coup d'envoi
+ * (`lib/shared/entrant-removal.ts`).
+ *
+ * Ligne distincte de l'abandon, et ce n'est pas une nuance de vocabulaire : un
+ * abandon laisse un engagé au classement avec un forfait à son nom, un retrait
+ * l'efface — après coup, rien sur la page ne dira qu'il a été inscrit. Le canal
+ * est alors le **seul** endroit où la trace subsiste, d'où l'auteur nommé, comme
+ * pour la suppression d'un tournoi et le retour en arrière.
+ *
+ * L'effectif restant suit : c'est ce qu'un arbitre vérifie en retirant une
+ * équipe la veille d'un tournoi, et il tombe déjà à cet endroit de la ligne sur
+ * l'inscription.
+ */
+export function formatEntrantRemovedLog(context: {
+  tournament: BotLogTournament;
+  entrantName: string;
+  registeredTeams: number;
+  maxTeams: number;
+  participantType: ParticipantType;
+  actorPseudo: string;
+  actorId: number;
+}): string {
+  const field = `${context.registeredTeams}/${context.maxTeams} ${participantWording(context.participantType).many}`;
+  const actor = `${context.actorPseudo} (#${context.actorId})`;
+  return `${lead("➖", "Inscription retirée", context.tournament)} : ${context.entrantName}, par ${actor}. ${field}.`;
 }
 
 /**

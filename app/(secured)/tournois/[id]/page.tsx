@@ -759,8 +759,8 @@ export default function TournamentDetailPage() {
 
         <RegistrationsPanel
           detail={detail}
-          canReorder={!frozen}
-          onReordered={() => void refresh()}
+          canAct={!frozen}
+          onChanged={() => void refresh()}
         />
 
         <TournamentProgress detail={detail} />
