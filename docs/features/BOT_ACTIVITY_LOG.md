@@ -14,6 +14,7 @@ jamais le site en retour.
 
 | Évènement | Ligne | Déclencheur |
 | --- | --- | --- |
+| Inscription d'un joueur | `👋 Nouveau joueur — « Nova » (#42) : compte créé via Google.` | `createOrGetGoogleUser` / `createOrGetDiscordUser` |
 | Création d'un tournoi | `📅 Nouveau tournoi — « … » (#12) : Ronde suisse · Overwatch, 16 équipes max, créé par …, début le …` | `createTournament` |
 | Inscription | `✅ Inscription — « … » (#12) : Alpha. 3/16 équipes.` | `registerTeam` (joueur ou staff) |
 | Retrait d'un engagé | `➖ Inscription retirée — « … » (#12) : Alpha, par … (#3). 2/16 équipes.` | `DELETE /api/admin/tournaments/[id]/registrations/[teamId]` |
@@ -29,6 +30,16 @@ que ce sont deux faits : l'abandon laisse l'engagé au classement avec un forfai
 à son nom, le retrait efface son inscription avant le coup d'envoi — après quoi
 rien, sur la page, ne dira qu'il a été inscrit. Le canal est alors la **seule**
 trace qui subsiste, d'où l'auteur nommé (voir `docs/features/ENTRANT_REMOVAL.md`).
+
+L'**inscription d'un joueur** est la seule ligne qui ne parle d'aucun tournoi,
+et la seule qu'un visiteur sans compte puisse provoquer. Elle y a sa place pour
+la même raison que les autres : c'est un fait accompli qui ne se relit nulle part
+ailleurs — l'annuaire montre les comptes, pas le moment où ils sont nés — et
+c'est ce qu'un community manager cherche le lendemain d'une annonce.
+
+Elle n'emploie **pas** le mot « inscription », déjà pris sur ce canal par
+l'engagement d'une équipe dans un tournoi, et porte son propre pictogramme : les
+deux lignes se distinguent à l'œil, dès la colonne de gauche.
 
 Le **conflit de score** n'y figure plus : c'est le premier évènement du site à
 appeler une intervention humaine, il part donc au **canal arbitre**
@@ -70,6 +81,12 @@ Restent donc dehors, en connaissance de cause :
   tournoi.** Réglages du staff, déjà visibles sur la page — et pour les rappels
   de match, le joueur concerné reçoit un message privé
   (`docs/features/DISCORD_NOTIFICATIONS.md`).
+- **Les connexions.** Le site n'a pas de formulaire d'inscription : un compte
+  naît à la **première** connexion, par la même fonction qui retrouve les
+  habitués les soirs suivants. La ligne est donc posée sur l'`INSERT` lui-même —
+  là, et nulle part ailleurs, « ce joueur est neuf » n'est pas une déduction. Un
+  compte existant auquel Google se rattache par son adresse vérifiée n'en produit
+  aucune : ce n'est pas un joueur de plus.
 - **Les lectures.** Aucun trafic n'écrit dans le journal : le nombre de lignes
   d'un tournoi reste de l'ordre de son nombre de matchs, qu'il ait trois
   spectateurs ou trois cents.
@@ -91,6 +108,7 @@ par une règle pure et unique (`lib/shared/referee-alerts.ts`). Voir
 | Tri journal / canal arbitre (pur) | `lib/shared/referee-alerts.ts` |
 | Libellés format / jeu (pur, partagés avec l'en-tête) | `lib/shared/tournament-labels.ts` |
 | File par transaction et résolution | `lib/server/tournaments/bot-logs.ts` |
+| Déclenchement de l'inscription d'un joueur | `lib/server/users-service.ts` (`announcePlayerSignup`) |
 | Transport vers le bot | `lib/server/bot-integration.ts` (`sendBotLog`) |
 
 ## Pourquoi une file par transaction
@@ -161,6 +179,12 @@ nulle part ailleurs :
 - `finishTournament` (`./repository`) est le seul point de clôture d'un tournoi,
   quel que soit le format qui la décide (élimination, survie, ronde suisse,
   endurance, phases).
+- `createOrGetGoogleUser` et `createOrGetDiscordUser` (`lib/server/users-service.ts`)
+  sont les deux seules naissances d'un compte, et l'annonce est posée sur leur
+  `INSERT`. Hors d'une transaction — il n'y en a pas ici —, donc envoyée
+  directement par `sendBotLog` et sans être attendue, comme le retrait d'un
+  engagé ou la suppression d'un tournoi : un bot endormi n'allonge pas une
+  connexion et ne la fait pas échouer.
 - `syncTournamentState` (`./state`) est le seul point de bascule d'état. La
   condition porte sur l'état **d'arrivée** (`RUNNING`) et non sur le départ : un
   tournoi repasse par `UPCOMING` entre la clôture des inscriptions et son heure
