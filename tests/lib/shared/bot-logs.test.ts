@@ -6,6 +6,7 @@ import {
   formatEntrantRemovedLog,
   formatForfeitLog,
   formatMatchResultLog,
+  formatPlayerSignupLog,
   formatRegistrationLog,
   formatTournamentCreatedLog,
   formatTournamentDeletedLog,
@@ -21,7 +22,7 @@ const TOURNAMENT = { id: 12, name: "Coupe BlueGenji" };
  * déroulante. Une ligne qui se replie sur trois lignes chasse les neuf
  * évènements précédents de l'écran.
  */
-const ALL_LINES = () => [
+const TOURNAMENT_LINES = () => [
   formatTournamentCreatedLog({
     tournament: TOURNAMENT,
     format: "SWISS",
@@ -84,6 +85,19 @@ const ALL_LINES = () => [
   }),
 ];
 
+/**
+ * Tout ce que le site journalise, tournoi ou non.
+ *
+ * L'inscription d'un joueur est la seule ligne qui ne parle d'aucun tournoi :
+ * elle est donc tenue à l'écart de la règle « nomme le tournoi », et à rien
+ * d'autre — une ligne sur trois lignes ou un pictogramme repris ailleurs
+ * abîmerait le canal exactement de la même façon.
+ */
+const ALL_LINES = () => [
+  ...TOURNAMENT_LINES(),
+  formatPlayerSignupLog({ player: { id: 42, pseudo: "Nova" }, provider: "GOOGLE" }),
+];
+
 describe("règles de rédaction communes", () => {
   it("tient chaque évènement sur une seule ligne", () => {
     for (const line of ALL_LINES()) {
@@ -91,17 +105,18 @@ describe("règles de rédaction communes", () => {
     }
   });
 
-  it("nomme le tournoi et son identifiant dans chaque ligne", () => {
-    for (const line of ALL_LINES()) {
+  it("nomme le tournoi et son identifiant dans chaque ligne qui en concerne un", () => {
+    for (const line of TOURNAMENT_LINES()) {
       expect(line).toContain("« Coupe BlueGenji » (#12)");
     }
   });
 
-  it("ouvre chaque ligne sur la même entame : pictogramme, nature, tournoi", () => {
+  it("ouvre chaque ligne sur la même entame : pictogramme, nature, sujet nommé", () => {
     // C'est ce qui rend le canal lisible en diagonale : la nature de
-    // l'évènement tombe toujours au même endroit.
+    // l'évènement tombe toujours au même endroit — y compris sur la seule ligne
+    // dont le sujet n'est pas un tournoi.
     for (const line of ALL_LINES()) {
-      expect(line).toMatch(/^\S+ [A-ZÀ-Ý][^—]* — « Coupe BlueGenji » \(#12\)/u);
+      expect(line).toMatch(/^\S+ [A-ZÀ-Ý][^—]* — « .+ » \(#\d+\)/u);
     }
   });
 
@@ -471,5 +486,59 @@ describe("pénalités d'endurance", () => {
     });
 
     expect(applied.slice(0, 2)).not.toBe(lifted.slice(0, 2));
+  });
+});
+
+describe("formatPlayerSignupLog", () => {
+  it("nomme le joueur, son identifiant et la voie d'entrée", () => {
+    const line = formatPlayerSignupLog({
+      player: { id: 42, pseudo: "Nova" },
+      provider: "GOOGLE",
+    });
+
+    expect(line).toBe("👋 Nouveau joueur — « Nova » (#42) : compte créé via Google.");
+  });
+
+  it("distingue les deux voies d'entrée", () => {
+    // Un compte né par Discord porte un identifiant Discord, donc reçoit les
+    // rappels de match en message privé ; un compte né par Google n'en a aucun
+    // tant que le joueur ne l'a pas renseigné.
+    const discord = formatPlayerSignupLog({
+      player: { id: 42, pseudo: "Nova" },
+      provider: "DISCORD",
+    });
+
+    expect(discord).toContain("via Discord");
+    expect(discord).not.toContain("via Google");
+  });
+
+  it("ne se confond pas avec une inscription à un tournoi", () => {
+    // Les deux mots « inscription » cohabitent sur le même canal : l'un désigne
+    // un compte qui naît, l'autre une équipe qui s'engage. La ligne du joueur
+    // n'emploie donc pas le mot, et son pictogramme est le sien.
+    const signup = formatPlayerSignupLog({
+      player: { id: 42, pseudo: "Nova" },
+      provider: "GOOGLE",
+    });
+    const registration = formatRegistrationLog({
+      tournament: TOURNAMENT,
+      entrantName: "Les Renards",
+      registeredTeams: 3,
+      maxTeams: 16,
+      participantType: "TEAM",
+      byStaff: false,
+    });
+
+    expect(signup).not.toContain("Inscription");
+    expect(signup.split(" ")[0]).not.toBe(registration.split(" ")[0]);
+  });
+
+  it("garde un pseudo à espaces lisible entre ses guillemets", () => {
+    const line = formatPlayerSignupLog({
+      player: { id: 7, pseudo: "Nova la Rousse" },
+      provider: "DISCORD",
+    });
+
+    expect(line).toContain("« Nova la Rousse » (#7)");
   });
 });
