@@ -1,5 +1,6 @@
 ﻿import crypto from "node:crypto";
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
@@ -7,6 +8,7 @@ import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
 import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
 import { importRemoteAvatar, shouldImportGoogleAvatar } from "@/lib/server/user-avatar-import";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
+import { formatPlayerSignupLog, type PlayerSignupProvider } from "@/lib/shared/bot-logs";
 import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 import { getPlayerEntityStats, loadPlayerRecords } from "@/lib/server/stats-service";
 import type {
@@ -257,6 +259,32 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
   });
 }
 
+/**
+ * Annonce la naissance d'un compte au journal Discord du bot.
+ *
+ * **Posé sur l'insertion, pas sur la connexion.** Les deux voies d'entrée du
+ * site passent par une fonction `createOrGet…` qui rend le même identifiant
+ * qu'un compte soit né ou simplement retrouvé : une route qui voudrait
+ * journaliser l'inscription devrait redemander à la base si ce compte existait
+ * déjà — une seconde règle, qui dériverait de celle-ci au premier changement, et
+ * une ligne par connexion le jour où elle se tromperait. Ici il n'y a rien à
+ * décider : l'`INSERT` vient de rendre un `insertId`, donc le joueur est neuf.
+ *
+ * Au meilleur effort et sans être attendue, comme tout le journal : un bot
+ * endormi n'allonge pas une connexion et ne la fait pas échouer. `sendBotLog`
+ * avale déjà ses erreurs ; le `catch` ne couvre que le rejet qu'une version
+ * future pourrait laisser passer, qui deviendrait sinon un rejet non traité.
+ */
+function announcePlayerSignup(
+  userId: number,
+  pseudo: string,
+  provider: PlayerSignupProvider,
+): void {
+  void sendBotLog(
+    formatPlayerSignupLog({ player: { id: userId, pseudo }, provider }),
+  ).catch(() => undefined);
+}
+
 export async function createOrGetGoogleUser(profile: GoogleProfilePayload): Promise<number> {
   const db = await getDatabase();
 
@@ -329,6 +357,7 @@ export async function createOrGetGoogleUser(profile: GoogleProfilePayload): Prom
   );
 
   const userId = Number(created.insertId);
+  announcePlayerSignup(userId, pseudo, "GOOGLE");
   await adoptGoogleAvatar(userId, profile.picture);
   return userId;
 }
@@ -384,7 +413,9 @@ export async function createOrGetDiscordUser(discordId: string, pseudoInput?: st
     [pseudo, discordId],
   );
 
-  return Number(created.insertId);
+  const userId = Number(created.insertId);
+  announcePlayerSignup(userId, pseudo, "DISCORD");
+  return userId;
 }
 
 /**

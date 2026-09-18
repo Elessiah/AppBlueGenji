@@ -83,7 +83,66 @@ function tournamentLabel(tournament: BotLogTournament): string {
  * @param tournament Tournoi concerné.
  */
 function lead(emoji: string, kind: string, tournament: BotLogTournament): string {
-  return `${emoji} ${kind} — ${tournamentLabel(tournament)}`;
+  return leadOn(emoji, kind, tournamentLabel(tournament));
+}
+
+/**
+ * La même entame, sur un sujet qui n'est pas un tournoi.
+ *
+ * Presque tout ce que le site journalise parle d'un tournoi, et {@link lead} est
+ * écrit pour qu'aucune de ces lignes-là ne puisse oublier de le nommer. Une
+ * inscription de joueur, elle, n'en a aucun : elle a lieu sur `/connexion`, avant
+ * que le compte n'existe. C'est la seule raison de cette seconde porte — et elle
+ * passe par la même chaîne de caractères, pour que la nature de l'évènement
+ * tombe au même endroit sur les deux familles de lignes.
+ */
+function leadOn(emoji: string, kind: string, subject: string): string {
+  return `${emoji} ${kind} — ${subject}`;
+}
+
+/**
+ * Voie par laquelle un compte vient de naître.
+ *
+ * Les deux que `/connexion` propose, et il n'y en a pas de troisième : le compte
+ * se crée à la première connexion, jamais par un formulaire d'inscription. La
+ * voie figure sur la ligne parce qu'elle décide de ce qu'on peut faire du
+ * compte ensuite — un compte né par Discord porte un identifiant Discord, donc
+ * reçoit les rappels de match en message privé ; un compte né par Google n'en a
+ * aucun tant que le joueur ne l'a pas renseigné sur `/profil`.
+ */
+export type PlayerSignupProvider = "GOOGLE" | "DISCORD";
+
+const SIGNUP_PROVIDER_LABELS: Record<PlayerSignupProvider, string> = {
+  GOOGLE: "Google",
+  DISCORD: "Discord",
+};
+
+/**
+ * Inscription d'un joueur : un compte vient d'être créé sur le site.
+ *
+ * Seule ligne du journal qui ne parle d'aucun tournoi, et la seule qu'un
+ * visiteur sans compte puisse provoquer. Elle y a sa place pour la même raison
+ * que les autres : c'est un **fait accompli** qui ne se relit nulle part
+ * ailleurs — l'annuaire montre les comptes, pas le moment où ils sont nés — et
+ * c'est ce qu'un community manager cherche le lendemain d'une annonce.
+ *
+ * Elle reste **une par compte**, pas une par connexion : la rédaction est
+ * appelée depuis l'insertion elle-même (`lib/server/users-service.ts`), donc un
+ * habitué qui se reconnecte chaque soir n'écrit rien, et un compte existant
+ * auquel Google se rattache par son adresse vérifiée non plus — ce n'est pas un
+ * joueur de plus.
+ *
+ * L'identifiant suit le pseudo, comme partout : un pseudo se change depuis
+ * `/profil`, et la ligne doit rester rapprochable de `/joueurs/<id>` des mois
+ * après.
+ */
+export function formatPlayerSignupLog(context: {
+  player: { id: number; pseudo: string };
+  provider: PlayerSignupProvider;
+}): string {
+  const subject = `« ${context.player.pseudo} » (#${context.player.id})`;
+  const provider = SIGNUP_PROVIDER_LABELS[context.provider];
+  return `${leadOn("👋", "Nouveau joueur", subject)} : compte créé via ${provider}.`;
 }
 
 /** Création d'un tournoi par le staff. */
