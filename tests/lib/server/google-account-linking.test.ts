@@ -1,13 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
 
 import { createOrGetGoogleUser, type GoogleProfilePayload } from "@/lib/server/users-service";
+import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
 import { ensureUniquePseudo } from "@/lib/server/auth";
+
+// Un compte créé annonce sa naissance au journal Discord
+// (`tests/lib/server/player-signup-log.test.ts`). Rien à mesurer ici, mais
+// l'envoi est bien tenté : sans promesse en retour, l'auto-mock ferait échouer
+// la création. `clearAllMocks` ne défait pas les implémentations.
+(sendBotLog as jest.Mock).mockResolvedValue(undefined as never);
 
 /**
  * **Rattacher un `sub` Google à un compte du site, et sur quelle preuve.**
