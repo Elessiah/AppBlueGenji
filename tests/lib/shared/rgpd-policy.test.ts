@@ -15,10 +15,29 @@ describe("DONNEES_PROFIL", () => {
     expect(names).toContain("ID Discord");
     expect(names).toContain("Pseudo Marvel Rivals");
     expect(names).toContain("Avatar");
+    expect(names).toContain("Certification du pseudo Discord");
   });
 
-  it("has exactly 6 entries", () => {
-    expect(DONNEES_PROFIL).toHaveLength(6);
+  it("has exactly 7 entries", () => {
+    expect(DONNEES_PROFIL).toHaveLength(7);
+  });
+
+  it("dit les deux régimes du tag Discord : certifié exposé, non certifié privé", () => {
+    // La finalité a changé avec la certification, et une déclaration restée sur
+    // l'ancienne serait fausse : le tag certifié est une coordonnée de contact
+    // exposée à l'organisation. Les deux régimes coexistent en base, la phrase
+    // doit donc nommer les deux.
+    const tag = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Discord");
+    expect(tag?.finalite).toMatch(/certifié/i);
+    expect(tag?.finalite).toMatch(/arbitres?/i);
+    expect(tag?.finalite).toMatch(/Non certifié/i);
+  });
+
+  it("déclare la certification elle-même, et qu'elle se perd", () => {
+    const certification = DONNEES_PROFIL.find(
+      (d) => d.donnee === "Certification du pseudo Discord",
+    );
+    expect(certification?.finalite).toMatch(/modifié/i);
   });
 
   it("discloses that the Discord user ID is stored for Discord login", () => {
@@ -41,8 +60,12 @@ describe("DONNEES_PROFIL", () => {
   });
 
   it("profile data is tied to account lifetime", () => {
+    // **Bornée par** la durée du compte, et non strictement égale : la
+    // certification du tag Discord se perd dès que le tag change, donc plus tôt.
+    // Ce qu'il faut tenir est qu'aucune donnée de profil ne survive au compte —
+    // pas que toutes vivent exactement aussi longtemps que lui.
     for (const entry of DONNEES_PROFIL) {
-      expect(entry.duree).toBe("Durée du compte");
+      expect(entry.duree.toLowerCase()).toContain("durée du compte");
     }
   });
 });

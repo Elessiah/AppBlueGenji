@@ -27,9 +27,23 @@ export const DONNEES_PROFIL: DonneEntry[] = [
   },
   {
     donnee: "Pseudo Discord",
-    finalite: "Authentification Discord, notifications bot",
+    // La finalité a changé avec la certification (`lib/shared/discord-identity.ts`),
+    // et une déclaration RGPD qui resterait sur l'ancienne serait fausse : le tag
+    // n'est plus seulement un moyen technique, il devient une **coordonnée de
+    // contact** exposée à l'organisation — mais uniquement une fois certifié, et
+    // uniquement à deux publics. La phrase dit les deux régimes, parce que les
+    // deux existent en base au même instant.
+    finalite:
+      "Authentification Discord, notifications bot. Une fois certifié : contact par l'organisation pendant un tournoi (administrateurs en permanence, arbitres tant que le joueur est engagé). Non certifié : visible de son seul titulaire",
     base: "Consentement",
     duree: "Durée du compte",
+  },
+  {
+    donnee: "Certification du pseudo Discord",
+    finalite:
+      "Atteste que le compte Discord appartient bien au joueur ; conditionne l'exposition du tag à l'organisation. Perdue dès que le tag est modifié",
+    base: "Consentement",
+    duree: "Jusqu'à modification du tag, ou durée du compte",
   },
   {
     donnee: "ID Discord",

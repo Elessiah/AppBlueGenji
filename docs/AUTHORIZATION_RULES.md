@@ -209,7 +209,7 @@ modifier le profil d'autrui.
 | Battletag Overwatch         | ✅        | `visible_overwatch`          |
 | Tag Marvel Rivals           | ✅        | `visible_marvel`             |
 | Majorité (`isAdult`)        | ✅        | `visible_major`              |
-| Pseudo Discord              | —         | **jamais exposé** à un tiers |
+| Pseudo Discord              | —         | **règle propre** : certifié → administration et arbitrage ; non certifié → personne (§2.4) |
 | Pseudo                      | ❌        | jamais masqué — il identifie le joueur en bracket, roster et feuille de match |
 
 Le masquage est appliqué **côté serveur, à la source** : le champ masqué vaut
@@ -250,6 +250,39 @@ Deux points volontaires, à ne pas prendre pour des fuites :
 Ni l'e-mail, ni le `google_sub`, ni le `discord_id` ne sortent jamais d'un profil
 consulté par un tiers ; ils n'apparaissent que dans l'export RGPD du
 propriétaire.
+
+### 2.4 Le tag Discord — un public, pas un réglage
+
+Le tag Discord n'a **pas** de case de visibilité : il a un public, décidé par
+`canViewDiscordTag` (`lib/shared/discord-identity.ts`), et l'ordre des cas *est*
+la règle :
+
+| Lecteur                              | Voit le tag                                    |
+| ------------------------------------ | ---------------------------------------------- |
+| Le propriétaire du compte            | Toujours, certifié ou non                      |
+| N'importe qui, tag **non certifié**  | **Jamais**, administrateur compris              |
+| Administrateur                       | Toujours (tag certifié)                         |
+| Permission `tournaments`             | Si le joueur est engagé dans un tournoi vivant  |
+| `casting`, joueur, visiteur          | Jamais — le tag n'est **pas** public            |
+
+La clause « non certifié » passe **avant** les rôles, et ce n'est pas un détail
+d'écriture : c'est elle qui protège les comptes qui ont saisi leur tag sous le
+régime « visible de moi seul », et placée après elle serait oubliée au premier
+rôle ajouté. La certification est facultative et porte le consentement à
+l'exposition (`docs/features/DISCORD_VERIFICATION.md`) ; elle se perd à toute
+modification du tag.
+
+« Tournoi vivant » = tout état sauf `FINISHED` : le besoin de joindre un joueur
+naît du tournoi et s'éteint avec lui. Le fait est **global**, pas relatif au
+lecteur — un arbitre arbitre le site, pas un tournoi en particulier.
+
+Le filtrage est posé **à la sortie** (`visibleDiscordTag`), comme celui de
+l'avatar : un écran ajouté demain n'a rien à afficher plutôt qu'à se souvenir
+d'une règle. Trois lectures y passent — `getFullProfile`, le panneau de contacts
+d'un tournoi (`GET /api/admin/tournaments/[id]/contacts`, qui n'a plus que la
+certification à appliquer, en SQL, puisque tout joueur listé est engagé dans *ce*
+tournoi) et le profil du titulaire. Rien de tout cela n'entre dans
+`TournamentSnapshot`, qui est diffusé tel quel à tous les abonnés du flux.
 
 ---
 
@@ -367,6 +400,14 @@ toujours `UPCOMING`.
 - Le staff `tournaments` inscrit des **équipes fantômes** en lot
   (`POST /api/admin/tournaments/[id]/ghost-registrations`), et rien d'autre : une
   équipe réelle ou une entrée solo se fait refuser par `NOT_A_GHOST_TEAM`.
+- **Le tournoi peut poser des conditions** (`lib/shared/registration-filters.ts`) :
+  un effectif minimal et une exigence de tag Discord certifié
+  (`NONE` / `ANY_PLAYER` / `ALL_PLAYERS`). Trois refus distincts, en **409** — la
+  saisie est bonne, c'est l'état de l'équipe qui ne convient pas, et il se
+  corrige. Deux portées à retenir : les **équipes fantômes** n'y sont pas soumises
+  (le contrôle vit dans `registerCurrentUserTeam`, jamais dans le tronc commun),
+  et une inscription **déjà enregistrée** n'est jamais relue. Voir
+  `docs/features/REGISTRATION_FILTERS.md`.
 - Signaler un problème (`POST .../report-issue`) est réservé aux **engagés** du
   tournoi (`NOT_REGISTERED` → 403), revérifié côté serveur.
 
