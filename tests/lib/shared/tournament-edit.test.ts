@@ -178,3 +178,53 @@ describe("ALL_TOURNAMENT_FIELDS", () => {
     }
   });
 });
+
+/**
+ * Les conditions d'inscription **survivent à la publication**.
+ *
+ * C'est un choix, pas un oubli : elles se jugent à l'écriture d'une inscription,
+ * jamais rétroactivement, et un tournoi annoncé où personne ne peut s'inscrire
+ * (cinq joueurs exigés sur un plateau d'équipes à quatre) doit pouvoir être
+ * ouvert sans être recréé. Voir `docs/features/REGISTRATION_FILTERS.md`.
+ */
+describe("conditions d'inscription", () => {
+  const announced: EditableTournament = {
+    state: "REGISTRATION",
+    startVisibilityAt: iso(-HOUR),
+    maxTeams: 16,
+  };
+  const running: EditableTournament = {
+    state: "RUNNING",
+    startVisibilityAt: iso(-HOUR),
+    maxTeams: 16,
+  };
+
+  it("reste modifiable sur un tournoi annoncé", () => {
+    expect(isFieldEditable("registrationDiscordRequirement", announced, NOW)).toBe(true);
+    expect(isFieldEditable("registrationMinPlayers", announced, NOW)).toBe(true);
+  });
+
+  it("se ferme au coup d'envoi, comme tout le reste", () => {
+    expect(isFieldEditable("registrationDiscordRequirement", running, NOW)).toBe(false);
+    expect(isFieldEditable("registrationMinPlayers", running, NOW)).toBe(false);
+  });
+
+  it("laisse passer un durcissement : rien n'est relu sur les inscrits", () => {
+    // Le pendant de `MAX_TEAMS_CANNOT_DECREASE`, qui existe parce qu'abaisser
+    // l'effectif renverrait une équipe chez elle. Durcir une condition ne
+    // désengage personne : aucune garde à opposer.
+    expect(
+      checkEditPatch(announced, { registrationMinPlayers: 20 }, NOW),
+    ).toBeNull();
+    expect(
+      checkEditPatch(announced, { registrationDiscordRequirement: "ALL_PLAYERS" }, NOW),
+    ).toBeNull();
+  });
+
+  it("refuse la modification sur un tournoi lancé, en nommant le champ", () => {
+    expect(checkEditPatch(running, { registrationMinPlayers: 3 }, NOW)).toEqual({
+      code: "FIELD_NOT_EDITABLE",
+      field: "registrationMinPlayers",
+    });
+  });
+});

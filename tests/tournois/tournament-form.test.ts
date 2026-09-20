@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
+import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import {
   ALL_TOURNAMENT_FIELDS,
   editWindowFor,
@@ -298,5 +299,79 @@ describe("toApiPayload — réglages du match nul", () => {
 
     expect(back.matchFormat).toEqual({ type: "FT", value: 3, maxMaps: 4, drawsAllowed: true });
     expect(back.endurancePlayoffFormat).toEqual({ type: "BO", value: 5 });
+  });
+});
+
+/**
+ * Conditions d'inscription.
+ *
+ * Elles ne sont propres à **aucun** format — contrairement au barème suisse ou à
+ * l'endurance, elles portent sur qui a le droit d'entrer, question que les six
+ * formats posent à l'identique. Elles partent donc toujours, et c'est cette
+ * asymétrie avec les réglages voisins qu'on fixe ici.
+ */
+describe("conditions d'inscription", () => {
+  const values = defaultTournamentFormValues();
+
+  it("propose les défauts du module partagé", () => {
+    expect(values.registrationDiscordRequirement).toBe(
+      DEFAULT_REGISTRATION_FILTERS.discordRequirement,
+    );
+    expect(values.registrationMinPlayers).toBe(DEFAULT_REGISTRATION_FILTERS.minPlayers);
+  });
+
+  it("part pour tous les formats, y compris ceux qui ignorent tout le reste", () => {
+    for (const format of ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL", "BG_SURVIE", "MULTI"] as const) {
+      const payload = toApiPayload({ ...values, format });
+      expect(payload.registrationDiscordRequirement).toBe("ANY_PLAYER");
+      expect(payload.registrationMinPlayers).toBe(5);
+    }
+  });
+
+  it("garde l'effectif minimal même en tournoi individuel", () => {
+    // Le formulaire n'affiche pas le champ en `SOLO` et le moteur ne le lit pas,
+    // mais la valeur reste enregistrée : la neutraliser la ferait perdre au
+    // premier aller-retour par `SOLO`, alors qu'elle ne coûte qu'une colonne.
+    const payload = toApiPayload({ ...values, participantType: "SOLO", registrationMinPlayers: 7 });
+    expect(payload.registrationMinPlayers).toBe(7);
+  });
+
+  it("fait l'aller-retour sans rien perdre", () => {
+    const api = {
+      ...toFormValues({
+        name: "T",
+        description: null,
+        game: "OW" as const,
+        format: "SINGLE" as const,
+        participantType: "TEAM" as const,
+        maxTeams: 8,
+        startVisibilityAt: "2026-09-01T10:00:00.000Z",
+        registrationOpenAt: "2026-09-02T10:00:00.000Z",
+        registrationCloseAt: "2026-09-03T10:00:00.000Z",
+        startAt: "2026-09-04T10:00:00.000Z",
+        hasThirdPlaceMatch: false,
+        survivalRoundsBeforeFirstCut: null,
+        survivalRoundsPerCut: null,
+        swissTotalRounds: null,
+        swissPointsWin: null,
+        swissPointsDraw: null,
+        swissPointsLoss: null,
+        endurancePoints: null,
+        enduranceWinDelta: null,
+        enduranceLossDelta: null,
+        endurancePlayoffSize: null,
+        enduranceMaxRounds: null,
+        matchFormat: null,
+        endurancePlayoffFormat: null,
+        registrationDiscordRequirement: "ALL_PLAYERS" as const,
+        registrationMinPlayers: 6,
+        phases: null,
+      }),
+    };
+
+    expect(api.registrationDiscordRequirement).toBe("ALL_PLAYERS");
+    expect(api.registrationMinPlayers).toBe(6);
+    expect(toApiPayload(api).registrationDiscordRequirement).toBe("ALL_PLAYERS");
+    expect(toApiPayload(api).registrationMinPlayers).toBe(6);
   });
 });
