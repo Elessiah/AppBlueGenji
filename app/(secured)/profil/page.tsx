@@ -347,6 +347,14 @@ export default function ProfilePage() {
                   type="button"
                   className="btn"
                   onClick={() => setVerifyOpen(true)}
+                  /* « Recertifier » seul ne dit pas quoi : le libellé
+                     accessible commence par le texte visible (WCAG 2.5.3) et
+                     ajoute l'objet. */
+                  aria-label={
+                    discordState.verified
+                      ? "Recertifier mon tag Discord"
+                      : "Certifier mon tag Discord"
+                  }
                   style={{ padding: "7px 14px", fontSize: 12 }}
                 >
                   {discordState.verified ? "Recertifier" : "Certifier mon tag"}

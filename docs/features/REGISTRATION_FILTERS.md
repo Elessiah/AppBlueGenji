@@ -127,7 +127,8 @@ l'absence de garde du genre « ne peut plus être durci ».
 
 Côté lecture, `registrationFiltersSummary` écrit les conditions en une phrase,
 posée dans la case « Conditions d'inscription » de l'en-tête du tournoi **et**
-sous le formulaire de création. La case n'apparaît que sur un tournoi `UPCOMING`
+sous les deux champs du formulaire, où l'organisateur lit d'avance ce que les
+participants liront — même fonction, donc aucune reformulation possible. La case n'apparaît que sur un tournoi `UPCOMING`
 ou `REGISTRATION` : passé le coup d'envoi plus personne n'entre, et la garder
 afficherait une condition d'accès comme un trait de palmarès.
 

@@ -23,6 +23,7 @@ import { participantWording, type ParticipantType } from "@/lib/shared/participa
 import {
   DISCORD_REQUIREMENT_LABELS,
   MIN_PLAYERS_BOUNDS,
+  registrationFiltersSummary,
   type DiscordRequirement,
 } from "@/lib/shared/registration-filters";
 import type { TournamentField } from "@/lib/shared/tournament-edit";
@@ -107,6 +108,13 @@ export function TournamentForm({
   const { format, maxTeams, phases } = values;
   const wording = participantWording(values.participantType);
   const isSolo = values.participantType === "SOLO";
+  const conditionsSummary = registrationFiltersSummary(
+    {
+      discordRequirement: values.registrationDiscordRequirement,
+      minPlayers: values.registrationMinPlayers,
+    },
+    isSolo,
+  );
 
   const matchFormatType: MatchFormatType | "LIBRE" = values.matchFormat?.type ?? "LIBRE";
   const matchFormatValue = values.matchFormat?.value ?? lastMatchFormatValue;
@@ -426,6 +434,17 @@ export function TournamentForm({
             Contrôlées à chaque inscription d&apos;un joueur. Les{" "}
             <strong>équipes fantômes</strong> inscrites par le staff n&apos;y sont pas soumises, et
             les engagés déjà inscrits ne sont jamais relus.
+          </p>
+          {/*
+            La phrase que liront les engagés, telle quelle : c'est la même
+            fonction qui l'écrit sur la fiche du tournoi
+            (`registrationFiltersSummary`). L'organisateur voit donc ce qu'il
+            annonce, et non une reformulation qui pourrait en dire autre chose.
+          */}
+          <p style={{ ...HINT, margin: "0 0 14px", color: "var(--ink-mute)" }}>
+            {conditionsSummary === null
+              ? "En l'état, ce tournoi est ouvert à tous : aucune condition ne sera affichée."
+              : `Les participants liront : « ${conditionsSummary} ».`}
           </p>
           <div className="form-grid" style={GRID}>
             <div className="field">

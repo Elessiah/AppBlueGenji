@@ -79,14 +79,31 @@ export function EntrantContactsPanel({ tournamentId }: { tournamentId: number })
         joueur qui n&apos;a pas prouvé le sien n&apos;est pas joignable par le site.
       </p>
 
-      <button type="button" className="btn" onClick={toggle} style={{ padding: "8px 16px", fontSize: 13 }}>
+      {/*
+        Bouton de dépliage, pas un bouton d'action : `aria-expanded` et
+        `aria-controls` disent au lecteur d'écran qu'il ouvre une région de la
+        page, et laquelle. Sans eux, « Afficher les contacts » s'annonce comme
+        une navigation.
+      */}
+      <button
+        type="button"
+        className="btn"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-controls="entrant-contacts-list"
+        style={{ padding: "8px 16px", fontSize: 13 }}
+      >
         {open ? "Masquer les contacts" : "Afficher les contacts"}
       </button>
 
       {open && (
-        <div className={styles.list}>
+        <div id="entrant-contacts-list" className={styles.list}>
           {loading && entrants === null ? (
-            <p className={styles.hint}>Chargement…</p>
+            /* `aria-live` : le contenu arrive après un aller-retour, et rien ne
+               le dirait autrement à qui ne voit pas la page. */
+            <p className={styles.hint} aria-live="polite">
+              Chargement…
+            </p>
           ) : entrants !== null && entrants.length === 0 ? (
             <p className={styles.hint}>Aucun engagé pour le moment.</p>
           ) : (

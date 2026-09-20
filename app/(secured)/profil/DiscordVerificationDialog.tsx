@@ -1,7 +1,9 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { CyberButton } from "@/components/cyber/CyberButton";
 import { VerifiedBadge } from "@/components/discord-tag";
 import { useToast } from "@/components/ui/toast";
@@ -44,6 +46,10 @@ export function DiscordVerificationDialog({
   onVerified,
 }: DiscordVerificationDialogProps) {
   const { showError, showSuccess } = useToast();
+  // Monté après l'hydratation : le portail vise `document.body`, qui n'existe
+  // pas au rendu serveur.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const [handle, setHandle] = useState(initialTag);
   const [discordId, setDiscordId] = useState("");
   const [code, setCode] = useState("");
@@ -107,12 +113,21 @@ export function DiscordVerificationDialog({
   };
 
   const awaitingCode = discordId !== "";
+  // Comportement commun des modales du site : `Échap` ferme (sauf pendant une
+  // écriture), le défilement de l'arrière-plan est verrouillé, le focus entre
+  // dans la boîte et y reste, puis retourne d'où il venait. Le `locked` n'est
+  // pas décoratif : une certification en cours d'envoi ne doit pas se faire
+  // interrompre par une touche.
+  const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: loading });
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="discord-verify-title"
+      role="presentation"
+      onClick={() => {
+        if (!loading) onClose();
+      }}
       style={{
         position: "fixed",
         inset: 0,
@@ -125,6 +140,16 @@ export function DiscordVerificationDialog({
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="discord-verify-title"
+        // Le lecteur d'écran doit entendre **ce que la certification expose**
+        // avant d'atteindre le champ : c'est le consentement, pas une
+        // décoration.
+        aria-describedby="discord-verify-exposure"
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
         style={{
           width: "min(520px, calc(100vw - 32px))",
           maxHeight: "calc(100vh - 32px)",
@@ -162,6 +187,7 @@ export function DiscordVerificationDialog({
           Ce que la certification expose
         </p>
         <ul
+          id="discord-verify-exposure"
           style={{
             color: "var(--ink-mute)",
             fontSize: 13,
@@ -242,6 +268,7 @@ export function DiscordVerificationDialog({
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
