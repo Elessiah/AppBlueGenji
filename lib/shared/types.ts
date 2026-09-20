@@ -2,6 +2,7 @@
 import type { MatchFormat } from "./match-format";
 import type { MatchLiveTrigger } from "./live-streams";
 import type { ParticipantType } from "./participants";
+import type { RegistrationFilters } from "./registration-filters";
 import type { PlatformRole } from "./permissions";
 import type { TournamentPreview } from "./tournament-preview";
 import type { DeepStats, TeamRankingPosition } from "./stats";
@@ -249,8 +250,19 @@ export type PublicUserProfile = {
    */
   openToRecruitment: boolean;
   createdAt: string;
-  // Privé — uniquement renseigné quand le viewer consulte son propre profil.
+  /**
+   * Tag Discord, **filtré à la sortie** par `visibleDiscordTag`
+   * (`lib/shared/discord-identity.ts`) : le propriétaire du compte, les
+   * administrateurs si le tag est certifié, l'arbitrage si le joueur est en plus
+   * engagé dans un tournoi vivant. `null` partout ailleurs — il n'est jamais
+   * public.
+   */
   discordPseudo?: string | null;
+  /**
+   * Le tag ci-dessus a-t-il été prouvé par son titulaire ? Suit `discordPseudo` :
+   * jamais `true` sur un tag qu'on ne montre pas.
+   */
+  discordVerified?: boolean;
   // Enriched fields for /joueurs listing
   team?: {
     id: number;
@@ -357,6 +369,15 @@ export type TournamentCard = {
    * deux côtés.
    */
   endurancePlayoffFormat: MatchFormat | null;
+  /**
+   * Conditions d'inscription (`lib/shared/registration-filters.ts`) : effectif
+   * minimal et exigence de tag Discord certifié.
+   *
+   * Sur la carte, donc **publiques** : ce sont des conditions d'accès, elles
+   * doivent se lire avant de tenter une inscription, et non se découvrir dans un
+   * refus. Les équipes fantômes n'y sont pas soumises.
+   */
+  registrationFilters: RegistrationFilters;
   /**
    * Chaîne officielle du tournoi (Twitch, YouTube, Kick). `null` = pas de
    * diffusion annoncée. Les matchs n'en héritent jamais (`lib/shared/live-streams.ts`).
@@ -669,6 +690,8 @@ export type PersonalDataExport = {
     email: string | null;
     discordId: string | null;
     discordPseudo: string | null;
+    /** Date de certification du tag Discord (`null` = jamais prouvé). */
+    discordVerifiedAt: string | null;
     googleSub: string | null;
     isAdult: boolean | null;
     isAdmin: boolean;

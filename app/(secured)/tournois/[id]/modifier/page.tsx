@@ -54,6 +54,8 @@ const FIELD_LABELS: Partial<Record<TournamentField, string>> = {
   enduranceMaxRounds: "Manches maximum",
   matchFormat: "Format de match",
   endurancePlayoffFormat: "Format des play-offs",
+  registrationDiscordRequirement: "Discord vérifié à l'inscription",
+  registrationMinPlayers: "Joueurs minimum dans l'équipe",
   phases: "Phases du tournoi",
 };
 

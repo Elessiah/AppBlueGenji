@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { TeamLink } from "@/components/entity-link";
+import { DiscordTag } from "@/components/discord-tag";
 import { useParams, useRouter } from "next/navigation";
 import { UserAvatar } from "@/components/user-avatar";
 import { formatLocalDate } from "@/lib/shared/dates";
@@ -187,6 +188,32 @@ export default function PlayerDetailPage() {
             <label>Tag Marvel Rivals</label>
             <input value={data.profile.marvelRivalsTag || "Masqué"} readOnly />
           </div>
+          {/*
+            Le tag Discord n'apparaît que s'il est **arrivé** : le serveur l'a
+            déjà filtré (`visibleDiscordTag`), et un champ « Masqué » posé là
+            renseignerait tout le monde sur l'existence d'un tag, y compris les
+            lecteurs à qui la règle ne l'accorde jamais. Les deux champs voisins
+            affichent « Masqué » parce que leur visibilité est, elle, un réglage
+            que le joueur assume publiquement.
+          */}
+          {data.profile.discordPseudo ? (
+            <div className="field">
+              <label>Discord</label>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  minHeight: 38,
+                  padding: "0 2px",
+                }}
+              >
+                <DiscordTag
+                  tag={data.profile.discordPseudo}
+                  verified={data.profile.discordVerified}
+                />
+              </div>
+            </div>
+          ) : null}
           <div className="field">
             <label>Majorité</label>
             <input

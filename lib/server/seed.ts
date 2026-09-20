@@ -35,6 +35,7 @@ import { normalizeStreamUrl } from "@/lib/shared/live-streams";
 import { initializeMultiTournament, startPhase, reconcilePhases } from "./tournaments/phases";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { matchWinsRequired } from "@/lib/shared/match-format";
+import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
 import { soloEntryNameCandidates } from "@/lib/shared/participants";
 import {
@@ -167,6 +168,14 @@ interface SpecialUserDef {
   withGameTags?: boolean;
   email?: string;
   discordId?: string;
+  /** Tag Discord stocké (`discord_pseudo`). Absent = aucun tag. */
+  discordTag?: string;
+  /**
+   * Le tag est-il **certifié** ? Un tag non certifié reste invisible pour tout
+   * le monde, administrateurs compris — c'est le cas qu'il faut pouvoir
+   * regarder, et il n'existe qu'ici.
+   */
+  discordVerified?: boolean;
 }
 
 const SPECIAL_USERS: SpecialUserDef[] = [
@@ -177,6 +186,8 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     isAdult: 1,
     email: "admin@example.test",
     discordId: "900000000000000001",
+    discordTag: "test_admin",
+    discordVerified: true,
   },
   {
     pseudo: "Arbitre",
@@ -184,6 +195,8 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     platformRoles: ["ARBITRE"],
     isAdult: 1,
     discordId: "900000000000000002",
+    discordTag: "test_arbitre",
+    discordVerified: true,
   },
   {
     pseudo: "Caster",
@@ -235,6 +248,19 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     purpose: "sans équipe mais fermé au recrutement (hors filtre free agents)",
     isAdult: 1,
     openToRecruitment: 0,
+  },
+  {
+    pseudo: "DiscordNonCertifie",
+    purpose: "tag Discord saisi mais non certifié (invisible même aux admins)",
+    isAdult: 1,
+    discordTag: "tag_non_prouve",
+  },
+  {
+    pseudo: "DiscordCertifie",
+    purpose: "tag Discord certifié (visible aux admins, aux arbitres en tournoi)",
+    isAdult: 1,
+    discordTag: "tag_prouve",
+    discordVerified: true,
   },
   {
     pseudo: "CompteSupprime",
@@ -466,14 +492,22 @@ async function clearDatabase(db: Pool): Promise<void> {
 async function createUsers(db: Pool): Promise<number[]> {
   console.log("👥 Création des joueurs...");
   const userIds: number[] = [];
-  for (const player of FICTIONAL_PLAYERS) {
+  for (const [index, player] of FICTIONAL_PLAYERS.entries()) {
     const pseudo = `Test_${player.pseudo}`;
+    // **Deux joueurs sur trois ont un tag certifié**, le troisième en a un qui
+    // ne l'est pas. Ce n'est pas de la décoration : les conditions d'inscription
+    // (`lib/shared/registration-filters.ts`) se jugent sur cette colonne, et un
+    // jeu de test où personne n'est certifié rendrait l'inscription impossible
+    // à essayer — tandis qu'un jeu où tout le monde l'est ne montrerait jamais
+    // le refus. Le motif est déterministe, donc le seed reste reproductible.
+    const discordVerified = index % 3 !== 2;
     try {
       const [result] = await db.execute<ResultSetHeader>(
         `INSERT INTO bg_users
-         (pseudo, overwatch_battletag, marvel_rivals_tag, visible_avatar, visible_pseudo, visible_overwatch, visible_marvel, is_adult)
-         VALUES (?, ?, ?, 1, 1, 1, 1, 1)`,
-        [pseudo, player.battletag, player.marvelTag]
+         (pseudo, overwatch_battletag, marvel_rivals_tag, discord_pseudo, discord_verified_at,
+          visible_avatar, visible_pseudo, visible_overwatch, visible_marvel, is_adult)
+         VALUES (?, ?, ?, ?, ${discordVerified ? "NOW()" : "NULL"}, 1, 1, 1, 1, 1)`,
+        [pseudo, player.battletag, player.marvelTag, player.pseudo.toLowerCase()]
       );
       userIds.push(result.insertId as number);
     } catch (error) {
@@ -503,14 +537,16 @@ async function createSpecialUsers(db: Pool): Promise<Map<string, number>> {
     try {
       const [result] = await db.execute<ResultSetHeader>(
         `INSERT INTO bg_users
-         (pseudo, email, discord_id, overwatch_battletag, marvel_rivals_tag,
+         (pseudo, email, discord_id, discord_pseudo, discord_verified_at,
+          overwatch_battletag, marvel_rivals_tag,
           visible_avatar, visible_overwatch, visible_marvel, visible_major,
           open_to_recruitment, is_adult, is_admin, is_deleted, platform_roles_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ${def.discordVerified ? "NOW()" : "NULL"}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           pseudo,
           def.email ?? null,
           def.discordId ?? null,
+          def.discordTag ?? null,
           withTags ? `${def.pseudo}#1000` : null,
           withTags ? `${def.pseudo}#2023` : null,
           visibility.avatar,
@@ -1370,8 +1406,9 @@ async function createTournament(
       endurance_start_points, endurance_playoff_size, endurance_max_rounds,
       match_format_type, match_format_value, match_format_draws,
       endurance_playoff_format_type, endurance_playoff_format_value,
+      registration_discord_requirement, registration_min_players,
       max_teams, state, start_visibility_at, registration_open_at, registration_close_at, start_at, finished_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       organizerId,
       `Test - ${def.name}`,
@@ -1393,6 +1430,11 @@ async function createTournament(
       matchFormatDraws ? 1 : 0,
       isEndurance ? def.endurancePlayoffFormat?.type ?? null : null,
       isEndurance ? def.endurancePlayoffFormat?.value ?? null : null,
+      // Absentes du cas = les défauts partagés, ceux-là mêmes que la migration a
+      // posés sur les tournois d'avant : un cas qui ne dit rien couvre donc le
+      // comportement courant.
+      def.registrationDiscordRequirement ?? DEFAULT_REGISTRATION_FILTERS.discordRequirement,
+      def.registrationMinPlayers ?? DEFAULT_REGISTRATION_FILTERS.minPlayers,
       def.maxTeams,
       insertState,
       regOpenAt,

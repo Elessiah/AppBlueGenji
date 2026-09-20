@@ -1,7 +1,7 @@
 ﻿import { createSession } from "@/lib/server/auth";
 import { DISCORD_CODE_VERIFY_RULE, enforceRateLimit, requestClientIp } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
-import { createOrGetDiscordUser, verifyDiscordChallenge } from "@/lib/server/users-service";
+import { consumeDiscordChallenge, createOrGetDiscordUser } from "@/lib/server/users-service";
 
 function normalizeDiscordId(raw: string): string {
   return raw.trim();
@@ -39,12 +39,17 @@ export async function POST(req: Request) {
     );
     if (throttled) return throttled;
 
-    const valid = await verifyDiscordChallenge(discordId, code);
-    if (!valid) {
+    // On consomme plutôt qu'on ne vérifie : le défi porte le **tag** qui a servi
+    // à résoudre l'identifiant, et se connecter par Discord *est* la preuve que
+    // la certification demande. Le compte ressort donc avec son tag certifié,
+    // sans que personne n'ait à refaire le geste depuis son profil — ce qui
+    // règle d'un coup le cas de tous les comptes nés par cette porte.
+    const proof = await consumeDiscordChallenge(discordId, code);
+    if (!proof) {
       return fail("CODE_INVALID_OR_EXPIRED", 401);
     }
 
-    const userId = await createOrGetDiscordUser(discordId, body.pseudo);
+    const userId = await createOrGetDiscordUser(discordId, body.pseudo, proof.handle);
     await createSession(userId);
 
     return ok({ success: true });

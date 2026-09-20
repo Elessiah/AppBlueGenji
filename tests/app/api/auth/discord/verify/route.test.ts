@@ -5,7 +5,7 @@ jest.mock("@/lib/server/users-service");
 
 import { POST } from "@/app/api/auth/discord/verify/route";
 import { createSession } from "@/lib/server/auth";
-import { createOrGetDiscordUser, verifyDiscordChallenge } from "@/lib/server/users-service";
+import { consumeDiscordChallenge, createOrGetDiscordUser } from "@/lib/server/users-service";
 import { DISCORD_CODE_VERIFY_RULE } from "@/lib/server/api-guard";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 
@@ -20,7 +20,13 @@ import { resetRateLimit } from "@/lib/server/rate-limit";
  * Voir `docs/AUTHORIZATION_RULES.md` §1.1.
  */
 
-const verifyMock = verifyDiscordChallenge as jest.MockedFunction<typeof verifyDiscordChallenge>;
+/**
+ * La route **consomme** le défi plutôt que de le vérifier : la ligne porte le
+ * tag qui a servi à résoudre l'identifiant, et une connexion Discord réussie
+ * *est* la preuve que la certification du tag demande. D'où un mock qui rend le
+ * tag, et non un booléen.
+ */
+const verifyMock = consumeDiscordChallenge as jest.MockedFunction<typeof consumeDiscordChallenge>;
 const createUserMock = createOrGetDiscordUser as jest.MockedFunction<typeof createOrGetDiscordUser>;
 const createSessionMock = createSession as jest.MockedFunction<typeof createSession>;
 
@@ -52,7 +58,7 @@ describe("POST /api/auth/discord/verify — plafond d'énumération", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetRateLimit(DISCORD_CODE_VERIFY_RULE.name);
-    verifyMock.mockResolvedValue(false);
+    verifyMock.mockResolvedValue(null);
     createUserMock.mockResolvedValue(42);
     createSessionMock.mockResolvedValue(undefined);
   });
@@ -80,7 +86,7 @@ describe("POST /api/auth/discord/verify — plafond d'énumération", () => {
     // rendait 429 : l'attaquant fermait la connexion de quelqu'un d'autre avec
     // dix requêtes non authentifiées, sans jamais rien tenter de plausible.
     await exhaust(VICTIM, ATTACKER_IP);
-    verifyMock.mockResolvedValue(true);
+    verifyMock.mockResolvedValue({ handle: "keryan" });
 
     const res = await attempt(VICTIM, "424242", VICTIM_IP);
 
@@ -108,11 +114,22 @@ describe("POST /api/auth/discord/verify — plafond d'énumération", () => {
   });
 
   it("laisse passer le bon code tant que le plafond n'est pas atteint", async () => {
-    verifyMock.mockResolvedValue(true);
+    verifyMock.mockResolvedValue({ handle: "keryan" });
     const res = await attempt(VICTIM, "424242");
 
     expect(res.status).toBe(200);
     expect(createSessionMock).toHaveBeenCalledWith(42);
+  });
+
+  it("transmet le tag prouvé au compte : entrer par Discord certifie le tag", async () => {
+    // Sans cela, un compte né par Discord n'aurait aucun tag certifié alors que
+    // son identifiant vient précisément d'être prouvé — et il faudrait le
+    // certifier à la main depuis le profil, geste que la règle rend inutile.
+    verifyMock.mockResolvedValue({ handle: "keryan" });
+
+    await attempt(VICTIM, "424242");
+
+    expect(createUserMock).toHaveBeenCalledWith(VICTIM, undefined, "keryan");
   });
 
   it("plafonne après la validation de forme, pas avant", async () => {

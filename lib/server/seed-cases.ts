@@ -75,6 +75,15 @@ export interface TournamentDef extends ReportStateCounts {
   description?: string | null;
   phases?: SeedPhase[]; // MULTI : phases successives du tournoi
   matchFormat?: MatchFormat; // format de match (BO5, FT3…) ; absent = score libre
+  /**
+   * Conditions d'inscription (`lib/shared/registration-filters.ts`). Absentes =
+   * les défauts (« au moins un Discord vérifié », 5 joueurs), qui sont aussi
+   * ceux de la migration : la matrice couvre donc le cas courant sans rien
+   * déclarer, et ces champs n'existent que pour les deux bords — aucune
+   * exigence, et l'exigence maximale.
+   */
+  registrationDiscordRequirement?: "NONE" | "ANY_PLAYER" | "ALL_PLAYERS";
+  registrationMinPlayers?: number;
   live?: SeedLive; // diffusion en direct ; absent = aucune chaîne annoncée
   matchSchedule?: SeedMatchSchedule; // dates de début des manches ; absent = aucun horaire
 }
@@ -133,6 +142,13 @@ export const TOURNAMENTS: TournamentDef[] = [
   { name: "11 Équipes + Petite Finale", game: "OW", state: "REGISTRATION", format: "SINGLE", hasThirdPlaceMatch: true, teamCount: 11, maxTeams: 16, daysOffset: 18 },
   { name: "Survie Inscriptions Impaires", game: "MR", state: "REGISTRATION", format: "SURVIVAL", teamCount: 9, maxTeams: 16, daysOffset: 16, survivalRoundsPerCut: 2 },
   { name: "Suisse Inscriptions", game: "OW", state: "REGISTRATION", format: "SWISS", teamCount: 10, maxTeams: 16, daysOffset: 20, swissTotalRounds: 4 },
+  // Les deux bords des conditions d'inscription : aucune exigence, puis
+  // l'exigence maximale (tous les joueurs certifiés, roster complet). Le seed
+  // insère ses inscriptions directement, donc ces tournois se remplissent quand
+  // même — ce qu'ils couvrent est l'**affichage** des conditions et le refus
+  // opposé à un joueur qui tente de s'inscrire depuis l'interface.
+  { name: "Inscriptions Sans Condition", game: "MR", state: "REGISTRATION", format: "SINGLE", teamCount: 4, maxTeams: 8, daysOffset: 22, registrationDiscordRequirement: "NONE", registrationMinPlayers: 1, teamOffset: 4 },
+  { name: "Inscriptions Tous Certifiés", game: "OW", state: "REGISTRATION", format: "SINGLE", teamCount: 3, maxTeams: 8, daysOffset: 24, registrationDiscordRequirement: "ALL_PLAYERS", registrationMinPlayers: 5, teamOffset: 6 },
   { name: "BG Survie Inscriptions", game: "MR", state: "REGISTRATION", format: "BG_SURVIE", teamCount: 12, maxTeams: 16, daysOffset: 22 },
 
   // ---- RUNNING · élimination simple (couverture des byes) ------------------

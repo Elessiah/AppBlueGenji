@@ -128,6 +128,8 @@ export async function loadTournamentRow(
       match_format_draws,
       endurance_playoff_format_type,
       endurance_playoff_format_value,
+      registration_discord_requirement,
+      registration_min_players,
       live_url
      FROM bg_tournaments
      WHERE id = ?
@@ -350,6 +352,8 @@ export async function getTournamentListRow(
       t.match_format_draws,
       t.endurance_playoff_format_type,
       t.endurance_playoff_format_value,
+      t.registration_discord_requirement,
+      t.registration_min_players,
       t.live_url,
       COALESCE(COUNT(r.id), 0) AS registered_teams
      FROM bg_tournaments t
@@ -383,6 +387,8 @@ export async function getTournamentListRow(
       t.match_format_draws,
       t.endurance_playoff_format_type,
       t.endurance_playoff_format_value,
+      t.registration_discord_requirement,
+      t.registration_min_players,
       t.live_url`,
     [tournamentId],
   );

@@ -9,7 +9,8 @@ import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
 import { importRemoteAvatar, shouldImportGoogleAvatar } from "@/lib/server/user-avatar-import";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { formatPlayerSignupLog, type PlayerSignupProvider } from "@/lib/shared/bot-logs";
-import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
+import { visibleDiscordTag } from "@/lib/shared/discord-identity";
+import { can, sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 import { getPlayerEntityStats, loadPlayerRecords } from "@/lib/server/stats-service";
 import type {
   FullProfileResponse,
@@ -44,6 +45,19 @@ export type DiscordChallenge = {
   expiresAt: Date;
 };
 
+/**
+ * Ce qu'un code juste rend, en plus du « oui ».
+ *
+ * Le **tag** est celui qui a servi à résoudre l'identifiant à la demande, relu
+ * sur la ligne du défi. La certification l'écrit tel quel, et ne prend pas celui
+ * que le client renvoie à la confirmation : entre les deux requêtes, la seconde
+ * valeur n'est plus couverte par la moindre preuve. `null` quand la demande
+ * portait un identifiant numérique — il n'y avait alors aucun tag à retenir.
+ */
+export type DiscordChallengeProof = {
+  handle: string | null;
+};
+
 type UserRow = RowDataPacket & {
   id: number;
   pseudo: string;
@@ -51,6 +65,7 @@ type UserRow = RowDataPacket & {
   overwatch_battletag: string | null;
   marvel_rivals_tag: string | null;
   discord_pseudo: string | null;
+  discord_verified_at?: Date | null;
   is_adult: 0 | 1 | null;
   visible_avatar: 0 | 1;
   visible_pseudo: 0 | 1;
@@ -135,6 +150,26 @@ function timingSafeEquals(left: string, right: string): boolean {
 function randomCode(): string {
   const randomInt = crypto.randomInt(100000, 1000000);
   return String(randomInt);
+}
+
+/**
+ * Un tag Discord tel qu'on le range en base : sans espaces autour, sans le `@`
+ * que le client Discord colle devant, et **jamais un identifiant numérique**.
+ *
+ * Le dernier point est la seule règle qui compte ici. La résolution accepte un
+ * identifiant à la place d'un tag (repli quand le bot ne partage aucun serveur
+ * avec le joueur), mais un identifiant n'est pas un pseudo : l'écrire dans
+ * `discord_pseudo` afficherait un nombre de dix-huit chiffres partout où
+ * l'arbitrage attend un nom, et le joueur croirait avoir certifié son tag.
+ *
+ * Rend `null` pour tout ce qui n'est pas un tag — l'appelant n'a alors rien à
+ * certifier, et le dit.
+ */
+export function normalizeDiscordHandle(raw: string | null | undefined): string | null {
+  const trimmed = (raw ?? "").trim().replace(/^@/, "");
+  if (trimmed.length === 0) return null;
+  if (/^\d{5,32}$/.test(trimmed)) return null;
+  return trimmed.slice(0, 64);
 }
 
 export async function getUserById(userId: number): Promise<PublicUserProfile | null> {
@@ -392,8 +427,28 @@ async function adoptGoogleAvatar(userId: number, picture: string | undefined): P
   await db.execute(`UPDATE bg_users SET avatar_url = ? WHERE id = ?`, [stored, userId]);
 }
 
-export async function createOrGetDiscordUser(discordId: string, pseudoInput?: string): Promise<number> {
+/**
+ * Retrouve (ou crée) le compte rattaché à cet identifiant Discord.
+ *
+ * `verifiedHandle` est le **tag prouvé** par le code qui vient d'être consommé
+ * (`null` quand la demande portait un identifiant numérique). Il est écrit tel
+ * quel, et **certifié** : se connecter par Discord *est* la preuve que la
+ * certification demande, si bien qu'un joueur qui entre par cette porte n'a
+ * jamais à la refaire depuis son profil.
+ *
+ * Il **écrase** le tag stocké, y compris un tag déjà certifié, et ce n'est pas
+ * une négligence : on n'arrive ici que par un identifiant qui a résolu ce
+ * handle-là. Les deux valeurs désignent donc le même compte Discord, et la plus
+ * récente est la bonne — un pseudo Discord se change, et c'est précisément le cas
+ * où le tag stocké est périmé.
+ */
+export async function createOrGetDiscordUser(
+  discordId: string,
+  pseudoInput?: string,
+  verifiedHandle?: string | null,
+): Promise<number> {
   const db = await getDatabase();
+  const handle = normalizeDiscordHandle(verifiedHandle);
 
   const [existing] = await db.execute<(RowDataPacket & { id: number })[]>(
     `SELECT id FROM bg_users WHERE discord_id = ? LIMIT 1`,
@@ -401,16 +456,26 @@ export async function createOrGetDiscordUser(discordId: string, pseudoInput?: st
   );
 
   if (existing.length > 0) {
-    return Number(existing[0].id);
+    const userId = Number(existing[0].id);
+    if (handle) {
+      await db.execute(
+        `UPDATE bg_users
+         SET discord_pseudo = ?,
+             discord_verified_at = NOW()
+         WHERE id = ?`,
+        [handle, userId],
+      );
+    }
+    return userId;
   }
 
   const rawPseudo = normalizePseudo(pseudoInput || `discord_${discordId.slice(-6)}`);
   const pseudo = await ensureUniquePseudo(rawPseudo);
 
   const [created] = await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_users (pseudo, discord_id)
-     VALUES (?, ?)`,
-    [pseudo, discordId],
+    `INSERT INTO bg_users (pseudo, discord_id, discord_pseudo, discord_verified_at)
+     VALUES (?, ?, ?, ${handle ? "NOW()" : "NULL"})`,
+    [pseudo, discordId, handle],
   );
 
   const userId = Number(created.insertId);
@@ -539,9 +604,16 @@ const DISCORD_CODE_LOCK_TIMEOUT_SECONDS = 1;
  *   file d'attente sur son verrou ne se vide pas dans le délai, ce qui est le
  *   même fait vu d'un peu plus loin.
  */
-export async function createDiscordLoginChallenge(discordId: string): Promise<DiscordChallenge> {
+export async function createDiscordLoginChallenge(
+  discordId: string,
+  handle?: string | null,
+): Promise<DiscordChallenge> {
   const db = await getDatabase();
   const code = randomCode();
+  // Le tag n'est retenu que s'il en est un : une demande faite par identifiant
+  // numérique n'a pas de tag à certifier, et écrire l'identifiant dans cette
+  // colonne ferait passer un nombre pour un pseudo.
+  const storedHandle = normalizeDiscordHandle(handle);
 
   // Ménage d'abord, et **hors verrou** : il ne regarde aucun compte en
   // particulier, et il ne pèse pas sur le comptage — une ligne expirée depuis un
@@ -574,9 +646,9 @@ export async function createDiscordLoginChallenge(discordId: string): Promise<Di
         }
 
         const [insert] = await connection.execute<ResultSetHeader>(
-          `INSERT INTO bg_discord_login_challenges (discord_id, code_hash, expires_at)
-           VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))`,
-          [discordId, hashCode(code)],
+          `INSERT INTO bg_discord_login_challenges (discord_id, code_hash, handle, expires_at)
+           VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))`,
+          [discordId, hashCode(code), storedHandle],
         );
 
         const [rows] = await connection.execute<(RowDataPacket & { expires_at: Date | string })[]>(
@@ -625,19 +697,32 @@ export async function discardDiscordChallenge(challengeId: number): Promise<void
   await db.execute(`DELETE FROM bg_discord_login_challenges WHERE id = ?`, [challengeId]);
 }
 
-export async function verifyDiscordChallenge(discordId: string, code: string): Promise<boolean> {
+/**
+ * Consomme un code juste et rend ce que la ligne du défi prouve
+ * ({@link DiscordChallengeProof}), ou `null` pour tout refus.
+ *
+ * Séparé de {@link verifyDiscordChallenge}, qui n'en garde que le « oui » : la
+ * connexion n'a besoin de rien d'autre, la **certification** du tag a besoin du
+ * tag résolu. Une seule consommation, donc un seul décompte d'essai — deux
+ * fonctions qui liraient la même ligne à la suite en brûleraient deux.
+ */
+export async function consumeDiscordChallenge(
+  discordId: string,
+  code: string,
+): Promise<DiscordChallengeProof | null> {
   const db = await getDatabase();
 
   const [rows] = await db.execute<
     (RowDataPacket & {
       id: number;
       code_hash: string;
+      handle: string | null;
       expires_at: Date;
       consumed_at: Date | null;
       attempts: number;
     })[]
   >(
-    `SELECT id, code_hash, expires_at, consumed_at, attempts
+    `SELECT id, code_hash, handle, expires_at, consumed_at, attempts
      FROM bg_discord_login_challenges
      WHERE discord_id = ?
      ORDER BY id DESC
@@ -645,11 +730,11 @@ export async function verifyDiscordChallenge(discordId: string, code: string): P
     [discordId],
   );
 
-  if (rows.length === 0) return false;
+  if (rows.length === 0) return null;
 
   const challenge = rows[0];
-  if (challenge.consumed_at !== null) return false;
-  if (new Date(challenge.expires_at).getTime() < Date.now()) return false;
+  if (challenge.consumed_at !== null) return null;
+  if (new Date(challenge.expires_at).getTime() < Date.now()) return null;
 
   // **L'essai se réserve avant d'être joué**, en une seule instruction.
   //
@@ -678,9 +763,9 @@ export async function verifyDiscordChallenge(discordId: string, code: string): P
        AND attempts < ?`,
     [MAX_DISCORD_CODE_ATTEMPTS, challenge.id, MAX_DISCORD_CODE_ATTEMPTS],
   );
-  if (Number(reserved.affectedRows) === 0) return false;
+  if (Number(reserved.affectedRows) === 0) return null;
 
-  if (!timingSafeEquals(challenge.code_hash, hashCode(code))) return false;
+  if (!timingSafeEquals(challenge.code_hash, hashCode(code))) return null;
 
   await db.execute(
     `UPDATE bg_discord_login_challenges
@@ -689,7 +774,17 @@ export async function verifyDiscordChallenge(discordId: string, code: string): P
     [challenge.id],
   );
 
-  return true;
+  return { handle: normalizeDiscordHandle(challenge.handle) };
+}
+
+/**
+ * Le code est-il juste ? Chemin de la **connexion**, qui n'a que faire du tag.
+ *
+ * Un mince habillage de {@link consumeDiscordChallenge} : deux implémentations
+ * de la réservation d'essai divergeraient, et c'est elle qui tient le secret.
+ */
+export async function verifyDiscordChallenge(discordId: string, code: string): Promise<boolean> {
+  return (await consumeDiscordChallenge(discordId, code)) !== null;
 }
 
 export async function updateOwnProfile(
@@ -722,11 +817,27 @@ export async function updateOwnProfile(
     }
   }
 
+  const nextDiscordPseudo = patch.discordPseudo === undefined ? null : patch.discordPseudo;
+
+  // **La certification se perd à chaque changement de tag.** Elle ne dit pas
+  // « ce compte a un Discord » (c'est `discord_id`) mais « le tag stocké a été
+  // prouvé » : un tag réécrit n'a rien prouvé, et le laisser certifié exposerait
+  // à l'arbitrage un pseudo que personne n'a vérifié — exactement ce que la
+  // certification est censée empêcher.
+  //
+  // Le `CASE` est posé **avant** l'affectation de `discord_pseudo`, et l'ordre
+  // n'est pas décoratif : MySQL évalue les affectations de gauche à droite, si
+  // bien qu'une comparaison placée après lirait déjà la valeur neuve et ne
+  // verrait jamais de changement (même piège que la réservation d'essai d'un
+  // code, plus haut). `<=>` parce que le tag peut être `NULL` des deux côtés —
+  // un `=` rendrait alors `NULL`, donc faux, donc une certification perdue à
+  // chaque sauvegarde d'un profil sans tag.
   await db.execute(
     `UPDATE bg_users
      SET pseudo = COALESCE(?, pseudo),
          overwatch_battletag = ?,
          marvel_rivals_tag = ?,
+         discord_verified_at = CASE WHEN discord_pseudo <=> ? THEN discord_verified_at ELSE NULL END,
          discord_pseudo = ?,
          is_adult = ?,
          visible_avatar = COALESCE(?, visible_avatar),
@@ -739,7 +850,8 @@ export async function updateOwnProfile(
       patch.pseudo ? normalizePseudo(patch.pseudo) : null,
       patch.overwatchBattletag === undefined ? null : patch.overwatchBattletag,
       patch.marvelRivalsTag === undefined ? null : patch.marvelRivalsTag,
-      patch.discordPseudo === undefined ? null : patch.discordPseudo,
+      nextDiscordPseudo,
+      nextDiscordPseudo,
       patch.isAdult === undefined ? null : patch.isAdult,
       patch.visibility?.avatar ?? null,
       patch.visibility?.overwatch ?? null,
@@ -774,6 +886,10 @@ export async function anonymizeOwnAccount(userId: number): Promise<void> {
          overwatch_battletag = NULL,
          marvel_rivals_tag = NULL,
          discord_pseudo = NULL,
+         -- Le tag part, sa certification avec : elle ne certifie rien d'autre
+         -- que lui, et une date restée seule ferait d'un compte anonymisé un
+         -- compte « vérifié » sans tag.
+         discord_verified_at = NULL,
          is_adult = NULL,
          discord_id = NULL,
          google_sub = NULL,
@@ -802,11 +918,50 @@ export async function updateUserAvatar(userId: number, avatarPath: string | null
   await syncSoloEntryIdentity(userId);
 }
 
+/**
+ * Un joueur est-il engagé dans un tournoi **encore vivant** ?
+ *
+ * C'est la condition qui ouvre son tag Discord à l'arbitrage
+ * (`lib/shared/discord-identity.ts`) : le besoin de le joindre naît du tournoi
+ * et s'éteint avec lui. « Vivant » = tout état sauf `FINISHED`, la bonne borne
+ * étant le palmarès : un tournoi clos n'a plus de manche à reprogrammer.
+ *
+ * Les deux formes d'engagement sont couvertes par la même requête — appartenance
+ * à une équipe inscrite (fenêtre d'appartenance **ouverte** : un joueur parti ne
+ * représente plus l'équipe) et entrée solo, qui porte l'identifiant du joueur.
+ */
+async function isInActiveTournament(userId: number): Promise<boolean> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { c: number })[]>(
+    `SELECT 1 AS c
+     FROM bg_tournament_registrations r
+     JOIN bg_tournaments t ON t.id = r.tournament_id
+     LEFT JOIN bg_team_members tm
+       ON tm.team_id = r.team_id
+      AND tm.user_id = ?
+      AND tm.left_at IS NULL
+     LEFT JOIN bg_teams te ON te.id = r.team_id
+     WHERE t.state <> 'FINISHED'
+       AND (tm.id IS NOT NULL OR te.solo_user_id = ?)
+     LIMIT 1`,
+    [userId, userId],
+  );
+  return rows.length > 0;
+}
+
+/** Le lecteur d'une fiche, tel que les règles de visibilité le demandent. */
+export type ProfileViewer = {
+  id: number;
+  isAdmin?: boolean;
+  roles?: readonly PlatformRole[];
+};
+
 export async function getFullProfile(
-  viewerId: number,
+  viewer: ProfileViewer,
   targetUserId: number,
-  viewerIsAdmin = false,
 ): Promise<FullProfileResponse | null> {
+  const viewerId = viewer.id;
+  const viewerIsAdmin = Boolean(viewer.isAdmin);
   const db = await getDatabase();
 
   const [userRows] = await db.execute<UserRow[]>(
@@ -817,6 +972,7 @@ export async function getFullProfile(
       overwatch_battletag,
       marvel_rivals_tag,
       discord_pseudo,
+      discord_verified_at,
       is_adult,
       visible_avatar,
       visible_overwatch,
@@ -838,12 +994,26 @@ export async function getFullProfile(
   const targetIsAdmin = Boolean(userRows[0].is_admin);
   const targetRoles = resolveRoles(targetIsAdmin, userRows[0].platform_roles_json);
   const profile = mapPublicUser(userRows[0]);
+  const discordVerified = userRows[0].discord_verified_at != null;
 
-  if (isSelf) {
-    profile.discordPseudo = userRows[0].discord_pseudo;
-  } else {
-    applyVisibility(profile, false);
-  }
+  if (!isSelf) applyVisibility(profile, false);
+
+  // **Le tag Discord passe par sa propre règle**, et pas par `applyVisibility` :
+  // il n'a pas de réglage de visibilité, il a un public (voir
+  // `lib/shared/discord-identity.ts`). La question du tournoi n'est posée que
+  // lorsqu'elle peut changer la réponse — un administrateur voit de toute façon,
+  // le lecteur ordinaire ne voit de toute façon pas, et une requête de plus sur
+  // chaque fiche consultée n'aurait servi à personne.
+  const needsTournamentCheck =
+    !isSelf && !viewerIsAdmin && can(viewer, "tournaments") && discordVerified;
+  profile.discordPseudo = visibleDiscordTag(userRows[0].discord_pseudo, viewer, {
+    userId: targetUserId,
+    verified: discordVerified,
+    inActiveTournament: needsTournamentCheck ? await isInActiveTournament(targetUserId) : false,
+  });
+  // La pastille suit le tag : elle ne s'affiche que là où il s'affiche, et dire
+  // « vérifié » d'un tag qu'on ne montre pas n'apprendrait rien à personne.
+  profile.discordVerified = profile.discordPseudo === null ? false : discordVerified;
 
   const [timelineRows] = await db.execute<TeamTimelineRow[]>(
     `SELECT
@@ -904,6 +1074,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       overwatch_battletag: string | null;
       marvel_rivals_tag: string | null;
       discord_pseudo: string | null;
+      discord_verified_at: Date | null;
       discord_id: string | null;
       google_sub: string | null;
       email: string | null;
@@ -918,7 +1089,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     })[]
   >(
     `SELECT id, pseudo, avatar_url, overwatch_battletag, marvel_rivals_tag,
-            discord_pseudo, discord_id, google_sub, email, is_adult, is_admin,
+            discord_pseudo, discord_verified_at, discord_id, google_sub, email, is_adult, is_admin,
             visible_avatar, visible_overwatch, visible_marvel, visible_major,
             open_to_recruitment, created_at
      FROM bg_users
@@ -932,7 +1103,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
 
   // Réutilise l'agrégation existante pour les stats, l'historique d'équipes et
   // le palmarès de tournois (vue « self » = données complètes non masquées).
-  const full = await getFullProfile(userId, userId);
+  const full = await getFullProfile({ id: userId }, userId);
   if (!full) throw new Error("PROFILE_NOT_FOUND");
 
   return {
@@ -943,6 +1114,10 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       email: row.email,
       discordId: row.discord_id,
       discordPseudo: row.discord_pseudo,
+      // L'export RGPD dit **tout** ce que le site détient : la date de
+      // certification en fait partie, c'est elle qui justifie l'exposition du
+      // tag à l'organisation.
+      discordVerifiedAt: toIso(row.discord_verified_at),
       googleSub: row.google_sub,
       isAdult: row.is_adult === null ? null : Boolean(row.is_adult),
       isAdmin: Boolean(row.is_admin),

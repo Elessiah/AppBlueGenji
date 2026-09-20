@@ -673,6 +673,35 @@ async function runMigrations(db: Pool): Promise<void> {
     // Column already exists
   }
 
+  // Migration: le **tag** saisi à la demande du code, retenu sur la ligne du
+  // défi. La certification enregistre le tag qui a servi à la résolution, et
+  // non celui que le client renvoie à la confirmation : c'est la ligne du défi
+  // qui porte la preuve, pas la seconde requête. `NULL` sur une demande faite
+  // par identifiant numérique, où il n'y a pas de tag à retenir.
+  try {
+    await db.execute(`
+      ALTER TABLE bg_discord_login_challenges
+      ADD COLUMN handle VARCHAR(64) NULL
+    `);
+  } catch {
+    // Column already exists
+  }
+
+  // Migration: certification du tag Discord. `NULL` = tag non prouvé, et c'est
+  // l'état de **tous** les comptes d'avant : leur tag garde donc les propriétés
+  // sous lesquelles il a été saisi (invisible à tous, administrateurs compris).
+  // La colonne ne dit pas « ce compte a un Discord » — `discord_id` le dit déjà
+  // — mais « le tag stocké dans `discord_pseudo` a été prouvé par son
+  // titulaire », ce qui se perd à chaque modification du tag.
+  try {
+    await db.execute(`
+      ALTER TABLE bg_users
+      ADD COLUMN discord_verified_at DATETIME NULL
+    `);
+  } catch {
+    // Column already exists
+  }
+
   // Migration: Rôles de permission cumulables (ARBITRE, COMMUNITY_MANAGER,
   // RECRUTEUR). Le rôle ADMIN reste porté par la colonne `is_admin`.
   try {
@@ -803,6 +832,26 @@ async function runMigrations(db: Pool): Promise<void> {
     // celles du tournoi.
     ["endurance_playoff_format_type", "ENUM('BO', 'FT') NULL"],
     ["endurance_playoff_format_value", "INT NULL"],
+  ] as const) {
+    try {
+      await db.execute(`ALTER TABLE bg_tournaments ADD COLUMN ${column} ${definition}`);
+    } catch {
+      // Column already exists
+    }
+  }
+
+  // Migration: conditions d'inscription (hors équipes fantômes). Les deux
+  // colonnes sont `NOT NULL` avec les défauts du module partagé : un tournoi
+  // d'avant ce réglage hérite donc de « au moins un Discord vérifié » et de cinq
+  // joueurs, ce qui est bien le comportement voulu pour la suite — les
+  // inscriptions **déjà enregistrées** ne sont jamais relues, seules les
+  // nouvelles passent la condition.
+  for (const [column, definition] of [
+    [
+      "registration_discord_requirement",
+      "ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'ANY_PLAYER'",
+    ],
+    ["registration_min_players", "INT NOT NULL DEFAULT 5"],
   ] as const) {
     try {
       await db.execute(`ALTER TABLE bg_tournaments ADD COLUMN ${column} ${definition}`);

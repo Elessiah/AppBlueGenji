@@ -243,6 +243,30 @@ export const DISCORD_CODE_VERIFY_RULE: RateLimitRule = {
 };
 
 /**
+ * Certifications de tag Discord, **par compte du site**.
+ *
+ * L'axe change par rapport à la connexion, et c'est le point à retenir : la
+ * route est **authentifiée**, donc il existe enfin quelqu'un à qui imputer
+ * l'appel. Ce que le plafond protège n'est plus la victime d'un message privé
+ * non sollicité mais la **dépense** — chaque essai résout un tag auprès du bot,
+ * qui interroge Discord.
+ *
+ * Le message privé reste borné par ailleurs, sur le compte Discord visé
+ * (`DISCORD_CODE_REQUEST_RULE`) et en base
+ * (`MAX_DISCORD_CODES_PER_WINDOW`) : un joueur ne peut pas faire sonner le
+ * Discord d'un autre plus souvent en passant par cette route que par la page de
+ * connexion.
+ *
+ * Assez large pour l'usage réel (un joueur se trompe de tag, corrige, réessaie),
+ * assez étroit pour qu'une boucle ne coûte rien.
+ */
+export const DISCORD_VERIFY_TAG_RULE: RateLimitRule = {
+  name: "discord-verify-tag",
+  limit: 10,
+  windowMs: 15 * 60_000,
+};
+
+/**
  * Applique un plafond. Renvoie la réponse 429 à retourner tel quel, ou `null`
  * si la requête peut continuer.
  *

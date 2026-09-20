@@ -3,6 +3,13 @@ import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { ensureSoloEntry, findSoloEntry } from "@/lib/server/solo-entries-service";
 import { isSoloTournament } from "@/lib/shared/participants";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
+import { checkRegistrationFilters } from "@/lib/shared/registration-filters";
+import {
+  assertRegistrationEligibility,
+  loadSoloEligibility,
+  loadTeamRosterEligibility,
+  tournamentRegistrationFilters,
+} from "./registration-eligibility";
 import type { TournamentRow } from "./_internal";
 import { queueBotLog } from "./bot-logs";
 import { syncTournamentState } from "./state";
@@ -187,6 +194,13 @@ export async function registerCurrentUserTeam(
   // seconde connexion ici attendrait une place du pool que les transactions
   // bloquées sur ce verrou ne rendront pas (voir `getUserActiveTeam`).
   if (isSoloTournament(tournament.participant_type)) {
+    // Les conditions **avant** la création de l'entrée solo : une inscription
+    // refusée ne doit pas laisser derrière elle une ligne d'équipe que personne
+    // n'a demandée.
+    await assertRegistrationEligibility(connection, tournament, {
+      teamId: 0,
+      soloUserId: userId,
+    });
     const soloTeamId = await ensureSoloEntry(connection, userId);
     await registerTeam(connection, tournamentId, soloTeamId, false);
     return;
@@ -203,6 +217,15 @@ export async function registerCurrentUserTeam(
   if (!hasTeamManagementRole(activeTeam.roles)) {
     throw new Error("NOT_TEAM_MANAGER");
   }
+
+  // **Ici et pas dans `registerTeam`** : le tronc commun sert aussi à l'inscription
+  // d'une équipe fantôme par le staff, qui n'a par définition aucun joueur. Les
+  // conditions d'inscription ne portent que sur l'engagement d'un joueur, et
+  // c'est cette fonction-ci qui le distingue sans rien deviner.
+  await assertRegistrationEligibility(connection, tournament, {
+    teamId: activeTeam.teamId,
+    soloUserId: null,
+  });
 
   await registerTeam(connection, tournamentId, activeTeam.teamId, false);
 }
@@ -304,15 +327,35 @@ export async function canUserRegister(
   if (!tournament || tournament.state !== "REGISTRATION") return false;
 
   const solo = isSoloTournament(tournament.participant_type);
+  const filters = tournamentRegistrationFilters(tournament);
 
   let teamId: number | null;
   if (solo) {
     teamId = await findSoloEntry(connection, userId);
+    // Les conditions se jugent sur le **joueur**, pas sur son entrée solo (qui
+    // n'existe peut-être pas encore) : la fermeture du bouton doit valoir dès la
+    // première inscription, sans quoi elle n'arriverait jamais à temps.
+    if (checkRegistrationFilters(filters, await loadSoloEligibility(connection, userId), true)) {
+      return false;
+    }
   } else {
     const activeTeam = await getUserActiveTeam(userId, connection);
     // Même refus que `registerCurrentUserTeam`, pour ne pas annoncer un bouton
     // que l'écriture rejetterait en 403.
     if (activeTeam && !hasTeamManagementRole(activeTeam.roles)) return false;
+    // Mêmes conditions, même module pur : le bouton ne s'ouvre pas sur un refus.
+    // Le serveur reste le juge — le roster peut changer entre le rendu et le
+    // clic —, celui-ci n'existe que pour ne pas proposer un geste voué à
+    // l'échec.
+    if (
+      activeTeam &&
+      checkRegistrationFilters(
+        filters,
+        await loadTeamRosterEligibility(connection, activeTeam.teamId),
+      )
+    ) {
+      return false;
+    }
     teamId = activeTeam?.teamId ?? null;
   }
 

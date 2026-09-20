@@ -8,6 +8,7 @@ import {
   headerIdentityLine,
   headerMetaItems,
 } from "@/app/(secured)/tournois/[id]/_lib/header-meta";
+import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import type {
   TournamentCard,
   TournamentFormat,
@@ -38,6 +39,9 @@ function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
     phases: null,
     matchFormat: null,
     endurancePlayoffFormat: null,
+    // Conditions d'inscription : les défauts du module partagé, qui sont aussi
+    // ceux que la migration a posés sur les tournois existants.
+    registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
     liveUrl: null,
     ...overrides,
   };

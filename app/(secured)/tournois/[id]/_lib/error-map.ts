@@ -46,6 +46,18 @@ export const ERROR_MESSAGES: Record<string, string> = {
   SOLO_ENTRY_NAME_UNAVAILABLE:
     "Ton pseudo est déjà utilisé comme nom d'équipe : change-le avant de t'inscrire.",
   USER_NOT_FOUND: "Compte introuvable.",
+  // Conditions d'inscription (`lib/shared/registration-filters.ts`). Chaque
+  // refus nomme **le geste qui le lève** : recruter, ou certifier un tag. Un
+  // « conditions non remplies » unique aurait laissé le capitaine deviner
+  // laquelle des deux conditions a bloqué.
+  TEAM_TOO_FEW_PLAYERS:
+    "Ton équipe n'a pas assez de joueurs pour ce tournoi : recrute, puis réessaie.",
+  TEAM_NEEDS_VERIFIED_DISCORD:
+    "Ce tournoi demande qu'au moins un joueur de l'équipe ait certifié son tag Discord (page Mon profil) : l'organisation doit pouvoir vous joindre.",
+  TEAM_NEEDS_ALL_VERIFIED_DISCORD:
+    "Ce tournoi demande que tous les joueurs de l'équipe aient certifié leur tag Discord (page Mon profil).",
+  INVALID_DISCORD_REQUIREMENT: "Condition « Discord vérifié » invalide.",
+  INVALID_MIN_PLAYERS: "Nombre de joueurs minimum invalide.",
   NOT_SURVIVAL: "Le forfait n'est disponible que pour les tournois en mode Survie.",
   // Formulations neutres : le forfait peut aussi être déclaré par l'arbitrage
   // pour une autre équipe que la sienne.

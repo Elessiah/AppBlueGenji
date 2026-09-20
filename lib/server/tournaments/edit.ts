@@ -15,6 +15,10 @@ import {
   type TournamentField,
 } from "@/lib/shared/tournament-edit";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
+import {
+  parseRegistrationFilters,
+  type DiscordRequirement,
+} from "@/lib/shared/registration-filters";
 import type { ParticipantType } from "@/lib/shared/participants";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import { normalizePhaseConfigs, validatePhases } from "@/lib/shared/tournament-phases";
@@ -51,6 +55,14 @@ export type EditableTournamentValues = {
   matchFormat: MatchFormat | null;
   /** BG Survie : format de l'arbre final (`null` = celui du tournoi). */
   endurancePlayoffFormat: MatchFormat | null;
+  /**
+   * Conditions d'inscription, **aplaties** en deux champs éditables et non
+   * réunies en objet comme `matchFormat` : ce sont deux réglages indépendants,
+   * qu'on ouvre et qu'on durcit séparément, et `checkEditPatch` juge champ par
+   * champ.
+   */
+  registrationDiscordRequirement: DiscordRequirement;
+  registrationMinPlayers: number;
   phases: PhaseConfig[] | null;
 };
 
@@ -76,7 +88,8 @@ async function loadEditRow(
       endurance_playoff_size, endurance_max_rounds,
       match_format_type, match_format_value,
       match_format_max_maps, match_format_draws,
-      endurance_playoff_format_type, endurance_playoff_format_value
+      endurance_playoff_format_type, endurance_playoff_format_value,
+      registration_discord_requirement, registration_min_players
      FROM bg_tournaments
      WHERE id = ?
      LIMIT 1${forUpdate ? " FOR UPDATE" : ""}`,
@@ -92,6 +105,10 @@ function toValues(
   phases: PhaseConfig[] | null,
 ): EditableTournamentValues {
   const num = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v));
+  const filters = parseRegistrationFilters(
+    row.registration_discord_requirement,
+    row.registration_min_players,
+  );
   return {
     name: String(row.name),
     description: row.description === null ? null : String(row.description),
@@ -125,6 +142,8 @@ function toValues(
       row.endurance_playoff_format_type,
       row.endurance_playoff_format_value,
     ),
+    registrationDiscordRequirement: filters.discordRequirement,
+    registrationMinPlayers: filters.minPlayers,
     phases,
   };
 }
@@ -252,6 +271,8 @@ export async function updateTournament(
       matchFormatDraws: next.matchFormat?.drawsAllowed ?? null,
       endurancePlayoffFormatType: next.endurancePlayoffFormat?.type ?? null,
       endurancePlayoffFormatValue: next.endurancePlayoffFormat?.value ?? null,
+      registrationDiscordRequirement: next.registrationDiscordRequirement,
+      registrationMinPlayers: next.registrationMinPlayers,
       phases: next.phases ?? undefined,
     });
     if ("error" in validation) throw new Error(validation.error);
@@ -289,7 +310,8 @@ export async function updateTournament(
         endurance_playoff_size = ?, endurance_max_rounds = ?,
         match_format_type = ?, match_format_value = ?,
         match_format_max_maps = ?, match_format_draws = ?,
-        endurance_playoff_format_type = ?, endurance_playoff_format_value = ?
+        endurance_playoff_format_type = ?, endurance_playoff_format_value = ?,
+        registration_discord_requirement = ?, registration_min_players = ?
        WHERE id = ?`,
       [
         valid.name,
@@ -320,6 +342,8 @@ export async function updateTournament(
         valid.matchFormat?.drawsAllowed ? 1 : 0,
         valid.endurancePlayoffFormat?.type ?? null,
         valid.endurancePlayoffFormat?.value ?? null,
+        valid.registrationFilters.discordRequirement,
+        valid.registrationFilters.minPlayers,
         tournamentId,
       ],
     );

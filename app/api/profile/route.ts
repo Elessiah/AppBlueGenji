@@ -6,7 +6,7 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
 
-  const profile = await getFullProfile(user.id, user.id);
+  const profile = await getFullProfile({ id: user.id }, user.id);
   if (!profile) return fail("PROFILE_NOT_FOUND", 404);
 
   return ok(profile);
@@ -35,7 +35,7 @@ export async function PATCH(req: Request) {
     };
 
     await updateOwnProfile(user.id, body);
-    const profile = await getFullProfile(user.id, user.id);
+    const profile = await getFullProfile({ id: user.id }, user.id);
     return ok(profile);
   } catch (error) {
     const message = (error as Error).message;

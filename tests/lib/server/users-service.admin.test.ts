@@ -16,6 +16,7 @@ function userRow(overrides: Record<string, unknown> = {}) {
     overwatch_battletag: null,
     marvel_rivals_tag: null,
     discord_pseudo: null,
+    discord_verified_at: null,
     is_adult: 1,
     visible_avatar: 1,
     visible_pseudo: 1,
@@ -42,7 +43,7 @@ describe("users-service admin management", () => {
         .mockResolvedValueOnce([[]]); // (inutilisé : le joueur n'a aucune équipe)
       await mockDb(execute);
 
-      const profile = await getFullProfile(1, 7, true);
+      const profile = await getFullProfile({ id: 1, isAdmin: true }, 7);
 
       expect(profile?.isAdmin).toBe(true);
       expect(profile?.viewerIsAdmin).toBe(true);
@@ -59,7 +60,7 @@ describe("users-service admin management", () => {
         .mockResolvedValueOnce([[]]);
       await mockDb(execute);
 
-      const profile = await getFullProfile(1, 7);
+      const profile = await getFullProfile({ id: 1 }, 7);
 
       expect(profile?.isAdmin).toBe(false);
       expect(profile?.viewerIsAdmin).toBe(false);
@@ -76,7 +77,7 @@ describe("users-service admin management", () => {
         .mockResolvedValueOnce([[]]);
       await mockDb(execute);
 
-      const profile = await getFullProfile(1, 7);
+      const profile = await getFullProfile({ id: 1 }, 7);
 
       // Non divulgué dans le champ admin `roles`, mais public dans `displayRoles`.
       expect(profile?.roles).toEqual([]);
@@ -92,7 +93,7 @@ describe("users-service admin management", () => {
         .mockResolvedValueOnce([[]]);
       await mockDb(execute);
 
-      const profile = await getFullProfile(1, 7);
+      const profile = await getFullProfile({ id: 1 }, 7);
 
       expect(profile?.displayRoles).toContain("ADMIN");
     });

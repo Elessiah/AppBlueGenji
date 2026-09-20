@@ -10,6 +10,10 @@ import type { TournamentFormat, TournamentGame } from "@/lib/shared/types";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import { computeRecommendedRounds } from "@/lib/shared/swiss";
 import { DEFAULT_MATCH_FORMAT, type MatchFormat } from "@/lib/shared/match-format";
+import {
+  DEFAULT_REGISTRATION_FILTERS,
+  type DiscordRequirement,
+} from "@/lib/shared/registration-filters";
 import type { ParticipantType } from "@/lib/shared/participants";
 import { createDefaultPhase } from "../creer/phase-form";
 
@@ -61,6 +65,13 @@ export type TournamentFormValues = {
    * play-offs en vrai FT3 — une élimination directe a besoin d'un vainqueur.
    */
   endurancePlayoffFormat: MatchFormat | null;
+  /**
+   * Conditions d'inscription. Aplaties en deux champs, comme côté serveur : ce
+   * sont deux réglages indépendants, et la liste blanche de l'édition les juge
+   * séparément.
+   */
+  registrationDiscordRequirement: DiscordRequirement;
+  registrationMinPlayers: number;
   phases: PhaseConfig[];
 };
 
@@ -95,6 +106,8 @@ export type TournamentApiValues = {
   enduranceMaxRounds: number | null;
   matchFormat: MatchFormat | null;
   endurancePlayoffFormat: MatchFormat | null;
+  registrationDiscordRequirement: DiscordRequirement;
+  registrationMinPlayers: number;
   phases: PhaseConfig[] | null;
 };
 
@@ -134,6 +147,10 @@ export function defaultTournamentFormValues(): TournamentFormValues {
     // `null` = l'arbre final reprend le format du tournoi. C'est le défaut, et
     // il vaut pour tous les tournois créés avant ce réglage.
     endurancePlayoffFormat: null,
+    // Conditions d'inscription : les défauts du module partagé — « au moins un
+    // Discord vérifié » et cinq joueurs.
+    registrationDiscordRequirement: DEFAULT_REGISTRATION_FILTERS.discordRequirement,
+    registrationMinPlayers: DEFAULT_REGISTRATION_FILTERS.minPlayers,
     phases: [createDefaultPhase(1, "SWISS"), createDefaultPhase(2, "DOUBLE")],
   };
 }
@@ -221,6 +238,11 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
       format === "BG_SURVIE" ? (values.endurancePlayoffFormat?.type ?? null) : null,
     endurancePlayoffFormatValue:
       format === "BG_SURVIE" ? (values.endurancePlayoffFormat?.value ?? null) : null,
+    // Les conditions partent pour **tous** les formats : elles ne portent pas
+    // sur le déroulé du tournoi mais sur qui a le droit d'y entrer, question
+    // que les six formats posent à l'identique.
+    registrationDiscordRequirement: values.registrationDiscordRequirement,
+    registrationMinPlayers: values.registrationMinPlayers,
   };
 }
 
@@ -263,6 +285,8 @@ export function toFormValues(apiValues: TournamentApiValues): TournamentFormValu
     enduranceMaxRounds: apiValues.enduranceMaxRounds ?? 0,
     matchFormat: apiValues.matchFormat,
     endurancePlayoffFormat: apiValues.endurancePlayoffFormat,
+    registrationDiscordRequirement: apiValues.registrationDiscordRequirement,
+    registrationMinPlayers: apiValues.registrationMinPlayers,
     phases: apiValues.phases ?? defaults.phases,
   };
 }

@@ -11,6 +11,10 @@ import { getDatabase, withConnection, type SqlParams } from "@/lib/server/databa
 import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { isSoloTournament, toParticipantType, type ParticipantType } from "@/lib/shared/participants";
+import {
+  parseRegistrationFilters,
+  type RegistrationFilters,
+} from "@/lib/shared/registration-filters";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
 import { canViewTournament } from "@/lib/shared/tournament-visibility";
@@ -291,6 +295,11 @@ export async function createTournament(
      * qui les complète avant validation et insertion.
      */
     phases?: readonly Partial<PhaseConfig>[];
+    /**
+     * Conditions d'inscription (`lib/shared/registration-filters.ts`). Absentes
+     * = les défauts du module — « au moins un Discord vérifié » et cinq joueurs.
+     */
+    registrationFilters?: RegistrationFilters | null;
   },
 ): Promise<number> {
   const db = await getDatabase();
@@ -374,6 +383,13 @@ export async function createTournament(
           )
         : null;
 
+    // Conditions d'inscription : revalidées ici comme le format de match, pour
+    // que le service reste sûr appelé hors de la route HTTP (seed, scripts).
+    const registrationFilters = parseRegistrationFilters(
+      payload.registrationFilters?.discordRequirement,
+      payload.registrationFilters?.minPlayers,
+    );
+
     const [insert] = await connection.execute<ResultSetHeader>(
       `INSERT INTO bg_tournaments (
         organizer_user_id,
@@ -406,8 +422,10 @@ export async function createTournament(
         match_format_max_maps,
         match_format_draws,
         endurance_playoff_format_type,
-        endurance_playoff_format_value
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        endurance_playoff_format_value,
+        registration_discord_requirement,
+        registration_min_players
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         organizerUserId,
         payload.name.trim(),
@@ -446,6 +464,8 @@ export async function createTournament(
         matchFormat?.drawsAllowed ? 1 : 0,
         playoffFormat?.type ?? null,
         playoffFormat?.value ?? null,
+        registrationFilters.discordRequirement,
+        registrationFilters.minPlayers,
       ],
     );
 
@@ -587,6 +607,8 @@ async function loadTournamentBuckets(
       t.match_format_draws,
       t.endurance_playoff_format_type,
       t.endurance_playoff_format_value,
+      t.registration_discord_requirement,
+      t.registration_min_players,
       t.live_url,
       COALESCE(COUNT(r.id), 0) AS registered_teams
      FROM bg_tournaments t
@@ -619,6 +641,8 @@ async function loadTournamentBuckets(
       t.match_format_draws,
       t.endurance_playoff_format_type,
       t.endurance_playoff_format_value,
+      t.registration_discord_requirement,
+      t.registration_min_players,
       t.live_url
      ORDER BY t.start_at DESC`,
     params,

@@ -16,6 +16,12 @@ import {
   type MatchFormat,
 } from "@/lib/shared/match-format";
 import { isParticipantType, type ParticipantType } from "@/lib/shared/participants";
+import {
+  DEFAULT_REGISTRATION_FILTERS,
+  isDiscordRequirement,
+  validateRegistrationFilters,
+  type RegistrationFilters,
+} from "@/lib/shared/registration-filters";
 import { DEFAULT_SWISS_POINTS } from "@/lib/shared/swiss";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import type { TournamentFormat, TournamentGame } from "@/lib/shared/types";
@@ -153,6 +159,9 @@ export type TournamentInputBody = {
   matchFormatDraws?: boolean | null;
   endurancePlayoffFormatType?: string | null;
   endurancePlayoffFormatValue?: number | null;
+  /** Conditions d'inscription ; absentes = les défauts du module partagé. */
+  registrationDiscordRequirement?: string | null;
+  registrationMinPlayers?: number | null;
 };
 
 export type ValidatedTournamentInput = {
@@ -191,6 +200,12 @@ export type ValidatedTournamentInput = {
    * `null` hors format MULTI.
    */
   phases: readonly Partial<PhaseConfig>[] | null;
+  /**
+   * Conditions d'inscription. **Jamais `null`** : les colonnes sont `NOT NULL`,
+   * et un tournoi sans condition est un tournoi dont les conditions ne refusent
+   * rien (`NONE` + un joueur), pas un tournoi dont on ignore les conditions.
+   */
+  registrationFilters: RegistrationFilters;
 };
 
 export function validateTournamentInput(
@@ -306,6 +321,30 @@ export function validateTournamentInput(
       value: Number(body.endurancePlayoffFormatValue),
     };
   }
+
+  // Conditions d'inscription. Contrairement aux réglages de format, elles ne
+  // sont **pas** propres à un format : elles portent sur qui a le droit
+  // d'entrer, question que les six formats posent à l'identique. Rien n'est donc
+  // neutralisé ici.
+  //
+  // L'effectif minimal reste enregistré sur un tournoi **individuel**, où il ne
+  // s'applique pas (`checkRegistrationFilters`) : le neutraliser ferait perdre
+  // le réglage au premier aller-retour par `SOLO`, alors qu'il n'a coûté qu'une
+  // colonne. Ce qui compte est que personne ne le *lise* en individuel.
+  const filterError = validateRegistrationFilters(
+    body.registrationDiscordRequirement,
+    body.registrationMinPlayers,
+  );
+  if (filterError) return { error: filterError };
+  const registrationFilters: RegistrationFilters = {
+    discordRequirement: isDiscordRequirement(body.registrationDiscordRequirement)
+      ? body.registrationDiscordRequirement
+      : DEFAULT_REGISTRATION_FILTERS.discordRequirement,
+    minPlayers:
+      body.registrationMinPlayers == null
+        ? DEFAULT_REGISTRATION_FILTERS.minPlayers
+        : Number(body.registrationMinPlayers),
+  };
 
   let survivalRoundsPerCut: number | null = null;
   let survivalRoundsBeforeFirstCut: number | null = null;
@@ -435,6 +474,7 @@ export function validateTournamentInput(
       enduranceMaxRounds,
       matchFormat,
       endurancePlayoffFormat,
+      registrationFilters,
       // Les phases ne concernent que le format MULTI : on ne les transmet pas
       // aux autres formats, même si le client en a envoyé. Voir le
       // commentaire du champ `phases` de `ValidatedTournamentInput` ci-dessus :
