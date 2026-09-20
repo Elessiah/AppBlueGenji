@@ -103,6 +103,12 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
     // Qualité pour engager son équipe (`OWNER`/`MANAGER`) : elle tient au
     // roster, pas au plateau — un instantané ne la connaît pas.
     canRegisterEntrant: state.detail.canRegisterEntrant,
+    // Conditions d'inscription : elles se jugent sur le **roster**, que
+    // l'instantané ne porte pas davantage. Rejouées telles quelles, comme le
+    // reste du contexte — un joueur qui certifie son tag pendant qu'il regarde
+    // la page verra le bouton s'ouvrir à sa prochaine connexion au flux, ce qui
+    // est le même délai que pour tout autre droit.
+    registrationBlock: state.detail.registrationBlock,
     myTeamId: state.detail.myTeamId,
     canCreateReportsForTeamIds: state.detail.canCreateReportsForTeamIds,
     isAdmin: state.detail.isAdmin,

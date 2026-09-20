@@ -2,7 +2,10 @@
 import type { MatchFormat } from "./match-format";
 import type { MatchLiveTrigger } from "./live-streams";
 import type { ParticipantType } from "./participants";
-import type { RegistrationFilters } from "./registration-filters";
+import type {
+  RegistrationFilterError,
+  RegistrationFilters,
+} from "./registration-filters";
 import type { PlatformRole } from "./permissions";
 import type { TournamentPreview } from "./tournament-preview";
 import type { DeepStats, TeamRankingPosition } from "./stats";
@@ -517,6 +520,19 @@ export type TournamentViewerContext = {
    * bouton qui n'apparaît pas.
    */
   canRegisterEntrant: boolean;
+  /**
+   * Pourquoi l'engagé du lecteur ne remplit-il pas les **conditions
+   * d'inscription** du tournoi (`lib/shared/registration-filters.ts`) ?
+   * `null` = il les remplit, ou la question ne se pose pas (inscriptions
+   * fermées, déjà engagé, pas d'engagé, pas la qualité pour l'engager).
+   *
+   * Distinct de `canRegister`, qui dit seulement *non* : le bouton se ferme sur
+   * ce champ, et la phrase qui prend sa place en vient — sans quoi le lecteur
+   * verrait un bouton disparaître sans savoir s'il doit recruter ou certifier un
+   * tag. Il dépend du **roster**, donc du lecteur, donc il vit dans son contexte
+   * et non dans l'instantané diffusé.
+   */
+  registrationBlock: RegistrationFilterError | null;
   /**
    * Engagé du viewer dans **ce** tournoi : son équipe active en tournoi par
    * équipes, son entrée solo en tournoi individuel (null s'il n'est pas

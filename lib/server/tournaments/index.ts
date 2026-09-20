@@ -15,6 +15,7 @@ import {
   parseRegistrationFilters,
   type RegistrationFilters,
 } from "@/lib/shared/registration-filters";
+import { checkEntrantEligibility } from "./registration-eligibility";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
 import { canViewTournament } from "@/lib/shared/tournament-visibility";
@@ -832,6 +833,32 @@ export async function getTournamentViewerContext(
   const alreadyRegistered =
     myTeamId !== null && snapshot.registrations.some((row) => row.teamId === myTeamId);
 
+  // Conditions d'inscription du tournoi (`lib/shared/registration-filters.ts`).
+  //
+  // **Posées ici et pas seulement à l'écriture**, parce qu'un bouton qui mène à
+  // un 409 est un bouton qui ment : c'est la règle de la maison, la même qui
+  // ferme « Éditer le score » sur une manche verrouillée. Le serveur reste le
+  // juge — le roster peut changer entre le rendu et le clic.
+  //
+  // La lecture n'a lieu **que quand elle peut changer la réponse** : inscriptions
+  // ouvertes, engagé identifié, pas déjà inscrit, qualité pour engager. Ailleurs
+  // le bouton est de toute façon fermé, et une requête de roster par connexion
+  // SSE n'aurait servi à personne.
+  const mayStillRegister =
+    snapshot.card.state === "REGISTRATION" &&
+    !alreadyRegistered &&
+    canRegisterEntrant &&
+    (isSolo || myTeamId !== null);
+
+  const registrationBlock = mayStillRegister
+    ? await withConnection((connection) =>
+        checkEntrantEligibility(connection, snapshot.card.registrationFilters, {
+          teamId: myTeamId,
+          soloUserId: isSolo ? userId : null,
+        }),
+      )
+    : null;
+
   // L'aperçu vit dans le contexte du lecteur, et non dans l'instantané : celui-ci
   // part tel quel à tous les abonnés du flux, alors que l'aperçu est réservé au
   // staff et au cast. Son contenu, lui, est le même pour tous ceux qui y ont
@@ -841,14 +868,11 @@ export async function getTournamentViewerContext(
 
   return {
     preview,
-    canRegister:
-      snapshot.card.state === "REGISTRATION" &&
-      !alreadyRegistered &&
-      canRegisterEntrant &&
-      // En individuel, un joueur sans entrée solo peut s'inscrire : elle sera
-      // créée à ce moment-là.
-      (isSolo || myTeamId !== null),
+    // En individuel, un joueur sans entrée solo peut s'inscrire : elle sera
+    // créée à ce moment-là — `mayStillRegister` en tient compte.
+    canRegister: mayStillRegister && registrationBlock === null,
     canRegisterEntrant,
+    registrationBlock,
     myTeamId,
     canCreateReportsForTeamIds: myTeamId ? [myTeamId] : [],
     isAdmin: canManage,

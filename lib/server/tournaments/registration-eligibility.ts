@@ -79,6 +79,42 @@ export function tournamentRegistrationFilters(
 }
 
 /**
+ * L'engagé désigné, réduit à ce qu'il faut pour lire son roster.
+ *
+ * `soloUserId` non nul **est** la marque du tournoi individuel : l'engagé y est
+ * une personne, son roster tient en une ligne, et l'effectif minimal ne
+ * s'applique pas (`checkRegistrationFilters`). `teamId` peut alors être `null` —
+ * l'entrée solo n'existe pas forcément encore, et c'est précisément le cas où la
+ * condition doit quand même se juger, sur le joueur.
+ */
+export type EligibilityTarget = { teamId: number | null; soloUserId: number | null };
+
+/**
+ * Les conditions sont-elles remplies ? Rend le refus, ou `null`.
+ *
+ * **La forme qui ne lève pas** : elle sert à *fermer le bouton* d'inscription
+ * (`getTournamentViewerContext`), où une exception n'aurait aucun sens. L'autre
+ * forme ({@link assertRegistrationEligibility}) lève, parce qu'elle protège une
+ * transaction qu'un refus doit défaire. Les deux passent par ici : deux lectures
+ * de roster divergeraient, et la divergence se verrait en 409 sur un bouton qui
+ * s'annonçait ouvert.
+ */
+export async function checkEntrantEligibility(
+  connection: PoolConnection,
+  filters: RegistrationFilters,
+  entrant: EligibilityTarget,
+): Promise<RegistrationFilterError | null> {
+  const solo = entrant.soloUserId !== null;
+  const roster = solo
+    ? await loadSoloEligibility(connection, entrant.soloUserId!)
+    : entrant.teamId === null
+      ? []
+      : await loadTeamRosterEligibility(connection, entrant.teamId);
+
+  return checkRegistrationFilters(filters, roster, solo);
+}
+
+/**
  * Refuse une inscription qui ne remplit pas les conditions.
  *
  * Levée plutôt que rendue : l'inscription est une transaction, et le refus doit
@@ -92,18 +128,12 @@ export async function assertRegistrationEligibility(
     TournamentRow,
     "registration_discord_requirement" | "registration_min_players"
   >,
-  entrant: { teamId: number; soloUserId: number | null },
+  entrant: EligibilityTarget,
 ): Promise<void> {
-  const filters = tournamentRegistrationFilters(tournament);
-  const roster =
-    entrant.soloUserId === null
-      ? await loadTeamRosterEligibility(connection, entrant.teamId)
-      : await loadSoloEligibility(connection, entrant.soloUserId);
-
-  const error: RegistrationFilterError | null = checkRegistrationFilters(
-    filters,
-    roster,
-    entrant.soloUserId !== null,
+  const error = await checkEntrantEligibility(
+    connection,
+    tournamentRegistrationFilters(tournament),
+    entrant,
   );
   if (error) throw new Error(error);
 }

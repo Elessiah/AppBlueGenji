@@ -84,17 +84,32 @@ tournoi par équipes — mais la garde ferme le cas pour de bon.
 
 ## Où la règle est écrite, et combien de fois
 
-Une seule fois : `checkRegistrationFilters`. Elle sert **deux fois**, aux deux
-bouts :
+Une seule fois : `checkRegistrationFilters`, sous deux habillages qui partagent la
+même lecture de roster (`checkEntrantEligibility`) — deux lectures divergeraient,
+et la divergence se verrait en 409 sur un bouton qui s'annonçait ouvert.
 
-- `registerCurrentUserTeam` la lève en 409 (le serveur est le juge) ;
-- `canUserRegister` ferme le bouton d'inscription, pour ne pas proposer un geste
-  voué à l'échec. Le roster peut changer entre le rendu et le clic : c'est le
-  serveur qui tranche, celui-ci n'existe que pour l'affordance.
+- `assertRegistrationEligibility` **lève**, parce qu'elle protège la transaction
+  d'inscription qu'un refus doit défaire (`registerCurrentUserTeam`) ;
+- `checkEntrantEligibility` **rend le refus**, et c'est lui que
+  `getTournamentViewerContext` pose sur `canRegister` : un bouton qui mène à un
+  409 est un bouton qui ment, c'est la règle de la maison (la même qui ferme
+  « Éditer le score » sur une manche verrouillée).
 
-En tournoi individuel, le bouton se juge sur le **joueur** et non sur son entrée
-solo, qui n'existe peut-être pas encore : sinon la fermeture n'arriverait jamais à
-temps pour la première inscription.
+Le motif voyage avec le refus : `TournamentViewerContext.registrationBlock` porte
+le code, et `registerBlockedNotice` met à la place du bouton la phrase qui **nomme
+le geste** — recruter, ou certifier un tag. Sans lui, le bouton disparaîtrait sans
+un mot. La phrase ne répète pas la condition chiffrée : celle-ci est affichée deux
+lignes plus haut, dans la case « Conditions d'inscription » du même en-tête.
+
+La lecture de roster n'a lieu **que si elle peut changer la réponse** :
+inscriptions ouvertes, engagé identifié, pas déjà inscrit, qualité pour engager.
+Ailleurs le bouton est de toute façon fermé, et une requête par connexion SSE
+n'aurait servi à personne. En tournoi individuel, le bouton se juge sur le
+**joueur** et non sur son entrée solo, qui n'existe peut-être pas encore : sinon
+la fermeture n'arriverait jamais à temps pour la première inscription.
+
+(`canUserRegister`, l'ancien prédicat du même nom, garde ce contrôle pour les
+appelants qui s'en servent ; c'est le contexte du lecteur qui décide du bouton.)
 
 Les lectures de roster vivent dans `registration-eligibility.ts`, **toujours sur
 la connexion de l'appelant** : l'inscription tient un verrou sur la ligne du
@@ -110,11 +125,11 @@ personne ne peut s'inscrire (cinq joueurs exigés sur un plateau d'équipes à
 quatre) doit pouvoir être ouvert sans être recréé. Rien n'est rétroactif, d'où
 l'absence de garde du genre « ne peut plus être durci ».
 
-Côté lecture, `registrationFiltersSummary` écrit la phrase **une fois** pour les
-deux usages — annoncer les conditions (case « Conditions d'inscription » de
-l'en-tête du tournoi) et expliquer un refus. La case n'apparaît que sur un tournoi
-`UPCOMING` ou `REGISTRATION` : passé le coup d'envoi plus personne n'entre, et la
-garder afficherait une condition d'accès comme un trait de palmarès.
+Côté lecture, `registrationFiltersSummary` écrit les conditions en une phrase,
+posée dans la case « Conditions d'inscription » de l'en-tête du tournoi **et**
+sous le formulaire de création. La case n'apparaît que sur un tournoi `UPCOMING`
+ou `REGISTRATION` : passé le coup d'envoi plus personne n'entre, et la garder
+afficherait une condition d'accès comme un trait de palmarès.
 
 Les conditions voyagent sur `TournamentCard.registrationFilters`, donc dans
 l'instantané diffusé : ce sont des conditions publiques, rien de personnel.
