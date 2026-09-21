@@ -5,7 +5,7 @@ jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
 
 import {
-  anonymizeOwnAccount,
+  deleteOwnAccount,
   createOrGetDiscordUser,
   getFullProfile,
   getUserById,
@@ -110,17 +110,32 @@ describe("updateOwnProfile — la certification suit le tag", () => {
   });
 });
 
-describe("anonymizeOwnAccount", () => {
+describe("deleteOwnAccount — anonymisation", () => {
+  /** Un compte qui a joué : la ligne doit rester, donc elle est anonymisée. */
+  const playedDb = () =>
+    fakeDb((sql) =>
+      sql.includes("AS tournaments")
+        ? [[{ tournaments: 1, organized: 0, owned: 0 }]]
+        : undefined,
+    );
+
   it("efface le tag **et** sa certification", async () => {
     // Une date restée seule ferait d'un compte anonymisé un compte « vérifié »
     // sans tag.
-    const { queries } = fakeDb();
+    const { queries } = playedDb();
 
-    await anonymizeOwnAccount(7);
+    await deleteOwnAccount(7);
 
     const update = find(queries, "UPDATE bg_users")!;
     expect(update.sql).toContain("discord_pseudo = NULL");
     expect(update.sql).toContain("discord_verified_at = NULL");
+  });
+
+  it("garde la ligne d'un compte qui a joué", async () => {
+    const { queries } = playedDb();
+
+    expect(await deleteOwnAccount(7)).toBe("ANONYMIZE");
+    expect(find(queries, "DELETE FROM bg_users")).toBeUndefined();
   });
 });
 

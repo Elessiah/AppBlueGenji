@@ -125,3 +125,21 @@ describe("listPlayers visibility", () => {
     expect(players[0].games).toEqual(["OW", "MR"]);
   });
 });
+
+describe("listPlayers — comptes anonymisés", () => {
+  it("rend `isDeleted`, sans quoi l'annuaire ne peut pas les masquer", async () => {
+    const open = await runList([userRow()], 999);
+    expect(open[0].isDeleted).toBe(false);
+
+    const deleted = await runList([userRow({ is_deleted: 1, pseudo: "compte_supprime_7" })], 999);
+    expect(deleted[0].isDeleted).toBe(true);
+  });
+
+  it("les liste tout de même : la ligne sert à qui remonte un ancien match", async () => {
+    const rows = await runList(
+      [userRow(), userRow({ id: 8, is_deleted: 1, pseudo: "compte_supprime_8" })],
+      999,
+    );
+    expect(rows).toHaveLength(2);
+  });
+});
