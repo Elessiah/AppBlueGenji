@@ -9,6 +9,10 @@ import type { FullProfileResponse } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { TeamLink } from "@/components/entity-link";
 import { VerifiedBadge } from "@/components/discord-tag";
+import {
+  discordTagLockNotice,
+  isDiscordTagLocked,
+} from "@/lib/shared/discord-tag-lock";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
 
@@ -225,6 +229,10 @@ export default function ProfilePage() {
     }
   };
 
+  // Le verrou se lit sur le rattachement **enregistré**, jamais sur le champ en
+  // cours de saisie : le formulaire ne doit ni ouvrir ni fermer ce qu'il montre.
+  const discordLocked = isDiscordTagLocked(discordState);
+
   if (!data) return <section className="ds-block" style={{ color: "var(--text-2)" }}>Chargement du profil...</section>;
 
   return (
@@ -342,29 +350,40 @@ export default function ProfilePage() {
                 onChange={(e) => setDiscordPseudo(e.target.value)}
                 placeholder="ton_pseudo"
                 aria-describedby="profile-discord-hint"
+                /* Un compte Discord rattaché possède son tag : le champ le
+                   montre, il ne le prend plus. `readOnly` et non `disabled` —
+                   la valeur reste lisible au lecteur d'écran et atteignable au
+                   clavier, ce qu'un champ désactivé perd. */
+                readOnly={discordLocked}
+                aria-readonly={discordLocked || undefined}
+                style={discordLocked ? { opacity: 0.7, cursor: "not-allowed" } : undefined}
               />
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => setVerifyOpen(true)}
-                  /* « Recertifier » seul ne dit pas quoi : le libellé
-                     accessible commence par le texte visible (WCAG 2.5.3) et
-                     ajoute l'objet. */
-                  aria-label={
-                    discordState.verified
-                      ? "Recertifier mon tag Discord"
-                      : "Certifier mon tag Discord"
-                  }
-                  style={{ padding: "7px 14px", fontSize: 12 }}
-                >
-                  {discordState.verified ? "Recertifier" : "Certifier mon tag"}
-                </button>
-              </div>
+              {discordLocked ? null : (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setVerifyOpen(true)}
+                    /* « Recertifier » seul ne dit pas quoi : le libellé
+                       accessible commence par le texte visible (WCAG 2.5.3) et
+                       ajoute l'objet. */
+                    aria-label={
+                      discordState.verified
+                        ? "Recertifier mon tag Discord"
+                        : "Certifier mon tag Discord"
+                    }
+                    style={{ padding: "7px 14px", fontSize: 12 }}
+                  >
+                    {discordState.verified ? "Recertifier" : "Certifier mon tag"}
+                  </button>
+                </div>
+              )}
               <p id="profile-discord-hint" style={{ fontSize: 11, color: "var(--text-2)", margin: "6px 0 0", lineHeight: 1.6 }}>
-                {discordState.verified
-                  ? "Tag certifié : les administrateurs le voient, et les arbitres pendant tes tournois. Le modifier annule la certification."
-                  : "Tag non certifié : personne ne le voit, pas même les administrateurs. Certifie-le pour que l'organisation puisse te joindre pendant un tournoi."}
+                {discordLocked
+                  ? discordTagLockNotice(discordState.tag)
+                  : discordState.verified
+                    ? "Tag certifié : les administrateurs le voient, et les arbitres pendant tes tournois. Le modifier annule la certification."
+                    : "Tag non certifié : personne ne le voit, pas même les administrateurs. Certifie-le pour que l'organisation puisse te joindre pendant un tournoi."}
               </p>
             </div>
             <div className="field">

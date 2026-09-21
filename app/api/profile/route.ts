@@ -1,5 +1,6 @@
 ﻿import { clearSession, getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
+import { DISCORD_TAG_LOCKED } from "@/lib/shared/discord-tag-lock";
 import { anonymizeOwnAccount, getFullProfile, updateOwnProfile } from "@/lib/server/users-service";
 
 export async function GET() {
@@ -40,6 +41,9 @@ export async function PATCH(req: Request) {
   } catch (error) {
     const message = (error as Error).message;
     if (message === "PSEUDO_ALREADY_USED") return fail(message, 409);
+    // La saisie est bonne, c'est l'état du compte qui l'interdit : un compte
+    // Discord rattaché possède son tag (`lib/shared/discord-tag-lock.ts`).
+    if (message === DISCORD_TAG_LOCKED) return fail(message, 409);
     return fail(message || "PROFILE_UPDATE_FAILED", 400);
   }
 }

@@ -2,6 +2,10 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
+import {
+  DISCORD_TAG_LOCKED,
+  isDiscordTagLocked,
+} from "@/lib/shared/discord-tag-lock";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
@@ -869,6 +873,26 @@ export async function updateOwnProfile(
 
   const nextDiscordPseudo = patch.discordPseudo === undefined ? null : patch.discordPseudo;
 
+  // **Un compte Discord rattaché possède son tag** (`lib/shared/discord-tag-lock.ts`).
+  // Le refus est lisible — l'écran verrouille déjà le champ, mais la route est
+  // atteignable sans lui —, et il ne tombe que sur une **réécriture** : le
+  // formulaire renvoie le tag à chaque sauvegarde, refuser sur sa seule présence
+  // rendrait tout le profil inenregistrable. La comparaison est celle de la
+  // colonne (insensible à la casse et aux accents, `utf8mb4_0900_ai_ci`), sans
+  // quoi une correction de casse serait refusée là où la certification, elle, y
+  // survit.
+  const [lockRows] = await db.execute<(RowDataPacket & {
+    discord_id: string | null;
+    discord_pseudo: string | null;
+  })[]>(`SELECT discord_id, discord_pseudo FROM bg_users WHERE id = ? LIMIT 1`, [userId]);
+  const lockRow = lockRows[0];
+  if (lockRow && isDiscordTagLocked({ linked: Boolean(lockRow.discord_id) })) {
+    const stored = lockRow.discord_pseudo;
+    const sameTag =
+      (stored ?? "").localeCompare(nextDiscordPseudo ?? "", "fr", { sensitivity: "base" }) === 0;
+    if (!sameTag) throw new Error(DISCORD_TAG_LOCKED);
+  }
+
   // **La certification se perd à chaque changement de tag.** Elle ne dit pas
   // « ce compte a un Discord » (c'est `discord_id`) mais « le tag stocké a été
   // prouvé » : un tag réécrit n'a rien prouvé, et le laisser certifié exposerait
@@ -890,13 +914,23 @@ export async function updateOwnProfile(
   // insensibles à la casse, la preuve continue de désigner le même compte —, et
   // c'est la raison de ne **pas** durcir ceci en comparaison binaire : on
   // recertifierait pour une majuscule.
+  //
+  // `discord_pseudo` est en outre **gardé tel quel** quand un `discord_id` est
+  // posé : le refus lisible ci-dessus nomme la règle, cette branche la tient —
+  // une lecture puis une écriture laissent un `await` entre les deux, et le
+  // rattachement peut tomber dans cet intervalle. La garde couvre du même geste
+  // `discord_verified_at`, qui n'a alors aucune raison de tomber puisque rien ne
+  // change.
   await db.execute(
     `UPDATE bg_users
      SET pseudo = COALESCE(?, pseudo),
          overwatch_battletag = ?,
          marvel_rivals_tag = ?,
-         discord_verified_at = CASE WHEN discord_pseudo <=> ? THEN discord_verified_at ELSE NULL END,
-         discord_pseudo = ?,
+         discord_verified_at = CASE
+           WHEN discord_id IS NOT NULL OR discord_pseudo <=> ? THEN discord_verified_at
+           ELSE NULL
+         END,
+         discord_pseudo = CASE WHEN discord_id IS NOT NULL THEN discord_pseudo ELSE ? END,
          is_adult = ?,
          visible_avatar = COALESCE(?, visible_avatar),
          visible_overwatch = COALESCE(?, visible_overwatch),
