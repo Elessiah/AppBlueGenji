@@ -98,6 +98,15 @@ résoudre l'identifiant, et `createOrGetDiscordUser` l'écrit certifié. Tous le
 comptes nés par cette porte se certifient donc à leur prochaine connexion, sans
 migration.
 
+**L'exposition est donc annoncée sur les deux chemins, pas seulement dans le
+dialogue.** C'est le seul endroit où la certification se produit sans qu'on l'ait
+demandée : un membre qui entre toujours par Discord et n'avait jamais rempli le
+champ « Pseudo Discord » verrait son handle devenir lisible par les
+administrateurs et l'arbitrage. La deuxième étape de `/connexion` porte donc la
+phrase — ce que la certification ouvre, à qui, et le geste qui l'annule — et
+`lib/shared/rgpd-policy.ts` déclare les **deux** voies. Le geste d'annulation
+existait déjà ; encore faut-il savoir qu'il y a quelque chose à annuler.
+
 ### Le tag écrit est celui du défi, jamais celui du client
 
 `bg_discord_login_challenges.handle` retient le tag de la demande. La

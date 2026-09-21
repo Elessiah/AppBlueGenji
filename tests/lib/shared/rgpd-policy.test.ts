@@ -40,6 +40,19 @@ describe("DONNEES_PROFIL", () => {
     expect(certification?.finalite).toMatch(/modifié/i);
   });
 
+  it("nomme les **deux** chemins de certification, dont celui qui n'est pas demandé", () => {
+    // Se connecter par Discord certifie le tag tout seul (c'est la preuve
+    // même), donc l'exposition peut commencer sans qu'aucun bouton ait été
+    // pressé. Une déclaration qui ne parlerait que de « Mon profil » laisserait
+    // croire à un geste toujours délibéré — et un membre qui entre toujours par
+    // Discord ne visite peut-être jamais cette page.
+    const certification = DONNEES_PROFIL.find(
+      (d) => d.donnee === "Certification du pseudo Discord",
+    );
+    expect(certification?.finalite).toMatch(/profil/i);
+    expect(certification?.finalite).toMatch(/connect/i);
+  });
+
   it("discloses that the Discord user ID is stored for Discord login", () => {
     const idDiscord = DONNEES_PROFIL.find((d) => d.donnee === "ID Discord");
     expect(idDiscord).toBeDefined();
