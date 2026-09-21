@@ -9,7 +9,7 @@ import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
 import { importRemoteAvatar, shouldImportGoogleAvatar } from "@/lib/server/user-avatar-import";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { formatPlayerSignupLog, type PlayerSignupProvider } from "@/lib/shared/bot-logs";
-import { visibleDiscordTag } from "@/lib/shared/discord-identity";
+import { isDiscordNumericId, visibleDiscordTag } from "@/lib/shared/discord-identity";
 import { can, sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 import { getPlayerEntityStats, loadPlayerRecords } from "@/lib/server/stats-service";
 import type {
@@ -168,7 +168,10 @@ function randomCode(): string {
 export function normalizeDiscordHandle(raw: string | null | undefined): string | null {
   const trimmed = (raw ?? "").trim().replace(/^@/, "");
   if (trimmed.length === 0) return null;
-  if (/^\d{5,32}$/.test(trimmed)) return null;
+  // Prédicat partagé avec la page de connexion, qui doit annoncer l'exposition
+  // exactement quand cette fonction va certifier : deux lectures du même motif
+  // divergeraient en une phrase fausse.
+  if (isDiscordNumericId(trimmed)) return null;
   return trimmed.slice(0, 64);
 }
 

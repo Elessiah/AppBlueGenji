@@ -8,6 +8,8 @@ import {
   DISCORD_VERIFICATION_PURPOSE,
   visibleDiscordTag,
   type DiscordTagViewer,
+  isCertifiableDiscordHandle,
+  isDiscordNumericId,
 } from "@/lib/shared/discord-identity";
 import { PLATFORM_ROLES, type PlatformRole } from "@/lib/shared/permissions";
 
@@ -193,5 +195,38 @@ describe("les textes de consentement", () => {
   it("donnent une raison, pas seulement une liste", () => {
     expect(DISCORD_VERIFICATION_PURPOSE.length).toBeGreaterThan(20);
     expect(DISCORD_VERIFICATION_PURPOSE.toLowerCase()).toContain("tournoi");
+  });
+});
+
+/**
+ * Un identifiant numérique n'est pas un tag.
+ *
+ * Le prédicat a **deux** appelants de part et d'autre de la frontière :
+ * `normalizeDiscordHandle` (serveur, qui décide ce qui s'écrit en base) et la
+ * deuxième étape de `/connexion` (client, qui annonce l'exposition). C'est la
+ * raison de le sortir ici : deux copies auraient divergé en une **phrase
+ * fausse** — l'écran promettant une certification que le serveur refuse.
+ */
+describe("isDiscordNumericId / isCertifiableDiscordHandle", () => {
+  it("reconnaît un identifiant Discord, `@` et espaces compris", () => {
+    for (const raw of ["123456789012345678", " 123456789012345678 ", "@123456789012345678"]) {
+      expect(isDiscordNumericId(raw)).toBe(true);
+      expect(isCertifiableDiscordHandle(raw)).toBe(false);
+    }
+  });
+
+  it("laisse passer un pseudo, même chiffré à moitié", () => {
+    for (const raw of ["keryan", "@keryan", "n0va", "1234"]) {
+      // « 1234 » : quatre chiffres sont sous le plancher d'un identifiant Discord,
+      // c'est donc un pseudo — improbable, mais certifiable.
+      expect(isDiscordNumericId(raw)).toBe(false);
+      expect(isCertifiableDiscordHandle(raw)).toBe(true);
+    }
+  });
+
+  it("ne certifie pas le vide", () => {
+    for (const raw of ["", "   ", "@", null, undefined]) {
+      expect(isCertifiableDiscordHandle(raw)).toBe(false);
+    }
   });
 });

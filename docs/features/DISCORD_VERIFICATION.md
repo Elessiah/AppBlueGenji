@@ -122,6 +122,13 @@ aucun serveur avec le joueur. La certification le refuse
 l'arbitrage, et un nombre de dix-huit chiffres affiché là où un arbitre attend un
 nom lui ferait croire qu'il a certifié son tag.
 
+Le prédicat vit dans le module **pur** (`isDiscordNumericId` /
+`isCertifiableDiscordHandle`) parce qu'il a deux appelants de part et d'autre de
+la frontière : le serveur, qui décide ce qui s'écrit, et la page de connexion,
+qui n'annonce la certification **que** si la saisie en produira une. Deux copies
+auraient divergé en une phrase fausse — un écran promettant ce que le serveur
+refuse.
+
 ### On ne déplace jamais une porte d'entrée
 
 Un compte dont le `discord_id` est posé le garde. Un tag qui résout vers un autre

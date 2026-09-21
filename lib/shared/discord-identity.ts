@@ -192,3 +192,34 @@ export const DISCORD_VERIFICATION_EXPOSURE: readonly string[] = [
  */
 export const DISCORD_VERIFICATION_PURPOSE =
   "L'organisation doit pouvoir te joindre pendant un tournoi : reprogrammation d'une manche, litige de score, forfait.";
+
+/**
+ * La saisie désigne-t-elle un **identifiant numérique** plutôt qu'un tag ?
+ *
+ * La connexion accepte les deux : un identifiant est le repli quand le bot ne
+ * partage aucun serveur avec le joueur. La **certification**, elle, ne retient
+ * qu'un tag — c'est un pseudo qu'elle publie à l'arbitrage, et dix-huit chiffres
+ * affichés là où un arbitre attend un nom ne servent personne.
+ *
+ * Le prédicat vit ici, dans le module **pur**, parce que deux endroits en ont
+ * besoin et qu'ils ne sont pas du même côté : `normalizeDiscordHandle`
+ * (serveur, qui décide ce qui s'écrit) et la page de connexion (client, qui
+ * annonce ou non que cette connexion va certifier le tag). Deux copies
+ * divergeraient, et la divergence prendrait la forme d'une **phrase fausse** —
+ * l'écran promettant une certification que le serveur ne fait pas.
+ */
+export function isDiscordNumericId(raw: string | null | undefined): boolean {
+  return /^\d{5,32}$/.test((raw ?? "").trim().replace(/^@/, ""));
+}
+
+/**
+ * Cette saisie donnera-t-elle un tag certifiable ?
+ *
+ * Non vide, et pas un identifiant. C'est exactement ce que
+ * `normalizeDiscordHandle` accepte, dit du point de vue de l'écran qui doit
+ * décider s'il annonce l'exposition.
+ */
+export function isCertifiableDiscordHandle(raw: string | null | undefined): boolean {
+  const trimmed = (raw ?? "").trim().replace(/^@/, "");
+  return trimmed.length > 0 && !isDiscordNumericId(trimmed);
+}

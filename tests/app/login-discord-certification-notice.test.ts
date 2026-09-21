@@ -38,3 +38,16 @@ describe("connexion Discord — annonce de la certification", () => {
     expect(SOURCE).toMatch(/annule la\s*\n?\s*certification/i);
   });
 });
+
+describe("annonce réservée à une saisie certifiable", () => {
+  it("n'annonce rien quand la saisie est un identifiant numérique", () => {
+    // Le repli par identifiant ne certifie **rien** (`normalizeDiscordHandle`
+    // rend `null`) : promettre une certification qui n'aura pas lieu est pire
+    // que se taire. La condition passe par le prédicat partagé, pas par une
+    // seconde lecture du motif.
+    expect(SOURCE).toMatch(/isCertifiableDiscordHandle\(handle\)/);
+    expect(SOURCE).toMatch(/from "@\/lib\/shared\/discord-identity"/);
+    // Aucun motif de chiffres recopié sur place à côté de l'annonce.
+    expect(SOURCE).not.toMatch(/\d\{5,32\}/);
+  });
+});
