@@ -5,6 +5,7 @@ import {
   mapEntrantError,
   mapError,
 } from "@/app/(secured)/tournois/[id]/_lib/error-map";
+import { REGISTRATION_FILTER_ERRORS } from "@/lib/shared/registration-filters";
 
 /**
  * Les codes que le serveur renvoie réellement doivent tous avoir une phrase
@@ -126,9 +127,14 @@ describe("mapEntrantError", () => {
 /**
  * Les refus des conditions d'inscription.
  *
- * Trois codes, trois messages distincts : chacun doit nommer **le geste qui le
- * lève** (recruter, ou certifier un tag), faute de quoi le capitaine ne sait pas
- * laquelle des deux conditions a bloqué.
+ * Cinq codes, cinq messages distincts : chacun doit nommer **le geste qui le
+ * lève** (recruter, certifier un tag, rattacher un compte Blizzard), faute de
+ * quoi le capitaine ne sait pas laquelle des trois conditions a bloqué.
+ *
+ * `mapError` rend le code lui-même quand il ne le connaît pas : un refus oublié
+ * ici ne casse rien, il s'affiche en capitales dans un toast. D'où le balayage
+ * de `REGISTRATION_FILTER_ERRORS`, qui ferme le cas pour tout refus ajouté
+ * demain.
  */
 describe("conditions d'inscription", () => {
   it("dit de recruter quand l'effectif manque", () => {
@@ -148,12 +154,43 @@ describe("conditions d'inscription", () => {
     }
   });
 
+  it("distingue les deux refus Blizzard, et renvoie au profil", () => {
+    const any = mapError("TEAM_NEEDS_LINKED_BLIZZARD");
+    const all = mapError("TEAM_NEEDS_ALL_LINKED_BLIZZARD");
+
+    expect(any).toMatch(/au moins un/i);
+    expect(all).toMatch(/tous/i);
+    expect(any).not.toBe(all);
+    for (const message of [any, all]) {
+      expect(message).toMatch(/blizzard/i);
+      expect(message).toMatch(/profil/i);
+    }
+  });
+
+  it("ne confond pas un refus Discord avec un refus Blizzard", () => {
+    // Les quatre messages se ressemblent par construction (« au moins un » /
+    // « tous ») : ce qui les sépare est le geste, et il doit se lire.
+    expect(mapError("TEAM_NEEDS_VERIFIED_DISCORD")).not.toMatch(/blizzard/i);
+    expect(mapError("TEAM_NEEDS_ALL_VERIFIED_DISCORD")).not.toMatch(/blizzard/i);
+    expect(mapError("TEAM_NEEDS_LINKED_BLIZZARD")).not.toMatch(/discord/i);
+    expect(mapError("TEAM_NEEDS_ALL_LINKED_BLIZZARD")).not.toMatch(/discord/i);
+  });
+
+  it("traduit chaque refus que le module pur peut rendre", () => {
+    for (const code of REGISTRATION_FILTER_ERRORS) {
+      expect(mapError(code)).not.toContain(code);
+    }
+  });
+
   it("ne laisse sortir aucun code brut", () => {
     for (const code of [
       "TEAM_TOO_FEW_PLAYERS",
       "TEAM_NEEDS_VERIFIED_DISCORD",
       "TEAM_NEEDS_ALL_VERIFIED_DISCORD",
+      "TEAM_NEEDS_LINKED_BLIZZARD",
+      "TEAM_NEEDS_ALL_LINKED_BLIZZARD",
       "INVALID_DISCORD_REQUIREMENT",
+      "INVALID_BLIZZARD_REQUIREMENT",
       "INVALID_MIN_PLAYERS",
     ]) {
       expect(mapError(code)).not.toContain(code);

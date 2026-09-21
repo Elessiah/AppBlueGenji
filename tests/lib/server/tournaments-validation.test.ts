@@ -445,6 +445,7 @@ describe("validateTournamentInput — conditions d'inscription", () => {
   it("applique les défauts quand rien n'est envoyé", () => {
     expect(value(base).registrationFilters).toEqual({
       discordRequirement: "ANY_PLAYER",
+      blizzardRequirement: "NONE",
       minPlayers: 5,
     });
   });
@@ -457,9 +458,14 @@ describe("validateTournamentInput — conditions d'inscription", () => {
         // Les formats à réglages obligatoires ont besoin des leurs pour passer.
         survivalRoundsPerCut: format === "SURVIVAL" ? 2 : undefined,
         registrationDiscordRequirement: "NONE",
+        registrationBlizzardRequirement: "ALL_PLAYERS",
         registrationMinPlayers: 1,
       });
-      expect(v.registrationFilters).toEqual({ discordRequirement: "NONE", minPlayers: 1 });
+      expect(v.registrationFilters).toEqual({
+        discordRequirement: "NONE",
+        blizzardRequirement: "ALL_PLAYERS",
+        minPlayers: 1,
+      });
     }
   });
 
@@ -467,6 +473,12 @@ describe("validateTournamentInput — conditions d'inscription", () => {
     expect(
       validateTournamentInput({ ...base, registrationDiscordRequirement: "MOST_PLAYERS" }),
     ).toEqual({ error: "INVALID_DISCORD_REQUIREMENT" });
+  });
+
+  it("refuse une exigence Blizzard inconnue", () => {
+    expect(
+      validateTournamentInput({ ...base, registrationBlizzardRequirement: "MOST_PLAYERS" }),
+    ).toEqual({ error: "INVALID_BLIZZARD_REQUIREMENT" });
   });
 
   it("refuse un effectif minimal hors bornes", () => {

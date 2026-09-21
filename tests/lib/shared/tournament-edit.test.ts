@@ -201,11 +201,13 @@ describe("conditions d'inscription", () => {
 
   it("reste modifiable sur un tournoi annoncé", () => {
     expect(isFieldEditable("registrationDiscordRequirement", announced, NOW)).toBe(true);
+    expect(isFieldEditable("registrationBlizzardRequirement", announced, NOW)).toBe(true);
     expect(isFieldEditable("registrationMinPlayers", announced, NOW)).toBe(true);
   });
 
   it("se ferme au coup d'envoi, comme tout le reste", () => {
     expect(isFieldEditable("registrationDiscordRequirement", running, NOW)).toBe(false);
+    expect(isFieldEditable("registrationBlizzardRequirement", running, NOW)).toBe(false);
     expect(isFieldEditable("registrationMinPlayers", running, NOW)).toBe(false);
   });
 
@@ -218,6 +220,9 @@ describe("conditions d'inscription", () => {
     ).toBeNull();
     expect(
       checkEditPatch(announced, { registrationDiscordRequirement: "ALL_PLAYERS" }, NOW),
+    ).toBeNull();
+    expect(
+      checkEditPatch(announced, { registrationBlizzardRequirement: "ALL_PLAYERS" }, NOW),
     ).toBeNull();
   });
 
