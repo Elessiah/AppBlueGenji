@@ -211,8 +211,38 @@ describe("confirmDiscordVerification", () => {
 
     expect(result).toEqual({ tag: "keryan" });
     expect(db.state.discord_pseudo).toBe("keryan");
-    expect(db.state.discord_id).toBe("900000000000000002");
     expect(db.state.discord_verified_at).not.toBeNull();
+  });
+
+  /**
+   * **Certifier ouvre la porte Discord à un compte Google.**
+   *
+   * C'est la seconde moitié de ce que la certification apporte : le compte
+   * repart avec un `discord_id`, et `createOrGetDiscordUser` — qui cherche
+   * exactement sur cette colonne — le retrouvera à la prochaine connexion par
+   * code. Un compte né par Google devient donc joignable par les deux portes,
+   * sans qu'aucune route de connexion n'ait à connaître la certification.
+   */
+  it("rattache l'identifiant au compte : il pourra désormais se connecter par Discord", async () => {
+    const db = fakeDb({ ...GOOGLE_ACCOUNT });
+    consumeMock.mockResolvedValue({ handle: "keryan" });
+
+    await confirmDiscordVerification(7, "900000000000000002", "123456");
+
+    expect(db.state.discord_id).toBe("900000000000000002");
+  });
+
+  it("ne déplace pas un identifiant déjà posé : `COALESCE` le préserve", async () => {
+    // Le cas ne devrait pas survenir (la garde de mismatch l'a écarté), mais
+    // l'écriture elle-même doit le refuser : une porte d'entrée ne se déplace
+    // pas, même par accident.
+    const db = fakeDb({ ...LINKED_ACCOUNT });
+    resolveMock.mockResolvedValue("900000000000000001");
+
+    await startDiscordVerification(7, "keryan");
+
+    expect(db.state.discord_id).toBe("900000000000000001");
+    expect(db.writes[0].sql).toContain("discord_id = COALESCE(discord_id, ?)");
   });
 
   it("refuse un code faux sans rien écrire", async () => {
