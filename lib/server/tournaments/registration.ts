@@ -3,11 +3,9 @@ import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { ensureSoloEntry, findSoloEntry } from "@/lib/server/solo-entries-service";
 import { isSoloTournament } from "@/lib/shared/participants";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
-import { checkRegistrationFilters } from "@/lib/shared/registration-filters";
 import {
   assertRegistrationEligibility,
-  loadSoloEligibility,
-  loadTeamRosterEligibility,
+  checkEntrantEligibility,
   tournamentRegistrationFilters,
 } from "./registration-eligibility";
 import type { TournamentRow } from "./_internal";
@@ -332,31 +330,30 @@ export async function canUserRegister(
   let teamId: number | null;
   if (solo) {
     teamId = await findSoloEntry(connection, userId);
-    // Les conditions se jugent sur le **joueur**, pas sur son entrée solo (qui
-    // n'existe peut-être pas encore) : la fermeture du bouton doit valoir dès la
-    // première inscription, sans quoi elle n'arriverait jamais à temps.
-    if (checkRegistrationFilters(filters, await loadSoloEligibility(connection, userId), true)) {
-      return false;
-    }
   } else {
     const activeTeam = await getUserActiveTeam(userId, connection);
     // Même refus que `registerCurrentUserTeam`, pour ne pas annoncer un bouton
     // que l'écriture rejetterait en 403.
     if (activeTeam && !hasTeamManagementRole(activeTeam.roles)) return false;
-    // Mêmes conditions, même module pur : le bouton ne s'ouvre pas sur un refus.
-    // Le serveur reste le juge — le roster peut changer entre le rendu et le
-    // clic —, celui-ci n'existe que pour ne pas proposer un geste voué à
-    // l'échec.
-    if (
-      activeTeam &&
-      checkRegistrationFilters(
-        filters,
-        await loadTeamRosterEligibility(connection, activeTeam.teamId),
-      )
-    ) {
-      return false;
-    }
     teamId = activeTeam?.teamId ?? null;
+  }
+
+  // Mêmes conditions, **même habillage** que les deux autres appelants
+  // (`checkEntrantEligibility`) : composer soi-même la lecture de roster et le
+  // module pur en ferait une troisième écriture de la même règle, et c'est
+  // précisément la divergence que ce module existe pour éviter.
+  //
+  // En individuel, la question porte sur le **joueur** et non sur son entrée
+  // solo, qui n'existe peut-être pas encore : la fermeture du bouton doit valoir
+  // dès la première inscription, sans quoi elle n'arriverait jamais à temps.
+  if (
+    (solo || teamId !== null) &&
+    (await checkEntrantEligibility(connection, filters, {
+      teamId,
+      soloUserId: solo ? userId : null,
+    }))
+  ) {
+    return false;
   }
 
   // En individuel, l'absence d'entrée solo n'est pas un obstacle : elle sera

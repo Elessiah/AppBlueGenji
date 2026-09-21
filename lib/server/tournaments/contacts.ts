@@ -14,14 +14,37 @@
  * quand l'arbitre en a besoin.
  *
  * **Pourquoi la règle de visibilité n'est pas rejouée ici.** `canViewDiscordTag`
- * demande deux choses de l'arbitre : la permission `tournaments` (la route la
- * garde) et que le joueur soit engagé dans un tournoi vivant — or tout joueur
- * listé ici est engagé dans **celui-ci**. La seule clause qui reste à appliquer
- * est donc la certification, et elle l'est en SQL, sur la colonne qui la porte.
- * Un tag non certifié ne sort pas, administrateur compris.
+ * demande trois choses de l'arbitre : la permission `tournaments`, que le joueur
+ * soit engagé dans un tournoi **vivant**, et que son tag soit **certifié**. Les
+ * deux premières sont tenues par la route — la permission, et l'état du tournoi
+ * (`tournamentGrantsContactAccess`, sans quoi ce panneau rendrait après la
+ * clôture ce que la fiche d'un joueur refuse) ; la troisième l'est ici, en SQL,
+ * sur la colonne qui la porte. Un tag non certifié ne sort pas, administrateur
+ * compris.
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import type { TournamentState } from "@/lib/shared/types";
+
+/**
+ * État du tournoi, pour la seule question que la route ait à lui poser : ce
+ * plateau ouvre-t-il encore ses contacts ?
+ *
+ * `null` = le tournoi n'existe pas. Lecture minuscule et à part plutôt qu'une
+ * jointure dans la requête des contacts : il faut pouvoir **refuser sans rien
+ * lire**, et un `WHERE t.state <> 'FINISHED'` aurait rendu une liste vide —
+ * impossible à distinguer d'un plateau sans engagé.
+ */
+export async function loadContactTournamentState(
+  tournamentId: number,
+): Promise<TournamentState | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { state: TournamentState })[]>(
+    `SELECT state FROM bg_tournaments WHERE id = ? LIMIT 1`,
+    [tournamentId],
+  );
+  return rows[0]?.state ?? null;
+}
 
 /** Un joueur d'un engagé, tel que l'arbitrage a besoin de le voir. */
 export type EntrantContact = {

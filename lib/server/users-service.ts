@@ -923,8 +923,9 @@ export async function updateUserAvatar(userId: number, avatarPath: string | null
  *
  * C'est la condition qui ouvre son tag Discord à l'arbitrage
  * (`lib/shared/discord-identity.ts`) : le besoin de le joindre naît du tournoi
- * et s'éteint avec lui. « Vivant » = tout état sauf `FINISHED`, la bonne borne
- * étant le palmarès : un tournoi clos n'a plus de manche à reprogrammer.
+ * et s'éteint avec lui. La borne est celle de `tournamentGrantsContactAccess` —
+ * tout état sauf `FINISHED` —, rejouée ici en SQL faute de pouvoir appeler du
+ * TypeScript depuis une requête : les deux doivent bouger ensemble.
  *
  * Les deux formes d'engagement sont couvertes par la même requête — appartenance
  * à une équipe inscrite (fenêtre d'appartenance **ouverte** : un joueur parti ne

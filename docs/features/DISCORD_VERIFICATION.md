@@ -143,6 +143,13 @@ ferait d'un compte anonymisé un compte « vérifié » sans tag.
   abonnés du flux** : y glisser des tags reviendrait à les envoyer à tout
   spectateur connecté.
 
+  Le panneau **se ferme avec le tournoi** (`tournamentGrantsContactAccess`, refus
+  en 409 côté route, panneau non rendu côté page) : la règle n'ouvre l'arbitrage
+  que sur un tournoi vivant, et sans cette borne ce chemin-ci l'aurait contournée —
+  six mois après la finale, un arbitre y aurait encore lu les coordonnées de tous
+  ceux qui ont joué, quand la fiche d'un joueur, elle, les refuse déjà. Deux
+  chemins vers la même donnée doivent s'arrêter au même endroit.
+
 La pastille (`components/discord-tag.tsx`, `public/badge-certifie.webp`) n'est
 jamais affichée seule : `discordVerified` suit `discordPseudo` côté serveur, et
 dire « vérifié » d'un tag qu'on ne montre pas n'apprendrait rien à personne.

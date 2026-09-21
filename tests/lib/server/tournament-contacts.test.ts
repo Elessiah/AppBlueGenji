@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/auth");
 
-import { loadTournamentContacts } from "@/lib/server/tournaments/contacts";
+import {
+  loadContactTournamentState,
+  loadTournamentContacts,
+} from "@/lib/server/tournaments/contacts";
 import { GET } from "@/app/api/admin/tournaments/[id]/contacts/route";
 import { getDatabase } from "@/lib/server/database";
 import { getCurrentUser } from "@/lib/server/auth";
@@ -11,11 +14,11 @@ import { getCurrentUser } from "@/lib/server/auth";
 /**
  * Les contacts Discord d'un plateau.
  *
- * Deux propriétés portent la feuille : **seul un tag certifié en sort** (le filtre
- * est en SQL, sur la colonne qui porte la preuve), et la route est **réservée au
- * staff `tournaments`** — c'est la règle de visibilité du tag, dont la clause
- * « tournoi vivant » est ici satisfaite par construction : tout joueur listé est
- * engagé dans *ce* tournoi.
+ * Trois propriétés portent la feuille, et ce sont les trois clauses de la règle
+ * de visibilité du tag : **seul un tag certifié en sort** (filtre en SQL, sur la
+ * colonne qui porte la preuve), la route est **réservée au staff `tournaments`**,
+ * et elle se **ferme avec le tournoi** — sans cette dernière, le panneau rendrait
+ * après la clôture ce que la fiche d'un joueur refuse.
  *
  * Voir `docs/features/DISCORD_VERIFICATION.md`.
  */
@@ -28,8 +31,17 @@ type ContactRow = {
   discord_tag: string | null;
 };
 
-function fakeDb(rows: ContactRow[]) {
-  const execute = jest.fn(async () => [rows]);
+/**
+ * Base factice. `state` est celui que rendra la lecture d'état de la route ;
+ * `null` = le tournoi n'existe pas.
+ */
+function fakeDb(rows: ContactRow[], state: string | null = "RUNNING") {
+  const execute = jest.fn(async (sql: string) => {
+    if (String(sql).includes("SELECT state FROM bg_tournaments")) {
+      return [state === null ? [] : [{ state }]];
+    }
+    return [rows];
+  });
   (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
   return { execute };
 }
@@ -97,6 +109,20 @@ describe("loadTournamentContacts", () => {
   });
 });
 
+describe("loadContactTournamentState", () => {
+  it("rend l'état du tournoi", async () => {
+    fakeDb([], "REGISTRATION");
+    expect(await loadContactTournamentState(5)).toBe("REGISTRATION");
+  });
+
+  it("rend null sur un tournoi inexistant, plutôt qu'un état inventé", async () => {
+    // « N'existe pas » et « terminé » appellent deux réponses différentes (404
+    // et 409) : les confondre enverrait chercher un tournoi qui est là.
+    fakeDb([], null);
+    expect(await loadContactTournamentState(5)).toBeNull();
+  });
+});
+
 describe("GET /api/admin/tournaments/[id]/contacts", () => {
   const params = Promise.resolve({ id: "5" });
   const request = new Request("http://localhost:3000/api/admin/tournaments/5/contacts");
@@ -127,6 +153,43 @@ describe("GET /api/admin/tournaments/[id]/contacts", () => {
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ entrants: [] });
     }
+  });
+
+  /**
+   * **L'accès s'éteint avec le tournoi.**
+   *
+   * La règle n'ouvre l'arbitrage que sur un tournoi vivant : sans cette garde,
+   * ce panneau rendrait six mois après la finale ce que la fiche d'un joueur
+   * refuse — deux chemins vers la même donnée qui ne s'arrêtent pas au même
+   * endroit.
+   */
+  it("refuse sur un tournoi terminé, sans lire aucun contact", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue({ id: 9, isAdmin: true } as never);
+    const { execute } = fakeDb([], "FINISHED");
+
+    const response = await GET(request, { params });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "TOURNAMENT_FINISHED" });
+    // Une seule requête : celle de l'état. Les contacts n'ont pas été lus.
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["UPCOMING", "REGISTRATION", "RUNNING"])(
+    "accorde l'accès sur un tournoi %s",
+    async (state) => {
+      (getCurrentUser as jest.Mock).mockResolvedValue({ id: 9, isAdmin: true } as never);
+      fakeDb([], state);
+
+      expect((await GET(request, { params })).status).toBe(200);
+    },
+  );
+
+  it("rend 404 sur un tournoi inexistant", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue({ id: 9, isAdmin: true } as never);
+    fakeDb([], null);
+
+    expect((await GET(request, { params })).status).toBe(404);
   });
 
   it("refuse un identifiant de tournoi invalide", async () => {

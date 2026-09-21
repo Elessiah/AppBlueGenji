@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   canViewDiscordTag,
+  tournamentGrantsContactAccess,
   discordVerificationNeedsCode,
   DISCORD_VERIFICATION_EXPOSURE,
   DISCORD_VERIFICATION_PURPOSE,
@@ -141,6 +142,18 @@ describe("discordVerificationNeedsCode", () => {
     // Le compte né par Discord a prouvé son identifiant en ouvrant sa session :
     // redemander un code rejouerait une preuve qu'on détient.
     expect(discordVerificationNeedsCode("900000000000000001")).toBe(false);
+  });
+});
+
+describe("tournamentGrantsContactAccess", () => {
+  it("ouvre l'accès tant que le tournoi n'est pas clos", () => {
+    for (const state of ["UPCOMING", "REGISTRATION", "RUNNING"] as const) {
+      expect(tournamentGrantsContactAccess(state)).toBe(true);
+    }
+  });
+
+  it("le ferme à la clôture : le besoin naît du tournoi et s'éteint avec lui", () => {
+    expect(tournamentGrantsContactAccess("FINISHED")).toBe(false);
   });
 });
 

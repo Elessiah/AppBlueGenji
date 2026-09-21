@@ -32,6 +32,27 @@
  * module sait poser.
  */
 import { can, type PlatformRole } from "./permissions";
+import type { TournamentState } from "./types";
+
+/**
+ * Ce tournoi ouvre-t-il l'accès aux contacts de ses engagés ?
+ *
+ * « Vivant » = tout état sauf `FINISHED`, et la borne est le palmarès : un
+ * tournoi clos n'a plus de manche à reprogrammer, donc plus de raison de donner
+ * les coordonnées de qui y a joué. C'est la même phrase que
+ * `inActiveTournament` ci-dessous, nommée ici une fois pour que les **deux**
+ * chemins l'appliquent à l'identique — la fiche d'un joueur (qui la relit en
+ * SQL, faute de pouvoir appeler du TypeScript depuis une requête) et le panneau
+ * de contacts d'un plateau (qui la lit sur l'état déjà chargé).
+ *
+ * Contrepartie assumée : l'organisation qui doit joindre quelqu'un après la
+ * clôture — remise de lot, litige tardif — passe par la fiche du joueur si un
+ * autre tournoi le porte encore, ou par le canal Discord. L'accès s'éteint avec
+ * le tournoi, c'est tout le propos.
+ */
+export function tournamentGrantsContactAccess(state: TournamentState): boolean {
+  return state !== "FINISHED";
+}
 
 /** Ce que le module a besoin de savoir du **lecteur**. */
 export type DiscordTagViewer = {

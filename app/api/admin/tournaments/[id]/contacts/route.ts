@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { loadTournamentContacts } from "@/lib/server/tournaments/contacts";
+import { loadTournamentContacts, loadContactTournamentState } from "@/lib/server/tournaments/contacts";
+import { tournamentGrantsContactAccess } from "@/lib/shared/discord-identity";
 import { can } from "@/lib/shared/permissions";
 
 /**
@@ -14,6 +15,13 @@ import { can } from "@/lib/shared/permissions";
  *
  * Volontairement **hors de l'instantané du tournoi** : celui-ci est diffusé tel
  * quel à tous les abonnés du flux. Voir `lib/server/tournaments/contacts.ts`.
+ *
+ * **L'accès s'éteint avec le tournoi.** La règle de visibilité du tag n'ouvre
+ * l'arbitrage que sur un tournoi *vivant* (`tournamentGrantsContactAccess`), et
+ * sans cette garde le panneau l'aurait contournée : six mois après la finale, un
+ * arbitre y aurait encore lu les coordonnées de tous ceux qui ont joué. La fiche
+ * d'un joueur, elle, applique déjà la borne — deux chemins vers la même donnée
+ * doivent s'arrêter au même endroit.
  */
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -25,6 +33,10 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   if (!Number.isInteger(tournamentId) || tournamentId <= 0) {
     return fail("INVALID_TOURNAMENT_ID", 400);
   }
+
+  const state = await loadContactTournamentState(tournamentId);
+  if (state === null) return fail("TOURNAMENT_NOT_FOUND", 404);
+  if (!tournamentGrantsContactAccess(state)) return fail("TOURNAMENT_FINISHED", 409);
 
   return ok({ entrants: await loadTournamentContacts(tournamentId) });
 }
