@@ -471,130 +471,56 @@
   background: linear-gradient(90deg, #6bd48a 0%, #6bd48a 60%, var(--amber) 80%, var(--red-live) 100%);
   border-radius: 2px;
 }
-
-/* ---------- Modules grid ---------- */
-.modules {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-}
-.mod {
-  padding: 22px;
-  display: flex; flex-direction: column;
-  gap: 14px;
-  position: relative;
-  min-height: 200px;
-}
-.mod-head {
-  display: flex; align-items: center; justify-content: space-between;
-}
-.mod-tag {
-  font-family: var(--mono);
-  font-size: 9px; letter-spacing: 0.22em;
-  color: var(--blue-300);
-  padding: 3px 8px;
-  border: 1px solid rgba(90,200,255,0.25);
-  border-radius: 3px;
-  background: rgba(90,200,255,0.04);
-}
-.mod-toggle {
-  width: 34px; height: 18px;
-  border-radius: 999px;
-  background: rgba(107,212,138,0.15);
-  border: 1px solid rgba(107,212,138,0.4);
-  position: relative;
-  cursor: default;
-  pointer-events: none;
-}
-.mod-toggle::after {
-  content: "";
-  position: absolute;
-  top: 1px; right: 2px;
-  width: 12px; height: 12px;
-  border-radius: 50%;
-  background: #6bd48a;
-  box-shadow: 0 0 6px rgba(107,212,138,0.6);
-  transition: all .2s ease;
-}
-.mod-toggle.off { background: rgba(180,210,230,0.06); border-color: var(--line-strong); }
-.mod-toggle.off::after { background: var(--ink-dim); right: auto; left: 2px; box-shadow: none; }
-.mod-icon {
-  width: 38px; height: 38px;
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  display: grid; place-items: center;
-  color: var(--blue-300);
-}
-.mod-title {
-  font-size: 19px;
-  letter-spacing: -0.01em;
-  color: var(--ink);
-}
-.mod-desc {
+/* ---------- Documentation du bot ---------- */
+/* La section « Slash commands » recopiait une liste de commandes en dur ; elle
+   renvoie désormais à `/bot/docs`, qui sert le Markdown du bot à chaud. Les
+   styles `.modules`/`.mod-*` et `.cmds`/`.cmd-row` sont partis avec leurs
+   composants — une feuille qui garde des règles orphelines finit par les faire
+   ressusciter. */
+.bot-docs-links { padding: 22px 24px 26px; }
+.bot-docs-intro {
   font-size: 13px;
+  line-height: 1.7;
   color: var(--ink-mute);
-  line-height: 1.5;
+  margin: 0 0 18px;
+  max-width: 62ch;
 }
-.mod-foot {
-  margin-top: auto;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
-  display: flex; justify-content: space-between;
-  font-family: var(--mono);
-  font-size: 10px; letter-spacing: 0.16em;
-  color: var(--ink-dim);
-}
-.mod-foot .ok { color: #6bd48a; }
-.mod-foot .warn { color: var(--amber); }
-
-/* ---------- Commands palette ---------- */
-.cmds {
+.bot-docs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
 }
-.cmd-row {
-  display: grid;
-  grid-template-columns: 38px 1fr auto;
-  gap: 16px;
-  align-items: center;
-  padding: 16px 22px;
-  border-bottom: 1px solid var(--line);
-  border-right: 1px solid var(--line);
-}
-.cmd-row:nth-child(2n) { border-right: none; }
-.cmd-row:nth-last-child(-n+2) { border-bottom: none; }
-.cmd-row .glyph {
-  width: 28px; height: 28px;
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  display: grid; place-items: center;
-  color: var(--blue-300);
-  font-family: var(--mono);
-  font-size: 16px;
-  background: rgba(90,200,255,0.03);
-}
-.cmd-row .cmd {
-  display: flex; flex-direction: column; gap: 3px;
-  min-width: 0;
-}
-.cmd-row .cmd .syntax {
-  font-family: var(--mono);
-  font-size: 13px;
-  color: var(--ink);
-}
-.cmd-row .cmd .syntax .arg { color: var(--blue-300); }
-.cmd-row .cmd .desc {
-  font-size: 12px;
-  color: var(--ink-mute);
-}
-.cmd-row .key {
-  font-family: var(--mono);
-  font-size: 9px; letter-spacing: 0.18em;
-  color: var(--ink-dim);
-  padding: 4px 8px;
+.bot-docs-link {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 13px 15px;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 8px;
+  background: rgba(90, 200, 255, 0.02);
+  text-decoration: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.bot-docs-link:hover,
+.bot-docs-link:focus-visible {
+  border-color: rgba(90, 200, 255, 0.45);
+  background: rgba(90, 200, 255, 0.06);
+}
+.bot-docs-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(90, 200, 255, 0.24);
+}
+.bot-docs-title {
+  font-size: 14px;
+  color: var(--ink);
+}
+.bot-docs-summary {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink-mute);
 }
 
 /* ---------- Perms / Invite ---------- */
@@ -663,12 +589,9 @@
 @media (max-width: 1024px) {
   .bot-grid { grid-template-columns: 1fr; }
   .kpis { grid-template-columns: repeat(2, 1fr); }
-  .modules { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 860px) {
-  .cmds { grid-template-columns: 1fr; }
-  .cmd-row { border-right: none; }
-  .cmd-row:nth-last-child(2) { border-bottom: 1px solid var(--line); }
+  .bot-docs-list { grid-template-columns: 1fr; }
   .invite-inner { grid-template-columns: 1fr; gap: 32px; }
   .invite-card { padding: 28px; }
   /* Hero bot : on empile identité + CTA */
@@ -684,7 +607,7 @@
   .bot-crumb .endpoint { margin-left: 0; }
 }
 @media (max-width: 640px) {
-  .kpis, .modules { grid-template-columns: 1fr; }
+  .kpis { grid-template-columns: 1fr; }
   /* Table serveurs : on masque relais + tendance, trop étroit sinon */
   .srv-head, .srv-row {
     grid-template-columns: 22px 1fr auto auto;

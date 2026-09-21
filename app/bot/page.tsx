@@ -11,10 +11,9 @@ import { BotActivityChart } from "@/components/bot/BotActivityChart";
 import { BotServersTable } from "@/components/bot/BotServersTable";
 import { BotLiveFeed } from "@/components/bot/BotLiveFeed";
 import { BotLatencyCard } from "@/components/bot/BotLatencyCard";
-import { BotModules } from "@/components/bot/BotModules";
 import { BotCommands } from "@/components/bot/BotCommands";
 import { BotInviteCard } from "@/components/bot/BotInviteCard";
-import { fetchBotStats, fetchBotStatus, fetchBotKpis, fetchBotServers, fetchBotActivity, fetchBotModules } from '@/lib/server/bot-integration';
+import { fetchBotStats, fetchBotStatus, fetchBotKpis, fetchBotServers, fetchBotActivity } from '@/lib/server/bot-integration';
 
 export const metadata: Metadata = pageMetadata({
   title: "BlueGenji Bot",
@@ -35,9 +34,6 @@ export default async function BotPage() {
     fetchBotServers(8),
     fetchBotActivity('30j'),
   ]);
-
-  const firstGuildId = serversPayload?.servers?.[0]?.id ?? null;
-  const modules = firstGuildId ? await fetchBotModules(firstGuildId) : null;
 
   return (
     <>
@@ -61,8 +57,6 @@ export default async function BotPage() {
             </div>
           </div>
 
-          <BotModules payload={modules} />
-          <div style={{ height: 24 }} />
           <BotCommands />
           <BotInviteCard />
         </div>
