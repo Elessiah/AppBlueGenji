@@ -455,6 +455,24 @@ select {
   cursor: not-allowed;
 }
 
+/* Champ en lecture seule : la valeur reste lisible et atteignable au clavier,
+   contrairement à un champ désactivé — seule l'invitation à écrire tombe, d'où
+   un fond en retrait et l'absence de halo au focus. */
+.field input[readonly],
+.field textarea[readonly] {
+  background: rgba(10, 11, 15, 0.55);
+  border-color: var(--line-soft);
+  color: var(--text-1);
+  cursor: default;
+}
+
+.field input[readonly]:focus,
+.field textarea[readonly]:focus {
+  border-color: var(--line-strong);
+  box-shadow: none;
+  background: rgba(10, 11, 15, 0.55);
+}
+
 input[type="datetime-local"] {
   appearance: none;
   cursor: pointer;

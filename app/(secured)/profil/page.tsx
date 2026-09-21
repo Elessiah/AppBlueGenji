@@ -356,7 +356,6 @@ export default function ProfilePage() {
                    clavier, ce qu'un champ désactivé perd. */
                 readOnly={discordLocked}
                 aria-readonly={discordLocked || undefined}
-                style={discordLocked ? { opacity: 0.7, cursor: "not-allowed" } : undefined}
               />
               {discordLocked ? null : (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
