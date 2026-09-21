@@ -18,19 +18,23 @@ import { ensureUniquePseudo } from "@/lib/server/auth";
 (sendBotLog as jest.Mock).mockResolvedValue(undefined as never);
 
 /**
- * **Rattacher un `sub` Google à un compte du site, et sur quelle preuve.**
+ * **Une identité Google ne revendique plus aucun compte du site.**
  *
- * La branche de rattachement lie une identité Google neuve à un compte existant
- * sur la seule **égalité de chaîne** de l'adresse e-mail. Sans consulter
- * `email_verified` — que `userinfo` renvoie et qu'on jetait —, il suffisait
- * d'obtenir une identité Google affirmant l'adresse d'un membre pour ouvrir sa
- * session en un clic : ni code, ni plafond, ni courriel de confirmation. C'est
- * le chemin d'entrée le plus court du site, et il n'était pas gardé.
+ * `createOrGetGoogleUser` liait une identité Google neuve à un compte existant
+ * sur la seule **égalité de chaîne** de l'adresse e-mail. Contrôler
+ * `email_verified` avait rendu ce rattachement honnête ; il restait que le site
+ * décidait qu'une adresse *est* une personne, sur la foi d'un fournisseur dont
+ * il n'est pas l'émetteur — et qu'il devait pour cela collecter et conserver une
+ * colonne d'adresses, exactement ce qu'une fuite fait le plus regretter.
  *
- * Le symétrique compte autant : `bg_users.email` est **unique**, donc y écrire
- * une adresse non vérifiée que quelqu'un d'autre détient ne la volait pas — elle
- * faisait échouer l'insertion, `ER_DUP_ENTRY` avalé en `?error=oauth` à chaque
- * essai. Voir `docs/AUTHORIZATION_RULES.md` §1.2.
+ * Le geste que ce rattachement rendait — « j'entre par Discord, je veux aussi
+ * entrer par Google » — existe toujours, mais à l'endroit où il se prouve tout
+ * seul : `/profil`, section « Applications connectées », où le joueur est
+ * **déjà connecté** quand il rattache (`lib/server/account-identities.ts`).
+ *
+ * Ce qui est vérifié ici est donc la propriété inverse de celle d'avant : un
+ * `sub` inconnu **crée un compte**, quoi que dise l'adresse, et plus aucune
+ * adresse n'est ni lue ni écrite. Voir `docs/AUTHORIZATION_RULES.md` §1.2.
  */
 
 type Statement = { sql: string; params: unknown[] };
@@ -51,10 +55,10 @@ function fakeDb(
       return [found.map(({ id }) => ({ id })), []];
     }
 
-    if (q.startsWith("SELECT id FROM bg_users WHERE email = ?")) {
-      const found = rows.filter((row) => row.email !== null && row.email === params[0]);
-      return [found.map(({ id }) => ({ id })), []];
-    }
+    // **Aucune branche pour `SELECT … WHERE email = ?`**, et c'est le propos :
+    // la requête n'est plus émise. Si elle revenait, elle tomberait sur le repli
+    // « aucune ligne » ci-dessous, et les assertions qui la cherchent dans le
+    // journal des instructions la verraient.
 
     if (q.startsWith("INSERT INTO bg_users")) {
       return [{ insertId: 4242 }, []];
@@ -78,8 +82,6 @@ function fakeDb(
 
 const profile = (overrides: Partial<GoogleProfilePayload> = {}): GoogleProfilePayload => ({
   sub: "google-sub-neuf",
-  email: "nova@exemple.test",
-  emailVerified: true,
   name: "Nova",
   ...overrides,
 });
@@ -87,106 +89,66 @@ const profile = (overrides: Partial<GoogleProfilePayload> = {}): GoogleProfilePa
 const find = (statements: Statement[], prefix: string) =>
   statements.find(({ sql }) => sql.startsWith(prefix));
 
-describe("createOrGetGoogleUser — rattachement d'un compte existant", () => {
+describe("createOrGetGoogleUser — aucune revendication par l'adresse", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("rattache sur une adresse **vérifiée**", async () => {
+  it("ne cherche **jamais** un compte par son adresse", async () => {
+    // Le cœur de la règle. Un membre existe, son adresse est celle que Google
+    // annonce : cela ne suffit plus, et la question n'est même plus posée.
     const { statements } = fakeDb([{ id: 7, google_sub: null, email: "nova@exemple.test" }]);
 
-    await expect(createOrGetGoogleUser(profile())).resolves.toBe(7);
-
-    const link = find(statements, "UPDATE bg_users SET google_sub = ?")!;
-    expect(link.params).toEqual(["google-sub-neuf", 7]);
-  });
-
-  it("**refuse** de rattacher sur une adresse non vérifiée", async () => {
-    // Le cœur de la règle : sans elle, une identité Google qui se contente
-    // d'affirmer l'adresse d'un membre ouvrait sa session.
-    const { statements } = fakeDb([{ id: 7, google_sub: null, email: "nova@exemple.test" }]);
-
-    const userId = await createOrGetGoogleUser(profile({ emailVerified: false }));
+    const userId = await createOrGetGoogleUser(profile());
 
     expect(userId).not.toBe(7);
-    expect(find(statements, "UPDATE bg_users SET google_sub = ?")).toBeUndefined();
-    // La ligne du membre n'est même pas cherchée : rien à comparer.
     expect(find(statements, "SELECT id FROM bg_users WHERE email = ?")).toBeUndefined();
+    expect(find(statements, "UPDATE bg_users SET google_sub = ?")).toBeUndefined();
   });
 
-  it("crée quand même un compte, mais **sans adresse**", async () => {
-    // `bg_users.email` est unique : y écrire l'adresse d'autrui ne la volait pas,
-    // elle faisait échouer l'insertion — compte inatteignable par Google, pour
-    // toujours, sur une erreur générique. Une identité non vérifiée entre donc,
-    // sans rien revendiquer.
+  it("crée un compte neuf, **sans colonne d'adresse**", async () => {
     const { statements } = fakeDb([{ id: 7, google_sub: null, email: "nova@exemple.test" }]);
 
-    await expect(createOrGetGoogleUser(profile({ emailVerified: false }))).resolves.toBe(4242);
+    await expect(createOrGetGoogleUser(profile())).resolves.toBe(4242);
 
     const insert = find(statements, "INSERT INTO bg_users")!;
-    expect(insert.params).toEqual(["Nova", "google-sub-neuf", null]);
-  });
-
-  it("écrit l'adresse à la création quand elle est vérifiée", async () => {
-    const { statements } = fakeDb([]);
-
-    await createOrGetGoogleUser(profile({ picture: "https://exemple.test/a.png" }));
-
-    const insert = find(statements, "INSERT INTO bg_users")!;
-    // La photo **n'est pas** un paramètre de l'insertion : la colonne naît à
-    // `NULL` et ne reçoit qu'un fichier copié chez nous, jamais l'URL de
-    // Google. Le nom du fichier portant l'identifiant du compte, il faut de
-    // toute façon que la ligne existe d'abord.
-    expect(insert.params).toEqual(["Nova", "google-sub-neuf", "nova@exemple.test"]);
+    // Deux paramètres : le pseudo et le `sub`. Ni adresse — elle n'est plus
+    // demandée à Google —, ni photo : la colonne d'avatar naît à `NULL` et ne
+    // reçoit qu'un fichier copié chez nous, le nom du fichier portant
+    // l'identifiant du compte, qui n'existe pas encore.
+    expect(insert.params).toEqual(["Nova", "google-sub-neuf"]);
+    expect(insert.sql).not.toContain("email");
     expect(insert.sql).toContain("NULL");
   });
 
-  it("ne met pas à jour l'adresse d'un compte connu sur une identité non vérifiée", async () => {
-    // Même colonne unique, même panne : une adresse non vérifiée qui appartient
-    // à un autre compte casserait la connexion d'un habitué du site.
-    const { statements } = fakeDb([
-      { id: 7, google_sub: "google-sub-neuf", email: "nova@exemple.test" },
-    ]);
-
-    await expect(
-      createOrGetGoogleUser(profile({ emailVerified: false, email: "autre@exemple.test" })),
-    ).resolves.toBe(7);
-
-    const update = find(statements, "UPDATE bg_users SET email = COALESCE")!;
-    expect(update.params[0]).toBeNull();
-  });
-
-  it("met à jour l'adresse d'un compte connu quand elle est vérifiée", async () => {
+  it("n'écrit aucune adresse sur un compte déjà rattaché", async () => {
     const { statements } = fakeDb([
       { id: 7, google_sub: "google-sub-neuf", email: "ancienne@exemple.test" },
     ]);
 
     await expect(createOrGetGoogleUser(profile())).resolves.toBe(7);
 
-    const update = find(statements, "UPDATE bg_users SET email = COALESCE")!;
-    expect(update.params[0]).toBe("nova@exemple.test");
+    expect(find(statements, "UPDATE bg_users SET email")).toBeUndefined();
+    expect(find(statements, "INSERT INTO bg_users")).toBeUndefined();
   });
 
-  it("passe par le `google_sub` avant tout : c'est lui qui identifie", async () => {
-    // Et il passe **avant** la question de la vérification : un compte déjà
-    // rattaché se reconnaît à son `sub`, pas à son adresse.
+  it("passe par le `google_sub`, qui est ce qui identifie", async () => {
     const { statements } = fakeDb([
       { id: 7, google_sub: "google-sub-neuf", email: "nova@exemple.test" },
     ]);
 
-    await expect(createOrGetGoogleUser(profile({ emailVerified: false }))).resolves.toBe(7);
+    await expect(createOrGetGoogleUser(profile())).resolves.toBe(7);
     expect(find(statements, "INSERT INTO bg_users")).toBeUndefined();
   });
 
-  it("crée un compte sans adresse du tout quand Google n'en donne pas", async () => {
+  it("se passe d'un nom d'affichage sans échouer", async () => {
+    // Google n'en promet aucun. Le pseudo retombe alors sur une valeur
+    // fabriquée, et la création aboutit — un compte sans pseudo n'existe pas.
     const { statements } = fakeDb([]);
 
-    await createOrGetGoogleUser({
-      sub: "google-sub-neuf",
-      emailVerified: false,
-      name: "Nova",
-    });
+    await createOrGetGoogleUser({ sub: "google-sub-neuf" });
 
     const insert = find(statements, "INSERT INTO bg_users")!;
-    expect(insert.params[2]).toBeNull();
+    expect(String(insert.params[0])).toMatch(/^player\d+$/);
+    expect(insert.params[1]).toBe("google-sub-neuf");
   });
 });
 

@@ -37,7 +37,11 @@ describe("google-oauth helpers", () => {
     expect(url.startsWith("https://accounts.google.com/o/oauth2/v2/auth?")).toBe(true);
     expect(url).toContain("client_id=client-123");
     expect(url).toContain("state=state-token");
-    expect(url).toContain("scope=openid+profile+email");
+    // **Sans `email`.** Le scope le demandait pour un seul usage — rattacher un
+    // compte du site sur l'égalité de l'adresse —, usage qui a disparu au profit
+    // de « Applications connectées ». Ce qu'on ne demande pas ne fuite pas.
+    expect(url).toContain("scope=openid+profile");
+    expect(url).not.toContain("email");
   });
 
   it("throws when GOOGLE_CLIENT_ID is missing", () => {

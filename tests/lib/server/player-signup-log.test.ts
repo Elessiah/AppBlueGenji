@@ -10,8 +10,12 @@ jest.mock("@/lib/server/user-avatar-import");
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
 import { ensureUniquePseudo } from "@/lib/server/auth";
-import { shouldImportGoogleAvatar } from "@/lib/server/user-avatar-import";
-import { createOrGetDiscordUser, createOrGetGoogleUser } from "@/lib/server/users-service";
+import { shouldImportRemoteAvatar } from "@/lib/server/user-avatar-import";
+import {
+  createOrGetBlizzardUser,
+  createOrGetDiscordUser,
+  createOrGetGoogleUser,
+} from "@/lib/server/users-service";
 
 /**
  * **Une ligne au journal Discord quand un joueur s'inscrit — une seule, et au
@@ -29,9 +33,15 @@ import { createOrGetDiscordUser, createOrGetGoogleUser } from "@/lib/server/user
  * est neuf » n'est pas une déduction.
  */
 
-type Row = { id: number; google_sub: string | null; discord_id: string | null; email: string | null };
+type Row = {
+  id: number;
+  google_sub: string | null;
+  discord_id: string | null;
+  blizzard_sub?: string | null;
+  email: string | null;
+};
 
-/** Base factice : une table de comptes, adressée par `google_sub`, `discord_id` ou `email`. */
+/** Base factice : une table de comptes, adressée par l'identité d'un fournisseur. */
 function fakeDb(rows: Row[]) {
   const execute = jest.fn(async (sql: string, params: unknown[] = []) => {
     const q = String(sql).replace(/\s+/g, " ").trim();
@@ -44,12 +54,14 @@ function fakeDb(rows: Row[]) {
       return [rows.filter((row) => row.discord_id === params[0]).map(({ id }) => ({ id })), []];
     }
 
-    if (q.startsWith("SELECT id FROM bg_users WHERE email = ?")) {
-      return [
-        rows.filter((row) => row.email !== null && row.email === params[0]).map(({ id }) => ({ id })),
-        [],
-      ];
+    if (q.startsWith("SELECT id FROM bg_users WHERE blizzard_sub = ?")) {
+      return [rows.filter((row) => row.blizzard_sub === params[0]).map(({ id }) => ({ id })), []];
     }
+
+    // Aucune branche pour `WHERE email = ?` : plus rien ne cherche un compte par
+    // son adresse, et une requête qui reparaîtrait ici retomberait sur le repli
+    // « aucune ligne » — donc créerait un compte, ce que les cas ci-dessous
+    // verraient.
 
     if (q.startsWith("INSERT INTO bg_users")) {
       return [{ insertId: 4242 }, []];
@@ -70,19 +82,14 @@ beforeEach(() => {
   (sendBotLog as jest.Mock).mockResolvedValue(undefined as never);
   // La photo de profil ne concerne pas ce fichier : rien à copier, donc aucun
   // appel sortant en marge de celui qu'on mesure.
-  (shouldImportGoogleAvatar as jest.Mock).mockReturnValue(false);
+  (shouldImportRemoteAvatar as jest.Mock).mockReturnValue(false);
 });
 
 describe("inscription par Google", () => {
   it("annonce le compte qui vient de naître", async () => {
     fakeDb([]);
 
-    await createOrGetGoogleUser({
-      sub: "google-sub-neuf",
-      email: "nova@exemple.test",
-      emailVerified: true,
-      name: "Nova",
-    });
+    await createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" });
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
     // L'identifiant est celui que l'`INSERT` vient de rendre, et le pseudo
@@ -99,49 +106,48 @@ describe("inscription par Google", () => {
     fakeDb([{ id: 7, google_sub: "google-sub-neuf", discord_id: null, email: "nova@exemple.test" }]);
 
     await expect(
-      createOrGetGoogleUser({
-        sub: "google-sub-neuf",
-        email: "nova@exemple.test",
-        emailVerified: true,
-        name: "Nova",
-      }),
+      createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" }),
     ).resolves.toBe(7);
 
     expect(sendBotLog).not.toHaveBeenCalled();
   });
 
-  it("se tait quand Google se rattache à un compte existant", async () => {
-    // Un joueur venu par Discord qui se connecte ensuite par Google : son `sub`
-    // est neuf, son compte ne l'est pas. Ce n'est pas un joueur de plus, et le
-    // dire au canal ferait compter deux fois la même personne.
+  it("annonce un compte neuf même si un membre porte la même adresse", async () => {
+    // Un joueur venu par Discord qui se connecte ensuite par Google obtient
+    // désormais un **compte distinct** : plus rien ne rattache par l'adresse, et
+    // c'est donc bien un compte de plus à annoncer. Rapprocher les deux se fait
+    // depuis « Applications connectées », qui n'écrit aucune ligne — un
+    // rattachement n'est pas une naissance.
     fakeDb([{ id: 7, google_sub: null, discord_id: "123456789", email: "nova@exemple.test" }]);
 
     await expect(
-      createOrGetGoogleUser({
-        sub: "google-sub-neuf",
-        email: "nova@exemple.test",
-        emailVerified: true,
-        name: "Nova",
-      }),
-    ).resolves.toBe(7);
-
-    expect(sendBotLog).not.toHaveBeenCalled();
-  });
-
-  it("annonce le compte créé sur une identité non vérifiée", async () => {
-    // Une adresse non vérifiée interdit de **revendiquer** un compte, pas d'en
-    // créer un : celui-ci naît sans adresse, et c'est bien un joueur de plus.
-    fakeDb([{ id: 7, google_sub: null, discord_id: null, email: "nova@exemple.test" }]);
-
-    await createOrGetGoogleUser({
-      sub: "google-sub-neuf",
-      email: "nova@exemple.test",
-      emailVerified: false,
-      name: "Nova",
-    });
+      createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" }),
+    ).resolves.toBe(4242);
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
     expect(lines()[0]).toContain("(#4242)");
+  });
+});
+
+describe("inscription par Blizzard", () => {
+  it("annonce le compte qui vient de naître, nommé d'après le BattleTag", async () => {
+    // Le discriminant reste chez Blizzard : « Nova#2143 » donne « Nova », qui
+    // est ce qu'on lit dans une URL de profil et sur une feuille de match.
+    fakeDb([]);
+
+    await createOrGetBlizzardUser("blizzard-sub-neuf", "Nova#2143");
+
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+    expect(lines()[0]).toContain("« Nova » (#4242)");
+    expect(lines()[0]).toContain("via Blizzard");
+  });
+
+  it("se tait à chaque connexion suivante", async () => {
+    fakeDb([{ id: 7, google_sub: null, discord_id: null, blizzard_sub: "blizzard-sub-neuf", email: null }]);
+
+    await expect(createOrGetBlizzardUser("blizzard-sub-neuf", "Nova#2143")).resolves.toBe(7);
+
+    expect(sendBotLog).not.toHaveBeenCalled();
   });
 });
 
