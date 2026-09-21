@@ -117,6 +117,12 @@ affectations de gauche à droite — placé après, il lirait déjà la valeur n
 ne verrait jamais de changement (même piège que la réservation d'essai d'un code).
 `<=>` et non `=`, le tag pouvant être `NULL` des deux côtés.
 
+La comparaison hérite de la **collation de la colonne** (`utf8mb4_0900_ai_ci`,
+insensible à la casse) : corriger « keryan » en « Keryan » ne défait donc pas la
+certification, ce qui est le bon comportement — les pseudos Discord sont
+eux-mêmes insensibles à la casse, la preuve continue de désigner le même compte.
+Ne pas durcir ceci en comparaison binaire : on recertifierait pour une majuscule.
+
 C'est aussi le geste d'annulation offert au joueur : modifier son tag retire
 l'exposition, et le dialogue le lui dit avant qu'il ne certifie. Il n'y a donc
 **pas** de route de décertification — un second chemin laisserait un compte

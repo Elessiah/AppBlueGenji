@@ -8,6 +8,8 @@ import {
   anonymizeOwnAccount,
   createOrGetDiscordUser,
   getFullProfile,
+  getUserById,
+  listPlayers,
   normalizeDiscordHandle,
   updateOwnProfile,
 } from "@/lib/server/users-service";
@@ -287,5 +289,27 @@ describe("getFullProfile — ce qui sort du tag", () => {
 
     expect(profile?.profile.discordPseudo).toBeNull();
     expect(profile?.profile.discordVerified).toBe(false);
+  });
+});
+
+/**
+ * Ce que la fiche et l'annuaire **ne lisent pas**.
+ *
+ * Le tag Discord est une donnée personnelle filtrée à la sortie : les deux
+ * lectures qui ne l'affichent jamais n'ont aucune raison de la charger. Une
+ * colonne qu'on ne sélectionne pas ne peut pas fuiter par un `...row` distrait.
+ */
+describe("les lectures qui n'ont pas à connaître le tag", () => {
+  it("ne le sélectionne ni dans l'annuaire ni sur la fiche d'un joueur", async () => {
+    const { queries } = fakeDb((q) =>
+      q.startsWith("SELECT id, pseudo, avatar_url") ? [[]] : [[]],
+    );
+
+    await getUserById(7);
+    await listPlayers(7);
+
+    for (const query of queries.filter((q) => q.sql.includes("FROM bg_users"))) {
+      expect(query.sql).not.toContain("discord_pseudo");
+    }
   });
 });

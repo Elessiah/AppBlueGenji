@@ -181,7 +181,6 @@ export async function getUserById(userId: number): Promise<PublicUserProfile | n
       avatar_url,
       overwatch_battletag,
       marvel_rivals_tag,
-      discord_pseudo,
       is_adult,
       visible_avatar,
       visible_overwatch,
@@ -208,7 +207,6 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
       avatar_url,
       overwatch_battletag,
       marvel_rivals_tag,
-      discord_pseudo,
       is_adult,
       visible_avatar,
       visible_overwatch,
@@ -832,6 +830,14 @@ export async function updateOwnProfile(
   // code, plus haut). `<=>` parce que le tag peut être `NULL` des deux côtés —
   // un `=` rendrait alors `NULL`, donc faux, donc une certification perdue à
   // chaque sauvegarde d'un profil sans tag.
+  //
+  // La comparaison hérite de la **collation de la colonne**
+  // (`utf8mb4_0900_ai_ci`, insensible à la casse et aux accents) : « keryan » et
+  // « Keryan » sont donc le même tag, et une correction de casse ne défait pas la
+  // certification. C'est le bon comportement — les pseudos Discord sont eux-mêmes
+  // insensibles à la casse, la preuve continue de désigner le même compte —, et
+  // c'est la raison de ne **pas** durcir ceci en comparaison binaire : on
+  // recertifierait pour une majuscule.
   await db.execute(
     `UPDATE bg_users
      SET pseudo = COALESCE(?, pseudo),
