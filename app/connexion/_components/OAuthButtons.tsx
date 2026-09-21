@@ -37,30 +37,46 @@ const PROVIDER_NOTES: Partial<Record<OAuthProvider, string>> = {
 export function OAuthButtons({ redirect }: { redirect: string }): React.ReactElement {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {LOGIN_ORDER.map((provider, index) => (
-        <div key={provider}>
-          <CyberButton variant={index === 0 ? "primary" : "ghost"} asChild style={{ width: "100%" }}>
-            <Link href={oauthStartPath(provider, { redirect })} prefetch={false}>
-              Continuer avec {OAUTH_PROVIDER_LABELS[provider]}
-            </Link>
-          </CyberButton>
-          {PROVIDER_NOTES[provider] ? (
-            <p
-              className="mono"
-              id={`oauth-note-${OAUTH_PROVIDER_SLUGS[provider]}`}
-              style={{
-                fontSize: 10,
-                color: "var(--ink-dim)",
-                letterSpacing: "0.08em",
-                lineHeight: 1.5,
-                margin: "6px 0 0",
-              }}
-            >
-              {PROVIDER_NOTES[provider]}
-            </p>
-          ) : null}
-        </div>
-      ))}
+      {LOGIN_ORDER.map((provider, index) => {
+        const note = PROVIDER_NOTES[provider];
+        const noteId = `oauth-note-${OAUTH_PROVIDER_SLUGS[provider]}`;
+        return (
+          <div key={provider}>
+            <CyberButton variant={index === 0 ? "primary" : "ghost"} asChild style={{ width: "100%" }}>
+              {/*
+                Pas d'`aria-label` : le nom accessible d'un lien doit **contenir
+                son texte visible** (WCAG 2.5.3), et un libellé posé à la main le
+                remplacerait — la commande vocale ne répondrait plus à ce qu'on
+                lit dessus. Ce que la note ajoute passe par `aria-describedby`,
+                qui complète le nom au lieu de l'écraser ; sans ce lien, la note
+                n'était qu'un paragraphe voisin, lu après coup ou pas du tout.
+              */}
+              <Link
+                href={oauthStartPath(provider, { redirect })}
+                prefetch={false}
+                aria-describedby={note ? noteId : undefined}
+              >
+                Continuer avec {OAUTH_PROVIDER_LABELS[provider]}
+              </Link>
+            </CyberButton>
+            {note ? (
+              <p
+                className="mono"
+                id={noteId}
+                style={{
+                  fontSize: 10,
+                  color: "var(--ink-dim)",
+                  letterSpacing: "0.08em",
+                  lineHeight: 1.5,
+                  margin: "6px 0 0",
+                }}
+              >
+                {note}
+              </p>
+            ) : null}
+          </div>
+        );
+      })}
     </div>
   );
 }

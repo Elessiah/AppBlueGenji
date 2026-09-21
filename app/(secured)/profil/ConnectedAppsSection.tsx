@@ -149,6 +149,8 @@ export function ConnectedAppsSection({
             const refusal = checkConnectionUnlink(connections, connection.provider);
             const label = OAUTH_PROVIDER_LABELS[connection.provider];
             const handleLabel = OAUTH_PROVIDER_HANDLE_LABELS[connection.provider];
+            const slug = OAUTH_PROVIDER_SLUGS[connection.provider];
+            const detailsId = `connection-details-${slug}`;
             return (
               <div
                 className="table-row"
@@ -157,7 +159,7 @@ export function ConnectedAppsSection({
               >
                 <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                   <strong style={{ fontSize: 14 }}>{label}</strong>
-                  <span style={{ fontSize: 11, color: "var(--text-2)", lineHeight: 1.5 }}>
+                  <span id={detailsId} style={{ fontSize: 11, color: "var(--text-2)", lineHeight: 1.5 }}>
                     {connection.linked
                       ? connection.handle && handleLabel
                         ? `${handleLabel} : ${connection.handle}`
@@ -189,6 +191,7 @@ export function ConnectedAppsSection({
                         disabled={busy !== null}
                         onClick={() => unlink(connection.provider)}
                         aria-label={`Retirer ${label} de mon compte`}
+                        aria-describedby={detailsId}
                         style={{ padding: "4px 12px", fontSize: 12 }}
                       >
                         {busy === connection.provider ? "Retrait…" : "Retirer"}
@@ -199,6 +202,11 @@ export function ConnectedAppsSection({
                       className="btn"
                       href={oauthStartPath(connection.provider, { intent: "LINK" })}
                       aria-label={`Rattacher ${label} à mon compte`}
+                      /* Ce que le fournisseur apporte tient dans la ligne d'à
+                         côté : `aria-describedby` la rattache au contrôle plutôt
+                         que de la laisser en texte voisin, qu'un lecteur d'écran
+                         parcourant les liens ne rencontre jamais. */
+                      aria-describedby={detailsId}
                       style={{ padding: "4px 12px", fontSize: 12 }}
                     >
                       Rattacher
