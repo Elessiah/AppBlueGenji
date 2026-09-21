@@ -62,6 +62,12 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // le connaît pas, et une réponse sans corps exploitable (502 d'un relais)
   // afficherait sinon un jeton en capitales au joueur.
   CONTACTS_LOAD_FAILED: "Impossible de charger les contacts. Réessaie dans un instant.",
+  // L'autre refus de la **même** route, et il est atteignable : le panneau n'est
+  // pas rendu sur un tournoi clos, mais la clôture peut tomber entre le rendu et
+  // le clic (la finale est tranchée, la trame SSE n'a pas encore réaffiché la
+  // page). Sans cette ligne, l'arbitre lisait « TOURNAMENT_FINISHED ».
+  TOURNAMENT_FINISHED:
+    "Ce tournoi est terminé : les contacts de ses engagés ne sont plus accessibles.",
   NOT_SURVIVAL: "Le forfait n'est disponible que pour les tournois en mode Survie.",
   // Formulations neutres : le forfait peut aussi être déclaré par l'arbitrage
   // pour une autre équipe que la sienne.

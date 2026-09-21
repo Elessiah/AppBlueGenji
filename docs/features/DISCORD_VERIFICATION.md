@@ -176,6 +176,16 @@ ferait d'un compte anonymisé un compte « vérifié » sans tag.
   ceux qui ont joué, quand la fiche d'un joueur, elle, les refuse déjà. Deux
   chemins vers la même donnée doivent s'arrêter au même endroit.
 
+  Ses **deux** refus se lisent dans le panneau lui-même, pas seulement en toast
+  (qui s'efface) : `contactsPanelView` (`_lib/contacts-panel-view.ts`) décide la
+  vue, et l'échec y porte son message et un bouton « Réessayer ». La règle est
+  sortie du JSX pour une raison précise : trois états font quatre vues, et
+  écrite en ternaires imbriqués elle avait un cas sans branche — chargement
+  retombé, liste encore `null` après un échec —, qui laissait un bloc déplié
+  parfaitement vide. `TOURNAMENT_FINISHED` est par ailleurs traduit comme
+  `CONTACTS_LOAD_FAILED` : la clôture peut tomber entre le rendu et le clic, et
+  `mapError` rend le code brut faute d'entrée.
+
 La pastille (`components/discord-tag.tsx`, `public/badge-certifie.webp`) s'affiche
 donc **avec ou sans son tag** — `discordVerified` ne suit pas `discordPseudo`, les
 deux champs répondent à deux questions différentes. Le composant n'a qu'un seul

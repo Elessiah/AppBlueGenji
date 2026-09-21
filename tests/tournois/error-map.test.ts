@@ -160,3 +160,31 @@ describe("conditions d'inscription", () => {
     }
   });
 });
+
+/**
+ * Les deux refus du panneau de contacts.
+ *
+ * `mapError` rend le code lui-même quand il ne le connaît pas, si bien qu'un
+ * refus oublié ici ne casse rien : il s'affiche en capitales dans un toast. Les
+ * **deux** refus de `GET /api/admin/tournaments/[id]/contacts` doivent donc y
+ * figurer — le second (`TOURNAMENT_FINISHED`) est atteignable même si le panneau
+ * n'est pas rendu sur un tournoi clos, la clôture pouvant tomber entre le rendu
+ * et le clic.
+ */
+describe("contacts d'un plateau", () => {
+  it("traduit les deux refus de la route, sans laisser sortir leur code", () => {
+    for (const code of ["CONTACTS_LOAD_FAILED", "TOURNAMENT_FINISHED"]) {
+      const message = mapError(code);
+      expect(message).not.toContain(code);
+      expect(message).not.toBe(code);
+    }
+  });
+
+  it("dit que le tournoi est terminé, et non qu'un droit manque", () => {
+    // Le refus n'est pas une question de permission : l'arbitre a bien le droit,
+    // c'est la fenêtre qui s'est fermée. Un « tu n'as pas les droits » l'enverrait
+    // demander un rôle qu'il détient déjà.
+    expect(mapError("TOURNAMENT_FINISHED")).toMatch(/termin/i);
+    expect(mapError("TOURNAMENT_FINISHED")).not.toMatch(/droit/i);
+  });
+});
