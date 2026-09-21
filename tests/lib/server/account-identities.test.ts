@@ -85,6 +85,28 @@ function fakeDb(row: Row | null, takenElsewhere: Record<string, boolean> = {}) {
       return [takenElsewhere[column] ? [{ id: 99 }] : [], []];
     }
 
+    // **Le détachement, évalué comme MySQL l'évaluerait.** La borne « il reste
+    // une autre porte » est portée par le `WHERE` de l'écriture : un `UPDATE`
+    // factice qui rendrait toujours `affectedRows: 1` ne prouverait rien, et
+    // c'est justement ce qui laissait passer la course d'avant. On applique donc
+    // la condition à la ligne, et on la **mute** — les appels suivants voient
+    // l'état que le premier a laissé.
+    if (q.startsWith("UPDATE bg_users SET") && q.includes("IS NOT NULL")) {
+      const guarded = q.match(/AND (\w+) IS NOT NULL AND \(/)?.[1] ?? "";
+      const others = [...q.matchAll(/(\w+) IS NOT NULL/g)]
+        .map((match) => match[1])
+        .filter((column) => column !== guarded);
+      const current = row as unknown as Record<string, string | null> | null;
+      const matches =
+        current !== null &&
+        Boolean(current[guarded]) &&
+        others.some((column) => Boolean(current[column]));
+      if (!matches) return [{ affectedRows: 0 }, []];
+      current[guarded] = null;
+      if (guarded === "discord_id") current.discord_verified_at = null;
+      return [{ affectedRows: 1 }, []];
+    }
+
     return [{ affectedRows: 1 }, []];
   });
 
@@ -273,6 +295,21 @@ describe("linkOAuthIdentity — on ne déplace jamais une porte", () => {
     expect(adoptRemoteAvatar).toHaveBeenCalledWith(7, "https://cdn.discord.test/a.png");
   });
 
+  it("n'annule pas le rattachement si la copie de la photo échoue", async () => {
+    // `importRemoteAvatar` ne lève jamais, mais les deux `db.execute` qui
+    // l'encadrent, si. Laissé remonter, ce rejet faisait annoncer « le
+    // rattachement a échoué » sur une identité **déjà écrite** — que la liste
+    // d'à côté montrait rattachée dans le même écran.
+    const { statements } = fakeDb(emptyRow);
+    (adoptRemoteAvatar as jest.Mock).mockRejectedValue(new Error("ER_LOCK_DEADLOCK") as never);
+
+    await expect(
+      linkOAuthIdentity(7, identity({ avatarUrl: "https://cdn.discord.test/a.png" })),
+    ).resolves.toBeUndefined();
+
+    expect(find(statements, "UPDATE bg_users SET discord_id")).toBeDefined();
+  });
+
   it("refuse un compte introuvable", async () => {
     fakeDb(null);
     await expect(linkOAuthIdentity(7, identity())).rejects.toThrow("PROFILE_NOT_FOUND");
@@ -280,17 +317,54 @@ describe("linkOAuthIdentity — on ne déplace jamais une porte", () => {
 });
 
 describe("unlinkOAuthIdentity — on ne mure jamais la dernière", () => {
+  it("porte la borne dans le `WHERE` de l'écriture, pas dans une lecture", async () => {
+    // **Le cœur de la règle.** Lue d'abord puis écrite après un `await`, elle
+    // laissait deux retraits concurrents passer tous les deux. Portée par
+    // l'écriture, elle ne peut plus être prise deux fois.
+    const { statements } = fakeDb({ ...emptyRow, google_sub: "sub-1", blizzard_sub: "bz-1" });
+
+    await unlinkOAuthIdentity(7, "GOOGLE");
+
+    const update = find(statements, "UPDATE bg_users")!;
+    expect(update.sql).toContain("google_sub IS NOT NULL");
+    expect(update.sql).toMatch(/\(discord_id IS NOT NULL OR blizzard_sub IS NOT NULL\)/);
+    // Et le cas nominal ne coûte qu'une instruction : plus de lecture préalable.
+    expect(statements.filter(({ sql }) => sql.startsWith("SELECT"))).toHaveLength(0);
+  });
+
+  it("**refuse le second de deux retraits concurrents** sur un compte à deux portes", async () => {
+    // Deux onglets ouverts sur `/profil` — le `busy` de l'écran n'en couvre
+    // qu'un — et deux `DELETE` lancés de front sur deux fournisseurs différents.
+    // Avant, les deux lectures voyaient deux connexions et les deux écritures
+    // passaient : compte fermé, sans recours.
+    const row = { ...emptyRow, google_sub: "sub-1", discord_id: "123456789012345678" };
+    fakeDb(row);
+
+    await unlinkOAuthIdentity(7, "GOOGLE");
+    await expect(unlinkOAuthIdentity(7, "DISCORD")).rejects.toThrow("LAST_CONNECTION");
+
+    // La porte restante est intacte : le compte reste atteignable.
+    expect(row.discord_id).toBe("123456789012345678");
+  });
+
   it("refuse de retirer le seul moyen de connexion", async () => {
     const { statements } = fakeDb({ ...emptyRow, discord_id: "123456789012345678" });
 
     await expect(unlinkOAuthIdentity(7, "DISCORD")).rejects.toThrow("LAST_CONNECTION");
-    expect(find(statements, "UPDATE bg_users")).toBeUndefined();
+    // L'écriture est tentée, mais elle n'apparie rien : c'est elle qui refuse.
+    expect(find(statements, "discord_id = NULL")).toBeDefined();
   });
 
   it("refuse de retirer ce qui n'est pas rattaché", async () => {
     fakeDb({ ...emptyRow, google_sub: "sub-1", discord_id: "123456789012345678" });
 
     await expect(unlinkOAuthIdentity(7, "BLIZZARD")).rejects.toThrow("NOT_LINKED");
+  });
+
+  it("refuse un compte introuvable", async () => {
+    fakeDb(null);
+
+    await expect(unlinkOAuthIdentity(7, "GOOGLE")).rejects.toThrow("PROFILE_NOT_FOUND");
   });
 
   it("retire Discord **et sa certification**, en gardant le tag", async () => {
@@ -303,7 +377,7 @@ describe("unlinkOAuthIdentity — on ne mure jamais la dernière", () => {
 
     await unlinkOAuthIdentity(7, "DISCORD");
 
-    const update = find(statements, "UPDATE bg_users SET discord_id = NULL")!;
+    const update = find(statements, "discord_id = NULL")!;
     expect(update.sql).toContain("discord_verified_at = NULL");
     expect(update.sql).not.toContain("discord_pseudo");
   });
@@ -320,19 +394,7 @@ describe("unlinkOAuthIdentity — on ne mure jamais la dernière", () => {
 
     await unlinkOAuthIdentity(7, "BLIZZARD");
 
-    const update = find(statements, "UPDATE bg_users SET blizzard_sub = NULL")!;
+    const update = find(statements, "blizzard_sub = NULL")!;
     expect(update.sql).not.toContain("overwatch_battletag");
-  });
-
-  it("retire Google quand une autre porte reste", async () => {
-    const { statements } = fakeDb({
-      ...emptyRow,
-      google_sub: "sub-1",
-      blizzard_sub: "bz-1",
-    });
-
-    await unlinkOAuthIdentity(7, "GOOGLE");
-
-    expect(find(statements, "UPDATE bg_users SET google_sub = NULL")).toBeDefined();
   });
 });

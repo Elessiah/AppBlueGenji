@@ -16,7 +16,6 @@
  * ultérieure sur `/profil`. La phrase sous le bouton le dit avant le clic —
  * annoncer l'exposition après coup serait la subir.
  */
-import Link from "next/link";
 import { CyberButton } from "@/components/cyber/CyberButton";
 import {
   OAUTH_PROVIDER_LABELS,
@@ -44,20 +43,28 @@ export function OAuthButtons({ redirect }: { redirect: string }): React.ReactEle
           <div key={provider}>
             <CyberButton variant={index === 0 ? "primary" : "ghost"} asChild style={{ width: "100%" }}>
               {/*
-                Pas d'`aria-label` : le nom accessible d'un lien doit **contenir
-                son texte visible** (WCAG 2.5.3), et un libellé posé à la main le
-                remplacerait — la commande vocale ne répondrait plus à ce qu'on
-                lit dessus. Ce que la note ajoute passe par `aria-describedby`,
-                qui complète le nom au lieu de l'écraser ; sans ce lien, la note
-                n'était qu'un paragraphe voisin, lu après coup ou pas du tout.
+                **Un `<a>`, surtout pas un `next/link`.** Une route de départ
+                OAuth n'est pas une page de l'application, et la transition
+                côté client de `Link` avait une conséquence qu'aucun test ne
+                pouvait voir : la redirection de retour vers
+                `/connexion?error=…` changeait l'URL **sans remonter la page**,
+                si bien que l'effet qui lit `window.location.search` ne se
+                rejouait pas — le joueur cliquait, revenait sur la même page, et
+                aucun refus ne lui était annoncé. Vrai des cinq motifs, pas
+                seulement de la configuration manquante.
+
+                Pas d'`aria-label` non plus : le nom accessible d'un lien doit
+                **contenir son texte visible** (WCAG 2.5.3), et un libellé posé à
+                la main le remplacerait — la commande vocale ne répondrait plus à
+                ce qu'on lit dessus. Ce que la note ajoute passe par
+                `aria-describedby`, qui complète le nom au lieu de l'écraser.
               */}
-              <Link
+              <a
                 href={oauthStartPath(provider, { redirect })}
-                prefetch={false}
                 aria-describedby={note ? noteId : undefined}
               >
                 Continuer avec {OAUTH_PROVIDER_LABELS[provider]}
-              </Link>
+              </a>
             </CyberButton>
             {note ? (
               <p

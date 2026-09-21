@@ -14,9 +14,11 @@
  *    nom `DISCORD_ID_MISMATCH`, énoncée ici pour les trois fournisseurs.
  * 2. **On ne mure jamais la dernière.** Détacher le seul moyen de connexion ne
  *    délie pas un compte, il le ferme — définitivement, puisqu'il n'existe aucune
- *    récupération par courriel. Le refus vit dans le module pur
- *    (`lib/shared/account-connections.ts`), partagé avec l'écran qui grise le
- *    bouton.
+ *    récupération par courriel. La phrase du refus vit dans le module pur
+ *    (`lib/shared/account-connections.ts`), partagée avec l'écran qui met le
+ *    motif à la place du bouton ; la **borne**, elle, est portée par l'écriture
+ *    (voir {@link unlinkOAuthIdentity}) — relue puis écrite, elle laissait deux
+ *    retraits concurrents fermer le compte.
  *
  * **Pourquoi ce module plutôt qu'un rattachement par adresse e-mail.** La
  * question que résout « ajouter un moyen de connexion » se posait jusqu'ici à la
@@ -46,7 +48,7 @@ import {
   checkConnectionUnlink,
   type AccountConnection,
 } from "@/lib/shared/account-connections";
-import type { OAuthProvider } from "@/lib/shared/oauth-providers";
+import { OAUTH_PROVIDERS, type OAuthProvider } from "@/lib/shared/oauth-providers";
 
 /**
  * Une identité rapportée par un aller-retour OAuth, réduite à ce que le site en
@@ -224,8 +226,17 @@ export async function linkOAuthIdentity(userId: number, identity: OAuthIdentity)
   }
 
   // La photo ne remplace jamais un avatar téléversé, et son échec ne remet pas
-  // le rattachement en cause : elle est copiée après l'écriture qui compte.
-  await adoptRemoteAvatar(userId, identity.avatarUrl ?? undefined);
+  // le rattachement en cause : elle est copiée après l'écriture qui compte, et
+  // son rejet est **avalé ici**. `importRemoteAvatar` ne lève jamais, par
+  // construction ; les deux `db.execute` qui l'encadrent, si — et le rejet
+  // remontait jusqu'à faire annoncer « le rattachement a échoué » sur une
+  // identité déjà écrite, que la liste d'à côté montrait rattachée dans le même
+  // écran.
+  await adoptRemoteAvatar(userId, identity.avatarUrl ?? undefined).catch(() => {
+    // Le compte garde sa pastille à initiale. La copie sera retentée à la
+    // prochaine connexion, `shouldImportRemoteAvatar` n'ayant toujours rien de
+    // local à constater.
+  });
 }
 
 /**
@@ -248,19 +259,49 @@ export async function linkOAuthIdentity(userId: number, identity: OAuthIdentity)
  * un pseudo de jeu que le joueur peut aussi taper à la main.
  */
 export async function unlinkOAuthIdentity(userId: number, provider: OAuthProvider): Promise<void> {
-  const row = await loadIdentityRow(userId);
-  if (!row) throw new Error("PROFILE_NOT_FOUND");
-
-  const refusal = checkConnectionUnlink(connectionsFromRow(row), provider);
-  if (refusal) throw new Error(refusal);
+  const column = SUBJECT_COLUMNS[provider];
+  // « Il reste une autre porte » est une **condition de l'écriture**, pas une
+  // lecture préalable.
+  //
+  // Lue d'abord puis écrite après un `await`, elle laissait exactement la course
+  // que `CLAUDE.md` décrit pour le code Discord : deux onglets ouverts sur
+  // `/profil` (le `busy` de l'écran n'en couvre qu'un), un `DELETE` sur Google et
+  // un sur Discord lancés de front, les deux lectures voyant **deux** connexions
+  // et les deux écritures passant. Le compte se retrouvait à zéro moyen
+  // d'entrée — et comme il n'y a ni mot de passe ni récupération par courriel,
+  // la perte était définitive. C'est précisément ce que cette règle existe pour
+  // empêcher.
+  //
+  // Le `SELECT` n'a pas disparu, il a changé de rôle : il ne décide plus, il
+  // **nomme le refus** quand l'écriture n'a rien apparié. Le cas nominal ne
+  // coûte donc plus qu'une seule instruction.
+  const otherDoors = OAUTH_PROVIDERS.filter((other) => other !== provider)
+    .map((other) => `${SUBJECT_COLUMNS[other]} IS NOT NULL`)
+    .join(" OR ");
+  // Discord perd sa certification dans la même instruction : ce sont les deux
+  // faces d'une preuve unique, et une base où l'une serait passée sans l'autre
+  // exposerait à l'organisation un tag que plus rien ne couvre.
+  const clearedColumns =
+    provider === "DISCORD" ? "discord_id = NULL, discord_verified_at = NULL" : `${column} = NULL`;
 
   const db = await getDatabase();
-  if (provider === "DISCORD") {
-    await db.execute(
-      `UPDATE bg_users SET discord_id = NULL, discord_verified_at = NULL WHERE id = ?`,
-      [userId],
-    );
-    return;
-  }
-  await db.execute(`UPDATE bg_users SET ${SUBJECT_COLUMNS[provider]} = NULL WHERE id = ?`, [userId]);
+  const [result] = await db.execute<ResultSetHeader>(
+    `UPDATE bg_users
+        SET ${clearedColumns}
+      WHERE id = ?
+        AND is_deleted = 0
+        AND ${column} IS NOT NULL
+        AND (${otherDoors})`,
+    [userId],
+  );
+  if (Number(result.affectedRows) > 0) return;
+
+  const row = await loadIdentityRow(userId);
+  if (!row) throw new Error("PROFILE_NOT_FOUND");
+  // Les deux refus du module pur sont **exactement** le complément de la
+  // condition ci-dessus, donc l'un des deux s'applique forcément. Le repli ne
+  // couvre que l'état qui aurait encore bougé entre l'écriture et cette
+  // relecture, et il refuse plutôt que de laisser croire que rien n'était
+  // rattaché.
+  throw new Error(checkConnectionUnlink(connectionsFromRow(row), provider) ?? "LAST_CONNECTION");
 }
