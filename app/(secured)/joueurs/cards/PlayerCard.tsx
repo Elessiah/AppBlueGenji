@@ -80,7 +80,7 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
               </TeamLink>
             </>
           ) : (
-            <span style={{ color: "var(--ink-dim)" }}>
+            <span className={s.plNoTeam}>
               {PLAYER_ROSTER_STATUS_LABEL[playerRosterStatus(player)]}
             </span>
           )}

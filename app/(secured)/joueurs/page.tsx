@@ -106,7 +106,7 @@ export default function PlayersPage() {
             </div>
             <div className={s.metric}>
               <div className={s.metricNum}>{freeAgents}</div>
-              <div className={s.metricLbl}>Free agents · sans roster</div>
+              <div className={s.metricLbl}>Free agents · ouverts aux offres</div>
             </div>
             <div className={s.metric}>
               <div className={s.metricNum}>{owCount}</div>

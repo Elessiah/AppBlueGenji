@@ -718,6 +718,10 @@
   font-style: normal;
   color: var(--c, var(--blue-300));
 }
+/* Statut sans roster : en retrait du nom d'équipe, qui porte la couleur. */
+.plNoTeam {
+  color: var(--ink-dim);
+}
 
 .plRoles {
   display: flex;
