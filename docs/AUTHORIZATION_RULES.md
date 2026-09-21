@@ -276,6 +276,14 @@ modification du tag.
 naît du tournoi et s'éteint avec lui. Le fait est **global**, pas relatif au
 lecteur — un arbitre arbitre le site, pas un tournoi en particulier.
 
+**Le tag et la certification sont deux faits distincts.** Le tableau ci-dessus ne
+porte que sur le **tag** — la coordonnée, qui dit *comment* joindre. La
+**certification** dit seulement *que le joueur est joignable* par l'organisation,
+ne nomme personne, et s'annonce donc à tout lecteur d'une fiche
+(`canSeeDiscordVerification`) : d'où l'affichage « Masqué ✅ ». Elle manquait au
+capitaine dont le tournoi exige « tous les Discord vérifiés », qui lisait un refus
+sans savoir qui de son roster devait encore certifier.
+
 Le filtrage est posé **à la sortie** (`visibleDiscordTag`), comme celui de
 l'avatar : un écran ajouté demain n'a rien à afficher plutôt qu'à se souvenir
 d'une règle. Trois lectures y passent — `getFullProfile`, le panneau de contacts

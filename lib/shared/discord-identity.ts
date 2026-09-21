@@ -107,6 +107,33 @@ export function canViewDiscordTag(
 }
 
 /**
+ * La **certification** est-elle annonçable à ce lecteur ?
+ *
+ * Oui, toujours — et c'est le point à ne pas confondre avec le tag. Ce sont
+ * **deux faits distincts** :
+ *
+ * - le **tag** dit *comment* joindre le joueur. C'est une coordonnée, filtrée
+ *   par `canViewDiscordTag` ;
+ * - la **certification** dit seulement *qu'il est joignable* par l'organisation.
+ *   Elle ne nomme personne, ne mène à personne, et ne se retourne pas contre son
+ *   titulaire : c'est une propriété de son compte, au même titre que son
+ *   ancienneté.
+ *
+ * L'annoncer sert à quelqu'un de précis : le **capitaine** dont le tournoi exige
+ * « tous les Discord vérifiés » (`docs/features/REGISTRATION_FILTERS.md`). Sans
+ * elle, il lit un refus qui nomme la condition sans jamais lui dire **qui** de
+ * son roster doit encore certifier — un mur sans poignée.
+ *
+ * D'où la forme retenue à l'affichage : « Masqué ✅ ». Le tag reste secret, la
+ * pastille dit le reste. Une fonction plutôt qu'une constante `true` : c'est
+ * l'endroit où l'on viendra la restreindre si elle devait l'être un jour, et le
+ * seul endroit.
+ */
+export function canSeeDiscordVerification(): boolean {
+  return true;
+}
+
+/**
  * Le tag tel qu'il doit sortir, ou `null`.
  *
  * Posé **à la sortie**, comme `visibleAvatarUrl` : une colonne se lit par les

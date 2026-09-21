@@ -263,6 +263,30 @@ describe("getFullProfile — ce qui sort du tag", () => {
     expect(profile?.profile.discordVerified).toBe(false);
   });
 
+  /**
+   * **La pastille ne suit pas le tag.**
+   *
+   * Le tag dit *comment* joindre le joueur, la certification dit seulement
+   * *qu'il est joignable* — un fait qui ne nomme personne et qui manque au
+   * capitaine dont le tournoi exige « tous les Discord vérifiés ».
+   */
+  it("annonce la certification même quand le tag est filtré", async () => {
+    profileDb(userRow(), false);
+
+    const profile = await getFullProfile({ id: 99, roles: [] }, 7);
+
+    expect(profile?.profile.discordPseudo).toBeNull();
+    expect(profile?.profile.discordVerified).toBe(true);
+  });
+
+  it("ne l'annonce pas quand elle n'existe pas", async () => {
+    profileDb(userRow({ discord_verified_at: null }), false);
+
+    const profile = await getFullProfile({ id: 99, roles: [] }, 7);
+
+    expect(profile?.profile.discordVerified).toBe(false);
+  });
+
   it("n'accorde l'arbitre que si le joueur est engagé dans un tournoi vivant", async () => {
     profileDb(userRow(), false);
     const away = await getFullProfile({ id: 99, roles: ["ARBITRE"] }, 7);
@@ -287,8 +311,8 @@ describe("getFullProfile — ce qui sort du tag", () => {
 
     const profile = await getFullProfile({ id: 99, roles: ["CASTER"] }, 7);
 
+    // Le tag, lui, reste filtré : c'est la coordonnée, pas l'état.
     expect(profile?.profile.discordPseudo).toBeNull();
-    expect(profile?.profile.discordVerified).toBe(false);
   });
 });
 

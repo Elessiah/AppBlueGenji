@@ -189,31 +189,33 @@ export default function PlayerDetailPage() {
             <input value={data.profile.marvelRivalsTag || "Masqué"} readOnly />
           </div>
           {/*
-            Le tag Discord n'apparaît que s'il est **arrivé** : le serveur l'a
-            déjà filtré (`visibleDiscordTag`), et un champ « Masqué » posé là
-            renseignerait tout le monde sur l'existence d'un tag, y compris les
-            lecteurs à qui la règle ne l'accorde jamais. Les deux champs voisins
-            affichent « Masqué » parce que leur visibilité est, elle, un réglage
-            que le joueur assume publiquement.
+            Même convention que ses deux voisins : « Masqué » couvre aussi bien
+            le tag filtré que le tag absent, et c'est ce qui le rend sûr — les
+            deux cas sont indiscernables, donc l'affichage ne dit rien de plus
+            que ce qu'il montre.
+
+            La **pastille**, elle, ne dépend pas du tag : elle dit que le joueur
+            est joignable par l'organisation, pas comment. C'est ce qui permet à
+            un capitaine de voir qui de son roster remplit la condition
+            « tous les Discord vérifiés » d'un tournoi.
           */}
-          {data.profile.discordPseudo ? (
-            <div className="field">
-              <label>Discord</label>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  minHeight: 38,
-                  padding: "0 2px",
-                }}
-              >
-                <DiscordTag
-                  tag={data.profile.discordPseudo}
-                  verified={data.profile.discordVerified}
-                />
-              </div>
+          <div className="field">
+            <label>Discord</label>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                minHeight: 38,
+                padding: "0 2px",
+              }}
+            >
+              <DiscordTag
+                tag={data.profile.discordPseudo}
+                verified={data.profile.discordVerified}
+                fallback="Masqué"
+              />
             </div>
-          ) : null}
+          </div>
           <div className="field">
             <label>Majorité</label>
             <input

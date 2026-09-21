@@ -1018,9 +1018,12 @@ export async function getFullProfile(
     verified: discordVerified,
     inActiveTournament: needsTournamentCheck ? await isInActiveTournament(targetUserId) : false,
   });
-  // La pastille suit le tag : elle ne s'affiche que là où il s'affiche, et dire
-  // « vérifié » d'un tag qu'on ne montre pas n'apprendrait rien à personne.
-  profile.discordVerified = profile.discordPseudo === null ? false : discordVerified;
+  // **La pastille ne suit pas le tag** (`canSeeDiscordVerification`) : le tag dit
+  // *comment* joindre le joueur, la certification dit seulement *qu'il est
+  // joignable*. Le second fait ne nomme personne — et il manque à quelqu'un de
+  // précis, le capitaine dont le tournoi exige « tous les Discord vérifiés », qui
+  // lisait jusqu'ici un refus sans savoir qui de son roster devait certifier.
+  profile.discordVerified = discordVerified;
 
   const [timelineRows] = await db.execute<TeamTimelineRow[]>(
     `SELECT

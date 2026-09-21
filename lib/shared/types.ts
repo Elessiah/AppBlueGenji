@@ -262,8 +262,14 @@ export type PublicUserProfile = {
    */
   discordPseudo?: string | null;
   /**
-   * Le tag ci-dessus a-t-il été prouvé par son titulaire ? Suit `discordPseudo` :
-   * jamais `true` sur un tag qu'on ne montre pas.
+   * Le tag a-t-il été prouvé par son titulaire ?
+   *
+   * **Ne suit pas `discordPseudo`**, et c'est délibéré : le tag dit *comment*
+   * joindre le joueur (coordonnée, filtrée), la certification dit seulement
+   * *qu'il est joignable* par l'organisation — un fait qui ne nomme personne.
+   * D'où « Masqué ✅ » sur une fiche dont le tag est filtré, et la possibilité
+   * pour un capitaine de voir qui de son roster remplit la condition
+   * d'inscription. Voir `canSeeDiscordVerification`.
    */
   discordVerified?: boolean;
   // Enriched fields for /joueurs listing

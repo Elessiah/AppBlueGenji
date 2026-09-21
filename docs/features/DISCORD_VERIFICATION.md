@@ -46,6 +46,26 @@ Le public se lit dans `canViewDiscordTag`, et l'ordre des cas *est* la règle :
 La clause « non certifié » passe **avant** les rôles. Ce n'est pas un détail
 d'écriture : placée après, elle serait oubliée le jour où un rôle s'ajoute.
 
+### Le tag et la certification sont deux faits, pas un
+
+Le tableau ci-dessus ne concerne **que le tag**. La *certification*, elle,
+s'annonce à tout lecteur d'une fiche (`canSeeDiscordVerification`) :
+
+| Fait            | Ce qu'il dit                      | Public                    |
+| --------------- | --------------------------------- | ------------------------- |
+| Le tag          | **Comment** joindre le joueur     | Filtré (tableau ci-dessus) |
+| La certification| **Qu'il est joignable**           | Tout lecteur de la fiche   |
+
+D'où l'affichage « Masqué ✅ » : la coordonnée reste secrète, l'état se lit. Il
+manquait à quelqu'un de précis — le **capitaine** dont le tournoi exige « tous
+les Discord vérifiés » (`docs/features/REGISTRATION_FILTERS.md`) : il lisait un
+refus qui nommait la condition sans jamais lui dire **qui** de son roster devait
+encore certifier. Un mur sans poignée.
+
+La certification ne nomme personne, ne mène à personne et ne se retourne pas
+contre son titulaire : c'est une propriété de son compte, au même titre que son
+ancienneté.
+
 « Tournoi vivant » = tout état sauf `FINISHED`. La bonne borne est le palmarès :
 un tournoi clos n'a plus de manche à reprogrammer. Le fait est **global** et non
 relatif au lecteur — un arbitre arbitre le site, pas un tournoi en particulier ;
@@ -137,11 +157,11 @@ ferait d'un compte anonymisé un compte « vérifié » sans tag.
   certification. L'état vient de `GET /api/profile/discord`, qui parle du tag
   **enregistré** : un champ modifié sans être sauvegardé ne gagne ni ne perd la
   pastille.
-- **`/joueurs/[id]`** — seulement si le serveur l'a laissé passer. Le champ
-  n'apparaît **pas du tout** quand le tag est filtré : un « Masqué » renseignerait
-  tout le monde sur l'existence d'un tag, y compris les lecteurs à qui la règle ne
-  l'accorde jamais. (Les deux champs voisins affichent bien « Masqué », eux :
-  leur visibilité est un réglage que le joueur assume publiquement.)
+- **`/joueurs/[id]`** — le tag si le serveur l'a laissé passer, « Masqué » sinon,
+  et **la pastille dans les deux cas** quand le joueur est certifié. « Masqué »
+  couvre aussi bien le tag filtré que le tag absent, exactement comme les deux
+  champs voisins : les deux cas sont indiscernables, donc l'affichage ne dit rien
+  de plus que ce qu'il montre.
 - **Fiche d'un tournoi, panneau « Contacts Discord »** — réservé au staff
   `tournaments`, chargé **à la demande** par
   `GET /api/admin/tournaments/[id]/contacts`. Rien de tout cela ne voyage dans

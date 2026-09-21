@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  canSeeDiscordVerification,
   canViewDiscordTag,
   tournamentGrantsContactAccess,
   discordVerificationNeedsCode,
@@ -142,6 +143,23 @@ describe("discordVerificationNeedsCode", () => {
     // Le compte né par Discord a prouvé son identifiant en ouvrant sa session :
     // redemander un code rejouerait une preuve qu'on détient.
     expect(discordVerificationNeedsCode("900000000000000001")).toBe(false);
+  });
+});
+
+describe("canSeeDiscordVerification", () => {
+  /**
+   * Deux faits, deux publics — et c'est la distinction qui porte tout : le
+   * **tag** dit comment joindre le joueur (coordonnée, filtrée), la
+   * **certification** dit seulement qu'il est joignable (état, annonçable).
+   */
+  it("s'annonce à tout le monde : elle ne nomme personne", () => {
+    expect(canSeeDiscordVerification()).toBe(true);
+  });
+
+  it("ne rend pas le tag pour autant", () => {
+    // La garde du tag reste entière : « Masqué ✅ » montre l'état, pas la
+    // coordonnée.
+    expect(visibleDiscordTag("keryan", viewer([]), verifiedSubject)).toBeNull();
   });
 });
 
