@@ -2,6 +2,11 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
+import {
+  accountDeletionMode,
+  type AccountDeletionMode,
+  type AccountTrace,
+} from "@/lib/shared/account-deletion";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
@@ -77,6 +82,7 @@ type UserRow = RowDataPacket & {
   visible_major: 0 | 1;
   open_to_recruitment: 0 | 1;
   is_admin?: 0 | 1;
+  is_deleted?: 0 | 1;
   platform_roles_json?: string | null;
   created_at: Date;
 };
@@ -219,14 +225,21 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
       visible_marvel,
       visible_major,
       open_to_recruitment,
+      is_deleted,
       created_at
      FROM bg_users
      ORDER BY is_deleted ASC, pseudo ASC`,
   );
 
-  const baseUsers = rows.map((row) =>
-    applyVisibility(mapPublicUser(row), Number(row.id) === viewerId),
-  );
+  // `isDeleted` voyage jusqu'à l'annuaire, qui masque ces comptes par défaut :
+  // un compte anonymisé n'est plus personne, mais sa ligne reste nécessaire à
+  // qui remonte un ancien match. Le filtre est côté client, comme les autres de
+  // cet écran — la liste entière y est déjà, et ces lignes ne portent plus rien
+  // de personnel.
+  const baseUsers = rows.map((row) => ({
+    ...applyVisibility(mapPublicUser(row), Number(row.id) === viewerId),
+    isDeleted: Boolean(row.is_deleted),
+  }));
   const userIds = baseUsers.map((u) => u.id);
 
   // Les badges de jeu se dérivent des tags bruts : jouer à OW/MR n'est pas
@@ -935,8 +948,102 @@ export async function updateOwnProfile(
  * statistiques et l'historique générés par la plateforme sont conservés
  * (les adhésions d'équipe restent rattachées à un profil anonyme).
  */
-export async function anonymizeOwnAccount(userId: number): Promise<void> {
+/**
+ * Ce que ce compte laisse derrière lui, en **une** requête.
+ *
+ * Trois `EXISTS` indexés plutôt que trois allers-retours : la suppression est
+ * un geste unique, ses trois questions se posent au même instant et sur le même
+ * instantané. Les poser séparément laisserait un `await` entre elles — un
+ * tournoi créé entre la deuxième et la troisième et la ligne partirait quand
+ * même, sur une base qui la refuse.
+ *
+ * L'engagement se lit sur **toute** appartenance, close comprise : un joueur
+ * parti d'une équipe a tout de même joué ses matchs sous ses couleurs.
+ */
+async function loadAccountTrace(userId: number): Promise<AccountTrace> {
   const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & {
+    tournaments: number;
+    organized: number;
+    owned: number;
+  })[]>(
+    `SELECT
+       (
+         EXISTS (
+           SELECT 1
+           FROM bg_tournament_registrations r
+           JOIN bg_team_members tm ON tm.team_id = r.team_id AND tm.user_id = ?
+         )
+         -- L'entrée solo compte **par elle-même** : elle n'a pas de clé
+         -- étrangère (une cascade effacerait l'engagé, et avec lui l'historique
+         -- des matchs), donc l'effacement du compte la laisserait pendre sur un
+         -- identifiant disparu.
+         OR EXISTS (SELECT 1 FROM bg_teams WHERE solo_user_id = ?)
+       ) AS tournaments,
+       EXISTS (
+         SELECT 1 FROM bg_tournaments WHERE organizer_user_id = ?
+       ) AS organized,
+       EXISTS (
+         SELECT 1
+         FROM bg_team_members m
+         JOIN bg_teams t ON t.id = m.team_id AND t.deleted_at IS NULL
+         WHERE m.user_id = ? AND m.left_at IS NULL
+           AND JSON_CONTAINS(m.roles_json, '"OWNER"')
+       ) AS owned`,
+    [userId, userId, userId, userId],
+  );
+  const row = rows[0];
+  return {
+    tournaments: Boolean(row?.tournaments),
+    organizedTournaments: Boolean(row?.organized),
+    ownedTeams: Boolean(row?.owned),
+  };
+}
+
+/**
+ * Ce que la suppression **ferait** à ce compte, sans rien écrire.
+ *
+ * L'écran doit annoncer le geste avant le clic : une confirmation qui promet la
+ * conservation des statistiques à un compte qui n'en a aucune est un mensonge
+ * poli, et l'inverse serait pire. La question n'est posée qu'au moment où elle
+ * peut changer la réponse — sur le chemin de la suppression, jamais à chaque
+ * chargement du profil.
+ *
+ * Ce n'est **pas** une promesse : l'écriture repose la question sur son propre
+ * instantané. Rien n'interdit qu'un tournoi soit créé entre les deux, et c'est
+ * l'écriture qui fait foi.
+ */
+export async function getAccountDeletionMode(userId: number): Promise<AccountDeletionMode> {
+  return accountDeletionMode(await loadAccountTrace(userId));
+}
+
+/**
+ * Supprimer son compte — **effacé** s'il ne laisse rien, anonymisé sinon.
+ *
+ * Le mode est décidé par `accountDeletionMode` (`lib/shared/account-deletion.ts`),
+ * partagé avec l'écran qui annonce le geste avant le clic : une confirmation
+ * qui promet la conservation des statistiques à un compte qui n'en a aucune est
+ * un mensonge poli, et l'inverse serait pire.
+ *
+ * L'**effacement** s'appuie sur les cascades déjà déclarées (sessions,
+ * appartenances, invitations) ; `bg_endurance_penalties.created_by` passe à
+ * `NULL`, la sanction restant due. Seules les visites demandent un geste : elles
+ * n'ont **aucune** clé étrangère (une cascade y effacerait l'historique de
+ * fréquentation), et c'est le lien vers une personne qu'il faut retirer, pas le
+ * fait qu'une page ait été vue.
+ *
+ * Rend le mode appliqué, pour que la route puisse le dire au joueur.
+ */
+export async function deleteOwnAccount(userId: number): Promise<AccountDeletionMode> {
+  const db = await getDatabase();
+  const mode = accountDeletionMode(await loadAccountTrace(userId));
+
+  if (mode === "ERASE") {
+    await db.execute(`UPDATE bg_site_visits SET user_id = NULL WHERE user_id = ?`, [userId]);
+    await db.execute(`DELETE FROM bg_users WHERE id = ?`, [userId]);
+    return mode;
+  }
+
   await db.execute(
     `UPDATE bg_users
      SET pseudo = CONCAT('compte_supprime_', id),
@@ -965,6 +1072,7 @@ export async function anonymizeOwnAccount(userId: number): Promise<void> {
   await db.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
   // Le pseudo anonymisé doit aussi remplacer le nom affiché en tournoi.
   await syncSoloEntryIdentity(userId);
+  return mode;
 }
 
 export async function updateUserAvatar(userId: number, avatarPath: string | null): Promise<void> {

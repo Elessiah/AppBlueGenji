@@ -273,6 +273,15 @@ export type PublicUserProfile = {
    */
   discordVerified?: boolean;
   // Enriched fields for /joueurs listing
+  /**
+   * Compte anonymisé (`bg_users.is_deleted`).
+   *
+   * Rendu par `listPlayers` seul : l'annuaire masque ces lignes **par défaut**
+   * derrière une case à cocher, la ligne restant nécessaire à qui remonte un
+   * ancien match. Absent partout ailleurs — une fiche de profil anonymisée ne
+   * s'ouvre pas.
+   */
+  isDeleted?: boolean;
   team?: {
     id: number;
     name: string;

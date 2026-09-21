@@ -6,6 +6,11 @@ import { useRouter } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
 import { Coche } from "@/components/Coche";
 import type { FullProfileResponse } from "@/lib/shared/types";
+import {
+  accountDeletionConfirmation,
+  accountDeletionOutcome,
+  type AccountDeletionMode,
+} from "@/lib/shared/account-deletion";
 import { useToast } from "@/components/ui/toast";
 import { TeamLink } from "@/components/entity-link";
 import { VerifiedBadge } from "@/components/discord-tag";
@@ -157,17 +162,27 @@ export default function ProfilePage() {
   };
 
   const onDeleteAccount = async () => {
-    if (!window.confirm(
-      "Supprimer définitivement ton compte ? Tes informations personnelles seront effacées (le compte devient anonyme), mais tes statistiques resteront conservées. Cette action est irréversible.",
-    )) {
+    // Le mode est demandé **avant** la confirmation : « effacé » et
+    // « anonymisé » ne sont pas la même promesse, et le joueur a droit à celle
+    // qui le concerne. Le serveur repose la question à l'écriture — ceci
+    // informe, cela tranche.
+    let mode: AccountDeletionMode = "ANONYMIZE";
+    try {
+      const preview = await fetch("/api/profile/deletion", { cache: "no-store" });
+      if (preview.ok) mode = ((await preview.json()) as { mode: AccountDeletionMode }).mode;
+    } catch {
+      // Injoignable : on reste sur la phrase la plus prudente, celle qui promet
+      // le moins d'effacement.
+    }
+    if (!window.confirm(accountDeletionConfirmation(mode))) {
       return;
     }
     setDeleting(true);
     try {
       const response = await fetch("/api/profile", { method: "DELETE" });
-      const payload = (await response.json()) as { error?: string };
+      const payload = (await response.json()) as { error?: string; mode?: AccountDeletionMode };
       if (!response.ok) throw new Error(payload.error || "ACCOUNT_DELETE_FAILED");
-      showSuccess("Compte supprimé. Tes statistiques restent conservées de façon anonyme.");
+      showSuccess(accountDeletionOutcome(payload.mode ?? mode));
       setTimeout(() => {
         window.location.href = "/";
       }, 1200);

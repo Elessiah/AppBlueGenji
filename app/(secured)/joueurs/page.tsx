@@ -29,6 +29,11 @@ export default function PlayersPage() {
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sort, setSort] = useState<SortKey>("pseudo");
+  // Les comptes anonymisés sortent de l'annuaire **par défaut** : « compte_supprime_412 »
+  // n'est plus personne, et la ligne n'existe que pour qui remonte un ancien
+  // match. Décoché par défaut, donc, mais jamais retiré — c'est le seul moyen de
+  // retrouver un adversaire d'un tournoi passé.
+  const [showDeleted, setShowDeleted] = useState(false);
 
   useEffect(() => {
     fetch("/api/players", { cache: "no-store" })
@@ -42,9 +47,17 @@ export default function PlayersPage() {
       .catch((e) => showError((e as Error).message));
   }, [showError]);
 
+  // L'annuaire, comptes supprimés compris ou non : tout ce que la page montre
+  // ou compte en descend, sinon la case à cocher changerait la liste sans
+  // changer les compteurs qui la surmontent.
+  const listed = useMemo(
+    () => (showDeleted ? players : players.filter((p) => !p.isDeleted)),
+    [players, showDeleted],
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let r = players.filter((p) => {
+    let r = listed.filter((p) => {
       if (q && !`${p.pseudo} ${p.team?.name || ""}`.toLowerCase().includes(q)) return false;
       if (roleFilter !== "all" && !(p.roles || []).includes(roleFilter as PlayerRole)) return false;
       // Free agent = sans roster ET ouvert au recrutement : un joueur qui a
@@ -56,11 +69,12 @@ export default function PlayersPage() {
     if (sort === "pseudo") r.sort((a, b) => a.pseudo.localeCompare(b.pseudo, "fr"));
     if (sort === "tournaments") r.sort((a, b) => (b.tournamentsCount || 0) - (a.tournamentsCount || 0));
     return r;
-  }, [players, query, roleFilter, statusFilter, sort]);
+  }, [listed, query, roleFilter, statusFilter, sort]);
 
-  const freeAgents = players.filter((p) => !p.team && p.openToRecruitment !== false).length;
-  const owCount = players.filter((p) => (p.games || []).includes("OW")).length;
-  const mrCount = players.filter((p) => (p.games || []).includes("MR")).length;
+  const freeAgents = listed.filter((p) => !p.team && p.openToRecruitment !== false).length;
+  const owCount = listed.filter((p) => (p.games || []).includes("OW")).length;
+  const mrCount = listed.filter((p) => (p.games || []).includes("MR")).length;
+  const deletedCount = players.filter((p) => p.isDeleted).length;
 
   const accentStyle = {
     "--g-rgb": ACCENT_RGB,
@@ -99,7 +113,7 @@ export default function PlayersPage() {
           <div className={s.metrics}>
             <div className={s.metric}>
               <div className={s.metricNum}>
-                <em>{players.length}</em>
+                <em>{listed.length}</em>
               </div>
               <div className={s.metricLbl}>Profils référencés</div>
             </div>
@@ -164,6 +178,27 @@ export default function PlayersPage() {
                   </button>
                 ))}
               </div>
+              {deletedCount > 0 && (
+                <>
+                  <span style={{ color: "var(--ink-dim)" }}>·</span>
+                  <label
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 7,
+                      cursor: "pointer",
+                      color: showDeleted ? "var(--ink)" : "var(--ink-dim)",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={showDeleted}
+                      onChange={(e) => setShowDeleted(e.target.checked)}
+                    />
+                    Comptes supprimés ({deletedCount})
+                  </label>
+                </>
+              )}
             </div>
             <div className={s.sortOpts}>
               <span style={{ color: "var(--ink-dim)" }}>Trier :</span>

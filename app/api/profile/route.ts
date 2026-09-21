@@ -1,6 +1,6 @@
 ﻿import { clearSession, getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { anonymizeOwnAccount, getFullProfile, updateOwnProfile } from "@/lib/server/users-service";
+import { deleteOwnAccount, getFullProfile, updateOwnProfile } from "@/lib/server/users-service";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -49,9 +49,11 @@ export async function DELETE() {
   if (!user) return fail("UNAUTHORIZED", 401);
 
   try {
-    await anonymizeOwnAccount(user.id);
+    // Le mode voyage jusqu'à l'écran : « effacé » et « anonymisé » ne sont pas
+    // la même promesse, et c'est le serveur qui vient de trancher.
+    const mode = await deleteOwnAccount(user.id);
     await clearSession();
-    return ok({ deleted: true });
+    return ok({ deleted: true, mode });
   } catch (error) {
     return fail((error as Error).message || "ACCOUNT_DELETE_FAILED", 400);
   }
