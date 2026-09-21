@@ -30,13 +30,25 @@ describe("contentSecurityPolicy", () => {
 
   it("ferme ce que le site n'utilise pas", () => {
     const policy = contentSecurityPolicy("n", { dev: false });
-    // Aucune iframe dans le site, ni de son côté ni du nôtre.
-    expect(directive(policy, "frame-src")).toBe("'none'");
     expect(directive(policy, "object-src")).toBe("'none'");
     // `base-uri` n'a pas d'équivalent ailleurs : une balise `<base>` injectée
     // réécrirait toutes les URL relatives de la page.
     expect(directive(policy, "base-uri")).toBe("'self'");
     expect(directive(policy, "form-action")).toBe("'self'");
+  });
+
+  it("n'ouvre frame-src qu'à Google One Tap, la seule iframe du site", () => {
+    const policy = contentSecurityPolicy("n", { dev: false });
+    expect(directive(policy, "frame-src")).toBe("https://accounts.google.com");
+  });
+
+  it("autorise le script, les appels et la feuille de styles de Google Identity Services (One Tap)", () => {
+    const policy = contentSecurityPolicy("n", { dev: false });
+    expect(directive(policy, "script-src")).toContain("https://accounts.google.com");
+    expect(directive(policy, "connect-src")).toBe("'self' https://accounts.google.com");
+    // L'invite charge sa propre feuille de styles (`gsi/style`) par un `<link>`,
+    // que `'unsafe-inline'` ne couvre pas — constaté en la faisant refuser.
+    expect(directive(policy, "style-src")).toContain("https://accounts.google.com");
   });
 
   it("double X-Frame-Options, que les navigateurs récents ignorent au profit de la CSP", () => {
