@@ -49,6 +49,7 @@ import {
   type OAuthIntent,
   type OAuthProvider,
 } from "@/lib/shared/oauth-providers";
+import { isLinkRefusal } from "@/lib/shared/account-connections";
 import { DEFAULT_REDIRECT, safeRedirectPath } from "@/lib/shared/safe-redirect";
 
 /** Où retombe un rattachement, réussi ou non. */
@@ -221,7 +222,14 @@ export async function completeOAuth(req: NextRequest, provider: OAuthProvider): 
     try {
       await linkOAuthIdentity(user.id, identity);
     } catch (error) {
-      return linkFailure(base, provider, (error as Error).message || "LINK_FAILED");
+      // **Seuls les refus nommés voyagent.** `linkOAuthIdentity` ne lève pas que
+      // ses trois refus : tout ce que `mysql2` fait remonter le traverse, et ce
+      // message-ci finit dans une URL — donc dans l'historique du navigateur, le
+      // `Referer` de la requête suivante et les journaux de chaque relais. Le
+      // joueur, lui, ne verrait rien : le registre français retombe sur sa
+      // phrase générique, ce qui rend la fuite parfaitement discrète.
+      const message = (error as Error).message;
+      return linkFailure(base, provider, isLinkRefusal(message) ? message : "LINK_FAILED");
     }
 
     const url = new URL(PROFILE_PATH, base);

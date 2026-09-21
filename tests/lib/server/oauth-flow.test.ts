@@ -371,6 +371,23 @@ describe("completeOAuth — rattachement", () => {
     );
   });
 
+  it("ne laisse **pas** le message d'une panne partir dans l'URL", async () => {
+    // `linkOAuthIdentity` ne lève pas que ses refus nommés : ce que `mysql2`
+    // fait remonter le traverse. Recopié tel quel, ce message finissait dans la
+    // barre d'adresse, l'historique et le `Referer` — sans que rien ne le
+    // signale à l'écran, le registre français retombant sur sa phrase générique.
+    (getCurrentUser as jest.Mock).mockResolvedValue({ id: 7 } as never);
+    (linkOAuthIdentity as jest.Mock).mockRejectedValue(
+      new Error("ER_LOCK_DEADLOCK: Deadlock found when trying to get lock") as never,
+    );
+
+    const response = await link();
+    const location = response.headers.get("location") ?? "";
+
+    expect(location).toBe("http://localhost:3000/profil?connection_error=LINK_FAILED&provider=discord");
+    expect(location).not.toContain("Deadlock");
+  });
+
   it("distingue la configuration manquante de la panne, jusque sur le retour", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue({ id: 7 } as never);
     (fetchGoogleUser as jest.Mock).mockRejectedValue(new Error("Missing GOOGLE_CLIENT_SECRET") as never);

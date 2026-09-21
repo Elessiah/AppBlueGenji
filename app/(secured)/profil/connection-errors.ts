@@ -29,6 +29,10 @@ const CONNECTION_ERRORS: Record<string, string> = {
   NOT_LINKED: "Cette application n'est pas rattachée à ton compte.",
   UNKNOWN_PROVIDER: "Application inconnue.",
   OAUTH_FAILED: "Le rattachement a échoué chez le fournisseur. Réessaie dans un instant.",
+  // Le motif que prennent toutes les pannes qui n'ont pas de nom : le message du
+  // serveur ne voyage pas jusqu'ici (`LINK_REFUSALS`), et il n'apprendrait rien
+  // au joueur.
+  LINK_FAILED: "Le rattachement n'a pas abouti. Réessaie dans un instant.",
   // Rien à réessayer : la variable d'environnement manque, et le bouton ne
   // marchera pas tant que personne ne l'aura remplie.
   NOT_CONFIGURED:

@@ -4,6 +4,7 @@ import { loginErrorMessage, oauthErrorMessage } from "@/app/connexion/_lib/login
 import { connectionErrorMessage } from "@/app/(secured)/profil/connection-errors";
 import { membershipErrorMessage } from "@/app/(secured)/equipes/_lib/membership-errors";
 import { OAUTH_PROVIDERS, OAUTH_PROVIDER_SLUGS } from "@/lib/shared/oauth-providers";
+import { LINK_REFUSALS } from "@/lib/shared/account-connections";
 
 /**
  * **Aucun jeton du serveur ne doit atteindre un toast.**
@@ -64,6 +65,7 @@ const CONNECTION_CODES = [
   "UNKNOWN_PROVIDER",
   "OAUTH_FAILED",
   "NOT_CONFIGURED",
+  "LINK_FAILED",
   "PROFILE_NOT_FOUND",
   "UNAUTHORIZED",
 ];
@@ -156,5 +158,20 @@ describe("registre des refus — aller-retour OAuth", () => {
     expect(oauthErrorMessage("un_motif_inconnu", "google")).toBeNull();
     expect(oauthErrorMessage(null, "google")).toBeNull();
     expect(oauthErrorMessage("", "google")).toBeNull();
+  });
+});
+
+/**
+ * **Ce qui a le droit de voyager dans l'URL a une phrase à l'arrivée.**
+ *
+ * `LINK_REFUSALS` borne ce que le rappel OAuth écrit dans `?connection_error=`
+ * — sans quoi le message d'une erreur `mysql2` finissait dans la barre
+ * d'adresse. Le corollaire est que les deux listes doivent se recouvrir : un
+ * motif autorisé à sortir sans phrase à l'arrivée ferait lire au joueur le repli
+ * générique là où on sait quoi lui dire.
+ */
+describe("motifs de rattachement autorisés dans l'URL", () => {
+  it.each([...LINK_REFUSALS])("« %s » a sa phrase dans le registre du profil", (code) => {
+    expect(connectionErrorMessage(code)).not.toBe(connectionErrorMessage(UNKNOWN_CODE));
   });
 });

@@ -98,3 +98,34 @@ export function buildAccountConnections(
     };
   });
 }
+
+/**
+ * Les refus du **rattachement** — ceux qu'une URL a le droit de porter.
+ *
+ * Le rappel OAuth renvoie le motif dans `?connection_error=`, et `oauth-flow`
+ * y recopiait le message de l'erreur attrapée. Or le service ne lève pas que
+ * ses refus nommés : tout ce que `mysql2` fait remonter le traverse. Un
+ * `ER_LOCK_DEADLOCK` se retrouvait donc en toutes lettres dans la barre
+ * d'adresse, l'historique du navigateur, le `Referer` de la requête suivante et
+ * les journaux de chaque relais — sans que rien ne le signale à l'écran, le
+ * registre de l'interface retombant sur sa phrase générique.
+ *
+ * C'est la règle déjà tenue pour les toasts (« un repli qui ne laisse jamais
+ * sortir un jeton »), appliquée à une URL, qui voyage plus loin qu'un toast.
+ * La liste vit ici, avec les refus qu'elle énumère, et non dans le module
+ * serveur qui s'en sert : le registre français de `/profil` doit couvrir
+ * exactement ces codes-là, et un test le vérifie.
+ */
+export const LINK_REFUSALS: readonly string[] = [
+  "PROVIDER_ALREADY_LINKED",
+  "IDENTITY_ALREADY_LINKED",
+  "PROFILE_NOT_FOUND",
+  "NOT_CONFIGURED",
+  "OAUTH_FAILED",
+  "LINK_FAILED",
+];
+
+/** Ce motif peut-il être écrit dans l'URL de retour ? */
+export function isLinkRefusal(code: string | null | undefined): boolean {
+  return typeof code === "string" && LINK_REFUSALS.includes(code);
+}
