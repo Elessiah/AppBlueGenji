@@ -137,6 +137,20 @@ async function discordIdTakenByAnother(discordId: string, userId: number): Promi
 }
 
 /**
+ * Contrôle posé sur l'identifiant **une fois résolu**, avant qu'un message privé
+ * ne parte.
+ *
+ * C'est le seul moyen de plafonner sur le compte Discord *visé* : il n'est connu
+ * qu'après la résolution du tag, qui vit dans ce module. La route y met son
+ * plafond de débit ; qu'il lève est ce qui le rend effectif — appelé après
+ * l'envoi, il n'aurait plus rien à empêcher.
+ *
+ * Il n'est **pas** appelé sur le chemin sans code : une certification immédiate
+ * ne fait sonner aucun téléphone, il n'y a rien à protéger.
+ */
+export type ResolvedDiscordIdGuard = (discordId: string) => void;
+
+/**
  * Ouvre une certification pour `handle`.
  *
  * @throws INVALID_DISCORD_HANDLE Un identifiant numérique, une chaîne vide : il
@@ -152,6 +166,7 @@ async function discordIdTakenByAnother(discordId: string, userId: number): Promi
 export async function startDiscordVerification(
   userId: number,
   handle: string,
+  guardBeforeSend?: ResolvedDiscordIdGuard,
 ): Promise<VerificationStart> {
   const tag = normalizeDiscordHandle(handle);
   if (!tag) throw new Error("INVALID_DISCORD_HANDLE");
@@ -174,6 +189,10 @@ export async function startDiscordVerification(
     await writeVerifiedTag(userId, discordId, tag);
     return { status: "VERIFIED", tag };
   }
+
+  // **Avant le défi et avant l'envoi** : ce qui suit fait vibrer le téléphone de
+  // quelqu'un, et un plafond posé après n'aurait plus rien à refuser.
+  guardBeforeSend?.(discordId);
 
   const challenge = await createDiscordLoginChallenge(discordId, tag);
   try {

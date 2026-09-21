@@ -10,7 +10,11 @@ import {
   getDiscordAccountState,
   startDiscordVerification,
 } from "@/lib/server/discord-verification";
-import { DISCORD_VERIFY_TAG_RULE } from "@/lib/server/api-guard";
+import {
+  DISCORD_CODE_REQUEST_RULE,
+  DISCORD_VERIFY_CONFIRM_RULE,
+  DISCORD_VERIFY_TAG_RULE,
+} from "@/lib/server/api-guard";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 
 /**
@@ -55,6 +59,8 @@ function put(body: unknown) {
 beforeEach(() => {
   jest.clearAllMocks();
   resetRateLimit(DISCORD_VERIFY_TAG_RULE.name);
+  resetRateLimit(DISCORD_VERIFY_CONFIRM_RULE.name);
+  resetRateLimit(DISCORD_CODE_REQUEST_RULE.name);
   (getCurrentUser as jest.Mock).mockResolvedValue(USER as never);
 });
 
@@ -82,7 +88,9 @@ describe("POST — ouvrir la certification", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ status: "VERIFIED", tag: "keryan" });
-    expect(startMock).toHaveBeenCalledWith(7, "keryan");
+    // Le troisième argument est le garde posé sur l'identifiant résolu : la
+    // route y met son plafond par compte Discord visé, appelé avant l'envoi.
+    expect(startMock).toHaveBeenCalledWith(7, "keryan", expect.any(Function));
   });
 
   it("rend l'identifiant et l'échéance quand un code part", async () => {
@@ -105,7 +113,45 @@ describe("POST — ouvrir la certification", () => {
     startMock.mockRejectedValue(new Error("INVALID_DISCORD_HANDLE"));
 
     expect((await post({})).status).toBe(400);
-    expect(startMock).toHaveBeenCalledWith(7, "");
+    expect(startMock).toHaveBeenCalledWith(7, "", expect.any(Function));
+  });
+
+  it("refuse **avant** l'envoi quand le compte Discord visé a reçu trop de codes", async () => {
+    // Le garde est appelé par le service juste avant le message privé : c'est ce
+    // qui le rend effectif. Posé après l'envoi, il n'aurait rien empêché tout en
+    // vidant le seau que la page de connexion consulte, elle, avant d'envoyer.
+    startMock.mockImplementation(async (_userId, _handle, guard) => {
+      guard?.("900000000000000002");
+      return { status: "CODE_SENT", discordId: "900000000000000002", expiresAt: "x" };
+    });
+
+    for (let i = 0; i < DISCORD_CODE_REQUEST_RULE.limit; i += 1) {
+      expect((await post({ handle: "keryan" })).status).toBe(200);
+    }
+
+    const blocked = await post({ handle: "keryan" });
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toEqual({ error: "TOO_MANY_CODE_REQUESTS" });
+  });
+
+  it("ne charge pas le seau du compte visé quand aucun code ne part", async () => {
+    // Une certification immédiate ne fait sonner aucun téléphone : le seau du
+    // compte visé — celui que partage `/api/auth/discord/request` — ne doit pas
+    // s'en trouver entamé. C'est le service qui décide d'appeler le garde ou
+    // non ; on le rejoue ici, puis on vérifie que le quota d'envois est resté
+    // entier.
+    startMock.mockResolvedValue({ status: "VERIFIED", tag: "keryan" });
+    for (let i = 0; i < DISCORD_CODE_REQUEST_RULE.limit + 2; i += 1) {
+      expect((await post({ handle: "keryan" })).status).toBe(200);
+    }
+
+    startMock.mockImplementation(async (_userId, _handle, guard) => {
+      guard?.("900000000000000002");
+      return { status: "CODE_SENT", discordId: "900000000000000002", expiresAt: "x" };
+    });
+    for (let i = 0; i < DISCORD_CODE_REQUEST_RULE.limit; i += 1) {
+      expect((await post({ handle: "keryan" })).status).toBe(200);
+    }
   });
 
   it("plafonne par compte du site : la route est authentifiée", async () => {
@@ -125,6 +171,21 @@ describe("POST — ouvrir la certification", () => {
 });
 
 describe("PUT — confirmer avec le code", () => {
+  it("garde son propre seau : les essais de tag n'épuisent pas la confirmation", async () => {
+    // Partagé, le seau laissait les essais infructueux de la demande refuser la
+    // confirmation d'un code qui, lui, expire en dix minutes.
+    startMock.mockRejectedValue(new Error("DISCORD_USER_NOT_FOUND"));
+    for (let i = 0; i < DISCORD_VERIFY_TAG_RULE.limit + 2; i += 1) {
+      await post({ handle: "faute-de-frappe" });
+    }
+
+    confirmMock.mockResolvedValue({ tag: "keryan" });
+    const response = await put({ discordId: "900000000000000002", code: "123456" });
+
+    expect(response.status).toBe(200);
+  });
+
+
   it("certifie et rend le tag écrit", async () => {
     confirmMock.mockResolvedValue({ tag: "keryan" });
 

@@ -58,6 +58,10 @@ export const ERROR_MESSAGES: Record<string, string> = {
     "Ce tournoi demande que tous les joueurs de l'équipe aient certifié leur tag Discord (page Mon profil).",
   INVALID_DISCORD_REQUIREMENT: "Condition « Discord vérifié » invalide.",
   INVALID_MIN_PLAYERS: "Nombre de joueurs minimum invalide.",
+  // Repli du panneau de contacts : `mapError` rend le code lui-même quand il ne
+  // le connaît pas, et une réponse sans corps exploitable (502 d'un relais)
+  // afficherait sinon un jeton en capitales au joueur.
+  CONTACTS_LOAD_FAILED: "Impossible de charger les contacts. Réessaie dans un instant.",
   NOT_SURVIVAL: "Le forfait n'est disponible que pour les tournois en mode Survie.",
   // Formulations neutres : le forfait peut aussi être déclaré par l'arbitrage
   // pour une autre équipe que la sienne.

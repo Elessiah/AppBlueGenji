@@ -267,6 +267,26 @@ export const DISCORD_VERIFY_TAG_RULE: RateLimitRule = {
 };
 
 /**
+ * Confirmations d'une certification (le code saisi), **par compte du site**.
+ *
+ * Un seau **distinct** de celui de la demande, et ce n'est pas de la symétrie
+ * décorative : les deux gestes se suivent, et partager un seul seau laisse les
+ * essais du premier épuiser le quota du second. Un joueur qui se trompe dix fois
+ * de tag — chaque essai comptant, même quand la résolution échoue sans rien
+ * envoyer — se verrait alors refuser la confirmation d'un code qu'il vient de
+ * recevoir, et qui expire en dix minutes. La connexion Discord sépare ses deux
+ * règles pour exactement cette raison.
+ *
+ * Le décompte des essais, lui, reste porté par le code en base
+ * (`MAX_DISCORD_CODE_ATTEMPTS`) : ce plafond-ci ne borne que le bruit.
+ */
+export const DISCORD_VERIFY_CONFIRM_RULE: RateLimitRule = {
+  name: "discord-verify-confirm",
+  limit: 10,
+  windowMs: 15 * 60_000,
+};
+
+/**
  * Applique un plafond. Renvoie la réponse 429 à retourner tel quel, ou `null`
  * si la requête peut continuer.
  *

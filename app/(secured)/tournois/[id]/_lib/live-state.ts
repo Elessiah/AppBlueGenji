@@ -129,7 +129,7 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
     detail: {
       ...message.snapshot,
       ...viewer,
-      canRegister: canRegisterIn(message.snapshot, viewer.myTeamId, viewer.canRegisterEntrant),
+      canRegister: canRegisterIn(message.snapshot, viewer),
     },
   };
 }
@@ -142,21 +142,25 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
  * d'elles-mêmes, dans les deux sens. Le bouton reste évidemment sous le contrôle
  * du serveur — c'est lui qui accepte ou refuse l'inscription.
  */
-function canRegisterIn(
-  snapshot: TournamentSnapshot,
-  myTeamId: number | null,
-  canRegisterEntrant: boolean,
-): boolean {
+function canRegisterIn(snapshot: TournamentSnapshot, viewer: TournamentViewerContext): boolean {
   if (snapshot.card.state !== "REGISTRATION") return false;
   // Qualité pour engager (`OWNER`/`MANAGER`) : elle vient du contexte du
   // lecteur et se rejoue telle quelle — l'instantané ne connaît pas les rosters.
-  if (!canRegisterEntrant) return false;
-  if (myTeamId !== null && snapshot.registrations.some((row) => row.teamId === myTeamId)) {
+  if (!viewer.canRegisterEntrant) return false;
+  // **Les conditions d'inscription aussi**, et pour la même raison : elles se
+  // jugent sur le roster. Les oublier ici rouvrait le bouton au premier
+  // instantané suivant la connexion — un autre engagé s'inscrit, un score est
+  // saisi —, et le clic partait alors droit sur un 409.
+  if (viewer.registrationBlock) return false;
+  if (
+    viewer.myTeamId !== null &&
+    snapshot.registrations.some((row) => row.teamId === viewer.myTeamId)
+  ) {
     return false;
   }
   // En individuel, un joueur sans entrée solo peut s'inscrire : elle sera créée
   // à ce moment-là.
-  return isSoloTournament(snapshot.card.participantType) || myTeamId !== null;
+  return isSoloTournament(snapshot.card.participantType) || viewer.myTeamId !== null;
 }
 
 function awaitingConfirmationIds(matches: BracketMatch[], teamId: number | null): Set<number> {

@@ -276,3 +276,58 @@ describe("getDiscordAccountState", () => {
     });
   });
 });
+
+/**
+ * Le garde posé sur l'identifiant résolu.
+ *
+ * C'est par lui que la route plafonne le compte Discord **visé** — celui dont le
+ * téléphone sonne. Il ne peut être appelé qu'ici : l'identifiant n'est connu
+ * qu'après la résolution du tag, et le plafond doit tomber **avant** l'envoi,
+ * sinon il ne refuse rien.
+ */
+describe("startDiscordVerification — le garde d'avant-envoi", () => {
+  it("est appelé avec l'identifiant résolu, avant le défi et avant l'envoi", async () => {
+    fakeDb({ ...GOOGLE_ACCOUNT });
+    resolveMock.mockResolvedValue("900000000000000002");
+    const order: string[] = [];
+    createChallengeMock.mockImplementation(async () => {
+      order.push("défi");
+      return { challengeId: 77, code: "123456", expiresAt: new Date() };
+    });
+    sendMock.mockImplementation(async () => {
+      order.push("envoi");
+    });
+
+    await startDiscordVerification(7, "keryan", (discordId) => {
+      order.push(`garde:${discordId}`);
+    });
+
+    expect(order).toEqual(["garde:900000000000000002", "défi", "envoi"]);
+  });
+
+  it("laisse son refus remonter, sans créer de défi ni envoyer quoi que ce soit", async () => {
+    fakeDb({ ...GOOGLE_ACCOUNT });
+    resolveMock.mockResolvedValue("900000000000000002");
+
+    await expect(
+      startDiscordVerification(7, "keryan", () => {
+        throw new Error("TOO_MANY_CODE_REQUESTS");
+      }),
+    ).rejects.toThrow("TOO_MANY_CODE_REQUESTS");
+
+    expect(createChallengeMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it("n'est pas appelé sur le chemin sans code : personne n'est dérangé", async () => {
+    // Une certification immédiate ne fait sonner aucun téléphone — charger le
+    // seau du compte visé fermerait sa connexion Discord pour rien.
+    fakeDb({ ...LINKED_ACCOUNT });
+    resolveMock.mockResolvedValue("900000000000000001");
+    const guard = jest.fn();
+
+    await startDiscordVerification(7, "keryan", guard);
+
+    expect(guard).not.toHaveBeenCalled();
+  });
+});

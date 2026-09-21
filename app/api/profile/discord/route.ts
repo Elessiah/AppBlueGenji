@@ -14,6 +14,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import {
   DISCORD_CODE_REQUEST_RULE,
+  DISCORD_VERIFY_CONFIRM_RULE,
   DISCORD_VERIFY_TAG_RULE,
   enforceRateLimit,
 } from "@/lib/server/api-guard";
@@ -83,16 +84,21 @@ export async function POST(req: Request) {
 
   try {
     const body = (await req.json()) as { handle?: string };
-    const result = await startDiscordVerification(user.id, body.handle ?? "");
 
-    // Le plafond par **compte Discord visé** n'est posé qu'ici, et seulement
-    // quand un message privé est parti : c'est le téléphone de quelqu'un qu'il
-    // protège, et une certification sans code ne fait sonner personne. Posé
-    // après l'envoi, il borne le rythme des appels **suivants** — l'envoi en
-    // cours a déjà été compté en base (`MAX_DISCORD_CODES_PER_WINDOW`).
-    if (result.status === "CODE_SENT") {
-      enforceRateLimit(DISCORD_CODE_REQUEST_RULE, result.discordId);
-    }
+    // Le plafond par **compte Discord visé** — celui qui protège le téléphone de
+    // quelqu'un — ne peut être posé qu'une fois le tag résolu, et il doit
+    // **refuser** : d'où un garde passé au service, appelé juste avant l'envoi.
+    // Posé après, il n'aurait rien empêché tout en vidant le seau que
+    // `/api/auth/discord/request` consulte, lui, avant d'envoyer — de quoi
+    // fermer la connexion Discord du compte visé sans jamais freiner celle-ci.
+    //
+    // Il n'est pas consulté sur le chemin sans code : une certification
+    // immédiate ne fait sonner personne.
+    const result = await startDiscordVerification(user.id, body.handle ?? "", (discordId) => {
+      if (enforceRateLimit(DISCORD_CODE_REQUEST_RULE, discordId)) {
+        throw new Error("TOO_MANY_CODE_REQUESTS");
+      }
+    });
 
     return ok(result);
   } catch (error) {
@@ -105,7 +111,10 @@ export async function PUT(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
 
-  const throttled = enforceRateLimit(DISCORD_VERIFY_TAG_RULE, user.id);
+  // Seau **distinct** de celui de la demande : partagé, les essais de tag
+  // infructueux épuiseraient le quota de la confirmation, et un joueur se
+  // verrait refuser le code qu'il vient de recevoir.
+  const throttled = enforceRateLimit(DISCORD_VERIFY_CONFIRM_RULE, user.id);
   if (throttled) return throttled;
 
   try {

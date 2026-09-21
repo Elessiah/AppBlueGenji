@@ -259,6 +259,7 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     pseudo: "DiscordCertifie",
     purpose: "tag Discord certifié (visible aux admins, aux arbitres en tournoi)",
     isAdult: 1,
+    discordId: "900000000000000003",
     discordTag: "tag_prouve",
     discordVerified: true,
   },
@@ -501,13 +502,20 @@ async function createUsers(db: Pool): Promise<number[]> {
     // à essayer — tandis qu'un jeu où tout le monde l'est ne montrerait jamais
     // le refus. Le motif est déterministe, donc le seed reste reproductible.
     const discordVerified = index % 3 !== 2;
+    // **Un tag certifié implique un identifiant prouvé** : `writeVerifiedTag`
+    // écrit toujours les deux ensemble, et un compte certifié sans `discord_id`
+    // est un état que la production ne sait pas produire — le jeu de test
+    // donnerait à relire un cas qui n'existe nulle part. L'identifiant est
+    // synthétique mais unique (la colonne l'exige) et hors des plages utilisées
+    // par les comptes spéciaux.
+    const discordId = discordVerified ? `9010000000000${String(index).padStart(5, "0")}` : null;
     try {
       const [result] = await db.execute<ResultSetHeader>(
         `INSERT INTO bg_users
-         (pseudo, overwatch_battletag, marvel_rivals_tag, discord_pseudo, discord_verified_at,
+         (pseudo, overwatch_battletag, marvel_rivals_tag, discord_id, discord_pseudo, discord_verified_at,
           visible_avatar, visible_pseudo, visible_overwatch, visible_marvel, is_adult)
-         VALUES (?, ?, ?, ?, ${discordVerified ? "NOW()" : "NULL"}, 1, 1, 1, 1, 1)`,
-        [pseudo, player.battletag, player.marvelTag, player.pseudo.toLowerCase()]
+         VALUES (?, ?, ?, ?, ?, ${discordVerified ? "NOW()" : "NULL"}, 1, 1, 1, 1, 1)`,
+        [pseudo, player.battletag, player.marvelTag, discordId, player.pseudo.toLowerCase()]
       );
       userIds.push(result.insertId as number);
     } catch (error) {
