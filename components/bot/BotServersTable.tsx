@@ -33,30 +33,33 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
         <span className="title">Serveurs connectés</span>
         <span className="meta">{list.length} ACTIFS · TRIÉS PAR ACTIVITÉ 30J</span>
       </div>
-      <div className="srv-table">
-        <div className="srv-head">
-          <span>#</span>
-          <span>SERVEUR</span>
-          <span style={{ textAlign: "right" }}>MEMBRES</span>
-          <span style={{ textAlign: "right" }}>RELAIS 30J</span>
-          <span style={{ textAlign: "right" }}>RELAIS</span>
-          <span style={{ textAlign: "right" }}>TENDANCE</span>
+      {/* Une grille de `div` reste un tableau pour qui le lit : sans ces rôles,
+          un lecteur d'écran annonce une suite de textes sans jamais dire de
+          quelle colonne ils viennent. */}
+      <div className="srv-table" role="table" aria-label="Serveurs connectés au bot">
+        <div className="srv-head" role="row">
+          <span role="columnheader">#</span>
+          <span role="columnheader">SERVEUR</span>
+          <span role="columnheader" style={{ textAlign: "right" }}>MEMBRES</span>
+          <span role="columnheader" style={{ textAlign: "right" }}>RELAIS 30J</span>
+          <span role="columnheader" style={{ textAlign: "right" }}>RELAIS</span>
+          <span role="columnheader" style={{ textAlign: "right" }}>TENDANCE</span>
         </div>
         {list.map((s, rank) => (
-          <div key={s.id} className="srv-row">
-            <span className="srv-rank">{String(rank + 1).padStart(2, "0")}</span>
-            <span className="srv-name">
+          <div key={s.id} className="srv-row" role="row">
+            <span className="srv-rank" role="cell">{String(rank + 1).padStart(2, "0")}</span>
+            <span className="srv-name" role="cell">
               <span className="srv-sigil" style={{ "--c": s.accentColor } as React.CSSProperties}>
                 {s.sigil}
               </span>
               {s.name}
             </span>
-            <span className="srv-num">{s.memberCount.toLocaleString("fr-FR")}</span>
-            <span className="srv-num">{s.relays30j}</span>
-            <span className={"srv-status " + s.status} title={STATUS_HINT[s.status]}>
+            <span className="srv-num" role="cell">{s.memberCount.toLocaleString("fr-FR")}</span>
+            <span className="srv-num" role="cell">{s.relays30j}</span>
+            <span className={"srv-status " + s.status} role="cell" title={STATUS_HINT[s.status]}>
               {STATUS_LABEL[s.status]}
             </span>
-            <span className="srv-spark">
+            <span className="srv-spark" role="cell" aria-hidden="true">
               {s.sparkline.map((v, i) => (
                 <span key={i} style={{ height: `${(v / Math.max(...s.sparkline, 1)) * 100}%` }} />
               ))}
