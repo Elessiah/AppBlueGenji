@@ -43,14 +43,21 @@ export type DiscordUserInfo = {
 /**
  * L'application Discord utilisée pour la connexion.
  *
- * Par défaut **celle du bot** (`DISCORD_BOT_CLIENT_ID`, déjà réglée pour le lien
- * d'invitation) : un seul écran de consentement au nom de BlueGenji, une seule
- * application à surveiller. `DISCORD_CLIENT_ID` permet d'en séparer une seconde
- * si le besoin s'en présentait, sans rien changer ailleurs.
+ * **Deux noms, et pas trois.** `DISCORD_AUTH_CLIENT_ID` est celui qu'on règle :
+ * il dit *à quoi sert* l'identifiant, là où `DISCORD_BOT_CLIENT_ID` — documenté
+ * comme celui du lien d'invitation du bot — ne le dirait que par un repli qu'il
+ * faut connaître. Ce repli reste, parce qu'en pratique c'est la **même**
+ * application qui invite le bot et ouvre les sessions : un seul écran de
+ * consentement au nom de BlueGenji, une seule application à surveiller, et une
+ * installation qui n'a réglé que la variable du bot continue de fonctionner.
+ *
+ * Poser `DISCORD_AUTH_CLIENT_ID` permet d'en séparer une seconde le jour où le
+ * besoin s'en présente, sans rien changer ailleurs.
  */
 export function getDiscordClientId(): string {
-  const value = process.env.DISCORD_CLIENT_ID?.trim() || process.env.DISCORD_BOT_CLIENT_ID?.trim();
-  if (!value) throw new Error("Missing DISCORD_CLIENT_ID");
+  const value =
+    process.env.DISCORD_AUTH_CLIENT_ID?.trim() || process.env.DISCORD_BOT_CLIENT_ID?.trim();
+  if (!value) throw new Error("Missing DISCORD_AUTH_CLIENT_ID");
   return value;
 }
 

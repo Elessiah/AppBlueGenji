@@ -186,8 +186,8 @@ rattachement aboutit quand même.
 ## Configuration
 
 ```env
-# Discord — par défaut l'application du bot (DISCORD_BOT_CLIENT_ID)
-DISCORD_CLIENT_ID=            # facultatif : sépare une seconde application
+# Discord — la même application que le bot en pratique
+DISCORD_AUTH_CLIENT_ID=       # app de connexion ; à défaut, DISCORD_BOT_CLIENT_ID
 DISCORD_CLIENT_SECRET=        # obligatoire
 DISCORD_REDIRECT_URI=         # facultatif : déduit d'APP_URL
 

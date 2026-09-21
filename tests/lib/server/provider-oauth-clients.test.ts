@@ -37,24 +37,34 @@ afterEach(() => {
 });
 
 describe("Discord — configuration", () => {
-  it("reprend l'application du bot par défaut", () => {
-    // Une seule application à surveiller, un seul écran de consentement au nom
-    // de BlueGenji.
-    delete process.env.DISCORD_CLIENT_ID;
+  it("retombe sur l'application du bot quand elle seule est réglée", () => {
+    // En pratique c'est la même application qui invite le bot et ouvre les
+    // sessions : une installation qui n'a que la variable du bot fonctionne.
+    delete process.env.DISCORD_AUTH_CLIENT_ID;
     process.env.DISCORD_BOT_CLIENT_ID = "bot-app";
     expect(getDiscordClientId()).toBe("bot-app");
   });
 
-  it("laisse en séparer une seconde", () => {
-    process.env.DISCORD_CLIENT_ID = "app-connexion";
+  it("préfère `DISCORD_AUTH_CLIENT_ID`, qui dit à quoi il sert", () => {
+    process.env.DISCORD_AUTH_CLIENT_ID = "app-connexion";
     process.env.DISCORD_BOT_CLIENT_ID = "bot-app";
     expect(getDiscordClientId()).toBe("app-connexion");
   });
 
-  it("lève un refus nommé quand rien n'est réglé", () => {
-    delete process.env.DISCORD_CLIENT_ID;
+  it("ignore l'ancien nom, pour qu'il n'y ait pas trois variables pour une valeur", () => {
+    // `DISCORD_CLIENT_ID` a été remplacée avant d'avoir jamais été réglée : la
+    // laisser vivre en parallèle donnerait un troisième nom pour la même chose,
+    // et une installation qui règle le mauvais n'aurait aucun message.
+    delete process.env.DISCORD_AUTH_CLIENT_ID;
     delete process.env.DISCORD_BOT_CLIENT_ID;
-    expect(() => getDiscordClientId()).toThrow("Missing DISCORD_CLIENT_ID");
+    process.env.DISCORD_CLIENT_ID = "ancien-nom";
+    expect(() => getDiscordClientId()).toThrow("Missing DISCORD_AUTH_CLIENT_ID");
+  });
+
+  it("lève un refus nommé quand rien n'est réglé", () => {
+    delete process.env.DISCORD_AUTH_CLIENT_ID;
+    delete process.env.DISCORD_BOT_CLIENT_ID;
+    expect(() => getDiscordClientId()).toThrow("Missing DISCORD_AUTH_CLIENT_ID");
   });
 
   it("déduit l'adresse de rappel d'`APP_URL`, sans barre en trop", () => {
@@ -64,7 +74,7 @@ describe("Discord — configuration", () => {
   });
 
   it("demande `identify`, et rien d'autre", () => {
-    process.env.DISCORD_CLIENT_ID = "app";
+    process.env.DISCORD_AUTH_CLIENT_ID = "app";
     process.env.DISCORD_REDIRECT_URI = "https://bluegenji.test/api/auth/discord/callback";
 
     const url = buildDiscordAuthorizationUrl("state-token");
@@ -106,7 +116,7 @@ describe("Discord — avatar", () => {
 
 describe("Discord — échange du code", () => {
   const configure = () => {
-    process.env.DISCORD_CLIENT_ID = "app";
+    process.env.DISCORD_AUTH_CLIENT_ID = "app";
     process.env.DISCORD_CLIENT_SECRET = "secret";
     process.env.DISCORD_REDIRECT_URI = "https://bluegenji.test/api/auth/discord/callback";
   };
