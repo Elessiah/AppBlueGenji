@@ -706,6 +706,30 @@
   letter-spacing: -0.01em;
   text-align: center;
 }
+/* Compte anonymisé : la carte reste lisible — on la consulte pour remonter un
+   ancien match — mais elle ne doit pas se confondre avec un joueur qu'on peut
+   encore contacter. En retrait, donc, et nommée. */
+.plCardDeleted {
+  opacity: 0.55;
+  filter: saturate(0.35);
+}
+
+.plCardDeleted:hover,
+.plCardDeleted:focus-within {
+  opacity: 0.85;
+  filter: none;
+}
+
+.plDeletedMark {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  text-align: center;
+  margin-top: 2px;
+}
+
 .plTeam {
   font-family: var(--font-mono);
   font-size: 9px;

@@ -41,7 +41,10 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
   const teamColor = player.team ? getPaletteColor(player.team.colorIndex) : "var(--ink-mute)";
 
   return (
-    <article className={s.plCard} style={{ "--c": teamColor } as React.CSSProperties}>
+    <article
+      className={`${s.plCard} ${player.isDeleted ? s.plCardDeleted : ""}`}
+      style={{ "--c": teamColor } as React.CSSProperties}
+    >
       <Link
         href={`/joueurs/${player.id}`}
         className={s.cardOverlay}
@@ -63,6 +66,7 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
           </div>
         </div>
         <div className={s.plPseudo}>{player.pseudo}</div>
+        {player.isDeleted && <div className={s.plDeletedMark}>Compte supprimé</div>}
         <div className={s.plTeam}>
           {player.team ? (
             <>
