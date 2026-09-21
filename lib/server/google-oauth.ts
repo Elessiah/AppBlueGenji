@@ -1,14 +1,15 @@
-﻿export type GoogleUserInfo = {
+﻿/**
+ * Ce que l'`userinfo` de Google rend, et ce que le site en lit.
+ *
+ * **L'adresse n'y figure plus**, parce qu'elle n'est plus demandee : le scope
+ * est `openid profile`, sans `email`. Elle n'avait qu'un usage — rattacher une
+ * identite Google neuve a un compte du site sur l'egalite de la chaine —, et ce
+ * rattachement a disparu au profit de la section « Applications connectees » du
+ * profil, ou le joueur est deja connecte quand il ajoute un fournisseur. Une
+ * colonne d'adresses qu'aucun code ne lit n'est plus qu'une surface de fuite.
+ */
+export type GoogleUserInfo = {
   sub: string;
-  email?: string;
-  /**
-   * Google a-t-il vérifié cette adresse ?
-   *
-   * Le champ est renvoye par `userinfo` et etait jete : voir
-   * `createOrGetGoogleUser`, qui refuse desormais de rattacher un `sub` neuf a
-   * un compte existant sans lui.
-   */
-  email_verified?: boolean;
   name?: string;
   picture?: string;
 };
@@ -41,7 +42,7 @@ export function buildGoogleAuthorizationUrl(state: string): string {
     client_id: requireGoogleEnv("GOOGLE_CLIENT_ID"),
     redirect_uri: getGoogleRedirectUri(),
     response_type: "code",
-    scope: "openid profile email",
+    scope: "openid profile",
     access_type: "online",
     include_granted_scopes: "true",
     prompt: "select_account",

@@ -702,6 +702,23 @@ async function runMigrations(db: Pool): Promise<void> {
     // Column already exists
   }
 
+  // Migration: identifiant Battle.net, troisième porte d'entrée du site aux
+  // côtés de `google_sub` et `discord_id` — et rangée comme elles, en colonne
+  // **unique** sur `bg_users` plutôt que dans une table d'identités. Un compte
+  // du site n'a qu'une identité par fournisseur, et c'est l'unicité de la
+  // colonne qui tranche la course entre deux comptes qui rattacheraient le même
+  // Battle.net au même instant (le `SELECT` préalable ne donne que le refus
+  // lisible). Le BattleTag, lui, n'a pas de colonne à part : il **est** le
+  // `overwatch_battletag` du profil, que la connexion Blizzard réécrit.
+  try {
+    await db.execute(`
+      ALTER TABLE bg_users
+      ADD COLUMN blizzard_sub VARCHAR(191) NULL UNIQUE
+    `);
+  } catch {
+    // Column already exists
+  }
+
   // Migration: Rôles de permission cumulables (ARBITRE, COMMUNITY_MANAGER,
   // RECRUTEUR). Le rôle ADMIN reste porté par la colonne `is_admin`.
   try {

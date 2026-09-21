@@ -97,36 +97,69 @@ pouvoir sur la plateforme.
   n'est invalidé *avant* l'envoi, pour la même raison inverse : l'ancien tué et
   le neuf jamais reçu laissaient le joueur sans rien du tout.
 
-- **Un compte ne se revendique que sur une adresse vérifiée.** La connexion
-  Google rattache une identité neuve (`google_sub` inconnu) à un compte du site
-  sur la seule **égalité de chaîne** de l'adresse e-mail. Sans consulter
-  `email_verified` — que l'`userinfo` de Google renvoie et qu'on jetait —, il
-  suffisait d'obtenir une identité Google affirmant l'adresse d'un membre pour
-  ouvrir sa session en un clic : ni code, ni plafond, ni courriel de
-  confirmation. C'était le chemin d'entrée le plus court du site, plus court que
-  la force brute sur le code Discord, et le seul qui ne demandait aucun secret.
+- **Trois portes, et aucune ne se revendique par une adresse.** Le compte n'a
+  pas de mot de passe : il s'ouvre par une identité OAuth rattachée — `google_sub`,
+  `discord_id`, `blizzard_sub` — et, pour Discord, par le code reçu en message
+  privé, qui passe par le *même* `discord_id`. Chaque colonne est donc une porte
+  d'entrée, et `lib/server/account-identities.ts` en porte les deux règles.
 
-  La règle tient en une phrase : **`bg_users.email` ne contient qu'une adresse
-  vérifiée**, et un seul endroit en décide (`verifiedEmail`, dans
-  `createOrGetGoogleUser`). Le corollaire n'est pas décoratif — la colonne est
-  **unique** : y écrire une adresse non vérifiée détenue par quelqu'un d'autre ne
-  la volait pas, elle faisait échouer l'insertion, `ER_DUP_ENTRY` avalé en
-  `/connexion?error=oauth` à chaque essai. Une identité non vérifiée pouvait donc
-  ni revendiquer un compte (ce qui est voulu) ni s'en créer un (ce qui ne l'est
-  pas) ; elle en crée un désormais, simplement sans adresse. `emailVerified` est
-  un champ **obligatoire** de `GoogleProfilePayload` : facultatif, un appelant
-  qui l'oublie ferait tomber la preuve à « absente », et chaque connexion d'un
-  compte dont le `sub` n'est pas encore enregistré créerait un **doublon** —
-  équipe, historique et rôles laissés derrière, sans le moindre message.
+  **On ne déplace jamais une porte.** Un compte dont l'identité d'un fournisseur
+  est posée la garde : y rattacher une autre identité du même fournisseur est
+  refusé (`PROVIDER_ALREADY_LINKED`), plutôt que de faire glisser l'identité de
+  connexion d'un compte à un autre. C'est la règle que la certification Discord
+  appliquait déjà sous le nom `DISCORD_ID_MISMATCH`, énoncée pour les trois.
+  Symétriquement, une identité déjà détenue par un autre compte du site est
+  refusée (`IDENTITY_ALREADY_LINKED`) : le `SELECT` donne le refus lisible,
+  l'index unique de la colonne tranche la course.
 
-  **Le revers, assumé :** qui connaît le pseudo Discord d'un joueur peut brûler
-  ses codes et épuiser ses quotas, donc le tenir hors de son compte par fenêtres
-  d'un quart d'heure. C'est le prix de tout plafonnement d'un code à usage
-  unique, et il est très inférieur à celui d'une session ouverte par énumération
-  — mais il est réel : un compte né par Discord n'a pas d'autre voie d'entrée.
-  Les bornes sont donc réglées assez haut pour qu'un usage normal ne s'en
-  approche jamais, et chaque demande laisse une trace chez la victime, qui reçoit
-  le message privé.
+  **On ne mure jamais la dernière.** Détacher le seul moyen de connexion ne
+  délie pas un compte, il le **ferme** — définitivement, le site n'ayant aucune
+  récupération par courriel. Le refus vit dans le module pur
+  (`lib/shared/account-connections.ts`), partagé par l'écran qui met une phrase à
+  la place du bouton et par la route qui répond **409** (et non 403 : la demande
+  est légitime, c'est l'état du compte qui s'y oppose).
+
+  **Ce que cela remplace.** La connexion Google rattachait une identité neuve
+  (`google_sub` inconnu) à un compte du site sur la seule **égalité de chaîne**
+  de l'adresse e-mail. Contrôler `email_verified` avait rendu ce rattachement
+  honnête — sans lui, obtenir une identité Google affirmant l'adresse d'un membre
+  ouvrait sa session en un clic, sans code ni plafond, le chemin d'entrée le plus
+  court du site. Il restait que le site décidait qu'une adresse *est* une
+  personne, sur la foi d'un fournisseur dont il n'est pas l'émetteur.
+
+  Le geste que ce rattachement rendait — « j'entre par Discord, je veux aussi
+  entrer par Google » — se fait désormais là où il se prouve tout seul :
+  `/profil`, section « Applications connectées », où le joueur est **déjà
+  connecté** quand il rattache, ce qui vaut mieux qu'une adresse. Une identité
+  inconnue ouvre donc un compte neuf, et rien d'autre.
+
+  **Corollaire : le site ne collecte plus d'adresse.** Le scope `email` a
+  disparu de la demande faite à Google, et `bg_users.email` n'a plus aucun
+  lecteur. Privée de son unique usage, une colonne d'adresses ne pesait plus que
+  d'un côté — c'est ce qu'une fuite fait le plus regretter. Discord est demandé
+  en `identify` seul, Blizzard en `openid` seul : ni adresse, ni liste de
+  serveurs. Les lignes écrites avant cette règle gardent leur adresse jusqu'à
+  purge (voir `ERREUR.txt`).
+
+  **L'intention d'un aller-retour est scellée à l'aller.** `LOGIN` ouvre une
+  session, `LINK` rattache au compte connecté ; la valeur vit dans le cookie
+  d'état, jamais dans l'URL du rappel — lue là, elle serait choisie par
+  l'appelant, et un `intent` retourné en `LOGIN` transformerait un rattachement
+  en changement de session. La session est relue **au retour** aussi : dix
+  minutes séparent les deux, et rattacher sur la seule foi du cookie poserait une
+  porte d'entrée sur un compte que plus rien ne prouve être celui de l'appelant.
+  Le cookie porte aussi le **fournisseur** : unique pour les trois portes, c'est
+  le seul contrôle qui empêche un état obtenu sur l'une d'être reçu sur une
+  autre.
+
+  **Le revers du plafonnement, assumé :** qui connaît le pseudo Discord d'un
+  joueur peut brûler ses codes et épuiser ses quotas, donc le tenir hors du
+  chemin « code par message privé » par fenêtres d'un quart d'heure. C'est le
+  prix de tout plafonnement d'un code à usage unique, très inférieur à celui
+  d'une session ouverte par énumération — et il s'est allégé : un compte né par
+  Discord garde désormais la porte **OAuth Discord**, qui ne dépend ni du bot ni
+  d'un message privé. Chaque demande laisse par ailleurs une trace chez la
+  victime, qui reçoit le message.
 
 ### 1.2 Les six permissions
 

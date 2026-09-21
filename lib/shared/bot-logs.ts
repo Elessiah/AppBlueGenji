@@ -26,6 +26,7 @@
  * résolution des noms vivent dans `lib/server/tournaments/bot-logs.ts`.
  */
 import { matchRoundLabel, formatMatchStart } from "./discord-notifications";
+import { OAUTH_PROVIDER_LABELS, type OAuthProvider } from "./oauth-providers";
 import { participantWording, type ParticipantType } from "./participants";
 import { formatLabel, gameLabel } from "./tournament-labels";
 import type { TournamentFormat, TournamentGame } from "./types";
@@ -103,19 +104,22 @@ function leadOn(emoji: string, kind: string, subject: string): string {
 /**
  * Voie par laquelle un compte vient de naître.
  *
- * Les deux que `/connexion` propose, et il n'y en a pas de troisième : le compte
+ * Toutes celles que `/connexion` propose, et il n'y en a pas d'autre : le compte
  * se crée à la première connexion, jamais par un formulaire d'inscription. La
  * voie figure sur la ligne parce qu'elle décide de ce qu'on peut faire du
  * compte ensuite — un compte né par Discord porte un identifiant Discord, donc
  * reçoit les rappels de match en message privé ; un compte né par Google n'en a
- * aucun tant que le joueur ne l'a pas renseigné sur `/profil`.
+ * aucun tant que le joueur ne l'a pas rattaché depuis `/profil`.
+ *
+ * C'est **la liste des fournisseurs OAuth, sans copie** : une seconde énumération
+ * ici aurait oublié Blizzard le jour de son ajout, et la ligne du journal aurait
+ * nommé une voie au hasard sans qu'aucun test ne s'en aperçoive — le type
+ * l'aurait pourtant refusée à la compilation, ce qui est exactement ce qu'on
+ * obtient en partageant le type.
  */
-export type PlayerSignupProvider = "GOOGLE" | "DISCORD";
+export type PlayerSignupProvider = OAuthProvider;
 
-const SIGNUP_PROVIDER_LABELS: Record<PlayerSignupProvider, string> = {
-  GOOGLE: "Google",
-  DISCORD: "Discord",
-};
+const SIGNUP_PROVIDER_LABELS: Record<PlayerSignupProvider, string> = OAUTH_PROVIDER_LABELS;
 
 /**
  * Inscription d'un joueur : un compte vient d'être créé sur le site.
@@ -128,9 +132,9 @@ const SIGNUP_PROVIDER_LABELS: Record<PlayerSignupProvider, string> = {
  *
  * Elle reste **une par compte**, pas une par connexion : la rédaction est
  * appelée depuis l'insertion elle-même (`lib/server/users-service.ts`), donc un
- * habitué qui se reconnecte chaque soir n'écrit rien, et un compte existant
- * auquel Google se rattache par son adresse vérifiée non plus — ce n'est pas un
- * joueur de plus.
+ * habitué qui se reconnecte chaque soir n'écrit rien, et un joueur qui rattache
+ * un second fournisseur depuis `/profil` non plus — ce n'est pas un joueur de
+ * plus.
  *
  * L'identifiant suit le pseudo, comme partout : un pseudo se change depuis
  * `/profil`, et la ligne doit rester rapprochable de `/joueurs/<id>` des mois

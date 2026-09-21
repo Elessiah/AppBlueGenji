@@ -125,14 +125,18 @@ describe("câblage des trois portes", () => {
     expect(page).not.toMatch(/params\.get\("redirect"\) \|\|/);
   });
 
+  // Les deux portes OAuth vivent désormais dans un module unique, partagé par
+  // les trois fournisseurs (`lib/server/oauth-flow.ts`) : c'est lui qu'on lit,
+  // et non six routes de cinq lignes qui ne font que le nommer. Une copie par
+  // fournisseur aurait justement pu oublier l'un des deux filtrages.
   it("l'aller OAuth filtre avant d'écrire le cookie d'état", () => {
-    const start = source(join("app", "api", "auth", "google", "start", "route.ts"));
-    expect(start).toMatch(/safeRedirectPath\(req\.nextUrl\.searchParams\.get\("redirect"\)\)/);
+    const flow = source(join("lib", "server", "oauth-flow.ts"));
+    expect(flow).toMatch(/safeRedirectPath\(req\.nextUrl\.searchParams\.get\("redirect"\)\)/);
   });
 
   it("le retour OAuth filtre de nouveau ce qu'il lit du cookie", () => {
-    const callback = source(join("app", "api", "auth", "google", "callback", "route.ts"));
-    expect(callback).toMatch(/safeRedirectPath\(cookieState\.redirectTo\)/);
-    expect(callback).not.toMatch(/cookieState\.redirectTo \|\|/);
+    const flow = source(join("lib", "server", "oauth-flow.ts"));
+    expect(flow).toMatch(/safeRedirectPath\(saved\.redirectTo/);
+    expect(flow).not.toMatch(/new URL\(saved\.redirectTo/);
   });
 });

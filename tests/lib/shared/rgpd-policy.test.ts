@@ -16,10 +16,41 @@ describe("DONNEES_PROFIL", () => {
     expect(names).toContain("Pseudo Marvel Rivals");
     expect(names).toContain("Avatar");
     expect(names).toContain("Certification du pseudo Discord");
+    // Les trois portes d'entrée du compte. Ce sont des **moyens de connexion**
+    // avant d'être des identifiants techniques : le déclarer est la condition
+    // pour que « on ne peut pas retirer le dernier » ait un sens pour le
+    // lecteur.
+    expect(names).toContain("Identifiant Google");
+    expect(names).toContain("Identifiant Blizzard");
   });
 
-  it("has exactly 7 entries", () => {
-    expect(DONNEES_PROFIL).toHaveLength(7);
+  it("has exactly 9 entries", () => {
+    expect(DONNEES_PROFIL).toHaveLength(9);
+  });
+
+  it("déclare chaque identité OAuth comme un moyen de connexion retirable", () => {
+    for (const donnee of ["ID Discord", "Identifiant Google", "Identifiant Blizzard"]) {
+      const entry = DONNEES_PROFIL.find((d) => d.donnee === donnee);
+      expect(entry?.finalite).toMatch(/moyen de connexion/i);
+      expect(entry?.finalite).toMatch(/retirable/i);
+    }
+  });
+
+  it("ne déclare **aucune** adresse e-mail, qui n'est plus collectée", () => {
+    // Le scope `email` a disparu de la demande faite à Google et plus rien ne
+    // rattache un compte par son adresse : déclarer une collecte qui n'a plus
+    // lieu serait aussi faux que taire celle qui a lieu.
+    const google = DONNEES_PROFIL.find((d) => d.donnee === "Identifiant Google");
+    expect(google?.finalite).toMatch(/sans adresse/i);
+    expect(DONNEES_PROFIL.map((d) => d.donnee)).not.toContain("Adresse e-mail");
+  });
+
+  it("dit que Blizzard renseigne le BattleTag, qu'il écrase à chaque connexion", () => {
+    // Sans cette phrase, un joueur qui voit sa saisie changer ne peut pas savoir
+    // pourquoi.
+    const overwatch = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch");
+    expect(overwatch?.finalite).toMatch(/Blizzard/);
+    expect(overwatch?.finalite).toMatch(/chaque connexion/i);
   });
 
   it("dit les deux régimes du tag Discord : certifié exposé, non certifié privé", () => {

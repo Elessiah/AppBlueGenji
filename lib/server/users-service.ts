@@ -6,7 +6,7 @@ import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-loc
 import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
 import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
-import { importRemoteAvatar, shouldImportGoogleAvatar } from "@/lib/server/user-avatar-import";
+import { importRemoteAvatar, shouldImportRemoteAvatar } from "@/lib/server/user-avatar-import";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { formatPlayerSignupLog, type PlayerSignupProvider } from "@/lib/shared/bot-logs";
 import { isDiscordNumericId, visibleDiscordTag } from "@/lib/shared/discord-identity";
@@ -20,21 +20,24 @@ import type {
   UserTeamTimeline,
 } from "@/lib/shared/types";
 
+/**
+ * Ce que la connexion Google rapporte, et **tout** ce qu'elle rapporte.
+ *
+ * **L'adresse n'y est plus, et le scope qui la demandait non plus.** Elle avait
+ * un seul usage : rattacher une identité Google neuve à un compte du site sur
+ * l'égalité de la chaîne. Ce rattachement a disparu — un moyen de connexion
+ * s'ajoute désormais depuis `/profil`, en étant *déjà* connecté, ce qui est une
+ * preuve autrement plus solide qu'une adresse dont le site n'est pas
+ * l'émetteur. Privée de son unique lecteur, la colonne `bg_users.email` ne
+ * pesait plus que d'un côté : une liste d'adresses est exactement ce qu'une
+ * fuite fait le plus regretter, et la garder « au cas où » revient à en
+ * assumer le risque pour un usage qui n'existe pas.
+ *
+ * C'est aussi pourquoi `emailVerified` a disparu avec elle : il ne servait qu'à
+ * garder ce rattachement honnête.
+ */
 export type GoogleProfilePayload = {
   sub: string;
-  email?: string;
-  /**
-   * `email_verified` de l'`userinfo` Google. Voir `createOrGetGoogleUser`.
-   *
-   * **Obligatoire, et c'est le compilateur qui tient la règle.** Facultatif, il
-   * valait `undefined` dès qu'un appelant l'oubliait — donc « non vérifiée »,
-   * donc plus aucun rattachement : chaque connexion Google d'un compte dont le
-   * `sub` n'est pas encore enregistré aurait créé un **doublon**, équipe,
-   * historique et rôles laissés derrière. Une panne sans message, qu'un
-   * `profile` passé tel quel au refactor suivant suffisait à provoquer, et
-   * qu'aucun test ne peut voir puisque la valeur manquante est un cas légitime.
-   */
-  emailVerified: boolean;
   name?: string;
   picture?: string;
 };
@@ -324,22 +327,6 @@ function announcePlayerSignup(
 export async function createOrGetGoogleUser(profile: GoogleProfilePayload): Promise<number> {
   const db = await getDatabase();
 
-  // **`bg_users.email` ne contient qu'une adresse vérifiée**, et cette ligne est
-  // le seul endroit qui en décide — les trois écritures en dessous n'en voient
-  // pas d'autre.
-  //
-  // Deux raisons, de deux ordres. La colonne est une **preuve d'identité** : la
-  // branche de rattachement ci-dessous lie un `sub` Google neuf à un compte du
-  // site sur la seule égalité de chaîne, donc ce qui s'y écrit doit valoir ce
-  // qu'elle y lit. Et la colonne est **unique** (`database.ts`) : écrire une
-  // adresse non vérifiée que quelqu'un d'autre détient déjà ne la volait pas,
-  // elle faisait échouer l'écriture — `ER_DUP_ENTRY` avalé en
-  // `/connexion?error=oauth` par la route de rappel, à chaque essai,
-  // indéfiniment. Une identité Google non vérifiée ne pouvait donc ni
-  // revendiquer un compte (ce qui est voulu) ni s'en créer un (ce qui ne l'est
-  // pas). Elle en crée un désormais, simplement sans adresse.
-  const verifiedEmail = profile.emailVerified === true ? (profile.email ?? null) : null;
-
   const [existing] = await db.execute<(RowDataPacket & { id: number })[]>(
     `SELECT id FROM bg_users WHERE google_sub = ? LIMIT 1`,
     [profile.sub],
@@ -347,71 +334,58 @@ export async function createOrGetGoogleUser(profile: GoogleProfilePayload): Prom
 
   if (existing.length > 0) {
     const userId = Number(existing[0].id);
-    await db.execute(`UPDATE bg_users SET email = COALESCE(?, email) WHERE id = ?`, [
-      verifiedEmail,
-      userId,
-    ]);
-    await adoptGoogleAvatar(userId, profile.picture);
+    await adoptRemoteAvatar(userId, profile.picture);
     return userId;
   }
 
-  // **Rattachement à un compte existant : uniquement sur une adresse vérifiée.**
+  // **Aucune revendication d'un compte existant.**
   //
-  // Cette branche lie un `sub` Google neuf à un compte du site sur la seule
-  // égalité de chaîne de l'adresse. Sans consulter `email_verified` — que
-  // `userinfo` renvoie et qu'on jetait —, il suffisait d'obtenir une identité
-  // Google affirmant l'adresse d'un membre pour ouvrir sa session en un clic :
-  // ni code, ni plafond, ni courriel de confirmation. Plus court que la force
-  // brute sur le code Discord, et le seul chemin d'entrée qui n'en demande
-  // aucun.
+  // Cette fonction lisait auparavant l'adresse du profil Google et, quand elle
+  // correspondait à celle d'un membre, posait le `sub` sur ce compte-là — une
+  // session ouverte en un clic sur la seule égalité d'une chaîne de caractères,
+  // et le chemin d'entrée le plus court du site. Le contrôle de `email_verified`
+  // l'avait rendu honnête ; il reste que le site n'a pas à décider qu'une
+  // adresse *est* une personne.
   //
-  // Une adresse non vérifiée n'interdit pas de **créer** un compte plus bas :
-  // elle interdit d'en revendiquer un — et elle ne s'y écrit pas (voir
-  // `verifiedEmail`).
-  if (verifiedEmail) {
-    const [emailMatch] = await db.execute<(RowDataPacket & { id: number })[]>(
-      `SELECT id FROM bg_users WHERE email = ? LIMIT 1`,
-      [verifiedEmail],
-    );
-
-    if (emailMatch.length > 0) {
-      await db.execute(`UPDATE bg_users SET google_sub = ? WHERE id = ?`, [profile.sub, emailMatch[0].id]);
-      return Number(emailMatch[0].id);
-    }
-  }
-
-  const pseudoSource = profile.name ?? profile.email?.split("@")[0] ?? `player${Date.now().toString().slice(-5)}`;
+  // Le geste qu'il servait existe toujours, mais à l'endroit où il se prouve
+  // tout seul : depuis `/profil`, un joueur **déjà connecté** rattache un second
+  // fournisseur (`lib/server/account-identities.ts`). Une identité Google
+  // inconnue, elle, ouvre un compte neuf — et rien d'autre.
+  const pseudoSource = profile.name ?? `player${Date.now().toString().slice(-5)}`;
   const pseudo = await ensureUniquePseudo(pseudoSource);
 
   // L'avatar n'est pas posé ici : le nom du fichier porte l'identifiant du
   // compte, qui n'existe qu'une fois la ligne écrite. La photo est copiée juste
   // après, et son échec ne remet pas la création en cause.
   const [created] = await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_users (pseudo, avatar_url, google_sub, email)
-     VALUES (?, NULL, ?, ?)`,
-    [pseudo, profile.sub, verifiedEmail],
+    `INSERT INTO bg_users (pseudo, avatar_url, google_sub)
+     VALUES (?, NULL, ?)`,
+    [pseudo, profile.sub],
   );
 
   const userId = Number(created.insertId);
   announcePlayerSignup(userId, pseudo, "GOOGLE");
-  await adoptGoogleAvatar(userId, profile.picture);
+  await adoptRemoteAvatar(userId, profile.picture);
   return userId;
 }
 
 /**
- * Copie la photo de profil Google du compte, si elle a lieu d'être.
+ * Copie la photo de profil rapportée par un fournisseur OAuth, si elle a lieu
+ * d'être.
  *
  * L'ancienne écriture rangeait l'URL de Google telle quelle, si bien que chaque
  * page portant cet avatar annonçait l'IP du **visiteur** à Google. La photo est
  * désormais copiée chez nous, et `avatar_url` ne porte plus que des fichiers du
- * site — c'est ce que `visibleAvatarUrl` exige à la sortie.
+ * site — c'est ce que `visibleAvatarUrl` exige à la sortie. Discord sert ses
+ * avatars depuis son propre CDN : même geste, même raison, donc la même
+ * fonction.
  *
  * Silencieux par construction : un CDN indisponible ne doit pas faire échouer
  * une connexion. Le compte reste alors sans avatar — pastille à initiale — et
- * la tentative sera refaite au prochain passage, `shouldImportGoogleAvatar`
+ * la tentative sera refaite au prochain passage, `shouldImportRemoteAvatar`
  * n'ayant toujours rien de local à constater.
  */
-async function adoptGoogleAvatar(userId: number, picture: string | undefined): Promise<void> {
+export async function adoptRemoteAvatar(userId: number, picture: string | undefined): Promise<void> {
   if (!picture) return;
 
   const db = await getDatabase();
@@ -420,7 +394,7 @@ async function adoptGoogleAvatar(userId: number, picture: string | undefined): P
     [userId],
   );
   if (rows.length === 0) return;
-  if (!shouldImportGoogleAvatar(rows[0].avatar_url)) return;
+  if (!shouldImportRemoteAvatar(rows[0].avatar_url)) return;
 
   const stored = await importRemoteAvatar(picture, userId);
   if (!stored) return;
@@ -447,6 +421,14 @@ export async function createOrGetDiscordUser(
   discordId: string,
   pseudoInput?: string,
   verifiedHandle?: string | null,
+  /**
+   * Photo de profil Discord, à **copier** chez nous comme celle de Google.
+   *
+   * Le code par message privé n'en rapporte aucune — le bot ne résout qu'un
+   * identifiant —, l'aller-retour OAuth si. Elle ne remplace jamais un avatar
+   * déjà téléversé (`shouldImportRemoteAvatar`).
+   */
+  avatarUrl?: string | null,
 ): Promise<number> {
   const db = await getDatabase();
   const handle = normalizeDiscordHandle(verifiedHandle);
@@ -467,10 +449,11 @@ export async function createOrGetDiscordUser(
         [handle, userId],
       );
     }
+    await adoptRemoteAvatar(userId, avatarUrl ?? undefined);
     return userId;
   }
 
-  const rawPseudo = normalizePseudo(pseudoInput || `discord_${discordId.slice(-6)}`);
+  const rawPseudo = normalizePseudo(pseudoInput || handle || `discord_${discordId.slice(-6)}`);
   const pseudo = await ensureUniquePseudo(rawPseudo);
 
   const [created] = await db.execute<ResultSetHeader>(
@@ -481,7 +464,73 @@ export async function createOrGetDiscordUser(
 
   const userId = Number(created.insertId);
   announcePlayerSignup(userId, pseudo, "DISCORD");
+  await adoptRemoteAvatar(userId, avatarUrl ?? undefined);
   return userId;
+}
+
+/**
+ * Retrouve (ou crée) le compte rattaché à ce Battle.net.
+ *
+ * **Le BattleTag n'a pas de colonne à lui** : il *est*
+ * `bg_users.overwatch_battletag`, le champ que le profil propose déjà de saisir
+ * à la main pour que les autres joueurs puissent s'ajouter en jeu. En avoir une
+ * seconde ferait deux BattleTags pour un joueur, dont un faux, et l'écran
+ * devrait choisir.
+ *
+ * **Et Blizzard l'écrase à chaque connexion**, y compris sur une valeur saisie à
+ * la main. C'est le sens de ce rattachement : entre ce que Blizzard affirme et
+ * ce qu'un joueur a tapé, la source fait foi — un BattleTag mal recopié ne se
+ * voit pas, il se constate quand l'ajout en jeu échoue. Le réglage de visibilité
+ * (`visible_overwatch`), lui, n'est pas touché : la connexion corrige une
+ * donnée, elle ne publie rien.
+ *
+ * `null` quand le compte Battle.net n'a pas de BattleTag — le champ reste alors
+ * ce qu'il était, on n'efface pas une saisie avec du vide.
+ */
+export async function createOrGetBlizzardUser(sub: string, battletag: string | null): Promise<number> {
+  const db = await getDatabase();
+  const tag = normalizeBattletag(battletag);
+
+  const [existing] = await db.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_users WHERE blizzard_sub = ? LIMIT 1`,
+    [sub],
+  );
+
+  if (existing.length > 0) {
+    const userId = Number(existing[0].id);
+    if (tag) {
+      await db.execute(`UPDATE bg_users SET overwatch_battletag = ? WHERE id = ?`, [tag, userId]);
+    }
+    return userId;
+  }
+
+  // Le pseudo du site se déduit du BattleTag amputé de son discriminant :
+  // « Nova#2143 » donne « nova ». Le discriminant est un détail de Blizzard, il
+  // n'a rien à faire dans une URL de profil.
+  const pseudoSource = tag ? tag.split("#")[0] : `player${Date.now().toString().slice(-5)}`;
+  const pseudo = await ensureUniquePseudo(pseudoSource);
+
+  const [created] = await db.execute<ResultSetHeader>(
+    `INSERT INTO bg_users (pseudo, blizzard_sub, overwatch_battletag)
+     VALUES (?, ?, ?)`,
+    [pseudo, sub, tag],
+  );
+
+  const userId = Number(created.insertId);
+  announcePlayerSignup(userId, pseudo, "BLIZZARD");
+  return userId;
+}
+
+/**
+ * Le BattleTag tel qu'il s'écrit en base, ou `null`.
+ *
+ * Borné à la largeur de la colonne (64), et vidé s'il est vide : un compte
+ * Battle.net sans BattleTag existe, et écrire une chaîne vide par-dessus une
+ * saisie du joueur serait la détruire pour rien.
+ */
+export function normalizeBattletag(raw: string | null | undefined): string | null {
+  const trimmed = (raw ?? "").trim();
+  return trimmed.length === 0 ? null : trimmed.slice(0, 64);
 }
 
 /**
@@ -902,6 +951,7 @@ export async function anonymizeOwnAccount(userId: number): Promise<void> {
          is_adult = NULL,
          discord_id = NULL,
          google_sub = NULL,
+         blizzard_sub = NULL,
          email = NULL,
          visible_avatar = 0,
          visible_overwatch = 0,
@@ -1090,6 +1140,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       discord_verified_at: Date | null;
       discord_id: string | null;
       google_sub: string | null;
+      blizzard_sub: string | null;
       email: string | null;
       is_adult: 0 | 1 | null;
       is_admin: 0 | 1;
@@ -1102,7 +1153,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     })[]
   >(
     `SELECT id, pseudo, avatar_url, overwatch_battletag, marvel_rivals_tag,
-            discord_pseudo, discord_verified_at, discord_id, google_sub, email, is_adult, is_admin,
+            discord_pseudo, discord_verified_at, discord_id, google_sub, blizzard_sub, email, is_adult, is_admin,
             visible_avatar, visible_overwatch, visible_marvel, visible_major,
             open_to_recruitment, created_at
      FROM bg_users
@@ -1132,6 +1183,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       // tag à l'organisation.
       discordVerifiedAt: toIso(row.discord_verified_at),
       googleSub: row.google_sub,
+      blizzardSub: row.blizzard_sub,
       isAdult: row.is_adult === null ? null : Boolean(row.is_adult),
       isAdmin: Boolean(row.is_admin),
       createdAt: toIso(row.created_at) ?? new Date().toISOString(),

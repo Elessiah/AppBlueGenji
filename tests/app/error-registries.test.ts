@@ -1,7 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { loginErrorMessage } from "@/app/connexion/_lib/login-errors";
+import { loginErrorMessage, oauthErrorMessage } from "@/app/connexion/_lib/login-errors";
+import { connectionErrorMessage } from "@/app/(secured)/profil/connection-errors";
 import { membershipErrorMessage } from "@/app/(secured)/equipes/_lib/membership-errors";
+import { OAUTH_PROVIDERS, OAUTH_PROVIDER_SLUGS } from "@/lib/shared/oauth-providers";
+import { LINK_REFUSALS } from "@/lib/shared/account-connections";
 
 /**
  * **Aucun jeton du serveur ne doit atteindre un toast.**
@@ -53,6 +56,23 @@ const MEMBERSHIP_CODES = [
   "INVITATION_RESPOND_FAILED",
 ];
 
+/** Tout ce que `/api/profile/connections[/:provider]` et le rappel OAuth peuvent rendre. */
+const CONNECTION_CODES = [
+  "PROVIDER_ALREADY_LINKED",
+  "IDENTITY_ALREADY_LINKED",
+  "LAST_CONNECTION",
+  "NOT_LINKED",
+  "UNKNOWN_PROVIDER",
+  "OAUTH_FAILED",
+  "NOT_CONFIGURED",
+  "LINK_FAILED",
+  "PROFILE_NOT_FOUND",
+  "UNAUTHORIZED",
+];
+
+/** Tous les motifs de refus que `lib/server/oauth-flow.ts` met dans `?error=`. */
+const OAUTH_ERROR_KINDS = ["not_configured", "unavailable", "params", "state", "oauth", "session"];
+
 /** Un jeton se reconnaît à sa forme : capitales, chiffres et tirets bas. */
 const looksLikeToken = (message: string) => /^[A-Z][A-Z0-9_]*$/.test(message.trim());
 
@@ -62,6 +82,7 @@ const UNKNOWN_CODE = "UN_CODE_QUE_PERSONNE_NE_CONNAIT";
 describe.each([
   ["connexion", loginErrorMessage, LOGIN_CODES] as const,
   ["adhésion à une équipe", membershipErrorMessage, MEMBERSHIP_CODES] as const,
+  ["applications connectées", connectionErrorMessage, CONNECTION_CODES] as const,
 ])("registre des refus — %s", (_label, translate, codes) => {
   it.each(codes)("traduit %s par une phrase qui lui est propre", (code) => {
     const message = translate(code);
@@ -92,5 +113,65 @@ describe.each([
     expect(looksLikeToken(translate(null))).toBe(false);
     expect(looksLikeToken(translate(undefined))).toBe(false);
     expect(looksLikeToken(translate(""))).toBe(false);
+  });
+});
+
+/**
+ * **Le registre OAuth prend deux entrées, pas une.**
+ *
+ * Le motif du refus (`?error=`) et le fournisseur (`?provider=`) arrivent
+ * séparément, justement pour qu'il n'y ait pas une table par porte : la page
+ * portait cinq codes écrits en dur, tous préfixés `google_`, soit quinze
+ * phrases à tenir à jour le jour où la troisième porte s'ouvre. Le nom du
+ * fournisseur doit donc apparaître dans la phrase, sans quoi le joueur ne sait
+ * pas laquelle a échoué.
+ */
+describe("registre des refus — aller-retour OAuth", () => {
+  it.each(OAUTH_ERROR_KINDS)("traduit « %s » par une phrase", (kind) => {
+    const message = oauthErrorMessage(kind, "discord");
+
+    expect(message).not.toBeNull();
+    expect(looksLikeToken(message!)).toBe(false);
+    expect(message!.length).toBeGreaterThan(10);
+  });
+
+  it.each([...OAUTH_PROVIDERS])("nomme le fournisseur %s dans le refus", (provider) => {
+    const message = oauthErrorMessage("not_configured", OAUTH_PROVIDER_SLUGS[provider]);
+    expect(message).toContain(provider === "GOOGLE" ? "Google" : provider === "DISCORD" ? "Discord" : "Blizzard");
+  });
+
+  it("reste lisible quand le fournisseur manque ou est inconnu", () => {
+    // Un vieux lien, un paramètre perdu : la phrase ne doit pas s'en trouver
+    // amputée.
+    for (const slug of [null, undefined, "", "facebook"]) {
+      const message = oauthErrorMessage("oauth", slug);
+      expect(message).not.toBeNull();
+      expect(message).not.toContain("undefined");
+      expect(message).not.toContain("null");
+    }
+  });
+
+  it("rend `null` sur un motif inconnu, pour ne rien afficher du tout", () => {
+    // Ici le repli n'est **pas** une phrase générique : la page n'affiche un
+    // toast que s'il y a un message. Un `?error=` fantaisiste dans l'URL ne doit
+    // pas faire surgir une erreur inventée devant un visiteur qui n'a rien fait.
+    expect(oauthErrorMessage("un_motif_inconnu", "google")).toBeNull();
+    expect(oauthErrorMessage(null, "google")).toBeNull();
+    expect(oauthErrorMessage("", "google")).toBeNull();
+  });
+});
+
+/**
+ * **Ce qui a le droit de voyager dans l'URL a une phrase à l'arrivée.**
+ *
+ * `LINK_REFUSALS` borne ce que le rappel OAuth écrit dans `?connection_error=`
+ * — sans quoi le message d'une erreur `mysql2` finissait dans la barre
+ * d'adresse. Le corollaire est que les deux listes doivent se recouvrir : un
+ * motif autorisé à sortir sans phrase à l'arrivée ferait lire au joueur le repli
+ * générique là où on sait quoi lui dire.
+ */
+describe("motifs de rattachement autorisés dans l'URL", () => {
+  it.each([...LINK_REFUSALS])("« %s » a sa phrase dans le registre du profil", (code) => {
+    expect(connectionErrorMessage(code)).not.toBe(connectionErrorMessage(UNKNOWN_CODE));
   });
 });

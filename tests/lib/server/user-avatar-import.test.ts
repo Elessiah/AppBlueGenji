@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { fetchRemoteImage } from "@/lib/server/remote-image-fetch";
-import { importRemoteAvatar, shouldImportGoogleAvatar } from "@/lib/server/user-avatar-import";
+import { importRemoteAvatar, shouldImportRemoteAvatar } from "@/lib/server/user-avatar-import";
 
 /**
  * La photo de profil d'un compte Google était rangée telle quelle dans
@@ -13,17 +13,17 @@ import { importRemoteAvatar, shouldImportGoogleAvatar } from "@/lib/server/user-
  * joignable, ce qu'elle n'était pas depuis le poste du visiteur. À la sortie,
  * un avatar **téléversé** ne doit jamais être écrasé par celui du fournisseur.
  */
-describe("shouldImportGoogleAvatar", () => {
+describe("shouldImportRemoteAvatar", () => {
   it("importe quand le compte n'a pas d'avatar", () => {
-    expect(shouldImportGoogleAvatar(null)).toBe(true);
-    expect(shouldImportGoogleAvatar(undefined)).toBe(true);
-    expect(shouldImportGoogleAvatar("")).toBe(true);
+    expect(shouldImportRemoteAvatar(null)).toBe(true);
+    expect(shouldImportRemoteAvatar(undefined)).toBe(true);
+    expect(shouldImportRemoteAvatar("")).toBe(true);
   });
 
   // Les comptes d'avant la correction se réparent ainsi d'eux-mêmes, à leur
   // prochaine connexion : leur URL Google n'est pas un fichier à nous.
   it("importe quand l'avatar en place est encore une URL étrangère", () => {
-    expect(shouldImportGoogleAvatar("https://lh3.googleusercontent.com/a/ACg8ocK=s96-c")).toBe(true);
+    expect(shouldImportRemoteAvatar("https://lh3.googleusercontent.com/a/ACg8ocK=s96-c")).toBe(true);
   });
 
   /**
@@ -35,8 +35,8 @@ describe("shouldImportGoogleAvatar", () => {
    * un **fichier** là où l'ancienne ne changeait qu'un pointeur.
    */
   it("n'écrase jamais un avatar téléversé", () => {
-    expect(shouldImportGoogleAvatar("/api/uploads/avatars/12-ab.webp")).toBe(false);
-    expect(shouldImportGoogleAvatar("/uploads/avatars/12-ab.webp")).toBe(false);
+    expect(shouldImportRemoteAvatar("/api/uploads/avatars/12-ab.webp")).toBe(false);
+    expect(shouldImportRemoteAvatar("/uploads/avatars/12-ab.webp")).toBe(false);
   });
 });
 
