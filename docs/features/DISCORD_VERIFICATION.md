@@ -167,12 +167,66 @@ certifié sur un tag qu'il vient de changer.
 L'anonymisation du compte efface le tag **et** sa date : une date restée seule
 ferait d'un compte anonymisé un compte « vérifié » sans tag.
 
+## Un compte Discord rattaché possède son tag
+
+> **Le champ se lit, il ne se saisit plus** — `lib/shared/discord-tag-lock.ts`.
+
+Deux façons d'écrire `bg_users.discord_pseudo` coexistaient sans se connaître :
+la **saisie libre** de `/profil`, que la certification vient prouver ensuite, et
+le **rattachement OAuth** — connexion par Discord ou ajout de Discord dans
+« Applications connectées » —, qui écrit le pseudo que Discord nomme lui-même et
+le pose certifié (`linkOAuthIdentity`).
+
+Laisser la première ouverte une fois la seconde faite ne pouvait produire que du
+faux. Le champ invitait à réécrire à la main une donnée que le fournisseur venait
+d'attester, et **toute modification défait la certification** (section
+précédente) : le joueur perdait donc, d'une faute de frappe, la seule chose qui
+rendait son tag visible de l'arbitrage, pour se voir ensuite proposer un bouton
+« Recertifier » qui ne fait que replacer ce que Discord disait déjà. Un
+aller-retour entier pour revenir au point de départ, avec entre les deux une
+fenêtre où le site exposait un tag inventé.
+
+D'où la règle, écrite **une fois** dans un module pur et tenue aux deux bouts :
+
+- **L'écran** passe le champ en `readOnly` (et non `disabled` : la valeur reste
+  lisible au lecteur d'écran et atteignable au clavier) et **retire le bouton**
+  de certification — il n'a plus rien à prouver.
+- **La route** refuse la réécriture en **409 `DISCORD_TAG_LOCKED`** : la saisie
+  est bonne, c'est l'état du compte qui l'interdit. Le refus ne tombe que sur un
+  tag **différent** du tag stocké — le formulaire renvoie le champ à chaque
+  sauvegarde, refuser sur sa seule présence rendrait tout le profil
+  inenregistrable — et la comparaison est insensible à la casse, comme celle qui
+  décide de la décertification.
+- **L'écriture** garde le tag par elle-même :
+  `discord_pseudo = CASE WHEN discord_id IS NOT NULL THEN discord_pseudo ELSE ? END`.
+  Le `SELECT` donne le refus lisible, la requête tranche la course — un
+  rattachement peut tomber entre les deux. La même branche couvre
+  `discord_verified_at`, qui n'a alors aucune raison de tomber puisque rien ne
+  change.
+
+Le verrou se lit sur le **rattachement seul**, ni sur le tag ni sur la
+certification. Un compte rattaché dont Discord n'a donné aucun pseudo affichable
+— un `username` entièrement numérique, que `normalizeDiscordHandle` écarte —
+reste donc verrouillé : ce qu'il saisirait ne serait de toute façon pas
+certifiable (la certification vérifie que le tag résout vers *son* identifiant
+Discord, et rejette le même numérique), donc invisible de tous. Un champ ouvert
+sur rien est un piège, pas une liberté ; l'aide du champ le dit en toutes
+lettres plutôt que de laisser croire à un chargement raté.
+
+Le refus **nomme les deux gestes qui le lèvent** : se renommer sur Discord puis
+se reconnecter (la connexion réécrit le tag et le recertifie), ou détacher
+Discord dans « Applications connectées » — ce qui efface la certification et
+rend le tag à la saisie libre, comme le veut `unlinkOAuthIdentity`.
+
 ## Où le tag s'affiche
 
-- **`/profil`** — le sien, toujours, avec la pastille et le bouton de
-  certification. L'état vient de `GET /api/profile/discord`, qui parle du tag
-  **enregistré** : un champ modifié sans être sauvegardé ne gagne ni ne perd la
-  pastille.
+- **`/profil`** — le sien, toujours, avec la pastille, et le bouton de
+  certification **tant que le tag est à lui** (section précédente : un compte
+  Discord rattaché le reçoit de Discord, le champ passe alors en lecture seule
+  et le bouton disparaît). L'état vient de `GET /api/profile/discord`, qui parle
+  du tag **enregistré** : un champ modifié sans être sauvegardé ne gagne ni ne
+  perd la pastille — et c'est le même état qui décide du verrou, jamais la
+  saisie en cours.
 - **`/joueurs/[id]`** — le tag si le serveur l'a laissé passer, « Masqué » sinon,
   et **la pastille dans les deux cas** quand le joueur est certifié. « Masqué »
   couvre aussi bien le tag filtré que le tag absent, exactement comme les deux
