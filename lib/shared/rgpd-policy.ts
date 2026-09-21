@@ -21,7 +21,11 @@ export const DONNEES_PROFIL: DonneEntry[] = [
   },
   {
     donnee: "Pseudo Overwatch",
-    finalite: "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique",
+    // Depuis la connexion Blizzard, ce champ a deux origines possibles, et la
+    // seconde écrase la première à chaque connexion : le dire est la condition
+    // pour que le joueur comprenne pourquoi sa saisie a changé.
+    finalite:
+      "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net",
     base: "Consentement",
     duree: "Durée du compte",
   },
@@ -53,7 +57,29 @@ export const DONNEES_PROFIL: DonneEntry[] = [
   },
   {
     donnee: "ID Discord",
-    finalite: "Connexion par code Discord (envoi du code en DM) — stocké uniquement si tu te connectes via Discord",
+    // Le compte n'a pas de mot de passe : cet identifiant **est** un moyen de
+    // connexion, au même titre que les deux suivants. La finalité le dit, parce
+    // que c'est ce qui explique qu'on ne puisse pas retirer le dernier.
+    finalite:
+      "Moyen de connexion (bouton Discord, ou code reçu en message privé) — stocké uniquement si tu rattaches Discord. Retirable depuis Mon profil tant qu'il t'en reste un autre",
+    base: "Consentement",
+    duree: "Durée du compte",
+  },
+  {
+    donnee: "Identifiant Google",
+    // L'**adresse** n'y figure pas, et ce n'est pas un oubli : plus rien ne
+    // rattache un compte par son e-mail, le scope `email` n'est plus demandé, et
+    // la colonne n'a plus de lecteur. Ce qui reste est un identifiant opaque,
+    // qui ne s'affiche à personne.
+    finalite:
+      "Moyen de connexion (bouton Google) — identifiant technique opaque, sans adresse e-mail. Retirable depuis Mon profil tant qu'il t'en reste un autre",
+    base: "Consentement",
+    duree: "Durée du compte",
+  },
+  {
+    donnee: "Identifiant Blizzard",
+    finalite:
+      "Moyen de connexion (bouton Blizzard) — identifiant technique opaque. Renseigne et tient à jour ton BattleTag. Retirable depuis Mon profil tant qu'il t'en reste un autre",
     base: "Consentement",
     duree: "Durée du compte",
   },

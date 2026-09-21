@@ -55,3 +55,57 @@ export function loginErrorMessage(code: string | null | undefined): string {
   if (!code) return "Une erreur interne est survenue.";
   return LOGIN_ERRORS[code] ?? "Une erreur interne est survenue.";
 }
+
+/**
+ * Les refus de l'aller-retour OAuth, dits en français.
+ *
+ * **Une table, pas trois.** La page portait cinq codes écrits en dur, tous
+ * préfixés `google_` — `google_not_configured`, `google_unavailable`… —, soit
+ * cinq phrases à recopier par fournisseur ajouté, et quinze à tenir à jour. Le
+ * refus ne dépend pourtant jamais du fournisseur : c'est toujours « la
+ * configuration manque », « l'aller-retour a échoué », « l'état a expiré ». Seul
+ * le **nom** change, et il arrive maintenant à part (`?provider=`).
+ *
+ * Chaque phrase nomme le geste qui lève le refus, et renvoie vers **les autres
+ * portes** quand celle-ci est fermée : un joueur bloqué sur Discord n'a pas à
+ * deviner que Google marche encore.
+ */
+const OAUTH_ERRORS: Record<string, (provider: string) => string> = {
+  // La variable d'environnement manque : rien à réessayer, la panne est chez
+  // nous et aucune patience ne la corrigera.
+  not_configured: (p) => `Connexion ${p} indisponible : configuration manquante. Essaie un autre moyen de connexion.`,
+  unavailable: (p) => `Connexion ${p} temporairement indisponible. Réessaie dans un instant.`,
+  // Le rappel est arrivé sans code ni état : lien tronqué, ou consentement
+  // refusé chez le fournisseur.
+  params: (p) => `Connexion ${p} interrompue. Relance la connexion depuis cette page.`,
+  // L'état a expiré (dix minutes) ou ne correspond pas : relancer est la seule
+  // réponse, et c'est aussi celle qu'on doit à une tentative de rejeu.
+  state: () => "Session de connexion expirée ou invalide. Relance la connexion.",
+  oauth: (p) => `Échec de la connexion ${p}. Réessaie dans un instant.`,
+  // `intent=link` sans session : la connexion a expiré pendant l'aller-retour.
+  session: () => "Tu dois être connecté pour rattacher une application. Connecte-toi, puis réessaie.",
+};
+
+/** Nom du fournisseur tel qu'il s'affiche dans une phrase de refus. */
+const PROVIDER_LABELS: Record<string, string> = {
+  google: "Google",
+  discord: "Discord",
+  blizzard: "Blizzard",
+};
+
+/**
+ * Message à afficher pour un refus d'aller-retour OAuth.
+ *
+ * Un fournisseur inconnu — ou absent, sur un vieux lien — retombe sur « OAuth »
+ * plutôt que sur une phrase amputée : le message reste lisible même quand le
+ * paramètre manque.
+ */
+export function oauthErrorMessage(
+  kind: string | null | undefined,
+  providerSlug: string | null | undefined,
+): string | null {
+  if (!kind) return null;
+  const render = OAUTH_ERRORS[kind];
+  if (!render) return null;
+  return render(PROVIDER_LABELS[(providerSlug ?? "").toLowerCase()] ?? "OAuth");
+}

@@ -8,7 +8,8 @@ import { CyberButton } from "@/components/cyber/CyberButton";
 import { CyberCard } from "@/components/cyber/CyberCard";
 import { RgpdConsentModal } from "@/components/cyber/RgpdConsentModal";
 import { DEFAULT_REDIRECT, safeRedirectPath } from "@/lib/shared/safe-redirect";
-import { loginErrorMessage } from "./_lib/login-errors";
+import { loginErrorMessage, oauthErrorMessage } from "./_lib/login-errors";
+import { OAuthButtons } from "./_components/OAuthButtons";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { isCertifiableDiscordHandle } from "@/lib/shared/discord-identity";
 
@@ -59,12 +60,11 @@ export default function LoginPage() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     setRedirect(safeRedirectPath(params.get("redirect")));
-    const routeError = params.get("error");
-    if (routeError === "google_not_configured") showError("Connexion Google indisponible: configuration manquante.");
-    else if (routeError === "google_unavailable") showError("Connexion Google temporairement indisponible.");
-    else if (routeError === "oauth") showError("Échec OAuth Google.");
-    else if (routeError === "state") showError("Session OAuth expirée ou invalide.");
-    else if (routeError === "google") showError("Paramètres OAuth Google invalides.");
+    // Le refus vient du module partagé, qui compose la phrase depuis le motif
+    // (`?error=`) et le fournisseur (`?provider=`). Les cinq codes écrits ici en
+    // dur ne parlaient que de Google : la troisième porte en aurait fait quinze.
+    const message = oauthErrorMessage(params.get("error"), params.get("provider"));
+    if (message) showError(message);
   }, [showError]);
 
   const requestCode = async (event: FormEvent) => {
@@ -133,19 +133,19 @@ export default function LoginPage() {
 
         {!requested ? (
           <>
-            <CyberButton
-              variant="primary"
-              asChild
-              style={{ width: "100%", marginBottom: 12 }}
-            >
-              <a href={`/api/auth/google/start?redirect=${encodeURIComponent(redirect)}`}>
-                Continuer avec Google
-              </a>
-            </CyberButton>
+            <OAuthButtons redirect={redirect} />
 
-            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 0", color: "var(--ink-dim)" }}>
+            {/*
+              Le séparateur **nomme** ce qui suit. « OU » seul laissait croire à
+              une variante du bouton Discord juste au-dessus, alors que c'est un
+              autre chemin, réservé aux membres du serveur : le bot doit pouvoir
+              écrire en message privé, donc partager un serveur avec le joueur.
+            */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 16px", color: "var(--ink-dim)" }}>
               <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
-              <span className="mono" style={{ fontSize: 10, letterSpacing: "0.2em" }}>OU</span>
+              <span className="mono" style={{ fontSize: 10, letterSpacing: "0.2em", whiteSpace: "nowrap" }}>
+                OU CODE PAR MESSAGE PRIVÉ
+              </span>
               <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
             </div>
 
@@ -161,16 +161,19 @@ export default function LoginPage() {
                   required
                 />
                 <span className="mono" style={{ fontSize: 10, color: "var(--ink-dim)", letterSpacing: "0.08em", marginTop: 4, lineHeight: 1.5 }}>
-                  Le tag fonctionne si le bot partage un serveur avec toi, sinon utilise ton ID Discord ou{" "}
+                  Réservé aux membres de notre serveur : le bot doit pouvoir t&apos;écrire en
+                  privé. Le tag fonctionne s&apos;il partage un serveur avec toi, sinon utilise ton
+                  ID Discord,{" "}
                   <Link
                     href={DISCORD_INVITE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ color: "var(--blue-300)", textDecoration: "underline" }}
                   >
-                    rejoins notre serveur
-                  </Link>
-                  .
+                    rejoins-nous
+                  </Link>{" "}
+                  — ou passe simplement par le bouton Discord ci-dessus, qui marche sans serveur
+                  commun.
                 </span>
               </div>
               <CyberButton
@@ -185,19 +188,13 @@ export default function LoginPage() {
           </>
         ) : (
           <>
-            <CyberButton
-              variant="primary"
-              asChild
-              style={{ width: "100%", marginBottom: 12 }}
-            >
-              <a href={`/api/auth/google/start?redirect=${encodeURIComponent(redirect)}`}>
-                Continuer avec Google
-              </a>
-            </CyberButton>
+            <OAuthButtons redirect={redirect} />
 
-            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 0", color: "var(--ink-dim)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 16px", color: "var(--ink-dim)" }}>
               <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
-              <span className="mono" style={{ fontSize: 10, letterSpacing: "0.2em" }}>OU</span>
+              <span className="mono" style={{ fontSize: 10, letterSpacing: "0.2em", whiteSpace: "nowrap" }}>
+                OU CODE PAR MESSAGE PRIVÉ
+              </span>
               <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
             </div>
 

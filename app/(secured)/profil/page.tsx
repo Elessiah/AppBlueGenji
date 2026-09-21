@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/toast";
 import { TeamLink } from "@/components/entity-link";
 import { VerifiedBadge } from "@/components/discord-tag";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
+import { ConnectedAppsSection } from "./ConnectedAppsSection";
 
 // Le pseudo n'est plus masquable : identité de base du joueur sur la plateforme.
 const VISIBILITY_LABELS: Record<string, string> = {
@@ -446,6 +447,8 @@ export default function ProfilePage() {
           </div>
         </form>
       </div>
+
+      <ConnectedAppsSection onChanged={loadDiscordState} />
 
       {invitations.length > 0 && (
         <div className="ds-block" style={{ marginBottom: 20 }}>

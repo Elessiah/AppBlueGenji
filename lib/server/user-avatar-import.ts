@@ -5,7 +5,11 @@ import { parseRemoteImageUrl } from "@/lib/shared/remote-image";
 import { toServedUploadUrl } from "@/lib/shared/uploads";
 
 /**
- * Copier chez nous la photo de profil d'un compte Google.
+ * Copier chez nous la photo de profil d'un compte OAuth.
+ *
+ * Écrit pour Google, et valable tel quel pour Discord : le défaut n'était pas
+ * propre à un fournisseur, il tenait à ce que l'URL rangée en base appartenait
+ * à quelqu'un d'autre. D'où un nom qui ne cite plus personne.
  *
  * `createOrGetGoogleUser` rangeait l'URL de `picture` telle quelle dans
  * `bg_users.avatar_url`, et les écrans la rendaient en `unoptimized` — donc
@@ -49,7 +53,7 @@ import { toServedUploadUrl } from "@/lib/shared/uploads";
  * Contrepartie assumée : une photo changée **côté Google** ne se propage plus
  * au site. Elle se change sur `/profil`, où l'on choisit déjà la sienne.
  */
-export function shouldImportGoogleAvatar(currentAvatarUrl: string | null | undefined): boolean {
+export function shouldImportRemoteAvatar(currentAvatarUrl: string | null | undefined): boolean {
   return !isLocalAvatarUrl(currentAvatarUrl);
 }
 

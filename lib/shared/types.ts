@@ -701,8 +701,9 @@ export type FullProfileResponse = {
 /**
  * Export RGPD (droit à la portabilité, art. 20) de l'intégralité des données
  * personnelles d'un utilisateur, dans un format lisible par machine (JSON).
- * Contient les identifiants bruts (email, Discord, Google) réservés au
- * propriétaire du compte — ne jamais exposer à un tiers.
+ * Contient les identifiants bruts (Discord, Google, Blizzard, et l'adresse des
+ * comptes d'avant sa mise hors collecte) réservés au propriétaire du compte —
+ * ne jamais exposer à un tiers.
  */
 export type PersonalDataExport = {
   exportedAt: string;
@@ -715,6 +716,8 @@ export type PersonalDataExport = {
     /** Date de certification du tag Discord (`null` = jamais prouvé). */
     discordVerifiedAt: string | null;
     googleSub: string | null;
+    /** Identifiant Battle.net (`null` si aucun compte Blizzard n'est rattaché). */
+    blizzardSub: string | null;
     isAdult: boolean | null;
     isAdmin: boolean;
     createdAt: string;

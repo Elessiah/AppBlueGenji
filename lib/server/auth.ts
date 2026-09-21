@@ -43,7 +43,6 @@ export function resolveRoles(isAdmin: boolean, rolesJson: unknown): PlatformRole
 }
 
 const SESSION_COOKIE = "bg_session";
-const OAUTH_COOKIE = "bg_google_oauth";
 const SESSION_TTL_DAYS = 30;
 
 function hashToken(token: string): string {
@@ -220,37 +219,6 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
 
   return fromRow(rows[0]);
 });
-
-export async function saveGoogleOAuthState(state: string, redirectTo: string): Promise<void> {
-  const cookieStore = await cookies();
-  const payload = Buffer.from(JSON.stringify({ state, redirectTo })).toString("base64url");
-  cookieStore.set(OAUTH_COOKIE, payload, {
-    ...baseCookieOptions(),
-    maxAge: 10 * 60,
-  });
-}
-
-export async function consumeGoogleOAuthState(): Promise<{ state: string; redirectTo: string } | null> {
-  const cookieStore = await cookies();
-  const payload = cookieStore.get(OAUTH_COOKIE)?.value;
-  cookieStore.set(OAUTH_COOKIE, "", {
-    ...baseCookieOptions(),
-    maxAge: 0,
-  });
-
-  if (!payload) return null;
-
-  try {
-    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
-      state: string;
-      redirectTo: string;
-    };
-    if (!parsed.state || !parsed.redirectTo) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
 
 async function pseudoExists(candidate: string): Promise<boolean> {
   const db = await getDatabase();

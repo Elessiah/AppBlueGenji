@@ -204,6 +204,13 @@ export default function RgpdPage() {
               sur la plateforme. Il est supprimé à la déconnexion.
             </li>
             <li>
+              <strong>bg_oauth</strong> — déposé <strong>le temps d&apos;une connexion</strong>
+              par Google, Discord ou Blizzard, et supprimé dès le retour. Il dure dix minutes
+              au plus et ne contient qu&apos;un jeton aléatoire à usage unique (protection
+              anti-CSRF), le nom du fournisseur et la page où te ramener. Aucun identifiant de
+              personne.
+            </li>
+            <li>
               <strong>bg_recr_modal</strong> et <strong>bg_recr_banner</strong> — déposés
               uniquement <strong>si vous fermez une annonce de recrutement</strong> mise en
               avant, pour ne pas vous la réafficher. Ils ne contiennent que le numéro de
