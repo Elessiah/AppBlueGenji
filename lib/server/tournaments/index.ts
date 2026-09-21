@@ -298,7 +298,8 @@ export async function createTournament(
     phases?: readonly Partial<PhaseConfig>[];
     /**
      * Conditions d'inscription (`lib/shared/registration-filters.ts`). Absentes
-     * = les défauts du module — « au moins un Discord vérifié » et cinq joueurs.
+     * = les défauts du module — « au moins un Discord vérifié », aucune exigence
+     * Blizzard, et cinq joueurs.
      */
     registrationFilters?: RegistrationFilters | null;
   },
@@ -389,6 +390,7 @@ export async function createTournament(
     const registrationFilters = parseRegistrationFilters(
       payload.registrationFilters?.discordRequirement,
       payload.registrationFilters?.minPlayers,
+      payload.registrationFilters?.blizzardRequirement,
     );
 
     const [insert] = await connection.execute<ResultSetHeader>(
@@ -425,8 +427,9 @@ export async function createTournament(
         endurance_playoff_format_type,
         endurance_playoff_format_value,
         registration_discord_requirement,
+        registration_blizzard_requirement,
         registration_min_players
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         organizerUserId,
         payload.name.trim(),
@@ -466,6 +469,7 @@ export async function createTournament(
         playoffFormat?.type ?? null,
         playoffFormat?.value ?? null,
         registrationFilters.discordRequirement,
+        registrationFilters.blizzardRequirement,
         registrationFilters.minPlayers,
       ],
     );
@@ -609,6 +613,7 @@ async function loadTournamentBuckets(
       t.endurance_playoff_format_type,
       t.endurance_playoff_format_value,
       t.registration_discord_requirement,
+      t.registration_blizzard_requirement,
       t.registration_min_players,
       t.live_url,
       COALESCE(COUNT(r.id), 0) AS registered_teams
@@ -643,6 +648,7 @@ async function loadTournamentBuckets(
       t.endurance_playoff_format_type,
       t.endurance_playoff_format_value,
       t.registration_discord_requirement,
+      t.registration_blizzard_requirement,
       t.registration_min_players,
       t.live_url
      ORDER BY t.start_at DESC`,

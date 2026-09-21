@@ -17,7 +17,7 @@ import {
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import {
   parseRegistrationFilters,
-  type DiscordRequirement,
+  type PlayerRequirement,
 } from "@/lib/shared/registration-filters";
 import type { ParticipantType } from "@/lib/shared/participants";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
@@ -56,12 +56,13 @@ export type EditableTournamentValues = {
   /** BG Survie : format de l'arbre final (`null` = celui du tournoi). */
   endurancePlayoffFormat: MatchFormat | null;
   /**
-   * Conditions d'inscription, **aplaties** en deux champs éditables et non
-   * réunies en objet comme `matchFormat` : ce sont deux réglages indépendants,
+   * Conditions d'inscription, **aplaties** en trois champs éditables et non
+   * réunies en objet comme `matchFormat` : ce sont trois réglages indépendants,
    * qu'on ouvre et qu'on durcit séparément, et `checkEditPatch` juge champ par
    * champ.
    */
-  registrationDiscordRequirement: DiscordRequirement;
+  registrationDiscordRequirement: PlayerRequirement;
+  registrationBlizzardRequirement: PlayerRequirement;
   registrationMinPlayers: number;
   phases: PhaseConfig[] | null;
 };
@@ -89,7 +90,8 @@ async function loadEditRow(
       match_format_type, match_format_value,
       match_format_max_maps, match_format_draws,
       endurance_playoff_format_type, endurance_playoff_format_value,
-      registration_discord_requirement, registration_min_players
+      registration_discord_requirement, registration_blizzard_requirement,
+      registration_min_players
      FROM bg_tournaments
      WHERE id = ?
      LIMIT 1${forUpdate ? " FOR UPDATE" : ""}`,
@@ -108,6 +110,7 @@ function toValues(
   const filters = parseRegistrationFilters(
     row.registration_discord_requirement,
     row.registration_min_players,
+    row.registration_blizzard_requirement,
   );
   return {
     name: String(row.name),
@@ -143,6 +146,7 @@ function toValues(
       row.endurance_playoff_format_value,
     ),
     registrationDiscordRequirement: filters.discordRequirement,
+    registrationBlizzardRequirement: filters.blizzardRequirement,
     registrationMinPlayers: filters.minPlayers,
     phases,
   };
@@ -272,6 +276,7 @@ export async function updateTournament(
       endurancePlayoffFormatType: next.endurancePlayoffFormat?.type ?? null,
       endurancePlayoffFormatValue: next.endurancePlayoffFormat?.value ?? null,
       registrationDiscordRequirement: next.registrationDiscordRequirement,
+      registrationBlizzardRequirement: next.registrationBlizzardRequirement,
       registrationMinPlayers: next.registrationMinPlayers,
       phases: next.phases ?? undefined,
     });
@@ -311,7 +316,8 @@ export async function updateTournament(
         match_format_type = ?, match_format_value = ?,
         match_format_max_maps = ?, match_format_draws = ?,
         endurance_playoff_format_type = ?, endurance_playoff_format_value = ?,
-        registration_discord_requirement = ?, registration_min_players = ?
+        registration_discord_requirement = ?, registration_blizzard_requirement = ?,
+        registration_min_players = ?
        WHERE id = ?`,
       [
         valid.name,
@@ -343,6 +349,7 @@ export async function updateTournament(
         valid.endurancePlayoffFormat?.type ?? null,
         valid.endurancePlayoffFormat?.value ?? null,
         valid.registrationFilters.discordRequirement,
+        valid.registrationFilters.blizzardRequirement,
         valid.registrationFilters.minPlayers,
         tournamentId,
       ],

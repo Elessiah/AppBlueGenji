@@ -380,7 +380,7 @@ export type TournamentCard = {
   endurancePlayoffFormat: MatchFormat | null;
   /**
    * Conditions d'inscription (`lib/shared/registration-filters.ts`) : effectif
-   * minimal et exigence de tag Discord certifié.
+   * minimal, exigence de tag Discord certifié et de compte Blizzard rattaché.
    *
    * Sur la carte, donc **publiques** : ce sont des conditions d'accès, elles
    * doivent se lire avant de tenter une inscription, et non se découvrir dans un

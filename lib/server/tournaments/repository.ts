@@ -129,6 +129,7 @@ export async function loadTournamentRow(
       endurance_playoff_format_type,
       endurance_playoff_format_value,
       registration_discord_requirement,
+      registration_blizzard_requirement,
       registration_min_players,
       live_url
      FROM bg_tournaments
@@ -353,6 +354,7 @@ export async function getTournamentListRow(
       t.endurance_playoff_format_type,
       t.endurance_playoff_format_value,
       t.registration_discord_requirement,
+      t.registration_blizzard_requirement,
       t.registration_min_players,
       t.live_url,
       COALESCE(COUNT(r.id), 0) AS registered_teams
@@ -388,6 +390,7 @@ export async function getTournamentListRow(
       t.endurance_playoff_format_type,
       t.endurance_playoff_format_value,
       t.registration_discord_requirement,
+      t.registration_blizzard_requirement,
       t.registration_min_players,
       t.live_url`,
     [tournamentId],

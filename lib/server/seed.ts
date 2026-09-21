@@ -509,13 +509,29 @@ async function createUsers(db: Pool): Promise<number[]> {
     // synthétique mais unique (la colonne l'exige) et hors des plages utilisées
     // par les comptes spéciaux.
     const discordId = discordVerified ? `9010000000000${String(index).padStart(5, "0")}` : null;
+    // **Un joueur sur deux a rattaché son compte Blizzard**, pour la même raison
+    // que la certification Discord juste au-dessus : la condition « compte
+    // Blizzard » d'un tournoi (`lib/shared/registration-filters.ts`) se juge sur
+    // `blizzard_sub`, et un jeu de test où la colonne est partout `NULL` ne
+    // montrerait jamais qu'un refus. Le motif est **décalé** de celui du tag
+    // (un sur deux contre deux sur trois) pour que les deux conditions ne
+    // retombent pas sur les mêmes joueurs : une équipe peut ainsi buter sur
+    // l'une sans buter sur l'autre, ce qui est exactement le cas à relire.
+    const blizzardSub = index % 2 === 0 ? `seed-blizzard-${String(index).padStart(5, "0")}` : null;
     try {
       const [result] = await db.execute<ResultSetHeader>(
         `INSERT INTO bg_users
          (pseudo, overwatch_battletag, marvel_rivals_tag, discord_id, discord_pseudo, discord_verified_at,
-          visible_avatar, visible_pseudo, visible_overwatch, visible_marvel, is_adult)
-         VALUES (?, ?, ?, ?, ?, ${discordVerified ? "NOW()" : "NULL"}, 1, 1, 1, 1, 1)`,
-        [pseudo, player.battletag, player.marvelTag, discordId, player.pseudo.toLowerCase()]
+          blizzard_sub, visible_avatar, visible_pseudo, visible_overwatch, visible_marvel, is_adult)
+         VALUES (?, ?, ?, ?, ?, ${discordVerified ? "NOW()" : "NULL"}, ?, 1, 1, 1, 1, 1)`,
+        [
+          pseudo,
+          player.battletag,
+          player.marvelTag,
+          discordId,
+          player.pseudo.toLowerCase(),
+          blizzardSub,
+        ]
       );
       userIds.push(result.insertId as number);
     } catch (error) {
@@ -1414,9 +1430,9 @@ async function createTournament(
       endurance_start_points, endurance_playoff_size, endurance_max_rounds,
       match_format_type, match_format_value, match_format_draws,
       endurance_playoff_format_type, endurance_playoff_format_value,
-      registration_discord_requirement, registration_min_players,
+      registration_discord_requirement, registration_blizzard_requirement, registration_min_players,
       max_teams, state, start_visibility_at, registration_open_at, registration_close_at, start_at, finished_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       organizerId,
       `Test - ${def.name}`,
@@ -1442,6 +1458,7 @@ async function createTournament(
       // posés sur les tournois d'avant : un cas qui ne dit rien couvre donc le
       // comportement courant.
       def.registrationDiscordRequirement ?? DEFAULT_REGISTRATION_FILTERS.discordRequirement,
+      def.registrationBlizzardRequirement ?? DEFAULT_REGISTRATION_FILTERS.blizzardRequirement,
       def.registrationMinPlayers ?? DEFAULT_REGISTRATION_FILTERS.minPlayers,
       def.maxTeams,
       insertState,

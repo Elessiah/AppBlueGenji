@@ -21,10 +21,11 @@ import {
 } from "@/lib/shared/match-format";
 import { participantWording, type ParticipantType } from "@/lib/shared/participants";
 import {
-  DISCORD_REQUIREMENT_LABELS,
   MIN_PLAYERS_BOUNDS,
+  PLAYER_REQUIREMENTS,
+  PLAYER_REQUIREMENT_LABELS,
   registrationFiltersSummary,
-  type DiscordRequirement,
+  type PlayerRequirement,
 } from "@/lib/shared/registration-filters";
 import type { TournamentField } from "@/lib/shared/tournament-edit";
 import { useToast } from "@/components/ui/toast";
@@ -111,6 +112,7 @@ export function TournamentForm({
   const conditionsSummary = registrationFiltersSummary(
     {
       discordRequirement: values.registrationDiscordRequirement,
+      blizzardRequirement: values.registrationBlizzardRequirement,
       minPlayers: values.registrationMinPlayers,
     },
     isSolo,
@@ -454,14 +456,14 @@ export function TournamentForm({
                 disabled={locked("registrationDiscordRequirement")}
                 value={values.registrationDiscordRequirement}
                 onChange={(e) =>
-                  set("registrationDiscordRequirement", e.target.value as DiscordRequirement)
+                  set("registrationDiscordRequirement", e.target.value as PlayerRequirement)
                 }
                 aria-describedby="registration-discord-hint"
                 {...lockedAttr("registrationDiscordRequirement")}
               >
-                {(["ANY_PLAYER", "ALL_PLAYERS", "NONE"] as DiscordRequirement[]).map((value) => (
+                {PLAYER_REQUIREMENTS.map((value) => (
                   <option key={value} value={value}>
-                    {DISCORD_REQUIREMENT_LABELS[value]}
+                    {PLAYER_REQUIREMENT_LABELS[value]}
                   </option>
                 ))}
               </select>
@@ -469,6 +471,31 @@ export function TournamentForm({
                 Un tag Discord <em>vérifié</em> est un tag dont le joueur a prouvé qu&apos;il lui
                 appartient : c&apos;est la seule façon pour l&apos;organisation de joindre
                 {isSolo ? " le joueur" : " l'équipe"} pendant le tournoi.
+              </p>
+            </div>
+
+            <div className="field">
+              <label htmlFor="registration-blizzard">Compte Blizzard</label>
+              <select
+                id="registration-blizzard"
+                disabled={locked("registrationBlizzardRequirement")}
+                value={values.registrationBlizzardRequirement}
+                onChange={(e) =>
+                  set("registrationBlizzardRequirement", e.target.value as PlayerRequirement)
+                }
+                aria-describedby="registration-blizzard-hint"
+                {...lockedAttr("registrationBlizzardRequirement")}
+              >
+                {PLAYER_REQUIREMENTS.map((value) => (
+                  <option key={value} value={value}>
+                    {PLAYER_REQUIREMENT_LABELS[value]}
+                  </option>
+                ))}
+              </select>
+              <p id="registration-blizzard-hint" style={HINT}>
+                Un compte Battle.net <em>rattaché</em> depuis « Mon profil » atteste le BattleTag
+                {isSolo ? " du joueur" : " de chaque joueur"} : un tag simplement saisi ne prouve
+                rien. Sans objet sur un tournoi Marvel Rivals.
               </p>
             </div>
 

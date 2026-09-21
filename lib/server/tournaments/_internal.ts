@@ -3,7 +3,10 @@ import { toIso } from "@/lib/server/serialization";
 import { toParticipantType } from "@/lib/shared/participants";
 import type { BracketMatch, TournamentCard, TournamentPhase } from "@/lib/shared/types";
 import { parseMatchFormat } from "@/lib/shared/match-format";
-import { parseRegistrationFilters } from "@/lib/shared/registration-filters";
+import {
+  parseRegistrationFilters,
+  type PlayerRequirement,
+} from "@/lib/shared/registration-filters";
 import { normalizeStreamUrl, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 
 export type TournamentRow = RowDataPacket & {
@@ -42,7 +45,8 @@ export type TournamentRow = RowDataPacket & {
   endurance_playoff_format_type: "BO" | "FT" | null;
   endurance_playoff_format_value: number | null;
   /** Conditions d'inscription (hors équipes fantômes). */
-  registration_discord_requirement: "NONE" | "ANY_PLAYER" | "ALL_PLAYERS";
+  registration_discord_requirement: PlayerRequirement;
+  registration_blizzard_requirement: PlayerRequirement;
   registration_min_players: number;
   /** Chaîne officielle du tournoi ; NULL = aucune diffusion annoncée. */
   live_url: string | null;
@@ -194,6 +198,7 @@ export function mapCard(row: TournamentListRow): TournamentCard {
     registrationFilters: parseRegistrationFilters(
       row.registration_discord_requirement,
       row.registration_min_players,
+      row.registration_blizzard_requirement,
     ),
     // Revalidé à la lecture, comme dans `findBroadcastingTournament` : une ligne
     // posée avant la liste blanche (ou éditée à la main en base) ne doit jamais

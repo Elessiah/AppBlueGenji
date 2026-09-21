@@ -21,27 +21,51 @@ import {
 } from "@/lib/shared/registration-filters";
 import type { TournamentRow } from "./_internal";
 
+/** Une ligne de `bg_users` réduite aux deux drapeaux que les conditions lisent. */
+type EligibilityRow = RowDataPacket & { verified: number; blizzard: number };
+
+/**
+ * Les deux colonnes qui **prouvent** quelque chose, et leur lecture.
+ *
+ * Écrites une fois : le roster d'équipe et l'engagé solo les lisent sur la même
+ * table, et deux copies auraient divergé au premier réglage ajouté — la seconde
+ * restant muette, puisqu'un tournoi individuel ne fait pas les mêmes essais
+ * qu'un tournoi par équipes.
+ *
+ * Chacune est la forme **prouvée** d'une donnée dont il existe aussi une forme
+ * saisie : `discord_verified_at` et non `discord_pseudo`, `blizzard_sub` et non
+ * `overwatch_battletag`. C'est exactement le trou que les conditions ferment —
+ * les deux chaînes libres se remplissent avec l'identité de n'importe qui.
+ */
+const ELIGIBILITY_COLUMNS_SQL = `(u.discord_verified_at IS NOT NULL) AS verified,
+            (u.blizzard_sub IS NOT NULL) AS blizzard`;
+
+function toEligibility(row: EligibilityRow): RosterMemberEligibility {
+  return {
+    discordVerified: Number(row.verified) === 1,
+    blizzardLinked: Number(row.blizzard) === 1,
+  };
+}
+
 /**
  * Roster **actif** d'une équipe, réduit à ce que les conditions regardent.
  *
  * `left_at IS NULL` : un joueur parti ne compte ni dans l'effectif ni comme
- * interlocuteur. La certification est lue sur `discord_verified_at` — jamais sur
- * `discord_pseudo`, qu'un joueur peut remplir sans rien prouver, ce qui est
- * précisément le trou que la condition est censée fermer.
+ * interlocuteur.
  */
 export async function loadTeamRosterEligibility(
   connection: PoolConnection,
   teamId: number,
 ): Promise<RosterMemberEligibility[]> {
-  const [rows] = await connection.execute<(RowDataPacket & { verified: number })[]>(
-    `SELECT (u.discord_verified_at IS NOT NULL) AS verified
+  const [rows] = await connection.execute<EligibilityRow[]>(
+    `SELECT ${ELIGIBILITY_COLUMNS_SQL}
      FROM bg_team_members tm
      JOIN bg_users u ON u.id = tm.user_id
      WHERE tm.team_id = ?
        AND tm.left_at IS NULL`,
     [teamId],
   );
-  return rows.map((row) => ({ discordVerified: Number(row.verified) === 1 }));
+  return rows.map(toEligibility);
 }
 
 /** Le joueur lui-même, pour un engagé solo : un roster d'une ligne. */
@@ -49,22 +73,24 @@ export async function loadSoloEligibility(
   connection: PoolConnection,
   userId: number,
 ): Promise<RosterMemberEligibility[]> {
-  const [rows] = await connection.execute<(RowDataPacket & { verified: number })[]>(
-    `SELECT (discord_verified_at IS NOT NULL) AS verified
-     FROM bg_users
-     WHERE id = ?
+  const [rows] = await connection.execute<EligibilityRow[]>(
+    `SELECT ${ELIGIBILITY_COLUMNS_SQL}
+     FROM bg_users u
+     WHERE u.id = ?
      LIMIT 1`,
     [userId],
   );
   if (rows.length === 0) return [];
-  return [{ discordVerified: Number(rows[0].verified) === 1 }];
+  return [toEligibility(rows[0])];
 }
 
 /** Les conditions du tournoi, lues sur la ligne déjà chargée. */
 export function tournamentRegistrationFilters(
   tournament: Pick<
     TournamentRow,
-    "registration_discord_requirement" | "registration_min_players"
+    | "registration_discord_requirement"
+    | "registration_blizzard_requirement"
+    | "registration_min_players"
   >,
 ): RegistrationFilters {
   // `parseRegistrationFilters` ferait le même travail ; on l'évite ici parce que
@@ -74,6 +100,7 @@ export function tournamentRegistrationFilters(
   // remplit les lignes existantes.
   return {
     discordRequirement: tournament.registration_discord_requirement,
+    blizzardRequirement: tournament.registration_blizzard_requirement,
     minPlayers: Number(tournament.registration_min_players),
   };
 }
@@ -126,7 +153,9 @@ export async function assertRegistrationEligibility(
   connection: PoolConnection,
   tournament: Pick<
     TournamentRow,
-    "registration_discord_requirement" | "registration_min_players"
+    | "registration_discord_requirement"
+    | "registration_blizzard_requirement"
+    | "registration_min_players"
   >,
   entrant: EligibilityTarget,
 ): Promise<void> {

@@ -1,6 +1,7 @@
 ﻿import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { registerCurrentUserTeam } from "@/lib/server/tournaments-service";
+import { isRegistrationFilterError } from "@/lib/shared/registration-filters";
 
 export async function POST(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -24,15 +25,12 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
 
     // Conditions d'inscription non remplies (`lib/shared/registration-filters.ts`).
     // **409 et non 400** : la saisie est bonne, c'est l'état de l'équipe qui ne
-    // convient pas — et il se corrige (recruter, certifier un tag), ce qu'un
-    // « requête invalide » ne laisserait pas entendre.
-    if (
-      message === "TEAM_TOO_FEW_PLAYERS"
-      || message === "TEAM_NEEDS_VERIFIED_DISCORD"
-      || message === "TEAM_NEEDS_ALL_VERIFIED_DISCORD"
-    ) {
-      return fail(message, 409);
-    }
+    // convient pas — et il se corrige (recruter, certifier un tag, rattacher un
+    // compte Blizzard), ce qu'un « requête invalide » ne laisserait pas entendre.
+    //
+    // Le test vient du module pur : la liste était recopiée ici, et un refus
+    // ajouté là-bas sans l'être ici serait ressorti en 500.
+    if (isRegistrationFilterError(message)) return fail(message, 409);
 
     if (
       message === "NO_ACTIVE_TEAM"
