@@ -5,6 +5,10 @@ import Link from "next/link";
 import type { PublicUserProfile } from "@/lib/shared/types";
 import { avatarInitial } from "@/lib/shared/avatar";
 import { getPaletteColor } from "@/lib/shared/palette";
+import {
+  PLAYER_ROSTER_STATUS_LABEL,
+  playerRosterStatus,
+} from "@/lib/shared/player-roster-status";
 import { TeamLink } from "@/components/entity-link";
 import s from "../../_shared/annuaire.module.css";
 
@@ -76,7 +80,9 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
               </TeamLink>
             </>
           ) : (
-            <span style={{ color: "var(--ink-dim)" }}>FREE AGENT</span>
+            <span style={{ color: "var(--ink-dim)" }}>
+              {PLAYER_ROSTER_STATUS_LABEL[playerRosterStatus(player)]}
+            </span>
           )}
         </div>
       </div>
