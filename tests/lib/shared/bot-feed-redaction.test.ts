@@ -9,7 +9,7 @@ import {
   redactSseLine,
 } from "@/lib/shared/bot-feed-redaction";
 
-const ID = "390973051367587850";
+const ID = "100000000000000001";
 
 describe("isDiscordSnowflake", () => {
   it("reconnaît un identifiant de 17 à 20 chiffres", () => {
@@ -39,7 +39,7 @@ describe("redactSnowflakes", () => {
   });
 
   it("efface plusieurs identifiants dans la même phrase", () => {
-    const out = redactSnowflakes(`${ID} a invite 812647086159036488`);
+    const out = redactSnowflakes(`${ID} a invite 100000000000000002`);
     expect(out).toBe(`${REDACTED_DISCORD_ID} a invite ${REDACTED_DISCORD_ID}`);
     expect(out).not.toMatch(/\d{17}/);
   });

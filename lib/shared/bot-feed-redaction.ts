@@ -3,7 +3,7 @@
  *
  * `/bot` est une page de **vitrine**, lisible sans compte, et son bandeau
  * « Flux temps réel » affichait tel quel ce que le bot lui envoie — dont
- * « Code DM envoyé à 390973051367587850 », c'est-à-dire l'identifiant Discord
+ * « Code DM envoyé à 100000000000000001 », c'est-à-dire l'identifiant Discord
  * d'un joueur en train de se connecter, avec l'horodatage de sa connexion. Un
  * identifiant Discord n'est pas un secret, mais c'est une **coordonnée** : il
  * suffit à écrire à la personne, et le site n'expose ailleurs le tag d'un

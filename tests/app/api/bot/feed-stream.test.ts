@@ -188,7 +188,7 @@ describe("GET /api/bot/feed/stream — garde-fous", () => {
  * chaque connexion. Le relais est le seul endroit qui voie tout ce qui part.
  */
 describe("GET /api/bot/feed/stream — identifiants Discord", () => {
-  const ID = "390973051367587850";
+  const ID = "100000000000000001";
 
   /** Collecte le corps relayé, tel qu'un navigateur le recevrait. */
   async function collect(response: Response): Promise<string> {
