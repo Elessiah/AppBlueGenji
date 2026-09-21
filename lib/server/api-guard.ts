@@ -287,6 +287,23 @@ export const DISCORD_VERIFY_CONFIRM_RULE: RateLimitRule = {
 };
 
 /**
+ * Vérifications d'un `credential` Google One Tap, **par IP appelante**.
+ *
+ * Comme la demande de code Discord par IP : la route est anonyme (aucun
+ * compte connu avant que le jeton ne soit vérifié), donc c'est le seul axe
+ * disponible. Ce que le plafond borne n'est pas une session usurpable — la
+ * signature du jeton s'en charge — mais la **dépense** : chaque appel peut
+ * déclencher une lecture du jeu de clés Google (`cached`, au plus une fois par
+ * heure) et, sur un jeton valide, une écriture en base. Large, pour la même
+ * raison que `DISCORD_CODE_REQUEST_IP_RULE` : une IP n'est pas une personne.
+ */
+export const GOOGLE_ONE_TAP_RULE: RateLimitRule = {
+  name: "google-one-tap",
+  limit: 30,
+  windowMs: 15 * 60_000,
+};
+
+/**
  * Applique un plafond. Renvoie la réponse 429 à retourner tel quel, ou `null`
  * si la requête peut continuer.
  *

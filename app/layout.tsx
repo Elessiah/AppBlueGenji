@@ -5,9 +5,11 @@ import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
 import { RecruitmentHighlight } from "@/components/recruitment-highlight";
 import { VisitTracker } from "@/components/visit-tracker";
+import { GoogleOneTap } from "@/components/auth/google-one-tap";
 import { getHighlightedAd } from "@/lib/server/recruitment-service";
+import { getCurrentUser } from "@/lib/server/auth";
 import { siteMetadataBase } from "@/lib/server/site-url";
-import { PATHNAME_HEADER } from "@/lib/shared/csp";
+import { CSP_NONCE_HEADER, PATHNAME_HEADER } from "@/lib/shared/csp";
 import {
   RECRUITMENT_BANNER_COOKIE,
   RECRUITMENT_MODAL_COOKIE,
@@ -137,11 +139,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const cookieName = ad?.highlight === "MODAL" ? RECRUITMENT_MODAL_COOKIE : RECRUITMENT_BANNER_COOKIE;
   const dismissed = ad === null || recruitmentDismissed(cookieStore.get(cookieName)?.value, ad.id);
 
+  // Un visiteur déjà connecté n'a rien à faire de l'invite : `getCurrentUser`
+  // est mémoïsé par requête (`cache()` de React), donc cet appel ne coûte rien
+  // de plus sur les pages où `PublicHeader`/`PublicFooter` le lisent déjà.
+  const user = await getCurrentUser();
+  const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim() || null;
+  // Même nonce que celui que le middleware appose sur les scripts de Next :
+  // c'est lui qui rend le `<script src="…gsi/client">` recevable sous
+  // `strict-dynamic` (voir `lib/shared/csp.ts`).
+  const nonce = requestHeaders.get(CSP_NONCE_HEADER) ?? undefined;
+
   return (
     <html lang="fr">
       <body className={`${titleFont.variable} ${bodyFont.variable} ${sansFont.variable} ${monoFont.variable} ${displayFont.variable}`}>
         <ToastProvider>
           <VisitTracker />
+          {!user && googleClientId && <GoogleOneTap clientId={googleClientId} nonce={nonce} />}
           <RecruitmentHighlight ad={ad} dismissed={dismissed} onAdPage={onRecruitmentPage} />
           {children}
         </ToastProvider>
