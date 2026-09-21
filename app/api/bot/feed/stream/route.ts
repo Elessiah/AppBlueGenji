@@ -13,9 +13,15 @@
  * du flux amont, erreur de lecture, annulation du corps par le runtime, abandon
  * de la requête par le client. Une seule oubliée, et le plafond se referme
  * définitivement au bout de quelques visites.
+ *
+ * Le relais n'est pas un tuyau : il **efface les identifiants Discord** au
+ * passage (`lib/shared/bot-feed-redaction.ts`). C'est ici que le flux devient
+ * public, donc ici que la règle se pose — le rattrapage d'historique du bot
+ * passe par la même porte.
  */
 import { BOT_FEED_OPEN_RULE, enforceRateLimit, requestClientIp } from '@/lib/server/api-guard';
 import { acquireBotFeedSlot } from '@/lib/server/bot-feed-guard';
+import { redactSseChunk } from '@/lib/shared/bot-feed-redaction';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -73,16 +79,35 @@ export async function GET(req: Request): Promise<Response> {
     return new Response(null, { status: 204 });
   }
 
+  // L'effacement travaille sur des **lignes entières** : une trame TCP peut
+  // couper un évènement au milieu d'un identifiant, et un `390973051367`
+  // orphelin ne ressemble plus à rien qu'on sache reconnaître. Ce qui suit le
+  // dernier saut de ligne attend donc la lecture suivante.
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let pending = '';
+
   const body = new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {
         const { done, value } = await reader.read();
         if (done) {
+          // Un reliquat sans saut de ligne final n'est pas une ligne complète,
+          // mais il part quand même effacé : mieux vaut un identifiant tronqué
+          // masqué qu'un identifiant entier laissé passer par la porte de
+          // sortie.
+          if (pending) controller.enqueue(encoder.encode(redactSseChunk(pending)));
           controller.close();
           release();
           return;
         }
-        controller.enqueue(value);
+        pending += decoder.decode(value, { stream: true });
+        const cut = pending.lastIndexOf('\n');
+        // Aucune ligne complète : on ne rend rien, `pull` sera rappelé.
+        if (cut < 0) return;
+        const complete = pending.slice(0, cut + 1);
+        pending = pending.slice(cut + 1);
+        controller.enqueue(encoder.encode(redactSseChunk(complete)));
       } catch (error) {
         release();
         controller.error(error);

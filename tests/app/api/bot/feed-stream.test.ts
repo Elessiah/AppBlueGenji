@@ -180,3 +180,80 @@ describe("GET /api/bot/feed/stream — garde-fous", () => {
     await drain(response);
   });
 });
+
+/**
+ * `/bot` est une page de vitrine : ce qui sort d'ici part à un visiteur sans
+ * compte. Le bot, lui, nomme le joueur par son identifiant Discord — dans le
+ * texte de l'évènement comme dans un champ à part — et rejoue son historique à
+ * chaque connexion. Le relais est le seul endroit qui voie tout ce qui part.
+ */
+describe("GET /api/bot/feed/stream — identifiants Discord", () => {
+  const ID = "390973051367587850";
+
+  /** Collecte le corps relayé, tel qu'un navigateur le recevrait. */
+  async function collect(response: Response): Promise<string> {
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let out = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      out += decoder.decode(value, { stream: true });
+    }
+    return out + decoder.decode();
+  }
+
+  it("efface l'identifiant du résumé et retire le champ qui le porte", async () => {
+    const event = JSON.stringify({
+      id: 9,
+      ts: "2026-09-21 08:21:14",
+      type: "auth",
+      target: ID,
+      summary: `Code DM envoye a ${ID}`,
+    });
+    globalThis.fetch = jest.fn(async () =>
+      upstreamOk([`id: 9\nevent: feed\ndata: ${event}\n\n`]),
+    ) as never;
+
+    const body = await collect(await GET(request()));
+
+    expect(body).not.toContain(ID);
+    expect(body).toContain("Code DM envoye a [masqué]");
+    expect(body).toContain("event: feed");
+    // La clé de reprise reste lisible, sans quoi la reconnexion rejouerait tout.
+    expect(body).toContain("id: 9");
+  });
+
+  it("efface un identifiant coupé entre deux trames", async () => {
+    // Une trame TCP ne respecte pas les lignes : l'identifiant peut arriver en
+    // deux morceaux, dont aucun ne ressemble à un identifiant.
+    const event = `data: {"summary":"Code DM envoye a ${ID}"}\n\n`;
+    globalThis.fetch = jest.fn(async () =>
+      upstreamOk([event.slice(0, 30), event.slice(30)]),
+    ) as never;
+
+    const body = await collect(await GET(request()));
+
+    expect(body).not.toContain(ID);
+    expect(body).toContain("[masqué]");
+  });
+
+  it("efface aussi ce qui arrive sans saut de ligne final", async () => {
+    globalThis.fetch = jest.fn(async () => upstreamOk([`data: {"target":"${ID}"}`])) as never;
+
+    const body = await collect(await GET(request()));
+
+    expect(body).not.toContain(ID);
+  });
+
+  it("laisse passer un évènement qui ne nomme personne", async () => {
+    globalThis.fetch = jest.fn(async () =>
+      upstreamOk([`data: {"id":4,"type":"relay","summary":"lfs vers 6 salon(s)"}\n\n`]),
+    ) as never;
+
+    const body = await collect(await GET(request()));
+
+    expect(body).toContain('"summary":"lfs vers 6 salon(s)"');
+    expect(body).toContain('"id":4');
+  });
+});
