@@ -10,6 +10,7 @@ const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
 const playersList = read("app/(secured)/joueurs/page.tsx");
 const teamsList = read("app/(secured)/equipes/page.tsx");
 const playerDetail = read("app/(secured)/joueurs/[id]/page.tsx");
+const playerCard = read("app/(secured)/joueurs/cards/PlayerCard.tsx");
 
 describe("Annuaires — titres orientés participation", () => {
   it("titre la liste des joueurs « Joueurs inscrits »", () => {
@@ -47,5 +48,20 @@ describe("Fiche joueur — badge d'appartenance", () => {
 
   it("conserve les rôles de plateforme affichés à côté du badge", () => {
     expect(playerDetail).toContain("data.displayRoles.map");
+  });
+});
+
+describe("Carte d'annuaire — « free agent » n'est pas « sans équipe »", () => {
+  it("ne code plus le libellé en dur dans la carte", () => {
+    expect(playerCard).not.toContain(">FREE AGENT<");
+  });
+
+  it("dérive le libellé du statut partagé", () => {
+    expect(playerCard).toContain("PLAYER_ROSTER_STATUS_LABEL[playerRosterStatus(player)]");
+  });
+
+  it("fait passer le filtre et le compteur par le même prédicat", () => {
+    expect(playersList).toContain("isFreeAgent");
+    expect(playersList).not.toContain("p.openToRecruitment === false");
   });
 });
