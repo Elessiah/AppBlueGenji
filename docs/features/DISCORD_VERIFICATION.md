@@ -176,9 +176,14 @@ ferait d'un compte anonymisé un compte « vérifié » sans tag.
   ceux qui ont joué, quand la fiche d'un joueur, elle, les refuse déjà. Deux
   chemins vers la même donnée doivent s'arrêter au même endroit.
 
-La pastille (`components/discord-tag.tsx`, `public/badge-certifie.webp`) n'est
-jamais affichée seule : `discordVerified` suit `discordPseudo` côté serveur, et
-dire « vérifié » d'un tag qu'on ne montre pas n'apprendrait rien à personne.
+La pastille (`components/discord-tag.tsx`, `public/badge-certifie.webp`) s'affiche
+donc **avec ou sans son tag** — `discordVerified` ne suit pas `discordPseudo`, les
+deux champs répondent à deux questions différentes. Le composant n'a qu'un seul
+chemin de rendu pour cette raison : son repli sortait d'abord avant la pastille,
+si bien qu'un joueur certifié dont le tag était filtré n'annonçait rien du tout.
+Un appelant pour qui « pas de tag » *signifie* « pas certifié » — le panneau de
+contacts, dont le serveur n'envoie que des tags certifiés — passe
+`verified={tag !== null}` : la règle reste la sienne, le composant affiche.
 
 Le panneau de contacts met en avant l'engagé **injoignable** (aucun tag certifié
 parmi ses joueurs) : c'est lui qui appelle un geste — relancer le capitaine,
