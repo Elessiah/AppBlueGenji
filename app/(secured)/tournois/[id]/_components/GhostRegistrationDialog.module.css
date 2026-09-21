@@ -112,11 +112,11 @@
   background: rgba(90, 200, 255, 0.1);
 }
 
+/* L'apparence de la case vient de `globals.css`, posée sur l'élément : la ligne
+   n'a plus à la redire — et `width: auto` la rendait justement à sa taille
+   système, celle dont il fallait sortir. */
 .option input {
-  width: auto;
-  margin: 0;
-  accent-color: var(--blue-400, var(--accent-blue));
-  cursor: pointer;
+  align-self: center;
 }
 
 .optionName {

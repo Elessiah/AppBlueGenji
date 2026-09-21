@@ -400,11 +400,10 @@ select.modalInput {
   cursor: pointer;
 }
 
+/* L'apparence de la case vient de `globals.css` — posée sur l'élément, elle vaut
+   partout. Il ne reste ici que ce qui tient à cette ligne-ci. */
 .checkRow input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--blue-500);
-  cursor: pointer;
+  align-self: center;
 }
 
 .modalActions {

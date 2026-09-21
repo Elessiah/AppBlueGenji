@@ -1375,3 +1375,66 @@ html {
   border-color: rgba(90, 200, 255, 0.5) !important;
   background: rgba(90, 200, 255, 0.05) !important;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Cases à cocher — une seule apparence, posée sur l'élément
+
+   Huit écrans posent un `<input type="checkbox">` nu (sélection d'équipes
+   invitées, options de format, confirmation d'un retour en arrière, filtres de
+   recrutement…). Aucun n'était habillé : la case restait celle du système —
+   carré blanc, taille dictée par l'OS, coche bleu Windows — sur un fond noir
+   profond, et deux écrans voisins n'avaient pas la même. Le seul réglage posé
+   ici ou là, `accent-color`, ne teinte que la case **cochée** : décochée, elle
+   restait blanche.
+
+   La règle est donc posée sur l'élément lui-même plutôt que sur une classe ou un
+   composant : une case ajoutée demain hérite de l'apparence sans que personne
+   ait à s'en souvenir — c'est la seule façon de fermer une panne qui tient
+   justement à ce qu'on l'oublie. `.Coche` (pastille à part entière) masque son
+   input en ligne, donc en sort par spécificité, sans conflit.
+
+   La coche est dessinée en `background-image` et non en `::after` : un input est
+   un élément remplacé, ses pseudo-éléments ne sont pas garantis.
+   ───────────────────────────────────────────────────────────────────────────── */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-cy-sm);
+  background: rgba(10, 11, 15, 0.88);
+  cursor: pointer;
+  display: inline-grid;
+  place-content: center;
+  transition: border-color 0.15s ease, background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+input[type="checkbox"]:hover:not(:disabled) {
+  border-color: rgba(var(--blue-rgb), 0.55);
+}
+
+input[type="checkbox"]:checked {
+  border-color: rgba(var(--blue-rgb), 0.8);
+  background-color: var(--blue-500);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%2305060a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M2.5 6.2l2.4 2.4 4.6-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 12px 12px;
+}
+
+/* Un anneau visible au clavier : la case nue n'en avait aucun une fois
+   `appearance` retirée, et c'est le seul repère d'un parcours au clavier. */
+input[type="checkbox"]:focus-visible {
+  outline: none;
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.28);
+}
+
+input[type="checkbox"]:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
