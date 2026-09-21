@@ -443,7 +443,10 @@ export function TournamentForm({
             (`registrationFiltersSummary`). L'organisateur voit donc ce qu'il
             annonce, et non une reformulation qui pourrait en dire autre chose.
           */}
-          <p style={{ ...HINT, margin: "0 0 14px", color: "var(--ink-mute)" }}>
+          <p
+            style={{ ...HINT, margin: "0 0 14px", color: "var(--ink-mute)" }}
+            aria-live="polite"
+          >
             {conditionsSummary === null
               ? "En l'état, ce tournoi est ouvert à tous : aucune condition ne sera affichée."
               : `Les participants liront : « ${conditionsSummary} ».`}
@@ -495,7 +498,10 @@ export function TournamentForm({
               <p id="registration-blizzard-hint" style={HINT}>
                 Un compte Battle.net <em>rattaché</em> depuis « Mon profil » atteste le BattleTag
                 {isSolo ? " du joueur" : " de chaque joueur"} : un tag simplement saisi ne prouve
-                rien. Sans objet sur un tournoi Marvel Rivals.
+                rien.
+                {values.game === "MR"
+                  ? " Sans objet sur un tournoi Marvel Rivals : mieux vaut laisser « Aucun joueur »."
+                  : ""}
               </p>
             </div>
 
