@@ -78,13 +78,24 @@ describe("Discord — configuration", () => {
 });
 
 describe("Discord — avatar", () => {
-  it("compose l'URL du CDN, en GIF pour un avatar animé", () => {
+  it("demande **toujours** un PNG, y compris pour un avatar animé", () => {
+    // Le `.gif` que Discord sert pour une empreinte `a_` condamnait la copie :
+    // `storeImageBuffer` ne connaît que PNG, JPEG et WebP, si bien que tout
+    // compte à avatar animé restait sans photo — sans erreur ni journal, et en
+    // réessayant à chaque connexion.
     expect(discordAvatarUrl({ id: "42", username: "nova", avatar: "a_abc" })).toBe(
-      "https://cdn.discordapp.com/avatars/42/a_abc.gif?size=256",
+      "https://cdn.discordapp.com/avatars/42/a_abc.png?size=256",
     );
     expect(discordAvatarUrl({ id: "42", username: "nova", avatar: "abc" })).toBe(
       "https://cdn.discordapp.com/avatars/42/abc.png?size=256",
     );
+  });
+
+  it("ne demande qu'un format que la chaîne d'import sait ranger", () => {
+    // Le lien entre les deux modules ne se lit nulle part ailleurs : c'est ce
+    // test qui le tient.
+    const url = discordAvatarUrl({ id: "42", username: "nova", avatar: "a_abc" })!;
+    expect(url).toMatch(/\.(png|jpe?g|webp)(\?|$)/);
   });
 
   it("rend `null` quand le compte n'en a pas", () => {

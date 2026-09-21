@@ -89,8 +89,20 @@ export function buildDiscordAuthorizationUrl(state: string): string {
  */
 export function discordAvatarUrl(user: DiscordUserInfo): string | null {
   if (!user.avatar) return null;
-  const extension = user.avatar.startsWith("a_") ? "gif" : "png";
-  return `${CDN_URL}/avatars/${user.id}/${user.avatar}.${extension}?size=256`;
+  // **Toujours `.png`, y compris pour une empreinte `a_` (avatar animé).**
+  //
+  // Demander le `.gif` que Discord sert pour celles-ci condamnait la copie :
+  // `fetchRemoteImage` accepte bien le GIF, mais `storeImageBuffer` ne connaît
+  // que PNG, JPEG et WebP (`ALLOWED_MIME`) et lève `IMAGE_FORMAT_INVALID`. Comme
+  // `importRemoteAvatar` avale tout et rend `null`, tout compte à avatar animé
+  // restait **sans photo** — sans erreur, sans journal, et en réessayant à
+  // chaque connexion pour échouer à l'identique. La branche ne servait donc que
+  // les comptes qu'elle empêchait d'aboutir.
+  //
+  // Le CDN rend la même empreinte en image fixe sous `.png`, et c'est de toute
+  // façon ce qui serait stocké : ce qu'on range est un fichier reconverti par
+  // `sharp`, jamais une animation.
+  return `${CDN_URL}/avatars/${user.id}/${user.avatar}.png?size=256`;
 }
 
 export async function fetchDiscordUser(code: string): Promise<DiscordUserInfo> {

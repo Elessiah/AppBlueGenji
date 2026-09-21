@@ -27,10 +27,12 @@
  * **déjà connecté** quand il rattache, ce qui en est une — et le site n'a plus
  * besoin de collecter d'adresse du tout.
  *
- * Deux contrôles qui ne font pas double emploi, partout : le `SELECT` préalable
- * donne le **refus lisible**, l'index unique de la colonne tranche la **course**
- * entre deux comptes qui rattacheraient la même identité au même instant. Même
- * paire que le sigle d'équipe et que la certification Discord.
+ * Au **rattachement**, deux contrôles qui ne font pas double emploi : le
+ * `SELECT` préalable donne le **refus lisible**, l'index unique de la colonne
+ * tranche la **course** entre deux comptes qui rattacheraient la même identité
+ * au même instant. Même paire que le sigle d'équipe et que la certification
+ * Discord. Au **détachement**, l'ordre s'inverse — c'est l'écriture qui porte la
+ * borne, et le `SELECT` ne vient qu'après pour nommer le refus.
  */
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
