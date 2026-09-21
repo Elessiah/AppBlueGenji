@@ -18,6 +18,7 @@
 import Script from "next/script";
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/toast";
 import { safeRedirectPath } from "@/lib/shared/safe-redirect";
 
 type CredentialResponse = { credential?: string };
@@ -41,6 +42,7 @@ declare global {
 
 export function GoogleOneTap({ clientId, nonce }: { clientId: string; nonce?: string }) {
   const router = useRouter();
+  const { showError, showSuccess } = useToast();
   // Un seul `initialize` par montage : le script peut se recharger sur une
   // navigation client sans que l'effet ne reparte, React 18 `StrictMode` en
   // développement l'exécutant même deux fois pour un seul montage réel.
@@ -68,8 +70,16 @@ export function GoogleOneTap({ clientId, nonce }: { clientId: string; nonce?: st
               headers: { "content-type": "application/json" },
               body: JSON.stringify({ credential: response.credential }),
             });
-            if (!res.ok) return;
+            if (!res.ok) {
+              // Un jeton qui échoue la vérification ne casse rien : le joueur
+              // garde les portes habituelles de `/connexion`. On le dit quand
+              // même — même règle que les trois autres portes — plutôt que de
+              // laisser l'invite disparaître sans explication.
+              showError("La connexion via Google n'a pas pu être vérifiée. Réessaie, ou utilise un autre moyen de connexion.");
+              return;
+            }
 
+            showSuccess("Connexion réussie via Google.");
             // Sur `/connexion`, un `?redirect=` attend d'être honoré, comme pour
             // les trois autres portes. Ailleurs, il n'y en a pas : on reste sur
             // la page, `router.refresh()` suffisant à y refléter la session.
@@ -77,8 +87,9 @@ export function GoogleOneTap({ clientId, nonce }: { clientId: string; nonce?: st
             if (redirectParam) router.push(safeRedirectPath(redirectParam));
             router.refresh();
           } catch {
-            // Échec silencieux : le joueur garde les portes habituelles de
-            // `/connexion`, et rien ne doit interrompre la page qu'il consulte.
+            // Échec réseau : même silence que la panne d'un bouton OAuth
+            // classique — rien à afficher tant qu'on ne sait pas si la requête
+            // a seulement échoué à partir.
           }
         },
       });
@@ -104,7 +115,7 @@ export function GoogleOneTap({ clientId, nonce }: { clientId: string; nonce?: st
       cancelled = true;
       if (pollId !== undefined) window.clearInterval(pollId);
     };
-  }, [clientId, router]);
+  }, [clientId, router, showError, showSuccess]);
 
   return <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" nonce={nonce} />;
 }
