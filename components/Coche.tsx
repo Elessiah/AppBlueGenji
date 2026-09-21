@@ -1,4 +1,6 @@
-import { InputHTMLAttributes } from "react";
+"use client";
+
+import { InputHTMLAttributes, useState } from "react";
 
 type CocheTheme = "tournoi" | "joueur" | "equipe";
 
@@ -26,6 +28,10 @@ export function Coche({
 }: CocheProps) {
   const color = checkedColor || THEME_COLORS[theme].base;
   const rgbColor = checkedColor || THEME_COLORS[theme].rgb;
+  // La case native est masquée : c'est elle qui reçoit le focus, mais la
+  // pastille qui se voit. Sans ce relais, un parcours au clavier traversait le
+  // réglage sans aucun repère à l'écran.
+  const [focused, setFocused] = useState(false);
 
   return (
     <label
@@ -37,16 +43,19 @@ export function Coche({
         borderRadius: 999,
         border: `1px solid ${checked ? `rgba(${rgbColor},0.4)` : "var(--line)"}`,
         background: checked ? `rgba(${rgbColor},0.1)` : "rgba(255,255,255,0.03)",
+        boxShadow: focused ? `0 0 0 3px rgba(${rgbColor},0.28)` : "none",
         cursor: "pointer",
         fontSize: 14,
         userSelect: "none",
-        transition: "border-color 0.15s, background 0.15s",
+        transition: "border-color 0.15s, background 0.15s, box-shadow 0.15s",
       }}
     >
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
+        onFocus={(e) => setFocused(e.currentTarget.matches(":focus-visible"))}
+        onBlur={() => setFocused(false)}
         style={{ position: "absolute", opacity: 0, width: 0, height: 0, pointerEvents: "none" }}
         {...props}
       />
