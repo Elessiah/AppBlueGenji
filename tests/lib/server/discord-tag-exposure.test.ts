@@ -71,7 +71,7 @@ describe("updateOwnProfile — la certification suit le tag", () => {
     // placé après il lirait déjà la valeur neuve — donc ne verrait jamais de
     // changement, donc ne décertifierait jamais rien.
     const caseIndex = update!.sql.indexOf("discord_verified_at = CASE");
-    const assignIndex = update!.sql.indexOf("discord_pseudo = ?");
+    const assignIndex = update!.sql.indexOf("discord_pseudo = CASE");
     expect(caseIndex).toBeGreaterThanOrEqual(0);
     expect(assignIndex).toBeGreaterThan(caseIndex);
   });
@@ -335,5 +335,73 @@ describe("les lectures qui n'ont pas à connaître le tag", () => {
     for (const query of queries.filter((q) => q.sql.includes("FROM bg_users"))) {
       expect(query.sql).not.toContain("discord_pseudo");
     }
+  });
+});
+
+describe("updateOwnProfile — un compte Discord rattaché possède son tag", () => {
+  /** Le `SELECT` du verrou, avec le rattachement et le tag qu'on veut lui faire lire. */
+  const lockedDb = (discordId: string | null, storedTag: string | null) =>
+    fakeDb((sql) =>
+      sql.startsWith("SELECT discord_id, discord_pseudo")
+        ? [[{ discord_id: discordId, discord_pseudo: storedTag }]]
+        : undefined,
+    );
+
+  it("refuse une réécriture du tag quand un compte Discord est rattaché", async () => {
+    lockedDb("100000000000000001", "keryan");
+
+    await expect(updateOwnProfile(7, { discordPseudo: "quelquun_dautre" })).rejects.toThrow(
+      "DISCORD_TAG_LOCKED",
+    );
+  });
+
+  it("laisse passer la sauvegarde qui renvoie le tag déjà stocké", async () => {
+    const { queries } = lockedDb("100000000000000001", "keryan");
+
+    await updateOwnProfile(7, { discordPseudo: "keryan", isAdult: true });
+
+    expect(find(queries, "UPDATE bg_users")).toBeDefined();
+  });
+
+  it("tolère la casse : le formulaire ne renvoie pas toujours l'orthographe exacte", async () => {
+    const { queries } = lockedDb("100000000000000001", "Keryan");
+
+    await updateOwnProfile(7, { discordPseudo: "keryan" });
+
+    expect(find(queries, "UPDATE bg_users")).toBeDefined();
+  });
+
+  it("traite un tag absent des deux côtés comme inchangé", async () => {
+    const { queries } = lockedDb("100000000000000001", null);
+
+    await updateOwnProfile(7, { discordPseudo: null });
+
+    expect(find(queries, "UPDATE bg_users")).toBeDefined();
+  });
+
+  it("n'oppose aucun verrou à un compte sans Discord rattaché", async () => {
+    const { queries } = lockedDb(null, "ancien_tag");
+
+    await updateOwnProfile(7, { discordPseudo: "nouveau_tag" });
+
+    expect(find(queries, "UPDATE bg_users")).toBeDefined();
+  });
+
+  it("garde le tag dans l'écriture elle-même — le refus lisible ne tient pas la course", async () => {
+    const { queries } = lockedDb(null, null);
+
+    await updateOwnProfile(7, { discordPseudo: "keryan" });
+
+    const sql = find(queries, "UPDATE bg_users")!.sql;
+    expect(sql).toContain("discord_pseudo = CASE WHEN discord_id IS NOT NULL THEN discord_pseudo");
+  });
+
+  it("ne décertifie pas un compte rattaché, dont le tag ne peut pas bouger", async () => {
+    const { queries } = lockedDb(null, null);
+
+    await updateOwnProfile(7, {});
+
+    const sql = find(queries, "UPDATE bg_users")!.sql;
+    expect(sql).toContain("WHEN discord_id IS NOT NULL OR discord_pseudo <=> ?");
   });
 });

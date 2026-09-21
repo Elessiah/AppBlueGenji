@@ -19,6 +19,22 @@ async function mockDb(execute: jest.Mock) {
   });
 }
 
+/**
+ * L'écriture du profil parmi les requêtes du mock.
+ *
+ * `updateOwnProfile` relit d'abord le rattachement Discord (le tag d'un compte
+ * rattaché ne se réécrit pas), si bien que l'`UPDATE` n'est plus le premier
+ * appel : le repérer par son texte plutôt que par son rang garde ces assertions
+ * valables au prochain contrôle ajouté devant.
+ */
+function profileUpdate(execute: jest.Mock): [string, unknown[]] {
+  const call = (execute.mock.calls as [string, unknown[]][]).find(([sql]) =>
+    sql.includes("UPDATE bg_users"),
+  );
+  if (!call) throw new Error("aucun UPDATE bg_users");
+  return call;
+}
+
 describe("updateOwnProfile — pseudo non masquable + ouverture au recrutement", () => {
   beforeEach(() => jest.clearAllMocks());
   afterEach(() => jest.restoreAllMocks());
@@ -29,7 +45,7 @@ describe("updateOwnProfile — pseudo non masquable + ouverture au recrutement",
 
     await updateOwnProfile(42, { visibility: { avatar: false } });
 
-    const [sql] = execute.mock.calls[0] as [string];
+    const [sql] = profileUpdate(execute);
     expect(sql).not.toMatch(/visible_pseudo/);
     expect(sql).toMatch(/visible_avatar = COALESCE\(\?, visible_avatar\)/);
   });
@@ -40,7 +56,7 @@ describe("updateOwnProfile — pseudo non masquable + ouverture au recrutement",
 
     await updateOwnProfile(42, { openToRecruitment: false });
 
-    const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = profileUpdate(execute);
     expect(sql).toMatch(/open_to_recruitment = COALESCE\(\?, open_to_recruitment\)/);
     // Dernier paramètre avant l'id = open_to_recruitment.
     expect(params[params.length - 2]).toBe(false);
@@ -53,7 +69,7 @@ describe("updateOwnProfile — pseudo non masquable + ouverture au recrutement",
 
     await updateOwnProfile(42, { isAdult: true });
 
-    const [, params] = execute.mock.calls[0] as [string, unknown[]];
+    const [, params] = profileUpdate(execute);
     // `null` → COALESCE conserve la valeur en base.
     expect(params[params.length - 2]).toBeNull();
   });
