@@ -8,6 +8,7 @@ import {
   headerIdentityLine,
   headerMetaItems,
 } from "@/app/(secured)/tournois/[id]/_lib/header-meta";
+import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import type {
   TournamentCard,
   TournamentFormat,
@@ -38,6 +39,9 @@ function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
     phases: null,
     matchFormat: null,
     endurancePlayoffFormat: null,
+    // Conditions d'inscription : les défauts du module partagé, qui sont aussi
+    // ceux que la migration a posés sur les tournois existants.
+    registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
     liveUrl: null,
     ...overrides,
   };
@@ -326,5 +330,49 @@ describe("en-tête de tournoi — mise en page", () => {
     // Ni l'état du tournoi ni celui d'une phase ne sont des diffusions.
     expect(HEADER).not.toContain('variant="live"');
     expect(PHASE_TIMELINE).not.toContain('variant="live"');
+  });
+});
+
+/**
+ * Conditions d'inscription dans l'en-tête.
+ *
+ * Elles disent qui a le droit d'entrer, pas comment le tournoi se joue : passé le
+ * coup d'envoi, plus personne n'entre, et les garder afficherait une condition
+ * d'accès comme un trait de palmarès.
+ */
+describe("en-tête de tournoi — conditions d'inscription", () => {
+  const conditions = (overrides: Partial<TournamentCard> = {}) =>
+    headerMetaItems(card(overrides), null, null, NOW).find(
+      (item) => item.key === "registration-conditions",
+    );
+
+  it("annonce les conditions avant et pendant les inscriptions", () => {
+    for (const state of ["UPCOMING", "REGISTRATION"] as const) {
+      const item = conditions({ state });
+      expect(item?.value).toContain("5 joueurs minimum");
+      expect(item?.value).toContain("Discord vérifié");
+    }
+  });
+
+  it("les retire dès le coup d'envoi", () => {
+    for (const state of ["RUNNING", "FINISHED"] as const) {
+      expect(conditions({ state })).toBeUndefined();
+    }
+  });
+
+  it("n'affiche rien quand le tournoi n'exige rien", () => {
+    expect(
+      conditions({ registrationFilters: { discordRequirement: "NONE", minPlayers: 1 } }),
+    ).toBeUndefined();
+  });
+
+  it("retire l'effectif en tournoi individuel : l'annoncer serait faux", () => {
+    const item = conditions({ participantType: "SOLO" });
+    expect(item?.value).not.toContain("joueurs minimum");
+    expect(item?.value).toContain("Discord vérifié");
+  });
+
+  it("dit au survol que les équipes invitées n'y sont pas soumises", () => {
+    expect(conditions()?.hint).toMatch(/staff/i);
   });
 });

@@ -20,6 +20,12 @@ import {
   type MatchFormatType,
 } from "@/lib/shared/match-format";
 import { participantWording, type ParticipantType } from "@/lib/shared/participants";
+import {
+  DISCORD_REQUIREMENT_LABELS,
+  MIN_PLAYERS_BOUNDS,
+  registrationFiltersSummary,
+  type DiscordRequirement,
+} from "@/lib/shared/registration-filters";
 import type { TournamentField } from "@/lib/shared/tournament-edit";
 import { useToast } from "@/components/ui/toast";
 import { CyberCard, CyberButton } from "@/components/cyber";
@@ -101,6 +107,14 @@ export function TournamentForm({
 
   const { format, maxTeams, phases } = values;
   const wording = participantWording(values.participantType);
+  const isSolo = values.participantType === "SOLO";
+  const conditionsSummary = registrationFiltersSummary(
+    {
+      discordRequirement: values.registrationDiscordRequirement,
+      minPlayers: values.registrationMinPlayers,
+    },
+    isSolo,
+  );
 
   const matchFormatType: MatchFormatType | "LIBRE" = values.matchFormat?.type ?? "LIBRE";
   const matchFormatValue = values.matchFormat?.value ?? lastMatchFormatValue;
@@ -409,6 +423,82 @@ export function TournamentForm({
               lockedAttr={lockedAttr}
               onSwissTotalRoundsChange={setSwissTotalRounds}
             />
+          </div>
+        </section>
+
+        <section style={SECTION_SEPARATOR}>
+          <p className="eyebrow" style={EYEBROW}>
+            Conditions d&apos;inscription
+          </p>
+          <p style={{ ...HINT, margin: "0 0 14px" }}>
+            Contrôlées à chaque inscription d&apos;un joueur. Les{" "}
+            <strong>équipes fantômes</strong> inscrites par le staff n&apos;y sont pas soumises, et
+            les engagés déjà inscrits ne sont jamais relus.
+          </p>
+          {/*
+            La phrase que liront les engagés, telle quelle : c'est la même
+            fonction qui l'écrit sur la fiche du tournoi
+            (`registrationFiltersSummary`). L'organisateur voit donc ce qu'il
+            annonce, et non une reformulation qui pourrait en dire autre chose.
+          */}
+          <p style={{ ...HINT, margin: "0 0 14px", color: "var(--ink-mute)" }}>
+            {conditionsSummary === null
+              ? "En l'état, ce tournoi est ouvert à tous : aucune condition ne sera affichée."
+              : `Les participants liront : « ${conditionsSummary} ».`}
+          </p>
+          <div className="form-grid" style={GRID}>
+            <div className="field">
+              <label htmlFor="registration-discord">Discord vérifié</label>
+              <select
+                id="registration-discord"
+                disabled={locked("registrationDiscordRequirement")}
+                value={values.registrationDiscordRequirement}
+                onChange={(e) =>
+                  set("registrationDiscordRequirement", e.target.value as DiscordRequirement)
+                }
+                aria-describedby="registration-discord-hint"
+                {...lockedAttr("registrationDiscordRequirement")}
+              >
+                {(["ANY_PLAYER", "ALL_PLAYERS", "NONE"] as DiscordRequirement[]).map((value) => (
+                  <option key={value} value={value}>
+                    {DISCORD_REQUIREMENT_LABELS[value]}
+                  </option>
+                ))}
+              </select>
+              <p id="registration-discord-hint" style={HINT}>
+                Un tag Discord <em>vérifié</em> est un tag dont le joueur a prouvé qu&apos;il lui
+                appartient : c&apos;est la seule façon pour l&apos;organisation de joindre
+                {isSolo ? " le joueur" : " l'équipe"} pendant le tournoi.
+              </p>
+            </div>
+
+            {/*
+              L'effectif minimal ne s'affiche pas en tournoi individuel : un
+              engagé y est **une** personne, et la condition n'y est pas lue
+              (`checkRegistrationFilters`). Montrer « 5 joueurs minimum » sur un
+              tournoi solo annoncerait une condition fausse. La valeur reste
+              enregistrée, prête à resservir si le type de participants rebascule.
+            */}
+            {!isSolo && (
+              <div className="field">
+                <label htmlFor="registration-min-players">Joueurs minimum dans l&apos;équipe</label>
+                <input
+                  id="registration-min-players"
+                  type="number"
+                  min={MIN_PLAYERS_BOUNDS.min}
+                  max={MIN_PLAYERS_BOUNDS.max}
+                  disabled={locked("registrationMinPlayers")}
+                  value={values.registrationMinPlayers}
+                  onChange={(e) => set("registrationMinPlayers", Number(e.target.value))}
+                  aria-describedby="registration-min-players-hint"
+                  {...lockedAttr("registrationMinPlayers")}
+                />
+                <p id="registration-min-players-hint" style={HINT}>
+                  Membres actifs du roster, coach et manager compris. {MIN_PLAYERS_BOUNDS.min} =
+                  aucune exigence.
+                </p>
+              </div>
+            )}
           </div>
         </section>
 

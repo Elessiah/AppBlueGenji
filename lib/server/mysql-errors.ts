@@ -43,3 +43,20 @@ export function isTransactionAborted(error: unknown): boolean {
 export function isMissingTableError(error: unknown): boolean {
   return errorCode(error) === "ER_NO_SUCH_TABLE";
 }
+
+/**
+ * `true` si l'écriture a buté sur une contrainte d'unicité.
+ *
+ * Le motif est toujours le même dans ce projet : un `SELECT` préalable donne le
+ * refus **lisible** (« ce tag est déjà certifié »), l'index unique tranche la
+ * **course** entre deux écritures simultanées que ce `SELECT` ne peut pas voir.
+ * Les deux ne font pas double emploi, et c'est cette seconde moitié que le
+ * prédicat sert à traduire.
+ *
+ * Il ne dit **pas laquelle** des contraintes a cédé : une table qui en porte
+ * plusieurs (`bg_teams` : le nom et le sigle) doit lire le nom de l'index, ce
+ * que fait `mapTeamTagConflict`. Là où il n'y en a qu'une, ce prédicat suffit.
+ */
+export function isDuplicateEntryError(error: unknown): boolean {
+  return errorCode(error) === "ER_DUP_ENTRY";
+}

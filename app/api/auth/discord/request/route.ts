@@ -68,7 +68,10 @@ export async function POST(req: Request) {
     // masque alors le champ « pseudo site », réservé à la première connexion.
     const isNewAccount = !(await discordAccountExists(discordId));
 
-    const challenge = await createDiscordLoginChallenge(discordId);
+    // Le tag part avec le défi : c'est lui qui sera certifié si le code
+    // revient juste (`consumeDiscordChallenge`). Un identifiant numérique n'en
+    // est pas un, `normalizeDiscordHandle` le laisse tomber.
+    const challenge = await createDiscordLoginChallenge(discordId, handle);
 
     try {
       await sendDiscordLoginCode(discordId, challenge.code);

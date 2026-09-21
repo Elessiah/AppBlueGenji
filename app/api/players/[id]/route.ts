@@ -12,7 +12,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     return fail("INVALID_ID", 400);
   }
 
-  const profile = await getFullProfile(user.id, targetId, user.isAdmin);
+  const profile = await getFullProfile(user, targetId);
   if (!profile) return fail("PLAYER_NOT_FOUND", 404);
 
   return ok(profile);

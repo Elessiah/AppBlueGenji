@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { TeamLink } from "@/components/entity-link";
+import { DiscordTag } from "@/components/discord-tag";
 import { useParams, useRouter } from "next/navigation";
 import { UserAvatar } from "@/components/user-avatar";
 import { formatLocalDate } from "@/lib/shared/dates";
@@ -186,6 +187,34 @@ export default function PlayerDetailPage() {
           <div className="field">
             <label>Tag Marvel Rivals</label>
             <input value={data.profile.marvelRivalsTag || "Masqué"} readOnly />
+          </div>
+          {/*
+            Même convention que ses deux voisins : « Masqué » couvre aussi bien
+            le tag filtré que le tag absent, et c'est ce qui le rend sûr — les
+            deux cas sont indiscernables, donc l'affichage ne dit rien de plus
+            que ce qu'il montre.
+
+            La **pastille**, elle, ne dépend pas du tag : elle dit que le joueur
+            est joignable par l'organisation, pas comment. C'est ce qui permet à
+            un capitaine de voir qui de son roster remplit la condition
+            « tous les Discord vérifiés » d'un tournoi.
+          */}
+          <div className="field">
+            <label>Discord</label>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                minHeight: 38,
+                padding: "0 2px",
+              }}
+            >
+              <DiscordTag
+                tag={data.profile.discordPseudo}
+                verified={data.profile.discordVerified}
+                fallback="Masqué"
+              />
+            </div>
           </div>
           <div className="field">
             <label>Majorité</label>

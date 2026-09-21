@@ -22,6 +22,18 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     // (`OWNER`/`MANAGER`, voir `lib/shared/team-roles.ts`).
     if (message === "NOT_TEAM_MANAGER") return fail(message, 403);
 
+    // Conditions d'inscription non remplies (`lib/shared/registration-filters.ts`).
+    // **409 et non 400** : la saisie est bonne, c'est l'état de l'équipe qui ne
+    // convient pas — et il se corrige (recruter, certifier un tag), ce qu'un
+    // « requête invalide » ne laisserait pas entendre.
+    if (
+      message === "TEAM_TOO_FEW_PLAYERS"
+      || message === "TEAM_NEEDS_VERIFIED_DISCORD"
+      || message === "TEAM_NEEDS_ALL_VERIFIED_DISCORD"
+    ) {
+      return fail(message, 409);
+    }
+
     if (
       message === "NO_ACTIVE_TEAM"
       || message === "REGISTRATION_CLOSED"

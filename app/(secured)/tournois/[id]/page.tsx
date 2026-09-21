@@ -34,6 +34,8 @@ import { LiveProvider } from "./_lib/live-context";
 import { IssueReportProvider } from "./_lib/issue-report-context";
 import { IssueReportDialog } from "./_components/IssueReportDialog";
 import { RegistrationsPanel } from "./_components/RegistrationsPanel";
+import { EntrantContactsPanel } from "./_components/EntrantContactsPanel";
+import { tournamentGrantsContactAccess } from "@/lib/shared/discord-identity";
 import { BracketPreview } from "./_components/BracketPreview";
 import { MatchScoreDraft } from "./_components/BracketTree";
 import { BracketSections } from "./_components/BracketSections";
@@ -762,6 +764,22 @@ export default function TournamentDetailPage() {
           canAct={!frozen}
           onChanged={() => void refresh()}
         />
+
+        {/* Contacts Discord : sous la liste des engagés, dont il prolonge la
+            lecture — on vient d'y voir qui joue, on y lit ensuite comment les
+            joindre. Réservé au staff `tournaments` (`detail.isAdmin` porte cette
+            permission, cf. `TournamentViewerContext`), la route le revérifiant
+            de son côté. Affiché même quand le suivi du tournoi est en échec :
+            c'est une lecture, elle n'écrit rien, et un incident est précisément
+            le moment où joindre les engagés devient urgent.
+
+            Il disparaît en revanche sur un tournoi **clos**
+            (`tournamentGrantsContactAccess`) : le besoin de joindre un engagé
+            naît du tournoi et s'éteint avec lui, et la route refuse de toute
+            façon — un panneau qui ne rendrait qu'un toast n'a rien à faire là. */}
+        {detail.isAdmin && tournamentGrantsContactAccess(detail.card.state) && (
+          <EntrantContactsPanel tournamentId={detail.card.id} />
+        )}
 
         <TournamentProgress detail={detail} />
 

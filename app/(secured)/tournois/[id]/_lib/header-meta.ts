@@ -1,6 +1,7 @@
 import { matchFormatLabel, matchFormatDescription } from "@/lib/shared/match-format";
 import { FORMAT_LABELS, GAME_LABELS } from "@/lib/shared/tournament-labels";
-import { participantWording } from "@/lib/shared/participants";
+import { isSoloTournament, participantWording } from "@/lib/shared/participants";
+import { registrationFiltersSummary } from "@/lib/shared/registration-filters";
 import type {
   TournamentCard,
   TournamentPhase,
@@ -159,6 +160,27 @@ export function headerMetaItems(
     kind: "count",
     ratio: card.maxTeams > 0 ? Math.min(1, card.registeredTeams / card.maxTeams) : 0,
   });
+
+  // Conditions d'inscription, tant qu'elles peuvent encore servir à quelqu'un :
+  // elles ne disent pas comment le tournoi se joue mais qui a le droit d'y
+  // entrer, et une fois le plateau lancé plus personne n'entre. Les garder
+  // affichées sur un tournoi terminé transformerait une condition d'accès en
+  // trait de palmarès.
+  if (card.state === "UPCOMING" || card.state === "REGISTRATION") {
+    const conditions = registrationFiltersSummary(
+      card.registrationFilters,
+      isSoloTournament(card.participantType),
+    );
+    if (conditions) {
+      items.push({
+        key: "registration-conditions",
+        label: "Conditions d'inscription",
+        value: conditions,
+        kind: "text",
+        hint: "Contrôlées à l'inscription d'un joueur ; les équipes invitées par le staff n'y sont pas soumises.",
+      });
+    }
+  }
 
   const registration = registrationDateItem(card, now);
   if (registration) items.push(registration);

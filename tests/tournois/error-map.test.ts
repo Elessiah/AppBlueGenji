@@ -122,3 +122,69 @@ describe("mapEntrantError", () => {
     expect(mapEntrantError("REGISTRATION_CLOSED", "Alpha")).not.toContain("REGISTRATION_CLOSED");
   });
 });
+
+/**
+ * Les refus des conditions d'inscription.
+ *
+ * Trois codes, trois messages distincts : chacun doit nommer **le geste qui le
+ * lève** (recruter, ou certifier un tag), faute de quoi le capitaine ne sait pas
+ * laquelle des deux conditions a bloqué.
+ */
+describe("conditions d'inscription", () => {
+  it("dit de recruter quand l'effectif manque", () => {
+    expect(mapError("TEAM_TOO_FEW_PLAYERS")).toMatch(/recrute/i);
+  });
+
+  it("distingue « au moins un » de « tous », et renvoie au profil", () => {
+    const any = mapError("TEAM_NEEDS_VERIFIED_DISCORD");
+    const all = mapError("TEAM_NEEDS_ALL_VERIFIED_DISCORD");
+
+    expect(any).toMatch(/au moins un/i);
+    expect(all).toMatch(/tous/i);
+    expect(any).not.toBe(all);
+    for (const message of [any, all]) {
+      // Le geste se fait sur sa fiche de profil : le message doit y mener.
+      expect(message).toMatch(/profil/i);
+    }
+  });
+
+  it("ne laisse sortir aucun code brut", () => {
+    for (const code of [
+      "TEAM_TOO_FEW_PLAYERS",
+      "TEAM_NEEDS_VERIFIED_DISCORD",
+      "TEAM_NEEDS_ALL_VERIFIED_DISCORD",
+      "INVALID_DISCORD_REQUIREMENT",
+      "INVALID_MIN_PLAYERS",
+    ]) {
+      expect(mapError(code)).not.toContain(code);
+    }
+  });
+});
+
+/**
+ * Les deux refus du panneau de contacts.
+ *
+ * `mapError` rend le code lui-même quand il ne le connaît pas, si bien qu'un
+ * refus oublié ici ne casse rien : il s'affiche en capitales dans un toast. Les
+ * **deux** refus de `GET /api/admin/tournaments/[id]/contacts` doivent donc y
+ * figurer — le second (`TOURNAMENT_FINISHED`) est atteignable même si le panneau
+ * n'est pas rendu sur un tournoi clos, la clôture pouvant tomber entre le rendu
+ * et le clic.
+ */
+describe("contacts d'un plateau", () => {
+  it("traduit les deux refus de la route, sans laisser sortir leur code", () => {
+    for (const code of ["CONTACTS_LOAD_FAILED", "TOURNAMENT_FINISHED"]) {
+      const message = mapError(code);
+      expect(message).not.toContain(code);
+      expect(message).not.toBe(code);
+    }
+  });
+
+  it("dit que le tournoi est terminé, et non qu'un droit manque", () => {
+    // Le refus n'est pas une question de permission : l'arbitre a bien le droit,
+    // c'est la fenêtre qui s'est fermée. Un « tu n'as pas les droits » l'enverrait
+    // demander un rôle qu'il détient déjà.
+    expect(mapError("TOURNAMENT_FINISHED")).toMatch(/termin/i);
+    expect(mapError("TOURNAMENT_FINISHED")).not.toMatch(/droit/i);
+  });
+});

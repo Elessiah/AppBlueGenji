@@ -1,0 +1,75 @@
+/*
+ * Contacts Discord d'un plateau.
+ *
+ * Une liste par engagé plutôt qu'un tableau à colonnes : le nombre de joueurs
+ * varie d'un engagé à l'autre (une fantôme n'en a aucun, une entrée solo un
+ * seul), et une grille figée aurait laissé des cases vides à interpréter.
+ */
+.hint {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.group {
+  padding: 10px 12px;
+  border: 1px solid var(--line, var(--line-soft));
+  border-radius: var(--r-cy-sm, 6px);
+}
+
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.teamName {
+  font-size: 14px;
+  color: var(--ink, var(--text-0));
+}
+
+/*
+ * L'engagé qu'on ne peut pas joindre.
+ *
+ * Ambre et non rouge : ce n'est pas une faute, c'est une information qui appelle
+ * une relance — le rouge est réservé à ce qui est à l'antenne (voir CLAUDE.md).
+ */
+.unreachable {
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--amber, #ffb347) 45%, transparent);
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--amber, #ffb347);
+}
+
+.members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.pseudo {
+  color: var(--text-1, var(--ink));
+}

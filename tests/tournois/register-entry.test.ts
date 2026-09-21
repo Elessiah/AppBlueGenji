@@ -1,13 +1,20 @@
 import { describe, expect, it } from "@jest/globals";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { registerBlockedNotice } from "@/app/(secured)/tournois/[id]/_lib/register-entry";
+import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 
 function detail(overrides: Partial<TournamentDetail> = {}): TournamentDetail {
   return {
-    card: { id: 7, state: "REGISTRATION" },
+    card: {
+      id: 7,
+      state: "REGISTRATION",
+      participantType: "TEAM",
+      registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
+    },
     registrations: [],
     canRegister: false,
     canRegisterEntrant: false,
+    registrationBlock: null,
     myTeamId: 10,
     ...overrides,
   } as unknown as TournamentDetail;
@@ -48,6 +55,33 @@ describe("registerBlockedNotice", () => {
         }),
       ),
     ).toBeNull();
+  });
+
+  /**
+   * Les conditions d'inscription.
+   *
+   * Le bouton se ferme sur elles ; la phrase qui prend sa place doit nommer le
+   * geste qui les lève, sans quoi le lecteur voit un bouton disparaître sans
+   * savoir s'il doit recruter ou certifier un tag.
+   */
+  it("nomme le geste qui lève la condition", () => {
+    const notice = registerBlockedNotice(
+      detail({ canRegisterEntrant: true, registrationBlock: "TEAM_TOO_FEW_PLAYERS" }),
+    );
+
+    expect(notice).toMatch(/recrute/i);
+    // Pas la condition chiffrée : elle est affichée deux lignes plus haut, dans
+    // la case « Conditions d'inscription » du même en-tête.
+    expect(notice).not.toContain("5 joueurs minimum");
+  });
+
+  it("passe avant le refus de qualité : elle désigne un geste, l'autre renvoie à quelqu'un", () => {
+    const notice = registerBlockedNotice(
+      detail({ canRegisterEntrant: false, registrationBlock: "TEAM_NEEDS_VERIFIED_DISCORD" }),
+    );
+
+    expect(notice).toMatch(/Discord/);
+    expect(notice).not.toMatch(/propriétaire et les managers/);
   });
 
   it("parle encore quand une **autre** équipe est engagée", () => {

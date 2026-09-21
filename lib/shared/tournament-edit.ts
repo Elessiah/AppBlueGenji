@@ -43,6 +43,8 @@ export const ALL_TOURNAMENT_FIELDS = [
   "enduranceMaxRounds",
   "matchFormat",
   "endurancePlayoffFormat",
+  "registrationDiscordRequirement",
+  "registrationMinPlayers",
   "phases",
 ] as const;
 
@@ -63,6 +65,15 @@ export const RESTRICTED_FIELDS: readonly TournamentField[] = [
   "registrationCloseAt",
   "startAt",
   "maxTeams",
+  // Les conditions d'inscription survivent à la publication, et c'est
+  // délibéré : elles se jugent **à l'écriture** d'une inscription, jamais
+  // rétroactivement. Un tournoi annoncé où personne ne peut s'inscrire — cinq
+  // joueurs exigés sur un plateau d'équipes à quatre — doit pouvoir être ouvert
+  // sans être recréé. Les engagés déjà inscrits ne sont pas relus : durcir la
+  // condition ne renvoie personne chez lui, c'est le retrait d'un engagé qui
+  // s'en charge (`docs/features/ENTRANT_REMOVAL.md`).
+  "registrationDiscordRequirement",
+  "registrationMinPlayers",
 ];
 
 /**

@@ -431,3 +431,56 @@ describe("validateTournamentInput — plafond de maps, égalités, format des pl
     expect(value(survie).endurancePlayoffFormat).toBeNull();
   });
 });
+
+/**
+ * Conditions d'inscription.
+ *
+ * Elles se distinguent de tous les réglages voisins sur un point : **rien n'est
+ * neutralisé hors d'un format**. Le barème suisse, l'endurance, la petite finale
+ * décrivent le déroulé d'un tournoi et tombent quand le format change ; les
+ * conditions décrivent qui a le droit d'entrer, question que les six formats
+ * posent à l'identique. Voir `docs/features/REGISTRATION_FILTERS.md`.
+ */
+describe("validateTournamentInput — conditions d'inscription", () => {
+  it("applique les défauts quand rien n'est envoyé", () => {
+    expect(value(base).registrationFilters).toEqual({
+      discordRequirement: "ANY_PLAYER",
+      minPlayers: 5,
+    });
+  });
+
+  it("garde ce qui est envoyé, quel que soit le format", () => {
+    for (const format of ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL", "BG_SURVIE"] as const) {
+      const v = value({
+        ...base,
+        format,
+        // Les formats à réglages obligatoires ont besoin des leurs pour passer.
+        survivalRoundsPerCut: format === "SURVIVAL" ? 2 : undefined,
+        registrationDiscordRequirement: "NONE",
+        registrationMinPlayers: 1,
+      });
+      expect(v.registrationFilters).toEqual({ discordRequirement: "NONE", minPlayers: 1 });
+    }
+  });
+
+  it("refuse une exigence Discord inconnue", () => {
+    expect(
+      validateTournamentInput({ ...base, registrationDiscordRequirement: "MOST_PLAYERS" }),
+    ).toEqual({ error: "INVALID_DISCORD_REQUIREMENT" });
+  });
+
+  it("refuse un effectif minimal hors bornes", () => {
+    for (const minPlayers of [0, -2, 21, 2.5]) {
+      expect(validateTournamentInput({ ...base, registrationMinPlayers: minPlayers })).toEqual({
+        error: "INVALID_MIN_PLAYERS",
+      });
+    }
+  });
+
+  it("garde l'effectif minimal sur un tournoi individuel", () => {
+    // Le moteur ne le lira pas (`checkRegistrationFilters`), mais le neutraliser
+    // ici le ferait perdre au premier aller-retour par `SOLO`.
+    const v = value({ ...base, participantType: "SOLO", registrationMinPlayers: 7 });
+    expect(v.registrationFilters.minPlayers).toBe(7);
+  });
+});

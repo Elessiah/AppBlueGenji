@@ -10,6 +10,7 @@ import { RgpdConsentModal } from "@/components/cyber/RgpdConsentModal";
 import { DEFAULT_REDIRECT, safeRedirectPath } from "@/lib/shared/safe-redirect";
 import { loginErrorMessage } from "./_lib/login-errors";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
+import { isCertifiableDiscordHandle } from "@/lib/shared/discord-identity";
 
 const CONSENT_STORAGE_KEY = "bg_rgpd_consent";
 
@@ -209,6 +210,32 @@ export default function LoginPage() {
                   value={handle}
                   disabled
                 />
+                {/*
+                  **La seule annonce de l'exposition sur ce chemin-ci.** Entrer
+                  par Discord *est* la preuve que la certification demande
+                  (`lib/shared/discord-identity.ts`), si bien que ce code
+                  certifie le tag tout seul — sans passer par le dialogue de
+                  `/profil`, qui est l'endroit où l'exposition est d'ordinaire
+                  énoncée public par public. Sans cette phrase, un membre qui
+                  n'avait jamais renseigné son tag le verrait s'ouvrir à
+                  l'organisation sans qu'on le lui ait dit. Le geste
+                  d'annulation est nommé, parce qu'il faut savoir qu'il y a
+                  quelque chose à annuler.
+
+                  Elle ne s'affiche **que si la saisie est un tag** : un
+                  identifiant numérique (le repli quand le bot ne partage aucun
+                  serveur) ne certifie rien, et promettre une certification qui
+                  n'aura pas lieu est pire que se taire. Le prédicat est celui
+                  du serveur, pas une seconde lecture du même motif.
+                */}
+                {isCertifiableDiscordHandle(handle) && (
+                  <span className="mono" style={{ fontSize: 10, color: "var(--ink-dim)", letterSpacing: "0.08em", marginTop: 4, lineHeight: 1.5 }}>
+                    Te connecter par Discord <strong>certifie ce tag</strong> : les administrateurs
+                    le voient, et les arbitres tant que tu es engagé dans un tournoi. Jamais
+                    personne d&apos;autre. Modifier ton tag depuis <em>Mon profil</em> annule la
+                    certification.
+                  </span>
+                )}
               </div>
               <div className="field">
                 <label>Code reçu en DM (6 chiffres)</label>

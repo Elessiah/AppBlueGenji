@@ -8,6 +8,8 @@ import { Coche } from "@/components/Coche";
 import type { FullProfileResponse } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { TeamLink } from "@/components/entity-link";
+import { VerifiedBadge } from "@/components/discord-tag";
+import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 
 // Le pseudo n'est plus masquable : identité de base du joueur sur la plateforme.
 const VISIBILITY_LABELS: Record<string, string> = {
@@ -29,6 +31,15 @@ export default function ProfilePage() {
   const [overwatchBattletag, setOverwatchBattletag] = useState("");
   const [marvelRivalsTag, setMarvelRivalsTag] = useState("");
   const [discordPseudo, setDiscordPseudo] = useState("");
+  // État Discord du compte, lu à part du formulaire : la certification porte sur
+  // ce qui est **enregistré**, pas sur ce qui est en train d'être tapé. Un champ
+  // modifié sans être sauvegardé ne doit ni gagner ni perdre la pastille.
+  const [discordState, setDiscordState] = useState<{
+    tag: string | null;
+    verified: boolean;
+    linked: boolean;
+  }>({ tag: null, verified: false, linked: false });
+  const [verifyOpen, setVerifyOpen] = useState(false);
   const [isAdult, setIsAdult] = useState<string>("unknown");
   const [deleting, setDeleting] = useState(false);
   const [openToRecruitment, setOpenToRecruitment] = useState(true);
@@ -53,8 +64,19 @@ export default function ProfilePage() {
     }
   };
 
+  const loadDiscordState = async () => {
+    try {
+      const res = await fetch("/api/profile/discord", { cache: "no-store" });
+      if (!res.ok) return;
+      setDiscordState((await res.json()) as { tag: string | null; verified: boolean; linked: boolean });
+    } catch {
+      // silencieux : le formulaire reste utilisable sans la pastille.
+    }
+  };
+
   useEffect(() => {
     loadInvitations();
+    loadDiscordState();
   }, []);
 
   const respondInvitation = async (invitationId: number, accept: boolean) => {
@@ -123,6 +145,10 @@ export default function ProfilePage() {
       const payload = (await response.json()) as FullProfileResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "PROFILE_UPDATE_FAILED");
       setData(payload);
+      // Une sauvegarde qui change le tag **annule la certification** côté
+      // serveur : la pastille doit tomber dans le même geste, sinon l'écran
+      // annonce une exposition qui n'existe plus.
+      await loadDiscordState();
       showSuccess("Profil mis à jour.");
     } catch (e) {
       showError((e as Error).message);
@@ -202,6 +228,18 @@ export default function ProfilePage() {
 
   return (
     <section className="fade-in">
+      {verifyOpen && (
+        <DiscordVerificationDialog
+          initialTag={discordPseudo}
+          linked={discordState.linked}
+          onClose={() => setVerifyOpen(false)}
+          onVerified={(tag) => {
+            setVerifyOpen(false);
+            setDiscordPseudo(tag);
+            setDiscordState((prev) => ({ ...prev, tag, verified: true, linked: true }));
+          }}
+        />
+      )}
       <div className="ds-header">
         <div className="ds-header-body" style={{ display: "flex", alignItems: "center", gap: 20 }}>
           <UserAvatar
@@ -291,8 +329,42 @@ export default function ProfilePage() {
               </p>
             </div>
             <div className="field">
-              <label>Pseudo Discord</label>
-              <input value={discordPseudo} onChange={(e) => setDiscordPseudo(e.target.value)} placeholder="pseudo#0000 ou @pseudo" />
+              <label htmlFor="profile-discord">
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  Pseudo Discord
+                  {discordState.verified ? <VerifiedBadge /> : null}
+                </span>
+              </label>
+              <input
+                id="profile-discord"
+                value={discordPseudo}
+                onChange={(e) => setDiscordPseudo(e.target.value)}
+                placeholder="ton_pseudo"
+                aria-describedby="profile-discord-hint"
+              />
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setVerifyOpen(true)}
+                  /* « Recertifier » seul ne dit pas quoi : le libellé
+                     accessible commence par le texte visible (WCAG 2.5.3) et
+                     ajoute l'objet. */
+                  aria-label={
+                    discordState.verified
+                      ? "Recertifier mon tag Discord"
+                      : "Certifier mon tag Discord"
+                  }
+                  style={{ padding: "7px 14px", fontSize: 12 }}
+                >
+                  {discordState.verified ? "Recertifier" : "Certifier mon tag"}
+                </button>
+              </div>
+              <p id="profile-discord-hint" style={{ fontSize: 11, color: "var(--text-2)", margin: "6px 0 0", lineHeight: 1.6 }}>
+                {discordState.verified
+                  ? "Tag certifié : les administrateurs le voient, et les arbitres pendant tes tournois. Le modifier annule la certification."
+                  : "Tag non certifié : personne ne le voit, pas même les administrateurs. Certifie-le pour que l'organisation puisse te joindre pendant un tournoi."}
+              </p>
             </div>
             <div className="field">
               <label>Statut majeur</label>

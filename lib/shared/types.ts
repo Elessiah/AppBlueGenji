@@ -2,6 +2,10 @@
 import type { MatchFormat } from "./match-format";
 import type { MatchLiveTrigger } from "./live-streams";
 import type { ParticipantType } from "./participants";
+import type {
+  RegistrationFilterError,
+  RegistrationFilters,
+} from "./registration-filters";
 import type { PlatformRole } from "./permissions";
 import type { TournamentPreview } from "./tournament-preview";
 import type { DeepStats, TeamRankingPosition } from "./stats";
@@ -249,8 +253,25 @@ export type PublicUserProfile = {
    */
   openToRecruitment: boolean;
   createdAt: string;
-  // Privé — uniquement renseigné quand le viewer consulte son propre profil.
+  /**
+   * Tag Discord, **filtré à la sortie** par `visibleDiscordTag`
+   * (`lib/shared/discord-identity.ts`) : le propriétaire du compte, les
+   * administrateurs si le tag est certifié, l'arbitrage si le joueur est en plus
+   * engagé dans un tournoi vivant. `null` partout ailleurs — il n'est jamais
+   * public.
+   */
   discordPseudo?: string | null;
+  /**
+   * Le tag a-t-il été prouvé par son titulaire ?
+   *
+   * **Ne suit pas `discordPseudo`**, et c'est délibéré : le tag dit *comment*
+   * joindre le joueur (coordonnée, filtrée), la certification dit seulement
+   * *qu'il est joignable* par l'organisation — un fait qui ne nomme personne.
+   * D'où « Masqué ✅ » sur une fiche dont le tag est filtré, et la possibilité
+   * pour un capitaine de voir qui de son roster remplit la condition
+   * d'inscription. Voir `canSeeDiscordVerification`.
+   */
+  discordVerified?: boolean;
   // Enriched fields for /joueurs listing
   team?: {
     id: number;
@@ -357,6 +378,15 @@ export type TournamentCard = {
    * deux côtés.
    */
   endurancePlayoffFormat: MatchFormat | null;
+  /**
+   * Conditions d'inscription (`lib/shared/registration-filters.ts`) : effectif
+   * minimal et exigence de tag Discord certifié.
+   *
+   * Sur la carte, donc **publiques** : ce sont des conditions d'accès, elles
+   * doivent se lire avant de tenter une inscription, et non se découvrir dans un
+   * refus. Les équipes fantômes n'y sont pas soumises.
+   */
+  registrationFilters: RegistrationFilters;
   /**
    * Chaîne officielle du tournoi (Twitch, YouTube, Kick). `null` = pas de
    * diffusion annoncée. Les matchs n'en héritent jamais (`lib/shared/live-streams.ts`).
@@ -496,6 +526,19 @@ export type TournamentViewerContext = {
    * bouton qui n'apparaît pas.
    */
   canRegisterEntrant: boolean;
+  /**
+   * Pourquoi l'engagé du lecteur ne remplit-il pas les **conditions
+   * d'inscription** du tournoi (`lib/shared/registration-filters.ts`) ?
+   * `null` = il les remplit, ou la question ne se pose pas (inscriptions
+   * fermées, déjà engagé, pas d'engagé, pas la qualité pour l'engager).
+   *
+   * Distinct de `canRegister`, qui dit seulement *non* : le bouton se ferme sur
+   * ce champ, et la phrase qui prend sa place en vient — sans quoi le lecteur
+   * verrait un bouton disparaître sans savoir s'il doit recruter ou certifier un
+   * tag. Il dépend du **roster**, donc du lecteur, donc il vit dans son contexte
+   * et non dans l'instantané diffusé.
+   */
+  registrationBlock: RegistrationFilterError | null;
   /**
    * Engagé du viewer dans **ce** tournoi : son équipe active en tournoi par
    * équipes, son entrée solo en tournoi individuel (null s'il n'est pas
@@ -669,6 +712,8 @@ export type PersonalDataExport = {
     email: string | null;
     discordId: string | null;
     discordPseudo: string | null;
+    /** Date de certification du tag Discord (`null` = jamais prouvé). */
+    discordVerifiedAt: string | null;
     googleSub: string | null;
     isAdult: boolean | null;
     isAdmin: boolean;

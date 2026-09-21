@@ -22,6 +22,7 @@
  */
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { isDuplicateEntryError } from "@/lib/server/mysql-errors";
 import { soloEntryNameCandidates } from "@/lib/shared/participants";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
 
@@ -48,9 +49,14 @@ function soloEntryLogo(user: UserIdentityRow): string | null {
   return visibleAvatarUrl(user.avatar_url, user.visible_avatar === 1);
 }
 
+/**
+ * Collision de nom d'entrée solo. Délègue au prédicat partagé
+ * (`lib/server/mysql-errors.ts`) : trois lectures du même code d'erreur
+ * vivaient dans trois modules, et c'est exactement le genre de détail qui
+ * dérive sans qu'aucun test ne le voie.
+ */
 function isDuplicateNameError(error: unknown): boolean {
-  const code = (error as { code?: string } | null)?.code;
-  return code === "ER_DUP_ENTRY";
+  return isDuplicateEntryError(error);
 }
 
 async function loadUserIdentity(

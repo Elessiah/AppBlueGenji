@@ -322,3 +322,41 @@ describe("seed — cohérence des définitions", () => {
     });
   });
 });
+
+/**
+ * Conditions d'inscription dans la matrice.
+ *
+ * Le seed insère ses inscriptions directement, donc ces cas ne couvrent pas le
+ * refus lui-même (éprouvé en unité) mais ce qui se **regarde** : l'affichage des
+ * conditions sur une fiche, et un plateau où le refus est reproductible depuis
+ * l'interface. Les deux bords sont donc représentés, le cas courant étant celui
+ * qu'aucun cas ne déclare — les défauts.
+ */
+describe("conditions d'inscription", () => {
+  it("couvre les deux bords : aucune exigence, et l'exigence maximale", () => {
+    expect(
+      TOURNAMENTS.some((t) => t.registrationDiscordRequirement === "NONE"),
+    ).toBe(true);
+    expect(
+      TOURNAMENTS.some((t) => t.registrationDiscordRequirement === "ALL_PLAYERS"),
+    ).toBe(true);
+  });
+
+  it("laisse la majorité des cas sur les défauts", () => {
+    // Un cas qui ne déclare rien couvre le comportement courant, celui-là même
+    // que la migration a posé sur les tournois existants.
+    const declared = TOURNAMENTS.filter(
+      (t) => t.registrationDiscordRequirement !== undefined || t.registrationMinPlayers !== undefined,
+    );
+    expect(declared.length).toBeGreaterThan(0);
+    expect(declared.length).toBeLessThan(TOURNAMENTS.length / 2);
+  });
+
+  it("place ces cas là où l'on peut s'inscrire", () => {
+    for (const tournament of TOURNAMENTS.filter(
+      (t) => t.registrationDiscordRequirement !== undefined,
+    )) {
+      expect(tournament.state).toBe("REGISTRATION");
+    }
+  });
+});
