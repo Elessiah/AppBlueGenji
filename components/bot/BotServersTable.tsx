@@ -30,7 +30,13 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
           <span role="columnheader">SERVEUR</span>
           <span role="columnheader" style={{ textAlign: "right" }}>MEMBRES</span>
           <span role="columnheader" style={{ textAlign: "right" }}>RELAIS 30J</span>
-          <span role="columnheader" style={{ textAlign: "right" }}>ÉTAT DU RELAIS</span>
+          <span role="columnheader" style={{ textAlign: "right" }}>
+            {/* « RELAIS 30J » compte, celle-ci qualifie : deux en-têtes
+                homonymes se reliraient l'un pour l'autre. Sous 640 px la
+                colonne des relais est masquée — l'homonymie part avec elle,
+                et « ÉTAT DU » avec, faute de place dans la piste. */}
+            <span className="srv-col-qualifier">ÉTAT DU </span>RELAIS
+          </span>
           <span role="columnheader" style={{ textAlign: "right" }}>TENDANCE</span>
         </div>
         {list.map((s, rank) => {

@@ -106,46 +106,18 @@ describe("/bot — les commandes renvoient à leur source", () => {
 });
 
 describe("/bot — l'état d'un serveur se lit en français", () => {
-  // La traduction elle-même est vérifiée sur le module pur
-  // (`tests/lib/shared/bot-relay-status.test.ts`) : ici on ne contrôle que ce
-  // qui ne peut se lire que dans le balisage.
-  it("passe par le module pur plutôt que par une table locale", () => {
+  /*
+   * Le comportement (libellés, repli sur un état inconnu, rôles ARIA, charge
+   * abîmée) est vérifié **sur le rendu** dans `bot-servers-table.test.tsx`, et
+   * la traduction sur le module pur dans `lib/shared/bot-relay-status`. Ne
+   * restent ici que les deux choses qu'aucun rendu ne montre : ce que le
+   * composant n'embarque plus, et la feuille de style.
+   */
+  it("ne garde aucune table de libellés locale", () => {
     expect(servers).toContain("resolveBotRelayState");
     expect(servers).not.toMatch(/"● (OK|LAG)"/);
     expect(servers).not.toContain('"○ OFF"');
-  });
-
-  it("colore d'après le registre, jamais d'après la chaîne reçue", () => {
-    expect(servers).toContain('className={"srv-status " + relay.tone}');
     expect(servers).not.toContain('"srv-status " + s.status');
-  });
-
-  it("donne à chaque état une définition atteignable au doigt comme au clavier", () => {
-    expect(servers).toContain("title={relay.hint}");
-    expect(servers).toContain("aria-label={botRelayAccessibleLabel(relay)}");
-  });
-
-  it("intitule la colonne d'après ce qu'elle décrit, sans homonyme", () => {
-    expect(servers).toContain(">ÉTAT DU RELAIS</span>");
-    expect(servers).not.toContain(">STATUS</span>");
-    // « RELAIS 30J » compte, « ÉTAT DU RELAIS » qualifie : deux en-têtes
-    // homonymes se reliraient l'un pour l'autre.
-    expect(servers).not.toMatch(/>RELAIS<\/span>/);
-  });
-
-  it("expose autant de cellules que l'en-tête a de colonnes", () => {
-    // Un `aria-hidden` posé sur une cellule décale tout le tableau pour qui le
-    // parcourt au lecteur d'écran.
-    const headers = servers.match(/role="columnheader"/g) ?? [];
-    const cells = servers.match(/role="cell"/g) ?? [];
-    expect(headers).toHaveLength(6);
-    expect(cells).toHaveLength(6);
-    expect(servers).not.toMatch(/role="cell"[^>]*aria-hidden/);
-    expect(servers).not.toMatch(/aria-hidden[^>]*role="cell"/);
-  });
-
-  it("a une couleur pour l'état qu'elle ne connaît pas", () => {
-    expect(css).toContain(".srv-status.unknown");
   });
 
   it("tient le libellé le plus long sur une ligne", () => {
@@ -155,32 +127,19 @@ describe("/bot — l'état d'un serveur se lit en français", () => {
     expect(css).toMatch(/\.srv-status \{[^}]*white-space: nowrap;/);
   });
 
-  it("ne fait confiance à aucun champ de la charge du bot", () => {
-    // `fetchBotServers` fait un simple `as` : un champ manquant doit donner une
-    // cellule fade, jamais un `TypeError` qui rendrait toute la page en 500.
-    expect(servers).toContain("(s.memberCount ?? 0).toLocaleString");
-    expect(servers).toContain("(s.relays30j ?? 0).toLocaleString");
-    expect(servers).toContain("Array.isArray(s.sparkline)");
-    expect(servers).not.toContain("s.sparkline.map");
-    expect(servers).not.toContain("Math.max(...s.sparkline");
-  });
-
-  it("ne passe jamais la série du bot en arguments d'appel", () => {
-    // `Math.max(...arr)` est un `RangeError` au-delà de ~100 000 points : une
-    // charge du bot suffirait à rendre la page en 500.
-    expect(servers).not.toMatch(/Math\.max\(\.\.\.(s\.)?sparkline/);
-    expect(servers).toContain("sparkline.reduce((max, v) => Math.max(max, v ?? 0), 1)");
-  });
-
   it("garde des pistes fixes sur mobile, où l'en-tête et les rangées sont des grilles séparées", () => {
     // Une piste `auto` se dimensionne sur le contenu de SA ligne : « ● À jour »
     // et « ● Hors ligne » posaient la colonne à deux abscisses différentes.
     expect(css).toContain("grid-template-columns: 22px 1fr 56px 86px;");
     expect(css).not.toContain("grid-template-columns: 22px 1fr auto auto;");
+    // Et l'en-tête, seul à ne pas être protégé par le `nowrap` des cellules,
+    // perd son qualificatif plutôt que de se couper en deux.
+    expect(css).toMatch(/\.srv-head > span \{ white-space: nowrap; \}/);
+    expect(css).toMatch(/\.srv-col-qualifier \{ display: none; \}/);
   });
 
-  it("n'annonce pas les initiales décoratives avant le nom du serveur", () => {
-    expect(servers).toMatch(/className="srv-sigil"\s*\n\s*aria-hidden="true"/);
+  it("a une couleur pour l'état qu'elle ne connaît pas", () => {
+    expect(css).toContain(".srv-status.unknown");
   });
 });
 
@@ -191,13 +150,12 @@ describe("/bot — la page ne parle plus de modules", () => {
   });
 
   it("fait dire au sous-titre de la case « Status » ce que la case affiche", () => {
+    // Une phrase fixe sous une valeur qui varie finit par la contredire : elle
+    // annonçait des « modules nominaux » sous un `DOWN`. La règle est pure et
+    // testée dans `tests/lib/shared/bot-status-summary.test.ts`.
     const strip = read("components/bot/BotStatusStrip.tsx");
     expect(strip).not.toMatch(/"sub">Tous les modules/);
-    expect(strip).toContain("STATUS_SUB");
-    // Une phrase fixe sous une valeur qui varie finit par la contredire.
-    for (const state of ["OPERATIONAL", "DEGRADED", "DOWN", "UNKNOWN"]) {
-      expect(strip).toContain(`${state}:`);
-    }
+    expect(strip).toContain("botStatusSummary(statusLabel)");
   });
 });
 

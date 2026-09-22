@@ -632,6 +632,11 @@
   /* Le gain de place ne se prend pas sur le nom du serveur : c'est la seule
      colonne qu'on ne peut ni abréger ni masquer. */
   .srv-head { font-size: 9px; letter-spacing: 0.12em; }
+  /* Les pistes étant fixes, un en-tête qui se coupe en deux n'aligne plus rien :
+     « ÉTAT DU » tombe (la colonne « RELAIS 30J » est masquée ici, l'en-tête
+     « RELAIS » n'a donc plus d'homonyme) et le reste tient sur une ligne. */
+  .srv-head > span { white-space: nowrap; }
+  .srv-col-qualifier { display: none; }
   .srv-status { font-size: 9px; letter-spacing: 0.08em; }
   .srv-sigil { width: 22px; height: 22px; font-size: 10px; }
   .srv-head > span:nth-child(4),

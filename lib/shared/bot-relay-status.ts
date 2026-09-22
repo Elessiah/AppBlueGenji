@@ -80,9 +80,15 @@ export function resolveBotRelayState(status: string | null | undefined): BotRela
 
 /**
  * Nom accessible de la cellule : **le texte visible d'abord**, puis sa
- * définition (WCAG 2.5.3). Le `title` seul ne suffit pas — il n'existe ni au
- * doigt ni au clavier, et c'est sur mobile qu'on se demande ce que « Retard »
- * veut dire.
+ * définition (WCAG 2.5.3).
+ *
+ * Ce que porte chaque canal, sans en promettre plus : le **libellé** dit l'état
+ * à tout le monde — c'est lui qui devait rendre une légende inutile, et c'est
+ * pourquoi il fallait qu'il se lise (« Retard », pas « LAG ») ; le `title`
+ * donne la définition au pointeur ; cet `aria-label` la donne aux technologies
+ * d'assistance. Un visiteur **voyant, au doigt** n'a ni l'un ni l'autre : il lit
+ * le libellé, et rien de plus. C'est le choix assumé de ne pas poser de légende
+ * sous le tableau — pas une lacune qu'un `aria-label` viendrait combler.
  */
 export function botRelayAccessibleLabel(state: BotRelayState): string {
   return `${stripBullet(state.label)} — ${state.hint}`;

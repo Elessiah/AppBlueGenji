@@ -2,21 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { BotStatus } from "@/lib/shared/types";
-
-/**
- * Sous-titre de la case « Status » : il **dit l'état affiché juste au-dessus**.
- *
- * Il annonçait des « modules nominaux » — quel que soit l'état, et alors que
- * plus rien sur `/bot` ne parle de modules depuis que la grille qui les
- * montrait a été retirée. Une phrase fixe sous une valeur qui varie finit par
- * la contredire : elle annonçait « nominaux » sous un `DOWN`.
- */
-const STATUS_SUB: Record<BotStatus["status"] | "UNKNOWN", string> = {
-  OPERATIONAL: "Tous les services répondent",
-  DEGRADED: "Service dégradé — certaines réponses tardent",
-  DOWN: "Le bot ne répond plus",
-  UNKNOWN: "Le bot n'a pas répondu à la page",
-};
+import { botStatusDisplay, botStatusSummary } from "@/lib/shared/bot-status-summary";
 
 export function BotStatusStrip({ status }: { status: BotStatus | null }) {
   const [uptime, setUptime] = useState("—");
@@ -36,7 +22,7 @@ export function BotStatusStrip({ status }: { status: BotStatus | null }) {
     return () => clearInterval(id);
   }, [status]);
 
-  const statusLabel = status?.status ?? "UNKNOWN";
+  const statusLabel = status?.status ?? null;
   const versionLabel = status ? `${status.version} · ${status.buildHash.slice(0, 4)}` : "—";
   const buildDate = status?.buildDate ?? "—";
   const latency = status?.gatewayLatency ?? "—";
@@ -46,8 +32,8 @@ export function BotStatusStrip({ status }: { status: BotStatus | null }) {
     <div className="status-strip">
       <div className={`status-cell ${statusLabel === "OPERATIONAL" ? "online" : ""}`}>
         <span className="lbl">Status</span>
-        <span className="val">{statusLabel === "UNKNOWN" ? "—" : statusLabel}</span>
-        <span className="sub">{STATUS_SUB[statusLabel]}</span>
+        <span className="val">{botStatusDisplay(statusLabel)}</span>
+        <span className="sub">{botStatusSummary(statusLabel)}</span>
       </div>
       <div className="status-cell">
         <span className="lbl">Uptime</span>
