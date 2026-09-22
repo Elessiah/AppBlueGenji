@@ -39,7 +39,7 @@ export function BotHero() {
               <Icon name="discord" /> APP
             </span>
             <span className="mono" style={{ fontSize: 10, letterSpacing: "0.18em", color: "var(--fg-dim)" }}>
-              VERIFIÉ
+              VÉRIFIÉ
             </span>
           </div>
         </div>

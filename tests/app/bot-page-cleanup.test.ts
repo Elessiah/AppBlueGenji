@@ -48,7 +48,7 @@ describe("/bot — la section « Modules » est partie", () => {
     // Une case à cocher qui demande l'appel sortant qu'on vient de retirer le
     // fait revenir : elle est barrée, et la décision nommée.
     const roadmap = read("docs/features/BOT_FEATURES_NEEDED.md");
-    expect(roadmap).not.toMatch(/^ *- \[ \] `fetchBotModules/m);
+    expect(roadmap).not.toMatch(/^\s*- \[ \][^\n]*fetchBotModules/m);
     expect(roadmap).not.toContain("[components/bot/mocks.ts](components/bot/mocks.ts)");
     // Et pas davantage les endpoints que cet appel consommait : une section
     // lue de haut en bas ferait construire au bot ce que le site ne lit plus.
@@ -159,9 +159,45 @@ describe("/bot — l'état d'un serveur se lit en français", () => {
     // `fetchBotServers` fait un simple `as` : un champ manquant doit donner une
     // cellule fade, jamais un `TypeError` qui rendrait toute la page en 500.
     expect(servers).toContain("(s.memberCount ?? 0).toLocaleString");
+    expect(servers).toContain("(s.relays30j ?? 0).toLocaleString");
     expect(servers).toContain("Array.isArray(s.sparkline)");
     expect(servers).not.toContain("s.sparkline.map");
     expect(servers).not.toContain("Math.max(...s.sparkline");
+  });
+
+  it("ne passe jamais la série du bot en arguments d'appel", () => {
+    // `Math.max(...arr)` est un `RangeError` au-delà de ~100 000 points : une
+    // charge du bot suffirait à rendre la page en 500.
+    expect(servers).not.toMatch(/Math\.max\(\.\.\.(s\.)?sparkline/);
+    expect(servers).toContain("sparkline.reduce((max, v) => Math.max(max, v ?? 0), 1)");
+  });
+
+  it("garde des pistes fixes sur mobile, où l'en-tête et les rangées sont des grilles séparées", () => {
+    // Une piste `auto` se dimensionne sur le contenu de SA ligne : « ● À jour »
+    // et « ● Hors ligne » posaient la colonne à deux abscisses différentes.
+    expect(css).toContain("grid-template-columns: 22px 1fr 56px 86px;");
+    expect(css).not.toContain("grid-template-columns: 22px 1fr auto auto;");
+  });
+
+  it("n'annonce pas les initiales décoratives avant le nom du serveur", () => {
+    expect(servers).toMatch(/className="srv-sigil"\s*\n\s*aria-hidden="true"/);
+  });
+});
+
+describe("/bot — la page ne parle plus de modules", () => {
+  it("ne compte plus des cases qui n'existent pas", () => {
+    // « six modules » comptait les vignettes d'une grille retirée.
+    expect(read("components/bot/BotInviteCard.tsx")).not.toContain("six modules");
+  });
+
+  it("fait dire au sous-titre de la case « Status » ce que la case affiche", () => {
+    const strip = read("components/bot/BotStatusStrip.tsx");
+    expect(strip).not.toMatch(/"sub">Tous les modules/);
+    expect(strip).toContain("STATUS_SUB");
+    // Une phrase fixe sous une valeur qui varie finit par la contredire.
+    for (const state of ["OPERATIONAL", "DEGRADED", "DOWN", "UNKNOWN"]) {
+      expect(strip).toContain(`${state}:`);
+    }
   });
 });
 

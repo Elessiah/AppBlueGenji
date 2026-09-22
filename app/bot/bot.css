@@ -618,11 +618,22 @@
 }
 @media (max-width: 640px) {
   .kpis { grid-template-columns: 1fr; }
-  /* Table serveurs : on masque relais + tendance, trop étroit sinon */
+  /* Table serveurs : on masque relais + tendance, trop étroit sinon.
+     Les pistes restantes sont **fixes** et non `auto` : l'en-tête et chaque
+     rangée sont des grilles séparées, donc une piste `auto` se dimensionne sur
+     le contenu de SA ligne. C'était sans conséquence tant que les états
+     tenaient en quatre signes (`● OK` / `○ OFF`) ; « ● Hors ligne » et
+     « ● À jour » posaient la colonne à deux abscisses différentes, sous un
+     en-tête qui ne surplombait ni l'une ni l'autre. */
   .srv-head, .srv-row {
-    grid-template-columns: 22px 1fr auto auto;
+    grid-template-columns: 22px 1fr 56px 86px;
     gap: 10px;
   }
+  /* Le gain de place ne se prend pas sur le nom du serveur : c'est la seule
+     colonne qu'on ne peut ni abréger ni masquer. */
+  .srv-head { font-size: 9px; letter-spacing: 0.12em; }
+  .srv-status { font-size: 9px; letter-spacing: 0.08em; }
+  .srv-sigil { width: 22px; height: 22px; font-size: 10px; }
   .srv-head > span:nth-child(4),
   .srv-head > span:nth-child(6),
   .srv-row > span:nth-child(4),

@@ -41,18 +41,29 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
           // ferait rendre toute la page `/bot` en 500, bien pire que la case
           // vide qu'on vient de chasser.
           const sparkline = Array.isArray(s.sparkline) ? s.sparkline : [];
-          const peak = Math.max(...sparkline.map((v) => v ?? 0), 1);
+          // `Math.max(...arr)` passe la série entière en arguments : au-delà de
+          // quelque cent mille points, c'est un `RangeError` — une charge du bot
+          // suffirait à rendre la page en 500. Un `reduce` n'a pas de pile à
+          // remplir.
+          const peak = sparkline.reduce((max, v) => Math.max(max, v ?? 0), 1);
           return (
             <div key={s.id} className="srv-row" role="row">
               <span className="srv-rank" role="cell">{String(rank + 1).padStart(2, "0")}</span>
               <span className="srv-name" role="cell">
-                <span className="srv-sigil" style={{ "--c": s.accentColor } as React.CSSProperties}>
+                {/* Le sigil répète les initiales du nom qui le suit : sans
+                    `aria-hidden`, la cellule s'annonce « NV Nova Esports ».
+                    Même règle que le mode `decorative` de `UserAvatar`. */}
+                <span
+                  className="srv-sigil"
+                  aria-hidden="true"
+                  style={{ "--c": s.accentColor } as React.CSSProperties}
+                >
                   {s.sigil}
                 </span>
                 {s.name}
               </span>
               <span className="srv-num" role="cell">{(s.memberCount ?? 0).toLocaleString("fr-FR")}</span>
-              <span className="srv-num" role="cell">{s.relays30j}</span>
+              <span className="srv-num" role="cell">{(s.relays30j ?? 0).toLocaleString("fr-FR")}</span>
               <span
                 className={"srv-status " + relay.tone}
                 role="cell"

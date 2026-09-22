@@ -25,7 +25,7 @@ export function BotInviteCard() {
             <span className="a">amateur francophone.</span>
           </h3>
           <p>
-            Un seul OAuth, six modules, zéro configuration obligatoire. Le bot s'auto-déclare au démarrage et propose
+            Un seul OAuth, zéro configuration obligatoire. Le bot s'auto-déclare au démarrage et propose
             un wizard de setup directement dans ton serveur Discord.
           </p>
           <div className="row-actions">
