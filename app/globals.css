@@ -464,6 +464,13 @@ select {
   border-color: var(--line-soft);
   color: var(--text-1);
   cursor: default;
+  /* `.field input:focus` déclare le halo vert plus haut, à **specificité
+     égale** : sans reset explicite ici, un clic de souris sur le champ
+     verrouillé rendait une bordure neutre *avec* le halo de la saisie — soit
+     exactement l'invitation à écrire que la règle vient retirer. La règle
+     `:focus-visible` ci-dessous, plus spécifique, repose ensuite l'anneau
+     neutre du parcours clavier. */
+  box-shadow: none;
 }
 
 /* Le halo vert d'un champ modifiable inviterait à écrire ; l'anneau doit tout de

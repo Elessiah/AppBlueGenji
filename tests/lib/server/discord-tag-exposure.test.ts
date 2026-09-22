@@ -550,3 +550,28 @@ describe("updateOwnProfile — un patch partiel ne vide pas les champs voisins",
     expect(update.sql).toContain("open_to_recruitment = COALESCE(?, open_to_recruitment)");
   });
 });
+
+describe("updateOwnProfile — le tag doit être du texte", () => {
+  /**
+   * Le corps du `PATCH` n'est qu'**annoté**, jamais validé : `{"discordPseudo":
+   * 123}` faisait lever `.trim()`, et la route rendait le message interne du
+   * `TypeError` tel quel dans le corps du 400. Un refus nommé vaut mieux qu'une
+   * fuite d'interne — et rien n'est écrit.
+   */
+  it.each([[123], [true], [{}], [[]]])("refuse %p sans rien écrire", async (value) => {
+    const { queries } = fakeDb();
+
+    await expect(
+      updateOwnProfile(7, { discordPseudo: value as never }),
+    ).rejects.toThrow("INVALID_DISCORD_PSEUDO");
+    expect(find(queries, "UPDATE bg_users")).toBeUndefined();
+  });
+
+  it("laisse passer les deux formes légitimes du champ vide", async () => {
+    for (const value of ["", null] as const) {
+      const { queries } = fakeDb();
+      await updateOwnProfile(7, { discordPseudo: value });
+      expect(find(queries, "UPDATE bg_users")).toBeDefined();
+    }
+  });
+});

@@ -40,11 +40,16 @@ export default function ProfilePage() {
   // État Discord du compte, lu à part du formulaire : la certification porte sur
   // ce qui est **enregistré**, pas sur ce qui est en train d'être tapé. Un champ
   // modifié sans être sauvegardé ne doit ni gagner ni perdre la pastille.
+  //
+  // `linked` vaut `null` tant que l'état n'a pas été **lu** : ni rattaché ni
+  // libre, inconnu. Partir de `false` revenait à affirmer le cas qui ouvre le
+  // champ, donc à l'ouvrir au premier rendu et à le laisser ouvert si l'appel
+  // échouait — le tag alors saisi faisait refuser toute la sauvegarde en 409.
   const [discordState, setDiscordState] = useState<{
     tag: string | null;
     verified: boolean;
-    linked: boolean;
-  }>({ tag: null, verified: false, linked: false });
+    linked: boolean | null;
+  }>({ tag: null, verified: false, linked: null });
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [isAdult, setIsAdult] = useState<string>("unknown");
   const [deleting, setDeleting] = useState(false);
@@ -76,7 +81,8 @@ export default function ProfilePage() {
       if (!res.ok) return;
       setDiscordState((await res.json()) as { tag: string | null; verified: boolean; linked: boolean });
     } catch {
-      // silencieux : le formulaire reste utilisable sans la pastille.
+      // Silencieux, mais **pas anodin** : l'état reste `linked: null`, donc le
+      // champ reste verrouillé. Le reste du formulaire s'enregistre normalement.
     }
   };
 
@@ -279,7 +285,10 @@ export default function ProfilePage() {
       {verifyOpen && (
         <DiscordVerificationDialog
           initialTag={discordPseudo}
-          linked={discordState.linked}
+          /* L'inconnu n'est pas un rattachement : le dialogue n'est de toute
+             façon atteignable qu'avec un état lu, ses deux boutons étant sous
+             un `linked` connu. */
+          linked={discordState.linked === true}
           onClose={() => setVerifyOpen(false)}
           onVerified={(tag) => {
             setVerifyOpen(false);

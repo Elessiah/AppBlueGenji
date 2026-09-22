@@ -889,6 +889,19 @@ export async function updateOwnProfile(
   // l'un passer pour un effacement et l'autre pour une réécriture — donc un 409
   // sur un compte rattaché, et une chaîne vide écrite dans la colonne sur les
   // autres.
+  //
+  // Le type est contrôlé ici et non à la route : le corps du `PATCH` n'est
+  // qu'*annoté*, jamais validé, si bien qu'un `{"discordPseudo": 123}` faisait
+  // lever `.trim()` — un `TypeError` dont le message interne ressortait tel quel
+  // dans le corps du 400. Les voisines n'ont pas ce besoin : elles passent à
+  // mysql2 sans être lues.
+  if (
+    touchesDiscordTag &&
+    patch.discordPseudo !== null &&
+    typeof patch.discordPseudo !== "string"
+  ) {
+    throw new Error("INVALID_DISCORD_PSEUDO");
+  }
   const nextDiscordPseudo = (patch.discordPseudo ?? "").trim() || null;
 
   // **Un compte Discord rattaché possède son tag** (`lib/shared/discord-tag-lock.ts`) :

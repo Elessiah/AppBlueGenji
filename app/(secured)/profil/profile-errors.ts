@@ -18,6 +18,10 @@ const PROFILE_ERRORS: Record<string, string> = {
   DISCORD_TAG_LOCKED:
     "Ton compte Discord est rattaché : ce tag vient de lui. Renomme-toi sur Discord puis reconnecte-toi pour en changer, ou retire-le.",
 
+  // Le corps du `PATCH` n'est qu'annoté, jamais validé : un tag qui n'est pas
+  // une chaîne est écarté par le service plutôt que de faire lever `.trim()`.
+  INVALID_DISCORD_PSEUDO: "Le tag Discord doit être du texte. Ressaisis-le.",
+
   UNAUTHORIZED: "Reconnecte-toi pour modifier ton profil.",
   PROFILE_NOT_FOUND: "Ton compte est introuvable. Reconnecte-toi.",
 };

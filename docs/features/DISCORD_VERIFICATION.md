@@ -237,17 +237,33 @@ Discord, et rejette le même numérique), donc invisible de tous. Un champ ouver
 sur rien est un piège, pas une liberté ; l'aide du champ le dit en toutes
 lettres plutôt que de laisser croire à un chargement raté.
 
-Le refus **nomme les deux gestes qui le lèvent** : se renommer sur Discord puis
-se reconnecter (la connexion réécrit le tag et le recertifie), ou détacher
-Discord dans « Applications connectées » — ce qui efface la certification et
-rend le tag à la saisie libre, comme le veut `unlinkOAuthIdentity`.
+Le refus **nomme les deux gestes qui le lèvent**, et seulement ceux qui existent
+toujours : se renommer sur Discord puis se reconnecter (la connexion réécrit le
+tag et le recertifie), ou **retirer son tag** — le geste d'annulation de
+l'exposition, que la route accepte parce qu'il n'efface rien d'autre. Détacher
+Discord depuis « Applications connectées » rend bien le tag à la saisie libre
+(`unlinkOAuthIdentity`), mais la phrase ne le nomme pas : ce n'est pas un geste
+pour le cas le plus courant, un compte **né** par Discord, à qui ce bouton est
+refusé en `LAST_CONNECTION` faute d'une autre porte. Un refus qui nomme une
+sortie inexistante se lit comme une panne.
+
+**Un rattachement inconnu verrouille aussi.** L'écran reçoit l'état par un appel
+à part, donc il ne le connaît pas au premier rendu et pas du tout si l'appel
+échoue : `linked` y vaut alors `null`, troisième valeur que `checkDiscordTagEdit`
+refuse (`UNKNOWN_LINK`). Le défaut inverse n'était pas tenable — le champ ouvert
+laissait saisir un tag que la route refuse en 409, et ce refus emporte **toute**
+la sauvegarde, le `PATCH` étant indivisible. L'aide du champ dit alors le verrou
+et sa sortie (recharger), sans affirmer un rattachement que rien n'établit.
 
 ## Où le tag s'affiche
 
-- **`/profil`** — le sien, toujours, avec la pastille, et le bouton de
-  certification **tant que le tag est à lui** (section précédente : un compte
-  Discord rattaché le reçoit de Discord, le champ passe alors en lecture seule
-  et le bouton disparaît). L'état vient de `GET /api/profile/discord`, qui parle
+- **`/profil`** — le sien, toujours, avec la pastille. Le champ passe en lecture
+  seule dès que le compte porte un `discord_id` (section précédente), mais les
+  **gestes restent** : « Certifier mon tag » tant que le tag enregistré n'est pas
+  certifié — un tag saisi avant la règle, ou rattaché sans que Discord ait donné
+  de pseudo certifiable —, et « Retirer mon tag », seule sortie de l'exposition.
+  Ce qui disparaît sur un compte rattaché est « Recertifier » : il ne ferait que
+  reposer ce que Discord dit déjà. L'état vient de `GET /api/profile/discord`, qui parle
   du tag **enregistré** : un champ modifié sans être sauvegardé ne gagne ni ne
   perd la pastille — et c'est le même état qui décide du verrou, jamais la
   saisie en cours.

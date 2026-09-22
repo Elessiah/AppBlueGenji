@@ -39,4 +39,21 @@ describe("profileErrorMessage", () => {
     // Deux écrans, deux consignes : le repli de l'un ne doit pas servir l'autre.
     expect(profileErrorMessage("BOOM")).not.toBe(discordVerificationErrorMessage("BOOM"));
   });
+
+  it("est le **seul** registre à connaître le verrou du tag", () => {
+    // `DISCORD_TAG_LOCKED` ne sort que de `PATCH /api/profile` ; le dialogue de
+    // certification ne parle qu'à `/api/profile/discord`. Une seconde entrée
+    // serait morte, et figerait une copie de la phrase que le premier
+    // ajustement ferait diverger.
+    expect(discordVerificationErrorMessage("DISCORD_TAG_LOCKED")).toBe(
+      discordVerificationErrorMessage("BOOM"),
+    );
+  });
+
+  it("traduit un tag d'un type inattendu sans laisser sortir de TypeError", () => {
+    // Le corps du `PATCH` n'est qu'annoté : `{"discordPseudo": 123}` faisait
+    // lever `.trim()`, et le message interne du `TypeError` ressortait dans le
+    // corps du 400.
+    expect(profileErrorMessage("INVALID_DISCORD_PSEUDO")).toContain("tag Discord");
+  });
 });
