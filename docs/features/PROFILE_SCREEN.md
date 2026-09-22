@@ -96,6 +96,17 @@ Un bouton par section aurait été l'autre réponse, mais il en faudrait alors
 plusieurs pour un seul `PATCH` — quatre contrôles qui font la même chose, et un
 doute sur ce qui est enregistré quand on en clique un.
 
+La barre porte **sa propre surface** (arrondie, bordée, floutée) et non la
+couleur de la page : les cartes défilent dessous, `.ds-block` est translucide et
+bien plus clair que `--bg-0`, et un dégradé vers le fond de la page les barrait
+d'un trait — la carte semblait coupée net au-dessus du bouton.
+
+Une sauvegarde **réaligne le champ Discord** sur ce qu'elle vient d'enregistrer :
+il est en lecture seule dès que le compte est rattaché et c'est le seul endroit
+où le tag s'affiche, si bien qu'un tag réécrit ailleurs entre le chargement et la
+sauvegarde laissait la pastille et la phrase du verrou annoncer le tag frais à
+côté d'un champ resté sur celui du montage.
+
 Le `.btn` global n'a **aucun** état désactivé : « Changer l'avatar » pendant un
 envoi, « Retirer mon tag » pendant un retrait et « Supprimer mon compte » pendant
 l'effacement gardaient le survol, le soulèvement, le reflet et `cursor: pointer`

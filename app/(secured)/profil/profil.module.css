@@ -217,11 +217,17 @@
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  padding: 12px 0;
-  /* Le dégradé s'écrit en `rgba` de la même couleur et non vers `transparent` :
-     `transparent` vaut `rgba(0, 0, 0, 0)`, qui grise le dégradé sur plusieurs
-     moteurs. */
-  background: linear-gradient(to top, var(--bg-0) 58%, rgba(7, 8, 10, 0));
+  /* **Une barre, pas un voile.** Un dégradé vers la couleur de la page barrait
+     les cartes qui défilent dessous — `.ds-block` est translucide et bien plus
+     clair que `--bg-0` —, si bien que la carte semblait coupée net au-dessus du
+     bouton. La barre porte donc sa propre surface, arrondie et bordée comme les
+     cartes : ce qui passe derrière passe derrière quelque chose. */
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(13, 16, 22, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 /* `:global` obligatoire : `.btn` vient du style global, et CSS Modules

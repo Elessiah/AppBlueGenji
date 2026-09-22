@@ -240,12 +240,38 @@ describe("La sauvegarde reste atteignable", () => {
     const rule = css.slice(css.indexOf(".formFoot {"));
     expect(rule.slice(0, rule.indexOf("}"))).toContain("position: sticky");
   });
+
+  it("lui donne sa propre surface, et non la couleur de la page", () => {
+    // Les cartes défilent dessous : un fond à la couleur de la page les
+    // barrerait, `.ds-block` étant translucide et bien plus clair.
+    const rule = css.slice(css.indexOf(".formFoot {"));
+    const body = rule.slice(0, rule.indexOf("}"));
+    expect(body).not.toContain("var(--bg-0)");
+    expect(body).toContain("border:");
+    expect(body).toContain("backdrop-filter");
+  });
 });
 
 /**
  * Le `.btn` global n'a aucun état désactivé : sans règle ici, un bouton qui
  * refuse le clic garde le survol, le soulèvement et `cursor: pointer`.
  */
+/**
+ * Le champ Discord est en lecture seule dès que le compte est rattaché, et c'est
+ * le seul endroit où le tag s'affiche : après une sauvegarde, il doit montrer ce
+ * qui est **enregistré**, sinon la pastille et la phrase du verrou annoncent un
+ * tag à côté d'un autre.
+ */
+describe("La sauvegarde réaligne le tag affiché", () => {
+  it("relit le tag depuis la réponse du PATCH", () => {
+    const save = page.slice(page.indexOf('method: "PATCH"'));
+    const afterSetData = save.slice(save.indexOf("setData(payload)"));
+    expect(afterSetData.slice(0, afterSetData.indexOf("showSuccess"))).toContain(
+      "setDiscordPseudo(payload.profile.discordPseudo",
+    );
+  });
+});
+
 describe("Un contrôle désactivé se voit", () => {
   it("habille le `.btn` global, en `:global` sans quoi la règle est hachée", () => {
     expect(css).toContain(":global(.btn:disabled)");

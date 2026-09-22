@@ -229,6 +229,16 @@ export default function ProfilePage() {
       const payload = (await response.json()) as FullProfileResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "PROFILE_UPDATE_FAILED");
       setData(payload);
+      // Le champ **et sa référence** se réalignent sur ce qui vient d'être
+      // enregistré. Le champ, parce qu'il est en lecture seule dès que le
+      // compte est rattaché et que c'est le seul endroit où le tag s'affiche :
+      // sans lui, un tag réécrit ailleurs entre le chargement et la sauvegarde
+      // (renommage sur Discord puis connexion depuis un autre appareil)
+      // laissait la pastille et la phrase du verrou annoncer le tag frais à
+      // côté d'un champ resté sur celui du montage. La référence, parce que
+      // c'est elle qui décide si la prochaine sauvegarde parle de ce champ —
+      // laissée en arrière, elle resoumettrait un tag déjà écrit.
+      setDiscordPseudo(payload.profile.discordPseudo || "");
       setSavedDiscordPseudo(payload.profile.discordPseudo || "");
       // Une sauvegarde qui change le tag **annule la certification** côté
       // serveur : la pastille doit tomber dans le même geste, sinon l'écran
