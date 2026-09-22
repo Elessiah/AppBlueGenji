@@ -115,6 +115,11 @@ const BOX_PROPERTIES = [
   "border",
   "background",
   "box-shadow",
+  // Un `flex: 1` pose `flex-basis: 0%` : sur une case de 16 px dans une rangée
+  // flex, le `flex-shrink: 0` global ne la protège pas d'un socle nul.
+  "flex",
+  "min-width",
+  "max-width",
   // `appearance: none` retire l'anneau natif : `outline` fait désormais partie
   // de ce qui peut casser le contrôle sans qu'on le voie.
   "outline",
@@ -128,6 +133,16 @@ const BOX_PROPERTIES = [
 const BARE_INPUT = /(^|[\s>+~,(])input(?![\w-]|\[|\s*\{)/;
 
 type Offender = { file: string; selector: string };
+
+/**
+ * Le compound sort-il **les deux** contrôles ? L'exclusion ne vaut que dans un
+ * `:not(…)` : un `:is([type="checkbox"], [type="radio"])` nomme les mêmes types
+ * pour mieux les viser, et pèse alors plus lourd que la règle globale.
+ */
+function excludesBoth(compound: string): boolean {
+  const negated = [...compound.matchAll(/:not\(([^()]*)\)/g)].map((m) => m[1]).join(" ");
+  return negated.includes('[type="checkbox"]') && negated.includes('[type="radio"]');
+}
 
 /**
  * Découpe une liste de sélecteurs sur ses virgules **de premier niveau** : celle
@@ -164,11 +179,7 @@ function bareInputOffenders(path: string, css: string): Offender[] {
     const selector = rawSelector.trim().replace(/\s+/g, " ");
     if (selector.startsWith("@") || selector === "") continue;
     const compounds = splitSelectorList(selector);
-    const bare = compounds.filter(
-      (part) =>
-        BARE_INPUT.test(part) &&
-        !(part.includes('[type="checkbox"]') && part.includes('[type="radio"]')),
-    );
+    const bare = compounds.filter((part) => BARE_INPUT.test(part) && !excludesBoth(part));
     if (bare.length === 0) continue;
     const declares = BOX_PROPERTIES.some((property) =>
       new RegExp(`(^|[;{\\s])${property}[\\w-]*\\s*:`).test(body),
@@ -207,8 +218,13 @@ describe("Cases à cocher — aucune feuille ne redéfinit l'apparence", () => {
     expect(bareInputOffenders("x.css", 'input[type="date"] { padding: 4px; }')).toEqual([]);
     expect(bareInputOffenders("x.css", ".a > input { width: auto; }")).toHaveLength(1);
     expect(bareInputOffenders("x.css", '.a input[type="checkbox"] { width: auto; }')).toEqual([]);
-    const excluded = '.a input:not([type="checkbox"], [type="radio"]) { width: auto; }';
+    const excluded = '.a input:not([type="checkbox"]):not([type="radio"]) { width: auto; }';
     expect(bareInputOffenders("x.css", excluded)).toEqual([]);
+    // Nommer les deux types pour mieux les **viser** n'est pas les exclure.
+    const targeted = '.a input:is([type="checkbox"], [type="radio"]) { width: auto; }';
+    expect(bareInputOffenders("x.css", targeted)).toHaveLength(1);
+    // `flex: 1` donne un socle nul à un contrôle de 16 px.
+    expect(bareInputOffenders("x.css", ".a input { flex: 1; }")).toHaveLength(1);
     // Exclure la case sans exclure le radio ne suffit plus : les deux sont posés
     // sur l'élément.
     const half = '.a input:not([type="checkbox"]) { width: auto; }';

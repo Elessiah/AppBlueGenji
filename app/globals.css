@@ -413,7 +413,7 @@ select {
    même spécificité que l'apparence de case posée plus bas — une case placée dans
    un `.field` en héritait donc le rembourrage, qui, `appearance` retirée, la
    rendait rectangulaire, et l'anneau vert au clic. */
-.field input:not([type="checkbox"], [type="radio"]),
+.field input:not([type="checkbox"]):not([type="radio"]),
 .field textarea,
 .field select {
   width: 100%;
@@ -425,7 +425,7 @@ select {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
-.field input:not([type="checkbox"], [type="radio"]):focus,
+.field input:not([type="checkbox"]):not([type="radio"]):focus,
 .field textarea:focus,
 .field select:focus {
   outline: none;
@@ -453,7 +453,7 @@ select {
   background-color: rgba(10, 11, 15, 0.92);
 }
 
-.field input:not([type="checkbox"], [type="radio"]):disabled,
+.field input:not([type="checkbox"]):not([type="radio"]):disabled,
 .field textarea:disabled,
 .field select:disabled {
   opacity: 0.6;
@@ -1407,8 +1407,10 @@ html {
 
    Corollaire à tenir : une règle de feuille visant un `input` nu (`.x input`)
    a la même spécificité que celle-ci et la déborde sur les propriétés qu'elle
-   déclare — d'où le `:not([type="checkbox"], [type="radio"])` posé sur
-   `.field input` plus haut, et le test qui balaie les feuilles pour qu'aucune
+   déclare — d'où le `:not([type="checkbox"]):not([type="radio"])` posé sur
+   `.field input` plus haut (chaîné, et non `:not(a, b)` : la liste dans un
+   `:not()` est du Sélecteurs 4, et un moteur qui ne la comprend pas jette la
+   règle **entière**, donc aussi le `.field textarea` qui la partage), et le test qui balaie les feuilles pour qu'aucune
    ne recommence.
 
    La marque est dessinée en `background-image` et non en `::after` : un input
@@ -1478,12 +1480,24 @@ input[type="radio"]:focus-visible {
   box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.28);
 }
 
-/* 0,6 est l'atténuation des autres champs désactivés du site — et, la bordure
-   portant seule le contrôle décoché, descendre plus bas revenait à l'effacer. */
+/* L'état désactivé se dit en **couleurs**, jamais en `opacity` : une opacité se
+   multiplie avec celle d'un parent — une carte verrouillée en porte déjà une —
+   et la bordure, qui porte seule le contrôle décoché, finissait effacée par le
+   produit des deux. Une couleur, elle, ne se compose pas. */
 input[type="checkbox"]:disabled,
 input[type="radio"]:disabled {
-  opacity: 0.6;
+  border-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.04);
   cursor: not-allowed;
+}
+
+/* Cochée **et** désactivée : sans cette reprise, la règle ci-dessus (plus bas
+   dans la feuille, à spécificité égale) effacerait le bleu et la marque
+   flotterait sur un fond vide. */
+input[type="checkbox"]:disabled:checked,
+input[type="radio"]:disabled:checked {
+  border-color: rgba(var(--blue-rgb), 0.45);
+  background-color: rgba(var(--blue-rgb), 0.55);
 }
 
 /* Contrastes forcés : on rend la main au système, et c'est la seule réponse
