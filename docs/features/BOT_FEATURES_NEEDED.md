@@ -156,10 +156,17 @@ Pour chaque commande :
   - [ ] `fetchBotKpis()` → KPIs avec séries
   - [ ] `fetchBotServers()` → liste serveurs
   - [ ] `fetchBotActivity(range)` → données chart
-  - [ ] `fetchBotModules(serverId)` / `toggleBotModule(serverId, key, on)`
+  - [x] ~~`fetchBotModules(serverId)` / `toggleBotModule(serverId, key, on)`~~ —
+        **abandonné** : la section « Modules » de `/bot` a été retirée (elle
+        rendait son en-tête au-dessus d'une grille vide tant que le bot
+        n'exposait rien), et l'appel sortant est parti avec elle. Ne pas le
+        recréer sans rouvrir la décision — voir `CLAUDE.md`, section « Page `/bot` ».
 - [ ] **Endpoint SSE proxy** `/api/bot/feed/stream` (similaire à
       `/api/tournaments/[id]/stream`) pour le live feed
-- [ ] **Remplacer les mocks** dans [components/bot/mocks.ts](components/bot/mocks.ts) par les vrais fetchs
+- [x] ~~**Remplacer les mocks** dans `components/bot/mocks.ts` par les vrais fetchs~~ —
+      **fait autrement** : le fichier a été supprimé. La liste de commandes
+      qu'il portait n'est pas refaite côté serveur, la section renvoie à
+      `/bot/docs`, qui lit le Markdown du bot à chaud.
 - [ ] **Mode dégradation gracieuse** : si le bot est down (circuit breaker
       déjà en place), afficher placeholders sans crash de la page
 

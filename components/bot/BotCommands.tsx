@@ -41,7 +41,10 @@ export function BotCommands() {
             publiés par le bot lui-même. Cette page y renvoie plutôt que d&apos;en
             garder une copie, qui aurait vieilli sans prévenir.
           </p>
-          <ul className="bot-docs-list">
+          {/* `role="list"` n'est pas redondant : Safari retire le rôle d'une
+              liste dont on a ôté les puces (`list-style: none`), et VoiceOver
+              n'annonce alors plus « liste, N éléments ». */}
+          <ul className="bot-docs-list" role="list">
             {BOT_DOC_SECTIONS.map((section) => (
               <li key={section.slug}>
                 <Link href={`/bot/docs/${section.slug}`} className="bot-docs-link">

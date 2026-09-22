@@ -44,6 +44,14 @@ describe("/bot — la section « Modules » est partie", () => {
     expect(read("lib/shared/types.ts")).not.toContain("BotModulesPayload");
   });
 
+  it("ne laisse pas la feuille de route demander de la reconstruire", () => {
+    // Une case à cocher qui demande l'appel sortant qu'on vient de retirer le
+    // fait revenir : elle est barrée, et la décision nommée.
+    const roadmap = read("docs/features/BOT_FEATURES_NEEDED.md");
+    expect(roadmap).not.toMatch(/^ *- \[ \] `fetchBotModules/m);
+    expect(roadmap).not.toContain("[components/bot/mocks.ts](components/bot/mocks.ts)");
+  });
+
   it("emporte ses styles — une feuille qui garde des règles orphelines les fait ressusciter", () => {
     expect(css).not.toMatch(/^\.mod-/m);
     expect(css).not.toMatch(/^\.modules \{/m);
@@ -75,32 +83,54 @@ describe("/bot — les commandes renvoient à leur source", () => {
   it("ne numérote plus une section unique", () => {
     expect(commands).not.toContain("SECTION 0");
   });
+
+  it("garde le rôle `list` qu'une liste sans puces perd sous Safari", () => {
+    expect(commands).toContain('className="bot-docs-list" role="list"');
+    expect(css).toContain("list-style: none;");
+  });
 });
 
 describe("/bot — l'état d'un serveur se lit en français", () => {
-  it("traduit les trois états", () => {
-    expect(servers).toContain('ok: "● À jour"');
-    expect(servers).toContain('lag: "● Retard"');
-    expect(servers).toContain('off: "○ Hors ligne"');
+  // La traduction elle-même est vérifiée sur le module pur
+  // (`tests/lib/shared/bot-relay-status.test.ts`) : ici on ne contrôle que ce
+  // qui ne peut se lire que dans le balisage.
+  it("passe par le module pur plutôt que par une table locale", () => {
+    expect(servers).toContain("resolveBotRelayState");
+    expect(servers).not.toMatch(/"● (OK|LAG)"/);
+    expect(servers).not.toContain('"○ OFF"');
   });
 
-  it("n'affiche plus le vocabulaire du bot", () => {
-    expect(servers).not.toContain('"● LAG"');
-    expect(servers).not.toContain('"● OK"');
+  it("colore d'après le registre, jamais d'après la chaîne reçue", () => {
+    expect(servers).toContain('className={"srv-status " + relay.tone}');
+    expect(servers).not.toContain('"srv-status " + s.status');
   });
 
-  it("garde les valeurs renvoyées par le bot — c'est la traduction qui manquait", () => {
-    expect(servers).toContain('className={"srv-status " + s.status}');
+  it("donne à chaque état une définition atteignable au doigt comme au clavier", () => {
+    expect(servers).toContain("title={relay.hint}");
+    expect(servers).toContain("aria-label={botRelayAccessibleLabel(relay)}");
   });
 
-  it("donne à chaque état une définition atteignable", () => {
-    expect(servers).toContain("STATUS_HINT");
-    expect(servers).toContain("title={STATUS_HINT[s.status]}");
-  });
-
-  it("intitule la colonne d'après ce qu'elle décrit", () => {
-    expect(servers).toContain(">RELAIS</span>");
+  it("intitule la colonne d'après ce qu'elle décrit, sans homonyme", () => {
+    expect(servers).toContain(">ÉTAT DU RELAIS</span>");
     expect(servers).not.toContain(">STATUS</span>");
+    // « RELAIS 30J » compte, « ÉTAT DU RELAIS » qualifie : deux en-têtes
+    // homonymes se reliraient l'un pour l'autre.
+    expect(servers).not.toMatch(/>RELAIS<\/span>/);
+  });
+
+  it("expose autant de cellules que l'en-tête a de colonnes", () => {
+    // Un `aria-hidden` posé sur une cellule décale tout le tableau pour qui le
+    // parcourt au lecteur d'écran.
+    const headers = servers.match(/role="columnheader"/g) ?? [];
+    const cells = servers.match(/role="cell"/g) ?? [];
+    expect(headers).toHaveLength(6);
+    expect(cells).toHaveLength(6);
+    expect(servers).not.toMatch(/role="cell"[^>]*aria-hidden/);
+    expect(servers).not.toMatch(/aria-hidden[^>]*role="cell"/);
+  });
+
+  it("a une couleur pour l'état qu'elle ne connaît pas", () => {
+    expect(css).toContain(".srv-status.unknown");
   });
 });
 

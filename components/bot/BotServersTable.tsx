@@ -1,29 +1,15 @@
 import { BotServerEntry } from "@/lib/shared/types";
+import { botRelayAccessibleLabel, resolveBotRelayState } from "@/lib/shared/bot-relay-status";
 
 /**
- * L'état du relais d'un serveur, **dit en français**.
+ * Le tableau des serveurs où le bot est installé.
  *
- * La colonne s'intitulait « STATUS » et rendait `● OK` / `● LAG` / `○ OFF` : trois
- * mots anglais sans définition nulle part, dont le deuxième ne veut rien dire
- * pour un lecteur — « lag » est le vocabulaire du bot, pas celui de la page. Ce
- * que la colonne décrit est en réalité **le relais** de ce serveur : à jour, en
- * retard, ou arrêté. Les valeurs renvoyées par le bot (`ok`/`lag`/`off`) sont
- * inchangées — c'est leur traduction qui manquait, et elle vit ici, à l'endroit
- * qui les affiche.
+ * La colonne d'état s'intitulait « STATUS » et rendait `● OK` / `● LAG` /
+ * `○ OFF`. Elle s'intitule désormais « ÉTAT DU RELAIS » et se lit en français ;
+ * la traduction elle-même vit dans `lib/shared/bot-relay-status.ts`, module pur
+ * et testé, parce qu'elle ne dépend d'aucun rendu. Les valeurs renvoyées par le
+ * bot sont inchangées.
  */
-const STATUS_LABEL: Record<BotServerEntry["status"], string> = {
-  ok: "● À jour",
-  lag: "● Retard",
-  off: "○ Hors ligne",
-};
-
-/** Ce que chaque état veut dire, pour qui s'arrête sur la cellule. */
-const STATUS_HINT: Record<BotServerEntry["status"], string> = {
-  ok: "Les annonces sont relayées sans délai sur ce serveur.",
-  lag: "Le relais fonctionne mais accuse du retard sur ce serveur.",
-  off: "Le bot ne relaie plus rien sur ce serveur.",
-};
-
 export function BotServersTable({ servers }: { servers: BotServerEntry[] | null }) {
   const list = servers ?? [];
 
@@ -35,37 +21,50 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
       </div>
       {/* Une grille de `div` reste un tableau pour qui le lit : sans ces rôles,
           un lecteur d'écran annonce une suite de textes sans jamais dire de
-          quelle colonne ils viennent. */}
+          quelle colonne ils viennent. Corollaire : chaque ligne doit exposer
+          **autant de cellules** que l'en-tête a de colonnes — un `aria-hidden`
+          posé sur l'une d'elles décalerait tout le tableau. */}
       <div className="srv-table" role="table" aria-label="Serveurs connectés au bot">
         <div className="srv-head" role="row">
           <span role="columnheader">#</span>
           <span role="columnheader">SERVEUR</span>
           <span role="columnheader" style={{ textAlign: "right" }}>MEMBRES</span>
           <span role="columnheader" style={{ textAlign: "right" }}>RELAIS 30J</span>
-          <span role="columnheader" style={{ textAlign: "right" }}>RELAIS</span>
+          <span role="columnheader" style={{ textAlign: "right" }}>ÉTAT DU RELAIS</span>
           <span role="columnheader" style={{ textAlign: "right" }}>TENDANCE</span>
         </div>
-        {list.map((s, rank) => (
-          <div key={s.id} className="srv-row" role="row">
-            <span className="srv-rank" role="cell">{String(rank + 1).padStart(2, "0")}</span>
-            <span className="srv-name" role="cell">
-              <span className="srv-sigil" style={{ "--c": s.accentColor } as React.CSSProperties}>
-                {s.sigil}
+        {list.map((s, rank) => {
+          const relay = resolveBotRelayState(s.status);
+          return (
+            <div key={s.id} className="srv-row" role="row">
+              <span className="srv-rank" role="cell">{String(rank + 1).padStart(2, "0")}</span>
+              <span className="srv-name" role="cell">
+                <span className="srv-sigil" style={{ "--c": s.accentColor } as React.CSSProperties}>
+                  {s.sigil}
+                </span>
+                {s.name}
               </span>
-              {s.name}
-            </span>
-            <span className="srv-num" role="cell">{s.memberCount.toLocaleString("fr-FR")}</span>
-            <span className="srv-num" role="cell">{s.relays30j}</span>
-            <span className={"srv-status " + s.status} role="cell" title={STATUS_HINT[s.status]}>
-              {STATUS_LABEL[s.status]}
-            </span>
-            <span className="srv-spark" role="cell" aria-hidden="true">
-              {s.sparkline.map((v, i) => (
-                <span key={i} style={{ height: `${(v / Math.max(...s.sparkline, 1)) * 100}%` }} />
-              ))}
-            </span>
-          </div>
-        ))}
+              <span className="srv-num" role="cell">{s.memberCount.toLocaleString("fr-FR")}</span>
+              <span className="srv-num" role="cell">{s.relays30j}</span>
+              <span
+                className={"srv-status " + relay.tone}
+                role="cell"
+                title={relay.hint}
+                aria-label={botRelayAccessibleLabel(relay)}
+              >
+                {relay.label}
+              </span>
+              {/* Les barres sont un dessin : elles n'ont pas de texte, la
+                  cellule se lit donc vide — mais elle existe, et l'en-tête
+                  « TENDANCE » reste en face des autres colonnes. */}
+              <span className="srv-spark" role="cell">
+                {s.sparkline.map((v, i) => (
+                  <span key={i} aria-hidden="true" style={{ height: `${(v / Math.max(...s.sparkline, 1)) * 100}%` }} />
+                ))}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
