@@ -140,6 +140,14 @@ export const PATHNAME_HEADER = "x-pathname";
 export const CSP_NONCE_HEADER = "x-nonce";
 
 /**
+ * Origine de Google Identity Services (One Tap), ouverte à quatre directives
+ * (`script-src`, `style-src`, `connect-src`, `frame-src`) — une seule
+ * constante plutôt que quatre littéraux, pour qu'un changement d'origine ou
+ * une cinquième ouverture ne demande jamais de les retrouver un par un.
+ */
+const GOOGLE_IDENTITY_ORIGIN = "https://accounts.google.com";
+
+/**
  * Rédige la politique.
  *
  * Deux directives méritent leur justification, les autres se lisent seules :
@@ -173,14 +181,14 @@ export function contentSecurityPolicy(nonce: string, options: { dev: boolean }):
     // `<script src>` de `gsi/client` lui-même — doit encore porter le nonce
     // pour être accepté (posé côté composant, `components/auth/google-one-tap.tsx`).
     // L'hôte reste listé pour les navigateurs qui ignorent `strict-dynamic`.
-    "https://accounts.google.com",
+    GOOGLE_IDENTITY_ORIGIN,
     ...(options.dev ? ["'unsafe-eval'"] : []),
   ];
 
   const directives: string[] = [
     "default-src 'self'",
     `script-src ${scriptSrc.join(" ")}`,
-    "style-src 'self' 'unsafe-inline' https://accounts.google.com",
+    `style-src 'self' 'unsafe-inline' ${GOOGLE_IDENTITY_ORIGIN}`,
     // `https://lh3.googleusercontent.com` a été admis ici le temps d'une PR :
     // l'avatar d'un compte Google était servi par Google, et le mode rapport
     // l'avait signalé dès le premier chargement — ce qu'aucune lecture du code
@@ -195,7 +203,7 @@ export function contentSecurityPolicy(nonce: string, options: { dev: boolean }):
     "font-src 'self' data:",
     // `accounts.google.com` : les appels que `gsi/client` fait lui-même
     // (résolution du compte, jeton). Rien d'autre côté site ne quitte `'self'`.
-    "connect-src 'self' https://accounts.google.com",
+    `connect-src 'self' ${GOOGLE_IDENTITY_ORIGIN}`,
     "media-src 'self'",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
@@ -204,7 +212,7 @@ export function contentSecurityPolicy(nonce: string, options: { dev: boolean }):
     // nôtre — celle-ci mise à part, les deux se ferment.
     // `frame-ancestors` double `X-Frame-Options: SAMEORIGIN`, que les
     // navigateurs récents ignorent au profit de la CSP.
-    "frame-src https://accounts.google.com",
+    `frame-src ${GOOGLE_IDENTITY_ORIGIN}`,
     "frame-ancestors 'self'",
     "object-src 'none'",
     // `base-uri` n'a pas d'équivalent ailleurs : une balise `<base>` injectée
