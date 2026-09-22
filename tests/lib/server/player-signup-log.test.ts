@@ -38,7 +38,6 @@ type Row = {
   google_sub: string | null;
   discord_id: string | null;
   blizzard_sub?: string | null;
-  email: string | null;
 };
 
 /** Base factice : une table de comptes, adressée par l'identité d'un fournisseur. */
@@ -103,7 +102,7 @@ describe("inscription par Google", () => {
     // Le compte se reconnaît à son `sub` : c'est le cas nominal, celui d'un
     // habitué. Une ligne par connexion noierait le canal, et surtout ne dirait
     // plus rien — « nouveau joueur » cesserait d'être vrai.
-    fakeDb([{ id: 7, google_sub: "google-sub-neuf", discord_id: null, email: "nova@exemple.test" }]);
+    fakeDb([{ id: 7, google_sub: "google-sub-neuf", discord_id: null }]);
 
     await expect(
       createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" }),
@@ -118,7 +117,7 @@ describe("inscription par Google", () => {
     // c'est donc bien un compte de plus à annoncer. Rapprocher les deux se fait
     // depuis « Applications connectées », qui n'écrit aucune ligne — un
     // rattachement n'est pas une naissance.
-    fakeDb([{ id: 7, google_sub: null, discord_id: "123456789", email: "nova@exemple.test" }]);
+    fakeDb([{ id: 7, google_sub: null, discord_id: "123456789" }]);
 
     await expect(
       createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" }),
@@ -143,7 +142,7 @@ describe("inscription par Blizzard", () => {
   });
 
   it("se tait à chaque connexion suivante", async () => {
-    fakeDb([{ id: 7, google_sub: null, discord_id: null, blizzard_sub: "blizzard-sub-neuf", email: null }]);
+    fakeDb([{ id: 7, google_sub: null, discord_id: null, blizzard_sub: "blizzard-sub-neuf" }]);
 
     await expect(createOrGetBlizzardUser("blizzard-sub-neuf", "Nova#2143")).resolves.toBe(7);
 
@@ -163,7 +162,7 @@ describe("inscription par Discord", () => {
   });
 
   it("se tait à chaque connexion suivante", async () => {
-    fakeDb([{ id: 7, google_sub: null, discord_id: "123456789", email: null }]);
+    fakeDb([{ id: 7, google_sub: null, discord_id: "123456789" }]);
 
     await expect(createOrGetDiscordUser("123456789", "Nova")).resolves.toBe(7);
 

@@ -118,7 +118,6 @@ describe("auth", () => {
         avatar_url: null,
         discord_id: null,
         google_sub: null,
-        email: null,
         is_adult: null,
         is_admin: 0,
       };
@@ -141,7 +140,6 @@ describe("auth", () => {
       avatar_url: null,
       discord_id: null,
       google_sub: null,
-      email: null,
       is_adult: null,
       is_admin: 1,
     };
