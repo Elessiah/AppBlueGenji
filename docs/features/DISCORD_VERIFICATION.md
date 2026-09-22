@@ -190,7 +190,9 @@ D'où la règle, écrite **une fois** dans un module pur et tenue aux deux bouts
 
 - **L'écran** passe le champ en `readOnly` (et non `disabled` : la valeur reste
   lisible au lecteur d'écran et atteignable au clavier) et **retire le bouton**
-  de certification — il n'a plus rien à prouver.
+  de certification — il n'a plus rien à prouver. Il en met un autre à la place,
+  « Retirer mon tag » : le champ ne se vidant plus à la main, la sortie que le
+  serveur accepte n'existerait nulle part ailleurs.
 - **La route** refuse la réécriture en **409 `DISCORD_TAG_LOCKED`** : la saisie
   est bonne, c'est l'état du compte qui l'interdit. Le refus ne tombe que sur un
   tag **différent** du tag stocké — le formulaire renvoie le champ à chaque

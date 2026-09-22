@@ -34,6 +34,13 @@ const VERIFICATION_ERRORS: Record<string, string> = {
 
   PROFILE_NOT_FOUND: "Ton compte est introuvable. Reconnecte-toi.",
   UNAUTHORIZED: "Reconnecte-toi pour certifier ton tag.",
+
+  // Rendu par `PATCH /api/profile`, et non par la certification : il atterrit
+  // tout de même ici parce qu'il parle du même objet, et qu'un code en
+  // capitales dans un toast n'aide personne. Le message nomme les deux gestes
+  // qui existent, comme la phrase du champ verrouillé.
+  DISCORD_TAG_LOCKED:
+    "Ton compte Discord est rattaché : ce tag vient de lui. Renomme-toi sur Discord puis reconnecte-toi pour en changer, ou retire-le.",
 };
 
 export function discordVerificationErrorMessage(code: string | null | undefined): string {

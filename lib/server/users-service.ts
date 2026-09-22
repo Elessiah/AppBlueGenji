@@ -878,7 +878,12 @@ export async function updateOwnProfile(
   // ci-dessous en aurait fait un refus en 409 sur tout compte rattaché, ce qui
   // rend la distinction obligatoire autant que juste.
   const touchesDiscordTag = patch.discordPseudo !== undefined;
-  const nextDiscordPseudo = patch.discordPseudo ?? null;
+  // Un champ **vidé** arrive en chaîne vide depuis un formulaire et en `null`
+  // depuis un appel direct : c'est le même geste, et les distinguer laissait
+  // l'un passer pour un effacement et l'autre pour une réécriture — donc un 409
+  // sur un compte rattaché, et une chaîne vide écrite dans la colonne sur les
+  // autres.
+  const nextDiscordPseudo = (patch.discordPseudo ?? "").trim() || null;
 
   // **Un compte Discord rattaché possède son tag** (`lib/shared/discord-tag-lock.ts`) :
   // il ne peut pas en **inventer** un autre, Discord ayant nommé celui-là.

@@ -70,18 +70,21 @@ export function discordTagLockNotice(state: {
   tag: string | null;
   verified: boolean;
 }): string {
+  // Le geste nommé doit **exister à l'écran**. « Détache Discord » n'en est pas
+  // un pour un compte né par Discord : le bouton y est remplacé par le refus
+  // `LAST_CONNECTION`, faute d'une autre porte. Restent les deux qui valent
+  // toujours — se renommer chez Discord puis se reconnecter, et retirer son tag.
   const reopen =
-    "Pour en changer, renomme-toi sur Discord puis reconnecte-toi, ou détache Discord dans « Applications connectées ».";
+    "Pour en changer, renomme-toi sur Discord puis reconnecte-toi. Pour cesser d'être joignable, retire-le.";
   if (!state.tag) {
-    return `Ton compte Discord est rattaché, mais Discord n'a donné aucun pseudo affichable (un pseudo entièrement numérique ne peut pas servir à te joindre). ${reopen}`;
+    return `Ton compte Discord est rattaché, mais aucun pseudo affichable n'est enregistré (un pseudo entièrement numérique ne peut pas servir à te joindre). Reconnecte-toi par Discord pour l'enregistrer.`;
   }
-  // La certification n'est **pas** garantie par le rattachement : le tag a pu
-  // être modifié à la main avant que cette règle existe, et l'annoncer certifié
-  // dirait à un joueur que l'organisation peut le joindre alors qu'elle ne le
-  // peut pas — la pastille d'à côté, elle, serait absente. L'écran dirait deux
-  // choses contraires au même endroit.
+  // On n'affirme pas l'**origine** du tag : `linkOAuthIdentity` n'écrit
+  // `discord_pseudo` que si Discord a donné un pseudo affichable, si bien qu'un
+  // compte rattaché peut porter un tag saisi à la main. Ce qui est sûr, et seul
+  // utile au joueur, c'est qui le lit.
   if (!state.verified) {
-    return `Ton compte Discord est rattaché : ce pseudo vient de Discord, mais il n'est pas certifié — personne ne le voit. ${reopen}`;
+    return `Ton compte Discord est rattaché, mais ce pseudo n'est pas certifié — personne ne le voit. ${reopen}`;
   }
-  return `Ton compte Discord est rattaché : ce pseudo vient de Discord et est certifié. ${reopen}`;
+  return `Ton compte Discord est rattaché et ce pseudo est certifié : les administrateurs le voient, et les arbitres pendant tes tournois. ${reopen}`;
 }

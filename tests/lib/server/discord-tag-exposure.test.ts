@@ -474,3 +474,33 @@ describe("updateOwnProfile — retirer son tag reste possible", () => {
     expect(find(queries, "UPDATE bg_users")).toBeUndefined();
   });
 });
+
+describe("updateOwnProfile — un tag vidé est un tag vidé", () => {
+  const lockedDb = (discordId: string | null, storedTag: string | null) =>
+    fakeDb((sql) =>
+      sql.includes("SELECT discord_id, discord_pseudo")
+        ? [[{ discord_id: discordId, discord_pseudo: storedTag }]]
+        : undefined,
+    );
+
+  it("traite la chaîne vide comme `null` — c'est le même geste", async () => {
+    // Un formulaire rend `""`, un appel direct rend `null` : les distinguer
+    // faisait de l'un un effacement et de l'autre une réécriture, donc un 409
+    // sur un compte rattaché.
+    const { queries } = lockedDb("100000000000000001", "keryan");
+
+    await updateOwnProfile(7, { discordPseudo: "" });
+
+    expect(find(queries, "UPDATE bg_users")).toBeDefined();
+  });
+
+  it("n'écrit jamais une chaîne vide dans la colonne", async () => {
+    const { queries } = lockedDb(null, null);
+
+    await updateOwnProfile(7, { discordPseudo: "   " });
+
+    const params = find(queries, "UPDATE bg_users")!.params;
+    expect(params[4]).toBeNull();
+    expect(params[8]).toBeNull();
+  });
+});

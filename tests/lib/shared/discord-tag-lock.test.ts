@@ -25,20 +25,27 @@ describe("checkDiscordTagEdit", () => {
 });
 
 describe("discordTagLockNotice", () => {
-  it("dit d'où vient le tag et qu'il est certifié", () => {
+  it("dit qui lit un tag certifié, plutôt que d'où il vient", () => {
     const notice = discordTagLockNotice({ tag: "keryan", verified: true });
     expect(notice).toContain("rattaché");
-    expect(notice).toContain("et est certifié");
+    expect(notice).toContain("certifié");
+    expect(notice).toContain("administrateurs");
   });
 
   it("n'annonce pas une certification que le compte n'a pas", () => {
-    // Le rattachement ne la garantit pas : un tag modifié à la main avant cette
-    // règle laisse un compte lié mais non certifié. L'annoncer certifié
-    // contredirait la pastille absente d'à côté — et promettrait au joueur que
-    // l'organisation peut le joindre, ce qu'elle ne peut pas.
+    // Le rattachement ne la garantit pas : `linkOAuthIdentity` n'écrit le
+    // pseudo que si Discord en donne un affichable, si bien qu'un compte lié
+    // peut porter un tag saisi à la main. L'annoncer certifié contredirait la
+    // pastille absente d'à côté.
     const notice = discordTagLockNotice({ tag: "keryan", verified: false });
     expect(notice).toContain("n'est pas certifié");
     expect(notice).toContain("personne ne le voit");
+  });
+
+  it("n'affirme jamais l'origine du tag — elle n'est pas garantie", () => {
+    for (const verified of [true, false]) {
+      expect(discordTagLockNotice({ tag: "keryan", verified })).not.toContain("vient de Discord");
+    }
   });
 
   it("explique l'absence de tag plutôt que de laisser un champ vide sans raison", () => {
@@ -47,15 +54,24 @@ describe("discordTagLockNotice", () => {
     expect(notice).not.toContain("est certifié");
   });
 
-  it("nomme toujours les deux gestes qui rouvrent la donnée", () => {
+  it("ne nomme que des gestes qui existent à l'écran", () => {
+    // « Détache Discord » n'en est pas un pour un compte né par Discord : le
+    // bouton y est remplacé par le refus `LAST_CONNECTION`, faute d'une autre
+    // porte. Le nommer enverrait chercher un contrôle absent.
     const notices = [
       discordTagLockNotice({ tag: "keryan", verified: true }),
       discordTagLockNotice({ tag: "keryan", verified: false }),
       discordTagLockNotice({ tag: null, verified: false }),
     ];
     for (const notice of notices) {
-      expect(notice).toContain("reconnecte-toi");
-      expect(notice).toContain("Applications connectées");
+      expect(notice.toLowerCase()).toContain("reconnecte-toi");
+      expect(notice).not.toContain("Applications connectées");
+    }
+  });
+
+  it("nomme le retrait, seul geste d'annulation, dès qu'un tag est enregistré", () => {
+    for (const verified of [true, false]) {
+      expect(discordTagLockNotice({ tag: "keryan", verified })).toContain("retire-le");
     }
   });
 });

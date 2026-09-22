@@ -13,6 +13,7 @@ import {
   discordTagLockNotice,
   isDiscordTagLocked,
 } from "@/lib/shared/discord-tag-lock";
+import { discordVerificationErrorMessage } from "./discord-errors";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
 
@@ -156,7 +157,44 @@ export default function ProfilePage() {
       await loadDiscordState();
       showSuccess("Profil mis à jour.");
     } catch (e) {
-      showError((e as Error).message);
+      // Le refus du tag verrouillé est le seul code que cette route rende et
+      // qui ait une phrase : un code en capitales dans un toast n'aide personne.
+      showError(discordVerificationErrorMessage((e as Error).message));
+    }
+  };
+
+  const [discordTagBusy, setDiscordTagBusy] = useState(false);
+
+  /**
+   * Retirer son tag Discord — l'annulation de l'exposition.
+   *
+   * Passe par la sauvegarde ordinaire du profil : c'est `updateOwnProfile` qui
+   * décertifie en même temps qu'il efface, et un second chemin laisserait un
+   * compte certifié sur un tag qu'il vient de retirer.
+   */
+  const onDiscordTagRemove = async () => {
+    if (!window.confirm(
+      "Retirer ton tag Discord ? L'organisation ne pourra plus te joindre pendant un tournoi. Reconnecte-toi par Discord pour le remettre.",
+    )) {
+      return;
+    }
+    setDiscordTagBusy(true);
+    try {
+      const response = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ discordPseudo: null }),
+      });
+      const payload = (await response.json()) as FullProfileResponse & { error?: string };
+      if (!response.ok) throw new Error(payload.error || "PROFILE_UPDATE_FAILED");
+      setData(payload);
+      setDiscordPseudo("");
+      await loadDiscordState();
+      showSuccess("Tag Discord retiré.");
+    } catch (e) {
+      showError(discordVerificationErrorMessage((e as Error).message));
+    } finally {
+      setDiscordTagBusy(false);
     }
   };
 
@@ -357,7 +395,27 @@ export default function ProfilePage() {
                 readOnly={discordLocked}
                 aria-readonly={discordLocked || undefined}
               />
-              {discordLocked ? null : (
+              {discordLocked ? (
+                // **Le seul geste que le verrou laisse au joueur.** Le champ ne
+                // se vide plus à la main, or effacer son tag *est* l'annulation
+                // de l'exposition — et un compte né par Discord ne peut pas non
+                // plus se détacher (`LAST_CONNECTION`). Sans ce bouton, la
+                // sortie que le serveur accepte n'existerait nulle part.
+                discordState.tag ? (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={onDiscordTagRemove}
+                      disabled={discordTagBusy}
+                      aria-label="Retirer mon tag Discord"
+                      style={{ padding: "7px 14px", fontSize: 12 }}
+                    >
+                      {discordTagBusy ? "Retrait…" : "Retirer mon tag"}
+                    </button>
+                  </div>
+                ) : null
+              ) : (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
                   <button
                     type="button"
