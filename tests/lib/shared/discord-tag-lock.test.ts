@@ -30,6 +30,17 @@ describe("checkDiscordTagEdit", () => {
     expect(checkDiscordTagEdit({ linked: null })).toBe("UNKNOWN_LINK");
     expect(isDiscordTagLocked({ linked: null })).toBe(true);
   });
+
+  it("traite tout ce qui n'est pas un booléen comme inconnu", () => {
+    // L'écran alimente cet état par un `as` sur une réponse JSON que rien ne
+    // valide : un corps sans `linked` rend `undefined`. Testé dans l'autre sens
+    // (`=== null` d'abord), il glissait entre les branches et **ouvrait** le
+    // champ — l'inverse du seul défaut tenable.
+    for (const linked of [undefined, "true", 1, {}]) {
+      expect(checkDiscordTagEdit({ linked } as never)).toBe("UNKNOWN_LINK");
+      expect(isDiscordTagLocked({ linked } as never)).toBe(true);
+    }
+  });
 });
 
 describe("discordTagLockNotice", () => {
@@ -97,6 +108,12 @@ describe("discordTagLockNotice", () => {
 
 describe("discordTagLockNotice — rattachement inconnu", () => {
   const notice = discordTagLockNotice({ tag: null, verified: false, linked: null });
+
+  it("dit la même chose sur n'importe quelle valeur non booléenne", () => {
+    expect(
+      discordTagLockNotice({ tag: null, verified: false, linked: undefined } as never),
+    ).toBe(notice);
+  });
 
   it("n'affirme ni le rattachement ni son absence", () => {
     expect(notice).not.toContain("est rattaché");

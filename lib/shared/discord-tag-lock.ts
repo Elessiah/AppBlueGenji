@@ -62,8 +62,15 @@ export const DISCORD_TAG_LOCKED = "DISCORD_TAG_LOCKED";
 export function checkDiscordTagEdit(state: {
   linked: boolean | null;
 }): DiscordTagEditRefusal | null {
-  if (state.linked === null) return "UNKNOWN_LINK";
-  return state.linked ? "LINKED_ACCOUNT" : null;
+  // Le test porte sur les deux valeurs **connues**, et tout le reste retombe sur
+  // l'inconnu. Écrit dans l'autre sens (`linked === null` d'abord), un
+  // `undefined` glissait entre les branches et **ouvrait** le champ — l'exact
+  // inverse du défaut que le bloc ci-dessus annonce comme seul tenable. Ce n'est
+  // pas théorique : l'écran alimente cet état par un `as` sur une réponse JSON
+  // que rien ne valide, si bien qu'un corps sans `linked` le produit.
+  if (state.linked === true) return "LINKED_ACCOUNT";
+  if (state.linked === false) return null;
+  return "UNKNOWN_LINK";
 }
 
 /** Raccourci de lecture, pour les écrans qui n'ont qu'un booléen à poser. */
@@ -91,7 +98,7 @@ export function discordTagLockNotice(state: {
   // On ne décrit alors **ni** un rattachement ni son absence : on nomme le
   // verrou, sa raison et sa sortie. Prétendre ici que le compte est rattaché
   // serait une affirmation que rien ne soutient.
-  if (state.linked === null) {
+  if (state.linked !== true) {
     return "Impossible de lire l'état de ton compte Discord pour l'instant : le champ reste en lecture seule, pour ne pas écraser un pseudo que Discord aurait nommé. Recharge la page pour le rouvrir.";
   }
   // Le geste nommé doit **exister à l'écran**. « Détache Discord » n'en est pas

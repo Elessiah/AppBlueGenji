@@ -50,6 +50,11 @@ export default function ProfilePage() {
     verified: boolean;
     linked: boolean | null;
   }>({ tag: null, verified: false, linked: null });
+  // Le tag **tel qu'il est enregistré**, indépendamment de ce qui est tapé : il
+  // décide si la sauvegarde a quelque chose à dire sur ce champ. Sans lui, la
+  // seule façon de le savoir était l'état du verrou — un renseignement que
+  // l'écran peut avoir périmé (voir `onSubmit`).
+  const [savedDiscordPseudo, setSavedDiscordPseudo] = useState("");
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [isAdult, setIsAdult] = useState<string>("unknown");
   const [deleting, setDeleting] = useState(false);
@@ -114,7 +119,7 @@ export default function ProfilePage() {
       if (!response.ok) {
         const errorCode = payload.error || "PROFILE_LOAD_FAILED";
         if (errorCode === "PROFILE_NOT_FOUND") {
-          showError(errorCode);
+          showError(profileErrorMessage(errorCode));
           setTimeout(() => router.push("/"), 1500);
           return;
         }
@@ -125,6 +130,7 @@ export default function ProfilePage() {
       setOverwatchBattletag(payload.profile.overwatchBattletag || "");
       setMarvelRivalsTag(payload.profile.marvelRivalsTag || "");
       setDiscordPseudo(payload.profile.discordPseudo || "");
+      setSavedDiscordPseudo(payload.profile.discordPseudo || "");
       setIsAdult(payload.profile.isAdult === null ? "unknown" : payload.profile.isAdult ? "yes" : "no");
       const v = payload.profile.visibility;
       setOpenToRecruitment(payload.profile.openToRecruitment !== false);
@@ -135,20 +141,30 @@ export default function ProfilePage() {
         major: !!v.major,
       });
     };
-    load().catch((e) => showError((e as Error).message));
+    // Les chemins de **lecture** passent par le même registre que les écritures :
+    // `profile-errors.ts` s'interdit en toutes lettres de laisser sortir un code
+    // en capitales dans un toast, et un `UNAUTHORIZED` brut n'aide personne.
+    load().catch((e) => showError(profileErrorMessage((e as Error).message)));
   }, [showError, router]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     try {
-      // **Un champ verrouillé ne se soumet pas.** Le formulaire renvoyait le tag
+      // **On ne soumet que ce qu'on a changé.** Le formulaire renvoyait le tag
       // de son instantané de montage à chaque sauvegarde, si bien qu'un tag
       // réécrit ailleurs entre-temps (renommage sur Discord puis connexion
       // depuis un autre appareil) faisait refuser **tout** le `PATCH` en 409 —
-      // pseudo, visibilités et BattleTag emportés par un champ que l'écran
-      // affiche en lecture seule. Omettre la clé n'efface rien : le service ne
-      // touche `discord_pseudo` que si le patch en parle.
-      const locked = isDiscordTagLocked(discordState);
+      // pseudo, visibilités et BattleTag emportés par un champ auquel personne
+      // n'avait touché. Omettre la clé n'efface rien : le service ne touche
+      // `discord_pseudo` que si le patch en parle.
+      //
+      // La condition porte sur la **valeur**, et non sur le verrou : le verrou
+      // se lit sur un état que l'écran peut avoir périmé — un onglet ouvert
+      // avant un rattachement fait ailleurs porte encore `linked: false`, et
+      // c'est précisément le cas où le refus tombe. La valeur, elle, dit
+      // exactement ce qu'il faut savoir : ce champ a-t-il quelque chose à
+      // écrire ?
+      const touchesDiscordTag = discordPseudo.trim() !== savedDiscordPseudo.trim();
       const response = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
@@ -156,9 +172,9 @@ export default function ProfilePage() {
           pseudo,
           overwatchBattletag: overwatchBattletag.trim() ? overwatchBattletag.trim() : null,
           marvelRivalsTag: marvelRivalsTag.trim() ? marvelRivalsTag.trim() : null,
-          ...(locked
-            ? {}
-            : { discordPseudo: discordPseudo.trim() ? discordPseudo.trim() : null }),
+          ...(touchesDiscordTag
+            ? { discordPseudo: discordPseudo.trim() ? discordPseudo.trim() : null }
+            : {}),
           isAdult: isAdult === "unknown" ? null : isAdult === "yes",
           visibility,
           openToRecruitment,
@@ -167,6 +183,7 @@ export default function ProfilePage() {
       const payload = (await response.json()) as FullProfileResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "PROFILE_UPDATE_FAILED");
       setData(payload);
+      setSavedDiscordPseudo(payload.profile.discordPseudo || "");
       // Une sauvegarde qui change le tag **annule la certification** côté
       // serveur : la pastille doit tomber dans le même geste, sinon l'écran
       // annonce une exposition qui n'existe plus.
@@ -206,6 +223,7 @@ export default function ProfilePage() {
       if (!response.ok) throw new Error(payload.error || "PROFILE_UPDATE_FAILED");
       setData(payload);
       setDiscordPseudo("");
+      setSavedDiscordPseudo("");
       await loadDiscordState();
       showSuccess("Tag Discord retiré.");
     } catch (e) {

@@ -249,8 +249,12 @@ sortie inexistante se lit comme une panne.
 
 **Un rattachement inconnu verrouille aussi.** L'écran reçoit l'état par un appel
 à part, donc il ne le connaît pas au premier rendu et pas du tout si l'appel
-échoue : `linked` y vaut alors `null`, troisième valeur que `checkDiscordTagEdit`
-refuse (`UNKNOWN_LINK`). Le défaut inverse n'était pas tenable — le champ ouvert
+échoue : `linked` y vaut alors `null`, et `checkDiscordTagEdit` refuse
+(`UNKNOWN_LINK`). Le prédicat teste les deux valeurs **connues** et fait
+retomber tout le reste sur l'inconnu — écrit dans l'autre sens (`=== null`
+d'abord), un `undefined` glissait entre les branches et *ouvrait* le champ, ce
+que l'écran rend atteignable en alimentant cet état par un `as` sur une réponse
+JSON que rien ne valide. Le défaut inverse n'était pas tenable — le champ ouvert
 laissait saisir un tag que la route refuse en 409, et ce refus emporte **toute**
 la sauvegarde, le `PATCH` étant indivisible. L'aide du champ dit alors le verrou
 et sa sortie (recharger), sans affirmer un rattachement que rien n'établit.
@@ -268,12 +272,18 @@ et sa sortie (recharger), sans affirmer un rattachement que rien n'établit.
   par Discord. Sans tag enregistré le bouton dit « Enregistrer mon tag » : il n'y
   a rien à *certifier*, et le geste se prouve seul — `startDiscordVerification`
   conclut sur place quand le tag résout vers l'identifiant déjà rattaché.
-  **Le champ verrouillé n'est pas soumis** : le formulaire renvoyait le tag de
-  son instantané de montage à chaque sauvegarde, si bien qu'un tag réécrit
-  ailleurs entre-temps (renommage sur Discord puis connexion depuis un autre
-  appareil) faisait refuser **tout** le `PATCH` en 409, pseudo et visibilités
-  emportés. La clé est omise, ce qui n'efface rien : `updateOwnProfile` ne touche
-  `discord_pseudo` que si le patch en parle.
+  **Le formulaire ne soumet que ce qu'il a changé** : il renvoyait le tag de son
+  instantané de montage à chaque sauvegarde, si bien qu'un tag réécrit ailleurs
+  entre-temps (renommage sur Discord puis connexion depuis un autre appareil)
+  faisait refuser **tout** le `PATCH` en 409, pseudo et visibilités emportés par
+  un champ auquel personne n'avait touché. La clé est omise quand la valeur n'a
+  pas bougé, ce qui n'efface rien : `updateOwnProfile` ne touche `discord_pseudo`
+  que si le patch en parle.
+  La condition porte sur la **valeur**, et non sur le verrou, parce que le verrou
+  se lit sur un état que l'écran peut avoir périmé : un onglet ouvert avant le
+  rattachement porte encore `linked: false`, et c'est exactement le cas où le
+  refus tombe. La valeur, elle, dit ce qu'il faut savoir — ce champ a-t-il
+  quelque chose à écrire ?
   Ce qui disparaît sur un compte rattaché est « Recertifier » : il ne ferait que
   reposer ce que Discord dit déjà. L'état vient de `GET /api/profile/discord`, qui parle
   du tag **enregistré** : un champ modifié sans être sauvegardé ne gagne ni ne
