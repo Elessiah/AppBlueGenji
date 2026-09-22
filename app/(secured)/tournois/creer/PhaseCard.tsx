@@ -501,6 +501,10 @@ export function PhaseCard({
                 </label>
                 <div
                   className="checkbox-card"
+                  // Même carte, même verrou que `FormatSettings` : sans
+                  // `data-locked`, le survol garde son halo bleu sur un bloc
+                  // devenu inerte.
+                  data-locked={disabled ? "" : undefined}
                   onClick={
                     disabled
                       ? undefined
@@ -549,16 +553,19 @@ export function PhaseCard({
                       style={{
                         display: "block",
                         margin: "0 0 4px",
-                        cursor: "pointer",
+                        cursor: disabled ? "not-allowed" : "pointer",
                         userSelect: "none",
                         fontSize: 14,
                         fontWeight: 500,
-                        color: "var(--ink)",
+                        // Ternir en **couleurs** et non en `opacity` : celle-ci
+                        // se multiplierait avec la bordure de la case, seule à
+                        // la dessiner. Même traitement que `FormatSettings`.
+                        color: disabled ? "var(--ink-mute)" : "var(--ink)",
                       }}
                     >
                       Petite finale
                     </label>
-                    <p style={{ ...HINT, margin: 0 }}>
+                    <p style={{ ...HINT, margin: 0, ...(disabled ? { color: "var(--ink-dim)" } : {}) }}>
                       Ajoute un match pour déterminer la 3ᵉ place entre les deux
                       perdants des demi-finales.
                     </p>

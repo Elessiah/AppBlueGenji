@@ -2,7 +2,19 @@ import { CSSProperties, InputHTMLAttributes } from "react";
 
 type CocheTheme = "tournoi" | "joueur" | "equipe";
 
-interface CocheProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "onChange"> {
+/**
+ * `className` et `style` sortent avec `type` et `onChange`, et pour la même
+ * raison : ce qui se **voit** ici n'est pas l'input mais la pastille, et l'input
+ * est masqué (`opacity: 0`, 0×0). Une classe ou un style d'appelant posé dessus
+ * ne peindrait rien — les accepter pour les jeter donne un réglage qui compile,
+ * ne fait rien et ne le dit pas. Le compilateur les refuse donc, comme il refuse
+ * de redéfinir le `type`.
+ */
+interface CocheProps
+  extends Omit<
+    InputHTMLAttributes<HTMLInputElement>,
+    "type" | "onChange" | "className" | "style"
+  > {
   label: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
@@ -47,20 +59,16 @@ export function Coche({
     >
       {/* `{...props}` passe **avant** : étalé après, il écraserait le `type`, le
           `checked` et l'`onChange` du contrôle. Ce qui suit n'est donc pas
-          surchargeable — d'où les deux seules choses qu'un appelant peut
-          légitimement apporter, `className` et `style`, **fusionnées** et non
-          remplacées : `className` n'est pas dans l'`Omit<…>`, le compilateur
-          l'accepte, et écrit en dur ici il partait à la poubelle sans un mot. Le
-          style de masquage reste le dernier — la pastille ne se voit que parce
-          que l'input, lui, ne se voit pas. */}
+          surchargeable, et ce que l'appelant ne peut pas surcharger, il ne peut
+          pas non plus l'écrire — `className` et `style` sont refusés par le type
+          (voir `CocheProps`) plutôt que reçus puis jetés. */}
       <input
         {...props}
-        className={["coche-input", props.className].filter(Boolean).join(" ")}
+        className="coche-input"
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
         style={{
-          ...props.style,
           position: "absolute",
           opacity: 0,
           width: 0,

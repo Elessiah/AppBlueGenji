@@ -73,8 +73,37 @@ describe("Cases à cocher — apparence unique", () => {
     expect(blockFor('input[type="checkbox"]:focus-visible,')).toContain("box-shadow");
   });
 
-  it("marque l'état désactivé", () => {
-    expect(blockFor('input[type="checkbox"]:disabled,')).toContain("cursor: not-allowed");
+  it("marque l'état désactivé sans effacer le contrôle", () => {
+    const off = blockFor('input[type="checkbox"]:disabled,');
+    expect(off).toContain("cursor: not-allowed");
+    // Décochée, la case n'est que sa bordure — `appearance: none` a retiré le
+    // carré que le système dessinait dessous. Trop pâle, elle laisse un trou
+    // dans la page à côté de son étiquette, et l'état désactivé est durable
+    // (le radio `START_TIME` l'est tant que le match n'a pas de date).
+    const alpha = off.match(/border-color: rgba\(255, 255, 255, ([\d.]+)\)/);
+    expect(alpha).not.toBeNull();
+    expect(Number(alpha![1])).toBeGreaterThanOrEqual(0.3);
+    // Elle reste tout de même plus pâle que la case active, sans quoi
+    // « désactivé » ne se lirait plus.
+    const on = CHECKBOX_BLOCK.match(/border: 1px solid rgba\(255, 255, 255, ([\d.]+)\)/);
+    expect(on).not.toBeNull();
+    expect(Number(alpha![1])).toBeLessThan(Number(on![1]));
+  });
+
+  it("ne fait plus miroiter une carte verrouillée", () => {
+    // Le halo et le balayage du survol annonçaient un clic que la carte
+    // verrouillée ne rend pas — et l'opacité qui les recouvrait a dû partir,
+    // elle effaçait la bordure de la case.
+    expect(globals).toContain(".checkbox-card:not([data-locked]):hover");
+    expect(globals).toContain(".checkbox-card:not([data-locked]):hover::before");
+    expect(globals).not.toMatch(/\.checkbox-card:hover/);
+    // Les deux écrans qui verrouillent cette carte doivent poser l'attribut.
+    for (const file of [
+      join(ROOT, "app", "(secured)", "tournois", "_components", "FormatSettings.tsx"),
+      join(ROOT, "app", "(secured)", "tournois", "creer", "PhaseCard.tsx"),
+    ]) {
+      expect(readFileSync(file, "utf8")).toMatch(/data-locked=\{/);
+    }
   });
 
   it("ne laisse pas le survol effacer le coché ni le focus", () => {
@@ -91,19 +120,20 @@ describe("Cases à cocher — apparence unique", () => {
     // `onFocus` reste donc muet là où le clavier prend la main.
     expect(globals).toContain(".coche-input:focus-visible ~ .coche-pill");
     const coche = readFileSync(join(ROOT, "components", "Coche.tsx"), "utf8");
-    expect(coche).toContain('"coche-input"');
+    expect(coche).toContain('className="coche-input"');
     expect(coche).toContain('className="coche-pill"');
     expect(coche).not.toContain("useState");
     expect(coche).not.toContain(':focus-visible")');
   });
 
-  it("fusionne la classe d'un appelant au lieu de la jeter", () => {
-    // `className` n'est pas dans l'`Omit<…>` de `CocheProps` : le compilateur
-    // l'accepte. Écrite en dur **après** `{...props}`, la classe du contrôle
-    // effaçait silencieusement celle de l'appelant.
+  it("refuse `className` et `style` au lieu de les recevoir pour rien", () => {
+    // Ils atterriraient sur l'input, que le composant masque (`opacity: 0`,
+    // 0×0) : un appelant réglant la pastille par l'un des deux n'obtiendrait
+    // aucun effet et aucun avertissement. Le type les refuse, comme `type`.
     const coche = readFileSync(join(ROOT, "components", "Coche.tsx"), "utf8");
-    expect(coche).toContain("props.className");
-    expect(coche).not.toMatch(/\{\.\.\.props\}\s*\n\s*className="coche-input"/);
+    expect(coche).toMatch(/"type" \| "onChange" \| "className" \| "style"/);
+    expect(coche).not.toContain("props.className");
+    expect(coche).not.toContain("props.style");
   });
 
   it("rend la main au système en contrastes forcés", () => {
