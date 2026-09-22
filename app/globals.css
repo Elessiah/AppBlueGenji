@@ -1543,3 +1543,14 @@ input[type="radio"]:disabled:checked {
 .coche-input:focus-visible ~ .coche-pill {
   box-shadow: 0 0 0 3px rgba(var(--coche-rgb), 0.28);
 }
+
+/* Contrastes forcés : le mode supprime les `box-shadow`, donc l'anneau ci-dessus
+   avec eux. L'`outline` native de la case ne le remplace pas ici — la case est
+   masquée en ligne (`opacity: 0`, 0×0), un contour posé dessus ne peint rien.
+   C'est donc la **pastille**, seule chose visible, qui doit le porter. */
+@media (forced-colors: active) {
+  .coche-input:focus-visible ~ .coche-pill {
+    outline: 2px solid;
+    outline-offset: 2px;
+  }
+}

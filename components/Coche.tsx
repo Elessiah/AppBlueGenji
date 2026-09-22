@@ -45,13 +45,17 @@ export function Coche({
         } as CSSProperties
       }
     >
-      {/* `{...props}` passe **avant** : étalé après, un `onFocus` ou un `onBlur`
-          d'appelant écraserait ceux du contrôle. Le style de masquage reste le
-          dernier — la pastille ne se voit que parce que l'input, lui, ne se voit
-          pas. */}
+      {/* `{...props}` passe **avant** : étalé après, il écraserait le `type`, le
+          `checked` et l'`onChange` du contrôle. Ce qui suit n'est donc pas
+          surchargeable — d'où les deux seules choses qu'un appelant peut
+          légitimement apporter, `className` et `style`, **fusionnées** et non
+          remplacées : `className` n'est pas dans l'`Omit<…>`, le compilateur
+          l'accepte, et écrit en dur ici il partait à la poubelle sans un mot. Le
+          style de masquage reste le dernier — la pastille ne se voit que parce
+          que l'input, lui, ne se voit pas. */}
       <input
         {...props}
-        className="coche-input"
+        className={["coche-input", props.className].filter(Boolean).join(" ")}
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}

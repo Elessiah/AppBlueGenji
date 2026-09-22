@@ -91,10 +91,19 @@ describe("Cases à cocher — apparence unique", () => {
     // `onFocus` reste donc muet là où le clavier prend la main.
     expect(globals).toContain(".coche-input:focus-visible ~ .coche-pill");
     const coche = readFileSync(join(ROOT, "components", "Coche.tsx"), "utf8");
-    expect(coche).toContain('className="coche-input"');
+    expect(coche).toContain('"coche-input"');
     expect(coche).toContain('className="coche-pill"');
     expect(coche).not.toContain("useState");
     expect(coche).not.toContain(':focus-visible")');
+  });
+
+  it("fusionne la classe d'un appelant au lieu de la jeter", () => {
+    // `className` n'est pas dans l'`Omit<…>` de `CocheProps` : le compilateur
+    // l'accepte. Écrite en dur **après** `{...props}`, la classe du contrôle
+    // effaçait silencieusement celle de l'appelant.
+    const coche = readFileSync(join(ROOT, "components", "Coche.tsx"), "utf8");
+    expect(coche).toContain("props.className");
+    expect(coche).not.toMatch(/\{\.\.\.props\}\s*\n\s*className="coche-input"/);
   });
 
   it("rend la main au système en contrastes forcés", () => {
@@ -105,6 +114,18 @@ describe("Cases à cocher — apparence unique", () => {
     expect(forced).toContain("background-image: none");
     // Le `box-shadow` du focus est supprimé lui aussi : il faut une `outline`.
     expect(forced).toMatch(/outline: 2px solid/);
+  });
+
+  it("donne aussi un anneau à la pastille `Coche` en contrastes forcés", () => {
+    // Son seul repère est un `box-shadow`, que le mode supprime ; et l'`outline`
+    // de secours posée sur la case ne peint rien — `Coche` la masque en ligne
+    // (`opacity: 0`, 0×0). C'est la pastille, seule visible, qui doit la porter.
+    const forcedBlocks = globals.split("@media (forced-colors: active)").slice(1);
+    const pill = forcedBlocks.find((block) =>
+      block.slice(0, 400).includes(".coche-input:focus-visible ~ .coche-pill"),
+    );
+    expect(pill).toBeDefined();
+    expect(pill!.slice(0, 400)).toMatch(/outline: 2px solid/);
   });
 });
 
@@ -143,6 +164,11 @@ const BOX_PROPERTIES = [
   // `appearance: none` retire l'anneau natif : `outline` fait désormais partie
   // de ce qui peut casser le contrôle sans qu'on le voie.
   "outline",
+  // Une case décochée n'est plus dessinée que par sa bordure : la ternir, c'est
+  // l'effacer. C'était le cas réel — `.field input:disabled` ne déclarait
+  // *que* `opacity` et `cursor`, donc aucune des propriétés ci-dessus, et
+  // serait passé au travers de ce balayage.
+  "opacity",
 ];
 
 /**
@@ -259,6 +285,11 @@ describe("Cases à cocher — aucune feuille ne redéfinit l'apparence", () => {
     expect(splitSelectorList('a:not(.x, .y), b')).toEqual(["a:not(.x, .y)", "b"]);
     // Un commentaire au-dessus ne doit plus servir de laissez-passer.
     expect(bareInputOffenders("x.css", "/* note */\n.a input { width: auto; }")).toHaveLength(1);
+    // Ternir une case décochée l'efface : sa bordure est tout ce qui la dessine.
+    // C'est la forme exacte que prenait la règle corrigée (`opacity` + `cursor`,
+    // et rien d'autre), donc celle que ce balayage devait déjà voir.
+    const faded = ".a input:disabled { opacity: 0.6; cursor: not-allowed; }";
+    expect(bareInputOffenders("x.css", faded)).toHaveLength(1);
   });
 });
 
@@ -271,7 +302,8 @@ describe("Cases à cocher — aucune feuille ne redéfinit l'apparence", () => {
  * règle ferme. `accent-color` y est en outre mort, `appearance: none` le
  * désactivant.
  */
-const INLINE_BANNED = /\b(width|height|accentColor|appearance|padding|borderRadius)\s*:/;
+const INLINE_BANNED =
+  /\b(width|height|minWidth|maxWidth|accentColor|appearance|padding|margin|display|border|borderRadius|background|boxShadow|outline|opacity|flex)\s*:/;
 
 function inlineOffenders(path: string, source: string): Offender[] {
   const offenders: Offender[] = [];
@@ -329,5 +361,28 @@ describe("Cases à cocher — aucun style en ligne ne reprend la main", () => {
     // Un étalement de props sans `style` ne porte aucune apparence.
     const spread = '<input type="checkbox" {...props} />';
     expect(inlineOffenders("x.tsx", spread)).toEqual([]);
+  });
+
+  it("tient en ligne tout ce que la feuille tient — c'est la moitié la plus forte", () => {
+    // Un style en ligne bat la règle globale : cette liste ne peut pas être plus
+    // permissive que celle du balayage des feuilles. `flex: 1` pose un
+    // `flex-basis: 0%` (le `flex-shrink: 0` global ne protège pas d'un socle
+    // nul), `border: "none"` efface la seule chose qui dessine une case
+    // décochée, et `minWidth` n'était pas même atteint par le motif — `n` et `W`
+    // sont deux caractères de mot, il n'y a pas de frontière entre eux.
+    for (const style of [
+      "flex: 1",
+      'border: "none"',
+      'background: "red"',
+      "minWidth: 24",
+      "maxWidth: 24",
+      'display: "block"',
+      'boxShadow: "none"',
+      'outline: "none"',
+    ]) {
+      expect(inlineOffenders("x.tsx", `<input type="checkbox" style={{ ${style} }} />`)).toHaveLength(
+        1,
+      );
+    }
   });
 });

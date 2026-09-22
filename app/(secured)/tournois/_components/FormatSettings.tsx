@@ -387,8 +387,13 @@ export function FormatSettings({
               }`,
               borderRadius: 10,
               cursor: locked("hasThirdPlaceMatch") ? "not-allowed" : "pointer",
-              opacity: locked("hasThirdPlaceMatch") ? 0.6 : 1,
-              transition: "border-color 0.2s ease, background-color 0.2s ease, opacity 0.2s ease",
+              // Verrouillée, la carte se ternit en **couleurs** et non en
+              // `opacity` : une opacité de parent se multiplie avec ce qu'elle
+              // couvre, et la case à cocher n'est plus dessinée que par sa
+              // bordure (`globals.css`) — désactivée, elle est déjà à 0,2 de
+              // blanc, que 0,6 ramenait à 0,12, sous le seuil du visible. Une
+              // couleur, elle, ne se compose pas.
+              transition: "border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease",
               backgroundColor: values.hasThirdPlaceMatch
                 ? "rgba(90, 200, 255, 0.07)"
                 : "transparent",
@@ -416,12 +421,18 @@ export function FormatSettings({
                   userSelect: "none",
                   fontSize: 14,
                   fontWeight: 500,
-                  color: "var(--ink)",
+                  color: locked("hasThirdPlaceMatch") ? "var(--ink-mute)" : "var(--ink)",
                 }}
               >
                 Petite finale
               </label>
-              <p style={{ ...HINT, margin: 0 }}>
+              <p
+                style={{
+                  ...HINT,
+                  margin: 0,
+                  ...(locked("hasThirdPlaceMatch") ? { color: "var(--ink-dim)" } : {}),
+                }}
+              >
                 Ajoute un match pour déterminer la 3ᵉ place entre les deux perdants des
                 demi-finales.
               </p>
