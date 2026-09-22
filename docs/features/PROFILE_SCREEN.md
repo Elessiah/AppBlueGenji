@@ -143,16 +143,21 @@ les deux écrans qui les affichent y puisent :
 | `BLIZZARD_BATTLETAG_NOTICE` | Blizzard renseigne le BattleTag et **remplace** la saisie à chaque connexion. |
 | `GAME_TAG_NOTICE` | Les identifiants de jeu servent à s'ajouter entre joueurs, jamais à des statistiques. |
 
-Sur `/profil`, le cas « certifié » est énoncé par la **phrase du verrou** et non
-par `discordCertifiedNotice` : un tag certifié appartient toujours à un compte
-rattaché (`writeVerifiedTag` écrit `discord_id`, et détacher Discord décertifie),
-donc le champ est toujours verrouillé — une branche « certifié, non verrouillé »
-n'aurait jamais été rendue.
+Le module n'expose que des **chaînes**, jamais d'assembleur : l'**entrée en
+matière** diffère selon l'écran (« Te connecter par Discord *certifie ce tag* »
+à la connexion, la phrase du verrou sur le profil) et aucun des deux ne peut
+passer par une fonction commune — la connexion met du `<strong>` dans la sienne,
+que rien qui rende une chaîne ne porte. Chaque écran compose donc son entrée en
+matière puis **concatène les constantes**, qui restent la seule rédaction de la
+promesse.
 
-L'**entrée en matière** diffère selon l'écran (« Te connecter par Discord
-certifie ce tag » à la connexion, « Tag certifié » sur le profil) ; ce qui suit ne
-doit pas différer, puisque c'est la promesse. D'où `discordCertifiedNotice(lead)`,
-qui laisse le premier morceau à l'appelant et tient le reste.
+Sur `/profil`, le cas « certifié » est énoncé par la **phrase du verrou**
+(`discordTagLockNotice`, `lib/shared/discord-tag-lock.ts`), qui dit en plus le
+rattachement : un tag certifié appartient toujours à un compte rattaché
+(`writeVerifiedTag` écrit `discord_id`, et détacher Discord décertifie), donc le
+champ est toujours verrouillé — une branche « certifié, non verrouillé »
+n'aurait jamais été rendue. Réserve connue : cette phrase-là **recopie** encore
+l'exposition au lieu de composer `DISCORD_TAG_AUDIENCE` (voir `ERREUR.txt`).
 
 Le test de `/connexion` porte désormais sur ces constantes **et** sur le fait que
 la page les emploie : c'est strictement plus fort que l'ancienne lecture

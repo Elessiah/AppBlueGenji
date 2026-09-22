@@ -5,7 +5,6 @@ import {
   DISCORD_TAG_AUDIENCE,
   DISCORD_TAG_UNVERIFIED_AUDIENCE,
   GAME_TAG_NOTICE,
-  discordCertifiedNotice,
 } from "@/lib/shared/identity-sharing";
 
 /**
@@ -53,16 +52,19 @@ describe("DISCORD_CERTIFICATION_UNDO", () => {
   });
 });
 
-describe("discordCertifiedNotice", () => {
-  it("laisse l'entrée en matière à l'écran, et jamais la promesse", () => {
-    const login = discordCertifiedNotice("Te connecter par Discord certifie ce tag");
-    const profile = discordCertifiedNotice("Tag certifié");
-
-    expect(login.startsWith("Te connecter par Discord certifie ce tag :")).toBe(true);
-    expect(profile.startsWith("Tag certifié :")).toBe(true);
-    for (const notice of [login, profile]) {
-      expect(notice).toContain(DISCORD_TAG_AUDIENCE);
-      expect(notice).toContain(DISCORD_CERTIFICATION_UNDO);
+describe("Le module n'expose que des chaînes", () => {
+  it("ne garde aucun assembleur sans appelant", async () => {
+    // Un `discordCertifiedNotice(lead)` a existé ici, pour coller une entrée en
+    // matière devant la promesse. Aucun des deux écrans n'a pu s'en servir : la
+    // connexion met du `<strong>` dans son entrée en matière (une fonction qui
+    // rend une chaîne ne peut pas la porter), et le profil énonce le cas
+    // certifié par la **phrase du verrou**, qui dit en plus le rattachement.
+    // Une aide que personne n'appelle n'unifie rien : elle donne seulement à
+    // croire que la promesse est écrite une fois, pendant que les écrans la
+    // composent ailleurs.
+    const module = await import("@/lib/shared/identity-sharing");
+    for (const value of Object.values(module)) {
+      expect(typeof value).toBe("string");
     }
   });
 });

@@ -123,8 +123,16 @@ describe("La page dit ce qu'elle fait des identifiants", () => {
   it("n'écrit pas de branche que l'état ne peut pas atteindre", () => {
     // `verified` implique `linked` (`writeVerifiedTag` écrit `discord_id`, et
     // détacher Discord décertifie), donc implique `discordLocked` : une branche
-    // « certifié, non verrouillé » ne serait jamais rendue.
-    expect(page).not.toContain("discordCertifiedNotice");
+    // « certifié, non verrouillé » ne serait jamais rendue. Deux cas donc, et
+    // deux seulement — la phrase du verrou, puis celle du tag non certifié.
+    expect(page).toContain("discordTagLockNotice(discordState)");
+    expect(page).toContain("DISCORD_TAG_UNVERIFIED_AUDIENCE");
+  });
+
+  it("ne recopie pas à la main l'exposition d'un tag certifié", () => {
+    // Elle est énoncée par `discordTagLockNotice` ; une seconde rédaction ici
+    // divergerait de la promesse faite sur `/connexion`.
+    expect(page).not.toMatch(/les administrateurs le voient/);
   });
 
   it("ne recopie plus l'aide des tags de jeu deux fois", () => {

@@ -75,14 +75,3 @@ export const BLIZZARD_BATTLETAG_NOTICE =
  */
 export const GAME_TAG_NOTICE =
   "Sert uniquement à ce que les autres joueurs puissent t'ajouter en jeu — jamais pour des statistiques.";
-
-/**
- * L'annonce complète de l'exposition, sous une entrée en matière au choix.
- *
- * L'entrée diffère selon l'écran — « Te connecter par Discord **certifie ce
- * tag** » à la connexion, « Tag certifié » sur le profil — mais ce qui suit ne
- * doit pas différer : c'est la promesse, et elle est la même des deux côtés.
- */
-export function discordCertifiedNotice(lead: string): string {
-  return `${lead} : ${DISCORD_TAG_AUDIENCE} ${DISCORD_CERTIFICATION_UNDO}`;
-}
