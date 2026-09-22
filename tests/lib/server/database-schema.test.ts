@@ -81,7 +81,11 @@ describe("Schéma — les ENUM sont à leur état final", () => {
     // en commentaire pourquoi il surveille cette conversion, et nommer la
     // valeur périmée y est le propos.
     expect(table("bg_tournaments")).toContain("ENUM('OW', 'MR')");
+    // Sur le **DDL** seul : le filet de schéma nomme la valeur périmée pour la
+    // surveiller (`forbid`), et son commentaire l'explique — les deux sont le
+    // propos, pas une survivance.
     const ddl = sql
+      .slice(0, sql.indexOf("async function warnIfSchemaIsBehind"))
       .split("\n")
       .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
       .join("\n");
@@ -270,15 +274,18 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     // instruction sans l'exécuter — ils ne comptent pas.
     const drops = code
       .split("\n")
-      .filter((line) => line.includes("await db.execute(`ALTER TABLE"))
+      .filter(
+        (line) =>
+          /\bALTER TABLE \w+ DROP COLUMN/.test(line) && !line.includes("reportSchemaFailure"),
+      )
       .map((line) => line.trim());
     expect(drops).toEqual([
       "await db.execute(`ALTER TABLE bg_recruitment_ads DROP COLUMN contact_email`);",
-      "await db.execute(`ALTER TABLE bg_users DROP COLUMN email`);",
+      'const DROP_EMAIL = "ALTER TABLE bg_users DROP COLUMN email";',
     ]);
     // Et la liste des changements récents, jouée par la boucle.
     expect(code).toContain("for (const statement of RECENT_SCHEMA_CHANGES)");
-    expect(code).toContain("ALTER TABLE bg_users DROP COLUMN email");
+    expect(code).toContain("await db.execute(DROP_EMAIL);");
   });
 
   it("garde les trois tables tolérantes, dont des chemins accessoires dépendent", () => {
@@ -357,6 +364,33 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
     expect(net).toContain("uniq_bg_teams_tag");
     expect(net).toContain("uniq_bg_teams_solo_user");
+  });
+
+  it("ne jette pas les constats d'une sonde quand l'autre échoue", () => {
+    // Les deux sondes sont indépendantes ; partageant un `try`, l'échec de la
+    // seconde emportait ce que la première venait d'établir — dont « les
+    // adresses sont encore là », qui est la raison d'être du filet.
+    const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
+    expect([...net.matchAll(/\btry \{/g)].length).toBeGreaterThanOrEqual(2);
+    // Le tableau des constats est déclaré **avant** les `try`, et le rapport
+    // vient après : il doit dire ce qu'on sait, même partiellement.
+    expect(net.indexOf("const gaps: string[] = []")).toBeLessThan(net.indexOf("try {"));
+    expect(net.lastIndexOf("} catch {")).toBeLessThan(net.indexOf("if (gaps.length > 0)"));
+  });
+
+  it("distingue une base à demi convertie d'une base à jour", () => {
+    // `enum('OW2','MR','OW')` contient bien `'OW'` : la présence de la valeur
+    // neuve ne prouve rien, c'est l'**absence** de l'ancienne qui tranche.
+    const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
+    expect(net).toContain("forbid: \"'OW2'\"");
+  });
+
+  it("vide les adresses quand le retrait de la colonne échoue", () => {
+    // Le `DROP` est le seul effaceur restant, `anonymizeOwnAccount` ayant perdu
+    // son `email = NULL`. Un repli sans DDL n'obtient pas le même résultat — la
+    // colonne survit — mais il obtient le seul qui soit urgent.
+    const drop = sql.slice(sql.indexOf("const DROP_EMAIL"));
+    expect(drop.slice(0, 900)).toContain("UPDATE bg_users SET email = NULL WHERE email IS NOT NULL");
   });
 
   it("le filet ne devient jamais la panne qu'il signale", () => {

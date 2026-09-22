@@ -1,5 +1,5 @@
 ﻿import "dotenv/config";
-import mysql, { type ExecuteValues, type Pool, type PoolConnection, type RowDataPacket } from "mysql2/promise";
+import mysql, { type ExecuteValues, type Pool, type PoolConnection, type ResultSetHeader, type RowDataPacket } from "mysql2/promise";
 import { isSchemaNoOpError } from "@/lib/server/mysql-errors";
 import { createOnceGate, withMigrationLock } from "@/lib/server/migration-lock";
 import { CONTACT_DISCORD_URL_KEY } from "@/lib/shared/contact";
@@ -838,16 +838,42 @@ async function runMigrations(db: Pool): Promise<void> {
   // personne ne lit n'est pas de la prudence, c'est une fuite en attente. Elle
   // part donc de la table, ce qui efface les valeurs du même geste.
   //
-  // **L'échec ne passe pas en silence**, et c'est ici qu'il compte le plus : le
-  // `DROP` est le geste d'effacement lui-même. Rien ne lit plus la colonne, donc
-  // la base démarre parfaitement sans lui — et `anonymizeOwnAccount` ne met plus
-  // l'adresse à `NULL`, cette ligne n'ayant plus d'objet. Un `ALTER` refusé et
-  // avalé garderait donc les adresses **indéfiniment**, y compris sur les
-  // comptes qui ont demandé leur suppression, sans que rien ne le dise.
+  // **L'échec ne passe ni en silence, ni sans recours**, et c'est ici qu'il
+  // compte le plus : le `DROP` est le geste d'effacement lui-même. Rien ne lit
+  // plus la colonne, donc la base démarre parfaitement sans lui — et
+  // `anonymizeOwnAccount` ne met plus l'adresse à `NULL`, cette ligne n'ayant
+  // plus d'objet. Un `ALTER` refusé (droit manquant, verrou de métadonnées
+  // tenace) laisserait donc les adresses **indéfiniment**, y compris sur les
+  // comptes qui ont demandé leur suppression.
+  //
+  // D'où un repli qui ne demande **aucun DDL** : vider la colonne. Il n'obtient
+  // pas le même résultat — la colonne survit, et il restera à la retirer — mais
+  // il obtient le seul qui soit urgent : les adresses ne sont plus là. Le
+  // `WHERE` le rend gratuit au passage suivant, et il se rejoue à chaque
+  // démarrage tant que le `DROP` ne passe pas.
+  const DROP_EMAIL = "ALTER TABLE bg_users DROP COLUMN email";
   try {
-    await db.execute(`ALTER TABLE bg_users DROP COLUMN email`);
+    await db.execute(DROP_EMAIL);
   } catch (error) {
-    reportSchemaFailure(error, "ALTER TABLE bg_users DROP COLUMN email");
+    reportSchemaFailure(error, DROP_EMAIL);
+    if (!isSchemaNoOpError(error, DROP_EMAIL)) {
+      try {
+        const [erased] = await db.execute<ResultSetHeader>(
+          `UPDATE bg_users SET email = NULL WHERE email IS NOT NULL`,
+        );
+        if (erased.affectedRows > 0) {
+          console.error(
+            `[migrations] Le retrait de bg_users.email a échoué : ${erased.affectedRows} ` +
+              `adresse(s) ont été vidées à la place. La colonne reste à retirer à la main.`,
+          );
+        }
+      } catch (fallbackError) {
+        console.error(
+          `[migrations] Les adresses de bg_users.email n'ont pu être ni retirées ni vidées.`,
+          fallbackError,
+        );
+      }
+    }
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -953,6 +979,16 @@ async function warnIfSchemaIsBehind(db: Pool): Promise<void> {
     column: string;
     /** Fragment attendu dans `COLUMN_TYPE`, pour un type replié par `MODIFY`. */
     expect?: string;
+    /**
+     * Fragment qui ne doit **plus** figurer dans `COLUMN_TYPE`.
+     *
+     * `expect` seul ne suffit pas sur un `ENUM` : une base à demi convertie
+     * porte `enum('OW2','MR','OW')`, qui contient bien `'OW'` et passerait le
+     * filet — alors qu'elle n'est ni réparée (la conversion est repliée) ni
+     * signalée. Ce qui distingue une base à jour est l'**absence** de l'ancienne
+     * valeur, pas la présence de la neuve.
+     */
+    forbid?: string;
     /** La colonne devait disparaître : la trouver **est** l'anomalie. */
     absent?: true;
   };
@@ -960,11 +996,19 @@ async function warnIfSchemaIsBehind(db: Pool): Promise<void> {
   // Une entrée par lot replié, la plus récente d'abord.
   const WITNESSES: readonly Witness[] = [
     { table: "bg_users", column: "email", absent: true },
-    { table: "bg_tournaments", column: "game", expect: "'OW'" },
+    { table: "bg_tournaments", column: "game", expect: "'OW'", forbid: "'OW2'" },
     { table: "bg_tournaments", column: "match_format_max_maps" },
     { table: "bg_tournaments", column: "endurance_playoff_format_type" },
     { table: "bg_matches", column: "phase_id" },
   ];
+
+  // **Trois `try` et non un seul**, et le découpage est le propos : les deux
+  // sondes sont indépendantes, et les faire partager un `try` faisait jeter par
+  // l'échec de la seconde les constats que la première venait d'établir — dont
+  // le « les adresses sont encore là », qui est la raison d'être du filet.
+  // Le rapport, lui, vit en dehors des deux : il doit dire ce qu'on sait, même
+  // partiellement.
+  const gaps: string[] = [];
 
   try {
     const [rows] = await db.execute<
@@ -978,7 +1022,6 @@ async function warnIfSchemaIsBehind(db: Pool): Promise<void> {
     );
     const found = new Map(rows.map((r) => [`${r.TABLE_NAME}.${r.COLUMN_NAME}`, r.COLUMN_TYPE]));
 
-    const gaps: string[] = [];
     for (const witness of WITNESSES) {
       const name = `${witness.table}.${witness.column}`;
       const type = found.get(name);
@@ -990,9 +1033,17 @@ async function warnIfSchemaIsBehind(db: Pool): Promise<void> {
         gaps.push(`${name} manque`);
       } else if (witness.expect && !type.includes(witness.expect)) {
         gaps.push(`${name} est resté « ${type} », sans ${witness.expect}`);
+      } else if (witness.forbid && type.includes(witness.forbid)) {
+        gaps.push(`${name} porte encore ${witness.forbid} : « ${type} »`);
       }
     }
 
+  } catch {
+    // Le filet ne doit jamais devenir la panne : une base qui refuse
+    // `information_schema` reste servie comme avant.
+  }
+
+  try {
     // Les **index** ne se lisent pas dans `COLUMNS`, et leur absence est la plus
     // silencieuse de toutes : une colonne manquante fait tomber la requête qui
     // la nomme, un index unique manquant ne fait **rien** — il cesse simplement
@@ -1019,17 +1070,16 @@ async function warnIfSchemaIsBehind(db: Pool): Promise<void> {
     for (const [table, index] of INDEX_WITNESSES) {
       if (!indexes.has(index)) gaps.push(`l'index ${index} manque sur ${table}`);
     }
-
-    if (gaps.length > 0) {
-      console.error(
-        `[migrations] Cette base est en retard sur le schéma : ${gaps.join(" ; ")}. ` +
-          `Les ALTER concernés ont été repliés dans les CREATE TABLE, qui ne rattrapent ` +
-          `rien sur une base existante — il faut la migrer à la main (docs/DATABASE_SCHEMA.md).`,
-      );
-    }
   } catch {
-    // Le filet ne doit jamais devenir la panne : une base qui refuse
-    // `information_schema` reste servie comme avant.
+    // Idem : l'écart sur les colonnes, lui, reste dit.
+  }
+
+  if (gaps.length > 0) {
+    console.error(
+      `[migrations] Cette base est en retard sur le schéma : ${gaps.join(" ; ")}. ` +
+        `Les ALTER concernés ont été repliés dans les CREATE TABLE, qui ne rattrapent ` +
+        `rien sur une base existante — il faut la migrer à la main (docs/DATABASE_SCHEMA.md).`,
+    );
   }
 }
 

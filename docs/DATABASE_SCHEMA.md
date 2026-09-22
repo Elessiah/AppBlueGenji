@@ -101,12 +101,20 @@ voit qu'une :
 | Classe | Témoin | Ce qui arriverait sans le filet |
 |---|---|---|
 | Colonne **absente** | `bg_matches.phase_id` | « Unknown column » sur la première requête qui la nomme |
-| Colonne présente mais du **mauvais type** | `bg_tournaments.game` doit contenir `'OW'` | Une base restée avant la conversion `ENUM('OW2','MR')` → `ENUM('OW','MR')` porte bien la colonne, et rend « Data truncated for column 'game' » au premier tournoi écrit |
+| Colonne présente mais du **mauvais type** | `bg_tournaments.game` doit contenir `'OW'` et **plus** `'OW2'` | Une base restée avant la conversion `ENUM('OW2','MR')` → `ENUM('OW','MR')` porte bien la colonne, et rend « Data truncated for column 'game' » au premier tournoi écrit |
 | Colonne qui devait **partir** | `bg_users.email` | Le `DROP` est best-effort, jamais rejoué dans le processus (la porte mémorise une passe qui se résout toujours), et `anonymizeOwnAccount` a perdu son `email = NULL` dans la même version : les adresses resteraient, sans que rien ne les efface |
 | **Index** absent | `uniq_bg_teams_tag`, `uniq_bg_teams_solo_user` | La plus silencieuse de toutes : un index unique manquant ne fait *rien* tomber, il cesse seulement de trancher la course qu'il existe pour trancher — deux équipes créées au même instant prendraient le même sigle, et `mapTeamTagConflict` traduirait un `ER_DUP_ENTRY` qui n'arrive plus jamais |
 
+Le témoin de type porte sur les **deux** faits : une base à demi convertie
+affiche `enum('OW2','MR','OW')`, qui contient bien `'OW'` et passerait un filet
+qui ne guetterait que la valeur neuve. Ce qui distingue une base à jour est
+l'absence de l'ancienne.
+
 Les index se lisent dans `information_schema.STATISTICS` et non dans `COLUMNS`,
-d'où une seconde requête. L'argument « les migrations sont jouées dans l'ordre »
+d'où une seconde requête — dans son **propre** `try` : partageant celui des
+colonnes, son échec jetait les constats déjà établis, dont le signal sur les
+adresses. Le rapport vit en dehors des deux et dit ce qu'on sait, même
+partiellement. L'argument « les migrations sont jouées dans l'ordre »
 ne les couvre pas : chaque ancien `ALTER` était tolérant **indépendamment**, et
 celui-là pouvait échouer de façon déterministe sur des données (des doublons de
 sigle à libérer d'abord) pendant que les suivants passaient.
@@ -114,6 +122,19 @@ sigle à libérer d'abord) pendant que les suivants passaient.
 Elle **ne répare rien** et ne fait échouer personne. Une base en retard se migre
 à la main ; interrompre le démarrage remplacerait un site dégradé par un site
 éteint, et une base qui refuse `information_schema` reste servie comme avant.
+
+### Si le retrait des adresses échoue
+
+Le `DROP COLUMN email` est le **seul effaceur restant** : `anonymizeOwnAccount`
+a perdu son `email = NULL` dans la même version, cette ligne n'ayant plus
+d'objet. Un `ALTER` refusé — droit manquant, verrou de métadonnées tenace —
+laisserait donc les adresses en place indéfiniment, y compris pour les comptes
+qui ont demandé leur suppression.
+
+D'où un repli qui ne demande **aucun DDL** : `UPDATE bg_users SET email = NULL`.
+Il n'obtient pas le même résultat — la colonne survit, et il restera à la retirer
+à la main — mais il obtient le seul qui soit urgent, et il se rejoue à chaque
+démarrage tant que le `DROP` ne passe pas. Les deux issues sont journalisées.
 
 ### Avant de déployer
 
