@@ -871,12 +871,18 @@ export async function updateOwnProfile(
     }
   }
 
-  // **Un champ absent du patch n'est pas un champ vidé.** `discordPseudo`
-  // manquant valait `null`, donc un effacement : une requête partielle qui ne
-  // parlait pas du tag le supprimait, et sa certification avec. Aucun appelant
-  // ne le faisait — le formulaire renvoie toujours le champ —, mais le verrou
-  // ci-dessous en aurait fait un refus en 409 sur tout compte rattaché, ce qui
-  // rend la distinction obligatoire autant que juste.
+  // **Un champ absent du patch n'est pas un champ vidé.** Quatre colonnes
+  // nullables — le tag Discord, les deux identifiants de jeu et la majorité —
+  // recevaient `null` dès que le patch ne les mentionnait pas : une requête
+  // partielle les effaçait toutes, et la certification avec. Longtemps sans
+  // conséquence, le formulaire renvoyant la fiche entière ; le premier appel
+  // partiel (le bouton « Retirer mon tag ») a vidé les trois voisines du champ
+  // qu'il visait, sans rien afficher avant un rechargement.
+  //
+  // Les quatre passent donc par le même `CASE WHEN ? THEN ? ELSE col END`, piloté
+  // par « le patch parle-t-il de ce champ ? ». `visible_*` et
+  // `open_to_recruitment` n'en ont pas besoin : `COALESCE` suffit à des colonnes
+  // `NOT NULL`.
   const touchesDiscordTag = patch.discordPseudo !== undefined;
   // Un champ **vidé** arrive en chaîne vide depuis un formulaire et en `null`
   // depuis un appel direct : c'est le même geste, et les distinguer laissait
@@ -948,8 +954,8 @@ export async function updateOwnProfile(
   await db.execute(
     `UPDATE bg_users
      SET pseudo = COALESCE(?, pseudo),
-         overwatch_battletag = ?,
-         marvel_rivals_tag = ?,
+         overwatch_battletag = CASE WHEN ? THEN ? ELSE overwatch_battletag END,
+         marvel_rivals_tag = CASE WHEN ? THEN ? ELSE marvel_rivals_tag END,
          discord_verified_at = CASE
            WHEN NOT ? THEN discord_verified_at
            WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_verified_at
@@ -961,7 +967,7 @@ export async function updateOwnProfile(
            WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_pseudo
            ELSE ?
          END,
-         is_adult = ?,
+         is_adult = CASE WHEN ? THEN ? ELSE is_adult END,
          visible_avatar = COALESCE(?, visible_avatar),
          visible_overwatch = COALESCE(?, visible_overwatch),
          visible_marvel = COALESCE(?, visible_marvel),
@@ -970,15 +976,18 @@ export async function updateOwnProfile(
      WHERE id = ?`,
     [
       patch.pseudo ? normalizePseudo(patch.pseudo) : null,
-      patch.overwatchBattletag === undefined ? null : patch.overwatchBattletag,
-      patch.marvelRivalsTag === undefined ? null : patch.marvelRivalsTag,
+      patch.overwatchBattletag !== undefined,
+      patch.overwatchBattletag ?? null,
+      patch.marvelRivalsTag !== undefined,
+      patch.marvelRivalsTag ?? null,
       touchesDiscordTag,
       nextDiscordPseudo,
       nextDiscordPseudo,
       touchesDiscordTag,
       nextDiscordPseudo,
       nextDiscordPseudo,
-      patch.isAdult === undefined ? null : patch.isAdult,
+      patch.isAdult !== undefined,
+      patch.isAdult ?? null,
       patch.visibility?.avatar ?? null,
       patch.visibility?.overwatch ?? null,
       patch.visibility?.marvel ?? null,

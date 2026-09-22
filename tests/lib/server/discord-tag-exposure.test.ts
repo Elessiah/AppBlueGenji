@@ -61,8 +61,8 @@ const find = (queries: Query[], needle: string) =>
  */
 function tagParams(params: unknown[]): { touches: unknown[]; tags: unknown[] } {
   return {
-    touches: [params[3], params[6]],
-    tags: [params[4], params[5], params[7], params[8]],
+    touches: [params[5], params[8]],
+    tags: [params[6], params[7], params[9], params[10]],
   };
 }
 
@@ -499,8 +499,54 @@ describe("updateOwnProfile — un tag vidé est un tag vidé", () => {
 
     await updateOwnProfile(7, { discordPseudo: "   " });
 
-    const params = find(queries, "UPDATE bg_users")!.params;
-    expect(params[4]).toBeNull();
-    expect(params[8]).toBeNull();
+    expect(tagParams(find(queries, "UPDATE bg_users")!.params).tags).toEqual([
+      null,
+      null,
+      null,
+      null,
+    ]);
+  });
+});
+
+describe("updateOwnProfile — un patch partiel ne vide pas les champs voisins", () => {
+  /**
+   * Quatre colonnes nullables recevaient `null` dès que le patch ne les
+   * mentionnait pas. Longtemps sans conséquence — le formulaire renvoie la fiche
+   * entière — jusqu'au premier appel partiel, qui a vidé les trois voisines du
+   * champ qu'il visait sans rien afficher avant un rechargement.
+   */
+  const partial = async (patch: Parameters<typeof updateOwnProfile>[1]) => {
+    const { queries } = fakeDb();
+    await updateOwnProfile(7, patch);
+    return find(queries, "UPDATE bg_users")!;
+  };
+
+  it("garde le BattleTag, le tag Marvel et la majorité quand le patch n'en parle pas", async () => {
+    const update = await partial({ discordPseudo: null });
+
+    // Positions 1, 3 et 11 : « le patch parle-t-il de ce champ ? »
+    expect([update.params[1], update.params[3], update.params[11]]).toEqual([false, false, false]);
+  });
+
+  it("les écrit dès que le patch les mentionne, valeur vide comprise", async () => {
+    const update = await partial({ overwatchBattletag: null, isAdult: false });
+
+    expect([update.params[1], update.params[2]]).toEqual([true, null]);
+    expect([update.params[11], update.params[12]]).toEqual([true, false]);
+  });
+
+  it("passe les quatre colonnes par le même `CASE`", async () => {
+    const update = await partial({ pseudo: "Nova" });
+
+    for (const column of ["overwatch_battletag", "marvel_rivals_tag", "is_adult"]) {
+      expect(update.sql).toContain(`${column} = CASE WHEN ? THEN ? ELSE ${column} END`);
+    }
+  });
+
+  it("laisse les colonnes NOT NULL à COALESCE, qui suffit", async () => {
+    const update = await partial({ pseudo: "Nova" });
+
+    expect(update.sql).toContain("visible_avatar = COALESCE(?, visible_avatar)");
+    expect(update.sql).toContain("open_to_recruitment = COALESCE(?, open_to_recruitment)");
   });
 });

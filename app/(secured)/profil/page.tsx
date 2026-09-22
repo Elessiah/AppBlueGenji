@@ -13,7 +13,7 @@ import {
   discordTagLockNotice,
   isDiscordTagLocked,
 } from "@/lib/shared/discord-tag-lock";
-import { discordVerificationErrorMessage } from "./discord-errors";
+import { profileErrorMessage } from "./profile-errors";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
 
@@ -157,9 +157,10 @@ export default function ProfilePage() {
       await loadDiscordState();
       showSuccess("Profil mis à jour.");
     } catch (e) {
-      // Le refus du tag verrouillé est le seul code que cette route rende et
-      // qui ait une phrase : un code en capitales dans un toast n'aide personne.
-      showError(discordVerificationErrorMessage((e as Error).message));
+      // Le registre du profil, et non celui de la certification : router ces
+      // erreurs vers l'autre faisait annoncer « La certification a échoué » à un
+      // pseudo déjà pris ou à une coupure réseau.
+      showError(profileErrorMessage((e as Error).message));
     }
   };
 
@@ -174,7 +175,7 @@ export default function ProfilePage() {
    */
   const onDiscordTagRemove = async () => {
     if (!window.confirm(
-      "Retirer ton tag Discord ? L'organisation ne pourra plus te joindre pendant un tournoi. Reconnecte-toi par Discord pour le remettre.",
+      "Retirer ton tag Discord ? L'organisation ne pourra plus te joindre pendant un tournoi.\n\nAttention : ta prochaine connexion par Discord le réenregistrera automatiquement, certifié. Pour ne plus être joignable durablement, entre par une autre porte.",
     )) {
       return;
     }
@@ -192,7 +193,7 @@ export default function ProfilePage() {
       await loadDiscordState();
       showSuccess("Tag Discord retiré.");
     } catch (e) {
-      showError(discordVerificationErrorMessage((e as Error).message));
+      showError(profileErrorMessage((e as Error).message));
     } finally {
       setDiscordTagBusy(false);
     }
@@ -396,13 +397,27 @@ export default function ProfilePage() {
                 aria-readonly={discordLocked || undefined}
               />
               {discordLocked ? (
-                // **Le seul geste que le verrou laisse au joueur.** Le champ ne
-                // se vide plus à la main, or effacer son tag *est* l'annulation
-                // de l'exposition — et un compte né par Discord ne peut pas non
-                // plus se détacher (`LAST_CONNECTION`). Sans ce bouton, la
-                // sortie que le serveur accepte n'existerait nulle part.
+                // Le verrou interdit de **changer** le tag, pas de le prouver ni
+                // de le retirer — et ces deux gestes doivent exister à l'écran.
+                // Sans le premier, un compte rattaché dont le tag n'est pas
+                // certifié (tag saisi avant la règle, ou pseudo Discord
+                // numérique) ne pourrait plus rien en faire ; sans le second, la
+                // sortie que le serveur accepte n'existerait nulle part, un
+                // compte né par Discord ne pouvant pas non plus se détacher
+                // (`LAST_CONNECTION`).
                 discordState.tag ? (
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                    {discordState.verified ? null : (
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => setVerifyOpen(true)}
+                        aria-label="Certifier mon tag Discord"
+                        style={{ padding: "7px 14px", fontSize: 12 }}
+                      >
+                        Certifier mon tag
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="btn ghost"

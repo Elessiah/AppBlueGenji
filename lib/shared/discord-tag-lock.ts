@@ -77,7 +77,11 @@ export function discordTagLockNotice(state: {
   const reopen =
     "Pour en changer, renomme-toi sur Discord puis reconnecte-toi. Pour cesser d'être joignable, retire-le.";
   if (!state.tag) {
-    return `Ton compte Discord est rattaché, mais aucun pseudo affichable n'est enregistré (un pseudo entièrement numérique ne peut pas servir à te joindre). Reconnecte-toi par Discord pour l'enregistrer.`;
+    // Deux causes mènent ici — un tag retiré, ou un pseudo Discord entièrement
+    // numérique que `normalizeDiscordHandle` écarte — et l'écran ne peut pas les
+    // distinguer. Il dit donc l'état et le geste, sans inventer la cause : le
+    // joueur qui vient de retirer son tag n'a pas à lire une explication fausse.
+    return `Ton compte Discord est rattaché, mais aucun pseudo n'est enregistré : l'organisation ne peut pas te joindre pendant un tournoi. Reconnecte-toi par Discord pour l'enregistrer.`;
   }
   // On n'affirme pas l'**origine** du tag : `linkOAuthIdentity` n'écrit
   // `discord_pseudo` que si Discord a donné un pseudo affichable, si bien qu'un

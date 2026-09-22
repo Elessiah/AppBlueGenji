@@ -48,9 +48,13 @@ describe("discordTagLockNotice", () => {
     }
   });
 
-  it("explique l'absence de tag plutôt que de laisser un champ vide sans raison", () => {
+  it("dit l'état et le geste sans inventer la cause d'un champ vide", () => {
+    // Deux causes y mènent — un tag retiré, ou un pseudo Discord numérique —
+    // et l'écran ne peut pas les distinguer : le joueur qui vient de retirer
+    // son tag n'a pas à lire une explication fausse.
     const notice = discordTagLockNotice({ tag: null, verified: false });
-    expect(notice).toContain("aucun pseudo affichable");
+    expect(notice).toContain("aucun pseudo n'est enregistré");
+    expect(notice).not.toContain("numérique");
     expect(notice).not.toContain("est certifié");
   });
 
