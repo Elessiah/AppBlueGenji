@@ -262,6 +262,18 @@ et sa sortie (recharger), sans affirmer un rattachement que rien n'établit.
   **gestes restent** : « Certifier mon tag » tant que le tag enregistré n'est pas
   certifié — un tag saisi avant la règle, ou rattaché sans que Discord ait donné
   de pseudo certifiable —, et « Retirer mon tag », seule sortie de l'exposition.
+  Ces deux gestes sont sous le **rattachement**, jamais sous la présence d'un
+  tag : posés sur le tag, ils disparaissaient tous les deux à l'état que le
+  retrait vient de produire (rattaché, sans tag), ne laissant qu'une reconnexion
+  par Discord. Sans tag enregistré le bouton dit « Enregistrer mon tag » : il n'y
+  a rien à *certifier*, et le geste se prouve seul — `startDiscordVerification`
+  conclut sur place quand le tag résout vers l'identifiant déjà rattaché.
+  **Le champ verrouillé n'est pas soumis** : le formulaire renvoyait le tag de
+  son instantané de montage à chaque sauvegarde, si bien qu'un tag réécrit
+  ailleurs entre-temps (renommage sur Discord puis connexion depuis un autre
+  appareil) faisait refuser **tout** le `PATCH` en 409, pseudo et visibilités
+  emportés. La clé est omise, ce qui n'efface rien : `updateOwnProfile` ne touche
+  `discord_pseudo` que si le patch en parle.
   Ce qui disparaît sur un compte rattaché est « Recertifier » : il ne ferait que
   reposer ce que Discord dit déjà. L'état vient de `GET /api/profile/discord`, qui parle
   du tag **enregistré** : un champ modifié sans être sauvegardé ne gagne ni ne

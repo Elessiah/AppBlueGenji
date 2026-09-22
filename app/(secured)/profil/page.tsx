@@ -141,6 +141,14 @@ export default function ProfilePage() {
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     try {
+      // **Un champ verrouillé ne se soumet pas.** Le formulaire renvoyait le tag
+      // de son instantané de montage à chaque sauvegarde, si bien qu'un tag
+      // réécrit ailleurs entre-temps (renommage sur Discord puis connexion
+      // depuis un autre appareil) faisait refuser **tout** le `PATCH` en 409 —
+      // pseudo, visibilités et BattleTag emportés par un champ que l'écran
+      // affiche en lecture seule. Omettre la clé n'efface rien : le service ne
+      // touche `discord_pseudo` que si le patch en parle.
+      const locked = isDiscordTagLocked(discordState);
       const response = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
@@ -148,7 +156,9 @@ export default function ProfilePage() {
           pseudo,
           overwatchBattletag: overwatchBattletag.trim() ? overwatchBattletag.trim() : null,
           marvelRivalsTag: marvelRivalsTag.trim() ? marvelRivalsTag.trim() : null,
-          discordPseudo: discordPseudo.trim() ? discordPseudo.trim() : null,
+          ...(locked
+            ? {}
+            : { discordPseudo: discordPseudo.trim() ? discordPseudo.trim() : null }),
           isAdult: isAdult === "unknown" ? null : isAdult === "yes",
           visibility,
           openToRecruitment,
@@ -414,29 +424,46 @@ export default function ProfilePage() {
                 // sortie que le serveur accepte n'existerait nulle part, un
                 // compte né par Discord ne pouvant pas non plus se détacher
                 // (`LAST_CONNECTION`).
-                discordState.tag ? (
+                //
+                // La condition porte sur le **rattachement**, pas sur le tag :
+                // posée sur le tag, elle ne rendait aucun bouton à l'état que le
+                // retrait vient justement de produire (rattaché, sans tag), et
+                // la seule sortie restante était de se reconnecter par Discord.
+                // Sur un état **inconnu**, en revanche, rien ne s'affiche — on
+                // ne propose pas un geste dont on ignore s'il a un objet.
+                discordState.linked === true ? (
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
                     {discordState.verified ? null : (
                       <button
                         type="button"
                         className="btn"
                         onClick={() => setVerifyOpen(true)}
-                        aria-label="Certifier mon tag Discord"
+                        /* Sans tag enregistré il n'y a rien à *certifier* : le
+                           geste est d'en poser un — et il se prouve tout seul,
+                           `startDiscordVerification` concluant sur place quand
+                           le tag résout vers l'identifiant déjà rattaché. */
+                        aria-label={
+                          discordState.tag
+                            ? "Certifier mon tag Discord"
+                            : "Enregistrer mon tag Discord"
+                        }
                         style={{ padding: "7px 14px", fontSize: 12 }}
                       >
-                        Certifier mon tag
+                        {discordState.tag ? "Certifier mon tag" : "Enregistrer mon tag"}
                       </button>
                     )}
-                    <button
-                      type="button"
-                      className="btn ghost"
-                      onClick={onDiscordTagRemove}
-                      disabled={discordTagBusy}
-                      aria-label="Retirer mon tag Discord"
-                      style={{ padding: "7px 14px", fontSize: 12 }}
-                    >
-                      {discordTagBusy ? "Retrait…" : "Retirer mon tag"}
-                    </button>
+                    {discordState.tag ? (
+                      <button
+                        type="button"
+                        className="btn ghost"
+                        onClick={onDiscordTagRemove}
+                        disabled={discordTagBusy}
+                        aria-label="Retirer mon tag Discord"
+                        style={{ padding: "7px 14px", fontSize: 12 }}
+                      >
+                        {discordTagBusy ? "Retrait…" : "Retirer mon tag"}
+                      </button>
+                    ) : null}
                   </div>
                 ) : null
               ) : (

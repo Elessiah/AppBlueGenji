@@ -105,7 +105,7 @@ export function discordTagLockNotice(state: {
     // numérique que `normalizeDiscordHandle` écarte — et l'écran ne peut pas les
     // distinguer. Il dit donc l'état et le geste, sans inventer la cause : le
     // joueur qui vient de retirer son tag n'a pas à lire une explication fausse.
-    return `Ton compte Discord est rattaché, mais aucun pseudo n'est enregistré : l'organisation ne peut pas te joindre pendant un tournoi. Reconnecte-toi par Discord pour l'enregistrer.`;
+    return `Ton compte Discord est rattaché, mais aucun pseudo n'est enregistré : l'organisation ne peut pas te joindre pendant un tournoi. Enregistre-le ci-dessous, ou reconnecte-toi par Discord.`;
   }
   // On n'affirme pas l'**origine** du tag : `linkOAuthIdentity` n'écrit
   // `discord_pseudo` que si Discord a donné un pseudo affichable, si bien qu'un

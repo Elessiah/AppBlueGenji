@@ -66,6 +66,13 @@ describe("discordTagLockNotice", () => {
     expect(notice).not.toContain("est certifié");
   });
 
+  it("nomme le bouton de l'écran avant la reconnexion, sur un tag absent", () => {
+    // L'écran rend « Enregistrer mon tag » dans cet état : renvoyer d'abord
+    // vers une reconnexion par Discord, c'est ignorer le geste d'à côté.
+    const notice = discordTagLockNotice({ tag: null, verified: false, linked: true });
+    expect(notice.indexOf("Enregistre-le")).toBeLessThan(notice.indexOf("reconnecte-toi"));
+  });
+
   it("ne nomme que des gestes qui existent à l'écran", () => {
     // « Détache Discord » n'en est pas un pour un compte né par Discord : le
     // bouton y est remplacé par le refus `LAST_CONNECTION`, faute d'une autre
