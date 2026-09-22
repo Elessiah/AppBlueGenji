@@ -152,7 +152,7 @@ describe("Schéma — la règle des deux endroits", () => {
   // Bornée aux deux extrémités : après elle vivent les « rattrapages
   // permanents », qui gardent volontairement un `catch` muet.
   const migrations = sql.slice(
-    sql.indexOf("const RECENT_COLUMNS"),
+    sql.indexOf("const RECENT_SCHEMA_CHANGES"),
     sql.indexOf("// Rattrapages permanents"),
   );
 
@@ -162,14 +162,18 @@ describe("Schéma — la règle des deux endroits", () => {
 
   it.each(RECENT)("%s.%s est aussi dans la liste des migrations", (tableName, column) => {
     expect(migrations).toMatch(
-      new RegExp(`"${tableName}",\\s*\n?\\s*"${column}"|\\["${tableName}", "${column}"`),
+      new RegExp(`ALTER TABLE ${tableName} ADD COLUMN\\s+${column}\\b`),
     );
   });
 
-  it("joue la liste par un seul ALTER paramétré", () => {
-    expect(sql).toContain(
-      "ALTER TABLE ${table} ADD COLUMN ${column} ${definition}",
-    );
+  it("porte des instructions entières, et non des triplets table/colonne/type", () => {
+    // Un triplet ne sait dire qu'`ADD COLUMN` : la règle des deux endroits ne
+    // s'appliquait alors ni à un `ENUM` élargi, ni à un index posé, ni à une clé
+    // primaire recomposée. La prochaine valeur de `format` n'aurait existé que
+    // dans le `CREATE TABLE`, et la base qui tourne aurait rendu « Data
+    // truncated » sur le premier tournoi créé.
+    expect(migrations).toContain("const RECENT_SCHEMA_CHANGES: readonly string[]");
+    expect(migrations).toContain("await db.execute(statement);");
   });
 
   it("ne laisse aucun échec de migration passer en silence", () => {
@@ -183,6 +187,7 @@ describe("Schéma — la règle des deux endroits", () => {
     // permanents gardent leur `catch` muet, et c'est voulu — un rappel perdu
     // vaut mieux qu'un report de score en erreur.
     expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(3);
+    expect(migrations).not.toMatch(/catch\s*\{\s*\}/);
     expect(migrations).not.toMatch(/catch\s*\{\s*\/\/[^\n]*\n\s*\}/);
   });
 
@@ -231,15 +236,16 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     // n'ont aucune contrepartie dans un `CREATE TABLE` et ne pouvaient donc pas
     // être repliés. Les libellés passés au rapporteur d'échec citent la même
     // instruction sans l'exécuter — ils ne comptent pas.
-    const statements = code
+    const drops = code
       .split("\n")
-      .filter((line) => line.includes("ALTER TABLE") && !line.includes("reportSchemaFailure"))
+      .filter((line) => line.includes("await db.execute(`ALTER TABLE"))
       .map((line) => line.trim());
-    expect(statements).toEqual([
-      "await db.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);",
+    expect(drops).toEqual([
       "await db.execute(`ALTER TABLE bg_recruitment_ads DROP COLUMN contact_email`);",
       "await db.execute(`ALTER TABLE bg_users DROP COLUMN email`);",
     ]);
+    // Et la liste des changements récents, jouée par la boucle.
+    expect(code).toContain("for (const statement of RECENT_SCHEMA_CHANGES)");
     expect(code).toContain("ALTER TABLE bg_users DROP COLUMN email");
   });
 
@@ -266,7 +272,6 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
 
   it("ne rejoue plus les rattrapages d'une conversion déjà faite", () => {
     for (const gone of [
-      "information_schema",
       "SET tag = UPPER(tag)",
       "SET visible_pseudo = 1",
       "ROW_NUMBER() OVER",
@@ -274,5 +279,25 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     ]) {
       expect(sql).not.toContain(gone);
     }
+  });
+
+  it("ne lit `information_schema` que pour le filet, jamais pour migrer", () => {
+    // L'ancien fichier l'interrogeait pour décider s'il devait jouer un
+    // rattrapage — une lecture par démarrage et par cas. La seule qui subsiste
+    // ne **répare** rien : elle dit qu'une base est en retard, et s'arrête là.
+    const reads = [...sql.matchAll(/FROM information_schema/gi)];
+    expect(reads).toHaveLength(1);
+    const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
+    expect(net).toContain("information_schema.COLUMNS");
+    expect(net).toContain("console.error");
+  });
+
+  it("le filet ne devient jamais la panne qu'il signale", () => {
+    // Une base qui refuse `information_schema` doit rester servie comme avant,
+    // et un retard de schéma ne s'éteint pas en interrompant le démarrage : cela
+    // remplacerait un site dégradé par un site mort.
+    const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
+    expect(net.slice(0, net.indexOf("\n}"))).toMatch(/catch\s*\{/);
+    expect(net.slice(0, net.indexOf("\n}"))).not.toContain("throw");
   });
 });

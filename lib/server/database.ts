@@ -1,5 +1,5 @@
 ﻿import "dotenv/config";
-import mysql, { type ExecuteValues, type Pool, type PoolConnection } from "mysql2/promise";
+import mysql, { type ExecuteValues, type Pool, type PoolConnection, type RowDataPacket } from "mysql2/promise";
 import { isSchemaNoOpError } from "@/lib/server/mysql-errors";
 import { createOnceGate, withMigrationLock } from "@/lib/server/migration-lock";
 import { CONTACT_DISCORD_URL_KEY } from "@/lib/shared/contact";
@@ -56,11 +56,18 @@ function requireEnv(name: string): string {
  * **La règle pour la suite est donc inchangée** : un changement de schéma
  * s'écrit ici en **deux** endroits — dans le `CREATE TABLE`, pour les bases
  * neuves, *et* en `ALTER TABLE` tolérant dans la section « Migrations », pour
- * celles qui tournent. La section « Migrations » ci-dessous en porte donc
- * exactement deux : la liste `RECENT_COLUMNS` des colonnes trop récentes pour
- * qu'on sache la production passée dessus — à retirer une par une, une fois un
- * déploiement constaté — et le retrait de `bg_users.email`, qui n'a pas de
- * pendant dans un `CREATE TABLE` puisqu'il *retire*.
+ * celles qui tournent. La section « Migrations » ci-dessous porte donc trois
+ * choses, et rien d'autre :
+ *
+ * - `RECENT_SCHEMA_CHANGES`, les changements trop récents pour qu'on sache la
+ *   production passée dessus — des **instructions entières**, pour que la règle
+ *   vaille aussi bien pour un `ENUM` élargi ou un index posé que pour une
+ *   colonne ajoutée ; à retirer un par un, une fois un déploiement constaté ;
+ * - les deux `DROP COLUMN`, qui n'ont pas de pendant dans un `CREATE TABLE`
+ *   puisqu'ils *retirent* ;
+ * - `warnIfSchemaIsBehind`, qui **dit** au démarrage qu'une base n'a pas joué
+ *   les `ALTER` repliés — la prémisse ci-dessus était jusqu'ici affirmée et
+ *   jamais vérifiée.
  */
 /**
  * Ce qu'on fait d'une migration qui a échoué : la **dire**, jamais l'avaler, et
@@ -772,37 +779,38 @@ async function runMigrations(db: Pool): Promise<void> {
   // Ce qu'il ne faut pas faire, c'est la retirer *par anticipation* — la panne
   // n'apparaît qu'au redémarrage, sur une requête qui nomme la colonne, et il
   // est alors trop tard pour la reposer sans interruption.
-  const RECENT_COLUMNS = [
+  // La liste porte des **instructions entières**, et non un triplet
+  // table/colonne/définition. Un triplet ne sait dire qu'`ADD COLUMN`, si bien
+  // que la règle des deux endroits ne pouvait pas s'appliquer à tout le reste :
+  // élargir un `ENUM`, poser un index, recomposer une clé primaire, remplir une
+  // colonne neuve. La prochaine valeur de `format` n'aurait existé que dans le
+  // `CREATE TABLE`, et la base qui tourne aurait rendu « Data truncated for
+  // column 'format' » sur le premier tournoi créé.
+  const RECENT_SCHEMA_CHANGES: readonly string[] = [
     // PR #135 — certification du tag Discord.
-    ["bg_discord_login_challenges", "handle", "VARCHAR(64) NULL"],
-    ["bg_users", "discord_verified_at", "DATETIME NULL"],
+    `ALTER TABLE bg_discord_login_challenges ADD COLUMN handle VARCHAR(64) NULL`,
+    `ALTER TABLE bg_users ADD COLUMN discord_verified_at DATETIME NULL`,
     // PR #135 — conditions d'inscription.
-    [
-      "bg_tournaments",
-      "registration_discord_requirement",
-      "ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'ANY_PLAYER'",
-    ],
-    ["bg_tournaments", "registration_min_players", "INT NOT NULL DEFAULT 5"],
+    `ALTER TABLE bg_tournaments ADD COLUMN registration_discord_requirement
+       ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'ANY_PLAYER'`,
+    `ALTER TABLE bg_tournaments ADD COLUMN registration_min_players INT NOT NULL DEFAULT 5`,
     // PR #136 — troisième porte d'entrée. `UNIQUE` posé avec la colonne : c'est
     // l'index qui tranche la course entre deux comptes rattachant le même
     // Battle.net, le `SELECT` préalable ne donnant que le refus lisible.
-    ["bg_users", "blizzard_sub", "VARCHAR(191) NULL UNIQUE"],
+    `ALTER TABLE bg_users ADD COLUMN blizzard_sub VARCHAR(191) NULL UNIQUE`,
     // PR #137 — condition d'inscription « compte Blizzard ». Le défaut `NONE`
     // n'est pas une prudence de migration : c'est le défaut du réglage, la
     // moitié du site jouant à Marvel Rivals, où un compte Battle.net ne veut
     // rien dire.
-    [
-      "bg_tournaments",
-      "registration_blizzard_requirement",
-      "ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'NONE'",
-    ],
-  ] as const;
+    `ALTER TABLE bg_tournaments ADD COLUMN registration_blizzard_requirement
+       ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'NONE'`,
+  ];
 
-  for (const [table, column, definition] of RECENT_COLUMNS) {
+  for (const statement of RECENT_SCHEMA_CHANGES) {
     try {
-      await db.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+      await db.execute(statement);
     } catch (error) {
-      reportSchemaFailure(error, `ALTER TABLE ${table} ADD COLUMN ${column}`);
+      reportSchemaFailure(error, statement.replace(/\s+/g, " ").trim());
     }
   }
 
@@ -893,6 +901,64 @@ async function runMigrations(db: Pool): Promise<void> {
     `);
   } catch {
     // Rattrapage remis au prochain démarrage.
+  }
+
+  await warnIfSchemaIsBehind(db);
+}
+
+/**
+ * Le **filet** de la consolidation : dire, au démarrage, qu'une base n'a pas
+ * joué les `ALTER` qu'on a repliés.
+ *
+ * Tout ce fichier repose sur une prémisse — « la production porte déjà les
+ * soixante-trois `ALTER` » — qui était jusqu'ici **affirmée et jamais
+ * vérifiée**. Si elle est fausse d'une seule version, la base démarre sans
+ * bruit (`CREATE TABLE IF NOT EXISTS` ne fait rien), et la panne se découvre en
+ * production sur la première requête qui nomme une colonne absente. Une lecture
+ * d'`information_schema` au démarrage change ce scénario en une ligne de log,
+ * avant le premier visiteur.
+ *
+ * Les colonnes témoins sont prises dans le **dernier lot replié** — celui qui a
+ * le plus de chances de manquer. En trouver une absente ne prouve pas que les
+ * soixante-deux autres sont là, mais l'inverse est vrai : les migrations étant
+ * jouées dans l'ordre, une base à jour sur le dernier lot l'est sur les
+ * précédents.
+ *
+ * Elle **ne répare rien** et ne fait échouer personne : la réparation d'une base
+ * en retard se fait à la main (`docs/DATABASE_SCHEMA.md`), et interrompre le
+ * démarrage n'y aiderait pas — cela remplacerait un site dégradé par un site
+ * éteint.
+ */
+async function warnIfSchemaIsBehind(db: Pool): Promise<void> {
+  // Une entrée par lot replié, la plus récente d'abord.
+  const WITNESSES: readonly (readonly [string, string])[] = [
+    ["bg_tournaments", "match_format_max_maps"],
+    ["bg_tournaments", "endurance_playoff_format_type"],
+    ["bg_matches", "phase_id"],
+  ];
+
+  try {
+    const [rows] = await db.execute<(RowDataPacket & { TABLE_NAME: string; COLUMN_NAME: string })[]>(
+      `SELECT TABLE_NAME, COLUMN_NAME
+         FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND (TABLE_NAME, COLUMN_NAME) IN (${WITNESSES.map(() => "(?, ?)").join(", ")})`,
+      WITNESSES.flatMap(([table, column]) => [table, column]),
+    );
+    const present = new Set(rows.map((r) => `${r.TABLE_NAME}.${r.COLUMN_NAME}`));
+    const missing = WITNESSES.filter(([t, c]) => !present.has(`${t}.${c}`)).map(
+      ([t, c]) => `${t}.${c}`,
+    );
+    if (missing.length > 0) {
+      console.error(
+        `[migrations] Cette base est en retard sur le schéma : ${missing.join(", ")} manque(nt). ` +
+          `Les ALTER qui les posaient ont été repliés dans les CREATE TABLE, qui ne rattrapent ` +
+          `rien sur une base existante — il faut la migrer à la main (docs/DATABASE_SCHEMA.md).`,
+      );
+    }
+  } catch {
+    // Le filet ne doit jamais devenir la panne : une base qui refuse
+    // `information_schema` reste servie comme avant.
   }
 }
 

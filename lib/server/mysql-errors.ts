@@ -87,8 +87,12 @@ export function isSchemaNoOpError(error: unknown): boolean {
     // La colonne à ajouter existe déjà.
     code === "ER_DUP_FIELDNAME" ||
     // La colonne à retirer n'existe pas (ou l'index n'existe pas).
-    code === "ER_CANT_DROP_FIELD_OR_KEY" ||
-    // L'index unique posé avec la colonne existe déjà.
-    code === "ER_DUP_KEYNAME"
+    code === "ER_CANT_DROP_FIELD_OR_KEY"
   );
 }
+
+// `ER_DUP_KEYNAME` n'est **pas** dans cette liste, et son absence est la règle.
+// Sur un `ADD COLUMN … UNIQUE` rejoué, MySQL rend `ER_DUP_FIELDNAME` : il voit
+// la colonne avant l'index. Recevoir `ER_DUP_KEYNAME` signifie donc l'inverse —
+// la colonne **n'a pas été ajoutée**, et un index porte déjà son nom. C'est une
+// anomalie, exactement ce que le rapporteur d'échec existe pour dire.

@@ -55,9 +55,16 @@ section — c'est ce qui a été fait pour les soixante-trois anciennes.
 
 Replier un `ALTER` dans son `CREATE TABLE` n'est sans danger que si **toute base
 vivante l'a déjà joué**. Les soixante-trois anciens remplissent cette condition.
-Les colonnes **récentes** — celles dont on ne peut pas affirmer que le serveur
-les a vues passer — restent donc écrites aux deux endroits, dans la liste
-`RECENT_COLUMNS` de `lib/server/database.ts` :
+Les changements **récents** — ceux dont on ne peut pas affirmer que le serveur
+les a vus passer — restent donc écrits aux deux endroits, dans la liste
+`RECENT_SCHEMA_CHANGES` de `lib/server/database.ts`. Elle porte des
+**instructions entières** et non des triplets table/colonne/type : un triplet ne
+sait dire qu'`ADD COLUMN`, si bien que la règle n'aurait couvert ni un `ENUM`
+élargi, ni un index posé, ni une clé primaire recomposée — la prochaine valeur de
+`format` n'aurait existé que dans le `CREATE TABLE`, et la base qui tourne aurait
+rendu « Data truncated for column 'format' » sur le premier tournoi créé.
+
+Ce qu'elle contient aujourd'hui :
 
 | PR | Table | Colonne |
 |---|---|---|
@@ -75,11 +82,43 @@ restant dans la table. Ce qu'il ne faut pas faire, c'est la retirer *par
 anticipation* : la panne n'apparaît qu'au redémarrage, sur une requête qui nomme
 la colonne, et il est alors trop tard pour la reposer sans interruption.
 
+### Le filet : dire qu'une base est en retard
+
+La prémisse de tout ce fichier — « la production porte déjà les soixante-trois
+`ALTER` » — était **affirmée et jamais vérifiée**. Si elle est fausse d'une seule
+version, la base démarre sans bruit (`CREATE TABLE IF NOT EXISTS` ne fait rien)
+et la panne se découvre en production sur la première requête qui nomme une
+colonne absente.
+
+`warnIfSchemaIsBehind` lit `information_schema.COLUMNS` une fois au démarrage et
+journalise les colonnes témoins manquantes. Les témoins sont pris dans le
+**dernier lot replié**, celui qui a le plus de chances de manquer : les
+migrations étant jouées dans l'ordre, une base à jour sur ce lot l'est sur les
+précédents.
+
+Elle **ne répare rien** et ne fait échouer personne. Une base en retard se migre
+à la main ; interrompre le démarrage remplacerait un site dégradé par un site
+éteint, et une base qui refuse `information_schema` reste servie comme avant.
+
+### Avant de déployer
+
+Le retrait de `bg_users.email` part dans **la même version** que celle qui retire
+ses lecteurs. C'est voulu — une colonne d'adresses qui survit à son dernier
+lecteur est une fuite en attente —, mais cela a une conséquence à connaître :
+**un retour en arrière de la version applicative après ce déploiement casse les
+lectures de session**, l'ancien `getCurrentUser()` demandant `u.email` à une
+table qui ne l'a plus. Le retour en arrière passe alors par une restauration de
+la colonne, pas par un simple `git revert` du déploiement.
+
 ### Ce qu'un `catch` a le droit d'avaler
 
 Dans cette section, **un seul cas** : « la colonne est déjà là » (ou déjà
 partie), le cas nominal d'une migration rejouée à chaque démarrage. C'est ce que
-reconnaît `isSchemaNoOpError` (`lib/server/mysql-errors.ts`). Tout autre échec —
+reconnaît `isSchemaNoOpError` (`lib/server/mysql-errors.ts`). `ER_DUP_KEYNAME`
+n'y est **pas**, et son absence est la règle : sur un `ADD COLUMN … UNIQUE`
+rejoué, MySQL voit la colonne avant l'index et rend `ER_DUP_FIELDNAME`. Recevoir
+`ER_DUP_KEYNAME` signifie donc l'inverse — la colonne n'a *pas* été ajoutée, et
+un index porte déjà son nom. C'est une anomalie. Tout autre échec —
 droit `ALTER` manquant, verrou de métadonnées sur une table chaude — laisse le
 schéma **en arrière du code** : la base démarre, et la panne se lit plus tard sur
 une requête qui nomme la colonne.
