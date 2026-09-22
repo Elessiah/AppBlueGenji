@@ -616,8 +616,10 @@
    qu'exige l'en-tête « ÉTAT DU RELAIS ») se prend entièrement sur le nom du
    serveur : il y restait moins de 50 px de texte, et les noms passaient sur
    trois lignes. La piste d'état, elle, ne bouge pas — c'est elle qu'on est
-   venu élargir. */
-@media (max-width: 1200px) {
+   venu élargir. La borne basse n'est pas décorative : sous 1024 px la grille
+   est déjà passée à une colonne et le tableau a toute la largeur, il n'y a
+   plus rien à resserrer. */
+@media (min-width: 1025px) and (max-width: 1200px) {
   .srv-head, .srv-row {
     grid-template-columns: 24px 1fr 64px 64px 115px 44px;
     gap: 10px;

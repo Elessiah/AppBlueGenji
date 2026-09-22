@@ -170,11 +170,17 @@ describe("/bot — l'état d'un serveur se lit en français", () => {
     // tableau n'a que ~530 px utiles et l'élargissement de la piste d'état se
     // prendrait entièrement sur le nom du serveur, seule colonne qu'on ne peut
     // ni abréger ni masquer.
-    const band = css.match(/@media \(max-width: 1200px\) \{[\s\S]*?\n\}/);
+    const band = css.match(
+      /@media \(min-width: 1025px\) and \(max-width: 1200px\) \{[\s\S]*?\n\}/,
+    );
     expect(band).not.toBeNull();
     expect(band![0]).toContain(".srv-head, .srv-row");
     // La piste d'état, elle, ne bouge pas : c'est elle qu'on est venu élargir.
     expect(band![0]).toContain("115px");
+    // La borne basse est ce qui fait que la règle dit ce qu'elle veut dire :
+    // sans elle, elle s'appliquait jusqu'en bas, y compris là où la grille est
+    // déjà à une colonne et le tableau à pleine largeur.
+    expect(css).not.toMatch(/@media \(max-width: 1200px\)/);
   });
 
   it("a une couleur pour l'état qu'elle ne connaît pas", () => {

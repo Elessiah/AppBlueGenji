@@ -1,5 +1,6 @@
 import { BotServerEntry } from "@/lib/shared/types";
 import { botRelayAccessibleLabel, resolveBotRelayState } from "@/lib/shared/bot-relay-status";
+import { botStatusNumber } from "@/lib/shared/bot-status-summary";
 
 /**
  * Le tableau des serveurs où le bot est installé.
@@ -66,10 +67,18 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
           // et `undefined`. Un point en chaîne rendait `Math.max` `NaN`, qui
           // empoisonne tous les tours suivants — et chaque barre sortait en
           // `height: NaN%`, donc une colonne « tendance » vide sans une erreur.
-          const point = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+          // Borné **des deux côtés**, comme les barres de `BotLatencyCard` : un
+          // point négatif rendait `height: -400%`, déclaration invalide que le
+          // navigateur laisse tomber — la barre disparaît sans rien dire, et
+          // `peak` reste à sa graine, ce qui aplatit toute la colonne.
+          const point = (v: unknown) => Math.max(0, botStatusNumber(v) ?? 0);
           const peak = sparkline.reduce<number>((max, v) => Math.max(max, point(v)), 1);
           return (
-            <div key={s.id} className="srv-row" role="row">
+            // `s.id` n'est pas plus garanti que les autres champs : deux
+            // entrées sans identifiant donnaient deux `key={undefined}`, donc
+            // un avertissement React et une réconciliation des rangées qui ne
+            // tient plus au retour sur la page.
+            <div key={s.id ?? `rang-${rank}`} className="srv-row" role="row">
               <span className="srv-rank" role="cell">{String(rank + 1).padStart(2, "0")}</span>
               <span className="srv-name" role="cell">
                 {/* Le sigil répète les initiales du nom qui le suit : sans
@@ -84,8 +93,13 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
                 </span>
                 {s.name}
               </span>
-              <span className="srv-num" role="cell">{(s.memberCount ?? 0).toLocaleString("fr-FR")}</span>
-              <span className="srv-num" role="cell">{(s.relays30j ?? 0).toLocaleString("fr-FR")}</span>
+              {/* `?? 0` ne rattrape que `null` : un compte arrivé en chaîne
+                  tombait sur `String.prototype.toLocaleString`, qui ne groupe
+                  rien — « 12345 » à côté d'un « 12 345 », soit deux échelles
+                  dans la même colonne —, et un objet rendait « [object
+                  Object] ». Aucune exception, donc aucun signal. */}
+              <span className="srv-num" role="cell">{(botStatusNumber(s.memberCount) ?? 0).toLocaleString("fr-FR")}</span>
+              <span className="srv-num" role="cell">{(botStatusNumber(s.relays30j) ?? 0).toLocaleString("fr-FR")}</span>
               <span
                 className={"srv-status " + relay.tone}
                 role="cell"

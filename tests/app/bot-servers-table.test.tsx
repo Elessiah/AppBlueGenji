@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
 import { BotServersTable } from "@/components/bot/BotServersTable";
 import type { BotServerEntry } from "@/lib/shared/types";
@@ -119,7 +119,57 @@ describe("BotServersTable — une charge abîmée ne fait pas tomber la page", (
     expect(html).toContain("Sans rien");
     expect(html).toContain("Inconnu");
     // `memberCount` et `relays30j` absents : zéro affiché, aucune exception.
-    expect(html).toContain("0");
+    // On compte les **cellules** chiffrées : un `toContain("0")` passait sur le
+    // « 01 » du rang, donc quoi que ces deux cases contiennent.
+    expect([...html.matchAll(/class="srv-num"[^>]*>([^<]*)</g)].map((m) => m[1])).toEqual([
+      "0",
+      "0",
+    ]);
+  });
+
+  it("ne laisse pas un compte de mauvais type défaire le format français", () => {
+    // `?? 0` ne rattrape que `null` : une chaîne tombe sur
+    // `String.prototype.toLocaleString`, qui ne groupe rien, et un objet rend
+    // « [object Object] » — dans une colonne de nombres, sans une erreur.
+    const html = render([
+      server({
+        memberCount: "12345" as unknown as number,
+        relays30j: {} as unknown as number,
+      }),
+    ]);
+    expect(html).not.toContain("[object Object]");
+    expect(html).not.toContain(">12345<");
+    expect([...html.matchAll(/class="srv-num"[^>]*>([^<]*)</g)].map((m) => m[1])).toEqual([
+      "0",
+      "0",
+    ]);
+  });
+
+  it("donne une clé à chaque rangée, même sans identifiant", () => {
+    // Deux `key={undefined}` : React avertit et la réconciliation des rangées
+    // ne tient plus au retour sur la page.
+    const anonymous = [{ name: "A" }, { name: "B" }] as unknown as BotServerEntry[];
+    const warn = jest.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const html = render(anonymous);
+      expect(html).toContain("A");
+      expect(html).toContain("B");
+      expect(warn.mock.calls.map((c) => String(c[0])).join(" ")).not.toMatch(/same key/i);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("ne laisse pas un point négatif effacer une barre", () => {
+    // `height: -400%` est une déclaration invalide : le navigateur la laisse
+    // tomber, la barre disparaît sans rien dire.
+    const html = render([server({ sparkline: [-4, 2, 8] })]);
+    const heights = [...html.matchAll(/height:(-?[\d.]+)%/g)].map((m) => Number(m[1]));
+    expect(heights).toHaveLength(3);
+    for (const height of heights) {
+      expect(height).toBeGreaterThanOrEqual(0);
+      expect(height).toBeLessThanOrEqual(100);
+    }
   });
 
   it("met les nombres au format français des deux côtés", () => {
