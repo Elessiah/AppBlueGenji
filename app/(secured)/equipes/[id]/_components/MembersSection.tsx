@@ -71,11 +71,16 @@ export function MembersSection({
     setMemberRoles(["DPS"]);
   };
 
+  // Un compte supprimé garde sa ligne et donc son pseudo
+  // (`compte_supprime_412`) : sans ce filtre, l'annuaire des joueurs le cachait
+  // mais l'autocomplétion le proposait encore. Le serveur le refuse désormais
+  // (`getUserIdByPseudo` ignore les lignes mortes) — la liste ne doit pas
+  // proposer un nom qui mène à un refus.
   const suggestions = useMemo(() => {
     const q = memberPseudo.trim().toLowerCase();
     if (!q) return [];
     return availablePlayers
-      .filter((p) => p.team == null && p.pseudo.toLowerCase().includes(q))
+      .filter((p) => !p.isDeleted && p.team == null && p.pseudo.toLowerCase().includes(q))
       .slice(0, 8);
   }, [availablePlayers, memberPseudo]);
 

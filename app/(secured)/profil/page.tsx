@@ -7,6 +7,7 @@ import { LogoutButton } from "@/components/logout-button";
 import { Coche } from "@/components/Coche";
 import type { FullProfileResponse } from "@/lib/shared/types";
 import {
+  accountDeletedWriteMessage,
   accountDeletionConfirmation,
   accountDeletionErrorMessage,
   accountDeletionOutcome,
@@ -151,7 +152,9 @@ export default function ProfilePage() {
         }),
       });
       const payload = (await response.json()) as FullProfileResponse & { error?: string };
-      if (!response.ok) throw new Error(payload.error || "PROFILE_UPDATE_FAILED");
+      if (!response.ok) {
+        throw new Error(accountDeletedWriteMessage(payload.error, "PROFILE_UPDATE_FAILED"));
+      }
       setData(payload);
       // Une sauvegarde qui change le tag **annule la certification** côté
       // serveur : la pastille doit tomber dans le même geste, sinon l'écran
@@ -230,7 +233,9 @@ export default function ProfilePage() {
         body: formData,
       });
       const payload = (await response.json()) as { avatarUrl?: string | null; error?: string };
-      if (!response.ok) throw new Error(payload.error || "AVATAR_UPLOAD_FAILED");
+      if (!response.ok) {
+        throw new Error(accountDeletedWriteMessage(payload.error, "AVATAR_UPLOAD_FAILED"));
+      }
       setData((prev) =>
         prev ? { ...prev, profile: { ...prev.profile, avatarUrl: payload.avatarUrl ?? null } } : prev,
       );

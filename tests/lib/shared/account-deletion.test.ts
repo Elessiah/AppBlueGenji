@@ -1,5 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  ACCOUNT_DELETED_ERROR,
+  accountDeletedWriteMessage,
   accountDeletionConfirmation,
   accountDeletionErrorMessage,
   accountDeletionMode,
@@ -157,5 +159,26 @@ describe("accountDeletionErrorMessage", () => {
       expect(message).not.toContain("_");
       expect(message).toMatch(/[éèà]/);
     }
+  });
+});
+
+describe("accountDeletedWriteMessage", () => {
+  it("dit en français qu'une modification est arrivée trop tard", () => {
+    const message = accountDeletedWriteMessage(ACCOUNT_DELETED_ERROR, "AVATAR_UPLOAD_FAILED");
+    expect(message).not.toContain("_");
+    expect(message).toMatch(/supprimé/);
+    // Le joueur doit savoir que **rien** n'a été écrit : sans cette moitié, il
+    // quitte la page en croyant sa photo posée.
+    expect(message).toMatch(/pas été enregistrée/);
+  });
+
+  it("laisse les autres codes au repli de l'appelant", () => {
+    expect(accountDeletedWriteMessage("PSEUDO_ALREADY_USED", "PROFILE_UPDATE_FAILED")).toBe(
+      "PSEUDO_ALREADY_USED",
+    );
+    expect(accountDeletedWriteMessage(undefined, "PROFILE_UPDATE_FAILED")).toBe(
+      "PROFILE_UPDATE_FAILED",
+    );
+    expect(accountDeletedWriteMessage("", "AVATAR_UPLOAD_FAILED")).toBe("AVATAR_UPLOAD_FAILED");
   });
 });

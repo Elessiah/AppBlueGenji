@@ -176,6 +176,44 @@ aucun contexte. Les deux propriétés sont gardées par
 `tests/app/deleted-player-card.test.ts` : leurs pannes sont muettes, ni erreur ni
 image cassée.
 
+## Ce qui arrive après, et ce qui reste atteignable
+
+Le verrou ferme la transaction, il ne ferme pas ce qui la suit. Deux écritures
+du profil étaient **déjà parties** quand la suppression a commencé : elles
+attendent le verrou, et reprennent **après** son commit, sur une ligne qu'elles
+croient encore vivante. Le téléversement d'un avatar y reposait une photo
+personnelle toute neuve, servie à tout le site par `/api/uploads/avatars/…` ; la
+sauvegarde du profil y reposait l'identité entière — pseudo réel, BattleTag, tag
+Marvel, tag Discord — puis `syncSoloEntryIdentity` la republiait jusque dans les
+brackets et sur la carte de match en direct de la vitrine, que lit un visiteur
+sans compte.
+
+Le remède est le même des deux côtés, et il tient dans la clause `WHERE` :
+`updateUserAvatar` et `updateOwnProfile` écrivent `WHERE id = ? AND
+is_deleted = 0`, puis relisent `affectedRows`. Le nombre est lisible parce que
+mysql2 pose `FOUND_ROWS` : il compte les lignes **appariées**, pas celles qui ont
+changé — zéro ne dit donc pas « rien à modifier » mais « aucune ligne vivante ».
+L'avatar rend alors un booléen, que la route traduit en ménage (le fichier est
+déjà sur le disque, il faut le reprendre) ; le profil lève `ACCOUNT_DELETED`, que
+la route rend en **409** — la saisie était bonne, c'est l'état de la ligne qui a
+changé sous elle — et que `accountDeletedWriteMessage` met en français dans la
+notification. Ni l'un ni l'autre n'atteint la resynchronisation de l'entrée solo,
+qui est la moitié la plus visible du dégât.
+
+Une ligne anonymisée reste par ailleurs **atteignable par son pseudo**
+(`compte_supprime_412` est un pseudo comme un autre), et c'est par là qu'on la
+rattachait encore à une équipe vivante. `getUserIdByPseudo` — l'unique traduction
+« pseudo → compte à rattacher », partagée par l'invitation dans une équipe et par
+la reprise d'une fantôme — filtre donc `is_deleted = 0`. Ses deux appelants
+traitaient déjà le `null` en `USER_NOT_FOUND`, ce qu'un compte supprimé doit
+précisément être pour eux : sans le filtre, une invitation partait vers un compte
+qui n'a plus aucun moyen d'ouvrir une session pour l'accepter, une demande
+d'adhésion déposée *avant* la suppression le faisait **rejoindre** le roster
+séance tenante, et la reprise d'une fantôme en faisait un `OWNER` sans titulaire.
+L'autocomplétion d'ajout de membre applique le même écart côté écran
+(`!p.isDeleted`), non pour garder le secret mais pour ne pas proposer un nom qui
+ne mène qu'à un refus.
+
 ## Quand la base refuse quand même
 
 Les contrôles de clé étrangère lisent la **dernière version commitée**, et non

@@ -3,6 +3,7 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/prom
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
 import {
+  ACCOUNT_DELETED_ERROR,
   accountDeletionPlan,
   type AccountDeletionPlan,
   type AccountTrace,
@@ -906,7 +907,14 @@ export async function updateOwnProfile(
   // insensibles à la casse, la preuve continue de désigner le même compte —, et
   // c'est la raison de ne **pas** durcir ceci en comparaison binaire : on
   // recertifierait pour une majuscule.
-  await db.execute(
+  // `is_deleted = 0` ferme la même course que sur l'avatar : une sauvegarde de
+  // profil déjà partie se bloque sur le verrou de `deleteOwnAccount` et reprend
+  // **après** son commit. Sans la condition, elle reposait le pseudo réel, le
+  // BattleTag, le tag Marvel et le tag Discord sur une ligne fraîchement
+  // anonymisée — puis `syncSoloEntryIdentity` republiait ce pseudo dans les
+  // brackets et jusqu'à la carte de match en direct de la vitrine. La
+  // suppression est irréversible : c'est elle qui doit gagner.
+  const [result] = await db.execute<ResultSetHeader>(
     `UPDATE bg_users
      SET pseudo = COALESCE(?, pseudo),
          overwatch_battletag = ?,
@@ -919,7 +927,7 @@ export async function updateOwnProfile(
          visible_marvel = COALESCE(?, visible_marvel),
          visible_major = COALESCE(?, visible_major),
          open_to_recruitment = COALESCE(?, open_to_recruitment)
-     WHERE id = ?`,
+     WHERE id = ? AND is_deleted = 0`,
     [
       patch.pseudo ? normalizePseudo(patch.pseudo) : null,
       patch.overwatchBattletag === undefined ? null : patch.overwatchBattletag,
@@ -935,6 +943,11 @@ export async function updateOwnProfile(
       userId,
     ],
   );
+  // `affectedRows` compte les lignes **appariées** (mysql2 pose `FOUND_ROWS`),
+  // pas celles qui ont changé : zéro ne dit donc pas « rien à modifier » mais
+  // bien « la ligne vivante n'existe plus ». On sort avant la synchronisation
+  // de l'entrée solo, qui republierait l'identité qu'on vient de refuser.
+  if (result.affectedRows === 0) throw new Error(ACCOUNT_DELETED_ERROR);
 
   // L'entrée solo (tournois individuels) affiche le pseudo **et l'avatar** du
   // joueur dans les brackets : elle suit le renommage, et aussi la bascule de
@@ -1475,10 +1488,27 @@ export async function setUserRoles(
   return sanitized;
 }
 
+/**
+ * Résout un pseudo vers le compte **vivant** qui le porte.
+ *
+ * Ses deux appelants nomment un joueur pour l'**attacher à une équipe** —
+ * `inviteToTeam` et la reprise d'une équipe fantôme, qui en fait un `OWNER`. Un
+ * compte anonymisé garde une ligne et donc un pseudo (`compte_supprime_412`) :
+ * sans la condition, il restait invitable, et une demande d'adhésion déposée
+ * avant la suppression le faisait même **rejoindre** le roster séance tenante —
+ * soit rattacher à une équipe vivante un compte dont on vient de promettre
+ * qu'il ne servirait plus à rien. Pire côté fantôme : il en devenait
+ * propriétaire, sans personne pour ouvrir la session qui l'administre.
+ *
+ * Le filtre est posé ici et pas chez les appelants parce que c'est **l'unique**
+ * traduction « pseudo → compte à rattacher », et que les deux traitent déjà le
+ * `null` en `USER_NOT_FOUND` — ce qui est exactement ce qu'un compte supprimé
+ * doit être pour eux.
+ */
 export async function getUserIdByPseudo(pseudo: string): Promise<number | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_users WHERE pseudo = ? LIMIT 1`,
+    `SELECT id FROM bg_users WHERE pseudo = ? AND is_deleted = 0 LIMIT 1`,
     [normalizePseudo(pseudo)],
   );
 

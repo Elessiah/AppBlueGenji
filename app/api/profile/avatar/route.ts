@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
 import { getUserById, updateUserAvatar } from "@/lib/server/users-service";
+import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 
 export async function POST(req: Request) {
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
     // compte effacé dont on vient de promettre qu'il ne resterait rien.
     if (!(await updateUserAvatar(user.id, servedUrl))) {
       await deleteStoredImage(diskPath);
-      return fail("ACCOUNT_DELETED", 409);
+      return fail(ACCOUNT_DELETED_ERROR, 409);
     }
     await deleteStoredImage(toDiskUploadPath(current?.avatarUrl));
     return ok({ avatarUrl: servedUrl });

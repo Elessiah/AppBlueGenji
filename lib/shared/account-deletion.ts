@@ -173,3 +173,31 @@ export function accountDeletionErrorMessage(code: string | undefined): string {
   }
   return "La suppression du compte a échoué. Réessaie dans un instant.";
 }
+
+/**
+ * Le code que rendent les écritures refusées parce que la ligne n'est plus
+ * vivante — avatar téléversé, profil sauvegardé.
+ *
+ * Une seule constante pour les deux côtés : le serveur le pose, l'écran le
+ * traduit, et la chaîne n'est écrite qu'une fois.
+ */
+export const ACCOUNT_DELETED_ERROR = "ACCOUNT_DELETED";
+
+/**
+ * Une écriture arrivée **après** la suppression du compte, en français.
+ *
+ * C'est le versant visible de la course que ferment les `is_deleted = 0` de
+ * `updateUserAvatar` et `updateOwnProfile` : la requête était légitime au
+ * départ, elle ne l'est plus à l'arrivée. Le joueur doit lire pourquoi sa
+ * modification n'a pas pris, et non le code interne — toute l'interface est en
+ * français.
+ *
+ * Les autres codes passent au `fallback` de l'appelant : ce n'est pas à cette
+ * fonction de traduire un vocabulaire qu'elle ne connaît pas.
+ */
+export function accountDeletedWriteMessage(code: string | undefined, fallback: string): string {
+  if (code === ACCOUNT_DELETED_ERROR) {
+    return "Ce compte vient d'être supprimé : la modification n'a pas été enregistrée.";
+  }
+  return code || fallback;
+}

@@ -1,6 +1,7 @@
 ﻿import { clearSession, getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteOwnAccount, getFullProfile, updateOwnProfile } from "@/lib/server/users-service";
+import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -40,6 +41,10 @@ export async function PATCH(req: Request) {
   } catch (error) {
     const message = (error as Error).message;
     if (message === "PSEUDO_ALREADY_USED") return fail(message, 409);
+    // Le compte a été supprimé pendant que la sauvegarde attendait son verrou :
+    // même refus que sur l'avatar, et même code — c'est un conflit d'état, pas
+    // une saisie fautive.
+    if (message === ACCOUNT_DELETED_ERROR) return fail(message, 409);
     return fail(message || "PROFILE_UPDATE_FAILED", 400);
   }
 }
