@@ -1,0 +1,99 @@
+# L'écran « Mon profil »
+
+> `app/(secured)/profil/` — registre pur `_lib/profile-sections.ts`, section
+> `_components/ProfileSection.tsx`, styles `profil.module.css`, phrases
+> partagées `lib/shared/identity-sharing.ts`.
+
+## Le manque
+
+La page empilait **onze blocs dans un seul formulaire**, sans un titre pour dire
+où l'on passait d'un sujet à l'autre : pseudo, avatar, BattleTag, tag Marvel, tag
+Discord, majorité, visibilité, recrutement, applications connectées, invitations,
+statistiques — puis l'export des données et la suppression du compte, au fil du
+texte.
+
+Trois défauts, et ils se renforçaient :
+
+1. **Tout avait le même poids.** Un champ d'identité et le bouton qui efface le
+   compte se ressemblaient à quelques pixels près. Le second était en bas, après
+   tout le reste, sans rien qui le sépare des réglages.
+2. **Le texte était trop pâle pour être lu.** Chaque aide de champ s'écrivait en
+   `--text-2` à 11 px — sous la taille où ce gris reste confortable —, si bien
+   que la page entière portait un voile gris que personne ne lisait. Tout était
+   en style **en ligne**, 554 lignes dont une bonne part de mise en forme.
+3. **Il fallait tout traverser.** Aucun moyen d'atteindre « Applications
+   connectées » ou l'export sans faire défiler les huit blocs qui précèdent.
+
+Et une **information manquait**, précisément celle qui engage le site :
+l'exposition d'un tag Discord certifié est énoncée sur `/connexion`, juste avant
+la case où l'on tape son pseudo, mais `/profil` — l'écran où l'on revient des
+mois plus tard pour corriger ce champ — n'en disait presque rien ; et le fait que
+Blizzard **réécrive** le BattleTag à chaque connexion n'était écrit nulle part
+qu'un joueur puisse lire.
+
+## Le découpage
+
+Huit sections, nommées **une fois** dans `PROFILE_SECTIONS` : identité, comptes
+de jeu, Discord, confidentialité, applications connectées, invitations
+(conditionnelle), statistiques, mon compte.
+
+Le registre sert **deux lecteurs** — la navigation d'ancres en tête de page et
+les titres des sections. Deux listes auraient dérivé, et la dérive se serait vue
+sous la forme d'un lien qui ne mène nulle part : `scrollIntoView` sur une ancre
+absente ne fait *rien du tout*, sans erreur et sans déplacement. D'où aussi
+`visibleProfileSections`, qui filtre les sections conditionnelles : déclarer
+l'invitation dans le JSX laisserait oublier de la retirer de la navigation.
+
+`ProfileSection` porte l'ancre, le titre et la promesse d'une section, et son
+`aria-labelledby` désigne le titre visible plutôt que de le recopier dans un
+`aria-label` — deux chaînes finiraient par diverger.
+
+La navigation est faite de **liens d'ancre**, pas d'onglets : rien à mémoriser,
+rien à hydrater, et une URL comme `/profil#connexions` fonctionne depuis
+n'importe où. `scroll-margin-top` sur la section plutôt qu'un décalage au clic,
+pour que l'arrivée par une URL collée tombe au bon endroit elle aussi.
+
+## La zone de danger
+
+« Mon compte » est la dernière section et **ne ressemble à aucune autre** :
+bordure et titre en rouge, boutons groupés. Exporter ses données, se déconnecter
+et effacer son compte ne sont pas des réglages, et les présenter comme tels
+revenait à cacher le plus lourd des trois au milieu des autres.
+
+## Le contraste
+
+Les aides de champ passent de `--text-2` / 11 px à **`--text-1` / 12 px**, avec
+une interligne de 1,65 et une largeur bornée à 68 caractères. `--text-2` est
+réservé à ce qui est vraiment secondaire (le format accepté d'une image, par
+exemple). Les styles quittent le JSX pour `profil.module.css`, qui porte la
+hiérarchie : titre de section > libellé de champ > aide.
+
+## Ce que le site dit de vos identifiants
+
+`lib/shared/identity-sharing.ts` porte les phrases qui **engagent le site**, et
+les deux écrans qui les affichent y puisent :
+
+| Constante | Ce qu'elle promet |
+| --- | --- |
+| `DISCORD_TAG_AUDIENCE` | Qui lit un tag certifié : les administrateurs toujours, l'arbitrage pendant un tournoi, **jamais personne d'autre**. |
+| `DISCORD_TAG_UNVERIFIED_AUDIENCE` | Ce qu'un tag non certifié vaut : rien, pour personne — et l'organisation ne peut pas joindre le joueur. |
+| `DISCORD_CERTIFICATION_UNDO` | Le seul geste qui défait la certification (il n'existe aucune route de décertification). |
+| `BLIZZARD_BATTLETAG_NOTICE` | Blizzard renseigne le BattleTag et **remplace** la saisie à chaque connexion. |
+| `GAME_TAG_NOTICE` | Les identifiants de jeu servent à s'ajouter entre joueurs, jamais à des statistiques. |
+
+L'**entrée en matière** diffère selon l'écran (« Te connecter par Discord
+certifie ce tag » à la connexion, « Tag certifié » sur le profil) ; ce qui suit ne
+doit pas différer, puisque c'est la promesse. D'où `discordCertifiedNotice(lead)`,
+qui laisse le premier morceau à l'appelant et tient le reste.
+
+Le test de `/connexion` porte désormais sur ces constantes **et** sur le fait que
+la page les emploie : c'est strictement plus fort que l'ancienne lecture
+littérale de la source, où deux écrans pouvaient promettre deux choses
+différentes sans que rien ne le signale.
+
+## Voir aussi
+
+- `docs/features/DISCORD_VERIFICATION.md` — ce que la certification expose, et à
+  qui.
+- `docs/features/OAUTH_PROVIDERS.md` — les trois portes d'entrée, et pourquoi le
+  rattachement se fait depuis cet écran.
