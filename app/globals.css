@@ -504,8 +504,12 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
 }
 
 .checkbox-card:not([data-locked]):hover {
-  border-color: var(--blue-500);
-  background-color: rgba(90, 200, 255, 0.08);
+  /* Ni `border-color` ni `background-color` ici : les deux écrans qui posent
+     cette carte les écrivent **en ligne** (le cadre dit coché / décoché /
+     verrouillé, trois valeurs qu'une feuille ne connaît pas), et un style en
+     ligne bat la règle sans `!important`. Déclarées, elles ne s'appliquaient
+     donc jamais — et laissaient croire, à qui lit la feuille, que le survol
+     change le cadre. Il ne change que ce qui suit. */
   box-shadow: 0 2px 12px rgba(90, 200, 255, 0.14);
 }
 
