@@ -34,11 +34,16 @@ export function isTransactionAborted(error: unknown): boolean {
 /**
  * `true` si la table n'existe pas.
  *
- * Les migrations de `lib/server/database.ts` créent chaque table dans un `try`
- * dont le `catch` est muet : une base où l'une d'elles a échoué reste debout,
- * et les chemins accessoires — notifications, réservations d'alerte — doivent
- * pouvoir s'en accommoder plutôt que d'emporter la fonctionnalité qui les
- * appelle.
+ * Trois tables de `lib/server/database.ts` — et elles seules — sont créées dans
+ * un `try` dont le `catch` est muet : `bg_match_reminders`,
+ * `bg_referee_alerts` et `bg_endurance_penalties`. Une base où leur création a
+ * échoué reste debout, et les chemins accessoires qui les lisent — rappels,
+ * réservations d'alerte, sanctions — s'en accommodent plutôt que d'emporter la
+ * fonctionnalité qui les appelle : un rappel perdu vaut mieux qu'un report de
+ * score en erreur.
+ *
+ * Les autres tables ne sont **pas** tolérées : le site n'a rien à servir sans
+ * elles, et ce prédicat n'a donc pas à couvrir leur absence.
  */
 export function isMissingTableError(error: unknown): boolean {
   return errorCode(error) === "ER_NO_SUCH_TABLE";

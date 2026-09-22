@@ -182,7 +182,7 @@ describe("Schéma — la règle des deux endroits", () => {
     // `CREATE TABLE` des tables de notification et les deux rattrapages
     // permanents gardent leur `catch` muet, et c'est voulu — un rappel perdu
     // vaut mieux qu'un report de score en erreur.
-    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(2);
+    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(3);
     expect(migrations).not.toMatch(/catch\s*\{\s*\/\/[^\n]*\n\s*\}/);
   });
 
@@ -226,14 +226,35 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
       .split("\n")
       .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
       .join("\n");
-    // Deux seulement : la boucle paramétrée des colonnes récentes, et le retrait
-    // de l'adresse e-mail. Les libellés passés au rapporteur d'échec citent la
-    // même instruction sans l'exécuter — ils ne comptent pas.
+    // Trois seulement, et le test nomme lesquelles plutôt que de compter : la
+    // boucle paramétrée des colonnes récentes, et les deux **retraits**, qui
+    // n'ont aucune contrepartie dans un `CREATE TABLE` et ne pouvaient donc pas
+    // être repliés. Les libellés passés au rapporteur d'échec citent la même
+    // instruction sans l'exécuter — ils ne comptent pas.
     const statements = code
       .split("\n")
-      .filter((line) => line.includes("ALTER TABLE") && !line.includes("reportSchemaFailure"));
-    expect(statements).toHaveLength(2);
+      .filter((line) => line.includes("ALTER TABLE") && !line.includes("reportSchemaFailure"))
+      .map((line) => line.trim());
+    expect(statements).toEqual([
+      "await db.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);",
+      "await db.execute(`ALTER TABLE bg_recruitment_ads DROP COLUMN contact_email`);",
+      "await db.execute(`ALTER TABLE bg_users DROP COLUMN email`);",
+    ]);
     expect(code).toContain("ALTER TABLE bg_users DROP COLUMN email");
+  });
+
+  it("garde les trois tables tolérantes, dont des chemins accessoires dépendent", () => {
+    // `isMissingTableError` décrit ce contrat, et `deletion.ts` / `rollback.ts` /
+    // les chemins de notification s'y appuient : un rappel, une alerte ou une
+    // sanction perdus valent mieux qu'un démarrage qui tombe.
+    for (const tableName of [
+      "bg_match_reminders",
+      "bg_referee_alerts",
+      "bg_endurance_penalties",
+    ]) {
+      const before = sql.slice(0, sql.indexOf(`CREATE TABLE IF NOT EXISTS ${tableName}`));
+      expect(before.slice(-60)).toContain("try {");
+    }
   });
 
   it("garde les deux rattrapages permanents, dont la cause peut se reproduire", () => {

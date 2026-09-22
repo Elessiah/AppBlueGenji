@@ -59,9 +59,11 @@ journal Discord descendent tous de la même liste.
 | Blizzard | `openid` | `blizzard_sub`, le BattleTag |
 
 Ni adresse e-mail, ni liste de serveurs. Le scope `email` a disparu de la demande
-faite à Google : `bg_users.email` n'ayant plus aucun lecteur une fois le
-rattachement par adresse retiré, une colonne d'adresses ne pesait plus que d'un
-côté.
+faite à Google, et `bg_users.email` avec lui : la colonne n'avait plus aucun
+lecteur une fois le rattachement par adresse retiré, et une colonne d'adresses ne
+pesait plus que d'un côté. Elle a fini par être **retirée de la table**, ce qui a
+effacé du même geste les adresses collectées avant la règle — voir
+`docs/DATABASE_SCHEMA.md`.
 
 Les photos sont **copiées** chez nous (`adoptRemoteAvatar`), jamais relayées :
 une URL de CDN rangée en base annoncerait l'IP de chaque visiteur au

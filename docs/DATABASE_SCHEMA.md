@@ -97,11 +97,26 @@ C'est `reportSchemaFailure` qui l'applique, aux deux migrations. Le cas nominal
 ne journalise rien : il se produit à chaque démarrage, et une ligne par entrée
 noierait la seule qui compte.
 
-**Les `CREATE TABLE` ne suivent pas cette règle**, et ce n'est pas un oubli :
-`bg_match_reminders` et `bg_referee_alerts` gardent un `catch` muet, parce que
-c'est le contrat qu'`isMissingTableError` décrit — une base où leur création a
-échoué reste debout, et un rappel ou une alerte perdus valent mieux qu'un report
-de score en erreur.
+**Trois `CREATE TABLE` ne suivent pas cette règle**, et ce n'est pas un oubli :
+`bg_match_reminders`, `bg_referee_alerts` et `bg_endurance_penalties` gardent un
+`catch` muet, parce que c'est le contrat qu'`isMissingTableError` décrit et sur
+lequel s'appuient les chemins de notification, `tournaments/deletion.ts` et
+`tournaments/rollback.ts` — une base où leur création a échoué reste debout, et
+un rappel, une alerte ou une sanction perdus valent mieux qu'un report de score
+en erreur. Les autres tables ne sont pas tolérées : le site n'a rien à servir
+sans elles.
+
+### Ce qui ne pouvait pas être replié
+
+Un **retrait** de colonne n'a aucune contrepartie dans un `CREATE TABLE` : la
+colonne y est simplement absente, si bien qu'une table neuve ne la porte jamais
+et qu'une base existante la garde pour toujours. Les deux `ALTER … DROP COLUMN`
+restent donc dans la section « Migrations » quoi qu'il arrive, et ils disent la
+même chose — une adresse que plus personne ne lit :
+
+- `bg_recruitment_ads.contact_email`, qui a perdu son lecteur quand le contact
+  d'une annonce est passé en « AUTO / DISCORD / LIEN » ;
+- `bg_users.email`, détaillé ci-dessous.
 
 La distinction n'est pas de la coquetterie sur le `DROP COLUMN email`, elle y est
 même plus forte : ce `DROP` **est** l'effacement des adresses. Rien ne lit plus la

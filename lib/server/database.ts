@@ -495,25 +495,33 @@ async function runMigrations(db: Pool): Promise<void> {
   // premier score corrigé. La ligne porte sa manche, ce qui la place dans la
   // chronologie du tournoi. L'auteur s'efface en `NULL` sans emporter la
   // sanction : le compte s'en va, la sanction reste due.
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_endurance_penalties (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      tournament_id BIGINT NOT NULL,
-      team_id BIGINT NOT NULL,
-      round_number INT NOT NULL,
-      points INT NOT NULL,
-      reason VARCHAR(255) NOT NULL,
-      created_by BIGINT NULL,
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      KEY idx_bg_endurance_penalties_tournament (tournament_id),
-      CONSTRAINT fk_bg_endurance_penalties_tournament FOREIGN KEY (tournament_id)
-        REFERENCES bg_tournaments(id) ON DELETE CASCADE,
-      CONSTRAINT fk_bg_endurance_penalties_team FOREIGN KEY (team_id)
-        REFERENCES bg_teams(id) ON DELETE CASCADE,
-      CONSTRAINT fk_bg_endurance_penalties_author FOREIGN KEY (created_by)
-        REFERENCES bg_users(id) ON DELETE SET NULL
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  // Créée sous un `catch` muet comme les deux tables de notification :
+  // `tournaments/deletion.ts` et `tournaments/rollback.ts` citent cette
+  // tolérance pour s'accommoder d'une table absente. La retirer ici rendrait
+  // leur garde morte et ferait tomber le démarrage sur une table accessoire.
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS bg_endurance_penalties (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        tournament_id BIGINT NOT NULL,
+        team_id BIGINT NOT NULL,
+        round_number INT NOT NULL,
+        points INT NOT NULL,
+        reason VARCHAR(255) NOT NULL,
+        created_by BIGINT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        KEY idx_bg_endurance_penalties_tournament (tournament_id),
+        CONSTRAINT fk_bg_endurance_penalties_tournament FOREIGN KEY (tournament_id)
+          REFERENCES bg_tournaments(id) ON DELETE CASCADE,
+        CONSTRAINT fk_bg_endurance_penalties_team FOREIGN KEY (team_id)
+          REFERENCES bg_teams(id) ON DELETE CASCADE,
+        CONSTRAINT fk_bg_endurance_penalties_author FOREIGN KEY (created_by)
+          REFERENCES bg_users(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+  } catch {
+    // Table déjà présente, ou création refusée : les sanctions se taisent.
+  }
 
   // ───────────────────────────────────────────────────────────────────────────
   // Tournois multi-phases
@@ -796,6 +804,21 @@ async function runMigrations(db: Pool): Promise<void> {
     } catch (error) {
       reportSchemaFailure(error, `ALTER TABLE ${table} ADD COLUMN ${column}`);
     }
+  }
+
+  // **Un retrait de colonne ne se replie pas.** Une colonne qui part n'a aucune
+  // contrepartie dans un `CREATE TABLE` : elle y est simplement absente, si bien
+  // qu'une table neuve ne la porte jamais et qu'une base existante la garde pour
+  // toujours. Les deux ci-dessous restent donc ici quoi qu'il arrive, et elles
+  // disent la même chose : une adresse que plus personne ne lit.
+  //
+  // Celle des annonces de recrutement a perdu son lecteur quand le contact est
+  // passé en « AUTO / DISCORD / LIEN » — plus aucun écran ne la saisit ni ne
+  // l'affiche.
+  try {
+    await db.execute(`ALTER TABLE bg_recruitment_ads DROP COLUMN contact_email`);
+  } catch (error) {
+    reportSchemaFailure(error, "ALTER TABLE bg_recruitment_ads DROP COLUMN contact_email");
   }
 
   // L'adresse e-mail n'a plus aucun lecteur — le scope `email` a disparu de la
