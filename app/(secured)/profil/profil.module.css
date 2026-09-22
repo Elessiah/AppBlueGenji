@@ -19,6 +19,14 @@
   gap: 18px;
 }
 
+/* Les sections d'un même formulaire gardent l'écartement de la page : elles se
+   lisent comme ses voisines, le formulaire ne se voit pas. */
+.formSections {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
 /* ── En-tête ──────────────────────────────────────────────────────────────── */
 
 .header {

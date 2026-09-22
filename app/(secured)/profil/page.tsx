@@ -377,7 +377,11 @@ export default function ProfilePage() {
         ))}
       </nav>
 
-      <form onSubmit={onSubmit} style={{ display: "contents" }}>
+      {/* `display: contents` aurait été plus court, mais plusieurs moteurs
+          retirent alors l'élément de l'arbre d'accessibilité : le formulaire
+          cesserait d'être annoncé comme tel. Une colonne au même écartement que
+          la page donne la même mise en page sans rien perdre. */}
+      <form onSubmit={onSubmit} className={s.formSections}>
         <ProfileSection section={sectionById.identite}>
           <div className="form-grid">
             <div className="field">
