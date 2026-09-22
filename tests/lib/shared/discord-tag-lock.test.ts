@@ -26,19 +26,34 @@ describe("checkDiscordTagEdit", () => {
 
 describe("discordTagLockNotice", () => {
   it("dit d'où vient le tag et qu'il est certifié", () => {
-    const notice = discordTagLockNotice("keryan");
+    const notice = discordTagLockNotice({ tag: "keryan", verified: true });
     expect(notice).toContain("rattaché");
-    expect(notice).toContain("certifié");
+    expect(notice).toContain("et est certifié");
+  });
+
+  it("n'annonce pas une certification que le compte n'a pas", () => {
+    // Le rattachement ne la garantit pas : un tag modifié à la main avant cette
+    // règle laisse un compte lié mais non certifié. L'annoncer certifié
+    // contredirait la pastille absente d'à côté — et promettrait au joueur que
+    // l'organisation peut le joindre, ce qu'elle ne peut pas.
+    const notice = discordTagLockNotice({ tag: "keryan", verified: false });
+    expect(notice).toContain("n'est pas certifié");
+    expect(notice).toContain("personne ne le voit");
   });
 
   it("explique l'absence de tag plutôt que de laisser un champ vide sans raison", () => {
-    const notice = discordTagLockNotice(null);
+    const notice = discordTagLockNotice({ tag: null, verified: false });
     expect(notice).toContain("aucun pseudo affichable");
     expect(notice).not.toContain("est certifié");
   });
 
   it("nomme toujours les deux gestes qui rouvrent la donnée", () => {
-    for (const notice of [discordTagLockNotice("keryan"), discordTagLockNotice(null)]) {
+    const notices = [
+      discordTagLockNotice({ tag: "keryan", verified: true }),
+      discordTagLockNotice({ tag: "keryan", verified: false }),
+      discordTagLockNotice({ tag: null, verified: false }),
+    ];
+    for (const notice of notices) {
       expect(notice).toContain("reconnecte-toi");
       expect(notice).toContain("Applications connectées");
     }

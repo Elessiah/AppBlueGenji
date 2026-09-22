@@ -51,6 +51,21 @@ function fakeDb(handler?: (q: string, params: unknown[]) => unknown) {
 const find = (queries: Query[], needle: string) =>
   queries.find((q) => q.sql.includes(needle));
 
+/**
+ * Les six paramètres que l'écriture consacre au tag Discord, nommés.
+ *
+ * Deux `CASE` jumeaux — l'un pour `discord_verified_at`, l'autre pour
+ * `discord_pseudo` — prennent chacun « le patch parle-t-il du tag ? » puis la
+ * valeur visée, deux fois. Les compter à la main par leur indice rendait ces
+ * tests illisibles et faux au premier paramètre inséré devant.
+ */
+function tagParams(params: unknown[]): { touches: unknown[]; tags: unknown[] } {
+  return {
+    touches: [params[3], params[6]],
+    tags: [params[4], params[5], params[7], params[8]],
+  };
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   (getPlayerEntityStats as jest.Mock).mockResolvedValue({
@@ -86,27 +101,39 @@ describe("updateOwnProfile — la certification suit le tag", () => {
     expect(find(queries, "UPDATE bg_users")!.sql).toContain("discord_pseudo <=> ?");
   });
 
-  it("passe le même tag aux deux emplacements : la comparaison porte sur ce qui sera écrit", async () => {
+  it("passe le même tag aux six emplacements : les deux `CASE` doivent lire ce qui sera écrit", async () => {
     const { queries } = fakeDb();
 
     await updateOwnProfile(7, { pseudo: "Nova", discordPseudo: "keryan" });
 
-    const params = find(queries, "UPDATE bg_users")!.params;
-    // Positions 3 et 4 : le paramètre du `CASE`, puis celui de l'affectation.
-    expect(params[3]).toBe("keryan");
-    expect(params[4]).toBe("keryan");
+    expect(tagParams(find(queries, "UPDATE bg_users")!.params)).toEqual({
+      touches: [true, true],
+      tags: ["keryan", "keryan", "keryan", "keryan"],
+    });
   });
 
-  it("efface le tag quand il est absent du patch, et la certification avec", async () => {
+  it("efface le tag quand le formulaire l'a vidé, et la certification avec", async () => {
     // Le formulaire envoie la fiche entière : un champ vidé arrive à `null`, et
     // c'est bien un changement de tag.
     const { queries } = fakeDb();
 
+    await updateOwnProfile(7, { pseudo: "Nova", discordPseudo: null });
+
+    expect(tagParams(find(queries, "UPDATE bg_users")!.params)).toEqual({
+      touches: [true, true],
+      tags: [null, null, null, null],
+    });
+  });
+
+  it("ne touche pas au tag quand le patch n'en parle pas — absent n'est pas vidé", async () => {
+    // Une requête partielle qui ne mentionne pas le tag le supprimait, et sa
+    // certification avec. Aucun appelant ne le faisait, mais le verrou du
+    // rattachement en aurait fait un refus en 409 sur tout compte lié.
+    const { queries } = fakeDb();
+
     await updateOwnProfile(7, { pseudo: "Nova" });
 
-    const params = find(queries, "UPDATE bg_users")!.params;
-    expect(params[3]).toBeNull();
-    expect(params[4]).toBeNull();
+    expect(tagParams(find(queries, "UPDATE bg_users")!.params).touches).toEqual([false, false]);
   });
 });
 
@@ -388,20 +415,62 @@ describe("updateOwnProfile — un compte Discord rattaché possède son tag", ()
   });
 
   it("garde le tag dans l'écriture elle-même — le refus lisible ne tient pas la course", async () => {
+    // La forme de l'écriture ne dépend pas de la ligne lue : c'est elle, et non
+    // le `SELECT`, qui tient un rattachement survenu entre les deux.
     const { queries } = lockedDb(null, null);
 
     await updateOwnProfile(7, { discordPseudo: "keryan" });
 
     const sql = find(queries, "UPDATE bg_users")!.sql;
-    expect(sql).toContain("discord_pseudo = CASE WHEN discord_id IS NOT NULL THEN discord_pseudo");
+    expect(sql).toContain(
+      "discord_pseudo = CASE WHEN NOT ? THEN discord_pseudo WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_pseudo ELSE ? END",
+    );
   });
 
   it("ne décertifie pas un compte rattaché, dont le tag ne peut pas bouger", async () => {
     const { queries } = lockedDb(null, null);
+    // Même remarque : c'est la requête qu'on lit, pas son résultat.
 
     await updateOwnProfile(7, {});
 
     const sql = find(queries, "UPDATE bg_users")!.sql;
-    expect(sql).toContain("WHEN discord_id IS NOT NULL OR discord_pseudo <=> ?");
+    expect(sql).toContain("WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_verified_at");
+  });
+});
+
+describe("updateOwnProfile — retirer son tag reste possible", () => {
+  const lockedDb = (discordId: string | null, storedTag: string | null) =>
+    fakeDb((sql) =>
+      sql.includes("SELECT discord_id, discord_pseudo")
+        ? [[{ discord_id: discordId, discord_pseudo: storedTag }]]
+        : undefined,
+    );
+
+  it("laisse un compte rattaché effacer son tag — c'est le seul geste d'annulation", async () => {
+    // Sans lui, un compte né par Discord n'a aucune sortie : son tag est
+    // certifié donc lisible de l'arbitrage, et détacher Discord lui est refusé
+    // en `LAST_CONNECTION` faute d'une autre porte.
+    const { queries } = lockedDb("100000000000000001", "keryan");
+
+    await updateOwnProfile(7, { discordPseudo: null });
+
+    expect(find(queries, "UPDATE bg_users")).toBeDefined();
+  });
+
+  it("n'interroge même pas le rattachement pour un effacement", async () => {
+    const { queries } = lockedDb("100000000000000001", "keryan");
+
+    await updateOwnProfile(7, { discordPseudo: null });
+
+    expect(find(queries, "SELECT discord_id, discord_pseudo")).toBeUndefined();
+  });
+
+  it("refuse toujours d'y écrire un autre tag", async () => {
+    const { queries } = lockedDb("100000000000000001", "keryan");
+
+    await expect(updateOwnProfile(7, { discordPseudo: "quelquun_dautre" })).rejects.toThrow(
+      "DISCORD_TAG_LOCKED",
+    );
+    expect(find(queries, "UPDATE bg_users")).toBeUndefined();
   });
 });

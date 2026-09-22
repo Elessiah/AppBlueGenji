@@ -379,7 +379,7 @@ export default function ProfilePage() {
               )}
               <p id="profile-discord-hint" style={{ fontSize: 11, color: "var(--text-2)", margin: "6px 0 0", lineHeight: 1.6 }}>
                 {discordLocked
-                  ? discordTagLockNotice(discordState.tag)
+                  ? discordTagLockNotice(discordState)
                   : discordState.verified
                     ? "Tag certifié : les administrateurs le voient, et les arbitres pendant tes tournois. Le modifier annule la certification."
                     : "Tag non certifié : personne ne le voit, pas même les administrateurs. Certifie-le pour que l'organisation puisse te joindre pendant un tournoi."}

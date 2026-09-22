@@ -466,10 +466,14 @@ select {
   cursor: default;
 }
 
-.field input[readonly]:focus,
-.field textarea[readonly]:focus {
-  border-color: var(--line-strong);
-  box-shadow: none;
+/* Le halo vert d'un champ modifiable inviterait à écrire ; l'anneau doit tout de
+   même rester **visible**, sinon un parcours au clavier traverse le champ sans
+   aucun repère (`outline: none` est déjà posé plus haut). D'où un anneau neutre,
+   distinct de celui de la saisie. */
+.field input[readonly]:focus-visible,
+.field textarea[readonly]:focus-visible {
+  border-color: var(--text-2);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
   background: rgba(10, 11, 15, 0.55);
 }
 

@@ -66,11 +66,22 @@ export function isDiscordTagLocked(state: { linked: boolean }): boolean {
  * puis se reconnecter, ou détacher Discord — parce qu'un refus qui ne dit pas
  * comment il se lève se lit comme une panne.
  */
-export function discordTagLockNotice(tag: string | null): string {
+export function discordTagLockNotice(state: {
+  tag: string | null;
+  verified: boolean;
+}): string {
   const reopen =
     "Pour en changer, renomme-toi sur Discord puis reconnecte-toi, ou détache Discord dans « Applications connectées ».";
-  if (!tag) {
+  if (!state.tag) {
     return `Ton compte Discord est rattaché, mais Discord n'a donné aucun pseudo affichable (un pseudo entièrement numérique ne peut pas servir à te joindre). ${reopen}`;
+  }
+  // La certification n'est **pas** garantie par le rattachement : le tag a pu
+  // être modifié à la main avant que cette règle existe, et l'annoncer certifié
+  // dirait à un joueur que l'organisation peut le joindre alors qu'elle ne le
+  // peut pas — la pastille d'à côté, elle, serait absente. L'écran dirait deux
+  // choses contraires au même endroit.
+  if (!state.verified) {
+    return `Ton compte Discord est rattaché : ce pseudo vient de Discord, mais il n'est pas certifié — personne ne le voit. ${reopen}`;
   }
   return `Ton compte Discord est rattaché : ce pseudo vient de Discord et est certifié. ${reopen}`;
 }

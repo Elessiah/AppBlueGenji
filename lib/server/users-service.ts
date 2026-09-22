@@ -871,9 +871,26 @@ export async function updateOwnProfile(
     }
   }
 
-  const nextDiscordPseudo = patch.discordPseudo === undefined ? null : patch.discordPseudo;
+  // **Un champ absent du patch n'est pas un champ vidé.** `discordPseudo`
+  // manquant valait `null`, donc un effacement : une requête partielle qui ne
+  // parlait pas du tag le supprimait, et sa certification avec. Aucun appelant
+  // ne le faisait — le formulaire renvoie toujours le champ —, mais le verrou
+  // ci-dessous en aurait fait un refus en 409 sur tout compte rattaché, ce qui
+  // rend la distinction obligatoire autant que juste.
+  const touchesDiscordTag = patch.discordPseudo !== undefined;
+  const nextDiscordPseudo = patch.discordPseudo ?? null;
 
-  // **Un compte Discord rattaché possède son tag** (`lib/shared/discord-tag-lock.ts`).
+  // **Un compte Discord rattaché possède son tag** (`lib/shared/discord-tag-lock.ts`) :
+  // il ne peut pas en **inventer** un autre, Discord ayant nommé celui-là.
+  //
+  // Il peut en revanche le **retirer**, et ce n'est pas une exception : effacer
+  // son tag *est* le geste d'annulation de l'exposition, le seul que le site
+  // offre — il n'existe aucune route de décertification. Le lui refuser
+  // enfermerait le cas le plus courant, un compte né par Discord : son tag est
+  // certifié donc lisible de l'arbitrage, et détacher Discord lui serait refusé
+  // en `LAST_CONNECTION` faute d'une autre porte. Il ne lui resterait que la
+  // suppression du compte.
+  //
   // Le refus est lisible — l'écran verrouille déjà le champ, mais la route est
   // atteignable sans lui —, et il ne tombe que sur une **réécriture** : le
   // formulaire renvoie le tag à chaque sauvegarde, refuser sur sa seule présence
@@ -881,16 +898,18 @@ export async function updateOwnProfile(
   // colonne (insensible à la casse et aux accents, `utf8mb4_0900_ai_ci`), sans
   // quoi une correction de casse serait refusée là où la certification, elle, y
   // survit.
-  const [lockRows] = await db.execute<(RowDataPacket & {
-    discord_id: string | null;
-    discord_pseudo: string | null;
-  })[]>(`SELECT discord_id, discord_pseudo FROM bg_users WHERE id = ? LIMIT 1`, [userId]);
-  const lockRow = lockRows[0];
-  if (lockRow && isDiscordTagLocked({ linked: Boolean(lockRow.discord_id) })) {
-    const stored = lockRow.discord_pseudo;
-    const sameTag =
-      (stored ?? "").localeCompare(nextDiscordPseudo ?? "", "fr", { sensitivity: "base" }) === 0;
-    if (!sameTag) throw new Error(DISCORD_TAG_LOCKED);
+  if (touchesDiscordTag && nextDiscordPseudo !== null) {
+    const [lockRows] = await db.execute<(RowDataPacket & {
+      discord_id: string | null;
+      discord_pseudo: string | null;
+    })[]>(`SELECT discord_id, discord_pseudo FROM bg_users WHERE id = ? LIMIT 1`, [userId]);
+    const lockRow = lockRows[0];
+    if (lockRow && isDiscordTagLocked({ linked: Boolean(lockRow.discord_id) })) {
+      const stored = lockRow.discord_pseudo ?? "";
+      const sameTag =
+        stored.localeCompare(nextDiscordPseudo, "fr", { sensitivity: "base" }) === 0;
+      if (!sameTag) throw new Error(DISCORD_TAG_LOCKED);
+    }
   }
 
   // **La certification se perd à chaque changement de tag.** Elle ne dit pas
@@ -927,10 +946,16 @@ export async function updateOwnProfile(
          overwatch_battletag = ?,
          marvel_rivals_tag = ?,
          discord_verified_at = CASE
-           WHEN discord_id IS NOT NULL OR discord_pseudo <=> ? THEN discord_verified_at
+           WHEN NOT ? THEN discord_verified_at
+           WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_verified_at
+           WHEN discord_pseudo <=> ? THEN discord_verified_at
            ELSE NULL
          END,
-         discord_pseudo = CASE WHEN discord_id IS NOT NULL THEN discord_pseudo ELSE ? END,
+         discord_pseudo = CASE
+           WHEN NOT ? THEN discord_pseudo
+           WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_pseudo
+           ELSE ?
+         END,
          is_adult = ?,
          visible_avatar = COALESCE(?, visible_avatar),
          visible_overwatch = COALESCE(?, visible_overwatch),
@@ -942,6 +967,10 @@ export async function updateOwnProfile(
       patch.pseudo ? normalizePseudo(patch.pseudo) : null,
       patch.overwatchBattletag === undefined ? null : patch.overwatchBattletag,
       patch.marvelRivalsTag === undefined ? null : patch.marvelRivalsTag,
+      touchesDiscordTag,
+      nextDiscordPseudo,
+      nextDiscordPseudo,
+      touchesDiscordTag,
       nextDiscordPseudo,
       nextDiscordPseudo,
       patch.isAdult === undefined ? null : patch.isAdult,

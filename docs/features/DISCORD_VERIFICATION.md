@@ -198,11 +198,33 @@ D'où la règle, écrite **une fois** dans un module pur et tenue aux deux bouts
   inenregistrable — et la comparaison est insensible à la casse, comme celle qui
   décide de la décertification.
 - **L'écriture** garde le tag par elle-même :
-  `discord_pseudo = CASE WHEN discord_id IS NOT NULL THEN discord_pseudo ELSE ? END`.
+  `discord_pseudo = CASE WHEN NOT ? THEN discord_pseudo WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_pseudo ELSE ? END`.
   Le `SELECT` donne le refus lisible, la requête tranche la course — un
-  rattachement peut tomber entre les deux. La même branche couvre
-  `discord_verified_at`, qui n'a alors aucune raison de tomber puisque rien ne
-  change.
+  rattachement peut tomber entre les deux. Un `CASE` jumeau couvre
+  `discord_verified_at`, qui n'a aucune raison de tomber quand rien ne change.
+
+### Retirer son tag reste possible
+
+Un compte rattaché ne peut pas **inventer** un autre tag ; il peut en revanche
+**retirer** le sien, et ce n'est pas une exception. Effacer son tag *est* le
+geste d'annulation de l'exposition, le seul que le site offre — il n'existe
+aucune route de décertification.
+
+Le lui refuser enfermerait le cas le plus courant, un compte **né par Discord** :
+son tag est certifié donc lisible de l'arbitrage, et détacher Discord lui serait
+refusé en `LAST_CONNECTION` faute d'une autre porte. Il ne lui resterait que la
+suppression du compte. D'où la forme du verrou : il ne mord que sur une valeur
+**non nulle** et différente, et l'effacement n'interroge même pas le
+rattachement.
+
+### Un champ absent n'est pas un champ vidé
+
+`discordPseudo` manquant valait `null`, donc un effacement : une requête
+partielle qui ne parlait pas du tag le supprimait, et sa certification avec.
+Aucun appelant ne le faisait — le formulaire renvoie toujours le champ —, mais
+le verrou en aurait fait un **409 sur tout compte rattaché**, ce qui rend la
+distinction obligatoire autant que juste. D'où le premier `WHEN` des deux
+`CASE` : « le patch parle-t-il du tag ? ».
 
 Le verrou se lit sur le **rattachement seul**, ni sur le tag ni sur la
 certification. Un compte rattaché dont Discord n'a donné aucun pseudo affichable
