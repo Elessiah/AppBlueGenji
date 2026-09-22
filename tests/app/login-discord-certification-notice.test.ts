@@ -1,6 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  DISCORD_CERTIFICATION_UNDO,
+  DISCORD_TAG_AUDIENCE,
+} from "@/lib/shared/identity-sharing";
 
 /**
  * L'exposition doit être annoncée sur **les deux** chemins de certification.
@@ -15,6 +19,12 @@ import { join } from "node:path";
  *
  * Assertion sur la **source** faute de pouvoir monter la page : elle tient à ce
  * qu'aucun test ne peut deviner, la présence de la phrase.
+ *
+ * Depuis que `/profil` énonce la même promesse, la phrase elle-même vit dans
+ * `lib/shared/identity-sharing.ts` : le contrôle porte donc sur son contenu
+ * *et* sur le fait que la page de connexion l'emploie. C'est plus fort que
+ * l'ancienne lecture littérale — deux écrans ne peuvent plus promettre deux
+ * choses différentes.
  */
 const SOURCE = readFileSync(join(process.cwd(), "app/connexion/page.tsx"), "utf8");
 
@@ -24,18 +34,25 @@ describe("connexion Discord — annonce de la certification", () => {
   });
 
   it("nomme les deux publics, et eux seuls", () => {
-    expect(SOURCE).toMatch(/administrateurs/i);
-    expect(SOURCE).toMatch(/arbitres/i);
+    expect(DISCORD_TAG_AUDIENCE).toMatch(/administrateurs/i);
+    expect(DISCORD_TAG_AUDIENCE).toMatch(/arbitres/i);
     // « Jamais personne d'autre » : la phrase borne l'exposition au lieu de la
     // laisser deviner. Sans cela, « les administrateurs le voient » se lirait
     // comme un début de liste.
-    expect(SOURCE).toMatch(/personne\s+d&apos;autre/i);
+    expect(DISCORD_TAG_AUDIENCE).toMatch(/personne\s+d'autre/i);
+    expect(SOURCE).toContain("DISCORD_TAG_AUDIENCE");
   });
 
   it("nomme le geste d'annulation", () => {
     // Il n'y a pas de route de décertification : modifier le tag *est* le geste.
     // Le taire laisserait le lecteur sans aucune issue.
-    expect(SOURCE).toMatch(/annule la\s*\n?\s*certification/i);
+    expect(DISCORD_CERTIFICATION_UNDO).toMatch(/annule la certification/i);
+    expect(SOURCE).toContain("DISCORD_CERTIFICATION_UNDO");
+  });
+
+  it("ne recopie plus la phrase dans la page", () => {
+    // Une copie vaudrait promesse divergente au premier ajustement.
+    expect(SOURCE).not.toMatch(/les administrateurs\s*\n?\s*le voient/i);
   });
 });
 

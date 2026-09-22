@@ -1,0 +1,102 @@
+import { describe, expect, it } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import {
+  PROFILE_SECTIONS,
+  visibleProfileSections,
+} from "@/app/(secured)/profil/_lib/profile-sections";
+
+const ROOT = join(__dirname, "..", "..");
+const page = readFileSync(join(ROOT, "app/(secured)/profil/page.tsx"), "utf8");
+
+/**
+ * `/profil` empilait onze blocs dans un seul formulaire, sans un titre pour dire
+ * où l'on passait d'un sujet à l'autre, et avec le bouton qui efface le compte
+ * au fil du texte, sous la même apparence qu'un réglage.
+ *
+ * Le registre nomme les sections **une fois** et sert deux lecteurs : la
+ * navigation d'ancres et les titres. Deux listes auraient dérivé, et la dérive
+ * se serait vue sous la forme d'un lien qui ne mène nulle part —
+ * `scrollIntoView` sur une ancre absente ne fait rien du tout, sans erreur.
+ */
+describe("Registre des sections", () => {
+  it("donne à chaque section une ancre, un titre et une promesse", () => {
+    for (const section of PROFILE_SECTIONS) {
+      expect(section.id).toMatch(/^[a-z]+$/);
+      expect(section.title.length).toBeGreaterThan(0);
+      expect(section.lead.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("n'emploie jamais deux fois la même ancre", () => {
+    const ids = PROFILE_SECTIONS.map((section) => section.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("finit par le compte — exporter et effacer ne sont pas des réglages", () => {
+    expect(PROFILE_SECTIONS[PROFILE_SECTIONS.length - 1].id).toBe("compte");
+  });
+});
+
+describe("visibleProfileSections", () => {
+  it("cache les invitations quand il n'y en a aucune", () => {
+    const ids = visibleProfileSections({ invitations: 0 }).map((s) => s.id);
+    expect(ids).not.toContain("invitations");
+  });
+
+  it("les montre dès la première", () => {
+    const ids = visibleProfileSections({ invitations: 1 }).map((s) => s.id);
+    expect(ids).toContain("invitations");
+  });
+
+  it("ne touche à rien d'autre", () => {
+    const withInvites = visibleProfileSections({ invitations: 2 });
+    expect(withInvites).toHaveLength(PROFILE_SECTIONS.length);
+  });
+
+  it("garde l'ordre du registre", () => {
+    const ids = visibleProfileSections({ invitations: 3 }).map((s) => s.id);
+    expect(ids).toEqual(PROFILE_SECTIONS.map((s) => s.id));
+  });
+});
+
+describe("La page descend du registre", () => {
+  it("bâtit sa navigation depuis les sections visibles", () => {
+    expect(page).toContain("visibleProfileSections({ invitations: invitations.length })");
+    expect(page).toContain('href={`#${entry.id}`}');
+  });
+
+  it("rend chaque section par le même composant", () => {
+    for (const section of PROFILE_SECTIONS) {
+      expect(page).toContain(`sectionById.${section.id}`);
+    }
+  });
+
+  it("ne réécrit aucun titre de section à la main", () => {
+    for (const section of PROFILE_SECTIONS) {
+      expect(page).not.toContain(`<h2>${section.title}</h2>`);
+    }
+  });
+
+  it("isole la suppression du compte dans sa propre section", () => {
+    const danger = page.slice(page.indexOf("sectionById.compte"));
+    expect(danger).toContain("onDeleteAccount");
+    expect(danger).toContain("dangerSection");
+  });
+});
+
+describe("La page dit ce qu'elle fait des identifiants", () => {
+  it("prévient que Blizzard réécrit le BattleTag", () => {
+    expect(page).toContain("BLIZZARD_BATTLETAG_NOTICE");
+  });
+
+  it("énonce l'exposition du tag Discord par la source partagée avec /connexion", () => {
+    expect(page).toContain("discordCertifiedNotice");
+    expect(page).toContain("DISCORD_TAG_UNVERIFIED_AUDIENCE");
+  });
+
+  it("ne recopie plus l'aide des tags de jeu deux fois", () => {
+    expect(page).toContain("GAME_TAG_NOTICE");
+    expect(page).not.toContain("jamais pour des statistiques");
+  });
+});
