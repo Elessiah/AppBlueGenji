@@ -401,10 +401,7 @@ select.modalInput {
 }
 
 /* L'apparence de la case vient de `globals.css` — posée sur l'élément, elle vaut
-   partout. Il ne reste ici que ce qui tient à cette ligne-ci. */
-.checkRow input {
-  align-self: center;
-}
+   partout. `.checkRow` centre déjà ses enfants : il ne reste rien à écrire ici. */
 
 .modalActions {
   display: flex;

@@ -539,14 +539,9 @@ export function PhaseCard({
                         hasThirdPlaceMatch: e.target.checked,
                       })
                     }
-                    style={{
-                      width: 18,
-                      height: 18,
-                      accentColor: "var(--blue-500)",
-                      cursor: "pointer",
-                      flexShrink: 0,
-                      marginTop: 2,
-                    }}
+                    // Taille, teinte et curseur viennent de `globals.css` :
+                    // les redire en ligne reprendrait la main sur la règle.
+                    style={{ marginTop: 2 }}
                   />
                   <div style={{ flex: 1 }}>
                     <label

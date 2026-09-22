@@ -18,6 +18,21 @@ const THEME_COLORS: Record<CocheTheme, { base: string; rgb: string }> = {
   equipe: { base: "#ff9d2e", rgb: "255,157,46" },
 };
 
+/**
+ * Le repère de focus ne se pose qu'au parcours **clavier**. `:focus-visible` est
+ * la seule façon de le dire, mais tous les moteurs ne connaissent pas le
+ * sélecteur : `matches()` lève alors une `SyntaxError` au beau milieu d'un
+ * gestionnaire React. On retombe donc sur « focus = repère », plus bavard
+ * qu'invisible.
+ */
+function isKeyboardFocus(element: HTMLInputElement): boolean {
+  try {
+    return element.matches(":focus-visible");
+  } catch {
+    return true;
+  }
+}
+
 export function Coche({
   label,
   checked,
@@ -50,14 +65,32 @@ export function Coche({
         transition: "border-color 0.15s, background 0.15s, box-shadow 0.15s",
       }}
     >
+      {/* `{...props}` passe **avant** : étalé après, un `onFocus` ou un `onBlur`
+          d'appelant remplacerait le relais et le repère clavier disparaîtrait
+          sans un mot. Les gestionnaires de l'appelant sont donc chaînés, et le
+          style de masquage reste le dernier — la pastille ne se voit que parce
+          que l'input, lui, ne se voit pas. */}
       <input
+        {...props}
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        onFocus={(e) => setFocused(e.currentTarget.matches(":focus-visible"))}
-        onBlur={() => setFocused(false)}
-        style={{ position: "absolute", opacity: 0, width: 0, height: 0, pointerEvents: "none" }}
-        {...props}
+        onFocus={(e) => {
+          props.onFocus?.(e);
+          setFocused(isKeyboardFocus(e.currentTarget));
+        }}
+        onBlur={(e) => {
+          props.onBlur?.(e);
+          setFocused(false);
+        }}
+        style={{
+          ...props.style,
+          position: "absolute",
+          opacity: 0,
+          width: 0,
+          height: 0,
+          pointerEvents: "none",
+        }}
       />
       <span
         style={{

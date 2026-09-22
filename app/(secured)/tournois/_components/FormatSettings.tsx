@@ -400,14 +400,10 @@ export function FormatSettings({
               disabled={locked("hasThirdPlaceMatch")}
               checked={values.hasThirdPlaceMatch}
               onChange={(e) => set("hasThirdPlaceMatch", e.target.checked)}
-              style={{
-                width: 18,
-                height: 18,
-                accentColor: "var(--blue-500)",
-                cursor: locked("hasThirdPlaceMatch") ? "not-allowed" : "pointer",
-                flexShrink: 0,
-                marginTop: 2,
-              }}
+              // Taille, teinte et curseur viennent de `globals.css` : les
+              // redire en ligne, c'est reprendre la main sur la règle et
+              // redonner à cet écran une case que ses voisins n'ont pas.
+              style={{ marginTop: 2 }}
               {...lockedAttr("hasThirdPlaceMatch")}
             />
             <div style={{ flex: 1 }}>

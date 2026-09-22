@@ -157,7 +157,7 @@
   display: grid;
   place-items: center;
 }
-.search input {
+.search input:not([type="checkbox"]) {
   flex: 1;
   background: transparent;
   border: none;

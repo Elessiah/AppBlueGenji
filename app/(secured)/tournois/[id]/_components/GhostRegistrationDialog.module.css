@@ -113,11 +113,9 @@
 }
 
 /* L'apparence de la case vient de `globals.css`, posée sur l'élément : la ligne
-   n'a plus à la redire — et `width: auto` la rendait justement à sa taille
-   système, celle dont il fallait sortir. */
-.option input {
-  align-self: center;
-}
+   n'a plus rien à en redire — et le `width: auto` qu'on trouvait ici la rendait
+   justement à sa taille système, celle dont il fallait sortir. `.option` centre
+   déjà ses enfants, il ne reste donc aucune règle à écrire. */
 
 .optionName {
   overflow: hidden;

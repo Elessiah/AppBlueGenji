@@ -408,7 +408,12 @@ select {
   color: var(--text-1);
 }
 
-.field input,
+/* `:not([type="checkbox"])` n'est pas décoratif : ces trois règles décrivent un
+   champ de saisie (largeur pleine, rembourrage, anneau vert au focus) et ont la
+   même spécificité que l'apparence de case posée plus bas — une case placée dans
+   un `.field` en héritait donc le rembourrage, qui, `appearance` retirée, la
+   rendait rectangulaire, et l'anneau vert au clic. */
+.field input:not([type="checkbox"]),
 .field textarea,
 .field select {
   width: 100%;
@@ -420,7 +425,7 @@ select {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
-.field input:focus,
+.field input:not([type="checkbox"]):focus,
 .field textarea:focus,
 .field select:focus {
   outline: none;
@@ -448,7 +453,7 @@ select {
   background-color: rgba(10, 11, 15, 0.92);
 }
 
-.field input:disabled,
+.field input:not([type="checkbox"]):disabled,
 .field textarea:disabled,
 .field select:disabled {
   opacity: 0.6;
@@ -1390,8 +1395,15 @@ html {
    La règle est donc posée sur l'élément lui-même plutôt que sur une classe ou un
    composant : une case ajoutée demain hérite de l'apparence sans que personne
    ait à s'en souvenir — c'est la seule façon de fermer une panne qui tient
-   justement à ce qu'on l'oublie. `.Coche` (pastille à part entière) masque son
-   input en ligne, donc en sort par spécificité, sans conflit.
+   justement à ce qu'on l'oublie. `Coche` (`components/Coche.tsx`, pastille à
+   part entière) n'y échappe pas par spécificité : son input reste habillé par
+   cette règle, mais il est masqué en ligne (`opacity: 0`, 0×0,
+   `pointer-events: none`), si bien que rien ne s'en peint.
+
+   Corollaire à tenir : une règle de feuille visant un `input` nu (`.x input`)
+   a la même spécificité que celle-ci et la déborde sur les propriétés qu'elle
+   déclare — d'où le `:not([type="checkbox"])` posé sur `.field input` plus
+   haut, et le test qui balaie les feuilles pour qu'aucune ne recommence.
 
    La coche est dessinée en `background-image` et non en `::after` : un input est
    un élément remplacé, ses pseudo-éléments ne sont pas garantis.
@@ -1403,6 +1415,10 @@ input[type="checkbox"] {
   width: 16px;
   height: 16px;
   margin: 0;
+  /* `padding: 0` n'est pas une redondance : la boîte est en `border-box`, si
+     bien qu'un rembourrage hérité d'une règle voisine repousse la taille
+     au-delà des 16 px demandés et rend la case rectangulaire. */
+  padding: 0;
   border: 1px solid var(--line-strong);
   border-radius: var(--r-cy-sm);
   background: rgba(10, 11, 15, 0.88);
