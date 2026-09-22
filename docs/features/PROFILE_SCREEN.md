@@ -74,9 +74,11 @@ n'y revient jamais, si bien qu'une URL collée déposait son lecteur en haut de 
 page — les liens de la navigation, eux, marchaient, parce qu'on clique forcément
 après la réponse. `profileSectionIdFromHash` reconnaît le fragment dans le
 registre (un fragment vient du navigateur, il ne désigne un élément qu'une fois
-reconnu), et le saut ne se joue **qu'une fois par ancre** : les invitations
-arrivant par un second appel, rejouer le saut ramènerait en arrière un lecteur
-qui a déjà fait défiler la page.
+reconnu). L'ancre demandée est lue **une seule fois, au montage**, et le saut ne
+se joue qu'une fois : `window.location.hash` garde le dernier lien cliqué et
+`data` est remplacé à chaque sauvegarde, si bien que relire le fragment
+remonterait le lecteur à la section visitée dix minutes plus tôt au moment où il
+enregistre son profil depuis une autre.
 
 `scroll-margin-top` vaut la hauteur d'`ArenaNav` (52 px de pastille + 2 × 14 px
 de rembourrage) **plus** une respiration : la barre est `position: sticky`, si
@@ -137,9 +139,15 @@ les deux écrans qui les affichent y puisent :
 | --- | --- |
 | `DISCORD_TAG_AUDIENCE` | Qui lit un tag certifié : les administrateurs toujours, l'arbitrage pendant un tournoi, **jamais personne d'autre**. |
 | `DISCORD_TAG_UNVERIFIED_AUDIENCE` | Ce qu'un tag non certifié vaut : rien, pour personne — et l'organisation ne peut pas joindre le joueur. |
-| `DISCORD_CERTIFICATION_UNDO` | Le seul geste qui défait la certification (il n'existe aucune route de décertification). |
+| `DISCORD_CERTIFICATION_UNDO` | Le seul geste qui défait la certification (il n'existe aucune route de décertification) — **le retrait du tag**, et non sa modification : un tag certifié appartient à un compte rattaché, dont le champ est en lecture seule. |
 | `BLIZZARD_BATTLETAG_NOTICE` | Blizzard renseigne le BattleTag et **remplace** la saisie à chaque connexion. |
 | `GAME_TAG_NOTICE` | Les identifiants de jeu servent à s'ajouter entre joueurs, jamais à des statistiques. |
+
+Sur `/profil`, le cas « certifié » est énoncé par la **phrase du verrou** et non
+par `discordCertifiedNotice` : un tag certifié appartient toujours à un compte
+rattaché (`writeVerifiedTag` écrit `discord_id`, et détacher Discord décertifie),
+donc le champ est toujours verrouillé — une branche « certifié, non verrouillé »
+n'aurait jamais été rendue.
 
 L'**entrée en matière** diffère selon l'écran (« Te connecter par Discord
 certifie ce tag » à la connexion, « Tag certifié » sur le profil) ; ce qui suit ne

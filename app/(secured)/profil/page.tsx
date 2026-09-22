@@ -18,7 +18,6 @@ import {
   BLIZZARD_BATTLETAG_NOTICE,
   DISCORD_TAG_UNVERIFIED_AUDIENCE,
   GAME_TAG_NOTICE,
-  discordCertifiedNotice,
 } from "@/lib/shared/identity-sharing";
 import {
   PROFILE_SECTION_BY_ID,
@@ -176,22 +175,25 @@ export default function ProfilePage() {
    * de la page. Les liens de la navigation marchaient, eux, parce qu'on clique
    * forcément après la réponse.
    *
-   * Une seule fois par ancre (`honouredHash`) : les invitations arrivent par un
-   * second appel, si bien que l'effet repasse, et rejouer le saut ramènerait en
-   * arrière un lecteur qui a déjà fait défiler la page.
+   * L'ancre demandée est lue **une seule fois, au montage**, et non à chaque
+   * passage de l'effet : `window.location.hash` garde le dernier lien cliqué,
+   * et `data` est remplacé à chaque sauvegarde — relire le fragment aurait
+   * remonté le lecteur à la section qu'il avait visitée dix minutes plus tôt au
+   * moment où il enregistre son profil depuis une autre.
    */
-  const honouredHash = useRef<string | null>(null);
+  const [requestedSection] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : profileSectionIdFromHash(window.location.hash),
+  );
+  const sectionHonoured = useRef(false);
   useEffect(() => {
-    if (!data) return;
-    const id = profileSectionIdFromHash(window.location.hash);
-    if (!id || honouredHash.current === id) return;
+    if (!data || !requestedSection || sectionHonoured.current) return;
     // Une section conditionnelle peut n'être pas encore là : on retentera au
-    // prochain rendu plutôt que de marquer l'ancre comme honorée.
-    const target = document.getElementById(id);
+    // prochain rendu plutôt que de tenir le saut pour fait.
+    const target = document.getElementById(requestedSection);
     if (!target) return;
-    honouredHash.current = id;
+    sectionHonoured.current = true;
     target.scrollIntoView({ block: "start" });
-  }, [data, invitations.length]);
+  }, [data, invitations.length, requestedSection]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -633,15 +635,18 @@ export default function ProfilePage() {
                 </button>
               </div>
             )}
-            {/* L'exposition est énoncée ici comme sur `/connexion`, et par la
-                même source : c'est une promesse, elle ne doit pas différer d'un
-                écran à l'autre. */}
+            {/* **Deux cas seulement, et non trois.** Un tag certifié appartient
+                forcément à un compte rattaché — `writeVerifiedTag` écrit
+                `discord_id`, et détacher Discord décertifie —, donc `verified`
+                implique `discordLocked` : la branche « certifié, non verrouillé »
+                ne pouvait jamais être atteinte. C'est la phrase du verrou qui
+                énonce alors l'exposition. L'annonce du tag **non** certifié, elle,
+                vient de la source partagée avec `/connexion` : c'est une promesse,
+                elle ne doit pas différer d'un écran à l'autre. */}
             <p id="profile-discord-hint" className={s.hint}>
               {discordLocked
                 ? discordTagLockNotice(discordState)
-                : discordState.verified
-                  ? discordCertifiedNotice("Tag certifié")
-                  : `Tag non certifié : ${DISCORD_TAG_UNVERIFIED_AUDIENCE} Certifie-le pour qu'elle puisse le faire.`}
+                : `Tag non certifié : ${DISCORD_TAG_UNVERIFIED_AUDIENCE} Certifie-le pour qu'elle puisse le faire.`}
             </p>
           </div>
         </ProfileSection>

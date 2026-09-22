@@ -243,10 +243,24 @@
   transform: none;
 }
 
+/* Le survol du `.btn` global éclaircit le fond : il faut le rendre à chaque
+   variante, et non poser le bleu du bouton principal pour tout le monde — la
+   règle, plus spécifique que `.btn.ghost`, **bleuissait** au survol les boutons
+   en retrait (« Retirer mon tag », « Supprimer » l'avatar, « Retirer » une
+   application), c'est-à-dire qu'un bouton refusé se faisait plus voyant que le
+   même bouton actif. */
 .page :global(.btn:disabled:hover) {
   background: rgba(89, 212, 255, 0.14);
   transform: none;
   box-shadow: none;
+}
+
+.page :global(.btn.ghost:disabled:hover) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.page :global(.btn.danger:disabled:hover) {
+  background: rgba(var(--danger-rgb), 0.14);
 }
 
 /* Le reflet balayant du `.btn` global se déclenche au survol : il donne, seul,

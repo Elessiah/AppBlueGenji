@@ -41,14 +41,21 @@ export const DISCORD_TAG_UNVERIFIED_AUDIENCE =
   "personne ne le voit, pas même les administrateurs. L'organisation ne peut donc pas te joindre pendant un tournoi.";
 
 /**
- * Le geste qui défait la certification.
+ * Le geste qui défait la certification — **celui qui existe à l'écran**.
  *
  * Il est nommé partout où l'exposition est annoncée : il faut savoir qu'il y a
- * quelque chose à annuler, et c'est le **seul** chemin — il n'existe aucune
- * route de décertification.
+ * quelque chose à annuler, et c'est le **seul** chemin, il n'existe aucune route
+ * de décertification.
+ *
+ * La phrase disait « modifier ton tag », ce que le moteur fait bien (toute
+ * écriture du tag efface `discord_verified_at`) mais que le joueur ne peut pas
+ * faire : un tag certifié appartient à un compte **rattaché**, et `/profil`
+ * rend alors le champ en lecture seule — Discord possède le pseudo. Le geste
+ * offert est le retrait, et nommer celui qui n'existe plus laissait le lecteur
+ * chercher un champ qu'il ne peut pas remplir.
  */
 export const DISCORD_CERTIFICATION_UNDO =
-  "Modifier ton tag annule la certification.";
+  "Pour l'annuler, retire ton tag depuis « Mon profil ».";
 
 /**
  * Blizzard **écrit** le BattleTag, et l'écrase à chaque connexion.

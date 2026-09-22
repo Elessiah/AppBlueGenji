@@ -43,10 +43,12 @@ describe("connexion Discord — annonce de la certification", () => {
     expect(SOURCE).toContain("DISCORD_TAG_AUDIENCE");
   });
 
-  it("nomme le geste d'annulation", () => {
-    // Il n'y a pas de route de décertification : modifier le tag *est* le geste.
-    // Le taire laisserait le lecteur sans aucune issue.
-    expect(DISCORD_CERTIFICATION_UNDO).toMatch(/annule la certification/i);
+  it("nomme le geste d'annulation, et celui qui existe à l'écran", () => {
+    // Il n'y a pas de route de décertification, et le taire laisserait le
+    // lecteur sans aucune issue. Mais se connecter par Discord **rattache** le
+    // compte, ce qui met le champ de `/profil` en lecture seule : « modifie ton
+    // tag » désignait alors le seul geste que ce lecteur ne peut plus faire.
+    expect(DISCORD_CERTIFICATION_UNDO).toMatch(/retire ton tag/i);
     expect(SOURCE).toContain("DISCORD_CERTIFICATION_UNDO");
   });
 

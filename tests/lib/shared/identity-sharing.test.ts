@@ -44,8 +44,12 @@ describe("DISCORD_CERTIFICATION_UNDO", () => {
   it("nomme le seul geste qui défait la certification", () => {
     // Il n'existe aucune route de décertification : modifier le tag *est* le
     // geste, et le taire laisserait le lecteur sans issue.
-    expect(DISCORD_CERTIFICATION_UNDO).toMatch(/modifier ton tag/i);
-    expect(DISCORD_CERTIFICATION_UNDO).toMatch(/annule la certification/i);
+    // Le geste nommé doit **exister à l'écran** : un tag certifié appartient à
+    // un compte rattaché, dont `/profil` rend le champ en lecture seule. « Le
+    // modifier » n'est donc plus à la portée du joueur, « le retirer » l'est.
+    expect(DISCORD_CERTIFICATION_UNDO).toMatch(/retire ton tag/i);
+    expect(DISCORD_CERTIFICATION_UNDO).toMatch(/mon profil/i);
+    expect(DISCORD_CERTIFICATION_UNDO).not.toMatch(/modifier ton tag/i);
   });
 });
 

@@ -117,8 +117,14 @@ describe("La page dit ce qu'elle fait des identifiants", () => {
   });
 
   it("énonce l'exposition du tag Discord par la source partagée avec /connexion", () => {
-    expect(page).toContain("discordCertifiedNotice");
     expect(page).toContain("DISCORD_TAG_UNVERIFIED_AUDIENCE");
+  });
+
+  it("n'écrit pas de branche que l'état ne peut pas atteindre", () => {
+    // `verified` implique `linked` (`writeVerifiedTag` écrit `discord_id`, et
+    // détacher Discord décertifie), donc implique `discordLocked` : une branche
+    // « certifié, non verrouillé » ne serait jamais rendue.
+    expect(page).not.toContain("discordCertifiedNotice");
   });
 
   it("ne recopie plus l'aide des tags de jeu deux fois", () => {
@@ -171,9 +177,19 @@ describe("profileSectionIdFromHash", () => {
 });
 
 describe("La page rejoue le saut vers l'ancre", () => {
-  it("relit le fragment par la fonction du registre une fois le profil chargé", () => {
+  it("lit le fragment par la fonction du registre", () => {
     expect(page).toContain("profileSectionIdFromHash(window.location.hash)");
-    expect(page).toContain("honouredHash");
+  });
+
+  it("le lit une seule fois, au montage, et non à chaque rafraîchissement", () => {
+    // `data` est remplacé à chaque sauvegarde : relire `window.location.hash`
+    // à ce moment-là ramènerait le lecteur à l'ancre cliquée bien plus tôt.
+    const capture = page.indexOf("profileSectionIdFromHash(window.location.hash)");
+    const effect = page.indexOf("sectionHonoured.current = true");
+    expect(capture).toBeLessThan(effect);
+    expect(page).toContain("useState<string | null>(() =>");
+    const effectBody = page.slice(page.indexOf("if (!data || !requestedSection"), effect);
+    expect(effectBody).not.toContain("window.location.hash");
   });
 
   it("indexe par le registre total et non par la liste filtrée", () => {
