@@ -145,14 +145,24 @@ describe("/bot — l'état d'un serveur se lit en français", () => {
     expect(css).toMatch(/\.srv-col-qualifier \{ display: none; \}/);
   });
 
-  it("ne laisse pas un nombre déborder d'une piste qui ne peut pas s'élargir", () => {
-    // Corollaire des pistes fixes : `min-width: auto` vaut le contenu, donc un
-    // nombre plus large que sa piste ne l'élargit pas — il déborde sur la
-    // colonne voisine. Et le séparateur de milliers du `fr-FR` est une espace
-    // insécable : il n'y a même pas de renvoi possible.
-    expect(css).toMatch(/\.srv-num \{[^}]*min-width: 0;/);
-    expect(css).toMatch(/\.srv-num \{[^}]*overflow: hidden;/);
+  it("ne coupe jamais un nombre — un nombre rogné est un autre nombre", () => {
+    // Le texte est aligné à droite : un `overflow: hidden` rognerait les
+    // chiffres de gauche, et « 1 234 567 » s'afficherait « 234 567 ». Un
+    // débordement se voit ; un nombre faux, non.
     expect(css).toMatch(/\.srv-num \{[^}]*white-space: nowrap;/);
+    expect(css).not.toMatch(/\.srv-num \{[^}]*overflow: hidden;/);
+    expect(css).not.toMatch(/\.srv-num \{[^}]*text-overflow:/);
+  });
+
+  it("rend sa place au nom du serveur sur les écrans les plus étroits", () => {
+    // Les pistes fixes ne laissaient que ~28 px de texte au nom à 360 px. Le
+    // compte de membres part à son tour — en-tête ET cellule, sans quoi les
+    // colonnes du `role="table"` ne correspondraient plus aux cellules.
+    const narrow = css.match(/@media \(max-width: 440px\) \{[\s\S]*?\n\}\n/);
+    expect(narrow).not.toBeNull();
+    expect(narrow![0]).toContain("grid-template-columns: 22px 1fr 86px;");
+    expect(narrow![0]).toContain(".srv-head > span:nth-child(3)");
+    expect(narrow![0]).toContain(".srv-row > span:nth-child(3)");
   });
 
   it("resserre le tableau là où la colonne de gauche est la plus étroite", () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
 import { BotStatusStrip } from "@/components/bot/BotStatusStrip";
+import { BotLatencyCard } from "@/components/bot/BotLatencyCard";
 import type { BotStatus } from "@/lib/shared/types";
 
 /**
@@ -102,5 +103,38 @@ describe("BotStatusStrip — une charge amputée ne fait pas tomber la page", ()
       <BotStatusStrip status={{ ...status(), buildHash: undefined } as unknown as BotStatus} />,
     );
     expect(html).toContain("2.4.1");
+  });
+});
+
+describe("BotLatencyCard — la même charge, la même garde", () => {
+  it("rend sans lever sur des mesures de mauvais type", () => {
+    // La carte reçoit le **même** objet que la bande : le durcir d'un côté
+    // seulement laisserait la page tomber en 500 par l'autre, et l'invariant
+    // annoncé plus haut serait faux.
+    const broken = {
+      ...status(),
+      cpuUsage: "12%",
+      ramUsage: null,
+      gatewayLatency: Number.NaN,
+    } as unknown as BotStatus;
+    const html = renderToStaticMarkup(<BotLatencyCard status={broken} />);
+    expect(html).toContain("CPU");
+    expect(html).not.toContain("NaN");
+  });
+
+  it("borne les barres des deux côtés", () => {
+    // Une largeur négative est une déclaration invalide : le navigateur la
+    // laisse tomber, et la barre garde celle du rendu précédent.
+    const html = renderToStaticMarkup(
+      <BotLatencyCard
+        status={{ ...status(), cpuUsage: -40, ramUsage: 999_999 } as unknown as BotStatus}
+      />,
+    );
+    const widths = [...html.matchAll(/width:(-?[\d.]+)%/g)].map((m) => Number(m[1]));
+    expect(widths).toHaveLength(3);
+    for (const width of widths) {
+      expect(width).toBeGreaterThanOrEqual(0);
+      expect(width).toBeLessThanOrEqual(100);
+    }
   });
 });

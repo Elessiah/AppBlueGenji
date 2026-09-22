@@ -16,7 +16,13 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
   // JSON reçu. Un `?? []` ne rattrape que `null` — une charge qui rangerait
   // les serveurs par identifiant passerait tout droit et `list.map` rendrait
   // la page entière en 500.
-  const list = Array.isArray(servers) ? servers : [];
+  // …et le `filter` ne fait pas double emploi avec l'`Array.isArray` : une
+  // charge `{"servers": [null]}` est un tableau, elle passe la première garde,
+  // et `s.status` lève au premier tour de boucle — exactement le 500 que la
+  // ligne au-dessus vient d'écarter, une indirection plus loin.
+  const list = (Array.isArray(servers) ? servers : []).filter(
+    (s): s is BotServerEntry => s !== null && typeof s === "object",
+  );
 
   return (
     <section className="panel">
@@ -56,7 +62,12 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
           // quelque cent mille points, c'est un `RangeError` — une charge du bot
           // suffirait à rendre la page en 500. Un `reduce` n'a pas de pile à
           // remplir.
-          const peak = sparkline.reduce((max, v) => Math.max(max, v ?? 0), 1);
+          // `Number.isFinite` et non `v ?? 0` : ce dernier ne rattrape que `null`
+          // et `undefined`. Un point en chaîne rendait `Math.max` `NaN`, qui
+          // empoisonne tous les tours suivants — et chaque barre sortait en
+          // `height: NaN%`, donc une colonne « tendance » vide sans une erreur.
+          const point = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+          const peak = sparkline.reduce<number>((max, v) => Math.max(max, point(v)), 1);
           return (
             <div key={s.id} className="srv-row" role="row">
               <span className="srv-rank" role="cell">{String(rank + 1).padStart(2, "0")}</span>
@@ -88,7 +99,7 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
                   « TENDANCE » reste en face des autres colonnes. */}
               <span className="srv-spark" role="cell">
                 {sparkline.map((v, i) => (
-                  <span key={i} aria-hidden="true" style={{ height: `${((v ?? 0) / peak) * 100}%` }} />
+                  <span key={i} aria-hidden="true" style={{ height: `${(point(v) / peak) * 100}%` }} />
                 ))}
               </span>
             </div>

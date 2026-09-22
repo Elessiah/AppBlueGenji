@@ -141,3 +141,29 @@ describe("BotServersTable — une charge abîmée ne fait pas tomber la page", (
     expect(html).not.toContain("Infinity");
   });
 });
+
+describe("BotServersTable — la charge n'est pas validée, une case fade vaut mieux qu'un 500", () => {
+  it("écarte une entrée nulle plutôt que de lever au premier tour de boucle", () => {
+    // `{"servers": [null]}` est un tableau : il passe l'`Array.isArray`, et
+    // `s.status` lève juste après — le 500 que la garde était censée écarter.
+    const html = renderToStaticMarkup(
+      <BotServersTable
+        servers={[null, server({ id: "9", name: "Vertex" }), undefined] as unknown as BotServerEntry[]}
+      />,
+    );
+    expect(html).toContain("Vertex");
+    expect(html).toContain("1 ACTIFS");
+  });
+
+  it("ne laisse pas un point non numérique éteindre toute la colonne tendance", () => {
+    // `Math.max(1, "n/a")` rend `NaN`, qui empoisonne chaque tour suivant :
+    // toutes les barres sortaient en `height: NaN%`, sans une erreur.
+    const html = renderToStaticMarkup(
+      <BotServersTable
+        servers={[server({ sparkline: [4, "n/a", 8, null] as unknown as number[] })]}
+      />,
+    );
+    expect(html).not.toContain("NaN");
+    expect(html).toContain("height:100%");
+  });
+});

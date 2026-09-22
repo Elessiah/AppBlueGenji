@@ -396,14 +396,14 @@
   font-size: 12px;
   color: var(--ink);
   text-align: right;
-  /* Les pistes chiffrées sont **fixes** (c'est ce qui aligne l'en-tête, qui est
-     une grille séparée) : un nombre trop large ne les élargit pas, il déborde
-     sur la colonne voisine — `min-width: auto` vaut le contenu, et le séparateur
-     de milliers du `fr-FR` est une espace insécable, donc sans renvoi possible.
-     La piste est dimensionnée pour sept chiffres ; au-delà, on coupe la cellule
-     plutôt que de décaler la ligne. */
-  min-width: 0;
-  overflow: hidden;
+  /* Un nombre ne se coupe pas : le texte étant aligné à droite, un
+     `overflow: hidden` rognerait les chiffres de **gauche**, et « 1 234 567 »
+     s'afficherait « 234 567 » — un nombre faux, parfaitement lisible, sans le
+     moindre signe qu'il manque quelque chose. C'est la pire des deux issues.
+     Les pistes chiffrées sont donc dimensionnées pour sept chiffres et leurs
+     séparateurs ; au-delà, la cellule déborde, ce qui **se voit**. Reste le
+     `nowrap` : le séparateur de milliers du `fr-FR` est une espace insécable,
+     mais rien ne garantit que le bot n'envoie pas autre chose. */
   white-space: nowrap;
 }
 .srv-status {
@@ -679,4 +679,20 @@
   .bot-id { gap: 16px; }
   .status-strip { grid-template-columns: repeat(2, 1fr); }
   .bot-hero { flex-direction: column; gap: 24px; }
+}
+/* Sous ~440 px, deux colonnes chiffrées ne tiennent plus **sans manger le nom
+   du serveur** : à 360 px, les pistes fixes en laissaient 62 px, dont 34 pour
+   le sigil et sa gouttière — soit ~28 px de texte, c'est-à-dire un caractère
+   par ligne. Le compte de membres s'en va à son tour, comme les relais et la
+   tendance juste au-dessus, et pour la même raison : le nom est la seule
+   colonne qu'on ne peut ni abréger ni masquer. En-tête ET cellule, sans quoi
+   les colonnes du `role="table"` ne correspondraient plus aux cellules. */
+@media (max-width: 440px) {
+  .srv-head, .srv-row {
+    grid-template-columns: 22px 1fr 86px;
+  }
+  .srv-head > span:nth-child(3),
+  .srv-row > span:nth-child(3) {
+    display: none;
+  }
 }

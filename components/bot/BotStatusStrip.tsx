@@ -2,23 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { BotStatus } from "@/lib/shared/types";
-import { botStatusDisplay, botStatusOf, botStatusSummary } from "@/lib/shared/bot-status-summary";
-
-/**
- * Un champ de la charge du bot, ramené à du texte affichable — ou `null`.
- *
- * `fetchBotStatus` rend cette charge par un simple `as BotStatus` sur du JSON
- * reçu par le réseau : **aucun** de ces champs n'est garanti, malgré le type.
- * Un `.slice()` sur un `buildHash` absent, ou un `.active` sur un `shardCount`
- * absent, lève pendant le rendu — et comme la bande est rendue par un composant
- * serveur, c'est toute la page `/bot` qui part en 500. Une case fade vaut
- * infiniment mieux, et c'est déjà la règle du tableau d'à côté.
- */
-function field(value: unknown): string | null {
-  if (typeof value === "string") return value.length > 0 ? value : null;
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  return null;
-}
+import {
+  botStatusDisplay,
+  botStatusOf,
+  botStatusSummary,
+  botStatusText,
+} from "@/lib/shared/bot-status-summary";
 
 export function BotStatusStrip({ status }: { status: BotStatus | null }) {
   const [uptime, setUptime] = useState("—");
@@ -42,13 +31,13 @@ export function BotStatusStrip({ status }: { status: BotStatus | null }) {
   }, [status]);
 
   const statusLabel = botStatusOf(status);
-  const version = field(status?.version);
-  const buildHash = field(status?.buildHash);
+  const version = botStatusText(status?.version);
+  const buildHash = botStatusText(status?.buildHash);
   const versionLabel = version ? (buildHash ? `${version} · ${buildHash.slice(0, 4)}` : version) : "—";
-  const buildDate = field(status?.buildDate) ?? "—";
-  const latency = field(status?.gatewayLatency);
-  const shardsActive = field(status?.shardCount?.active);
-  const shardsTotal = field(status?.shardCount?.total);
+  const buildDate = botStatusText(status?.buildDate) ?? "—";
+  const latency = botStatusText(status?.gatewayLatency);
+  const shardsActive = botStatusText(status?.shardCount?.active);
+  const shardsTotal = botStatusText(status?.shardCount?.total);
   const shards =
     shardsActive && shardsTotal
       ? `${shardsActive.padStart(2, "0")} / ${shardsTotal.padStart(2, "0")}`
