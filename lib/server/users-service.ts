@@ -3,8 +3,8 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/prom
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
 import {
-  accountDeletionMode,
-  type AccountDeletionMode,
+  accountDeletionPlan,
+  type AccountDeletionPlan,
   type AccountTrace,
 } from "@/lib/shared/account-deletion";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
@@ -945,11 +945,12 @@ export async function updateOwnProfile(
 }
 
 /**
- * Anonymise (« supprime ») le compte de l'utilisateur : toutes les données
- * personnelles sont effacées et les moyens de connexion révoqués, mais les
- * statistiques et l'historique générés par la plateforme sont conservés
- * (les adhésions d'équipe restent rattachées à un profil anonyme).
+ * Pool ou connexion de transaction : la lecture des traces se fait sur l'une ou
+ * sur l'autre selon qu'on **informe** (route de prévisualisation, hors
+ * transaction) ou qu'on **écrit** (suppression, sous verrou).
  */
+type SqlRunner = Pick<PoolConnection, "execute">;
+
 /**
  * Ce que ce compte laisse derrière lui, en **une** requête.
  *
@@ -962,13 +963,6 @@ export async function updateOwnProfile(
  * L'engagement se lit sur **toute** appartenance, close comprise : un joueur
  * parti d'une équipe a tout de même joué ses matchs sous ses couleurs.
  */
-/**
- * Pool ou connexion de transaction : la lecture des traces se fait sur l'une ou
- * sur l'autre selon qu'on **informe** (route de prévisualisation, hors
- * transaction) ou qu'on **écrit** (suppression, sous verrou).
- */
-type SqlRunner = Pick<PoolConnection, "execute">;
-
 async function loadAccountTrace(
   runner: SqlRunner,
   userId: number,
@@ -1024,9 +1018,9 @@ async function loadAccountTrace(
  * instantané. Rien n'interdit qu'un tournoi soit créé entre les deux, et c'est
  * l'écriture qui fait foi.
  */
-export async function getAccountDeletionMode(userId: number): Promise<AccountDeletionMode> {
+export async function getAccountDeletionPlan(userId: number): Promise<AccountDeletionPlan> {
   const db = await getDatabase();
-  return accountDeletionMode(await loadAccountTrace(db, userId));
+  return accountDeletionPlan(await loadAccountTrace(db, userId));
 }
 
 /**
@@ -1051,12 +1045,14 @@ export async function getAccountDeletionMode(userId: number): Promise<AccountDel
  * — `bg_teams.solo_user_id` en particulier, que `ensureSoloEntry` verrouille de
  * son côté.
  *
- * Rend le mode appliqué, pour que la route puisse le dire au joueur.
+ * Rend le plan appliqué — le mode **et** le motif —, pour que la route puisse
+ * le dire au joueur : « tes statistiques restent » ne veut rien dire à qui n'en
+ * a aucune et dont la ligne n'est retenue que par une équipe à transférer.
  */
-export async function deleteOwnAccount(userId: number): Promise<AccountDeletionMode> {
+export async function deleteOwnAccount(userId: number): Promise<AccountDeletionPlan> {
   const db = await getDatabase();
   const connection = await db.getConnection();
-  let mode: AccountDeletionMode;
+  let plan: AccountDeletionPlan;
   // Le fichier de l'avatar, relevé **avant** l'effacement : la ligne partie, son
   // chemin ne se retrouve plus. Il ne part qu'après le commit — un `unlink` ne
   // se défait pas, et une transaction annulée rendrait un compte vivant sans sa
@@ -1082,9 +1078,9 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionM
     if (locked.length === 0) throw new Error("USER_NOT_FOUND");
     orphanedAvatar = toDiskUploadPath(locked[0].avatar_url);
 
-    mode = accountDeletionMode(await loadAccountTrace(connection, userId));
+    plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
 
-    if (mode === "ERASE") {
+    if (plan.mode === "ERASE") {
       await eraseAccount(connection, userId);
     } else {
       await anonymizeAccount(connection, userId);
@@ -1109,7 +1105,7 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionM
     // Fichier verrouillé ou disque en lecture seule : un résidu, pas un échec.
   }
 
-  return mode;
+  return plan;
 }
 
 /**

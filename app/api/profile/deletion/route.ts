@@ -13,10 +13,12 @@
  */
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { getAccountDeletionMode } from "@/lib/server/users-service";
+import { getAccountDeletionPlan } from "@/lib/server/users-service";
 
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  return ok({ mode: await getAccountDeletionMode(user.id) });
+  // Le plan entier — mode **et** motif : la phrase de confirmation nomme ce qui
+  // retient la ligne, et le mode seul ne le dit pas.
+  return ok(await getAccountDeletionPlan(user.id));
 }

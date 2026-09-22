@@ -115,13 +115,34 @@ cas et promettait la conservation des statistiques à des comptes qui n'en ont
 aucune ; le joueur qui n'a jamais joué a droit à la vraie réponse — il ne restera
 rien.
 
+Le **mode ne suffit pas** à la rédiger. « Tes statistiques de tournoi resteront
+conservées — elles appartiennent aussi aux équipes que tu as affrontées » est
+vrai d'un joueur qui a joué, et faux de celui dont la ligne n'est retenue que par
+une équipe qu'il possède ou par un tournoi qu'il a organisé : il n'a aucune
+statistique et n'a affronté personne. Le plan porte donc le **motif**
+(`AccountRetentionReason`), une phrase par motif, et celle du propriétaire
+d'équipe nomme **le geste qui lèverait la conservation** — transférer ou
+dissoudre l'équipe. Refuser un effacement complet sans dire ce qui l'ouvrirait
+serait le plus désagréable des deux refus. Mode et motif sont construits par
+`accountDeletionPlan` et par lui seul : calculés séparément, ils pourraient se
+contredire dans une même réponse.
+
 `GET /api/profile/deletion` rend le mode sans rien écrire, appelé **sur le chemin
 de la suppression** et jamais au chargement du profil : la réponse ne change pas
 quand la fiche change, et trois `EXISTS` à chaque visite pour une question que
 presque personne ne pose seraient du gaspillage. Ce n'est pas une promesse :
 `DELETE /api/profile` repose la question sur son propre instantané et **rend le
-mode appliqué**, que le message de succès reprend. Un aperçu injoignable retombe
+plan appliqué**, que le message de succès reprend — le `mode` servant de témoin
+de réponse, un motif `null` étant une réponse (« rien ne retient la ligne ») et
+non une absence. Un aperçu injoignable retombe
 sur la phrase la plus prudente, celle qui promet le moins d'effacement.
+
+Le bouton se ferme **avant** l'aller-retour d'aperçu, et non après la
+confirmation : `window.confirm` bloquait à lui seul le second clic tant qu'il
+était la première instruction du gestionnaire, mais un `await` posé devant lui
+rouvre la fenêtre — deux clics, deux confirmations, deux `DELETE`, dont le second
+échoue en 400 et affiche une erreur juste après le succès. Une annulation le
+rouvre.
 
 ## Les comptes anonymisés à l'annuaire
 

@@ -9,7 +9,8 @@ import type { FullProfileResponse } from "@/lib/shared/types";
 import {
   accountDeletionConfirmation,
   accountDeletionOutcome,
-  type AccountDeletionMode,
+  type AccountDeletionPlan,
+  type AccountRetentionReason,
 } from "@/lib/shared/account-deletion";
 import { useToast } from "@/components/ui/toast";
 import { TeamLink } from "@/components/entity-link";
@@ -162,27 +163,41 @@ export default function ProfilePage() {
   };
 
   const onDeleteAccount = async () => {
-    // Le mode est demandé **avant** la confirmation : « effacé » et
-    // « anonymisé » ne sont pas la même promesse, et le joueur a droit à celle
-    // qui le concerne. Le serveur repose la question à l'écriture — ceci
-    // informe, cela tranche.
-    let mode: AccountDeletionMode = "ANONYMIZE";
+    // Le bouton se ferme **avant** l'aller-retour d'aperçu, et non après la
+    // confirmation : `window.confirm` bloquait à lui seul le second clic tant
+    // qu'il était la première instruction, mais un `await` posé devant lui
+    // rouvre la fenêtre — deux clics, deux confirmations, deux `DELETE`, dont
+    // le second échoue en 400 et affiche une erreur juste après le succès.
+    if (deleting) return;
+    setDeleting(true);
+
+    // Le motif est demandé avant la confirmation : « effacé » et « anonymisé »
+    // ne sont pas la même promesse, et « tes statistiques restent » ne veut
+    // rien dire à qui n'en a aucune. Le serveur repose la question à l'écriture
+    // — ceci informe, cela tranche.
+    let reason: AccountRetentionReason | null = "TOURNAMENTS";
     try {
       const preview = await fetch("/api/profile/deletion", { cache: "no-store" });
-      if (preview.ok) mode = ((await preview.json()) as { mode: AccountDeletionMode }).mode;
+      if (preview.ok) reason = ((await preview.json()) as AccountDeletionPlan).reason;
     } catch {
       // Injoignable : on reste sur la phrase la plus prudente, celle qui promet
       // le moins d'effacement.
     }
-    if (!window.confirm(accountDeletionConfirmation(mode))) {
+    if (!window.confirm(accountDeletionConfirmation(reason))) {
+      setDeleting(false);
       return;
     }
-    setDeleting(true);
+
     try {
       const response = await fetch("/api/profile", { method: "DELETE" });
-      const payload = (await response.json()) as { error?: string; mode?: AccountDeletionMode };
+      const payload = (await response.json()) as { error?: string } & Partial<AccountDeletionPlan>;
       if (!response.ok) throw new Error(payload.error || "ACCOUNT_DELETE_FAILED");
-      showSuccess(accountDeletionOutcome(payload.mode ?? mode));
+      // `reason` vaut `null` sur un effacement complet : c'est une réponse, pas
+      // une absence de réponse. Le `mode` sert donc de témoin — il dit que le
+      // serveur a bien répondu, là où un `??` sur le motif retomberait sur
+      // l'aperçu au moment précis où le serveur annonce qu'il n'a rien gardé.
+      const applied = payload.mode ? payload.reason ?? null : reason;
+      showSuccess(accountDeletionOutcome(applied));
       setTimeout(() => {
         window.location.href = "/";
       }, 1200);

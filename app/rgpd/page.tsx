@@ -103,8 +103,9 @@ export default function RgpdPage() {
           </tbody>
         </table>
         <p style={{ marginTop: 16, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
-          * Un compte qui n'a participé à aucun tournoi est <strong>entièrement effacé</strong> à
-          sa suppression. Un compte qui a joué voit ses données de profil anonymisées immédiatement
+          * Un compte qui n'a participé à aucun tournoi, n'en a organisé aucun et n'est
+          propriétaire d'aucune équipe est <strong>entièrement effacé</strong> à sa suppression.
+          Sinon, ses données de profil sont anonymisées immédiatement
           (des copies de sauvegarde techniques peuvent subsister quelques jours). Les sessions
           (cookie <code>bg_session</code>) expirent 30 jours après la connexion.
         </p>
@@ -134,7 +135,10 @@ export default function RgpdPage() {
           avatar) sont anonymisées — le palmarès subsiste sous une forme neutre
           («&nbsp;Joueur supprimé&nbsp;») dans les archives. Un compte qui n'a jamais été
           engagé dans un tournoi n'a, lui, aucun palmarès à préserver : il est effacé
-          entièrement, sans ligne résiduelle.
+          entièrement, sans ligne résiduelle — à deux réserves près, où sa ligne reste parce
+          qu'elle est le titulaire de quelque chose qui survit : s'il a <strong>organisé</strong>
+          un tournoi, ou s'il est <strong>propriétaire d'une équipe</strong> (transférer ou
+          dissoudre l'équipe avant la suppression rétablit l'effacement complet).
         </div>
         <div className={styles.prose} style={{ marginTop: 20 }}>
           <p>

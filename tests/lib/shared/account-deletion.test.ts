@@ -3,6 +3,8 @@ import {
   accountDeletionConfirmation,
   accountDeletionMode,
   accountDeletionOutcome,
+  accountDeletionPlan,
+  accountRetentionReason,
   type AccountTrace,
 } from "@/lib/shared/account-deletion";
 
@@ -42,27 +44,101 @@ describe("accountDeletionMode", () => {
   });
 });
 
+describe("accountRetentionReason", () => {
+  it("ne retient rien quand rien ne reste", () => {
+    expect(accountRetentionReason(nothing)).toBeNull();
+  });
+
+  it("nomme la trace qui retient la ligne", () => {
+    expect(accountRetentionReason({ ...nothing, tournaments: true })).toBe("TOURNAMENTS");
+    expect(accountRetentionReason({ ...nothing, organizedTournaments: true }))
+      .toBe("ORGANIZED_TOURNAMENTS");
+    expect(accountRetentionReason({ ...nothing, ownedTeams: true })).toBe("OWNED_TEAMS");
+  });
+
+  it("préfère le tournoi joué : c'est la trace qui appartient aussi aux autres", () => {
+    expect(accountRetentionReason({
+      tournaments: true,
+      organizedTournaments: true,
+      ownedTeams: true,
+    })).toBe("TOURNAMENTS");
+    expect(accountRetentionReason({
+      tournaments: false,
+      organizedTournaments: true,
+      ownedTeams: true,
+    })).toBe("ORGANIZED_TOURNAMENTS");
+  });
+});
+
+describe("accountDeletionPlan", () => {
+  it("accorde toujours le mode et le motif — deux calculs séparés pourraient mentir", () => {
+    const traces: AccountTrace[] = [
+      nothing,
+      { ...nothing, tournaments: true },
+      { ...nothing, organizedTournaments: true },
+      { ...nothing, ownedTeams: true },
+    ];
+    for (const trace of traces) {
+      const plan = accountDeletionPlan(trace);
+      expect(plan.mode).toBe(accountDeletionMode(trace));
+      expect(plan.reason).toBe(accountRetentionReason(trace));
+      expect(plan.mode === "ERASE").toBe(plan.reason === null);
+    }
+  });
+});
+
 describe("accountDeletionConfirmation", () => {
   it("ne promet pas la conservation de statistiques inexistantes", () => {
-    const erase = accountDeletionConfirmation("ERASE");
+    const erase = accountDeletionConfirmation(null);
     expect(erase).toContain("aucun tournoi");
     expect(erase).not.toContain("statistiques de tournoi resteront");
   });
 
-  it("annonce la conservation des statistiques quand la ligne reste", () => {
-    expect(accountDeletionConfirmation("ANONYMIZE")).toContain("statistiques de tournoi");
+  it("annonce la conservation des statistiques à qui en a", () => {
+    expect(accountDeletionConfirmation("TOURNAMENTS")).toContain("statistiques de tournoi");
   });
 
-  it("dit dans les deux cas que le geste est irréversible", () => {
-    expect(accountDeletionConfirmation("ERASE")).toContain("irréversible");
-    expect(accountDeletionConfirmation("ANONYMIZE")).toContain("irréversible");
+  it("ne parle de statistiques ni au propriétaire d'équipe ni à l'organisateur", () => {
+    // Ils n'en ont aucune et n'ont affronté personne : le motif servi doit être
+    // le leur, sans quoi la phrase est fausse sur un geste irréversible.
+    for (const reason of ["ORGANIZED_TOURNAMENTS", "OWNED_TEAMS"] as const) {
+      expect(accountDeletionConfirmation(reason)).not.toContain("statistiques");
+      expect(accountDeletionConfirmation(reason)).not.toContain("affrontées");
+    }
+    expect(accountDeletionConfirmation("OWNED_TEAMS")).toContain("propriétaire d'une équipe");
+    expect(accountDeletionConfirmation("ORGANIZED_TOURNAMENTS")).toContain("organisateur");
+  });
+
+  it("dit au propriétaire d'équipe le geste qui ouvrirait l'effacement complet", () => {
+    const owned = accountDeletionConfirmation("OWNED_TEAMS");
+    expect(owned).toMatch(/[Tt]ransf/);
+    expect(owned).toContain("dissous");
+  });
+
+  it("dit dans tous les cas que le geste est irréversible", () => {
+    for (const reason of [null, "TOURNAMENTS", "ORGANIZED_TOURNAMENTS", "OWNED_TEAMS"] as const) {
+      expect(accountDeletionConfirmation(reason)).toContain("irréversible");
+    }
+  });
+
+  it("annonce l'anonymat dès qu'une ligne reste, et jamais sinon", () => {
+    for (const reason of ["TOURNAMENTS", "ORGANIZED_TOURNAMENTS", "OWNED_TEAMS"] as const) {
+      expect(accountDeletionConfirmation(reason)).toContain("anonyme");
+    }
+    expect(accountDeletionConfirmation(null)).not.toContain("anonyme");
   });
 });
 
 describe("accountDeletionOutcome", () => {
   it("décrit ce qui vient d'être fait, et pas l'autre cas", () => {
-    expect(accountDeletionOutcome("ERASE")).toContain("aucune trace");
-    expect(accountDeletionOutcome("ANONYMIZE")).toContain("anonyme");
-    expect(accountDeletionOutcome("ERASE")).not.toContain("anonyme");
+    expect(accountDeletionOutcome(null)).toContain("aucune trace");
+    expect(accountDeletionOutcome("TOURNAMENTS")).toContain("anonyme");
+    expect(accountDeletionOutcome(null)).not.toContain("anonyme");
+  });
+
+  it("ne promet pas de statistiques conservées à qui n'en a pas", () => {
+    expect(accountDeletionOutcome("ORGANIZED_TOURNAMENTS")).not.toContain("statistiques");
+    expect(accountDeletionOutcome("OWNED_TEAMS")).not.toContain("statistiques");
+    expect(accountDeletionOutcome("TOURNAMENTS")).toContain("statistiques");
   });
 });

@@ -54,6 +54,48 @@ export type AccountTrace = {
 export type AccountDeletionMode = "ERASE" | "ANONYMIZE";
 
 /**
+ * **Ce qui** retient la ligne — pas seulement qu'elle est retenue.
+ *
+ * Le mode ne suffit pas à parler au joueur. « Tes statistiques de tournoi
+ * resteront conservées — elles appartiennent aussi aux équipes que tu as
+ * affrontées » est vrai d'un joueur qui a joué, et **faux** de celui qui a
+ * seulement créé une équipe ou organisé un tournoi : il n'a aucune statistique
+ * et n'a affronté personne. Un motif inapplicable sur un geste irréversible est
+ * pire qu'une phrase vague — il fait croire qu'aucun geste ne lèverait la
+ * conservation, alors que dissoudre ou transférer son équipe la lèverait.
+ */
+export type AccountRetentionReason =
+  | "TOURNAMENTS"
+  | "ORGANIZED_TOURNAMENTS"
+  | "OWNED_TEAMS";
+
+/**
+ * Ce que la suppression fera, et pourquoi. Construit **ici** et nulle part
+ * ailleurs : le mode se déduit du motif, deux champs calculés séparément
+ * pourraient se contredire dans une même réponse.
+ */
+export type AccountDeletionPlan = {
+  mode: AccountDeletionMode;
+  /** `null` quand rien ne retient la ligne. */
+  reason: AccountRetentionReason | null;
+};
+
+/**
+ * La trace qui retient la ligne, ou `null` si aucune.
+ *
+ * L'ordre **est** la règle : une trace de tournoi joué explique la conservation
+ * mieux que les deux autres — c'est elle qui appartient aussi à d'autres —,
+ * puis l'organisation, puis la propriété d'une équipe, qui est la seule que le
+ * joueur puisse lever lui-même.
+ */
+export function accountRetentionReason(trace: AccountTrace): AccountRetentionReason | null {
+  if (trace.tournaments) return "TOURNAMENTS";
+  if (trace.organizedTournaments) return "ORGANIZED_TOURNAMENTS";
+  if (trace.ownedTeams) return "OWNED_TEAMS";
+  return null;
+}
+
+/**
  * Le mode, à partir des traces. Une seule trace suffit à retenir la ligne.
  *
  * Volontairement **conservateur** : dans le doute on anonymise, parce que les
@@ -62,29 +104,52 @@ export type AccountDeletionMode = "ERASE" | "ANONYMIZE";
  * défait.
  */
 export function accountDeletionMode(trace: AccountTrace): AccountDeletionMode {
-  const leavesSomething =
-    trace.tournaments || trace.organizedTournaments || trace.ownedTeams;
-  return leavesSomething ? "ANONYMIZE" : "ERASE";
+  return accountRetentionReason(trace) === null ? "ERASE" : "ANONYMIZE";
+}
+
+/** Le plan complet : ce qui va se passer, et ce qui l'impose. */
+export function accountDeletionPlan(trace: AccountTrace): AccountDeletionPlan {
+  const reason = accountRetentionReason(trace);
+  return { mode: reason === null ? "ERASE" : "ANONYMIZE", reason };
 }
 
 /**
  * La phrase de confirmation, qui doit **décrire ce qui va se passer**.
  *
  * Une seule phrase servait aux deux cas et promettait la conservation des
- * statistiques à des comptes qui n'en ont aucune. Le joueur qui n'a jamais joué
- * a droit à la vraie réponse : il ne restera rien.
+ * statistiques à des comptes qui n'en ont aucune. Chaque motif a donc la
+ * sienne, et celles qui nomment une conservation levable disent **le geste qui
+ * la lève** : on ne refuse pas un effacement complet à quelqu'un sans lui dire
+ * ce qui l'ouvrirait.
  */
-export function accountDeletionConfirmation(mode: AccountDeletionMode): string {
-  if (mode === "ERASE") {
-    return "Supprimer définitivement ton compte ? Tu n'as participé à aucun tournoi : ton compte sera effacé entièrement, sans laisser de trace sur le site. Cette action est irréversible.";
+export function accountDeletionConfirmation(
+  reason: AccountRetentionReason | null,
+): string {
+  const irreversible = "Cette action est irréversible.";
+  switch (reason) {
+    case "TOURNAMENTS":
+      return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées (le compte devient anonyme), mais tes statistiques de tournoi resteront conservées — elles appartiennent aussi aux équipes que tu as affrontées. ${irreversible}`;
+    case "ORGANIZED_TOURNAMENTS":
+      return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées (le compte devient anonyme), mais ta ligne restera : tu es l'organisateur de tournois qui doivent garder un titulaire. ${irreversible}`;
+    case "OWNED_TEAMS":
+      return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées (le compte devient anonyme), mais ta ligne restera : tu es propriétaire d'une équipe, que personne ne pourrait plus gérer sans toi. Transfère-la ou dissous-la d'abord pour un effacement complet. ${irreversible}`;
+    default:
+      return `Supprimer définitivement ton compte ? Tu n'as participé à aucun tournoi et ne gères ni équipe ni tournoi : ton compte sera effacé entièrement, sans laisser de trace sur le site. ${irreversible}`;
   }
-  return "Supprimer définitivement ton compte ? Tes informations personnelles seront effacées (le compte devient anonyme), mais tes statistiques de tournoi resteront conservées — elles appartiennent aussi aux équipes que tu as affrontées. Cette action est irréversible.";
 }
 
 /** Le message rendu une fois la suppression faite. */
-export function accountDeletionOutcome(mode: AccountDeletionMode): string {
-  if (mode === "ERASE") {
-    return "Compte effacé. Il ne reste aucune trace de ton passage sur le site.";
+export function accountDeletionOutcome(
+  reason: AccountRetentionReason | null,
+): string {
+  switch (reason) {
+    case "TOURNAMENTS":
+      return "Compte supprimé. Tes statistiques restent conservées de façon anonyme.";
+    case "ORGANIZED_TOURNAMENTS":
+      return "Compte supprimé. Tes tournois gardent un organisateur anonyme.";
+    case "OWNED_TEAMS":
+      return "Compte supprimé. Ton équipe garde un propriétaire anonyme.";
+    default:
+      return "Compte effacé. Il ne reste aucune trace de ton passage sur le site.";
   }
-  return "Compte supprimé. Tes statistiques restent conservées de façon anonyme.";
 }

@@ -5,7 +5,7 @@ jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
 jest.mock("@/lib/server/image-upload");
 
-import { deleteOwnAccount, getAccountDeletionMode } from "@/lib/server/users-service";
+import { deleteOwnAccount, getAccountDeletionPlan } from "@/lib/server/users-service";
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 
@@ -73,7 +73,7 @@ describe("deleteOwnAccount — effacement complet", () => {
   it("efface la ligne d'un compte qui n'a rien laissé", async () => {
     const { queries } = fakeDb(EMPTY);
 
-    expect(await deleteOwnAccount(7)).toBe("ERASE");
+    expect(await deleteOwnAccount(7)).toEqual({ mode: "ERASE", reason: null });
     expect(has(queries, "DELETE FROM bg_users")).toBe(true);
     expect(has(queries, "UPDATE bg_users SET pseudo")).toBe(false);
   });
@@ -109,13 +109,15 @@ describe("deleteOwnAccount — effacement complet", () => {
 
 describe("deleteOwnAccount — traces qui retiennent la ligne", () => {
   it.each([
-    ["un tournoi joué", { ...EMPTY, tournaments: 1 }],
-    ["un tournoi organisé", { ...EMPTY, organized: 1 }],
-    ["une équipe possédée", { ...EMPTY, owned: 1 }],
-  ])("anonymise sur %s", async (_label, trace) => {
+    ["un tournoi joué", { ...EMPTY, tournaments: 1 }, "TOURNAMENTS"],
+    ["un tournoi organisé", { ...EMPTY, organized: 1 }, "ORGANIZED_TOURNAMENTS"],
+    ["une équipe possédée", { ...EMPTY, owned: 1 }, "OWNED_TEAMS"],
+  ])("anonymise sur %s, et le dit", async (_label, trace, reason) => {
     const { queries } = fakeDb(trace);
 
-    expect(await deleteOwnAccount(7)).toBe("ANONYMIZE");
+    // Le motif remonte jusqu'à l'écran : « tes statistiques restent » ne veut
+    // rien dire à qui n'en a aucune.
+    expect(await deleteOwnAccount(7)).toEqual({ mode: "ANONYMIZE", reason });
     expect(has(queries, "DELETE FROM bg_users")).toBe(false);
     expect(has(queries, "compte_supprime_")).toBe(true);
   });
@@ -163,7 +165,7 @@ describe("loadAccountTrace — ce qu'on interroge", () => {
   it("pose les trois questions en une requête — un await entre elles les désaccorderait", async () => {
     const { queries } = fakeDb(EMPTY);
 
-    await getAccountDeletionMode(7);
+    await getAccountDeletionPlan(7);
 
     expect(queries).toHaveLength(1);
     expect(queries[0].sql).toContain("AS organized");
@@ -182,11 +184,11 @@ describe("loadAccountTrace — ce qu'on interroge", () => {
   });
 });
 
-describe("getAccountDeletionMode", () => {
+describe("getAccountDeletionPlan", () => {
   it("n'écrit rien", async () => {
     const { queries } = fakeDb(EMPTY);
 
-    expect(await getAccountDeletionMode(7)).toBe("ERASE");
+    expect(await getAccountDeletionPlan(7)).toEqual({ mode: "ERASE", reason: null });
     expect(queries.every((q) => q.sql.startsWith("SELECT"))).toBe(true);
   });
 });
@@ -268,6 +270,6 @@ describe("deleteOwnAccount — le fichier de l'avatar", () => {
     });
     fakeDb(EMPTY, { avatarUrl: "/api/uploads/avatars/7-gh.webp" });
 
-    await expect(deleteOwnAccount(7)).resolves.toBe("ERASE");
+    await expect(deleteOwnAccount(7)).resolves.toEqual({ mode: "ERASE", reason: null });
   });
 });

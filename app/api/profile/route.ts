@@ -49,11 +49,12 @@ export async function DELETE() {
   if (!user) return fail("UNAUTHORIZED", 401);
 
   try {
-    // Le mode voyage jusqu'à l'écran : « effacé » et « anonymisé » ne sont pas
-    // la même promesse, et c'est le serveur qui vient de trancher.
-    const mode = await deleteOwnAccount(user.id);
+    // Le plan voyage jusqu'à l'écran : « effacé » et « anonymisé » ne sont pas
+    // la même promesse, et le motif de la conservation encore moins — c'est le
+    // serveur qui vient de trancher les deux.
+    const plan = await deleteOwnAccount(user.id);
     await clearSession();
-    return ok({ deleted: true, mode });
+    return ok({ deleted: true, ...plan });
   } catch (error) {
     return fail((error as Error).message || "ACCOUNT_DELETE_FAILED", 400);
   }

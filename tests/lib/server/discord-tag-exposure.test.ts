@@ -149,7 +149,7 @@ describe("deleteOwnAccount — anonymisation", () => {
   it("garde la ligne d'un compte qui a joué", async () => {
     const { queries } = playedDb();
 
-    expect(await deleteOwnAccount(7)).toBe("ANONYMIZE");
+    expect((await deleteOwnAccount(7)).mode).toBe("ANONYMIZE");
     expect(find(queries, "DELETE FROM bg_users")).toBeUndefined();
   });
 });
