@@ -200,6 +200,19 @@ changé sous elle — et que `accountDeletedWriteMessage` met en français dans 
 notification. Ni l'un ni l'autre n'atteint la resynchronisation de l'entrée solo,
 qui est la moitié la plus visible du dégât.
 
+Les mêmes secondes séparent le contrôle de l'écriture sur deux chemins plus
+lourds, et ceux-là reposent une **porte d'entrée**. `writeVerifiedTag`
+(certification du tag Discord) écrit `discord_id`, et `linkOAuthIdentity` écrit
+`google_sub`, `discord_id` ou `blizzard_sub` : ce sont exactement les colonnes
+par lesquelles `createOrGetDiscordUser` et ses sœurs retrouvent un compte à la
+connexion, et que l'anonymisation met à `NULL`. Une certification lancée avant la
+suppression — un message privé, une saisie — ou un aller-retour OAuth de
+plusieurs secondes reprenait après le commit et rouvrait la porte, tag personnel
+certifié compris, republié à l'arbitrage par `canViewDiscordTag`. Les cinq
+variantes d'écriture portent donc `AND is_deleted = 0`, comme le **détachement**
+d'une identité le faisait déjà, et `loadDiscordRow` filtre lui aussi : leur
+`affectedRows = 0` retombe sur `PROFILE_NOT_FOUND`, qui est la vérité.
+
 Une ligne anonymisée reste par ailleurs **atteignable par son pseudo**
 (`compte_supprime_412` est un pseudo comme un autre), et c'est par là qu'on la
 rattachait encore à une équipe vivante. `getUserIdByPseudo` — l'unique traduction
@@ -213,6 +226,20 @@ séance tenante, et la reprise d'une fantôme en faisait un `OWNER` sans titulai
 L'autocomplétion d'ajout de membre applique le même écart côté écran
 (`!p.isDeleted`), non pour garder le secret mais pour ne pas proposer un nom qui
 ne mène qu'à un refus.
+
+Le pseudo n'est cependant pas le seul chemin vers un roster, et c'est le dernier
+qui restait ouvert : une **demande d'adhésion** (`kind = 'REQUEST'`) déposée
+avant la suppression reste `PENDING` — `bg_team_invitations` n'est purgée que par
+la cascade du mode « effacement » — et le gérant de l'équipe la voit comme une
+autre. L'accepter passe par `respondToInvitation`, qui travaille sur un
+**identifiant**, jamais sur un pseudo : aucun filtre de résolution ne l'atteint,
+et le compte supprimé rejoignait le roster séance tenante, réapparaissant sur la
+fiche d'équipe et « avec équipe » à l'annuaire. `anonymizeAccount` passe donc en
+`CANCELLED`, dans sa transaction, tout ce qui pend au nom du compte — demandes
+comme invitations, ces dernières n'ayant plus personne pour les accepter une fois
+les sessions et les identités parties. `CANCELLED` plutôt qu'un `DELETE` : la
+ligne ne nomme plus personne, et l'équipe garde la trace d'un échange qui a eu
+lieu.
 
 ## Quand la base refuse quand même
 

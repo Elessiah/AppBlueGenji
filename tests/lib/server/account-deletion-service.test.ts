@@ -136,6 +136,47 @@ describe("deleteOwnAccount — traces qui retiennent la ligne", () => {
 
     expect(has(queries, "DELETE FROM bg_user_sessions")).toBe(true);
   });
+
+  /**
+   * Le dernier chemin par lequel un compte supprimé rejoignait une équipe
+   * vivante. Une demande d'adhésion déposée avant la suppression reste visible
+   * du gérant ; l'accepter passe par `respondToInvitation`, qui travaille sur un
+   * identifiant et non sur un pseudo — le filtre de `getUserIdByPseudo` ne
+   * l'atteint pas. Le compte réapparaissait au roster et « avec équipe » à
+   * l'annuaire.
+   */
+  it("annule les invitations et demandes restées en attente", async () => {
+    const { queries } = fakeDb({ ...EMPTY, tournaments: 1 });
+
+    await deleteOwnAccount(7);
+
+    const cancel = queries.find((q) => q.sql.includes("bg_team_invitations"));
+    expect(cancel).toBeDefined();
+    expect(cancel!.sql).toContain("status = 'CANCELLED'");
+    expect(cancel!.sql).toContain("status = 'PENDING'");
+    expect(cancel!.params).toEqual([7]);
+  });
+
+  it("annule dans la transaction, jamais après le commit", async () => {
+    const { queries, connection } = fakeDb({ ...EMPTY, tournaments: 1 });
+
+    await deleteOwnAccount(7);
+
+    // Les requêtes relevées sont celles de la connexion verrouillée ; le commit
+    // vient après la dernière d'entre elles.
+    expect(has(queries, "bg_team_invitations")).toBe(true);
+    expect(connection.commit).toHaveBeenCalled();
+  });
+
+  it("laisse la cascade faire le ménage d'un effacement complet", async () => {
+    const { queries } = fakeDb(EMPTY);
+
+    await deleteOwnAccount(7);
+
+    // `fk_bg_team_inv_user` est en `ON DELETE CASCADE` : écrire ici serait une
+    // instruction de plus sur une table qui disparaît avec la ligne.
+    expect(has(queries, "bg_team_invitations")).toBe(false);
+  });
 });
 
 describe("loadAccountTrace — ce qu'on interroge", () => {

@@ -185,6 +185,16 @@ export async function linkOAuthIdentity(userId: number, identity: OAuthIdentity)
     throw new Error("IDENTITY_ALREADY_LINKED");
   }
 
+  // Les trois écritures portent `is_deleted = 0`, exactement comme le
+  // détachement plus bas. `loadIdentityRow` filtre déjà les lignes mortes, mais
+  // il le fait **deux `await` plus tôt** : un aller-retour OAuth dure plusieurs
+  // secondes, le joueur peut supprimer son compte depuis un autre onglet
+  // pendant ce temps, et l'écriture reprise après le commit de la suppression
+  // reposerait `discord_id`, `google_sub` ou `blizzard_sub` sur la ligne
+  // anonymisée — c'est-à-dire une **porte d'entrée** vers un compte dont on
+  // vient de promettre qu'il n'en avait plus. `affectedRows = 0` retombe sur le
+  // `PROFILE_NOT_FOUND` déjà rendu par la lecture : c'est la même réponse pour
+  // le même fait.
   const db = await getDatabase();
   try {
     let result: ResultSetHeader;
@@ -201,8 +211,8 @@ export async function linkOAuthIdentity(userId: number, identity: OAuthIdentity)
         handle
           ? `UPDATE bg_users
              SET discord_id = ?, discord_pseudo = ?, discord_verified_at = NOW()
-             WHERE id = ?`
-          : `UPDATE bg_users SET discord_id = ? WHERE id = ?`,
+             WHERE id = ? AND is_deleted = 0`
+          : `UPDATE bg_users SET discord_id = ? WHERE id = ? AND is_deleted = 0`,
         handle ? [identity.subject, handle, userId] : [identity.subject, userId],
       );
     } else if (identity.provider === "BLIZZARD") {
@@ -211,13 +221,13 @@ export async function linkOAuthIdentity(userId: number, identity: OAuthIdentity)
       const tag = normalizeBattletag(identity.handle);
       [result] = await db.execute<ResultSetHeader>(
         tag
-          ? `UPDATE bg_users SET blizzard_sub = ?, overwatch_battletag = ? WHERE id = ?`
-          : `UPDATE bg_users SET blizzard_sub = ? WHERE id = ?`,
+          ? `UPDATE bg_users SET blizzard_sub = ?, overwatch_battletag = ? WHERE id = ? AND is_deleted = 0`
+          : `UPDATE bg_users SET blizzard_sub = ? WHERE id = ? AND is_deleted = 0`,
         tag ? [identity.subject, tag, userId] : [identity.subject, userId],
       );
     } else {
       [result] = await db.execute<ResultSetHeader>(
-        `UPDATE bg_users SET google_sub = ? WHERE id = ?`,
+        `UPDATE bg_users SET google_sub = ? WHERE id = ? AND is_deleted = 0`,
         [identity.subject, userId],
       );
     }

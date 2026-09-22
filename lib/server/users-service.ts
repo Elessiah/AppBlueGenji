@@ -1191,6 +1191,27 @@ async function anonymizeAccount(connection: PoolConnection, userId: number): Pro
     [userId],
   );
   await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
+  // Les invitations et demandes **en attente** sont annulées, et c'est le seul
+  // chemin par lequel un compte supprimé rejoignait encore une équipe vivante.
+  // Une demande d'adhésion (`REQUEST`) déposée avant la suppression reste
+  // visible du gérant, qui n'a aucune raison de deviner : l'accepter passe par
+  // `respondToInvitation`, qui travaille sur un identifiant et non sur un
+  // pseudo — le filtre de `getUserIdByPseudo` ne l'atteint pas. Le compte
+  // réapparaissait alors au roster, à la fiche d'équipe et « avec équipe » à
+  // l'annuaire. Dans l'autre sens, une invitation adressée au compte n'a plus
+  // personne pour l'accepter : ses sessions viennent d'être effacées et ses
+  // identités avec.
+  //
+  // `CANCELLED` plutôt qu'un `DELETE` : la ligne ne nomme plus personne (le
+  // pseudo est anonymisé), et l'équipe garde la trace d'un échange qui a eu
+  // lieu. Le mode « effacement » n'a rien à faire ici — la cascade emporte la
+  // table avec la ligne.
+  await connection.execute(
+    `UPDATE bg_team_invitations
+        SET status = 'CANCELLED', responded_at = NOW()
+      WHERE user_id = ? AND status = 'PENDING'`,
+    [userId],
+  );
   // Le pseudo anonymisé doit aussi remplacer le nom affiché en tournoi — sur la
   // connexion de la transaction, sans quoi le renommage survivrait à un
   // rollback de l'anonymisation qui l'a motivé.
