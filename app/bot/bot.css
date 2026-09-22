@@ -419,7 +419,15 @@
 .srv-status.off { color: var(--ink-dim); }
 /* Un état que la page ne sait pas nommer : ni vert, ni ambre, ni éteint. */
 .srv-status.unknown { color: var(--ink-mute); }
-.srv-spark { display: flex; align-items: flex-end; gap: 1.5px; height: 22px; justify-content: flex-end; }
+.srv-spark {
+  display: flex; align-items: flex-end; gap: 1.5px; height: 22px; justify-content: flex-end;
+  /* Les gouttières d'une `flex` ne se compriment pas : passé une quarantaine de
+     barres, elles dépassent la piste à elles seules et la ligne sortirait sur la
+     cellule voisine. Le nombre de points est déjà plafonné côté composant ; ceci
+     est la ceinture, pour qu'un élargissement de ce plafond ne puisse pas casser
+     la rangée. */
+  overflow: hidden;
+}
 .srv-spark span {
   width: 3px;
   background: var(--blue-500);
@@ -616,10 +624,10 @@
    qu'exige l'en-tête « ÉTAT DU RELAIS ») se prend entièrement sur le nom du
    serveur : il y restait moins de 50 px de texte, et les noms passaient sur
    trois lignes. La piste d'état, elle, ne bouge pas — c'est elle qu'on est
-   venu élargir. La borne basse n'est pas décorative : sous 1024 px la grille
-   est déjà passée à une colonne et le tableau a toute la largeur, il n'y a
-   plus rien à resserrer. */
-@media (min-width: 1025px) and (max-width: 1200px) {
+   venu élargir. Sous 1024 px, la règle suivante rend leurs pistes aux colonnes
+   chiffrées : la grille y est passée à une colonne et le tableau a toute la
+   largeur, il n'y a plus rien à resserrer. */
+@media (max-width: 1200px) {
   .srv-head, .srv-row {
     grid-template-columns: 24px 1fr 64px 64px 115px 44px;
     gap: 10px;
@@ -628,6 +636,16 @@
 @media (max-width: 1024px) {
   .bot-grid { grid-template-columns: 1fr; }
   .kpis { grid-template-columns: repeat(2, 1fr); }
+  /* La grille est passée à une colonne : le tableau a toute la largeur, on rend
+     leurs pistes aux colonnes chiffrées. C'est une cascade de `max-width` et non
+     une borne basse sur la règle précédente, parce qu'un couple
+     `min-width: 1025px` / `max-width: 1024px` laisse un trou : à 1024,5 px —
+     largeur atteignable au zoom du navigateur — aucune des deux ne s'applique,
+     et la colonne de gauche retrouvait le resserrement qu'on venait de corriger. */
+  .srv-head, .srv-row {
+    grid-template-columns: 28px 1fr 80px 80px 115px 60px;
+    gap: 16px;
+  }
 }
 @media (max-width: 860px) {
   .bot-docs-list { grid-template-columns: 1fr; }

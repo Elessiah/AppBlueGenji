@@ -102,7 +102,7 @@ describe("BotServersTable — la grille reste un tableau", () => {
 describe("BotServersTable — une charge abîmée ne fait pas tomber la page", () => {
   it("survit à une absence de serveurs", () => {
     expect(() => render(null)).not.toThrow();
-    expect(render([])).toContain("0 ACTIFS");
+    expect(render([])).toContain("AUCUN SERVEUR");
   });
 
   it("survit à une charge qui n'est pas une liste", () => {
@@ -110,7 +110,7 @@ describe("BotServersTable — une charge abîmée ne fait pas tomber la page", (
     // serveur passerait tout droit et `list.map` rendrait la page en 500.
     const keyed = { "123": { id: "123" } } as unknown as BotServerEntry[];
     expect(() => render(keyed)).not.toThrow();
-    expect(render(keyed)).toContain("0 ACTIFS");
+    expect(render(keyed)).toContain("AUCUN SERVEUR");
   });
 
   it("survit aux champs manquants plutôt que de rendre la page en 500", () => {
@@ -208,8 +208,8 @@ describe("BotServersTable — une charge abîmée ne fait pas tomber la page", (
     }).not.toThrow();
     const bars = [...html.matchAll(/height:/g)].length;
     expect(bars).toBeGreaterThan(0);
-    expect(bars).toBeLessThanOrEqual(60);
-    expect(html.length).toBeLessThan(20_000);
+    expect(bars).toBeLessThanOrEqual(10);
+    expect(html.length).toBeLessThan(5_000);
   });
 
   it("ne divise pas par zéro sur une série plate", () => {
@@ -229,7 +229,7 @@ describe("BotServersTable — la charge n'est pas validée, une case fade vaut m
       />,
     );
     expect(html).toContain("Vertex");
-    expect(html).toContain("1 ACTIFS");
+    expect(html).toContain("LES 1 PLUS ACTIFS");
   });
 
   it("ne laisse pas un point non numérique éteindre toute la colonne tendance", () => {
@@ -260,5 +260,22 @@ describe("BotServersTable — un champ posé en enfant de React", () => {
     expect(html).toContain("srv-name");
     // La rangée reste une rangée : six cellules, comme l'en-tête a six colonnes.
     expect([...html.matchAll(/role="cell"/g)]).toHaveLength(6);
+  });
+});
+
+describe("BotServersTable — la couleur d'accent", () => {
+  it("laisse passer une couleur hexadécimale", () => {
+    const html = render([server({ accentColor: "#5ac8ff" })]);
+    expect(html).toContain("--c:#5ac8ff");
+  });
+
+  it("n'écrit rien plutôt qu'une valeur que `color-mix` ne sait pas lire", () => {
+    // Une déclaration invalide n'est pas remplacée, elle est **abandonnée** :
+    // le sigil perdait fond, bordure et couleur d'un coup. Le repli
+    // `var(--c, var(--blue-500))` ne joue que si la propriété est absente.
+    for (const bad of ["blurple", 5, {}, "red; content: x", ""]) {
+      const html = render([server({ accentColor: bad as unknown as string })]);
+      expect(html).not.toContain("--c:");
+    }
   });
 });

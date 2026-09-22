@@ -51,3 +51,23 @@ export function botPayloadText(value: unknown): string | null {
 export function botPayloadLabel(value: unknown): string {
   return botPayloadText(value) ?? "";
 }
+
+/** Les seules écritures de couleur que le site accepte d'une charge du bot. */
+const HEX_COLOR = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+
+/**
+ * Une couleur d'accent, ou `null`.
+ *
+ * Prouver qu'une valeur est une **chaîne** ne prouve pas qu'elle est une
+ * couleur : `accentColor: "blurple"` traverse `botPayloadText`, puis rend
+ * `color-mix(in oklab, blurple …)` invalide au calcul — et une déclaration
+ * invalide n'est pas remplacée, elle est **abandonnée**. Le sigil perdait alors
+ * fond, bordure et couleur de texte d'un coup, sans une erreur. Le repli
+ * `var(--c, var(--blue-500))` du CSS ne couvre pas ce cas : il ne joue que si
+ * la propriété est **absente**, ce que `null` obtient ici et qu'une valeur
+ * invalide n'obtient pas.
+ */
+export function botPayloadColor(value: unknown): string | null {
+  const text = botPayloadText(value);
+  return text !== null && HEX_COLOR.test(text) ? text : null;
+}

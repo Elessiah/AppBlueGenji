@@ -170,17 +170,36 @@ describe("/bot — l'état d'un serveur se lit en français", () => {
     // tableau n'a que ~530 px utiles et l'élargissement de la piste d'état se
     // prendrait entièrement sur le nom du serveur, seule colonne qu'on ne peut
     // ni abréger ni masquer.
-    const band = css.match(
-      /@media \(min-width: 1025px\) and \(max-width: 1200px\) \{[\s\S]*?\n\}/,
-    );
+    const band = css.match(/@media \(max-width: 1200px\) \{[\s\S]*?\n\}/);
     expect(band).not.toBeNull();
     expect(band![0]).toContain(".srv-head, .srv-row");
     // La piste d'état, elle, ne bouge pas : c'est elle qu'on est venu élargir.
     expect(band![0]).toContain("115px");
-    // La borne basse est ce qui fait que la règle dit ce qu'elle veut dire :
-    // sans elle, elle s'appliquait jusqu'en bas, y compris là où la grille est
-    // déjà à une colonne et le tableau à pleine largeur.
-    expect(css).not.toMatch(/@media \(max-width: 1200px\)/);
+    // …et la règle suivante rend leurs pistes aux colonnes chiffrées, la grille
+    // étant passée à une colonne. En **cascade de `max-width`** : un couple
+    // `min-width: 1025px` / `max-width: 1024px` laisse un trou à 1024,5 px,
+    // largeur atteignable au zoom, où aucune des deux ne s'applique.
+    expect(css).not.toMatch(/@media \(min-width: [\d.]+px\) and \(max-width: [\d.]+px\)/);
+    const wide = css.match(/@media \(max-width: 1024px\) \{[\s\S]*?\n\}/);
+    expect(wide).not.toBeNull();
+    expect(wide![0]).toContain("grid-template-columns: 28px 1fr 80px 80px 115px 60px;");
+  });
+
+  it("borne les barres de tendance à ce que la cellule tient", () => {
+    // Les gouttières d'une `flex` ne se compriment pas : passé une quarantaine
+    // de barres elles dépassent la piste à elles seules, toutes les barres
+    // tombent à 0 px et la ligne sort sur la cellule voisine.
+    expect(servers).toContain("const MAX_SPARKLINE_POINTS = 10;");
+    expect(css).toMatch(/\.srv-spark \{[\s\S]*?overflow: hidden;/);
+  });
+
+  it("n'annonce plus un total de serveurs que la page ne connaît pas", () => {
+    // `fetchBotServers(8)` plafonne la demande : « 8 ACTIFS » sur un bot
+    // installé sur trente serveurs était faux, de la même famille que le
+    // « BUILD 4f8a » retiré par ailleurs.
+    expect(servers).not.toContain("ACTIFS · TRIÉS PAR ACTIVITÉ 30J");
+    expect(servers).toContain("PLUS ACTIFS");
+    expect(page).toContain("fetchBotServers(8)");
   });
 
   it("a une couleur pour l'état qu'elle ne connaît pas", () => {

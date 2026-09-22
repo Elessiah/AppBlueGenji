@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  botPayloadColor,
   botPayloadLabel,
   botPayloadNumber,
   botPayloadText,
@@ -68,6 +69,34 @@ describe("botPayloadLabel", () => {
     // vide, pas `null`, parce qu'il ne doit rester aucune décision à prendre.
     for (const value of [{ fr: "Nova" }, ["N", "V"], null, undefined, Number.NaN]) {
       expect(botPayloadLabel(value)).toBe("");
+    }
+  });
+});
+
+describe("botPayloadColor", () => {
+  it("laisse passer les quatre écritures hexadécimales", () => {
+    for (const value of ["#fff", "#ffff", "#5ac8ff", "#5ac8ff80", "#5AC8FF"]) {
+      expect(botPayloadColor(value)).toBe(value);
+    }
+  });
+
+  it("refuse tout le reste — une chaîne n'est pas une couleur", () => {
+    // `color-mix(in oklab, blurple …)` est invalide au calcul, et une
+    // déclaration invalide est **abandonnée** : le sigil perd fond, bordure et
+    // couleur d'un coup, sans une erreur.
+    for (const value of [
+      "blurple",
+      "red",
+      "rgb(90 200 255)",
+      "#12345",
+      "#gggggg",
+      "5ac8ff",
+      "#5ac8ff; color: red",
+      5,
+      null,
+      {},
+    ]) {
+      expect(botPayloadColor(value)).toBeNull();
     }
   });
 });

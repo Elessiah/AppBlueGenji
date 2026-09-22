@@ -1,6 +1,11 @@
 import { BotServerEntry } from "@/lib/shared/types";
 import { botRelayAccessibleLabel, resolveBotRelayState } from "@/lib/shared/bot-relay-status";
-import { botPayloadLabel, botPayloadNumber, botPayloadText } from "@/lib/shared/bot-payload";
+import {
+  botPayloadColor,
+  botPayloadLabel,
+  botPayloadNumber,
+  botPayloadText,
+} from "@/lib/shared/bot-payload";
 
 /**
  * Le tableau des serveurs où le bot est installé.
@@ -15,8 +20,17 @@ import { botPayloadLabel, botPayloadNumber, botPayloadText } from "@/lib/shared/
  * Le nombre de barres rendues par cellule de tendance. La série arrive du bot
  * sans borne ; on garde les plus **récentes**, une tendance se lisant par sa
  * fin.
+ *
+ * Dix, et pas un nombre rond choisi au hasard : c'est ce que la cellule tient.
+ * `.srv-spark` est une rangée `flex` de barres de 3 px séparées de 1,5 px, dans
+ * une piste de 60 px — 44 px dans la bande resserrée. Les gouttières d'une
+ * `flex` ne se compriment **pas** : à partir d'une quarantaine de points elles
+ * dépassent à elles seules la piste, toutes les barres tombent à 0 px de large
+ * et la ligne déborde sur la cellule voisine. Dix points font 43,5 px, ce qui
+ * tient des deux côtés — et c'est aussi le format que le bot doit rendre
+ * (`docs/features/BOT_FEATURES_NEEDED.md`).
  */
-const MAX_SPARKLINE_POINTS = 60;
+const MAX_SPARKLINE_POINTS = 10;
 
 export function BotServersTable({ servers }: { servers: BotServerEntry[] | null }) {
   // Même précaution que sur `sparkline` juste en dessous, et pour la même
@@ -36,7 +50,15 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
     <section className="panel">
       <div className="panel-head">
         <span className="title">Serveurs connectés</span>
-        <span className="meta">{list.length} ACTIFS · TRIÉS PAR ACTIVITÉ 30J</span>
+        {/* « 8 ACTIFS » affirmait un total que la page ne connaît pas :
+            `fetchBotServers(8)` **plafonne** la demande, si bien qu'un bot
+            installé sur trente serveurs en annonçait huit. Le panneau ne dit
+            plus que ce qu'il montre. */}
+        <span className="meta">
+          {list.length === 0
+            ? "AUCUN SERVEUR"
+            : `LES ${list.length} PLUS ACTIFS · ACTIVITÉ 30J`}
+        </span>
       </div>
       {/* Une grille de `div` reste un tableau pour qui le lit : sans ces rôles,
           un lecteur d'écran annonce une suite de textes sans jamais dire de
@@ -65,12 +87,11 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
           // manquant doit donner une cellule fade, jamais un `TypeError` — qui
           // ferait rendre toute la page `/bot` en 500, bien pire que la case
           // vide qu'on vient de chasser.
-          // Plafonné : la cellule fait quelques dizaines de pixels de large, une
-          // barre de plus n'y est pas visible — mais elle est bien rendue. Le
-          // `reduce` plus bas a retiré le `RangeError` de `Math.max(...arr)` ;
-          // il restait qu'une série de cinquante mille points écrivait
-          // cinquante mille `<span>`, soit ~3 Mo d'HTML pour **une** rangée.
-          // Ne pas lever n'est pas la même chose que rester utilisable.
+          // Plafonné à ce que la cellule tient (voir la constante). Le `reduce`
+          // plus bas a retiré le `RangeError` de `Math.max(...arr)` ; il restait
+          // qu'une série de cinquante mille points écrivait cinquante mille
+          // `<span>`, soit ~3 Mo d'HTML pour **une** rangée. Ne pas lever n'est
+          // pas la même chose que rester utilisable.
           const sparkline = (Array.isArray(s.sparkline) ? s.sparkline : []).slice(
             -MAX_SPARKLINE_POINTS,
           );
@@ -104,7 +125,7 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
                 <span
                   className="srv-sigil"
                   aria-hidden="true"
-                  style={{ "--c": botPayloadText(s.accentColor) } as React.CSSProperties}
+                  style={{ "--c": botPayloadColor(s.accentColor) ?? undefined } as React.CSSProperties}
                 >
                   {botPayloadLabel(s.sigil)}
                 </span>
