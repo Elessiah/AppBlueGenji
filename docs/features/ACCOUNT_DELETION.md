@@ -213,6 +213,15 @@ variantes d'écriture portent donc `AND is_deleted = 0`, comme le **détachement
 d'une identité le faisait déjà, et `loadDiscordRow` filtre lui aussi : leur
 `affectedRows = 0` retombe sur `PROFILE_NOT_FOUND`, qui est la vérité.
 
+La plus longue de ces courses n'est pas une écriture de profil mais
+`adoptRemoteAvatar` : entre sa lecture de `avatar_url` et son écriture, elle
+**télécharge** l'image chez le fournisseur et la retraite. La photo repartait
+donc sur la ligne anonymisée, servie publiquement par `/api/uploads/avatars/…`.
+La condition ne suffit pas ici : le fichier est sur le disque avant l'écriture,
+et sur un compte **effacé** plus aucune ligne ne le désigne — l'écriture refusée
+reprend donc ce qu'elle vient de poser, faute de quoi une photo personnelle
+orpheline survivait au compte.
+
 Une ligne anonymisée reste par ailleurs **atteignable par son pseudo**
 (`compte_supprime_412` est un pseudo comme un autre), et c'est par là qu'on la
 rattachait encore à une équipe vivante. `getUserIdByPseudo` — l'unique traduction
@@ -240,6 +249,26 @@ comme invitations, ces dernières n'ayant plus personne pour les accepter une fo
 les sessions et les identités parties. `CANCELLED` plutôt qu'un `DELETE` : la
 ligne ne nomme plus personne, et l'équipe garde la trace d'un échange qui a eu
 lieu.
+
+## La phrase qu'on ne sait pas encore écrire
+
+La confirmation décrit le sort du compte, et elle le demande au serveur
+(`GET /api/profile/deletion`). Cette requête peut échouer. L'écran partait alors
+d'une hypothèse — celle du joueur qui a joué — et la gardait : « tes informations
+personnelles seront effacées (le compte devient anonyme), mais tes statistiques
+de tournoi resteront conservées ». Le commentaire disait « la phrase la plus
+prudente, celle qui promet le moins d'effacement », et c'est là que le
+raisonnement se renverse : le serveur **re-décide** sur son propre instantané et
+peut effacer entièrement. Le joueur avait consenti à devenir anonyme.
+
+Le repli n'est donc ni l'une ni l'autre des deux phrases, mais une troisième, qui
+ne promet rien : « le site n'a pas pu dire ce qu'il en restera ; selon ce que tu
+as laissé, il sera rendu anonyme ou effacé entièrement ». Refuser de confirmer
+n'était pas une option — supprimer son compte est un droit, et un aperçu en échec
+n'a pas à le suspendre. `RETENTION_UNKNOWN` n'est pas un motif de conservation de
+plus : c'est l'absence de réponse, et elle porte le `default` du `switch` — une
+valeur inattendue doit mener à la description la plus prudente, pas à la plus
+définitive des quatre.
 
 ## Quand la base refuse quand même
 

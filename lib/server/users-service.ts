@@ -407,7 +407,7 @@ export async function adoptRemoteAvatar(userId: number, picture: string | undefi
 
   const db = await getDatabase();
   const [rows] = await db.execute<(RowDataPacket & { avatar_url: string | null })[]>(
-    `SELECT avatar_url FROM bg_users WHERE id = ? LIMIT 1`,
+    `SELECT avatar_url FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
     [userId],
   );
   if (rows.length === 0) return;
@@ -416,7 +416,26 @@ export async function adoptRemoteAvatar(userId: number, picture: string | undefi
   const stored = await importRemoteAvatar(picture, userId);
   if (!stored) return;
 
-  await db.execute(`UPDATE bg_users SET avatar_url = ? WHERE id = ?`, [stored, userId]);
+  // Même condition, même raison que le téléversement ordinaire — avec un délai
+  // plus long encore : entre la lecture ci-dessus et cette écriture, il y a un
+  // téléchargement sortant et un traitement d'image, soit des secondes pendant
+  // lesquelles le joueur peut supprimer son compte depuis un autre onglet. La
+  // photo repartait alors sur la ligne anonymisée, publiquement servie par
+  // `/api/uploads/avatars/…` et republiée sur l'entrée solo à la prochaine
+  // resynchronisation. Le fichier est déjà sur le disque dans les deux modes —
+  // sur un compte **effacé** la ligne n'existe même plus —, d'où le ménage :
+  // sans lui, une photo personnelle orpheline survivait à un compte dont on
+  // venait de promettre qu'il ne resterait rien.
+  const [result] = await db.execute<ResultSetHeader>(
+    `UPDATE bg_users SET avatar_url = ? WHERE id = ? AND is_deleted = 0`,
+    [stored, userId],
+  );
+  if (Number(result.affectedRows) === 0) {
+    await deleteStoredImage(toDiskUploadPath(stored)).catch(() => {
+      // Disque récalcitrant : un résidu, et rien à annoncer — l'appelant a déjà
+      // avalé les refus de cette fonction par construction.
+    });
+  }
 }
 
 /**

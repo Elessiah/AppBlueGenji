@@ -40,4 +40,17 @@ describe("interface — un compte supprimé ne se propose ni ne se raconte en co
     expect(PROFIL).not.toContain('payload.error || "PROFILE_UPDATE_FAILED"');
     expect(PROFIL).not.toContain('payload.error || "AVATAR_UPLOAD_FAILED"');
   });
+
+  /**
+   * L'aperçu du plan de suppression peut ne pas répondre. L'écran partait alors
+   * — et restait — sur `TOURNAMENTS`, la phrase qui promet que le compte
+   * devient anonyme et que les statistiques restent, quand le serveur, qui
+   * re-décide sur son propre instantané, pouvait **effacer entièrement**. Un
+   * accord donné à la moitié rassurante d'un geste irréversible.
+   */
+  it("n'invente aucun sort de compte avant que l'aperçu ait répondu", () => {
+    expect(PROFIL).toContain("ConfirmationSubject = RETENTION_UNKNOWN");
+    // L'hypothèse initiale a disparu : plus aucun motif codé en dur.
+    expect(PROFIL).not.toContain('= "TOURNAMENTS"');
+  });
 });

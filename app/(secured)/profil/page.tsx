@@ -11,8 +11,10 @@ import {
   accountDeletionConfirmation,
   accountDeletionErrorMessage,
   accountDeletionOutcome,
+  RETENTION_UNKNOWN,
   type AccountDeletionPlan,
   type AccountRetentionReason,
+  type ConfirmationSubject,
 } from "@/lib/shared/account-deletion";
 import { useToast } from "@/components/ui/toast";
 import { TeamLink } from "@/components/entity-link";
@@ -179,15 +181,25 @@ export default function ProfilePage() {
     // ne sont pas la même promesse, et « tes statistiques restent » ne veut
     // rien dire à qui n'en a aucune. Le serveur repose la question à l'écriture
     // — ceci informe, cela tranche.
-    let reason: AccountRetentionReason | null = "TOURNAMENTS";
+    //
+    // Tant que l'aperçu n'a pas répondu, l'écran ne sait **rien** — pas même
+    // lequel des deux modes s'appliquera. Il partait d'une hypothèse
+    // (`TOURNAMENTS`), qu'il gardait quand la requête échouait : le joueur
+    // consentait alors à devenir anonyme et pouvait être effacé entièrement.
+    // Sur un geste irréversible, on décrit l'incertitude plutôt que d'inventer
+    // la moitié rassurante.
+    let subject: ConfirmationSubject = RETENTION_UNKNOWN;
+    let previewed: AccountRetentionReason | null = null;
     try {
       const preview = await fetch("/api/profile/deletion", { cache: "no-store" });
-      if (preview.ok) reason = ((await preview.json()) as AccountDeletionPlan).reason;
+      if (preview.ok) {
+        previewed = ((await preview.json()) as AccountDeletionPlan).reason;
+        subject = previewed;
+      }
     } catch {
-      // Injoignable : on reste sur la phrase la plus prudente, celle qui promet
-      // le moins d'effacement.
+      // Injoignable : la phrase qui ne promet ni conservation ni effacement.
     }
-    if (!window.confirm(accountDeletionConfirmation(reason))) {
+    if (!window.confirm(accountDeletionConfirmation(subject))) {
       setDeleting(false);
       return;
     }
@@ -203,7 +215,7 @@ export default function ProfilePage() {
       // une absence de réponse. Le `mode` sert donc de témoin — il dit que le
       // serveur a bien répondu, là où un `??` sur le motif retomberait sur
       // l'aperçu au moment précis où le serveur annonce qu'il n'a rien gardé.
-      const applied = payload.mode ? payload.reason ?? null : reason;
+      const applied = payload.mode ? payload.reason ?? null : previewed;
       showSuccess(accountDeletionOutcome(applied));
       setTimeout(() => {
         window.location.href = "/";

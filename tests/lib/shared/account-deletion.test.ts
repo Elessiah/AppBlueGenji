@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   ACCOUNT_DELETED_ERROR,
+  RETENTION_UNKNOWN,
   accountDeletedWriteMessage,
   accountDeletionConfirmation,
   accountDeletionErrorMessage,
@@ -122,6 +123,33 @@ describe("accountDeletionConfirmation", () => {
     for (const reason of [null, "TOURNAMENTS", "ORGANIZED_TOURNAMENTS", "OWNED_TEAMS"] as const) {
       expect(accountDeletionConfirmation(reason)).toContain("irréversible");
     }
+  });
+
+  /**
+   * L'aperçu peut ne pas répondre, et le serveur re-décide de toute façon sur
+   * son propre instantané. L'écran retombait alors sur la phrase de
+   * `TOURNAMENTS` — « le compte devient anonyme, tes statistiques restent » —
+   * alors qu'un effacement **complet** pouvait suivre : un accord donné à la
+   * moitié rassurante d'un geste irréversible.
+   */
+  it("ne promet ni conservation ni effacement quand le sort du compte est inconnu", () => {
+    const unknown = accountDeletionConfirmation(RETENTION_UNKNOWN);
+    expect(unknown).toContain("irréversible");
+    expect(unknown).not.toContain("statistiques");
+    // Ni « ton compte sera effacé entièrement », ni « le compte devient
+    // anonyme » : les deux issues sont nommées comme possibles, aucune promise.
+    expect(unknown).not.toMatch(/sera effacé entièrement, sans laisser/);
+    expect(unknown).not.toMatch(/seront effacées \(le compte devient anonyme\)/);
+    expect(unknown).toMatch(/anonyme ou effacé/);
+  });
+
+  it("retombe sur la phrase prudente, jamais sur la plus définitive", () => {
+    // Une valeur qu'on n'attendait pas ne doit pas mener à la description la
+    // plus lourde des quatre. Seul `null` — la réponse « il ne reste rien » —
+    // annonce un effacement complet.
+    const surprise = accountDeletionConfirmation("N_IMPORTE_QUOI" as never);
+    expect(surprise).toBe(accountDeletionConfirmation(RETENTION_UNKNOWN));
+    expect(accountDeletionConfirmation(null)).toContain("effacé entièrement");
   });
 
   it("annonce l'anonymat dès qu'une ligne reste, et jamais sinon", () => {

@@ -114,6 +114,19 @@ export function accountDeletionPlan(trace: AccountTrace): AccountDeletionPlan {
 }
 
 /**
+ * Ce que l'écran sait du sort du compte quand l'aperçu n'a pas répondu :
+ * **rien**.
+ *
+ * Ce n'est pas un motif de conservation de plus, c'est l'absence de réponse — et
+ * elle ne se confond avec aucun des deux modes, l'un promettant qu'une ligne
+ * reste et l'autre qu'il ne restera rien.
+ */
+export const RETENTION_UNKNOWN = "UNKNOWN";
+
+/** Ce que la confirmation a pour décrire le sort du compte. */
+export type ConfirmationSubject = AccountRetentionReason | null | typeof RETENTION_UNKNOWN;
+
+/**
  * La phrase de confirmation, qui doit **décrire ce qui va se passer**.
  *
  * Une seule phrase servait aux deux cas et promettait la conservation des
@@ -121,9 +134,23 @@ export function accountDeletionPlan(trace: AccountTrace): AccountDeletionPlan {
  * sienne, et celles qui nomment une conservation levable disent **le geste qui
  * la lève** : on ne refuse pas un effacement complet à quelqu'un sans lui dire
  * ce qui l'ouvrirait.
+ *
+ * Le **repli n'est pas l'effacement, et pas davantage l'anonymisation** : c'est
+ * la phrase qui ne promet ni l'un ni l'autre. L'écran retombait sur celle de
+ * `TOURNAMENTS` quand l'aperçu ne répondait pas, au motif qu'elle promet le
+ * moins d'effacement — mais la prudence va ici dans le mauvais sens : le serveur
+ * re-décide sur son propre instantané, il peut **effacer entièrement**, et le
+ * joueur aurait consenti à devenir anonyme. Sur un geste irréversible, on ne
+ * demande pas un accord à une description qui peut être fausse. Le refus de
+ * confirmer n'est pas une option non plus : supprimer son compte est un droit,
+ * et une requête d'aperçu en échec n'a pas à le suspendre.
+ *
+ * `default` porte cette phrase — et non celle de l'effacement, la plus
+ * définitive des quatre : une valeur qu'on n'attendait pas doit mener à la
+ * description la plus prudente, pas à la plus lourde.
  */
 export function accountDeletionConfirmation(
-  reason: AccountRetentionReason | null,
+  reason: ConfirmationSubject,
 ): string {
   const irreversible = "Cette action est irréversible.";
   switch (reason) {
@@ -133,8 +160,10 @@ export function accountDeletionConfirmation(
       return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées (le compte devient anonyme), mais ta ligne restera : tu es l'organisateur de tournois qui doivent garder un titulaire. ${irreversible}`;
     case "OWNED_TEAMS":
       return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées (le compte devient anonyme), mais ta ligne restera : tu es propriétaire d'une équipe, que personne ne pourrait plus gérer sans toi. Transfère-la ou dissous-la d'abord pour un effacement complet. ${irreversible}`;
-    default:
+    case null:
       return `Supprimer définitivement ton compte ? Tu n'as participé à aucun tournoi et ne gères ni équipe ni tournoi : ton compte sera effacé entièrement, sans laisser de trace sur le site. ${irreversible}`;
+    default:
+      return `Supprimer définitivement ton compte ? Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (tournoi joué, équipe possédée, tournoi organisé), il sera rendu anonyme ou effacé entièrement. ${irreversible}`;
   }
 }
 
