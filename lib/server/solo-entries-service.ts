@@ -59,12 +59,32 @@ function isDuplicateNameError(error: unknown): boolean {
   return isDuplicateEntryError(error);
 }
 
+/**
+ * Identité du joueur, à recopier sur son entrée solo.
+ *
+ * `lock` fait de la lecture un **verrou** sur la ligne du compte. Il n'est pas
+ * décoratif : `bg_teams.solo_user_id` n'a volontairement aucune clé étrangère
+ * (une cascade emporterait l'engagé, et avec lui l'historique des matchs), si
+ * bien que rien n'empêche la base de créer une entrée solo pour un compte que
+ * `deleteOwnAccount` vient d'effacer. Le compte est la ressource que les deux
+ * gestes se disputent, et la suppression pose le même verrou : ou bien
+ * l'inscription passe la première et la suppression *voit* l'entrée solo (donc
+ * anonymise), ou bien la suppression passe la première et l'inscription ne
+ * trouve plus personne (`USER_NOT_FOUND`).
+ *
+ * Une lecture verrouillante lit toujours la **dernière version commitée**, là
+ * où une lecture ordinaire se contenterait de l'instantané de la transaction.
+ */
 async function loadUserIdentity(
   connection: PoolConnection,
   userId: number,
+  lock = false,
 ): Promise<UserIdentityRow | null> {
   const [rows] = await connection.execute<UserIdentityRow[]>(
-    `SELECT pseudo, avatar_url, visible_avatar FROM bg_users WHERE id = ? LIMIT 1`,
+    `SELECT pseudo, avatar_url, visible_avatar
+     FROM bg_users
+     WHERE id = ?
+     LIMIT 1${lock ? " FOR UPDATE" : ""}`,
     [userId],
   );
   return rows.length === 0 ? null : rows[0];
@@ -121,7 +141,9 @@ export async function ensureSoloEntry(
   connection: PoolConnection,
   userId: number,
 ): Promise<number> {
-  const user = await loadUserIdentity(connection, userId);
+  // Verrouillant : l'entrée solo qui va naître ne pend à aucune clé étrangère,
+  // c'est ce verrou-là qui la tient à une ligne `bg_users` bien vivante.
+  const user = await loadUserIdentity(connection, userId, true);
   if (!user) throw new Error("USER_NOT_FOUND");
 
   const existing = await findSoloEntry(connection, userId);

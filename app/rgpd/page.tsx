@@ -103,7 +103,8 @@ export default function RgpdPage() {
           </tbody>
         </table>
         <p style={{ marginTop: 16, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
-          * Les données de profil sont anonymisées immédiatement lors de la suppression du compte
+          * Un compte qui n'a participé à aucun tournoi est <strong>entièrement effacé</strong> à
+          sa suppression. Un compte qui a joué voit ses données de profil anonymisées immédiatement
           (des copies de sauvegarde techniques peuvent subsister quelques jours). Les sessions
           (cookie <code>bg_session</code>) expirent 30 jours après la connexion.
         </p>
@@ -131,7 +132,9 @@ export default function RgpdPage() {
           (nombre de tournois joués, scores, placements) ne sont pas effacées lors de
           la suppression du compte. En revanche, les données de profil liées (pseudo,
           avatar) sont anonymisées — le palmarès subsiste sous une forme neutre
-          («&nbsp;Joueur supprimé&nbsp;») dans les archives.
+          («&nbsp;Joueur supprimé&nbsp;») dans les archives. Un compte qui n'a jamais été
+          engagé dans un tournoi n'a, lui, aucun palmarès à préserver : il est effacé
+          entièrement, sans ligne résiduelle.
         </div>
         <div className={styles.prose} style={{ marginTop: 20 }}>
           <p>

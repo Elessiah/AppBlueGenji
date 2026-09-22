@@ -3,9 +3,11 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
+jest.mock("@/lib/server/image-upload");
 
 import { deleteOwnAccount, getAccountDeletionMode } from "@/lib/server/users-service";
 import { getDatabase } from "@/lib/server/database";
+import { deleteStoredImage } from "@/lib/server/image-upload";
 
 /**
  * L'écriture de la suppression : ce qu'elle efface, ce qu'elle garde, et ce
@@ -19,16 +21,46 @@ import { getDatabase } from "@/lib/server/database";
  */
 type Query = { sql: string; params: unknown[] };
 
-function fakeDb(trace: { tournaments: number; organized: number; owned: number }) {
+type Trace = { tournaments: number; organized: number; owned: number };
+
+/**
+ * La base, et la transaction qui la porte.
+ *
+ * L'écriture passe par une connexion dédiée : c'est elle qui tient le verrou et
+ * la transaction, et le test doit pouvoir dire qu'elle a bien été ouverte,
+ * commitée — ou annulée, quand une écriture échoue.
+ */
+function fakeDb(
+  trace: Trace,
+  options: { avatarUrl?: string | null; missing?: boolean; failOn?: string } = {},
+) {
   const queries: Query[] = [];
+  const avatarUrl = options.avatarUrl ?? null;
+
   const execute = jest.fn(async (sql: string, params: unknown[] = []) => {
     const q = String(sql).replace(/\s+/g, " ").trim();
     queries.push({ sql: q, params });
+    if (options.failOn && q.includes(options.failOn)) throw new Error("DB_DOWN");
     if (q.includes("AS tournaments")) return [[trace]];
+    if (q.includes("SELECT avatar_url FROM bg_users")) {
+      return [options.missing ? [] : [{ avatar_url: avatarUrl }]];
+    }
     return [[]];
   });
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
-  return { queries };
+
+  const connection = {
+    execute,
+    beginTransaction: jest.fn(async () => {}),
+    commit: jest.fn(async () => {}),
+    rollback: jest.fn(async () => {}),
+    release: jest.fn(() => {}),
+  };
+
+  (getDatabase as jest.Mock).mockResolvedValue({
+    execute,
+    getConnection: jest.fn(async () => connection),
+  } as never);
+  return { queries, connection };
 }
 
 const has = (queries: Query[], needle: string) => queries.some((q) => q.sql.includes(needle));
@@ -137,6 +169,17 @@ describe("loadAccountTrace — ce qu'on interroge", () => {
     expect(queries[0].sql).toContain("AS organized");
     expect(queries[0].sql).toContain("AS owned");
   });
+
+  it("est lue **après** le verrou : avant lui, elle daterait d'avant l'attente", async () => {
+    const { queries } = fakeDb(EMPTY);
+
+    await deleteOwnAccount(7);
+
+    const lock = queries.findIndex((q) => q.sql.includes("FOR UPDATE"));
+    const trace = queries.findIndex((q) => q.sql.includes("AS tournaments"));
+    expect(lock).toBe(0);
+    expect(trace).toBeGreaterThan(lock);
+  });
 });
 
 describe("getAccountDeletionMode", () => {
@@ -145,5 +188,86 @@ describe("getAccountDeletionMode", () => {
 
     expect(await getAccountDeletionMode(7)).toBe("ERASE");
     expect(queries.every((q) => q.sql.startsWith("SELECT"))).toBe(true);
+  });
+});
+
+describe("deleteOwnAccount — transaction et verrou", () => {
+  it("ouvre une transaction, verrouille la ligne du compte, puis commite", async () => {
+    const { queries, connection } = fakeDb(EMPTY);
+
+    await deleteOwnAccount(7);
+
+    expect(connection.beginTransaction).toHaveBeenCalled();
+    expect(queries[0].sql).toContain("FOR UPDATE");
+    expect(queries[0].sql).toContain("FROM bg_users");
+    expect(connection.commit).toHaveBeenCalled();
+    expect(connection.rollback).not.toHaveBeenCalled();
+    expect(connection.release).toHaveBeenCalled();
+  });
+
+  it("annule tout si l'effacement échoue — jamais de visites détachées sans compte effacé", async () => {
+    const { connection } = fakeDb(EMPTY, { failOn: "DELETE FROM bg_users" });
+
+    await expect(deleteOwnAccount(7)).rejects.toThrow("DB_DOWN");
+
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(connection.release).toHaveBeenCalled();
+  });
+
+  it("refuse un compte disparu plutôt que d'écrire à vide", async () => {
+    const { connection } = fakeDb(EMPTY, { missing: true });
+
+    await expect(deleteOwnAccount(7)).rejects.toThrow("USER_NOT_FOUND");
+
+    expect(connection.rollback).toHaveBeenCalled();
+  });
+});
+
+describe("deleteOwnAccount — le fichier de l'avatar", () => {
+  it("efface la photo d'un compte effacé : sa ligne partie, plus rien ne la désigne", async () => {
+    const { connection } = fakeDb(EMPTY, { avatarUrl: "/api/uploads/avatars/7-ab.webp" });
+
+    await deleteOwnAccount(7);
+
+    expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/avatars/7-ab.webp");
+    // Après le commit : un `unlink` ne se défait pas.
+    expect(connection.commit).toHaveBeenCalled();
+  });
+
+  it("efface aussi la photo d'un compte anonymisé — `avatar_url` passe à NULL", async () => {
+    fakeDb({ ...EMPTY, tournaments: 1 }, { avatarUrl: "/api/uploads/avatars/7-cd.webp" });
+
+    await deleteOwnAccount(7);
+
+    expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/avatars/7-cd.webp");
+  });
+
+  it("ne touche à rien quand la photo n'est pas un fichier à nous", async () => {
+    fakeDb(EMPTY, { avatarUrl: "https://exemple.invalid/photo.png" });
+
+    await deleteOwnAccount(7);
+
+    expect(deleteStoredImage).toHaveBeenCalledWith(null);
+  });
+
+  it("ne garde pas la photo si l'écriture est annulée", async () => {
+    fakeDb(EMPTY, {
+      avatarUrl: "/api/uploads/avatars/7-ef.webp",
+      failOn: "DELETE FROM bg_users",
+    });
+
+    await expect(deleteOwnAccount(7)).rejects.toThrow("DB_DOWN");
+
+    expect(deleteStoredImage).not.toHaveBeenCalled();
+  });
+
+  it("un disque récalcitrant ne fait pas échouer une suppression commitée", async () => {
+    (deleteStoredImage as jest.Mock).mockImplementation(() => {
+      throw new Error("EACCES");
+    });
+    fakeDb(EMPTY, { avatarUrl: "/api/uploads/avatars/7-gh.webp" });
+
+    await expect(deleteOwnAccount(7)).resolves.toBe("ERASE");
   });
 });

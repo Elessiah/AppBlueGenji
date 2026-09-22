@@ -42,10 +42,25 @@ function fakeDb(handler?: (q: string, params: unknown[]) => unknown) {
     queries.push({ sql: q, params });
     const handled = handler?.(q, params);
     if (handled !== undefined) return handled;
+    // Le verrou que prend la suppression rend la ligne du compte : sans elle,
+    // tout chemin d'écriture s'arrêterait sur `USER_NOT_FOUND`.
+    if (q.includes("SELECT avatar_url FROM bg_users")) return [[{ avatar_url: null }]];
     return [[]];
   });
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
-  return { queries, execute };
+  // La suppression écrit sous transaction, donc sur une connexion dédiée — la
+  // même `execute`, pour que le test continue de voir passer les requêtes.
+  const connection = {
+    execute,
+    beginTransaction: jest.fn(async () => {}),
+    commit: jest.fn(async () => {}),
+    rollback: jest.fn(async () => {}),
+    release: jest.fn(() => {}),
+  };
+  (getDatabase as jest.Mock).mockResolvedValue({
+    execute,
+    getConnection: jest.fn(async () => connection),
+  } as never);
+  return { queries, execute, connection };
 }
 
 const find = (queries: Query[], needle: string) =>

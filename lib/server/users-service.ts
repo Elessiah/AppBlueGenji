@@ -1,5 +1,5 @@
 ﻿import crypto from "node:crypto";
-import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
 import {
@@ -10,9 +10,11 @@ import {
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
-import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
+import { deleteStoredImage } from "@/lib/server/image-upload";
+import { syncSoloEntryIdentity, syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { importRemoteAvatar, shouldImportRemoteAvatar } from "@/lib/server/user-avatar-import";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
+import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { formatPlayerSignupLog, type PlayerSignupProvider } from "@/lib/shared/bot-logs";
 import { isDiscordNumericId, visibleDiscordTag } from "@/lib/shared/discord-identity";
 import { can, sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
@@ -960,9 +962,18 @@ export async function updateOwnProfile(
  * L'engagement se lit sur **toute** appartenance, close comprise : un joueur
  * parti d'une équipe a tout de même joué ses matchs sous ses couleurs.
  */
-async function loadAccountTrace(userId: number): Promise<AccountTrace> {
-  const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & {
+/**
+ * Pool ou connexion de transaction : la lecture des traces se fait sur l'une ou
+ * sur l'autre selon qu'on **informe** (route de prévisualisation, hors
+ * transaction) ou qu'on **écrit** (suppression, sous verrou).
+ */
+type SqlRunner = Pick<PoolConnection, "execute">;
+
+async function loadAccountTrace(
+  runner: SqlRunner,
+  userId: number,
+): Promise<AccountTrace> {
+  const [rows] = await runner.execute<(RowDataPacket & {
     tournaments: number;
     organized: number;
     owned: number;
@@ -1014,7 +1025,8 @@ async function loadAccountTrace(userId: number): Promise<AccountTrace> {
  * l'écriture qui fait foi.
  */
 export async function getAccountDeletionMode(userId: number): Promise<AccountDeletionMode> {
-  return accountDeletionMode(await loadAccountTrace(userId));
+  const db = await getDatabase();
+  return accountDeletionMode(await loadAccountTrace(db, userId));
 }
 
 /**
@@ -1025,26 +1037,100 @@ export async function getAccountDeletionMode(userId: number): Promise<AccountDel
  * qui promet la conservation des statistiques à un compte qui n'en a aucune est
  * un mensonge poli, et l'inverse serait pire.
  *
- * L'**effacement** s'appuie sur les cascades déjà déclarées (sessions,
- * appartenances, invitations) ; `bg_endurance_penalties.created_by` passe à
- * `NULL`, la sanction restant due. Seules les visites demandent un geste : elles
- * n'ont **aucune** clé étrangère (une cascade y effacerait l'historique de
- * fréquentation), et c'est le lien vers une personne qu'il faut retirer, pas le
- * fait qu'une page ait été vue.
+ * Lecture des traces et écriture vivent dans **une seule transaction**, sous un
+ * verrou pris sur la ligne du compte : une trace relue hors transaction laisse
+ * un `await` entre la question et la réponse, et l'effacement d'un compte ne se
+ * défait pas. La transaction ferme au passage l'état intermédiaire des deux
+ * écritures de l'effacement — un `DELETE` refusé après le détachement des
+ * visites laissait un compte vivant dont la fréquentation était anonymisée pour
+ * toujours.
+ *
+ * Deux choses échappent à la transaction, chacune pour sa raison : le **fichier
+ * de l'avatar**, qu'un `unlink` ne rendrait pas (il part après le commit), et
+ * les tables sans clé étrangère, dont seul le verrou du compte protège
+ * — `bg_teams.solo_user_id` en particulier, que `ensureSoloEntry` verrouille de
+ * son côté.
  *
  * Rend le mode appliqué, pour que la route puisse le dire au joueur.
  */
 export async function deleteOwnAccount(userId: number): Promise<AccountDeletionMode> {
   const db = await getDatabase();
-  const mode = accountDeletionMode(await loadAccountTrace(userId));
+  const connection = await db.getConnection();
+  let mode: AccountDeletionMode;
+  // Le fichier de l'avatar, relevé **avant** l'effacement : la ligne partie, son
+  // chemin ne se retrouve plus. Il ne part qu'après le commit — un `unlink` ne
+  // se défait pas, et une transaction annulée rendrait un compte vivant sans sa
+  // photo.
+  let orphanedAvatar: string | null = null;
 
-  if (mode === "ERASE") {
-    await db.execute(`UPDATE bg_site_visits SET user_id = NULL WHERE user_id = ?`, [userId]);
-    await db.execute(`DELETE FROM bg_users WHERE id = ?`, [userId]);
-    return mode;
+  try {
+    await connection.beginTransaction();
+
+    // Verrou en **toute première instruction**, et lecture des traces juste
+    // après : sous `REPEATABLE READ`, c'est la première lecture *ordinaire* qui
+    // fige l'instantané, si bien qu'une trace lue avant le verrou daterait
+    // d'avant l'attente. Le compte est ici la ressource disputée — une
+    // inscription en tournoi individuel pose le même verrou (`ensureSoloEntry`),
+    // seul moyen de couvrir une entrée solo qui n'a volontairement aucune clé
+    // étrangère.
+    const [locked] = await connection.execute<(RowDataPacket & {
+      avatar_url: string | null;
+    })[]>(
+      `SELECT avatar_url FROM bg_users WHERE id = ? FOR UPDATE`,
+      [userId],
+    );
+    if (locked.length === 0) throw new Error("USER_NOT_FOUND");
+    orphanedAvatar = toDiskUploadPath(locked[0].avatar_url);
+
+    mode = accountDeletionMode(await loadAccountTrace(connection, userId));
+
+    if (mode === "ERASE") {
+      await eraseAccount(connection, userId);
+    } else {
+      await anonymizeAccount(connection, userId);
+    }
+
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
   }
 
-  await db.execute(
+  // Les deux modes effacent la photo : l'un fait disparaître la ligne, l'autre
+  // met `avatar_url` à `NULL` — dans les deux cas le fichier resterait servi
+  // par `/api/uploads/avatars/...`, donc une donnée personnelle publique que
+  // plus aucune ligne ne désigne. L'échec est **avalé** : la suppression est
+  // commitée, annoncer un refus au joueur serait faux.
+  try {
+    await deleteStoredImage(orphanedAvatar);
+  } catch {
+    // Fichier verrouillé ou disque en lecture seule : un résidu, pas un échec.
+  }
+
+  return mode;
+}
+
+/**
+ * L'effacement pur et simple, sous le verrou de `deleteOwnAccount`.
+ *
+ * Les cascades déjà déclarées font l'essentiel (sessions, appartenances,
+ * invitations) ; `bg_endurance_penalties.created_by` passe à `NULL`, la
+ * sanction restant due. Seules les visites demandent un geste : elles n'ont
+ * **aucune** clé étrangère (une cascade y effacerait l'historique de
+ * fréquentation), et c'est le lien vers une personne qu'il faut retirer, pas le
+ * fait qu'une page ait été vue — d'où un détachement, et **avant** l'effacement
+ * qui rendrait la ligne introuvable.
+ */
+async function eraseAccount(connection: PoolConnection, userId: number): Promise<void> {
+  await connection.execute(`UPDATE bg_site_visits SET user_id = NULL WHERE user_id = ?`, [userId]);
+  await connection.execute(`DELETE FROM bg_users WHERE id = ?`, [userId]);
+}
+
+/** L'anonymisation : la ligne reste, tout ce qui désigne une personne part. */
+async function anonymizeAccount(connection: PoolConnection, userId: number): Promise<void> {
+  await connection.execute(
     `UPDATE bg_users
      SET pseudo = CONCAT('compte_supprime_', id),
          avatar_url = NULL,
@@ -1069,10 +1155,11 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionM
      WHERE id = ?`,
     [userId],
   );
-  await db.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
-  // Le pseudo anonymisé doit aussi remplacer le nom affiché en tournoi.
-  await syncSoloEntryIdentity(userId);
-  return mode;
+  await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
+  // Le pseudo anonymisé doit aussi remplacer le nom affiché en tournoi — sur la
+  // connexion de la transaction, sans quoi le renommage survivrait à un
+  // rollback de l'anonymisation qui l'a motivé.
+  await syncSoloEntryIdentityOn(connection, userId);
 }
 
 export async function updateUserAvatar(userId: number, avatarPath: string | null): Promise<void> {

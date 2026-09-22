@@ -56,6 +56,37 @@ describe("ensureSoloEntry", () => {
     expect(params).toEqual(["ShadowNinja", "/api/uploads/avatars/1-ab.webp", 1]);
   });
 
+  it("verrouille la ligne du compte avant de créer l'entrée — aucune clé étrangère ne la tient", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce(USER as never)
+      .mockResolvedValueOnce(NO_ROW as never)
+      .mockResolvedValueOnce([{ insertId: 77 }] as never);
+
+    await ensureSoloEntry(fakeConnection(execute), 1);
+
+    const [sql] = execute.mock.calls[0] as [string];
+    expect(sql).toMatch(/FROM bg_users/);
+    expect(sql).toMatch(/FOR UPDATE/);
+  });
+
+  it("laisse la resynchronisation hors transaction lire sans verrouiller", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([[{ id: 55 }], []] as never)
+      .mockResolvedValueOnce(USER as never)
+      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+    (getDatabase as jest.Mock).mockResolvedValue({
+      getConnection: jest.fn(async () => ({ execute, release: jest.fn() })),
+    } as never);
+
+    await syncSoloEntryIdentity(1);
+
+    const [sql] = execute.mock.calls[1] as [string];
+    expect(sql).toMatch(/FROM bg_users/);
+    expect(sql).not.toMatch(/FOR UPDATE/);
+  });
+
   it("réutilise l'entrée existante et resynchronise son identité", async () => {
     const execute = jest
       .fn()

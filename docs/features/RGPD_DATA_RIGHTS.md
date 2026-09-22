@@ -27,9 +27,15 @@ affichées dans le tableau « Données collectées ») :
 - **Session** : le cookie `bg_session` expire **30 jours après la connexion**
   (TTL absolu fixé dans `createSession`, jamais rafraîchi) — et non « après
   30 jours d'inactivité ».
-- **Suppression de compte** : les données de profil sont **anonymisées
-  immédiatement** lors de la suppression (`anonymizeOwnAccount`), pas via un job
-  différé. Des copies de sauvegarde techniques peuvent subsister quelques jours.
+- **Suppression de compte** : deux gestes, décidés par `deleteOwnAccount`
+  (`lib/server/users-service.ts`) selon ce que le compte laisse derrière lui. Un
+  compte **jamais engagé** est **effacé** : sa ligne `bg_users` part, avec elle
+  ses identités, ses sessions et le fichier de son avatar. Un compte qui a
+  **joué** est **anonymisé** immédiatement — pseudo neutralisé, identités,
+  coordonnées et avatar effacés, la ligne restant pour que le palmarès des
+  équipes adverses tienne debout. Dans les deux cas c'est immédiat, jamais un
+  job différé ; des copies de sauvegarde techniques peuvent subsister quelques
+  jours. Voir `docs/features/ACCOUNT_DELETION.md`.
 - **Aucune mention de SIRET / RNA** (données non publiées) sur le site.
 
 ## 2. Consentement à l'inscription
@@ -63,5 +69,5 @@ affichées dans le tableau « Données collectées ») :
 | `components/cyber/RgpdConsentModal.tsx` | Popup de consentement |
 | `app/connexion/page.tsx` | Montage du consentement avant login |
 | `app/api/profile/export/route.ts` | Endpoint d'export RGPD |
-| `lib/server/users-service.ts` | `exportOwnData()` / `anonymizeOwnAccount()` |
+| `lib/server/users-service.ts` | `exportOwnData()` / `deleteOwnAccount()` |
 | `app/(secured)/profil/page.tsx` | Bouton d'export + mentions OW/Marvel |

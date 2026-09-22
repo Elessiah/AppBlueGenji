@@ -50,12 +50,25 @@ appartenances (`bg_team_members`), invitations (`bg_team_invitations`, des deux
 côtés) — et `bg_endurance_penalties.created_by` passe à `NULL`, la sanction
 restant due.
 
-Une seule table demande un geste : **`bg_site_visits`**, qui n'a
-**aucune clé étrangère** (une cascade y effacerait l'historique de
-fréquentation). Le lien est détaché plutôt que la ligne supprimée
+Deux choses demandent un geste, parce qu'aucune clé étrangère ne les couvre.
+
+**`bg_site_visits`** n'en a aucune — une cascade y effacerait l'historique de
+fréquentation. Le lien est donc détaché plutôt que la ligne supprimée
 (`SET user_id = NULL`) : ce qu'il faut retirer est le lien vers une personne, pas
 le fait qu'une page ait été vue. Et **avant** l'effacement du compte, faute de
 quoi la ligne ne serait plus retrouvable par `user_id`.
+
+**Le fichier de l'avatar** ne vit pas en base : `avatar_url` ne fait que le
+désigner. Or les photos des fournisseurs OAuth sont **copiées** chez nous à la
+connexion (`lib/server/user-avatar-import.ts`), si bien que presque tout compte
+effaçable — inscrit, jamais engagé — en possède un sous
+`public/uploads/avatars/`. La ligne partie, son chemin est perdu pour toujours
+et l'image reste servie par `/api/uploads/avatars/…` : une donnée personnelle
+publique que plus rien ne désigne, exactement le contraire de ce que la phrase
+de succès promet. Le chemin est donc relevé **avant** l'écriture et le fichier
+supprimé **après le commit** — un `unlink` ne se défait pas, et une transaction
+annulée rendrait un compte vivant sans sa photo. Même geste à l'anonymisation,
+qui met `avatar_url` à `NULL` : le fichier n'y survit pas davantage.
 
 L'**entrée solo** compte comme un engagement *par elle-même* : `bg_teams
 .solo_user_id` n'a volontairement pas de clé étrangère (une cascade effacerait
@@ -66,6 +79,34 @@ Les trois questions sont posées en **une** requête, trois `EXISTS` indexés. L
 poser séparément laisserait un `await` entre elles : un tournoi créé entre la
 deuxième et la troisième, et la ligne partirait quand même — sur une base qui la
 refuse.
+
+## La transaction, et le verrou
+
+Lecture des traces et écriture vivent dans **une seule transaction**, ouverte par
+un verrou sur la ligne du compte (`SELECT … FOR UPDATE`, en **toute première
+instruction** : sous `REPEATABLE READ`, c'est la première lecture *ordinaire* qui
+fige l'instantané, donc une trace lue avant le verrou daterait d'avant
+l'attente).
+
+Elle répond à deux choses distinctes.
+
+D'abord à l'**état intermédiaire** : le détachement des visites et le `DELETE`
+étaient deux instructions autocommitées, si bien qu'un `DELETE` refusé (verrou
+expiré, `RESTRICT`) laissait un compte bien vivant dont la fréquentation était
+anonymisée pour toujours.
+
+Ensuite à la **course**, et c'est là que le verrou sert. La plupart des traces
+sont tenues par des clés étrangères : une inscription d'équipe passe par
+`bg_team_members`, dont la clé refuserait de pointer vers un compte effacé, et
+`organizer_user_id` est en `RESTRICT` — la base tranche toute seule, bruyamment.
+Une seule ne l'est pas : **l'entrée solo**. Rien n'empêcherait d'en créer une
+pour un compte que la transaction voisine vient d'effacer, et elle pendrait alors
+sur un identifiant disparu — tout `JOIN bg_users` la laisserait silencieusement
+de côté, nom et logo figés à jamais. `ensureSoloEntry` pose donc **le même
+verrou** sur la ligne du compte avant de créer l'entrée : ou bien l'inscription
+passe la première et la suppression *voit* l'entrée solo (donc anonymise), ou
+bien la suppression passe la première et l'inscription ne trouve plus personne
+(`USER_NOT_FOUND`).
 
 ## Ce que le joueur lit
 
@@ -85,7 +126,8 @@ sur la phrase la plus prudente, celle qui promet le moins d'effacement.
 ## Les comptes anonymisés à l'annuaire
 
 `/joueurs` les masque **par défaut**, derrière une case à cocher qui les compte
-(`Comptes supprimés (3)`), rendue seulement s'il y en a. La case n'est pas un
+(`Comptes supprimés (3)`), rendue seulement s'il y en a — une `<Coche>`, comme
+partout ailleurs sur le site, et non la case par défaut du navigateur. La case n'est pas un
 filtre de plus : tout ce que la page montre ou compte descend de la même liste,
 sans quoi elle changerait les cartes sans changer les compteurs qui les
 surmontent.
@@ -94,6 +136,13 @@ Ils ne sont pas **retirés** de la réponse : c'est le seul moyen de retrouver u
 adversaire d'un tournoi passé, et la ligne ne porte plus rien de personnel.
 `listPlayers` rend donc `isDeleted`, et le filtre est côté client comme les
 autres de cet écran.
+
+La carte d'un compte anonymisé est **en retrait** et porte la mention « Compte
+supprimé ». Le retrait est posé sur les décorations une par une, jamais sur la
+carte entière : `opacity` se multiplie de parent à enfant et aucun enfant ne peut
+la défaire, si bien qu'une carte assombrie rendait illisible la mention qui
+explique justement pourquoi elle l'est — et le survol qui la relevait n'existe
+pas au doigt.
 
 ## Voir aussi
 

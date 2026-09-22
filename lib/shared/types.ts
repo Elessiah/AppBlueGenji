@@ -278,8 +278,12 @@ export type PublicUserProfile = {
    *
    * Rendu par `listPlayers` seul : l'annuaire masque ces lignes **par défaut**
    * derrière une case à cocher, la ligne restant nécessaire à qui remonte un
-   * ancien match. Absent partout ailleurs — une fiche de profil anonymisée ne
-   * s'ouvre pas.
+   * ancien match.
+   *
+   * Absent des autres lectures (`getUserById`, `getFullProfile`), qui ne
+   * filtrent pas `is_deleted` : la fiche d'un compte anonymisé **s'ouvre**
+   * encore — il n'y reste rien de personnel, et le lien vient d'un plateau ou
+   * d'un ancien match —, elle ne s'annonce simplement pas comme supprimée.
    */
   isDeleted?: boolean;
   team?: {

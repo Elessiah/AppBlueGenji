@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/toast";
 import { Ticker } from "@/components/cyber/Ticker";
 import { BgCanvas } from "../_shared/BgCanvas";
 import { AnnuaireSearchField } from "../_shared/AnnuaireSearchField";
+import { Coche } from "@/components/Coche";
 import { PlayerCard } from "./cards/PlayerCard";
 import s from "../_shared/annuaire.module.css";
 
@@ -181,22 +182,12 @@ export default function PlayersPage() {
               {deletedCount > 0 && (
                 <>
                   <span style={{ color: "var(--ink-dim)" }}>·</span>
-                  <label
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 7,
-                      cursor: "pointer",
-                      color: showDeleted ? "var(--ink)" : "var(--ink-dim)",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={showDeleted}
-                      onChange={(e) => setShowDeleted(e.target.checked)}
-                    />
-                    Comptes supprimés ({deletedCount})
-                  </label>
+                  <Coche
+                    label={`Comptes supprimés (${deletedCount})`}
+                    checked={showDeleted}
+                    onChange={setShowDeleted}
+                    theme="joueur"
+                  />
                 </>
               )}
             </div>
