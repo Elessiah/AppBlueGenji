@@ -1426,7 +1426,12 @@ input[type="radio"] {
      bien qu'un rembourrage hérité d'une règle voisine repousse la taille
      au-delà des 16 px demandés et rend la case rectangulaire. */
   padding: 0;
-  border: 1px solid var(--line-strong);
+  /* La bordure **est** le contrôle tant qu'il est décoché : rien d'autre ne le
+     dessine. `--line-strong` (0,24 de blanc) rend ≈ 2,1:1 sur le fond du site,
+     sous les 3:1 qu'un contour de contrôle demande (WCAG 1.4.11) — d'où une
+     valeur propre, qui monte à ≈ 4,6:1. Le token reste ce qu'il est ailleurs :
+     il borde des surfaces, pas des cases de 16 px. */
+  border: 1px solid rgba(255, 255, 255, 0.45);
   border-radius: var(--r-cy-sm);
   background: rgba(10, 11, 15, 0.88);
   cursor: pointer;
@@ -1473,9 +1478,11 @@ input[type="radio"]:focus-visible {
   box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.28);
 }
 
+/* 0,6 est l'atténuation des autres champs désactivés du site — et, la bordure
+   portant seule le contrôle décoché, descendre plus bas revenait à l'effacer. */
 input[type="checkbox"]:disabled,
 input[type="radio"]:disabled {
-  opacity: 0.45;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 

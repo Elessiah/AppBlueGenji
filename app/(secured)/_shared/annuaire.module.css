@@ -167,7 +167,7 @@
   font-size: 14px;
   color: var(--ink);
 }
-.search input::placeholder {
+.search input:not([type="checkbox"], [type="radio"])::placeholder {
   color: var(--ink-dim);
 }
 .searchKbd {

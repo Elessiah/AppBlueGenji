@@ -110,13 +110,22 @@ const BOX_PROPERTIES = [
   "width",
   "height",
   "padding",
+  "margin",
+  "display",
   "border",
   "background",
   "box-shadow",
+  // `appearance: none` retire l'anneau natif : `outline` fait désormais partie
+  // de ce qui peut casser le contrôle sans qu'on le voie.
+  "outline",
 ];
 
-/** Un `input` sans `[type=…]` accolé : ce compound-là attrape les cases. */
-const BARE_INPUT = /(^|[\s>+~,])input(?![\w-]|\[|\s*\{)/;
+/**
+ * Un `input` sans `[type=…]` accolé : ce compound-là attrape les cases. La
+ * parenthèse ouvrante compte parmi les débuts possibles — `:is(input, textarea)`
+ * vise l'élément nu tout autant que `.x input`.
+ */
+const BARE_INPUT = /(^|[\s>+~,(])input(?![\w-]|\[|\s*\{)/;
 
 type Offender = { file: string; selector: string };
 
@@ -172,14 +181,19 @@ function bareInputOffenders(path: string, css: string): Offender[] {
 }
 
 describe("Cases à cocher — aucune feuille ne redéfinit l'apparence", () => {
-  const sheets = [join(ROOT, "app", "globals.css")]
-    .concat(walk(join(ROOT, "app"), ".module.css"))
-    .concat(walk(join(ROOT, "components"), ".module.css"))
+  // Toutes les feuilles, pas seulement celles de module : `/bot` en importe deux
+  // qui sont globales (`bot.css`, `docs/docs.css`) et pèsent donc autant.
+  const sheets = walk(join(ROOT, "app"), ".css")
+    .concat(walk(join(ROOT, "components"), ".css"))
     .map((path) => ({ path, css: readFileSync(path, "utf8") }));
 
   it("trouve bien des feuilles à contrôler", () => {
-    expect(sheets.length).toBeGreaterThan(1);
+    expect(sheets.some(({ path }) => path.endsWith("globals.css"))).toBe(true);
     expect(sheets.some(({ path }) => path.endsWith(".module.css"))).toBe(true);
+    // Les feuilles globales hors module comptent aussi.
+    expect(
+      sheets.some(({ path }) => path.endsWith("bot.css") || path.endsWith("docs.css")),
+    ).toBe(true);
   });
 
   it("n'habille jamais un `input` nu sans exclure la case à cocher", () => {
@@ -199,6 +213,11 @@ describe("Cases à cocher — aucune feuille ne redéfinit l'apparence", () => {
     // sur l'élément.
     const half = '.a input:not([type="checkbox"]) { width: auto; }';
     expect(bareInputOffenders("x.css", half)).toHaveLength(1);
+    // Un `:is(…)` vise l'élément nu tout autant qu'un descendant écrit à plat.
+    const wrapped = ".panel :is(input, textarea) { padding: 8px; }";
+    expect(bareInputOffenders("x.css", wrapped)).toHaveLength(1);
+    // `outline` casse l'anneau de focus, que `appearance: none` a retiré.
+    expect(bareInputOffenders("x.css", ".a input:focus { outline: 2px solid; }")).toHaveLength(1);
     expect(bareInputOffenders("x.css", "input, textarea { font: inherit; }")).toEqual([]);
     // La virgule d'un `:not(…)` n'est pas celle d'une liste de sélecteurs.
     expect(splitSelectorList('a:not(.x, .y), b')).toEqual(["a:not(.x, .y)", "b"]);
@@ -225,7 +244,16 @@ function inlineOffenders(path: string, source: string): Offender[] {
     const tag = end === -1 ? chunk.slice(0, 600) : chunk.slice(0, end);
     if (!/type=["'](checkbox|radio)["']/.test(tag)) continue;
     const style = tag.match(/style=\{\{([\s\S]*?)\}\}/);
-    if (!style) continue;
+    if (!style) {
+      // Un `style={variable}` ne se lit pas d'ici : le balayage ne peut ni
+      // l'innocenter ni le condamner, donc il le refuse — la règle globale doit
+      // rester le seul endroit où l'apparence se décide. (Un `{...props}` sans
+      // `style` reste permis : il ne porte pas d'apparence par lui-même.)
+      if (/style=\{/.test(tag)) {
+        offenders.push({ file: relative(ROOT, path), selector: "style non littéral" });
+      }
+      continue;
+    }
     // Une case délibérément masquée (relais de focus d'un contrôle dessiné à
     // côté) donne sa propre boîte : elle ne peint rien.
     if (/opacity:\s*0(?![.\d])/.test(style[1])) continue;
@@ -259,5 +287,11 @@ describe("Cases à cocher — aucun style en ligne ne reprend la main", () => {
     // `opacity: 0.6` n'est pas un masquage : la case se voit, donc elle est tenue.
     const faded = '<input type="checkbox" style={{ opacity: 0.6, width: 18 }} />';
     expect(inlineOffenders("x.tsx", faded)).toHaveLength(1);
+    // Illisible d'ici, donc refusé : l'apparence ne se décide qu'au global.
+    const opaque = '<input type="checkbox" style={someStyle} />';
+    expect(inlineOffenders("x.tsx", opaque)).toHaveLength(1);
+    // Un étalement de props sans `style` ne porte aucune apparence.
+    const spread = '<input type="checkbox" {...props} />';
+    expect(inlineOffenders("x.tsx", spread)).toEqual([]);
   });
 });
