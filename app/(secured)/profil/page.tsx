@@ -8,6 +8,7 @@ import { Coche } from "@/components/Coche";
 import type { FullProfileResponse } from "@/lib/shared/types";
 import {
   accountDeletionConfirmation,
+  accountDeletionErrorMessage,
   accountDeletionOutcome,
   type AccountDeletionPlan,
   type AccountRetentionReason,
@@ -191,7 +192,10 @@ export default function ProfilePage() {
     try {
       const response = await fetch("/api/profile", { method: "DELETE" });
       const payload = (await response.json()) as { error?: string } & Partial<AccountDeletionPlan>;
-      if (!response.ok) throw new Error(payload.error || "ACCOUNT_DELETE_FAILED");
+      // Le corps porte un **code**, pas une phrase : la traduction vit dans le
+      // module pur, et un code inconnu retombe sur la phrase générique plutôt
+      // que de s'afficher tel quel.
+      if (!response.ok) throw new Error(accountDeletionErrorMessage(payload.error));
       // `reason` vaut `null` sur un effacement complet : c'est une réponse, pas
       // une absence de réponse. Le `mode` sert donc de témoin — il dit que le
       // serveur a bien répondu, là où un `??` sur le motif retomberait sur

@@ -32,7 +32,12 @@ type Trace = { tournaments: number; organized: number; owned: number };
  */
 function fakeDb(
   trace: Trace,
-  options: { avatarUrl?: string | null; missing?: boolean; failOn?: string } = {},
+  options: {
+    avatarUrl?: string | null;
+    missing?: boolean;
+    failOn?: string;
+    failWith?: Error;
+  } = {},
 ) {
   const queries: Query[] = [];
   const avatarUrl = options.avatarUrl ?? null;
@@ -40,7 +45,9 @@ function fakeDb(
   const execute = jest.fn(async (sql: string, params: unknown[] = []) => {
     const q = String(sql).replace(/\s+/g, " ").trim();
     queries.push({ sql: q, params });
-    if (options.failOn && q.includes(options.failOn)) throw new Error("DB_DOWN");
+    if (options.failOn && q.includes(options.failOn)) {
+      throw options.failWith ?? new Error("DB_DOWN");
+    }
     if (q.includes("AS tournaments")) return [[trace]];
     if (q.includes("SELECT avatar_url FROM bg_users")) {
       return [options.missing ? [] : [{ avatar_url: avatarUrl }]];
@@ -271,5 +278,44 @@ describe("deleteOwnAccount — le fichier de l'avatar", () => {
     fakeDb(EMPTY, { avatarUrl: "/api/uploads/avatars/7-gh.webp" });
 
     await expect(deleteOwnAccount(7)).resolves.toEqual({ mode: "ERASE", reason: null });
+  });
+});
+
+describe("deleteOwnAccount — un refus de la base ne part pas tel quel", () => {
+  /** Ce que MySQL rend quand une clé étrangère en `RESTRICT` retient la ligne. */
+  function referencedRow(): Error {
+    const error = new Error(
+      "Cannot delete or update a parent row: a foreign key constraint fails " +
+        "(`bluegenji`.`bg_tournaments`, CONSTRAINT `fk_bg_tournaments_organizer` ...)",
+    ) as Error & { code: string };
+    error.code = "ER_ROW_IS_REFERENCED_2";
+    return error;
+  }
+
+  it("rend un code stable plutôt que le message de MySQL", async () => {
+    // Le contrôle de clé étrangère lit la dernière version commitée et non
+    // l'instantané : un tournoi créé après la lecture des traces retient la
+    // ligne, et la route rend le message de l'erreur telle quelle.
+    fakeDb(EMPTY, { failOn: "DELETE FROM bg_users", failWith: referencedRow() });
+
+    await expect(deleteOwnAccount(7)).rejects.toThrow("ACCOUNT_STILL_REFERENCED");
+  });
+
+  it("n'en fait pas un fourre-tout : une autre panne remonte telle quelle", async () => {
+    fakeDb(EMPTY, { failOn: "DELETE FROM bg_users" });
+
+    await expect(deleteOwnAccount(7)).rejects.toThrow("DB_DOWN");
+  });
+
+  it("annule tout de même la transaction", async () => {
+    const { connection } = fakeDb(EMPTY, {
+      failOn: "DELETE FROM bg_users",
+      failWith: referencedRow(),
+    });
+
+    await expect(deleteOwnAccount(7)).rejects.toThrow();
+
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(connection.commit).not.toHaveBeenCalled();
   });
 });

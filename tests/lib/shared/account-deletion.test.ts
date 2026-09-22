@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   accountDeletionConfirmation,
+  accountDeletionErrorMessage,
   accountDeletionMode,
   accountDeletionOutcome,
   accountDeletionPlan,
@@ -140,5 +141,21 @@ describe("accountDeletionOutcome", () => {
     expect(accountDeletionOutcome("ORGANIZED_TOURNAMENTS")).not.toContain("statistiques");
     expect(accountDeletionOutcome("OWNED_TEAMS")).not.toContain("statistiques");
     expect(accountDeletionOutcome("TOURNAMENTS")).toContain("statistiques");
+  });
+});
+
+describe("accountDeletionErrorMessage", () => {
+  it("nomme le geste qui débloque une ligne devenue référencée", () => {
+    const message = accountDeletionErrorMessage("ACCOUNT_STILL_REFERENCED");
+    expect(message).toMatch(/[Rr]éessaie/);
+    expect(message).toContain("anonymisé");
+  });
+
+  it("ne laisse jamais passer un code brut dans une notification", () => {
+    for (const code of [undefined, "ACCOUNT_DELETE_FAILED", "ER_ROW_IS_REFERENCED_2"]) {
+      const message = accountDeletionErrorMessage(code);
+      expect(message).not.toContain("_");
+      expect(message).toMatch(/[éèà]/);
+    }
   });
 });

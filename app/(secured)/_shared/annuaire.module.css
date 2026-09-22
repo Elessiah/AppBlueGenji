@@ -718,7 +718,6 @@
    seule chose que la carte ait de plus à dire. */
 .plCardDeleted .plAvatarWrap,
 .plCardDeleted .plPseudo,
-.plCardDeleted .plTeam,
 .plCardDeleted .plRoles,
 .plCardDeleted .plStats,
 .plCardDeleted .plTags {
@@ -729,18 +728,43 @@
 
 .plCardDeleted:hover .plAvatarWrap,
 .plCardDeleted:hover .plPseudo,
-.plCardDeleted:hover .plTeam,
 .plCardDeleted:hover .plRoles,
 .plCardDeleted:hover .plStats,
 .plCardDeleted:hover .plTags,
 .plCardDeleted:focus-within .plAvatarWrap,
 .plCardDeleted:focus-within .plPseudo,
-.plCardDeleted:focus-within .plTeam,
 .plCardDeleted:focus-within .plRoles,
 .plCardDeleted:focus-within .plStats,
 .plCardDeleted:focus-within .plTags {
   opacity: 1;
   filter: none;
+}
+
+/* `.plTeam` est le seul bloc en retrait qui contienne un lien : celui de
+   l'équipe, que `.aboveOverlay` (`z-index: 2`) fait passer **au-dessus** de la
+   plaque `.cardOverlay` (`z-index: 1`). Or `opacity < 1` comme `filter` créent
+   un **contexte d'empilement** : le `z-index: 2` se résoudrait alors à
+   l'intérieur de `.plTeam`, qui repasserait entier sous la plaque — le nom de
+   l'équipe mènerait à la fiche du joueur, sans qu'aucune règle de style ne
+   paraisse en cause. Le retrait se fait donc ici par la **couleur**, qui n'en
+   crée aucun. */
+.plCardDeleted .plTeam {
+  color: var(--ink-dim);
+  transition: color 0.15s ease;
+}
+
+.plCardDeleted .plTeam em {
+  color: var(--ink-mute);
+}
+
+.plCardDeleted:hover .plTeam,
+.plCardDeleted:focus-within .plTeam {
+  color: var(--ink-mute);
+}
+
+.plCardDeleted:hover .plTeam em,
+.plCardDeleted:focus-within .plTeam em {
+  color: var(--c, var(--blue-300));
 }
 
 .plDeletedMark {

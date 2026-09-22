@@ -7,6 +7,7 @@ import {
   type AccountDeletionPlan,
   type AccountTrace,
 } from "@/lib/shared/account-deletion";
+import { isReferencedRowError } from "@/lib/server/mysql-errors";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
@@ -1089,6 +1090,14 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
     await connection.commit();
   } catch (error) {
     await connection.rollback();
+    // Une clé étrangère en `RESTRICT` peut encore refuser l'effacement : ses
+    // contrôles lisent la dernière version commitée et non l'instantané de la
+    // transaction, donc un tournoi créé après la lecture des traces retient la
+    // ligne. Le message brut de MySQL nomme la base, la table et la contrainte
+    // — il partirait tel quel dans la notification, `DELETE /api/profile`
+    // rendant le message de l'erreur. Un code stable à la place : le second
+    // essai lira la trace et anonymisera, ce qui est la bonne réponse.
+    if (isReferencedRowError(error)) throw new Error("ACCOUNT_STILL_REFERENCED");
     throw error;
   } finally {
     connection.release();

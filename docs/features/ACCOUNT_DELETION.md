@@ -165,6 +165,34 @@ la défaire, si bien qu'une carte assombrie rendait illisible la mention qui
 explique justement pourquoi elle l'est — et le survol qui la relevait n'existe
 pas au doigt.
 
+Un bloc y échappe, et pas par exception décorative : **`.plTeam`**, le seul en
+retrait qui contienne un lien. `opacity < 1` comme `filter` créent un **contexte
+d'empilement**, et le `z-index: 2` d'`.aboveOverlay` — posé pour faire repasser
+le nom de l'équipe **au-dessus** de la plaque `.cardOverlay` (`z-index: 1`) — s'y
+résoudrait alors *à l'intérieur* de `.plTeam`, qui repasserait entier sous la
+plaque. Le nom de l'équipe mènerait à la fiche du joueur, sans qu'aucune règle
+ne paraisse en cause. Son retrait se fait donc par la **couleur**, qui ne crée
+aucun contexte. Les deux propriétés sont gardées par
+`tests/app/deleted-player-card.test.ts` : leurs pannes sont muettes, ni erreur ni
+image cassée.
+
+## Quand la base refuse quand même
+
+Les contrôles de clé étrangère lisent la **dernière version commitée**, et non
+l'instantané de la transaction : un tournoi créé entre la lecture des traces et
+le `DELETE` retient la ligne que les traces disaient libre, et
+`fk_bg_tournaments_organizer` (`ON DELETE RESTRICT`) refuse. Le verrou du compte
+ne ferme pas ce cas — l'organisateur d'un tournoi n'est pas tenu d'être celui qui
+le crée.
+
+Le message brut de MySQL nomme la base, la table et la contrainte, et
+`DELETE /api/profile` rend le message de l'erreur : il partirait tel quel dans la
+notification du joueur. `isReferencedRowError` (`lib/server/mysql-errors.ts`) le
+traduit donc en `ACCOUNT_STILL_REFERENCED`, et `accountDeletionErrorMessage` en
+une phrase française qui nomme la suite : **réessayer**, le second passage lisant
+la trace neuve et anonymisant. Tout code inconnu retombe sur la phrase générique
+— une notification est lue par un joueur, jamais par qui a nommé le code.
+
 ## Voir aussi
 
 - `docs/AUTHORIZATION_RULES.md` — qui peut supprimer quoi.

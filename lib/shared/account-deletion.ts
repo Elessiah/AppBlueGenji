@@ -153,3 +153,23 @@ export function accountDeletionOutcome(
       return "Compte effacé. Il ne reste aucune trace de ton passage sur le site.";
   }
 }
+
+/**
+ * Le refus, en français.
+ *
+ * La suppression ne peut échouer que de deux façons, et l'une d'elles est une
+ * **course** que rien ne ferme : une clé étrangère en `RESTRICT` lit la dernière
+ * version commitée, non l'instantané de la transaction, si bien qu'un tournoi
+ * créé après la lecture des traces retient une ligne qu'elles disaient libre.
+ * Le second essai anonymisera — c'est exactement ce que la phrase invite à
+ * faire.
+ *
+ * Tout code inconnu retombe sur la phrase générique : une notification est lue
+ * par un joueur, jamais par le développeur qui a nommé le code.
+ */
+export function accountDeletionErrorMessage(code: string | undefined): string {
+  if (code === "ACCOUNT_STILL_REFERENCED") {
+    return "Ton compte a été rattaché à un tournoi ou à une équipe pendant la suppression. Réessaie : il sera alors anonymisé plutôt qu'effacé.";
+  }
+  return "La suppression du compte a échoué. Réessaie dans un instant.";
+}
