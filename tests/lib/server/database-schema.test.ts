@@ -131,29 +131,67 @@ describe("Schéma — l'adresse e-mail a disparu", () => {
 
 describe("Schéma — la règle des deux endroits", () => {
   /**
-   * Une colonne **postérieure** à la version que sert la production a encore un
-   * `ALTER` à faire jouer : un `CREATE TABLE IF NOT EXISTS` ne fait rien du tout
-   * sur une base qui existe déjà. Elle s'écrit donc **deux fois** — dans la table
-   * neuve *et* en migration —, et c'est précisément la règle que
-   * `docs/DATABASE_SCHEMA.md` pose pour la suite.
+   * Une colonne **récente** — dont on ne peut pas affirmer que la production l'a
+   * déjà jouée — s'écrit **deux fois** : dans le `CREATE TABLE` pour une base
+   * neuve, et en `ALTER` pour celle qui tourne. Un `CREATE TABLE IF NOT EXISTS`
+   * n'ajoute rien à une table présente, il ne fait rien du tout.
    *
-   * L'oublier ne casse aucun test qui lirait la seule table : la panne est au
-   * redémarrage de la production, sur une colonne que toutes les requêtes
-   * nomment.
+   * Oublier la seconde moitié ne casse aucun test qui lirait la seule table : la
+   * panne est au **redémarrage de la production**, sur une requête qui nomme la
+   * colonne, et il est alors trop tard pour la reposer sans interruption.
    */
-  const RECENT_COLUMNS = ["registration_blizzard_requirement"];
+  const RECENT = [
+    ["bg_discord_login_challenges", "handle"],
+    ["bg_users", "discord_verified_at"],
+    ["bg_users", "blizzard_sub"],
+    ["bg_tournaments", "registration_discord_requirement"],
+    ["bg_tournaments", "registration_min_players"],
+    ["bg_tournaments", "registration_blizzard_requirement"],
+  ] as const;
 
-  it.each(RECENT_COLUMNS)("écrit %s dans la table neuve", (column) => {
-    expect(table("bg_tournaments")).toContain(column);
+  // Bornée aux deux extrémités : après elle vivent les « rattrapages
+  // permanents », qui gardent volontairement un `catch` muet.
+  const migrations = sql.slice(
+    sql.indexOf("const RECENT_COLUMNS"),
+    sql.indexOf("// Rattrapages permanents"),
+  );
+
+  it.each(RECENT)("%s.%s est dans la table neuve", (tableName, column) => {
+    expect(table(tableName)).toContain(column);
   });
 
-  it.each(RECENT_COLUMNS)("et la pose aussi par ALTER, pour les bases existantes", (column) => {
-    // Le `ALTER` est cherché **dans la section des migrations**, pas n'importe
-    // où : le nom de la colonne figure aussi dans le `CREATE TABLE`.
-    const alter = sql.slice(sql.indexOf("// Migrations"));
-    expect(alter).toMatch(
-      new RegExp(`ALTER TABLE bg_tournaments\\s+ADD COLUMN\\s+${column}`),
+  it.each(RECENT)("%s.%s est aussi dans la liste des migrations", (tableName, column) => {
+    expect(migrations).toMatch(
+      new RegExp(`"${tableName}",\\s*\n?\\s*"${column}"|\\["${tableName}", "${column}"`),
     );
+  });
+
+  it("joue la liste par un seul ALTER paramétré", () => {
+    expect(sql).toContain(
+      "ALTER TABLE ${table} ADD COLUMN ${column} ${definition}",
+    );
+  });
+
+  it("n'avale que « la colonne est déjà là »", () => {
+    // Un droit `ALTER` manquant ou un verrou de métadonnées laisserait le schéma
+    // en arrière du code sans que rien ne le dise : la base démarrerait, et la
+    // panne se lirait plus tard sur une requête.
+    //
+    // Le contrôle porte sur la **section des migrations** seule : les
+    // `CREATE TABLE` et les deux rattrapages permanents gardent leur `catch`
+    // muet, et c'est voulu — ils sont idempotents et rien n'en dépend.
+    const guards = [...migrations.matchAll(/if \(!isSchemaNoOpError\(error\)\) throw error;/g)];
+    expect(guards).toHaveLength(2);
+    expect(migrations).not.toMatch(/catch\s*\{\s*\/\/[^\n]*\n\s*\}/);
+  });
+
+  it("ne relâche pas la garde sur le DROP, qui **est** l'effacement", () => {
+    // Rien ne lit plus `email`, donc la base démarre parfaitement sans le DROP —
+    // et `anonymizeOwnAccount` ne met plus l'adresse à NULL. Un ALTER refusé et
+    // avalé garderait les adresses indéfiniment, y compris sur les comptes qui
+    // ont demandé leur suppression.
+    const drop = sql.slice(sql.indexOf("DROP COLUMN email"));
+    expect(drop.slice(0, 200)).toContain("isSchemaNoOpError");
   });
 });
 
@@ -168,6 +206,8 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
       .split("\n")
       .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
       .join("\n");
+    // Deux seulement : la boucle paramétrée des colonnes récentes, et le retrait
+    // de l'adresse e-mail.
     expect([...code.matchAll(/ALTER TABLE/g)]).toHaveLength(2);
     expect(code).toContain("ALTER TABLE bg_users DROP COLUMN email");
   });

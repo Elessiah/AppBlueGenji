@@ -60,3 +60,30 @@ export function isMissingTableError(error: unknown): boolean {
 export function isDuplicateEntryError(error: unknown): boolean {
   return errorCode(error) === "ER_DUP_ENTRY";
 }
+
+/**
+ * `true` si la migration n'avait **rien à faire** : la colonne visée existe
+ * déjà, ou n'existe plus.
+ *
+ * C'est le cas nominal des migrations de `lib/server/database.ts`, rejouées à
+ * chaque démarrage, et le **seul** qu'un `catch` a le droit d'avaler. Tout
+ * autre échec — droit `ALTER` manquant, verrou de métadonnées sur une table
+ * chaude — laisse le schéma dans un état que le code ne suppose plus : la base
+ * démarre, et la panne se lit plus tard sur une requête qui nomme la colonne.
+ *
+ * Le distinguer n'est pas de la coquetterie sur un `DROP` : la colonne
+ * `bg_users.email` est retirée **pour effacer les adresses**, et un échec avalé
+ * les garde indéfiniment sans que rien ne le dise, l'anonymisation ne les
+ * effaçant plus non plus.
+ */
+export function isSchemaNoOpError(error: unknown): boolean {
+  const code = errorCode(error);
+  return (
+    // La colonne à ajouter existe déjà.
+    code === "ER_DUP_FIELDNAME" ||
+    // La colonne à retirer n'existe pas (ou l'index n'existe pas).
+    code === "ER_CANT_DROP_FIELD_OR_KEY" ||
+    // L'index unique posé avec la colonne existe déjà.
+    code === "ER_DUP_KEYNAME"
+  );
+}

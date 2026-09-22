@@ -49,26 +49,47 @@ Un changement de schéma s'écrit **à deux endroits** :
    tournent déjà.
 
 Une migration qu'on sait jouée partout peut ensuite être retirée de cette
-section — c'est ce qui vient d'être fait pour les soixante-trois autres.
+section — c'est ce qui a été fait pour les soixante-trois anciennes.
 
-Le fichier porte donc exactement **deux** `ALTER`, et ils illustrent chacun une
-moitié de la règle :
+### Ce qui est replié, et ce qui ne l'est pas
 
-- **`bg_users DROP COLUMN email`** — un changement que la production n'a pas
-  encore joué, et qui n'a rien à faire dans un `CREATE TABLE` puisqu'il
-  *retire* : la colonne est simplement absente de la table neuve.
-- **`bg_tournaments ADD COLUMN registration_blizzard_requirement`** — la
-  condition d'inscription « compte Blizzard », **postérieure** à la version que
-  sert la production. Elle est écrite aux deux endroits, et c'est le cas qui
-  montre pourquoi la règle existe : la replier dans le seul `CREATE TABLE` aurait
-  fait disparaître la colonne pour la base qui tourne, laquelle aurait redémarré
-  sur un schéma que toutes les requêtes de tournoi contredisent.
+Replier un `ALTER` dans son `CREATE TABLE` n'est sans danger que si **toute base
+vivante l'a déjà joué**. Les soixante-trois anciens remplissent cette condition.
+Les colonnes **récentes** — celles dont on ne peut pas affirmer que le serveur
+les a vues passer — restent donc écrites aux deux endroits, dans la liste
+`RECENT_COLUMNS` de `lib/server/database.ts` :
 
-`tests/lib/server/database-schema.test.ts` fige les deux : la colonne récente est
-exigée dans la table **et** dans la section « Migrations », et le nombre total
-d'`ALTER` est compté sur les lignes de code — une assertion accrochée à une seule
-forme d'écriture (`db.execute(\`ALTER`) restait verte en ne voyant pas une
-migration posée sur plusieurs lignes.
+| PR | Table | Colonne |
+|---|---|---|
+| #135 | `bg_discord_login_challenges` | `handle` |
+| #135 | `bg_users` | `discord_verified_at` |
+| #135 | `bg_tournaments` | `registration_discord_requirement` |
+| #135 | `bg_tournaments` | `registration_min_players` |
+| #136 | `bg_users` | `blizzard_sub` |
+| #137 | `bg_tournaments` | `registration_blizzard_requirement` |
+
+Le coût est nul : chaque entrée retombe en silence quand la colonne est là, et le
+bloc ne fait rien sur une base neuve. **La liste est faite pour rétrécir** — une
+colonne dont un déploiement a confirmé le passage se retire d'ici, sa définition
+restant dans la table. Ce qu'il ne faut pas faire, c'est la retirer *par
+anticipation* : la panne n'apparaît qu'au redémarrage, sur une requête qui nomme
+la colonne, et il est alors trop tard pour la reposer sans interruption.
+
+### Ce qu'un `catch` a le droit d'avaler
+
+Dans cette section, **un seul cas** : « la colonne est déjà là » (ou déjà
+partie), le cas nominal d'une migration rejouée à chaque démarrage. C'est ce que
+reconnaît `isSchemaNoOpError` (`lib/server/mysql-errors.ts`). Tout autre échec —
+droit `ALTER` manquant, verrou de métadonnées sur une table chaude — laisse le
+schéma **en arrière du code** : la base démarre, et la panne se lit plus tard sur
+une requête qui nomme la colonne. Il est donc relancé.
+
+La distinction n'est pas de la coquetterie sur le `DROP COLUMN email`, elle y est
+même plus forte : ce `DROP` **est** l'effacement des adresses. Rien ne lit plus la
+colonne, donc la base démarrerait parfaitement sans lui, et `anonymizeOwnAccount`
+ne met plus l'adresse à `NULL` — cette ligne n'ayant plus d'objet. Un `ALTER`
+refusé et avalé garderait donc les adresses **indéfiniment et en silence**, y
+compris sur les comptes qui ont demandé leur suppression.
 
 ## Le retrait de `bg_users.email`
 

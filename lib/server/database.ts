@@ -1,5 +1,6 @@
 ﻿import "dotenv/config";
 import mysql, { type ExecuteValues, type Pool, type PoolConnection } from "mysql2/promise";
+import { isSchemaNoOpError } from "@/lib/server/mysql-errors";
 import { createOnceGate, withMigrationLock } from "@/lib/server/migration-lock";
 import { CONTACT_DISCORD_URL_KEY } from "@/lib/shared/contact";
 import { DISCORD_INVITE_URL, SUPERSEDED_DISCORD_INVITE_URLS } from "@/lib/shared/discord";
@@ -698,26 +699,59 @@ async function runMigrations(db: Pool): Promise<void> {
   // ───────────────────────────────────────────────────────────────────────────
   //
   // Ce que les `CREATE TABLE` ci-dessus ne font **pas** sur une base qui existe
-  // déjà. Chaque entrée retombe en silence quand elle a déjà été jouée, et rien
-  // n'en dépend : ce bloc est vide par construction sur une base neuve.
-
-  // La condition d'inscription « compte Blizzard » est **postérieure** à la
-  // version que sert la production : elle a donc encore un `ALTER` à faire
-  // jouer, là où les soixante-trois autres ont été repliés dans les
-  // `CREATE TABLE` parce que la production les avait déjà tous joués.
+  // déjà : un `CREATE TABLE IF NOT EXISTS` n'ajoute aucune colonne à une table
+  // présente, il ne fait rien du tout. C'est la seconde moitié de la règle des
+  // deux endroits (`docs/DATABASE_SCHEMA.md`), et la seule que voie la
+  // production.
   //
-  // C'est la règle des **deux endroits** (`docs/DATABASE_SCHEMA.md`) en
-  // exercice : la colonne est écrite dans la table neuve *et* ici, la seconde
-  // écriture étant la seule que voie une base qui existe déjà — un
-  // `CREATE TABLE IF NOT EXISTS` n'y fait rien du tout.
-  try {
-    await db.execute(
-      `ALTER TABLE bg_tournaments
-         ADD COLUMN registration_blizzard_requirement
-           ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'NONE'`,
-    );
-  } catch {
-    // Colonne déjà posée (cas nominal sur une base neuve ou déjà migrée).
+  // **Ce qui est replié, et ce qui ne l'est pas.** Replier un `ALTER` dans son
+  // `CREATE TABLE` n'est sans danger que si toute base vivante l'a déjà joué.
+  // Les soixante-trois anciens remplissent cette condition. Les colonnes
+  // ci-dessous sont les **récentes** — celles dont on ne peut pas affirmer que
+  // le serveur les a vues passer —, et elles restent donc écrites aux deux
+  // endroits. Le coût est nul : chaque entrée retombe en silence quand la
+  // colonne est là, et le bloc ne fait rien sur une base neuve.
+  //
+  // La liste est faite pour **rétrécir** : une colonne dont un déploiement a
+  // confirmé le passage se retire d'ici, sa définition restant dans la table.
+  // Ce qu'il ne faut pas faire, c'est la retirer *par anticipation* — la panne
+  // n'apparaît qu'au redémarrage, sur une requête qui nomme la colonne, et il
+  // est alors trop tard pour la reposer sans interruption.
+  const RECENT_COLUMNS = [
+    // PR #135 — certification du tag Discord.
+    ["bg_discord_login_challenges", "handle", "VARCHAR(64) NULL"],
+    ["bg_users", "discord_verified_at", "DATETIME NULL"],
+    // PR #135 — conditions d'inscription.
+    [
+      "bg_tournaments",
+      "registration_discord_requirement",
+      "ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'ANY_PLAYER'",
+    ],
+    ["bg_tournaments", "registration_min_players", "INT NOT NULL DEFAULT 5"],
+    // PR #136 — troisième porte d'entrée. `UNIQUE` posé avec la colonne : c'est
+    // l'index qui tranche la course entre deux comptes rattachant le même
+    // Battle.net, le `SELECT` préalable ne donnant que le refus lisible.
+    ["bg_users", "blizzard_sub", "VARCHAR(191) NULL UNIQUE"],
+    // PR #137 — condition d'inscription « compte Blizzard ». Le défaut `NONE`
+    // n'est pas une prudence de migration : c'est le défaut du réglage, la
+    // moitié du site jouant à Marvel Rivals, où un compte Battle.net ne veut
+    // rien dire.
+    [
+      "bg_tournaments",
+      "registration_blizzard_requirement",
+      "ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'NONE'",
+    ],
+  ] as const;
+
+  for (const [table, column, definition] of RECENT_COLUMNS) {
+    try {
+      await db.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    } catch (error) {
+      // Seul « la colonne est déjà là » s'avale — c'est le cas nominal. Un droit
+      // `ALTER` manquant ou un verrou de métadonnées laisserait, lui, le schéma
+      // en arrière du code sans que rien ne le dise.
+      if (!isSchemaNoOpError(error)) throw error;
+    }
   }
 
   // L'adresse e-mail n'a plus aucun lecteur — le scope `email` a disparu de la
@@ -726,10 +760,18 @@ async function runMigrations(db: Pool): Promise<void> {
   // elle les adresses collectées avant la règle : garder une donnée que plus
   // personne ne lit n'est pas de la prudence, c'est une fuite en attente. Elle
   // part donc de la table, ce qui efface les valeurs du même geste.
+  //
+  // **L'échec ne s'avale pas**, et pas par symétrie avec ce qui précède : le
+  // `DROP` est ici le geste d'effacement lui-même. Rien ne lit plus la colonne,
+  // donc la base démarre parfaitement sans lui — et `anonymizeOwnAccount` ne
+  // met plus l'adresse à `NULL`, cette ligne n'ayant plus d'objet. Un `ALTER`
+  // refusé garderait donc les adresses **indéfiniment et en silence**, y compris
+  // sur les comptes qui ont demandé leur suppression. Le démarrage échoue à la
+  // place, ce qui se voit.
   try {
     await db.execute(`ALTER TABLE bg_users DROP COLUMN email`);
-  } catch {
-    // Colonne déjà absente (cas nominal sur une base neuve).
+  } catch (error) {
+    if (!isSchemaNoOpError(error)) throw error;
   }
 
   // ───────────────────────────────────────────────────────────────────────────
