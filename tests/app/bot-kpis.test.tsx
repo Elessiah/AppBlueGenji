@@ -1,0 +1,98 @@
+import { describe, expect, it } from "@jest/globals";
+import { renderToStaticMarkup } from "react-dom/server";
+import { BotKpis } from "@/components/bot/BotKpis";
+import { Sparkline } from "@/components/bot/Sparkline";
+import type { BotKpis as BotKpisType } from "@/lib/shared/types";
+
+/**
+ * Les tuiles de chiffres de `/bot` et leur courbe.
+ *
+ * `fetchBotKpis` rend sa charge par un simple `as BotKpis` sur du JSON reçu,
+ * comme ses voisines. La garde portait sur l'**objet** (`entry.data ? …`) et
+ * jamais sur le champ : une charge `{"servers": {}}` la passait, puis
+ * `.toLocaleString()` levait sur `undefined` — et la page `/bot` étant rendue
+ * par des composants serveur, c'est toute la page en 500.
+ */
+const entry = (overrides: Partial<BotKpisType["servers"]> = {}) => ({
+  value: 128,
+  delta: "+4",
+  series: [1, 4, 2, 8, 5],
+  ...overrides,
+});
+
+const kpis = (overrides: Partial<BotKpisType> = {}): BotKpisType =>
+  ({
+    servers: entry(),
+    channels: entry(),
+    messages: entry(),
+    relays: entry(),
+    ...overrides,
+  }) as BotKpisType;
+
+describe("BotKpis — une charge amputée ne fait pas tomber la page", () => {
+  it("rend les quatre tuiles sur une charge saine", () => {
+    const html = renderToStaticMarkup(<BotKpis kpis={kpis()} />);
+    expect(html).toContain("Serveurs");
+    expect(html).toContain((128).toLocaleString("fr-FR"));
+  });
+
+  it("met un tiret plutôt que de lever sur une tuile vide", () => {
+    const html = renderToStaticMarkup(
+      <BotKpis kpis={{ ...kpis(), servers: {} } as unknown as BotKpisType} />,
+    );
+    expect(html).toContain("—");
+    expect(html).not.toContain("undefined");
+    expect(html).not.toContain("NaN");
+  });
+
+  it("ne pose pas un objet en enfant de React", () => {
+    // « Objects are not valid as a React child » lève pendant le rendu.
+    const broken = {
+      ...kpis(),
+      channels: { value: {}, delta: { fr: "+4" }, series: "nope" },
+    } as unknown as BotKpisType;
+    const html = renderToStaticMarkup(<BotKpis kpis={broken} />);
+    expect(html).not.toContain("[object Object]");
+    expect(html).toContain("Channels relayés");
+  });
+
+  it("survit à une charge absente", () => {
+    const html = renderToStaticMarkup(<BotKpis kpis={null} />);
+    expect(html).toContain("—");
+  });
+});
+
+describe("Sparkline — pas de courbe plutôt qu'une courbe fausse", () => {
+  it("trace une courbe à partir de deux points", () => {
+    const html = renderToStaticMarkup(<Sparkline data={[1, 4, 2]} />);
+    expect(html).toContain("<svg");
+    expect(html).not.toContain("NaN");
+  });
+
+  it("ne rend rien sur zéro ou un point", () => {
+    // Avec un seul point, `i / (n - 1)` vaut `0 / 0` : tout le chemin sortait
+    // en « MNaN,NaN ». Avec zéro, `Math.max` rend `-Infinity` et l'aire
+    // commence par un `L`, un `d` que le navigateur refuse.
+    expect(renderToStaticMarkup(<Sparkline data={[]} />)).toBe("");
+    expect(renderToStaticMarkup(<Sparkline data={[5]} />)).toBe("");
+  });
+
+  it("écarte les points qui ne sont pas des nombres", () => {
+    const html = renderToStaticMarkup(
+      <Sparkline data={[1, "n/a", null, 4, Number.NaN, 2] as unknown as number[]} />,
+    );
+    expect(html).toContain("<svg");
+    expect(html).not.toContain("NaN");
+    expect(html).not.toContain("Infinity");
+  });
+
+  it("ne passe jamais la série en arguments d'appel", () => {
+    // `Math.max(...arr)` est un `RangeError` au-delà de ~100 000 points.
+    const huge = Array.from({ length: 200_000 }, (_, i) => i % 9);
+    expect(() => renderToStaticMarkup(<Sparkline data={huge} />)).not.toThrow();
+  });
+
+  it("survit à une série qui n'est pas une liste", () => {
+    expect(renderToStaticMarkup(<Sparkline data={"nope" as unknown as number[]} />)).toBe("");
+  });
+});

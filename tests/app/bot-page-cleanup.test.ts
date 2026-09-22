@@ -198,7 +198,7 @@ describe("/bot — l'état d'un serveur se lit en français", () => {
     // installé sur trente serveurs était faux, de la même famille que le
     // « BUILD 4f8a » retiré par ailleurs.
     expect(servers).not.toContain("ACTIFS · TRIÉS PAR ACTIVITÉ 30J");
-    expect(servers).toContain("PLUS ACTIFS");
+    expect(servers).toContain("SERVEURS AFFICHÉS");
     expect(page).toContain("fetchBotServers(8)");
   });
 

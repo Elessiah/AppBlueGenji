@@ -110,7 +110,7 @@ describe("BotServersTable — une charge abîmée ne fait pas tomber la page", (
     // serveur passerait tout droit et `list.map` rendrait la page en 500.
     const keyed = { "123": { id: "123" } } as unknown as BotServerEntry[];
     expect(() => render(keyed)).not.toThrow();
-    expect(render(keyed)).toContain("AUCUN SERVEUR");
+    expect(render(keyed)).toContain("RÉPONSE ILLISIBLE");
   });
 
   it("survit aux champs manquants plutôt que de rendre la page en 500", () => {
@@ -229,7 +229,7 @@ describe("BotServersTable — la charge n'est pas validée, une case fade vaut m
       />,
     );
     expect(html).toContain("Vertex");
-    expect(html).toContain("LES 1 PLUS ACTIFS");
+    expect(html).toContain("1 SERVEUR AFFICHÉ");
   });
 
   it("ne laisse pas un point non numérique éteindre toute la colonne tendance", () => {
@@ -277,5 +277,31 @@ describe("BotServersTable — la couleur d'accent", () => {
       const html = render([server({ accentColor: bad as unknown as string })]);
       expect(html).not.toContain("--c:");
     }
+  });
+});
+
+describe("BotServersTable — le panneau ne dit que ce qu'il sait", () => {
+  it("distingue « le bot n'a pas répondu » de « aucun serveur »", () => {
+    // `fetchBotServers` rend `null` dès que le coupe-circuit est ouvert ou que
+    // l'appel échoue : ramener ce `null` à zéro affirmait que le bot n'est
+    // installé nulle part. Même règle que la case « Status », et que le
+    // compteur de membres Discord de l'accueil — jamais zéro pour dire « je ne
+    // sais pas ».
+    expect(render(null)).toContain("BOT INJOIGNABLE");
+    expect(render(null)).not.toContain("AUCUN SERVEUR");
+    expect(render([])).toContain("AUCUN SERVEUR");
+    expect(render([])).not.toContain("BOT INJOIGNABLE");
+  });
+
+  it("n'affirme ni total ni ordre — la demande est plafonnée et le tri n'existe pas", () => {
+    const html = render([server({ id: "1" }), server({ id: "2" }), server({ id: "3" })]);
+    expect(html).toContain("3 SERVEURS AFFICHÉS");
+    expect(html).not.toMatch(/ACTIFS/);
+    expect(html).not.toMatch(/TRIÉS/);
+  });
+
+  it("accorde le singulier", () => {
+    expect(render([server()])).toContain("1 SERVEUR AFFICHÉ");
+    expect(render([server({ id: "1" }), server({ id: "2" })])).toContain("2 SERVEURS AFFICHÉS");
   });
 });

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { BotActivity } from "@/lib/shared/types";
+import { botPayloadNumber } from "@/lib/shared/bot-payload";
 
 export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
   const [range, setRange] = useState<"7j" | "30j" | "90j">("30j");
@@ -52,9 +53,17 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
     );
   }
 
-  const relays = data.relays ?? [];
-  const scrims = data.scrims ?? [];
-  const max = Math.max(...relays, ...scrims, 1);
+  const relays = Array.isArray(data.relays) ? data.relays : [];
+  const scrims = Array.isArray(data.scrims) ? data.scrims : [];
+  // `reduce` et non `Math.max(...relays, ...scrims, 1)` : ce dernier passe les
+  // deux séries en arguments d'appel, ce qui est un `RangeError` au-delà de
+  // ~100 000 points, et rendrait `NaN` sur un point non numérique — la charge
+  // arrive par un `as BotActivityPayload` sur du JSON reçu. La graine à 1 reste
+  // le garde-fou contre la division par zéro d'une série plate.
+  const max = [...relays, ...scrims].reduce<number>(
+    (m, v) => Math.max(m, botPayloadNumber(v) ?? 0),
+    1,
+  );
   const labels = data.labels ?? [];
   const avgPerDay = data.avgPerDay ?? 0;
 

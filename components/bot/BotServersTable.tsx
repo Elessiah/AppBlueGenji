@@ -46,19 +46,31 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
     (s): s is BotServerEntry => s !== null && typeof s === "object",
   );
 
+  // **Trois faits, jamais un seul chiffre.** `fetchBotServers` rend `null` dès
+  // que le coupe-circuit est ouvert, que l'appel échoue ou que la réponse n'est
+  // pas `ok` : ramener ce `null` à une liste vide faisait affirmer « aucun
+  // serveur » — c'est-à-dire que le bot n'est installé nulle part — quand la
+  // seule chose vraie était qu'on n'en sait rien. Même règle que la case
+  // « Status » juste au-dessus, et que le compteur de membres Discord de
+  // l'accueil : refus en `null`, jamais en zéro.
+  const meta =
+    servers === null
+      ? "BOT INJOIGNABLE"
+      : !Array.isArray(servers)
+        ? "RÉPONSE ILLISIBLE"
+        : list.length === 0
+          ? "AUCUN SERVEUR"
+          : // On ne dit rien de l'ordre ni du total : `fetchBotServers(8)`
+            // **plafonne** la demande, et le tri par activité est encore une
+            // case à cocher de `docs/features/BOT_FEATURES_NEEDED.md`. Le
+            // panneau ne compte que ce qu'il montre.
+            `${list.length} ${list.length === 1 ? "SERVEUR AFFICHÉ" : "SERVEURS AFFICHÉS"}`;
+
   return (
     <section className="panel">
       <div className="panel-head">
         <span className="title">Serveurs connectés</span>
-        {/* « 8 ACTIFS » affirmait un total que la page ne connaît pas :
-            `fetchBotServers(8)` **plafonne** la demande, si bien qu'un bot
-            installé sur trente serveurs en annonçait huit. Le panneau ne dit
-            plus que ce qu'il montre. */}
-        <span className="meta">
-          {list.length === 0
-            ? "AUCUN SERVEUR"
-            : `LES ${list.length} PLUS ACTIFS · ACTIVITÉ 30J`}
-        </span>
+        <span className="meta">{meta}</span>
       </div>
       {/* Une grille de `div` reste un tableau pour qui le lit : sans ces rôles,
           un lecteur d'écran annonce une suite de textes sans jamais dire de
