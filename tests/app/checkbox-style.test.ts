@@ -19,16 +19,31 @@ const globals = readFileSync(join(ROOT, "app", "globals.css"), "utf8");
  * ce qu'on l'oublie. Ces contrôles sont au niveau source — une feuille de style
  * n'a pas d'autre prise en test.
  */
-/** Le corps de la première règle dont le sélecteur porte ce fragment. */
-function blockFor(fragment: string, css: string = globals): string {
-  const at = css.indexOf(fragment);
-  expect(at).toBeGreaterThanOrEqual(0);
+/**
+ * Le corps de la première règle dont le sélecteur correspond.
+ *
+ * La recherche se fait sur un **motif** et non sur une chaîne : un sélecteur
+ * écrit sur deux lignes tient à la mise en forme de la feuille, que Prettier ou
+ * un sélecteur ajouté peuvent replier — et un dépôt sorti en CRLF n'a pas les
+ * mêmes sauts de ligne. La règle, elle, n'aurait pas bougé. L'absence lève une
+ * `Error` nommée plutôt qu'un `expect` : appelé hors d'un test, celui-ci fait
+ * échouer le **chargement du module**, donc les vingt contrôles d'un coup et
+ * sans dire lequel.
+ */
+function blockFor(pattern: RegExp, css: string = globals): string {
+  const at = css.search(pattern);
+  if (at < 0) throw new Error(`Règle introuvable dans globals.css : ${pattern}`);
   const open = css.indexOf("{", at);
   return css.slice(open + 1, css.indexOf("}", open));
 }
 
+/** Le sélecteur de la règle de base, sauts de ligne et espaces indifférents. */
+const CHECKBOX_RULE = /input\[type="checkbox"\]\s*,\s*input\[type="radio"\]\s*\{/;
+
 /** La règle de base, partagée par la case et le radio. */
-const CHECKBOX_BLOCK = blockFor('input[type="checkbox"],\ninput[type="radio"] {');
+function checkboxBlock(): string {
+  return blockFor(CHECKBOX_RULE);
+}
 
 /** Fichiers du projet portant l'extension donnée, `node_modules` exclu. */
 function walk(dir: string, suffix: string, found: string[] = []): string[] {
@@ -43,38 +58,38 @@ function walk(dir: string, suffix: string, found: string[] = []): string[] {
 
 describe("Cases à cocher — apparence unique", () => {
   it("retire l'apparence système", () => {
-    expect(CHECKBOX_BLOCK).toContain("appearance: none");
-    expect(CHECKBOX_BLOCK).toContain("-webkit-appearance: none");
+    expect(checkboxBlock()).toContain("appearance: none");
+    expect(checkboxBlock()).toContain("-webkit-appearance: none");
   });
 
   it("donne une taille au lieu de la laisser au système", () => {
-    expect(CHECKBOX_BLOCK).toMatch(/width: 16px/);
-    expect(CHECKBOX_BLOCK).toMatch(/height: 16px/);
+    expect(checkboxBlock()).toMatch(/width: 16px/);
+    expect(checkboxBlock()).toMatch(/height: 16px/);
   });
 
   it("remet le rembourrage à zéro — en `border-box`, il repousserait la taille", () => {
-    expect(CHECKBOX_BLOCK).toMatch(/padding: 0/);
+    expect(checkboxBlock()).toMatch(/padding: 0/);
   });
 
   it("habille aussi le bouton radio, qui n'est qu'une case ronde", () => {
-    expect(CHECKBOX_BLOCK).toContain("appearance: none");
-    expect(blockFor('input[type="radio"] {\n  border-radius')).toContain("border-radius: 50%");
+    expect(checkboxBlock()).toContain("appearance: none");
+    expect(blockFor(/input\[type="radio"\]\s*\{\s*border-radius/)).toContain("border-radius: 50%");
   });
 
   it("dessine la marque en image de fond, un input n'ayant pas de pseudo-élément garanti", () => {
-    expect(blockFor('input[type="checkbox"]:checked {')).toContain("background-image: url(");
-    expect(blockFor('input[type="radio"]:checked {\n  background-image')).toContain(
+    expect(blockFor(/input\[type="checkbox"\]:checked\s*\{/)).toContain("background-image: url(");
+    expect(blockFor(/input\[type="radio"\]:checked\s*\{\s*background-image/)).toContain(
       "background-image: url(",
     );
     expect(globals).not.toContain('input[type="checkbox"]::after');
   });
 
   it("donne un anneau de focus clavier — `appearance: none` le retire", () => {
-    expect(blockFor('input[type="checkbox"]:focus-visible,')).toContain("box-shadow");
+    expect(blockFor(/input\[type="checkbox"\]:focus-visible\s*,/)).toContain("box-shadow");
   });
 
   it("marque l'état désactivé sans effacer le contrôle", () => {
-    const off = blockFor('input[type="checkbox"]:disabled,');
+    const off = blockFor(/input\[type="checkbox"\]:disabled\s*,/);
     expect(off).toContain("cursor: not-allowed");
     // Décochée, la case n'est que sa bordure — `appearance: none` a retiré le
     // carré que le système dessinait dessous. Trop pâle, elle laisse un trou
@@ -85,7 +100,7 @@ describe("Cases à cocher — apparence unique", () => {
     expect(Number(alpha![1])).toBeGreaterThanOrEqual(0.3);
     // Elle reste tout de même plus pâle que la case active, sans quoi
     // « désactivé » ne se lirait plus.
-    const on = CHECKBOX_BLOCK.match(/border: 1px solid rgba\(255, 255, 255, ([\d.]+)\)/);
+    const on = checkboxBlock().match(/border: 1px solid rgba\(255, 255, 255, ([\d.]+)\)/);
     expect(on).not.toBeNull();
     expect(Number(alpha![1])).toBeLessThan(Number(on![1]));
   });
@@ -177,6 +192,12 @@ describe("Cases à cocher — apparence unique", () => {
  */
 const BOX_PROPERTIES = [
   "appearance",
+  // Le motif s'ancre sur un début de déclaration : `-webkit-appearance` commence
+  // par un tiret, `appearance` seul ne l'atteint donc pas. Or c'est lui qui
+  // *rend* la case au système sur WebKit, et le rendre à un écran seul rouvre
+  // exactement la panne — une case système au milieu de cases dessinées.
+  "-webkit-appearance",
+  "-moz-appearance",
   "accent-color",
   "width",
   "height",
@@ -205,6 +226,16 @@ const BOX_PROPERTIES = [
   // *que* `opacity` et `cursor`, donc aucune des propriétés ci-dessus, et
   // serait passé au travers de ce balayage.
   "opacity",
+  // Redimensionner par `transform` ne **collisionne** pas avec la règle globale,
+  // il se compose avec elle : la case garde ses 16 px déclarés et s'affiche plus
+  // grande, sans qu'aucune déclaration ne soit perdue. C'est donc la divergence
+  // d'un écran à l'autre sous sa forme la moins visible d'ici. `scale`, `rotate`
+  // et `translate` (propriétés indépendantes) font la même chose sans le mot.
+  "transform",
+  "scale",
+  "rotate",
+  "translate",
+  "zoom",
 ];
 
 /**
@@ -361,6 +392,14 @@ describe("Cases à cocher — aucune feuille ne redéfinit l'apparence", () => {
     expect(bareInputOffenders("x.css", twoInputs)).toHaveLength(1);
     // Et une taille minimale étire la case hors de sa boîte de 16 px.
     expect(bareInputOffenders("x.css", ".a input { min-height: 44px; }")).toHaveLength(1);
+    // Un `transform` ne collisionne pas, il se **compose** : la case garde ses
+    // 16 px et s'affiche plus grande, sans qu'aucune déclaration ne se perde.
+    expect(bareInputOffenders("x.css", ".a input { transform: scale(1.5); }")).toHaveLength(1);
+    expect(bareInputOffenders("x.css", ".a input { scale: 1.5; }")).toHaveLength(1);
+    // Le préfixe constructeur rend la case au système : il commence par un
+    // tiret, là où le motif attend un début de déclaration.
+    const prefixed = ".a input { -webkit-appearance: checkbox; }";
+    expect(bareInputOffenders("x.css", prefixed)).toHaveLength(1);
   });
 });
 
@@ -387,7 +426,7 @@ describe("Cases à cocher — aucune feuille ne redéfinit l'apparence", () => {
  * prendre à leur place : il dépend de la taille du texte d'à côté.
  */
 const INLINE_BANNED =
-  /\b(width|minWidth|maxWidth|height|minHeight|maxHeight|accentColor|appearance|padding[A-Za-z]*|margin|display|border[A-Za-z]*|background[A-Za-z]*|box[A-Za-z]*|outline[A-Za-z]*|opacity|flex[A-Za-z]*|transform|zoom)\s*:/;
+  /\b(width|minWidth|maxWidth|height|minHeight|maxHeight|accentColor|[A-Za-z]*[Aa]ppearance|padding[A-Za-z]*|margin|display|border[A-Za-z]*|background[A-Za-z]*|box[A-Za-z]*|outline[A-Za-z]*|opacity|flex[A-Za-z]*|transform|scale|rotate|translate|zoom)\s*:/;
 
 function inlineOffenders(path: string, source: string): Offender[] {
   const offenders: Offender[] = [];
@@ -478,7 +517,15 @@ describe("Cases à cocher — aucun style en ligne ne reprend la main", () => {
       'outline: "none"',
       'outlineColor: "#fff"',
       'transform: "scale(1.4)"',
+      "scale: 1.5",
+      'rotate: "45deg"',
+      'translate: "0 2px"',
       "margin: 0",
+      // Le préfixe constructeur n'est pas une frontière de mot : `\bappearance`
+      // ne pouvait pas l'atteindre, le même piège que `minWidth`. Et c'est lui
+      // qui rend la case au système sur WebKit.
+      'WebkitAppearance: "checkbox"',
+      'MozAppearance: "none"',
     ]) {
       expect(inlineOffenders("x.tsx", `<input type="checkbox" style={{ ${style} }} />`)).toHaveLength(
         1,
