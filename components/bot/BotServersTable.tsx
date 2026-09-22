@@ -35,6 +35,13 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
         </div>
         {list.map((s, rank) => {
           const relay = resolveBotRelayState(s.status);
+          // Même raison que pour l'état : la charge du bot n'est pas validée à
+          // l'exécution (`as BotServersPayload` sur du JSON reçu). Un champ
+          // manquant doit donner une cellule fade, jamais un `TypeError` — qui
+          // ferait rendre toute la page `/bot` en 500, bien pire que la case
+          // vide qu'on vient de chasser.
+          const sparkline = Array.isArray(s.sparkline) ? s.sparkline : [];
+          const peak = Math.max(...sparkline.map((v) => v ?? 0), 1);
           return (
             <div key={s.id} className="srv-row" role="row">
               <span className="srv-rank" role="cell">{String(rank + 1).padStart(2, "0")}</span>
@@ -44,7 +51,7 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
                 </span>
                 {s.name}
               </span>
-              <span className="srv-num" role="cell">{s.memberCount.toLocaleString("fr-FR")}</span>
+              <span className="srv-num" role="cell">{(s.memberCount ?? 0).toLocaleString("fr-FR")}</span>
               <span className="srv-num" role="cell">{s.relays30j}</span>
               <span
                 className={"srv-status " + relay.tone}
@@ -58,8 +65,8 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
                   cellule se lit donc vide — mais elle existe, et l'en-tête
                   « TENDANCE » reste en face des autres colonnes. */}
               <span className="srv-spark" role="cell">
-                {s.sparkline.map((v, i) => (
-                  <span key={i} aria-hidden="true" style={{ height: `${(v / Math.max(...s.sparkline, 1)) * 100}%` }} />
+                {sparkline.map((v, i) => (
+                  <span key={i} aria-hidden="true" style={{ height: `${((v ?? 0) / peak) * 100}%` }} />
                 ))}
               </span>
             </div>

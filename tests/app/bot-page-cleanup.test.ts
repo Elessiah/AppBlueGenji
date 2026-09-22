@@ -50,6 +50,12 @@ describe("/bot — la section « Modules » est partie", () => {
     const roadmap = read("docs/features/BOT_FEATURES_NEEDED.md");
     expect(roadmap).not.toMatch(/^ *- \[ \] `fetchBotModules/m);
     expect(roadmap).not.toContain("[components/bot/mocks.ts](components/bot/mocks.ts)");
+    // Et pas davantage les endpoints que cet appel consommait : une section
+    // lue de haut en bas ferait construire au bot ce que le site ne lit plus.
+    expect(roadmap).not.toMatch(/^- \[ \] \*\*`GET  \/internal\/servers\/:id\/modules`/m);
+    expect(roadmap).not.toMatch(/^- \[ \] \*\*`PUT  \/internal\/servers\/:id\/modules/m);
+    expect(roadmap).toContain("Section abandonnée côté site");
+    expect(roadmap).not.toContain("mod-foot`)");
   });
 
   it("emporte ses styles — une feuille qui garde des règles orphelines les fait ressusciter", () => {
@@ -87,6 +93,15 @@ describe("/bot — les commandes renvoient à leur source", () => {
   it("garde le rôle `list` qu'une liste sans puces perd sous Safari", () => {
     expect(commands).toContain('className="bot-docs-list" role="list"');
     expect(css).toContain("list-style: none;");
+  });
+
+  it("n'annonce que ce qu'elle tient : le contenu, pas la liste", () => {
+    // Les titres et résumés viennent de `BOT_DOC_SECTIONS`, registre de CE
+    // dépôt (c'est lui qui borne les fichiers lisibles) : seul le corps des
+    // pages est relu chez le bot. Promettre une « mise à jour continue » de la
+    // liste serait la même fausse promesse en plus discret.
+    expect(commands).not.toContain("MISE À JOUR CONTINUE");
+    expect(commands).toContain("CONTENU RELU DANS LE DÉPÔT DU BOT");
   });
 });
 
@@ -131,6 +146,22 @@ describe("/bot — l'état d'un serveur se lit en français", () => {
 
   it("a une couleur pour l'état qu'elle ne connaît pas", () => {
     expect(css).toContain(".srv-status.unknown");
+  });
+
+  it("tient le libellé le plus long sur une ligne", () => {
+    // « ÉTAT DU RELAIS » et « ● Hors ligne » ne tenaient pas dans les 70px
+    // d'origine : l'en-tête passait sur deux lignes et la rangée avec lui.
+    expect(css).toContain("grid-template-columns: 28px 1fr 80px 80px 115px 60px;");
+    expect(css).toMatch(/\.srv-status \{[^}]*white-space: nowrap;/);
+  });
+
+  it("ne fait confiance à aucun champ de la charge du bot", () => {
+    // `fetchBotServers` fait un simple `as` : un champ manquant doit donner une
+    // cellule fade, jamais un `TypeError` qui rendrait toute la page en 500.
+    expect(servers).toContain("(s.memberCount ?? 0).toLocaleString");
+    expect(servers).toContain("Array.isArray(s.sparkline)");
+    expect(servers).not.toContain("s.sparkline.map");
+    expect(servers).not.toContain("Math.max(...s.sparkline");
   });
 });
 

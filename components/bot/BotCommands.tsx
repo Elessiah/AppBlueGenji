@@ -16,6 +16,15 @@ import { BOT_DOC_SECTIONS } from "@/lib/server/bot-docs";
  * **à chaud** (`lib/server/bot-docs.ts`, revalidation 60 s), si bien qu'une
  * correction chez le bot y apparaît dans la minute, sans rebuild. La section
  * mène donc là, et ne dit plus rien qu'elle ne puisse tenir.
+ *
+ * Une nuance à ne pas gommer : **le corps** de chaque page est relu chez le
+ * bot, mais les **titres et résumés** affichés ici viennent de
+ * `BOT_DOC_SECTIONS`, un registre de ce dépôt — c'est lui qui borne les
+ * fichiers lisibles (garde-fou anti-traversée de chemin), il ne peut donc pas
+ * venir d'ailleurs. Un document renommé chez le bot laisse donc sa vignette
+ * ici, et le lien tombe sur la dégradation « momentanément indisponible » de
+ * `loadBotDoc`. L'intitulé de la section dit « contenu relu » et non « liste
+ * tenue à jour » : elle n'annonce que ce qu'elle tient.
  */
 export function BotCommands() {
   return (
@@ -27,7 +36,7 @@ export function BotCommands() {
           </div>
           <h2>Commandes et documentation</h2>
         </div>
-        <div className="meta">LUE DEPUIS LE BOT · MISE À JOUR CONTINUE</div>
+        <div className="meta">CONTENU RELU DANS LE DÉPÔT DU BOT</div>
       </div>
 
       <div className="card card-ticks">
@@ -39,7 +48,9 @@ export function BotCommands() {
           <p className="bot-docs-intro">
             La liste des commandes slash, leurs arguments et leurs droits sont
             publiés par le bot lui-même. Cette page y renvoie plutôt que d&apos;en
-            garder une copie, qui aurait vieilli sans prévenir.
+            garder une copie, qui aurait vieilli sans prévenir : le contenu de
+            chaque page est relu dans le dépôt du bot, une correction là-bas y
+            apparaît dans la minute.
           </p>
           {/* `role="list"` n'est pas redondant : Safari retire le rôle d'une
               liste dont on a ôté les puces (`list-style: none`), et VoiceOver
