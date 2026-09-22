@@ -83,25 +83,3 @@ export function botStatusDisplay(status: string | null | undefined): string {
 export function botStatusSummary(status: string | null | undefined): string {
   return STATUS_SUMMARIES[resolveBotStatusLabel(status)];
 }
-
-/**
- * Un champ **numérique** de la charge du bot, ou `null`.
- *
- * Même prémisse que `botStatusOf` : `fetchBotStatus` rend la charge par un
- * simple `as BotStatus` sur du JSON reçu, si bien qu'aucun champ n'est garanti
- * malgré le type. Un `?? 0` ne rattrape que `null` et `undefined` — un
- * `cpuUsage: "12%"` le traverse, et le `.toFixed()` qui suit lève **pendant le
- * rendu** : la page `/bot` entière part alors en 500, ce qui est bien pire que
- * la case fade qu'on met à la place. Un `NaN` est écarté pour la même raison :
- * il ne lève pas, il se propage, et finit en `width: NaN%` — la panne muette.
- */
-export function botStatusNumber(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-/** Un champ de la charge du bot, ramené à du texte affichable, ou `null`. */
-export function botStatusText(value: unknown): string | null {
-  if (typeof value === "string") return value.length > 0 ? value : null;
-  const numeric = botStatusNumber(value);
-  return numeric === null ? null : String(numeric);
-}

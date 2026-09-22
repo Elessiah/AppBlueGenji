@@ -217,3 +217,21 @@ describe("BotServersTable — la charge n'est pas validée, une case fade vaut m
     expect(html).toContain("height:100%");
   });
 });
+
+describe("BotServersTable — un champ posé en enfant de React", () => {
+  it("ne lève pas sur un nom ou un sigil qui n'est pas du texte", () => {
+    // Les deux derniers champs non gardés, et les seuls qui tombent
+    // directement en enfants de React : « Objects are not valid as a React
+    // child » lève pendant le rendu, donc toute la page `/bot` en 500.
+    const html = render([
+      server({
+        name: { fr: "Nova" } as unknown as string,
+        sigil: ["N", "V"] as unknown as string,
+      }),
+    ]);
+    expect(html).not.toContain("[object Object]");
+    expect(html).toContain("srv-name");
+    // La rangée reste une rangée : six cellules, comme l'en-tête a six colonnes.
+    expect([...html.matchAll(/role="cell"/g)]).toHaveLength(6);
+  });
+});

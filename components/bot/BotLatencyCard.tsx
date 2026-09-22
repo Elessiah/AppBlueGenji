@@ -1,16 +1,16 @@
 import { BotStatus } from "@/lib/shared/types";
-import { botStatusNumber } from "@/lib/shared/bot-status-summary";
+import { botPayloadNumber } from "@/lib/shared/bot-payload";
 
 export function BotLatencyCard({ status }: { status: BotStatus | null }) {
   // La carte reçoit **la même charge** que la bande d'état juste au-dessus, et
   // `fetchBotStatus` la rend par un simple `as BotStatus` sur du JSON reçu : un
   // `?? 0` ne rattrape que `null` et `undefined`, si bien qu'un `cpuUsage`
   // arrivé en chaîne traversait le garde-fou et faisait lever le `.toFixed()`
-  // qui suit — toute la page `/bot` en 500. `botStatusNumber` écarte aussi le
+  // qui suit — toute la page `/bot` en 500. `botPayloadNumber` écarte aussi le
   // `NaN`, qui ne lève pas mais finit en `width: NaN%`.
-  const gateway = botStatusNumber(status?.gatewayLatency) ?? 0;
-  const cpu = botStatusNumber(status?.cpuUsage) ?? 0;
-  const ram = botStatusNumber(status?.ramUsage) ?? 0;
+  const gateway = botPayloadNumber(status?.gatewayLatency) ?? 0;
+  const cpu = botPayloadNumber(status?.cpuUsage) ?? 0;
+  const ram = botPayloadNumber(status?.ramUsage) ?? 0;
 
   // Les barres sont bornées **des deux côtés** : une valeur négative rendrait
   // une largeur négative, déclaration invalide que le navigateur laisse tomber

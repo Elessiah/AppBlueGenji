@@ -2,12 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { BotStatus } from "@/lib/shared/types";
-import {
-  botStatusDisplay,
-  botStatusOf,
-  botStatusSummary,
-  botStatusText,
-} from "@/lib/shared/bot-status-summary";
+import { botStatusDisplay, botStatusOf, botStatusSummary } from "@/lib/shared/bot-status-summary";
+import { botPayloadText } from "@/lib/shared/bot-payload";
 
 export function BotStatusStrip({ status }: { status: BotStatus | null }) {
   const [uptime, setUptime] = useState("—");
@@ -31,13 +27,13 @@ export function BotStatusStrip({ status }: { status: BotStatus | null }) {
   }, [status]);
 
   const statusLabel = botStatusOf(status);
-  const version = botStatusText(status?.version);
-  const buildHash = botStatusText(status?.buildHash);
+  const version = botPayloadText(status?.version);
+  const buildHash = botPayloadText(status?.buildHash);
   const versionLabel = version ? (buildHash ? `${version} · ${buildHash.slice(0, 4)}` : version) : "—";
-  const buildDate = botStatusText(status?.buildDate) ?? "—";
-  const latency = botStatusText(status?.gatewayLatency);
-  const shardsActive = botStatusText(status?.shardCount?.active);
-  const shardsTotal = botStatusText(status?.shardCount?.total);
+  const buildDate = botPayloadText(status?.buildDate) ?? "—";
+  const latency = botPayloadText(status?.gatewayLatency);
+  const shardsActive = botPayloadText(status?.shardCount?.active);
+  const shardsTotal = botPayloadText(status?.shardCount?.total);
   const shards =
     shardsActive && shardsTotal
       ? `${shardsActive.padStart(2, "0")} / ${shardsTotal.padStart(2, "0")}`

@@ -1,6 +1,6 @@
 import { BotServerEntry } from "@/lib/shared/types";
 import { botRelayAccessibleLabel, resolveBotRelayState } from "@/lib/shared/bot-relay-status";
-import { botStatusNumber } from "@/lib/shared/bot-status-summary";
+import { botPayloadLabel, botPayloadNumber, botPayloadText } from "@/lib/shared/bot-payload";
 
 /**
  * Le tableau des serveurs où le bot est installé.
@@ -71,7 +71,7 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
           // point négatif rendait `height: -400%`, déclaration invalide que le
           // navigateur laisse tomber — la barre disparaît sans rien dire, et
           // `peak` reste à sa graine, ce qui aplatit toute la colonne.
-          const point = (v: unknown) => Math.max(0, botStatusNumber(v) ?? 0);
+          const point = (v: unknown) => Math.max(0, botPayloadNumber(v) ?? 0);
           const peak = sparkline.reduce<number>((max, v) => Math.max(max, point(v)), 1);
           return (
             // `s.id` n'est pas plus garanti que les autres champs : deux
@@ -87,19 +87,24 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
                 <span
                   className="srv-sigil"
                   aria-hidden="true"
-                  style={{ "--c": s.accentColor } as React.CSSProperties}
+                  style={{ "--c": botPayloadText(s.accentColor) } as React.CSSProperties}
                 >
-                  {s.sigil}
+                  {botPayloadLabel(s.sigil)}
                 </span>
-                {s.name}
+                {/* Les deux derniers champs de la rangée, et les seuls qui
+                    tombent **directement** en enfants de React : un objet ou un
+                    tableau y lève « Objects are not valid as a React child »
+                    pendant le rendu, donc toute la page en 500 — là où un
+                    nombre mal typé se contentait de mal s'afficher. */}
+                {botPayloadLabel(s.name)}
               </span>
               {/* `?? 0` ne rattrape que `null` : un compte arrivé en chaîne
                   tombait sur `String.prototype.toLocaleString`, qui ne groupe
                   rien — « 12345 » à côté d'un « 12 345 », soit deux échelles
                   dans la même colonne —, et un objet rendait « [object
                   Object] ». Aucune exception, donc aucun signal. */}
-              <span className="srv-num" role="cell">{(botStatusNumber(s.memberCount) ?? 0).toLocaleString("fr-FR")}</span>
-              <span className="srv-num" role="cell">{(botStatusNumber(s.relays30j) ?? 0).toLocaleString("fr-FR")}</span>
+              <span className="srv-num" role="cell">{(botPayloadNumber(s.memberCount) ?? 0).toLocaleString("fr-FR")}</span>
+              <span className="srv-num" role="cell">{(botPayloadNumber(s.relays30j) ?? 0).toLocaleString("fr-FR")}</span>
               <span
                 className={"srv-status " + relay.tone}
                 role="cell"
