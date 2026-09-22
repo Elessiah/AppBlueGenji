@@ -17,20 +17,33 @@ import type { BotStatus } from "@/lib/shared/types";
  * n'afficherait rien, et la ligne serait vide sans qu'aucune erreur ne le
  * signale — la panne muette que cette page vient de chasser.
  */
-export type BotStatusLabel = BotStatus["status"] | "UNKNOWN";
+export type BotStatusLabel = BotStatus["status"] | "UNREACHABLE" | "UNREADABLE";
 
+/**
+ * **Deux silences, pas un.** « Le bot n'a rien dit » et « le bot a dit quelque
+ * chose que la page ne sait pas lire » sont deux faits distincts, et les
+ * confondre refabrique le défaut qu'on vient de retirer : la case afficherait
+ * `MAINTENANCE` en gros avec « le bot n'a pas répondu » juste en dessous.
+ */
 const STATUS_SUMMARIES: Record<BotStatusLabel, string> = {
   OPERATIONAL: "Tous les services répondent",
   DEGRADED: "Service dégradé — certaines réponses tardent",
   DOWN: "Le bot ne répond plus",
-  UNKNOWN: "Le bot n'a pas répondu à la page",
+  UNREACHABLE: "Le bot n'a pas répondu à la page",
+  UNREADABLE: "Le bot a répondu un état que la page ne sait pas lire",
+};
+
+const KNOWN_STATUSES: Record<BotStatus["status"], true> = {
+  OPERATIONAL: true,
+  DEGRADED: true,
+  DOWN: true,
 };
 
 /** L'état reçu, ramené à l'une des valeurs que la page sait nommer. */
 export function resolveBotStatusLabel(status: string | null | undefined): BotStatusLabel {
-  if (!status) return "UNKNOWN";
-  if (!Object.prototype.hasOwnProperty.call(STATUS_SUMMARIES, status)) {
-    return "UNKNOWN";
+  if (!status) return "UNREACHABLE";
+  if (!Object.prototype.hasOwnProperty.call(KNOWN_STATUSES, status)) {
+    return "UNREADABLE";
   }
   return status as BotStatusLabel;
 }

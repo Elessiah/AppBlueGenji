@@ -11,7 +11,12 @@ import { botRelayAccessibleLabel, resolveBotRelayState } from "@/lib/shared/bot-
  * bot sont inchangées.
  */
 export function BotServersTable({ servers }: { servers: BotServerEntry[] | null }) {
-  const list = servers ?? [];
+  // Même précaution que sur `sparkline` juste en dessous, et pour la même
+  // raison : `fetchBotServers` fait un simple `as BotServersPayload` sur du
+  // JSON reçu. Un `?? []` ne rattrape que `null` — une charge qui rangerait
+  // les serveurs par identifiant passerait tout droit et `list.map` rendrait
+  // la page entière en 500.
+  const list = Array.isArray(servers) ? servers : [];
 
   return (
     <section className="panel">

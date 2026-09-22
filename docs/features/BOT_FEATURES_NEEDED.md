@@ -105,13 +105,13 @@ avec `/api/tournaments/[id]/stream` déjà en place) :
 > des modules pour son propre compte, c'est un besoin du bot, pas une attente de
 > la plateforme.
 
-- [ ] ~~**`GET  /internal/servers/:id/modules`** — liste les modules avec `on/off`~~
-- [ ] ~~**`PUT  /internal/servers/:id/modules/:moduleKey`** — toggle on/off~~
-- [ ] ~~**Persistence** : table dédiée (MySQL existant ou store du bot)~~
-- [ ] ~~**Compteurs par module** : nb relais 30j, nb matchs 30j, nb annonces
+- ~~**`GET  /internal/servers/:id/modules`** — liste les modules avec `on/off`~~
+- ~~**`PUT  /internal/servers/:id/modules/:moduleKey`** — toggle on/off~~
+- ~~**Persistence** : table dédiée (MySQL existant ou store du bot)~~
+- ~~**Compteurs par module** : nb relais 30j, nb matchs 30j, nb annonces
       actives, nb comptes liés, etc.~~ (le bloc `mod-foot` qui les affichait
       n'existe plus)
-- [ ] ~~**Garde-fou** : module `OAuth` non-toggleable~~ — la dépendance de
+- ~~**Garde-fou** : module `OAuth` non-toggleable~~ — la dépendance de
       `/connexion` reste réelle, mais rien ne propose plus de la débrancher.
 
 ---
@@ -137,7 +137,7 @@ avec `/api/tournaments/[id]/stream` déjà en place) :
 
 ### Admin
 - [ ] **`/relay <channel>`** — configure un channel de relais inter-serveurs
-- [ ] ~~**`/config <module>`** — toggle on/off d'un module sur le serveur courant~~
+- ~~**`/config <module>`** — toggle on/off d'un module sur le serveur courant~~
       — dépend de la section 6, abandonnée côté site.
 
 Pour chaque commande :
@@ -171,14 +171,14 @@ Pour chaque commande :
   - [ ] `fetchBotKpis()` → KPIs avec séries
   - [ ] `fetchBotServers()` → liste serveurs
   - [ ] `fetchBotActivity(range)` → données chart
-  - [x] ~~`fetchBotModules(serverId)` / `toggleBotModule(serverId, key, on)`~~ —
+  - ~~`fetchBotModules(serverId)` / `toggleBotModule(serverId, key, on)`~~ —
         **abandonné** : la section « Modules » de `/bot` a été retirée (elle
         rendait son en-tête au-dessus d'une grille vide tant que le bot
         n'exposait rien), et l'appel sortant est parti avec elle. Ne pas le
         recréer sans rouvrir la décision — voir `CLAUDE.md`, section « Page `/bot` ».
 - [ ] **Endpoint SSE proxy** `/api/bot/feed/stream` (similaire à
       `/api/tournaments/[id]/stream`) pour le live feed
-- [x] ~~**Remplacer les mocks** dans `components/bot/mocks.ts` par les vrais fetchs~~ —
+- ~~**Remplacer les mocks** dans `components/bot/mocks.ts` par les vrais fetchs~~ —
       **fait autrement** : le fichier a été supprimé. La liste de commandes
       qu'il portait n'est pas refaite côté serveur, la section renvoie à
       `/bot/docs`, qui lit le Markdown du bot à chaud.

@@ -520,7 +520,11 @@
   background: rgba(90, 200, 255, 0.06);
 }
 .bot-docs-link:focus-visible {
-  outline: none;
+  /* Un `outline: none` seul laisse le lien sans repère en contrastes forcés
+     (Windows HCM), où l'ombre portée n'est pas peinte et le contour l'est :
+     d'où un contour transparent, invisible ici, rendu là-bas. */
+  outline: 2px solid transparent;
+  outline-offset: 2px;
   box-shadow: 0 0 0 3px rgba(90, 200, 255, 0.24);
 }
 .bot-docs-title {

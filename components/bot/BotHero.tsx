@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Icon } from "./Icon";
+import { DiscordIcon } from "./DiscordIcon";
 import { botInviteUrl } from "@/lib/server/bot-invite";
 
 export function BotHero() {
@@ -36,7 +36,7 @@ export function BotHero() {
           <div className="bot-handle">
             <span className="h">@BlueGenji Bot#8242</span>
             <span className="badge">
-              <Icon name="discord" /> APP
+              <DiscordIcon /> APP
             </span>
             <span className="mono" style={{ fontSize: 10, letterSpacing: "0.18em", color: "var(--fg-dim)" }}>
               VÉRIFIÉ
@@ -56,7 +56,7 @@ export function BotHero() {
             target="_blank"
             rel="noreferrer"
           >
-            <Icon name="discord" />
+            <DiscordIcon />
             Inviter sur mon serveur
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
               <path

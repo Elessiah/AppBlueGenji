@@ -32,8 +32,13 @@ describe("botStatusSummary", () => {
     }
   });
 
-  it("dit qu'elle ne sait pas lire, plutôt que d'inventer un état", () => {
-    expect(botStatusSummary("MAINTENANCE")).toBe(botStatusSummary(null));
+  it("distingue « rien dit » de « dit quelque chose d'illisible »", () => {
+    // La case montre la valeur reçue en gros : sous un `MAINTENANCE` affiché,
+    // « le bot n'a pas répondu » serait la phrase fixe qui contredit sa valeur,
+    // c'est-à-dire exactement le défaut que ce module retire.
+    expect(botStatusSummary("MAINTENANCE")).not.toBe(botStatusSummary(null));
+    expect(botStatusSummary(null)).toContain("n'a pas répondu");
+    expect(botStatusSummary("MAINTENANCE")).toContain("ne sait pas lire");
     expect(botStatusSummary("MAINTENANCE")).not.toBe(botStatusSummary("OPERATIONAL"));
   });
 });
@@ -45,9 +50,15 @@ describe("resolveBotStatusLabel", () => {
     expect(resolveBotStatusLabel("DOWN")).toBe("DOWN");
   });
 
-  it("ramène tout le reste à « inconnu », prototype compris", () => {
-    for (const status of ["operational", "MAINTENANCE", "", null, undefined, "constructor"]) {
-      expect(resolveBotStatusLabel(status)).toBe("UNKNOWN");
+  it("appelle « injoignable » l'absence de réponse", () => {
+    for (const status of ["", null, undefined]) {
+      expect(resolveBotStatusLabel(status)).toBe("UNREACHABLE");
+    }
+  });
+
+  it("appelle « illisible » une réponse qu'elle ne sait pas lire, prototype compris", () => {
+    for (const status of ["operational", "MAINTENANCE", "constructor", "toString"]) {
+      expect(resolveBotStatusLabel(status)).toBe("UNREADABLE");
     }
   });
 });

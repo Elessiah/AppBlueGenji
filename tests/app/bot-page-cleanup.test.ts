@@ -56,6 +56,9 @@ describe("/bot — la section « Modules » est partie", () => {
     expect(roadmap).not.toMatch(/^- \[ \] \*\*`PUT  \/internal\/servers\/:id\/modules/m);
     expect(roadmap).toContain("Section abandonnée côté site");
     expect(roadmap).not.toContain("mod-foot`)");
+    // Une ligne barrée ne porte pas de case : vide elle se lit « à faire »,
+    // cochée elle se lit « livré » — ni l'un ni l'autre n'est vrai.
+    expect(roadmap).not.toMatch(/- \[[ x]\] ~~/);
   });
 
   it("emporte ses styles — une feuille qui garde des règles orphelines les fait ressusciter", () => {
@@ -141,6 +144,13 @@ describe("/bot — l'état d'un serveur se lit en français", () => {
   it("a une couleur pour l'état qu'elle ne connaît pas", () => {
     expect(css).toContain(".srv-status.unknown");
   });
+
+  it("garde un repère de focus en contrastes forcés", () => {
+    // `outline: none` + `box-shadow` : l'ombre n'est pas peinte sous Windows
+    // HCM, le contour l'est — un lien au clavier y serait sans repère.
+    expect(css).not.toMatch(/\.bot-docs-link:focus-visible \{\s*outline: none;/);
+    expect(css).toMatch(/\.bot-docs-link:focus-visible \{[^}]*outline: 2px solid transparent;/);
+  });
 });
 
 describe("/bot — la page ne parle plus de modules", () => {
@@ -160,11 +170,21 @@ describe("/bot — la page ne parle plus de modules", () => {
 });
 
 describe("/bot — les pictogrammes restants servent", () => {
-  it("ne garde que celui que la page dessine", () => {
-    const icon = read("components/bot/Icon.tsx");
-    expect(icon).toContain('name: "discord"');
+  it("ne garde que celui que la page dessine, et le dit dans son nom", () => {
+    expect(existsSync(join(ROOT, "components/bot/Icon.tsx"))).toBe(false);
+    const icon = read("components/bot/DiscordIcon.tsx");
+    expect(icon).toContain("export function DiscordIcon(");
+    // Un `name` que le corps ignore invite à écrire `<Icon name="bell" />`.
+    expect(icon).not.toContain("name:");
     for (const dead of ["swords", "relay", "chart"]) {
       expect(icon).not.toContain(`"${dead}"`);
+    }
+  });
+
+  it("ne laisse aucun appelant sur l'ancien nom", () => {
+    for (const caller of ["components/bot/BotHero.tsx", "components/bot/BotInviteCard.tsx"]) {
+      expect(read(caller)).not.toContain('name="discord"');
+      expect(read(caller)).toContain("<DiscordIcon />");
     }
   });
 });

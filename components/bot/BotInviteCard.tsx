@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Icon } from "./Icon";
+import { DiscordIcon } from "./DiscordIcon";
 import { botInviteUrl, DEFAULT_BOT_PERMISSIONS } from "@/lib/server/bot-invite";
 
 export function BotInviteCard() {
@@ -36,7 +36,7 @@ export function BotInviteCard() {
               rel="noreferrer"
               style={{ padding: "14px 22px" }}
             >
-              <Icon name="discord" />
+              <DiscordIcon />
               Inviter le bot
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                 <path

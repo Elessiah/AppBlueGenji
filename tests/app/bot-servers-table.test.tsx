@@ -105,6 +105,14 @@ describe("BotServersTable — une charge abîmée ne fait pas tomber la page", (
     expect(render([])).toContain("0 ACTIFS");
   });
 
+  it("survit à une charge qui n'est pas une liste", () => {
+    // `?? []` ne rattrape que `null` : une charge rangée par identifiant de
+    // serveur passerait tout droit et `list.map` rendrait la page en 500.
+    const keyed = { "123": { id: "123" } } as unknown as BotServerEntry[];
+    expect(() => render(keyed)).not.toThrow();
+    expect(render(keyed)).toContain("0 ACTIFS");
+  });
+
   it("survit aux champs manquants plutôt que de rendre la page en 500", () => {
     const broken = { id: "9", name: "Sans rien" } as unknown as BotServerEntry;
     const html = render([broken]);
