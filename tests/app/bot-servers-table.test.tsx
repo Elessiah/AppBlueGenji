@@ -160,6 +160,24 @@ describe("BotServersTable — une charge abîmée ne fait pas tomber la page", (
     }
   });
 
+  it("ne donne pas la même clé à deux rangées dont l'identifiant est un objet", () => {
+    // `?? ` ne rattrape que `null` : deux `id` objets donnaient deux
+    // `key="[object Object]"`, le doublon que le repli devait écarter.
+    const objectIds = [
+      { ...server({ name: "A" }), id: {} },
+      { ...server({ name: "B" }), id: {} },
+    ] as unknown as BotServerEntry[];
+    const warn = jest.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const html = render(objectIds);
+      expect(html).toContain("A");
+      expect(html).toContain("B");
+      expect(warn.mock.calls.map((c) => String(c[0])).join(" ")).not.toMatch(/same key/i);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("ne laisse pas un point négatif effacer une barre", () => {
     // `height: -400%` est une déclaration invalide : le navigateur la laisse
     // tomber, la barre disparaît sans rien dire.
@@ -179,10 +197,19 @@ describe("BotServersTable — une charge abîmée ne fait pas tomber la page", (
     expect(html).toContain((54321).toLocaleString("fr-FR"));
   });
 
-  it("ne passe jamais la série en arguments d'appel", () => {
-    // `Math.max(...arr)` est un `RangeError` au-delà de ~100 000 points.
+  it("ne passe jamais la série en arguments d'appel, et n'en rend pas cinquante mille", () => {
+    // `Math.max(...arr)` est un `RangeError` au-delà de ~100 000 points — mais
+    // ne pas lever ne suffit pas : une barre par point, c'était ~3 Mo d'HTML
+    // pour une seule rangée. La cellule fait quelques dizaines de pixels.
     const huge = Array.from({ length: 200_000 }, (_, i) => i % 7);
-    expect(() => render([server({ sparkline: huge })])).not.toThrow();
+    let html = "";
+    expect(() => {
+      html = render([server({ sparkline: huge })]);
+    }).not.toThrow();
+    const bars = [...html.matchAll(/height:/g)].length;
+    expect(bars).toBeGreaterThan(0);
+    expect(bars).toBeLessThanOrEqual(60);
+    expect(html.length).toBeLessThan(20_000);
   });
 
   it("ne divise pas par zéro sur une série plate", () => {

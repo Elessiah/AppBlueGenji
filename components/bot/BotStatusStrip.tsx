@@ -3,26 +3,40 @@
 import { useState, useEffect } from "react";
 import { BotStatus } from "@/lib/shared/types";
 import { botStatusDisplay, botStatusOf, botStatusSummary } from "@/lib/shared/bot-status-summary";
-import { botPayloadText } from "@/lib/shared/bot-payload";
+import { botPayloadNumber, botPayloadText } from "@/lib/shared/bot-payload";
 
 export function BotStatusStrip({ status }: { status: BotStatus | null }) {
   const [uptime, setUptime] = useState("—");
 
   useEffect(() => {
-    if (!status) return;
+    const base = botPayloadNumber(status?.startupTs);
+    const uptimeMs = botPayloadNumber(status?.uptimeMs);
     // Sans ces deux nombres, le compteur n'afficherait pas une erreur mais
-    // « NaNj NaNh NaNm » — une panne muette de plus. Mieux vaut le tiret.
-    if (!Number.isFinite(status.startupTs) || !Number.isFinite(status.uptimeMs)) return;
-    const base = status.startupTs;
-    const startSec = Math.floor(status.uptimeMs / 1000);
-    const id = setInterval(() => {
-      const s = startSec + Math.floor((Date.now() - base - status.uptimeMs) / 1000);
+    // « NaNj NaNh NaNm » — une panne muette de plus. Mieux vaut le tiret, et il
+    // faut le **reposer** : sortir sans rien écrire laissait la case sur la
+    // durée de la charge précédente, si bien qu'une charge devenue illisible
+    // affichait « 1j 04h 23m » juste à côté de « Le bot n'a pas répondu à la
+    // page » — la contradiction entre cases voisines que cette page retire.
+    if (base === null || uptimeMs === null) {
+      setUptime("—");
+      return;
+    }
+    const startSec = Math.floor(uptimeMs / 1000);
+    const tick = () => {
+      // Borné à zéro : l'horloge du visiteur et celle du bot n'ont aucune
+      // raison de concorder, et une dérive rendait « -1j 23h ».
+      const s = Math.max(0, startSec + Math.floor((Date.now() - base - uptimeMs) / 1000));
       const d = Math.floor(s / 86400);
       const h = Math.floor((s % 86400) / 3600);
       const m = Math.floor((s % 3600) / 60);
       const sec = s % 60;
       setUptime(`${d}j ${h}h ${String(m).padStart(2, "0")}m ${String(sec).padStart(2, "0")}s`);
-    }, 1000);
+    };
+    // Tout de suite, puis chaque seconde : le seul `setInterval` laissait la
+    // case au tiret une seconde pleine pendant que ses voisines affichaient
+    // déjà leurs valeurs.
+    tick();
+    const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [status]);
 
@@ -31,12 +45,18 @@ export function BotStatusStrip({ status }: { status: BotStatus | null }) {
   const buildHash = botPayloadText(status?.buildHash);
   const versionLabel = version ? (buildHash ? `${version} · ${buildHash.slice(0, 4)}` : version) : "—";
   const buildDate = botPayloadText(status?.buildDate) ?? "—";
-  const latency = botPayloadText(status?.gatewayLatency);
-  const shardsActive = botPayloadText(status?.shardCount?.active);
-  const shardsTotal = botPayloadText(status?.shardCount?.total);
+  // Les champs **chiffrés** passent par `botPayloadNumber` et non par
+  // `botPayloadText`, qui laisse filer n'importe quelle chaîne : la case
+  // annonçait « vite ms » pendant que la carte « Santé du système », juste en
+  // dessous, tirait un tiret du **même champ de la même charge**. Deux gardes
+  // différentes sur une seule donnée, c'est une divergence qui finit par
+  // s'afficher.
+  const latency = botPayloadNumber(status?.gatewayLatency);
+  const shardsActive = botPayloadNumber(status?.shardCount?.active);
+  const shardsTotal = botPayloadNumber(status?.shardCount?.total);
   const shards =
-    shardsActive && shardsTotal
-      ? `${shardsActive.padStart(2, "0")} / ${shardsTotal.padStart(2, "0")}`
+    shardsActive !== null && shardsTotal !== null
+      ? `${String(shardsActive).padStart(2, "0")} / ${String(shardsTotal).padStart(2, "0")}`
       : "—";
 
   return (

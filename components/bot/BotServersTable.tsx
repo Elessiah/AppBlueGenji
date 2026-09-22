@@ -11,6 +11,13 @@ import { botPayloadLabel, botPayloadNumber, botPayloadText } from "@/lib/shared/
  * et testé, parce qu'elle ne dépend d'aucun rendu. Les valeurs renvoyées par le
  * bot sont inchangées.
  */
+/**
+ * Le nombre de barres rendues par cellule de tendance. La série arrive du bot
+ * sans borne ; on garde les plus **récentes**, une tendance se lisant par sa
+ * fin.
+ */
+const MAX_SPARKLINE_POINTS = 60;
+
 export function BotServersTable({ servers }: { servers: BotServerEntry[] | null }) {
   // Même précaution que sur `sparkline` juste en dessous, et pour la même
   // raison : `fetchBotServers` fait un simple `as BotServersPayload` sur du
@@ -58,7 +65,15 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
           // manquant doit donner une cellule fade, jamais un `TypeError` — qui
           // ferait rendre toute la page `/bot` en 500, bien pire que la case
           // vide qu'on vient de chasser.
-          const sparkline = Array.isArray(s.sparkline) ? s.sparkline : [];
+          // Plafonné : la cellule fait quelques dizaines de pixels de large, une
+          // barre de plus n'y est pas visible — mais elle est bien rendue. Le
+          // `reduce` plus bas a retiré le `RangeError` de `Math.max(...arr)` ;
+          // il restait qu'une série de cinquante mille points écrivait
+          // cinquante mille `<span>`, soit ~3 Mo d'HTML pour **une** rangée.
+          // Ne pas lever n'est pas la même chose que rester utilisable.
+          const sparkline = (Array.isArray(s.sparkline) ? s.sparkline : []).slice(
+            -MAX_SPARKLINE_POINTS,
+          );
           // `Math.max(...arr)` passe la série entière en arguments : au-delà de
           // quelque cent mille points, c'est un `RangeError` — une charge du bot
           // suffirait à rendre la page en 500. Un `reduce` n'a pas de pile à
@@ -74,11 +89,13 @@ export function BotServersTable({ servers }: { servers: BotServerEntry[] | null 
           const point = (v: unknown) => Math.max(0, botPayloadNumber(v) ?? 0);
           const peak = sparkline.reduce<number>((max, v) => Math.max(max, point(v)), 1);
           return (
-            // `s.id` n'est pas plus garanti que les autres champs : deux
-            // entrées sans identifiant donnaient deux `key={undefined}`, donc
-            // un avertissement React et une réconciliation des rangées qui ne
-            // tient plus au retour sur la page.
-            <div key={s.id ?? `rang-${rank}`} className="srv-row" role="row">
+            // `s.id` n'est pas plus garanti que les autres champs — et un
+            // `?? ` ne rattrape que `null` : deux entrées sans identifiant
+            // donnaient deux `key={undefined}`, deux entrées dont
+            // l'identifiant est un objet deux `"[object Object]"`. Dans les
+            // deux cas, un avertissement React et une réconciliation des
+            // rangées qui ne tient plus au retour sur la page.
+            <div key={botPayloadText(s.id) ?? `rang-${rank}`} className="srv-row" role="row">
               <span className="srv-rank" role="cell">{String(rank + 1).padStart(2, "0")}</span>
               <span className="srv-name" role="cell">
                 {/* Le sigil répète les initiales du nom qui le suit : sans

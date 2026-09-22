@@ -98,6 +98,26 @@ describe("BotStatusStrip — une charge amputée ne fait pas tomber la page", ()
     });
   }
 
+  it("écarte une mesure chiffrée arrivée en texte, comme la carte d'à côté", () => {
+    // `botPayloadText` laissait filer n'importe quelle chaîne : la bande
+    // affichait « vite ms » pendant que `BotLatencyCard`, sur la même charge
+    // et le même champ, tirait un tiret. Deux gardes pour une donnée.
+    const html = renderToStaticMarkup(
+      <BotStatusStrip
+        status={
+          {
+            ...status(),
+            gatewayLatency: "vite",
+            shardCount: { active: "abc", total: "xyz" },
+          } as unknown as BotStatus
+        }
+      />,
+    );
+    expect(html).not.toContain("vite");
+    expect(html).not.toContain("abc");
+    expect(html).not.toContain("xyz");
+  });
+
   it("garde la version quand seule l'empreinte de build manque", () => {
     const html = renderToStaticMarkup(
       <BotStatusStrip status={{ ...status(), buildHash: undefined } as unknown as BotStatus} />,
