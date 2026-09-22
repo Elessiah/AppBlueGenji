@@ -10,8 +10,6 @@
 
 - [2026-09-21] `bg_users.email` — colonne d'adresses conservée alors qu'elle n'a plus **aucun** lecteur — le scope `email` a été retiré de la demande faite à Google et le rattachement par adresse supprimé (voir `docs/features/OAUTH_PROVIDERS.md`), si bien que la colonne n'est plus ni lue ni écrite ; les lignes écrites avant gardent pourtant leur adresse. La purger (un `UPDATE … SET email = NULL` idempotent au démarrage, comme la reprise des logos d'entrées solo dans `database.ts`) est la suite logique de la règle « on ne garde que ce qui sert », mais c'est une **destruction irréversible de données de production** que la tâche en cours ne demandait pas : elle doit être décidée explicitement. Retirer aussi la colonne de `exportOwnData` / `PersonalDataExport` le jour où elle est vidée — (rencontré sur : feature/oauth-discord-blizzard)
 
-- [2026-09-21] UI trop chargé et pas assez contrasté du profil. Il commence à être trop chargé, avec des informations dans tous les sens. Des informations sont données sur l'écran de connexion (le partage des pseudos par exemple, avec discord et blizzard) mais pas dans la page de profil.
-
 - [2026-09-21] Les comptes supprimés c'est moche. Si pas de participation à des tournois, supprimer complètement, sinon faire une option décoché par défaut permettant d'afficher les comptes supprimés
 
 - [2026-09-21] Le sous-titre "FREE AGENT" dans chaque carte de joueur dans la page /joueurs ne disparait pas si je décoche "Ouvert aux propositions d'équipes" pourtant lorsque je filtre le profil disparait bien
