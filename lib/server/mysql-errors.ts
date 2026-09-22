@@ -37,10 +37,15 @@ export function isTransactionAborted(error: unknown): boolean {
  * Trois tables de `lib/server/database.ts` — et elles seules — sont créées dans
  * un `try` dont le `catch` est muet : `bg_match_reminders`,
  * `bg_referee_alerts` et `bg_endurance_penalties`. Une base où leur création a
- * échoué reste debout, et les chemins accessoires qui les lisent — rappels,
- * réservations d'alerte, sanctions — s'en accommodent plutôt que d'emporter la
- * fonctionnalité qui les appelle : un rappel perdu vaut mieux qu'un report de
- * score en erreur.
+ * échoué reste debout, et c'est à leurs lecteurs de s'en accommoder plutôt que
+ * d'emporter la fonctionnalité qui les appelle : un rappel perdu vaut mieux
+ * qu'un report de score en erreur.
+ *
+ * **Tous ne le font pas encore**, et ce prédicat ne le garantit pas tout seul :
+ * les `DELETE FROM bg_match_reminders` de `tournaments/deletion.ts` et
+ * `tournaments/rollback.ts` n'ont pas la garde que portent leurs voisins, si
+ * bien qu'une base sans cette table rendrait tout tournoi indélébile. Défaut
+ * préexistant, consigné dans `ERREUR.txt`.
  *
  * Les autres tables ne sont **pas** tolérées : le site n'a rien à servir sans
  * elles, et ce prédicat n'a donc pas à couvrir leur absence.

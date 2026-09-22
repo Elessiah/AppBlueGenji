@@ -91,10 +91,18 @@ et la panne se découvre en production sur la première requête qui nomme une
 colonne absente.
 
 `warnIfSchemaIsBehind` lit `information_schema.COLUMNS` une fois au démarrage et
-journalise les colonnes témoins manquantes. Les témoins sont pris dans le
-**dernier lot replié**, celui qui a le plus de chances de manquer : les
-migrations étant jouées dans l'ordre, une base à jour sur ce lot l'est sur les
-précédents.
+journalise les écarts. Les témoins sont pris dans le **dernier lot replié**,
+celui qui a le plus de chances de manquer : les migrations étant jouées dans
+l'ordre, une base à jour sur ce lot l'est sur les précédents.
+
+Il en surveille **trois classes**, parce qu'un simple contrôle de présence n'en
+voit qu'une :
+
+| Classe | Témoin | Ce qui arriverait sans le filet |
+|---|---|---|
+| Colonne **absente** | `bg_matches.phase_id` | « Unknown column » sur la première requête qui la nomme |
+| Colonne présente mais du **mauvais type** | `bg_tournaments.game` doit contenir `'OW'` | Une base restée avant la conversion `ENUM('OW2','MR')` → `ENUM('OW','MR')` porte bien la colonne, et rend « Data truncated for column 'game' » au premier tournoi écrit |
+| Colonne qui devait **partir** | `bg_users.email` | Le `DROP` est best-effort, jamais rejoué dans le processus (la porte mémorise une passe qui se résout toujours), et `anonymizeOwnAccount` a perdu son `email = NULL` dans la même version : les adresses resteraient, sans que rien ne les efface |
 
 Elle **ne répare rien** et ne fait échouer personne. Une base en retard se migre
 à la main ; interrompre le démarrage remplacerait un site dégradé par un site

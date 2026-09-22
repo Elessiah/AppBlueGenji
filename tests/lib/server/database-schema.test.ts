@@ -77,7 +77,15 @@ describe("Schéma — les ENUM sont à leur état final", () => {
   });
 
   it("le jeu ne connaît plus « OW2 », renommé en « OW »", () => {
-    expect(sql).not.toContain("OW2");
+    // Sur le **SQL** et non sur le fichier entier : le filet de schéma explique
+    // en commentaire pourquoi il surveille cette conversion, et nommer la
+    // valeur périmée y est le propos.
+    expect(table("bg_tournaments")).toContain("ENUM('OW', 'MR')");
+    const ddl = sql
+      .split("\n")
+      .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+      .join("\n");
+    expect(ddl).not.toContain("'OW2'");
   });
 
   it("le tableau d'un match connaît la petite finale", () => {
@@ -290,6 +298,26 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
     expect(net).toContain("information_schema.COLUMNS");
     expect(net).toContain("console.error");
+  });
+
+  it("voit les trois classes de retard, et pas seulement la colonne absente", () => {
+    // Une colonne **présente mais du mauvais type** est le cas qu'un simple
+    // contrôle de présence ne peut pas voir : une base restée avant la
+    // conversion du jeu porte bien `game`, et rend « Data truncated » au premier
+    // tournoi écrit. Une colonne qui devait **partir** est la classe symétrique,
+    // et c'est celle des adresses e-mail.
+    const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
+    expect(net).toContain("COLUMN_TYPE");
+    expect(net).toContain('{ table: "bg_users", column: "email", absent: true }');
+    expect(net).toContain('expect: "\'OW\'"');
+  });
+
+  it("surveille le retrait de l'adresse, que rien d'autre ne rattrape", () => {
+    // Le `DROP` est best-effort et n'est jamais rejoué dans le processus, la
+    // porte mémorisant une passe qui se résout toujours ; et
+    // `anonymizeOwnAccount` a perdu son `email = NULL` dans la même version.
+    const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
+    expect(net).toContain("les adresses y sont encore");
   });
 
   it("le filet ne devient jamais la panne qu'il signale", () => {

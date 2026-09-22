@@ -930,29 +930,71 @@ async function runMigrations(db: Pool): Promise<void> {
  * éteint.
  */
 async function warnIfSchemaIsBehind(db: Pool): Promise<void> {
+  /**
+   * Un témoin, et ce qu'on attend de lui.
+   *
+   * `expect` couvre une classe que la seule **présence** d'une colonne ne voit
+   * pas : un `ALTER … MODIFY` replié. La conversion de `game` de
+   * `ENUM('OW2','MR')` vers `ENUM('OW','MR')` est la plus récente des trois, et
+   * une base restée avant elle porte bien la colonne — elle rendrait simplement
+   * « Data truncated for column 'game' » au premier tournoi écrit.
+   *
+   * `absent` couvre la classe symétrique : une colonne qui devait **partir**. Le
+   * retrait de `bg_users.email` est au mieux best-effort — un dépassement de
+   * délai de verrou suffit à le manquer — et il n'est jamais rejoué dans le
+   * processus, la porte mémorisant une passe qui se résout désormais toujours.
+   * Or plus rien d'autre n'efface ces adresses : `anonymizeOwnAccount` a perdu
+   * son `email = NULL` dans la même version.
+   */
+  type Witness = {
+    table: string;
+    column: string;
+    /** Fragment attendu dans `COLUMN_TYPE`, pour un type replié par `MODIFY`. */
+    expect?: string;
+    /** La colonne devait disparaître : la trouver **est** l'anomalie. */
+    absent?: true;
+  };
+
   // Une entrée par lot replié, la plus récente d'abord.
-  const WITNESSES: readonly (readonly [string, string])[] = [
-    ["bg_tournaments", "match_format_max_maps"],
-    ["bg_tournaments", "endurance_playoff_format_type"],
-    ["bg_matches", "phase_id"],
+  const WITNESSES: readonly Witness[] = [
+    { table: "bg_users", column: "email", absent: true },
+    { table: "bg_tournaments", column: "game", expect: "'OW'" },
+    { table: "bg_tournaments", column: "match_format_max_maps" },
+    { table: "bg_tournaments", column: "endurance_playoff_format_type" },
+    { table: "bg_matches", column: "phase_id" },
   ];
 
   try {
-    const [rows] = await db.execute<(RowDataPacket & { TABLE_NAME: string; COLUMN_NAME: string })[]>(
-      `SELECT TABLE_NAME, COLUMN_NAME
+    const [rows] = await db.execute<
+      (RowDataPacket & { TABLE_NAME: string; COLUMN_NAME: string; COLUMN_TYPE: string })[]
+    >(
+      `SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE
          FROM information_schema.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
           AND (TABLE_NAME, COLUMN_NAME) IN (${WITNESSES.map(() => "(?, ?)").join(", ")})`,
-      WITNESSES.flatMap(([table, column]) => [table, column]),
+      WITNESSES.flatMap((w) => [w.table, w.column]),
     );
-    const present = new Set(rows.map((r) => `${r.TABLE_NAME}.${r.COLUMN_NAME}`));
-    const missing = WITNESSES.filter(([t, c]) => !present.has(`${t}.${c}`)).map(
-      ([t, c]) => `${t}.${c}`,
-    );
-    if (missing.length > 0) {
+    const found = new Map(rows.map((r) => [`${r.TABLE_NAME}.${r.COLUMN_NAME}`, r.COLUMN_TYPE]));
+
+    const gaps: string[] = [];
+    for (const witness of WITNESSES) {
+      const name = `${witness.table}.${witness.column}`;
+      const type = found.get(name);
+      if (witness.absent) {
+        if (type !== undefined) {
+          gaps.push(`${name} devrait avoir disparu (les adresses y sont encore)`);
+        }
+      } else if (type === undefined) {
+        gaps.push(`${name} manque`);
+      } else if (witness.expect && !type.includes(witness.expect)) {
+        gaps.push(`${name} est resté « ${type} », sans ${witness.expect}`);
+      }
+    }
+
+    if (gaps.length > 0) {
       console.error(
-        `[migrations] Cette base est en retard sur le schéma : ${missing.join(", ")} manque(nt). ` +
-          `Les ALTER qui les posaient ont été repliés dans les CREATE TABLE, qui ne rattrapent ` +
+        `[migrations] Cette base est en retard sur le schéma : ${gaps.join(" ; ")}. ` +
+          `Les ALTER concernés ont été repliés dans les CREATE TABLE, qui ne rattrapent ` +
           `rien sur une base existante — il faut la migrer à la main (docs/DATABASE_SCHEMA.md).`,
       );
     }
