@@ -24,3 +24,31 @@ export const HINT: CSSProperties = {
   color: "var(--ink-mute)",
   lineHeight: 1.5,
 };
+
+/**
+ * Le chrome de la carte « option » (`.checkbox-card`), écrit **une fois**.
+ *
+ * Deux écrans posent cette carte pour le même réglage — le formulaire de
+ * tournoi et la carte de phase —, et son cadre dit **trois** choses : coché ou
+ * non, et cliquable ou non. Verrouillée, elle gardait le chrome d'une carte qui
+ * répond au clic (bleu plein si cochée, cadre ordinaire sinon), seul le texte
+ * changeant ; elle passe donc en sourdine dans les deux cas, comme la case
+ * désactivée qu'elle contient.
+ *
+ * Le verrou ne se dit **jamais** par une `opacity` : elle se multiplierait avec
+ * la bordure de la case, seule à dessiner un contrôle décoché (`globals.css`),
+ * et l'effacerait. Une couleur, elle, ne se compose pas.
+ */
+export function checkboxCardChrome(
+  checked: boolean,
+  locked: boolean,
+): { border: string; backgroundColor: string } {
+  if (locked) {
+    return checked
+      ? { border: "1.5px solid rgba(90, 200, 255, 0.25)", backgroundColor: "rgba(90, 200, 255, 0.03)" }
+      : { border: "1.5px solid var(--line-soft)", backgroundColor: "transparent" };
+  }
+  return checked
+    ? { border: "1.5px solid var(--blue-500)", backgroundColor: "rgba(90, 200, 255, 0.07)" }
+    : { border: "1.5px solid var(--line-strong-cy)", backgroundColor: "transparent" };
+}

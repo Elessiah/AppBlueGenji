@@ -9,6 +9,7 @@ import {
   phaseFormatLabel,
   phaseSummary,
 } from "./phase-form";
+import { checkboxCardChrome } from "../_lib/form-styles";
 
 const HINT: CSSProperties = {
   margin: "2px 0 0",
@@ -519,24 +520,13 @@ export function PhaseCard({
                     alignItems: "flex-start",
                     gap: 12,
                     padding: "14px 16px",
-                    // Même sourdine que `FormatSettings` : verrouillée, une
-                    // carte cochée ne doit pas porter le bleu plein d'une carte
-                    // qui répond au clic.
-                    border: `1.5px solid ${
-                      !phase.hasThirdPlaceMatch
-                        ? "var(--line-strong-cy)"
-                        : disabled
-                          ? "rgba(90, 200, 255, 0.25)"
-                          : "var(--blue-500)"
-                    }`,
+                    // Même chrome que la carte jumelle du formulaire, par la
+                    // même fonction : le verrou se lit sur le cadre, pas
+                    // seulement sur le texte.
+                    ...checkboxCardChrome(phase.hasThirdPlaceMatch, disabled),
                     borderRadius: 10,
                     cursor: disabled ? "not-allowed" : "pointer",
                     transition: "border-color 0.2s ease, background-color 0.2s ease",
-                    backgroundColor: !phase.hasThirdPlaceMatch
-                      ? "transparent"
-                      : disabled
-                        ? "rgba(90, 200, 255, 0.03)"
-                        : "rgba(90, 200, 255, 0.07)",
                   }}
                 >
                   <input

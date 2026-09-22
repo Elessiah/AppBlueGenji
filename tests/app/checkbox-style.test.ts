@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
+import { checkboxCardChrome } from "@/app/(secured)/tournois/_lib/form-styles";
 
 const ROOT = join(__dirname, "..", "..");
 const globals = readFileSync(join(ROOT, "app", "globals.css"), "utf8");
@@ -105,6 +106,36 @@ describe("Cases à cocher — apparence unique", () => {
     expect(Number(alpha![1])).toBeLessThan(Number(on![1]));
   });
 
+  it("dit le verrou sur le cadre de la carte, jamais par une opacité", () => {
+    // Le cadre dit **trois** choses : coché ou non, cliquable ou non. Sans le
+    // ton verrouillé, une carte inerte portait le chrome d'une carte qui répond
+    // au clic — bleu plein si cochée, cadre ordinaire sinon — et seul le texte
+    // changeait. Une `opacity` est exclue : elle se multiplierait avec la
+    // bordure de la case, seule à dessiner un contrôle décoché.
+    const chrome = (checked: boolean, locked: boolean) =>
+      checkboxCardChrome(checked, locked);
+    const tones = [
+      chrome(false, false),
+      chrome(true, false),
+      chrome(false, true),
+      chrome(true, true),
+    ];
+    expect(new Set(tones.map((t) => `${t.border}|${t.backgroundColor}`)).size).toBe(4);
+    for (const tone of tones) expect(tone.border).not.toContain("opacity");
+    // Verrouillée, la carte est plus sourde que la même carte ouverte.
+    expect(chrome(true, true).border).not.toBe(chrome(true, false).border);
+    expect(chrome(false, true).border).not.toBe(chrome(false, false).border);
+    // Et les deux écrans qui posent cette carte passent par la même fonction.
+    for (const file of [
+      join(ROOT, "app", "(secured)", "tournois", "_components", "FormatSettings.tsx"),
+      join(ROOT, "app", "(secured)", "tournois", "creer", "PhaseCard.tsx"),
+    ]) {
+      const source = readFileSync(file, "utf8");
+      expect(source).toContain("checkboxCardChrome(");
+      expect(source).not.toMatch(/opacity:\s*(locked|disabled)/);
+    }
+  });
+
   it("ne fait plus miroiter une carte verrouillée", () => {
     // Le halo et le balayage du survol annonçaient un clic que la carte
     // verrouillée ne rend pas — et l'opacité qui les recouvrait a dû partir,
@@ -189,6 +220,14 @@ describe("Cases à cocher — apparence unique", () => {
  * sa boîte doit exclure la case à cocher**. Celui qui nomme son type
  * (`input[type="radio"]`, `input[type="number"]`) reste libre — il dit déjà ce
  * qu'il vise.
+ *
+ * Sa **limite**, et elle est assumée : ce balayage lit des feuilles, pas du JSX.
+ * `input.maCase` est bien vu (`input` nu suivi d'une classe), mais une règle qui
+ * n'atteint la case que par une classe — `.panel .maCase { appearance: auto }` —
+ * ne se distingue d'aucune autre sans savoir à quel élément cette classe est
+ * posée. Le cas est hors de portée d'un contrôle sur les sources, et c'est
+ * justement pourquoi l'apparence est posée sur l'**élément** : une règle de
+ * classe est un geste délibéré, pas un débordement qu'on n'a pas vu venir.
  */
 const BOX_PROPERTIES = [
   "appearance",
@@ -400,6 +439,13 @@ describe("Cases à cocher — aucune feuille ne redéfinit l'apparence", () => {
     // tiret, là où le motif attend un début de déclaration.
     const prefixed = ".a input { -webkit-appearance: checkbox; }";
     expect(bareInputOffenders("x.css", prefixed)).toHaveLength(1);
+    // Une classe **accolée** à l'élément reste vue : le motif n'exige pas que
+    // l'`input` termine le compound, seulement qu'aucun `[type=…]` ne le suive.
+    expect(bareInputOffenders("x.css", "input.maCase { width: 24px; }")).toHaveLength(1);
+    // La classe **seule**, elle, est hors de portée : rien dans la feuille ne
+    // dit à quel élément elle est posée. C'est la limite du balayage, pas un
+    // oubli — voir le commentaire de `BOX_PROPERTIES`.
+    expect(bareInputOffenders("x.css", ".panel .maCase { appearance: auto; }")).toEqual([]);
   });
 });
 
@@ -433,7 +479,12 @@ function inlineOffenders(path: string, source: string): Offender[] {
   for (const chunk of source.split("<input").slice(1)) {
     const end = chunk.indexOf("/>");
     const tag = end === -1 ? chunk.slice(0, 600) : chunk.slice(0, end);
-    if (!/type=["'](checkbox|radio)["']/.test(tag)) continue;
+    // Le type peut être calculé (`type={isRadio ? "radio" : "checkbox"}`) : une
+    // case écrite ainsi sortait avant d'avoir montré son style, et gardait donc
+    // la sienne. On la reconnaît au mot, où qu'il soit dans l'expression.
+    const literal = /type=["'](checkbox|radio)["']/.test(tag);
+    const computed = /type=\{[^}]*["'](checkbox|radio)["'][^}]*\}/.test(tag);
+    if (!literal && !computed) continue;
     const style = tag.match(/style=\{\{([\s\S]*?)\}\}/);
     if (!style) {
       // Un `style={variable}` ne se lit pas d'ici : le balayage ne peut ni
@@ -489,6 +540,14 @@ describe("Cases à cocher — aucun style en ligne ne reprend la main", () => {
     // taille du texte d'à côté n'étant pas la même d'un écran à l'autre.
     const aligned = '<input type="checkbox" style={{ marginTop: 2 }} />';
     expect(inlineOffenders("x.tsx", aligned)).toEqual([]);
+    // Un type calculé ne met pas la case hors d'atteinte.
+    const computed =
+      '<input type={isRadio ? "radio" : "checkbox"} style={{ width: 18, accentColor: "#f00" }} />';
+    expect(inlineOffenders("x.tsx", computed)).toHaveLength(1);
+    // Un champ de saisie au type calculé n'a, lui, rien à voir avec la règle.
+    const password =
+      '<input type={visible ? "text" : "password"} style={{ width: "100%" }} />';
+    expect(inlineOffenders("x.tsx", password)).toEqual([]);
   });
 
   it("tient en ligne tout ce que la feuille tient — c'est la moitié la plus forte", () => {

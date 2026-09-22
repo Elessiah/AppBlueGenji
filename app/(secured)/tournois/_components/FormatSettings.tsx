@@ -9,7 +9,7 @@ import {
 import { participantWording } from "@/lib/shared/participants";
 import type { TournamentField } from "@/lib/shared/tournament-edit";
 import { PhaseBuilder } from "../creer/PhaseBuilder";
-import { FULL_WIDTH, HINT } from "../_lib/form-styles";
+import { checkboxCardChrome, FULL_WIDTH, HINT } from "../_lib/form-styles";
 import type { TournamentFormValues } from "../_lib/tournament-form-values";
 
 /**
@@ -386,31 +386,15 @@ export function FormatSettings({
               alignItems: "flex-start",
               gap: 12,
               padding: "14px 16px",
-              // Cochée **et** verrouillée, la carte gardait le bleu plein d'une
-              // carte cliquable : chrome identique, seul le texte changeait. Le
-              // coché reste dit — en sourdine, comme la case désactivée juste à
-              // côté — au lieu d'être annoncé comme modifiable.
-              border: `1.5px solid ${
-                !values.hasThirdPlaceMatch
-                  ? "var(--line-strong-cy)"
-                  : locked("hasThirdPlaceMatch")
-                    ? "rgba(90, 200, 255, 0.25)"
-                    : "var(--blue-500)"
-              }`,
+              // Cadre et fond viennent de `checkboxCardChrome`, partagé avec la
+              // carte jumelle de `PhaseCard` : deux copies auraient divergé au
+              // premier réglage, et la divergence se serait vue à l'écran.
+              ...checkboxCardChrome(values.hasThirdPlaceMatch, locked("hasThirdPlaceMatch")),
               borderRadius: 10,
               cursor: locked("hasThirdPlaceMatch") ? "not-allowed" : "pointer",
-              // Verrouillée, la carte se ternit en **couleurs** et non en
-              // `opacity` : une opacité de parent se multiplie avec ce qu'elle
-              // couvre, et la case à cocher n'est plus dessinée que par sa
-              // bordure (`globals.css`) — désactivée, elle est déjà à 0,2 de
-              // blanc, que 0,6 ramenait à 0,12, sous le seuil du visible. Une
-              // couleur, elle, ne se compose pas.
-              transition: "border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease",
-              backgroundColor: !values.hasThirdPlaceMatch
-                ? "transparent"
-                : locked("hasThirdPlaceMatch")
-                  ? "rgba(90, 200, 255, 0.03)"
-                  : "rgba(90, 200, 255, 0.07)",
+              // Pas de `color` dans la liste : la carte ne change jamais la
+              // sienne, ce sont ses enfants qui portent les leurs.
+              transition: "border-color 0.2s ease, background-color 0.2s ease",
             }}
           >
             <input
