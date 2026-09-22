@@ -44,7 +44,9 @@ function fakeDb(handler?: (q: string, params: unknown[]) => unknown) {
     if (handled !== undefined) return handled;
     // Le verrou que prend la suppression rend la ligne du compte : sans elle,
     // tout chemin d'écriture s'arrêterait sur `USER_NOT_FOUND`.
-    if (q.includes("SELECT avatar_url FROM bg_users")) return [[{ avatar_url: null }]];
+    if (q.includes("SELECT avatar_url, discord_id FROM bg_users")) {
+      return [[{ avatar_url: null, discord_id: null }]];
+    }
     return [[]];
   });
   // La suppression écrit sous transaction, donc sur une connexion dédiée — la

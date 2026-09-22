@@ -643,6 +643,41 @@ async function runMigrations(db: Pool): Promise<void> {
     // Column already exists
   }
 
+  // Migration: l'auteur d'une invitation peut disparaître, l'invitation reste.
+  //
+  // `bg_team_invitations.created_by` était `NOT NULL` en `ON DELETE CASCADE`.
+  // Tant qu'aucun compte ne s'effaçait vraiment, la cascade ne partait jamais ;
+  // l'effacement l'a réveillée, et elle emporte alors **les invitations encore
+  // en attente chez des tiers** — un gérant qui n'a jamais joué supprime son
+  // compte, et trois joueurs voient leur invitation disparaître sans que
+  // personne ne l'ait retirée. Or l'invitation est l'acte de l'équipe (seule sa
+  // gestion peut l'émettre), la colonne n'est **lue nulle part**, et le projet
+  // tranche déjà ce cas ailleurs de la même façon : `bg_endurance_penalties`
+  // .`created_by` passe à `NULL`, la sanction restant due.
+  //
+  // La condition n'est pas une optimisation : sans elle, chaque démarrage
+  // détruirait et reposerait la clé étrangère.
+  const [invitationCreatorRows] = await db.execute(
+    `SELECT IS_NULLABLE AS isNullable
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'bg_team_invitations'
+       AND COLUMN_NAME = 'created_by'`
+  );
+  const invitationCreatorNullable =
+    (invitationCreatorRows as { isNullable?: string }[])[0]?.isNullable ?? "YES";
+  if (invitationCreatorNullable === "NO") {
+    // La clé part d'abord : une colonne référencée ne change pas de nullabilité
+    // tant qu'une contrainte s'appuie dessus.
+    await db.execute(`ALTER TABLE bg_team_invitations DROP FOREIGN KEY fk_bg_team_inv_creator`);
+    await db.execute(`ALTER TABLE bg_team_invitations MODIFY COLUMN created_by BIGINT NULL`);
+    await db.execute(`
+      ALTER TABLE bg_team_invitations
+      ADD CONSTRAINT fk_bg_team_inv_creator FOREIGN KEY (created_by)
+        REFERENCES bg_users(id) ON DELETE SET NULL
+    `);
+  }
+
   // Migration: avatar + pseudo visibles par défaut (le pseudo/avatar est
   // l'identité publique de base). Aligne les installs existantes sur le nouveau
   // défaut sans écraser les choix explicites déjà enregistrés.
@@ -916,7 +951,12 @@ async function runMigrations(db: Pool): Promise<void> {
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       team_id BIGINT NOT NULL,
       user_id BIGINT NOT NULL,
-      created_by BIGINT NOT NULL,
+      -- NULL = l'auteur a supprimé son compte. L'invitation, elle, reste :
+      -- elle est l'acte de l'equipe (seule sa gestion peut l'emettre) et
+      -- personne ne lit jamais cette colonne. En NOT NULL avec sa cascade,
+      -- l'effacement d'un compte emportait silencieusement les invitations
+      -- encore en attente chez des tiers.
+      created_by BIGINT NULL,
       kind ENUM('INVITE', 'REQUEST') NOT NULL,
       status ENUM('PENDING', 'ACCEPTED', 'DECLINED', 'CANCELLED') NOT NULL DEFAULT 'PENDING',
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -929,7 +969,7 @@ async function runMigrations(db: Pool): Promise<void> {
       CONSTRAINT fk_bg_team_inv_user FOREIGN KEY (user_id)
         REFERENCES bg_users(id) ON DELETE CASCADE,
       CONSTRAINT fk_bg_team_inv_creator FOREIGN KEY (created_by)
-        REFERENCES bg_users(id) ON DELETE CASCADE
+        REFERENCES bg_users(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 

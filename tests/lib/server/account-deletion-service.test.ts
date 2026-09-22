@@ -34,6 +34,7 @@ function fakeDb(
   trace: Trace,
   options: {
     avatarUrl?: string | null;
+    discordId?: string | null;
     missing?: boolean;
     failOn?: string;
     failWith?: Error;
@@ -49,8 +50,10 @@ function fakeDb(
       throw options.failWith ?? new Error("DB_DOWN");
     }
     if (q.includes("AS tournaments")) return [[trace]];
-    if (q.includes("SELECT avatar_url FROM bg_users")) {
-      return [options.missing ? [] : [{ avatar_url: avatarUrl }]];
+    if (q.includes("SELECT avatar_url, discord_id FROM bg_users")) {
+      return [
+        options.missing ? [] : [{ avatar_url: avatarUrl, discord_id: options.discordId ?? null }],
+      ];
     }
     return [[]];
   });
@@ -176,6 +179,61 @@ describe("deleteOwnAccount — traces qui retiennent la ligne", () => {
     // `fk_bg_team_inv_user` est en `ON DELETE CASCADE` : écrire ici serait une
     // instruction de plus sur une table qui disparaît avec la ligne.
     expect(has(queries, "bg_team_invitations")).toBe(false);
+  });
+});
+
+/**
+ * `bg_discord_login_challenges` n'a **aucune clé étrangère** : elle est indexée
+ * sur un identifiant Discord, pas sur un compte du site. Aucune cascade ne la
+ * couvre, et son seul ménage est la purge des lignes expirées depuis un jour,
+ * déclenchée par la demande de code d'un *autre* joueur — un soir calme,
+ * l'identifiant Discord d'un compte effacé restait en base indéfiniment, alors
+ * que la confirmation promet « sans laisser de trace sur le site ».
+ */
+describe("deleteOwnAccount — les défis de connexion par message privé", () => {
+  it.each([
+    ["un compte effacé", EMPTY],
+    ["un compte anonymisé", { ...EMPTY, tournaments: 1 }],
+  ])("efface les défis portant l'identifiant Discord (%s)", async (_label, trace) => {
+    const { queries } = fakeDb(trace, { discordId: "900000000000000001" });
+
+    await deleteOwnAccount(7);
+
+    const purge = queries.find((q) => q.sql.includes("bg_discord_login_challenges"));
+    expect(purge).toBeDefined();
+    expect(purge!.sql).toContain("DELETE FROM bg_discord_login_challenges");
+    expect(purge!.params).toEqual(["900000000000000001"]);
+  });
+
+  it("relève l'identifiant sous le verrou, avant que la ligne ne le perde", async () => {
+    const { queries } = fakeDb(EMPTY, { discordId: "900000000000000001" });
+
+    await deleteOwnAccount(7);
+
+    // La lecture verrouillante rend l'identifiant en même temps que l'avatar :
+    // une seconde lecture, après l'écriture, ne trouverait plus rien — la ligne
+    // est partie (effacement) ou vidée de son `discord_id` (anonymisation).
+    const locked = queries.findIndex((q) => q.sql.includes("FOR UPDATE"));
+    expect(locked).toBe(0);
+    expect(queries[0].sql).toContain("discord_id");
+  });
+
+  it("n'écrit rien quand le compte n'a jamais eu de Discord", async () => {
+    const { queries } = fakeDb(EMPTY);
+
+    await deleteOwnAccount(7);
+
+    expect(has(queries, "bg_discord_login_challenges")).toBe(false);
+  });
+
+  it("efface dans la transaction : un rollback ne doit pas les avoir perdus", async () => {
+    const { queries, connection } = fakeDb(EMPTY, { discordId: "900000000000000001" });
+
+    await deleteOwnAccount(7);
+
+    expect(has(queries, "bg_discord_login_challenges")).toBe(true);
+    expect(connection.commit).toHaveBeenCalled();
+    expect(connection.rollback).not.toHaveBeenCalled();
   });
 });
 

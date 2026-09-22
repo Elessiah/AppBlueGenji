@@ -44,7 +44,16 @@ export async function DELETE() {
   if (!user) return fail("UNAUTHORIZED", 401);
 
   const current = await getUserById(user.id);
+  // **La base d'abord, le fichier ensuite.** L'ordre inverse effaçait l'image
+  // avant l'écriture qui la déréférence : `updateUserAvatar` peut échouer (la
+  // route n'a pas de `try/catch`, contrairement au POST) et `avatar_url`
+  // pointait alors sur un fichier disparu — une image cassée, définitivement.
+  //
+  // Le refus est le même qu'au téléversement : une ligne supprimée n'accepte
+  // plus rien, et annoncer « avatar supprimé » sur une écriture qui n'a rien
+  // apparié serait faux. Ici, rien à reprendre — le fichier est encore là,
+  // c'est le mode « anonymisation » qui l'emporte de son côté.
+  if (!(await updateUserAvatar(user.id, null))) return fail(ACCOUNT_DELETED_ERROR, 409);
   await deleteStoredImage(toDiskUploadPath(current?.avatarUrl));
-  await updateUserAvatar(user.id, null);
   return ok({ avatarUrl: null });
 }

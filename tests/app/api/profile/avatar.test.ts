@@ -86,7 +86,13 @@ describe("POST /api/profile/avatar", () => {
 });
 
 describe("DELETE /api/profile/avatar", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Le compte est vivant, sauf mention contraire — et le dire ici plutôt que
+    // de l'hériter du bloc précédent : `clearAllMocks` ne retire pas les
+    // implémentations, si bien que ce bloc vivait sur le réglage du voisin.
+    (updateUserAvatar as jest.Mock).mockResolvedValue(true as never);
+  });
   afterEach(() => jest.restoreAllMocks());
 
   it("rejects anonymous users with 401", async () => {
@@ -103,6 +109,48 @@ describe("DELETE /api/profile/avatar", () => {
     expect(await res.json()).toEqual({ avatarUrl: null });
     expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/avatars/old.webp");
     expect(updateUserAvatar).toHaveBeenCalledWith(42, null);
+  });
+
+  /**
+   * **La base d'abord, le fichier ensuite.** L'ordre inverse effaçait l'image
+   * avant l'écriture qui la déréférence : cette route n'a pas de `try/catch`,
+   * et une écriture en échec laissait `avatar_url` pointer sur un fichier
+   * disparu — une image cassée, que plus rien ne répare.
+   */
+  it("n'efface le fichier qu'une fois la ligne mise à jour", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+    (getUserById as jest.Mock).mockResolvedValue({
+      avatarUrl: "/api/uploads/avatars/old.webp",
+    } as never);
+    const order: string[] = [];
+    (updateUserAvatar as jest.Mock).mockImplementation(async () => {
+      order.push("db");
+      return true;
+    });
+    (deleteStoredImage as jest.Mock).mockImplementation(async () => {
+      order.push("file");
+    });
+
+    await DELETE();
+
+    expect(order).toEqual(["db", "file"]);
+  });
+
+  it("refuse en 409 quand la ligne n'accepte plus rien, et garde le fichier", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+    (getUserById as jest.Mock).mockResolvedValue({
+      avatarUrl: "/api/uploads/avatars/old.webp",
+    } as never);
+    (updateUserAvatar as jest.Mock).mockResolvedValue(false as never);
+
+    const res = await DELETE();
+
+    // Annoncer « avatar supprimé » sur une écriture qui n'a rien apparié serait
+    // faux ; et il n'y a rien à reprendre ici, la suppression du compte
+    // emportant la photo de son côté.
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "ACCOUNT_DELETED" });
+    expect(deleteStoredImage).not.toHaveBeenCalled();
   });
 });
 

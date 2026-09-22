@@ -1121,8 +1121,9 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
     // de **chaque** membre à chaque inscription.
     const [locked] = await connection.execute<(RowDataPacket & {
       avatar_url: string | null;
+      discord_id: string | null;
     })[]>(
-      `SELECT avatar_url FROM bg_users WHERE id = ? FOR UPDATE`,
+      `SELECT avatar_url, discord_id FROM bg_users WHERE id = ? FOR UPDATE`,
       [userId],
     );
     if (locked.length === 0) throw new Error("USER_NOT_FOUND");
@@ -1134,6 +1135,25 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
       await eraseAccount(connection, userId);
     } else {
       await anonymizeAccount(connection, userId);
+    }
+
+    // Les défis de connexion par message privé, relevés sur la ligne **avant**
+    // qu'elle ne parte ou ne soit vidée de son identifiant.
+    //
+    // `bg_discord_login_challenges` n'a **aucune clé étrangère** — elle est
+    // indexée sur un identifiant Discord, pas sur un compte du site —, donc
+    // aucune cascade ne la couvre, et son seul ménage est la purge des lignes
+    // expirées depuis un jour, déclenchée par la demande de code d'un *autre*
+    // joueur : un soir calme, l'identifiant Discord du compte effacé reste en
+    // base indéfiniment, alors qu'on vient de promettre qu'il ne resterait rien.
+    // C'est la même coordonnée que le tag, et le seul geste des deux modes qui
+    // regarde une table hors de `bg_users`, avec le détachement des visites.
+    const discordId = locked[0].discord_id;
+    if (discordId) {
+      await connection.execute(
+        `DELETE FROM bg_discord_login_challenges WHERE discord_id = ?`,
+        [discordId],
+      );
     }
 
     await connection.commit();

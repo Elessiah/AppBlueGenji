@@ -250,6 +250,36 @@ les sessions et les identités parties. `CANCELLED` plutôt qu'un `DELETE` : la
 ligne ne nomme plus personne, et l'équipe garde la trace d'un échange qui a eu
 lieu.
 
+## Ce que l'effacement réveille
+
+L'anonymisation n'a jamais fait partir une ligne `bg_users`. L'effacement, lui,
+la fait partir — et il réveille du même coup **toutes les cascades** que
+personne n'avait vues s'exécuter. Deux d'entre elles demandaient une réponse.
+
+`bg_team_invitations.created_by` était `NOT NULL` en `ON DELETE CASCADE` : un
+gérant d'équipe qui n'a jamais joué supprime son compte, et les invitations
+qu'il avait envoyées disparaissent de la boîte de trois joueurs sans que
+personne ne les ait retirées — alors que la même situation sur un compte à
+historique les laisse intactes, puisqu'il est anonymisé. Or une invitation est
+l'acte de **l'équipe** (seule sa gestion peut l'émettre), la colonne n'est lue
+nulle part, et le projet tranche déjà ce cas ailleurs de la même façon :
+`bg_endurance_penalties.created_by` passe à `NULL`, la sanction restant due. La
+colonne devient donc nullable et sa clé `ON DELETE SET NULL` — une manœuvre en
+trois temps sur une base peuplée (clé retirée, colonne élargie, clé reposée :
+une colonne référencée ne change pas de nullabilité tant qu'une contrainte
+s'appuie dessus), gardée par une lecture d'`information_schema` sans laquelle
+chaque démarrage détruirait et reposerait la clé.
+
+`bg_discord_login_challenges` pose le problème inverse : elle n'a **aucune** clé
+étrangère — elle est indexée sur un identifiant Discord, pas sur un compte du
+site —, donc rien ne la couvre. Son seul ménage est la purge des lignes expirées
+depuis un jour, déclenchée par la demande de code d'un *autre* joueur : un soir
+calme, l'identifiant Discord d'un compte effacé reste en base indéfiniment, et
+c'est la même coordonnée que le tag. La suppression efface donc ces lignes dans
+sa transaction, l'identifiant étant relevé **sous le verrou**, en même temps que
+le chemin de l'avatar — une seconde lecture ne le trouverait plus, la ligne
+étant partie ou vidée de son `discord_id`.
+
 ## La phrase qu'on ne sait pas encore écrire
 
 La confirmation décrit le sort du compte, et elle le demande au serveur
