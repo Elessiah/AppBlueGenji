@@ -362,8 +362,26 @@ describe("en-tête de tournoi — conditions d'inscription", () => {
 
   it("n'affiche rien quand le tournoi n'exige rien", () => {
     expect(
-      conditions({ registrationFilters: { discordRequirement: "NONE", minPlayers: 1 } }),
+      conditions({
+        registrationFilters: {
+          discordRequirement: "NONE",
+          blizzardRequirement: "NONE",
+          minPlayers: 1,
+        },
+      }),
     ).toBeUndefined();
+  });
+
+  it("annonce la condition Blizzard quand le tournoi la pose", () => {
+    const item = conditions({
+      registrationFilters: {
+        ...DEFAULT_REGISTRATION_FILTERS,
+        blizzardRequirement: "ALL_PLAYERS",
+      },
+    });
+    expect(item?.value).toContain("comptes Blizzard liés");
+    // Et elle ne s'invente pas : le défaut est « aucune exigence ».
+    expect(conditions()?.value).not.toContain("Blizzard");
   });
 
   it("retire l'effectif en tournoi individuel : l'annoncer serait faux", () => {

@@ -55,6 +55,7 @@ const FIELD_LABELS: Partial<Record<TournamentField, string>> = {
   matchFormat: "Format de match",
   endurancePlayoffFormat: "Format des play-offs",
   registrationDiscordRequirement: "Discord vérifié à l'inscription",
+  registrationBlizzardRequirement: "Compte Blizzard à l'inscription",
   registrationMinPlayers: "Joueurs minimum dans l'équipe",
   phases: "Phases du tournoi",
 };

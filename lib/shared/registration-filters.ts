@@ -7,13 +7,24 @@
  * personne. Les deux se lisent sur le roster **avant** l'inscription, donc les
  * deux sont des conditions du tournoi et non des surprises d'arbitrage.
  *
- * Deux réglages, et pas un de plus :
+ * Trois réglages, et pas un de plus :
  *
  * - **Discord vérifié** — `ANY_PLAYER` (défaut), `ALL_PLAYERS` ou `NONE`. La
  *   valeur par défaut est celle qui rend l'équipe joignable en exigeant le
  *   minimum : un interlocuteur suffit à reprogrammer une manche. `ALL_PLAYERS`
  *   sert aux tournois où chaque joueur doit être joignable individuellement
  *   (vérification d'éligibilité, tournoi à enjeu) ; `NONE` retire la condition.
+ * - **Compte Blizzard rattaché** — mêmes trois valeurs, `NONE` par défaut. Ce
+ *   n'est pas une **coordonnée** comme le tag Discord mais une **attestation de
+ *   compte de jeu** : l'aller-retour OAuth prouve que le BattleTag du profil est
+ *   bien celui du joueur. La condition se lit donc sur `bg_users.blizzard_sub`
+ *   et **jamais** sur `overwatch_battletag`, chaîne que n'importe qui remplit
+ *   sans rien prouver — c'est le même écart qu'entre `discord_verified_at` et
+ *   `discord_pseudo`, et c'est le trou que la condition ferme. Le défaut est
+ *   `NONE` parce que la moitié du site joue à Marvel Rivals, où un compte
+ *   Battle.net ne veut rien dire : l'exiger par défaut fermerait des tournois
+ *   qui n'ont aucune raison de l'être — et, la migration reprenant ce défaut,
+ *   aucun tournoi d'avant ce réglage ne change de conditions.
  * - **Effectif minimal** — 5 par défaut, l'effectif d'une équipe complète sur
  *   les deux jeux du site.
  *
@@ -32,12 +43,21 @@
  *    à la main (`docs/features/ENTRANT_REMOVAL.md`).
  */
 
-/** Combien de joueurs doivent porter un tag Discord vérifié. */
-export type DiscordRequirement = "NONE" | "ANY_PLAYER" | "ALL_PLAYERS";
+/**
+ * Combien de joueurs du roster doivent remplir une condition.
+ *
+ * Un seul type pour les deux réglages qui s'en servent : ils posent la **même**
+ * question (« aucun / au moins un / tous »), et deux énumérations jumelles
+ * auraient fini par diverger — ne serait-ce que par leurs libellés, qui sont
+ * ceux d'une liste déroulante partagée.
+ */
+export type PlayerRequirement = "NONE" | "ANY_PLAYER" | "ALL_PLAYERS";
 
 /** Conditions d'inscription d'un tournoi. */
 export type RegistrationFilters = {
-  discordRequirement: DiscordRequirement;
+  discordRequirement: PlayerRequirement;
+  /** Compte Battle.net **rattaché** au compte du site, jamais un BattleTag saisi. */
+  blizzardRequirement: PlayerRequirement;
   /** Effectif minimal du roster. `1` = aucune exigence. */
   minPlayers: number;
 };
@@ -45,6 +65,7 @@ export type RegistrationFilters = {
 /** Les valeurs par défaut d'un tournoi neuf, et de tous ceux d'avant ce réglage. */
 export const DEFAULT_REGISTRATION_FILTERS: RegistrationFilters = {
   discordRequirement: "ANY_PLAYER",
+  blizzardRequirement: "NONE",
   minPlayers: 5,
 };
 
@@ -61,31 +82,84 @@ export const DEFAULT_REGISTRATION_FILTERS: RegistrationFilters = {
  */
 export const MIN_PLAYERS_BOUNDS = { min: 1, max: 20 } as const;
 
-const DISCORD_REQUIREMENTS: readonly DiscordRequirement[] = ["NONE", "ANY_PLAYER", "ALL_PLAYERS"];
+/** Les trois valeurs, dans l'ordre où le formulaire les propose. */
+export const PLAYER_REQUIREMENTS: readonly PlayerRequirement[] = [
+  "ANY_PLAYER",
+  "ALL_PLAYERS",
+  "NONE",
+];
 
 /** Vrai si `value` est une exigence connue. */
-export function isDiscordRequirement(value: unknown): value is DiscordRequirement {
-  return typeof value === "string" && (DISCORD_REQUIREMENTS as readonly string[]).includes(value);
+export function isPlayerRequirement(value: unknown): value is PlayerRequirement {
+  return typeof value === "string" && (PLAYER_REQUIREMENTS as readonly string[]).includes(value);
 }
 
 /** Libellés FR, pour le formulaire comme pour l'en-tête d'un tournoi. */
-export const DISCORD_REQUIREMENT_LABELS: Record<DiscordRequirement, string> = {
+export const PLAYER_REQUIREMENT_LABELS: Record<PlayerRequirement, string> = {
   NONE: "Aucun joueur",
   ANY_PLAYER: "Au moins un joueur",
   ALL_PLAYERS: "Tous les joueurs",
 };
 
-/** Refus possibles. Trois codes distincts : chacun désigne un geste différent. */
-export type RegistrationFilterError =
-  | "TEAM_TOO_FEW_PLAYERS"
-  | "TEAM_NEEDS_VERIFIED_DISCORD"
-  | "TEAM_NEEDS_ALL_VERIFIED_DISCORD";
+/**
+ * Les refus possibles, énumérés — **source unique** dont le type est dérivé.
+ *
+ * La route d'inscription doit rendre un **409** sur chacun d'eux (la saisie est
+ * bonne, c'est l'état de l'équipe qui ne convient pas) et les listait à la main :
+ * un code ajouté ici sans être ajouté là-bas serait ressorti en 500, sur un
+ * refus parfaitement prévu. Le tableau ferme le cas — `isRegistrationFilterError`
+ * est le seul test à écrire.
+ */
+export const REGISTRATION_FILTER_ERRORS = [
+  "TEAM_TOO_FEW_PLAYERS",
+  "TEAM_NEEDS_VERIFIED_DISCORD",
+  "TEAM_NEEDS_ALL_VERIFIED_DISCORD",
+  "TEAM_NEEDS_LINKED_BLIZZARD",
+  "TEAM_NEEDS_ALL_LINKED_BLIZZARD",
+] as const;
+
+/** Refus de condition. Un code par geste : chacun nomme ce qu'il faut faire. */
+export type RegistrationFilterError = (typeof REGISTRATION_FILTER_ERRORS)[number];
+
+/** Vrai si `value` est un refus de condition d'inscription. */
+export function isRegistrationFilterError(value: unknown): value is RegistrationFilterError {
+  return (
+    typeof value === "string" && (REGISTRATION_FILTER_ERRORS as readonly string[]).includes(value)
+  );
+}
 
 /** Un membre du roster, réduit à ce que les conditions regardent. */
 export type RosterMemberEligibility = {
   /** Le joueur porte-t-il un tag Discord **vérifié** ? */
   discordVerified: boolean;
+  /** Son compte du site porte-t-il une identité **Blizzard** rattachée ? */
+  blizzardLinked: boolean;
 };
+
+/**
+ * Un réglage `ANY_PLAYER` / `ALL_PLAYERS` appliqué à un roster.
+ *
+ * Écrit une fois pour les deux conditions : elles ne diffèrent que par le champ
+ * lu et par leurs deux codes de refus, et les recopier aurait fait deux endroits
+ * où oublier la garde du **roster vide** — qu'un `every` laisse passer, faute
+ * d'un seul membre à mettre en défaut. En tournoi par équipes l'effectif minimal
+ * l'a déjà écarté (son plancher est 1), mais la garde ne coûte rien et ferme le
+ * cas pour de bon : un appelant qui passerait un roster vide obtiendrait sinon
+ * un « toutes les conditions remplies » sur une équipe sans personne.
+ */
+function checkPlayerRequirement(
+  requirement: PlayerRequirement,
+  roster: readonly RosterMemberEligibility[],
+  satisfies: (member: RosterMemberEligibility) => boolean,
+  anyError: RegistrationFilterError,
+  allError: RegistrationFilterError,
+): RegistrationFilterError | null {
+  if (requirement === "ANY_PLAYER" && !roster.some(satisfies)) return anyError;
+  if (requirement === "ALL_PLAYERS" && (roster.length === 0 || !roster.every(satisfies))) {
+    return allError;
+  }
+  return null;
+}
 
 /**
  * L'engagé remplit-il les conditions ? `null` = oui.
@@ -93,13 +167,16 @@ export type RosterMemberEligibility = {
  * `soloEntry` dit que l'engagé **est** un joueur (tournoi individuel) : son
  * roster n'a alors qu'une ligne, et l'effectif minimal n'a **aucun sens** — le
  * défaut à 5 interdirait toute inscription à tout tournoi individuel, sur un
- * réglage que le formulaire n'a même pas affiché. La condition Discord, elle,
- * s'applique telle quelle : « au moins un » et « tous » désignent le même unique
- * joueur.
+ * réglage que le formulaire n'a même pas affiché. Les deux conditions de compte,
+ * elles, s'appliquent telles quelles : « au moins un » et « tous » désignent le
+ * même unique joueur.
  *
- * L'ordre des contrôles est significatif : l'effectif d'abord, parce qu'il se
- * corrige en recrutant, et que reprocher un tag manquant à une équipe de deux
- * joueurs enverrait corriger le moins urgent des deux.
+ * L'ordre des contrôles est significatif, et va du plus urgent au moins urgent :
+ * l'**effectif** d'abord, parce qu'il se corrige en recrutant et que reprocher
+ * un tag manquant à une équipe de deux joueurs enverrait corriger le moins
+ * urgent des deux ; le **Discord** ensuite, sans lequel l'arbitrage ne peut
+ * joindre personne ; le **Blizzard** enfin, qui n'atteste que l'éligibilité au
+ * jeu.
  */
 export function checkRegistrationFilters(
   filters: RegistrationFilters,
@@ -108,23 +185,22 @@ export function checkRegistrationFilters(
 ): RegistrationFilterError | null {
   if (!soloEntry && roster.length < filters.minPlayers) return "TEAM_TOO_FEW_PLAYERS";
 
-  if (filters.discordRequirement === "ANY_PLAYER") {
-    if (!roster.some((member) => member.discordVerified)) return "TEAM_NEEDS_VERIFIED_DISCORD";
-  }
-
-  if (filters.discordRequirement === "ALL_PLAYERS") {
-    // Un roster **vide** passerait un `every` : il n'a aucun joueur non vérifié.
-    // En tournoi par équipes l'effectif minimal l'a déjà écarté (son plancher
-    // est 1), mais la garde ne coûte rien et ferme le cas pour de bon — un
-    // appelant qui passerait un roster vide obtiendrait sinon un « toutes les
-    // conditions remplies » sur une équipe sans personne.
-    if (roster.length === 0) return "TEAM_NEEDS_ALL_VERIFIED_DISCORD";
-    if (!roster.every((member) => member.discordVerified)) {
-      return "TEAM_NEEDS_ALL_VERIFIED_DISCORD";
-    }
-  }
-
-  return null;
+  return (
+    checkPlayerRequirement(
+      filters.discordRequirement,
+      roster,
+      (member) => member.discordVerified,
+      "TEAM_NEEDS_VERIFIED_DISCORD",
+      "TEAM_NEEDS_ALL_VERIFIED_DISCORD",
+    ) ??
+    checkPlayerRequirement(
+      filters.blizzardRequirement,
+      roster,
+      (member) => member.blizzardLinked,
+      "TEAM_NEEDS_LINKED_BLIZZARD",
+      "TEAM_NEEDS_ALL_LINKED_BLIZZARD",
+    )
+  );
 }
 
 /**
@@ -141,12 +217,16 @@ export function checkRegistrationFilters(
 export function parseRegistrationFilters(
   discordRequirement: unknown,
   minPlayers: unknown,
+  blizzardRequirement: unknown,
 ): RegistrationFilters {
   const parsedMin = Number(minPlayers);
   return {
-    discordRequirement: isDiscordRequirement(discordRequirement)
+    discordRequirement: isPlayerRequirement(discordRequirement)
       ? discordRequirement
       : DEFAULT_REGISTRATION_FILTERS.discordRequirement,
+    blizzardRequirement: isPlayerRequirement(blizzardRequirement)
+      ? blizzardRequirement
+      : DEFAULT_REGISTRATION_FILTERS.blizzardRequirement,
     minPlayers: isValidMinPlayers(parsedMin)
       ? parsedMin
       : DEFAULT_REGISTRATION_FILTERS.minPlayers,
@@ -163,6 +243,12 @@ export function isValidMinPlayers(value: unknown): boolean {
   );
 }
 
+/** Refus de saisie possibles, codes bruts — la route les traduit en 400. */
+export type RegistrationFiltersInputError =
+  | "INVALID_DISCORD_REQUIREMENT"
+  | "INVALID_BLIZZARD_REQUIREMENT"
+  | "INVALID_MIN_PLAYERS";
+
 /**
  * Valide une saisie de conditions. Rend un code d'erreur, jamais un statut HTTP
  * — même contrat que `validateTournamentInput`, qui l'appelle.
@@ -170,9 +256,13 @@ export function isValidMinPlayers(value: unknown): boolean {
 export function validateRegistrationFilters(
   discordRequirement: unknown,
   minPlayers: unknown,
-): "INVALID_DISCORD_REQUIREMENT" | "INVALID_MIN_PLAYERS" | null {
-  if (discordRequirement != null && !isDiscordRequirement(discordRequirement)) {
+  blizzardRequirement: unknown,
+): RegistrationFiltersInputError | null {
+  if (discordRequirement != null && !isPlayerRequirement(discordRequirement)) {
     return "INVALID_DISCORD_REQUIREMENT";
+  }
+  if (blizzardRequirement != null && !isPlayerRequirement(blizzardRequirement)) {
+    return "INVALID_BLIZZARD_REQUIREMENT";
   }
   if (minPlayers != null && !isValidMinPlayers(minPlayers)) return "INVALID_MIN_PLAYERS";
   return null;
@@ -186,7 +276,8 @@ export function validateRegistrationFilters(
  * et deux rédactions divergeraient au premier réglage ajouté.
  *
  * `soloEntry` retire l'effectif, qui ne s'applique pas — annoncer « 5 joueurs
- * minimum » sur un tournoi individuel serait faux.
+ * minimum » sur un tournoi individuel serait faux. Les deux conditions de compte
+ * y restent, au singulier : elles désignent le seul joueur engagé.
  */
 export function registrationFiltersSummary(
   filters: RegistrationFilters,
@@ -201,6 +292,12 @@ export function registrationFiltersSummary(
   }
   if (filters.discordRequirement === "ALL_PLAYERS") {
     parts.push(soloEntry ? "Discord vérifié" : "tous les Discord vérifiés");
+  }
+  if (filters.blizzardRequirement === "ANY_PLAYER") {
+    parts.push(soloEntry ? "compte Blizzard lié" : "au moins un compte Blizzard lié");
+  }
+  if (filters.blizzardRequirement === "ALL_PLAYERS") {
+    parts.push(soloEntry ? "compte Blizzard lié" : "tous les comptes Blizzard liés");
   }
   return parts.length === 0 ? null : parts.join(" · ");
 }

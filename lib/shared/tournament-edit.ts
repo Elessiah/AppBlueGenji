@@ -44,6 +44,7 @@ export const ALL_TOURNAMENT_FIELDS = [
   "matchFormat",
   "endurancePlayoffFormat",
   "registrationDiscordRequirement",
+  "registrationBlizzardRequirement",
   "registrationMinPlayers",
   "phases",
 ] as const;
@@ -73,6 +74,7 @@ export const RESTRICTED_FIELDS: readonly TournamentField[] = [
   // condition ne renvoie personne chez lui, c'est le retrait d'un engagé qui
   // s'en charge (`docs/features/ENTRANT_REMOVAL.md`).
   "registrationDiscordRequirement",
+  "registrationBlizzardRequirement",
   "registrationMinPlayers",
 ];
 

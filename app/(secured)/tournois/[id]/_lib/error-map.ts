@@ -47,16 +47,21 @@ export const ERROR_MESSAGES: Record<string, string> = {
     "Ton pseudo est déjà utilisé comme nom d'équipe : change-le avant de t'inscrire.",
   USER_NOT_FOUND: "Compte introuvable.",
   // Conditions d'inscription (`lib/shared/registration-filters.ts`). Chaque
-  // refus nomme **le geste qui le lève** : recruter, ou certifier un tag. Un
-  // « conditions non remplies » unique aurait laissé le capitaine deviner
-  // laquelle des deux conditions a bloqué.
+  // refus nomme **le geste qui le lève** : recruter, certifier un tag, ou
+  // rattacher un compte Blizzard. Un « conditions non remplies » unique aurait
+  // laissé le capitaine deviner laquelle des trois conditions a bloqué.
   TEAM_TOO_FEW_PLAYERS:
     "Ton équipe n'a pas assez de joueurs pour ce tournoi : recrute, puis réessaie.",
   TEAM_NEEDS_VERIFIED_DISCORD:
     "Ce tournoi demande qu'au moins un joueur de l'équipe ait certifié son tag Discord (page Mon profil) : l'organisation doit pouvoir vous joindre.",
   TEAM_NEEDS_ALL_VERIFIED_DISCORD:
     "Ce tournoi demande que tous les joueurs de l'équipe aient certifié leur tag Discord (page Mon profil).",
+  TEAM_NEEDS_LINKED_BLIZZARD:
+    "Ce tournoi demande qu'au moins un joueur de l'équipe ait rattaché son compte Blizzard (page Mon profil, « Applications connectées »).",
+  TEAM_NEEDS_ALL_LINKED_BLIZZARD:
+    "Ce tournoi demande que tous les joueurs de l'équipe aient rattaché leur compte Blizzard (page Mon profil, « Applications connectées »).",
   INVALID_DISCORD_REQUIREMENT: "Condition « Discord vérifié » invalide.",
+  INVALID_BLIZZARD_REQUIREMENT: "Condition « Compte Blizzard » invalide.",
   INVALID_MIN_PLAYERS: "Nombre de joueurs minimum invalide.",
   // Repli du panneau de contacts : `mapError` rend le code lui-même quand il ne
   // le connaît pas, et une réponse sans corps exploitable (502 d'un relais)

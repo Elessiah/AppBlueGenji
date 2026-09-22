@@ -2,7 +2,8 @@
 
 > `lib/shared/registration-filters.ts` (pur) ·
 > `lib/server/tournaments/registration-eligibility.ts` ·
-> colonnes `bg_tournaments.registration_discord_requirement` / `registration_min_players`
+> colonnes `bg_tournaments.registration_discord_requirement` /
+> `registration_blizzard_requirement` / `registration_min_players`
 
 ## Le manque
 
@@ -19,19 +20,40 @@ conditions du tournoi, pas des surprises d'arbitrage.
 
 ## La règle
 
-> Deux réglages par tournoi, contrôlés à chaque inscription **d'un joueur**.
+> Trois réglages par tournoi, contrôlés à chaque inscription **d'un joueur**.
 
 | Réglage              | Valeurs                                             | Défaut        |
 | -------------------- | --------------------------------------------------- | ------------- |
 | Discord vérifié      | `NONE` · `ANY_PLAYER` · `ALL_PLAYERS`                | `ANY_PLAYER`  |
+| Compte Blizzard      | `NONE` · `ANY_PLAYER` · `ALL_PLAYERS`                | `NONE`        |
 | Joueurs minimum      | 1 à 20 (`1` = aucune exigence)                       | 5             |
 
-`ANY_PLAYER` est le défaut parce qu'il rend l'équipe joignable en exigeant le
-minimum : un interlocuteur suffit à reprogrammer une manche. `ALL_PLAYERS` sert
-aux tournois où chaque joueur doit l'être individuellement (éligibilité, tournoi à
-enjeu) ; `NONE` retire la condition. « Vérifié » renvoie à
+Les deux premiers partagent leur type (`PlayerRequirement`) et leurs libellés :
+ils posent la **même** question — aucun joueur, au moins un, tous — et deux
+énumérations jumelles auraient divergé, à commencer par la liste déroulante
+qu'elles remplissent toutes les deux.
+
+`ANY_PLAYER` est le défaut **côté Discord** parce qu'il rend l'équipe joignable en
+exigeant le minimum : un interlocuteur suffit à reprogrammer une manche.
+`ALL_PLAYERS` sert aux tournois où chaque joueur doit l'être individuellement
+(éligibilité, tournoi à enjeu) ; `NONE` retire la condition. « Vérifié » renvoie à
 `docs/features/DISCORD_VERIFICATION.md` : un tag **prouvé**, jamais une chaîne
 saisie — c'est précisément le trou que la condition ferme.
+
+`NONE` est le défaut **côté Blizzard**, et pour une raison de fond : la moitié du
+site joue à Marvel Rivals, où un compte Battle.net ne veut rien dire. L'exiger
+partout par défaut fermerait des tournois qui n'ont aucune raison de l'être — et,
+la migration reprenant ce défaut, aucun tournoi existant ne voit ses conditions
+changer.
+
+**Ce que la condition Blizzard n'est pas.** Le tag Discord est une
+**coordonnée** : l'organisation s'en sert pour joindre une équipe. Un compte
+Battle.net rattaché est une **attestation de compte de jeu** — l'aller-retour
+OAuth prouve que le BattleTag affiché sur le profil est bien celui du joueur. La
+condition se lit donc sur `bg_users.blizzard_sub` et **jamais** sur
+`overwatch_battletag`, chaîne libre où l'on peut écrire le tag de n'importe qui :
+c'est exactement l'écart entre `discord_verified_at` et `discord_pseudo`, et c'est
+le trou que la condition ferme.
 
 Les colonnes sont `NOT NULL` avec ces défauts : un tournoi d'avant la migration
 en hérite, ce qui est le comportement voulu pour la suite, puisque seules les
@@ -55,32 +77,44 @@ d'ailleurs). Un engagé qui ne remplit plus les conditions se retire à la main
 
 **3. L'effectif minimal ne s'applique pas en tournoi individuel.** Un engagé y est
 **une** personne : le défaut à 5 interdirait toute inscription à tout tournoi
-solo, sur un réglage que le formulaire n'a même pas affiché. La condition Discord,
-elle, s'applique telle quelle — « au moins un » et « tous » désignent le même
-unique joueur. La valeur reste **enregistrée** sur un tournoi solo (elle
+solo, sur un réglage que le formulaire n'a même pas affiché. Les deux conditions
+de compte, elles, s'appliquent telles quelles — « au moins un » et « tous »
+désignent le même unique joueur. La valeur reste **enregistrée** sur un tournoi solo (elle
 resservirait si le type de participants rebasculait) ; ce qui compte est que
 personne ne la *lise*.
 
-## Trois refus, trois gestes
+## Cinq refus, cinq gestes
 
 | Code                              | Statut | Ce qu'il demande de faire |
 | --------------------------------- | :----: | ------------------------- |
 | `TEAM_TOO_FEW_PLAYERS`            | 409    | Recruter                  |
 | `TEAM_NEEDS_VERIFIED_DISCORD`     | 409    | Qu'un joueur certifie son tag |
 | `TEAM_NEEDS_ALL_VERIFIED_DISCORD` | 409    | Que tous le fassent       |
+| `TEAM_NEEDS_LINKED_BLIZZARD`      | 409    | Qu'un joueur rattache son compte Blizzard |
+| `TEAM_NEEDS_ALL_LINKED_BLIZZARD`  | 409    | Que tous le fassent       |
 
 **409 et non 400** : la saisie est bonne, c'est l'état de l'équipe qui ne convient
 pas — et il se corrige, ce qu'un « requête invalide » ne laisserait pas entendre.
 
-Trois codes distincts plutôt qu'un « conditions non remplies » unique : chacun
-nomme le geste qui le lève, et le capitaine n'a pas à deviner laquelle des deux
-conditions a bloqué. L'ordre des contrôles suit la même intention — l'effectif
-d'abord, parce que reprocher un tag manquant à une équipe de deux joueurs
-enverrait corriger le moins urgent des deux.
+Cinq codes distincts plutôt qu'un « conditions non remplies » unique : chacun
+nomme le geste qui le lève, et le capitaine n'a pas à deviner laquelle des trois
+conditions a bloqué. L'ordre des contrôles suit la même intention, du plus urgent
+au moins urgent — l'**effectif** d'abord, parce que reprocher un tag manquant à
+une équipe de deux joueurs enverrait corriger le moins urgent des deux ; le
+**Discord** ensuite, sans lequel l'arbitrage ne peut joindre personne ; le
+**Blizzard** enfin, qui n'atteste que l'éligibilité au jeu.
+
+La liste des codes est **énumérée dans le module pur**
+(`REGISTRATION_FILTER_ERRORS`) et le type en est dérivé, parce que la route
+d'inscription la recopiait : un refus ajouté ici sans l'être là-bas serait
+ressorti en **500**, sur un cas parfaitement prévu. Elle teste désormais
+`isRegistrationFilterError`, et rien d'autre.
 
 Un roster **vide** est refusé explicitement sous `ALL_PLAYERS` : un `every` sur un
 tableau vide rend `true`, et l'effectif minimal (plancher 1) l'a déjà écarté en
-tournoi par équipes — mais la garde ferme le cas pour de bon.
+tournoi par équipes — mais la garde ferme le cas pour de bon. Elle est écrite une
+seule fois (`checkPlayerRequirement`), que les deux conditions partagent : les
+recopier aurait fait deux endroits où l'oublier, et le second n'aurait rien dit.
 
 ## Où la règle est écrite, et combien de fois
 
@@ -115,11 +149,15 @@ Les lectures de roster vivent dans `registration-eligibility.ts`, **toujours sur
 la connexion de l'appelant** : l'inscription tient un verrou sur la ligne du
 tournoi, et emprunter une seconde place du pool sous ce verrou arme un convoi.
 Le roster compte les membres **actifs** (`left_at IS NULL`) : un joueur parti
-n'est ni un effectif ni un interlocuteur.
+n'est ni un effectif ni un interlocuteur. Les deux colonnes lues sont écrites une
+fois (`ELIGIBILITY_COLUMNS_SQL`) et partagées par la lecture d'équipe et celle de
+l'engagé solo — deux copies auraient divergé au premier réglage ajouté, la
+seconde restant muette puisqu'un tournoi individuel ne fait pas les mêmes essais
+qu'un tournoi par équipes.
 
 ## Édition et affichage
 
-Les deux champs sont dans `RESTRICTED_FIELDS` : **modifiables après publication**,
+Les trois champs sont dans `RESTRICTED_FIELDS` : **modifiables après publication**,
 tant que le tournoi n'est pas lancé. C'est délibéré — un tournoi annoncé où
 personne ne peut s'inscrire (cinq joueurs exigés sur un plateau d'équipes à
 quatre) doit pouvoir être ouvert sans être recréé. Rien n'est rétroactif, d'où
@@ -127,7 +165,7 @@ l'absence de garde du genre « ne peut plus être durci ».
 
 Côté lecture, `registrationFiltersSummary` écrit les conditions en une phrase,
 posée dans la case « Conditions d'inscription » de l'en-tête du tournoi **et**
-sous les deux champs du formulaire, où l'organisateur lit d'avance ce que les
+sous les trois champs du formulaire, où l'organisateur lit d'avance ce que les
 participants liront — même fonction, donc aucune reformulation possible. La case n'apparaît que sur un tournoi `UPCOMING`
 ou `REGISTRATION` : passé le coup d'envoi plus personne n'entre, et la garder
 afficherait une condition d'accès comme un trait de palmarès.
@@ -138,14 +176,23 @@ l'instantané diffusé : ce sont des conditions publiques, rien de personnel.
 ## Jeu de test
 
 `lib/server/seed.ts` donne un tag Discord à tous les joueurs fictifs et en
-certifie **deux sur trois** (motif déterministe, le seed reste reproductible) :
-un jeu où personne n'est certifié rendrait l'inscription impossible à essayer,
-un jeu où tout le monde l'est ne montrerait jamais le refus. Deux tournois de la
-matrice prennent les bords — « Inscriptions Sans Condition » (`NONE`, 1 joueur) et
-« Inscriptions Tous Certifiés » (`ALL_PLAYERS`, 5 joueurs).
+certifie **deux sur trois** ; il rattache un compte Blizzard à **un sur deux**
+(motifs déterministes, le seed reste reproductible). Un jeu où personne n'est
+certifié rendrait l'inscription impossible à essayer, un jeu où tout le monde
+l'est ne montrerait jamais le refus. Les deux motifs sont **décalés** l'un de
+l'autre pour qu'ils ne retombent pas sur les mêmes joueurs : une équipe peut ainsi
+buter sur une condition sans buter sur l'autre, ce qui est exactement le cas à
+relire.
+
+Trois tournois de la matrice prennent les bords — « Inscriptions Sans Condition »
+(`NONE`, 1 joueur), « Inscriptions Tous Certifiés » (`ALL_PLAYERS`, 5 joueurs) et
+« Inscriptions Blizzard Obligatoire » (Blizzard `ALL_PLAYERS`, Discord `NONE`), ce
+dernier sur un tournoi **Overwatch** : c'est le seul jeu où la condition veut dire
+quelque chose.
 
 ## Voir aussi
 
 - `docs/features/DISCORD_VERIFICATION.md` — ce qu'« un tag vérifié » veut dire
+- `docs/features/OAUTH_PROVIDERS.md` — ce qu'« un compte Blizzard rattaché » veut dire
 - `docs/features/GHOST_TEAMS.md` — pourquoi les fantômes échappent aux conditions
 - `docs/features/TOURNAMENT_EDITING.md` — les trois fenêtres d'édition

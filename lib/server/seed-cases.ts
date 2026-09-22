@@ -83,6 +83,7 @@ export interface TournamentDef extends ReportStateCounts {
    * exigence, et l'exigence maximale.
    */
   registrationDiscordRequirement?: "NONE" | "ANY_PLAYER" | "ALL_PLAYERS";
+  registrationBlizzardRequirement?: "NONE" | "ANY_PLAYER" | "ALL_PLAYERS";
   registrationMinPlayers?: number;
   live?: SeedLive; // diffusion en direct ; absent = aucune chaîne annoncée
   matchSchedule?: SeedMatchSchedule; // dates de début des manches ; absent = aucun horaire
@@ -149,6 +150,12 @@ export const TOURNAMENTS: TournamentDef[] = [
   // opposé à un joueur qui tente de s'inscrire depuis l'interface.
   { name: "Inscriptions Sans Condition", game: "MR", state: "REGISTRATION", format: "SINGLE", teamCount: 4, maxTeams: 8, daysOffset: 22, registrationDiscordRequirement: "NONE", registrationMinPlayers: 1, teamOffset: 4 },
   { name: "Inscriptions Tous Certifiés", game: "OW", state: "REGISTRATION", format: "SINGLE", teamCount: 3, maxTeams: 8, daysOffset: 24, registrationDiscordRequirement: "ALL_PLAYERS", registrationMinPlayers: 5, teamOffset: 6 },
+  // Le compte Blizzard, sur un tournoi Overwatch — le seul jeu où il veut dire
+  // quelque chose, et la raison pour laquelle son défaut est `NONE`. Le seed ne
+  // rattache le compte que d'un joueur sur deux (motif décalé de celui de la
+  // certification Discord) : ce cas oppose donc un vrai refus à une équipe qui
+  // remplit pourtant la condition Discord.
+  { name: "Inscriptions Blizzard Obligatoire", game: "OW", state: "REGISTRATION", format: "SINGLE", teamCount: 3, maxTeams: 8, daysOffset: 25, registrationBlizzardRequirement: "ALL_PLAYERS", registrationDiscordRequirement: "NONE", registrationMinPlayers: 1, teamOffset: 9 },
   { name: "BG Survie Inscriptions", game: "MR", state: "REGISTRATION", format: "BG_SURVIE", teamCount: 12, maxTeams: 16, daysOffset: 22 },
 
   // ---- RUNNING · élimination simple (couverture des byes) ------------------

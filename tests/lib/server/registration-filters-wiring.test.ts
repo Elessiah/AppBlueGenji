@@ -39,16 +39,28 @@ const TOURNAMENT: Row = {
   max_teams: 16,
   participant_type: "TEAM",
   registration_discord_requirement: "ANY_PLAYER",
+  registration_blizzard_requirement: "NONE",
   registration_min_players: 5,
 };
+
+/** Un membre du roster, tel que la base le rend aux conditions d'inscription. */
+type Member = { discord: boolean; blizzard: boolean };
+
+/** Un roster dont seuls les tags varient — tout le monde a rattaché Blizzard. */
+const withDiscord = (...flags: boolean[]): Member[] =>
+  flags.map((discord) => ({ discord, blizzard: true }));
+
+/** L'inverse : seul le rattachement Blizzard varie, tous les tags certifiés. */
+const withBlizzard = (...flags: boolean[]): Member[] =>
+  flags.map((blizzard) => ({ discord: true, blizzard }));
 
 /**
  * Connexion factice.
  *
- * `roster` décrit le roster que la base rendra : un tableau de drapeaux « ce
- * joueur a-t-il un tag certifié ». `registrations` compte les inscrits.
+ * `roster` décrit le roster que la base rendra : les deux drapeaux que lisent
+ * les conditions. `registrations` compte les inscrits.
  */
-function mockConnection(roster: boolean[], overrides: Row = {}) {
+function mockConnection(roster: Member[], overrides: Row = {}) {
   const tournament = { ...TOURNAMENT, ...overrides };
   const inserts: unknown[][] = [];
 
@@ -62,11 +74,17 @@ function mockConnection(roster: boolean[], overrides: Row = {}) {
       return [(params as number[]).map((id) => ({ id, is_ghost: 1, deleted_at: null }))];
     }
     if (q.includes("FOR UPDATE")) return [[{ id: tournament.id }]];
+    // Une seule branche pour les deux lectures (roster d'équipe et engagé solo) :
+    // elles partagent la même liste de colonnes, écrite une fois dans
+    // `registration-eligibility.ts`. Deux branches ici laisseraient croire à deux
+    // requêtes différentes.
     if (q.startsWith("SELECT (u.discord_verified_at IS NOT NULL)")) {
-      return [roster.map((verified) => ({ verified: verified ? 1 : 0 }))];
-    }
-    if (q.startsWith("SELECT (discord_verified_at IS NOT NULL)")) {
-      return [roster.map((verified) => ({ verified: verified ? 1 : 0 }))];
+      return [
+        roster.map((member) => ({
+          verified: member.discord ? 1 : 0,
+          blizzard: member.blizzard ? 1 : 0,
+        })),
+      ];
     }
     if (q.startsWith("SELECT COUNT(*) AS c")) return [[{ c: 0 }]];
     if (q.startsWith("INSERT INTO bg_tournament_registrations")) {
@@ -95,7 +113,7 @@ beforeEach(() => {
 
 describe("inscription d'un joueur", () => {
   it("passe quand l'équipe remplit les conditions", async () => {
-    const { connection, inserts } = mockConnection([true, false, false, false, false]);
+    const { connection, inserts } = mockConnection(withDiscord(true, false, false, false, false));
 
     await registerCurrentUserTeam(connection, 5, 7);
 
@@ -103,7 +121,7 @@ describe("inscription d'un joueur", () => {
   });
 
   it("refuse une équipe trop petite, sans inscrire", async () => {
-    const { connection, inserts } = mockConnection([true, true]);
+    const { connection, inserts } = mockConnection(withDiscord(true, true));
 
     await expect(registerCurrentUserTeam(connection, 5, 7)).rejects.toThrow(
       "TEAM_TOO_FEW_PLAYERS",
@@ -112,7 +130,7 @@ describe("inscription d'un joueur", () => {
   });
 
   it("refuse une équipe sans aucun tag certifié", async () => {
-    const { connection, inserts } = mockConnection([false, false, false, false, false]);
+    const { connection, inserts } = mockConnection(withDiscord(false, false, false, false, false));
 
     await expect(registerCurrentUserTeam(connection, 5, 7)).rejects.toThrow(
       "TEAM_NEEDS_VERIFIED_DISCORD",
@@ -121,7 +139,7 @@ describe("inscription d'un joueur", () => {
   });
 
   it("exige tous les tags quand le tournoi le demande", async () => {
-    const { connection } = mockConnection([true, true, true, true, false], {
+    const { connection } = mockConnection(withDiscord(true, true, true, true, false), {
       registration_discord_requirement: "ALL_PLAYERS",
     });
 
@@ -131,7 +149,7 @@ describe("inscription d'un joueur", () => {
   });
 
   it("n'exige rien quand le tournoi n'exige rien", async () => {
-    const { connection, inserts } = mockConnection([false], {
+    const { connection, inserts } = mockConnection(withDiscord(false), {
       registration_discord_requirement: "NONE",
       registration_min_players: 1,
     });
@@ -153,21 +171,77 @@ describe("inscription d'un joueur", () => {
   });
 });
 
+describe("condition Blizzard — la colonne lue est `blizzard_sub`", () => {
+  it("refuse une équipe entièrement certifiée Discord mais sans compte Blizzard", async () => {
+    // Le cas que seule cette condition peut attraper : le roster est
+    // irréprochable du côté Discord. Si la lecture SQL avait oublié la colonne,
+    // ou si elle s'était posée sur `overwatch_battletag` (chaîne saisie, que
+    // n'importe qui remplit), rien ne serait refusé ici.
+    const { connection, inserts } = mockConnection(withBlizzard(true, true, true, true, false), {
+      registration_blizzard_requirement: "ALL_PLAYERS",
+    });
+
+    await expect(registerCurrentUserTeam(connection, 5, 7)).rejects.toThrow(
+      "TEAM_NEEDS_ALL_LINKED_BLIZZARD",
+    );
+    expect(inserts).toHaveLength(0);
+  });
+
+  it("se contente d'un compte rattaché sous ANY_PLAYER", async () => {
+    const { connection, inserts } = mockConnection(withBlizzard(false, false, false, false, true), {
+      registration_blizzard_requirement: "ANY_PLAYER",
+    });
+
+    await registerCurrentUserTeam(connection, 5, 7);
+    expect(inserts).toHaveLength(1);
+  });
+
+  it("n'exige rien sous le défaut `NONE`, quel que soit le roster", async () => {
+    // La garantie de la migration : un tournoi d'avant ce réglage hérite de
+    // `NONE`, et ses conditions ne changent donc pas.
+    const { connection, inserts } = mockConnection(withBlizzard(false, false, false, false, false));
+
+    await registerCurrentUserTeam(connection, 5, 7);
+    expect(inserts).toHaveLength(1);
+  });
+
+  it("ferme le bouton comme elle refuse l'écriture", async () => {
+    const { connection } = mockConnection(withBlizzard(false, false, false, false, false), {
+      registration_blizzard_requirement: "ANY_PLAYER",
+    });
+
+    expect(await canUserRegister(connection, 5, 7)).toBe(false);
+  });
+});
+
 describe("tournoi individuel", () => {
   const solo = { participant_type: "SOLO" as const };
 
   it("ignore l'effectif minimal, et n'a pas créé d'entrée solo pour rien", async () => {
-    const { connection, inserts } = mockConnection([true], solo);
+    const { connection, inserts } = mockConnection(withDiscord(true), solo);
 
     await registerCurrentUserTeam(connection, 5, 7);
 
     expect(inserts).toHaveLength(1);
   });
 
+  it("juge le compte Blizzard du joueur, pas de son entrée solo", async () => {
+    const { connection, inserts } = mockConnection(withBlizzard(false), {
+      ...solo,
+      registration_blizzard_requirement: "ALL_PLAYERS",
+    });
+
+    await expect(registerCurrentUserTeam(connection, 5, 7)).rejects.toThrow(
+      "TEAM_NEEDS_ALL_LINKED_BLIZZARD",
+    );
+    expect(ensureSoloEntry).not.toHaveBeenCalled();
+    expect(inserts).toHaveLength(0);
+  });
+
   it("refuse le joueur non certifié **avant** de créer son entrée solo", async () => {
     // Une inscription refusée ne doit pas laisser derrière elle une ligne
     // d'équipe que personne n'a demandée.
-    const { connection, inserts } = mockConnection([false], solo);
+    const { connection, inserts } = mockConnection(withDiscord(false), solo);
 
     await expect(registerCurrentUserTeam(connection, 5, 7)).rejects.toThrow(
       "TEAM_NEEDS_VERIFIED_DISCORD",
@@ -184,6 +258,7 @@ describe("équipes fantômes — hors conditions", () => {
     // impossible — et c'est l'usage même de ces équipes.
     const { connection, inserts } = mockConnection([], {
       registration_discord_requirement: "ALL_PLAYERS",
+      registration_blizzard_requirement: "ALL_PLAYERS",
       registration_min_players: 5,
     });
 
@@ -195,13 +270,13 @@ describe("équipes fantômes — hors conditions", () => {
 
 describe("canUserRegister — le bouton dit ce que le serveur fera", () => {
   it("ferme le bouton quand les conditions ne sont pas remplies", async () => {
-    const { connection } = mockConnection([false, false, false, false, false]);
+    const { connection } = mockConnection(withDiscord(false, false, false, false, false));
 
     expect(await canUserRegister(connection, 5, 7)).toBe(false);
   });
 
   it("l'ouvre quand elles le sont", async () => {
-    const { connection } = mockConnection([true, true, true, true, true]);
+    const { connection } = mockConnection(withDiscord(true, true, true, true, true));
 
     expect(await canUserRegister(connection, 5, 7)).toBe(true);
   });
@@ -209,7 +284,7 @@ describe("canUserRegister — le bouton dit ce que le serveur fera", () => {
   it("juge le **joueur** en individuel, sans attendre son entrée solo", async () => {
     // L'entrée solo n'existe qu'après la première inscription : la juger
     // fermerait le bouton trop tard, c'est-à-dire jamais.
-    const { connection } = mockConnection([false], { participant_type: "SOLO" });
+    const { connection } = mockConnection(withDiscord(false), { participant_type: "SOLO" });
 
     expect(await canUserRegister(connection, 5, 7)).toBe(false);
   });

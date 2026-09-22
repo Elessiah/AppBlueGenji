@@ -18,7 +18,7 @@ import {
 import { isParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import {
   DEFAULT_REGISTRATION_FILTERS,
-  isDiscordRequirement,
+  isPlayerRequirement,
   validateRegistrationFilters,
   type RegistrationFilters,
 } from "@/lib/shared/registration-filters";
@@ -161,6 +161,7 @@ export type TournamentInputBody = {
   endurancePlayoffFormatValue?: number | null;
   /** Conditions d'inscription ; absentes = les défauts du module partagé. */
   registrationDiscordRequirement?: string | null;
+  registrationBlizzardRequirement?: string | null;
   registrationMinPlayers?: number | null;
 };
 
@@ -334,12 +335,16 @@ export function validateTournamentInput(
   const filterError = validateRegistrationFilters(
     body.registrationDiscordRequirement,
     body.registrationMinPlayers,
+    body.registrationBlizzardRequirement,
   );
   if (filterError) return { error: filterError };
   const registrationFilters: RegistrationFilters = {
-    discordRequirement: isDiscordRequirement(body.registrationDiscordRequirement)
+    discordRequirement: isPlayerRequirement(body.registrationDiscordRequirement)
       ? body.registrationDiscordRequirement
       : DEFAULT_REGISTRATION_FILTERS.discordRequirement,
+    blizzardRequirement: isPlayerRequirement(body.registrationBlizzardRequirement)
+      ? body.registrationBlizzardRequirement
+      : DEFAULT_REGISTRATION_FILTERS.blizzardRequirement,
     minPlayers:
       body.registrationMinPlayers == null
         ? DEFAULT_REGISTRATION_FILTERS.minPlayers

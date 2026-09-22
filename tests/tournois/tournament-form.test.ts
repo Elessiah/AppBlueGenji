@@ -317,6 +317,9 @@ describe("conditions d'inscription", () => {
     expect(values.registrationDiscordRequirement).toBe(
       DEFAULT_REGISTRATION_FILTERS.discordRequirement,
     );
+    expect(values.registrationBlizzardRequirement).toBe(
+      DEFAULT_REGISTRATION_FILTERS.blizzardRequirement,
+    );
     expect(values.registrationMinPlayers).toBe(DEFAULT_REGISTRATION_FILTERS.minPlayers);
   });
 
@@ -324,6 +327,7 @@ describe("conditions d'inscription", () => {
     for (const format of ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL", "BG_SURVIE", "MULTI"] as const) {
       const payload = toApiPayload({ ...values, format });
       expect(payload.registrationDiscordRequirement).toBe("ANY_PLAYER");
+      expect(payload.registrationBlizzardRequirement).toBe("NONE");
       expect(payload.registrationMinPlayers).toBe(5);
     }
   });
@@ -364,14 +368,19 @@ describe("conditions d'inscription", () => {
         matchFormat: null,
         endurancePlayoffFormat: null,
         registrationDiscordRequirement: "ALL_PLAYERS" as const,
+        registrationBlizzardRequirement: "ANY_PLAYER" as const,
         registrationMinPlayers: 6,
         phases: null,
       }),
     };
 
     expect(api.registrationDiscordRequirement).toBe("ALL_PLAYERS");
+    // Les deux exigences partagent leur type et leurs trois valeurs : une
+    // inversion des deux champs traverserait l'aller-retour sans rien dire.
+    expect(api.registrationBlizzardRequirement).toBe("ANY_PLAYER");
     expect(api.registrationMinPlayers).toBe(6);
     expect(toApiPayload(api).registrationDiscordRequirement).toBe("ALL_PLAYERS");
+    expect(toApiPayload(api).registrationBlizzardRequirement).toBe("ANY_PLAYER");
     expect(toApiPayload(api).registrationMinPlayers).toBe(6);
   });
 });

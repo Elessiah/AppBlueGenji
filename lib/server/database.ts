@@ -857,16 +857,24 @@ async function runMigrations(db: Pool): Promise<void> {
     }
   }
 
-  // Migration: conditions d'inscription (hors équipes fantômes). Les deux
+  // Migration: conditions d'inscription (hors équipes fantômes). Les trois
   // colonnes sont `NOT NULL` avec les défauts du module partagé : un tournoi
-  // d'avant ce réglage hérite donc de « au moins un Discord vérifié » et de cinq
-  // joueurs, ce qui est bien le comportement voulu pour la suite — les
-  // inscriptions **déjà enregistrées** ne sont jamais relues, seules les
-  // nouvelles passent la condition.
+  // d'avant ce réglage hérite donc de « au moins un Discord vérifié », d'aucune
+  // exigence Blizzard et de cinq joueurs, ce qui est bien le comportement voulu
+  // pour la suite — les inscriptions **déjà enregistrées** ne sont jamais
+  // relues, seules les nouvelles passent la condition.
+  //
+  // Le défaut `NONE` de la colonne Blizzard n'est pas une prudence de
+  // migration : c'est le défaut du réglage lui-même, la moitié du site jouant à
+  // Marvel Rivals, où un compte Battle.net ne veut rien dire.
   for (const [column, definition] of [
     [
       "registration_discord_requirement",
       "ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'ANY_PLAYER'",
+    ],
+    [
+      "registration_blizzard_requirement",
+      "ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'NONE'",
     ],
     ["registration_min_players", "INT NOT NULL DEFAULT 5"],
   ] as const) {

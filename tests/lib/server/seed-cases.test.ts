@@ -342,11 +342,31 @@ describe("conditions d'inscription", () => {
     ).toBe(true);
   });
 
+  it("couvre la condition Blizzard, sur le seul jeu où elle veut dire quelque chose", () => {
+    // Son défaut étant `NONE`, aucun cas ne la déclare par accident : sans un
+    // tournoi qui la pose, le jeu de test ne montrerait jamais ni l'affichage de
+    // la condition ni le refus qu'elle oppose. Et elle est posée sur un tournoi
+    // **Overwatch** — l'exiger sur un plateau Marvel Rivals serait un cas que la
+    // production n'a aucune raison de produire.
+    const blizzard = TOURNAMENTS.filter(
+      (t) => t.registrationBlizzardRequirement !== undefined,
+    );
+    expect(blizzard.length).toBeGreaterThan(0);
+    expect(blizzard.some((t) => t.registrationBlizzardRequirement === "ALL_PLAYERS")).toBe(true);
+    for (const tournament of blizzard) {
+      expect(tournament.game).toBe("OW");
+      expect(tournament.state).toBe("REGISTRATION");
+    }
+  });
+
   it("laisse la majorité des cas sur les défauts", () => {
     // Un cas qui ne déclare rien couvre le comportement courant, celui-là même
     // que la migration a posé sur les tournois existants.
     const declared = TOURNAMENTS.filter(
-      (t) => t.registrationDiscordRequirement !== undefined || t.registrationMinPlayers !== undefined,
+      (t) =>
+        t.registrationDiscordRequirement !== undefined ||
+        t.registrationBlizzardRequirement !== undefined ||
+        t.registrationMinPlayers !== undefined,
     );
     expect(declared.length).toBeGreaterThan(0);
     expect(declared.length).toBeLessThan(TOURNAMENTS.length / 2);

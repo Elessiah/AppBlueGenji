@@ -12,7 +12,7 @@ import { computeRecommendedRounds } from "@/lib/shared/swiss";
 import { DEFAULT_MATCH_FORMAT, type MatchFormat } from "@/lib/shared/match-format";
 import {
   DEFAULT_REGISTRATION_FILTERS,
-  type DiscordRequirement,
+  type PlayerRequirement,
 } from "@/lib/shared/registration-filters";
 import type { ParticipantType } from "@/lib/shared/participants";
 import { createDefaultPhase } from "../creer/phase-form";
@@ -66,11 +66,12 @@ export type TournamentFormValues = {
    */
   endurancePlayoffFormat: MatchFormat | null;
   /**
-   * Conditions d'inscription. Aplaties en deux champs, comme côté serveur : ce
-   * sont deux réglages indépendants, et la liste blanche de l'édition les juge
+   * Conditions d'inscription. Aplaties en trois champs, comme côté serveur : ce
+   * sont trois réglages indépendants, et la liste blanche de l'édition les juge
    * séparément.
    */
-  registrationDiscordRequirement: DiscordRequirement;
+  registrationDiscordRequirement: PlayerRequirement;
+  registrationBlizzardRequirement: PlayerRequirement;
   registrationMinPlayers: number;
   phases: PhaseConfig[];
 };
@@ -106,7 +107,8 @@ export type TournamentApiValues = {
   enduranceMaxRounds: number | null;
   matchFormat: MatchFormat | null;
   endurancePlayoffFormat: MatchFormat | null;
-  registrationDiscordRequirement: DiscordRequirement;
+  registrationDiscordRequirement: PlayerRequirement;
+  registrationBlizzardRequirement: PlayerRequirement;
   registrationMinPlayers: number;
   phases: PhaseConfig[] | null;
 };
@@ -148,8 +150,9 @@ export function defaultTournamentFormValues(): TournamentFormValues {
     // il vaut pour tous les tournois créés avant ce réglage.
     endurancePlayoffFormat: null,
     // Conditions d'inscription : les défauts du module partagé — « au moins un
-    // Discord vérifié » et cinq joueurs.
+    // Discord vérifié », aucune exigence Blizzard, et cinq joueurs.
     registrationDiscordRequirement: DEFAULT_REGISTRATION_FILTERS.discordRequirement,
+    registrationBlizzardRequirement: DEFAULT_REGISTRATION_FILTERS.blizzardRequirement,
     registrationMinPlayers: DEFAULT_REGISTRATION_FILTERS.minPlayers,
     phases: [createDefaultPhase(1, "SWISS"), createDefaultPhase(2, "DOUBLE")],
   };
@@ -242,6 +245,7 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
     // sur le déroulé du tournoi mais sur qui a le droit d'y entrer, question
     // que les six formats posent à l'identique.
     registrationDiscordRequirement: values.registrationDiscordRequirement,
+    registrationBlizzardRequirement: values.registrationBlizzardRequirement,
     registrationMinPlayers: values.registrationMinPlayers,
   };
 }
@@ -286,6 +290,7 @@ export function toFormValues(apiValues: TournamentApiValues): TournamentFormValu
     matchFormat: apiValues.matchFormat,
     endurancePlayoffFormat: apiValues.endurancePlayoffFormat,
     registrationDiscordRequirement: apiValues.registrationDiscordRequirement,
+    registrationBlizzardRequirement: apiValues.registrationBlizzardRequirement,
     registrationMinPlayers: apiValues.registrationMinPlayers,
     phases: apiValues.phases ?? defaults.phases,
   };
