@@ -31,15 +31,62 @@ function requireEnv(name: string): string {
   return value;
 }
 
+/**
+ * Le schéma, **tel qu'il est aujourd'hui** — et non l'histoire de la façon dont
+ * on y est arrivé.
+ *
+ * Jusqu'ici ce module racontait cette histoire : une poignée de `CREATE TABLE`
+ * d'origine, puis soixante-trois `ALTER TABLE` empilés au fil des
+ * fonctionnalités, chacun dans son `try {} catch {}` parce qu'il devait
+ * retomber en silence sur une base qui l'avait déjà subi. Personne ne pouvait
+ * plus lire la définition d'une table sans parcourir mille lignes, l'ordre des
+ * colonnes n'avait plus aucun rapport avec leur sens, et chaque démarrage
+ * rejouait des conversions d'ENUM et des `UPDATE` de rattrapage sans objet
+ * depuis des mois.
+ *
+ * **La contrepartie, à connaître avant de toucher à ce fichier.** Sur une base
+ * qui existe déjà, `CREATE TABLE IF NOT EXISTS` ne fait *rien* : il ne rattrape
+ * ni une colonne ni un index manquants. Replier les anciens `ALTER` dans les
+ * `CREATE` n'est donc sans danger que parce que la production porte déjà le
+ * schéma complet — elle a joué tous ces `ALTER`, un par un, avant cette
+ * consolidation. Une base restée à une version antérieure n'est **pas**
+ * rattrapée par ce fichier et doit être migrée à la main.
+ *
+ * **La règle pour la suite est donc inchangée** : un changement de schéma
+ * s'écrit ici en **deux** endroits — dans le `CREATE TABLE`, pour les bases
+ * neuves, *et* en `ALTER TABLE` tolérant dans la section « Migrations », pour
+ * celles qui tournent. C'est exactement ce que fait le retrait de
+ * `bg_users.email` ci-dessous, seul `ALTER` que ce fichier porte encore.
+ */
 async function runMigrations(db: Pool): Promise<void> {
+  // ───────────────────────────────────────────────────────────────────────────
+  // Comptes
+  // ───────────────────────────────────────────────────────────────────────────
+
+  // Les trois portes d'entrée du site (`google_sub`, `discord_id`,
+  // `blizzard_sub`) sont des colonnes **uniques** de cette table plutôt qu'une
+  // table d'identités : un compte n'a qu'une identité par fournisseur, et c'est
+  // l'unicité qui tranche la course entre deux comptes qui rattacheraient la
+  // même identité au même instant (le `SELECT` préalable ne donne que le refus
+  // lisible). Aucune adresse e-mail : le site n'en demande plus à personne.
+  //
+  // `discord_verified_at` ne dit pas « ce compte a un Discord » — `discord_id`
+  // le dit — mais « le tag de `discord_pseudo` a été prouvé par son titulaire »,
+  // ce qui se perd à chaque modification du tag.
+  //
+  // `visible_pseudo` survit sans lecteur : le pseudo n'est plus masquable (c'est
+  // l'identité de base du joueur : brackets, rosters, feuilles de match), la
+  // colonne est conservée pour ne pas casser les installs.
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_users (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       pseudo VARCHAR(40) NOT NULL UNIQUE,
       avatar_url TEXT NULL,
       discord_id VARCHAR(40) NULL UNIQUE,
+      discord_pseudo VARCHAR(64) NULL,
+      discord_verified_at DATETIME NULL,
       google_sub VARCHAR(191) NULL UNIQUE,
-      email VARCHAR(191) NULL UNIQUE,
+      blizzard_sub VARCHAR(191) NULL UNIQUE,
       is_adult TINYINT(1) NULL DEFAULT NULL,
       overwatch_battletag VARCHAR(64) NULL,
       marvel_rivals_tag VARCHAR(64) NULL,
@@ -48,9 +95,12 @@ async function runMigrations(db: Pool): Promise<void> {
       visible_overwatch TINYINT(1) NOT NULL DEFAULT 0,
       visible_marvel TINYINT(1) NOT NULL DEFAULT 0,
       visible_major TINYINT(1) NOT NULL DEFAULT 0,
+      open_to_recruitment TINYINT(1) NOT NULL DEFAULT 1,
+      platform_roles_json JSON NULL,
+      is_admin TINYINT(1) NOT NULL DEFAULT 0,
+      is_deleted TINYINT(1) NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      is_admin TINYINT(1) NOT NULL DEFAULT 0
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
@@ -68,10 +118,15 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  // `handle` retient le **tag** saisi à la demande du code : la certification
+  // enregistre celui qui a servi à la résolution, et non celui que le client
+  // renvoie à la confirmation — c'est la ligne du défi qui porte la preuve.
+  // `NULL` sur une demande faite par identifiant numérique.
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_discord_login_challenges (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       discord_id VARCHAR(40) NOT NULL,
+      handle VARCHAR(64) NULL,
       code_hash CHAR(64) NOT NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       expires_at DATETIME NOT NULL,
@@ -82,13 +137,40 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // Équipes
+  // ───────────────────────────────────────────────────────────────────────────
+
+  // Trois sortes de lignes cohabitent ici : les **équipes** ordinaires, les
+  // **fantômes** (`is_ghost`, créées par le staff pour remplir un plateau) et
+  // les **entrées solo** (`solo_user_id`, un joueur engagé en tournoi
+  // individuel). Ne jamais compter `bg_teams` sans filtrer
+  // `solo_user_id IS NULL`.
+  //
+  // `solo_user_id` n'a **pas** de clé étrangère, volontairement : une
+  // suppression de compte en cascade effacerait l'engagé, et avec lui
+  // l'historique des matchs qui le référencent. L'unicité garantit « un joueur =
+  // au plus une entrée solo ».
+  //
+  // `uniq_bg_teams_tag` est nommé : `mapTeamTagConflict` lit le **nom de
+  // l'index** dans `ER_DUP_ENTRY` pour distinguer « sigle pris » de « nom pris »,
+  // et `bg_teams` porte deux uniques. L'unicité MySQL ignore les `NULL` — autant
+  // d'équipes sans sigle qu'on veut, et les entrées solo restent hors de
+  // l'espace de noms sans une règle de plus.
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_teams (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(60) NOT NULL UNIQUE,
+      tag VARCHAR(4) NULL,
       logo_url TEXT NULL,
+      description TEXT NULL,
+      is_ghost TINYINT(1) NOT NULL DEFAULT 0,
+      solo_user_id BIGINT NULL,
+      deleted_at DATETIME NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_bg_teams_tag (tag),
+      UNIQUE KEY uniq_bg_teams_solo_user (solo_user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
@@ -111,15 +193,90 @@ async function runMigrations(db: Pool): Promise<void> {
   `);
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS bg_team_invitations (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      team_id BIGINT NOT NULL,
+      user_id BIGINT NOT NULL,
+      created_by BIGINT NOT NULL,
+      kind ENUM('INVITE', 'REQUEST') NOT NULL,
+      status ENUM('PENDING', 'ACCEPTED', 'DECLINED', 'CANCELLED') NOT NULL DEFAULT 'PENDING',
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      responded_at DATETIME NULL,
+      INDEX idx_bg_team_inv_team (team_id),
+      INDEX idx_bg_team_inv_user (user_id),
+      INDEX idx_bg_team_inv_status (status),
+      CONSTRAINT fk_bg_team_inv_team FOREIGN KEY (team_id)
+        REFERENCES bg_teams(id) ON DELETE CASCADE,
+      CONSTRAINT fk_bg_team_inv_user FOREIGN KEY (user_id)
+        REFERENCES bg_users(id) ON DELETE CASCADE,
+      CONSTRAINT fk_bg_team_inv_creator FOREIGN KEY (created_by)
+        REFERENCES bg_users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Tournois
+  // ───────────────────────────────────────────────────────────────────────────
+
+  // Les réglages sont groupés par famille et non par date d'ajout : général,
+  // inscriptions, format de match, puis un bloc par moteur (suisse, survie,
+  // endurance). Un tournoi ne renseigne jamais que le bloc de son format.
+  //
+  // `organizer_user_id` est en `ON DELETE RESTRICT` : un tournoi sans
+  // organisateur n'aurait plus de titulaire, et c'est cette contrainte qui
+  // interdit d'effacer un compte organisateur (cf. `accountDeletionMode`).
+  //
+  // Les deux colonnes `match_format_*` vont **par paire** : tant que l'une est
+  // `NULL`, la saisie des scores reste libre. `match_format_max_maps` borne les
+  // maps *décisives* et n'a de sens qu'avec `match_format_draws`.
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_tournaments (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       organizer_user_id BIGINT NOT NULL,
       name VARCHAR(120) NOT NULL,
       description TEXT NULL,
-      format ENUM('SINGLE', 'DOUBLE') NOT NULL,
+      game ENUM('OW', 'MR') NOT NULL DEFAULT 'OW',
+      format ENUM('SINGLE', 'DOUBLE', 'SWISS', 'SURVIVAL', 'MULTI', 'BG_SURVIE') NOT NULL,
+      participant_type ENUM('TEAM', 'SOLO') NOT NULL DEFAULT 'TEAM',
       max_teams INT NOT NULL,
       bracket_size INT NULL,
       state ENUM('UPCOMING', 'REGISTRATION', 'RUNNING', 'FINISHED') NOT NULL DEFAULT 'UPCOMING',
+      has_third_place_match TINYINT(1) NOT NULL DEFAULT 0,
+      manual_seeding TINYINT(1) NOT NULL DEFAULT 0,
+      registration_discord_requirement
+        ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'ANY_PLAYER',
+      -- Le défaut \`NONE\` de la condition Blizzard n'est pas une prudence de
+      -- migration : c'est le défaut du réglage lui-même, la moitié du site
+      -- jouant à Marvel Rivals, où un compte Battle.net ne veut rien dire.
+      registration_blizzard_requirement
+        ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'NONE',
+      registration_min_players INT NOT NULL DEFAULT 5,
+      match_format_type ENUM('BO', 'FT') NULL,
+      match_format_value INT NULL,
+      match_format_max_maps INT NULL,
+      match_format_draws TINYINT(1) NOT NULL DEFAULT 0,
+      swiss_total_rounds INT NULL,
+      swiss_current_round INT NOT NULL DEFAULT 0,
+      swiss_points_win INT NOT NULL DEFAULT 3,
+      swiss_points_draw INT NOT NULL DEFAULT 1,
+      swiss_points_loss INT NOT NULL DEFAULT 0,
+      swiss_points_bye INT NOT NULL DEFAULT 3,
+      swiss_tiebreakers_json JSON NULL,
+      survival_rounds_before_first_cut INT NULL,
+      survival_rounds_per_cut INT NULL,
+      survival_current_round INT NOT NULL DEFAULT 0,
+      survival_barrage_rounds INT NOT NULL DEFAULT 0,
+      endurance_start_points INT NULL,
+      endurance_win_delta INT NULL,
+      endurance_loss_delta INT NULL,
+      endurance_playoff_size INT NULL,
+      endurance_max_rounds INT NULL,
+      endurance_current_round INT NOT NULL DEFAULT 0,
+      endurance_playoffs_started TINYINT(1) NOT NULL DEFAULT 0,
+      endurance_playoff_format_type ENUM('BO', 'FT') NULL,
+      endurance_playoff_format_value INT NULL,
+      current_phase_id BIGINT NULL,
+      live_url VARCHAR(255) NULL,
       start_visibility_at DATETIME NOT NULL,
       registration_open_at DATETIME NOT NULL,
       registration_close_at DATETIME NOT NULL,
@@ -152,20 +309,34 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  // `phase_id = 0` désigne un tournoi **sans phases**, ce qui laisse tous les
+  // formats non multi-phases inchangés.
+  //
+  // `live_trigger IS NULL` est le marqueur « ce match n'est pas casté » ; un
+  // match ne recopie jamais la chaîne de son tournoi (un streamer indépendant
+  // peut le caster). L'index `idx_bg_matches_live` porte le balayage du bouton
+  // « Regarder le live » de l'accueil, qui lirait sinon toute la table à chaque
+  // chargement.
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_matches (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       tournament_id BIGINT NOT NULL,
+      phase_id BIGINT NOT NULL DEFAULT 0,
       bracket ENUM('UPPER', 'LOWER', 'GRAND', 'THIRD_PLACE') NOT NULL,
       round_number INT NOT NULL,
       match_number INT NOT NULL,
+      swiss_round INT NULL,
+      is_bye BOOLEAN NOT NULL DEFAULT FALSE,
       team1_id BIGINT NULL,
       team2_id BIGINT NULL,
+      team1_placeholder VARCHAR(255) NULL,
+      team2_placeholder VARCHAR(255) NULL,
       team1_score INT NULL,
       team2_score INT NULL,
       status ENUM('PENDING', 'READY', 'AWAITING_CONFIRMATION', 'COMPLETED') NOT NULL DEFAULT 'PENDING',
       winner_team_id BIGINT NULL,
       loser_team_id BIGINT NULL,
+      forfeit_team_id BIGINT NULL,
       next_winner_match_id BIGINT NULL,
       next_winner_slot TINYINT NULL,
       next_loser_match_id BIGINT NULL,
@@ -177,11 +348,17 @@ async function runMigrations(db: Pool): Promise<void> {
       team2_report_opponent_score INT NULL,
       team2_reported_at DATETIME NULL,
       score_deadline_at DATETIME NULL,
+      start_at DATETIME NULL,
+      live_trigger ENUM('AUTO', 'START_TIME', 'MANUAL') NULL,
+      live_url VARCHAR(255) NULL,
+      live_started_at DATETIME NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_bg_matches_tournament (tournament_id),
       INDEX idx_bg_matches_status (status),
       INDEX idx_bg_matches_round (round_number),
+      INDEX idx_bg_matches_phase (tournament_id, phase_id),
+      INDEX idx_bg_matches_live (live_trigger, status),
       CONSTRAINT fk_bg_matches_tournament FOREIGN KEY (tournament_id)
         REFERENCES bg_tournaments(id) ON DELETE CASCADE,
       CONSTRAINT fk_bg_matches_team1 FOREIGN KEY (team1_id)
@@ -199,155 +376,24 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  // Migration: Add placeholder columns for loser bracket initialization
-  try {
-    await db.execute(`
-      ALTER TABLE bg_matches
-      ADD COLUMN team1_placeholder VARCHAR(255) NULL
-    `);
-  } catch {
-    // Column already exists, ignore
-  }
-  try {
-    await db.execute(`
-      ALTER TABLE bg_matches
-      ADD COLUMN team2_placeholder VARCHAR(255) NULL
-    `);
-  } catch {
-    // Column already exists, ignore
-  }
+  // ───────────────────────────────────────────────────────────────────────────
+  // Classements des moteurs à rejeu
+  // ───────────────────────────────────────────────────────────────────────────
+  //
+  // Les trois tables suivantes sont des **résultats**, pas des accumulateurs :
+  // chaque entretien les réécrit depuis l'historique des matchs. Seules les
+  // décisions humaines y sont des *entrées* du rejeu — le seed initial et les
+  // abandons (`status`, `forfeit_round` / `eliminated_round`).
+  //
+  // La clé primaire porte `phase_id` : une même équipe traverse plusieurs phases
+  // d'un tournoi multi-format, et chacune a son classement.
 
-  // Migration: Add forfeit tracking
-  try {
-    await db.execute(`
-      ALTER TABLE bg_matches
-      ADD COLUMN forfeit_team_id BIGINT NULL
-    `);
-  } catch {
-    // Column already exists, ignore
-  }
-
-  // Migration: Reset invalid forfeit_team_id values (0 or non-matching team IDs)
-  try {
-    await db.execute(`
-      UPDATE bg_matches
-      SET forfeit_team_id = NULL
-      WHERE forfeit_team_id = 0
-      OR (forfeit_team_id IS NOT NULL AND status != 'COMPLETED')
-    `);
-  } catch {
-    // Ignore if already done
-  }
-
-  // Migration: Add has_third_place_match to bg_tournaments
-  try {
-    await db.execute(`
-      ALTER TABLE bg_tournaments
-      ADD COLUMN has_third_place_match TINYINT(1) NOT NULL DEFAULT 0
-    `);
-  } catch {
-    // Column already exists, ignore
-  }
-
-  // Migration: Add THIRD_PLACE to bracket ENUM
-  try {
-    await db.execute(`
-      ALTER TABLE bg_matches
-      MODIFY COLUMN bracket ENUM('UPPER', 'LOWER', 'GRAND', 'THIRD_PLACE') NOT NULL
-    `);
-  } catch {
-    // Ignore if already done
-  }
-
-  // Migration: Add game column to tournaments (multi-game support)
-  try {
-    await db.execute(`
-      ALTER TABLE bg_tournaments
-      ADD COLUMN game ENUM('OW', 'MR') NOT NULL DEFAULT 'OW'
-      AFTER description
-    `);
-  } catch (err: unknown) {
-    // Column already exists or other error; MySQL 8.0.29+ supports IF NOT EXISTS
-    const error = err as { message?: string };
-    if (!error.message?.includes("Duplicate column name")) {
-      throw err;
-    }
-  }
-
-  // Migration: le jeu s'appelle « OW » et non plus « OW2 ». Un ENUM ne se
-  // réécrit pas d'un coup : retirer une valeur encore portée par des lignes les
-  // vide (ou fait échouer l'ALTER en mode strict). On élargit donc à trois
-  // valeurs, on convertit les lignes, puis on reverrouille sur deux.
-  // La condition n'est pas une optimisation : sans elle, la première étape
-  // **réintroduirait** `OW2` à chaque démarrage sur une base déjà migrée.
-  const [gameColumnRows] = await db.execute(
-    `SELECT COLUMN_TYPE AS columnType
-     FROM information_schema.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE()
-       AND TABLE_NAME = 'bg_tournaments'
-       AND COLUMN_NAME = 'game'`
-  );
-  const gameColumnType = (gameColumnRows as { columnType?: string }[])[0]?.columnType ?? "";
-  if (gameColumnType.includes("'OW2'")) {
-    await db.execute(`
-      ALTER TABLE bg_tournaments
-      MODIFY COLUMN game ENUM('OW2', 'MR', 'OW') NOT NULL DEFAULT 'OW2'
-    `);
-    await db.execute(`UPDATE bg_tournaments SET game = 'OW' WHERE game = 'OW2'`);
-    await db.execute(`
-      ALTER TABLE bg_tournaments
-      MODIFY COLUMN game ENUM('OW', 'MR') NOT NULL DEFAULT 'OW'
-    `);
-  }
-
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_sponsors (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      name VARCHAR(120) NOT NULL,
-      slug VARCHAR(140) NOT NULL UNIQUE,
-      tier ENUM('GOLD', 'SILVER', 'BRONZE', 'PARTNER') NOT NULL DEFAULT 'PARTNER',
-      logo_url TEXT NULL,
-      website_url TEXT NULL,
-      description TEXT NULL,
-      display_order INT NOT NULL DEFAULT 100,
-      active TINYINT(1) NOT NULL DEFAULT 1,
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_bg_sponsors_active_order (active, display_order)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
-
-  // Migration: Add SWISS format support
-  try {
-    await db.execute(`
-      ALTER TABLE bg_tournaments
-      MODIFY COLUMN format ENUM('SINGLE', 'DOUBLE', 'SWISS') NOT NULL
-    `);
-  } catch {
-    // Already done
-  }
-
-  // Migration: Add Swiss tournament metadata columns
-  try {
-    await db.execute(`
-      ALTER TABLE bg_tournaments
-      ADD COLUMN swiss_total_rounds INT NULL,
-      ADD COLUMN swiss_current_round INT NOT NULL DEFAULT 0,
-      ADD COLUMN swiss_points_win INT NOT NULL DEFAULT 3,
-      ADD COLUMN swiss_points_draw INT NOT NULL DEFAULT 1,
-      ADD COLUMN swiss_points_loss INT NOT NULL DEFAULT 0,
-      ADD COLUMN swiss_points_bye INT NOT NULL DEFAULT 3,
-      ADD COLUMN swiss_tiebreakers_json JSON NULL
-    `);
-  } catch {
-    // Columns already exist
-  }
-
-  // Migration: Create Swiss standings table
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_swiss_standings (
       tournament_id BIGINT NOT NULL,
+      phase_id BIGINT NOT NULL DEFAULT 0,
       team_id BIGINT NOT NULL,
+      seed INT NOT NULL DEFAULT 0,
       points INT NOT NULL DEFAULT 0,
       wins INT NOT NULL DEFAULT 0,
       draws INT NOT NULL DEFAULT 0,
@@ -355,8 +401,10 @@ async function runMigrations(db: Pool): Promise<void> {
       byes INT NOT NULL DEFAULT 0,
       opponent_ids_json JSON NOT NULL,
       buchholz DECIMAL(6, 2) NOT NULL DEFAULT 0,
+      status ENUM('ACTIVE', 'FORFEIT') NOT NULL DEFAULT 'ACTIVE',
+      forfeit_round INT NULL,
       \`rank\` INT NOT NULL DEFAULT 0,
-      PRIMARY KEY (tournament_id, team_id),
+      PRIMARY KEY (tournament_id, phase_id, team_id),
       CONSTRAINT fk_swiss_standings_tournament FOREIGN KEY (tournament_id)
         REFERENCES bg_tournaments(id) ON DELETE CASCADE,
       CONSTRAINT fk_swiss_standings_team FOREIGN KEY (team_id)
@@ -364,105 +412,10 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  // Migration: seed + abandon dans les standings suisses. L'état complet est
-  // redérivé de l'historique des matchs ; seuls le seed initial et les abandons
-  // (décisions humaines) sont stockés en entrée du rejeu.
-  try {
-    await db.execute(`
-      ALTER TABLE bg_swiss_standings
-      ADD COLUMN seed INT NOT NULL DEFAULT 0,
-      ADD COLUMN status ENUM('ACTIVE', 'FORFEIT') NOT NULL DEFAULT 'ACTIVE',
-      ADD COLUMN forfeit_round INT NULL
-    `);
-  } catch {
-    // Columns already exist
-  }
-
-  // Backfill du seed : `ADD COLUMN seed ... DEFAULT 0` laisse les tournois déjà
-  // créés à 0 pour toutes leurs équipes, et `initializeSwissTournament` ne
-  // repasse jamais dessus (il ne s'exécute qu'à la bascule REGISTRATION →
-  // RUNNING). Sans ce rattrapage, le départage ultime `a.seed - b.seed` vaut
-  // toujours 0 et les ex æquo parfaits retombent sur un ordre arbitraire.
-  // Idempotent : ne touche que les lignes restées à 0.
-  try {
-    await db.execute(`
-      UPDATE bg_swiss_standings s
-      JOIN (
-        SELECT tournament_id, team_id,
-               ROW_NUMBER() OVER (
-                 PARTITION BY tournament_id ORDER BY points DESC, team_id ASC
-               ) AS rn
-        FROM bg_swiss_standings
-      ) x ON x.tournament_id = s.tournament_id AND x.team_id = s.team_id
-      SET s.seed = x.rn
-      WHERE s.seed = 0
-    `);
-  } catch {
-    // Rien à rattraper (table vide, ou backfill déjà appliqué)
-  }
-
-  // Migration: Add Swiss round and bye columns to matches
-  try {
-    await db.execute(`
-      ALTER TABLE bg_matches
-      ADD COLUMN swiss_round INT NULL,
-      ADD COLUMN is_bye BOOLEAN NOT NULL DEFAULT FALSE
-    `);
-  } catch {
-    // Columns already exist
-  }
-
-  // Migration: Add SURVIVAL format support
-  try {
-    await db.execute(`
-      ALTER TABLE bg_tournaments
-      MODIFY COLUMN format ENUM('SINGLE', 'DOUBLE', 'SWISS', 'SURVIVAL') NOT NULL
-    `);
-  } catch {
-    // Already done
-  }
-
-  // Migration: Add Survival tournament metadata columns.
-  // survival_rounds_per_cut = nombre de rounds joués entre chaque coupe.
-  try {
-    await db.execute(`
-      ALTER TABLE bg_tournaments
-      ADD COLUMN survival_rounds_per_cut INT NULL,
-      ADD COLUMN survival_current_round INT NOT NULL DEFAULT 0
-    `);
-  } catch {
-    // Columns already exist
-  }
-
-  // Migration: Délai avant la première coupe, réglable indépendamment de
-  // l'intervalle entre les coupes suivantes. NULL sur les tournois créés avant
-  // l'option : la cadence s'applique alors dès la première coupe (comportement
-  // historique, cf. `resolveCutSchedule`).
-  try {
-    await db.execute(`
-      ALTER TABLE bg_tournaments
-      ADD COLUMN survival_rounds_before_first_cut INT NULL
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  // Migration: Add Survival barrage counter.
-  // survival_barrage_rounds = nombre de rounds de barrage d'équilibrage joués
-  // (0 ou 1) ; ils ne comptent pas dans la cadence des coupes.
-  try {
-    await db.execute(`
-      ALTER TABLE bg_tournaments
-      ADD COLUMN survival_barrage_rounds INT NOT NULL DEFAULT 0
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  // Migration: Create Survival standings table.
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_survival_standings (
       tournament_id BIGINT NOT NULL,
+      phase_id BIGINT NOT NULL DEFAULT 0,
       team_id BIGINT NOT NULL,
       seed INT NOT NULL DEFAULT 0,
       wins INT NOT NULL DEFAULT 0,
@@ -470,7 +423,7 @@ async function runMigrations(db: Pool): Promise<void> {
       status ENUM('ACTIVE', 'ELIMINATED', 'FORFEIT') NOT NULL DEFAULT 'ACTIVE',
       eliminated_round INT NULL,
       \`rank\` INT NOT NULL DEFAULT 0,
-      PRIMARY KEY (tournament_id, team_id),
+      PRIMARY KEY (tournament_id, phase_id, team_id),
       CONSTRAINT fk_survival_standings_tournament FOREIGN KEY (tournament_id)
         REFERENCES bg_tournaments(id) ON DELETE CASCADE,
       CONSTRAINT fk_survival_standings_team FOREIGN KEY (team_id)
@@ -478,28 +431,59 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  // Migration: Add MULTI format support for multi-phase tournaments
-  try {
-    await db.execute(`
-      ALTER TABLE bg_tournaments
-      MODIFY COLUMN format ENUM('SINGLE', 'DOUBLE', 'SWISS', 'SURVIVAL', 'MULTI') NOT NULL
-    `);
-  } catch {
-    // Already done
-  }
+  // `OUT_OF_CONTENTION` (« hors course ») n'est pas `ELIMINATED` : l'équipe
+  // garde son capital mais ne peut plus mathématiquement rejoindre les
+  // play-offs. « Éliminée » à côté de neuf points serait un contresens.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS bg_endurance_standings (
+      tournament_id BIGINT NOT NULL,
+      team_id BIGINT NOT NULL,
+      seed INT NOT NULL DEFAULT 0,
+      points INT NOT NULL DEFAULT 0,
+      wins INT NOT NULL DEFAULT 0,
+      losses INT NOT NULL DEFAULT 0,
+      draws INT NOT NULL DEFAULT 0,
+      status ENUM('ACTIVE', 'ELIMINATED', 'OUT_OF_CONTENTION', 'FORFEIT') NOT NULL DEFAULT 'ACTIVE',
+      eliminated_round INT NULL,
+      \`rank\` INT NOT NULL DEFAULT 0,
+      PRIMARY KEY (tournament_id, team_id),
+      CONSTRAINT fk_endurance_standings_tournament FOREIGN KEY (tournament_id)
+        REFERENCES bg_tournaments(id) ON DELETE CASCADE,
+      CONSTRAINT fk_endurance_standings_team FOREIGN KEY (team_id)
+        REFERENCES bg_teams(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
 
-  // Migration: Add current_phase_id to track active phase in multi-phase tournaments
-  try {
-    await db.execute(`
-      ALTER TABLE bg_tournaments
-      ADD COLUMN current_phase_id BIGINT NULL
-    `);
-  } catch {
-    // Column already exists
-  }
+  // Une table à part, et non une colonne de plus sur `bg_endurance_standings` :
+  // une pénalité est une **entrée** du rejeu, au même titre qu'un abandon, et un
+  // cumul rangé dans un classement réécrit à chaque entretien serait effacé au
+  // premier score corrigé. La ligne porte sa manche, ce qui la place dans la
+  // chronologie du tournoi. L'auteur s'efface en `NULL` sans emporter la
+  // sanction : le compte s'en va, la sanction reste due.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS bg_endurance_penalties (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      tournament_id BIGINT NOT NULL,
+      team_id BIGINT NOT NULL,
+      round_number INT NOT NULL,
+      points INT NOT NULL,
+      reason VARCHAR(255) NOT NULL,
+      created_by BIGINT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      KEY idx_bg_endurance_penalties_tournament (tournament_id),
+      CONSTRAINT fk_bg_endurance_penalties_tournament FOREIGN KEY (tournament_id)
+        REFERENCES bg_tournaments(id) ON DELETE CASCADE,
+      CONSTRAINT fk_bg_endurance_penalties_team FOREIGN KEY (team_id)
+        REFERENCES bg_teams(id) ON DELETE CASCADE,
+      CONSTRAINT fk_bg_endurance_penalties_author FOREIGN KEY (created_by)
+        REFERENCES bg_users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
 
-  // Migration: Create tournament phases table for multi-phase tournament support
-  // Chaque phase a son propre format, ses qualifications et son état de progression
+  // ───────────────────────────────────────────────────────────────────────────
+  // Tournois multi-phases
+  // ───────────────────────────────────────────────────────────────────────────
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_tournament_phases (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -531,20 +515,6 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  // Migration: compteur de manches suisses d'une phase. Ajouté après coup — les
-  // bases ayant déjà créé bg_tournament_phases ne l'ont pas, et `CREATE TABLE IF
-  // NOT EXISTS` ne rattrape pas une colonne manquante.
-  try {
-    await db.execute(`
-      ALTER TABLE bg_tournament_phases
-      ADD COLUMN swiss_current_round INT NOT NULL DEFAULT 0
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  // Migration: Create tournament phase teams table for multi-phase entrants tracking
-  // Enregistre la participation des équipes dans chaque phase (seed, rank, qualified)
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_tournament_phase_teams (
       phase_id BIGINT NOT NULL,
@@ -562,378 +532,61 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  // Migration: Add phase_id to matches
-  // phase_id = 0 pour les tournois sans phases (existants) ; >0 pour les phases multi-format
-  try {
-    await db.execute(`
-      ALTER TABLE bg_matches
-      ADD COLUMN phase_id BIGINT NOT NULL DEFAULT 0
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  // Migration: Add index on (tournament_id, phase_id) for efficient phase queries
-  try {
-    await db.execute(`
-      ALTER TABLE bg_matches
-      ADD INDEX idx_bg_matches_phase (tournament_id, phase_id)
-    `);
-  } catch {
-    // Index already exists
-  }
-
-  // Migration: Add phase_id to Swiss standings for multi-phase support
-  // Rekey primary key to allow same team across multiple phases
-  try {
-    await db.execute(`
-      ALTER TABLE bg_swiss_standings
-      ADD COLUMN phase_id BIGINT NOT NULL DEFAULT 0
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  try {
-    await db.execute(`
-      ALTER TABLE bg_swiss_standings
-      DROP PRIMARY KEY,
-      ADD PRIMARY KEY (tournament_id, phase_id, team_id)
-    `);
-  } catch {
-    // Primary key already rekeyed
-  }
-
-  // Migration: Add phase_id to Survival standings for multi-phase support
-  // Rekey primary key to allow same team across multiple phases
-  try {
-    await db.execute(`
-      ALTER TABLE bg_survival_standings
-      ADD COLUMN phase_id BIGINT NOT NULL DEFAULT 0
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  try {
-    await db.execute(`
-      ALTER TABLE bg_survival_standings
-      DROP PRIMARY KEY,
-      ADD PRIMARY KEY (tournament_id, phase_id, team_id)
-    `);
-  } catch {
-    // Primary key already rekeyed
-  }
-
-  // Migration: Add Discord pseudo + soft-delete (anonymisation) to users
-  try {
-    await db.execute(`
-      ALTER TABLE bg_users
-      ADD COLUMN discord_pseudo VARCHAR(64) NULL
-    `);
-  } catch {
-    // Column already exists
-  }
-  try {
-    await db.execute(`
-      ALTER TABLE bg_users
-      ADD COLUMN is_deleted TINYINT(1) NOT NULL DEFAULT 0
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  // Migration: avatar + pseudo visibles par défaut (le pseudo/avatar est
-  // l'identité publique de base). Aligne les installs existantes sur le nouveau
-  // défaut sans écraser les choix explicites déjà enregistrés.
-  try {
-    await db.execute(`ALTER TABLE bg_users ALTER COLUMN visible_avatar SET DEFAULT 1`);
-    await db.execute(`ALTER TABLE bg_users ALTER COLUMN visible_pseudo SET DEFAULT 1`);
-  } catch {
-    // Default already applied
-  }
-
-  // Migration: le pseudo n'est plus masquable — c'est l'identité de base du
-  // joueur (brackets, rosters, feuilles de match). La colonne est conservée
-  // pour ne pas casser les installs, mais forcée à 1 une bonne fois.
-  try {
-    await db.execute(`UPDATE bg_users SET visible_pseudo = 1 WHERE visible_pseudo = 0`);
-  } catch {
-    // Colonne absente sur une install neuve : rien à reprendre.
-  }
-
-  // Migration: ouverture au recrutement. Un joueur sans équipe est « free
-  // agent » par défaut ; il peut se retirer pour ne plus être démarché.
-  try {
-    await db.execute(`
-      ALTER TABLE bg_users
-      ADD COLUMN open_to_recruitment TINYINT(1) NOT NULL DEFAULT 1
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  // Migration: le **tag** saisi à la demande du code, retenu sur la ligne du
-  // défi. La certification enregistre le tag qui a servi à la résolution, et
-  // non celui que le client renvoie à la confirmation : c'est la ligne du défi
-  // qui porte la preuve, pas la seconde requête. `NULL` sur une demande faite
-  // par identifiant numérique, où il n'y a pas de tag à retenir.
-  try {
-    await db.execute(`
-      ALTER TABLE bg_discord_login_challenges
-      ADD COLUMN handle VARCHAR(64) NULL
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  // Migration: certification du tag Discord. `NULL` = tag non prouvé, et c'est
-  // l'état de **tous** les comptes d'avant : leur tag garde donc les propriétés
-  // sous lesquelles il a été saisi (invisible à tous, administrateurs compris).
-  // La colonne ne dit pas « ce compte a un Discord » — `discord_id` le dit déjà
-  // — mais « le tag stocké dans `discord_pseudo` a été prouvé par son
-  // titulaire », ce qui se perd à chaque modification du tag.
-  try {
-    await db.execute(`
-      ALTER TABLE bg_users
-      ADD COLUMN discord_verified_at DATETIME NULL
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  // Migration: identifiant Battle.net, troisième porte d'entrée du site aux
-  // côtés de `google_sub` et `discord_id` — et rangée comme elles, en colonne
-  // **unique** sur `bg_users` plutôt que dans une table d'identités. Un compte
-  // du site n'a qu'une identité par fournisseur, et c'est l'unicité de la
-  // colonne qui tranche la course entre deux comptes qui rattacheraient le même
-  // Battle.net au même instant (le `SELECT` préalable ne donne que le refus
-  // lisible). Le BattleTag, lui, n'a pas de colonne à part : il **est** le
-  // `overwatch_battletag` du profil, que la connexion Blizzard réécrit.
-  try {
-    await db.execute(`
-      ALTER TABLE bg_users
-      ADD COLUMN blizzard_sub VARCHAR(191) NULL UNIQUE
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  // Migration: Rôles de permission cumulables (ARBITRE, COMMUNITY_MANAGER,
-  // RECRUTEUR). Le rôle ADMIN reste porté par la colonne `is_admin`.
-  try {
-    await db.execute(`
-      ALTER TABLE bg_users
-      ADD COLUMN platform_roles_json JSON NULL
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  // Migration: Add description to teams
-  try {
-    await db.execute(`
-      ALTER TABLE bg_teams
-      ADD COLUMN description TEXT NULL
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  // Migration: Soft-delete (dissolution) des équipes — conserve les stats
-  try {
-    await db.execute(`
-      ALTER TABLE bg_teams
-      ADD COLUMN deleted_at DATETIME NULL
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  // Migration: format « BlueGenji Survie » (endurance + play-offs à 8).
-  try {
-    await db.execute(`
-      ALTER TABLE bg_tournaments
-      MODIFY COLUMN format ENUM('SINGLE', 'DOUBLE', 'SWISS', 'SURVIVAL', 'MULTI', 'BG_SURVIE') NOT NULL
-    `);
-  } catch {
-    // Already done
-  }
-
-  // Migration: barème d'endurance (capital de départ, gains/pertes, effectif
-  // des play-offs) + manche courante de la phase qualificative.
-  for (const [column, definition] of [
-    ["endurance_start_points", "INT NULL"],
-    ["endurance_win_delta", "INT NULL"],
-    ["endurance_loss_delta", "INT NULL"],
-    ["endurance_playoff_size", "INT NULL"],
-    // Plafond de manches qualificatives. NULL = aucun : la phase court jusqu'à
-    // ce que l'effectif retombe à `endurance_playoff_size`, comportement de
-    // tous les tournois créés avant ce réglage.
-    ["endurance_max_rounds", "INT NULL"],
-    ["endurance_current_round", "INT NOT NULL DEFAULT 0"],
-    // 1 dès que la phase éliminatoire a été générée : la phase qualificative
-    // ne produit alors plus de manche.
-    ["endurance_playoffs_started", "TINYINT(1) NOT NULL DEFAULT 0"],
-  ] as const) {
-    try {
-      await db.execute(`ALTER TABLE bg_tournaments ADD COLUMN ${column} ${definition}`);
-    } catch {
-      // Column already exists
-    }
-  }
-
-  // Migration: classement d'endurance (mode BlueGenji Survie).
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_endurance_standings (
-      tournament_id BIGINT NOT NULL,
-      team_id BIGINT NOT NULL,
-      seed INT NOT NULL DEFAULT 0,
-      points INT NOT NULL DEFAULT 0,
-      wins INT NOT NULL DEFAULT 0,
-      losses INT NOT NULL DEFAULT 0,
-      draws INT NOT NULL DEFAULT 0,
-      status ENUM('ACTIVE', 'ELIMINATED', 'OUT_OF_CONTENTION', 'FORFEIT') NOT NULL DEFAULT 'ACTIVE',
-      eliminated_round INT NULL,
-      \`rank\` INT NOT NULL DEFAULT 0,
-      PRIMARY KEY (tournament_id, team_id),
-      CONSTRAINT fk_endurance_standings_tournament FOREIGN KEY (tournament_id)
-        REFERENCES bg_tournaments(id) ON DELETE CASCADE,
-      CONSTRAINT fk_endurance_standings_team FOREIGN KEY (team_id)
-        REFERENCES bg_teams(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
-
-  // Migration: matchs nuls du classement d'endurance. Une map nulle peut clore
-  // une rencontre de qualification sans vainqueur (2-2 en BO5) : ce n'est ni une
-  // victoire ni une defaite, et le total « matchs joues » serait faux sans elle.
-  try {
-    await db.execute(`
-      ALTER TABLE bg_endurance_standings
-      ADD COLUMN draws INT NOT NULL DEFAULT 0
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  // Migration: sortie « hors course » du classement d'endurance — une équipe
-  // qui garde du capital mais ne peut plus rejoindre les play-offs dans les
-  // manches restantes. Distincte d'`ELIMINATED`, qui dit un capital vidé : les
-  // deux sorties ne racontent pas la même chose et ne s'affichent pas pareil.
-  try {
-    await db.execute(`
-      ALTER TABLE bg_endurance_standings
-      MODIFY COLUMN status ENUM('ACTIVE', 'ELIMINATED', 'OUT_OF_CONTENTION', 'FORFEIT')
-        NOT NULL DEFAULT 'ACTIVE'
-    `);
-  } catch {
-    // Already done
-  }
-
-  // Migration: format de match du tournoi (BO5, FT3…). Les deux colonnes vont
-  // par paire : tant que l'une est NULL, la saisie des scores reste libre —
-  // c'est l'état des tournois créés avant la fonctionnalité.
-  for (const [column, definition] of [
-    ["match_format_type", "ENUM('BO', 'FT') NULL"],
-    ["match_format_value", "INT NULL"],
-    // Plafond de maps **décisives** (somme des deux scores). NULL = le plafond
-    // naturel du format (objectif x 2 - 1), seule valeur qu'aient connue les
-    // tournois d'avant ce reglage.
-    ["match_format_max_maps", "INT NULL"],
-    // 1 = un match peut se clore sans vainqueur (map nulle). Reserve a la phase
-    // qualificative de « BlueGenji Survie », dont le capital se compte map par
-    // map : un arbre a elimination directe a besoin d'un vainqueur.
-    ["match_format_draws", "TINYINT(1) NOT NULL DEFAULT 0"],
-    // Format propre a l'arbre final de « BlueGenji Survie ». NULL = celui du
-    // tournoi, egalites en moins. Les deux colonnes vont par paire, comme
-    // celles du tournoi.
-    ["endurance_playoff_format_type", "ENUM('BO', 'FT') NULL"],
-    ["endurance_playoff_format_value", "INT NULL"],
-  ] as const) {
-    try {
-      await db.execute(`ALTER TABLE bg_tournaments ADD COLUMN ${column} ${definition}`);
-    } catch {
-      // Column already exists
-    }
-  }
-
-  // Migration: conditions d'inscription (hors équipes fantômes). Les trois
-  // colonnes sont `NOT NULL` avec les défauts du module partagé : un tournoi
-  // d'avant ce réglage hérite donc de « au moins un Discord vérifié », d'aucune
-  // exigence Blizzard et de cinq joueurs, ce qui est bien le comportement voulu
-  // pour la suite — les inscriptions **déjà enregistrées** ne sont jamais
-  // relues, seules les nouvelles passent la condition.
+  // ───────────────────────────────────────────────────────────────────────────
+  // Notifications déjà envoyées
+  // ───────────────────────────────────────────────────────────────────────────
   //
-  // Le défaut `NONE` de la colonne Blizzard n'est pas une prudence de
-  // migration : c'est le défaut du réglage lui-même, la moitié du site jouant à
-  // Marvel Rivals, où un compte Battle.net ne veut rien dire.
-  for (const [column, definition] of [
-    [
-      "registration_discord_requirement",
-      "ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'ANY_PLAYER'",
-    ],
-    [
-      "registration_blizzard_requirement",
-      "ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'NONE'",
-    ],
-    ["registration_min_players", "INT NOT NULL DEFAULT 5"],
-  ] as const) {
-    try {
-      await db.execute(`ALTER TABLE bg_tournaments ADD COLUMN ${column} ${definition}`);
-    } catch {
-      // Column already exists
-    }
-  }
+  // Même motif dans les deux tables : la ligne est **réservée avant l'envoi**,
+  // et c'est sa clé unique qui interdit le doublon — deux requêtes concurrentes
+  // déclenchent toutes deux le balayage. `ON DELETE CASCADE` suit la manche : un
+  // plateau régénéré efface ses matchs, donc ses réservations, et les nouvelles
+  // repartent de zéro.
 
-  // Migration: seeding ordonné à la main par le staff. Tant que le drapeau vaut
-  // 0, chaque format seede comme avant (classement du site) ; dès qu'un arbitre
-  // réordonne, l'ordre de `bg_tournament_registrations.seed` fait autorité.
-  try {
-    await db.execute(`
-      ALTER TABLE bg_tournaments
-      ADD COLUMN manual_seeding TINYINT(1) NOT NULL DEFAULT 0
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  // Migration: Équipes fantômes — créées par le staff (permission `tournaments`)
-  // pour représenter une équipe sans compte joueur sur le site (remplissage de
-  // bracket, équipe invitée). Aucun membre : le drapeau suffit à les distinguer.
-  try {
-    await db.execute(`
-      ALTER TABLE bg_teams
-      ADD COLUMN is_ghost TINYINT(1) NOT NULL DEFAULT 0
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  // Migration: Team invitations / join requests
-  // kind = INVITE (management → user) or REQUEST (user → team, self-service)
   await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_team_invitations (
+    CREATE TABLE IF NOT EXISTS bg_match_reminders (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      team_id BIGINT NOT NULL,
-      user_id BIGINT NOT NULL,
-      created_by BIGINT NOT NULL,
-      kind ENUM('INVITE', 'REQUEST') NOT NULL,
-      status ENUM('PENDING', 'ACCEPTED', 'DECLINED', 'CANCELLED') NOT NULL DEFAULT 'PENDING',
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      responded_at DATETIME NULL,
-      INDEX idx_bg_team_inv_team (team_id),
-      INDEX idx_bg_team_inv_user (user_id),
-      INDEX idx_bg_team_inv_status (status),
-      CONSTRAINT fk_bg_team_inv_team FOREIGN KEY (team_id)
-        REFERENCES bg_teams(id) ON DELETE CASCADE,
-      CONSTRAINT fk_bg_team_inv_user FOREIGN KEY (user_id)
-        REFERENCES bg_users(id) ON DELETE CASCADE,
-      CONSTRAINT fk_bg_team_inv_creator FOREIGN KEY (created_by)
-        REFERENCES bg_users(id) ON DELETE CASCADE
+      match_id BIGINT NOT NULL,
+      offset_key VARCHAR(8) NOT NULL,
+      sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_bg_match_reminders (match_id, offset_key),
+      CONSTRAINT fk_bg_match_reminders_match FOREIGN KEY (match_id)
+        REFERENCES bg_matches(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  // Migration: Membres du bureau de l'association (gérables par les admins)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS bg_referee_alerts (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      match_id BIGINT NOT NULL,
+      alert_key VARCHAR(32) NOT NULL,
+      sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_bg_referee_alerts (match_id, alert_key),
+      CONSTRAINT fk_bg_referee_alerts_match FOREIGN KEY (match_id)
+        REFERENCES bg_matches(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Vitrine et association
+  // ───────────────────────────────────────────────────────────────────────────
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS bg_sponsors (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(120) NOT NULL,
+      slug VARCHAR(140) NOT NULL UNIQUE,
+      tier ENUM('GOLD', 'SILVER', 'BRONZE', 'PARTNER') NOT NULL DEFAULT 'PARTNER',
+      logo_url TEXT NULL,
+      website_url TEXT NULL,
+      description TEXT NULL,
+      display_order INT NOT NULL DEFAULT 100,
+      active TINYINT(1) NOT NULL DEFAULT 1,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_bg_sponsors_active_order (active, display_order)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_bureau_members (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -948,7 +601,6 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  // Migration: Cartes « L'association » (valeur + titre, gérables par les admins)
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_about_stats (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -961,7 +613,6 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  // Migration: Piliers « L'association » (titre + texte, gérables par les admins)
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_about_pillars (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -974,7 +625,6 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  // Migration: Réglages clé/valeur de l'association (ex. email contact presse)
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_settings (
       setting_key VARCHAR(80) PRIMARY KEY,
@@ -983,31 +633,6 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  // Rattrapage : l'invitation Discord est une constante partout **sauf** en pied
-  // de page, où elle est une donnée que le staff peut modifier
-  // (`contact_discord_url`). Changer de serveur ne suffisait donc pas à changer
-  // ce lien-là, et l'écran qui l'affiche est justement celui qu'on ne relit
-  // jamais — la panne serait muette, l'ancienne adresse menant toujours
-  // quelque part.
-  //
-  // Seules les adresses **périmées connues** sont remplacées : une invitation
-  // que le staff a saisie lui appartient, et l'écraser à chaque démarrage
-  // ferait de ce champ un leurre. Après un passage, l'instruction ne trouve
-  // plus rien — elle est rejouée sans coût, comme ses voisines.
-  try {
-    const placeholders = SUPERSEDED_DISCORD_INVITE_URLS.map(() => "?").join(", ");
-    await db.execute(
-      `UPDATE bg_settings
-          SET setting_value = ?
-        WHERE setting_key = ?
-          AND setting_value IN (${placeholders})`,
-      [DISCORD_INVITE_URL, CONTACT_DISCORD_URL_KEY, ...SUPERSEDED_DISCORD_INVITE_URLS],
-    );
-  } catch {
-    // Rattrapage remis au prochain démarrage.
-  }
-
-  // Migration: Bénévoles de l'association, groupés par catégorie dynamique
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_benevoles (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -1026,19 +651,8 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  // Migration: ordre d'affichage des catégories de bénévoles (réordonnable admin)
-  try {
-    await db.execute(`
-      ALTER TABLE bg_benevoles
-      ADD COLUMN category_order INT NOT NULL DEFAULT 100
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  // Migration: annonces de recrutement (page dédiée + mise en avant urgente
-  // via banderole ou modale). Réordonnable par les administrateurs. La colonne
-  // `domain` porte le pôle de bénévolat visé (recrutement du staff associatif).
+  // `domain` porte le **pôle de bénévolat** visé (recrutement du staff
+  // associatif) et non un jeu : la page a changé d'objet en cours de route.
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_recruitment_ads (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -1061,164 +675,11 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  // Migration: réorientation « staff associatif » — l'ancienne colonne `game`
-  // (jeu : OW/MR/ANY) devient `domain` (pôle de bénévolat). On élargit d'abord
-  // en VARCHAR pour renommer sans erreur de conversion d'ENUM, on neutralise les
-  // anciennes valeurs, puis on reverrouille sur le nouvel ENUM. Chaque étape est
-  // tolérante : sur une base récente `domain` existe déjà et les ALTER échouent
-  // silencieusement.
-  try {
-    await db.execute(`
-      ALTER TABLE bg_recruitment_ads
-      CHANGE COLUMN game domain VARCHAR(32) NOT NULL DEFAULT 'AUTRE'
-    `);
-  } catch {
-    // `game` déjà renommé (base récente) ou table absente.
-  }
-  try {
-    await db.execute(`
-      UPDATE bg_recruitment_ads
-      SET domain = 'AUTRE'
-      WHERE domain NOT IN ('ARBITRAGE', 'CASTING', 'DEV', 'COMMUNICATION', 'DESIGN', 'MODERATION', 'EVENEMENTIEL', 'ADMIN', 'AUTRE')
-    `);
-  } catch {
-    // Rien à normaliser.
-  }
-  try {
-    await db.execute(`
-      ALTER TABLE bg_recruitment_ads
-      MODIFY COLUMN domain ENUM('ARBITRAGE', 'CASTING', 'DEV', 'COMMUNICATION', 'DESIGN', 'MODERATION', 'EVENEMENTIEL', 'ADMIN', 'AUTRE') NOT NULL DEFAULT 'AUTRE'
-    `);
-  } catch {
-    // Colonne déjà au bon type.
-  }
-
-  // Migration: canaux de contact directs (tag Discord + lien de candidature). Sur
-  // une base ancienne les colonnes manquent ; sur une base récente elles existent
-  // déjà et les ALTER échouent silencieusement.
-  try {
-    await db.execute(`
-      ALTER TABLE bg_recruitment_ads
-      ADD COLUMN contact_discord VARCHAR(120) NULL AFTER contact_url
-    `);
-  } catch {
-    // Colonne déjà présente.
-  }
-  try {
-    await db.execute(`
-      ALTER TABLE bg_recruitment_ads
-      ADD COLUMN contact_discord_id VARCHAR(32) NULL AFTER contact_discord
-    `);
-  } catch {
-    // Colonne déjà présente.
-  }
-  try {
-    await db.execute(`
-      ALTER TABLE bg_recruitment_ads
-      ADD COLUMN contact_preferred ENUM('AUTO', 'DISCORD', 'LINK') NOT NULL DEFAULT 'AUTO' AFTER contact_discord_id
-    `);
-  } catch {
-    // Colonne déjà présente.
-  }
-
-  // Migration: abandon du canal email. On neutralise l'ancienne valeur de canal
-  // préféré `EMAIL`, on resserre l'ENUM, puis on supprime la colonne `contact_email`
-  // si elle subsiste d'une version antérieure. Étapes tolérantes.
-  try {
-    await db.execute(`UPDATE bg_recruitment_ads SET contact_preferred = 'AUTO' WHERE contact_preferred = 'EMAIL'`);
-  } catch {
-    // Valeur déjà absente / colonne au bon type.
-  }
-  try {
-    await db.execute(`
-      ALTER TABLE bg_recruitment_ads
-      MODIFY COLUMN contact_preferred ENUM('AUTO', 'DISCORD', 'LINK') NOT NULL DEFAULT 'AUTO'
-    `);
-  } catch {
-    // ENUM déjà resserré.
-  }
-  try {
-    await db.execute(`ALTER TABLE bg_recruitment_ads DROP COLUMN contact_email`);
-  } catch {
-    // Colonne déjà absente (cas nominal).
-  }
-
-  // Migration: tournois individuels. `participant_type = 'SOLO'` fait inscrire
-  // les joueurs eux-mêmes plutôt que leur équipe ; le moteur, lui, continue de
-  // raisonner en engagés (`team_id`), si bien que tous les formats existants
-  // fonctionnent à l'identique. Défaut `TEAM` : les tournois déjà créés ne
-  // changent pas de comportement.
-  try {
-    await db.execute(`
-      ALTER TABLE bg_tournaments
-      ADD COLUMN participant_type ENUM('TEAM', 'SOLO') NOT NULL DEFAULT 'TEAM'
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  // Migration: entrée solo d'un joueur — une ligne `bg_teams` qui le représente
-  // en tournoi individuel, sans aucun membre (comme une équipe fantôme). Pas de
-  // clé étrangère volontairement : une suppression de compte en cascade
-  // effacerait l'engagé, et avec lui l'historique des matchs qui le référencent.
-  // L'unicité garantit « un joueur = au plus une entrée solo ».
-  try {
-    await db.execute(`
-      ALTER TABLE bg_teams
-      ADD COLUMN solo_user_id BIGINT NULL
-    `);
-  } catch {
-    // Column already exists
-  }
-  try {
-    await db.execute(`
-      ALTER TABLE bg_teams
-      ADD UNIQUE INDEX uniq_bg_teams_solo_user (solo_user_id)
-    `);
-  } catch {
-    // Index already exists
-  }
-
-  // Rattrapage : le logo d'une entrée solo est une **copie** de l'avatar du
-  // joueur, et elle se recopiait sans consulter `visible_avatar`. Le masquage
-  // posé dans `solo-entries-service` ne vaut que pour les écritures à venir —
-  // la prochaine inscription ou la prochaine édition de profil —, si bien que
-  // les lignes déjà écrites auraient continué de publier un avatar masqué,
-  // jusque sur la carte « match en direct » de l'accueil que lit un visiteur
-  // sans compte.
-  //
-  // Idempotent, et volontairement rejoué à chaque démarrage : c'est un filet,
-  // pas une migration à cocher. Le chemin inverse (l'avatar redevient public)
-  // est tenu par `syncSoloEntryIdentity`, appelé sur la bascule du réglage.
-  //
-  // Rattrapé comme ses voisines, et ici ce n'est pas une formalité : c'est la
-  // seule instruction de cette passe qui prenne des **verrous de ligne** sur une
-  // table chaude — `registerGhostTeams` tient `bg_teams` sous
-  // `SELECT … FOR UPDATE` le temps de 32 insertions. Un lot d'inscriptions qui
-  // chevauche un démarrage à froid rendrait `ER_LOCK_WAIT_TIMEOUT`, et
-  // l'exception emporterait **tout ce qui suit** : `bg_site_visits`, l'horaire
-  // et la diffusion d'un match, le sigle d'équipe et son index. Un filet qui
-  // casse le schéma est pire que le trou qu'il bouche ; il se rejouera au
-  // prochain démarrage.
-  try {
-    await db.execute(`
-      UPDATE bg_teams t
-        JOIN bg_users u ON u.id = t.solo_user_id
-         SET t.logo_url = NULL
-       WHERE t.solo_user_id IS NOT NULL
-         AND u.visible_avatar = 0
-         AND t.logo_url IS NOT NULL
-    `);
-  } catch {
-    // Rattrapage remis au prochain démarrage.
-  }
-
-  // Fréquentation du site. Une ligne = une visite (arrivée d'un visiteur, les
-  // chargements suivants d'une même fenêtre de session étant regroupés côté
-  // service). `visitor_key` est un SHA-256 salé : ni IP ni user-agent ne sont
-  // stockés en clair. Pas de clé étrangère sur `user_id` — une suppression de
-  // compte ne doit pas réécrire l'historique de fréquentation, qui n'est qu'un
-  // comptage.
+  // Une ligne = une visite. `visitor_key` est un SHA-256 salé : ni IP ni
+  // user-agent ne sont stockés en clair. Pas de clé étrangère sur `user_id` —
+  // une suppression de compte ne doit pas réécrire l'historique de
+  // fréquentation, qui n'est qu'un comptage (le lien est détaché à la main,
+  // cf. `deleteOwnAccount`).
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bg_site_visits (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -1232,215 +693,98 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  // Migration: diffusion en direct. Le tournoi porte sa chaîne officielle ; le
-  // match porte, lui, son propre mode de déclenchement et sa propre chaîne — il
-  // n'hérite jamais de celle du tournoi (cf. `lib/shared/live-streams.ts`).
-  // `live_trigger IS NULL` est le marqueur « ce match n'est pas casté ».
-  try {
-    await db.execute(`
-      ALTER TABLE bg_tournaments
-      ADD COLUMN live_url VARCHAR(255) NULL
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  for (const [column, definition] of [
-    ["live_trigger", "ENUM('AUTO', 'START_TIME', 'MANUAL') NULL"],
-    ["live_url", "VARCHAR(255) NULL"],
-    ["live_started_at", "DATETIME NULL"],
-  ] as const) {
-    try {
-      await db.execute(`ALTER TABLE bg_matches ADD COLUMN ${column} ${definition}`);
-    } catch {
-      // Column already exists
-    }
-  }
-
-  // Le bouton « Regarder le live » de l'accueil balaye les matchs castés de tous
-  // les tournois en cours : sans index, ce balayage lit toute la table de matchs
-  // à chaque chargement de la page d'accueil.
-  try {
-    await db.execute(`
-      ALTER TABLE bg_matches
-      ADD INDEX idx_bg_matches_live (live_trigger, status)
-    `);
-  } catch {
-    // Index already exists
-  }
-
-  // Migration: date de début d'un match (`lib/shared/match-schedule.ts`). Fixée
-  // par le staff `tournaments`, elle annonce l'horaire de la manche et sert de
-  // frontière au mode de diffusion `START_TIME`.
-  try {
-    await db.execute(`ALTER TABLE bg_matches ADD COLUMN start_at DATETIME NULL`);
-  } catch {
-    // Column already exists
-  }
-
-  // `START_TIME` s'ajoute aux deux modes d'antenne existants. Le `MODIFY` est
-  // séparé de la création de la colonne : sur une base antérieure, celle-ci
-  // existe déjà avec l'ancien ENUM et l'`ADD COLUMN` échoue sans rien changer.
-  try {
-    await db.execute(`
-      ALTER TABLE bg_matches
-      MODIFY COLUMN live_trigger ENUM('AUTO', 'START_TIME', 'MANUAL') NULL
-    `);
-  } catch {
-    // Already migrated
-  }
-
-  // Rappels de match déjà envoyés (`lib/shared/discord-notifications.ts`).
+  // ───────────────────────────────────────────────────────────────────────────
+  // Migrations
+  // ───────────────────────────────────────────────────────────────────────────
   //
-  // Une ligne par (manche, palier), posée **avant** l'envoi : c'est la clé
-  // unique qui fait office de verrou. Deux requêtes concurrentes déclenchent
-  // toutes deux le balayage — sans elle, le joueur recevrait deux fois le même
-  // rappel. Le `ON DELETE CASCADE` suit la manche : un plateau régénéré
-  // (réappariement d'une ronde suisse, correction de score en survie) efface
-  // ses matchs, donc ses rappels, et les nouveaux repartent de zéro.
+  // Ce que les `CREATE TABLE` ci-dessus ne font **pas** sur une base qui existe
+  // déjà. Chaque entrée retombe en silence quand elle a déjà été jouée, et rien
+  // n'en dépend : ce bloc est vide par construction sur une base neuve.
+
+  // La condition d'inscription « compte Blizzard » est **postérieure** à la
+  // version que sert la production : elle a donc encore un `ALTER` à faire
+  // jouer, là où les soixante-trois autres ont été repliés dans les
+  // `CREATE TABLE` parce que la production les avait déjà tous joués.
+  //
+  // C'est la règle des **deux endroits** (`docs/DATABASE_SCHEMA.md`) en
+  // exercice : la colonne est écrite dans la table neuve *et* ici, la seconde
+  // écriture étant la seule que voie une base qui existe déjà — un
+  // `CREATE TABLE IF NOT EXISTS` n'y fait rien du tout.
   try {
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS bg_match_reminders (
-        id BIGINT AUTO_INCREMENT PRIMARY KEY,
-        match_id BIGINT NOT NULL,
-        offset_key VARCHAR(8) NOT NULL,
-        sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY uniq_bg_match_reminders (match_id, offset_key),
-        CONSTRAINT fk_bg_match_reminders_match FOREIGN KEY (match_id)
-          REFERENCES bg_matches(id) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    `);
+    await db.execute(
+      `ALTER TABLE bg_tournaments
+         ADD COLUMN registration_blizzard_requirement
+           ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'NONE'`,
+    );
   } catch {
-    // Table already exists
+    // Colonne déjà posée (cas nominal sur une base neuve ou déjà migrée).
   }
 
-  // Alertes déjà envoyées au rôle arbitre pour une manche
-  // (`lib/shared/referee-alerts.ts`).
-  //
-  // Même motif que `bg_match_reminders`, pour un besoin voisin : une alerte qui
-  // naît d'un **constat** — « ce report a dépassé son délai et personne n'a
-  // tranché » — se reproduit à chaque passage d'entretien, donc à chaque
-  // lecture de la page. La clé unique `(match_id, alert_key)` fait qu'elle ne
-  // part qu'une fois. La réservation est écrite dans la transaction du moteur,
-  // si bien qu'un rollback ne consomme pas l'alerte. `ON DELETE CASCADE` suit
-  // la manche : un plateau régénéré efface ses matchs, donc ses réservations.
+  // L'adresse e-mail n'a plus aucun lecteur — le scope `email` a disparu de la
+  // demande faite à Google et un compte ne se revendique plus par son adresse
+  // (`docs/features/OAUTH_PROVIDERS.md`). La colonne restait pourtant, et avec
+  // elle les adresses collectées avant la règle : garder une donnée que plus
+  // personne ne lit n'est pas de la prudence, c'est une fuite en attente. Elle
+  // part donc de la table, ce qui efface les valeurs du même geste.
   try {
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS bg_referee_alerts (
-        id BIGINT AUTO_INCREMENT PRIMARY KEY,
-        match_id BIGINT NOT NULL,
-        alert_key VARCHAR(32) NOT NULL,
-        sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY uniq_bg_referee_alerts (match_id, alert_key),
-        CONSTRAINT fk_bg_referee_alerts_match FOREIGN KEY (match_id)
-          REFERENCES bg_matches(id) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    `);
+    await db.execute(`ALTER TABLE bg_users DROP COLUMN email`);
   } catch {
-    // Table already exists
+    // Colonne déjà absente (cas nominal sur une base neuve).
   }
 
-  // Pénalités d'endurance du mode « BlueGenji Survie »
-  // (`lib/shared/endurance-penalty.ts`).
+  // ───────────────────────────────────────────────────────────────────────────
+  // Rattrapages permanents
+  // ───────────────────────────────────────────────────────────────────────────
   //
-  // Une table à part, et non une colonne de plus sur `bg_endurance_standings` :
-  // le classement d'endurance est **rejoué** à chaque entretien, donc écrasé —
-  // un cumul qui y vivrait serait effacé au premier score corrigé. La pénalité
-  // est une décision humaine, au même titre qu'un abandon : elle est une
-  // *entrée* du rejeu, jamais un de ses résultats. La ligne porte sa manche,
-  // ce qui la place dans la chronologie du tournoi.
+  // Deux filets, et non des migrations à cocher : leur cause peut se reproduire,
+  // et ils sont donc **volontairement** rejoués à chaque démarrage. Tous deux
+  // sont idempotents et ne trouvent rien à faire dans le cas nominal.
+
+  // L'invitation Discord est une constante partout **sauf** en pied de page, où
+  // elle est une donnée que le staff peut modifier (`contact_discord_url`).
+  // Changer de serveur ne suffit donc pas à changer ce lien-là, et l'écran qui
+  // l'affiche est justement celui qu'on ne relit jamais — la panne serait muette,
+  // l'ancienne adresse menant toujours quelque part.
   //
-  // `ON DELETE CASCADE` sur les deux clés : un tournoi ou une équipe effacés
-  // n'ont plus de sanction à porter.
+  // Seules les adresses **périmées connues** sont remplacées : une invitation que
+  // le staff a saisie lui appartient, et l'écraser à chaque démarrage ferait de
+  // ce champ un leurre.
   try {
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS bg_endurance_penalties (
-        id BIGINT AUTO_INCREMENT PRIMARY KEY,
-        tournament_id BIGINT NOT NULL,
-        team_id BIGINT NOT NULL,
-        round_number INT NOT NULL,
-        points INT NOT NULL,
-        reason VARCHAR(255) NOT NULL,
-        created_by BIGINT NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        KEY idx_bg_endurance_penalties_tournament (tournament_id),
-        CONSTRAINT fk_bg_endurance_penalties_tournament FOREIGN KEY (tournament_id)
-          REFERENCES bg_tournaments(id) ON DELETE CASCADE,
-        CONSTRAINT fk_bg_endurance_penalties_team FOREIGN KEY (team_id)
-          REFERENCES bg_teams(id) ON DELETE CASCADE,
-        -- L'auteur s'efface en NULL et n'emporte pas la sanction : un compte
-        -- supprimé ne doit pas rendre au classement des points retirés par
-        -- décision d'arbitrage.
-        CONSTRAINT fk_bg_endurance_penalties_author FOREIGN KEY (created_by)
-          REFERENCES bg_users(id) ON DELETE SET NULL
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    `);
+    const placeholders = SUPERSEDED_DISCORD_INVITE_URLS.map(() => "?").join(", ");
+    await db.execute(
+      `UPDATE bg_settings
+          SET setting_value = ?
+        WHERE setting_key = ?
+          AND setting_value IN (${placeholders})`,
+      [DISCORD_INVITE_URL, CONTACT_DISCORD_URL_KEY, ...SUPERSEDED_DISCORD_INVITE_URLS],
+    );
   } catch {
-    // Table already exists
+    // Rattrapage remis au prochain démarrage.
   }
 
-  // Migration: sigle d'équipe (« trigramme », `lib/shared/team-tag.ts`).
+  // Le logo d'une entrée solo est une **copie** de l'avatar du joueur. Le
+  // masquage posé dans `solo-entries-service` ne vaut que pour les écritures à
+  // venir — la prochaine inscription ou édition de profil —, si bien qu'une ligne
+  // déjà écrite continuerait de publier un avatar masqué, jusque sur la carte
+  // « match en direct » de l'accueil que lit un visiteur sans compte. Le chemin
+  // inverse (l'avatar redevient public) est tenu par `syncSoloEntryIdentity`.
   //
-  // 2 à 4 caractères alphanumériques, en majuscules, **unique sur tout le
-  // site**. `NULL` signifie « pas de sigle » : c'est l'état de toutes les
-  // équipes créées avant la fonctionnalité, et l'unicité MySQL ignore les
-  // `NULL` — autant d'équipes sans sigle qu'on veut, aucune collision. C'est
-  // aussi ce qui laisse les **entrées solo** hors de l'espace de noms sans une
-  // règle de plus : elles ne se voient jamais attribuer de sigle.
-  //
-  // La colonne garde la collation par défaut (`utf8mb4`, insensible à la
-  // casse) : deux sigles ne différant que par la casse se heurtent donc à
-  // l'index. C'est une ceinture, pas la règle — le service normalise en
-  // majuscules avant d'écrire.
-  try {
-    await db.execute(`ALTER TABLE bg_teams ADD COLUMN tag VARCHAR(4) NULL`);
-  } catch {
-    // Column already exists
-  }
-
-  // L'index unique ne peut naître que sur des données qui le respectent déjà.
-  // Sur une base de production, la colonne existe peut-être depuis une version
-  // intermédiaire, remplie sans contrainte : on met donc les valeurs en forme
-  // (majuscules) puis on **libère les doublons** avant d'indexer. Le sigle est
-  // conservé à la plus ancienne des équipes en conflit (`MIN(id)`) et effacé
-  // chez les autres, qui retombent sur leurs initiales dérivées et pourront en
-  // choisir un autre. Effacer plutôt qu'inventer un suffixe : un sigle est un
-  // nom, il se choisit, il ne se génère pas dans le dos de son équipe.
-  // Piège de la collation : `tag <> UPPER(tag)` est **toujours faux** en
-  // `utf8mb4_general_ci`, qui tient « yy8 » et « YY8 » pour la même chaîne. La
-  // clause qui devait éviter les écritures inutiles n'en laissait donc passer
-  // aucune, et la mise en majuscules ne s'appliquait jamais. La comparaison est
-  // faite octet à octet pour poser la question qui se pose vraiment : « cette
-  // valeur est-elle écrite en majuscules ? »
-  try {
-    await db.execute(`
-      UPDATE bg_teams
-      SET tag = UPPER(tag)
-      WHERE tag IS NOT NULL
-        AND CAST(tag AS BINARY) <> CAST(UPPER(tag) AS BINARY)
-    `);
-  } catch {
-    // Colonne absente sur une base antérieure à la migration ci-dessus.
-  }
+  // Le `try` n'est pas une formalité : c'est la seule instruction de cette passe
+  // qui prenne des **verrous de ligne** sur une table chaude — `registerGhostTeams`
+  // tient `bg_teams` sous `SELECT … FOR UPDATE` le temps de 32 insertions. Un lot
+  // d'inscriptions qui chevauche un démarrage à froid rendrait
+  // `ER_LOCK_WAIT_TIMEOUT`, et l'exception emporterait tout ce qui suit.
   try {
     await db.execute(`
       UPDATE bg_teams t
-      JOIN (
-        SELECT UPPER(tag) AS normalized, MIN(id) AS keep_id
-        FROM bg_teams
-        WHERE tag IS NOT NULL
-        GROUP BY UPPER(tag)
-        HAVING COUNT(*) > 1
-      ) dupes ON UPPER(t.tag) = dupes.normalized AND t.id <> dupes.keep_id
-      SET t.tag = NULL
+        JOIN bg_users u ON u.id = t.solo_user_id
+         SET t.logo_url = NULL
+       WHERE t.solo_user_id IS NOT NULL
+         AND u.visible_avatar = 0
+         AND t.logo_url IS NOT NULL
     `);
   } catch {
-    // Colonne absente, ou aucun doublon à libérer.
-  }
-  try {
-    await db.execute(`ALTER TABLE bg_teams ADD UNIQUE INDEX uniq_bg_teams_tag (tag)`);
-  } catch {
-    // Index already exists
+    // Rattrapage remis au prochain démarrage.
   }
 }
 
