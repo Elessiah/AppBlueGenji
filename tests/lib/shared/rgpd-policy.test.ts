@@ -41,7 +41,7 @@ describe("DONNEES_PROFIL", () => {
     // rattache un compte par son adresse : déclarer une collecte qui n'a plus
     // lieu serait aussi faux que taire celle qui a lieu.
     const google = DONNEES_PROFIL.find((d) => d.donnee === "Identifiant Google");
-    expect(google?.finalite).toMatch(/sans adresse/i);
+    expect(google?.finalite).toMatch(/aucune adresse e-mail n’est demandée|aucune adresse e-mail n'est demandée/i);
     expect(DONNEES_PROFIL.map((d) => d.donnee)).not.toContain("Adresse e-mail");
   });
 
