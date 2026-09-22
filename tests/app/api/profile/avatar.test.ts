@@ -22,7 +22,11 @@ function pngFile() {
 }
 
 describe("POST /api/profile/avatar", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // L'écriture réussit, sauf mention contraire : un compte vivant.
+    (updateUserAvatar as jest.Mock).mockResolvedValue(true as never);
+  });
   afterEach(() => jest.restoreAllMocks());
 
   it("rejects anonymous users with 401", async () => {
@@ -99,5 +103,43 @@ describe("DELETE /api/profile/avatar", () => {
     expect(await res.json()).toEqual({ avatarUrl: null });
     expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/avatars/old.webp");
     expect(updateUserAvatar).toHaveBeenCalledWith(42, null);
+  });
+});
+
+describe("POST /api/profile/avatar — course avec la suppression du compte", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  /**
+   * Un téléversement parti avant la suppression reprend **après** son commit,
+   * bloqué jusque-là sur le verrou de la ligne. L'écriture est refusée ; le
+   * fichier, lui, est déjà sur le disque et serait servi seul par
+   * `/api/uploads/avatars/…` — survivant à un compte dont on vient de promettre
+   * qu'il ne resterait rien.
+   */
+  it("reprend le fichier qu'il vient d'écrire quand la ligne n'accepte plus rien", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+    (getUserById as jest.Mock).mockResolvedValue({ avatarUrl: null } as never);
+    (processAndStoreImage as jest.Mock).mockResolvedValue("/uploads/avatars/42-new.webp" as never);
+    (updateUserAvatar as jest.Mock).mockResolvedValue(false as never);
+
+    const res = await POST(fileReq(pngFile()));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "ACCOUNT_DELETED" });
+    expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/avatars/42-new.webp");
+  });
+
+  it("ne touche pas à l'ancienne photo d'un compte qu'il n'a pas modifié", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+    (getUserById as jest.Mock).mockResolvedValue({
+      avatarUrl: "/api/uploads/avatars/old.webp",
+    } as never);
+    (processAndStoreImage as jest.Mock).mockResolvedValue("/uploads/avatars/42-new.webp" as never);
+    (updateUserAvatar as jest.Mock).mockResolvedValue(false as never);
+
+    await POST(fileReq(pngFile()));
+
+    expect(deleteStoredImage).toHaveBeenCalledTimes(1);
+    expect(deleteStoredImage).not.toHaveBeenCalledWith("/uploads/avatars/old.webp");
   });
 });

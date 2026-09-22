@@ -999,10 +999,17 @@ async function loadAccountTrace(
     [userId, userId, userId, userId],
   );
   const row = rows[0];
+  // Une ligne absente **n'est pas** une absence de trace : lue en booléens, elle
+  // donnerait trois `false`, donc `ERASE` — le seul dénouement qui ne se défait
+  // pas, et l'exact contraire de la règle conservatrice du module pur. La
+  // requête en rend toujours une aujourd'hui (des sous-requêtes scalaires, sans
+  // `FROM`) ; le jour où elle porte un `FROM bg_users`, l'anomalie doit lever et
+  // non effacer.
+  if (!row) throw new Error("ACCOUNT_TRACE_UNAVAILABLE");
   return {
-    tournaments: Boolean(row?.tournaments),
-    organizedTournaments: Boolean(row?.organized),
-    ownedTeams: Boolean(row?.owned),
+    tournaments: Boolean(row.tournaments),
+    organizedTournaments: Boolean(row.organized),
+    ownedTeams: Boolean(row.owned),
   };
 }
 
@@ -1066,10 +1073,20 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
     // Verrou en **toute première instruction**, et lecture des traces juste
     // après : sous `REPEATABLE READ`, c'est la première lecture *ordinaire* qui
     // fige l'instantané, si bien qu'une trace lue avant le verrou daterait
-    // d'avant l'attente. Le compte est ici la ressource disputée — une
-    // inscription en tournoi individuel pose le même verrou (`ensureSoloEntry`),
-    // seul moyen de couvrir une entrée solo qui n'a volontairement aucune clé
-    // étrangère.
+    // d'avant l'attente. Le compte est ici la ressource disputée, et une
+    // inscription en tournoi individuel pose le même verrou (`ensureSoloEntry`)
+    // — seul moyen de tenir une entrée solo, qui n'a volontairement aucune clé
+    // étrangère et resterait sinon à pendre sur un identifiant disparu.
+    //
+    // L'inscription d'une **équipe** n'est pas couverte, et c'est assumé : elle
+    // n'écrit que `bg_tournament_registrations`, qui ne référence que l'équipe,
+    // sans jamais toucher `bg_team_members` — aucune clé étrangère ne tranche
+    // donc cette course-là. Un membre qui supprime son compte à l'instant où sa
+    // capitaine engage l'équipe est effacé alors qu'il figurait au roster
+    // engagé. Rien ne pend (son appartenance part en cascade), l'équipe garde
+    // son inscription et ses matchs, et ce qu'il perd est son propre historique
+    // — ce qu'il venait de demander. Le fermer coûterait un verrou sur la ligne
+    // de **chaque** membre à chaque inscription.
     const [locked] = await connection.execute<(RowDataPacket & {
       avatar_url: string | null;
     })[]>(
@@ -1167,14 +1184,32 @@ async function anonymizeAccount(connection: PoolConnection, userId: number): Pro
   await syncSoloEntryIdentityOn(connection, userId);
 }
 
-export async function updateUserAvatar(userId: number, avatarPath: string | null): Promise<void> {
+/**
+ * Pose (ou retire) l'avatar d'un compte **vivant**, et dit si l'écriture a eu
+ * lieu.
+ *
+ * La condition `is_deleted = 0` n'est pas une précaution de style : un
+ * téléversement déjà parti se bloque sur le verrou de `deleteOwnAccount` et
+ * reprend **après** son commit. Sans elle, il reposait une photo personnelle
+ * toute neuve sur une ligne fraîchement anonymisée — publiquement servie par
+ * `/api/uploads/avatars/…`, c'est-à-dire précisément ce que la suppression
+ * venait d'effacer. Sur un compte effacé, la ligne a disparu et l'écriture ne
+ * touche rien, mais le fichier, lui, est déjà sur le disque : d'où un booléen
+ * rendu, que l'appelant traduit en ménage.
+ */
+export async function updateUserAvatar(
+  userId: number,
+  avatarPath: string | null,
+): Promise<boolean> {
   const db = await getDatabase();
-  await db.execute(
-    `UPDATE bg_users SET avatar_url = ? WHERE id = ?`,
+  const [result] = await db.execute<ResultSetHeader>(
+    `UPDATE bg_users SET avatar_url = ? WHERE id = ? AND is_deleted = 0`,
     [avatarPath, userId],
   );
+  if (result.affectedRows === 0) return false;
   // Le logo de l'entrée solo est l'avatar du joueur.
   await syncSoloEntryIdentity(userId);
+  return true;
 }
 
 /**

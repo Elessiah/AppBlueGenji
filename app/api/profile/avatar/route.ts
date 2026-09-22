@@ -22,7 +22,15 @@ export async function POST(req: Request) {
     const current = await getUserById(user.id);
     const diskPath = await processAndStoreImage(file, "avatar", user.id);
     const servedUrl = toServedUploadUrl(diskPath);
-    await updateUserAvatar(user.id, servedUrl);
+    // Un téléversement parti avant une suppression de compte reprend **après**
+    // son commit, bloqué jusque-là sur le verrou de la ligne : l'écriture est
+    // alors refusée, et c'est le fichier déjà posé sur le disque qu'il faut
+    // reprendre — servi par `/api/uploads/avatars/…`, il survivrait seul à un
+    // compte effacé dont on vient de promettre qu'il ne resterait rien.
+    if (!(await updateUserAvatar(user.id, servedUrl))) {
+      await deleteStoredImage(diskPath);
+      return fail("ACCOUNT_DELETED", 409);
+    }
     await deleteStoredImage(toDiskUploadPath(current?.avatarUrl));
     return ok({ avatarUrl: servedUrl });
   } catch (error) {
