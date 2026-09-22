@@ -1,6 +1,4 @@
-"use client";
-
-import { InputHTMLAttributes, useState } from "react";
+import { CSSProperties, InputHTMLAttributes } from "react";
 
 type CocheTheme = "tournoi" | "joueur" | "equipe";
 
@@ -17,21 +15,6 @@ const THEME_COLORS: Record<CocheTheme, { base: string; rgb: string }> = {
   equipe: { base: "#ff9d2e", rgb: "255,157,46" },
 };
 
-/**
- * Le repère de focus ne se pose qu'au parcours **clavier**. `:focus-visible` est
- * la seule façon de le dire, mais tous les moteurs ne connaissent pas le
- * sélecteur : `matches()` lève alors une `SyntaxError` au beau milieu d'un
- * gestionnaire React. On retombe donc sur « focus = repère », plus bavard
- * qu'invisible.
- */
-function isKeyboardFocus(element: HTMLInputElement): boolean {
-  try {
-    return element.matches(":focus-visible");
-  } catch {
-    return true;
-  }
-}
-
 export function Coche({
   label,
   checked,
@@ -45,46 +28,33 @@ export function Coche({
   // `rgba(#ff0000,0.28)` — déclaration invalide, donc anneau de focus muet. Il
   // n'avait aucun appelant : il est retiré plutôt que rafistolé.
   const { base: color, rgb: rgbColor } = THEME_COLORS[theme];
-  // La case native est masquée : c'est elle qui reçoit le focus, mais la
-  // pastille qui se voit. Sans ce relais, un parcours au clavier traversait le
-  // réglage sans aucun repère à l'écran.
-  const [focused, setFocused] = useState(false);
 
   return (
+    // L'anneau de focus se pose en CSS (`.coche-input:focus-visible ~ .coche-pill`,
+    // `app/globals.css`) : la case native est masquée, c'est elle qui reçoit le
+    // focus et la pastille qui se voit. D'où le découpage en deux — l'étiquette
+    // n'est plus qu'un cadre, la pastille est le frère de l'input — et la teinte
+    // du thème passée en variable CSS, la feuille ne connaissant pas le thème.
     <label
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "7px 14px",
-        borderRadius: 999,
-        border: `1px solid ${checked ? `rgba(${rgbColor},0.4)` : "var(--line)"}`,
-        background: checked ? `rgba(${rgbColor},0.1)` : "rgba(255,255,255,0.03)",
-        boxShadow: focused ? `0 0 0 3px rgba(${rgbColor},0.28)` : "none",
-        cursor: "pointer",
-        fontSize: 14,
-        userSelect: "none",
-        transition: "border-color 0.15s, background 0.15s, box-shadow 0.15s",
-      }}
+      style={
+        {
+          display: "inline-flex",
+          position: "relative",
+          cursor: "pointer",
+          "--coche-rgb": rgbColor,
+        } as CSSProperties
+      }
     >
       {/* `{...props}` passe **avant** : étalé après, un `onFocus` ou un `onBlur`
-          d'appelant remplacerait le relais et le repère clavier disparaîtrait
-          sans un mot. Les gestionnaires de l'appelant sont donc chaînés, et le
-          style de masquage reste le dernier — la pastille ne se voit que parce
-          que l'input, lui, ne se voit pas. */}
+          d'appelant écraserait ceux du contrôle. Le style de masquage reste le
+          dernier — la pastille ne se voit que parce que l'input, lui, ne se voit
+          pas. */}
       <input
         {...props}
+        className="coche-input"
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        onFocus={(e) => {
-          props.onFocus?.(e);
-          setFocused(isKeyboardFocus(e.currentTarget));
-        }}
-        onBlur={(e) => {
-          props.onBlur?.(e);
-          setFocused(false);
-        }}
         style={{
           ...props.style,
           position: "absolute",
@@ -95,27 +65,43 @@ export function Coche({
         }}
       />
       <span
+        className="coche-pill"
         style={{
-          flexShrink: 0,
-          width: 16,
-          height: 16,
-          borderRadius: "50%",
-          border: `1.5px solid ${checked ? `rgba(${rgbColor},0.8)` : "rgba(255,255,255,0.2)"}`,
-          background: checked ? color : "transparent",
-          display: "flex",
+          display: "inline-flex",
           alignItems: "center",
-          justifyContent: "center",
-          transition: "all 0.15s",
-          fontSize: 10,
-          color: "var(--bg-0)",
-          fontWeight: 900,
-          lineHeight: 1,
+          gap: 8,
+          padding: "7px 14px",
+          borderRadius: 999,
+          border: `1px solid ${checked ? `rgba(${rgbColor},0.4)` : "var(--line)"}`,
+          background: checked ? `rgba(${rgbColor},0.1)` : "rgba(255,255,255,0.03)",
+          fontSize: 14,
+          userSelect: "none",
+          transition: "border-color 0.15s, background 0.15s, box-shadow 0.15s",
         }}
       >
-        {checked && "✓"}
-      </span>
-      <span style={{ color: checked ? "var(--text-0)" : "var(--text-1)" }}>
-        {label}
+        <span
+          style={{
+            flexShrink: 0,
+            width: 16,
+            height: 16,
+            borderRadius: "50%",
+            border: `1.5px solid ${checked ? `rgba(${rgbColor},0.8)` : "rgba(255,255,255,0.2)"}`,
+            background: checked ? color : "transparent",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "all 0.15s",
+            fontSize: 10,
+            color: "var(--bg-0)",
+            fontWeight: 900,
+            lineHeight: 1,
+          }}
+        >
+          {checked && "✓"}
+        </span>
+        <span style={{ color: checked ? "var(--text-0)" : "var(--text-1)" }}>
+          {label}
+        </span>
       </span>
     </label>
   );

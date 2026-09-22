@@ -1448,8 +1448,13 @@ input[type="radio"] {
   border-radius: 50%;
 }
 
-input[type="checkbox"]:hover:not(:disabled),
-input[type="radio"]:hover:not(:disabled) {
+/* Le survol ne parle que d'une case au repos. Écrit sans ses deux exclusions,
+   il pèse plus lourd (`:not()` compte son argument) que `:checked` et que
+   `:focus-visible` : la souris posée sur une case cochée la faisait paraître
+   moins cochée, et sur une case parcourue au clavier, elle affaiblissait le
+   seul repère du parcours. */
+input[type="checkbox"]:hover:not(:disabled):not(:checked):not(:focus-visible),
+input[type="radio"]:hover:not(:disabled):not(:checked):not(:focus-visible) {
   border-color: rgba(var(--blue-rgb), 0.55);
 }
 
@@ -1524,4 +1529,17 @@ input[type="radio"]:disabled:checked {
     outline: 2px solid;
     outline-offset: 2px;
   }
+}
+
+/* Pastille `Coche` — l'anneau de focus, relayé par le frère de l'input.
+
+   L'input est masqué : c'est lui qui reçoit le focus, la pastille qui se voit.
+   Le relais est en CSS et **pas** en état React, parce que `:focus-visible`
+   n'est pas un instantané : il bascule aussi quand on presse une touche sur un
+   élément **déjà** focalisé (clic à la souris, puis Espace), et aucun second
+   évènement ne vient le dire — un état échantillonné à `onFocus` restait donc
+   muet au moment précis où le clavier prend la main. Le sélecteur de frère
+   (Sélecteurs 3) suit l'état au lieu de l'échantillonner. */
+.coche-input:focus-visible ~ .coche-pill {
+  box-shadow: 0 0 0 3px rgba(var(--coche-rgb), 0.28);
 }

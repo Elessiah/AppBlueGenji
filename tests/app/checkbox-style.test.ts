@@ -77,6 +77,26 @@ describe("Cases à cocher — apparence unique", () => {
     expect(blockFor('input[type="checkbox"]:disabled,')).toContain("cursor: not-allowed");
   });
 
+  it("ne laisse pas le survol effacer le coché ni le focus", () => {
+    // `:not()` compte son argument : sans ses exclusions, le survol pèse plus
+    // lourd que `:checked` et `:focus-visible`, et les défait tous les deux.
+    const hover = globals.slice(globals.indexOf('input[type="checkbox"]:hover'));
+    expect(hover.slice(0, 120)).toContain(":not(:checked)");
+    expect(hover.slice(0, 120)).toContain(":not(:focus-visible)");
+  });
+
+  it("relaie en CSS le focus de la pastille `Coche`, jamais par un état React", () => {
+    // `:focus-visible` bascule aussi sur une touche pressée alors que l'élément
+    // est **déjà** focalisé : aucun évènement ne le dit, un état échantillonné à
+    // `onFocus` reste donc muet là où le clavier prend la main.
+    expect(globals).toContain(".coche-input:focus-visible ~ .coche-pill");
+    const coche = readFileSync(join(ROOT, "components", "Coche.tsx"), "utf8");
+    expect(coche).toContain('className="coche-input"');
+    expect(coche).toContain('className="coche-pill"');
+    expect(coche).not.toContain("useState");
+    expect(coche).not.toContain(':focus-visible")');
+  });
+
   it("rend la main au système en contrastes forcés", () => {
     // Le mode force la couleur de fond mais **pas** l'image : une coche presque
     // noire finirait sur un fond noir imposé, et cochée vaudrait décochée.
