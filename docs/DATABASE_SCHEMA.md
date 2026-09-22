@@ -48,10 +48,27 @@ Un changement de schéma s'écrit **à deux endroits** :
 2. en `ALTER TABLE` tolérant dans la section « Migrations », pour celles qui
    tournent déjà.
 
-C'est exactement ce que fait le retrait de `bg_users.email`, seul `ALTER` que le
-fichier porte encore. Une migration qu'on sait jouée partout peut ensuite être
-retirée de cette section — c'est ce qui vient d'être fait pour les
-soixante-trois autres.
+Une migration qu'on sait jouée partout peut ensuite être retirée de cette
+section — c'est ce qui vient d'être fait pour les soixante-trois autres.
+
+Le fichier porte donc exactement **deux** `ALTER`, et ils illustrent chacun une
+moitié de la règle :
+
+- **`bg_users DROP COLUMN email`** — un changement que la production n'a pas
+  encore joué, et qui n'a rien à faire dans un `CREATE TABLE` puisqu'il
+  *retire* : la colonne est simplement absente de la table neuve.
+- **`bg_tournaments ADD COLUMN registration_blizzard_requirement`** — la
+  condition d'inscription « compte Blizzard », **postérieure** à la version que
+  sert la production. Elle est écrite aux deux endroits, et c'est le cas qui
+  montre pourquoi la règle existe : la replier dans le seul `CREATE TABLE` aurait
+  fait disparaître la colonne pour la base qui tourne, laquelle aurait redémarré
+  sur un schéma que toutes les requêtes de tournoi contredisent.
+
+`tests/lib/server/database-schema.test.ts` fige les deux : la colonne récente est
+exigée dans la table **et** dans la section « Migrations », et le nombre total
+d'`ALTER` est compté sur les lignes de code — une assertion accrochée à une seule
+forme d'écriture (`db.execute(\`ALTER`) restait verte en ne voyant pas une
+migration posée sur plusieurs lignes.
 
 ## Le retrait de `bg_users.email`
 

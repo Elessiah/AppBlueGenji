@@ -124,15 +124,52 @@ describe("Schéma — l'adresse e-mail a disparu", () => {
     expect(table("bg_users")).not.toContain("email");
   });
 
-  it("est retirée des bases existantes par le seul ALTER que le fichier porte encore", () => {
+  it("est retirée des bases existantes par un ALTER, que le fichier porte encore", () => {
     expect(sql).toContain("ALTER TABLE bg_users DROP COLUMN email");
   });
 });
 
+describe("Schéma — la règle des deux endroits", () => {
+  /**
+   * Une colonne **postérieure** à la version que sert la production a encore un
+   * `ALTER` à faire jouer : un `CREATE TABLE IF NOT EXISTS` ne fait rien du tout
+   * sur une base qui existe déjà. Elle s'écrit donc **deux fois** — dans la table
+   * neuve *et* en migration —, et c'est précisément la règle que
+   * `docs/DATABASE_SCHEMA.md` pose pour la suite.
+   *
+   * L'oublier ne casse aucun test qui lirait la seule table : la panne est au
+   * redémarrage de la production, sur une colonne que toutes les requêtes
+   * nomment.
+   */
+  const RECENT_COLUMNS = ["registration_blizzard_requirement"];
+
+  it.each(RECENT_COLUMNS)("écrit %s dans la table neuve", (column) => {
+    expect(table("bg_tournaments")).toContain(column);
+  });
+
+  it.each(RECENT_COLUMNS)("et la pose aussi par ALTER, pour les bases existantes", (column) => {
+    // Le `ALTER` est cherché **dans la section des migrations**, pas n'importe
+    // où : le nom de la colonne figure aussi dans le `CREATE TABLE`.
+    const alter = sql.slice(sql.indexOf("// Migrations"));
+    expect(alter).toMatch(
+      new RegExp(`ALTER TABLE bg_tournaments\\s+ADD COLUMN\\s+${column}`),
+    );
+  });
+});
+
 describe("Schéma — ce qui reste à côté des CREATE", () => {
-  it("ne garde qu'une seule migration : celle qui n'est pas encore jouée en production", () => {
-    const alters = [...sql.matchAll(/await db\.execute\(`ALTER TABLE/g)];
-    expect(alters).toHaveLength(1);
+  it("ne garde que les migrations pas encore jouées en production", () => {
+    // Le compte se fait sur les lignes de **code**, commentaires écartés : ils
+    // parlent des soixante-trois ALTER repliés. Et il ne s'accroche pas à une
+    // forme d'écriture — l'ancienne version cherchait `db.execute(\`ALTER`, si
+    // bien qu'une migration posée sur plusieurs lignes ne comptait pas et que
+    // l'assertion restait verte en ne voyant rien.
+    const code = sql
+      .split("\n")
+      .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+      .join("\n");
+    expect([...code.matchAll(/ALTER TABLE/g)]).toHaveLength(2);
+    expect(code).toContain("ALTER TABLE bg_users DROP COLUMN email");
   });
 
   it("garde les deux rattrapages permanents, dont la cause peut se reproduire", () => {
