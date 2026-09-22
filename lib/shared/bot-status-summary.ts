@@ -39,9 +39,32 @@ const KNOWN_STATUSES: Record<BotStatus["status"], true> = {
   DOWN: true,
 };
 
+/**
+ * L'état lu sur la charge du bot — **`null` veut dire « aucune réponse », et
+ * rien d'autre**.
+ *
+ * C'est ici que les deux silences se séparent, parce que c'est le seul endroit
+ * qui voie la différence : une fois l'état extrait, `undefined` (le champ
+ * manque) et `null` (il n'y a pas eu de réponse) sont la même valeur. Or
+ * `fetchBotStatus` rend la charge par un simple `as BotStatus` : une réponse
+ * sans champ `status` est parfaitement possible, et elle donnait
+ * « Le bot n'a pas répondu à la page » **à côté** d'un uptime, d'une version et
+ * d'une latence tirés de cette réponse-là — la phrase fixe qui contredit la
+ * valeur d'à côté, c'est-à-dire le défaut que ce module retire.
+ *
+ * Toute réponse reçue rend donc une chaîne, fût-elle vide.
+ */
+export function botStatusOf(status: BotStatus | null | undefined): string | null {
+  if (!status) return null;
+  const raw: unknown = status.status;
+  return typeof raw === "string" ? raw : "";
+}
+
 /** L'état reçu, ramené à l'une des valeurs que la page sait nommer. */
 export function resolveBotStatusLabel(status: string | null | undefined): BotStatusLabel {
-  if (!status) return "UNREACHABLE";
+  // `== null` et non `!status` : la chaîne vide est une **réponse** reçue dont
+  // l'état est illisible, pas une absence de réponse.
+  if (status == null) return "UNREACHABLE";
   if (!Object.prototype.hasOwnProperty.call(KNOWN_STATUSES, status)) {
     return "UNREADABLE";
   }

@@ -133,12 +133,38 @@ describe("/bot — l'état d'un serveur se lit en français", () => {
   it("garde des pistes fixes sur mobile, où l'en-tête et les rangées sont des grilles séparées", () => {
     // Une piste `auto` se dimensionne sur le contenu de SA ligne : « ● À jour »
     // et « ● Hors ligne » posaient la colonne à deux abscisses différentes.
-    expect(css).toContain("grid-template-columns: 22px 1fr 56px 86px;");
-    expect(css).not.toContain("grid-template-columns: 22px 1fr auto auto;");
+    // On pin la **forme** (quatre pistes, aucune `auto`) et non des largeurs,
+    // qui se retouchent à vue sans que l'invariant bouge.
+    const mobile = css.match(/grid-template-columns: 22px 1fr (\S+) (\S+);/);
+    expect(mobile).not.toBeNull();
+    expect(mobile![1]).toMatch(/^\d+px$/);
+    expect(mobile![2]).toMatch(/^\d+px$/);
     // Et l'en-tête, seul à ne pas être protégé par le `nowrap` des cellules,
     // perd son qualificatif plutôt que de se couper en deux.
     expect(css).toMatch(/\.srv-head > span \{ white-space: nowrap; \}/);
     expect(css).toMatch(/\.srv-col-qualifier \{ display: none; \}/);
+  });
+
+  it("ne laisse pas un nombre déborder d'une piste qui ne peut pas s'élargir", () => {
+    // Corollaire des pistes fixes : `min-width: auto` vaut le contenu, donc un
+    // nombre plus large que sa piste ne l'élargit pas — il déborde sur la
+    // colonne voisine. Et le séparateur de milliers du `fr-FR` est une espace
+    // insécable : il n'y a même pas de renvoi possible.
+    expect(css).toMatch(/\.srv-num \{[^}]*min-width: 0;/);
+    expect(css).toMatch(/\.srv-num \{[^}]*overflow: hidden;/);
+    expect(css).toMatch(/\.srv-num \{[^}]*white-space: nowrap;/);
+  });
+
+  it("resserre le tableau là où la colonne de gauche est la plus étroite", () => {
+    // La grille reste à deux colonnes jusqu'à 1024 px : entre là et 1200 px, le
+    // tableau n'a que ~530 px utiles et l'élargissement de la piste d'état se
+    // prendrait entièrement sur le nom du serveur, seule colonne qu'on ne peut
+    // ni abréger ni masquer.
+    const band = css.match(/@media \(max-width: 1200px\) \{[\s\S]*?\n\}/);
+    expect(band).not.toBeNull();
+    expect(band![0]).toContain(".srv-head, .srv-row");
+    // La piste d'état, elle, ne bouge pas : c'est elle qu'on est venu élargir.
+    expect(band![0]).toContain("115px");
   });
 
   it("a une couleur pour l'état qu'elle ne connaît pas", () => {

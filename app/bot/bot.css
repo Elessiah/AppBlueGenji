@@ -396,6 +396,15 @@
   font-size: 12px;
   color: var(--ink);
   text-align: right;
+  /* Les pistes chiffrées sont **fixes** (c'est ce qui aligne l'en-tête, qui est
+     une grille séparée) : un nombre trop large ne les élargit pas, il déborde
+     sur la colonne voisine — `min-width: auto` vaut le contenu, et le séparateur
+     de milliers du `fr-FR` est une espace insécable, donc sans renvoi possible.
+     La piste est dimensionnée pour sept chiffres ; au-delà, on coupe la cellule
+     plutôt que de décaler la ligne. */
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 .srv-status {
   font-family: var(--mono);
@@ -600,6 +609,20 @@
 }
 
 /* ---------- Responsive ---------- */
+/* Entre 1024 px et 1200 px, la grille à deux colonnes tient encore mais sa
+   colonne de gauche n'a plus que ~570 px, dont le tableau des serveurs perd
+   encore 44 px de rembourrage. Les pistes chiffrées et les gouttières s'y
+   resserrent, faute de quoi l'élargissement de la piste d'état (70 → 115 px,
+   qu'exige l'en-tête « ÉTAT DU RELAIS ») se prend entièrement sur le nom du
+   serveur : il y restait moins de 50 px de texte, et les noms passaient sur
+   trois lignes. La piste d'état, elle, ne bouge pas — c'est elle qu'on est
+   venu élargir. */
+@media (max-width: 1200px) {
+  .srv-head, .srv-row {
+    grid-template-columns: 24px 1fr 64px 64px 115px 44px;
+    gap: 10px;
+  }
+}
 @media (max-width: 1024px) {
   .bot-grid { grid-template-columns: 1fr; }
   .kpis { grid-template-columns: repeat(2, 1fr); }
@@ -630,7 +653,7 @@
      « ● À jour » posaient la colonne à deux abscisses différentes, sous un
      en-tête qui ne surplombait ni l'une ni l'autre. */
   .srv-head, .srv-row {
-    grid-template-columns: 22px 1fr 56px 86px;
+    grid-template-columns: 22px 1fr 68px 86px;
     gap: 10px;
   }
   /* Le gain de place ne se prend pas sur le nom du serveur : c'est la seule

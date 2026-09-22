@@ -2,13 +2,32 @@
 
 import { useState, useEffect } from "react";
 import { BotStatus } from "@/lib/shared/types";
-import { botStatusDisplay, botStatusSummary } from "@/lib/shared/bot-status-summary";
+import { botStatusDisplay, botStatusOf, botStatusSummary } from "@/lib/shared/bot-status-summary";
+
+/**
+ * Un champ de la charge du bot, ramené à du texte affichable — ou `null`.
+ *
+ * `fetchBotStatus` rend cette charge par un simple `as BotStatus` sur du JSON
+ * reçu par le réseau : **aucun** de ces champs n'est garanti, malgré le type.
+ * Un `.slice()` sur un `buildHash` absent, ou un `.active` sur un `shardCount`
+ * absent, lève pendant le rendu — et comme la bande est rendue par un composant
+ * serveur, c'est toute la page `/bot` qui part en 500. Une case fade vaut
+ * infiniment mieux, et c'est déjà la règle du tableau d'à côté.
+ */
+function field(value: unknown): string | null {
+  if (typeof value === "string") return value.length > 0 ? value : null;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return null;
+}
 
 export function BotStatusStrip({ status }: { status: BotStatus | null }) {
   const [uptime, setUptime] = useState("—");
 
   useEffect(() => {
     if (!status) return;
+    // Sans ces deux nombres, le compteur n'afficherait pas une erreur mais
+    // « NaNj NaNh NaNm » — une panne muette de plus. Mieux vaut le tiret.
+    if (!Number.isFinite(status.startupTs) || !Number.isFinite(status.uptimeMs)) return;
     const base = status.startupTs;
     const startSec = Math.floor(status.uptimeMs / 1000);
     const id = setInterval(() => {
@@ -22,11 +41,18 @@ export function BotStatusStrip({ status }: { status: BotStatus | null }) {
     return () => clearInterval(id);
   }, [status]);
 
-  const statusLabel = status?.status ?? null;
-  const versionLabel = status ? `${status.version} · ${status.buildHash.slice(0, 4)}` : "—";
-  const buildDate = status?.buildDate ?? "—";
-  const latency = status?.gatewayLatency ?? "—";
-  const shards = status ? `${String(status.shardCount.active).padStart(2, "0")} / ${String(status.shardCount.total).padStart(2, "0")}` : "—";
+  const statusLabel = botStatusOf(status);
+  const version = field(status?.version);
+  const buildHash = field(status?.buildHash);
+  const versionLabel = version ? (buildHash ? `${version} · ${buildHash.slice(0, 4)}` : version) : "—";
+  const buildDate = field(status?.buildDate) ?? "—";
+  const latency = field(status?.gatewayLatency);
+  const shardsActive = field(status?.shardCount?.active);
+  const shardsTotal = field(status?.shardCount?.total);
+  const shards =
+    shardsActive && shardsTotal
+      ? `${shardsActive.padStart(2, "0")} / ${shardsTotal.padStart(2, "0")}`
+      : "—";
 
   return (
     <div className="status-strip">
@@ -47,7 +73,7 @@ export function BotStatusStrip({ status }: { status: BotStatus | null }) {
       </div>
       <div className="status-cell">
         <span className="lbl">Gateway latency</span>
-        <span className="val">{latency === "—" ? "—" : `${latency} ms`}</span>
+        <span className="val">{latency === null ? "—" : `${latency} ms`}</span>
         <span className="sub">Discord WS · OVH Gravelines</span>
       </div>
       <div className="status-cell">

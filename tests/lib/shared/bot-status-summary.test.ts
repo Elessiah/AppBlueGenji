@@ -1,9 +1,11 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   botStatusDisplay,
+  botStatusOf,
   botStatusSummary,
   resolveBotStatusLabel,
 } from "@/lib/shared/bot-status-summary";
+import type { BotStatus } from "@/lib/shared/types";
 
 /**
  * La case « Status » de `/bot` annonçait une phrase fixe (« Tous les modules
@@ -50,10 +52,15 @@ describe("resolveBotStatusLabel", () => {
     expect(resolveBotStatusLabel("DOWN")).toBe("DOWN");
   });
 
-  it("appelle « injoignable » l'absence de réponse", () => {
-    for (const status of ["", null, undefined]) {
+  it("appelle « injoignable » l'absence de réponse, et elle seule", () => {
+    for (const status of [null, undefined]) {
       expect(resolveBotStatusLabel(status)).toBe("UNREACHABLE");
     }
+    // La chaîne vide est une **réponse** reçue dont l'état est illisible : la
+    // ranger avec l'absence de réponse remettrait « le bot n'a pas répondu »
+    // sous une case qui affiche, juste à côté, la version et la latence tirées
+    // de cette réponse-là.
+    expect(resolveBotStatusLabel("")).toBe("UNREADABLE");
   });
 
   it("appelle « illisible » une réponse qu'elle ne sait pas lire, prototype compris", () => {
@@ -72,5 +79,38 @@ describe("botStatusDisplay", () => {
   it("montre l'état reçu tel quel, même inconnu — c'est une information", () => {
     expect(botStatusDisplay("OPERATIONAL")).toBe("OPERATIONAL");
     expect(botStatusDisplay("MAINTENANCE")).toBe("MAINTENANCE");
+  });
+});
+
+describe("botStatusOf", () => {
+  const payload = (overrides: Partial<BotStatus> = {}) =>
+    ({ status: "OPERATIONAL", ...overrides }) as BotStatus;
+
+  it("rend l'état quand le bot en a donné un", () => {
+    expect(botStatusOf(payload())).toBe("OPERATIONAL");
+    expect(botStatusOf(payload({ status: "DOWN" }))).toBe("DOWN");
+  });
+
+  it("ne rend `null` que faute de réponse", () => {
+    expect(botStatusOf(null)).toBeNull();
+    expect(botStatusOf(undefined)).toBeNull();
+  });
+
+  it("rend une chaîne vide sur une réponse sans état lisible", () => {
+    // `fetchBotStatus` fait un `as BotStatus` sur du JSON reçu : le champ est
+    // typé, il n'est pas garanti.
+    for (const broken of [{}, { status: null }, { status: 42 }, { status: {} }]) {
+      expect(botStatusOf(broken as unknown as BotStatus)).toBe("");
+    }
+  });
+
+  it("sépare les deux silences jusqu'au sous-titre affiché", () => {
+    // C'est tout l'objet de la fonction : une réponse amputée de son seul champ
+    // `status` affichait « Le bot n'a pas répondu à la page » **à côté** de la
+    // version et de la latence venues de cette même réponse.
+    expect(botStatusSummary(botStatusOf(null))).toContain("n'a pas répondu");
+    expect(botStatusSummary(botStatusOf({} as unknown as BotStatus))).toContain(
+      "ne sait pas lire",
+    );
   });
 });
