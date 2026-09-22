@@ -56,9 +56,43 @@ function requireEnv(name: string): string {
  * **La règle pour la suite est donc inchangée** : un changement de schéma
  * s'écrit ici en **deux** endroits — dans le `CREATE TABLE`, pour les bases
  * neuves, *et* en `ALTER TABLE` tolérant dans la section « Migrations », pour
- * celles qui tournent. C'est exactement ce que fait le retrait de
- * `bg_users.email` ci-dessous, seul `ALTER` que ce fichier porte encore.
+ * celles qui tournent. La section « Migrations » ci-dessous en porte donc
+ * exactement deux : la liste `RECENT_COLUMNS` des colonnes trop récentes pour
+ * qu'on sache la production passée dessus — à retirer une par une, une fois un
+ * déploiement constaté — et le retrait de `bg_users.email`, qui n'a pas de
+ * pendant dans un `CREATE TABLE` puisqu'il *retire*.
  */
+/**
+ * Ce qu'on fait d'une migration qui a échoué : la **dire**, jamais l'avaler, et
+ * ne jamais faire tomber le démarrage avec elle.
+ *
+ * Les trois issues possibles ne se valent pas, et le choix s'est fait contre les
+ * deux autres :
+ *
+ * - **Avaler** (`catch {}`) laisse le schéma en arrière du code sans qu'aucune
+ *   trace n'existe. Pour le retrait de l'adresse e-mail, c'est pire qu'un
+ *   schéma en retard : les adresses restent, et plus rien ne les efface.
+ * - **Relancer** fait 500 sur **toute** requête, `createOnceGate` n'ayant pas de
+ *   mémoire de l'échec : la passe entière se rejoue à chaque appel, sans recul,
+ *   pendant que les autres processus expirent sur le verrou nommé. Un
+ *   dépassement de délai de verrou sur `bg_users` — la table la plus chaude du
+ *   site — suffit à y entrer, et c'est un incident transitoire.
+ * - **Journaliser et poursuivre**, ce que fait cette fonction. Le site reste
+ *   debout, la migration se rejoue au prochain démarrage, et la panne est
+ *   lisible là où on la cherche (`pm2 logs`, cf. `docs/DEPLOYMENT.md`).
+ *
+ * Le cas nominal — la colonne est déjà là, ou déjà partie — ne journalise rien :
+ * il se produit à chaque démarrage, et une ligne par entrée noierait la seule
+ * qui compte.
+ */
+function reportSchemaFailure(error: unknown, statement: string): void {
+  if (isSchemaNoOpError(error)) return;
+  console.error(
+    `[migrations] « ${statement} » a échoué — le schéma reste en arrière du code.`,
+    error,
+  );
+}
+
 async function runMigrations(db: Pool): Promise<void> {
   // ───────────────────────────────────────────────────────────────────────────
   // Comptes
@@ -543,29 +577,42 @@ async function runMigrations(db: Pool): Promise<void> {
   // plateau régénéré efface ses matchs, donc ses réservations, et les nouvelles
   // repartent de zéro.
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_match_reminders (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      match_id BIGINT NOT NULL,
-      offset_key VARCHAR(8) NOT NULL,
-      sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE KEY uniq_bg_match_reminders (match_id, offset_key),
-      CONSTRAINT fk_bg_match_reminders_match FOREIGN KEY (match_id)
-        REFERENCES bg_matches(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  // Ces deux-là, et elles seules, sont créées sous un `catch` muet : c'est le
+  // contrat qu'`isMissingTableError` décrit et sur lequel les chemins de
+  // notification s'appuient — une base où leur création a échoué reste debout,
+  // et un rappel ou une alerte perdus valent mieux qu'un report de score en
+  // erreur. Le replier a failli leur coûter cette propriété.
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS bg_match_reminders (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        match_id BIGINT NOT NULL,
+        offset_key VARCHAR(8) NOT NULL,
+        sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_bg_match_reminders (match_id, offset_key),
+        CONSTRAINT fk_bg_match_reminders_match FOREIGN KEY (match_id)
+          REFERENCES bg_matches(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+  } catch {
+    // Table déjà présente, ou création refusée : les rappels se taisent.
+  }
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_referee_alerts (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      match_id BIGINT NOT NULL,
-      alert_key VARCHAR(32) NOT NULL,
-      sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE KEY uniq_bg_referee_alerts (match_id, alert_key),
-      CONSTRAINT fk_bg_referee_alerts_match FOREIGN KEY (match_id)
-        REFERENCES bg_matches(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS bg_referee_alerts (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        match_id BIGINT NOT NULL,
+        alert_key VARCHAR(32) NOT NULL,
+        sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_bg_referee_alerts (match_id, alert_key),
+        CONSTRAINT fk_bg_referee_alerts_match FOREIGN KEY (match_id)
+          REFERENCES bg_matches(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+  } catch {
+    // Table déjà présente, ou création refusée : les alertes se taisent.
+  }
 
   // ───────────────────────────────────────────────────────────────────────────
   // Vitrine et association
@@ -747,10 +794,7 @@ async function runMigrations(db: Pool): Promise<void> {
     try {
       await db.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
     } catch (error) {
-      // Seul « la colonne est déjà là » s'avale — c'est le cas nominal. Un droit
-      // `ALTER` manquant ou un verrou de métadonnées laisserait, lui, le schéma
-      // en arrière du code sans que rien ne le dise.
-      if (!isSchemaNoOpError(error)) throw error;
+      reportSchemaFailure(error, `ALTER TABLE ${table} ADD COLUMN ${column}`);
     }
   }
 
@@ -761,17 +805,16 @@ async function runMigrations(db: Pool): Promise<void> {
   // personne ne lit n'est pas de la prudence, c'est une fuite en attente. Elle
   // part donc de la table, ce qui efface les valeurs du même geste.
   //
-  // **L'échec ne s'avale pas**, et pas par symétrie avec ce qui précède : le
-  // `DROP` est ici le geste d'effacement lui-même. Rien ne lit plus la colonne,
-  // donc la base démarre parfaitement sans lui — et `anonymizeOwnAccount` ne
-  // met plus l'adresse à `NULL`, cette ligne n'ayant plus d'objet. Un `ALTER`
-  // refusé garderait donc les adresses **indéfiniment et en silence**, y compris
-  // sur les comptes qui ont demandé leur suppression. Le démarrage échoue à la
-  // place, ce qui se voit.
+  // **L'échec ne passe pas en silence**, et c'est ici qu'il compte le plus : le
+  // `DROP` est le geste d'effacement lui-même. Rien ne lit plus la colonne, donc
+  // la base démarre parfaitement sans lui — et `anonymizeOwnAccount` ne met plus
+  // l'adresse à `NULL`, cette ligne n'ayant plus d'objet. Un `ALTER` refusé et
+  // avalé garderait donc les adresses **indéfiniment**, y compris sur les
+  // comptes qui ont demandé leur suppression, sans que rien ne le dise.
   try {
     await db.execute(`ALTER TABLE bg_users DROP COLUMN email`);
   } catch (error) {
-    if (!isSchemaNoOpError(error)) throw error;
+    reportSchemaFailure(error, "ALTER TABLE bg_users DROP COLUMN email");
   }
 
   // ───────────────────────────────────────────────────────────────────────────

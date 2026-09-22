@@ -172,17 +172,31 @@ describe("Schéma — la règle des deux endroits", () => {
     );
   });
 
-  it("n'avale que « la colonne est déjà là »", () => {
+  it("ne laisse aucun échec de migration passer en silence", () => {
     // Un droit `ALTER` manquant ou un verrou de métadonnées laisserait le schéma
-    // en arrière du code sans que rien ne le dise : la base démarrerait, et la
-    // panne se lirait plus tard sur une requête.
+    // en arrière du code : la base démarre, et la panne se lit plus tard sur une
+    // requête qui nomme la colonne. Les deux migrations passent donc par le même
+    // rapporteur.
     //
     // Le contrôle porte sur la **section des migrations** seule : les
-    // `CREATE TABLE` et les deux rattrapages permanents gardent leur `catch`
-    // muet, et c'est voulu — ils sont idempotents et rien n'en dépend.
-    const guards = [...migrations.matchAll(/if \(!isSchemaNoOpError\(error\)\) throw error;/g)];
-    expect(guards).toHaveLength(2);
+    // `CREATE TABLE` des tables de notification et les deux rattrapages
+    // permanents gardent leur `catch` muet, et c'est voulu — un rappel perdu
+    // vaut mieux qu'un report de score en erreur.
+    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(2);
     expect(migrations).not.toMatch(/catch\s*\{\s*\/\/[^\n]*\n\s*\}/);
+  });
+
+  it("ne fait pourtant pas tomber le démarrage avec elle", () => {
+    // Relancer ferait 500 sur **toute** requête : `createOnceGate` n'a pas de
+    // mémoire de l'échec, la passe entière se rejoue à chaque appel sans recul,
+    // et les autres processus expirent sur le verrou nommé. Un dépassement de
+    // délai de verrou sur `bg_users` suffit à y entrer, et il est transitoire.
+    const reporter = sql.slice(
+      sql.indexOf("function reportSchemaFailure"),
+      sql.indexOf("async function runMigrations"),
+    );
+    expect(reporter).toContain("console.error");
+    expect(reporter).not.toContain("throw");
   });
 
   it("ne relâche pas la garde sur le DROP, qui **est** l'effacement", () => {
@@ -191,7 +205,13 @@ describe("Schéma — la règle des deux endroits", () => {
     // avalé garderait les adresses indéfiniment, y compris sur les comptes qui
     // ont demandé leur suppression.
     const drop = sql.slice(sql.indexOf("DROP COLUMN email"));
-    expect(drop.slice(0, 200)).toContain("isSchemaNoOpError");
+    expect(drop.slice(0, 200)).toContain("reportSchemaFailure");
+  });
+
+  it("ne journalise rien sur le cas nominal, qui se produit à chaque démarrage", () => {
+    // Une ligne par entrée à chaque redémarrage noierait la seule qui compte.
+    const reporter = sql.slice(sql.indexOf("function reportSchemaFailure"));
+    expect(reporter.slice(0, 400)).toContain("if (isSchemaNoOpError(error)) return;");
   });
 });
 
@@ -207,8 +227,12 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
       .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
       .join("\n");
     // Deux seulement : la boucle paramétrée des colonnes récentes, et le retrait
-    // de l'adresse e-mail.
-    expect([...code.matchAll(/ALTER TABLE/g)]).toHaveLength(2);
+    // de l'adresse e-mail. Les libellés passés au rapporteur d'échec citent la
+    // même instruction sans l'exécuter — ils ne comptent pas.
+    const statements = code
+      .split("\n")
+      .filter((line) => line.includes("ALTER TABLE") && !line.includes("reportSchemaFailure"));
+    expect(statements).toHaveLength(2);
     expect(code).toContain("ALTER TABLE bg_users DROP COLUMN email");
   });
 

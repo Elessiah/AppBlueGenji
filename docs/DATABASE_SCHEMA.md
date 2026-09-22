@@ -82,7 +82,26 @@ partie), le cas nominal d'une migration rejouée à chaque démarrage. C'est ce 
 reconnaît `isSchemaNoOpError` (`lib/server/mysql-errors.ts`). Tout autre échec —
 droit `ALTER` manquant, verrou de métadonnées sur une table chaude — laisse le
 schéma **en arrière du code** : la base démarre, et la panne se lit plus tard sur
-une requête qui nomme la colonne. Il est donc relancé.
+une requête qui nomme la colonne.
+
+Il est donc **journalisé**, et le démarrage se poursuit. Les trois issues
+possibles ne se valent pas :
+
+| | Effet |
+|---|---|
+| **Avaler** (`catch {}`) | Aucune trace. Pour le retrait de l'adresse, les adresses restent et plus rien ne les efface. |
+| **Relancer** | 500 sur **toute** requête : `createOnceGate` n'a pas de mémoire de l'échec, la passe entière se rejoue à chaque appel sans recul, et les autres processus expirent sur le verrou nommé. Un dépassement de délai de verrou sur `bg_users` — la table la plus chaude du site — suffit à y entrer, et il est transitoire. |
+| **Journaliser et poursuivre** | Le site reste debout, la migration se rejoue au prochain démarrage, et la panne est lisible là où on la cherche (`pm2 logs`, cf. `docs/DEPLOYMENT.md`). |
+
+C'est `reportSchemaFailure` qui l'applique, aux deux migrations. Le cas nominal
+ne journalise rien : il se produit à chaque démarrage, et une ligne par entrée
+noierait la seule qui compte.
+
+**Les `CREATE TABLE` ne suivent pas cette règle**, et ce n'est pas un oubli :
+`bg_match_reminders` et `bg_referee_alerts` gardent un `catch` muet, parce que
+c'est le contrat qu'`isMissingTableError` décrit — une base où leur création a
+échoué reste debout, et un rappel ou une alerte perdus valent mieux qu'un report
+de score en erreur.
 
 La distinction n'est pas de la coquetterie sur le `DROP COLUMN email`, elle y est
 même plus forte : ce `DROP` **est** l'effacement des adresses. Rien ne lit plus la
