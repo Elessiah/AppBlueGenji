@@ -99,10 +99,28 @@ describe("discordTagLockNotice", () => {
     }
   });
 
-  it("nomme le retrait, seul geste d'annulation, dès qu'un tag est enregistré", () => {
+  it("nomme le retrait dès qu'un tag est enregistré", () => {
     for (const verified of [true, false]) {
-      expect(discordTagLockNotice({ tag: "keryan", verified, linked: true })).toContain("retire-le");
+      expect(discordTagLockNotice({ tag: "keryan", verified, linked: true })).toMatch(/retire/i);
     }
+  });
+
+  it("ne promet de « cesser d'être joignable » que sur un tag réellement exposé", () => {
+    // Un tag non certifié n'est vu de personne : proposer d'arrêter une
+    // exposition qui n'existe pas pousse à effacer une donnée sans raison.
+    const uncertified = discordTagLockNotice({ tag: "keryan", verified: false, linked: true });
+    const certified = discordTagLockNotice({ tag: "keryan", verified: true, linked: true });
+    expect(uncertified).not.toContain("cesser d'être joignable");
+    expect(certified).toContain("cesser d'être joignable");
+  });
+
+  it("nomme le bouton d'enregistrement sans le situer", () => {
+    // Le bouton est rendu **au-dessus** du paragraphe ; et un module pur n'a de
+    // toute façon pas à connaître la mise en page de ses lecteurs.
+    const notice = discordTagLockNotice({ tag: null, verified: false, linked: true });
+    expect(notice).toContain("Enregistrer mon tag");
+    expect(notice).not.toContain("ci-dessous");
+    expect(notice).not.toContain("ci-dessus");
   });
 });
 
@@ -122,6 +140,7 @@ describe("discordTagLockNotice — rattachement inconnu", () => {
 
   it("nomme le verrou, sa raison et sa sortie", () => {
     expect(notice).toContain("lecture seule");
+    expect(notice.toLowerCase()).toContain("réessaie");
     expect(notice.toLowerCase()).toContain("recharge la page");
   });
 });

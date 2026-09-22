@@ -80,14 +80,20 @@ export default function ProfilePage() {
     }
   };
 
+  const [discordStateBusy, setDiscordStateBusy] = useState(false);
+
   const loadDiscordState = async () => {
+    setDiscordStateBusy(true);
     try {
       const res = await fetch("/api/profile/discord", { cache: "no-store" });
       if (!res.ok) return;
       setDiscordState((await res.json()) as { tag: string | null; verified: boolean; linked: boolean });
     } catch {
       // Silencieux, mais **pas anodin** : l'état reste `linked: null`, donc le
-      // champ reste verrouillé. Le reste du formulaire s'enregistre normalement.
+      // champ reste verrouillé. Le reste du formulaire s'enregistre normalement,
+      // et le bouton « Réessayer » ci-dessous rouvre le seul chemin fermé.
+    } finally {
+      setDiscordStateBusy(false);
     }
   };
 
@@ -449,7 +455,26 @@ export default function ProfilePage() {
                 // la seule sortie restante était de se reconnecter par Discord.
                 // Sur un état **inconnu**, en revanche, rien ne s'affiche — on
                 // ne propose pas un geste dont on ignore s'il a un objet.
-                discordState.linked === true ? (
+                discordState.linked !== true ? (
+                  // Un état illisible verrouille le champ **et** ferait
+                  // disparaître tous les gestes, « Retirer mon tag » compris —
+                  // la seule annulation d'exposition que le site offre. Une
+                  // panne de lecture ne doit pas coûter cela : le verrou reste
+                  // (on n'écrase pas un pseudo que Discord aurait nommé), mais
+                  // il porte sa propre sortie, sans rechargement.
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => void loadDiscordState()}
+                      disabled={discordStateBusy}
+                      aria-label="Réessayer la lecture de l'état Discord"
+                      style={{ padding: "7px 14px", fontSize: 12 }}
+                    >
+                      {discordStateBusy ? "Lecture…" : "Réessayer"}
+                    </button>
+                  </div>
+                ) : (
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
                     {discordState.verified ? null : (
                       <button
@@ -483,7 +508,7 @@ export default function ProfilePage() {
                       </button>
                     ) : null}
                   </div>
-                ) : null
+                )
               ) : (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
                   <button

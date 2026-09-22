@@ -99,27 +99,34 @@ export function discordTagLockNotice(state: {
   // verrou, sa raison et sa sortie. Prétendre ici que le compte est rattaché
   // serait une affirmation que rien ne soutient.
   if (state.linked !== true) {
-    return "Impossible de lire l'état de ton compte Discord pour l'instant : le champ reste en lecture seule, pour ne pas écraser un pseudo que Discord aurait nommé. Recharge la page pour le rouvrir.";
+    return "Impossible de lire l'état de ton compte Discord pour l'instant : le champ reste en lecture seule, pour ne pas écraser un pseudo que Discord aurait nommé. Réessaie, ou recharge la page.";
   }
   // Le geste nommé doit **exister à l'écran**. « Détache Discord » n'en est pas
   // un pour un compte né par Discord : le bouton y est remplacé par le refus
-  // `LAST_CONNECTION`, faute d'une autre porte. Restent les deux qui valent
-  // toujours — se renommer chez Discord puis se reconnecter, et retirer son tag.
-  const reopen =
-    "Pour en changer, renomme-toi sur Discord puis reconnecte-toi. Pour cesser d'être joignable, retire-le.";
+  // `LAST_CONNECTION`, faute d'une autre porte. Reste celui qui vaut toujours :
+  // se renommer chez Discord, puis se reconnecter.
+  const rename = "Pour en changer, renomme-toi sur Discord puis reconnecte-toi.";
   if (!state.tag) {
     // Deux causes mènent ici — un tag retiré, ou un pseudo Discord entièrement
     // numérique que `normalizeDiscordHandle` écarte — et l'écran ne peut pas les
     // distinguer. Il dit donc l'état et le geste, sans inventer la cause : le
     // joueur qui vient de retirer son tag n'a pas à lire une explication fausse.
-    return `Ton compte Discord est rattaché, mais aucun pseudo n'est enregistré : l'organisation ne peut pas te joindre pendant un tournoi. Enregistre-le ci-dessous, ou reconnecte-toi par Discord.`;
+    //
+    // Le bouton est **nommé**, jamais situé : « ci-dessous » était faux (il est
+    // rendu au-dessus du paragraphe) et n'aurait de toute façon rien à faire
+    // dans un module pur, qui ne connaît pas la mise en page de ses lecteurs.
+    return `Ton compte Discord est rattaché, mais aucun pseudo n'est enregistré : l'organisation ne peut pas te joindre pendant un tournoi. Utilise « Enregistrer mon tag », ou reconnecte-toi par Discord.`;
   }
   // On n'affirme pas l'**origine** du tag : `linkOAuthIdentity` n'écrit
   // `discord_pseudo` que si Discord a donné un pseudo affichable, si bien qu'un
   // compte rattaché peut porter un tag saisi à la main. Ce qui est sûr, et seul
   // utile au joueur, c'est qui le lit.
   if (!state.verified) {
-    return `Ton compte Discord est rattaché, mais ce pseudo n'est pas certifié — personne ne le voit. ${reopen}`;
+    // **Pas de « pour cesser d'être joignable »** ici : la phrase vient de dire
+    // que personne ne voit ce tag. Proposer d'arrêter une exposition qui
+    // n'existe pas pousserait à effacer une donnée sans raison. Le retrait reste
+    // offert par le bouton d'à côté, il n'a simplement rien à promettre.
+    return `Ton compte Discord est rattaché, mais ce pseudo n'est pas certifié — personne ne le voit. ${rename} Tu peux aussi le retirer.`;
   }
-  return `Ton compte Discord est rattaché et ce pseudo est certifié : les administrateurs le voient, et les arbitres pendant tes tournois. ${reopen}`;
+  return `Ton compte Discord est rattaché et ce pseudo est certifié : les administrateurs le voient, et les arbitres pendant tes tournois. ${rename} Pour cesser d'être joignable, retire-le.`;
 }

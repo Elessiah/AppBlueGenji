@@ -254,7 +254,13 @@ sortie inexistante se lit comme une panne.
 retomber tout le reste sur l'inconnu — écrit dans l'autre sens (`=== null`
 d'abord), un `undefined` glissait entre les branches et *ouvrait* le champ, ce
 que l'écran rend atteignable en alimentant cet état par un `as` sur une réponse
-JSON que rien ne valide. Le défaut inverse n'était pas tenable — le champ ouvert
+JSON que rien ne valide.
+
+Le verrou porte alors **sa propre sortie** : un bouton « Réessayer » relit
+l'état sans rechargement. Sans lui, une panne de lecture coûtait bien plus que
+le champ — tous les gestes étant sous `linked === true`, « Retirer mon tag »
+disparaissait avec eux, c'est-à-dire la seule annulation d'exposition que le
+site offre, et il n'existait aucun recours hors d'un rechargement manuel. Le défaut inverse n'était pas tenable — le champ ouvert
 laissait saisir un tag que la route refuse en 409, et ce refus emporte **toute**
 la sauvegarde, le `PATCH` étant indivisible. L'aide du champ dit alors le verrou
 et sa sortie (recharger), sans affirmer un rattachement que rien n'établit.
