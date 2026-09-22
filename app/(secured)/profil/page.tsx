@@ -430,8 +430,15 @@ export default function ProfilePage() {
                 feuilles de match. Il n&apos;est pas masquable.
               </p>
             </div>
-            <div className="field">
-              <label id="profile-avatar-label">Avatar</label>
+            {/* L'avatar n'a pas de champ à étiqueter — le `<input type="file">`
+                est caché et les deux contrôles sont des boutons : « Avatar »
+                nomme donc un **groupe** (un `<label>` sans `for` n'étiquette
+                rien, et le lecteur d'écran n'annonçait pas à quoi se
+                rapportaient les deux boutons). */}
+            <div className="field" role="group" aria-labelledby="profile-avatar-label">
+              <span id="profile-avatar-label" className={s.groupLabel}>
+                Avatar
+              </span>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -455,6 +462,11 @@ export default function ProfilePage() {
                     className="btn ghost"
                     disabled={avatarBusy}
                     onClick={onAvatarDelete}
+                    /* Le nom accessible commence par le texte affiché (WCAG
+                       2.5.3) et lève l'ambiguïté avec « Supprimer mon compte »,
+                       plus bas : parcourus hors contexte, deux « Supprimer » ne
+                       se distinguent pas. */
+                    aria-label="Supprimer mon avatar"
                     style={{ padding: "9px 18px", fontSize: 13 }}
                   >
                     Supprimer
@@ -663,12 +675,17 @@ export default function ProfilePage() {
             </p>
           </div>
 
-          <div className={s.formFoot}>
-            <button type="submit" className={`btn ${s.save}`}>
-              Sauvegarder
-            </button>
-          </div>
         </ProfileSection>
+
+        {/* Le pied appartient au **formulaire**, pas à sa dernière section : il
+            couvre quatre sections, et son unique bouton, posé au fond de la
+            quatrième, était hors de vue pour qui arrive par une ancre. Collé au
+            bas de la fenêtre, il reste atteignable depuis n'importe laquelle. */}
+        <div className={s.formFoot}>
+          <button type="submit" className={`btn ${s.save}`}>
+            Sauvegarder
+          </button>
+        </div>
       </form>
 
       <ProfileSection section={sectionById.connexions}>

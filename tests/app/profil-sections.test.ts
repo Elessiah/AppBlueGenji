@@ -14,6 +14,8 @@ const connectedApps = readFileSync(
   join(ROOT, "app/(secured)/profil/ConnectedAppsSection.tsx"),
   "utf8",
 );
+const css = readFileSync(join(ROOT, "app/(secured)/profil/profil.module.css"), "utf8");
+const arenaNav = readFileSync(join(ROOT, "components/arena-nav.module.css"), "utf8");
 
 /**
  * `/profil` empilait onze blocs dans un seul formulaire, sans un titre pour dire
@@ -192,5 +194,81 @@ describe("Aucune section ne se dessine deux fois", () => {
 
   it("garde son texte d'aide, que le registre ne porte pas", () => {
     expect(connectedApps).toContain("la dernière ne peut pas être retirée");
+  });
+});
+
+/**
+ * `/profil` vit sous `ArenaNav`, barre `position: sticky; top: 0`. Une ancre qui
+ * tombe à la hauteur exacte de la section la range **derrière** la barre : le
+ * titre visé devient le seul élément qu'on ne voit pas.
+ */
+describe("L'ancre tombe sous la barre de navigation", () => {
+  it("réserve au moins la hauteur de la barre", () => {
+    const margin = css.match(/scroll-margin-top:\s*(\d+)px/);
+    expect(margin).not.toBeNull();
+    // 52 px de pastille + 2 × 14 px de rembourrage : la barre est haute de 80.
+    expect(Number(margin![1])).toBeGreaterThanOrEqual(80);
+  });
+
+  it("mesure bien la barre que la page a au-dessus d'elle", () => {
+    // Le jour où la barre grandit, ce test dit où relire la marge.
+    expect(arenaNav).toContain("position: sticky");
+    expect(arenaNav).toMatch(/width:\s*52px/);
+    expect(arenaNav).toMatch(/padding:\s*14px 0/);
+  });
+});
+
+/**
+ * Le formulaire couvre quatre sections pour un seul bouton : posé au fond de la
+ * dernière, il était hors de vue de qui arrive par une ancre — et la navigation
+ * de cette page invite précisément à sauter au milieu du formulaire.
+ */
+describe("La sauvegarde reste atteignable", () => {
+  it("sort le pied de la dernière section pour le rendre au formulaire", () => {
+    const foot = page.indexOf("s.formFoot");
+    const lastSectionClose = page.lastIndexOf("</ProfileSection>", foot);
+    const formClose = page.indexOf("</form>", foot);
+    expect(foot).toBeGreaterThan(lastSectionClose);
+    expect(formClose).toBeGreaterThan(foot);
+  });
+
+  it("n'a toujours qu'un seul bouton de soumission", () => {
+    expect(page.match(/type="submit"/g)).toHaveLength(1);
+  });
+
+  it("colle le pied au bas de la fenêtre", () => {
+    const rule = css.slice(css.indexOf(".formFoot {"));
+    expect(rule.slice(0, rule.indexOf("}"))).toContain("position: sticky");
+  });
+});
+
+/**
+ * Le `.btn` global n'a aucun état désactivé : sans règle ici, un bouton qui
+ * refuse le clic garde le survol, le soulèvement et `cursor: pointer`.
+ */
+describe("Un contrôle désactivé se voit", () => {
+  it("habille le `.btn` global, en `:global` sans quoi la règle est hachée", () => {
+    expect(css).toContain(":global(.btn:disabled)");
+    expect(css).toContain("cursor: not-allowed");
+  });
+
+  it("éteint aussi son survol", () => {
+    expect(css).toContain(":global(.btn:disabled:hover)");
+  });
+});
+
+/**
+ * « Avatar » n'étiquette aucun champ : le `<input type="file">` est caché et les
+ * deux contrôles sont des boutons. Un `<label>` sans `for` n'étiquette rien.
+ */
+describe("Le groupe « Avatar » porte un nom", () => {
+  it("nomme un groupe plutôt qu'un champ", () => {
+    expect(page).toContain('role="group" aria-labelledby="profile-avatar-label"');
+    expect(page).not.toContain('<label id="profile-avatar-label">');
+  });
+
+  it("lève l'ambiguïté du second « Supprimer » sans perdre son texte visible", () => {
+    // WCAG 2.5.3 : le nom accessible commence par le texte affiché.
+    expect(page).toContain('aria-label="Supprimer mon avatar"');
   });
 });

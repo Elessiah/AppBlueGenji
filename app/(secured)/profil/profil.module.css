@@ -90,8 +90,13 @@
 
 .section {
   /* `scroll-margin-top` et non un décalage au clic : l'ancre doit tomber au bon
-     endroit aussi quand on arrive par une URL collée. */
-  scroll-margin-top: 24px;
+     endroit aussi quand on arrive par une URL collée.
+     La marge vaut la hauteur de `ArenaNav` (52 px de pastille + 2 × 14 px de
+     rembourrage, soit 80) **plus** une respiration : la barre est
+     `position: sticky; top: 0`, si bien qu'une marge plus courte faisait
+     atterrir le titre de la section derrière elle — à 24 px, le `<h2>` tombait
+     à y ≈ 52, entièrement masqué. */
+  scroll-margin-top: 96px;
 }
 
 .sectionHead {
@@ -129,6 +134,15 @@
   color: var(--text-1);
   margin: 7px 0 0;
   max-width: 68ch;
+}
+
+/* « Avatar » n'étiquette aucun champ — le `<input type="file">` est caché et
+   les deux contrôles sont des boutons. C'est le nom d'un **groupe**, d'où un
+   `<span>` (un `<label>` sans `for` n'étiquette rien) qui reprend l'apparence
+   de `.field label`. */
+.groupLabel {
+  font-size: 13px;
+  color: var(--text-1);
 }
 
 .hintMuted {
@@ -184,11 +198,55 @@
 
 /* ── Pied de formulaire ───────────────────────────────────────────────────── */
 
+/*
+ * **Une seule sauvegarde, atteignable depuis n'importe quelle section.**
+ *
+ * Le formulaire couvre quatre sections (identité, comptes de jeu, Discord,
+ * confidentialité) et n'a qu'un bouton. Posé au fond de la dernière, il était
+ * invisible pour qui arrive par une ancre — la navigation de cette page invite
+ * précisément à sauter à « Comptes de jeu », où l'on modifie son BattleTag sans
+ * rien voir qui l'enregistre. Le pied quitte donc la section pour le formulaire
+ * lui-même, et s'y colle au bas de la fenêtre : il reste à l'écran tant qu'une
+ * partie du formulaire l'est, et se pose naturellement à sa place une fois le
+ * bas atteint.
+ */
 .formFoot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  padding-top: 4px;
+  padding: 12px 0;
+  /* Le dégradé s'écrit en `rgba` de la même couleur et non vers `transparent` :
+     `transparent` vaut `rgba(0, 0, 0, 0)`, qui grise le dégradé sur plusieurs
+     moteurs. */
+  background: linear-gradient(to top, var(--bg-0) 58%, rgba(7, 8, 10, 0));
+}
+
+/* `:global` obligatoire : `.btn` vient du style global, et CSS Modules
+   hacherait un `.btn` local — la règle ne s'appliquerait alors à rien. Le
+   `.btn` global n'a **aucun** état désactivé : sans ces deux règles, « Changer
+   l'avatar » pendant un envoi, « Retirer mon tag » pendant un retrait et
+   « Supprimer mon compte » pendant l'effacement gardaient le survol, le
+   soulèvement, le reflet et `cursor: pointer` tout en refusant le clic. */
+.page :global(.btn:disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.page :global(.btn:disabled:hover) {
+  background: rgba(89, 212, 255, 0.14);
+  transform: none;
+  box-shadow: none;
+}
+
+/* Le reflet balayant du `.btn` global se déclenche au survol : il donne, seul,
+   l'impression d'un bouton vivant. */
+.page :global(.btn:disabled:hover)::before {
+  left: -100%;
 }
 
 .save {

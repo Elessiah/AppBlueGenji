@@ -78,6 +78,30 @@ reconnu), et le saut ne se joue **qu'une fois par ancre** : les invitations
 arrivant par un second appel, rejouer le saut ramènerait en arrière un lecteur
 qui a déjà fait défiler la page.
 
+`scroll-margin-top` vaut la hauteur d'`ArenaNav` (52 px de pastille + 2 × 14 px
+de rembourrage) **plus** une respiration : la barre est `position: sticky`, si
+bien qu'une marge plus courte rangeait le titre visé derrière elle — le seul
+élément de la page qu'on ne voyait pas était celui qu'on venait chercher.
+
+## La sauvegarde
+
+Le formulaire couvre quatre sections — identité, comptes de jeu, Discord,
+confidentialité — pour **un seul** bouton. Posé au fond de la dernière, il était
+hors de vue de qui arrive par une ancre, et la navigation de cette page invite
+précisément à sauter au milieu : on modifie son BattleTag dans « Comptes de jeu »
+sans rien voir qui l'enregistre. Le pied appartient donc au `<form>` et non à sa
+dernière section, et se colle au bas de la fenêtre.
+
+Un bouton par section aurait été l'autre réponse, mais il en faudrait alors
+plusieurs pour un seul `PATCH` — quatre contrôles qui font la même chose, et un
+doute sur ce qui est enregistré quand on en clique un.
+
+Le `.btn` global n'a **aucun** état désactivé : « Changer l'avatar » pendant un
+envoi, « Retirer mon tag » pendant un retrait et « Supprimer mon compte » pendant
+l'effacement gardaient le survol, le soulèvement, le reflet et `cursor: pointer`
+tout en refusant le clic. La feuille de la page le pose, en `:global(.btn)` —
+CSS Modules hacherait un `.btn` local et la règle ne s'appliquerait à rien.
+
 ## La zone de danger
 
 « Mon compte » est la dernière section et **ne ressemble à aucune autre** :
