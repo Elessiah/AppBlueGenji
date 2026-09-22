@@ -519,17 +519,24 @@ export function PhaseCard({
                     alignItems: "flex-start",
                     gap: 12,
                     padding: "14px 16px",
+                    // Même sourdine que `FormatSettings` : verrouillée, une
+                    // carte cochée ne doit pas porter le bleu plein d'une carte
+                    // qui répond au clic.
                     border: `1.5px solid ${
-                      phase.hasThirdPlaceMatch
-                        ? "var(--blue-500)"
-                        : "var(--line-strong-cy)"
+                      !phase.hasThirdPlaceMatch
+                        ? "var(--line-strong-cy)"
+                        : disabled
+                          ? "rgba(90, 200, 255, 0.25)"
+                          : "var(--blue-500)"
                     }`,
                     borderRadius: 10,
                     cursor: disabled ? "not-allowed" : "pointer",
                     transition: "border-color 0.2s ease, background-color 0.2s ease",
-                    backgroundColor: phase.hasThirdPlaceMatch
-                      ? "rgba(90, 200, 255, 0.07)"
-                      : "transparent",
+                    backgroundColor: !phase.hasThirdPlaceMatch
+                      ? "transparent"
+                      : disabled
+                        ? "rgba(90, 200, 255, 0.03)"
+                        : "rgba(90, 200, 255, 0.07)",
                   }}
                 >
                   <input

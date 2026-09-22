@@ -386,8 +386,16 @@ export function FormatSettings({
               alignItems: "flex-start",
               gap: 12,
               padding: "14px 16px",
+              // Cochée **et** verrouillée, la carte gardait le bleu plein d'une
+              // carte cliquable : chrome identique, seul le texte changeait. Le
+              // coché reste dit — en sourdine, comme la case désactivée juste à
+              // côté — au lieu d'être annoncé comme modifiable.
               border: `1.5px solid ${
-                values.hasThirdPlaceMatch ? "var(--blue-500)" : "var(--line-strong-cy)"
+                !values.hasThirdPlaceMatch
+                  ? "var(--line-strong-cy)"
+                  : locked("hasThirdPlaceMatch")
+                    ? "rgba(90, 200, 255, 0.25)"
+                    : "var(--blue-500)"
               }`,
               borderRadius: 10,
               cursor: locked("hasThirdPlaceMatch") ? "not-allowed" : "pointer",
@@ -398,9 +406,11 @@ export function FormatSettings({
               // blanc, que 0,6 ramenait à 0,12, sous le seuil du visible. Une
               // couleur, elle, ne se compose pas.
               transition: "border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease",
-              backgroundColor: values.hasThirdPlaceMatch
-                ? "rgba(90, 200, 255, 0.07)"
-                : "transparent",
+              backgroundColor: !values.hasThirdPlaceMatch
+                ? "transparent"
+                : locked("hasThirdPlaceMatch")
+                  ? "rgba(90, 200, 255, 0.03)"
+                  : "rgba(90, 200, 255, 0.07)",
             }}
           >
             <input

@@ -191,6 +191,12 @@ const BOX_PROPERTIES = [
   "flex",
   "min-width",
   "max-width",
+  // `height` seul ne les attrape pas : le motif s'ancre sur un début de
+  // déclaration (`(^|[;{\s])`) et le tiret de `min-height` n'en est pas un.
+  // Un `min-height: 44px` posé pour la cible tactile étire la case hors de sa
+  // boîte de 16 px aussi sûrement qu'un `height`.
+  "min-height",
+  "max-height",
   // `appearance: none` retire l'anneau natif : `outline` fait désormais partie
   // de ce qui peut casser le contrôle sans qu'on le voie.
   "outline",
@@ -243,6 +249,33 @@ function splitSelectorList(selector: string): string[] {
   return parts.filter((part) => part.length > 0);
 }
 
+/**
+ * Découpe un sélecteur en **compounds** sur ses combinateurs de premier niveau.
+ *
+ * L'exclusion appartient au compound qui la porte, pas au sélecteur entier :
+ * `.field input:not([type="checkbox"]):not([type="radio"]) + input` en contient
+ * **deux**, et seul le premier est gardé — lue sur la chaîne complète, la
+ * négation du premier innocentait le second, qui réimposerait pourtant sa
+ * largeur à une case, à spécificité égale.
+ */
+function splitCompounds(part: string): string[] {
+  const compounds: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const char of part) {
+    if (char === "(") depth += 1;
+    else if (char === ")") depth -= 1;
+    if (depth === 0 && /[\s>+~]/.test(char)) {
+      if (current.trim().length > 0) compounds.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  if (current.trim().length > 0) compounds.push(current.trim());
+  return compounds;
+}
+
 function bareInputOffenders(path: string, css: string): Offender[] {
   const offenders: Offender[] = [];
   // Les commentaires partent **d'abord** : le découpage naïf ci-dessous les
@@ -254,8 +287,9 @@ function bareInputOffenders(path: string, css: string): Offender[] {
   for (const [, rawSelector, body] of stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     const selector = rawSelector.trim().replace(/\s+/g, " ");
     if (selector.startsWith("@") || selector === "") continue;
-    const compounds = splitSelectorList(selector);
-    const bare = compounds.filter((part) => BARE_INPUT.test(part) && !excludesBoth(part));
+    const bare = splitSelectorList(selector)
+      .flatMap((part) => splitCompounds(part))
+      .filter((compound) => BARE_INPUT.test(compound) && !excludesBoth(compound));
     if (bare.length === 0) continue;
     const declares = BOX_PROPERTIES.some((property) =>
       new RegExp(`(^|[;{\\s])${property}[\\w-]*\\s*:`).test(body),
@@ -320,6 +354,13 @@ describe("Cases à cocher — aucune feuille ne redéfinit l'apparence", () => {
     // et rien d'autre), donc celle que ce balayage devait déjà voir.
     const faded = ".a input:disabled { opacity: 0.6; cursor: not-allowed; }";
     expect(bareInputOffenders("x.css", faded)).toHaveLength(1);
+    // L'exclusion appartient au compound qui la porte : lue sur le sélecteur
+    // entier, celle du premier `input` innocentait le second, pourtant nu.
+    const twoInputs =
+      '.field input:not([type="checkbox"]):not([type="radio"]) + input { width: 100%; }';
+    expect(bareInputOffenders("x.css", twoInputs)).toHaveLength(1);
+    // Et une taille minimale étire la case hors de sa boîte de 16 px.
+    expect(bareInputOffenders("x.css", ".a input { min-height: 44px; }")).toHaveLength(1);
   });
 });
 
@@ -332,8 +373,21 @@ describe("Cases à cocher — aucune feuille ne redéfinit l'apparence", () => {
  * règle ferme. `accent-color` y est en outre mort, `appearance: none` le
  * désactivant.
  */
+/*
+ * Les **longhands** comptent autant que les raccourcis : `backgroundColor` et
+ * `borderColor` refont à eux deux la case entière, et le motif d'avant, qui
+ * exigeait le nom exact suivi du deux-points, les laissait passer — la moitié
+ * la plus forte de la garde était donc la plus permissive. D'où des familles
+ * (`border…`, `background…`, `outline…`) plutôt qu'une liste de noms.
+ *
+ * `margin` fait seul exception à la famille : le raccourci est tenu — il défait
+ * le `margin: 0` global — mais pas `marginTop`, qui aligne la case de 16 px sur
+ * la première ligne de son étiquette sans rien changer à sa boîte. Quatre
+ * écrans s'en servent, et c'est le seul réglage qu'aucune règle globale ne peut
+ * prendre à leur place : il dépend de la taille du texte d'à côté.
+ */
 const INLINE_BANNED =
-  /\b(width|height|minWidth|maxWidth|accentColor|appearance|padding|margin|display|border|borderRadius|background|boxShadow|outline|opacity|flex)\s*:/;
+  /\b(width|minWidth|maxWidth|height|minHeight|maxHeight|accentColor|appearance|padding[A-Za-z]*|margin|display|border[A-Za-z]*|background[A-Za-z]*|box[A-Za-z]*|outline[A-Za-z]*|opacity|flex[A-Za-z]*|transform|zoom)\s*:/;
 
 function inlineOffenders(path: string, source: string): Offender[] {
   const offenders: Offender[] = [];
@@ -391,6 +445,11 @@ describe("Cases à cocher — aucun style en ligne ne reprend la main", () => {
     // Un étalement de props sans `style` ne porte aucune apparence.
     const spread = '<input type="checkbox" {...props} />';
     expect(inlineOffenders("x.tsx", spread)).toEqual([]);
+    // `marginTop` aligne la case sur la première ligne de son étiquette : il ne
+    // touche pas à sa boîte, et aucune règle globale ne peut le décider, la
+    // taille du texte d'à côté n'étant pas la même d'un écran à l'autre.
+    const aligned = '<input type="checkbox" style={{ marginTop: 2 }} />';
+    expect(inlineOffenders("x.tsx", aligned)).toEqual([]);
   });
 
   it("tient en ligne tout ce que la feuille tient — c'est la moitié la plus forte", () => {
@@ -402,13 +461,24 @@ describe("Cases à cocher — aucun style en ligne ne reprend la main", () => {
     // sont deux caractères de mot, il n'y a pas de frontière entre eux.
     for (const style of [
       "flex: 1",
+      "flexBasis: 0",
       'border: "none"',
+      'borderColor: "#fff"',
+      "borderWidth: 3",
       'background: "red"',
+      'backgroundColor: "#fff"',
       "minWidth: 24",
       "maxWidth: 24",
+      "minHeight: 44",
+      "maxHeight: 44",
+      "paddingLeft: 4",
       'display: "block"',
       'boxShadow: "none"',
+      'boxSizing: "content-box"',
       'outline: "none"',
+      'outlineColor: "#fff"',
+      'transform: "scale(1.4)"',
+      "margin: 0",
     ]) {
       expect(inlineOffenders("x.tsx", `<input type="checkbox" style={{ ${style} }} />`)).toHaveLength(
         1,
