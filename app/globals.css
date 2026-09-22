@@ -413,7 +413,7 @@ select {
    même spécificité que l'apparence de case posée plus bas — une case placée dans
    un `.field` en héritait donc le rembourrage, qui, `appearance` retirée, la
    rendait rectangulaire, et l'anneau vert au clic. */
-.field input:not([type="checkbox"]),
+.field input:not([type="checkbox"], [type="radio"]),
 .field textarea,
 .field select {
   width: 100%;
@@ -425,7 +425,7 @@ select {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
-.field input:not([type="checkbox"]):focus,
+.field input:not([type="checkbox"], [type="radio"]):focus,
 .field textarea:focus,
 .field select:focus {
   outline: none;
@@ -453,7 +453,7 @@ select {
   background-color: rgba(10, 11, 15, 0.92);
 }
 
-.field input:not([type="checkbox"]):disabled,
+.field input:not([type="checkbox"], [type="radio"]):disabled,
 .field textarea:disabled,
 .field select:disabled {
   opacity: 0.6;
@@ -1382,15 +1382,15 @@ html {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   Cases à cocher — une seule apparence, posée sur l'élément
+   Cases à cocher et boutons radio — une seule apparence, posée sur l'élément
 
    Huit écrans posent un `<input type="checkbox">` nu (sélection d'équipes
    invitées, options de format, confirmation d'un retour en arrière, filtres de
-   recrutement…). Aucun n'était habillé : la case restait celle du système —
-   carré blanc, taille dictée par l'OS, coche bleu Windows — sur un fond noir
-   profond, et deux écrans voisins n'avaient pas la même. Le seul réglage posé
-   ici ou là, `accent-color`, ne teinte que la case **cochée** : décochée, elle
-   restait blanche.
+   recrutement…), deux autres un `<input type="radio">`. Aucun n'était habillé :
+   la case restait celle du système — carré blanc, taille dictée par l'OS, coche
+   bleu Windows — sur un fond noir profond, et deux écrans voisins n'avaient pas
+   la même. Le seul réglage posé ici ou là, `accent-color`, ne teinte que la case
+   **cochée** : décochée, elle restait blanche.
 
    La règle est donc posée sur l'élément lui-même plutôt que sur une classe ou un
    composant : une case ajoutée demain hérite de l'apparence sans que personne
@@ -1400,15 +1400,22 @@ html {
    cette règle, mais il est masqué en ligne (`opacity: 0`, 0×0,
    `pointer-events: none`), si bien que rien ne s'en peint.
 
+   Les deux contrôles partagent tout sauf leur marque — ils sont donc écrits
+   ensemble : le radio n'est qu'une case ronde. Les séparer aurait laissé deux
+   copies qui divergent au premier réglage, et `MatchLiveDialog` les montre
+   justement l'un sous l'autre dans le même panneau.
+
    Corollaire à tenir : une règle de feuille visant un `input` nu (`.x input`)
    a la même spécificité que celle-ci et la déborde sur les propriétés qu'elle
-   déclare — d'où le `:not([type="checkbox"])` posé sur `.field input` plus
-   haut, et le test qui balaie les feuilles pour qu'aucune ne recommence.
+   déclare — d'où le `:not([type="checkbox"], [type="radio"])` posé sur
+   `.field input` plus haut, et le test qui balaie les feuilles pour qu'aucune
+   ne recommence.
 
-   La coche est dessinée en `background-image` et non en `::after` : un input est
-   un élément remplacé, ses pseudo-éléments ne sont pas garantis.
+   La marque est dessinée en `background-image` et non en `::after` : un input
+   est un élément remplacé, ses pseudo-éléments ne sont pas garantis.
    ───────────────────────────────────────────────────────────────────────────── */
-input[type="checkbox"] {
+input[type="checkbox"],
+input[type="radio"] {
   appearance: none;
   -webkit-appearance: none;
   flex-shrink: 0;
@@ -1429,28 +1436,71 @@ input[type="checkbox"] {
     box-shadow 0.15s ease;
 }
 
-input[type="checkbox"]:hover:not(:disabled) {
+/* La seule chose qui distingue un radio d'une case : il est rond. */
+input[type="radio"] {
+  border-radius: 50%;
+}
+
+input[type="checkbox"]:hover:not(:disabled),
+input[type="radio"]:hover:not(:disabled) {
   border-color: rgba(var(--blue-rgb), 0.55);
 }
 
-input[type="checkbox"]:checked {
+input[type="checkbox"]:checked,
+input[type="radio"]:checked {
   border-color: rgba(var(--blue-rgb), 0.8);
   background-color: var(--blue-500);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%2305060a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M2.5 6.2l2.4 2.4 4.6-5'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: center;
+}
+
+input[type="checkbox"]:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%2305060a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M2.5 6.2l2.4 2.4 4.6-5'/%3E%3C/svg%3E");
+  background-size: 12px 12px;
+}
+
+input[type="radio"]:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='2.6' fill='%2305060a'/%3E%3C/svg%3E");
   background-size: 12px 12px;
 }
 
 /* Un anneau visible au clavier : la case nue n'en avait aucun une fois
    `appearance` retirée, et c'est le seul repère d'un parcours au clavier. */
-input[type="checkbox"]:focus-visible {
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
   outline: none;
   border-color: var(--blue-500);
   box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.28);
 }
 
-input[type="checkbox"]:disabled {
+input[type="checkbox"]:disabled,
+input[type="radio"]:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* Contrastes forcés : on rend la main au système, et c'est la seule réponse
+   juste. Le mode force la `background-color` mais **pas** l'image de fond, si
+   bien qu'une coche presque noire se retrouverait sur un fond noir imposé —
+   cochée et décochée deviennent alors indiscernables. L'anneau de focus étant
+   un `box-shadow`, lui aussi supprimé, l'`outline` native le remplace. */
+@media (forced-colors: active) {
+  input[type="checkbox"],
+  input[type="radio"] {
+    appearance: auto;
+    -webkit-appearance: auto;
+    border: none;
+    background-image: none;
+  }
+
+  input[type="checkbox"]:checked,
+  input[type="radio"]:checked {
+    background-image: none;
+  }
+
+  input[type="checkbox"]:focus-visible,
+  input[type="radio"]:focus-visible {
+    outline: 2px solid;
+    outline-offset: 2px;
+  }
 }

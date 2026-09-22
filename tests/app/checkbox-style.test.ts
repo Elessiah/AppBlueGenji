@@ -19,11 +19,16 @@ const globals = readFileSync(join(ROOT, "app", "globals.css"), "utf8");
  * ce qu'on l'oublie. Ces contrôles sont au niveau source — une feuille de style
  * n'a pas d'autre prise en test.
  */
-const CHECKBOX_BLOCK = (() => {
-  const start = globals.indexOf('input[type="checkbox"] {');
-  expect(start).toBeGreaterThanOrEqual(0);
-  return globals.slice(start);
-})();
+/** Le corps de la première règle dont le sélecteur porte ce fragment. */
+function blockFor(fragment: string, css: string = globals): string {
+  const at = css.indexOf(fragment);
+  expect(at).toBeGreaterThanOrEqual(0);
+  const open = css.indexOf("{", at);
+  return css.slice(open + 1, css.indexOf("}", open));
+}
+
+/** La règle de base, partagée par la case et le radio. */
+const CHECKBOX_BLOCK = blockFor('input[type="checkbox"],\ninput[type="radio"] {');
 
 /** Fichiers du projet portant l'extension donnée, `node_modules` exclu. */
 function walk(dir: string, suffix: string, found: string[] = []): string[] {
@@ -48,24 +53,38 @@ describe("Cases à cocher — apparence unique", () => {
   });
 
   it("remet le rembourrage à zéro — en `border-box`, il repousserait la taille", () => {
-    expect(CHECKBOX_BLOCK.slice(0, CHECKBOX_BLOCK.indexOf("}"))).toMatch(/padding: 0/);
+    expect(CHECKBOX_BLOCK).toMatch(/padding: 0/);
   });
 
-  it("dessine la coche en image de fond, un input n'ayant pas de pseudo-élément garanti", () => {
-    expect(globals).toContain('input[type="checkbox"]:checked');
-    const checked = globals.slice(globals.indexOf('input[type="checkbox"]:checked'));
-    expect(checked).toContain("background-image: url(");
-    expect(checked).not.toContain("::after");
+  it("habille aussi le bouton radio, qui n'est qu'une case ronde", () => {
+    expect(CHECKBOX_BLOCK).toContain("appearance: none");
+    expect(blockFor('input[type="radio"] {\n  border-radius')).toContain("border-radius: 50%");
+  });
+
+  it("dessine la marque en image de fond, un input n'ayant pas de pseudo-élément garanti", () => {
+    expect(blockFor('input[type="checkbox"]:checked {')).toContain("background-image: url(");
+    expect(blockFor('input[type="radio"]:checked {\n  background-image')).toContain(
+      "background-image: url(",
+    );
+    expect(globals).not.toContain('input[type="checkbox"]::after');
   });
 
   it("donne un anneau de focus clavier — `appearance: none` le retire", () => {
-    expect(globals).toContain('input[type="checkbox"]:focus-visible');
-    const focus = globals.slice(globals.indexOf('input[type="checkbox"]:focus-visible'));
-    expect(focus.slice(0, 200)).toContain("box-shadow");
+    expect(blockFor('input[type="checkbox"]:focus-visible,')).toContain("box-shadow");
   });
 
   it("marque l'état désactivé", () => {
-    expect(globals).toContain('input[type="checkbox"]:disabled');
+    expect(blockFor('input[type="checkbox"]:disabled,')).toContain("cursor: not-allowed");
+  });
+
+  it("rend la main au système en contrastes forcés", () => {
+    // Le mode force la couleur de fond mais **pas** l'image : une coche presque
+    // noire finirait sur un fond noir imposé, et cochée vaudrait décochée.
+    const forced = globals.slice(globals.indexOf("@media (forced-colors: active)"));
+    expect(forced).toContain("appearance: auto");
+    expect(forced).toContain("background-image: none");
+    // Le `box-shadow` du focus est supprimé lui aussi : il faut une `outline`.
+    expect(forced).toMatch(/outline: 2px solid/);
   });
 });
 
@@ -101,16 +120,45 @@ const BARE_INPUT = /(^|[\s>+~,])input(?![\w-]|\[|\s*\{)/;
 
 type Offender = { file: string; selector: string };
 
+/**
+ * Découpe une liste de sélecteurs sur ses virgules **de premier niveau** : celle
+ * d'un `:not([type="checkbox"], [type="radio"])` appartient au sélecteur, la
+ * couper le mutilerait et ferait passer l'exclusion pour absente.
+ */
+function splitSelectorList(selector: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const char of selector) {
+    if (char === "(") depth += 1;
+    else if (char === ")") depth -= 1;
+    if (char === "," && depth === 0) {
+      parts.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  parts.push(current.trim());
+  return parts.filter((part) => part.length > 0);
+}
+
 function bareInputOffenders(path: string, css: string): Offender[] {
   const offenders: Offender[] = [];
+  // Les commentaires partent **d'abord** : le découpage naïf ci-dessous les
+  // replie dans le sélecteur, si bien qu'une règle précédée d'un commentaire —
+  // la forme même que laisse ce correctif — passait tout entière au travers.
+  const stripped = css.replace(/\/\*[\s\S]*?\*\//g, " ");
   // Découpage volontairement naïf (`sélecteur { déclarations }`) : ces feuilles
   // n'ont ni `@media` imbriqué dans une règle ni accolade dans une valeur.
-  for (const [, rawSelector, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+  for (const [, rawSelector, body] of stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     const selector = rawSelector.trim().replace(/\s+/g, " ");
-    if (selector.startsWith("@") || selector.startsWith("/*")) continue;
-    const compounds = selector.split(",").map((part) => part.trim());
+    if (selector.startsWith("@") || selector === "") continue;
+    const compounds = splitSelectorList(selector);
     const bare = compounds.filter(
-      (part) => BARE_INPUT.test(part) && !part.includes(':not([type="checkbox"])'),
+      (part) =>
+        BARE_INPUT.test(part) &&
+        !(part.includes('[type="checkbox"]') && part.includes('[type="radio"]')),
     );
     if (bare.length === 0) continue;
     const declares = BOX_PROPERTIES.some((property) =>
@@ -142,10 +190,20 @@ describe("Cases à cocher — aucune feuille ne redéfinit l'apparence", () => {
   it("laisse libre le sélecteur qui nomme son type", () => {
     // Le garde-fou ne doit pas interdire d'habiller un bouton radio, que la
     // règle globale ne couvre pas : il ne vise que l'`input` nu.
-    expect(bareInputOffenders("x.css", 'input[type="radio"] { accent-color: red; }')).toEqual([]);
+    expect(bareInputOffenders("x.css", 'input[type="date"] { padding: 4px; }')).toEqual([]);
     expect(bareInputOffenders("x.css", ".a > input { width: auto; }")).toHaveLength(1);
     expect(bareInputOffenders("x.css", '.a input[type="checkbox"] { width: auto; }')).toEqual([]);
+    const excluded = '.a input:not([type="checkbox"], [type="radio"]) { width: auto; }';
+    expect(bareInputOffenders("x.css", excluded)).toEqual([]);
+    // Exclure la case sans exclure le radio ne suffit plus : les deux sont posés
+    // sur l'élément.
+    const half = '.a input:not([type="checkbox"]) { width: auto; }';
+    expect(bareInputOffenders("x.css", half)).toHaveLength(1);
     expect(bareInputOffenders("x.css", "input, textarea { font: inherit; }")).toEqual([]);
+    // La virgule d'un `:not(…)` n'est pas celle d'une liste de sélecteurs.
+    expect(splitSelectorList('a:not(.x, .y), b')).toEqual(["a:not(.x, .y)", "b"]);
+    // Un commentaire au-dessus ne doit plus servir de laissez-passer.
+    expect(bareInputOffenders("x.css", "/* note */\n.a input { width: auto; }")).toHaveLength(1);
   });
 });
 
@@ -165,12 +223,12 @@ function inlineOffenders(path: string, source: string): Offender[] {
   for (const chunk of source.split("<input").slice(1)) {
     const end = chunk.indexOf("/>");
     const tag = end === -1 ? chunk.slice(0, 600) : chunk.slice(0, end);
-    if (!/type=["']checkbox["']/.test(tag)) continue;
+    if (!/type=["'](checkbox|radio)["']/.test(tag)) continue;
     const style = tag.match(/style=\{\{([\s\S]*?)\}\}/);
     if (!style) continue;
     // Une case délibérément masquée (relais de focus d'un contrôle dessiné à
     // côté) donne sa propre boîte : elle ne peint rien.
-    if (/opacity:\s*0\b/.test(style[1])) continue;
+    if (/opacity:\s*0(?![.\d])/.test(style[1])) continue;
     if (INLINE_BANNED.test(style[1])) {
       offenders.push({ file: relative(ROOT, path), selector: style[1].trim() });
     }
@@ -198,5 +256,8 @@ describe("Cases à cocher — aucun style en ligne ne reprend la main", () => {
     expect(inlineOffenders("x.tsx", hidden)).toEqual([]);
     const sized = '<input type="checkbox" style={{ width: 18, height: 18 }} />';
     expect(inlineOffenders("x.tsx", sized)).toHaveLength(1);
+    // `opacity: 0.6` n'est pas un masquage : la case se voit, donc elle est tenue.
+    const faded = '<input type="checkbox" style={{ opacity: 0.6, width: 18 }} />';
+    expect(inlineOffenders("x.tsx", faded)).toHaveLength(1);
   });
 });

@@ -9,7 +9,6 @@ interface CocheProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type" 
   checked: boolean;
   onChange: (checked: boolean) => void;
   theme?: CocheTheme;
-  checkedColor?: string;
 }
 
 const THEME_COLORS: Record<CocheTheme, { base: string; rgb: string }> = {
@@ -38,11 +37,14 @@ export function Coche({
   checked,
   onChange,
   theme = "joueur",
-  checkedColor,
   ...props
 }: CocheProps) {
-  const color = checkedColor || THEME_COLORS[theme].base;
-  const rgbColor = checkedColor || THEME_COLORS[theme].rgb;
+  // Le thème donne **deux** valeurs, et il le faut : la couleur pleine de la
+  // pastille et le triplet `r,g,b` de ses voiles. Un réglage unique servait les
+  // deux, si bien qu'une couleur passée par un appelant sortait en
+  // `rgba(#ff0000,0.28)` — déclaration invalide, donc anneau de focus muet. Il
+  // n'avait aucun appelant : il est retiré plutôt que rafistolé.
+  const { base: color, rgb: rgbColor } = THEME_COLORS[theme];
   // La case native est masquée : c'est elle qui reçoit le focus, mais la
   // pastille qui se voit. Sans ce relais, un parcours au clavier traversait le
   // réglage sans aucun repère à l'écran.
