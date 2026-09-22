@@ -20,7 +20,11 @@ import {
   GAME_TAG_NOTICE,
   discordCertifiedNotice,
 } from "@/lib/shared/identity-sharing";
-import { visibleProfileSections } from "./_lib/profile-sections";
+import {
+  PROFILE_SECTION_BY_ID,
+  profileSectionIdFromHash,
+  visibleProfileSections,
+} from "./_lib/profile-sections";
 import { ProfileSection } from "./_components/ProfileSection";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
@@ -161,6 +165,33 @@ export default function ProfilePage() {
     // en capitales dans un toast, et un `UNAUTHORIZED` brut n'aide personne.
     load().catch((e) => showError(profileErrorMessage((e as Error).message)));
   }, [showError, router]);
+
+  /**
+   * **Le saut vers l'ancre se rejoue une fois la section montée.**
+   *
+   * Le navigateur n'honore le fragment d'une URL collée qu'au chargement du
+   * document, c'est-à-dire au moment précis où la page n'affiche encore que
+   * « Chargement du profil… » : aucune section n'existe, il ne trouve rien, et
+   * il n'y revient jamais — `/profil#compte` déposait donc son lecteur en haut
+   * de la page. Les liens de la navigation marchaient, eux, parce qu'on clique
+   * forcément après la réponse.
+   *
+   * Une seule fois par ancre (`honouredHash`) : les invitations arrivent par un
+   * second appel, si bien que l'effet repasse, et rejouer le saut ramènerait en
+   * arrière un lecteur qui a déjà fait défiler la page.
+   */
+  const honouredHash = useRef<string | null>(null);
+  useEffect(() => {
+    if (!data) return;
+    const id = profileSectionIdFromHash(window.location.hash);
+    if (!id || honouredHash.current === id) return;
+    // Une section conditionnelle peut n'être pas encore là : on retentera au
+    // prochain rendu plutôt que de marquer l'ancre comme honorée.
+    const target = document.getElementById(id);
+    if (!target) return;
+    honouredHash.current = id;
+    target.scrollIntoView({ block: "start" });
+  }, [data, invitations.length]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -329,11 +360,13 @@ export default function ProfilePage() {
     );
   }
 
-  // Les sections viennent du registre, filtrées par ce que la page a reçu : la
-  // navigation et les titres descendent de la même liste, si bien qu'un lien
-  // d'ancre ne peut pas désigner une section absente.
+  // Les sections viennent du registre, et la navigation n'annonce que celles que
+  // la page a de quoi remplir : un lien d'ancre ne peut donc pas désigner une
+  // section absente. La **recherche par ancre**, elle, reste totale — indexer la
+  // liste filtrée rendrait `undefined` sur la section conditionnelle, sans que
+  // le typage le voie.
   const sections = visibleProfileSections({ invitations: invitations.length });
-  const sectionById = Object.fromEntries(sections.map((entry) => [entry.id, entry]));
+  const sectionById = PROFILE_SECTION_BY_ID;
 
   return (
     <section className={`fade-in ${s.page}`}>
@@ -642,7 +675,7 @@ export default function ProfilePage() {
         <ConnectedAppsSection onChanged={loadDiscordState} />
       </ProfileSection>
 
-      {sectionById.invitations && (
+      {invitations.length > 0 && (
         <ProfileSection section={sectionById.invitations}>
           <div className="table-like">
             {invitations.map((inv) => (

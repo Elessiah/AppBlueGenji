@@ -44,6 +44,20 @@ absente ne fait *rien du tout*, sans erreur et sans déplacement. D'où aussi
 `visibleProfileSections`, qui filtre les sections conditionnelles : déclarer
 l'invitation dans le JSX laisserait oublier de la retirer de la navigation.
 
+Une section conditionnelle se déclare par son **`requires`**, qui nomme le
+compteur de `ProfileSectionAvailability` dont elle dépend, et non par un drapeau
+que le filtre doublerait d'un `id !== "invitations"` écrit en dur : la deuxième
+section conditionnelle le porterait alors sans aucun effet. La **recherche par
+ancre** reste en revanche totale (`PROFILE_SECTION_BY_ID`) : indexer la liste
+filtrée rendrait `undefined` sur la section masquée, ce que le typage ne verrait
+pas et que `ProfileSection` ferait planter sur `section.id`. C'est la navigation
+qu'on veut voir maigrir, pas la recherche.
+
+Le rendu d'une section reste **enveloppé par `ProfileSection` et par lui seul** :
+un composant qui se dessinait déjà tout seul (« Applications connectées » portait
+son propre `ds-block` et son propre `<h2>`, du temps où il vivait sans section
+autour) donne sinon une carte dans une carte et le même titre écrit deux fois.
+
 `ProfileSection` porte l'ancre, le titre et la promesse d'une section, et son
 `aria-labelledby` désigne le titre visible plutôt que de le recopier dans un
 `aria-label` — deux chaînes finiraient par diverger.
@@ -52,6 +66,17 @@ La navigation est faite de **liens d'ancre**, pas d'onglets : rien à mémoriser
 rien à hydrater, et une URL comme `/profil#connexions` fonctionne depuis
 n'importe où. `scroll-margin-top` sur la section plutôt qu'un décalage au clic,
 pour que l'arrivée par une URL collée tombe au bon endroit elle aussi.
+
+Le saut est **rejoué une fois la section montée**. Le navigateur n'honore le
+fragment qu'au chargement du document, c'est-à-dire au moment précis où la page
+n'affiche encore que « Chargement du profil… » : il ne trouve aucune ancre et
+n'y revient jamais, si bien qu'une URL collée déposait son lecteur en haut de la
+page — les liens de la navigation, eux, marchaient, parce qu'on clique forcément
+après la réponse. `profileSectionIdFromHash` reconnaît le fragment dans le
+registre (un fragment vient du navigateur, il ne désigne un élément qu'une fois
+reconnu), et le saut ne se joue **qu'une fois par ancre** : les invitations
+arrivant par un second appel, rejouer le saut ramènerait en arrière un lecteur
+qui a déjà fait défiler la page.
 
 ## La zone de danger
 

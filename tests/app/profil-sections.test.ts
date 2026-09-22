@@ -2,12 +2,18 @@ import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  PROFILE_SECTION_BY_ID,
   PROFILE_SECTIONS,
+  profileSectionIdFromHash,
   visibleProfileSections,
 } from "@/app/(secured)/profil/_lib/profile-sections";
 
 const ROOT = join(__dirname, "..", "..");
 const page = readFileSync(join(ROOT, "app/(secured)/profil/page.tsx"), "utf8");
+const connectedApps = readFileSync(
+  join(ROOT, "app/(secured)/profil/ConnectedAppsSection.tsx"),
+  "utf8",
+);
 
 /**
  * `/profil` empilait onze blocs dans un seul formulaire, sans un titre pour dire
@@ -47,6 +53,24 @@ describe("visibleProfileSections", () => {
   it("les montre dès la première", () => {
     const ids = visibleProfileSections({ invitations: 1 }).map((s) => s.id);
     expect(ids).toContain("invitations");
+  });
+
+  it("ne filtre que les sections qui déclarent un `requires`", () => {
+    const hidden = visibleProfileSections({ invitations: 0 }).map((s) => s.id);
+    for (const section of PROFILE_SECTIONS) {
+      if (section.requires === undefined) expect(hidden).toContain(section.id);
+    }
+  });
+
+  it("lit le compteur nommé par `requires`, jamais une ancre écrite en dur", () => {
+    // La section conditionnelle du registre doit nommer sa condition : sans
+    // cela, le filtre retomberait sur un `id !== "invitations"` en dur qu'une
+    // deuxième section conditionnelle porterait sans effet.
+    const conditional = PROFILE_SECTIONS.filter((s) => s.requires !== undefined);
+    expect(conditional.length).toBeGreaterThan(0);
+    for (const section of conditional) {
+      expect(section.requires).toBe("invitations");
+    }
   });
 
   it("ne touche à rien d'autre", () => {
@@ -98,5 +122,75 @@ describe("La page dit ce qu'elle fait des identifiants", () => {
   it("ne recopie plus l'aide des tags de jeu deux fois", () => {
     expect(page).toContain("GAME_TAG_NOTICE");
     expect(page).not.toContain("jamais pour des statistiques");
+  });
+});
+
+describe("PROFILE_SECTION_BY_ID", () => {
+  it("indexe le registre entier, sections conditionnelles comprises", () => {
+    for (const section of PROFILE_SECTIONS) {
+      expect(PROFILE_SECTION_BY_ID[section.id]).toBe(section);
+    }
+    expect(Object.keys(PROFILE_SECTION_BY_ID)).toHaveLength(PROFILE_SECTIONS.length);
+  });
+
+  it("garde l'invitation même quand la navigation ne l'annonce pas", () => {
+    // La recherche par ancre est totale : la liste filtrée rendrait `undefined`
+    // ici, et `<ProfileSection>` planterait sur `section.id`.
+    expect(PROFILE_SECTION_BY_ID.invitations).toBeDefined();
+    expect(visibleProfileSections({ invitations: 0 }).map((s) => s.id)).not.toContain(
+      "invitations",
+    );
+  });
+});
+
+/**
+ * Le navigateur n'honore le fragment d'une URL collée qu'au chargement du
+ * document — quand `/profil` n'affiche encore que « Chargement du profil… ».
+ * Le saut se rejoue donc une fois la section montée, sur une ancre reconnue
+ * dans le registre : un fragment vient du navigateur.
+ */
+describe("profileSectionIdFromHash", () => {
+  it("reconnaît une ancre du registre, avec ou sans dièse", () => {
+    expect(profileSectionIdFromHash("#connexions")).toBe("connexions");
+    expect(profileSectionIdFromHash("compte")).toBe("compte");
+  });
+
+  it("reconnaît la section conditionnelle, qui est bien une ancre", () => {
+    expect(profileSectionIdFromHash("#invitations")).toBe("invitations");
+  });
+
+  it("refuse ce qui ne nomme aucune section", () => {
+    expect(profileSectionIdFromHash("")).toBeNull();
+    expect(profileSectionIdFromHash("#")).toBeNull();
+    expect(profileSectionIdFromHash("#inconnu")).toBeNull();
+    expect(profileSectionIdFromHash("#compte-title")).toBeNull();
+    expect(profileSectionIdFromHash("##compte")).toBeNull();
+  });
+});
+
+describe("La page rejoue le saut vers l'ancre", () => {
+  it("relit le fragment par la fonction du registre une fois le profil chargé", () => {
+    expect(page).toContain("profileSectionIdFromHash(window.location.hash)");
+    expect(page).toContain("honouredHash");
+  });
+
+  it("indexe par le registre total et non par la liste filtrée", () => {
+    expect(page).toContain("const sectionById = PROFILE_SECTION_BY_ID");
+  });
+});
+
+/**
+ * « Applications connectées » se dessinait tout seul du temps où il vivait sans
+ * section autour. Rendu depuis `<ProfileSection>`, son cadre et son titre
+ * faisaient doublon : une carte dans une carte, le même `<h2>` deux fois.
+ */
+describe("Aucune section ne se dessine deux fois", () => {
+  it("laisse le cadre et le titre à ProfileSection", () => {
+    expect(connectedApps).not.toContain("ds-block");
+    expect(connectedApps).not.toContain("<h2>");
+  });
+
+  it("garde son texte d'aide, que le registre ne porte pas", () => {
+    expect(connectedApps).toContain("la dernière ne peut pas être retirée");
   });
 });

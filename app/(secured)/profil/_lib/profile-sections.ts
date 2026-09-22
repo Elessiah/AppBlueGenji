@@ -27,11 +27,25 @@ export type ProfileSection = {
   title: string;
   /** Une phrase sous le titre — ce que la section règle, pas ce qu'elle contient. */
   lead: string;
-  /** Rendue seulement si l'appelant a de quoi la remplir. */
-  conditional?: true;
+  /**
+   * Ce qu'il faut avoir reçu pour que la section ait un sens.
+   *
+   * La clé désigne un compteur de `ProfileSectionAvailability`, et c'est
+   * `visibleProfileSections` qui la lit : un simple drapeau `conditional` se
+   * serait doublé d'un `id !== "invitations"` écrit en dur dans le filtre, si
+   * bien qu'une deuxième section conditionnelle l'aurait porté sans effet —
+   * affichée quand même, et annoncée par la navigation.
+   */
+  requires?: keyof ProfileSectionAvailability;
 };
 
-export const PROFILE_SECTIONS: readonly ProfileSection[] = [
+/** Ce que la page a reçu, et qui décide des sections conditionnelles. */
+export type ProfileSectionAvailability = {
+  /** Nombre d'invitations d'équipe en attente. */
+  invitations: number;
+};
+
+export const PROFILE_SECTIONS = [
   {
     id: "identite",
     title: "Identité",
@@ -61,7 +75,7 @@ export const PROFILE_SECTIONS: readonly ProfileSection[] = [
     id: "invitations",
     title: "Invitations d'équipe",
     lead: "Les équipes qui t'ont proposé de les rejoindre.",
-    conditional: true,
+    requires: "invitations",
   },
   {
     id: "statistiques",
@@ -73,19 +87,51 @@ export const PROFILE_SECTIONS: readonly ProfileSection[] = [
     title: "Mon compte",
     lead: "Exporter tes données, te déconnecter, ou tout effacer.",
   },
-] as const;
+] as const satisfies readonly ProfileSection[];
+
+/** L'ancre d'une section, telle qu'elle s'écrit dans une URL. */
+export type ProfileSectionId = (typeof PROFILE_SECTIONS)[number]["id"];
+
+/**
+ * Le registre indexé par ancre — **total**, sections conditionnelles comprises.
+ *
+ * La page y lit la section qu'elle rend ; la liste filtrée ne sert qu'à la
+ * navigation. Indexer la liste filtrée rendrait `undefined` sur une section
+ * absente, que le typage ne verrait pas et que `<ProfileSection>` ferait
+ * planter sur `section.id` : c'est la navigation qu'on veut voir maigrir, pas
+ * la recherche par ancre.
+ */
+export const PROFILE_SECTION_BY_ID = Object.fromEntries(
+  PROFILE_SECTIONS.map((section) => [section.id, section]),
+) as Record<ProfileSectionId, ProfileSection>;
+
+/**
+ * L'ancre désignée par un fragment d'URL, si c'en est bien une.
+ *
+ * Un fragment revient du navigateur : il ne sert à désigner un élément qu'une
+ * fois reconnu dans le registre — le reste ne nomme aucune section et vaut
+ * `null`.
+ */
+export function profileSectionIdFromHash(hash: string): ProfileSectionId | null {
+  const id = hash.startsWith("#") ? hash.slice(1) : hash;
+  const match = PROFILE_SECTIONS.find((section) => section.id === id);
+  return match ? match.id : null;
+}
 
 /**
  * Les sections à afficher, sachant ce que l'appelant a reçu.
  *
  * Une seule question posée pour l'instant, et c'est voulu : une section
- * conditionnelle de plus se déclarera ici plutôt que dans le JSX, où l'oubli de
- * la retirer de la navigation ne se verrait pas.
+ * conditionnelle de plus se déclare par son `requires` plutôt que dans le JSX,
+ * où l'oubli de la retirer de la navigation ne se verrait pas.
  */
-export function visibleProfileSections(available: {
-  invitations: number;
-}): ProfileSection[] {
+export function visibleProfileSections(
+  available: ProfileSectionAvailability,
+): ProfileSection[] {
+  // Le paramètre est annoté : `as const` donne à chaque entrée son type
+  // littéral, d'où `requires` absent de celles qui ne le portent pas.
   return PROFILE_SECTIONS.filter(
-    (section) => section.id !== "invitations" || available.invitations > 0,
+    (section: ProfileSection) =>
+      section.requires === undefined || available[section.requires] > 0,
   );
 }
