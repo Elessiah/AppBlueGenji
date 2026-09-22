@@ -5,17 +5,18 @@ import { bulkTeamTag } from "@/lib/server/seed-cases";
 import { checkTeamTag } from "@/lib/shared/team-tag";
 
 /**
- * La migration du sigle et les sigles que produit le jeu de test.
+ * Le sigle **dans le schéma**, et les sigles que produit le jeu de test.
  *
- * Les migrations tournent contre un vrai MySQL et ne sont pas exécutables ici :
- * ce qui est vérifié est ce qui se lit dans la source — l'**ordre** des trois
- * étapes, qui est toute la correction de la manœuvre sur une base peuplée. Créer
- * l'index avant d'avoir libéré les doublons le ferait échouer, et comme chaque
- * étape est enveloppée dans un `try` (le schéma se rejoue à chaque démarrage),
- * l'échec serait **silencieux** : l'unicité ne serait jamais posée et rien ne le
- * dirait.
+ * Le schéma tourne contre un vrai MySQL et n'est pas exécutable ici : ce qui est
+ * vérifié est ce qui se lit dans la source. Depuis la consolidation, le sigle
+ * n'a plus de migration en trois temps — la colonne et son index unique naissent
+ * avec la table —, mais deux propriétés restent décisives et se perdraient sans
+ * bruit : la colonne est **nullable** (c'est ce qui laisse les entrées solo hors
+ * de l'espace de noms sans une règle de plus, l'unicité MySQL ignorant les
+ * `NULL`), et l'index porte un **nom**, que `mapTeamTagConflict` lit dans
+ * `ER_DUP_ENTRY` pour distinguer « sigle pris » de « nom pris ».
  *
- * Les sigles du seed sont vérifiés ici pour la même raison : une collision ne se
+ * Les sigles du seed sont vérifiés pour une raison voisine : une collision ne se
  * découvrirait qu'en base, au premier `npm run seed`, sous la forme d'une équipe
  * manquante dans la matrice de cas.
  */
@@ -26,48 +27,30 @@ function source(relative: string): string {
   return readFileSync(join(ROOT, relative), "utf8");
 }
 
-describe("migration du sigle (lib/server/database.ts)", () => {
+describe("sigle d'équipe dans le schéma (lib/server/database.ts)", () => {
   const sql = source(join("lib", "server", "database.ts"));
+  const teamsTable = sql.slice(
+    sql.indexOf("CREATE TABLE IF NOT EXISTS bg_teams"),
+    sql.indexOf("CREATE TABLE IF NOT EXISTS bg_team_members"),
+  );
 
-  it("ajoute la colonne, la libère de ses doublons, puis pose l'index — dans cet ordre", () => {
-    const addColumn = sql.indexOf("ADD COLUMN tag VARCHAR(4) NULL");
-    const upperCase = sql.indexOf("SET tag = UPPER(tag)");
-    const dedupe = sql.indexOf("HAVING COUNT(*) > 1");
-    const index = sql.indexOf("ADD UNIQUE INDEX uniq_bg_teams_tag");
-
-    expect(addColumn).toBeGreaterThan(-1);
-    expect(upperCase).toBeGreaterThan(addColumn);
-    expect(dedupe).toBeGreaterThan(upperCase);
-    expect(index).toBeGreaterThan(dedupe);
+  it("déclare la colonne dans la table plutôt que par un ALTER de rattrapage", () => {
+    expect(teamsTable).toMatch(/tag VARCHAR\(4\) NULL/);
+    expect(sql).not.toMatch(/ALTER TABLE bg_teams\s+ADD COLUMN tag/);
   });
 
-  it("déclare la colonne nullable — c'est ce qui laisse les entrées solo hors de l'espace de noms", () => {
-    expect(sql).toMatch(/ADD COLUMN tag VARCHAR\(4\) NULL/);
-    expect(sql).not.toMatch(/ADD COLUMN tag VARCHAR\(4\) NOT NULL/);
+  it("la garde nullable — c'est ce qui laisse les entrées solo hors de l'espace de noms", () => {
+    expect(teamsTable).not.toMatch(/tag VARCHAR\(4\) NOT NULL/);
   });
 
-  it("conserve le sigle à la plus ancienne des équipes en conflit", () => {
-    // `MIN(id)` plutôt qu'un choix arbitraire : la première à l'avoir pris le
-    // garde, les autres le perdent et retombent sur leurs initiales.
-    expect(sql).toMatch(/MIN\(id\) AS keep_id/);
-    expect(sql).toMatch(/SET t\.tag = NULL/);
+  it("nomme l'index unique — le refus lisible se décide sur ce nom", () => {
+    expect(teamsTable).toMatch(/UNIQUE KEY uniq_bg_teams_tag \(tag\)/);
   });
 
-  it("compare les doublons sans égard à la casse", () => {
-    expect(sql).toMatch(/GROUP BY UPPER\(tag\)/);
-    expect(sql).toMatch(/UPPER\(t\.tag\) = dupes\.normalized/);
-  });
-
-  it("compare octet à octet pour décider ce qui reste à mettre en majuscules", () => {
-    // `tag <> UPPER(tag)` est toujours faux en collation insensible à la casse :
-    // écrite ainsi, la mise en forme ne s'appliquait à aucune ligne.
-    expect(sql).toMatch(/CAST\(tag AS BINARY\) <> CAST\(UPPER\(tag\) AS BINARY\)/);
-    expect(sql).not.toMatch(/WHERE tag IS NOT NULL AND tag <> UPPER\(tag\)/);
-  });
-
-  it("n'invente aucun sigle de remplacement", () => {
-    // Effacer, jamais suffixer : un sigle est un nom, il se choisit.
-    expect(sql).not.toMatch(/CONCAT\(tag/);
+  it("garde l'unique de l'entrée solo distinct de celui du sigle", () => {
+    // `bg_teams` porte deux uniques : une collision de sigle annoncée « nom déjà
+    // pris » enverrait corriger le mauvais champ.
+    expect(teamsTable).toMatch(/UNIQUE KEY uniq_bg_teams_solo_user \(solo_user_id\)/);
   });
 });
 
