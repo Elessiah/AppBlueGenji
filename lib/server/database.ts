@@ -93,7 +93,9 @@ function requireEnv(name: string): string {
  * qui compte.
  */
 function reportSchemaFailure(error: unknown, statement: string): void {
-  if (isSchemaNoOpError(error)) return;
+  // L'instruction est passée au prédicat : le même code MySQL ne dit pas la même
+  // chose sur un `ADD COLUMN` et sur un `ADD INDEX` (voir `mysql-errors.ts`).
+  if (isSchemaNoOpError(error, statement)) return;
   console.error(
     `[migrations] « ${statement} » a échoué — le schéma reste en arrière du code.`,
     error,
@@ -989,6 +991,33 @@ async function warnIfSchemaIsBehind(db: Pool): Promise<void> {
       } else if (witness.expect && !type.includes(witness.expect)) {
         gaps.push(`${name} est resté « ${type} », sans ${witness.expect}`);
       }
+    }
+
+    // Les **index** ne se lisent pas dans `COLUMNS`, et leur absence est la plus
+    // silencieuse de toutes : une colonne manquante fait tomber la requête qui
+    // la nomme, un index unique manquant ne fait **rien** — il cesse simplement
+    // de trancher la course qu'il existe pour trancher. `mapTeamTagConflict`
+    // continuerait de traduire un `ER_DUP_ENTRY` qui n'arrive plus jamais, et
+    // deux équipes créées au même instant prendraient le même sigle.
+    //
+    // L'argument « les migrations sont jouées dans l'ordre » ne les couvre pas :
+    // chaque ancien `ALTER` était tolérant **indépendamment**, et celui-ci
+    // pouvait échouer de façon déterministe sur des données (des doublons à
+    // libérer d'abord) pendant que les suivants passaient.
+    const INDEX_WITNESSES: readonly (readonly [string, string])[] = [
+      ["bg_teams", "uniq_bg_teams_tag"],
+      ["bg_teams", "uniq_bg_teams_solo_user"],
+    ];
+    const [indexRows] = await db.execute<(RowDataPacket & { INDEX_NAME: string })[]>(
+      `SELECT DISTINCT INDEX_NAME
+         FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND (TABLE_NAME, INDEX_NAME) IN (${INDEX_WITNESSES.map(() => "(?, ?)").join(", ")})`,
+      INDEX_WITNESSES.flatMap(([table, index]) => [table, index]),
+    );
+    const indexes = new Set(indexRows.map((r) => r.INDEX_NAME));
+    for (const [table, index] of INDEX_WITNESSES) {
+      if (!indexes.has(index)) gaps.push(`l'index ${index} manque sur ${table}`);
     }
 
     if (gaps.length > 0) {

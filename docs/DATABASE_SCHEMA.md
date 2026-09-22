@@ -103,6 +103,13 @@ voit qu'une :
 | Colonne **absente** | `bg_matches.phase_id` | « Unknown column » sur la première requête qui la nomme |
 | Colonne présente mais du **mauvais type** | `bg_tournaments.game` doit contenir `'OW'` | Une base restée avant la conversion `ENUM('OW2','MR')` → `ENUM('OW','MR')` porte bien la colonne, et rend « Data truncated for column 'game' » au premier tournoi écrit |
 | Colonne qui devait **partir** | `bg_users.email` | Le `DROP` est best-effort, jamais rejoué dans le processus (la porte mémorise une passe qui se résout toujours), et `anonymizeOwnAccount` a perdu son `email = NULL` dans la même version : les adresses resteraient, sans que rien ne les efface |
+| **Index** absent | `uniq_bg_teams_tag`, `uniq_bg_teams_solo_user` | La plus silencieuse de toutes : un index unique manquant ne fait *rien* tomber, il cesse seulement de trancher la course qu'il existe pour trancher — deux équipes créées au même instant prendraient le même sigle, et `mapTeamTagConflict` traduirait un `ER_DUP_ENTRY` qui n'arrive plus jamais |
+
+Les index se lisent dans `information_schema.STATISTICS` et non dans `COLUMNS`,
+d'où une seconde requête. L'argument « les migrations sont jouées dans l'ordre »
+ne les couvre pas : chaque ancien `ALTER` était tolérant **indépendamment**, et
+celui-là pouvait échouer de façon déterministe sur des données (des doublons de
+sigle à libérer d'abord) pendant que les suivants passaient.
 
 Elle **ne répare rien** et ne fait échouer personne. Une base en retard se migre
 à la main ; interrompre le démarrage remplacerait un site dégradé par un site
@@ -122,11 +129,22 @@ la colonne, pas par un simple `git revert` du déploiement.
 
 Dans cette section, **un seul cas** : « la colonne est déjà là » (ou déjà
 partie), le cas nominal d'une migration rejouée à chaque démarrage. C'est ce que
-reconnaît `isSchemaNoOpError` (`lib/server/mysql-errors.ts`). `ER_DUP_KEYNAME`
-n'y est **pas**, et son absence est la règle : sur un `ADD COLUMN … UNIQUE`
-rejoué, MySQL voit la colonne avant l'index et rend `ER_DUP_FIELDNAME`. Recevoir
-`ER_DUP_KEYNAME` signifie donc l'inverse — la colonne n'a *pas* été ajoutée, et
-un index porte déjà son nom. C'est une anomalie. Tout autre échec —
+reconnaît `isSchemaNoOpError` (`lib/server/mysql-errors.ts`).
+
+**Le même code ne dit pas la même chose selon l'instruction**, d'où le second
+paramètre du prédicat. `ER_DUP_KEYNAME` en est l'exemple entier :
+
+- sur `ADD COLUMN blizzard_sub … UNIQUE`, c'est une **anomalie**. MySQL voit la
+  colonne avant l'index et aurait rendu `ER_DUP_FIELDNAME` si elle était là ;
+  recevoir celui-ci dit donc que la colonne n'a *pas* été ajoutée.
+- sur `ADD UNIQUE INDEX uniq_bg_teams_tag …`, c'est le **cas nominal** — l'index
+  est déjà là, à chaque démarrage. Le traiter en anomalie poserait une fausse
+  ligne d'échec à chaque redémarrage, et une alerte permanente cesse d'être lue :
+  ce serait éroder le signal même qu'on a posé pour protéger le retrait des
+  adresses.
+
+`ER_MULTIPLE_PRI_KEY` suit la même règle sur un `ADD PRIMARY KEY`. Tout autre
+échec —
 droit `ALTER` manquant, verrou de métadonnées sur une table chaude — laisse le
 schéma **en arrière du code** : la base démarre, et la panne se lit plus tard sur
 une requête qui nomme la colonne.

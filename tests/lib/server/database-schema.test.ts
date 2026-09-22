@@ -148,15 +148,6 @@ describe("Schéma — la règle des deux endroits", () => {
    * panne est au **redémarrage de la production**, sur une requête qui nomme la
    * colonne, et il est alors trop tard pour la reposer sans interruption.
    */
-  const RECENT = [
-    ["bg_discord_login_challenges", "handle"],
-    ["bg_users", "discord_verified_at"],
-    ["bg_users", "blizzard_sub"],
-    ["bg_tournaments", "registration_discord_requirement"],
-    ["bg_tournaments", "registration_min_players"],
-    ["bg_tournaments", "registration_blizzard_requirement"],
-  ] as const;
-
   // Bornée aux deux extrémités : après elle vivent les « rattrapages
   // permanents », qui gardent volontairement un `catch` muet.
   const migrations = sql.slice(
@@ -164,13 +155,46 @@ describe("Schéma — la règle des deux endroits", () => {
     sql.indexOf("// Rattrapages permanents"),
   );
 
-  it.each(RECENT)("%s.%s est dans la table neuve", (tableName, column) => {
-    expect(table(tableName)).toContain(column);
+  /**
+   * La liste est **lue dans la source**, jamais recopiée ici.
+   *
+   * Une copie à la main ne peut pas voir l'oubli qu'elle est censée empêcher :
+   * ajouter une colonne au seul `CREATE TABLE` laisse la copie inchangée, donc
+   * tous les tests verts, et la production tombe au redémarrage. Dériver de la
+   * source ferme au moins le sens qui se vérifie — toute migration annoncée doit
+   * exister dans sa table.
+   *
+   * L'autre sens ne se ferme pas au niveau de la source : rien dans le fichier
+   * ne dit d'une colonne qu'elle est « récente ». C'est un jugement de
+   * déploiement, et c'est pourquoi `docs/DATABASE_SCHEMA.md` en fait une règle
+   * écrite plutôt qu'une assertion.
+   */
+  const RECENT = [...migrations.matchAll(/ALTER TABLE (\w+) ADD COLUMN\s+(\w+)/g)].map(
+    (m) => [m[1], m[2]] as const,
+  );
+
+  it("lit une liste non vide — sinon les cas ci-dessous ne prouveraient rien", () => {
+    expect(RECENT.length).toBeGreaterThanOrEqual(6);
   });
 
-  it.each(RECENT)("%s.%s est aussi dans la liste des migrations", (tableName, column) => {
-    expect(migrations).toMatch(
-      new RegExp(`ALTER TABLE ${tableName} ADD COLUMN\\s+${column}\\b`),
+  it("toute colonne annoncée en migration existe dans sa table neuve", () => {
+    const orphans = RECENT.filter(([tableName, column]) => !table(tableName).includes(column));
+    expect(orphans).toEqual([]);
+  });
+
+  it("couvre bien les trois PR postérieures au dernier déploiement connu", () => {
+    // Nommées ici parce que leur *absence* est le défaut à voir : une entrée
+    // retirée par anticipation ne laisse aucune trace ailleurs.
+    const names = RECENT.map(([t, c]) => `${t}.${c}`);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "bg_discord_login_challenges.handle",
+        "bg_users.discord_verified_at",
+        "bg_users.blizzard_sub",
+        "bg_tournaments.registration_discord_requirement",
+        "bg_tournaments.registration_min_players",
+        "bg_tournaments.registration_blizzard_requirement",
+      ]),
     );
   });
 
@@ -224,7 +248,7 @@ describe("Schéma — la règle des deux endroits", () => {
   it("ne journalise rien sur le cas nominal, qui se produit à chaque démarrage", () => {
     // Une ligne par entrée à chaque redémarrage noierait la seule qui compte.
     const reporter = sql.slice(sql.indexOf("function reportSchemaFailure"));
-    expect(reporter.slice(0, 400)).toContain("if (isSchemaNoOpError(error)) return;");
+    expect(reporter.slice(0, 500)).toContain("if (isSchemaNoOpError(error, statement)) return;");
   });
 });
 
@@ -293,9 +317,13 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     // L'ancien fichier l'interrogeait pour décider s'il devait jouer un
     // rattrapage — une lecture par démarrage et par cas. La seule qui subsiste
     // ne **répare** rien : elle dit qu'une base est en retard, et s'arrête là.
+    // Deux lectures, toutes deux dans le filet : les colonnes puis les index —
+    // ces derniers ne figurant pas dans `COLUMNS`.
     const reads = [...sql.matchAll(/FROM information_schema/gi)];
-    expect(reads).toHaveLength(1);
+    expect(reads).toHaveLength(2);
     const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
+    expect([...net.matchAll(/FROM information_schema/gi)]).toHaveLength(2);
+    expect(net).toContain("information_schema.STATISTICS");
     expect(net).toContain("information_schema.COLUMNS");
     expect(net).toContain("console.error");
   });
@@ -318,6 +346,17 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     // `anonymizeOwnAccount` a perdu son `email = NULL` dans la même version.
     const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
     expect(net).toContain("les adresses y sont encore");
+  });
+
+  it("surveille aussi les index, que `COLUMNS` ne montre pas", () => {
+    // L'absence d'un index unique est la plus silencieuse de toutes : elle ne
+    // fait rien tomber, elle cesse seulement de trancher la course qu'il existe
+    // pour trancher — deux équipes créées au même instant prendraient le même
+    // sigle, et `mapTeamTagConflict` traduirait un `ER_DUP_ENTRY` qui n'arrive
+    // plus jamais.
+    const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
+    expect(net).toContain("uniq_bg_teams_tag");
+    expect(net).toContain("uniq_bg_teams_solo_user");
   });
 
   it("le filet ne devient jamais la panne qu'il signale", () => {
