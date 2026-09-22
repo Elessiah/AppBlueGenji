@@ -60,6 +60,13 @@ describe("Carte d'annuaire — « free agent » n'est pas « sans équipe »", (
     expect(playerCard).toContain("PLAYER_ROSTER_STATUS_LABEL[playerRosterStatus(player)]");
   });
 
+  it("demande le statut une seule fois — le roster aussi passe par lui", () => {
+    // Brancher ici sur `player.team` et là sur le statut partagé remettrait la
+    // règle à deux endroits, ce que le module existe pour éviter.
+    expect(playerCard).toContain('playerRosterStatus(player) === "ROSTER"');
+    expect(playerCard).not.toContain("ROSTER ·");
+  });
+
   it("fait passer le filtre et le compteur par le même prédicat", () => {
     expect(playersList).toContain("isFreeAgent");
     expect(playersList).not.toContain("p.openToRecruitment === false");

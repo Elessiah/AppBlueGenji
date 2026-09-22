@@ -68,9 +68,12 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
         </div>
         <div className={s.plPseudo}>{player.pseudo}</div>
         <div className={s.plTeam}>
-          {player.team ? (
+          {/* Le statut est demandé **une fois** : brancher ici sur `player.team`
+              et là sur le statut partagé remettrait la règle à deux endroits,
+              ce que le module existe justement pour éviter. */}
+          {playerRosterStatus(player) === "ROSTER" && player.team ? (
             <>
-              ROSTER ·{" "}
+              {PLAYER_ROSTER_STATUS_LABEL.ROSTER} ·{" "}
               <TeamLink
                 teamId={player.team.id}
                 className={s.aboveOverlay}
