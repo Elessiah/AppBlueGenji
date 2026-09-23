@@ -292,6 +292,17 @@ describe("POST /api/auth/discord/request", () => {
     expect(payload.error).toBe("BOT_INTERNAL_UNREACHABLE");
   });
 
+  it("maps BOT_RESOLVE_TIMEOUT to 504", async () => {
+    resolveDiscordUserMock.mockRejectedValue(new Error("BOT_RESOLVE_TIMEOUT"));
+
+    const response = await POST(buildRequest({ discordId: "keryan" }));
+    const payload = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(504);
+    expect(payload.error).toBe("BOT_RESOLVE_TIMEOUT");
+    expect(sendDiscordLoginCodeMock).not.toHaveBeenCalled();
+  });
+
   it("maps DISCORD_DM_FAILED to 502", async () => {
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 1,

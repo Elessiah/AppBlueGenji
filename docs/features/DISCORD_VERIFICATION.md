@@ -82,14 +82,48 @@ mécanisme de secret, moins éprouvé, n'aurait rien apporté.
 
 Deux chemins, une seule règle :
 
-- **Compte déjà relié à Discord** (né par cette porte, ou certifié une première
-  fois) : la preuve existe, il l'a faite en ouvrant sa session. Le site vérifie
-  seulement que le tag saisi **résout vers cet identifiant-là**, et certifie sur
-  place, sans message privé. C'est le « un seul bouton ».
-- **Compte Google** : rien n'a été prouvé. Code, puis confirmation.
+- **Compte déjà relié à Discord** (né par l'OAuth, par le code en message
+  privé, ou certifié une première fois) : la preuve existe, il l'a faite en
+  ouvrant sa session. Le dialogue le renvoie **chez Discord**
+  (`/api/auth/discord/start?intent=link`) : le rattachement retrouve la même
+  identité, ne déplace aucune porte, et réécrit certifié le pseudo que Discord
+  nomme (`linkOAuthIdentity` rend alors `REFRESHED`, et le profil annonce
+  « Discord reconfirmé » plutôt qu'un rattachement qui n'a pas eu lieu). Aucun
+  appel au bot.
+- **Compte sans Discord rattaché** : rien n'a été prouvé. Le bot résout le tag,
+  code en message privé, puis confirmation.
 
-`discordVerificationNeedsCode(linkedDiscordId)` tranche, et le dialogue ne rejoue
-pas la règle : il envoie le tag et lit `status` (`VERIFIED` ou `CODE_SENT`).
+### Pourquoi un compte relié ne passe plus par le bot
+
+Il y passait : le site envoyait le tag au bot et vérifiait qu'il résolvait vers
+l'identifiant déjà rattaché. Or le bot ne résout un tag qu'en cherchant parmi les
+membres des serveurs **qu'il partage** avec le joueur, un serveur après l'autre.
+Un compte venu par OAuth Discord — ou par un code demandé avec son identifiant
+numérique, le repli prévu justement pour qui n'est sur aucun de ces serveurs —
+n'en partage souvent aucun : la recherche les parcourait **tous**, dépassait les
+trois secondes de l'appel, et le profil annonçait « bot non joignable ». Aboutie,
+elle aurait de toute façon répondu « tag introuvable ». On demandait au bot de
+prouver ce que Discord atteste lui-même en un aller-retour.
+
+Le chemin serveur (`startDiscordVerification` qui conclut sur place quand le tag
+résout vers l'identifiant rattaché) est **conservé** : il reste une preuve juste,
+et un compte rattaché entre l'ouverture du profil et le clic y aboutit encore.
+
+**« Trop lent » n'est plus « injoignable ».** Une **résolution de tag** qui
+dépasse son délai lève désormais `BOT_RESOLVE_TIMEOUT` (504), distinct de
+`BOT_INTERNAL_UNREACHABLE` (503, connexion refusée). Sa phrase nomme les deux
+causes possibles — tag absent des serveurs du bot, ou bot surchargé — sans en
+affirmer une, et renvoie au geste (vérifier le tag, rejoindre le serveur, ou
+passer par l'identifiant / le bouton Discord). L'**envoi du code** garde
+`BOT_INTERNAL_UNREACHABLE` : il suit une résolution réussie, le tag n'y est pour
+rien, et le message privé est peut-être parti.
+
+**Mauvais compte chez Discord.** Reconfirmer par OAuth en étant connecté, chez
+Discord, sous un autre compte que celui rattaché est refusé
+(`PROVIDER_ALREADY_LINKED`) : la phrase dit d'abord de revenir avec le bon compte,
+et ne propose le retrait qu'ensuite — l'inverse pousserait à détacher la bonne
+identité. Un pseudo Discord fait uniquement de chiffres reste non certifiable par
+ce chemin comme par les autres, et le dialogue le dit avant le clic.
 
 **Se connecter par Discord certifie le tag**, sans le moindre geste
 supplémentaire : la route de connexion **consomme** le défi
@@ -296,8 +330,8 @@ et sa sortie (recharger), sans affirmer un rattachement que rien n'établit.
   tag : posés sur le tag, ils disparaissaient tous les deux à l'état que le
   retrait vient de produire (rattaché, sans tag), ne laissant qu'une reconnexion
   par Discord. Sans tag enregistré le bouton dit « Enregistrer mon tag » : il n'y
-  a rien à *certifier*, et le geste se prouve seul — `startDiscordVerification`
-  conclut sur place quand le tag résout vers l'identifiant déjà rattaché.
+  a rien à *certifier*, et le geste se prouve seul — le dialogue renvoie chez
+  Discord, qui nomme le pseudo, et le rattachement l'écrit certifié.
   **Le formulaire ne soumet que ce qu'il a changé** : il renvoyait le tag de son
   instantané de montage à chaque sauvegarde, si bien qu'un tag réécrit ailleurs
   entre-temps (renommage sur Discord puis connexion depuis un autre appareil)

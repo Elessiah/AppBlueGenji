@@ -36,7 +36,7 @@ import {
   oauthStartPath,
   type OAuthProvider,
 } from "@/lib/shared/oauth-providers";
-import { connectionErrorMessage } from "./connection-errors";
+import { connectionErrorMessage, connectionSuccessMessage } from "./connection-errors";
 import s from "./profil.module.css";
 
 /** Ce que chaque porte apporte au compte, en plus d'une session. */
@@ -90,11 +90,8 @@ export function ConnectedAppsSection({
     if (!connected && !failed) return;
 
     if (connected) {
-      const provider = oauthProviderFromSlug(connected);
       showSuccess(
-        provider
-          ? `${OAUTH_PROVIDER_LABELS[provider]} est maintenant rattaché à ton compte.`
-          : "Application rattachée.",
+        connectionSuccessMessage(oauthProviderFromSlug(connected), params.get("refreshed") === "1"),
       );
       onChanged?.();
     } else {
@@ -104,6 +101,7 @@ export function ConnectedAppsSection({
     params.delete("connected");
     params.delete("connection_error");
     params.delete("provider");
+    params.delete("refreshed");
     const query = params.toString();
     window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
     // `onChanged` est volontairement hors des dépendances : la fonction vient du

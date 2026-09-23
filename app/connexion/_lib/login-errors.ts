@@ -16,6 +16,10 @@ const LOGIN_ERRORS: Record<string, string> = {
   // rien à corriger — mais la connexion Google, elle, reste ouverte.
   BOT_INTERNAL_UNREACHABLE:
     "Connexion Discord indisponible (bot non joignable). Tu peux passer par Google.",
+  // Le bot a répondu trop tard : tag absent de ses serveurs ou bot surchargé,
+  // sans qu'on sache lequel. Les deux sorties évitent la recherche par tag.
+  BOT_RESOLVE_TIMEOUT:
+    "La recherche de ton tag par le bot n'a pas abouti à temps. Utilise plutôt ton ID Discord, ou passe par le bouton Discord.",
   BOT_INTERNAL_UNAUTHORIZED:
     "Connexion Discord indisponible (token interne invalide). Tu peux passer par Google.",
   DISCORD_DM_FAILED:
