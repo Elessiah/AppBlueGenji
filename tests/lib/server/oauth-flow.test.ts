@@ -51,7 +51,7 @@ beforeEach(() => {
   (saveOAuthState as jest.Mock).mockResolvedValue(undefined as never);
   (createSession as jest.Mock).mockResolvedValue(undefined as never);
   (createOrGetOAuthUser as jest.Mock).mockResolvedValue(7 as never);
-  (linkOAuthIdentity as jest.Mock).mockResolvedValue(undefined as never);
+  (linkOAuthIdentity as jest.Mock).mockResolvedValue("LINKED" as never);
   (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
   (discordAvatarUrl as jest.Mock).mockReturnValue("https://cdn.discord.test/a.png");
 });
@@ -330,6 +330,19 @@ describe("completeOAuth — rattachement", () => {
     expect(createSession).not.toHaveBeenCalled();
     expect(createOrGetOAuthUser).not.toHaveBeenCalled();
     expect(response.headers.get("location")).toBe("http://localhost:3000/profil?connected=discord");
+  });
+
+  it("dit au profil qu'une identité déjà rattachée a été **relue**, pas ajoutée", async () => {
+    // C'est le chemin de certification d'un compte déjà relié à Discord :
+    // annoncer « rattaché » décrirait un changement qui n'a pas eu lieu.
+    (getCurrentUser as jest.Mock).mockResolvedValue({ id: 7 } as never);
+    (linkOAuthIdentity as jest.Mock).mockResolvedValue("REFRESHED" as never);
+
+    const response = await link();
+
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/profil?connected=discord&refreshed=1",
+    );
   });
 
   it("refuse quand la session a expiré pendant l'aller-retour", async () => {

@@ -222,6 +222,7 @@ describe("traduction des refus", () => {
     ["TOO_MANY_CODE_REQUESTS", 429],
     ["DISCORD_DM_FAILED", 502],
     ["BOT_INTERNAL_UNREACHABLE", 503],
+    ["BOT_INTERNAL_TIMEOUT", 504],
     ["QUELQUE_CHOSE_DINATTENDU", 500],
   ];
 

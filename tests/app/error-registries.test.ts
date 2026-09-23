@@ -23,6 +23,7 @@ import { LINK_REFUSALS } from "@/lib/shared/account-connections";
 /** Tout ce que `/api/auth/discord/{request,verify}` peut rendre. */
 const LOGIN_CODES = [
   "BOT_INTERNAL_UNREACHABLE",
+  "BOT_INTERNAL_TIMEOUT",
   "BOT_INTERNAL_UNAUTHORIZED",
   "DISCORD_USER_NOT_FOUND",
   "DISCORD_DM_FAILED",

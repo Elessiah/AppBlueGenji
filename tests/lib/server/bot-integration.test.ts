@@ -127,6 +127,27 @@ describe("bot-integration", () => {
     await expect(resolveDiscordUser("keryan")).rejects.toThrow("BOT_INTERNAL_UNREACHABLE");
   });
 
+  it("resolveDiscordUser distingue un bot trop lent d'un bot injoignable", async () => {
+    // Le bot balaie ses serveurs un à un : un tag absent de tous dépasse le
+    // délai. Le rendre en « injoignable » faisait passer un joueur hors des
+    // serveurs du bot pour une panne d'infrastructure.
+    jest
+      .spyOn(global, "fetch")
+      .mockRejectedValue(new DOMException("The operation timed out.", "TimeoutError"));
+
+    await expect(resolveDiscordUser("keryan")).rejects.toThrow("BOT_INTERNAL_TIMEOUT");
+  });
+
+  it("sendDiscordLoginCode rend aussi le dépassement de délai sous son nom", async () => {
+    jest
+      .spyOn(global, "fetch")
+      .mockRejectedValue(new DOMException("This operation was aborted", "AbortError"));
+
+    await expect(sendDiscordLoginCode("123456789", "123456")).rejects.toThrow(
+      "BOT_INTERNAL_TIMEOUT",
+    );
+  });
+
   it("returns empty stats when stats endpoint fails", async () => {
     jest.spyOn(global, "fetch").mockRejectedValue(new Error("ECONNREFUSED"));
 
