@@ -215,7 +215,10 @@ export function DiscordVerificationDialog({
 
         {linked ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <p style={{ fontSize: 12, color: "var(--ink-dim)", margin: 0, lineHeight: 1.6 }}>
+            {/* `--ink-mute` et non `--ink-dim` : c'est la seule phrase qui dit
+                pourquoi le bouton quitte la page, elle doit se lire avant le
+                clic. */}
+            <p style={{ fontSize: 12.5, color: "var(--ink-mute)", margin: 0, lineHeight: 1.6 }}>
               Ton compte est déjà relié à Discord : c&apos;est Discord qui confirme ton pseudo. Tu
               passes par sa page d&apos;autorisation, puis tu reviens ici, tag certifié — sans code ni
               serveur commun avec le bot.
