@@ -1,4 +1,8 @@
-import { describe, expect, it } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
+
+let mockPathname: string | null = "/tournois";
+jest.mock("next/navigation", () => ({ usePathname: () => mockPathname }));
+
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -19,6 +23,21 @@ const render = (changes: PrivacyChange[]) =>
   );
 
 describe("PrivacyChangesModal — rendu serveur", () => {
+  afterEach(() => {
+    mockPathname = "/tournois";
+  });
+
+  it("se tait sur /rgpd, seule page où elle couvrirait ce qu'elle invite à lire", () => {
+    mockPathname = "/rgpd";
+    expect(render([...PRIVACY_CHANGES])).not.toMatch(/role="dialog"/);
+  });
+
+  it("revient sur toute autre page, sous-pages de /rgpd comprises", () => {
+    for (const path of ["/", "/profil", "/rgpd/autre", "/regles"]) {
+      mockPathname = path;
+      expect(render([...PRIVACY_CHANGES])).toMatch(/role="dialog"/);
+    }
+  });
   it("ne rend rien quand tout est accepté", () => {
     expect(render([])).not.toMatch(/role="dialog"/);
   });
@@ -86,8 +105,11 @@ describe("mise en page racine", () => {
     expect(layout).toContain("void dispatchPrivacyChangeNotifications().catch(");
   });
 
-  it("se tait sur /rgpd et fait taire la modale de recrutement", () => {
-    expect(layout).toContain('const PRIVACY_POLICY_PAGE = "/rgpd"');
+  it("lit les changements sur toutes les pages et fait taire la modale de recrutement", () => {
+    // Le silence de `/rgpd` est décidé côté client : décidé ici, il suivrait le
+    // joueur d'un lien à l'autre (la mise en page n'est pas re-rendue).
+    expect(layout).toContain("const privacyChanges = await pendingChangesFor(user?.id);");
+    expect(layout).not.toContain("PRIVACY_POLICY_PAGE");
     expect(layout).toMatch(/privacyChanges\.length > 0 && ad\?\.highlight === "MODAL"/);
   });
 });

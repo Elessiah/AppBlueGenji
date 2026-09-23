@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
@@ -21,6 +22,14 @@ import {
 import styles from "./PrivacyChangesModal.module.css";
 
 type Step = "REVIEW" | "CONFIRM_DELETE";
+
+/**
+ * Seule page où la modale se tait : elle y couvrirait la politique qu'elle
+ * invite à lire. Décidé **ici**, au rendu client, et non par la mise en page :
+ * celle-ci n'est pas re-rendue d'un lien à l'autre, si bien qu'un silence
+ * décidé côté serveur sur `/rgpd` aurait suivi le joueur sur tout le site.
+ */
+export const PRIVACY_POLICY_PATH = "/rgpd";
 
 /**
  * Présente à un compte connecté les changements du traitement de ses données
@@ -49,9 +58,14 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
   const [answered, setAnswered] = useState(false);
   const [step, setStep] = useState<Step>("REVIEW");
   const [busy, setBusy] = useState(false);
+  // Chargement de l'aperçu, distinct de `busy` : « Retour » doit rester
+  // atteignable (et focalisable) pendant qu'on demande au serveur ce que la
+  // suppression ferait — seul le bouton de confirmation attend la réponse.
+  const [previewing, setPreviewing] = useState(false);
   const [subject, setSubject] = useState<ConfirmationSubject>(RETENTION_UNKNOWN);
 
-  const open = changes.length > 0 && !answered;
+  const pathname = usePathname();
+  const open = changes.length > 0 && !answered && pathname !== PRIVACY_POLICY_PATH;
   const dialogRef = useDialogBehavior({
     open,
     onClose: () => {
@@ -94,8 +108,8 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
   // « effacé » et « anonymisé » ne sont pas la même promesse. Injoignable, la
   // phrase reste celle qui ne promet ni l'un ni l'autre.
   const askDeletion = async () => {
-    if (busy) return;
-    setBusy(true);
+    if (busy || previewing) return;
+    setPreviewing(true);
     setSubject(RETENTION_UNKNOWN);
     setStep("CONFIRM_DELETE");
     try {
@@ -104,12 +118,12 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
     } catch {
       // Phrase prudente conservée.
     } finally {
-      setBusy(false);
+      setPreviewing(false);
     }
   };
 
   const deleteAccount = async () => {
-    if (busy) return;
+    if (busy || previewing) return;
     setBusy(true);
     try {
       const response = await fetch("/api/profile", { method: "DELETE" });
@@ -137,7 +151,7 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
         aria-modal="true"
         aria-labelledby="privacy-changes-title"
         aria-describedby="privacy-changes-intro"
-        aria-busy={busy}
+        aria-busy={busy || previewing}
         tabIndex={-1}
       >
         {step === "REVIEW" ? (
@@ -184,7 +198,7 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
             </p>
 
             <div className={styles.actions}>
-              <button type="button" className={styles.refuse} onClick={askDeletion} disabled={busy}>
+              <button type="button" className={styles.refuse} onClick={askDeletion} disabled={busy || previewing}>
                 Je refuse, je supprime mon compte
               </button>
               <CyberButton variant="primary" type="button" onClick={accept} disabled={busy}>
@@ -215,8 +229,13 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
               <CyberButton variant="ghost" type="button" onClick={() => setStep("REVIEW")} disabled={busy}>
                 Retour
               </CyberButton>
-              <button type="button" className={styles.confirmDelete} onClick={deleteAccount} disabled={busy}>
-                {busy ? "Patiente…" : "Supprimer définitivement mon compte"}
+              <button
+                type="button"
+                className={styles.confirmDelete}
+                onClick={deleteAccount}
+                disabled={busy || previewing}
+              >
+                {busy ? "Suppression…" : "Supprimer définitivement mon compte"}
               </button>
             </div>
           </>

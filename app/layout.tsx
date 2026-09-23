@@ -97,13 +97,6 @@ export const metadata: Metadata = {
 const RECRUITMENT_PAGE = "/recrutement";
 
 /**
- * Page où la modale des changements de confidentialité se tait : elle y
- * couvrirait la politique même qu'elle invite à lire. Elle revient à la page
- * suivante.
- */
-const PRIVACY_POLICY_PAGE = "/rgpd";
-
-/**
  * Les changements de confidentialité que le compte connecté n'a pas acceptés.
  * Une panne de lecture ne doit pas faire tomber la mise en page : la modale
  * reviendra au chargement suivant.
@@ -169,9 +162,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // est mémoïsé par requête (`cache()` de React), donc cet appel ne coûte rien
   // de plus sur les pages où `PublicHeader`/`PublicFooter` le lisent déjà.
   const user = await getCurrentUser();
-  const pathname = requestHeaders.get(PATHNAME_HEADER);
-  const privacyChanges =
-    pathname === PRIVACY_POLICY_PAGE ? [] : await pendingChangesFor(user?.id);
+  // Lus sur **toutes** les pages, `/rgpd` comprise : la modale s'y tait côté
+  // client. Décidé ici, le silence survivrait à la navigation — la mise en
+  // page racine n'est pas re-rendue d'un lien à l'autre, et un joueur arrivé
+  // par `/rgpd` parcourrait ensuite le site sans jamais avoir à répondre.
+  const privacyChanges = await pendingChangesFor(user?.id);
   // L'annonce Discord des mêmes changements, entraînée par le trafic comme les
   // rappels de match : étranglée, à vol unique, jamais attendue — la page ne
   // doit ni ralentir ni tomber à cause du bot.
