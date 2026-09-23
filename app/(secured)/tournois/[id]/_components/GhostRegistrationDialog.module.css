@@ -112,12 +112,10 @@
   background: rgba(90, 200, 255, 0.1);
 }
 
-.option input {
-  width: auto;
-  margin: 0;
-  accent-color: var(--blue-400, var(--accent-blue));
-  cursor: pointer;
-}
+/* L'apparence de la case vient de `globals.css`, posée sur l'élément : la ligne
+   n'a plus rien à en redire — et le `width: auto` qu'on trouvait ici la rendait
+   justement à sa taille système, celle dont il fallait sortir. `.option` centre
+   déjà ses enfants, il ne reste donc aucune règle à écrire. */
 
 .optionName {
   overflow: hidden;
