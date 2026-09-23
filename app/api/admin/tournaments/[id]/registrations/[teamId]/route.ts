@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
-import { sendBotLog } from "@/lib/server/bot-integration";
 import { fail, ok } from "@/lib/server/http";
+import { publishStaffAction } from "@/lib/server/staff-audit";
 import { removeTournamentEntrant } from "@/lib/server/tournaments/registration-removal";
 import { formatEntrantRemovedLog } from "@/lib/shared/bot-logs";
 import { ENTRANT_REMOVAL_BLOCK_MESSAGES } from "@/lib/shared/entrant-removal";
@@ -45,18 +45,16 @@ export async function DELETE(
     // Après le commit, au meilleur effort : le bot est optionnel, et la ligne
     // d'inscription est déjà effacée — il n'y a rien à annuler si le message ne
     // part pas. Le journal est en revanche le seul endroit où ce retrait laisse
-    // une trace, d'où l'auteur nommé.
-    void sendBotLog(
+    // une trace — l'auteur y est « le staff », et nommé dans pm2.
+    publishStaffAction(
       formatEntrantRemovedLog({
         tournament: { id: removed.tournamentId, name: removed.tournamentName },
-        entrantName: removed.entrantName,
+        entrant: { name: removed.entrantName, participantType: removed.participantType },
         registeredTeams: removed.registeredTeams,
         maxTeams: removed.maxTeams,
-        participantType: removed.participantType,
-        actorPseudo: user.pseudo,
-        actorId: user.id,
       }),
-    ).catch(() => undefined);
+      { id: user.id, pseudo: user.pseudo },
+    );
 
     return ok({ removed });
   } catch (error) {

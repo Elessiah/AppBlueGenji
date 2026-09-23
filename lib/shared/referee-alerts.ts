@@ -78,6 +78,7 @@
  */
 import type { BotEventKind, BotLogTournament } from "./bot-logs";
 import { matchRoundLabel } from "./discord-notifications";
+import { entrantLabel, type LogEntrant } from "./log-privacy";
 
 /**
  * Canal de destination d'un évènement.
@@ -133,8 +134,9 @@ export interface RefereeAlertContext {
   matchId: number;
   bracket: string;
   roundNumber: number;
-  team1Name: string;
-  team2Name: string;
+  /** Les engagées : un joueur ne part jamais sur Discord par son pseudo (`entrantLabel`). */
+  team1: LogEntrant;
+  team2: LogEntrant;
 }
 
 /**
@@ -153,7 +155,7 @@ function alertLine(emoji: string, reason: string, context: RefereeAlertContext):
   const round = matchRoundLabel(context.bracket, context.roundNumber);
   const line =
     `${emoji} Arbitrage requis — « ${context.tournament.name} » (#${context.tournament.id})` +
-    ` · ${round} : ${context.team1Name} vs ${context.team2Name} (match #${context.matchId})` +
+    ` · ${round} : ${entrantLabel(context.team1)} vs ${entrantLabel(context.team2)} (match #${context.matchId})` +
     ` — ${reason}.`;
   return context.tournamentUrl ? `${line} ${context.tournamentUrl}` : line;
 }

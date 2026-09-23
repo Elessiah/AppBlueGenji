@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteTournament } from "@/lib/server/tournaments-service";
-import { sendBotLog } from "@/lib/server/bot-integration";
+import { publishStaffAction } from "@/lib/server/staff-audit";
 import { formatTournamentDeletedLog } from "@/lib/shared/bot-logs";
 
 /**
@@ -29,15 +29,13 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     const deleted = await deleteTournament(tournamentId);
 
     // Une suppression définitive ne laisse rien derrière elle : la trace côté
-    // bot est le seul journal qui subsiste. L'échec est délibérément avalé — le
-    // bot est optionnel, et le tournoi est déjà supprimé : rien à annuler.
-    void sendBotLog(
-      formatTournamentDeletedLog({
-        tournament: { id: deleted.id, name: deleted.name },
-        actorPseudo: user.pseudo,
-        actorId: user.id,
-      }),
-    ).catch(() => undefined);
+    // bot est le seul journal qui subsiste — l'auteur y est « le staff », et
+    // nommé dans pm2. L'échec d'envoi est avalé : le bot est optionnel, et le
+    // tournoi est déjà supprimé.
+    publishStaffAction(
+      formatTournamentDeletedLog({ tournament: { id: deleted.id, name: deleted.name } }),
+      { id: user.id, pseudo: user.pseudo },
+    );
 
     return ok({ deleted });
   } catch (error) {

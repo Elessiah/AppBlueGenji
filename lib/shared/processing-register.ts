@@ -23,7 +23,7 @@ import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "
 import { SITE_VISIT_WINDOW_MINUTES } from "@/lib/shared/site-visits";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-09-23";
+export const REGISTER_UPDATED_AT = "2026-09-24";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -205,15 +205,25 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     name: "Journal d'activité du staff sur Discord",
     purpose: "Tenir le staff informé des faits marquants de la plateforme",
     subPurposes: [
-      "Inscriptions de joueurs, inscriptions et abandons en tournoi, fins de match, clôtures",
-      "Traçabilité des gestes d'arbitrage (pénalités, retraits d'engagés, retours en arrière)",
+      "Arrivées de joueurs, inscriptions et abandons en tournoi, fins de match, clôtures",
+      "Traçabilité des gestes d'arbitrage (pénalités, retraits d'engagés, retours en arrière), pour la modération",
     ],
     legalBasis: "Intérêt légitime (administration et contrôle de l'arbitrage)",
-    dataSubjects: ["Joueurs", "Staff"],
-    dataCategories: ["Pseudos du site, noms d'équipe, scores, auteur des gestes d'arbitrage"],
+    dataSubjects: ["Staff"],
+    dataCategories: [
+      "Sur Discord : noms d'équipe, scores, noms des tournois — aucun pseudo de joueur (« un joueur », y compris en tournoi individuel) et aucun membre du staff nommé (« le staff »)",
+      "Dans les journaux du serveur : pseudo et identifiant du membre du staff auteur d'un geste d'arbitrage",
+    ],
     sensitiveData: "Aucune",
-    retention: ["Messages conservés dans un salon Discord réservé au staff, sans purge automatique"],
-    recipients: ["Staff de l'association ayant accès au salon", "Discord (hébergement du salon)"],
+    retention: [
+      "Messages Discord : conservés dans un salon réservé au staff, purgé à la main par l'association",
+      "Journaux du serveur : selon leur rotation automatique",
+    ],
+    recipients: [
+      "Staff de l'association ayant accès au salon",
+      "Discord (hébergement du salon)",
+      "Responsable technique (journaux du serveur)",
+    ],
     transfers: ["États-Unis : Discord, dans le cadre des garanties propres à Discord"],
     security: [...COMMON_SECURITY, "Salon privé, accès restreint par rôle Discord"],
   },
@@ -225,20 +235,22 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     legalBasis: "Intérêt légitime (statistiques de fréquentation, sans cookie ni traceur tiers)",
     dataSubjects: ["Visiteurs du site"],
     dataCategories: [
-      "Empreinte salée et non réversible (SHA-256) dérivée du compte, ou de l'adresse IP et du navigateur",
+      "Empreinte salée par un secret du serveur (SHA-256), dérivée du compte ou de l'adresse IP et du navigateur : elle rend un visiteur unique sans permettre de remonter à lui",
       "Page consultée (sans paramètres d'URL), date",
-      "Identifiant du compte si le visiteur est connecté",
+      "Indicateur « visiteur connecté » (oui / non), sans le compte concerné",
       `Plusieurs chargements d'un même visiteur en ${SITE_VISIT_WINDOW_MINUTES} minutes ne comptent qu'une visite`,
     ],
     sensitiveData: "Aucune",
     retention: [
-      "Visites conservées sans limite de durée pour le total depuis la mise en service",
-      "Le lien vers un compte est retiré à la suppression de ce compte",
-      "Adresse IP et navigateur jamais enregistrés",
+      "Visites conservées sans limite de durée pour le total depuis la mise en service — elles ne désignent aucune personne",
+      "Adresse IP, navigateur et identifiant du compte jamais enregistrés",
     ],
     recipients: ["Staff de l'association (commande Discord des statistiques)"],
     transfers: ["Aucun"],
-    security: [...COMMON_SECURITY, "Aucun cookie de mesure, empreinte salée par un secret du serveur"],
+    security: [
+      ...COMMON_SECURITY,
+      "Aucun cookie de mesure ; le secret de salage n'est ni en base ni dans les sauvegardes, et sans lui aucune visite n'est comptée",
+    ],
   },
   {
     ref: "T07",

@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
-import { sendBotLog } from "@/lib/server/bot-integration";
 import { fail, ok } from "@/lib/server/http";
+import { publishStaffAction } from "@/lib/server/staff-audit";
 import { rollbackCurrentRound } from "@/lib/server/tournaments/rollback";
 import { formatRoundRolledBackLog } from "@/lib/shared/bot-logs";
 import { can } from "@/lib/shared/permissions";
@@ -48,16 +48,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
     // Après le commit, et au meilleur effort : le bot est optionnel, le stade
     // est déjà effacé, il n'y a rien à annuler si le message ne part pas.
-    void sendBotLog(
+    publishStaffAction(
       formatRoundRolledBackLog({
         tournament: { id: rolledBack.tournamentId, name: rolledBack.tournamentName },
         roundLabel: rolledBack.label,
         clearedMatches: rolledBack.clearedMatches,
         reopenedTournament: rolledBack.reopenedTournament,
-        actorPseudo: user.pseudo,
-        actorId: user.id,
       }),
-    ).catch(() => undefined);
+      { id: user.id, pseudo: user.pseudo },
+    );
 
     return ok({ rolledBack });
   } catch (error) {

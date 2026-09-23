@@ -8,8 +8,13 @@
  * table se répercute d'elle-même.
  *
  * Vie privée : seule une empreinte SHA-256 salée est stockée
- * ({@link lib/shared/site-visits.visitorIdentitySource}) — jamais l'IP ni le
- * user-agent.
+ * ({@link lib/shared/site-visits.visitorIdentitySource}) — jamais l'IP, ni le
+ * user-agent, ni l'identifiant du compte. L'empreinte rend un visiteur unique
+ * sans permettre de remonter à lui : le sel est un secret du serveur, absent de
+ * la base comme de ses sauvegardes, si bien qu'une table lue ailleurs — une
+ * archive restaurée, une copie volée — ne se rapproche d'aucune personne. Seul
+ * un drapeau `authenticated` dit qu'une visite venait d'un compte connecté,
+ * sans dire lequel.
  *
  * Le résultat est poussé au bot Discord par le canal interne déjà existant
  * (`lib/server/bot-integration.ts`), qui le sert à la commande `/stats-site`.
@@ -68,18 +73,28 @@ interface VisitStatsRow extends RowDataPacket {
 
 /**
  * Sel de hachage des empreintes. `VISIT_HASH_SALT` en priorité ; à défaut, le
- * secret interne déjà partagé avec le bot. Sans aucun des deux (dev local), un
- * sel constant garde la fonctionnalité utilisable — les empreintes restent
- * inexploitables hors de la base, mais théoriquement rejouables : renseigner la
- * variable en production.
+ * secret interne déjà partagé avec le bot.
+ *
+ * **C'est le sel qui rend l'empreinte irréversible**, et non le hachage : un
+ * identifiant de compte se devine en quelques milliers d'essais, une adresse
+ * IPv4 en quatre milliards — un SHA-256 sans secret se renverse donc par simple
+ * énumération. D'où le refus d'un sel connu en production : avec la constante de
+ * repli, n'importe qui retrouverait qui a visité quoi. Rendre `null` fait
+ * **renoncer à compter** (voir {@link recordSiteVisit}) plutôt que de compter
+ * de façon réversible. Hors production (dev local, tests), la constante garde la
+ * fonctionnalité utilisable.
  */
-function visitHashSalt(): string {
-  return process.env.VISIT_HASH_SALT?.trim() || process.env.BOT_INTERNAL_TOKEN?.trim() || "bg-site-visits";
+export function visitHashSalt(env: NodeJS.ProcessEnv = process.env): string | null {
+  const secret = env.VISIT_HASH_SALT?.trim() || env.BOT_INTERNAL_TOKEN?.trim();
+  if (secret) return secret;
+  return env.NODE_ENV === "production" ? null : "bg-site-visits";
 }
 
-function hashVisitorIdentity(source: string): string {
-  return createHash("sha256").update(`${visitHashSalt()}:${source}`).digest("hex");
+function hashVisitorIdentity(salt: string, source: string): string {
+  return createHash("sha256").update(`${salt}:${source}`).digest("hex");
 }
+
+let missingSaltReported = false;
 
 function rateLimitKey(ip: string | null | undefined): string {
   return (ip ?? "").trim() || "unknown-ip";
@@ -172,16 +187,28 @@ export async function recordSiteVisit(input: {
   // plafond d'insertions par IP, lui, tient.
   if (isVisitRateExceeded(input.ip)) return { recorded: false };
 
-  const visitorKey = hashVisitorIdentity(visitorIdentitySource(input));
+  const salt = visitHashSalt();
+  if (salt === null) {
+    if (!missingSaltReported) {
+      missingSaltReported = true;
+      console.error(
+        "[site-visits] Ni VISIT_HASH_SALT ni BOT_INTERNAL_TOKEN : les visites ne sont pas comptées " +
+          "(une empreinte au sel connu se renverserait par énumération).",
+      );
+    }
+    return { recorded: false };
+  }
+
+  const visitorKey = hashVisitorIdentity(salt, visitorIdentitySource(input));
   const path = normalizeVisitPath(input.path);
-  const userId =
-    typeof input.userId === "number" && Number.isInteger(input.userId) && input.userId > 0
-      ? input.userId
-      : null;
+  // Le compte n'est **pas** écrit : seulement le fait qu'il y en avait un, pour
+  // distinguer les visiteurs connectés dans les statistiques.
+  const authenticated =
+    typeof input.userId === "number" && Number.isInteger(input.userId) && input.userId > 0 ? 1 : 0;
 
   const db = await getDatabase();
   const [result] = await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_site_visits (visitor_key, user_id, path)
+    `INSERT INTO bg_site_visits (visitor_key, authenticated, path)
      SELECT ?, ?, ?
      FROM DUAL
      WHERE NOT EXISTS (
@@ -192,7 +219,7 @@ export async function recordSiteVisit(input: {
          LIMIT 1
        ) AS recent
      )`,
-    [visitorKey, userId, path, visitorKey, SITE_VISIT_WINDOW_MINUTES],
+    [visitorKey, authenticated, path, visitorKey, SITE_VISIT_WINDOW_MINUTES],
   );
 
   const recorded = result.affectedRows > 0;
@@ -216,7 +243,7 @@ export async function getSiteVisitStats(): Promise<SiteVisitStats | null> {
       `SELECT
          COUNT(*) AS total_visits,
          COUNT(DISTINCT visitor_key) AS unique_visitors,
-         COUNT(DISTINCT user_id) AS identified_visitors,
+         COUNT(DISTINCT CASE WHEN authenticated = 1 THEN visitor_key END) AS identified_visitors,
          SUM(created_at >= NOW() - INTERVAL 1 DAY) AS visits_24h,
          COUNT(DISTINCT CASE WHEN created_at >= NOW() - INTERVAL 1 DAY THEN visitor_key END) AS unique_24h,
          SUM(created_at >= NOW() - INTERVAL 7 DAY) AS visits_7d,

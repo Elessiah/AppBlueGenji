@@ -10,7 +10,8 @@
  * - **visiteurs uniques** : nombre d'empreintes de visiteur distinctes.
  *
  * L'empreinte est dérivée de {@link visitorIdentitySource} puis hachée côté
- * serveur : aucune IP n'est jamais stockée en clair. Un visiteur connecté est
+ * serveur avec un sel secret : ni l'IP ni le compte ne sont stockés, et
+ * l'empreinte ne se renverse pas sans ce secret. Un visiteur connecté est
  * identifié par son compte (donc reconnu d'un appareil à l'autre) ; un visiteur
  * anonyme l'est par le couple IP + user-agent. Conséquence assumée : un même
  * humain compté anonyme puis connecté pèse deux visiteurs uniques.

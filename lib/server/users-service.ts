@@ -339,14 +339,10 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
  * avale déjà ses erreurs ; le `catch` ne couvre que le rejet qu'une version
  * future pourrait laisser passer, qui deviendrait sinon un rejet non traité.
  */
-function announcePlayerSignup(
-  userId: number,
-  pseudo: string,
-  provider: PlayerSignupProvider,
-): void {
-  void sendBotLog(
-    formatPlayerSignupLog({ player: { id: userId, pseudo }, provider }),
-  ).catch(() => undefined);
+function announcePlayerSignup(provider: PlayerSignupProvider): void {
+  // Ni pseudo ni identifiant : le canal Discord ne nomme aucun joueur
+  // (`lib/shared/log-privacy.ts`).
+  void sendBotLog(formatPlayerSignupLog({ provider })).catch(() => undefined);
 }
 
 export async function createOrGetGoogleUser(profile: GoogleProfilePayload): Promise<number> {
@@ -389,7 +385,7 @@ export async function createOrGetGoogleUser(profile: GoogleProfilePayload): Prom
   );
 
   const userId = Number(created.insertId);
-  announcePlayerSignup(userId, pseudo, "GOOGLE");
+  announcePlayerSignup("GOOGLE");
   await adoptRemoteAvatar(userId, profile.picture);
   return userId;
 }
@@ -521,7 +517,7 @@ export async function createOrGetDiscordUser(
   );
 
   const userId = Number(created.insertId);
-  announcePlayerSignup(userId, pseudo, "DISCORD");
+  announcePlayerSignup("DISCORD");
   await adoptRemoteAvatar(userId, avatarUrl ?? undefined);
   return userId;
 }
@@ -584,7 +580,7 @@ export async function createOrGetBlizzardUser(sub: string, battletag: string | n
   );
 
   const userId = Number(created.insertId);
-  announcePlayerSignup(userId, pseudo, "BLIZZARD");
+  announcePlayerSignup("BLIZZARD");
   return userId;
 }
 
@@ -1201,10 +1197,9 @@ export async function getAccountDeletionPlan(userId: number): Promise<AccountDel
  * Lecture des traces et écriture vivent dans **une seule transaction**, sous un
  * verrou pris sur la ligne du compte : une trace relue hors transaction laisse
  * un `await` entre la question et la réponse, et l'effacement d'un compte ne se
- * défait pas. La transaction ferme au passage l'état intermédiaire des deux
- * écritures de l'effacement — un `DELETE` refusé après le détachement des
- * visites laissait un compte vivant dont la fréquentation était anonymisée pour
- * toujours.
+ * défait pas. La transaction ferme au passage l'état intermédiaire de ses
+ * écritures — un `DELETE` refusé après la purge des défis de connexion ne laisse
+ * pas un compte à moitié défait.
  *
  * Deux choses échappent à la transaction, chacune pour sa raison : le **fichier
  * de l'avatar**, qu'un `unlink` ne rendrait pas (il part après le commit), et
@@ -1264,21 +1259,9 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
 
     plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
 
-    // **Les visites se détachent dans les deux modes**, et c'est pour cela que
-    // le geste vit ici plutôt que dans `eraseAccount`. `bg_site_visits` n'a
-    // **aucune** clé étrangère (une cascade y effacerait l'historique de
-    // fréquentation) : ce qu'il faut retirer est le lien vers une personne, pas
-    // le fait qu'une page ait été vue — et une anonymisation qui garderait ce
-    // lien laisserait la trace de navigation complète attachée à une ligne que
-    // son palmarès public suffit souvent à rapprocher d'un nom. La ligne garde
-    // son empreinte salée, donc elle continue de compter comme visite ; elle ne
-    // compte simplement plus comme visite **identifiée**.
-    //
-    // Posé **avant** la bascule : après l'effacement, la ligne du compte n'est
-    // plus là pour dire de qui il s'agissait.
-    await connection.execute(`UPDATE bg_site_visits SET user_id = NULL WHERE user_id = ?`, [
-      userId,
-    ]);
+    // Les visites n'ont rien à détacher : `bg_site_visits` ne garde aucun lien
+    // vers un compte, seulement une empreinte salée qu'on ne sait pas renverser
+    // (`lib/server/site-visits-service.ts`).
 
     if (plan.mode === "ERASE") {
       await eraseAccount(connection, userId);
@@ -1296,7 +1279,7 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
     // joueur : un soir calme, l'identifiant Discord du compte effacé reste en
     // base indéfiniment, alors qu'on vient de promettre qu'il ne resterait rien.
     // C'est la même coordonnée que le tag, et le seul geste des deux modes qui
-    // regarde une table hors de `bg_users`, avec le détachement des visites.
+    // regarde une table hors de `bg_users`.
     const discordId = locked[0].discord_id;
     if (discordId) {
       await connection.execute(
@@ -1350,9 +1333,8 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
  * Les cascades déjà déclarées font tout (sessions, appartenances, invitations
  * reçues) ; `bg_endurance_penalties.created_by` et `bg_team_invitations`
  * .`created_by` passent à `NULL`, la sanction restant due et l'invitation
- * restant l'acte de l'équipe. Les visites, elles, sont détachées par
- * `deleteOwnAccount` avant la bascule : elles n'ont aucune clé étrangère et le
- * geste vaut pour les **deux** modes.
+ * restant l'acte de l'équipe. Les visites n'ont rien à suivre : elles ne
+ * désignent aucun compte.
  */
 async function eraseAccount(connection: PoolConnection, userId: number): Promise<void> {
   await connection.execute(`DELETE FROM bg_users WHERE id = ?`, [userId]);

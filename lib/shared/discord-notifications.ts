@@ -18,6 +18,7 @@
  * base ni réseau, pour que la règle soit testable et que serveur et interface ne
  * puissent pas en avoir deux lectures.
  */
+import { ANONYMOUS_PLAYER_LABEL, entrantLabel, type LogEntrant } from "./log-privacy";
 
 /** Clé d'un palier de rappel. Persistée (`bg_match_reminders.offset_key`). */
 export type MatchReminderOffsetKey = "P7D" | "P1D" | "PT1H";
@@ -296,13 +297,25 @@ export function normalizeIssueReportMessage(raw: unknown): string | null {
 export interface IssueReportContext {
   tournamentName: string;
   tournamentUrl: string | null;
-  /** Pseudo de l'auteur, tel qu'il apparaît sur le site. */
-  reporterPseudo: string;
-  /** Engagée de l'auteur (son équipe, ou son propre pseudo en tournoi solo). */
-  entrantName: string;
-  /** Manche visée, `null` pour un signalement portant sur tout le tournoi. */
-  matchLabel: string | null;
+  /**
+   * Engagée de l'auteur. L'auteur lui-même n'est **pas** nommé : le message part
+   * sur Discord, qui ne reçoit aucun pseudo de joueur (`lib/shared/log-privacy.ts`).
+   * L'arbitre répond par l'équipe, ou par la page du tournoi.
+   */
+  entrant: LogEntrant;
+  /**
+   * Manche visée, `null` pour un signalement portant sur tout le tournoi. Ses
+   * engagées passent elles aussi par `entrantLabel`.
+   */
+  match: { round: string; team1: LogEntrant | null; team2: LogEntrant | null; id: number } | null;
   message: string;
+}
+
+/** « un joueur de l'équipe X », ou « un joueur » en tournoi individuel. */
+function reporterLabel(entrant: LogEntrant): string {
+  return entrant.participantType === "SOLO"
+    ? ANONYMOUS_PLAYER_LABEL
+    : `${ANONYMOUS_PLAYER_LABEL} de l'équipe ${entrant.name}`;
 }
 
 /**
@@ -315,8 +328,10 @@ export function buildIssueReportMessage(context: IssueReportContext): string {
   const lines = [
     "**Signalement de problème**",
     `Tournoi : ${context.tournamentName}`,
-    context.matchLabel ? `Match : ${context.matchLabel}` : "Portée : tournoi entier",
-    `Auteur : ${context.reporterPseudo} (${context.entrantName})`,
+    context.match
+      ? `Match : ${context.match.round} — ${context.match.team1 ? entrantLabel(context.match.team1) : "TBD"} vs ${context.match.team2 ? entrantLabel(context.match.team2) : "TBD"} (#${context.match.id})`
+      : "Portée : tournoi entier",
+    `Auteur : ${reporterLabel(context.entrant)}`,
     "",
     context.message,
   ];

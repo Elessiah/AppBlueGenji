@@ -12,24 +12,31 @@
  * sans quoi n'importe quel visiteur pourrait faire sonner le téléphone des
  * arbitres.
  *
+ * **L'auteur n'est pas nommé** : le message part sur Discord, qui ne reçoit
+ * aucun pseudo de joueur (`lib/shared/log-privacy.ts`). Il est désigné par son
+ * équipe — « un joueur de l'équipe X » —, et en tournoi individuel par « un
+ * joueur » ; l'arbitre remonte à lui par la page du tournoi.
+ *
  * La rédaction vit dans le module pur `lib/shared/discord-notifications.ts`.
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase, withConnection } from "@/lib/server/database";
+import { toParticipantType } from "@/lib/shared/participants";
 import { pushRefereeAlert } from "@/lib/server/bot-integration";
 import {
   buildIssueReportMessage,
   matchRoundLabel,
   normalizeIssueReportMessage,
 } from "@/lib/shared/discord-notifications";
+import type { LogEntrant } from "@/lib/shared/log-privacy";
 import { tournamentPageUrl } from "./app-url";
 import { resolveUserEntrantTeamId } from "./registration";
 import { loadTournamentRow } from "./repository";
 
 type EntrantRow = RowDataPacket & {
   tournament_name: string;
+  participant_type: string | null;
   entrant_name: string;
-  reporter_pseudo: string;
 };
 
 type MatchRow = RowDataPacket & {
@@ -78,20 +85,21 @@ export async function reportTournamentIssue(
   if (entrantTeamId === null) throw new Error("NOT_REGISTERED");
 
   const [rows] = await db.execute<EntrantRow[]>(
-    `SELECT t.name AS tournament_name, e.name AS entrant_name, u.pseudo AS reporter_pseudo
+    `SELECT t.name AS tournament_name, t.participant_type, e.name AS entrant_name
        FROM bg_tournaments t
        JOIN bg_tournament_registrations r
          ON r.tournament_id = t.id AND r.team_id = ?
        JOIN bg_teams e ON e.id = r.team_id
-       JOIN bg_users u ON u.id = ?
       WHERE t.id = ?
       LIMIT 1`,
-    [entrantTeamId, userId, tournamentId],
+    [entrantTeamId, tournamentId],
   );
   if (rows.length === 0) throw new Error("NOT_REGISTERED");
   const context = rows[0];
+  const participantType = toParticipantType(context.participant_type);
 
-  let matchLabel: string | null = null;
+  let match: { round: string; team1: LogEntrant | null; team2: LogEntrant | null; id: number } | null =
+    null;
   if (matchId !== null) {
     const [matchRows] = await db.execute<MatchRow[]>(
       `SELECT m.bracket, m.round_number,
@@ -106,19 +114,21 @@ export async function reportTournamentIssue(
     // Le match doit appartenir au tournoi : sans ce contrôle, un identifiant
     // pris ailleurs ferait décrire à l'arbitre une manche d'un autre plateau.
     if (matchRows.length === 0) throw new Error("MATCH_NOT_FOUND");
-    const match = matchRows[0];
-    const round = matchRoundLabel(String(match.bracket), Number(match.round_number));
-    const opponents = `${match.team1_name ?? "TBD"} vs ${match.team2_name ?? "TBD"}`;
-    matchLabel = `${round} — ${opponents} (#${matchId})`;
+    const row = matchRows[0];
+    match = {
+      round: matchRoundLabel(String(row.bracket), Number(row.round_number)),
+      team1: row.team1_name ? { name: row.team1_name, participantType } : null,
+      team2: row.team2_name ? { name: row.team2_name, participantType } : null,
+      id: matchId,
+    };
   }
 
   const alert = await pushRefereeAlert(
     buildIssueReportMessage({
       tournamentName: String(context.tournament_name),
       tournamentUrl: tournamentPageUrl(tournamentId),
-      reporterPseudo: String(context.reporter_pseudo),
-      entrantName: String(context.entrant_name),
-      matchLabel,
+      entrant: { name: String(context.entrant_name), participantType },
+      match,
       message,
     }),
     "issue-report",

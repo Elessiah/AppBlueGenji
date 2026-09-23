@@ -53,6 +53,7 @@ import {
   type BotEventKind,
 } from "@/lib/shared/bot-logs";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
+import { staffAuditLine, type LogEntrant } from "@/lib/shared/log-privacy";
 import { toParticipantType } from "@/lib/shared/participants";
 import {
   botEventChannel,
@@ -668,6 +669,7 @@ type TournamentLogRow = RowDataPacket & {
   max_teams: number;
   participant_type: string | null;
   start_at: Date | string | null;
+  organizer_id: number | null;
   organizer_pseudo: string | null;
   registered_teams: number;
   champion_name: string | null;
@@ -688,6 +690,7 @@ async function loadTournament(tournamentId: number): Promise<TournamentLogRow | 
         t.max_teams,
         t.participant_type,
         t.start_at,
+        u.id AS organizer_id,
         u.pseudo AS organizer_pseudo,
         (SELECT COUNT(*) FROM bg_tournament_registrations r WHERE r.tournament_id = t.id)
           AS registered_teams,
@@ -703,6 +706,14 @@ async function loadTournament(tournamentId: number): Promise<TournamentLogRow | 
     [tournamentId],
   );
   return rows[0] ?? null;
+}
+
+/**
+ * Un engagé tel que le journal le reçoit : son nom, et le type de son tournoi —
+ * qui décide s'il peut partir sur Discord (`lib/shared/log-privacy.ts`).
+ */
+function logEntrant(name: string, tournament: TournamentLogRow): LogEntrant {
+  return { name, participantType: toParticipantType(tournament.participant_type) };
 }
 
 async function loadEntrantName(teamId: number): Promise<string | null> {
@@ -727,6 +738,7 @@ type MatchLogRow = RowDataPacket & {
   team2_name: string | null;
   tournament_id: number;
   tournament_name: string;
+  participant_type: string | null;
 };
 
 async function loadMatch(matchId: number): Promise<MatchLogRow | null> {
@@ -744,7 +756,8 @@ async function loadMatch(matchId: number): Promise<MatchLogRow | null> {
         t1.name AS team1_name,
         t2.name AS team2_name,
         tr.id AS tournament_id,
-        tr.name AS tournament_name
+        tr.name AS tournament_name,
+        tr.participant_type
        FROM bg_matches m
        JOIN bg_tournaments tr ON tr.id = m.tournament_id
        LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
@@ -766,14 +779,15 @@ async function loadMatch(matchId: number): Promise<MatchLogRow | null> {
 async function loadRefereeAlertContext(matchId: number): Promise<RefereeAlertContext | null> {
   const match = await loadMatch(matchId);
   if (!match || !match.team1_name || !match.team2_name) return null;
+  const participantType = toParticipantType(match.participant_type);
   return {
     tournament: { id: Number(match.tournament_id), name: match.tournament_name },
     tournamentUrl: tournamentPageUrl(Number(match.tournament_id)),
     matchId: Number(match.id),
     bracket: String(match.bracket),
     roundNumber: Number(match.round_number),
-    team1Name: match.team1_name,
-    team2Name: match.team2_name,
+    team1: { name: match.team1_name, participantType },
+    team2: { name: match.team2_name, participantType },
   };
 }
 
@@ -782,15 +796,24 @@ async function resolveOne(entry: PendingBotLog): Promise<string | null> {
     case "tournament_created": {
       const tournament = await loadTournament(entry.tournamentId);
       if (!tournament) return null;
-      return formatTournamentCreatedLog({
+      const message = formatTournamentCreatedLog({
         tournament: { id: Number(tournament.id), name: tournament.name },
         format: tournament.format,
         game: tournament.game,
         maxTeams: Number(tournament.max_teams),
         participantType: toParticipantType(tournament.participant_type),
-        organizerPseudo: tournament.organizer_pseudo ?? "le staff",
         startAt: tournament.start_at,
       });
+      // L'organisateur n'est pas nommé sur Discord ; il l'est dans pm2.
+      if (tournament.organizer_id !== null && tournament.organizer_pseudo !== null) {
+        console.info(
+          staffAuditLine(message, {
+            id: Number(tournament.organizer_id),
+            pseudo: tournament.organizer_pseudo,
+          }),
+        );
+      }
+      return message;
     }
 
     case "registration": {
@@ -801,10 +824,9 @@ async function resolveOne(entry: PendingBotLog): Promise<string | null> {
       if (!tournament || !entrantName) return null;
       return formatRegistrationLog({
         tournament: { id: Number(tournament.id), name: tournament.name },
-        entrantName,
+        entrant: logEntrant(entrantName, tournament),
         registeredTeams: Number(tournament.registered_teams),
         maxTeams: Number(tournament.max_teams),
-        participantType: toParticipantType(tournament.participant_type),
         byStaff: entry.byStaff,
       });
     }
@@ -817,7 +839,7 @@ async function resolveOne(entry: PendingBotLog): Promise<string | null> {
       if (!tournament || !entrantName) return null;
       return formatForfeitLog({
         tournament: { id: Number(tournament.id), name: tournament.name },
-        entrantName,
+        entrant: logEntrant(entrantName, tournament),
       });
     }
 
@@ -840,8 +862,8 @@ async function resolveOne(entry: PendingBotLog): Promise<string | null> {
         tournament: { id: Number(match.tournament_id), name: match.tournament_name },
         bracket: String(match.bracket),
         roundNumber: Number(match.round_number),
-        team1Name: match.team1_name,
-        team2Name: match.team2_name,
+        team1: { name: match.team1_name, participantType: toParticipantType(match.participant_type) },
+        team2: { name: match.team2_name, participantType: toParticipantType(match.participant_type) },
         team1Score: match.team1_score === null ? null : Number(match.team1_score),
         team2Score: match.team2_score === null ? null : Number(match.team2_score),
         forfeit,
@@ -877,7 +899,8 @@ async function resolveOne(entry: PendingBotLog): Promise<string | null> {
       if (!tournament) return null;
       return formatTournamentFinishedLog({
         tournament: { id: Number(tournament.id), name: tournament.name },
-        championName: tournament.champion_name,
+        champion:
+          tournament.champion_name === null ? null : logEntrant(tournament.champion_name, tournament),
       });
     }
 
@@ -899,7 +922,7 @@ async function resolveOne(entry: PendingBotLog): Promise<string | null> {
       if (!tournament || !entrantName) return null;
       return formatEndurancePenaltyLog({
         tournament: { id: Number(tournament.id), name: tournament.name },
-        entrantName,
+        entrant: logEntrant(entrantName, tournament),
         points: entry.points,
         reason: entry.reason,
       });
@@ -913,7 +936,7 @@ async function resolveOne(entry: PendingBotLog): Promise<string | null> {
       if (!tournament || !entrantName) return null;
       return formatEndurancePenaltyLiftedLog({
         tournament: { id: Number(tournament.id), name: tournament.name },
-        entrantName,
+        entrant: logEntrant(entrantName, tournament),
         points: entry.points,
       });
     }
