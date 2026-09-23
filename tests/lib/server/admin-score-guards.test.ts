@@ -64,9 +64,20 @@ function fakeConnection(
         ];
       }
 
-      // Verrou aval, second temps : la manche suivante.
-      if (q.includes("FROM bg_matches WHERE id IN")) {
-        return [options.dependents ?? [], []];
+      // Verrou aval, second temps : le plateau de la phase, que le verrou
+      // parcourt depuis les liens du match édité (`dependentMatches`, qui
+      // traverse les exemptions posées par le moteur). Les dépendants factices
+      // portent l'identifiant de la cible (11).
+      if (q.includes("next_winner_match_id, next_loser_match_id FROM bg_matches WHERE tournament_id")) {
+        return [
+          (options.dependents ?? []).map((row) => ({
+            next_winner_match_id: null,
+            next_loser_match_id: null,
+            ...row,
+            id: 11,
+          })),
+          [],
+        ];
       }
 
       if (q.includes("match_format_type")) {

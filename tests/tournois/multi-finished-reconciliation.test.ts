@@ -218,8 +218,17 @@ beforeEach(() => {
   // La finale est jouée, et le rejeu du bracket donne désormais l'équipe 2
   // championne — c'est la correction de score que l'on suit.
   (isEliminationPhaseComplete as jest.Mock).mockImplementation(async () => true);
-  (rankEliminationPhase as jest.Mock).mockImplementation(async () => [2, 1]);
+  (rankEliminationPhase as jest.Mock).mockImplementation(async () => ranked([2, 1]));
 });
+
+/** Rangs d'élimination à la suite, sans ex æquo ni double forfait. */
+function ranked(teamIds: number[]) {
+  return teamIds.map((teamId, index) => ({
+    teamId,
+    rank: index + 1,
+    eliminatedByDoubleForfeit: false,
+  }));
+}
 
 describe("reconcilePhases sur un tournoi MULTI terminé", () => {
   it("réécrit le classement de la phase finale depuis le rejeu du bracket", async () => {
@@ -352,7 +361,7 @@ describe("reconcilePhases — le chemin ordinaire reste intact", () => {
     phaseStates = { [PHASE_1]: "RUNNING", [PHASE_2]: "PENDING" };
     currentPhaseId = PHASE_1;
     (loadPhase as jest.Mock).mockImplementation(async () => phaseRow(PHASE_1, 1));
-    (rankEliminationPhase as jest.Mock).mockImplementation(async () => [1, 2, 3, 4]);
+    (rankEliminationPhase as jest.Mock).mockImplementation(async () => ranked([1, 2, 3, 4]));
 
     const conn = makeConn();
     await reconcilePhases(TOURNAMENT_ID, conn);
