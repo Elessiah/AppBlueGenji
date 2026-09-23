@@ -29,3 +29,42 @@ export function envFileOrder(nodeEnv: string): string[] {
   const files = [`.env.${nodeEnv}.local`, ".env.local", `.env.${nodeEnv}`, ".env"];
   return nodeEnv === "test" ? files.filter((file) => !file.endsWith(".local")) : files;
 }
+
+/** Fichiers qui ne sont lus qu'en production, et qu'un `NODE_ENV` absent ignore. */
+export const PRODUCTION_ENV_FILES = [".env.production.local", ".env.production"] as const;
+
+/**
+ * Phrase à afficher quand un script va manquer la configuration de production
+ * faute de `NODE_ENV`, ou `null` s'il n'y a rien à dire.
+ *
+ * Le shell du serveur n'exporte pas `NODE_ENV` (seul pm2 le pose), si bien que
+ * `npm run backfill:avatars` y retombait sur `development`, ne lisait pas
+ * `.env.production` et mourait sur `Missing required environment variable
+ * DB_HOST` — un message qui ne dit rien de la cause. On **n'en déduit pas**
+ * pour autant la production : un poste de développement peut garder un
+ * `.env.production`, et un script qui choisirait seul la base de production
+ * est bien pire qu'un script qui s'arrête. On nomme la cause et le geste.
+ *
+ * Ne parle que lorsque le cas est sans ambiguïté : `NODE_ENV` absent, un
+ * fichier de production présent, et **aucun** des fichiers que l'on s'apprête
+ * à lire — donc rien d'autre ne fournira la configuration.
+ *
+ * @param nodeEnv Valeur brute de `NODE_ENV`, `undefined` ou vide si non posée.
+ * @param existingFiles Chemins (parmi ceux d'`envFileOrder` et de
+ *   `PRODUCTION_ENV_FILES`) qui existent sur le disque.
+ * @param scriptName Nom du script npm lancé (`npm_lifecycle_event`), pour
+ *   écrire la commande à relancer telle quelle.
+ */
+export function missingNodeEnvNotice(
+  nodeEnv: string | undefined,
+  existingFiles: readonly string[],
+  scriptName?: string,
+): string | null {
+  if (nodeEnv) return null;
+  const present = new Set(existingFiles);
+  const productionFile = PRODUCTION_ENV_FILES.find((file) => present.has(file));
+  if (!productionFile) return null;
+  if (envFileOrder("development").some((file) => present.has(file))) return null;
+  const command = `NODE_ENV=production npm run ${scriptName || "<script>"}`;
+  return `⚠ NODE_ENV n'est pas défini : ${productionFile} n'a pas été lu. Sur le serveur, relancer avec : ${command}`;
+}

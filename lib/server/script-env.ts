@@ -1,5 +1,6 @@
+import { existsSync } from "node:fs";
 import { config } from "dotenv";
-import { envFileOrder } from "@/lib/shared/env-files";
+import { envFileOrder, missingNodeEnvNotice, PRODUCTION_ENV_FILES } from "@/lib/shared/env-files";
 
 /**
  * Charge l'environnement d'un script `tsx`, comme Next le ferait.
@@ -16,11 +17,24 @@ import { envFileOrder } from "@/lib/shared/env-files";
  * testé. Ici il ne reste que la lecture : dotenv ignore sans bruit un fichier
  * absent, et n'écrase jamais une variable déjà posée — c'est ce qui rend la
  * liste ordonnée suffisante, sans avoir à savoir lequel existe.
+ *
+ * `NODE_ENV` absent vaut `development`, comme chez Next. Si c'est la raison
+ * pour laquelle `.env.production` ne sera pas lu, on le dit avant que le script
+ * ne meure sur une variable manquante (`missingNodeEnvNotice`).
  */
-export function loadScriptEnv(nodeEnv: string = process.env.NODE_ENV || "development"): void {
-  for (const path of envFileOrder(nodeEnv)) {
+export function loadScriptEnv(nodeEnv: string | undefined = process.env.NODE_ENV): void {
+  const files = envFileOrder(nodeEnv || "development");
+  for (const path of files) {
     config({ path, quiet: true });
   }
+
+  const candidates = [...new Set([...files, ...PRODUCTION_ENV_FILES])];
+  const notice = missingNodeEnvNotice(
+    nodeEnv,
+    candidates.filter((path) => existsSync(path)),
+    process.env.npm_lifecycle_event,
+  );
+  if (notice) console.warn(notice);
 }
 
 loadScriptEnv();

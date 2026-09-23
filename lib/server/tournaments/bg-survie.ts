@@ -45,7 +45,7 @@ import {
 } from "@/lib/shared/endurance-penalty";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { toIso } from "@/lib/server/serialization";
-import { ignoreMissingTable } from "@/lib/server/mysql-errors";
+import { ignoreMissingTable, rowsOrEmptyIfMissingTable } from "@/lib/server/mysql-errors";
 import { appendSequentialRanks, podiumRanks } from "@/lib/shared/double-forfeit";
 import { createMatch, finishTournament, reopenTournament } from "./repository";
 import { localUploadUrl } from "@/lib/shared/uploads";
@@ -406,14 +406,16 @@ async function loadPenalties(
   conn: PoolConnection,
   tournamentId: number,
 ): Promise<EndurancePenalty[]> {
-  const [rows] = await conn.execute<
-    (RowDataPacket & { team_id: number; round_number: number; points: number })[]
-  >(
-    `SELECT team_id, round_number, points
-     FROM bg_endurance_penalties
-     WHERE tournament_id = ?
-     ORDER BY round_number ASC, id ASC`,
-    [tournamentId],
+  // Table tolérée absente : aucune sanction n'a pu y être posée, et une base
+  // qui en manque ne doit pas faire échouer tout report de score du mode.
+  const rows = await rowsOrEmptyIfMissingTable(
+    conn.execute<(RowDataPacket & { team_id: number; round_number: number; points: number })[]>(
+      `SELECT team_id, round_number, points
+       FROM bg_endurance_penalties
+       WHERE tournament_id = ?
+       ORDER BY round_number ASC, id ASC`,
+      [tournamentId],
+    ),
   );
 
   return rows.map((row) => ({
@@ -1188,26 +1190,30 @@ async function loadPenaltyRows(conn: PoolConnection, tournamentId: number) {
   // (même règle que `liftEndurancePenalty`, même prédicat).
   const lockRound = await lastRoundWithScoreInput(conn, tournamentId);
 
-  const [rows] = await conn.execute<
-    (RowDataPacket & {
-      id: number;
-      team_id: number;
-      team_name: string;
-      round_number: number;
-      points: number;
-      reason: string;
-      author_pseudo: string | null;
-      created_at: Date | string;
-    })[]
-  >(
-    `SELECT p.id, p.team_id, p.round_number, p.points, p.reason, p.created_at,
-            t.name AS team_name, u.pseudo AS author_pseudo
-     FROM bg_endurance_penalties p
-     JOIN bg_teams t ON t.id = p.team_id
-     LEFT JOIN bg_users u ON u.id = p.created_by
-     WHERE p.tournament_id = ?
-     ORDER BY p.round_number ASC, p.id ASC`,
-    [tournamentId],
+  // Même tolérance que `loadPenalties` : sans la table, le classement
+  // s'affiche sans journal des sanctions plutôt que pas du tout.
+  const rows = await rowsOrEmptyIfMissingTable(
+    conn.execute<
+      (RowDataPacket & {
+        id: number;
+        team_id: number;
+        team_name: string;
+        round_number: number;
+        points: number;
+        reason: string;
+        author_pseudo: string | null;
+        created_at: Date | string;
+      })[]
+    >(
+      `SELECT p.id, p.team_id, p.round_number, p.points, p.reason, p.created_at,
+              t.name AS team_name, u.pseudo AS author_pseudo
+       FROM bg_endurance_penalties p
+       JOIN bg_teams t ON t.id = p.team_id
+       LEFT JOIN bg_users u ON u.id = p.created_by
+       WHERE p.tournament_id = ?
+       ORDER BY p.round_number ASC, p.id ASC`,
+      [tournamentId],
+    ),
   );
 
   return rows.map((row) => ({
@@ -1340,12 +1346,14 @@ export async function liftEndurancePenalty(
 
   // La pénalité est relue **par son tournoi** : un identifiant de sanction
   // appartenant à un autre plateau ne doit pas s'effacer depuis cette page.
-  const [rows] = await conn.execute<
-    (RowDataPacket & { team_id: number; points: number; round_number: number })[]
-  >(
-    `SELECT team_id, points, round_number FROM bg_endurance_penalties
-     WHERE id = ? AND tournament_id = ? LIMIT 1`,
-    [penaltyId, tournamentId],
+  // Sans la table, aucune sanction n'existe : l'identifiant est introuvable
+  // (404), pas une panne du serveur.
+  const rows = await rowsOrEmptyIfMissingTable(
+    conn.execute<(RowDataPacket & { team_id: number; points: number; round_number: number })[]>(
+      `SELECT team_id, points, round_number FROM bg_endurance_penalties
+       WHERE id = ? AND tournament_id = ? LIMIT 1`,
+      [penaltyId, tournamentId],
+    ),
   );
   if (rows.length === 0) throw new Error("PENALTY_NOT_FOUND");
 
