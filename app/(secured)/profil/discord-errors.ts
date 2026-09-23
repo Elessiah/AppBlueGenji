@@ -27,10 +27,10 @@ const VERIFICATION_ERRORS: Record<string, string> = {
     "Certification indisponible pour le moment (bot non joignable). Réessaie plus tard.",
   BOT_INTERNAL_UNAUTHORIZED:
     "Certification indisponible (configuration interne). Signale-le à l'organisation.",
-  // Le bot a répondu trop tard. Deux causes possibles, que le site ne sait pas
-  // départager — un tag absent de tous ses serveurs (qu'il parcourt alors un à
-  // un), ou un bot surchargé : la phrase nomme les deux plutôt que d'en affirmer
-  // une.
+  // La recherche n'a pas abouti dans le délai. Deux causes possibles, que le
+  // site ne sait pas départager — des serveurs du bot qui tardent à répondre
+  // (le tag y est peut-être, ou nulle part), ou un bot surchargé : la phrase
+  // nomme les deux plutôt que d'en affirmer une.
   BOT_RESOLVE_TIMEOUT:
     "La recherche de ton tag par le bot n'a pas abouti à temps : le tag n'est peut-être sur aucun de ses serveurs, ou le bot est surchargé. Vérifie ton tag et rejoins le serveur BlueGenji, puis réessaie.",
 
