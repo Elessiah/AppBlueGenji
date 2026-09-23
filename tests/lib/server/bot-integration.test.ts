@@ -270,6 +270,16 @@ describe("bot-integration", () => {
       expect(fetchMock).not.toHaveBeenCalled();
     });
 
+    it("rend null quand le bot ne joint aucun serveur BlueGenji (503)", async () => {
+      // Le contrat qui fait réessayer : un `null` rend la réservation. Le bot
+      // répondait `200` + « tous introuvables », lu comme un résultat définitif.
+      jest
+        .spyOn(global, "fetch")
+        .mockResolvedValue(Response.json({ error: "HOME_GUILD_UNAVAILABLE" }, { status: 503 }));
+
+      expect(await pushDiscordDirectMessages("Rappel", recipients, "match-reminder")).toBeNull();
+    });
+
     it("rend null quand le bot est injoignable", async () => {
       jest.spyOn(global, "fetch").mockRejectedValue(new Error("ECONNREFUSED"));
 

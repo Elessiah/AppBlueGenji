@@ -123,10 +123,20 @@ Deux exclusions, silencieuses toutes les deux :
 - **Pas d'identité Discord** (ni `discord_id`, ni `discord_pseudo`) : le joueur
   est simplement écarté. Ce n'est pas une anomalie — un compte créé par Google
   n'a pas de tag.
-- **Pas sur le serveur BlueGenji** : le bot cherche le destinataire dans la
-  guilde `GUILD_ID` et **ne tente aucun envoi** s'il ne l'y trouve pas. Un tag
-  mal saisi ne doit pas faire écrire le bot à un inconnu croisé sur un serveur
+- **Pas sur un serveur BlueGenji** : le bot cherche le destinataire sur les
+  serveurs `SERV_GENJI` et `SERV_RIVALS` (ou ceux de `GUILD_ID`, surcharge
+  facultative) et **ne tente aucun envoi** s'il ne l'y trouve pas. Un tag mal
+  saisi ne doit pas faire écrire le bot à un inconnu croisé sur un serveur
   partenaire.
+
+**Aucun serveur joignable n'est pas une absence.** Le bot répond alors `503`
+(`HOME_GUILD_UNAVAILABLE`), le site y voit un bot injoignable et rend ses
+réservations. Il répondait auparavant `200` en déclarant tous les destinataires
+« introuvables » : le site gardait la réservation (un joueur absent du serveur
+ne se relance pas) et le message ne repartait jamais. C'est ce qui s'est
+produit, sans bruit, depuis la création de ces envois : le bot lisait
+`GUILD_ID`, une variable absente de sa configuration réelle
+(blueGenjiBot#23).
 
 Le tag suffit — le bot résout le membre. L'ID, quand le compte a été lié par code
 Discord, évite cette recherche et reste donc prioritaire.
@@ -186,5 +196,6 @@ Côté site, rien de nouveau : le canal interne existant (`BOT_INTERNAL_URL`,
 `BOT_INTERNAL_TOKEN`) suffit. `APP_URL`, si elle est réglée, ajoute le lien du
 tournoi au bas de chaque message.
 
-Côté bot, `GUILD_ID` désigne le serveur BlueGenji — seule population démarchée —
-et `/set-referee-role` désigne le rôle arbitre, serveur par serveur.
+Côté bot, `SERV_GENJI` et `SERV_RIVALS` désignent les serveurs BlueGenji — seule
+population démarchée, `GUILD_ID` pouvant les remplacer — et `/set-referee-role`
+désigne le rôle arbitre, serveur par serveur.

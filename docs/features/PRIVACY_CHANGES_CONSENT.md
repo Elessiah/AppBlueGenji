@@ -101,7 +101,12 @@ nouvelle, le bot n'écrit qu'aux membres du serveur BlueGenji.
 - **Réservation avant l'envoi** (`bg_privacy_change_notifications`, clé primaire
   `(user_id, change_id)`) : c'est elle qui interdit le doublon. Bot injoignable
   → réservation rendue, le lot repartira ; membre introuvable ou messages privés
-  fermés → réservation gardée, la modale prend le relais. Coupe-circuit ouvert →
+  fermés → réservation gardée, la modale prend le relais. « Injoignable »
+  comprend le bot qui ne voit **aucun** serveur BlueGenji (`503`) : avant
+  blueGenjiBot#23, il répondait `200` en déclarant tout le monde introuvable, et
+  la première mise en production a ainsi marqué « prévenus » des comptes à qui
+  rien n'était parti — réparation : supprimer les lignes antérieures au
+  redémarrage du bot corrigé. Coupe-circuit ouvert →
   rien n'est lu ni réservé.
 - **Par lots de 20 comptes**, pour que le bot, qui écrit en série, réponde dans
   son délai — un dépassement ferait rendre puis renvoyer un lot déjà parti.
