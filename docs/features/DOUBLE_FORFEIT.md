@@ -62,6 +62,19 @@ On défait, on ne recalcule pas : le nouveau résultat est ensuite propagé par 
 chemin ordinaire, et les exemptions encore justes sont reposées par
 `tryAutoResolveByes`, la fonction qui les avait posées.
 
+**Un tournoi clos par la cascade se rouvre.** C'est même le cas ordinaire : un
+double forfait en demi-finale fait de la finale une exemption, et le tableau se
+termine dans la même transaction. Corriger ce double forfait rouvre la finale —
+et le tournoi doit repartir avec elle (`reopenTournament`, `repository.ts` :
+état `RUNNING`, date de clôture et classement final effacés ; en multi-phases,
+la dernière phase repasse `RUNNING`). Sans cela, il resterait « terminé » sur
+une finale que personne ne peut plus saisir : `reportMatchScore` exige
+`RUNNING`, et l'entretien ne visite que les tournois en cours. Il se reclôt de
+lui-même, nouvelle championne comprise, dès que le tableau est de nouveau
+complet. `detachDownstreamOutcome` rend pour cela le nombre de rencontres
+closes qu'il a rouvertes ; l'arbre d'une BG Survie applique la même règle quand
+`repairPlayoffBracket` réécrit un tour dans un tournoi clos.
+
 **Le verrou suit la chaîne.** `dependentMatches` (`lib/shared/match-lock.ts`)
 traverse désormais les rencontres **tranchées sans saisie** (exemptions, matchs
 fantômes) : c'est la première rencontre réellement disputée au bout de la

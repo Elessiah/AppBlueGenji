@@ -8,7 +8,7 @@ import {
   type MatchFormat,
 } from "@/lib/shared/match-format";
 import { MatchRow } from "./_internal";
-import { forfeitMatchScores, loadTournamentMatchFormat } from "./repository";
+import { forfeitMatchScores, loadTournamentMatchFormat, reopenTournament } from "./repository";
 import { finalizeMatch } from "./scoring";
 import { tryAutoResolveByes } from "./byes";
 import { detachDownstreamOutcome } from "./bracket-cascade";
@@ -422,7 +422,8 @@ export async function adminResolveMatch(
       next_winner_slot,
       next_loser_match_id,
       next_loser_slot,
-      winner_team_id
+      winner_team_id,
+      phase_id
      FROM bg_matches
      WHERE id = ?
      LIMIT 1`,
@@ -500,7 +501,28 @@ export async function adminResolveMatch(
   // le tableau (une équipe dans un créneau, ou une exemption close d'office
   // faute d'équipe) est défait avant que le nouveau ne soit propagé. Sans effet
   // hors élimination — un match sans lien d'aval n'a rien propagé.
-  await detachDownstreamOutcome(connection, match, { winnerTeamId, loserTeamId });
+  const reopened = await detachDownstreamOutcome(connection, match, { winnerTeamId, loserTeamId });
+
+  // Une exemption rouverte peut appartenir à un tournoi **déjà clos** : c'est
+  // même le cas ordinaire — un double forfait en demi-finale fait de la finale
+  // une exemption, et le tableau se termine dans la même transaction. Corriger
+  // ce double forfait rouvre la finale ; le tournoi doit repartir avec elle,
+  // sinon il resterait « terminé » sur une rencontre que plus personne ne peut
+  // saisir (`reportMatchScore` exige `RUNNING`, l'entretien ne visite que
+  // `RUNNING`). Il se reclôt de lui-même si le tableau est de nouveau complet.
+  if (reopened > 0 && (await reopenTournament(connection, tournamentId))) {
+    // Dans un tournoi multi-phases clos, la phase du match est la dernière :
+    // elle doit repartir elle aussi, `reconcilePhases` n'avançant qu'une phase
+    // `RUNNING` d'un tournoi en cours.
+    const phaseId = Number(match.phase_id ?? 0);
+    if (phaseId > 0) {
+      await connection.execute(
+        `UPDATE bg_tournament_phases SET state = 'RUNNING', finished_at = NULL
+         WHERE id = ? AND state = 'FINISHED'`,
+        [phaseId],
+      );
+    }
+  }
 
   await finalizeMatch(connection, tournamentId, match, {
     team1Score: resultTeam1Score,

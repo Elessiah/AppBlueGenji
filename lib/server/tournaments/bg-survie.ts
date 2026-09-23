@@ -46,7 +46,7 @@ import {
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { toIso } from "@/lib/server/serialization";
 import { appendSequentialRanks, podiumRanks } from "@/lib/shared/double-forfeit";
-import { createMatch, finishTournament } from "./repository";
+import { createMatch, finishTournament, reopenTournament } from "./repository";
 import { localUploadUrl } from "@/lib/shared/uploads";
 
 type TournamentEnduranceRow = RowDataPacket & {
@@ -486,7 +486,14 @@ export async function reconcileEndurance(
     // L'arbre se relit avant de s'enchaîner : une correction de score en amont
     // (un quart de finale, voire une manche qualificative) a pu périmer un tour
     // déjà posé, et rien d'autre ne le regarde.
-    await repairPlayoffBracket(conn, tournamentId, assignRanks(replayed), config);
+    const rewritten = await repairPlayoffBracket(conn, tournamentId, assignRanks(replayed), config);
+    // Un tour réécrit dans un tournoi **clos** : ce ne peut être qu'un tour
+    // d'exemptions né d'un double forfait (un tour joué porte une saisie, et
+    // n'est jamais réécrit). Corriger ce double forfait remet une vraie
+    // rencontre en jeu — le tournoi doit repartir avec elle, sinon il resterait
+    // « terminé » sur un arbre que plus personne ne peut jouer. Il se reclôt
+    // par le chemin ordinaire une fois la finale jouée.
+    if (rewritten && finished) await reopenTournament(conn, tournamentId);
     await finalizePlayoffsIfDone(conn, tournamentId);
     return;
   }
@@ -917,9 +924,9 @@ async function repairPlayoffBracket(
   tournamentId: number,
   standings: EnduranceStanding[],
   config: EnduranceConfig,
-): Promise<void> {
+): Promise<boolean> {
   const rounds = await loadPlayoffRoundNumbers(conn, tournamentId);
-  if (rounds.length === 0) return;
+  if (rounds.length === 0) return false;
 
   let plan = planPlayoffFirstRound(selectQualifiedTeamIds(standings, config), config);
 
@@ -927,14 +934,14 @@ async function repairPlayoffBracket(
     const matches = await loadPlayoffRoundMatches(conn, tournamentId, round);
 
     if (playoffRoundIsStale(plan, matches)) {
-      if (matches.some((match) => match.hasScoreInput)) return;
+      if (matches.some((match) => match.hasScoreInput)) return false;
 
       await writePlayoffRound(conn, tournamentId, round, plan, matches);
       await conn.execute(`DELETE FROM bg_matches WHERE tournament_id = ? AND round_number > ?`, [
         tournamentId,
         round,
       ]);
-      return;
+      return true;
     }
 
     // Tour conforme : le suivant se déduit de ses résultats — encore faut-il
@@ -942,11 +949,12 @@ async function repairPlayoffBracket(
     // part : `planNextPlayoffRound` rend un plan vide, et il n'y a plus rien à
     // relire en aval.
     const decisive = matches.filter((match) => match.bracket !== "THIRD_PLACE");
-    if (decisive.some((match) => match.status !== "COMPLETED")) return;
+    if (decisive.some((match) => match.status !== "COMPLETED")) return false;
 
     plan = planNextPlayoffRound(decisive);
-    if (plan.length === 0) return;
+    if (plan.length === 0) return false;
   }
+  return false;
 }
 
 /**

@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/tournaments/repository");
 
 import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie";
-import { createMatch, finishTournament } from "@/lib/server/tournaments/repository";
+import {
+  createMatch,
+  finishTournament,
+  reopenTournament,
+} from "@/lib/server/tournaments/repository";
 
 /**
  * L'arbre final d'une BlueGenji Survie face au double forfait, **en cascade** :
@@ -48,7 +52,7 @@ function semi(id: number, team1: number, team2: number, result: "DF" | number): 
   };
 }
 
-function makeBoard(matches: MatchRow[]) {
+function makeBoard(matches: MatchRow[], state = "RUNNING") {
   const board = [...matches];
   const ranks = new Map<number, number>();
   let nextId = 900;
@@ -82,7 +86,7 @@ function makeBoard(matches: MatchRow[]) {
         [
           {
             format: "BG_SURVIE",
-            state: "RUNNING",
+            state,
             match_format_type: "FT",
             match_format_value: 3,
             endurance_start_points: 9,
@@ -96,6 +100,8 @@ function makeBoard(matches: MatchRow[]) {
         ],
       ];
     }
+    // Les abandons se lisent dans la même table : aucun ici.
+    if (q.includes("status = 'FORFEIT'")) return [[]];
     if (q.includes("FROM bg_endurance_standings")) {
       return [
         [1, 2, 3, 4].map((teamId) => ({
@@ -188,6 +194,48 @@ describe("BlueGenji Survie — double forfait dans l'arbre final", () => {
     expect(finishTournament).toHaveBeenCalled();
     // Classement de qualification, faute d'arbre.
     expect(ranks.size).toBe(4);
+  });
+
+  it("rouvre un tournoi clos par exemptions quand le double forfait est corrigé", async () => {
+    // Le double forfait de la demi 2-3 avait fait naître finale et petite
+    // finale d'exemptions, et clos le tournoi. L'arbitre le corrige : 2 gagne.
+    const byeFinal: MatchRow = {
+      ...semi(600, 1, 0, 1),
+      team2_id: null,
+      is_bye: 1,
+      round_number: 1001,
+      loser_team_id: null,
+    };
+    const byeThird: MatchRow = {
+      ...semi(601, 4, 0, 4),
+      team2_id: null,
+      is_bye: 1,
+      bracket: "THIRD_PLACE",
+      round_number: 1001,
+      loser_team_id: null,
+    };
+    const { conn, board } = makeBoard(
+      [semi(500, 1, 4, 1), semi(501, 2, 3, 2), byeFinal, byeThird],
+      "FINISHED",
+    );
+
+    await reconcileEndurance(5, conn);
+
+    expect(reopenTournament).toHaveBeenCalledWith(conn, 5);
+    // La finale redevient une vraie rencontre, à jouer.
+    expect(board.find((m) => m.id === 600)).toMatchObject({
+      team1_id: 1,
+      team2_id: 2,
+      status: "READY",
+      winner_team_id: null,
+    });
+    expect(finishTournament).not.toHaveBeenCalled();
+  });
+
+  it("ne rouvre rien quand la correction ne change pas l'arbre", async () => {
+    const { conn } = makeBoard([semi(500, 1, 4, 1), semi(501, 2, 3, 2)], "FINISHED");
+    await reconcileEndurance(5, conn);
+    expect(reopenTournament).not.toHaveBeenCalled();
   });
 
   it("ne fait pas de championne sur une finale close en double forfait", async () => {

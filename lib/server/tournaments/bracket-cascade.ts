@@ -102,17 +102,18 @@ async function vacateSlot(
   slot: number,
   keepTeamId: number | null,
   depth: number,
-): Promise<void> {
-  if (depth > MAX_DEPTH) return;
+): Promise<number> {
+  if (depth > MAX_DEPTH) return 0;
   const target = await loadRow(connection, targetId);
-  if (!target) return;
+  if (!target) return 0;
 
   const current = slot === 1 ? target.team1_id : target.team2_id;
   const currentId = current === null ? null : Number(current);
   const closed = target.status === "COMPLETED";
 
-  if (currentId === keepTeamId && !closed) return;
+  if (currentId === keepTeamId && !closed) return 0;
 
+  let reopened = 0;
   if (closed) {
     if (!isEngineResolved(target)) {
       // Une rencontre disputée derrière : le verrou aurait dû refuser. On
@@ -121,7 +122,7 @@ async function vacateSlot(
     }
     // Ce que l'exemption avait fait monter redescend, en entier : la cible sera
     // tranchée de nouveau, et rien ne dit encore par qui.
-    await undoPropagation(connection, target, null, null, depth + 1);
+    reopened += 1 + (await undoPropagation(connection, target, null, null, depth + 1));
     await connection.execute(
       `UPDATE bg_matches
        SET team1_score = NULL, team2_score = NULL,
@@ -146,6 +147,7 @@ async function vacateSlot(
      WHERE id = ?`,
     [statusFromTeams(team1 === null ? null : Number(team1), team2 === null ? null : Number(team2)), targetId],
   );
+  return reopened;
 }
 
 /**
@@ -159,16 +161,18 @@ async function undoPropagation(
   nextWinnerTeamId: number | null,
   nextLoserTeamId: number | null,
   depth: number,
-): Promise<void> {
+): Promise<number> {
   const links: [number | null, number | null, number | null][] = [
     [match.next_winner_match_id, match.next_winner_slot, nextWinnerTeamId],
     [match.next_loser_match_id, match.next_loser_slot, nextLoserTeamId],
   ];
 
+  let reopened = 0;
   for (const [targetId, slot, keep] of links) {
     if (targetId === null || slot === null) continue;
-    await vacateSlot(connection, Number(targetId), Number(slot), keep, depth);
+    reopened += await vacateSlot(connection, Number(targetId), Number(slot), keep, depth);
   }
+  return reopened;
 }
 
 /**
@@ -178,11 +182,16 @@ async function undoPropagation(
  *
  * À appeler **avant** `finalizeMatch`, qui propagera ensuite le résultat, puis
  * `tryAutoResolveByes`, qui reposera les exemptions encore justes.
+ *
+ * @returns le nombre de rencontres closes d'office qui ont été **rouvertes**.
+ *   Au-delà de zéro, le tableau a de nouveau quelque chose à jouer : un tournoi
+ *   que ces exemptions avaient clos doit être rouvert par l'appelant, sans quoi
+ *   il resterait « terminé » avec une rencontre que plus rien ne ferait jouer.
  */
 export async function detachDownstreamOutcome(
   connection: PoolConnection,
   match: CascadeLinks,
   next: { winnerTeamId: number | null; loserTeamId: number | null },
-): Promise<void> {
-  await undoPropagation(connection, match, next.winnerTeamId, next.loserTeamId, 0);
+): Promise<number> {
+  return undoPropagation(connection, match, next.winnerTeamId, next.loserTeamId, 0);
 }

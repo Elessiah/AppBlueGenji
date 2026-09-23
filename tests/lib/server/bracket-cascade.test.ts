@@ -124,7 +124,11 @@ describe("detachDownstreamOutcome — double forfait corrigé en résultat", () 
   it("rouvre l'exemption et fait redescendre son bénéficiaire", async () => {
     const { conn, get } = afterDoubleForfeit();
 
-    await detachDownstreamOutcome(conn, links(2, 1), { winnerTeamId: 7, loserTeamId: 8 });
+    // Une exemption rouverte : l'appelant doit rouvrir un tournoi qu'elle
+    // aurait clos.
+    await expect(
+      detachDownstreamOutcome(conn, links(2, 1), { winnerTeamId: 7, loserTeamId: 8 }),
+    ).resolves.toBe(1);
 
     expect(get(2)).toMatchObject({
       status: "PENDING",
@@ -166,7 +170,9 @@ describe("detachDownstreamOutcome — double forfait corrigé en résultat", () 
       row({ id: 4, status: "PENDING", team1_id: 30, team2_id: 20 }),
     ]);
 
-    await detachDownstreamOutcome(conn, links(2, 1), { winnerTeamId: 7, loserTeamId: 8 });
+    await expect(
+      detachDownstreamOutcome(conn, links(2, 1), { winnerTeamId: 7, loserTeamId: 8 }),
+    ).resolves.toBe(2);
 
     expect(get(2)).toMatchObject({ status: "PENDING", team1_score: null, team2_score: null });
     expect(get(3)).toMatchObject({ status: "PENDING", winner_team_id: null, team2_id: 20 });
@@ -180,7 +186,10 @@ describe("detachDownstreamOutcome — résultat corrigé en double forfait", () 
       row({ id: 2, status: "READY", team1_id: 7, team2_id: 10, live_started_at: "2026-09-23" }),
     ]);
 
-    await detachDownstreamOutcome(conn, links(2, 1), { winnerTeamId: null, loserTeamId: null });
+    // Rien de clos n'est rouvert : le tournoi n'a pas à repartir.
+    await expect(
+      detachDownstreamOutcome(conn, links(2, 1), { winnerTeamId: null, loserTeamId: null }),
+    ).resolves.toBe(0);
 
     expect(get(2)).toMatchObject({ team1_id: null, team2_id: 10, status: "PENDING" });
     expect(get(2).live_started_at).toBeNull();
@@ -219,7 +228,7 @@ describe("detachDownstreamOutcome — rien à défaire", () => {
     const { conn } = board([]);
     await expect(
       detachDownstreamOutcome(conn, links(null, null), { winnerTeamId: null, loserTeamId: null }),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe(0);
   });
 
   it("refuse d'effacer une rencontre réellement disputée en aval", async () => {
