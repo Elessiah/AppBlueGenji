@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
-import { isMatchDrawn } from "@/lib/shared/match-outcome";
+import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
 import type { BracketMatch } from "@/lib/shared/types";
 import { mapError } from "../_lib/error-map";
 
@@ -42,6 +42,9 @@ interface RollbackRoundDialogProps {
 
 /** Score affiché d'une rencontre, ou son absence, en une chaîne relisible. */
 function scoreLabel(match: BracketMatch): string {
+  // Avant le test des scores : un double forfait n'en porte aucun, et « aucun
+  // score saisi » cacherait qu'un résultat va être effacé.
+  if (isMatchDoubleForfeit(match)) return "double forfait";
   if (match.team1Score === null && match.team2Score === null) return "aucun score saisi";
   const score = `${match.team1Score ?? "—"} – ${match.team2Score ?? "—"}`;
   if (match.forfeitTeamId !== null) return `${score} (forfait)`;

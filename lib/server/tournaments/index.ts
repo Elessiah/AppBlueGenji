@@ -1280,6 +1280,7 @@ export async function adminResolveMatchPublic(
   team1Score?: number,
   team2Score?: number,
   forfeitTeamId?: number,
+  doubleForfeit = false,
 ): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
@@ -1297,7 +1298,14 @@ export async function adminResolveMatchPublic(
     const tournamentId = Number(matchData[0].tournament_id);
 
     const { adminResolveMatch } = await import("./admin");
-    await adminResolveMatch(connection, matchId, team1Score, team2Score, forfeitTeamId);
+    await adminResolveMatch(
+      connection,
+      matchId,
+      team1Score,
+      team2Score,
+      forfeitTeamId,
+      doubleForfeit,
+    );
 
     await tryAutoResolveByes(connection, tournamentId);
 

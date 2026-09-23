@@ -66,7 +66,8 @@ async function findCrossedMilestones(connection: PoolConnection): Promise<number
  * - report de score dont le délai a expiré (`resolveExpiredScoreReports`) ;
  * - bye ou match fantôme encore ouvert (`tryAutoResolveByes`) ;
  * - élimination dont toutes les rencontres sont jouées : la clôture reste à
- *   prononcer (`finalizeTournamentIfDone`) ;
+ *   prononcer (`finalizeTournamentIfDone`) — un double forfait est joué sans
+ *   vainqueur, même exception que `isEliminationPhaseComplete` ;
  * - plateau sans adversaires resté « en cours » (`finalizeUnderfilledTournament`,
  *   qui s'applique aussi à un tournoi *déjà* `RUNNING`).
  */
@@ -99,6 +100,7 @@ async function findDueMaintenance(connection: PoolConnection): Promise<number[]>
              AND NOT EXISTS (SELECT 1 FROM bg_matches m
                              WHERE m.tournament_id = t.id AND m.phase_id = 0
                                AND m.winner_team_id IS NULL
+                               AND NOT (m.status = 'COMPLETED' AND m.double_forfeit = 1)
                                AND (m.team1_id IS NOT NULL OR m.team2_id IS NOT NULL)))
          OR (SELECT COUNT(*) FROM bg_tournament_registrations r
              WHERE r.tournament_id = t.id) < ${MIN_ENTRANTS_FOR_MATCHES}

@@ -79,6 +79,8 @@ export type MatchRow = RowDataPacket & {
   winner_team_id: number | null;
   loser_team_id: number | null;
   forfeit_team_id: number | null;
+  /** 1 = les deux engagées ont déclaré forfait (`lib/shared/double-forfeit.ts`). */
+  double_forfeit?: number | null;
   next_winner_match_id: number | null;
   next_winner_slot: number | null;
   next_loser_match_id: number | null;
@@ -227,6 +229,7 @@ export function mapMatch(row: MatchRow): BracketMatch {
     winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
     loserTeamId: row.loser_team_id === null ? null : Number(row.loser_team_id),
     forfeitTeamId: row.forfeit_team_id === null ? null : Number(row.forfeit_team_id),
+    doubleForfeit: Number(row.double_forfeit ?? 0) === 1,
     nextWinnerMatchId: row.next_winner_match_id === null ? null : Number(row.next_winner_match_id),
     nextWinnerSlot: row.next_winner_slot === null ? null : Number(row.next_winner_slot),
     nextLoserMatchId: row.next_loser_match_id === null ? null : Number(row.next_loser_match_id),

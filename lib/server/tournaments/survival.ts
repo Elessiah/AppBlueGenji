@@ -154,9 +154,13 @@ async function loadMatchOutcomes(
       winner_team_id: number | null;
       loser_team_id: number | null;
       is_bye: number;
+      team1_id: number | null;
+      team2_id: number | null;
+      double_forfeit: number | null;
     })[]
   >(
-    `SELECT round_number, status, winner_team_id, loser_team_id, is_bye
+    `SELECT round_number, status, winner_team_id, loser_team_id, is_bye,
+            team1_id, team2_id, double_forfeit
      FROM bg_matches
      WHERE tournament_id = ? AND phase_id = ?
      ORDER BY round_number, match_number`,
@@ -169,6 +173,11 @@ async function loadMatchOutcomes(
     winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
     loserTeamId: row.loser_team_id === null ? null : Number(row.loser_team_id),
     isBye: Number(row.is_bye) === 1,
+    // Double forfait : deux perdantes (`lib/shared/double-forfeit.ts`).
+    doubleForfeitTeamIds:
+      row.status === "COMPLETED" && Number(row.double_forfeit ?? 0) === 1
+        ? [row.team1_id, row.team2_id].filter((id): id is number => id !== null).map(Number)
+        : null,
   }));
 }
 
@@ -419,6 +428,7 @@ async function roundHasScoreInput(
      WHERE tournament_id = ? AND phase_id = ? AND round_number = ? AND is_bye = 0
        AND (team1_score IS NOT NULL OR team2_score IS NOT NULL
             OR winner_team_id IS NOT NULL OR forfeit_team_id IS NOT NULL
+            OR double_forfeit = 1
             OR team1_reported_at IS NOT NULL OR team2_reported_at IS NOT NULL)`,
     [tournamentId, phaseId, round],
   );

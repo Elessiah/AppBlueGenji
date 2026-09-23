@@ -432,6 +432,13 @@ export type BracketMatch = {
   winnerTeamId: number | null;
   loserTeamId: number | null;
   forfeitTeamId: number | null;
+  /**
+   * Les **deux** engagées ont déclaré forfait : la rencontre est close sans
+   * vainqueur, sans perdant désigné et sans score, et compte comme une défaite
+   * pour chacune (`lib/shared/double-forfeit.ts`). Exclusif de `forfeitTeamId`,
+   * qui ne nomme qu'une équipe.
+   */
+  doubleForfeit: boolean;
   nextWinnerMatchId: number | null;
   nextWinnerSlot: number | null;
   nextLoserMatchId: number | null;

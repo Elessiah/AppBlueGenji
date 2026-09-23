@@ -12,7 +12,17 @@ export async function PATCH(req: Request, context: { params: Promise<{ matchId: 
   const matchId_ = Number(matchId);
   if (!Number.isInteger(matchId_) || matchId_ <= 0) return fail("INVALID_MATCH_ID", 400);
 
-  const body = (await req.json()) as { team1Score?: unknown; team2Score?: unknown; forfeitTeamId?: unknown };
+  const body = (await req.json()) as {
+    team1Score?: unknown;
+    team2Score?: unknown;
+    forfeitTeamId?: unknown;
+    doubleForfeit?: unknown;
+  };
+
+  // Un double forfait **tranche** la rencontre : il n'a rien d'un avancement à
+  // noter. Il passe par `/resolve`, seule route qui propage dans le plateau —
+  // l'accepter ici laisserait une rencontre « en cours » sans score ni équipe.
+  if (body.doubleForfeit === true) return fail("DOUBLE_FORFEIT_RESOLVE_ONLY", 400);
 
   const forfeitTeamId = body.forfeitTeamId !== undefined && body.forfeitTeamId !== null ? Number(body.forfeitTeamId) : undefined;
   const team1Score = body.team1Score !== undefined && body.team1Score !== null ? Number(body.team1Score) : undefined;

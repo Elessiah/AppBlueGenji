@@ -91,8 +91,15 @@ export function useScoreForm(match: BracketMatch | null) {
           : `/api/admin/matches/${match.id}/resolve`;
       const method = action === "save" ? "PATCH" : "POST";
 
-      const body: { team1Score?: number; team2Score?: number; forfeitTeamId?: number } = {};
-      if (state.forfeitTeamId !== undefined) {
+      const body: {
+        team1Score?: number;
+        team2Score?: number;
+        forfeitTeamId?: number;
+        doubleForfeit?: true;
+      } = {};
+      if (state.doubleForfeit === true) {
+        body.doubleForfeit = true;
+      } else if (state.forfeitTeamId !== undefined) {
         body.forfeitTeamId = state.forfeitTeamId;
       } else if (decision.scores) {
         body.team1Score = decision.scores.team1;
@@ -131,6 +138,7 @@ export function useScoreForm(match: BracketMatch | null) {
     score1: state.score1,
     score2: state.score2,
     forfeitTeamId: state.forfeitTeamId,
+    doubleForfeit: state.doubleForfeit === true,
     submitting,
     decision,
     /** Le résultat enregistré a changé pendant qu'une saisie était en cours. */
@@ -140,13 +148,25 @@ export function useScoreForm(match: BracketMatch | null) {
     dirty: !isUntouched(state, match),
     setScore1: (val: string) => setState((s) => ({ ...s, score1: val })),
     setScore2: (val: string) => setState((s) => ({ ...s, score2: val })),
-    setForfeitTeamId: (id?: number) => setState((s) => ({ ...s, forfeitTeamId: id })),
+    // Forfait nominatif et double forfait s'excluent : en choisir un retire
+    // l'autre, pour que le formulaire ne porte jamais deux verdicts.
+    setForfeitTeamId: (id?: number) =>
+      setState((s) => ({ ...s, forfeitTeamId: id, doubleForfeit: undefined })),
+    setDoubleForfeit: (on: boolean) =>
+      setState((s) => ({
+        ...s,
+        doubleForfeit: on ? true : undefined,
+        forfeitTeamId: on ? undefined : s.forfeitTeamId,
+      })),
     submit,
   };
 }
 
 function sameFormState(a: ScoreFormState, b: ScoreFormState): boolean {
   return (
-    a.score1 === b.score1 && a.score2 === b.score2 && a.forfeitTeamId === b.forfeitTeamId
+    a.score1 === b.score1 &&
+    a.score2 === b.score2 &&
+    a.forfeitTeamId === b.forfeitTeamId &&
+    (a.doubleForfeit === true) === (b.doubleForfeit === true)
   );
 }

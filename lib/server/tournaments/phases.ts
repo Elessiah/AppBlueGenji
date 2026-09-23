@@ -1,6 +1,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import type { SqlParams } from "@/lib/server/database";
 import { resolvePhasePlan } from "@/lib/shared/tournament-phases";
+import { multiTournamentRanks } from "@/lib/shared/double-forfeit";
 import type { TournamentPhaseStanding } from "@/lib/shared/types";
 import {
   loadPhases,
@@ -244,6 +245,11 @@ export async function reconcilePhases(tournamentId: number, conn: PoolConnection
   // Vérifie si la phase est complète selon son format
   let isDone = false;
   let phaseFinalRanking: number[] = [];
+  // Rangs d'un tableau à élimination, ex æquo compris (double forfait au
+  // podium), et équipes qu'un double forfait a sorties. Vides hors élimination :
+  // Survie et Ronde suisse rendent un ordre strict.
+  let eliminationRanks = new Map<number, number>();
+  let doubleForfeited = new Set<number>();
 
   if (currentPhase.format === "SURVIVAL") {
     const { reconcileSurvival: reconcileSurvivalInternal } = await import("./survival");
@@ -285,12 +291,17 @@ export async function reconcilePhases(tournamentId: number, conn: PoolConnection
     isDone = await isEliminationPhaseComplete(conn, tournamentId, currentPhaseId);
 
     if (isDone) {
-      phaseFinalRanking = await rankEliminationPhase(
+      const ranking = await rankEliminationPhase(
         conn,
         tournamentId,
         currentPhaseId,
         currentPhase.format as "SINGLE" | "DOUBLE",
         Boolean(currentPhase.has_third_place_match),
+      );
+      phaseFinalRanking = ranking.map((entry) => entry.teamId);
+      eliminationRanks = new Map(ranking.map((entry) => [entry.teamId, entry.rank]));
+      doubleForfeited = new Set(
+        ranking.filter((entry) => entry.eliminatedByDoubleForfeit).map((entry) => entry.teamId),
       );
     }
   }
@@ -311,10 +322,14 @@ export async function reconcilePhases(tournamentId: number, conn: PoolConnection
   }
 
   const qualifiersCount = currentPhase.qualifiers ?? 1;
+  // Une équipe sortie par un double forfait n'est jamais qualifiée, même si son
+  // rang tombe dans la cible : elle a perdu, comme toute perdante d'un tableau
+  // à élimination. Sa place n'est pas repêchée — la phase suivante se joue à
+  // une qualifiée de moins, le plan restant étant re-résolu sur l'effectif réel.
   const rankedStandings = ordered.map((teamId, index) => ({
     teamId,
-    rank: index + 1,
-    qualified: index < qualifiersCount,
+    rank: eliminationRanks.get(teamId) ?? index + 1,
+    qualified: index < qualifiersCount && !doubleForfeited.has(teamId),
   }));
 
   await savePhaseResults(conn, currentPhaseId, rankedStandings);
@@ -448,10 +463,10 @@ export async function finalizeMultiTournament(
   const caseStmt: string[] = [];
   const values: SqlParams = [];
 
+  const ranks = multiTournamentRanks(finalOrder);
   for (let i = 0; i < finalOrder.length; i++) {
-    const ranking = finalOrder[i];
     caseStmt.push("WHEN ? THEN ?");
-    values.push(ranking.teamId, i + 1);
+    values.push(finalOrder[i].teamId, ranks[i]);
   }
 
   if (caseStmt.length === 0) {
