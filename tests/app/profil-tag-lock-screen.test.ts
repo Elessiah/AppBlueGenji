@@ -77,6 +77,17 @@ describe("champ Discord — la référence suit toute écriture du tag", () => {
   it("couvre les trois chemins d'écriture", () => {
     expect([...page.matchAll(/setSavedDiscordPseudo\(/g)].length).toBeGreaterThanOrEqual(4);
   });
+
+  it("réaligne le champ **en même temps** que sa référence", () => {
+    // Les deux doivent bouger ensemble : réaligner la seule référence les
+    // faisait diverger dès que le tag avait bougé ailleurs, et la sauvegarde
+    // suivante resoumettait celui du montage — 409, sans issue puisque le champ
+    // est en lecture seule.
+    const field = [...page.matchAll(/setDiscordPseudo\(payload\.profile\.discordPseudo/g)];
+    const ref = [...page.matchAll(/setSavedDiscordPseudo\(payload\.profile\.discordPseudo/g)];
+    expect(field.length).toBe(ref.length);
+    expect(field.length).toBeGreaterThanOrEqual(2);
+  });
 });
 
 describe("champ Discord — un retrait ne laisse pas la pastille mentir", () => {

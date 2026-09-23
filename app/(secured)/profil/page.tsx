@@ -197,6 +197,14 @@ export default function ProfilePage() {
       const payload = (await response.json()) as FullProfileResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "PROFILE_UPDATE_FAILED");
       setData(payload);
+      // Le champ **et sa référence**, comme au chargement. Réaligner la seule
+      // référence les faisait diverger dès que le tag avait bougé ailleurs : la
+      // sauvegarde suivante resoumettait celui du montage et mourait en 409
+      // `DISCORD_TAG_LOCKED` — précisément ce que cette référence existe pour
+      // empêcher —, sans autre issue qu'un rechargement puisque le champ est en
+      // lecture seule. Le champ affichait en prime un tag que l'aide juste en
+      // dessous contredisait.
+      setDiscordPseudo(payload.profile.discordPseudo || "");
       setSavedDiscordPseudo(payload.profile.discordPseudo || "");
       // Une sauvegarde qui change le tag **annule la certification** côté
       // serveur : la pastille doit tomber dans le même geste, sinon l'écran
