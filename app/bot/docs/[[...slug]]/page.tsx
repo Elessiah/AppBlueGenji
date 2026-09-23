@@ -6,7 +6,10 @@ import "../../bot.css";
 import "../docs.css";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
-import { BOT_DOC_SECTIONS, findBotDocSection, loadBotDoc } from "@/lib/server/bot-docs";
+import { findBotDocSection, loadBotDoc } from "@/lib/server/bot-docs";
+import { visibleBotDocSections, BOT_LEGAL_LINKS } from "@/lib/shared/bot-doc-sections";
+import { getCurrentUser } from "@/lib/server/auth";
+import { isStaffMember } from "@/lib/shared/permissions";
 
 /**
  * Les fichiers sources vivent dans le projet du bot (dossier voisin) et sont
@@ -21,7 +24,8 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const section = findBotDocSection(slug?.[0]);
+  const user = await getCurrentUser();
+  const section = findBotDocSection(slug?.[0], isStaffMember(user));
   if (!section) {
     return pageMetadata({
       title: "Documentation du bot",
@@ -40,7 +44,10 @@ export default async function BotDocsPage({ params }: PageProps) {
   const { slug } = await params;
   if (slug && slug.length > 1) notFound();
 
-  const section = findBotDocSection(slug?.[0]);
+  const user = await getCurrentUser();
+  const isStaff = isStaffMember(user);
+  const sections = visibleBotDocSections(isStaff);
+  const section = findBotDocSection(slug?.[0], isStaff);
   if (!section) notFound();
 
   const doc = await loadBotDoc(section);
@@ -94,10 +101,10 @@ export default async function BotDocsPage({ params }: PageProps) {
             <nav className="panel docs-nav">
               <div className="panel-head">
                 <span className="title">Sommaire</span>
-                <span className="meta">{BOT_DOC_SECTIONS.length} PAGES</span>
+                <span className="meta">{sections.length + BOT_LEGAL_LINKS.length} PAGES</span>
               </div>
               <div className="panel-body">
-                {BOT_DOC_SECTIONS.map((s) => (
+                {sections.map((s) => (
                   <Link
                     key={s.slug}
                     href={`/bot/docs/${s.slug}`}
@@ -106,6 +113,15 @@ export default async function BotDocsPage({ params }: PageProps) {
                   >
                     <span className="t">{s.title}</span>
                     <span className="s">{s.summary}</span>
+                  </Link>
+                ))}
+                {/* Pages légales du bot : servies à leur propre adresse, hors
+                    du registre `/bot/docs`, mais listées ici pour occuper la
+                    place laissée par les pages techniques masquées. */}
+                {BOT_LEGAL_LINKS.map((link) => (
+                  <Link key={link.slug} href={link.href} className="docs-link">
+                    <span className="t">{link.title}</span>
+                    <span className="s">{link.summary}</span>
                   </Link>
                 ))}
               </div>

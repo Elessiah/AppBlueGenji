@@ -2,7 +2,12 @@ import Link from "next/link";
 // Le registre vient de `lib/shared` et non de `lib/server/bot-docs.ts`, qui
 // importe `node:fs` : « `lib/server/*` ne s'importe jamais depuis un composant »
 // doit rester vrai sans dépendre de ce que ce fichier-ci est aujourd'hui.
-import { BOT_DOC_SECTIONS } from "@/lib/shared/bot-doc-sections";
+import { visibleBotDocSections, BOT_LEGAL_LINKS } from "@/lib/shared/bot-doc-sections";
+
+interface BotCommandsProps {
+  /** Visiteur avec au moins un rôle de permission de plateforme. */
+  isStaff: boolean;
+}
 
 /**
  * Les commandes du bot — **renvoyées à leur source**, jamais recopiées.
@@ -29,7 +34,15 @@ import { BOT_DOC_SECTIONS } from "@/lib/shared/bot-doc-sections";
  * `loadBotDoc`. L'intitulé de la section dit « contenu relu » et non « liste
  * tenue à jour » : elle n'annonce que ce qu'elle tient.
  */
-export function BotCommands() {
+export function BotCommands({ isStaff }: BotCommandsProps) {
+  const sections = visibleBotDocSections(isStaff);
+  // Les pages légales du bot vivent à leur propre adresse (pas sous
+  // `/bot/docs`) : elles occupent la place laissée par les pages techniques
+  // masquées, et restent visibles de tous, staff ou non.
+  const items = [
+    ...sections.map((s) => ({ slug: s.slug, title: s.title, summary: s.summary, href: `/bot/docs/${s.slug}` })),
+    ...BOT_LEGAL_LINKS,
+  ];
   return (
     <>
       <div className="bot-section-head">
@@ -45,7 +58,7 @@ export function BotCommands() {
       <div className="card card-ticks">
         <div className="panel-head">
           <span className="title mono">~/bluegenji_bot $ help</span>
-          <span className="meta">{BOT_DOC_SECTIONS.length} DOCUMENTS</span>
+          <span className="meta">{items.length} DOCUMENTS</span>
         </div>
         <div className="bot-docs-links">
           <p className="bot-docs-intro">
@@ -59,11 +72,11 @@ export function BotCommands() {
               liste dont on a ôté les puces (`list-style: none`), et VoiceOver
               n'annonce alors plus « liste, N éléments ». */}
           <ul className="bot-docs-list" role="list">
-            {BOT_DOC_SECTIONS.map((section) => (
-              <li key={section.slug}>
-                <Link href={`/bot/docs/${section.slug}`} className="bot-docs-link">
-                  <span className="bot-docs-title">{section.title}</span>
-                  <span className="bot-docs-summary">{section.summary}</span>
+            {items.map((item) => (
+              <li key={item.slug}>
+                <Link href={item.href} className="bot-docs-link">
+                  <span className="bot-docs-title">{item.title}</span>
+                  <span className="bot-docs-summary">{item.summary}</span>
                 </Link>
               </li>
             ))}
