@@ -243,3 +243,145 @@
     display: none;
   }
 }
+
+/* --- Registre des traitements (/rgpd/registre) et son encart sur /rgpd --- */
+
+.registerActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  margin-top: 28px;
+}
+
+.registerBack {
+  font-size: 14px;
+  color: var(--ink-mute);
+  text-decoration: underline;
+  text-decoration-color: var(--line-soft);
+  text-underline-offset: 3px;
+}
+
+.registerBack:hover,
+.registerBack:focus-visible {
+  color: var(--ink);
+}
+
+.registerToc {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+
+.registerToc a {
+  font-size: 14px;
+  color: var(--ink-mute);
+}
+
+.registerToc a:hover,
+.registerToc a:focus-visible {
+  color: var(--ink);
+}
+
+.registerCards {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.registerCard {
+  scroll-margin-top: 96px;
+}
+
+.registerTitle {
+  margin: 0 0 12px;
+  font-family: var(--font-sans);
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.registerTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.registerTable th,
+.registerTable td {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: top;
+  text-align: left;
+}
+
+.registerTable td {
+  color: var(--ink-mute);
+}
+
+.registerLabel {
+  width: 190px;
+  padding-right: 16px !important;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.registerList {
+  margin: 0;
+  padding: 0 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+@media (max-width: 640px) {
+  .registerTable tr {
+    display: block;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .registerTable th,
+  .registerTable td {
+    display: block;
+    width: auto;
+    padding: 0;
+    border-bottom: 0;
+  }
+
+  .registerLabel {
+    margin-bottom: 4px;
+  }
+}
+
+/* Impression — « Enregistrer en PDF » est le chemin le plus court pour joindre
+   le registre à un courrier : une fiche ne se coupe pas entre deux pages, et les
+   gris pensés pour un fond noir redeviennent lisibles sur papier blanc. */
+@media print {
+  .registerCard {
+    break-inside: avoid;
+  }
+
+  .registerTable th,
+  .registerTable td,
+  .registerTitle,
+  .registerLabel {
+    color: #000 !important;
+  }
+
+  .registerTable th,
+  .registerTable td {
+    border-bottom-color: #ccc;
+  }
+
+  .registerActions,
+  .registerToc {
+    display: none;
+  }
+}

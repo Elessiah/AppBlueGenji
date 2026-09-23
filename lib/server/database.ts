@@ -1,6 +1,6 @@
 ﻿import "dotenv/config";
 import mysql, { type ExecuteValues, type Pool, type PoolConnection, type ResultSetHeader, type RowDataPacket } from "mysql2/promise";
-import { isSchemaNoOpError } from "@/lib/server/mysql-errors";
+import { isSchemaNoOpError, isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { createOnceGate, withMigrationLock } from "@/lib/server/migration-lock";
 import { CONTACT_DISCORD_URL_KEY } from "@/lib/shared/contact";
 import { DISCORD_INVITE_URL, SUPERSEDED_DISCORD_INVITE_URLS } from "@/lib/shared/discord";
@@ -63,7 +63,7 @@ function requireEnv(name: string): string {
  *   production passée dessus — des **instructions entières**, pour que la règle
  *   vaille aussi bien pour un `ENUM` élargi ou un index posé que pour une
  *   colonne ajoutée ; à retirer un par un, une fois un déploiement constaté ;
- * - les deux `DROP COLUMN`, qui n'ont pas de pendant dans un `CREATE TABLE`
+ * - les trois `DROP COLUMN`, qui n'ont pas de pendant dans un `CREATE TABLE`
  *   puisqu'ils *retirent* ;
  * - `warnIfSchemaIsBehind`, qui **dit** au démarrage qu'une base n'a pas joué
  *   les `ALTER` repliés — la prémisse ci-dessus était jusqu'ici affirmée et
@@ -951,12 +951,11 @@ async function runMigrations(db: Pool): Promise<void> {
       CREATE TABLE IF NOT EXISTS bg_site_visits (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       visitor_key CHAR(64) NOT NULL,
-      user_id BIGINT NULL,
+      authenticated TINYINT(1) NOT NULL DEFAULT 0,
       path VARCHAR(191) NOT NULL DEFAULT '/',
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_bg_site_visits_created_at (created_at),
-      INDEX idx_bg_site_visits_visitor (visitor_key, created_at),
-      INDEX idx_bg_site_visits_user (user_id)
+      INDEX idx_bg_site_visits_visitor (visitor_key, created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
@@ -1050,6 +1049,10 @@ async function runMigrations(db: Pool): Promise<void> {
     // Rôles portés par une invitation : le formulaire d'invitation les
     // demandait, le serveur les jetait et le joueur arrivait toujours en DPS.
     `ALTER TABLE bg_team_invitations ADD COLUMN roles_json JSON NULL`,
+    // Visites sans lien vers le compte : seul reste le fait qu'il y en avait un.
+    // Le retrait de `user_id` suit, plus bas, avec les autres `DROP COLUMN`.
+    `ALTER TABLE bg_site_visits ADD COLUMN authenticated TINYINT(1) NOT NULL DEFAULT 0
+       AFTER visitor_key`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {
@@ -1063,7 +1066,7 @@ async function runMigrations(db: Pool): Promise<void> {
   // **Un retrait de colonne ne se replie pas.** Une colonne qui part n'a aucune
   // contrepartie dans un `CREATE TABLE` : elle y est simplement absente, si bien
   // qu'une table neuve ne la porte jamais et qu'une base existante la garde pour
-  // toujours. Les deux ci-dessous restent donc ici quoi qu'il arrive, et elles
+  // toujours. Les trois ci-dessous restent donc ici quoi qu'il arrive ; les deux premières
   // disent la même chose : une adresse que plus personne ne lit.
   //
   // Celle des annonces de recrutement a perdu son lecteur quand le contact est
@@ -1114,6 +1117,44 @@ async function runMigrations(db: Pool): Promise<void> {
       } catch (fallbackError) {
         console.error(
           `[migrations] Les adresses de bg_users.email n'ont pu être ni retirées ni vidées.`,
+          fallbackError,
+        );
+      }
+    }
+  }
+
+  // Les visites ne pointent plus vers un compte : `bg_site_visits.user_id` gardait
+  // qui avait vu quelle page, et à quelle heure, tant que le compte vivait — une
+  // trace de navigation nominative que la mesure d'audience n'a jamais demandée.
+  // Seul le fait « visite d'un compte connecté » est conservé (`authenticated`),
+  // repris des lignes existantes avant le retrait.
+  //
+  // Même filet que l'adresse e-mail : si le `DROP` est refusé, la colonne est
+  // **vidée** — c'est l'effacement qui est urgent, pas la forme du schéma. Le
+  // report de `authenticated` échoue en silence sur une base déjà migrée (la
+  // colonne source n'existe plus), ce qui est la réussite attendue.
+  try {
+    await db.execute(`UPDATE bg_site_visits SET authenticated = 1 WHERE user_id IS NOT NULL`);
+  } catch (error) {
+    if (!isUnknownColumnError(error)) {
+      reportSchemaFailure(error, "UPDATE bg_site_visits SET authenticated (report depuis user_id)");
+    }
+  }
+  const DROP_VISIT_USER = "ALTER TABLE bg_site_visits DROP COLUMN user_id";
+  try {
+    await db.execute(DROP_VISIT_USER);
+  } catch (error) {
+    reportSchemaFailure(error, DROP_VISIT_USER);
+    if (!isSchemaNoOpError(error, DROP_VISIT_USER)) {
+      try {
+        await db.execute(`UPDATE bg_site_visits SET user_id = NULL WHERE user_id IS NOT NULL`);
+        console.error(
+          "[migrations] Le retrait de bg_site_visits.user_id a échoué : la colonne a été vidée à la place. " +
+            "Elle reste à retirer à la main.",
+        );
+      } catch (fallbackError) {
+        console.error(
+          "[migrations] bg_site_visits.user_id n'a pu être ni retirée ni vidée.",
           fallbackError,
         );
       }

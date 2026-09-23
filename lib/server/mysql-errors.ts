@@ -88,6 +88,17 @@ export function isReferencedRowError(error: unknown): boolean {
 }
 
 /**
+ * `true` si l'instruction nomme une colonne que la table n'a pas.
+ *
+ * Sert aux reports de données d'une colonne vers une autre, joués avant le
+ * retrait de la source : sur une base déjà migrée, la source n'existe plus et
+ * l'échec est la réussite attendue.
+ */
+export function isUnknownColumnError(error: unknown): boolean {
+  return errorCode(error) === "ER_BAD_FIELD_ERROR";
+}
+
+/**
  * `true` si la migration n'avait **rien à faire** — au regard de l'instruction
  * qu'elle jouait.
  *

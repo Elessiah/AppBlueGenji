@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { CyberButton } from "@/components/cyber";
 import { pageMetadata } from "@/lib/shared/page-metadata";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
@@ -10,6 +12,7 @@ import {
   RGPD_CONTACT_EMAIL_FALLBACK,
 } from "@/lib/shared/rgpd-policy";
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
+import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { privacyPolicyUpdatedLabel } from "@/lib/shared/privacy-changes";
 import styles from "./page.module.css";
 
@@ -253,6 +256,35 @@ export default function RgpdPage() {
             nécessaires au fonctionnement du service (directive ePrivacy, art. 5.3, exemption
             cookies fonctionnels).
           </p>
+        </div>
+      </section>
+
+      {/* REGISTRE — public, sans demande à faire */}
+      <section className={styles.section}>
+        <header className={styles.head}>
+          <div>
+            <span className="eyebrow">RGPD · ARTICLE 30</span>
+            <h2 className={styles.sectionTitle}>Registre des traitements</h2>
+          </div>
+          <span className={styles.meta}>{PROCESSING_ACTIVITIES.length} TRAITEMENTS</span>
+        </header>
+        <div className={styles.prose}>
+          <p>
+            Le registre recense tout ce que BlueGenji fait de données personnelles :
+            finalités, données, durées de conservation, destinataires, transferts et
+            mesures de sécurité. Il est <strong>public</strong> — consultable et
+            téléchargeable par tous, sans compte ni demande.
+          </p>
+        </div>
+        <div className={styles.registerActions}>
+          <CyberButton asChild variant="primary">
+            <a href="/rgpd/registre.csv" download>
+              Télécharger le registre (tableur CSV)
+            </a>
+          </CyberButton>
+          <Link className={styles.registerBack} href="/rgpd/registre">
+            Consulter en ligne →
+          </Link>
         </div>
       </section>
 

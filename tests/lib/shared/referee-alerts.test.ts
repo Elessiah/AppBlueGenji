@@ -94,8 +94,8 @@ describe("formatScoreConflictAlert", () => {
       matchId: 101,
       bracket: "UPPER",
       roundNumber: 3,
-      team1Name: "Les Renards",
-      team2Name: "Team Nova",
+      team1: { name: "Les Renards", participantType: "TEAM" },
+      team2: { name: "Team Nova", participantType: "TEAM" },
     });
 
     expect(alert).not.toContain("\n");
@@ -108,8 +108,8 @@ describe("formatScoreConflictAlert", () => {
       matchId: 101,
       bracket: "UPPER",
       roundNumber: 1,
-      team1Name: "Les Renards",
-      team2Name: "Team Nova",
+      team1: { name: "Les Renards", participantType: "TEAM" },
+      team2: { name: "Team Nova", participantType: "TEAM" },
     });
 
     expect(alert).toContain("Arbitrage requis");
@@ -122,8 +122,8 @@ describe("formatScoreConflictAlert", () => {
       matchId: 101,
       bracket: "UPPER",
       roundNumber: 1,
-      team1Name: "A",
-      team2Name: "B",
+      team1: { name: "A", participantType: "TEAM" },
+      team2: { name: "B", participantType: "TEAM" },
     });
 
     expect(alert).toContain("« Coupe de Fer »");
@@ -137,8 +137,8 @@ describe("formatScoreConflictAlert", () => {
       matchId: 101,
       bracket: "UPPER",
       roundNumber: 2,
-      team1Name: "A",
-      team2Name: "B",
+      team1: { name: "A", participantType: "TEAM" },
+      team2: { name: "B", participantType: "TEAM" },
     });
 
     expect(alert).toContain("Manche 2");
@@ -151,8 +151,8 @@ describe("formatScoreConflictAlert", () => {
       matchId: 101,
       bracket: "UPPER",
       roundNumber: 1,
-      team1Name: "Les Renards",
-      team2Name: "Team Nova",
+      team1: { name: "Les Renards", participantType: "TEAM" },
+      team2: { name: "Team Nova", participantType: "TEAM" },
     });
 
     expect(alert).toContain("Les Renards");
@@ -166,8 +166,8 @@ describe("formatScoreConflictAlert", () => {
       matchId: 12345,
       bracket: "UPPER",
       roundNumber: 1,
-      team1Name: "A",
-      team2Name: "B",
+      team1: { name: "A", participantType: "TEAM" },
+      team2: { name: "B", participantType: "TEAM" },
     });
 
     expect(alert).toContain("match #12345");
@@ -181,8 +181,8 @@ describe("formatScoreConflictAlert", () => {
       matchId: 101,
       bracket: "UPPER",
       roundNumber: 1,
-      team1Name: "A",
-      team2Name: "B",
+      team1: { name: "A", participantType: "TEAM" },
+      team2: { name: "B", participantType: "TEAM" },
     });
 
     expect(alert).toContain(url);
@@ -196,8 +196,8 @@ describe("formatScoreConflictAlert", () => {
       matchId: 101,
       bracket: "UPPER",
       roundNumber: 1,
-      team1Name: "A",
-      team2Name: "B",
+      team1: { name: "A", participantType: "TEAM" },
+      team2: { name: "B", participantType: "TEAM" },
     });
 
     expect(alert).not.toContain("null");
@@ -214,8 +214,8 @@ describe("formatScoreConflictAlert", () => {
       matchId: 50,
       bracket: "GRAND",
       roundNumber: 1,
-      team1Name: "Champion 1",
-      team2Name: "Champion 2",
+      team1: { name: "Champion 1", participantType: "TEAM" },
+      team2: { name: "Champion 2", participantType: "TEAM" },
     });
 
     // matchRoundLabel retourne "Grande finale" pour GRAND.
@@ -232,8 +232,8 @@ describe("formatStalledScoreReportAlert", () => {
         matchId: 101,
         bracket: "UPPER",
         roundNumber: 1,
-        team1Name: "A",
-        team2Name: "B",
+        team1: { name: "A", participantType: "TEAM" },
+        team2: { name: "B", participantType: "TEAM" },
       },
       30,
     );
@@ -249,8 +249,8 @@ describe("formatStalledScoreReportAlert", () => {
         matchId: 101,
         bracket: "UPPER",
         roundNumber: 1,
-        team1Name: "A",
-        team2Name: "B",
+        team1: { name: "A", participantType: "TEAM" },
+        team2: { name: "B", participantType: "TEAM" },
       },
       30,
     );
@@ -266,8 +266,8 @@ describe("formatStalledScoreReportAlert", () => {
         matchId: 101,
         bracket: "UPPER",
         roundNumber: 1,
-        team1Name: "A",
-        team2Name: "B",
+        team1: { name: "A", participantType: "TEAM" },
+        team2: { name: "B", participantType: "TEAM" },
       },
       45,
     );
@@ -283,8 +283,8 @@ describe("formatStalledScoreReportAlert", () => {
         matchId: 101,
         bracket: "UPPER",
         roundNumber: 1,
-        team1Name: "Les Renards",
-        team2Name: "Team Nova",
+        team1: { name: "Les Renards", participantType: "TEAM" },
+        team2: { name: "Team Nova", participantType: "TEAM" },
       },
       60,
     );
@@ -306,8 +306,8 @@ describe("formatStalledScoreReportAlert", () => {
         matchId: 101,
         bracket: "UPPER",
         roundNumber: 1,
-        team1Name: "A",
-        team2Name: "B",
+        team1: { name: "A", participantType: "TEAM" },
+        team2: { name: "B", participantType: "TEAM" },
       },
       30,
     );
@@ -323,8 +323,8 @@ describe("formatStalledScoreReportAlert", () => {
         matchId: 101,
         bracket: "UPPER",
         roundNumber: 1,
-        team1Name: "A",
-        team2Name: "B",
+        team1: { name: "A", participantType: "TEAM" },
+        team2: { name: "B", participantType: "TEAM" },
       },
       30,
     );
@@ -344,8 +344,8 @@ describe("pictogrammes distincts des alertes", () => {
       matchId: 101,
       bracket: "UPPER",
       roundNumber: 1,
-      team1Name: "A",
-      team2Name: "B",
+      team1: { name: "A", participantType: "TEAM" },
+      team2: { name: "B", participantType: "TEAM" },
     };
 
     const conflict = formatScoreConflictAlert(context);
@@ -361,5 +361,24 @@ describe("pictogrammes distincts des alertes", () => {
     // ⚠️ pour conflit, ⏱️ pour escalade.
     expect(conflictEmoji).toBe("⚠️");
     expect(stalledEmoji).toBe("⏱️");
+  });
+});
+
+describe("confidentialité des alertes", () => {
+  it("n'écrit que « un joueur » pour les engagés d'un tournoi individuel", () => {
+    const context = {
+      tournament: TOURNAMENT,
+      tournamentUrl: null,
+      matchId: 9,
+      bracket: "UPPER",
+      roundNumber: 1,
+      team1: { name: "Nova", participantType: "SOLO" as const },
+      team2: { name: "Kiro", participantType: "SOLO" as const },
+    };
+    for (const line of [formatScoreConflictAlert(context), formatStalledScoreReportAlert(context, 30)]) {
+      expect(line).not.toContain("Nova");
+      expect(line).not.toContain("Kiro");
+      expect(line).toContain("un joueur vs un joueur");
+    }
   });
 });

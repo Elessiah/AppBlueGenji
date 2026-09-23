@@ -88,24 +88,14 @@ describe("deleteOwnAccount — effacement complet", () => {
     expect(has(queries, "UPDATE bg_users SET pseudo")).toBe(false);
   });
 
-  it("détache les visites plutôt que de les effacer — la page a bien été vue", async () => {
+  it("ne touche pas aux visites : elles ne désignent aucun compte", async () => {
+    // `bg_site_visits` ne garde qu'une empreinte salée, sans `user_id` : il n'y
+    // a plus de lien à détacher, et les visites restent comptées.
     const { queries } = fakeDb(EMPTY);
 
     await deleteOwnAccount(7);
 
-    expect(has(queries, "UPDATE bg_site_visits SET user_id = NULL")).toBe(true);
-    expect(has(queries, "DELETE FROM bg_site_visits")).toBe(false);
-  });
-
-  it("détache les visites **avant** d'effacer le compte", async () => {
-    const { queries } = fakeDb(EMPTY);
-
-    await deleteOwnAccount(7);
-
-    const visits = queries.findIndex((q) => q.sql.includes("bg_site_visits"));
-    const user = queries.findIndex((q) => q.sql.includes("DELETE FROM bg_users"));
-    expect(visits).toBeGreaterThanOrEqual(0);
-    expect(user).toBeGreaterThan(visits);
+    expect(has(queries, "bg_site_visits")).toBe(false);
   });
 
   it("ne resynchronise aucune entrée solo — un compte effaçable n'en a pas", async () => {

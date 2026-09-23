@@ -91,10 +91,10 @@ describe("inscription par Google", () => {
     await createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" });
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
-    // L'identifiant est celui que l'`INSERT` vient de rendre, et le pseudo
-    // celui qui a été retenu — pas celui que Google propose, qui peut être déjà
-    // pris.
-    expect(lines()[0]).toContain("« Nova » (#4242)");
+    // Le compte n'est **pas** nommé : ni pseudo, ni identifiant (qui mène à
+    // `/joueurs/<id>`) — le canal Discord ne reçoit aucun joueur.
+    expect(lines()[0]).not.toContain("Nova");
+    expect(lines()[0]).not.toContain("4242");
     expect(lines()[0]).toContain("via Google");
   });
 
@@ -124,12 +124,12 @@ describe("inscription par Google", () => {
     ).resolves.toBe(4242);
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
-    expect(lines()[0]).toContain("(#4242)");
+    expect(lines()[0]).toContain("Nouveau joueur");
   });
 });
 
 describe("inscription par Blizzard", () => {
-  it("annonce le compte qui vient de naître, nommé d'après le BattleTag", async () => {
+  it("annonce le compte qui vient de naître, sans reprendre le BattleTag", async () => {
     // Le discriminant reste chez Blizzard : « Nova#2143 » donne « Nova », qui
     // est ce qu'on lit dans une URL de profil et sur une feuille de match.
     fakeDb([]);
@@ -137,7 +137,8 @@ describe("inscription par Blizzard", () => {
     await createOrGetBlizzardUser("blizzard-sub-neuf", "Nova#2143");
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
-    expect(lines()[0]).toContain("« Nova » (#4242)");
+    expect(lines()[0]).not.toContain("Nova");
+    expect(lines()[0]).not.toContain("4242");
     expect(lines()[0]).toContain("via Blizzard");
   });
 
@@ -157,7 +158,8 @@ describe("inscription par Discord", () => {
     await createOrGetDiscordUser("123456789", "Nova");
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
-    expect(lines()[0]).toContain("« Nova » (#4242)");
+    expect(lines()[0]).not.toContain("Nova");
+    expect(lines()[0]).not.toContain("4242");
     expect(lines()[0]).toContain("via Discord");
   });
 

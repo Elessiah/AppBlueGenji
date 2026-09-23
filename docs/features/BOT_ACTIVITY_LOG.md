@@ -1,5 +1,10 @@
 # Journal d'activité Discord
 
+> **Mise à jour** — le journal ne nomme plus aucun joueur (« un joueur », y
+> compris en tournoi individuel) ni aucun membre du staff (« le staff », l'auteur
+> étant écrit dans les journaux pm2). Voir `docs/features/RGPD_LOGS_AND_VISITS.md`,
+> qui fait foi là où ce document cite un pseudo ou un auteur nommé.
+
 Le canal de logs du bot recevait deux lignes du site : un conflit de score, une
 suppression de tournoi. Un tournoi pouvait donc s'ouvrir, se remplir, se lancer,
 se jouer et se conclure sans qu'une seule ligne ne passe — le staff suivait la

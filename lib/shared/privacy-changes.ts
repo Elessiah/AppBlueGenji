@@ -75,7 +75,8 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Si tu rattaches ton compte Battle.net, Blizzard renseigne ton BattleTag et le remplace à chaque connexion. Sa visibilité sur ton profil ne change pas.",
       "Ta photo de profil est copiée sur nos serveurs à la connexion : aucune page du site ne fait plus appel à Google pour l'afficher, et un avatar que tu masques l'est partout, accueil compris.",
       "Supprimer ton compte l'efface entièrement s'il n'a laissé aucune trace. S'il a joué ou organisé un tournoi, ou s'il possède une équipe, il est anonymisé et seul le palmarès sportif reste. Tu peux exporter tes données à tout moment depuis Mon profil.",
-      "Seuls des cookies techniques sont déposés. La fréquentation du site est mesurée par une empreinte non réversible (jamais ton adresse IP), et le flux d'activité public du bot n'affiche aucun identifiant Discord.",
+      "Seuls des cookies techniques sont déposés. La fréquentation du site est mesurée par une empreinte non réversible : ni ton adresse IP ni ton compte ne sont enregistrés avec tes visites. Le flux d'activité public du bot n'affiche aucun identifiant Discord.",
+      "Le journal d'activité que le staff suit sur Discord ne nomme aucun joueur : il parle d'équipes et écrit « un joueur », y compris en tournoi individuel.",
     ],
   },
   // Durées lues sur les constantes que `/rgpd` affiche déjà : la modale ne peut

@@ -237,25 +237,46 @@ describe("normalizeIssueReportMessage", () => {
 });
 
 describe("buildIssueReportMessage", () => {
+  const team = (name: string) => ({ name, participantType: "TEAM" as const });
+  const solo = (name: string) => ({ name, participantType: "SOLO" as const });
   const context = {
     tournamentName: "Coupe BlueGenji",
     tournamentUrl: "https://bluegenji.fr/tournois/7",
-    reporterPseudo: "Kiro",
-    entrantName: "Les Renards",
-    matchLabel: "Manche 2 — Les Renards vs Team Nova (#31)",
+    entrant: team("Les Renards"),
+    match: { round: "Manche 2", team1: team("Les Renards"), team2: team("Team Nova"), id: 31 },
     message: "adversaire absent depuis 20 minutes",
   };
 
-  it("situe le signalement, son auteur et sa manche", () => {
+  it("situe le signalement, son équipe et sa manche", () => {
     const message = buildIssueReportMessage(context);
     expect(message).toContain("Tournoi : Coupe BlueGenji");
     expect(message).toContain("Match : Manche 2 — Les Renards vs Team Nova (#31)");
-    expect(message).toContain("Auteur : Kiro (Les Renards)");
+    expect(message).toContain("Auteur : un joueur de l'équipe Les Renards");
     expect(message).toContain("adversaire absent depuis 20 minutes");
   });
 
+  it("ne nomme jamais un joueur, même en tournoi individuel", () => {
+    const message = buildIssueReportMessage({
+      ...context,
+      entrant: solo("Kiro"),
+      match: { round: "Manche 1", team1: solo("Kiro"), team2: solo("Nova"), id: 5 },
+    });
+    expect(message).not.toContain("Kiro");
+    expect(message).not.toContain("Nova");
+    expect(message).toContain("Auteur : un joueur");
+    expect(message).toContain("Match : Manche 1 — un joueur vs un joueur (#5)");
+  });
+
+  it("écrit « TBD » pour une place encore vide", () => {
+    const message = buildIssueReportMessage({
+      ...context,
+      match: { round: "Manche 3", team1: team("Les Renards"), team2: null, id: 9 },
+    });
+    expect(message).toContain("Les Renards vs TBD (#9)");
+  });
+
   it("annonce une portée « tournoi entier » sans manche", () => {
-    const message = buildIssueReportMessage({ ...context, matchLabel: null });
+    const message = buildIssueReportMessage({ ...context, match: null });
     expect(message).toContain("Portée : tournoi entier");
     expect(message).not.toContain("Match :");
   });

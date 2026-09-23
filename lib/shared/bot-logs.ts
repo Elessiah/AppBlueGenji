@@ -22,12 +22,22 @@
  * rôle configuré côté Discord — le tri, unique et pur, vit dans
  * `lib/shared/referee-alerts.ts`, qui rédige aussi ces alertes.
  *
+ * **Troisième règle, de confidentialité** : le canal est un salon Discord — un
+ * tiers, hébergé hors de l'Union européenne, et sans purge automatique. Il ne
+ * reçoit donc **aucun pseudo de joueur** : les noms d'équipe y figurent, un
+ * joueur s'y écrit « un joueur ». Un engagé n'arrive jamais ici par son nom brut
+ * mais par un `LogEntrant` (`lib/shared/log-privacy.ts`), qui sait s'il
+ * désigne une équipe ou une personne. Le **staff** n'y est pas nommé non plus
+ * (« le staff ») : son identité part dans les journaux du serveur (pm2), qui
+ * servent à la modération — `staffAuditLine`.
+ *
  * Module pur (`lib/shared`) : aucune base, aucun réseau. Le déclenchement et la
  * résolution des noms vivent dans `lib/server/tournaments/bot-logs.ts`.
  */
 import { matchRoundLabel, formatMatchStart } from "./discord-notifications";
 import { OAUTH_PROVIDER_LABELS, type OAuthProvider } from "./oauth-providers";
 import { participantWording, type ParticipantType } from "./participants";
+import { ANONYMOUS_STAFF_LABEL, entrantLabel, type LogEntrant } from "./log-privacy";
 import { formatLabel, gameLabel } from "./tournament-labels";
 import type { TournamentFormat, TournamentGame } from "./types";
 
@@ -136,17 +146,13 @@ const SIGNUP_PROVIDER_LABELS: Record<PlayerSignupProvider, string> = OAUTH_PROVI
  * un second fournisseur depuis `/profil` non plus — ce n'est pas un joueur de
  * plus.
  *
- * L'identifiant suit le pseudo, comme partout : un pseudo se change depuis
- * `/profil`, et la ligne doit rester rapprochable de `/joueurs/<id>` des mois
- * après.
+ * Le joueur n'y est **pas nommé**, ni par son pseudo ni par son identifiant —
+ * `#id` mène à `/joueurs/<id>`, donc au pseudo : la ligne compte une arrivée,
+ * elle ne dit pas qui.
  */
-export function formatPlayerSignupLog(context: {
-  player: { id: number; pseudo: string };
-  provider: PlayerSignupProvider;
-}): string {
-  const subject = `« ${context.player.pseudo} » (#${context.player.id})`;
+export function formatPlayerSignupLog(context: { provider: PlayerSignupProvider }): string {
   const provider = SIGNUP_PROVIDER_LABELS[context.provider];
-  return `${leadOn("👋", "Nouveau joueur", subject)} : compte créé via ${provider}.`;
+  return `${leadOn("👋", "Nouveau joueur", `compte créé via ${provider}`)}.`;
 }
 
 /** Création d'un tournoi par le staff. */
@@ -156,13 +162,13 @@ export function formatTournamentCreatedLog(context: {
   game: TournamentGame | string;
   maxTeams: number;
   participantType: ParticipantType;
-  organizerPseudo: string;
   startAt: string | Date | null;
 }): string {
+  // L'organisateur n'est pas nommé : c'est un membre du staff, et son identité
+  // part dans les journaux du serveur (`staffAuditLine`), pas sur Discord.
   const parts = [
     `${formatLabel(context.format)} · ${gameLabel(context.game)}`,
     `${context.maxTeams} ${participantWording(context.participantType).many} max`,
-    `créé par ${context.organizerPseudo}`,
   ];
   if (context.startAt !== null) {
     parts.push(`début le ${formatMatchStart(context.startAt)}`);
@@ -180,15 +186,14 @@ export function formatTournamentCreatedLog(context: {
  */
 export function formatRegistrationLog(context: {
   tournament: BotLogTournament;
-  entrantName: string;
+  entrant: LogEntrant;
   registeredTeams: number;
   maxTeams: number;
-  participantType: ParticipantType;
   byStaff: boolean;
 }): string {
-  const field = `${context.registeredTeams}/${context.maxTeams} ${participantWording(context.participantType).many}`;
+  const field = `${context.registeredTeams}/${context.maxTeams} ${participantWording(context.entrant.participantType).many}`;
   const author = context.byStaff ? " (ajout du staff)" : "";
-  return `${lead("✅", "Inscription", context.tournament)} : ${context.entrantName}${author}. ${field}.`;
+  return `${lead("✅", "Inscription", context.tournament)} : ${entrantLabel(context.entrant)}${author}. ${field}.`;
 }
 
 /**
@@ -202,9 +207,9 @@ export function formatRegistrationLog(context: {
  */
 export function formatForfeitLog(context: {
   tournament: BotLogTournament;
-  entrantName: string;
+  entrant: LogEntrant;
 }): string {
-  return `${lead("🚪", "Abandon", context.tournament)} : ${context.entrantName} quitte la compétition.`;
+  return `${lead("🚪", "Abandon", context.tournament)} : ${entrantLabel(context.entrant)} quitte la compétition.`;
 }
 
 /**
@@ -214,7 +219,8 @@ export function formatForfeitLog(context: {
  * Ligne distincte de l'abandon, et ce n'est pas une nuance de vocabulaire : un
  * abandon laisse un engagé au classement avec un forfait à son nom, un retrait
  * l'efface — après coup, rien sur la page ne dira qu'il a été inscrit. Le canal
- * est alors le **seul** endroit où la trace subsiste, d'où l'auteur nommé, comme
+ * est alors le **seul** endroit où la trace subsiste. L'auteur y est « le
+ * staff » : son nom part dans les journaux du serveur (`staffAuditLine`), comme
  * pour la suppression d'un tournoi et le retour en arrière.
  *
  * L'effectif restant suit : c'est ce qu'un arbitre vérifie en retirant une
@@ -223,16 +229,12 @@ export function formatForfeitLog(context: {
  */
 export function formatEntrantRemovedLog(context: {
   tournament: BotLogTournament;
-  entrantName: string;
+  entrant: LogEntrant;
   registeredTeams: number;
   maxTeams: number;
-  participantType: ParticipantType;
-  actorPseudo: string;
-  actorId: number;
 }): string {
-  const field = `${context.registeredTeams}/${context.maxTeams} ${participantWording(context.participantType).many}`;
-  const actor = `${context.actorPseudo} (#${context.actorId})`;
-  return `${lead("➖", "Inscription retirée", context.tournament)} : ${context.entrantName}, par ${actor}. ${field}.`;
+  const field = `${context.registeredTeams}/${context.maxTeams} ${participantWording(context.entrant.participantType).many}`;
+  return `${lead("➖", "Inscription retirée", context.tournament)} : ${entrantLabel(context.entrant)}, par ${ANONYMOUS_STAFF_LABEL}. ${field}.`;
 }
 
 /**
@@ -246,8 +248,8 @@ export function formatMatchResultLog(context: {
   tournament: BotLogTournament;
   bracket: string;
   roundNumber: number;
-  team1Name: string;
-  team2Name: string;
+  team1: LogEntrant;
+  team2: LogEntrant;
   /** `null` sur un forfait arbitré : le moteur n'y écrit aucun score. */
   team1Score: number | null;
   team2Score: number | null;
@@ -262,10 +264,12 @@ export function formatMatchResultLog(context: {
   const round = matchRoundLabel(context.bracket, context.roundNumber);
   // Un forfait prononcé par un arbitre laisse les deux scores à `null` : la
   // rencontre n'a pas été jouée. Écrire « 0–0 » raconterait un match nul.
+  const team1 = entrantLabel(context.team1);
+  const team2 = entrantLabel(context.team2);
   const score =
     context.team1Score === null || context.team2Score === null
-      ? `${context.team1Name} vs ${context.team2Name}`
-      : `${context.team1Name} ${context.team1Score}–${context.team2Score} ${context.team2Name}`;
+      ? `${team1} vs ${team2}`
+      : `${team1} ${context.team1Score}–${context.team2Score} ${team2}`;
   const forfeit = context.doubleForfeit
     ? " (double forfait, aucune qualifiée)"
     : context.forfeit
@@ -288,9 +292,9 @@ export function formatTournamentStartedLog(context: {
 /** Clôture d'un tournoi, avec sa championne quand le classement en désigne une. */
 export function formatTournamentFinishedLog(context: {
   tournament: BotLogTournament;
-  championName: string | null;
+  champion: LogEntrant | null;
 }): string {
-  const champion = context.championName ? ` : ${context.championName} l'emporte.` : ".";
+  const champion = context.champion ? ` : ${entrantLabel(context.champion)} l'emporte.` : ".";
   return `${lead("🏆", "Tournoi terminé", context.tournament)}${champion}`;
 }
 
@@ -329,12 +333,12 @@ export function formatUnderfilledTournamentLog(context: {
  */
 export function formatEndurancePenaltyLog(context: {
   tournament: BotLogTournament;
-  entrantName: string;
+  entrant: LogEntrant;
   points: number;
   reason: string;
 }): string {
   const points = `${context.points} point${context.points > 1 ? "s" : ""} d'endurance`;
-  return `${lead("⛔", "Pénalité", context.tournament)} : ${context.entrantName} perd ${points} — ${context.reason}.`;
+  return `${lead("⛔", "Pénalité", context.tournament)} : ${entrantLabel(context.entrant)} perd ${points} — ${context.reason}.`;
 }
 
 /**
@@ -347,20 +351,16 @@ export function formatEndurancePenaltyLog(context: {
  */
 export function formatEndurancePenaltyLiftedLog(context: {
   tournament: BotLogTournament;
-  entrantName: string;
+  entrant: LogEntrant;
   points: number;
 }): string {
   const points = `${context.points} point${context.points > 1 ? "s" : ""} d'endurance`;
-  return `${lead("↩️", "Pénalité annulée", context.tournament)} : ${context.entrantName} récupère ${points}.`;
+  return `${lead("↩️", "Pénalité annulée", context.tournament)} : ${entrantLabel(context.entrant)} récupère ${points}.`;
 }
 
-/** Suppression définitive d'un tournoi (administrateur). */
-export function formatTournamentDeletedLog(context: {
-  tournament: BotLogTournament;
-  actorPseudo: string;
-  actorId: number;
-}): string {
-  return `${lead("🗑️", "Tournoi supprimé définitivement", context.tournament)}, par ${context.actorPseudo} (#${context.actorId}).`;
+/** Suppression définitive d'un tournoi (administrateur, nommé dans l'audit pm2). */
+export function formatTournamentDeletedLog(context: { tournament: BotLogTournament }): string {
+  return `${lead("🗑️", "Tournoi supprimé définitivement", context.tournament)}, par ${ANONYMOUS_STAFF_LABEL}.`;
 }
 
 /**
@@ -369,7 +369,8 @@ export function formatTournamentDeletedLog(context: {
  * Ligne de journal et non alerte arbitre : c'est le staff qui vient de faire le
  * geste, il n'y a rien à lui demander. Mais elle *doit* figurer au canal — c'est
  * la seule action du site qui efface des résultats déjà annoncés, et une équipe
- * qui retrouve sa manche vierge doit pouvoir lire pourquoi, et par qui.
+ * qui retrouve sa manche vierge doit pouvoir lire pourquoi. Le « qui » reste
+ * dans les journaux du serveur (`staffAuditLine`).
  *
  * `roundLabel` est rédigé par `lib/shared/tournament-rollback.ts`, qui seul sait
  * qu'un tour d'arbre de BlueGenji Survie ne s'annonce pas « manche 1002 » — et
@@ -388,11 +389,9 @@ export function formatRoundRolledBackLog(context: {
    * clôture qui suivra en annoncera un autre.
    */
   reopenedTournament?: boolean;
-  actorPseudo: string;
-  actorId: number;
 }): string {
   const plural = context.clearedMatches > 1 ? "s" : "";
   const matches = `${context.clearedMatches} rencontre${plural} effacée${plural}`;
   const reopened = context.reopenedTournament ? ", tournoi rouvert" : "";
-  return `${lead("⏪", "Retour en arrière", context.tournament)} : ${context.roundLabel} — ${matches}${reopened}, par ${context.actorPseudo} (#${context.actorId}).`;
+  return `${lead("⏪", "Retour en arrière", context.tournament)} : ${context.roundLabel} — ${matches}${reopened}, par ${ANONYMOUS_STAFF_LABEL}.`;
 }

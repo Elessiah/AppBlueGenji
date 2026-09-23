@@ -6,6 +6,7 @@ import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { CyberButton } from "@/components/cyber";
 import styles from "./page.module.css";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
+import { SITE_HOST } from "@/lib/shared/site-host";
 
 /**
  * Lien externe vers le règlement intérieur (Google Docs).
@@ -185,13 +186,13 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           , par :
         </p>
         <p>
-          <strong>Keryan Houssin</strong> — Auto-entrepreneur
+          <strong>{SITE_HOST.name}</strong> — {SITE_HOST.status}
           <br />
-          13 rue du Chemin Fourchue, 14000 Caen, France
+          {SITE_HOST.address}
           <br />
-          Téléphone : 06 02 22 49 56
+          Téléphone : {SITE_HOST.phone}
           <br />
-          SIREN : 930 888 342
+          SIREN : {SITE_HOST.siren}
         </p>
       </>
     ),

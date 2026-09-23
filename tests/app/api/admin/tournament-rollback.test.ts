@@ -171,8 +171,9 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
     expect(await res.json()).toEqual({ error: "ROLLBACK_FAILED" });
   });
 
-  it("journalise le geste avec son auteur et le stade défait", async () => {
+  it("journalise le geste et le stade défait, l'auteur dans pm2 seulement", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
+    const info = jest.spyOn(console, "info").mockImplementation(() => {});
 
     await rollback("7");
 
@@ -181,8 +182,11 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
     expect(line).toContain("« BlueGenji Open » (#7)");
     expect(line).toContain("la manche 4");
     expect(line).toContain("3 rencontres effacées");
-    expect(line).toContain("Sifflet");
+    expect(line).toContain("par le staff");
+    expect(line).not.toContain("Sifflet");
     expect(line).not.toContain("rouvert");
+    expect(String(info.mock.calls[0]?.[0])).toContain("Sifflet");
+    info.mockRestore();
   });
 
   it("reprend le libellé du serveur, jamais un libellé reconstruit", async () => {

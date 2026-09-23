@@ -53,6 +53,7 @@ const SHOWCASE_ROUTES: readonly SitemapRoute[] = [
   { path: "/benevoles", changeFrequency: "monthly", priority: 0.5 },
   { path: "/mentions-legales", changeFrequency: "yearly", priority: 0.2 },
   { path: "/rgpd", changeFrequency: "yearly", priority: 0.2 },
+  { path: "/rgpd/registre", changeFrequency: "yearly", priority: 0.1 },
   { path: "/privacy-policy-bot", changeFrequency: "yearly", priority: 0.1 },
   { path: "/terms-of-service-bot", changeFrequency: "yearly", priority: 0.1 },
 ];

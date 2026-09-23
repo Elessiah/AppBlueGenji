@@ -8,12 +8,14 @@ import {
   formatMatchResultLog,
   formatPlayerSignupLog,
   formatRegistrationLog,
+  formatRoundRolledBackLog,
   formatTournamentCreatedLog,
   formatTournamentDeletedLog,
   formatTournamentFinishedLog,
   formatTournamentStartedLog,
   formatUnderfilledTournamentLog,
 } from "@/lib/shared/bot-logs";
+import { ANONYMOUS_PLAYER_LABEL, entrantLabel, staffAuditLine } from "@/lib/shared/log-privacy";
 
 const TOURNAMENT = { id: 12, name: "Coupe BlueGenji" };
 
@@ -29,33 +31,28 @@ const TOURNAMENT_LINES = () => [
     game: "OW",
     maxTeams: 16,
     participantType: "TEAM",
-    organizerPseudo: "Kiro",
     startAt: "2026-03-14T18:00:00.000Z",
   }),
   formatRegistrationLog({
     tournament: TOURNAMENT,
-    entrantName: "Les Renards",
+    entrant: { name: "Les Renards", participantType: "TEAM" },
     registeredTeams: 3,
     maxTeams: 16,
-    participantType: "TEAM",
     byStaff: false,
   }),
-  formatForfeitLog({ tournament: TOURNAMENT, entrantName: "Les Renards" }),
+  formatForfeitLog({ tournament: TOURNAMENT, entrant: { name: "Les Renards", participantType: "TEAM" } }),
   formatEntrantRemovedLog({
     tournament: TOURNAMENT,
-    entrantName: "Les Renards",
+    entrant: { name: "Les Renards", participantType: "TEAM" },
     registeredTeams: 2,
     maxTeams: 16,
-    participantType: "TEAM",
-    actorPseudo: "Kiro",
-    actorId: 3,
   }),
   formatMatchResultLog({
     tournament: TOURNAMENT,
     bracket: "UPPER",
     roundNumber: 2,
-    team1Name: "Les Renards",
-    team2Name: "Team Nova",
+    team1: { name: "Les Renards", participantType: "TEAM" },
+    team2: { name: "Team Nova", participantType: "TEAM" },
     team1Score: 2,
     team2Score: 1,
   }),
@@ -65,22 +62,22 @@ const TOURNAMENT_LINES = () => [
     registeredTeams: 8,
     participantType: "TEAM",
   }),
-  formatTournamentFinishedLog({ tournament: TOURNAMENT, championName: "Les Renards" }),
+  formatTournamentFinishedLog({ tournament: TOURNAMENT, champion: { name: "Les Renards", participantType: "TEAM" } }),
   formatUnderfilledTournamentLog({
     tournament: TOURNAMENT,
     registeredTeams: 0,
     participantType: "TEAM",
   }),
-  formatTournamentDeletedLog({ tournament: TOURNAMENT, actorPseudo: "Kiro", actorId: 3 }),
+  formatTournamentDeletedLog({ tournament: TOURNAMENT }),
   formatEndurancePenaltyLog({
     tournament: TOURNAMENT,
-    entrantName: "Les Renards",
+    entrant: { name: "Les Renards", participantType: "TEAM" },
     points: 3,
     reason: "Retard au coup d'envoi",
   }),
   formatEndurancePenaltyLiftedLog({
     tournament: TOURNAMENT,
-    entrantName: "Les Renards",
+    entrant: { name: "Les Renards", participantType: "TEAM" },
     points: 3,
   }),
 ];
@@ -95,7 +92,7 @@ const TOURNAMENT_LINES = () => [
  */
 const ALL_LINES = () => [
   ...TOURNAMENT_LINES(),
-  formatPlayerSignupLog({ player: { id: 42, pseudo: "Nova" }, provider: "GOOGLE" }),
+  formatPlayerSignupLog({ provider: "GOOGLE" }),
 ];
 
 describe("règles de rédaction communes", () => {
@@ -116,7 +113,7 @@ describe("règles de rédaction communes", () => {
     // l'évènement tombe toujours au même endroit — y compris sur la seule ligne
     // dont le sujet n'est pas un tournoi.
     for (const line of ALL_LINES()) {
-      expect(line).toMatch(/^\S+ [A-ZÀ-Ý][^—]* — « .+ » \(#\d+\)/u);
+      expect(line).toMatch(/^\S+ [A-ZÀ-Ý][^—]* — (« .+ » \(#\d+\)|compte créé via )/u);
     }
   });
 
@@ -128,34 +125,28 @@ describe("règles de rédaction communes", () => {
 });
 
 describe("formatEntrantRemovedLog", () => {
-  it("nomme l'engagé, son auteur et l'effectif restant", () => {
+  it("nomme l'équipe et l'effectif restant, et l'auteur « le staff »", () => {
     // Le canal est la **seule** trace qui subsiste d'une inscription effacée :
     // après coup, rien sur la page ne dira que cet engagé a été inscrit.
     const line = formatEntrantRemovedLog({
       tournament: TOURNAMENT,
-      entrantName: "Les Renards",
+      entrant: { name: "Les Renards", participantType: "TEAM" },
       registeredTeams: 2,
       maxTeams: 16,
-      participantType: "TEAM",
-      actorPseudo: "Kiro",
-      actorId: 3,
     });
 
     expect(line).toContain("Inscription retirée");
     expect(line).toContain("Les Renards");
-    expect(line).toContain("par Kiro (#3)");
+    expect(line).toContain("par le staff");
     expect(line).toContain("2/16 équipes");
   });
 
   it("parle de joueurs pour un tournoi individuel", () => {
     const line = formatEntrantRemovedLog({
       tournament: TOURNAMENT,
-      entrantName: "Nova",
+      entrant: { name: "Nova", participantType: "SOLO" },
       registeredTeams: 7,
       maxTeams: 32,
-      participantType: "SOLO",
-      actorPseudo: "Kiro",
-      actorId: 3,
     });
 
     expect(line).toContain("7/32 joueurs");
@@ -166,14 +157,11 @@ describe("formatEntrantRemovedLog", () => {
     // forfait à son nom, le retrait efface son inscription avant le tirage.
     const removed = formatEntrantRemovedLog({
       tournament: TOURNAMENT,
-      entrantName: "Les Renards",
+      entrant: { name: "Les Renards", participantType: "TEAM" },
       registeredTeams: 2,
       maxTeams: 16,
-      participantType: "TEAM",
-      actorPseudo: "Kiro",
-      actorId: 3,
     });
-    const forfeit = formatForfeitLog({ tournament: TOURNAMENT, entrantName: "Les Renards" });
+    const forfeit = formatForfeitLog({ tournament: TOURNAMENT, entrant: { name: "Les Renards", participantType: "TEAM" } });
 
     expect(removed.split(" ")[0]).not.toBe(forfeit.split(" ")[0]);
     expect(removed).not.toContain("Abandon");
@@ -181,20 +169,19 @@ describe("formatEntrantRemovedLog", () => {
 });
 
 describe("formatTournamentCreatedLog", () => {
-  it("annonce format, jeu, capacité, auteur et date de début", () => {
+  it("annonce format, jeu, capacité et date de début, sans nommer l'organisateur", () => {
     const line = formatTournamentCreatedLog({
       tournament: TOURNAMENT,
       format: "SWISS",
       game: "OW",
       maxTeams: 16,
       participantType: "TEAM",
-      organizerPseudo: "Kiro",
       startAt: "2026-03-14T18:00:00.000Z",
     });
 
     expect(line).toContain("Ronde suisse · Overwatch");
     expect(line).toContain("16 équipes max");
-    expect(line).toContain("créé par Kiro");
+    expect(line).not.toContain("créé par");
     expect(line).toContain("début le");
   });
 
@@ -205,7 +192,6 @@ describe("formatTournamentCreatedLog", () => {
       game: "MR",
       maxTeams: 32,
       participantType: "SOLO",
-      organizerPseudo: "Kiro",
       startAt: null,
     });
 
@@ -220,7 +206,6 @@ describe("formatTournamentCreatedLog", () => {
       game: "MR",
       maxTeams: 8,
       participantType: "TEAM",
-      organizerPseudo: "Kiro",
       startAt: null,
     });
 
@@ -235,7 +220,6 @@ describe("formatTournamentCreatedLog", () => {
       game: "OW",
       maxTeams: 8,
       participantType: "TEAM",
-      organizerPseudo: "Kiro",
       startAt: null,
     });
 
@@ -248,10 +232,9 @@ describe("formatRegistrationLog", () => {
   it("donne l'engagé et l'effectif atteint", () => {
     const line = formatRegistrationLog({
       tournament: TOURNAMENT,
-      entrantName: "Les Renards",
+      entrant: { name: "Les Renards", participantType: "TEAM" },
       registeredTeams: 3,
       maxTeams: 16,
-      participantType: "TEAM",
       byStaff: false,
     });
 
@@ -263,10 +246,9 @@ describe("formatRegistrationLog", () => {
   it("distingue l'ajout du staff de l'inscription d'un joueur", () => {
     const line = formatRegistrationLog({
       tournament: TOURNAMENT,
-      entrantName: "Équipe fantôme",
+      entrant: { name: "Équipe fantôme", participantType: "TEAM" },
       registeredTeams: 4,
       maxTeams: 16,
-      participantType: "TEAM",
       byStaff: true,
     });
 
@@ -276,10 +258,9 @@ describe("formatRegistrationLog", () => {
   it("compte en joueurs sur un tournoi individuel", () => {
     const line = formatRegistrationLog({
       tournament: TOURNAMENT,
-      entrantName: "Kiro",
+      entrant: { name: "Kiro", participantType: "SOLO" },
       registeredTeams: 5,
       maxTeams: 32,
-      participantType: "SOLO",
       byStaff: false,
     });
 
@@ -293,8 +274,8 @@ describe("formatMatchResultLog", () => {
       tournament: TOURNAMENT,
       bracket: "UPPER",
       roundNumber: 2,
-      team1Name: "Les Renards",
-      team2Name: "Team Nova",
+      team1: { name: "Les Renards", participantType: "TEAM" },
+      team2: { name: "Team Nova", participantType: "TEAM" },
       team1Score: 2,
       team2Score: 1,
     });
@@ -310,8 +291,8 @@ describe("formatMatchResultLog", () => {
       tournament: TOURNAMENT,
       bracket: "UPPER",
       roundNumber: 1,
-      team1Name: "Les Renards",
-      team2Name: "Team Nova",
+      team1: { name: "Les Renards", participantType: "TEAM" },
+      team2: { name: "Team Nova", participantType: "TEAM" },
       team1Score: 1,
       team2Score: 0,
       forfeit: true,
@@ -325,8 +306,8 @@ describe("formatMatchResultLog", () => {
       tournament: TOURNAMENT,
       bracket: "UPPER",
       roundNumber: 1,
-      team1Name: "Les Renards",
-      team2Name: "Team Nova",
+      team1: { name: "Les Renards", participantType: "TEAM" },
+      team2: { name: "Team Nova", participantType: "TEAM" },
       team1Score: null,
       team2Score: null,
       forfeit: true,
@@ -342,8 +323,8 @@ describe("formatMatchResultLog", () => {
       tournament: TOURNAMENT,
       bracket: "GRAND",
       roundNumber: 1,
-      team1Name: "A",
-      team2Name: "B",
+      team1: { name: "A", participantType: "TEAM" },
+      team2: { name: "B", participantType: "TEAM" },
       team1Score: 3,
       team2Score: 2,
     });
@@ -351,8 +332,8 @@ describe("formatMatchResultLog", () => {
       tournament: TOURNAMENT,
       bracket: "LOWER",
       roundNumber: 4,
-      team1Name: "A",
-      team2Name: "B",
+      team1: { name: "A", participantType: "TEAM" },
+      team2: { name: "B", participantType: "TEAM" },
       team1Score: 3,
       team2Score: 2,
     });
@@ -380,14 +361,14 @@ describe("formatTournamentFinishedLog", () => {
   it("annonce la championne", () => {
     const line = formatTournamentFinishedLog({
       tournament: TOURNAMENT,
-      championName: "Les Renards",
+      champion: { name: "Les Renards", participantType: "TEAM" },
     });
 
     expect(line).toContain("Les Renards l'emporte");
   });
 
   it("reste une phrase correcte quand aucun classement ne désigne de championne", () => {
-    const line = formatTournamentFinishedLog({ tournament: TOURNAMENT, championName: null });
+    const line = formatTournamentFinishedLog({ tournament: TOURNAMENT, champion: null });
 
     expect(line).toBe("🏆 Tournoi terminé — « Coupe BlueGenji » (#12).");
   });
@@ -422,14 +403,10 @@ describe("formatUnderfilledTournamentLog", () => {
 });
 
 describe("formatTournamentDeletedLog", () => {
-  it("nomme l'administrateur responsable", () => {
-    const line = formatTournamentDeletedLog({
-      tournament: TOURNAMENT,
-      actorPseudo: "Kiro",
-      actorId: 3,
-    });
+  it("attribue la suppression au staff, sans le nommer", () => {
+    const line = formatTournamentDeletedLog({ tournament: TOURNAMENT });
 
-    expect(line).toContain("par Kiro (#3)");
+    expect(line).toContain("par le staff");
   });
 });
 
@@ -437,7 +414,7 @@ describe("pénalités d'endurance", () => {
   it("nomme l'engagé, le montant et le motif — c'est ce qu'on vient y chercher", () => {
     const line = formatEndurancePenaltyLog({
       tournament: TOURNAMENT,
-      entrantName: "Les Renards",
+      entrant: { name: "Les Renards", participantType: "TEAM" },
       points: 3,
       reason: "Retard au coup d'envoi",
     });
@@ -450,7 +427,7 @@ describe("pénalités d'endurance", () => {
   it("accorde le singulier sur une sanction d'un point", () => {
     const line = formatEndurancePenaltyLog({
       tournament: TOURNAMENT,
-      entrantName: "Les Renards",
+      entrant: { name: "Les Renards", participantType: "TEAM" },
       points: 1,
       reason: "Motif",
     });
@@ -464,7 +441,7 @@ describe("pénalités d'endurance", () => {
     // rouvrirait un débat que la ligne est justement là pour clore.
     const line = formatEndurancePenaltyLiftedLog({
       tournament: TOURNAMENT,
-      entrantName: "Les Renards",
+      entrant: { name: "Les Renards", participantType: "TEAM" },
       points: 3,
     });
 
@@ -475,13 +452,13 @@ describe("pénalités d'endurance", () => {
   it("distingue les deux lignes à l'œil, dès le pictogramme", () => {
     const applied = formatEndurancePenaltyLog({
       tournament: TOURNAMENT,
-      entrantName: "Les Renards",
+      entrant: { name: "Les Renards", participantType: "TEAM" },
       points: 3,
       reason: "Motif",
     });
     const lifted = formatEndurancePenaltyLiftedLog({
       tournament: TOURNAMENT,
-      entrantName: "Les Renards",
+      entrant: { name: "Les Renards", participantType: "TEAM" },
       points: 3,
     });
 
@@ -490,23 +467,19 @@ describe("pénalités d'endurance", () => {
 });
 
 describe("formatPlayerSignupLog", () => {
-  it("nomme le joueur, son identifiant et la voie d'entrée", () => {
-    const line = formatPlayerSignupLog({
-      player: { id: 42, pseudo: "Nova" },
-      provider: "GOOGLE",
-    });
+  it("compte une arrivée et sa voie d'entrée, sans nommer le joueur", () => {
+    const line = formatPlayerSignupLog({ provider: "GOOGLE" });
 
-    expect(line).toBe("👋 Nouveau joueur — « Nova » (#42) : compte créé via Google.");
+    expect(line).toBe("👋 Nouveau joueur — compte créé via Google.");
+    // Ni pseudo, ni identifiant : `#id` mène à `/joueurs/<id>`, donc au pseudo.
+    expect(line).not.toMatch(/#\d/);
   });
 
   it("distingue les deux voies d'entrée", () => {
     // Un compte né par Discord porte un identifiant Discord, donc reçoit les
     // rappels de match en message privé ; un compte né par Google n'en a aucun
     // tant que le joueur ne l'a pas renseigné.
-    const discord = formatPlayerSignupLog({
-      player: { id: 42, pseudo: "Nova" },
-      provider: "DISCORD",
-    });
+    const discord = formatPlayerSignupLog({ provider: "DISCORD" });
 
     expect(discord).toContain("via Discord");
     expect(discord).not.toContain("via Google");
@@ -516,29 +489,87 @@ describe("formatPlayerSignupLog", () => {
     // Les deux mots « inscription » cohabitent sur le même canal : l'un désigne
     // un compte qui naît, l'autre une équipe qui s'engage. La ligne du joueur
     // n'emploie donc pas le mot, et son pictogramme est le sien.
-    const signup = formatPlayerSignupLog({
-      player: { id: 42, pseudo: "Nova" },
-      provider: "GOOGLE",
-    });
+    const signup = formatPlayerSignupLog({ provider: "GOOGLE" });
     const registration = formatRegistrationLog({
       tournament: TOURNAMENT,
-      entrantName: "Les Renards",
+      entrant: { name: "Les Renards", participantType: "TEAM" },
       registeredTeams: 3,
       maxTeams: 16,
-      participantType: "TEAM",
       byStaff: false,
     });
 
     expect(signup).not.toContain("Inscription");
     expect(signup.split(" ")[0]).not.toBe(registration.split(" ")[0]);
   });
+});
 
-  it("garde un pseudo à espaces lisible entre ses guillemets", () => {
-    const line = formatPlayerSignupLog({
-      player: { id: 7, pseudo: "Nova la Rousse" },
-      provider: "DISCORD",
-    });
+describe("confidentialité : aucun pseudo de joueur, aucun membre du staff nommé", () => {
+  const SOLO = (name: string) => ({ name, participantType: "SOLO" as const });
+  const TEAM = (name: string) => ({ name, participantType: "TEAM" as const });
 
-    expect(line).toContain("« Nova la Rousse » (#7)");
+  it("écrit « un joueur » à la place d'un engagé de tournoi individuel, partout", () => {
+    const lines = [
+      formatRegistrationLog({ tournament: TOURNAMENT, entrant: SOLO("Nova"), registeredTeams: 1, maxTeams: 8, byStaff: false }),
+      formatForfeitLog({ tournament: TOURNAMENT, entrant: SOLO("Nova") }),
+      formatEntrantRemovedLog({ tournament: TOURNAMENT, entrant: SOLO("Nova"), registeredTeams: 1, maxTeams: 8 }),
+      formatMatchResultLog({
+        tournament: TOURNAMENT,
+        bracket: "UPPER",
+        roundNumber: 1,
+        team1: SOLO("Nova"),
+        team2: SOLO("Kiro"),
+        team1Score: 2,
+        team2Score: 1,
+      }),
+      formatTournamentFinishedLog({ tournament: TOURNAMENT, champion: SOLO("Nova") }),
+      formatEndurancePenaltyLog({ tournament: TOURNAMENT, entrant: SOLO("Nova"), points: 2, reason: "Retard" }),
+      formatEndurancePenaltyLiftedLog({ tournament: TOURNAMENT, entrant: SOLO("Nova"), points: 2 }),
+    ];
+    for (const line of lines) {
+      expect(line).not.toContain("Nova");
+      expect(line).not.toContain("Kiro");
+      expect(line).toContain("un joueur");
+    }
+  });
+
+  it("garde le nom d'une équipe", () => {
+    expect(formatForfeitLog({ tournament: TOURNAMENT, entrant: TEAM("Les Renards") })).toContain(
+      "Les Renards",
+    );
+  });
+
+  it("dit « le staff » pour chaque geste du staff, sans nom ni identifiant", () => {
+    const lines = [
+      formatEntrantRemovedLog({ tournament: TOURNAMENT, entrant: TEAM("Les Renards"), registeredTeams: 2, maxTeams: 16 }),
+      formatTournamentDeletedLog({ tournament: TOURNAMENT }),
+      formatRoundRolledBackLog({ tournament: TOURNAMENT, roundLabel: "la manche 2", clearedMatches: 3 }),
+    ];
+    for (const line of lines) expect(line).toContain("par le staff");
+    expect(
+      formatTournamentCreatedLog({
+        tournament: TOURNAMENT,
+        format: "SWISS",
+        game: "OW",
+        maxTeams: 16,
+        participantType: "TEAM",
+        startAt: null,
+      }),
+    ).not.toMatch(/créé par/);
+  });
+});
+
+describe("entrantLabel / staffAuditLine", () => {
+  it("rend le nom d'une équipe, jamais celui d'un joueur", () => {
+    expect(entrantLabel({ name: "Les Renards", participantType: "TEAM" })).toBe("Les Renards");
+    expect(entrantLabel({ name: "Nova", participantType: "SOLO" })).toBe(ANONYMOUS_PLAYER_LABEL);
+  });
+
+  it("reprend la ligne Discord et nomme l'auteur, pour les journaux du serveur", () => {
+    const discord = formatTournamentDeletedLog({ tournament: TOURNAMENT });
+    const audit = staffAuditLine(discord, { id: 3, pseudo: "Kiro" });
+
+    expect(audit.startsWith("[staff-audit] ")).toBe(true);
+    expect(audit).toContain(discord);
+    expect(audit).toContain("Kiro (#3)");
   });
 });
