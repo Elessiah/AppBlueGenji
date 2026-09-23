@@ -22,6 +22,7 @@ import { importRemoteAvatar, shouldImportRemoteAvatar } from "@/lib/server/user-
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
+import { DISCORD_CODE_VALIDITY_MINUTES } from "@/lib/shared/processing-register";
 import { formatPlayerSignupLog, type PlayerSignupProvider } from "@/lib/shared/bot-logs";
 import { isDiscordNumericId, visibleDiscordTag } from "@/lib/shared/discord-identity";
 import { can, sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
@@ -762,7 +763,7 @@ export async function createDiscordLoginChallenge(
 
         const [insert] = await connection.execute<ResultSetHeader>(
           `INSERT INTO bg_discord_login_challenges (discord_id, code_hash, handle, expires_at)
-           VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))`,
+           VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL ${DISCORD_CODE_VALIDITY_MINUTES} MINUTE))`,
           [discordId, hashCode(code), storedHandle],
         );
 
@@ -776,7 +777,7 @@ export async function createDiscordLoginChallenge(
           challengeId: Number(insert.insertId),
           code,
           // mysql2 peut renvoyer expires_at en string selon la config du pool : on normalise en Date.
-          expiresAt: rawExpiresAt ? new Date(rawExpiresAt) : new Date(Date.now() + 10 * 60 * 1000),
+          expiresAt: rawExpiresAt ? new Date(rawExpiresAt) : new Date(Date.now() + DISCORD_CODE_VALIDITY_MINUTES * 60 * 1000),
         };
       },
     );

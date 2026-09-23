@@ -3,6 +3,7 @@ import * as React from "react";
 import { cookies } from "next/headers";
 import type { RowDataPacket, ResultSetHeader } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { SESSION_RETENTION_DAYS } from "@/lib/shared/processing-register";
 import { localAvatarUrl } from "@/lib/shared/avatar";
 import { normalizePseudo, slugifyPseudo } from "@/lib/server/serialization";
 import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
@@ -41,7 +42,8 @@ export function resolveRoles(isAdmin: boolean, rolesJson: unknown): PlatformRole
 }
 
 const SESSION_COOKIE = "bg_session";
-const SESSION_TTL_DAYS = 30;
+// Déclarée dans le registre des traitements (`/rgpd/registre`), d'où elle vient.
+const SESSION_TTL_DAYS = SESSION_RETENTION_DAYS;
 
 function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
