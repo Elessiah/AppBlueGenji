@@ -2,7 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   ACCOUNT_DELETED_ERROR,
   RETENTION_UNKNOWN,
-  accountDeletedWriteMessage,
+  ACCOUNT_DELETED_WRITE_MESSAGE,
   accountDeletionConfirmation,
   accountDeletionErrorMessage,
   accountDeletionMode,
@@ -201,28 +201,12 @@ describe("accountDeletionErrorMessage", () => {
   });
 });
 
-describe("accountDeletedWriteMessage", () => {
+describe("ACCOUNT_DELETED_WRITE_MESSAGE", () => {
   it("dit en français qu'une modification est arrivée trop tard", () => {
-    const message = accountDeletedWriteMessage(ACCOUNT_DELETED_ERROR, "AVATAR_UPLOAD_FAILED");
-    expect(message).not.toContain("_");
-    expect(message).toMatch(/supprimé/);
+    expect(ACCOUNT_DELETED_WRITE_MESSAGE).not.toContain("_");
+    expect(ACCOUNT_DELETED_WRITE_MESSAGE).toMatch(/supprimé/);
     // Le joueur doit savoir que **rien** n'a été écrit : sans cette moitié, il
     // quitte la page en croyant sa photo posée.
-    expect(message).toMatch(/pas été enregistrée/);
-  });
-
-  it("rend tout autre code tel quel, et ne se sert du repli que sur son absence", () => {
-    // Le nom qu'avait ce cas — « laisse les autres codes au repli de
-    // l'appelant » — décrivait l'inverse de ce que les assertions vérifient :
-    // le repli ne sert qu'à un code **absent**. La fonction reprend l'idiome
-    // `payload.error || FALLBACK` qu'elle remplace ; elle ne ferme pas les
-    // chemins qui toastent encore un code en capitales.
-    expect(accountDeletedWriteMessage("PSEUDO_ALREADY_USED", "PROFILE_UPDATE_FAILED")).toBe(
-      "PSEUDO_ALREADY_USED",
-    );
-    expect(accountDeletedWriteMessage(undefined, "PROFILE_UPDATE_FAILED")).toBe(
-      "PROFILE_UPDATE_FAILED",
-    );
-    expect(accountDeletedWriteMessage("", "AVATAR_UPLOAD_FAILED")).toBe("AVATAR_UPLOAD_FAILED");
+    expect(ACCOUNT_DELETED_WRITE_MESSAGE).toMatch(/pas été enregistrée/);
   });
 });

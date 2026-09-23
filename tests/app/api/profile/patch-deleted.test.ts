@@ -46,6 +46,7 @@ describe("PATCH /api/profile — course avec la suppression du compte", () => {
     (updateOwnProfile as jest.Mock).mockRejectedValue(new Error("PSEUDO_ALREADY_USED") as never);
     expect((await PATCH(patchReq({ pseudo: "Nova" }))).status).toBe(409);
 
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
     (updateOwnProfile as jest.Mock).mockRejectedValue(new Error("BOOM") as never);
     expect((await PATCH(patchReq({ pseudo: "Nova" }))).status).toBe(400);
   });
@@ -58,5 +59,57 @@ describe("PATCH /api/profile — course avec la suppression du compte", () => {
     const res = await PATCH(patchReq({ pseudo: "Nova" }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ profile: { pseudo: "Nova" } });
+  });
+});
+
+/**
+ * Seule une liste fermée de codes sort de la route telle quelle : le message de
+ * n'importe quelle exception partait sinon dans le corps du 400 —
+ * `raw.replace is not a function` sur un `{"pseudo": 123}`, le message MySQL
+ * d'un pseudo trop long, le `SyntaxError` d'un corps illisible.
+ */
+describe("PATCH /api/profile — aucun message interne ne sort", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  it.each(["INVALID_PSEUDO", "PSEUDO_EMPTY", "PSEUDO_TOO_LONG", "INVALID_DISCORD_PSEUDO"])(
+    "rend le refus de saisie %s tel quel, en 400",
+    async (code) => {
+      (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+      (updateOwnProfile as jest.Mock).mockRejectedValue(new Error(code) as never);
+      const res = await PATCH(patchReq({ pseudo: "Nova" }));
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: code });
+    },
+  );
+
+  it.each([
+    "raw.replace is not a function",
+    "Data too long for column 'pseudo' at row 1",
+    "BOOM",
+  ])("remplace « %s » par le code générique", async (message) => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+    (updateOwnProfile as jest.Mock).mockRejectedValue(new Error(message) as never);
+    const res = await PATCH(patchReq({ pseudo: "Nova" }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "PROFILE_UPDATE_FAILED" });
+    // Le message reste au journal du serveur, pour qui doit le lire.
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it("ne rend pas le message d'un corps illisible", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+    const req = new Request("http://localhost/api/profile", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: "{pas du json",
+    });
+    const res = await PATCH(req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "PROFILE_UPDATE_FAILED" });
+    expect(updateOwnProfile).not.toHaveBeenCalled();
   });
 });

@@ -1,3 +1,9 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import {
+  DISCORD_TAG_AUDIENCE,
+  DISCORD_TAG_UNVERIFIED_AUDIENCE,
+} from "@/lib/shared/identity-sharing";
 import { describe, expect, it } from "@jest/globals";
 import {
   DISCORD_TAG_LOCKED,
@@ -201,5 +207,25 @@ describe("discordTagLockNotice — lecture en cours", () => {
 describe("DISCORD_TAG_LOCKED", () => {
   it("est le code que la route rend en 409", () => {
     expect(DISCORD_TAG_LOCKED).toBe("DISCORD_TAG_LOCKED");
+  });
+});
+
+describe("discordTagLockNotice — la promesse d'exposition n'est rédigée qu'une fois", () => {
+  // `/connexion` et `/profil` annoncent le même public : la phrase du verrou
+  // compose les constantes d'`identity-sharing.ts` au lieu de les recopier, sans
+  // quoi un ajustement de l'une laisserait l'autre promettre autre chose.
+  it("compose le public d'un tag certifié", () => {
+    const notice = discordTagLockNotice({ tag: "keryan", verified: true, linked: true });
+    expect(notice).toContain(DISCORD_TAG_AUDIENCE);
+  });
+
+  it("compose l'absence de public d'un tag non certifié", () => {
+    const notice = discordTagLockNotice({ tag: "keryan", verified: false, linked: true });
+    expect(notice).toContain(DISCORD_TAG_UNVERIFIED_AUDIENCE);
+  });
+
+  it("n'écrit plus le public en dur", () => {
+    const source = readFileSync(join(__dirname, "..", "..", "..", "lib", "shared", "discord-tag-lock.ts"), "utf8");
+    expect(source).not.toMatch(/les administrateurs le voient/);
   });
 });
