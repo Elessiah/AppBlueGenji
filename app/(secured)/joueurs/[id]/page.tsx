@@ -98,8 +98,8 @@ export default function PlayerDetailPage() {
   const battletagHint =
     data.profile.overwatchBattletag && !data.profile.visibility.overwatch
       ? data.isSelf
-        ? "Masqué au public : seuls les joueurs de tes matchs et l'arbitrage le lisent, le temps d'un tournoi."
-        : "Masqué au public : tu le lis parce qu'un tournoi en cours vous réunit. Ne le diffuse pas."
+        ? "Masqué au public : seuls les joueurs de tes matchs et l'arbitrage le lisent, tant que le tournoi n'est pas terminé."
+        : "Masqué au public : tu le lis pour jouer ou arbitrer un tournoi qui n'est pas terminé. Ne le diffuse pas."
       : null;
 
   // Équipe courante = seule ligne de timeline encore ouverte (leftAt === null).

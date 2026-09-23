@@ -108,6 +108,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     recipients: [
       "Public du site (seules les données que le joueur rend visibles)",
+      "Joueurs d'un même match, tant que le tournoi n'est pas terminé (BattleTag même masqué, pour s'ajouter en jeu)",
       "Staff de l'association selon son rôle (administration, arbitrage)",
     ],
     transfers: ["Aucun"],

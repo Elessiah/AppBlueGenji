@@ -131,12 +131,15 @@ describe("getFullProfile — BattleTag masqué", () => {
     expect(profile?.profile.overwatchBattletag).toBeNull();
   });
 
-  it("n'interroge pas les tournois quand un match partagé suffit", async () => {
-    const { queries } = profileDb(userRow(), { sharesMatch: true, inTournament: true });
+  it("pose ensemble les deux questions pour l'arbitrage, chacune une fois", async () => {
+    // Indépendantes : les enchaîner doublerait l'attente sur chaque fiche.
+    const { queries } = profileDb(userRow(), { sharesMatch: true, inTournament: false });
 
-    await getFullProfile({ id: 30, roles: ["ARBITRE"] }, 7);
+    const profile = await getFullProfile({ id: 30, roles: ["ARBITRE"] }, 7);
 
-    expect(count(queries, TOURNAMENT_QUERY)).toBe(0);
+    expect(profile?.profile.overwatchBattletag).toBe("Nova#1234");
+    expect(count(queries, MATCH_QUERY)).toBe(1);
+    expect(count(queries, TOURNAMENT_QUERY)).toBe(1);
   });
 
   it("pose la question du tournoi une seule fois, partagée avec le tag Discord", async () => {

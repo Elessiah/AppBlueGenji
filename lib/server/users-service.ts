@@ -1698,12 +1698,15 @@ export async function getFullProfile(
   const rawBattletag = userRows[0].overwatch_battletag;
   const battletagSubject = { userId: targetUserId, visible: profile.visibility.overwatch };
   if (battletagNeedsTournamentContext(rawBattletag, viewer, battletagSubject)) {
-    const shares = await sharesLiveMatch(targetUserId, viewerId);
+    // Deux questions indépendantes : posées ensemble, un seul aller-retour d'attente.
+    const [shares, inActive] = await Promise.all([
+      sharesLiveMatch(targetUserId, viewerId),
+      can(viewer, "tournaments") ? targetInActiveTournament() : Promise.resolve(false),
+    ]);
     profile.overwatchBattletag = visibleBattletag(rawBattletag, viewer, {
       ...battletagSubject,
       sharesLiveMatch: shares,
-      inActiveTournament:
-        !shares && can(viewer, "tournaments") ? await targetInActiveTournament() : false,
+      inActiveTournament: inActive,
     });
   }
   // **La pastille ne suit pas le tag** (`canSeeDiscordVerification`) : le tag dit

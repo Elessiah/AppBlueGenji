@@ -114,9 +114,16 @@ describe("seed.ts", () => {
 
   it("efface et régénère sous le verrou, jamais avant de l'avoir pris", () => {
     expect(source).toMatch(/withSeedLock\(\s*db,\s*\(\) => seed\(db\)/);
-    // Le nettoyage ne vit que dans la fonction jouée sous le verrou.
-    const main = source.slice(source.indexOf("async function main("), source.indexOf("async function seed("));
+    // Le nettoyage ne vit que dans la fonction jouée sous le verrou. Chaque
+    // corps est borné par sa propre accolade fermante, en colonne 0 : un
+    // découpage entre deux déclarations rendrait une chaîne vide dès que leur
+    // ordre s'inverse, et le test passerait à vide.
+    const body = (name: string) =>
+      source.match(new RegExp(String.raw`async function ${name}\([\s\S]*?\n\}\r?\n`))?.[0];
+    const main = body("main");
+    const seed = body("seed");
+    expect(main).toContain("withSeedLock(");
     expect(main).not.toContain("clearDatabase(");
-    expect(source.slice(source.indexOf("async function seed("))).toContain("await clearDatabase(db)");
+    expect(seed).toContain("await clearDatabase(db)");
   });
 });

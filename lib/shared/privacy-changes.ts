@@ -94,6 +94,21 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       `Une donnée supprimée peut donc subsister jusqu'à ${BACKUP_RETENTION_DAYS} jours dans ces archives, qu'on ne peut pas corriger une à une. Pour qu'elle ne revienne jamais, chaque suppression de compte est notée dans un journal — numéro et date de création du compte, date de suppression, rien d'autre — gardé ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours : si une sauvegarde devait être restaurée, les suppressions intervenues depuis sont réappliquées avant la remise en service.`,
     ],
   },
+  // Le masquage du BattleTag ne valait jusqu'ici pour personne d'autre que son
+  // titulaire, alors que la modale de `/profil` annonçait déjà l'exception :
+  // c'est l'**application** de la règle qui élargit qui le lit.
+  {
+    id: "2026-09-battletag-masque-matchs",
+    publishedAt: "2026-09-24",
+    title: "BattleTag masqué : lisible là où il sert à jouer",
+    summary:
+      "Un BattleTag masqué reste hors de ta fiche publique et de l'annuaire, mais les joueurs de tes matchs et l'arbitrage peuvent le lire tant que le tournoi n'est pas terminé.",
+    details: [
+      "Les autres joueurs d'un match que tu disputes (adversaires et coéquipiers) lisent ton BattleTag sur ta fiche, même masqué : c'est par lui qu'on s'ajoute en jeu pour lancer la partie.",
+      "Les arbitres et les administrateurs le lisent aussi tant que tu es engagé dans un tournoi qui n'est pas terminé. En dehors, un administrateur ne voit pas un BattleTag masqué.",
+      "Ces accès s'éteignent à la fin du tournoi. Pour ne plus communiquer ton BattleTag du tout, efface-le depuis Mon profil.",
+    ],
+  },
 ];
 
 /**

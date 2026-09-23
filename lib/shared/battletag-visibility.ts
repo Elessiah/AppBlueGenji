@@ -90,7 +90,9 @@ export function battletagNeedsTournamentContext(
   subject: Pick<BattletagSubject, "userId" | "visible">,
 ): boolean {
   if (!tag || !viewer) return false;
-  return viewer.id !== subject.userId && !subject.visible;
+  // Dérivé de la règle elle-même, faits de tournoi à faux : si elle répond déjà
+  // oui sans eux, les demander ne changerait rien.
+  return !canViewBattletag(viewer, { ...subject, sharesLiveMatch: false, inActiveTournament: false });
 }
 
 /**
