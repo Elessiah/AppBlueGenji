@@ -14,8 +14,6 @@
 
 - [2026-09-21] Les comptes supprimés c'est moche. Si pas de participation à des tournois, supprimer complètement, sinon faire une option décoché par défaut permettant d'afficher les comptes supprimés
 
-- [2026-09-21] Le sous-titre "FREE AGENT" dans chaque carte de joueur dans la page /joueurs ne disparait pas si je décoche "Ouvert aux propositions d'équipes" pourtant lorsque je filtre le profil disparait bien
-
 - [2026-09-21] Les coches pour sélectionner les équipes fantômes à un tournoi ne sont pas stylisé
 
 - [2026-09-21] Si Discord connecté au compte, retirer la possibilité de modifier le discord tag, et retirer le bouton "certifier/recertifier"
