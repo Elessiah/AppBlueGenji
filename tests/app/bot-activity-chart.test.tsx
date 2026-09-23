@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
-import { BotActivityChart, loadActivityRange } from "@/components/bot/BotActivityChart";
+import { BotActivityChart, activityView, loadActivityRange } from "@/components/bot/BotActivityChart";
 import type { BotActivity } from "@/lib/shared/types";
 
 /**
@@ -39,6 +39,16 @@ describe("BotActivityChart — une charge saine", () => {
     const html = render(activity());
     expect(html).toMatch(/aria-pressed="true"[^>]*>30j</);
     expect(html.match(/aria-pressed="false"/g)).toHaveLength(2);
+    // Le nom d'une pastille est son texte visible ; le groupe dit de quoi.
+    expect(html).not.toContain("Filtrer par");
+    expect(html).toMatch(/role="group" aria-label="Plage d&#x27;activité affichée"/);
+  });
+
+  it("ne s'annonce pas en chargement au premier rendu", () => {
+    const html = render(activity());
+    expect(html).toContain('aria-busy="false"');
+    expect(html).not.toContain("is-loading");
+    expect(html).not.toContain("CHARGEMENT");
   });
 
   it("dit « Données indisponibles » plutôt que d'inventer un graphe vide", () => {
@@ -256,5 +266,26 @@ describe("loadActivityRange — une plage abandonnée n'écrit plus rien", () =>
     await flush();
 
     expect(applied).toEqual([{ range: "7j" }, null, null]);
+  });
+});
+
+describe("activityView — la charge affichée et la plage demandée", () => {
+  const shown = (range: "7j" | "30j" | "90j", data: BotActivity | null) => ({ range, data });
+
+  it("n'est pas en chargement quand la charge décrit la plage demandée", () => {
+    const data = activity();
+    expect(activityView(shown("30j", data), "30j")).toEqual({ data, loading: false });
+  });
+
+  it("garde la charge précédente, mais la dit en chargement, entre le clic et la réponse", () => {
+    // Sans ce drapeau, le graphe décrivait 30 jours sous une pastille déjà
+    // allumée sur « 90j », le temps de l'aller-retour.
+    const data = activity();
+    expect(activityView(shown("30j", data), "90j")).toEqual({ data, loading: true });
+  });
+
+  it("ne dit pas « indisponible » la plage qui n'a pas encore répondu", () => {
+    expect(activityView(shown("7j", null), "90j")).toEqual({ data: null, loading: true });
+    expect(activityView(shown("90j", null), "90j")).toEqual({ data: null, loading: false });
   });
 });

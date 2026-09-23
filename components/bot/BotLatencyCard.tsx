@@ -33,7 +33,7 @@ export function BotLatencyCard({ status }: { status: BotStatus | null }) {
   // Le repli à zéro ne vaut que pour la **largeur** : une barre vide ne dit
   // rien de faux, un « 0 » écrit à côté, si.
   const cells = [
-    { label: "GATEWAY", value: gateway ?? "—", unit: "ms", width: bar((gateway ?? 0) / 100) },
+    { label: "GATEWAY", value: gateway?.toFixed(0) ?? "—", unit: "ms", width: bar((gateway ?? 0) / 100) },
     { label: "CPU", value: cpu?.toFixed(1) ?? "—", unit: "%", width: bar((cpu ?? 0) / 100) },
     { label: "RAM", value: ram?.toFixed(0) ?? "—", unit: "MB", width: bar((ram ?? 0) / 1024) },
   ];

@@ -13,6 +13,24 @@ const MAX_COLUMNS = 120;
 
 type ActivityRange = "7j" | "30j" | "90j";
 
+const RANGES: readonly ActivityRange[] = ["7j", "30j", "90j"];
+
+/** Une charge, et la plage qu'elle **décrit** — pas forcément celle demandée. */
+export type ShownActivity = { range: ActivityRange; data: BotActivity | null };
+
+/**
+ * Ce que le graphe peut afficher pour la plage `requested`.
+ *
+ * Entre le clic et la réponse, la charge affichée est encore celle de la plage
+ * précédente : la montrer sans rien dire faisait décrire 30 jours au graphe
+ * sous une pastille déjà allumée sur « 90j ». `loading` le dit, et une plage
+ * précédente **illisible** ne s'annonce pas « indisponible » pour la suivante,
+ * qui n'a pas encore répondu.
+ */
+export function activityView(shown: ShownActivity, requested: ActivityRange) {
+  return { data: shown.data, loading: shown.range !== requested };
+}
+
 /**
  * Recharge une plage et remet sa réponse à `apply` — **tant qu'elle est encore
  * demandée**. Rend la fonction qui l'annule, posée telle quelle en nettoyage de
@@ -54,39 +72,52 @@ export function loadActivityRange(
   };
 }
 
+/**
+ * Les trois plages. Leur nom accessible **est** leur texte visible (WCAG
+ * 2.5.3) : le groupe dit de quoi elles sont la plage, `aria-pressed` laquelle
+ * est affichée.
+ */
+function RangeChips({ range, onChange }: { range: ActivityRange; onChange: (range: ActivityRange) => void }) {
+  return (
+    <div className="chart-tools" role="group" aria-label="Plage d'activité affichée">
+      {RANGES.map((r) => (
+        <button
+          key={r}
+          type="button"
+          className={"chip" + (range === r ? " chip-on" : "")}
+          onClick={() => onChange(r)}
+          aria-pressed={range === r}
+        >
+          {r}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
   const [range, setRange] = useState<ActivityRange>("30j");
-  const [data, setData] = useState<BotActivity | null>(initial);
+  const [shown, setShown] = useState<ShownActivity>({ range: "30j", data: initial });
 
   useEffect(() => {
     if (range === "30j") {
-      setData(initial);
+      setShown({ range, data: initial });
       return;
     }
-    return loadActivityRange(range, setData);
+    return loadActivityRange(range, (data) => setShown({ range, data }));
   }, [range, initial]);
+
+  const { data, loading } = activityView(shown, range);
 
   if (!data) {
     return (
-      <section className="panel">
+      <section className="panel" aria-busy={loading}>
         <div className="panel-head">
           <span className="title">Activité · relais & scrims</span>
-          <div className="chart-tools row gap-2">
-            {["7j", "30j", "90j"].map((r) => (
-              <button
-                key={r}
-                className={"chip " + (range === r ? "chip-on" : "")}
-                onClick={() => setRange(r as ActivityRange)}
-                aria-label={`Filtrer par ${r}`}
-                aria-pressed={range === r}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
+          <RangeChips range={range} onChange={setRange} />
         </div>
         <div style={{ padding: "2rem", textAlign: "center", color: "var(--ink-mute)" }}>
-          <p>Données indisponibles</p>
+          <p>{loading ? "Chargement…" : "Données indisponibles"}</p>
         </div>
       </section>
     );
@@ -148,24 +179,12 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
   const avgPerDay = botPayloadNumber(data.avgPerDay);
 
   return (
-    <section className="panel">
+    <section className="panel" aria-busy={loading}>
       <div className="panel-head">
         <span className="title">Activité · relais & scrims</span>
-        <div className="chart-tools row gap-2">
-          {["7j", "30j", "90j"].map((r) => (
-            <button
-              key={r}
-              className={"chip " + (range === r ? "chip-on" : "")}
-              onClick={() => setRange(r as ActivityRange)}
-              aria-label={`Filtrer par ${r}`}
-              aria-pressed={range === r}
-            >
-              {r}
-            </button>
-          ))}
-        </div>
+        <RangeChips range={range} onChange={setRange} />
       </div>
-      <div className="chart-wrap">
+      <div className={"chart-wrap" + (loading ? " is-loading" : "")}>
         <div className="chart">
           <div className="y-axis">
             <span>0</span>
@@ -209,7 +228,9 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
         <div className="chart-legend">
           <span className="lg">RELAIS INTER-SERVEUR</span>
           <span className="lg amber">SCRIMS PROPOSÉS</span>
-          <span style={{ marginLeft: "auto" }}>MOY. {avgPerDay === null ? "—" : Math.round(avgPerDay)} / JOUR</span>
+          <span style={{ marginLeft: "auto" }}>
+            {loading ? "CHARGEMENT…" : `MOY. ${avgPerDay === null ? "—" : Math.round(avgPerDay)} / JOUR`}
+          </span>
         </div>
       </div>
     </section>

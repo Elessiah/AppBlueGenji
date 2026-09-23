@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { readSource } from "../helpers/read-source";
 
 /**
  * `/bot` est née d'une maquette qui avait ses propres noms de jetons (`--mono`,
@@ -25,19 +26,23 @@ function walk(dir: string): string[] {
   });
 }
 
-const read = (path: string) => readFileSync(path, "utf8");
+const read = readSource;
 const isSource = (path: string) => /\.(css|tsx?)$/.test(path);
 
-// Les définitions : toute feuille de `app/` et `components/` (un jeton défini
-// sous un sélecteur ne vaut que sous lui, mais le site n'en pose qu'à la racine
-// et les écarts se verraient ailleurs), et les polices que `next/font` expose
-// par `variable: "--font-…"`.
-const definitionSources = [...walk(join(ROOT, "app")), ...walk(join(ROOT, "components"))].filter(isSource);
+// Les définitions **qui valent partout** : les blocs `:root` des feuilles
+// globales (pas des modules CSS), et les polices que `next/font` expose par
+// `variable: "--font-…"`. Un jeton déclaré sous un sélecteur ne vaut que sous
+// lui : le compter ici laisserait passer un `var(--g-rgb)` que `/bot` ne
+// résout pas.
+const appAndComponents = [...walk(join(ROOT, "app")), ...walk(join(ROOT, "components"))];
 const defined = new Set<string>();
-for (const path of definitionSources) {
-  const text = read(path);
-  for (const m of text.matchAll(/(?:^|[\s{;"'])(--[a-zA-Z0-9-]+)\s*["']?\s*:/g)) defined.add(m[1]);
-  for (const m of text.matchAll(/variable:\s*["'](--[a-zA-Z0-9-]+)["']/g)) defined.add(m[1]);
+for (const path of appAndComponents.filter((p) => p.endsWith(".css") && !p.endsWith(".module.css"))) {
+  for (const block of read(path).matchAll(/:root[^{]*\{([^}]*)\}/g)) {
+    for (const m of block[1].matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)) defined.add(m[1]);
+  }
+}
+for (const path of appAndComponents.filter((p) => p.endsWith(".tsx"))) {
+  for (const m of read(path).matchAll(/variable:\s*["'](--[a-zA-Z0-9-]+)["']/g)) defined.add(m[1]);
 }
 
 const botFiles = [...walk(join(ROOT, "app", "bot")), ...walk(join(ROOT, "components", "bot"))].filter(isSource);
@@ -69,7 +74,7 @@ describe("/bot — n'emploie que des jetons que le site définit", () => {
 });
 
 describe("/bot — les pastilles d'en-tête de panneau ont un habillage", () => {
-  const css = read(join(ROOT, "app", "bot", "bot.css"));
+  const css = read("app/bot/bot.css");
 
   it("habille `.chip` et distingue la pastille active", () => {
     // Sans règle, les plages du graphe s'affichaient en boutons natifs blancs,

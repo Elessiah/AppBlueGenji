@@ -212,4 +212,10 @@ describe("BotLatencyCard — la même charge, la même garde", () => {
     expect(cellValue(html, "CPU")).toBe("12.0");
     expect(cellValue(html, "RAM")).toBe("340");
   });
+
+  it("arrondit la latence de la passerelle comme ses deux voisines", () => {
+    const html = renderToStaticMarkup(<BotLatencyCard status={{ ...status(), gatewayLatency: 42.83719 }} />);
+    expect(cellValue(html, "GATEWAY")).toBe("43");
+    expect(html).not.toContain(">42.83719 <");
+  });
 });
