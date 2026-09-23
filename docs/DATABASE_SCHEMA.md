@@ -90,13 +90,9 @@ version, la base démarre sans bruit (`CREATE TABLE IF NOT EXISTS` ne fait rien)
 et la panne se découvre en production sur la première requête qui nomme une
 colonne absente.
 
-`warnIfSchemaIsBehind` lit `information_schema.COLUMNS` une fois au démarrage et
-journalise les écarts. Les témoins sont pris dans le **dernier lot replié**,
-celui qui a le plus de chances de manquer : les migrations étant jouées dans
-l'ordre, une base à jour sur ce lot l'est sur les précédents.
-
-Il en surveille **trois classes**, parce qu'un simple contrôle de présence n'en
-voit qu'une :
+`warnIfSchemaIsBehind` lit `information_schema` une fois au démarrage et
+journalise les écarts. Il en surveille **cinq classes**, parce qu'un simple
+contrôle de présence n'en voit qu'une :
 
 | Classe | Témoin | Ce qui arriverait sans le filet |
 |---|---|---|
@@ -104,14 +100,53 @@ voit qu'une :
 | Colonne présente mais du **mauvais type** | `bg_tournaments.game` doit contenir `'OW'` et **plus** `'OW2'` | Une base restée avant la conversion `ENUM('OW2','MR')` → `ENUM('OW','MR')` porte bien la colonne, et rend « Data truncated for column 'game' » au premier tournoi écrit |
 | Colonne qui devait **partir** | `bg_users.email` (la colonne, pas ses valeurs : le filet ne lit qu'`information_schema`, c'est le repli ci-dessous qui compte les adresses) | Le `DROP` est best-effort, jamais rejoué dans le processus (la porte mémorise une passe qui se résout toujours), et `anonymizeOwnAccount` a perdu son `email = NULL` dans la même version : les adresses resteraient, sans que rien ne les efface |
 | **Index** absent | `uniq_bg_teams_tag`, `uniq_bg_teams_solo_user` | La plus silencieuse de toutes : un index unique manquant ne fait *rien* tomber, il cesse seulement de trancher la course qu'il existe pour trancher — deux équipes créées au même instant prendraient le même sigle, et `mapTeamTagConflict` traduirait un `ER_DUP_ENTRY` qui n'arrive plus jamais |
+| **Clé primaire** restée trop étroite | `bg_swiss_standings`, `bg_survival_standings` doivent porter 3 colonnes | `phase_id` présent mais la clé restée à `(tournament_id, team_id)` : le classement de la phase 2 d'un tournoi `MULTI` **écrase** la ligne de la phase 1 pour la même équipe au lieu de lever |
+
+#### Les témoins de présence ne sont plus choisis à la main
+
+La première version listait **cinq** colonnes témoins, prises dans le dernier
+lot replié, sur l'argument que les migrations sont jouées dans l'ordre : une
+base à jour sur le dernier lot l'est sur les précédents. L'argument est juste
+pour une base qui n'a jamais raté une version, et faux pour toutes les autres —
+c'est justement la population que le filet existe pour voir. Cinq témoins sur
+~70 `ALTER` repliés, cela laissait soixante-cinq façons d'être en retard sans
+que rien ne le dise.
+
+La liste est donc **dérivée du fichier lui-même**. `createTable` retient chaque
+DDL qu'il exécute (`DECLARED_TABLES`), et `declaredColumns` en lit les colonnes :
+**25 tables, ~250 colonnes**, exactes par construction et qui suivent une table
+modifiée sans qu'on y pense. Une seule requête ramène toutes les colonnes de la
+base, et l'écart se lit par différence d'ensembles.
+
+Une **table entièrement absente** n'est pas comptée : les `CREATE TABLE` viennent
+de passer, et le filet ne signale que les colonnes manquantes d'une table
+**présente**.
+
+`declaredColumns` découpe le corps du `CREATE` sur ses virgules de **premier
+niveau**, jamais sur ses lignes, et trois pièges l'ont imposé — chacun ayant
+produit une fausse alerte sur une base saine, vérifiée contre MariaDB :
+
+- une `FOREIGN KEY` écrite sur deux lignes laisse une ligne de continuation
+  (`REFERENCES bg_users(id) …`) que la lecture ligne à ligne prenait pour une
+  colonne nommée « REFERENCES » (30 entrées fantaisistes au premier essai) ;
+- un commentaire `--` glissé entre deux colonnes se lisait comme une définition
+  de plus (`bg_tournaments.la`) ;
+- une virgule dans un `DEFAULT 'a, b'` fabriquerait une colonne à partir du
+  fragment de droite, d'où un découpage qui connaît les apostrophes.
+
+Un filet qui crie au loup est un filet qu'on éteint : la propriété qui compte
+est le **silence sur une base saine**, et c'est celle-là qui a été vérifiée en
+premier, avant de contrôler qu'une base volontairement abîmée (une colonne
+supprimée, une clé primaire rétrécie) nomme **exactement** ces deux défauts et
+rien d'autre.
 
 Le témoin de type porte sur les **deux** faits : une base à demi convertie
 affiche `enum('OW2','MR','OW')`, qui contient bien `'OW'` et passerait un filet
 qui ne guetterait que la valeur neuve. Ce qui distingue une base à jour est
 l'absence de l'ancienne.
 
-Les index se lisent dans `information_schema.STATISTICS` et non dans `COLUMNS`,
-d'où une seconde requête — dans son **propre** `try` : partageant celui des
+Index et clés primaires se lisent dans `information_schema.STATISTICS` et non
+dans `COLUMNS`, d'où des requêtes supplémentaires — dans leur **propre** `try` : partageant celui des
 colonnes, son échec jetait les constats déjà établis, dont le signal sur les
 adresses. Le rapport vit en dehors des deux et dit ce qu'on sait, même
 partiellement. L'argument « les migrations sont jouées dans l'ordre »

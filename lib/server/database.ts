@@ -102,6 +102,86 @@ function reportSchemaFailure(error: unknown, statement: string): void {
   );
 }
 
+/**
+ * Les `CREATE TABLE` **tels qu'ils ont été déclarés**, retenus au passage.
+ *
+ * Le filet de schéma s'en sert pour savoir ce que le code attend, au lieu d'une
+ * liste de témoins choisis à la main. Une liste choisie ne voit que ce qu'on a
+ * pensé à y mettre — cinq colonnes sur les soixante-dix repliées —, et
+ * l'argument qui la justifiait (« les migrations sont jouées dans l'ordre »)
+ * est celui que ce fichier réfute déjà pour les index : chaque ancien `ALTER`
+ * était tolérant **indépendamment**, donc chacun pouvait manquer seul.
+ *
+ * Retenir la déclaration plutôt que la recopier est ce qui rend l'attente
+ * exacte par construction : une colonne ajoutée à une table neuve entre dans la
+ * surveillance sans que personne ait à y penser, ce qui est la seule façon de
+ * fermer une panne qui tient justement à ce qu'on l'oublie.
+ */
+const DECLARED_TABLES: string[] = [];
+
+async function createTable(db: Pool, ddl: string): Promise<void> {
+  DECLARED_TABLES.push(ddl);
+  await db.execute(ddl);
+}
+
+/**
+ * Les colonnes déclarées par un `CREATE TABLE`, et le nom de sa table.
+ *
+ * Découpage volontairement simple : ces déclarations sont écrites ici, d'une
+ * seule main, une définition par ligne. Une ligne qui commence par un mot-clé de
+ * contrainte n'est pas une colonne, et une ligne de commentaire SQL non plus.
+ */
+export function declaredColumns(ddl: string): { table: string; columns: string[] } | null {
+  const named = /CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(/.exec(ddl);
+  if (!named) return null;
+  // On découpe le corps sur ses virgules **de premier niveau** plutôt que sur
+  // ses lignes : une clé étrangère écrite sur deux lignes laisse une ligne de
+  // continuation (`REFERENCES bg_users(id) …`) que la lecture ligne à ligne
+  // prenait pour une colonne nommée « REFERENCES ».
+  const body = ddl
+    .slice(named.index + named[0].length)
+    // Un commentaire SQL peut tomber entre deux colonnes : sa première ligne se
+    // lirait comme une définition de plus.
+    .replace(/--[^\n]*/g, "");
+  const definitions: string[] = [];
+  let depth = 1;
+  let quote: string | null = null;
+  let current = "";
+  for (const char of body) {
+    // Une virgule entre apostrophes appartient à une valeur par défaut, pas au
+    // découpage : sans cette garde, `DEFAULT 'a,b'` fabriquerait une colonne.
+    if (quote !== null) {
+      current += char;
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === "'" || char === '"') quote = char;
+    else if (char === "(") depth += 1;
+    else if (char === ")") {
+      depth -= 1;
+      if (depth === 0) break;
+    }
+    if (char === "," && depth === 1) {
+      definitions.push(current);
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  definitions.push(current);
+  const columns: string[] = [];
+  for (const definition of definitions) {
+    const word = /^`?(\w+)`?\s+\S/.exec(definition.trim().replace(/\s+/g, " "));
+    if (!word) continue;
+    const first = word[1].toUpperCase();
+    if (["PRIMARY", "UNIQUE", "KEY", "INDEX", "CONSTRAINT", "FOREIGN", "FULLTEXT", "SPATIAL"].includes(first)) {
+      continue;
+    }
+    columns.push(word[1]);
+  }
+  return { table: named[1], columns };
+}
+
 async function runMigrations(db: Pool): Promise<void> {
   // ───────────────────────────────────────────────────────────────────────────
   // Comptes
@@ -121,8 +201,8 @@ async function runMigrations(db: Pool): Promise<void> {
   // `visible_pseudo` survit sans lecteur : le pseudo n'est plus masquable (c'est
   // l'identité de base du joueur : brackets, rosters, feuilles de match), la
   // colonne est conservée pour ne pas casser les installs.
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_users (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_users (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       pseudo VARCHAR(40) NOT NULL UNIQUE,
       avatar_url TEXT NULL,
@@ -148,8 +228,8 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_user_sessions (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_user_sessions (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       token_hash CHAR(64) NOT NULL UNIQUE,
       user_id BIGINT NOT NULL,
@@ -166,8 +246,8 @@ async function runMigrations(db: Pool): Promise<void> {
   // enregistre celui qui a servi à la résolution, et non celui que le client
   // renvoie à la confirmation — c'est la ligne du défi qui porte la preuve.
   // `NULL` sur une demande faite par identifiant numérique.
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_discord_login_challenges (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_discord_login_challenges (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       discord_id VARCHAR(40) NOT NULL,
       handle VARCHAR(64) NULL,
@@ -201,8 +281,8 @@ async function runMigrations(db: Pool): Promise<void> {
   // et `bg_teams` porte deux uniques. L'unicité MySQL ignore les `NULL` — autant
   // d'équipes sans sigle qu'on veut, et les entrées solo restent hors de
   // l'espace de noms sans une règle de plus.
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_teams (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_teams (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(60) NOT NULL UNIQUE,
       tag VARCHAR(4) NULL,
@@ -218,8 +298,8 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_team_members (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_team_members (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       team_id BIGINT NOT NULL,
       user_id BIGINT NOT NULL,
@@ -236,8 +316,8 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_team_invitations (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_team_invitations (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       team_id BIGINT NOT NULL,
       user_id BIGINT NOT NULL,
@@ -273,8 +353,8 @@ async function runMigrations(db: Pool): Promise<void> {
   // Les deux colonnes `match_format_*` vont **par paire** : tant que l'une est
   // `NULL`, la saisie des scores reste libre. `match_format_max_maps` borne les
   // maps *décisives* et n'a de sens qu'avec `match_format_draws`.
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_tournaments (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_tournaments (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       organizer_user_id BIGINT NOT NULL,
       name VARCHAR(120) NOT NULL,
@@ -335,8 +415,8 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_tournament_registrations (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_tournament_registrations (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       tournament_id BIGINT NOT NULL,
       team_id BIGINT NOT NULL,
@@ -361,8 +441,8 @@ async function runMigrations(db: Pool): Promise<void> {
   // peut le caster). L'index `idx_bg_matches_live` porte le balayage du bouton
   // « Regarder le live » de l'accueil, qui lirait sinon toute la table à chaque
   // chargement.
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_matches (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_matches (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       tournament_id BIGINT NOT NULL,
       phase_id BIGINT NOT NULL DEFAULT 0,
@@ -432,8 +512,8 @@ async function runMigrations(db: Pool): Promise<void> {
   // La clé primaire porte `phase_id` : une même équipe traverse plusieurs phases
   // d'un tournoi multi-format, et chacune a son classement.
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_swiss_standings (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_swiss_standings (
       tournament_id BIGINT NOT NULL,
       phase_id BIGINT NOT NULL DEFAULT 0,
       team_id BIGINT NOT NULL,
@@ -456,8 +536,8 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_survival_standings (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_survival_standings (
       tournament_id BIGINT NOT NULL,
       phase_id BIGINT NOT NULL DEFAULT 0,
       team_id BIGINT NOT NULL,
@@ -478,8 +558,8 @@ async function runMigrations(db: Pool): Promise<void> {
   // `OUT_OF_CONTENTION` (« hors course ») n'est pas `ELIMINATED` : l'équipe
   // garde son capital mais ne peut plus mathématiquement rejoindre les
   // play-offs. « Éliminée » à côté de neuf points serait un contresens.
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_endurance_standings (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_endurance_standings (
       tournament_id BIGINT NOT NULL,
       team_id BIGINT NOT NULL,
       seed INT NOT NULL DEFAULT 0,
@@ -509,7 +589,7 @@ async function runMigrations(db: Pool): Promise<void> {
   // tolérance pour s'accommoder d'une table absente. La retirer ici rendrait
   // leur garde morte et ferait tomber le démarrage sur une table accessoire.
   try {
-    await db.execute(`
+    await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_endurance_penalties (
         id BIGINT AUTO_INCREMENT PRIMARY KEY,
         tournament_id BIGINT NOT NULL,
@@ -536,8 +616,8 @@ async function runMigrations(db: Pool): Promise<void> {
   // Tournois multi-phases
   // ───────────────────────────────────────────────────────────────────────────
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_tournament_phases (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_tournament_phases (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       tournament_id BIGINT NOT NULL,
       position INT NOT NULL,
@@ -567,8 +647,8 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_tournament_phase_teams (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_tournament_phase_teams (
       phase_id BIGINT NOT NULL,
       tournament_id BIGINT NOT NULL,
       team_id BIGINT NOT NULL,
@@ -600,7 +680,7 @@ async function runMigrations(db: Pool): Promise<void> {
   // et un rappel ou une alerte perdus valent mieux qu'un report de score en
   // erreur. Le replier a failli leur coûter cette propriété.
   try {
-    await db.execute(`
+    await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_match_reminders (
         id BIGINT AUTO_INCREMENT PRIMARY KEY,
         match_id BIGINT NOT NULL,
@@ -616,7 +696,7 @@ async function runMigrations(db: Pool): Promise<void> {
   }
 
   try {
-    await db.execute(`
+    await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_referee_alerts (
         id BIGINT AUTO_INCREMENT PRIMARY KEY,
         match_id BIGINT NOT NULL,
@@ -635,8 +715,8 @@ async function runMigrations(db: Pool): Promise<void> {
   // Vitrine et association
   // ───────────────────────────────────────────────────────────────────────────
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_sponsors (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_sponsors (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(120) NOT NULL,
       slug VARCHAR(140) NOT NULL UNIQUE,
@@ -652,8 +732,8 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_bureau_members (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_bureau_members (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(120) NOT NULL,
       role VARCHAR(120) NOT NULL,
@@ -666,8 +746,8 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_about_stats (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_about_stats (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       value VARCHAR(40) NOT NULL,
       label VARCHAR(60) NOT NULL,
@@ -678,8 +758,8 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_about_pillars (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_about_pillars (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       title VARCHAR(60) NOT NULL,
       text VARCHAR(240) NOT NULL,
@@ -690,16 +770,16 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_settings (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_settings (
       setting_key VARCHAR(80) PRIMARY KEY,
       setting_value TEXT NOT NULL,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_benevoles (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_benevoles (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       first_name VARCHAR(80) NOT NULL,
       pseudo VARCHAR(80) NULL,
@@ -718,8 +798,8 @@ async function runMigrations(db: Pool): Promise<void> {
 
   // `domain` porte le **pôle de bénévolat** visé (recrutement du staff
   // associatif) et non un jeu : la page a changé d'objet en cours de route.
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_recruitment_ads (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_recruitment_ads (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       title VARCHAR(140) NOT NULL,
       team_name VARCHAR(120) NULL,
@@ -745,8 +825,8 @@ async function runMigrations(db: Pool): Promise<void> {
   // une suppression de compte ne doit pas réécrire l'historique de
   // fréquentation, qui n'est qu'un comptage (le lien est détaché à la main,
   // cf. `deleteOwnAccount`).
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bg_site_visits (
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_site_visits (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       visitor_key CHAR(64) NOT NULL,
       user_id BIGINT NULL,
@@ -1052,6 +1132,28 @@ async function warnIfSchemaIsBehind(db: Pool): Promise<void> {
   }
 
   try {
+    // **Toutes** les colonnes déclarées, et pas seulement des témoins choisis :
+    // la liste vient des `CREATE TABLE` retenus par `createTable`, donc elle est
+    // exacte par construction et suit une table modifiée sans qu'on y pense.
+    const declared = DECLARED_TABLES.map(declaredColumns).filter((d) => d !== null);
+    const [allRows] = await db.execute<(RowDataPacket & { t: string; c: string })[]>(
+      `SELECT TABLE_NAME t, COLUMN_NAME c FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()`,
+    );
+    const present = new Set(allRows.map((r) => `${r.t}.${r.c}`));
+    const missing = declared.flatMap(({ table, columns }) =>
+      columns.filter((c) => !present.has(`${table}.${c}`)).map((c) => `${table}.${c}`),
+    );
+    // Une table entièrement absente n'est pas un retard de schéma : les
+    // `CREATE TABLE` viennent de passer, et trois d'entre elles sont
+    // volontairement tolérées. On ne signale que les colonnes manquantes d'une
+    // table **présente**.
+    const tables = new Set(allRows.map((r) => r.t));
+    const lagging = missing.filter((name) => tables.has(name.split(".")[0]));
+    if (lagging.length > 0) {
+      gaps.push(`${lagging.length} colonne(s) déclarée(s) manquante(s) : ${lagging.join(", ")}`);
+    }
+
     // Les **index** ne se lisent pas dans `COLUMNS`, et leur absence est la plus
     // silencieuse de toutes : une colonne manquante fait tomber la requête qui
     // la nomme, un index unique manquant ne fait **rien** — il cesse simplement
@@ -1077,6 +1179,26 @@ async function warnIfSchemaIsBehind(db: Pool): Promise<void> {
     const indexes = new Set(indexRows.map((r) => r.INDEX_NAME));
     for (const [table, index] of INDEX_WITNESSES) {
       if (!indexes.has(index)) gaps.push(`l'index ${index} manque sur ${table}`);
+    }
+
+    // La **clé primaire recomposée** des deux classements à phases. Son absence
+    // ne fait rien tomber : avec `phase_id` présent mais la clé restée à deux
+    // colonnes, le classement de la phase 2 d'un tournoi `MULTI` **écrase** la
+    // ligne de la phase 1 pour la même équipe au lieu de lever. Un écrasement
+    // silencieux est exactement ce qu'un filet doit rendre bruyant.
+    const [pkRows] = await db.execute<(RowDataPacket & { t: string; n: number })[]>(
+      `SELECT TABLE_NAME t, COUNT(*) n FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE() AND INDEX_NAME = 'PRIMARY'
+          AND TABLE_NAME IN ('bg_swiss_standings', 'bg_survival_standings')
+        GROUP BY TABLE_NAME`,
+    );
+    for (const row of pkRows) {
+      if (row.n < 3) {
+        gaps.push(
+          `la clé primaire de ${row.t} n'a que ${row.n} colonne(s) au lieu de 3 ` +
+            `(sans phase_id, un classement de phase en écrase un autre en silence)`,
+        );
+      }
     }
   } catch {
     // Idem : l'écart sur les colonnes, lui, reste dit.

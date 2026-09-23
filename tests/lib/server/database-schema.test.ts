@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
+import { declaredColumns } from "@/lib/server/database";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -324,12 +325,14 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     // L'ancien fichier l'interrogeait pour décider s'il devait jouer un
     // rattrapage — une lecture par démarrage et par cas. La seule qui subsiste
     // ne **répare** rien : elle dit qu'une base est en retard, et s'arrête là.
-    // Deux lectures, toutes deux dans le filet : les colonnes puis les index —
-    // ces derniers ne figurant pas dans `COLUMNS`.
+    // Quatre lectures, toutes dans le filet : les types des colonnes témoins,
+    // puis **toutes** les colonnes déclarées, puis les index nommés, puis la
+    // largeur des clés primaires — aucune de ces trois dernières ne se lisant
+    // dans `COLUMNS`.
     const reads = [...sql.matchAll(/FROM information_schema/gi)];
-    expect(reads).toHaveLength(2);
+    expect(reads).toHaveLength(4);
     const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
-    expect([...net.matchAll(/FROM information_schema/gi)]).toHaveLength(2);
+    expect([...net.matchAll(/FROM information_schema/gi)]).toHaveLength(4);
     expect(net).toContain("information_schema.STATISTICS");
     expect(net).toContain("information_schema.COLUMNS");
     expect(net).toContain("console.error");
@@ -370,6 +373,30 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     expect(net).toContain("uniq_bg_teams_solo_user");
   });
 
+  it("surveille la largeur des clés primaires à phase, que rien ne fait tomber", () => {
+    // `phase_id` présent mais la clé restée à `(tournament_id, team_id)` ne lève
+    // nulle part : le classement de la phase 2 d'un tournoi `MULTI` **écrase**
+    // la ligne de la phase 1 pour la même équipe. Un écrasement silencieux est
+    // exactement ce qu'un filet doit rendre bruyant.
+    const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
+    expect(net).toContain("INDEX_NAME = 'PRIMARY'");
+    expect(net).toContain("bg_swiss_standings");
+    expect(net).toContain("bg_survival_standings");
+    expect(net).toMatch(/n\s*<\s*3/);
+  });
+
+  it("dérive les colonnes surveillées du fichier au lieu de les choisir", () => {
+    // Cinq témoins écrits à la main sur ~70 `ALTER` repliés laissaient
+    // soixante-cinq façons d'être en retard sans que rien ne le dise. La liste
+    // vient désormais des `CREATE TABLE` que `createTable` retient.
+    expect(sql).toContain("const DECLARED_TABLES");
+    const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
+    expect(net).toContain("DECLARED_TABLES.map(declaredColumns)");
+    // Une table entièrement absente n'est pas un retard : trois d'entre elles
+    // sont volontairement tolérées, et les `CREATE` viennent de passer.
+    expect(net).toContain("tables.has(");
+  });
+
   it("ne jette pas les constats d'une sonde quand l'autre échoue", () => {
     // Les deux sondes sont indépendantes ; partageant un `try`, l'échec de la
     // seconde emportait ce que la première venait d'établir — dont « les
@@ -404,5 +431,81 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
     expect(net.slice(0, net.indexOf("\n}"))).toMatch(/catch\s*\{/);
     expect(net.slice(0, net.indexOf("\n}"))).not.toContain("throw");
+  });
+});
+
+describe("Schéma — la liste des colonnes se lit sur le CREATE, pas sur ses lignes", () => {
+  /**
+   * Le filet ne vaut que s'il se **tait sur une base saine**. Trois écritures
+   * parfaitement ordinaires d'un `CREATE TABLE` fabriquaient chacune une colonne
+   * qui n'existe pas, donc une alerte de retard sur un schéma à jour — et un
+   * filet qui crie au loup est un filet qu'on éteint. Les trois cas ci-dessous
+   * ont été observés, dans cet ordre, contre une vraie base.
+   */
+
+  it("nomme la table et ses colonnes ordinaires", () => {
+    const parsed = declaredColumns(`CREATE TABLE IF NOT EXISTS bg_demo (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(80) NOT NULL,
+      PRIMARY KEY (id),
+      UNIQUE KEY uniq_demo_name (name),
+      KEY idx_demo_name (name)
+    )`);
+    // Les clauses de clé ne sont pas des colonnes : leur premier mot suffit à les
+    // écarter, et c'est pourquoi la liste des mots réservés existe.
+    expect(parsed).toEqual({ table: "bg_demo", columns: ["id", "name"] });
+  });
+
+  it("ne prend pas la ligne de continuation d'une FOREIGN KEY pour une colonne", () => {
+    // Le cas qui a produit trente fausses entrées au premier essai, toutes
+    // nommées « REFERENCES » : lue ligne à ligne, la seconde ligne d'une clé
+    // étrangère commence par un mot qui n'est dans aucune liste de mots
+    // réservés, donc elle passait pour une définition de plus.
+    const parsed = declaredColumns(`CREATE TABLE IF NOT EXISTS bg_demo (
+      id INT NOT NULL,
+      user_id INT NOT NULL,
+      FOREIGN KEY (user_id)
+        REFERENCES bg_users(id) ON DELETE CASCADE
+    )`);
+    expect(parsed?.columns).toEqual(["id", "user_id"]);
+  });
+
+  it("ignore un commentaire SQL glissé entre deux colonnes", () => {
+    // Celui-là a survécu à la correction précédente et rendait
+    // `bg_tournaments.la` : trois lignes de commentaire dans le corps de la
+    // table, dont la première se lisait comme une définition.
+    const parsed = declaredColumns(`CREATE TABLE IF NOT EXISTS bg_demo (
+      id INT NOT NULL,
+      -- la cible se règle en nombre fixe ou en pourcentage
+      -- (voir lib/shared/tournament-phases.ts)
+      target INT NULL
+    )`);
+    expect(parsed?.columns).toEqual(["id", "target"]);
+  });
+
+  it("ne découpe pas sur une virgule prise dans une valeur par défaut", () => {
+    // Latent, et c'est bien le problème : aucun `CREATE` du fichier ne porte
+    // aujourd'hui de virgule entre apostrophes, si bien que le jour où l'un en
+    // porterait une, le filet crierait au loup sur une base parfaitement saine.
+    const parsed = declaredColumns(`CREATE TABLE IF NOT EXISTS bg_demo (
+      id INT NOT NULL,
+      label VARCHAR(40) NOT NULL DEFAULT 'a, b et c',
+      state VARCHAR(10) NOT NULL
+    )`);
+    expect(parsed?.columns).toEqual(["id", "label", "state"]);
+  });
+
+  it("s'arrête à la parenthèse fermante du corps, pas à la première venue", () => {
+    // Un `DECIMAL(10, 2)` porte une virgule *à l'intérieur* d'une parenthèse,
+    // et la clause `ENGINE=` qui suit le corps ne doit rien ajouter.
+    const parsed = declaredColumns(`CREATE TABLE IF NOT EXISTS bg_demo (
+      id INT NOT NULL,
+      amount DECIMAL(10, 2) NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+    expect(parsed?.columns).toEqual(["id", "amount"]);
+  });
+
+  it("rend null sur ce qui n'est pas un CREATE TABLE nommé", () => {
+    expect(declaredColumns("ALTER TABLE bg_demo ADD COLUMN x INT NULL")).toBeNull();
   });
 });
