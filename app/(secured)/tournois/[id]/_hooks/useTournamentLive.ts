@@ -30,6 +30,12 @@ import {
   type LiveState,
 } from "../_lib/live-state";
 
+/** Plafond d'un `setTimeout` (~24,8 jours) : au-delà, il se déclencherait tout de suite. */
+const MAX_TIMEOUT_MS = 2_147_483_647;
+
+/** Point de départ du régime, avant la première lecture du magasin. */
+const FULL_POWER_INPUT: ClientPowerInput = { attention: "FOCUSED", matchFocus: false };
+
 /**
  * Suivi en direct d'un tournoi.
  *
@@ -66,12 +72,6 @@ import {
  * spectateur (`?quiet=1`). Les annonces arrivent encore — à la cadence des
  * spectateurs —, et le budget de sortie de la salle revient à ceux qui jouent.
  */
-/** Plafond d'un `setTimeout` (~24,8 jours) : au-delà, il se déclencherait tout de suite. */
-const MAX_TIMEOUT_MS = 2_147_483_647;
-
-/** Point de départ du régime, avant la première lecture du magasin. */
-const FULL_POWER_INPUT: ClientPowerInput = { attention: "FOCUSED", matchFocus: false };
-
 export function useTournamentLive(tournamentId: number) {
   const { showError } = useToast();
   /** État **rendu** — peut retarder sur `stateRef`, qui est l'état reçu. */
