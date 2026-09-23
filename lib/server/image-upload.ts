@@ -2,12 +2,13 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import sharp from "sharp";
+import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/uploads";
 
 export type UploadKind = "avatar" | "team-logo" | "sponsor-logo" | "benevole-photo" | "tournament-image";
 
-const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_BYTES = IMAGE_UPLOAD_MAX_BYTES;
 const MAX_DIMENSION = 8000;
-const ALLOWED_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
+const ALLOWED_MIME: ReadonlySet<string> = new Set(IMAGE_UPLOAD_MIME_TYPES);
 
 const KIND_CONFIG: Record<
   UploadKind,

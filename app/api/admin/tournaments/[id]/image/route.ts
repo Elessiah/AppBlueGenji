@@ -92,10 +92,14 @@ export async function PATCH(req: Request, context: RouteContext) {
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (body === null || typeof body !== "object") return fail("INVALID_IMAGE_FIT", 400);
 
-  // Au PATCH, les trois champs sont **exigés** : un champ oublié vaudrait sinon
-  // le défaut, et recentrerait l'image en silence.
-  if (body.fit === undefined) return fail("INVALID_IMAGE_FIT", 400);
-  if (body.focusX === undefined || body.focusY === undefined) return fail("INVALID_IMAGE_FOCUS", 400);
+  // Au PATCH, les trois champs sont **exigés**, et typés : `checkTournamentImageSettings`
+  // tient un champ absent, `null` ou vide pour le défaut (un fichier seul doit
+  // suffire au POST), ce qui recentrerait ici l'image en silence. Un corps JSON
+  // n'a aucune raison de porter autre chose qu'une chaîne et deux nombres.
+  if (typeof body.fit !== "string") return fail("INVALID_IMAGE_FIT", 400);
+  if (typeof body.focusX !== "number" || typeof body.focusY !== "number") {
+    return fail("INVALID_IMAGE_FOCUS", 400);
+  }
 
   const settings = checkTournamentImageSettings(body);
   if (!settings.ok) return fail(settings.error, 400);

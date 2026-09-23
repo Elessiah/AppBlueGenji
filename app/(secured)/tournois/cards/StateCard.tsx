@@ -8,6 +8,7 @@ import { FinishedCard } from "./FinishedCard";
 
 interface StateCardProps {
   t: TournamentCard;
+  priority?: boolean;
 }
 
 /**
@@ -18,9 +19,9 @@ interface StateCardProps {
  * regroupe des tournois de n'importe quel état : c'est le seul endroit qui a
  * besoin d'aiguiller.
  */
-export function StateCard({ t }: StateCardProps) {
-  if (t.state === "RUNNING") return <RunningCard t={t} />;
-  if (t.state === "REGISTRATION") return <RegistrationCard t={t} />;
-  if (t.state === "FINISHED") return <FinishedCard t={t} />;
-  return <UpcomingCard t={t} />;
+export function StateCard({ t, priority }: StateCardProps) {
+  if (t.state === "RUNNING") return <RunningCard t={t} priority={priority} />;
+  if (t.state === "REGISTRATION") return <RegistrationCard t={t} priority={priority} />;
+  if (t.state === "FINISHED") return <FinishedCard t={t} priority={priority} />;
+  return <UpcomingCard t={t} priority={priority} />;
 }

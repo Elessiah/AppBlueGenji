@@ -18,7 +18,7 @@
  * Le point focal est conservé en mode logo (il n'y sert à rien) : repasser en
  * illustration retrouve le cadrage choisi.
  */
-import { localUploadUrl } from "./uploads";
+import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES, localUploadUrl } from "./uploads";
 
 export const TOURNAMENT_IMAGE_FITS = ["COVER", "CONTAIN"] as const;
 
@@ -234,10 +234,10 @@ export function planTournamentImageChange(
 }
 
 /** Types de fichier acceptés par le sélecteur (le serveur relit les octets). */
-export const TOURNAMENT_IMAGE_ACCEPT = "image/png,image/jpeg,image/webp";
+export const TOURNAMENT_IMAGE_ACCEPT = IMAGE_UPLOAD_MIME_TYPES.join(",");
 
-/** Poids maximal d'un fichier, repris de `lib/server/image-upload.ts`. */
-export const TOURNAMENT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+/** Poids maximal d'un fichier : la limite du serveur, partagée. */
+export const TOURNAMENT_IMAGE_MAX_BYTES = IMAGE_UPLOAD_MAX_BYTES;
 
 /** Refus rendus par `/api/admin/tournaments/[id]/image`, en français. */
 export function tournamentImageErrorMessage(code: string): string {

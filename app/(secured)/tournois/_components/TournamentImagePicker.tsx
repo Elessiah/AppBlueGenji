@@ -34,19 +34,26 @@ interface TournamentImagePickerProps {
   disabled?: boolean;
 }
 
-/** URL `blob:` d'un fichier local, révoquée dès qu'elle ne sert plus. */
+/**
+ * URL `blob:` d'un fichier local, révoquée dès qu'elle ne sert plus.
+ *
+ * L'URL est rendue **avec le fichier qu'elle désigne** et n'est lue que si ce
+ * fichier est toujours le courant : l'effet ne s'exécutant qu'après le rendu,
+ * le rendu qui suit un changement de fichier verrait sinon l'URL — déjà
+ * révoquée — du fichier précédent.
+ */
 function useObjectUrl(file: File | null): string | null {
-  const [url, setUrl] = useState<string | null>(null);
+  const [entry, setEntry] = useState<{ file: File; url: string } | null>(null);
   useEffect(() => {
     if (!file) {
-      setUrl(null);
+      setEntry(null);
       return;
     }
-    const next = URL.createObjectURL(file);
-    setUrl(next);
-    return () => URL.revokeObjectURL(next);
+    const url = URL.createObjectURL(file);
+    setEntry({ file, url });
+    return () => URL.revokeObjectURL(url);
   }, [file]);
-  return url;
+  return entry !== null && entry.file === file ? entry.url : null;
 }
 
 /** Dimensions d'un fichier image ; `null` si le navigateur ne sait pas les lire. */
@@ -88,15 +95,23 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: T
   const baseId = useId();
   const objectUrl = useObjectUrl(value.file);
 
-  const displayUrl = objectUrl ?? (value.removed ? null : existing?.url ?? null);
-  // Le fichier local n'a pas encore d'URL au premier rendu qui suit son choix :
-  // on ne bascule pas sur l'écran « vide » pour autant.
+  // Un fichier choisi ne se montre que **lui-même** : tant que son URL locale
+  // n'existe pas, on n'affiche rien plutôt que l'image enregistrée (retirée
+  // peut-être), qui se serait montrée un instant sous les réglages du nouveau
+  // fichier. Pas d'écran « vide » pour autant : `hasImage` tient compte du
+  // fichier.
+  const displayUrl = value.file !== null ? objectUrl : value.removed ? null : existing?.url ?? null;
   const hasImage = value.file !== null || displayUrl !== null;
   const { settings } = value;
   const isCover = settings.fit === "COVER";
 
   const setSettings = (patch: Partial<TournamentImageSettings>) =>
     onChange({ ...value, settings: { ...settings, ...patch } });
+
+  // Numéro du dernier fichier choisi : la lecture de ses dimensions est
+  // asynchrone, et deux choix rapprochés peuvent se résoudre dans le désordre —
+  // seul le dernier a le droit d'écrire le brouillon.
+  const pickSeqRef = useRef(0);
 
   const onFileChosen = async (file: File | undefined) => {
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -106,7 +121,9 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: T
       showError(refusal);
       return;
     }
+    const seq = ++pickSeqRef.current;
     const size = await readImageSize(file);
+    if (seq !== pickSeqRef.current) return;
     onChange(withNewFile(file, size ? suggestImageFit(size.width, size.height) : settings.fit));
   };
 
@@ -217,7 +234,9 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: T
                         }
                   }
                   onPointerMove={(event) => {
-                    if (draggingRef.current) moveFocus(event);
+                    // Un glisser commencé avant l'envoi s'arrête avec lui : le
+                    // brouillon ne doit plus bouger une fois parti.
+                    if (draggingRef.current && !disabled) moveFocus(event);
                   }}
                   onPointerUp={() => {
                     draggingRef.current = false;
@@ -295,7 +314,12 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: T
               type="button"
               className="btn ghost"
               disabled={disabled}
-              onClick={() => onChange({ ...value, file: null, removed: true })}
+              onClick={() => {
+                // Un fichier dont les dimensions se lisent encore ne revient pas
+                // après un retrait.
+                pickSeqRef.current += 1;
+                onChange({ ...value, file: null, removed: true });
+              }}
               style={{ padding: "8px 16px", fontSize: 13 }}
             >
               Retirer l&apos;image

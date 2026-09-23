@@ -5,6 +5,7 @@ import { FinishedCard } from "@/app/(secured)/tournois/cards/FinishedCard";
 import { RegistrationCard } from "@/app/(secured)/tournois/cards/RegistrationCard";
 import { RunningCard } from "@/app/(secured)/tournois/cards/RunningCard";
 import { UpcomingCard } from "@/app/(secured)/tournois/cards/UpcomingCard";
+import { priorityBannerIds } from "@/app/(secured)/tournois/cards/card-image";
 import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import type { TournamentImage } from "@/lib/shared/tournament-image";
 import type { TournamentCard } from "@/lib/shared/types";
@@ -111,5 +112,27 @@ describe("cartes de /tournois", () => {
   it("l'image reste dans la carte : aucune seconde ancre", () => {
     const markup = renderToStaticMarkup(<RegistrationCard t={card({ image: cover })} />);
     expect(markup.match(/<a\b/g)).toHaveLength(1);
+  });
+});
+
+describe("priorityBannerIds — bandeaux chargés en priorité", () => {
+  it("retient les premiers bandeaux dans l'ordre d'affichage, logos et cartes nues exclus", () => {
+    const cards = [
+      card({ id: 1, image: null }),
+      card({ id: 2, image: logo }),
+      card({ id: 3, image: cover }),
+      card({ id: 4, image: cover }),
+      card({ id: 5, image: cover }),
+    ];
+    expect([...priorityBannerIds(cards)]).toEqual([3, 4]);
+    expect([...priorityBannerIds(cards, 1)]).toEqual([3]);
+    expect(priorityBannerIds([card({ image: logo })]).size).toBe(0);
+  });
+
+  it("une carte prioritaire charge son bandeau d'emblée, les autres paresseusement", () => {
+    const eager = imgTags(renderToStaticMarkup(<RegistrationCard t={card({ image: cover })} priority />))[0];
+    const lazy = imgTags(renderToStaticMarkup(<RegistrationCard t={card({ image: cover })} />))[0];
+    expect(eager).not.toContain('loading="lazy"');
+    expect(lazy).toContain('loading="lazy"');
   });
 });

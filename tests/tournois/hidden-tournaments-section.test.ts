@@ -89,6 +89,6 @@ describe("StateCard", () => {
     expect(stateCard).toMatch(/state === "REGISTRATION"\) return <RegistrationCard/);
     expect(stateCard).toMatch(/state === "FINISHED"\) return <FinishedCard/);
     // Défaut : « à venir », l'état de l'immense majorité des tournois invisibles.
-    expect(stateCard).toMatch(/return <UpcomingCard t=\{t\} \/>;\s*\}/);
+    expect(stateCard).toMatch(/return <UpcomingCard t=\{t\}( priority=\{priority\})? \/>;\s*\}/);
   });
 });

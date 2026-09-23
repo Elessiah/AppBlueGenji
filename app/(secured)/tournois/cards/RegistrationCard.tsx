@@ -9,9 +9,11 @@ import s from "../tournois.module.css";
 
 interface RegistrationCardProps {
   t: TournamentCard;
+  /** Bandeau chargé en priorité : premières cartes illustrées de la page (`priorityBannerIds`). */
+  priority?: boolean;
 }
 
-export function RegistrationCard({ t }: RegistrationCardProps) {
+export function RegistrationCard({ t, priority }: RegistrationCardProps) {
   const wording = participantWording(t.participantType);
   const gameLabel = t.game === "OW" ? "OVERWATCH" : "MARVEL RIVALS";
   const formatLabel = t.format === "DOUBLE" ? "Double élimination" : "Élimination simple";
@@ -37,7 +39,12 @@ export function RegistrationCard({ t }: RegistrationCardProps) {
   return (
     <Link href={`/tournois/${t.id}`} style={{ textDecoration: "none" }}>
       <article className={s.card} data-state="open">
-        <TournamentImageBanner image={t.image} sizes={CARD_IMAGE_SIZES} className={s.cardBanner} />
+        <TournamentImageBanner
+          image={t.image}
+          sizes={CARD_IMAGE_SIZES}
+          className={s.cardBanner}
+          priority={priority}
+        />
         <div className={`${s.cardRibbon} ${s.cardRibbonOpen}`}>
           <span className={s.dot} />
           Inscriptions ouvertes

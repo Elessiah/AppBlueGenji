@@ -304,3 +304,12 @@ describe("tournamentImageErrorMessage", () => {
     expect(tournamentImageErrorMessage("")).toBe("L'image n'a pas pu être enregistrée.");
   });
 });
+
+describe("limites du sélecteur — celles du serveur", () => {
+  it("reprend le poids et les formats partagés avec lib/server/image-upload.ts", async () => {
+    const { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } = await import("@/lib/shared/uploads");
+    const { TOURNAMENT_IMAGE_ACCEPT, TOURNAMENT_IMAGE_MAX_BYTES } = await import("@/lib/shared/tournament-image");
+    expect(TOURNAMENT_IMAGE_MAX_BYTES).toBe(IMAGE_UPLOAD_MAX_BYTES);
+    expect(TOURNAMENT_IMAGE_ACCEPT.split(",")).toEqual([...IMAGE_UPLOAD_MIME_TYPES]);
+  });
+});

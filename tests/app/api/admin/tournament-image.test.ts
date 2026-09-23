@@ -191,6 +191,19 @@ describe("PATCH — change le cadrage seul", () => {
     expect(updateTournamentImageSettings).not.toHaveBeenCalled();
   });
 
+  it("refuse null, une chaîne vide ou un nombre en chaîne : aucun défaut au PATCH", async () => {
+    for (const body of [
+      { fit: null, focusX: 10, focusY: 10 },
+      { fit: "COVER", focusX: null, focusY: 10 },
+      { fit: "COVER", focusX: 10, focusY: "" },
+      { fit: "COVER", focusX: "10", focusY: 10 },
+    ]) {
+      const res = await PATCH(patchReq(body), params());
+      expect(res.status).toBe(400);
+    }
+    expect(updateTournamentImageSettings).not.toHaveBeenCalled();
+  });
+
   it("refuse un corps illisible ou des valeurs hors bornes", async () => {
     expect((await PATCH(patchReq("pas du json"), params())).status).toBe(400);
     expect((await PATCH(patchReq("null"), params())).status).toBe(400);

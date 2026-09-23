@@ -147,7 +147,11 @@ export async function deleteTournament(tournamentId: number): Promise<DeletedTou
     await connection.beginTransaction();
 
     const [rows] = await connection.execute<TournamentIdentityRow[]>(
-      `SELECT id, name, image_url FROM bg_tournaments WHERE id = ? LIMIT 1`,
+      // Verrouillante : l'image relevée ici est celle qu'on effacera. Une
+      // lecture ordinaire laissait un envoi concurrent poser un nouveau fichier
+      // entre ce SELECT et le DELETE — fichier que plus aucune ligne ne
+      // désignerait (`lib/server/tournaments/image.ts` prend le même verrou).
+      `SELECT id, name, image_url FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`,
       [tournamentId],
     );
     if (rows.length === 0) throw new Error("TOURNAMENT_NOT_FOUND");

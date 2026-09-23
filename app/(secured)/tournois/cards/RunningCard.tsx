@@ -9,9 +9,11 @@ import s from "../tournois.module.css";
 
 interface RunningCardProps {
   t: TournamentCard;
+  /** Bandeau chargé en priorité : premières cartes illustrées de la page (`priorityBannerIds`). */
+  priority?: boolean;
 }
 
-export function RunningCard({ t }: RunningCardProps) {
+export function RunningCard({ t, priority }: RunningCardProps) {
   const wording = participantWording(t.participantType);
   const gameLabel = t.game === "OW" ? "OVERWATCH" : "MARVEL RIVALS";
   const formatLabel = t.format === "DOUBLE" ? "Double élimination" : "Élimination simple";
@@ -26,7 +28,12 @@ export function RunningCard({ t }: RunningCardProps) {
   return (
     <Link href={`/tournois/${t.id}`} style={{ textDecoration: "none" }}>
       <article className={s.card} data-state="live" style={{ gridColumn: "span 2" }}>
-        <TournamentImageBanner image={t.image} sizes={CARD_IMAGE_SIZES} className={s.cardBanner} />
+        <TournamentImageBanner
+          image={t.image}
+          sizes={CARD_IMAGE_SIZES}
+          className={s.cardBanner}
+          priority={priority}
+        />
         <div className={`${s.cardRibbon} ${s.cardRibbonLive}`}>
           <span className={s.dot} />
           EN COURS

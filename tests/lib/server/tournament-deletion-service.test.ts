@@ -43,7 +43,12 @@ function mockExistingTournament(name = "BlueGenji Open", imageUrl: string | null
 }
 
 describe("deleteTournament", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // `clearAllMocks` garde les implémentations : un rejet posé par un test
+    // déborderait sur le suivant.
+    (deleteStoredImage as jest.Mock).mockResolvedValue(undefined as never);
+  });
   afterEach(() => jest.restoreAllMocks());
 
   it("rend l'identité du tournoi supprimé", async () => {
@@ -166,6 +171,15 @@ describe("deleteTournament", () => {
     // toujours vivant : les lecteurs quitteraient la fiche pour rien.
     expect(publishUpdatedEvent).not.toHaveBeenCalled();
     expect(deleteStoredImage).not.toHaveBeenCalled();
+  });
+
+  it("relève l'image sous verrou, avant toute suppression", async () => {
+    const { execute } = mockExistingTournament("Open", "/api/uploads/tournaments/7-a.webp");
+    await deleteTournament(7);
+    // Un envoi concurrent ne peut plus poser un fichier que plus rien ne désignerait.
+    expect(statements(execute)[0]).toBe(
+      "SELECT id, name, image_url FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE",
+    );
   });
 
   it("efface le fichier de l'image du tournoi, après le commit", async () => {

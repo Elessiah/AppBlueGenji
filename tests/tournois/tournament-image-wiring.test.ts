@@ -74,7 +74,7 @@ describe("écrans", () => {
   it("les quatre cartes de /tournois posent le bandeau et la pastille", () => {
     for (const name of ["FinishedCard", "RegistrationCard", "RunningCard", "UpcomingCard"]) {
       const source = read(`app/(secured)/tournois/cards/${name}.tsx`);
-      expect(source).toContain("<TournamentImageBanner image={t.image}");
+      expect(source).toMatch(/<TournamentImageBanner\s+image=\{t\.image\}[\s\S]{0,200}priority=\{priority\}/);
       expect(source).toContain("<TournamentImageEmblem image={t.image}");
     }
   });

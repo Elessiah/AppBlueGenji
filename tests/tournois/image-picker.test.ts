@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import {
   applyImageChange,
   imageChangeSuccessMessage,
+  imageFingerprint,
   imagePickerChange,
   initialImagePickerValue,
   rejectImageFile,
+  resyncImageDraft,
   suggestImageFit,
   withNewFile,
 } from "@/app/(secured)/tournois/_lib/image-picker";
@@ -204,5 +206,47 @@ describe("imageChangeSuccessMessage", () => {
     expect(imageChangeSuccessMessage({ kind: "UPDATE", settings })).toBe("Réglage de l'image enregistré.");
     expect(imageChangeSuccessMessage({ kind: "DELETE" })).toBe("Image du tournoi retirée.");
     expect(imageChangeSuccessMessage({ kind: "NONE" })).toBeNull();
+  });
+});
+
+describe("imageFingerprint", () => {
+  it("change avec le fichier comme avec le cadrage", () => {
+    const base = imageFingerprint(saved);
+    expect(imageFingerprint({ ...saved })).toBe(base);
+    expect(imageFingerprint({ ...saved, url: "/api/uploads/tournaments/7-b.webp" })).not.toBe(base);
+    expect(imageFingerprint({ ...saved, fit: "COVER" })).not.toBe(base);
+    expect(imageFingerprint({ ...saved, focusY: 71 })).not.toBe(base);
+    expect(imageFingerprint(null)).toBe("");
+  });
+});
+
+describe("resyncImageDraft — l'image enregistrée change sous la modale", () => {
+  const next: TournamentImage = { ...saved, fit: "COVER", focusX: 10 };
+
+  it("ne touche à rien quand l'image n'a pas changé", () => {
+    const value = { ...initialImagePickerValue(saved), removed: true };
+    expect(resyncImageDraft(saved, { ...saved }, value)).toEqual({ value, conflict: false });
+  });
+
+  it("un brouillon intact suit la nouvelle image : aucun recadrage fantôme", () => {
+    const result = resyncImageDraft(saved, next, initialImagePickerValue(saved));
+    expect(result).toEqual({ value: initialImagePickerValue(next), conflict: false });
+    expect(imagePickerChange(next, result.value)).toEqual({ kind: "NONE" });
+  });
+
+  it("un brouillon intact suit aussi un retrait fait ailleurs", () => {
+    expect(resyncImageDraft(saved, null, initialImagePickerValue(saved))).toEqual({
+      value: initialImagePickerValue(null),
+      conflict: false,
+    });
+  });
+
+  it("un brouillon entamé est gardé, et le désaccord signalé", () => {
+    const touched = initialImagePickerValue(saved);
+    touched.settings = { ...touched.settings, focusX: 90 };
+    expect(resyncImageDraft(saved, next, touched)).toEqual({ value: touched, conflict: true });
+
+    const withFile = withNewFile(pngFile(), "COVER");
+    expect(resyncImageDraft(saved, next, withFile)).toEqual({ value: withFile, conflict: true });
   });
 });

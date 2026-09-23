@@ -49,6 +49,33 @@ export function imagePickerChange(
   });
 }
 
+/** Empreinte de l'image enregistrée : change dès que fichier ou cadrage change. */
+export function imageFingerprint(image: TournamentImage | null): string {
+  return image === null ? "" : `${image.url}|${image.fit}|${image.focusX}|${image.focusY}`;
+}
+
+/**
+ * Le brouillon face à une image enregistrée qui vient de changer — le flux SSE
+ * apporte le geste d'un autre membre du staff pendant que la modale est ouverte.
+ *
+ * - brouillon **intact** : il suit la nouvelle image (sinon ses réglages
+ *   périmés, comparés à elle, formeraient un recadrage qu'« Enregistrer »
+ *   appliquerait par-dessus sans que personne ait rien touché) ;
+ * - brouillon **entamé** : il est gardé — c'est une saisie en cours —, et le
+ *   désaccord est signalé plutôt qu'écrasé en silence d'un côté ou de l'autre.
+ */
+export function resyncImageDraft(
+  previous: TournamentImage | null,
+  next: TournamentImage | null,
+  value: ImagePickerValue,
+): { value: ImagePickerValue; conflict: boolean } {
+  if (imageFingerprint(previous) === imageFingerprint(next)) return { value, conflict: false };
+  if (imagePickerChange(previous, value).kind === "NONE") {
+    return { value: initialImagePickerValue(next), conflict: false };
+  }
+  return { value, conflict: true };
+}
+
 /**
  * Premier mode proposé pour une image fraîchement choisie : une image nettement
  * plus large que haute est une **illustration**, le reste (carré, portrait) a

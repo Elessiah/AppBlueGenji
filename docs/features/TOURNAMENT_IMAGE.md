@@ -46,6 +46,9 @@ Sobrement, pour que la carte reste d'abord une fiche à lire :
 - **Cartes de `/tournois`** : une illustration devient un bandeau bas (112 px)
   en tête de carte, fondu dans le fond ; un logo, une pastille de 40 px à droite
   de la ligne « jeu ◆ format ». Les cartes d'une rangée gardent la même hauteur.
+  Les **deux premiers bandeaux** dans l'ordre d'affichage sont chargés en
+  priorité (`priorityBannerIds`) : en haut de liste, un bandeau est l'élément le
+  plus grand de l'écran, donc le LCP ; les autres restent paresseux.
 - **Fiche du tournoi** : l'illustration occupe un bandeau d'affiche entre la
   barre d'outils et le nom ; le logo, une pastille de 88 px (64 px sur mobile) à
   gauche du nom.
@@ -84,7 +87,14 @@ répond un code générique en 500 et se journalise — son message peut nommer 
 chemin du serveur.
 
 Au `PATCH`, un champ absent n'est pas un défaut : il recentrerait l'image en
-silence. Au `POST`, si — un fichier seul doit suffire.
+silence. Les trois sont donc exigés **et typés** (une chaîne, deux nombres) —
+`null`, `""` ou `"10"` sont refusés, la lecture partagée les tenant pour le
+défaut. Au `POST`, si — un fichier seul doit suffire, et les champs d'un
+formulaire multipart arrivent en chaînes.
+
+Les limites du fichier (5 Mo, PNG/JPEG/WebP) sont écrites une fois dans
+`lib/shared/uploads.ts` et lues par le serveur comme par le sélecteur, qui
+refuse un fichier avant de l'envoyer.
 
 **Aucune garde d'état** : l'image est décorative, elle n'entre dans aucune
 règle du moteur. Habiller une archive ou poser le logo d'un tournoi en cours
@@ -104,7 +114,10 @@ Trois règles dans `lib/server/tournaments/image.ts` :
 Toute écriture passe par `publishUpdatedEvent` : caches vidés, instantané
 rediffusé par le flux SSE — la fiche ouverte se met à jour seule.
 
-La **suppression d'un tournoi** efface aussi son fichier, après le commit.
+La **suppression d'un tournoi** efface aussi son fichier, après le commit ; elle
+relève l'image **sous le même verrou** (`FOR UPDATE`), sans quoi un envoi
+concurrent pouvait poser un fichier entre sa lecture et le `DELETE` — fichier
+que plus aucune ligne ne désignerait.
 
 ## Interface
 
@@ -126,6 +139,19 @@ illustration ; sinon : logo), **dire ce que c'est**, et pour une illustration
 clavier (flèches, Maj ×5, Origine pour recentrer). Deux aperçus montrent le
 résultat aux proportions réelles du site (bandeau de la fiche, carte de la
 liste), si bien qu'on voit ce que le cadre coupe.
+
+Trois précautions dans le sélecteur et la modale :
+
+- deux fichiers choisis coup sur coup se résolvent dans le désordre (la lecture
+  des dimensions est asynchrone) : seul le **dernier choix** écrit le brouillon ;
+- tant que l'aperçu local d'un nouveau fichier n'existe pas, rien n'est affiché
+  — jamais l'image enregistrée (retirée, peut-être) sous les réglages du
+  nouveau fichier ;
+- l'image enregistrée peut changer **sous la modale** (flux SSE, geste d'un
+  autre membre du staff) : un brouillon intact la suit (`resyncImageDraft`),
+  sans quoi ses réglages périmés formeraient un recadrage appliqué sans que
+  personne ait rien touché ; un brouillon entamé est gardé, avec un bandeau qui
+  dit le désaccord.
 
 ## Jeu de test
 
