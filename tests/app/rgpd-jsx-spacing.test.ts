@@ -47,17 +47,12 @@ describe("/rgpd — les espaces survivent aux frontières d'éléments", () => {
     expect(SOURCE).not.toMatch(/<strong>organisé<\/strong>\s*\n/);
   });
 
-  it("n'a pas d'autre frontière écrasée que celle déjà consignée", () => {
-    // Jeu **exact**, dans les deux sens. Une frontière nouvelle fait échouer le
-    // test ; la disparition de celle qui reste aussi — c'est le rappel de
-    // retirer l'entrée d'`ERREUR.txt` dans le commit qui la règle.
-    //
-    // Celle-ci préexiste sur `main`, dans la section « cookies » : elle rend
-    // « le temps d'une connexionpar Google ». Hors périmètre de la suppression
-    // de compte, consignée le 2026-09-23.
-    const boundaries = collapsedBoundaries(SOURCE);
-    expect(boundaries).toHaveLength(1);
-    expect(boundaries[0]).toContain("le temps d&apos;une connexion</strong>");
-    expect(boundaries[0]).toContain("par Google, Discord ou Blizzard");
+  it("n'a plus aucune frontière écrasée", () => {
+    // La dernière — « le temps d'une connexionpar Google », section « cookies »,
+    // consignée le 2026-09-23 — est réglée par un `{" "}`. Le balayage de tous
+    // les écrans vit dans `jsx-inline-spacing.test.ts` ; celui-ci garde la page
+    // publique, où toutes les balises comptent et pas seulement l'emphase.
+    expect(collapsedBoundaries(SOURCE)).toEqual([]);
+    expect(SOURCE).toContain('le temps d&apos;une connexion</strong>{" "}');
   });
 });
