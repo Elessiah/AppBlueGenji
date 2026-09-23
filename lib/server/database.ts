@@ -960,6 +960,35 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  // Changements du traitement des données (`lib/shared/privacy-changes.ts`) :
+  // une ligne par changement **accepté**, avec sa date — c'est la trace du
+  // consentement, que l'export RGPD rend au joueur. Le registre vit dans le
+  // code, pas en base : `change_id` n'a donc pas de clé étrangère.
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_privacy_acknowledgments (
+      user_id BIGINT NOT NULL,
+      change_id VARCHAR(80) NOT NULL,
+      accepted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, change_id),
+      CONSTRAINT fk_bg_privacy_ack_user FOREIGN KEY (user_id)
+        REFERENCES bg_users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // Annonce Discord de ces changements, **réservée avant l'envoi** : la clé
+  // primaire est ce qui interdit le doublon entre deux balayages concurrents
+  // (`lib/server/privacy-change-notifications.ts`).
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_privacy_change_notifications (
+      user_id BIGINT NOT NULL,
+      change_id VARCHAR(80) NOT NULL,
+      sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, change_id),
+      CONSTRAINT fk_bg_privacy_notif_user FOREIGN KEY (user_id)
+        REFERENCES bg_users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
   // ───────────────────────────────────────────────────────────────────────────
   // Migrations
   // ───────────────────────────────────────────────────────────────────────────
