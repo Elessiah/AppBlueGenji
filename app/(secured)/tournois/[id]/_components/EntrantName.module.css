@@ -59,3 +59,16 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Contrastes forcés : le fond teinté disparaît, et avec lui le seul contour
+   d'une case à initiale. Une bordure système la redessine ; la case vide reste
+   invisible, elle ne fait que réserver la place. */
+@media (forced-colors: active) {
+  .logo {
+    border-color: CanvasText;
+  }
+
+  .empty {
+    border-color: transparent;
+  }
+}
