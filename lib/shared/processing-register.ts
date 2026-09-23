@@ -191,7 +191,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: [
       "Pseudo certifié : jusqu'à sa modification ou la suppression du compte",
-      "Traces d'envoi des rappels et alertes : durée de vie du match",
+      "Traces d'envoi des rappels et alertes (match et palier, sans contenu) : conservées avec le match, donc sans limite de durée",
     ],
     recipients: ["Administrateurs et arbitres de l'association", "Discord, qui achemine les messages"],
     transfers: ["États-Unis : Discord (acheminement des messages privés), dans le cadre des garanties propres à Discord"],
@@ -342,12 +342,13 @@ export const REGISTER_EXPORT_COLUMNS = [
  *
  * Guillemets doublés et cellule entre guillemets dès qu'elle contient le
  * séparateur, un guillemet ou un saut de ligne. Une cellule qui commence par
- * `=`, `+`, `-` ou `@` est préfixée d'une apostrophe : un tableur l'exécuterait
- * sinon comme une formule (injection CSV) — aucune ne l'est aujourd'hui, mais
- * le registre est un texte qu'on éditera.
+ * `=`, `+`, `-`, `@`, une tabulation ou un retour chariot (liste OWASP) est
+ * préfixée d'une apostrophe : un tableur l'exécuterait sinon comme une formule
+ * (injection CSV) — aucune ne l'est aujourd'hui, mais le registre est un texte
+ * qu'on éditera.
  */
 export function csvCell(value: string): string {
-  const safe = /^[=+\-@]/.test(value) ? `'${value}` : value;
+  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
   return /[";\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 

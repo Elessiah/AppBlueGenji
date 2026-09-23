@@ -81,6 +81,12 @@ describe("PROCESSING_ACTIVITIES", () => {
     }
   });
 
+  it("ne présente pas comme courte une trace conservée avec le match", () => {
+    const retention = byRef("T04").retention.join(" ");
+    expect(retention).not.toMatch(/durée de vie du match/);
+    expect(retention).toMatch(/sans limite/);
+  });
+
   it("ne déclare aucune adresse e-mail collectée", () => {
     expect(byRef("T01").dataCategories.join(" ")).toMatch(/aucune adresse e-mail/i);
   });
@@ -126,7 +132,7 @@ describe("csvCell", () => {
     expect(csvCell("a\nb")).toBe('"a\nb"');
   });
 
-  it.each(["=SOMME(A1)", "+1", "-1", "@cmd"])("neutralise une formule : %s", (value) => {
+  it.each(["=SOMME(A1)", "+1", "-1", "@cmd", "\t=SOMME(A1)", "\r=SOMME(A1)"])("neutralise une formule : %j", (value) => {
     expect(csvCell(value).replace(/^"|"$/g, "")).toBe(`'${value}`);
   });
 });
