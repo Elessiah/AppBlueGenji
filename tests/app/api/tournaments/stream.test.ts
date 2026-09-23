@@ -156,6 +156,38 @@ describe("GET /api/tournaments/[id]/stream — palier décidé par le serveur", 
     expect(message.tier).toBe("PRIORITY");
   });
 
+  it("sert le palier standard à un engagé qui le demande (onglet caché, `?quiet=1`)", async () => {
+    // Régime de charge (`lib/shared/client-power.ts`) : un onglet caché depuis
+    // une minute, hors match, se déclasse lui-même pour libérer la salle.
+    (getVisibleTournamentSnapshot as jest.Mock).mockResolvedValue(
+      snapshotWith([{ teamId: 42 }]) as never,
+    );
+    (getTournamentViewerContext as jest.Mock).mockResolvedValue(
+      viewerWith({ myTeamId: 42 }) as never,
+    );
+    const message = await firstMessage(await GET(new Request("http://t/?quiet=1"), params("5")));
+    expect(message.tier).toBe("STANDARD");
+  });
+
+  it("ne promeut jamais un spectateur, quoi que dise la requête", async () => {
+    // Le paramètre ne sait que déclasser : toute autre valeur est ignorée, et
+    // aucune ne fait passer un spectateur devant.
+    for (const url of ["http://t/?quiet=0", "http://t/?quiet=PRIORITY", "http://t/?tier=PRIORITY"]) {
+      const message = await firstMessage(await GET(new Request(url), params("5")));
+      expect(message.tier).toBe("STANDARD");
+    }
+  });
+
+  it("ne déclasse que sur `quiet=1` exactement", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(
+      { id: 1, isAdmin: false, roles: ["ARBITRE"] } as never,
+    );
+    const kept = await firstMessage(await GET(new Request("http://t/?quiet=true"), params("5")));
+    expect(kept.tier).toBe("PRIORITY");
+    const quiet = await firstMessage(await GET(new Request("http://t/?quiet=1"), params("5")));
+    expect(quiet.tier).toBe("STANDARD");
+  });
+
   it("laisse en standard une équipe qui n'est pas inscrite ici", async () => {
     // Avoir une équipe ne suffit pas : il faut être engagé dans CE tournoi.
     (getTournamentViewerContext as jest.Mock).mockResolvedValue(

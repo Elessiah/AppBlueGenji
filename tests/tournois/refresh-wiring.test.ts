@@ -44,7 +44,12 @@ describe("flux SSE — le contrat de la route", () => {
     // Un client ne doit pas pouvoir se déclarer prioritaire : le palier se lit
     // sur la session et sur l'instantané, jamais sur la requête. Qui y entre est
     // vérifié par le comportement (`app/api/tournaments/stream.test.ts`).
-    expect(stream).toMatch(/const tier = resolveRefreshTier\(/);
+    // La seule entrée lue sur la requête est `?quiet=1`, et elle ne sait que
+    // **déclasser** : un onglet caché demande le palier spectateur
+    // (`lib/shared/client-power.ts`), jamais l'inverse.
+    expect(stream).toMatch(
+      /const tier = wantsQuietStream\(req\)\s*\?\s*"STANDARD"\s*:\s*resolveRefreshTier\(/,
+    );
     expect(stream).toMatch(/const isParticipant =[\s\S]*?registrations\.some/);
   });
 
