@@ -13,7 +13,6 @@ import {
   accountDeletionOutcome,
   RETENTION_UNKNOWN,
   type AccountDeletionPlan,
-  type AccountRetentionReason,
   type ConfirmationSubject,
 } from "@/lib/shared/account-deletion";
 import { useToast } from "@/components/ui/toast";
@@ -188,8 +187,14 @@ export default function ProfilePage() {
     // consentait alors à devenir anonyme et pouvait être effacé entièrement.
     // Sur un geste irréversible, on décrit l'incertitude plutôt que d'inventer
     // la moitié rassurante.
+    //
+    // `previewed` part de la **même** valeur que `subject`, et non de `null` :
+    // sur ce type, `null` n'est pas « je ne sais pas » mais « il ne restera
+    // rien ». Initialisé à `null`, un aperçu en échec faisait annoncer un
+    // effacement complet dès que la réponse du serveur devenait illisible —
+    // l'unique endroit du fichier où l'inconnu redevenait une promesse.
     let subject: ConfirmationSubject = RETENTION_UNKNOWN;
-    let previewed: AccountRetentionReason | null = null;
+    let previewed: ConfirmationSubject = RETENTION_UNKNOWN;
     try {
       const preview = await fetch("/api/profile/deletion", { cache: "no-store" });
       if (preview.ok) {
@@ -215,7 +220,7 @@ export default function ProfilePage() {
       // une absence de réponse. Le `mode` sert donc de témoin — il dit que le
       // serveur a bien répondu, là où un `??` sur le motif retomberait sur
       // l'aperçu au moment précis où le serveur annonce qu'il n'a rien gardé.
-      const applied = payload.mode ? payload.reason ?? null : previewed;
+      const applied: ConfirmationSubject = payload.mode ? payload.reason ?? null : previewed;
       showSuccess(accountDeletionOutcome(applied));
       setTimeout(() => {
         window.location.href = "/";

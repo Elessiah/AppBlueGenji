@@ -172,6 +172,17 @@ describe("accountDeletionOutcome", () => {
     expect(accountDeletionOutcome("OWNED_TEAMS")).not.toContain("statistiques");
     expect(accountDeletionOutcome("TOURNAMENTS")).toContain("statistiques");
   });
+
+  it("ne promet ni effacement ni conservation sur une valeur inconnue", () => {
+    // `null` **est** une réponse (« il ne reste rien ») ; l'inconnu n'en est
+    // pas une. Le repli portait la phrase de `null`, la plus définitive des
+    // deux : un aperçu en échec suivi d'une réponse illisible annonçait donc
+    // une disparition totale que rien n'avait prouvée.
+    const unknown = accountDeletionOutcome(RETENTION_UNKNOWN);
+    expect(unknown).not.toContain("aucune trace");
+    expect(unknown).not.toContain("anonyme");
+    expect(unknown).toContain("supprimé");
+  });
 });
 
 describe("accountDeletionErrorMessage", () => {

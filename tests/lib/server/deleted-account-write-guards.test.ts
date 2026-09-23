@@ -8,6 +8,7 @@ import {
   createOrGetBlizzardUser,
   createOrGetDiscordUser,
   getUserIdByPseudo,
+  setUserRoles,
   updateOwnProfile,
 } from "@/lib/server/users-service";
 
@@ -113,6 +114,38 @@ describe("getUserIdByPseudo — un compte supprimé ne se rattache plus", () => 
     // `null` est exactement ce que les deux appelants traduisent en
     // `USER_NOT_FOUND` : rien à apprendre de plus chez eux.
     await expect(getUserIdByPseudo("compte_supprime_412")).resolves.toBeNull();
+  });
+});
+
+describe("setUserRoles — la course se dit, elle ne se tait pas", () => {
+  beforeEach(() => jest.clearAllMocks());
+  afterEach(() => jest.restoreAllMocks());
+
+  it("refuse le rôle posé sur une ligne morte au lieu de l'annoncer enregistré", async () => {
+    // Le `SELECT` trouve un compte vivant, la suppression se glisse dans le
+    // `await`, l'`UPDATE` n'apparie plus rien. Sans ce refus, l'écran
+    // d'administration affichait les rôles comme sauvegardés alors qu'aucune
+    // ligne n'avait bougé.
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([[{ id: 7 }]])
+      .mockResolvedValueOnce([{ affectedRows: 0 }]);
+    await mockDb(execute);
+
+    await expect(setUserRoles(7, ["ARBITRE"])).rejects.toThrow("USER_NOT_FOUND");
+  });
+
+  it("rend les rôles normalisés quand l'écriture a bien apparié la ligne", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([[{ id: 7 }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+    await mockDb(execute);
+
+    await expect(setUserRoles(7, ["ARBITRE"])).resolves.toEqual(["ARBITRE"]);
+
+    const [sql] = execute.mock.calls[1] as [string];
+    expect(sql).toMatch(/WHERE id = \? AND is_deleted = 0/);
   });
 });
 

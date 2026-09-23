@@ -167,9 +167,18 @@ export function accountDeletionConfirmation(
   }
 }
 
-/** Le message rendu une fois la suppression faite. */
+/**
+ * Le message rendu une fois la suppression faite.
+ *
+ * `null` est ici une **réponse** — « il ne reste rien » —, et c'est pourquoi il
+ * porte son propre `case` au lieu d'être laissé au `default` : le repli sert à
+ * ce qu'on n'attendait pas, et il ne doit alors promettre ni la conservation ni
+ * l'effacement. Même doctrine que `accountDeletionConfirmation`, pour la même
+ * raison : de ces deux phrases, celle de l'effacement est la plus définitive,
+ * et l'écran ne peut pas l'affirmer sur une valeur qu'il n'a pas comprise.
+ */
 export function accountDeletionOutcome(
-  reason: AccountRetentionReason | null,
+  reason: ConfirmationSubject,
 ): string {
   switch (reason) {
     case "TOURNAMENTS":
@@ -178,8 +187,10 @@ export function accountDeletionOutcome(
       return "Compte supprimé. Tes tournois gardent un organisateur anonyme.";
     case "OWNED_TEAMS":
       return "Compte supprimé. Ton équipe garde un propriétaire anonyme.";
-    default:
+    case null:
       return "Compte effacé. Il ne reste aucune trace de ton passage sur le site.";
+    default:
+      return "Compte supprimé.";
   }
 }
 

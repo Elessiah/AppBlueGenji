@@ -85,7 +85,23 @@ describe("bg_team_invitations.created_by — l'auteur devient facultatif", () =>
       SQL.indexOf("REFERENTIAL_CONSTRAINTS"),
       SQL.indexOf("`information_schema` inaccessible"),
     );
-    expect([...block.matchAll(/\} catch \{/g)].length).toBeGreaterThanOrEqual(4);
+    expect([...block.matchAll(/\} catch (?:\(error\) )?\{/g)].length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("journalise les deux issues qui laissent le schéma dans la règle d'avant", () => {
+    // « Se retente au prochain démarrage » est une promesse, pas un constat.
+    // Deux issues la démentent sans lever : la clé qu'on n'arrive plus à
+    // reposer (droits manquants) et l'`information_schema` illisible, qui ne
+    // vérifie rien. Dans les deux cas l'ancienne règle `CASCADE` survit, et
+    // effacer le compte d'une manageuse emporte les invitations encore en
+    // attente qu'elle avait adressées à des tiers. Avalées en silence, elles
+    // sont indiscernables du cas nominal.
+    const block = SQL.slice(
+      SQL.indexOf("REFERENTIAL_CONSTRAINTS"),
+      SQL.indexOf("bg_bureau_members"),
+    );
+    expect([...block.matchAll(/console\.warn\(/g)].length).toBe(2);
+    expect(block).toContain("fk_bg_team_inv_creator non reposée");
   });
 
   it("se joue après le `CREATE TABLE`, sinon la garde ne décide rien", () => {

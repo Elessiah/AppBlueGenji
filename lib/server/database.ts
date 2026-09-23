@@ -1002,13 +1002,28 @@ async function runMigrations(db: Pool): Promise<void> {
           ADD CONSTRAINT fk_bg_team_inv_creator FOREIGN KEY (created_by)
             REFERENCES bg_users(id) ON DELETE SET NULL
         `);
-      } catch {
+      } catch (error) {
         // Reposée au prochain démarrage : la condition la redemandera tant
-        // qu'elle n'est pas en `SET NULL`.
+        // qu'elle n'est pas en `SET NULL`. Mais « se retente » est une
+        // promesse, pas un constat : avalée sans un mot, une clé qui ne se
+        // repose **jamais** (droits manquants) laisse la règle d'avant, et
+        // effacer le compte d'une manageuse emporte alors en cascade les
+        // invitations encore en attente qu'elle avait adressées à des tiers.
+        // Une ligne au journal est le seul moyen de distinguer « c'est passé
+        // au démarrage suivant » de « ça ne passera plus ».
+        console.warn(
+          "[db] fk_bg_team_inv_creator non reposée en SET NULL — nouvel essai au prochain démarrage",
+          error,
+        );
       }
     }
-  } catch {
-    // `information_schema` inaccessible : rien de tenté, rien de cassé.
+  } catch (error) {
+    // `information_schema` inaccessible : rien de tenté, rien de cassé — mais
+    // rien de vérifié non plus, et la clé peut être restée en `CASCADE`.
+    console.warn(
+      "[db] règle de fk_bg_team_inv_creator non vérifiable (information_schema)",
+      error,
+    );
   }
 
   // Migration: Membres du bureau de l'association (gérables par les admins)

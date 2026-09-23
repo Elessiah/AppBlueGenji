@@ -95,11 +95,21 @@ D'abord à l'**état intermédiaire** : le détachement des visites et le `DELET
 expiré, `RESTRICT`) laissait un compte bien vivant dont la fréquentation était
 anonymisée pour toujours.
 
-Ensuite à la **course**, et c'est là que le verrou sert. La plupart des traces
-sont tenues par des clés étrangères : une inscription d'équipe passe par
-`bg_team_members`, dont la clé refuserait de pointer vers un compte effacé, et
-`organizer_user_id` est en `RESTRICT` — la base tranche toute seule, bruyamment.
-Une seule ne l'est pas : **l'entrée solo**. Rien n'empêcherait d'en créer une
+Ensuite à la **course**, et c'est là que le verrou sert. Une partie des traces
+est tenue par des clés étrangères — `organizer_user_id` est en `RESTRICT`, la
+base tranche alors toute seule et bruyamment. Deux ne le sont pas, et il faut
+les distinguer.
+
+**L'inscription d'une équipe n'est pas couverte, et c'est assumé** : elle n'écrit
+que `bg_tournament_registrations`, qui ne référence que l'équipe, sans jamais
+toucher `bg_team_members` — aucune clé étrangère n'arbitre donc cette
+course-là. Un membre qui supprime son compte à l'instant où sa capitaine engage
+l'équipe est effacé alors qu'il figurait au roster engagé. Rien ne pend (son
+appartenance part en cascade), l'équipe garde son inscription et ses matchs, et
+ce qu'il perd est son propre historique — ce qu'il venait de demander. La fermer
+coûterait un verrou sur la ligne de **chaque** membre à chaque inscription.
+
+**L'entrée solo, elle, est fermée** : rien n'empêcherait d'en créer une
 pour un compte que la transaction voisine vient d'effacer, et elle pendrait alors
 sur un identifiant disparu — tout `JOIN bg_users` la laisserait silencieusement
 de côté, nom et logo figés à jamais. `ensureSoloEntry` pose donc **le même

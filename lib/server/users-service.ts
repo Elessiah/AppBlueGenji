@@ -1585,10 +1585,18 @@ export async function setUserRoles(
   // plateforme posé sur une ligne anonymisée — invisible de `getCurrentUser`,
   // qui filtre déjà les lignes mortes, mais bien listé à l'écran des rôles, qui
   // rend les comptes supprimés.
-  await db.execute(
+  const [result] = await db.execute<ResultSetHeader>(
     `UPDATE bg_users SET is_admin = ?, platform_roles_json = ? WHERE id = ? AND is_deleted = 0`,
     [isAdmin ? 1 : 0, JSON.stringify(nonAdminRoles), targetUserId],
   );
+  // Et la course se **dit**, elle ne se tait pas : `affectedRows` compte les
+  // lignes appariées (mysql2 pose `FOUND_ROWS`), donc zéro ne signifie pas
+  // « rien à modifier » mais « la ligne vivante a disparu entre les deux ».
+  // Rendre `sanitized` sans regarder affichait les rôles comme enregistrés à
+  // l'écran d'administration alors que rien ne l'avait été. C'est le refus que
+  // le `SELECT` ci-dessus donne déjà, et le même geste que `updateOwnProfile`
+  // et `updateUserAvatar`, qui refusent bruyamment sur la même condition.
+  if (result.affectedRows === 0) throw new Error("USER_NOT_FOUND");
 
   return sanitized;
 }
