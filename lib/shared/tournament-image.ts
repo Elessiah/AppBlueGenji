@@ -90,9 +90,20 @@ export function parseTournamentImage(
   return {
     url: safeUrl,
     fit: isTournamentImageFit(fit) ? fit : DEFAULT_IMAGE_SETTINGS.fit,
-    focusX: clampFocus(Number(focusX)),
-    focusY: clampFocus(Number(focusY)),
+    focusX: readStoredFocus(focusX),
+    focusY: readStoredFocus(focusY),
   };
+}
+
+/**
+ * Point focal lu en base : un nombre (ou une chaîne numérique, selon le
+ * pilote), borné ; tout le reste — `NULL` compris — vaut le centre. `Number`
+ * seul ne suffit pas : `Number(null)` vaut 0, le bord haut/gauche.
+ */
+function readStoredFocus(value: unknown): number {
+  if (typeof value !== "number" && typeof value !== "string") return DEFAULT_IMAGE_FOCUS;
+  if (typeof value === "string" && value.trim() === "") return DEFAULT_IMAGE_FOCUS;
+  return clampFocus(Number(value));
 }
 
 export type TournamentImageSettingsError = "INVALID_IMAGE_FIT" | "INVALID_IMAGE_FOCUS";

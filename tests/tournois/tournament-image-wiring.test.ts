@@ -71,6 +71,23 @@ describe("écrans", () => {
     expect(page).toContain("onEditImage={() => setImageDialogOpen(true)}");
   });
 
+  it("la modale se réaligne sur l'image du flux, mais jamais pendant son propre envoi", () => {
+    const dialog = read("app/(secured)/tournois/[id]/_components/TournamentImageDialog.tsx");
+    expect(dialog).toContain("if (!busy && imageFingerprint(base) !== imageFingerprint(image)) {");
+    expect(dialog).toContain("resyncImageDraft(base, image, value)");
+    // CLAUDE.md : une zone qui défile passe par <ScrollArea>.
+    expect(dialog).toContain('<ScrollArea orientation="y"');
+    expect(dialog).not.toMatch(/overflowY:\s*"auto"/);
+  });
+
+  it("la liste charge en priorité les premiers bandeaux, dans l'ordre d'affichage", () => {
+    const page = read("app/(secured)/tournois/page.tsx");
+    expect(page).toMatch(/const priorityBanners = priorityBannerIds\(\[/);
+    for (const card of ["StateCard t={t}", "RunningCard key={t.id} t={t}", "RegistrationCard key={t.id} t={t}", "UpcomingCard key={t.id} t={t}"]) {
+      expect(page).toContain(`<${card} priority={priorityBanners.has(t.id)} />`);
+    }
+  });
+
   it("les quatre cartes de /tournois posent le bandeau et la pastille", () => {
     for (const name of ["FinishedCard", "RegistrationCard", "RunningCard", "UpcomingCard"]) {
       const source = read(`app/(secured)/tournois/cards/${name}.tsx`);

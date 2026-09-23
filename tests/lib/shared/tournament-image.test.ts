@@ -69,7 +69,10 @@ describe("parseTournamentImage — lecture tolérante d'une ligne de base", () =
 
   it("borne le point focal et recentre une valeur illisible", () => {
     expect(parseTournamentImage(SERVED, "COVER", 140, -8)).toMatchObject({ focusX: 100, focusY: 0 });
-    expect(parseTournamentImage(SERVED, "COVER", "abc", null)).toMatchObject({ focusX: 50, focusY: 0 });
+    expect(parseTournamentImage(SERVED, "COVER", "abc", null)).toMatchObject({ focusX: 50, focusY: 50 });
+    expect(parseTournamentImage(SERVED, "COVER", "", true)).toMatchObject({ focusX: 50, focusY: 50 });
+    // Un vrai zéro reste un zéro : seul l'absent vaut le centre.
+    expect(parseTournamentImage(SERVED, "COVER", 0, "0")).toMatchObject({ focusX: 0, focusY: 0 });
     expect(parseTournamentImage(SERVED, "COVER", undefined, Number.NaN)).toMatchObject({
       focusX: 50,
       focusY: 50,

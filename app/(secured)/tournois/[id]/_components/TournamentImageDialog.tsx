@@ -48,7 +48,10 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
   const [busy, setBusy] = useState(false);
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
 
-  if (imageFingerprint(base) !== imageFingerprint(image)) {
+  // Jamais pendant l'envoi : le serveur publie la nouvelle image par le flux
+  // avant de répondre, et notre propre enregistrement passerait pour un conflit.
+  // Un envoi raté se réaligne au rendu suivant.
+  if (!busy && imageFingerprint(base) !== imageFingerprint(image)) {
     const next = resyncImageDraft(base, image, value);
     setBase(image);
     setValue(next.value);
