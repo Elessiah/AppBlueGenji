@@ -59,8 +59,16 @@ export function BotServersTable({ payload }: { payload: BotServersPayload | null
   // `{"servers": [null]}` est un tableau, elle passe la première garde, et
   // `s.status` lève au premier tour de boucle — exactement le 500 que la ligne
   // au-dessus vient d'écarter, une indirection plus loin.
+  //
+  // `!Array.isArray(s)` n'est pas une précaution de plus : `typeof [] vaut
+  // "object"`, si bien qu'une charge `{"servers": [[], []]}` traversait un
+  // prédicat qui annonce pourtant `s is BotServerEntry`. Elle ne levait pas —
+  // elle rendait deux rangées vides que `meta` comptait comme « 2 SERVEURS
+  // AFFICHÉS », c'est-à-dire un fait affirmé sur une réponse illisible, ce que
+  // la règle du panneau juste en dessous interdit. Un prédicat de type qui
+  // ment est pire qu'une garde absente : tout ce qui le suit le croit.
   const list = (rows ?? []).filter(
-    (s): s is BotServerEntry => s !== null && typeof s === "object",
+    (s): s is BotServerEntry => s !== null && typeof s === "object" && !Array.isArray(s),
   );
 
   // **Trois faits, jamais un seul chiffre.** Ramener l'absence de réponse à une

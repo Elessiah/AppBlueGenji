@@ -363,6 +363,18 @@ describe("BotServersTable — le panneau ne dit que ce qu'il sait", () => {
     expect(render([])).toContain("AUCUN SERVEUR");
   });
 
+  it("n'accepte pas un tableau comme entrée de serveur", () => {
+    // `typeof [] === "object"` : sans `!Array.isArray`, une charge
+    // `{"servers": [[], []]}` traversait un prédicat qui annonce pourtant
+    // `s is BotServerEntry`. Elle ne levait pas — elle rendait deux rangées
+    // vides comptées « 2 SERVEURS AFFICHÉS », un fait affirmé sur une réponse
+    // illisible.
+    const html = renderToStaticMarkup(<BotServersTable payload={payload([[], []])} />);
+    expect(html).toContain("RÉPONSE ILLISIBLE");
+    expect(html).not.toContain("SERVEURS AFFICHÉS");
+    expect([...html.matchAll(/class="srv-row"/g)]).toHaveLength(0);
+  });
+
   it("ne compte que les rangées qu'il montre quand une entrée est écartée", () => {
     const html = renderToStaticMarkup(
       <BotServersTable payload={payload([null, server({ id: "1" }), server({ id: "2" })])} />,
