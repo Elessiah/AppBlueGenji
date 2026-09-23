@@ -92,6 +92,7 @@
   background: var(--blue-100);
   box-shadow: 0 0 10px var(--blue-300);
   animation: tp-head-pulse 1.8s ease-in-out infinite;
+  animation-play-state: var(--deco-anim-state);
 }
 
 /* --- Jalons ---------------------------------------------- */
@@ -142,6 +143,7 @@
   background: var(--blue-300);
   box-shadow: 0 0 0 5px rgba(var(--blue-rgb), 0.12), 0 0 16px rgba(var(--blue-rgb), 0.7);
   animation: tp-node-pulse 2.2s ease-in-out infinite;
+  animation-play-state: var(--deco-anim-state);
 }
 
 .caption {

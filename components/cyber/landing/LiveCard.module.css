@@ -222,6 +222,7 @@
 
 .streamBanner .streamLabel {
   animation: liveCardPulse 2s ease-in-out infinite;
+  animation-play-state: var(--deco-anim-state);
 }
 
 /* Acces au direct : un vrai bouton, et seulement quand le match est a

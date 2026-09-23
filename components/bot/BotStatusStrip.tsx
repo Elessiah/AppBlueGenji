@@ -9,9 +9,12 @@ import {
   botUptimeLabel,
 } from "@/lib/shared/bot-status-summary";
 import { botPayloadNumber, botPayloadText } from "@/lib/shared/bot-payload";
+import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 
 export function BotStatusStrip({ status }: { status: BotStatus | null }) {
   const [uptime, setUptime] = useState("—");
+  // Onglet caché : l'horloge s'arrête, et la relecture au retour la recale.
+  const { clocks } = useClientPower();
 
   // Le calcul lui-même vit dans `botUptimeLabel`, pur et testé : enfermé ici,
   // il était hors de portée des tests de rendu (`renderToStaticMarkup`
@@ -29,10 +32,10 @@ export function BotStatusStrip({ status }: { status: BotStatus | null }) {
     // déjà leurs valeurs.
     setUptime(first ?? "—");
     // Rien à compter : pas d'horloge à faire tourner pour réécrire un tiret.
-    if (first === null) return;
+    if (first === null || !clocks) return;
     const id = setInterval(() => setUptime(botUptimeLabel(status, Date.now()) ?? "—"), 1000);
     return () => clearInterval(id);
-  }, [status]);
+  }, [status, clocks]);
 
   const statusLabel = botStatusOf(status);
   const version = botPayloadText(status?.version);

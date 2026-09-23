@@ -5,6 +5,7 @@ import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
 import { RecruitmentHighlight } from "@/components/recruitment-highlight";
 import { VisitTracker } from "@/components/visit-tracker";
+import { ClientPowerRoot } from "@/components/client-power-root";
 import { GoogleOneTap } from "@/components/auth/google-one-tap";
 import { PrivacyChangesModal } from "@/components/privacy/PrivacyChangesModal";
 import { getHighlightedAd } from "@/lib/server/recruitment-service";
@@ -182,6 +183,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className={`${titleFont.variable} ${bodyFont.variable} ${sansFont.variable} ${monoFont.variable} ${displayFont.variable}`}>
         <ToastProvider>
           <VisitTracker />
+          <ClientPowerRoot />
           {!user && googleClientId && <GoogleOneTap clientId={googleClientId} nonce={nonce} />}
           {/* Deux modales ne se superposent pas : tant qu'un choix de
               confidentialité est dû, la mise en avant du recrutement se tait

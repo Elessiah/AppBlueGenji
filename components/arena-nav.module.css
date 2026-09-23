@@ -114,6 +114,7 @@
   border: 1px solid rgba(90, 200, 255, 0.12);
   border-radius: 50%;
   animation: ringSpin 18s linear infinite;
+  animation-play-state: var(--deco-anim-state);
   pointer-events: none;
 }
 
@@ -124,6 +125,7 @@
   border: 1px solid rgba(167, 115, 255, 0.1);
   border-radius: 50%;
   animation: ringSpin 28s linear infinite reverse;
+  animation-play-state: var(--deco-anim-state);
   pointer-events: none;
 }
 

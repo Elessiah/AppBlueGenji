@@ -3,7 +3,11 @@ import type { TournamentDetail } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { REFRESH_CADENCE, FOCUS_REFRESH_MIN_INTERVAL_MS } from "@/lib/shared/refresh-tiers";
 import { mapError } from "../_lib/error-map";
-import { playScoreReady } from "../_lib/sounds";
+import { playAlertChime } from "../_lib/sounds";
+import { clearAttention, raiseAttention } from "../_lib/attention";
+import { isPersonalAlert, touchesViewerMatches, viewerAlert } from "@/lib/shared/viewer-alerts";
+import { nextViewerMatchFocusChangeAt, viewerMatchFocus } from "@/lib/shared/client-power";
+import { useClientPower, useMatchFocusLease } from "@/lib/shared/hooks/useClientPower";
 import {
   applyLiveMessage,
   fatalFailure,
@@ -11,7 +15,6 @@ import {
   parseLiveMessage,
   reconnectDelayMs,
   shouldCommitFetched,
-  shouldPlayScoreReady,
   shouldRefreshViewerContext,
   type LiveFailure,
   type LiveState,
@@ -38,9 +41,27 @@ import {
  *    vieilli, ce qui remplace le réflexe de recharger ;
  * 4. **sondage de secours** — uniquement tant que le flux est coupé, à la
  *    cadence du palier accordé par le serveur.
+ *
+ * Et une règle de sobriété, le **régime de charge** (`lib/shared/client-power.ts`) :
+ * ce qui est *reçu* et ce qui est *rendu* sont deux choses. Tout instantané est
+ * intégré sur-le-champ — c'est sur lui qu'on détecte « ton match est prêt »,
+ * qu'on sonne et qu'on écrit le titre d'onglet —, mais il n'est **rendu** que si
+ * quelqu'un peut le voir : tout de suite quand la page est regardée ou sur un
+ * second écran, regroupé toutes les cinq secondes pour un joueur en match qui
+ * regarde son jeu (sauf ce qui touche son propre match), et pas avant le retour
+ * quand l'onglet est caché. Redessiner l'arbre d'un gros plateau à chaque score
+ * d'un autre match, c'était prendre au jeu du joueur des images par dizaines.
+ *
+ * Onglet caché depuis une minute, hors match : le flux est rouvert au palier
+ * spectateur (`?quiet=1`). Les annonces arrivent encore — à la cadence des
+ * spectateurs —, et le budget de sortie de la salle revient à ceux qui jouent.
  */
+/** Plafond d'un `setTimeout` (~24,8 jours) : au-delà, il se déclencherait tout de suite. */
+const MAX_TIMEOUT_MS = 2_147_483_647;
+
 export function useTournamentLive(tournamentId: number) {
   const { showError } = useToast();
+  /** État **rendu** — peut retarder sur `stateRef`, qui est l'état reçu. */
   const [state, setState] = useState<LiveState>(INITIAL_LIVE_STATE);
   const [isLive, setIsLive] = useState(false);
   /** Échec dont on ne se relèvera pas seul (session expirée, tournoi supprimé). */
@@ -48,24 +69,132 @@ export function useTournamentLive(tournamentId: number) {
 
   // Refs plutôt qu'états : ces valeurs pilotent les minuteurs, elles ne doivent
   // pas provoquer de rendu ni relancer l'effet.
+  /** Dernier état **reçu** : la source de vérité, rendue ou non. */
   const stateRef = useRef<LiveState>(INITIAL_LIVE_STATE);
   const lastUpdateAtRef = useRef(0);
   const lastFetchAtRef = useRef(0);
   /** Rouvre le flux. Renseigné par l'effet, remis à null au démontage. */
   const reconnectRef = useRef<(() => void) | null>(null);
 
-  const commit = useCallback((next: LiveState) => {
-    const previous = stateRef.current;
-    if (next === previous) return;
+  const policy = useClientPower();
+  const policyRef = useRef(policy);
+  policyRef.current = policy;
+  /** Un état reçu attend d'être rendu. */
+  const pendingRenderRef = useRef(false);
+  const renderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Flux ouvert au palier spectateur (`?quiet=1`). */
+  const quietRef = useRef(false);
 
-    stateRef.current = next;
-    lastUpdateAtRef.current = Date.now();
-    setState(next);
+  /** Le lecteur a une rencontre en cours — lu sur l'état reçu, pas sur le rendu. */
+  const [matchFocus, setMatchFocus] = useState(false);
+  const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useMatchFocusLease(matchFocus);
 
-    if (next.detail && shouldPlayScoreReady(previous.detail, next.detail)) {
-      playScoreReady();
+  /** Rend le dernier état reçu. */
+  const flushRender = useCallback(() => {
+    pendingRenderRef.current = false;
+    if (renderTimerRef.current !== null) {
+      clearTimeout(renderTimerRef.current);
+      renderTimerRef.current = null;
+    }
+    setState(stateRef.current);
+  }, []);
+
+  /**
+   * Réévalue le régime `MATCH` sur l'état reçu, et se réveille seul à l'approche
+   * d'un horaire annoncé — le seul changement qu'aucun instantané n'apporte.
+   */
+  const updateMatchFocus = useCallback(function update() {
+    if (focusTimerRef.current !== null) {
+      clearTimeout(focusTimerRef.current);
+      focusTimerRef.current = null;
+    }
+    const detail = stateRef.current.detail;
+    const now = Date.now();
+    setMatchFocus(viewerMatchFocus(detail, now));
+    const at = nextViewerMatchFocusChangeAt(detail, now);
+    if (at !== null) {
+      focusTimerRef.current = setTimeout(update, Math.min(at - now, MAX_TIMEOUT_MS));
     }
   }, []);
+
+  const commit = useCallback(
+    (next: LiveState) => {
+      const previous = stateRef.current;
+      if (next === previous) return;
+
+      stateRef.current = next;
+      lastUpdateAtRef.current = Date.now();
+
+      // Détecté sur ce qui est **reçu** : l'annonce part même quand rien n'est
+      // rendu — c'est justement quand le lecteur ne regarde pas qu'elle sert.
+      if (next.detail) {
+        const alert = viewerAlert(previous.detail, next.detail);
+        if (alert) {
+          if (isPersonalAlert(alert)) playAlertChime(alert);
+          raiseAttention(alert);
+        }
+      }
+      updateMatchFocus();
+
+      const delay = policyRef.current.snapshotRenderDelayMs;
+      if (delay === 0) {
+        flushRender();
+        return;
+      }
+      pendingRenderRef.current = true;
+      // Onglet caché : rien avant le retour (l'effet sur le régime s'en charge).
+      if (delay === null) return;
+      // Le match du lecteur ne se regroupe pas : c'est ce qu'il regarde.
+      const urgent =
+        !previous.detail || !next.detail || touchesViewerMatches(previous.detail, next.detail);
+      if (urgent) {
+        flushRender();
+        return;
+      }
+      if (renderTimerRef.current === null) {
+        renderTimerRef.current = setTimeout(flushRender, delay);
+      }
+    },
+    [flushRender, updateMatchFocus],
+  );
+
+  // Changement de régime : ce qui attendait est rendu dès qu'on peut le voir.
+  const renderDelay = policy.snapshotRenderDelayMs;
+  useEffect(() => {
+    if (!pendingRenderRef.current) return;
+    if (renderDelay === 0) flushRender();
+    else if (renderDelay !== null && renderTimerRef.current === null) {
+      renderTimerRef.current = setTimeout(flushRender, renderDelay);
+    }
+  }, [renderDelay, flushRender]);
+
+  // Palier spectateur pour un onglet caché hors match ; palier normal au retour.
+  const quietAfter = policy.quietStreamAfterMs;
+  useEffect(() => {
+    if (quietAfter === null) {
+      if (quietRef.current) {
+        quietRef.current = false;
+        reconnectRef.current?.();
+      }
+      return;
+    }
+    const timer = setTimeout(() => {
+      quietRef.current = true;
+      reconnectRef.current?.();
+    }, quietAfter);
+    return () => clearTimeout(timer);
+  }, [quietAfter]);
+
+  // Au démontage : aucun minuteur ni titre d'appel ne survit à la page.
+  useEffect(
+    () => () => {
+      if (renderTimerRef.current !== null) clearTimeout(renderTimerRef.current);
+      if (focusTimerRef.current !== null) clearTimeout(focusTimerRef.current);
+      clearAttention();
+    },
+    [],
+  );
 
   /**
    * Lecture REST. Chemin de secours uniquement : le flux se suffit à lui-même.
@@ -122,6 +251,23 @@ export function useTournamentLive(tournamentId: number) {
       reconnectRef.current?.();
     }
   }, [load]);
+
+  // Même remise à zéro pour le régime de charge : un rendu en attente, un match
+  // en cours ou un titre d'appel du tournoi précédent n'ont rien à faire ici.
+  useEffect(() => {
+    pendingRenderRef.current = false;
+    if (renderTimerRef.current !== null) {
+      clearTimeout(renderTimerRef.current);
+      renderTimerRef.current = null;
+    }
+    if (focusTimerRef.current !== null) {
+      clearTimeout(focusTimerRef.current);
+      focusTimerRef.current = null;
+    }
+    quietRef.current = false;
+    clearAttention();
+    setMatchFocus(false);
+  }, [tournamentId]);
 
   /**
    * Repart de zéro quand on change de tournoi.
@@ -204,7 +350,8 @@ export function useTournamentLive(tournamentId: number) {
       if (cancelled || stopped) return;
 
       try {
-        source = new EventSource(`/api/tournaments/${tournamentId}/stream`);
+        const quiet = quietRef.current ? "?quiet=1" : "";
+        source = new EventSource(`/api/tournaments/${tournamentId}/stream${quiet}`);
       } catch {
         startFallback();
         scheduleReconnect();
@@ -312,6 +459,11 @@ export function useTournamentLive(tournamentId: number) {
 
   return {
     tournament: state.detail,
+    /**
+     * Le lecteur a une rencontre en cours (régime `MATCH`,
+     * `lib/shared/client-power.ts`) — lu sur le dernier état reçu.
+     */
+    matchFocus,
     matches: state.detail?.matches ?? [],
     isLive,
     /**

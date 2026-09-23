@@ -2,6 +2,10 @@
 
 import Image from "next/image";
 import { useEffect, useRef } from "react";
+import { useClientPower } from "@/lib/shared/hooks/useClientPower";
+
+/** Pause des animations décoratives, pilotée par `ClientPowerRoot`. */
+const DECO_ANIM_STATE = "var(--deco-anim-state)";
 
 interface LogoWithGlowProps {
   src: string;
@@ -32,7 +36,33 @@ export function LogoWithGlow({
   const target = useRef({ x: 0, y: 0 });
   const current = useRef({ x: 0, y: 0 });
 
+  // Inclinaison qui suit la souris : la boucle ne tourne que **pendant** que le
+  // halo rattrape le pointeur, et plus du tout quand la page n'est pas regardée
+  // ou que le lecteur est en match (`lib/shared/client-power.ts`). Elle tournait
+  // auparavant à la fréquence de l'écran pour toujours, souris immobile — 144
+  // images par seconde sur un écran de joueur, pour un halo figé.
+  const { decorativeMotion } = useClientPower();
+  const tilts = size !== "sm" && decorativeMotion;
+
   useEffect(() => {
+    if (!tilts) return;
+
+    let raf = 0;
+    const tick = () => {
+      raf = 0;
+      const el = wrapRef.current;
+      if (!el) return;
+      const t = target.current;
+      const c = current.current;
+      c.x += (t.x - c.x) * 0.05;
+      c.y += (t.y - c.y) * 0.05;
+      el.style.transform = `rotateX(${c.x.toFixed(2)}deg) rotateY(${c.y.toFixed(2)}deg)`;
+      // Rattrapé à un centième de degré près : plus rien à peindre.
+      if (Math.abs(t.x - c.x) > 0.01 || Math.abs(t.y - c.y) > 0.01) {
+        raf = requestAnimationFrame(tick);
+      }
+    };
+
     const onMove = (e: MouseEvent) => {
       const el = wrapRef.current;
       if (!el) return;
@@ -41,37 +71,20 @@ export function LogoWithGlow({
       const cy = rect.top + rect.height / 2;
       const dx = (e.clientX - cx) / (window.innerWidth * 0.4);
       const dy = (e.clientY - cy) / (window.innerHeight * 0.4);
+      const amplitude = size === "md" ? 10 : 14;
       target.current = {
-        x: Math.max(-1, Math.min(1, dy)) * (size === "sm" ? 6 : size === "md" ? 10 : 14),
-        y: Math.max(-1, Math.min(1, dx)) * (size === "sm" ? 6 : size === "md" ? 10 : 14),
+        x: Math.max(-1, Math.min(1, dy)) * amplitude,
+        y: Math.max(-1, Math.min(1, dx)) * amplitude,
       };
+      if (raf === 0) raf = requestAnimationFrame(tick);
     };
 
-    let raf: number;
-    const tick = () => {
-      const el = wrapRef.current;
-      if (el) {
-        const t = target.current;
-        const c = current.current;
-        c.x += (t.x - c.x) * 0.05;
-        c.y += (t.y - c.y) * 0.05;
-        el.style.transform = `rotateX(${c.x.toFixed(2)}deg) rotateY(${c.y.toFixed(2)}deg)`;
-      }
-      raf = requestAnimationFrame(tick);
-    };
-
-    if (size !== "sm") {
-      window.addEventListener("mousemove", onMove);
-      raf = requestAnimationFrame(tick);
-    }
-
+    window.addEventListener("mousemove", onMove);
     return () => {
-      if (size !== "sm") {
-        window.removeEventListener("mousemove", onMove);
-        cancelAnimationFrame(raf);
-      }
+      window.removeEventListener("mousemove", onMove);
+      if (raf !== 0) cancelAnimationFrame(raf);
     };
-  }, [size]);
+  }, [size, tilts]);
 
   const config = sizeConfigs[size];
   const hasAnimation = size !== "sm";
@@ -92,7 +105,7 @@ export function LogoWithGlow({
           width,
           height,
           transformStyle: hasAnimation ? "preserve-3d" : "flat",
-          willChange: hasAnimation ? "transform" : "auto",
+          willChange: tilts ? "transform" : "auto",
         }}
       >
         {/* Glow */}
@@ -105,6 +118,7 @@ export function LogoWithGlow({
               borderRadius: "50%",
               background: `radial-gradient(circle, rgba(89,212,255,0.12) 0%, rgba(89,212,255,0.04) 50%, transparent 70%)`,
               animation: "logoPulseSmall 3.5s ease-in-out infinite",
+              animationPlayState: DECO_ANIM_STATE,
               pointerEvents: "none",
             }}
           />
@@ -120,6 +134,7 @@ export function LogoWithGlow({
               borderRadius: "50%",
               border: "1px solid rgba(89,212,255,0.18)",
               animation: "logoRing1 13s linear infinite",
+              animationPlayState: DECO_ANIM_STATE,
               pointerEvents: "none",
             }}
           >
@@ -149,6 +164,7 @@ export function LogoWithGlow({
               borderRadius: "50%",
               border: "1px solid rgba(167,115,255,0.16)",
               animation: "logoRing2 20s linear infinite",
+              animationPlayState: DECO_ANIM_STATE,
               pointerEvents: "none",
             }}
           >
@@ -184,6 +200,7 @@ export function LogoWithGlow({
               ? `drop-shadow(0 0 ${config.shadow}px rgba(89,212,255,0.25)) drop-shadow(0 0 6px rgba(0,0,0,0.4))`
               : "drop-shadow(0 0 8px rgba(0,0,0,0.3))",
             animation: hasAnimation ? "logoFloatSmall 4s ease-in-out infinite" : "none",
+            animationPlayState: DECO_ANIM_STATE,
           }}
         />
 
@@ -201,6 +218,7 @@ export function LogoWithGlow({
               background: `radial-gradient(ellipse, rgba(89,212,255,0.2) 0%, transparent 70%)`,
               filter: "blur(3px)",
               animation: "logoShadowSmall 4s ease-in-out infinite",
+              animationPlayState: DECO_ANIM_STATE,
               pointerEvents: "none",
               transform: "translateX(-50%)",
             }}
