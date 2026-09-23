@@ -6,9 +6,14 @@ import { accountDeletionJournalPath, readAccountDeletionJournal } from "./accoun
  * Après la restauration d'une sauvegarde de la base, rejoue les suppressions de
  * compte intervenues depuis — **avant** de remettre le site en service.
  *
- *     npm run replay:deletions -- --dry-run            # ce qui serait fait
- *     npm run replay:deletions                          # journal du site
- *     npm run replay:deletions -- /chemin/journal.jsonl # journal récupéré sur OneDrive
+ *     NODE_ENV=production npm run replay:deletions -- --dry-run   # ce qui serait fait
+ *     NODE_ENV=production npm run replay:deletions                 # journal du site
+ *     NODE_ENV=production npm run replay:deletions -- /chemin/j.jsonl
+ *
+ * `NODE_ENV=production` n'est pas décoratif : `./script-env` choisit ses
+ * fichiers d'après lui, et le shell du serveur ne l'exporte pas (seul pm2 le
+ * pose) — sans lui, `.env.production` n'est pas lu et le script meurt sur
+ * `DB_HOST`. Constaté au premier lancement en production.
  *
  * Le journal par défaut est celui du site (`ACCOUNT_DELETION_JOURNAL_PATH`,
  * sinon `data/account-deletions.jsonl`). Si la machine elle-même a été perdue,
