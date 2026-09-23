@@ -109,9 +109,9 @@
   }
 }
 
-/* Contrastes forcés : le système retire les fonds, la pastille disparaîtrait —
-   c'est pourtant elle qui distingue le match de l'éco. Et l'anneau de focus
-   passe en `outline`, déjà le cas ici, que le mode respecte. */
+/* Contrastes forcés : le système retire les fonds, et le point disparaîtrait.
+   Il est redonné dans la couleur du texte — le libellé, lui, dit déjà « éco »
+   ou « match ». L'anneau de focus est une `outline`, que le mode respecte. */
 @media (forced-colors: active) {
   .dot {
     forced-color-adjust: none;
