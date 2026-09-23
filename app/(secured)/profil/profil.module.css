@@ -1,0 +1,371 @@
+/*
+ * `/profil` — une page de réglages, pas un formulaire à rallonge.
+ *
+ * Tout y était écrit en style en ligne, et tout y avait le même poids : un champ
+ * d'identité et le bouton qui efface le compte se ressemblaient à quelques
+ * pixels près. Les aides des champs étaient en `--text-2` à 11 px, sous la
+ * taille où ce gris reste confortable — d'où un texte gris pâle omniprésent que
+ * personne ne lit.
+ *
+ * Trois règles ici : une **hiérarchie** (titre de section > libellé de champ >
+ * aide), un **contraste** relevé pour les aides (`--text-1` à 12 px, que l'on
+ * réserve à ce qui s'adresse vraiment au lecteur), et une **zone de danger**
+ * qui ne ressemble à rien d'autre.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Les sections d'un même formulaire gardent l'écartement de la page : elles se
+   lisent comme ses voisines, le formulaire ne se voit pas. */
+.formSections {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ── En-tête ──────────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.headerText {
+  min-width: 0;
+}
+
+.title {
+  font-size: clamp(26px, 3vw, 40px);
+  margin: 0 0 4px;
+}
+
+.subtitle {
+  color: var(--text-1);
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ── Navigation d'ancres ──────────────────────────────────────────────────── */
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 0 2px;
+}
+
+.navLink {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  padding: 7px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.navLink:hover,
+.navLink:focus-visible {
+  color: var(--text-0);
+  border-color: rgba(var(--blue-rgb), 0.45);
+  background: rgba(var(--blue-rgb), 0.07);
+}
+
+.navLink:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.24);
+}
+
+/* ── Sections ─────────────────────────────────────────────────────────────── */
+
+.section {
+  /* `scroll-margin-top` et non un décalage au clic : l'ancre doit tomber au bon
+     endroit aussi quand on arrive par une URL collée.
+     La marge vaut la hauteur de `ArenaNav` (52 px de pastille + 2 × 14 px de
+     rembourrage, soit 80) **plus** une respiration : la barre est
+     `position: sticky; top: 0`, si bien qu'une marge plus courte faisait
+     atterrir le titre de la section derrière elle — à 24 px, le `<h2>` tombait
+     à y ≈ 52, entièrement masqué. */
+  scroll-margin-top: 96px;
+}
+
+.sectionHead {
+  margin-bottom: 18px;
+}
+
+.sectionTitle {
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--text-0);
+  margin: 0 0 4px;
+}
+
+.sectionLead {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-1);
+  margin: 0;
+  max-width: 68ch;
+}
+
+.dangerSection .sectionTitle {
+  color: var(--danger);
+}
+
+/* ── Champs ───────────────────────────────────────────────────────────────── */
+
+/* L'aide d'un champ s'adresse au lecteur : elle mérite mieux qu'un gris de
+   mention légale. 12 px et `--text-1`, contre 11 px et `--text-2` partout
+   avant. */
+.hint {
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--text-1);
+  margin: 7px 0 0;
+  max-width: 68ch;
+}
+
+/* « Avatar » n'étiquette aucun champ — le `<input type="file">` est caché et
+   les deux contrôles sont des boutons. C'est le nom d'un **groupe**, d'où un
+   `<span>` (un `<label>` sans `for` n'étiquette rien) qui reprend l'apparence
+   de `.field label`. */
+.groupLabel {
+  font-size: 13px;
+  color: var(--text-1);
+}
+
+.hintMuted {
+  color: var(--text-2);
+}
+
+.fieldLabelRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.actionsRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.avatarActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Groupes de cases ─────────────────────────────────────────────────────── */
+
+.toggleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toggleGroup + .toggleGroup {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.toggleGroupTitle {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-1);
+  margin: 0;
+}
+
+.toggleRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* ── Pied de formulaire ───────────────────────────────────────────────────── */
+
+/*
+ * **Une seule sauvegarde, atteignable depuis n'importe quelle section.**
+ *
+ * Le formulaire couvre quatre sections (identité, comptes de jeu, Discord,
+ * confidentialité) et n'a qu'un bouton. Posé au fond de la dernière, il était
+ * invisible pour qui arrive par une ancre — la navigation de cette page invite
+ * précisément à sauter à « Comptes de jeu », où l'on modifie son BattleTag sans
+ * rien voir qui l'enregistre. Le pied quitte donc la section pour le formulaire
+ * lui-même, et s'y colle au bas de la fenêtre : il reste à l'écran tant qu'une
+ * partie du formulaire l'est, et se pose naturellement à sa place une fois le
+ * bas atteint.
+ */
+.formFoot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  /* **Une barre, pas un voile.** Un dégradé vers la couleur de la page barrait
+     les cartes qui défilent dessous — `.ds-block` est translucide et bien plus
+     clair que `--bg-0` —, si bien que la carte semblait coupée net au-dessus du
+     bouton. La barre porte donc sa propre surface, arrondie et bordée comme les
+     cartes : ce qui passe derrière passe derrière quelque chose. */
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(13, 16, 22, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* `:global` obligatoire : `.btn` vient du style global, et CSS Modules
+   hacherait un `.btn` local — la règle ne s'appliquerait alors à rien. Le
+   `.btn` global n'a **aucun** état désactivé : sans ces deux règles, « Changer
+   l'avatar » pendant un envoi, « Retirer mon tag » pendant un retrait et
+   « Supprimer mon compte » pendant l'effacement gardaient le survol, le
+   soulèvement, le reflet et `cursor: pointer` tout en refusant le clic. */
+.page :global(.btn:disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Le survol du `.btn` global éclaircit le fond : il faut le rendre à chaque
+   variante, et non poser le bleu du bouton principal pour tout le monde — la
+   règle, plus spécifique que `.btn.ghost`, **bleuissait** au survol les boutons
+   en retrait (« Retirer mon tag », « Supprimer » l'avatar, « Retirer » une
+   application), c'est-à-dire qu'un bouton refusé se faisait plus voyant que le
+   même bouton actif. */
+.page :global(.btn:disabled:hover) {
+  background: rgba(89, 212, 255, 0.14);
+  transform: none;
+  box-shadow: none;
+}
+
+.page :global(.btn.ghost:disabled:hover) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.page :global(.btn.danger:disabled:hover) {
+  background: rgba(var(--danger-rgb), 0.14);
+}
+
+/* Le reflet balayant du `.btn` global se déclenche au survol : il donne, seul,
+   l'impression d'un bouton vivant. */
+.page :global(.btn:disabled:hover)::before {
+  left: -100%;
+}
+
+.save {
+  padding: 11px 28px;
+  background: rgba(var(--blue-rgb), 0.15);
+  border-color: rgba(var(--blue-rgb), 0.35);
+}
+
+/* ── Invitations ──────────────────────────────────────────────────────────── */
+
+.inviteActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.inviteButton {
+  padding: 5px 13px;
+  font-size: 12px;
+}
+
+/* ── Zone de danger ───────────────────────────────────────────────────────── */
+
+/* Elle ne ressemble à aucune autre section, et c'est tout l'objet : le bouton
+   qui efface un compte n'a rien à faire au milieu de réglages, sous la même
+   apparence qu'eux. */
+.dangerSection {
+  border-color: rgba(var(--danger-rgb), 0.3);
+}
+
+.accountActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.accountActionsLeft {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.accountButton {
+  padding: 10px 18px;
+  font-size: 13px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.deleteButton {
+  color: var(--danger);
+  border-color: rgba(var(--danger-rgb), 0.4);
+}
+
+.deleteButton:hover:not(:disabled) {
+  background: rgba(var(--danger-rgb), 0.1);
+  border-color: rgba(var(--danger-rgb), 0.6);
+}
+
+/* ── Statistiques ─────────────────────────────────────────────────────────── */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 12px;
+}
+
+.stat {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.statLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-2);
+  margin-bottom: 6px;
+}
+
+.statValue {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  color: var(--text-0);
+  line-height: 1;
+}
+
+@media (max-width: 640px) {
+  .accountActions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .accountActionsLeft {
+    flex-direction: column;
+  }
+}
