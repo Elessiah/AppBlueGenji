@@ -2,41 +2,35 @@
 
 import { useState, useEffect } from "react";
 import { BotStatus } from "@/lib/shared/types";
-import { botStatusDisplay, botStatusOf, botStatusSummary } from "@/lib/shared/bot-status-summary";
+import {
+  botStatusDisplay,
+  botStatusOf,
+  botStatusSummary,
+  botUptimeLabel,
+} from "@/lib/shared/bot-status-summary";
 import { botPayloadNumber, botPayloadText } from "@/lib/shared/bot-payload";
 
 export function BotStatusStrip({ status }: { status: BotStatus | null }) {
   const [uptime, setUptime] = useState("—");
 
+  // Le calcul lui-même vit dans `botUptimeLabel`, pur et testé : enfermé ici,
+  // il était hors de portée des tests de rendu (`renderToStaticMarkup`
+  // n'exécute aucun effet), et la remise au tiret comme la borne à zéro
+  // pouvaient être retirées sans qu'une assertion bronche.
   useEffect(() => {
-    const base = botPayloadNumber(status?.startupTs);
-    const uptimeMs = botPayloadNumber(status?.uptimeMs);
-    // Sans ces deux nombres, le compteur n'afficherait pas une erreur mais
-    // « NaNj NaNh NaNm » — une panne muette de plus. Mieux vaut le tiret, et il
-    // faut le **reposer** : sortir sans rien écrire laissait la case sur la
-    // durée de la charge précédente, si bien qu'une charge devenue illisible
-    // affichait « 1j 04h 23m » juste à côté de « Le bot n'a pas répondu à la
-    // page » — la contradiction entre cases voisines que cette page retire.
-    if (base === null || uptimeMs === null) {
-      setUptime("—");
-      return;
-    }
-    const startSec = Math.floor(uptimeMs / 1000);
-    const tick = () => {
-      // Borné à zéro : l'horloge du visiteur et celle du bot n'ont aucune
-      // raison de concorder, et une dérive rendait « -1j 23h ».
-      const s = Math.max(0, startSec + Math.floor((Date.now() - base - uptimeMs) / 1000));
-      const d = Math.floor(s / 86400);
-      const h = Math.floor((s % 86400) / 3600);
-      const m = Math.floor((s % 3600) / 60);
-      const sec = s % 60;
-      setUptime(`${d}j ${h}h ${String(m).padStart(2, "0")}m ${String(sec).padStart(2, "0")}s`);
-    };
+    // Le tiret est **reposé** à chaque charge : sortir sans rien écrire
+    // laissait la case sur la durée de la charge précédente, si bien qu'une
+    // charge devenue illisible affichait « 1j 04h 23m » juste à côté de « Le
+    // bot n'a pas répondu à la page » — la contradiction entre cases voisines
+    // que cette page retire.
+    const first = botUptimeLabel(status, Date.now());
     // Tout de suite, puis chaque seconde : le seul `setInterval` laissait la
     // case au tiret une seconde pleine pendant que ses voisines affichaient
     // déjà leurs valeurs.
-    tick();
-    const id = setInterval(tick, 1000);
+    setUptime(first ?? "—");
+    // Rien à compter : pas d'horloge à faire tourner pour réécrire un tiret.
+    if (first === null) return;
+    const id = setInterval(() => setUptime(botUptimeLabel(status, Date.now()) ?? "—"), 1000);
     return () => clearInterval(id);
   }, [status]);
 

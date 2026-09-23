@@ -25,10 +25,25 @@ export interface BotKpiDelta {
   tone: "up" | "down" | "flat";
   /** Le glyphe posé devant le texte, ou `""` quand le sens n'est pas su. */
   glyph: string;
+  /**
+   * Le sens **en toutes lettres**, ou `""` quand rien n'est affirmé.
+   *
+   * La flèche et la couleur sont un dessin : elles ne se lisent ni au lecteur
+   * d'écran ni en nuances de gris. Ce mot est le seul canal qui porte le sens
+   * à qui ne voit ni l'une ni l'autre, et il se pose **à côté** du texte
+   * visible — en `sr-only` — plutôt qu'en `aria-label`. C'est le piège déjà
+   * documenté dans `app/(secured)/equipes/cards/TeamCard.tsx` : un
+   * `aria-label` posé sur un `<span>` sans rôle (`generic`) n'accepte pas de
+   * nom d'auteur, il est **ignoré** — la pastille n'annoncerait alors que
+   * « -8 % », sans son sens, c'est-à-dire exactement ce qu'elle doit dire.
+   * Écrit à côté du texte, il le **suit** au lieu de le remplacer, ce qui
+   * satisfait WCAG 2.5.3 par construction.
+   */
+  direction: string;
 }
 
 /** Ce qu'affiche une tuile dont le bot n'a rien dit de lisible. */
-const UNKNOWN_DELTA: BotKpiDelta = { label: "—", tone: "flat", glyph: "" };
+const UNKNOWN_DELTA: BotKpiDelta = { label: "—", tone: "flat", glyph: "", direction: "" };
 
 /**
  * Les deux écritures du moins : le signe ASCII, et le **signe moins Unicode**
@@ -52,25 +67,10 @@ export function resolveBotKpiDelta(value: unknown): BotKpiDelta {
   if (!text) return UNKNOWN_DELTA;
 
   if (MINUS_SIGNS.some((sign) => text.startsWith(sign))) {
-    return { label: text, tone: "down", glyph: "▼" };
+    return { label: text, tone: "down", glyph: "▼", direction: "en baisse" };
   }
   if (text.startsWith("+")) {
-    return { label: text, tone: "up", glyph: "▲" };
+    return { label: text, tone: "up", glyph: "▲", direction: "en hausse" };
   }
-  return { label: text, tone: "flat", glyph: "" };
-}
-
-/**
- * Nom accessible de la pastille : **le texte visible d'abord** (WCAG 2.5.3),
- * puis ce que la flèche veut dire.
- *
- * La flèche et la couleur sont un dessin — elles ne se lisent ni au lecteur
- * d'écran ni en nuances de gris. Le sens qu'elles portent doit donc être dit,
- * et il ne l'est qu'une fois : une pastille neutre n'ajoute rien, puisqu'elle
- * n'affirme rien.
- */
-export function botKpiDeltaAccessibleLabel(delta: BotKpiDelta, metric: string): string {
-  if (delta.tone === "flat") return `${metric} : ${delta.label}`;
-  const direction = delta.tone === "up" ? "en hausse" : "en baisse";
-  return `${metric} : ${delta.label}, ${direction}`;
+  return { label: text, tone: "flat", glyph: "", direction: "" };
 }

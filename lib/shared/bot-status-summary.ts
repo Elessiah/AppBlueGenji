@@ -1,4 +1,5 @@
 import type { BotStatus } from "@/lib/shared/types";
+import { botPayloadNumber } from "@/lib/shared/bot-payload";
 
 /**
  * Le sous-titre de la case « Status » de `/bot` — **il dit l'état affiché
@@ -82,4 +83,42 @@ export function botStatusDisplay(status: string | null | undefined): string {
 /** Le sous-titre, jamais vide. */
 export function botStatusSummary(status: string | null | undefined): string {
   return STATUS_SUMMARIES[resolveBotStatusLabel(status)];
+}
+
+/**
+ * La durée de fonctionnement affichée par la case « Uptime » — ou `null`.
+ *
+ * Elle vivait **entièrement** dans le `useEffect` de `BotStatusStrip`, donc
+ * hors de portée des seuls tests qui l'entouraient : `renderToStaticMarkup`
+ * n'exécute aucun effet, si bien que le cas « horodatages absents » n'
+ * observait jamais que l'état initial de la case. La remise au tiret, la borne
+ * à zéro et le premier affichage immédiat pouvaient tous être retirés sans
+ * qu'une assertion bronche — une couverture qui ne couvre rien est pire que
+ * pas de couverture, parce qu'elle se lit comme une garantie.
+ *
+ * Trois choses qu'elle tient, et que le composant ne décide plus :
+ *
+ * 1. **`null` plutôt que « NaNj NaNh NaNm ».** Les deux horodatages arrivent
+ *    par un `as BotStatus` sur du JSON reçu ; sans eux, le calcul ne rend pas
+ *    une erreur mais une panne muette. Et il faut **reposer** le tiret : sortir
+ *    sans rien écrire laissait la case sur la durée de la charge précédente,
+ *    donc « 1j 04h 23m » juste à côté de « Le bot n'a pas répondu à la page ».
+ * 2. **Bornée à zéro.** L'horloge du visiteur et celle du bot n'ont aucune
+ *    raison de concorder, et une dérive de quelques secondes rendait
+ *    « -1j 23h 59m ».
+ * 3. **`now` est un argument.** C'est ce qui rend la fonction pure, donc
+ *    testable sans horloge truquée — et le composant se contente de lui passer
+ *    `Date.now()` à chaque seconde.
+ */
+export function botUptimeLabel(status: BotStatus | null | undefined, now: number): string | null {
+  const base = botPayloadNumber(status?.startupTs);
+  const uptimeMs = botPayloadNumber(status?.uptimeMs);
+  if (base === null || uptimeMs === null) return null;
+
+  const elapsed = Math.max(0, Math.floor(uptimeMs / 1000) + Math.floor((now - base - uptimeMs) / 1000));
+  const d = Math.floor(elapsed / 86400);
+  const h = Math.floor((elapsed % 86400) / 3600);
+  const m = Math.floor((elapsed % 3600) / 60);
+  const s = elapsed % 60;
+  return `${d}j ${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
 }

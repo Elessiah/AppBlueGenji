@@ -83,6 +83,10 @@ describe("BotStatusStrip — une charge amputée ne fait pas tomber la page", ()
     ["sans shardCount", { ...status(), shardCount: undefined }],
     ["shardCount amputé", { ...status(), shardCount: { active: 1 } }],
     ["champs de mauvais type", { ...status(), version: 7, gatewayLatency: "vite" }],
+    // La case « Uptime » elle-même n'est PAS couverte ici : son calcul vit dans
+    // un `useEffect`, que `renderToStaticMarkup` n'exécute pas — le cas
+    // ci-dessous n'observe donc que le reste de la bande. C'est `botUptimeLabel`
+    // (`tests/lib/shared/bot-status-summary.test.ts`) qui la tient.
     ["horodatages absents", { ...status(), startupTs: undefined, uptimeMs: undefined }],
   ];
 

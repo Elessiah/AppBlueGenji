@@ -107,6 +107,39 @@ describe("BotKpis — la pastille de variation dit ce qu'elle colore", () => {
     expect(html).not.toContain("▼");
     expect(html).toContain("—");
   });
+
+  it("écrit le sens à côté du texte, jamais en aria-label", () => {
+    // `aria-label` posé sur un `<span>` sans rôle (`generic`) n'accepte pas de
+    // nom d'auteur : il est ignoré, et la pastille n'annonce que « -8 % » —
+    // sans le sens, c'est-à-dire sans ce qu'elle a justement à dire. Même
+    // piège, et même remède, que `TeamCard`.
+    const html = renderToStaticMarkup(
+      <BotKpis kpis={kpis({ servers: entry({ delta: "-8 %" }) } as Partial<BotKpisType>)} />,
+    );
+    expect(html).not.toContain("aria-label");
+    expect(html).toContain('class="sr-only"');
+    expect(html).toContain("en baisse");
+    // Le texte visible reste devant (WCAG 2.5.3).
+    expect(html.indexOf("-8 %")).toBeLessThan(html.indexOf("en baisse"));
+  });
+
+  it("n'ajoute pas de mot en trop sur une pastille neutre", () => {
+    const html = renderToStaticMarkup(
+      <BotKpis
+        kpis={
+          {
+            servers: entry({ delta: "12 %" }),
+            channels: entry({ delta: "12 %" }),
+            messages: entry({ delta: "12 %" }),
+            relays: entry({ delta: "12 %" }),
+          } as unknown as BotKpisType
+        }
+      />,
+    );
+    expect(html).not.toContain("sr-only");
+    expect(html).not.toContain("hausse");
+    expect(html).not.toContain("baisse");
+  });
 });
 
 describe("Sparkline — pas de courbe plutôt qu'une courbe fausse", () => {

@@ -74,6 +74,14 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
   // serveur dans `app/bot/page.tsx`, cette exception-là ne fait pas une case
   // vide : elle sert **toute** la page en 500 — bien pire que l'axe sans
   // libellés qu'on rend ici.
+  // **Le nombre de colonnes est celui de la plus longue des deux séries**, et
+  // non celui des relais. Les barres se tiraient de `relays.map` seul, quand
+  // `max`, la légende et l'axe parlent des deux : une charge
+  // `{"relays": [], "scrims": [ … ]}` rendait un graphe **vide** sous un axe
+  // gradué sur des données jamais dessinées, et une légende qui annonçait des
+  // scrims. Seule l'asymétrie inverse était couverte. Une colonne sans point
+  // d'un côté y porte un zéro, ce que `point` donne déjà.
+  const columns = Math.max(relays.length, scrims.length);
   const labels = Array.isArray(data.labels) ? data.labels : [];
   // Même charge non validée : un objet tombait dans `Math.round`, qui rend
   // `NaN`, et la légende annonçait « MOY. NaN / JOUR ».
@@ -106,13 +114,13 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
             <span>{max}</span>
           </div>
           <div className="bars">
-            {relays.map((v, i) => {
+            {Array.from({ length: columns }, (_, i) => {
               // Les hauteurs passaient les valeurs **brutes** alors que `max`
               // venait d'être durci : une série `scrims` plus courte que
               // `relays` (ou absente) donnait `scrims[i] === undefined`, donc
               // `height: NaN%` et un `title="undefined scrims"`. Les barres
               // ambre disparaissaient sans une erreur.
-              const relay = point(v);
+              const relay = point(relays[i]);
               const scrim = point(scrims[i]);
               return (
                 <div key={i} style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 1.5, height: "100%" }}>

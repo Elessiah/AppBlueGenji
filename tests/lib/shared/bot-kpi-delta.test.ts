@@ -1,8 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import {
-  botKpiDeltaAccessibleLabel,
-  resolveBotKpiDelta,
-} from "@/lib/shared/bot-kpi-delta";
+import { resolveBotKpiDelta } from "@/lib/shared/bot-kpi-delta";
 
 /**
  * La pastille de variation d'une tuile de `/bot`.
@@ -17,6 +14,7 @@ describe("resolveBotKpiDelta — le ton se lit sur le signe", () => {
       label: "+12 %",
       tone: "up",
       glyph: "▲",
+      direction: "en hausse",
     });
   });
 
@@ -54,7 +52,7 @@ describe("resolveBotKpiDelta — le ton se lit sur le signe", () => {
   it("met un tiret neutre sur tout ce qui n'est pas lisible", () => {
     for (const value of [null, undefined, "", "   ", {}, [], Number.NaN]) {
       const delta = resolveBotKpiDelta(value);
-      expect(delta).toEqual({ label: "—", tone: "flat", glyph: "" });
+      expect(delta).toEqual({ label: "—", tone: "flat", glyph: "", direction: "" });
     }
   });
 
@@ -70,21 +68,24 @@ describe("resolveBotKpiDelta — le ton se lit sur le signe", () => {
   });
 });
 
-describe("botKpiDeltaAccessibleLabel — la flèche est un dessin", () => {
-  it("dit le texte visible d'abord, puis le sens (WCAG 2.5.3)", () => {
-    const up = botKpiDeltaAccessibleLabel(resolveBotKpiDelta("+12 %"), "Serveurs");
-    expect(up).toContain("+12 %");
-    expect(up).toContain("en hausse");
-
-    const down = botKpiDeltaAccessibleLabel(resolveBotKpiDelta("-8 %"), "Serveurs");
-    expect(down).toContain("en baisse");
-    expect(down).not.toContain("en hausse");
+describe("resolveBotKpiDelta — le sens est écrit, pas seulement dessiné", () => {
+  it("donne le sens en toutes lettres à côté de la flèche", () => {
+    // La flèche et la couleur ne se lisent ni au lecteur d'écran ni en
+    // nuances de gris : sans ce mot, la pastille n'annonce que « -8 % ».
+    expect(resolveBotKpiDelta("+12 %").direction).toBe("en hausse");
+    expect(resolveBotKpiDelta("-8 %").direction).toBe("en baisse");
   });
 
-  it("n'ajoute aucun sens à une pastille neutre", () => {
-    const flat = botKpiDeltaAccessibleLabel(resolveBotKpiDelta("12 %"), "Serveurs");
-    expect(flat).toContain("12 %");
-    expect(flat).not.toContain("hausse");
-    expect(flat).not.toContain("baisse");
+  it("n'écrit aucun sens quand elle n'en affirme aucun", () => {
+    expect(resolveBotKpiDelta("12 %").direction).toBe("");
+    expect(resolveBotKpiDelta(null).direction).toBe("");
+  });
+
+  it("n'écrit un sens que lorsqu'elle colore, et l'inverse", () => {
+    for (const value of ["+1", "-1", "12 %", "stable", null, {}, 7]) {
+      const delta = resolveBotKpiDelta(value);
+      expect(delta.direction === "").toBe(delta.tone === "flat");
+      expect(delta.glyph === "").toBe(delta.tone === "flat");
+    }
   });
 });

@@ -108,6 +108,26 @@ describe("BotActivityChart — une charge abîmée ne fait pas tomber la page", 
     }
   });
 
+  it("dessine autant de colonnes que la plus longue des deux séries", () => {
+    // Les barres se tiraient de `relays.map` seul, quand `max`, la légende et
+    // l'axe parlent des deux : une charge sans relais rendait un graphe vide
+    // sous un axe gradué sur des scrims jamais dessinés.
+    const html = render(
+      activity({ relays: [], scrims: [3, 5], labels: ["01/09", "02/09"] }),
+    );
+    expect(html).toContain("3 scrims");
+    expect(html).toContain("5 scrims");
+    expect(html).toContain("0 relais");
+    expect(html).not.toContain("NaN");
+  });
+
+  it("comble l'autre sens aussi, sans jamais inventer de point", () => {
+    const html = render(activity({ relays: [3, 5, 2], scrims: [] }));
+    expect(html).toContain("3 relais");
+    expect(html).toContain("0 scrims");
+    expect(html).not.toContain("NaN");
+  });
+
   it("ne divise pas par zéro sur une série plate", () => {
     const html = render(activity({ relays: [0, 0], scrims: [0, 0] }));
     expect(html).not.toContain("NaN");

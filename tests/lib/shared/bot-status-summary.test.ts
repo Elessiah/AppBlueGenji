@@ -3,6 +3,7 @@ import {
   botStatusDisplay,
   botStatusOf,
   botStatusSummary,
+  botUptimeLabel,
   resolveBotStatusLabel,
 } from "@/lib/shared/bot-status-summary";
 import type { BotStatus } from "@/lib/shared/types";
@@ -112,5 +113,67 @@ describe("botStatusOf", () => {
     expect(botStatusSummary(botStatusOf({} as unknown as BotStatus))).toContain(
       "ne sait pas lire",
     );
+  });
+});
+
+describe("botUptimeLabel — la case « Uptime » se teste enfin", () => {
+  /**
+   * Tout ce calcul vivait dans le `useEffect` de `BotStatusStrip`, donc hors
+   * de portée des tests de rendu : `renderToStaticMarkup` n'exécute aucun
+   * effet, et le cas « horodatages absents » n'observait jamais que l'état
+   * initial de la case. La remise au tiret, la borne à zéro et le premier
+   * affichage immédiat pouvaient tous être retirés sans qu'une assertion
+   * bronche.
+   */
+  const startupTs = 1_700_000_000_000;
+  const uptimeMs = 90_061_000; // 1j 01h 01m 01s
+
+  it("compte depuis l'instant où la charge a été prise", () => {
+    expect(botUptimeLabel({ startupTs, uptimeMs } as never, startupTs + uptimeMs)).toBe(
+      "1j 1h 01m 01s",
+    );
+  });
+
+  it("avance avec l'horloge du visiteur", () => {
+    expect(
+      botUptimeLabel({ startupTs, uptimeMs } as never, startupTs + uptimeMs + 59_000),
+    ).toBe("1j 1h 02m 00s");
+  });
+
+  it("pose des zéros devant les minutes et les secondes", () => {
+    const label = botUptimeLabel({ startupTs, uptimeMs: 5_000 } as never, startupTs + 5_000);
+    expect(label).toBe("0j 0h 00m 05s");
+  });
+
+  it("rend `null` plutôt que « NaNj NaNh NaNm »", () => {
+    // Les deux horodatages arrivent par un `as BotStatus` sur du JSON reçu :
+    // sans eux, le calcul ne lève pas, il se propage.
+    expect(botUptimeLabel(null, Date.now())).toBeNull();
+    expect(botUptimeLabel({} as never, Date.now())).toBeNull();
+    expect(botUptimeLabel({ startupTs } as never, Date.now())).toBeNull();
+    expect(botUptimeLabel({ uptimeMs } as never, Date.now())).toBeNull();
+    expect(botUptimeLabel({ startupTs: "hier", uptimeMs } as never, Date.now())).toBeNull();
+    expect(
+      botUptimeLabel({ startupTs, uptimeMs: Number.NaN } as never, Date.now()),
+    ).toBeNull();
+  });
+
+  it("borne la dérive des horloges à zéro", () => {
+    // L'horloge du visiteur et celle du bot n'ont aucune raison de concorder :
+    // une avance de quelques secondes rendait « -1j 23h 59m ».
+    const label = botUptimeLabel(
+      { startupTs, uptimeMs: 1_000 } as never,
+      startupTs - 3_600_000,
+    );
+    expect(label).toBe("0j 0h 00m 00s");
+    expect(label).not.toContain("-");
+  });
+
+  it("ne rend jamais NaN quel que soit l'instant demandé", () => {
+    for (const now of [0, startupTs, startupTs + 1e12, Number.MAX_SAFE_INTEGER]) {
+      const label = botUptimeLabel({ startupTs, uptimeMs } as never, now);
+      expect(label).not.toContain("NaN");
+      expect(label).not.toContain("Infinity");
+    }
   });
 });

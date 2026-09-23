@@ -1,7 +1,7 @@
 import { Sparkline } from "./Sparkline";
 import { BotKpis as BotKpisType } from "@/lib/shared/types";
 import { botPayloadNumber } from "@/lib/shared/bot-payload";
-import { botKpiDeltaAccessibleLabel, resolveBotKpiDelta } from "@/lib/shared/bot-kpi-delta";
+import { resolveBotKpiDelta } from "@/lib/shared/bot-kpi-delta";
 
 export function BotKpis({ kpis }: { kpis: BotKpisType | null }) {
   const entries = [
@@ -42,15 +42,17 @@ export function BotKpis({ kpis }: { kpis: BotKpisType | null }) {
           <div key={entry.key} className="card card-ticks kpi">
             <div className="kpi-head">
               <span className="kpi-lbl">{entry.lbl}</span>
-              {/* La flèche et la couleur sont un dessin : elles ne se lisent
-                  ni au lecteur d'écran ni en nuances de gris, d'où le nom
-                  accessible qui dit le sens en toutes lettres. */}
-              <span
-                className={"kpi-delta " + delta.tone}
-                aria-label={botKpiDeltaAccessibleLabel(delta, entry.lbl)}
-              >
+              {/* La flèche et la couleur sont un dessin : elles ne se lisent ni
+                  au lecteur d'écran ni en nuances de gris, d'où le sens écrit
+                  en toutes lettres. En `sr-only` **à côté** du texte, et non en
+                  `aria-label` : posé sur un `<span>` sans rôle (`generic`),
+                  un nom d'auteur est ignoré — la pastille n'aurait alors
+                  annoncé que « -8 % », sans son sens. Même piège, et même
+                  remède, que `app/(secured)/equipes/cards/TeamCard.tsx`. */}
+              <span className={"kpi-delta " + delta.tone}>
                 {delta.glyph ? <span aria-hidden="true">{delta.glyph} </span> : null}
                 {delta.label}
+                {delta.direction ? <span className="sr-only"> {delta.direction}</span> : null}
               </span>
             </div>
             <div className="kpi-val">
