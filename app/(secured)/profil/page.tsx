@@ -29,6 +29,8 @@ import {
   profileLoadErrorMessage,
 } from "./profile-errors";
 import { precheckImageUpload } from "@/lib/shared/image-upload-errors";
+import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/uploads";
+import { PSEUDO_MAX_LENGTH } from "@/lib/shared/pseudo";
 import {
   BLIZZARD_BATTLETAG_NOTICE,
   DISCORD_TAG_UNVERIFIED_AUDIENCE,
@@ -561,7 +563,8 @@ export default function ProfilePage() {
               />
               <p id="profile-pseudo-hint" className={s.hint}>
                 C&apos;est lui qui t&apos;identifie dans les brackets, les rosters et les
-                feuilles de match. Il n&apos;est pas masquable.
+                feuilles de match. Il n&apos;est pas masquable ({PSEUDO_MAX_LENGTH} caractères
+                au plus).
               </p>
             </div>
             {/* L'avatar n'a pas de champ à étiqueter — le `<input type="file">`
@@ -576,7 +579,7 @@ export default function ProfilePage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/png,image/jpeg,image/webp"
+                accept={IMAGE_UPLOAD_MIME_TYPES.join(",")}
                 onChange={onAvatarChange}
                 style={{ display: "none" }}
               />
@@ -607,7 +610,9 @@ export default function ProfilePage() {
                   </button>
                 ) : null}
               </div>
-              <p className={`${s.hint} ${s.hintMuted}`}>PNG, JPEG ou WebP — 5 Mo max.</p>
+              <p className={`${s.hint} ${s.hintMuted}`}>
+                PNG, JPEG ou WebP — {IMAGE_UPLOAD_MAX_BYTES / (1024 * 1024)} Mo max.
+              </p>
             </div>
             <div className="field">
               <label htmlFor="profile-adult">Statut majeur</label>
