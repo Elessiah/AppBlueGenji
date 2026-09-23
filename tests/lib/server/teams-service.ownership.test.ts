@@ -61,7 +61,7 @@ describe("transferTeamOwnership", () => {
 
   it("laisse l'ancien propriétaire dans l'équipe avec un rôle par défaut", async () => {
     // Un membre sans aucun rôle n'existe pas côté modèle : OWNER seul retombe
-    // sur DPS, comme à l'arrivée d'un membre (`insertMembership`).
+    // sur DPS, comme à l'arrivée d'un membre (`acceptIntoTeam`).
     const execute = jest
       .fn()
       .mockResolvedValueOnce(member("OWNER"))

@@ -283,7 +283,7 @@ Distinct de l'attribution : `POST /api/teams/[id]/transfer-ownership` avec
 
 L'ancien propriétaire **reste dans l'équipe** : il perd `OWNER` et garde ses
 autres rôles, ou reçoit `DPS` s'il n'en avait aucun (même repli que
-`insertMembership`, à l'arrivée d'un membre). Les deux lignes sont réécrites
+`acceptIntoTeam`, à l'arrivée d'un membre). Les deux lignes sont réécrites
 dans une transaction.
 
 Interface : `TransferOwnershipDialog` (`/equipes/[id]`), liste des membres non
