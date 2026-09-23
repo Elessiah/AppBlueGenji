@@ -74,6 +74,10 @@ Ce qu'elle contient aujourd'hui :
 | #135 | `bg_tournaments` | `registration_min_players` |
 | #136 | `bg_users` | `blizzard_sub` |
 | #137 | `bg_tournaments` | `registration_blizzard_requirement` |
+| — (image de tournoi) | `bg_tournaments` | `image_url` |
+| — (image de tournoi) | `bg_tournaments` | `image_fit` |
+| — (image de tournoi) | `bg_tournaments` | `image_focus_x` |
+| — (image de tournoi) | `bg_tournaments` | `image_focus_y` |
 
 Le coût est nul : chaque entrée retombe en silence quand la colonne est là, et le
 bloc ne fait rien sur une base neuve. **La liste est faite pour rétrécir** — une
