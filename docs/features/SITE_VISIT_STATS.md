@@ -1,5 +1,10 @@
 # Fréquentation du site (`/stats-site`)
 
+> **Mise à jour** — les visites ne gardent plus aucun lien vers un compte :
+> `user_id` est remplacée par un simple drapeau `authenticated`, et le sel est
+> obligatoire en production. Voir `docs/features/RGPD_LOGS_AND_VISITS.md`, qui
+> fait foi là où ce document parle encore d'identifiant de compte.
+
 Comptage des visites du site BlueGenji, restitué par une commande Discord du bot.
 
 Deux nombres sont suivis :

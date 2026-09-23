@@ -50,13 +50,11 @@ appartenances (`bg_team_members`), invitations (`bg_team_invitations`, des deux
 côtés) — et `bg_endurance_penalties.created_by` passe à `NULL`, la sanction
 restant due.
 
-Deux choses demandent un geste, parce qu'aucune clé étrangère ne les couvre.
+Une chose demande un geste, parce qu'aucune clé étrangère ne la couvre.
 
-**`bg_site_visits`** n'en a aucune — une cascade y effacerait l'historique de
-fréquentation. Le lien est donc détaché plutôt que la ligne supprimée
-(`SET user_id = NULL`) : ce qu'il faut retirer est le lien vers une personne, pas
-le fait qu'une page ait été vue. Et **avant** l'effacement du compte, faute de
-quoi la ligne ne serait plus retrouvable par `user_id`.
+**`bg_site_visits`**, qui en demandait un autrefois, n'est plus concernée : la
+table ne garde aucun lien vers un compte (`docs/features/RGPD_LOGS_AND_VISITS.md`),
+il n'y a donc rien à détacher.
 
 **Le fichier de l'avatar** ne vit pas en base : `avatar_url` ne fait que le
 désigner. Or les photos des fournisseurs OAuth sont **copiées** chez nous à la
@@ -90,10 +88,10 @@ l'attente).
 
 Elle répond à deux choses distinctes.
 
-D'abord à l'**état intermédiaire** : le détachement des visites et le `DELETE`
-étaient deux instructions autocommitées, si bien qu'un `DELETE` refusé (verrou
-expiré, `RESTRICT`) laissait un compte bien vivant dont la fréquentation était
-anonymisée pour toujours.
+D'abord à l'**état intermédiaire** : les écritures de la suppression (autrefois
+le détachement des visites, aujourd'hui la purge des défis de connexion) et le
+`DELETE` étaient des instructions autocommitées, si bien qu'un `DELETE` refusé
+(verrou expiré, `RESTRICT`) laissait un compte à moitié défait.
 
 Ensuite à la **course**, et c'est là que le verrou sert. Une partie des traces
 est tenue par des clés étrangères — `organizer_user_id` est en `RESTRICT`, la
