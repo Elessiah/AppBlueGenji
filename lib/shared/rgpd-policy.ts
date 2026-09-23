@@ -69,10 +69,11 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     donnee: "Identifiant Google",
     // L'**adresse** n'y figure pas, et ce n'est pas un oubli : plus rien ne
     // rattache un compte par son e-mail, le scope `email` n'est plus demandé, et
-    // la colonne n'a plus de lecteur. Ce qui reste est un identifiant opaque,
-    // qui ne s'affiche à personne.
+    // la colonne a été **supprimée** — avec les adresses collectées avant la
+    // règle. Ce qui reste est un identifiant opaque, qui ne s'affiche à
+    // personne.
     finalite:
-      "Moyen de connexion (bouton Google) — identifiant technique opaque, sans adresse e-mail. Retirable depuis Mon profil tant qu'il t'en reste un autre",
+      "Moyen de connexion (bouton Google) — identifiant technique opaque. Aucune adresse e-mail n'est demandée ni conservée. Retirable depuis Mon profil tant qu'il t'en reste un autre",
     base: "Consentement",
     duree: "Durée du compte",
   },

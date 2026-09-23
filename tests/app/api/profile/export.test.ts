@@ -16,7 +16,6 @@ function sampleExport(): PersonalDataExport {
     account: {
       id: 42,
       pseudo: "player",
-      email: "user@example.com",
       discordId: "123",
       discordPseudo: "player#0001",
       googleSub: null,
@@ -64,8 +63,12 @@ describe("GET /api/profile/export", () => {
     expect(exportOwnData).toHaveBeenCalledWith(42);
 
     const body = JSON.parse(await res.text()) as PersonalDataExport;
-    expect(body.account.email).toBe("user@example.com");
     expect(body.account.id).toBe(42);
+    // L'adresse n'a plus de champ : la colonne a été retirée de `bg_users`, et
+    // l'export ne peut donc plus la porter (`docs/DATABASE_SCHEMA.md`). Le
+    // gabarit n'étant pas type-vérifié par ts-jest (`tsconfig.jest.json`
+    // n'inclut pas `tests/`), seule une assertion explicite tient la règle.
+    expect(body.account).not.toHaveProperty("email");
   });
 
   it("serves the payload as a downloadable JSON attachment", async () => {
