@@ -1,33 +1,9 @@
 import { describe, it, expect } from "@jest/globals";
-import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
-import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
+import type { TournamentBuckets } from "@/lib/shared/types";
+import { tournamentCard } from "../helpers/tournament-card";
 import { buildTickerItems } from "@/app/(secured)/tournois/_lib/ticker";
 
-const card = (overrides: Partial<TournamentCard>): TournamentCard => ({
-  id: 1,
-  name: "Tournoi",
-  description: null,
-  format: "SINGLE",
-  game: "OW",
-  participantType: "TEAM",
-  maxTeams: 8,
-  registeredTeams: 0,
-  state: "UPCOMING",
-  startVisibilityAt: "2026-05-01T10:00:00Z",
-  registrationOpenAt: "2026-05-02T10:00:00Z",
-  registrationCloseAt: "2026-05-10T10:00:00Z",
-  startAt: "2026-05-12T10:00:00Z",
-  hasThirdPlaceMatch: false,
-  survivalRoundsBeforeFirstCut: null,
-  survivalRoundsPerCut: null,
-  phases: null,
-  matchFormat: null,
-  endurancePlayoffFormat: null,
-  registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
-  liveUrl: null,
-  image: null,
-  ...overrides,
-});
+const card = tournamentCard;
 
 const mockBuckets = (overrides?: Partial<TournamentBuckets>): TournamentBuckets => ({
   upcoming: [],

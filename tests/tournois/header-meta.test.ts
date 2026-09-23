@@ -16,11 +16,12 @@ import type {
   TournamentPhase,
   TournamentState,
 } from "@/lib/shared/types";
+import { tournamentCard } from "../helpers/tournament-card";
 
 const ROOT = join(__dirname, "..", "..");
 
 function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
-  return {
+  return tournamentCard({
     id: 1,
     name: "BlueGenji Slash Tournament",
     description: "saison 6",
@@ -39,14 +40,11 @@ function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
     survivalRoundsPerCut: null,
     phases: null,
     matchFormat: null,
-    endurancePlayoffFormat: null,
     // Conditions d'inscription : les défauts du module partagé, qui sont aussi
     // ceux que la migration a posés sur les tournois existants.
-    registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
     liveUrl: null,
-    image: null,
     ...overrides,
-  };
+  });
 }
 
 function phase(id: number, position: number): TournamentPhase {

@@ -3,8 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { LiveCard } from "@/components/cyber/landing/LiveCard";
 import type { LandingLive, LandingLiveMatch } from "@/lib/shared/landing";
 import type { MatchLiveState } from "@/lib/shared/live-streams";
-import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import type { TournamentCard } from "@/lib/shared/types";
+import { tournamentCard } from "../helpers/tournament-card";
 
 /**
  * La carte « en cours » de l'accueil met un match en avant — et doit y mener.
@@ -19,7 +19,7 @@ import type { TournamentCard } from "@/lib/shared/types";
 const ISO = "2026-09-01T18:00:00.000Z";
 
 function tournament(overrides: Partial<TournamentCard> = {}): TournamentCard {
-  return {
+  return tournamentCard({
     id: 7,
     name: "Coupe Genji",
     description: null,
@@ -38,12 +38,9 @@ function tournament(overrides: Partial<TournamentCard> = {}): TournamentCard {
     survivalRoundsPerCut: null,
     phases: null,
     matchFormat: null,
-    endurancePlayoffFormat: null,
-    registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
     liveUrl: null,
-    image: null,
     ...overrides,
-  };
+  });
 }
 
 function match(overrides: Partial<LandingLiveMatch> = {}): LandingLiveMatch {

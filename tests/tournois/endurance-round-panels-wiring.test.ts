@@ -8,6 +8,7 @@ import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie";
 import { createMatch } from "@/lib/server/tournaments/repository";
 import type { BracketMatch, MatchStatus } from "@/lib/shared/types";
 import { endurancePlayoffLinks } from "@/app/(secured)/tournois/[id]/_lib/endurance-sections";
+import { bracketMatch } from "../helpers/bracket-match";
 
 const ROOT = join(__dirname, "..", "..");
 const TOURNAMENT_DIR = join("app", "(secured)", "tournois", "[id]");
@@ -143,7 +144,7 @@ describe("endurancePlayoffLinks — accordé sur ce que crée le moteur", () => 
     { id: 104, match_number: 4, teams: [3, 7], winner: 3, loser: 7 },
   ];
 
-  const mockMatch = (overrides: Partial<BracketMatch>): BracketMatch => ({
+  const mockMatch = (overrides: Partial<BracketMatch>): BracketMatch => bracketMatch({
     id: 1,
     tournamentId: TOURNAMENT_ID,
     bracket: "UPPER",
@@ -167,13 +168,6 @@ describe("endurancePlayoffLinks — accordé sur ce que crée le moteur", () => 
     nextLoserSlot: null,
     scoreDeadlineAt: null,
     updatedAt: "2026-01-01T00:00:00.000Z",
-    doubleForfeit: false,
-    phaseId: 0,
-    phasePosition: null,
-    startAt: null,
-    liveTrigger: null,
-    liveUrl: null,
-    liveStartedAt: null,
     ...overrides,
   });
 

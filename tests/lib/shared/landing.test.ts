@@ -7,8 +7,8 @@ import {
   inferGameLabel,
   inferGameShortLabel,
 } from "@/lib/shared/landing";
-import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import type { TournamentBuckets, TournamentCard, TournamentState } from "@/lib/shared/types";
+import { tournamentCard } from "../../helpers/tournament-card";
 
 describe("inferGameLabel", () => {
   it("detects Marvel Rivals from either keyword", () => {
@@ -55,7 +55,7 @@ describe("inferGameShortLabel", () => {
 });
 
 function card(id: number, state: TournamentState, startAt = "2026-01-04T00:00:00.000Z"): TournamentCard {
-  return {
+  return tournamentCard({
     id,
     name: `Tournoi ${id}`,
     description: null,
@@ -74,11 +74,8 @@ function card(id: number, state: TournamentState, startAt = "2026-01-04T00:00:00
     survivalRoundsPerCut: null,
     phases: null,
     matchFormat: null,
-    endurancePlayoffFormat: null,
-    registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
     liveUrl: null,
-    image: null,
-  };
+  });
 }
 
 function buckets(partial: Partial<TournamentBuckets>): TournamentBuckets {

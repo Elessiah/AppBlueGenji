@@ -21,7 +21,7 @@ function json(path: string): Record<string, unknown> {
 }
 
 describe("type-vérification des tests", () => {
-  const config = json("tsconfig.tests.json");
+  const config = json("tsconfig.typecheck.json");
 
   it("hérite de la configuration de l'application", () => {
     // Mêmes options strictes, même alias `@/*` : un test ne doit pas être jugé
@@ -29,22 +29,28 @@ describe("type-vérification des tests", () => {
     expect(config.extends).toBe("./tsconfig.json");
   });
 
-  it("couvre tout `tests/`, sans l'exclure par héritage", () => {
-    expect(config.include).toEqual(expect.arrayContaining(["tests/**/*.ts", "tests/**/*.tsx"]));
+  it("couvre l'application **et** `tests/`, en un seul programme", () => {
+    // Un seul passage : un programme pour l'application puis un second pour
+    // les tests revérifiaient toute l'application, que les tests importent.
+    expect(config.include).toEqual(expect.arrayContaining(["**/*.ts", "**/*.tsx"]));
     // `exclude` doit être redéfini : hérité de `tsconfig.json`, il retirerait
-    // `tests` de ce qu'`include` vient d'y mettre — piège dans lequel
-    // `tsconfig.jest.json` était tombé.
+    // `tests` de ce qu'`include` vient d'y mettre.
     expect(config.exclude).toBeDefined();
     expect(config.exclude).not.toContain("tests");
   });
 
-  it("est lancée par `npm run typecheck`, avec celle de l'application", () => {
+  it("est lancée par `npm run typecheck`", () => {
     const pkg = json("package.json") as { scripts: Record<string, string> };
-    expect(pkg.scripts.typecheck).toContain("tsc --noEmit -p tsconfig.tests.json");
-    expect(pkg.scripts.typecheck).toMatch(/^tsc --noEmit &&/);
+    expect(pkg.scripts.typecheck).toBe("tsc --noEmit -p tsconfig.typecheck.json");
   });
 
   it("est jouée par le CI", () => {
     expect(readSource(".github/workflows/ci.yml")).toMatch(/run: npm run typecheck/);
+  });
+
+  it("ne laisse pas `tsconfig.jest.json` prétendre couvrir les tests", () => {
+    // Son `include: ["tests", …]` était annulé par l'`exclude` hérité : un
+    // `tsc -p tsconfig.jest.json` passait au vert sans lire un seul test.
+    expect(json("tsconfig.jest.json").include).toBeUndefined();
   });
 });

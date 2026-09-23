@@ -1,0 +1,14 @@
+{
+  // Vérification des types de **tout** le dépôt, tests compris, en un seul
+  // programme (`npm run typecheck`, joué par le CI). `tsconfig.json` exclut
+  // `tests/` — c'est lui que lit `next build` — et ts-jest ne fait que
+  // transpiler : sans ce fichier, un test pouvait contredire les types qu'il
+  // exerce sans que rien ne le dise.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "jsx": "react-jsx"
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", ".claude"]
+}

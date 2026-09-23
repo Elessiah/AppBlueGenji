@@ -9,8 +9,8 @@ import { generateMetadata } from "@/app/(secured)/tournois/[id]/layout";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import type { AuthUser } from "@/lib/server/auth";
-import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import type { TournamentCard } from "@/lib/shared/types";
+import { tournamentCard } from "../helpers/tournament-card";
 
 /**
  * L'aperçu d'un lien de tournoi, du côté du câblage.
@@ -40,7 +40,7 @@ const mockedUser = jest.mocked(getCurrentUser);
 const mockedSnapshot = jest.mocked(getVisibleTournamentSnapshot);
 
 function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
-  return {
+  return tournamentCard({
     id: 42,
     name: "OW Open Cup",
     description: null,
@@ -59,12 +59,9 @@ function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
     survivalRoundsPerCut: null,
     phases: null,
     matchFormat: null,
-    endurancePlayoffFormat: null,
-    registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
     liveUrl: null,
-    image: null,
     ...overrides,
-  };
+  });
 }
 
 function user(overrides: Partial<AuthUser> = {}): AuthUser {

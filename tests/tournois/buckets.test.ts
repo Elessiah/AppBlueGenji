@@ -1,5 +1,4 @@
 import { describe, it, expect } from "@jest/globals";
-import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import type { TournamentCard, TournamentBuckets } from "@/lib/shared/types";
 import {
   filterTournamentsByQuery,
@@ -8,32 +7,16 @@ import {
   flattenBuckets,
   countByGame,
 } from "@/app/(secured)/tournois/_lib/buckets";
+import { tournamentCard } from "../helpers/tournament-card";
 
-const mockCard = (overrides?: Partial<TournamentCard>): TournamentCard => ({
-  id: 1,
-  name: "Test Tournament",
-  description: "A test tournament",
-  format: "SINGLE",
-  game: "OW",
-  participantType: "TEAM",
-  state: "UPCOMING",
-  startVisibilityAt: "2026-05-01T10:00:00Z",
-  registrationOpenAt: "2026-05-02T10:00:00Z",
-  registrationCloseAt: "2026-05-10T10:00:00Z",
-  startAt: "2026-05-20T10:00:00Z",
-  registeredTeams: 4,
-  maxTeams: 8,
-  hasThirdPlaceMatch: false,
-  survivalRoundsBeforeFirstCut: null,
-  survivalRoundsPerCut: null,
-  phases: null,
-  matchFormat: null,
-  endurancePlayoffFormat: null,
-  registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
-  liveUrl: null,
-  image: null,
-  ...overrides,
-});
+const mockCard = (overrides?: Partial<TournamentCard>): TournamentCard =>
+  tournamentCard({
+    name: "Test Tournament",
+    description: "A test tournament",
+    startAt: "2026-05-20T10:00:00Z",
+    registeredTeams: 4,
+    ...overrides,
+  });
 
 const mockBuckets = (overrides?: Partial<TournamentBuckets>): TournamentBuckets => ({
   upcoming: [],

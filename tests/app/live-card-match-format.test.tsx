@@ -3,8 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { LiveCard } from "@/components/cyber/landing/LiveCard";
 import type { LandingLive, LandingLiveMatch } from "@/lib/shared/landing";
 import { MATCH_FORMAT_BOUNDS, matchFormatLabel, type MatchFormat } from "@/lib/shared/match-format";
-import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import type { TournamentCard } from "@/lib/shared/types";
+import { tournamentCard } from "../helpers/tournament-card";
 
 /**
  * La carte « en cours » de l'accueil annonce le format des matchs du tournoi.
@@ -23,7 +23,7 @@ import type { TournamentCard } from "@/lib/shared/types";
 const ISO = "2026-09-01T18:00:00.000Z";
 
 function tournament(matchFormat: MatchFormat | null): TournamentCard {
-  return {
+  return tournamentCard({
     id: 7,
     name: "Coupe Genji",
     description: null,
@@ -42,11 +42,8 @@ function tournament(matchFormat: MatchFormat | null): TournamentCard {
     survivalRoundsPerCut: null,
     phases: null,
     matchFormat,
-    endurancePlayoffFormat: null,
-    registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
     liveUrl: null,
-    image: null,
-  };
+  });
 }
 
 function match(roundLabel: string, matchFormat: MatchFormat | null = null): LandingLiveMatch {
