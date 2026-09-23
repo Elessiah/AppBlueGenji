@@ -236,7 +236,7 @@ export default function RgpdPage() {
               sur la plateforme. Il est supprimé à la déconnexion.
             </li>
             <li>
-              <strong>bg_oauth</strong> — déposé <strong>le temps d&apos;une connexion</strong>
+              <strong>bg_oauth</strong> — déposé <strong>le temps d&apos;une connexion</strong>{" "}
               par Google, Discord ou Blizzard, et supprimé dès le retour. Il dure dix minutes
               au plus et ne contient qu&apos;un jeton aléatoire à usage unique (protection
               anti-CSRF), le nom du fournisseur et la page où te ramener. Aucun identifiant de

@@ -211,6 +211,8 @@ export const ERROR_MESSAGES: Record<string, string> = {
     "Une manche a été jouée depuis : cette pénalité ne peut plus être retirée.",
   NOT_BG_SURVIE: "Les pénalités d'endurance n'existent qu'en mode BlueGenji Survie.",
   PENALTY_FAILED: "Erreur lors de l'enregistrement de la pénalité.",
+  PENALTIES_UNAVAILABLE:
+    "Les pénalités sont indisponibles sur ce serveur : leur table n'existe pas. Prévenez un administrateur.",
   PENALTY_LIFT_FAILED: "Erreur lors du retrait de la pénalité.",
 };
 

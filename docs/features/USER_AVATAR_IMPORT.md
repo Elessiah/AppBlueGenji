@@ -134,7 +134,7 @@ qu'une fois la ligne écrite.
 ## Les comptes d'avant
 
 ```bash
-npm run backfill:avatars
+NODE_ENV=production npm run backfill:avatars
 ```
 
 Il est fait pour tourner **sur le serveur**, et il importe `lib/server/script-env.ts`
@@ -142,7 +142,11 @@ pour cela : `dotenv/config`, qu'emploient les autres scripts `tsx`, ne connaît 
 `.env` — or la production n'en a pas, sa configuration vit dans `.env.production`,
 que Next charge seul. Lancé en production le 16/09/2026 dans sa première version,
 le script est mort sur `Missing required environment variable DB_HOST` avant
-d'avoir rien lu.
+d'avoir rien lu. `script-env` choisit ses fichiers d'après `NODE_ENV`, que le shell
+du serveur n'exporte pas (seul pm2 le pose) : d'où le préfixe, sans lequel
+`.env.production` reste ignoré. Oublié, le script le dit avant de mourir
+(`missingNodeEnvNotice`) — il ne se rabat **pas** seul sur la production, un poste
+de développement pouvant garder un `.env.production`.
 
 Rapatrie d'un coup les photos des comptes dont l'avatar est resté une URL
 étrangère. Séquentiel à dessein — ouvrir des dizaines de connexions simultanées

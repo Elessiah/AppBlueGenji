@@ -86,5 +86,12 @@ quand `NODE_ENV=production`, avant toute connexion. Le refus porte sur
 Pour rapatrier les photos de profil restées chez leur hébergeur d'origine :
 
 ```bash
-npm run backfill:avatars     # conçu pour tourner en production, idempotent
+NODE_ENV=production npm run backfill:avatars     # conçu pour tourner en production, idempotent
 ```
+
+`NODE_ENV=production` n'est pas décoratif : les scripts `tsx` choisissent leurs
+fichiers d'environnement d'après lui (`lib/server/script-env.ts`), et le shell du
+serveur ne l'exporte pas — seul pm2 le pose. Sans lui, `.env.production` n'est
+pas lu et le script meurt sur `Missing required environment variable DB_HOST` ;
+il affiche désormais juste avant la commande à relancer. Même règle pour
+`npm run replay:deletions`.

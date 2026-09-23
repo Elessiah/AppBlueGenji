@@ -187,3 +187,23 @@ relisible de ce qui part dans `purgeTournamentRows`
 (`docs/features/TOURNAMENT_DELETION.md`), sous `try` comme les alertes arbitre —
 sa création est avalée par un `catch` dans `database.ts`, et une base à qui la
 table manquerait rendrait sinon tous les tournois indéboulonnables.
+
+## Une base sans la table
+
+La même création avalée vaut pour les lectures : une base privée de
+`bg_endurance_penalties` doit continuer de jouer ses tournois BG Survie, une
+sanction perdue valant mieux qu'un report de score en erreur. Aucune sanction
+n'ayant pu y être posée, la lire vide est exact
+(`rowsOrEmptyIfMissingTable`, `lib/server/mysql-errors.ts`) :
+
+- la réconciliation rejoue le tournoi **sans sanction** ;
+- le classement s'affiche avec un journal des sanctions **vide** ;
+- le retrait répond `PENALTY_NOT_FOUND` (404) — l'identifiant ne désigne rien ;
+- la **pose** est la seule à ne pas pouvoir faire semblant : elle est refusée
+  en `PENALTIES_UNAVAILABLE` (**503**), traduit en français côté interface, et
+  non par le message brut de MySQL, qui nommerait la base et la table dans la
+  notification de l'arbitre.
+
+Le remède est de créer la table (redémarrer l'application rejoue son
+`CREATE TABLE`) ; toute autre erreur sur la table remonte telle quelle — un
+interblocage, en particulier, a déjà défait la transaction.

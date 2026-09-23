@@ -117,6 +117,9 @@ describe("POST /api/tournaments/[id]/penalties", () => {
       ["TEAM_ALREADY_OUT", 400],
       ["INVALID_PENALTY", 400],
       ["TEAM_NOT_IN_TOURNAMENT", 404],
+      // Table des sanctions absente : le service est indisponible, et le code
+      // part à la place du message brut de MySQL.
+      ["PENALTIES_UNAVAILABLE", 503],
     ];
 
     for (const [message, status] of cases) {

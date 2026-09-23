@@ -16,7 +16,7 @@ npm test             # Jest test suite
 npm run test:coverage
 npm run seed         # Populate MySQL with test data (matrice de cas, voir ci-dessous)
 npm run seed:view    # Inspect seeded test data
-npm run backfill:avatars  # Rapatrie les photos restées chez leur hébergeur (prévu pour la prod)
+NODE_ENV=production npm run backfill:avatars  # Rapatrie les photos restées chez leur hébergeur (prévu pour la prod)
 NODE_ENV=production npm run replay:deletions  # Après restauration d'une sauvegarde : rejoue les suppressions de compte (--dry-run d'abord)
 ./update.sh          # Déploiement (voir docs/DEPLOYMENT.md — et n'effacez jamais les journaux pm2 à la main)
 ```

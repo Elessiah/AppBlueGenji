@@ -42,13 +42,11 @@ export function isTransactionAborted(error: unknown): boolean {
  * qu'un report de score en erreur. Les purges — suppression d'un tournoi,
  * retour en arrière, réécriture d'un tour de play-off — passent toutes par
  * `ignoreMissingTable` : sans quoi une base qui en manque rendrait tout tournoi
- * indélébile pour une table de notifications.
- *
- * **Tous les lecteurs ne le font pas encore** : les lectures de
- * `bg_endurance_penalties` dans `tournaments/bg-survie.ts` (`loadPenalties`,
- * `loadPenaltyRows`) n'ont pas de garde, si bien qu'une base sans cette table
- * ferait échouer toute réconciliation BG Survie. Défaut préexistant, consigné
- * dans `ERREUR.txt`.
+ * indélébile pour une table de notifications. Les lectures des **sanctions**
+ * passent par `rowsOrEmptyIfMissingTable` : une table absente n'a rien pu
+ * enregistrer, et la lire vide est exact. Pas celles des réservations
+ * (`refereeAlertExists`, `loadSentReminders`) : lire vide y laisserait passer
+ * une réservation, et leurs appelants avalent déjà l'échec.
  *
  * Les autres tables ne sont **pas** tolérées : le site n'a rien à servir sans
  * elles, et ce prédicat n'a donc pas à couvrir leur absence.
@@ -69,6 +67,26 @@ export async function ignoreMissingTable(write: Promise<unknown>): Promise<void>
     await write;
   } catch (error) {
     if (!isMissingTableError(error)) throw error;
+  }
+}
+
+/**
+ * Lit les lignes d'un `SELECT` sur l'une des trois tables tolérées, en tenant
+ * son absence pour « aucune ligne ».
+ *
+ * Aucune ligne n'a pu être écrite dans une table qui n'existe pas : la lire
+ * vide n'invente rien. Sans cette garde, une base privée de
+ * `bg_endurance_penalties` faisait échouer **toute** réconciliation BG Survie —
+ * donc tout report de score du mode — pour une table de sanctions. Toute autre
+ * erreur remonte, pour la même raison qu'`ignoreMissingTable`.
+ */
+export async function rowsOrEmptyIfMissingTable<T>(read: Promise<[T[], unknown]>): Promise<T[]> {
+  try {
+    const [rows] = await read;
+    return rows;
+  } catch (error) {
+    if (!isMissingTableError(error)) throw error;
+    return [];
   }
 }
 
