@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import robots from "@/app/robots";
 import sitemap from "@/app/sitemap";
-import { BOT_DOC_SECTIONS } from "@/lib/server/bot-docs";
+import { visibleBotDocSections } from "@/lib/shared/bot-doc-sections";
 import { TOURNAMENT_RULE_MODES } from "@/lib/shared/tournament-rules";
 
 /**
@@ -85,13 +85,20 @@ describe("sitemap.xml", () => {
     expect(urls).not.toContain("https://bluegenji-esport.fr/");
   });
 
-  it("liste chaque page de règles et chaque section de doc du bot", () => {
+  it("liste chaque page de règles et chaque section publique de doc du bot", () => {
     const urls = sitemap().map((entry) => entry.url);
     for (const mode of TOURNAMENT_RULE_MODES) {
       expect(urls).toContain(`https://bluegenji-esport.fr/regles/${mode.slug}`);
     }
-    for (const section of BOT_DOC_SECTIONS) {
+    for (const section of visibleBotDocSections(false)) {
       expect(urls).toContain(`https://bluegenji-esport.fr/bot/docs/${section.slug}`);
+    }
+  });
+
+  it("n'indexe aucune page de doc réservée au staff", () => {
+    const urls = sitemap().map((entry) => entry.url);
+    for (const slug of ["adhesions", "api-interne", "architecture", "base-de-donnees"]) {
+      expect(urls).not.toContain(`https://bluegenji-esport.fr/bot/docs/${slug}`);
     }
   });
 
