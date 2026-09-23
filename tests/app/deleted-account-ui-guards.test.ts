@@ -28,12 +28,18 @@ describe("interface — un compte supprimé ne se propose ni ne se raconte en co
   });
 
   it("traduit ACCOUNT_DELETED sur **toutes** les écritures du profil", () => {
-    // Sauvegarde du profil, téléversement d'avatar **et retrait d'avatar** :
-    // les trois écritures qui peuvent perdre leur course contre la suppression.
-    // Le retrait manquait à l'appel — il part par la même route que le
-    // téléversement et se fait refuser par la même garde.
+    // Sauvegarde du profil, téléversement d'avatar, retrait d'avatar **et
+    // retrait du tag Discord** : les quatre écritures qui peuvent perdre leur
+    // course contre la suppression. La dernière est arrivée avec le verrou du
+    // tag (#140) et n'existait pas quand cette garde a été écrite — elle part
+    // vers `PATCH /api/profile`, exactement comme la sauvegarde du profil, donc
+    // elle reçoit le même 409.
+    //
+    // Le compte est **exact** et non un minimum : c'est lui qui a fait tomber
+    // ce contrôle au moment de la fusion, et c'est tout ce qu'on lui demande —
+    // qu'une écriture ajoutée ailleurs ne puisse pas entrer sans passer ici.
     const calls = PROFIL.match(/accountDeletedWriteMessage\(/g) ?? [];
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(4);
     for (const code of [
       "PROFILE_UPDATE_FAILED",
       "AVATAR_UPLOAD_FAILED",

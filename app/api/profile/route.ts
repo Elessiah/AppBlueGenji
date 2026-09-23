@@ -2,6 +2,7 @@
 import { fail, ok } from "@/lib/server/http";
 import { deleteOwnAccount, getFullProfile, updateOwnProfile } from "@/lib/server/users-service";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
+import { DISCORD_TAG_LOCKED } from "@/lib/shared/discord-tag-lock";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -45,6 +46,9 @@ export async function PATCH(req: Request) {
     // même refus que sur l'avatar, et même code — c'est un conflit d'état, pas
     // une saisie fautive.
     if (message === ACCOUNT_DELETED_ERROR) return fail(message, 409);
+    // La saisie est bonne, c'est l'état du compte qui l'interdit : un compte
+    // Discord rattaché possède son tag (`lib/shared/discord-tag-lock.ts`).
+    if (message === DISCORD_TAG_LOCKED) return fail(message, 409);
     return fail(message || "PROFILE_UPDATE_FAILED", 400);
   }
 }

@@ -4,7 +4,6 @@ import type {
   BotKpis,
   BotServersPayload,
   BotActivity,
-  BotModulesPayload,
   SiteVisitStats,
 } from "@/lib/shared/types";
 
@@ -510,34 +509,6 @@ export async function fetchBotActivity(
 
     recordSuccess();
     return (await response.json()) as BotActivity;
-  } catch {
-    recordFailure();
-    return null;
-  }
-}
-
-export async function fetchBotModules(guildId: string): Promise<BotModulesPayload | null> {
-  if (isCircuitOpen()) {
-    return null;
-  }
-
-  const baseUrl = resolveBotInternalUrl();
-
-  try {
-    const response = await fetch(`${baseUrl}/internal/servers/${guildId}/modules`, {
-      method: "GET",
-      headers: getInternalHeaders(),
-      cache: "no-store",
-      signal: AbortSignal.timeout(BOT_FETCH_TIMEOUT_MS),
-    });
-
-    if (!response.ok) {
-      recordFailure();
-      return null;
-    }
-
-    recordSuccess();
-    return (await response.json()) as BotModulesPayload;
   } catch {
     recordFailure();
     return null;

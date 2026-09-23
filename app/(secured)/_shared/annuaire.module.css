@@ -157,7 +157,7 @@
   display: grid;
   place-items: center;
 }
-.search input {
+.search input:not([type="checkbox"]):not([type="radio"]) {
   flex: 1;
   background: transparent;
   border: none;
@@ -167,7 +167,7 @@
   font-size: 14px;
   color: var(--ink);
 }
-.search input::placeholder {
+.search input:not([type="checkbox"]):not([type="radio"])::placeholder {
   color: var(--ink-dim);
 }
 .searchKbd {
@@ -788,6 +788,10 @@
 .plTeam em {
   font-style: normal;
   color: var(--c, var(--blue-300));
+}
+/* Statut sans roster : en retrait du nom d'équipe, qui porte la couleur. */
+.plNoTeam {
+  color: var(--ink-dim);
 }
 
 .plRoles {

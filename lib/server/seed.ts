@@ -166,7 +166,6 @@ interface SpecialUserDef {
   /** Ouvert au recrutement (défaut 1) — 0 = ne veut pas être démarché. */
   openToRecruitment?: 0 | 1;
   withGameTags?: boolean;
-  email?: string;
   discordId?: string;
   /** Tag Discord stocké (`discord_pseudo`). Absent = aucun tag. */
   discordTag?: string;
@@ -184,7 +183,6 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     purpose: "admin global (organisateur de tous les tournois seedés)",
     isAdmin: true,
     isAdult: 1,
-    email: "admin@example.test",
     discordId: "900000000000000001",
     discordTag: "test_admin",
     discordVerified: true,
@@ -561,14 +559,13 @@ async function createSpecialUsers(db: Pool): Promise<Map<string, number>> {
     try {
       const [result] = await db.execute<ResultSetHeader>(
         `INSERT INTO bg_users
-         (pseudo, email, discord_id, discord_pseudo, discord_verified_at,
+         (pseudo, discord_id, discord_pseudo, discord_verified_at,
           overwatch_battletag, marvel_rivals_tag,
           visible_avatar, visible_overwatch, visible_marvel, visible_major,
           open_to_recruitment, is_adult, is_admin, is_deleted, platform_roles_json)
-         VALUES (?, ?, ?, ?, ${def.discordVerified ? "NOW()" : "NULL"}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ${def.discordVerified ? "NOW()" : "NULL"}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           pseudo,
-          def.email ?? null,
           def.discordId ?? null,
           def.discordTag ?? null,
           withTags ? `${def.pseudo}#1000` : null,

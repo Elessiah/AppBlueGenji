@@ -18,7 +18,6 @@ function exportRow(overrides: Record<string, unknown> = {}) {
     discord_pseudo: "player#0001",
     discord_id: "123456789",
     google_sub: null,
-    email: "user@example.com",
     is_adult: 1,
     is_admin: 0,
     visible_avatar: 0,
@@ -56,7 +55,7 @@ describe("exportOwnData", () => {
   beforeEach(() => jest.clearAllMocks());
   afterEach(() => jest.restoreAllMocks());
 
-  it("includes raw account identifiers reserved to the owner (email, discord, google)", async () => {
+  it("includes raw account identifiers reserved to the owner (discord, google, blizzard)", async () => {
     const execute = jest
       .fn()
       .mockResolvedValueOnce([[exportRow()]]) // identifiants bruts
@@ -70,7 +69,6 @@ describe("exportOwnData", () => {
 
     expect(data.account).toMatchObject({
       id: 42,
-      email: "user@example.com",
       discordId: "123456789",
       googleSub: null,
       isAdmin: false,
@@ -112,5 +110,38 @@ describe("exportOwnData", () => {
 
     await expect(exportOwnData(999)).rejects.toThrow("PROFILE_NOT_FOUND");
     expect(execute).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("exportOwnData — plus aucune adresse", () => {
+  it("n'expose aucun champ `email` : la colonne n'existe plus", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([[exportRow()]])
+      .mockResolvedValueOnce([[fullProfileRow()]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    const data = await exportOwnData(42);
+
+    expect(Object.keys(data.account)).not.toContain("email");
+  });
+
+  it("ne la demande pas non plus en base", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([[exportRow()]])
+      .mockResolvedValueOnce([[fullProfileRow()]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    await exportOwnData(42);
+
+    const [sql] = execute.mock.calls[0] as [string];
+    expect(sql).not.toContain("email");
   });
 });

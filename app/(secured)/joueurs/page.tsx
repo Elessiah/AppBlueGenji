@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { PublicUserProfile, PlayerRole } from "@/lib/shared/types";
+import { isFreeAgent } from "@/lib/shared/player-roster-status";
 import { useToast } from "@/components/ui/toast";
 import { Ticker } from "@/components/cyber/Ticker";
 import { BgCanvas } from "../_shared/BgCanvas";
@@ -63,7 +64,7 @@ export default function PlayersPage() {
       if (roleFilter !== "all" && !(p.roles || []).includes(roleFilter as PlayerRole)) return false;
       // Free agent = sans roster ET ouvert au recrutement : un joueur qui a
       // décoché « ouvert aux propositions » ne veut pas être démarché.
-      if (statusFilter === "free" && (p.team || p.openToRecruitment === false)) return false;
+      if (statusFilter === "free" && !isFreeAgent(p)) return false;
       return true;
     });
     r = [...r];
@@ -72,9 +73,16 @@ export default function PlayersPage() {
     return r;
   }, [listed, query, roleFilter, statusFilter, sort]);
 
-  const freeAgents = listed.filter((p) => !p.team && p.openToRecruitment !== false).length;
+  // Le prédicat partagé (#139) posé sur la liste **affichée** (#142) : les deux
+  // conditions du compteur venaient de branches différentes et aucune ne
+  // remplace l'autre — « free agent » se lit toujours sur l'ouverture au
+  // recrutement, et un compteur qui ne suivrait pas la case « comptes
+  // supprimés » contredirait la liste qu'il surmonte.
+  const freeAgents = listed.filter(isFreeAgent).length;
   const owCount = listed.filter((p) => (p.games || []).includes("OW")).length;
   const mrCount = listed.filter((p) => (p.games || []).includes("MR")).length;
+  // Celui-ci se compte sur **tout** l'annuaire : c'est l'étiquette de la case,
+  // et elle doit dire combien de comptes elle ferait apparaître.
   const deletedCount = players.filter((p) => p.isDeleted).length;
 
   const accentStyle = {
@@ -120,7 +128,7 @@ export default function PlayersPage() {
             </div>
             <div className={s.metric}>
               <div className={s.metricNum}>{freeAgents}</div>
-              <div className={s.metricLbl}>Free agents · sans roster</div>
+              <div className={s.metricLbl}>Free agents · ouverts aux offres</div>
             </div>
             <div className={s.metric}>
               <div className={s.metricNum}>{owCount}</div>

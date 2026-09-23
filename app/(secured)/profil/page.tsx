@@ -18,6 +18,11 @@ import {
 import { useToast } from "@/components/ui/toast";
 import { TeamLink } from "@/components/entity-link";
 import { VerifiedBadge } from "@/components/discord-tag";
+import {
+  discordTagLockNotice,
+  isDiscordTagLocked,
+} from "@/lib/shared/discord-tag-lock";
+import { profileErrorMessage, profileLoadErrorMessage } from "./profile-errors";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
 
@@ -44,11 +49,21 @@ export default function ProfilePage() {
   // État Discord du compte, lu à part du formulaire : la certification porte sur
   // ce qui est **enregistré**, pas sur ce qui est en train d'être tapé. Un champ
   // modifié sans être sauvegardé ne doit ni gagner ni perdre la pastille.
+  //
+  // `linked` vaut `null` tant que l'état n'a pas été **lu** : ni rattaché ni
+  // libre, inconnu. Partir de `false` revenait à affirmer le cas qui ouvre le
+  // champ, donc à l'ouvrir au premier rendu et à le laisser ouvert si l'appel
+  // échouait — le tag alors saisi faisait refuser toute la sauvegarde en 409.
   const [discordState, setDiscordState] = useState<{
     tag: string | null;
     verified: boolean;
-    linked: boolean;
-  }>({ tag: null, verified: false, linked: false });
+    linked: boolean | null;
+  }>({ tag: null, verified: false, linked: null });
+  // Le tag **tel qu'il est enregistré**, indépendamment de ce qui est tapé : il
+  // décide si la sauvegarde a quelque chose à dire sur ce champ. Sans lui, la
+  // seule façon de le savoir était l'état du verrou — un renseignement que
+  // l'écran peut avoir périmé (voir `onSubmit`).
+  const [savedDiscordPseudo, setSavedDiscordPseudo] = useState("");
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [isAdult, setIsAdult] = useState<string>("unknown");
   const [deleting, setDeleting] = useState(false);
@@ -74,13 +89,46 @@ export default function ProfilePage() {
     }
   };
 
+  // **Vrai dès le premier rendu** : une lecture part au montage, et partir de
+  // `false` laissait une fenêtre — entre le premier rendu et l'effet — où
+  // l'écran annonçait une panne de lecture avant d'avoir essayé quoi que ce
+  // soit.
+  const [discordStateBusy, setDiscordStateBusy] = useState(true);
+
+  /**
+   * Le numéro de la **dernière lecture lancée**.
+   *
+   * Deux lectures peuvent être en vol en même temps — sauvegarder puis retirer
+   * son tag dans la foulée en lance deux —, et rien ne garantit qu'elles
+   * reviennent dans l'ordre. Celle du `PATCH`, revenue après celle du retrait,
+   * reposait `{tag, verified: true}` : l'écran gardait la pastille et « les
+   * administrateurs le voient » à côté d'un champ vidé, jusqu'au rechargement.
+   *
+   * Une `ref` et non un état : elle ne doit provoquer aucun rendu, et doit être
+   * lue à sa valeur **du moment**, pas à celle figée dans la fermeture.
+   */
+  const discordReadSeq = useRef(0);
+
   const loadDiscordState = async () => {
+    const seq = (discordReadSeq.current += 1);
+    setDiscordStateBusy(true);
     try {
       const res = await fetch("/api/profile/discord", { cache: "no-store" });
       if (!res.ok) return;
-      setDiscordState((await res.json()) as { tag: string | null; verified: boolean; linked: boolean });
+      const payload = (await res.json()) as { tag: string | null; verified: boolean; linked: boolean };
+      // Une lecture dépassée n'écrit rien : ce qu'elle a vu est plus vieux que
+      // ce que l'écran affiche déjà.
+      if (seq !== discordReadSeq.current) return;
+      setDiscordState(payload);
     } catch {
-      // silencieux : le formulaire reste utilisable sans la pastille.
+      // Silencieux, mais **pas anodin** : l'état reste `linked: null`, donc le
+      // champ reste verrouillé. Le reste du formulaire s'enregistre normalement,
+      // et le bouton « Réessayer » ci-dessous rouvre le seul chemin fermé.
+    } finally {
+      // L'attente ne se lève que sur la **dernière** lecture : la dépassée qui
+      // rentre la première rouvrait sinon « Réessayer » alors qu'une lecture
+      // court encore, et faisait annoncer une panne pendant ce temps-là.
+      if (seq === discordReadSeq.current) setDiscordStateBusy(false);
     }
   };
 
@@ -112,7 +160,12 @@ export default function ProfilePage() {
       if (!response.ok) {
         const errorCode = payload.error || "PROFILE_LOAD_FAILED";
         if (errorCode === "PROFILE_NOT_FOUND") {
-          showError(errorCode);
+          // Chemin de **lecture** : le repli doit l'être aussi. `PROFILE_NOT_FOUND`
+          // est nommé dans le registre, donc les deux fonctions rendent
+          // aujourd'hui la même phrase — mais le jour où ce code en sortirait,
+          // celle-ci annoncerait « La sauvegarde a échoué » à un visiteur qui
+          // vient d'ouvrir la page, le défaut même que ce registre sépare.
+          showError(profileLoadErrorMessage(errorCode));
           setTimeout(() => router.push("/"), 1500);
           return;
         }
@@ -123,6 +176,7 @@ export default function ProfilePage() {
       setOverwatchBattletag(payload.profile.overwatchBattletag || "");
       setMarvelRivalsTag(payload.profile.marvelRivalsTag || "");
       setDiscordPseudo(payload.profile.discordPseudo || "");
+      setSavedDiscordPseudo(payload.profile.discordPseudo || "");
       setIsAdult(payload.profile.isAdult === null ? "unknown" : payload.profile.isAdult ? "yes" : "no");
       const v = payload.profile.visibility;
       setOpenToRecruitment(payload.profile.openToRecruitment !== false);
@@ -133,12 +187,34 @@ export default function ProfilePage() {
         major: !!v.major,
       });
     };
-    load().catch((e) => showError((e as Error).message));
+    // Les chemins de **lecture** passent par le registre, comme les écritures —
+    // `profile-errors.ts` s'interdit en toutes lettres de laisser sortir un code
+    // en capitales dans un toast, et un `UNAUTHORIZED` brut n'aide personne —
+    // mais avec **leur** repli : « La sauvegarde a échoué » annonçait à un
+    // visiteur qui vient d'ouvrir la page l'échec d'un geste qu'il n'a pas
+    // fait. Les codes nommés (session expirée, compte introuvable) gardent
+    // leur phrase, qui vaut des deux côtés.
+    load().catch((e) => showError(profileLoadErrorMessage((e as Error).message)));
   }, [showError, router]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     try {
+      // **On ne soumet que ce qu'on a changé.** Le formulaire renvoyait le tag
+      // de son instantané de montage à chaque sauvegarde, si bien qu'un tag
+      // réécrit ailleurs entre-temps (renommage sur Discord puis connexion
+      // depuis un autre appareil) faisait refuser **tout** le `PATCH` en 409 —
+      // pseudo, visibilités et BattleTag emportés par un champ auquel personne
+      // n'avait touché. Omettre la clé n'efface rien : le service ne touche
+      // `discord_pseudo` que si le patch en parle.
+      //
+      // La condition porte sur la **valeur**, et non sur le verrou : le verrou
+      // se lit sur un état que l'écran peut avoir périmé — un onglet ouvert
+      // avant un rattachement fait ailleurs porte encore `linked: false`, et
+      // c'est précisément le cas où le refus tombe. La valeur, elle, dit
+      // exactement ce qu'il faut savoir : ce champ a-t-il quelque chose à
+      // écrire ?
+      const touchesDiscordTag = discordPseudo.trim() !== savedDiscordPseudo.trim();
       const response = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
@@ -146,7 +222,9 @@ export default function ProfilePage() {
           pseudo,
           overwatchBattletag: overwatchBattletag.trim() ? overwatchBattletag.trim() : null,
           marvelRivalsTag: marvelRivalsTag.trim() ? marvelRivalsTag.trim() : null,
-          discordPseudo: discordPseudo.trim() ? discordPseudo.trim() : null,
+          ...(touchesDiscordTag
+            ? { discordPseudo: discordPseudo.trim() ? discordPseudo.trim() : null }
+            : {}),
           isAdult: isAdult === "unknown" ? null : isAdult === "yes",
           visibility,
           openToRecruitment,
@@ -157,13 +235,75 @@ export default function ProfilePage() {
         throw new Error(accountDeletedWriteMessage(payload.error, "PROFILE_UPDATE_FAILED"));
       }
       setData(payload);
+      // Le champ **et sa référence**, comme au chargement. Réaligner la seule
+      // référence les faisait diverger dès que le tag avait bougé ailleurs : la
+      // sauvegarde suivante resoumettait celui du montage et mourait en 409
+      // `DISCORD_TAG_LOCKED` — précisément ce que cette référence existe pour
+      // empêcher —, sans autre issue qu'un rechargement puisque le champ est en
+      // lecture seule. Le champ affichait en prime un tag que l'aide juste en
+      // dessous contredisait.
+      setDiscordPseudo(payload.profile.discordPseudo || "");
+      setSavedDiscordPseudo(payload.profile.discordPseudo || "");
       // Une sauvegarde qui change le tag **annule la certification** côté
       // serveur : la pastille doit tomber dans le même geste, sinon l'écran
       // annonce une exposition qui n'existe plus.
       await loadDiscordState();
       showSuccess("Profil mis à jour.");
     } catch (e) {
-      showError((e as Error).message);
+      // Le registre du profil, et non celui de la certification : router ces
+      // erreurs vers l'autre faisait annoncer « La certification a échoué » à un
+      // pseudo déjà pris ou à une coupure réseau.
+      showError(profileErrorMessage((e as Error).message));
+    }
+  };
+
+  const [discordTagBusy, setDiscordTagBusy] = useState(false);
+
+  /**
+   * Retirer son tag Discord — l'annulation de l'exposition.
+   *
+   * Passe par la sauvegarde ordinaire du profil : c'est `updateOwnProfile` qui
+   * décertifie en même temps qu'il efface, et un second chemin laisserait un
+   * compte certifié sur un tag qu'il vient de retirer.
+   */
+  const onDiscordTagRemove = async () => {
+    if (!window.confirm(
+      "Retirer ton tag Discord ? L'organisation ne pourra plus te joindre pendant un tournoi.\n\nAttention : ta prochaine connexion par Discord le réenregistrera automatiquement, certifié. Pour ne plus être joignable durablement, entre par une autre porte.",
+    )) {
+      return;
+    }
+    setDiscordTagBusy(true);
+    try {
+      const response = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ discordPseudo: null }),
+      });
+      const payload = (await response.json()) as FullProfileResponse & { error?: string };
+      // Quatrième écriture vers `PATCH /api/profile`, arrivée avec le verrou du
+      // tag : elle passe par la même porte que la sauvegarde du profil, donc
+      // elle peut recevoir le même 409 `ACCOUNT_DELETED` — le compte supprimé
+      // depuis un autre onglet pendant que celle-ci attendait son verrou. Sans
+      // le registre, le joueur lisait le code en capitales.
+      if (!response.ok) {
+        throw new Error(accountDeletedWriteMessage(payload.error, "PROFILE_UPDATE_FAILED"));
+      }
+      setData(payload);
+      setDiscordPseudo("");
+      setSavedDiscordPseudo("");
+      // L'état est posé **depuis la réponse**, et non attendu d'une seconde
+      // lecture : `loadDiscordState` se tait quand elle échoue, et l'écran
+      // gardait alors la pastille et « ce pseudo est certifié : les
+      // administrateurs le voient » à côté d'un champ qu'on vient de vider. La
+      // réponse du `PATCH` porte déjà la vérité — le tag est parti, donc la
+      // certification avec (toute modification du tag la défait).
+      setDiscordState((prev) => ({ ...prev, tag: null, verified: false }));
+      await loadDiscordState();
+      showSuccess("Tag Discord retiré.");
+    } catch (e) {
+      showError(profileErrorMessage((e as Error).message));
+    } finally {
+      setDiscordTagBusy(false);
     }
   };
 
@@ -283,6 +423,10 @@ export default function ProfilePage() {
     }
   };
 
+  // Le verrou se lit sur le rattachement **enregistré**, jamais sur le champ en
+  // cours de saisie : le formulaire ne doit ni ouvrir ni fermer ce qu'il montre.
+  const discordLocked = isDiscordTagLocked(discordState);
+
   if (!data) return <section className="ds-block" style={{ color: "var(--text-2)" }}>Chargement du profil...</section>;
 
   return (
@@ -290,11 +434,21 @@ export default function ProfilePage() {
       {verifyOpen && (
         <DiscordVerificationDialog
           initialTag={discordPseudo}
-          linked={discordState.linked}
+          /* L'inconnu n'est pas un rattachement : le dialogue n'est de toute
+             façon atteignable qu'avec un état lu, ses deux boutons étant sous
+             un `linked` connu. */
+          linked={discordState.linked === true}
           onClose={() => setVerifyOpen(false)}
           onVerified={(tag) => {
             setVerifyOpen(false);
             setDiscordPseudo(tag);
+            // La certification **écrit** le tag en base : la référence suit, au
+            // même titre qu'après une sauvegarde. Laissée en arrière, elle
+            // faisait resoumettre ce tag à chaque enregistrement ultérieur —
+            // et un tag déplacé entre-temps faisait alors mourir tout le
+            // `PATCH` en 409, exactement ce que cette référence existe pour
+            // empêcher.
+            setSavedDiscordPseudo(tag);
             setDiscordState((prev) => ({ ...prev, tag, verified: true, linked: true }));
           }}
         />
@@ -400,29 +554,109 @@ export default function ProfilePage() {
                 onChange={(e) => setDiscordPseudo(e.target.value)}
                 placeholder="ton_pseudo"
                 aria-describedby="profile-discord-hint"
+                /* Un compte Discord rattaché possède son tag : le champ le
+                   montre, il ne le prend plus. `readOnly` et non `disabled` —
+                   la valeur reste lisible au lecteur d'écran et atteignable au
+                   clavier, ce qu'un champ désactivé perd. */
+                readOnly={discordLocked}
+                aria-readonly={discordLocked || undefined}
               />
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => setVerifyOpen(true)}
-                  /* « Recertifier » seul ne dit pas quoi : le libellé
-                     accessible commence par le texte visible (WCAG 2.5.3) et
-                     ajoute l'objet. */
-                  aria-label={
-                    discordState.verified
-                      ? "Recertifier mon tag Discord"
-                      : "Certifier mon tag Discord"
-                  }
-                  style={{ padding: "7px 14px", fontSize: 12 }}
-                >
-                  {discordState.verified ? "Recertifier" : "Certifier mon tag"}
-                </button>
-              </div>
+              {discordLocked ? (
+                // Le verrou interdit de **changer** le tag, pas de le prouver ni
+                // de le retirer — et ces deux gestes doivent exister à l'écran.
+                // Sans le premier, un compte rattaché dont le tag n'est pas
+                // certifié (tag saisi avant la règle, ou pseudo Discord
+                // numérique) ne pourrait plus rien en faire ; sans le second, la
+                // sortie que le serveur accepte n'existerait nulle part, un
+                // compte né par Discord ne pouvant pas non plus se détacher
+                // (`LAST_CONNECTION`).
+                //
+                // La condition porte sur le **rattachement**, pas sur le tag :
+                // posée sur le tag, elle ne rendait aucun bouton à l'état que le
+                // retrait vient justement de produire (rattaché, sans tag), et
+                // la seule sortie restante était de se reconnecter par Discord.
+                // Sur un état **inconnu**, en revanche, rien ne s'affiche — on
+                // ne propose pas un geste dont on ignore s'il a un objet.
+                discordState.linked !== true ? (
+                  // Un état illisible verrouille le champ **et** ferait
+                  // disparaître tous les gestes, « Retirer mon tag » compris —
+                  // la seule annulation d'exposition que le site offre. Une
+                  // panne de lecture ne doit pas coûter cela : le verrou reste
+                  // (on n'écrase pas un pseudo que Discord aurait nommé), mais
+                  // il porte sa propre sortie, sans rechargement.
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => void loadDiscordState()}
+                      disabled={discordStateBusy}
+                      aria-label="Réessayer la lecture de l'état Discord"
+                      style={{ padding: "7px 14px", fontSize: 12 }}
+                    >
+                      {discordStateBusy ? "Lecture…" : "Réessayer"}
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                    {discordState.verified ? null : (
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => setVerifyOpen(true)}
+                        /* Sans tag enregistré il n'y a rien à *certifier* : le
+                           geste est d'en poser un — et il se prouve tout seul,
+                           `startDiscordVerification` concluant sur place quand
+                           le tag résout vers l'identifiant déjà rattaché. */
+                        aria-label={
+                          discordState.tag
+                            ? "Certifier mon tag Discord"
+                            : "Enregistrer mon tag Discord"
+                        }
+                        style={{ padding: "7px 14px", fontSize: 12 }}
+                      >
+                        {discordState.tag ? "Certifier mon tag" : "Enregistrer mon tag"}
+                      </button>
+                    )}
+                    {discordState.tag ? (
+                      <button
+                        type="button"
+                        className="btn ghost"
+                        onClick={onDiscordTagRemove}
+                        disabled={discordTagBusy}
+                        aria-label="Retirer mon tag Discord"
+                        style={{ padding: "7px 14px", fontSize: 12 }}
+                      >
+                        {discordTagBusy ? "Retrait…" : "Retirer mon tag"}
+                      </button>
+                    ) : null}
+                  </div>
+                )
+              ) : (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setVerifyOpen(true)}
+                    /* « Recertifier » seul ne dit pas quoi : le libellé
+                       accessible commence par le texte visible (WCAG 2.5.3) et
+                       ajoute l'objet. */
+                    aria-label={
+                      discordState.verified
+                        ? "Recertifier mon tag Discord"
+                        : "Certifier mon tag Discord"
+                    }
+                    style={{ padding: "7px 14px", fontSize: 12 }}
+                  >
+                    {discordState.verified ? "Recertifier" : "Certifier mon tag"}
+                  </button>
+                </div>
+              )}
               <p id="profile-discord-hint" style={{ fontSize: 11, color: "var(--text-2)", margin: "6px 0 0", lineHeight: 1.6 }}>
-                {discordState.verified
-                  ? "Tag certifié : les administrateurs le voient, et les arbitres pendant tes tournois. Le modifier annule la certification."
-                  : "Tag non certifié : personne ne le voit, pas même les administrateurs. Certifie-le pour que l'organisation puisse te joindre pendant un tournoi."}
+                {discordLocked
+                  ? discordTagLockNotice({ ...discordState, pending: discordStateBusy })
+                  : discordState.verified
+                    ? "Tag certifié : les administrateurs le voient, et les arbitres pendant tes tournois. Le modifier annule la certification."
+                    : "Tag non certifié : personne ne le voit, pas même les administrateurs. Certifie-le pour que l'organisation puisse te joindre pendant un tournoi."}
               </p>
             </div>
             <div className="field">

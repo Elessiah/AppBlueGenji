@@ -659,19 +659,6 @@ export type BotActivity = {
   avgPerDay: number;
 };
 
-export type BotModuleKey = "annonces" | "scrims" | "recrutement" | "notifications" | "oauth" | "stats";
-
-export type BotModuleEntry = {
-  key: BotModuleKey;
-  enabled: boolean;
-  count30j: number;
-};
-
-export type BotModulesPayload = {
-  guildId: string;
-  modules: BotModuleEntry[];
-};
-
 export type BotFeedEvent = {
   id: number;
   ts: string;
@@ -714,16 +701,16 @@ export type FullProfileResponse = {
 /**
  * Export RGPD (droit à la portabilité, art. 20) de l'intégralité des données
  * personnelles d'un utilisateur, dans un format lisible par machine (JSON).
- * Contient les identifiants bruts (Discord, Google, Blizzard, et l'adresse des
- * comptes d'avant sa mise hors collecte) réservés au propriétaire du compte —
- * ne jamais exposer à un tiers.
+ * Contient les identifiants bruts (Discord, Google, Blizzard) réservés au
+ * propriétaire du compte — ne jamais exposer à un tiers. Aucune adresse
+ * e-mail : le site n'en collecte plus, et la colonne qui portait celles d'avant
+ * a été supprimée.
  */
 export type PersonalDataExport = {
   exportedAt: string;
   account: {
     id: number;
     pseudo: string;
-    email: string | null;
     discordId: string | null;
     discordPseudo: string | null;
     /** Date de certification du tag Discord (`null` = jamais prouvé). */

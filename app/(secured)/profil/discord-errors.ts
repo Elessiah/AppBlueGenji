@@ -36,6 +36,14 @@ const VERIFICATION_ERRORS: Record<string, string> = {
   UNAUTHORIZED: "Reconnecte-toi pour certifier ton tag.",
 };
 
+// `DISCORD_TAG_LOCKED` n'est **pas** ici, et son absence est la règle : ce
+// registre traduit les refus de `/api/profile/discord`, seule route à laquelle
+// le dialogue de certification parle. Le verrou du tag est rendu par
+// `PATCH /api/profile`, donc traduit par `profile-errors.ts`. Une entrée de plus
+// aurait été morte au premier jour et aurait figé une seconde copie de la même
+// phrase, que le premier ajustement aurait fait diverger.
+
+
 export function discordVerificationErrorMessage(code: string | null | undefined): string {
   if (!code) return "La certification a échoué. Réessaie dans un instant.";
   return VERIFICATION_ERRORS[code] ?? "La certification a échoué. Réessaie dans un instant.";

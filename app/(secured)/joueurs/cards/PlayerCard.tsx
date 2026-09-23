@@ -5,6 +5,10 @@ import Link from "next/link";
 import type { PublicUserProfile } from "@/lib/shared/types";
 import { avatarInitial } from "@/lib/shared/avatar";
 import { getPaletteColor } from "@/lib/shared/palette";
+import {
+  PLAYER_ROSTER_STATUS_LABEL,
+  playerRosterStatus,
+} from "@/lib/shared/player-roster-status";
 import { TeamLink } from "@/components/entity-link";
 import s from "../../_shared/annuaire.module.css";
 
@@ -68,9 +72,12 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
         <div className={s.plPseudo}>{player.pseudo}</div>
         {player.isDeleted && <div className={s.plDeletedMark}>Compte supprimé</div>}
         <div className={s.plTeam}>
-          {player.team ? (
+          {/* Le statut est demandé **une fois** : brancher ici sur `player.team`
+              et là sur le statut partagé remettrait la règle à deux endroits,
+              ce que le module existe justement pour éviter. */}
+          {playerRosterStatus(player) === "ROSTER" && player.team ? (
             <>
-              ROSTER ·{" "}
+              {PLAYER_ROSTER_STATUS_LABEL.ROSTER} ·{" "}
               <TeamLink
                 teamId={player.team.id}
                 className={s.aboveOverlay}
@@ -80,14 +87,17 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
               </TeamLink>
             </>
           ) : player.isDeleted ? null : (
-            // « FREE AGENT » est une **invitation à recruter**, et un compte
-            // supprimé est justement celui qu'on ne peut plus rattacher à une
-            // équipe : `getUserIdByPseudo` refuse son pseudo en
-            // `USER_NOT_FOUND`. Affichée sous « Compte supprimé », la mention
-            // envoyait le recruteur vers un refus. Le roster, lui, se garde :
+            // Le statut d'un compte sans équipe est une **invitation à
+            // recruter** — « FREE AGENT » ouvertement, « SANS ÉQUIPE » par
+            // défaut —, et un compte supprimé est justement celui qu'on ne peut
+            // plus rattacher : `getUserIdByPseudo` refuse son pseudo en
+            // `USER_NOT_FOUND`. Affiché sous « Compte supprimé », il envoyait le
+            // recruteur vers un refus. Le roster, lui, se garde :
             // l'anonymisation retire l'identité, pas l'appartenance — c'est un
             // fait, pas une offre.
-            <span style={{ color: "var(--ink-dim)" }}>FREE AGENT</span>
+            <span className={s.plNoTeam}>
+              {PLAYER_ROSTER_STATUS_LABEL[playerRosterStatus(player)]}
+            </span>
           )}
         </div>
       </div>

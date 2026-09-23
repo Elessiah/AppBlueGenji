@@ -13,7 +13,6 @@ export type AuthUser = {
   avatarUrl: string | null;
   discordId: string | null;
   googleSub: string | null;
-  email: string | null;
   isAdult: boolean | null;
   isAdmin: boolean;
   /** Rôles de permission cumulables (inclut `ADMIN` si `isAdmin`). */
@@ -26,7 +25,6 @@ type UserRow = RowDataPacket & {
   avatar_url: string | null;
   discord_id: string | null;
   google_sub: string | null;
-  email: string | null;
   is_adult: 0 | 1 | null;
   is_admin: 0 | 1;
   platform_roles_json: string | null;
@@ -74,7 +72,6 @@ function fromRow(row: UserRow): AuthUser {
     avatarUrl: localAvatarUrl(row.avatar_url),
     discordId: row.discord_id,
     googleSub: row.google_sub,
-    email: row.email,
     isAdult: row.is_adult === null ? null : Boolean(row.is_adult),
     isAdmin: Boolean(row.is_admin),
     roles: resolveRoles(Boolean(row.is_admin), row.platform_roles_json),
@@ -166,7 +163,7 @@ async function getDevBypassUser(): Promise<AuthUser | null> {
 
   const db = await getDatabase();
   const [rows] = await db.execute<UserRow[]>(
-    `SELECT id, pseudo, avatar_url, discord_id, google_sub, email, is_adult, is_admin, platform_roles_json
+    `SELECT id, pseudo, avatar_url, discord_id, google_sub, is_adult, is_admin, platform_roles_json
      FROM bg_users
      WHERE id = ?
        AND is_deleted = 0
@@ -203,7 +200,7 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
 
   const db = await getDatabase();
   const [rows] = await db.execute<UserRow[]>(
-    `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.email, u.is_adult, u.is_admin, u.platform_roles_json
+    `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json
      FROM bg_user_sessions s
      JOIN bg_users u ON u.id = s.user_id
      WHERE s.token_hash = ?

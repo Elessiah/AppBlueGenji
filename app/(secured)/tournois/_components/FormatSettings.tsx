@@ -9,7 +9,7 @@ import {
 import { participantWording } from "@/lib/shared/participants";
 import type { TournamentField } from "@/lib/shared/tournament-edit";
 import { PhaseBuilder } from "../creer/PhaseBuilder";
-import { FULL_WIDTH, HINT } from "../_lib/form-styles";
+import { checkboxCardChrome, FULL_WIDTH, HINT } from "../_lib/form-styles";
 import type { TournamentFormValues } from "../_lib/tournament-form-values";
 
 /**
@@ -372,6 +372,9 @@ export function FormatSettings({
           </label>
           <div
             className="checkbox-card"
+            // Verrouillée, la carte n'a plus de geste — et rien à déclarer pour
+            // le dire : `globals.css` retire le halo et le balayage du survol
+            // dès que la case qu'elle contient est `disabled`.
             onClick={
               locked("hasThirdPlaceMatch")
                 ? undefined
@@ -382,16 +385,15 @@ export function FormatSettings({
               alignItems: "flex-start",
               gap: 12,
               padding: "14px 16px",
-              border: `1.5px solid ${
-                values.hasThirdPlaceMatch ? "var(--blue-500)" : "var(--line-strong-cy)"
-              }`,
+              // Cadre et fond viennent de `checkboxCardChrome`, partagé avec la
+              // carte jumelle de `PhaseCard` : deux copies auraient divergé au
+              // premier réglage, et la divergence se serait vue à l'écran.
+              ...checkboxCardChrome(values.hasThirdPlaceMatch, locked("hasThirdPlaceMatch")),
               borderRadius: 10,
               cursor: locked("hasThirdPlaceMatch") ? "not-allowed" : "pointer",
-              opacity: locked("hasThirdPlaceMatch") ? 0.6 : 1,
-              transition: "border-color 0.2s ease, background-color 0.2s ease, opacity 0.2s ease",
-              backgroundColor: values.hasThirdPlaceMatch
-                ? "rgba(90, 200, 255, 0.07)"
-                : "transparent",
+              // Pas de `color` dans la liste : la carte ne change jamais la
+              // sienne, ce sont ses enfants qui portent les leurs.
+              transition: "border-color 0.2s ease, background-color 0.2s ease",
             }}
           >
             <input
@@ -400,14 +402,10 @@ export function FormatSettings({
               disabled={locked("hasThirdPlaceMatch")}
               checked={values.hasThirdPlaceMatch}
               onChange={(e) => set("hasThirdPlaceMatch", e.target.checked)}
-              style={{
-                width: 18,
-                height: 18,
-                accentColor: "var(--blue-500)",
-                cursor: locked("hasThirdPlaceMatch") ? "not-allowed" : "pointer",
-                flexShrink: 0,
-                marginTop: 2,
-              }}
+              // Taille, teinte et curseur viennent de `globals.css` : les
+              // redire en ligne, c'est reprendre la main sur la règle et
+              // redonner à cet écran une case que ses voisins n'ont pas.
+              style={{ marginTop: 2 }}
               {...lockedAttr("hasThirdPlaceMatch")}
             />
             <div style={{ flex: 1 }}>
@@ -420,12 +418,18 @@ export function FormatSettings({
                   userSelect: "none",
                   fontSize: 14,
                   fontWeight: 500,
-                  color: "var(--ink)",
+                  color: locked("hasThirdPlaceMatch") ? "var(--ink-mute)" : "var(--ink)",
                 }}
               >
                 Petite finale
               </label>
-              <p style={{ ...HINT, margin: 0 }}>
+              <p
+                style={{
+                  ...HINT,
+                  margin: 0,
+                  ...(locked("hasThirdPlaceMatch") ? { color: "var(--ink-dim)" } : {}),
+                }}
+              >
                 Ajoute un match pour déterminer la 3ᵉ place entre les deux perdants des
                 demi-finales.
               </p>
