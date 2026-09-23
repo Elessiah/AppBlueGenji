@@ -8,6 +8,32 @@ import styles from "../team.module.css";
 /** Nombre de suggestions affichées : au-delà, mieux vaut préciser la saisie. */
 const MAX_SUGGESTIONS = 8;
 
+/**
+ * Durée pendant laquelle l'annuaire chargé resert aux montages suivants. La
+ * liste ne sert qu'à suggérer — le serveur reste juge (`USER_ALREADY_IN_TEAM`) —,
+ * si bien qu'une minute de retard ne coûte rien, là où chaque ouverture de la
+ * modale d'attribution retéléchargeait tout l'annuaire.
+ */
+const PLAYERS_TTL_MS = 60_000;
+let playersCache: { at: number; request: Promise<PublicUserProfile[]> } | null = null;
+
+function loadPlayers(): Promise<PublicUserProfile[]> {
+  const now = Date.now();
+  if (playersCache && now - playersCache.at < PLAYERS_TTL_MS) return playersCache.request;
+  const request = fetch("/api/players", { cache: "no-store" })
+    .then(async (res) => {
+      if (!res.ok) throw new Error(`HTTP_${res.status}`);
+      return ((await res.json()) as { players: PublicUserProfile[] }).players;
+    })
+    .catch((error: unknown) => {
+      // Un échec n'est pas retenu : le montage suivant retentera.
+      playersCache = null;
+      throw error;
+    });
+  playersCache = { at: now, request };
+  return request;
+}
+
 interface PlayerPseudoComboboxProps {
   id: string;
   value: string;
@@ -49,16 +75,13 @@ export function PlayerPseudoCombobox({
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/players", { cache: "no-store" });
-        if (!res.ok) return;
-        const payload = (await res.json()) as { players: PublicUserProfile[] };
-        if (!cancelled) setPlayers(payload.players);
-      } catch {
+    loadPlayers()
+      .then((list) => {
+        if (!cancelled) setPlayers(list);
+      })
+      .catch(() => {
         // Sans suggestions, le champ reste une saisie libre : rien à signaler.
-      }
-    })();
+      });
     return () => {
       cancelled = true;
     };

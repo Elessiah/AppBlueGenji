@@ -239,10 +239,11 @@ describe("correctifs de la première revue", () => {
     expect(css).not.toContain("data-allow-overflow");
   });
 
-  it("la liste du transfert défile par ScrollArea", () => {
-    const transfer = read("_components", "TransferOwnershipDialog.tsx");
-    expect(transfer).toMatch(/<ScrollArea orientation="y" className=\{styles\.choiceList\}/);
-    expect(stripComments(block(".choiceList"))).not.toMatch(/overflow/);
+  it("la liste du transfert ne crée pas de zone défilante qui volerait le focus", () => {
+    const transfer = stripComments(read("_components", "TransferOwnershipDialog.tsx"));
+    expect(transfer).not.toContain("<ScrollArea");
+    expect(transfer).toContain('role="radiogroup"');
+    expect(stripComments(block(".choiceList"))).not.toMatch(/overflow|max-height/);
   });
 
   it("un refus de rôles se dit en notification, pas en ligne", () => {
@@ -257,7 +258,16 @@ describe("correctifs de la première revue", () => {
   it("Échap revient d'abord au contrôle qui a quelque chose d'ouvert", () => {
     const hook = readFileSync(join(ROOT, "lib", "shared", "hooks", "useDialogBehavior.ts"), "utf8");
     const escape = hook.slice(hook.indexOf('event.key === "Escape"'), hook.indexOf("closeRef.current()"));
-    expect(escape).toContain('getAttribute?.("aria-expanded") === "true"');
+    // Le rôle est exigé : un bouton de dépliage porte aussi `aria-expanded`,
+    // et n'écoute pas Échap — la modale ne se fermerait plus du tout.
+    expect(escape).toMatch(/getAttribute\?\.\("role"\) === "combobox" &&\s*target\.getAttribute\("aria-expanded"\) === "true"/);
+  });
+
+  it("l'annuaire des joueurs est partagé entre les montages du champ", () => {
+    const combo = stripComments(read("_components", "PlayerPseudoCombobox.tsx"));
+    expect(combo.match(/fetch\("\/api\/players"/g)).toHaveLength(1);
+    expect(combo).toContain("PLAYERS_TTL_MS");
+    expect(combo).toMatch(/playersCache = null;\s*throw error;/);
   });
 
   it("les relectures ne s'appliquent que si elles sont les dernières lancées", () => {

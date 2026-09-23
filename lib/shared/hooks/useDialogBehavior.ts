@@ -82,12 +82,19 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
 
       if (event.key === "Escape") {
         if (lockedRef.current) return;
-        // Un contrôle qui a quelque chose d'ouvert (liste de suggestions d'un
-        // champ `combobox`, menu déroulant) répond d'abord à Échap : l'écouteur
-        // est posé en capture sur `window`, il passerait avant lui et fermerait
-        // la modale entière — saisie comprise — au lieu de la seule liste.
+        // Un champ `combobox` dont la liste est ouverte répond d'abord à Échap
+        // (il la referme) : l'écouteur est posé en capture sur `window`, il
+        // passerait avant lui et fermerait la modale entière — saisie comprise.
+        // Le rôle est exigé, et pas seulement `aria-expanded` : un bouton de
+        // dépliage porte lui aussi `aria-expanded="true"`, mais n'écoute pas
+        // Échap — la modale ne se fermerait alors plus du tout.
         const target = event.target as HTMLElement | null;
-        if (target?.getAttribute?.("aria-expanded") === "true") return;
+        if (
+          target?.getAttribute?.("role") === "combobox" &&
+          target.getAttribute("aria-expanded") === "true"
+        ) {
+          return;
+        }
         event.stopPropagation();
         closeRef.current();
         return;

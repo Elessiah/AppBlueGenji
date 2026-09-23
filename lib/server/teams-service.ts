@@ -759,18 +759,6 @@ export async function transferTeamOwnership(
     throw new Error("MEMBER_NOT_FOUND");
   }
 
-  // Un compte anonymisé garde sa ligne d'appartenance : lui confier l'équipe
-  // la laisserait sans personne capable d'ouvrir une session pour la conduire,
-  // et l'état serait définitif — seul le propriétaire transfère ou dissout, et
-  // il ne peut être ni exclu ni partir.
-  const [targetAccount] = await db.execute<(RowDataPacket & { is_deleted: 0 | 1 })[]>(
-    `SELECT is_deleted FROM bg_users WHERE id = ? LIMIT 1`,
-    [newOwnerUserId],
-  );
-  if (targetAccount.length === 0 || targetAccount[0].is_deleted === 1) {
-    throw new Error("MEMBER_ACCOUNT_DELETED");
-  }
-
   const newOwnerRoles: TeamRole[] = ["OWNER", ...targetRoles.filter((r) => r !== "OWNER")];
 
   const oldOwnerRemaining = requesterRoles.filter((r) => r !== "OWNER");
@@ -779,6 +767,21 @@ export async function transferTeamOwnership(
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
+
+    // Un compte anonymisé garde sa ligne d'appartenance : lui confier l'équipe
+    // la laisserait sans personne capable d'ouvrir une session pour la
+    // conduire, et l'état serait définitif — seul le propriétaire transfère ou
+    // dissout, et il ne peut être ni exclu ni partir. Lu **dans** la
+    // transaction et sous le verrou que prend la suppression de compte, en
+    // toute première instruction : lu avant, une anonymisation commitée entre
+    // la lecture et les écritures recevait quand même la propriété.
+    const [targetAccount] = await connection.execute<(RowDataPacket & { is_deleted: 0 | 1 })[]>(
+      `SELECT is_deleted FROM bg_users WHERE id = ? FOR UPDATE`,
+      [newOwnerUserId],
+    );
+    if (targetAccount.length === 0 || targetAccount[0].is_deleted === 1) {
+      throw new Error("MEMBER_ACCOUNT_DELETED");
+    }
 
     await connection.execute(
       `UPDATE bg_team_members

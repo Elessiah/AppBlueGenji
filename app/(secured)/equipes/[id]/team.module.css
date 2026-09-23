@@ -551,13 +551,6 @@
 
 .choiceList {
   margin-top: 14px;
-  max-height: 280px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.choiceGroup {
   display: flex;
   flex-direction: column;
   gap: 6px;

@@ -6,7 +6,6 @@ import { useToast } from "@/components/ui/toast";
 import { sortTeamMembers } from "@/lib/shared/team-role-display";
 import { teamErrorMessage } from "../../_lib/team-errors";
 import { jsonRequest, teamApi } from "../_lib/team-api";
-import { ScrollArea } from "@/components/cyber";
 import { TeamDialog } from "./TeamDialog";
 import { RolePills } from "./RolePills";
 import styles from "../team.module.css";
@@ -88,8 +87,10 @@ export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }:
       {candidates.length === 0 ? (
         <p>Aucun autre membre dans l&apos;équipe : invite d&apos;abord le joueur à qui la confier.</p>
       ) : (
-        <ScrollArea orientation="y" className={styles.choiceList} ariaLabel="Membres de l'équipe">
-          <div role="radiogroup" aria-label="Nouveau propriétaire" className={styles.choiceGroup}>
+        // Pas de zone défilante : c'est le voile de la modale qui défile. Une
+        // `ScrollArea` poserait `tabIndex={0}` — elle prendrait le focus
+        // initial et ajouterait un arrêt clavier avant les boutons radio.
+        <div role="radiogroup" aria-label="Nouveau propriétaire" className={styles.choiceList}>
           {candidates.map((m) => (
             <label key={m.userId} className={styles.choice} data-checked={targetId === m.userId}>
               <input
@@ -107,8 +108,7 @@ export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }:
               </span>
             </label>
           ))}
-          </div>
-        </ScrollArea>
+        </div>
       )}
 
       {confirmStep && target ? (
