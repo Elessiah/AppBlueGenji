@@ -91,13 +91,19 @@ async function purgeTournamentRows(
   }
   // Les rappels de match pendent aux manches, pas au tournoi : on les efface
   // avant elles, à la main comme le reste, plutôt que de compter sur la cascade
-  // de `bg_match_reminders.match_id`.
-  await connection.execute(
-    `DELETE r FROM bg_match_reminders r
-     JOIN bg_matches m ON m.id = r.match_id
-     WHERE m.tournament_id = ?`,
-    [tournamentId],
-  );
+  // de `bg_match_reminders.match_id`. Sous `try` pour la même raison que les
+  // pénalités au-dessus : une base à qui la table manque n'a aucun rappel à
+  // effacer, et ne doit pas pour autant garder tous ses tournois.
+  try {
+    await connection.execute(
+      `DELETE r FROM bg_match_reminders r
+       JOIN bg_matches m ON m.id = r.match_id
+       WHERE m.tournament_id = ?`,
+      [tournamentId],
+    );
+  } catch (error) {
+    if (!isMissingTableError(error)) throw error;
+  }
   // Même remarque pour les réservations d'alerte arbitre : elles pendent aux
   // manches, et la liste relisible de ce qui part vaut mieux qu'une cascade que
   // personne ne relit — d'autant que la création de la table est avalée par un

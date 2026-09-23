@@ -45,6 +45,7 @@ import {
 } from "@/lib/shared/endurance-penalty";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { toIso } from "@/lib/server/serialization";
+import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { appendSequentialRanks, podiumRanks } from "@/lib/shared/double-forfeit";
 import { createMatch, finishTournament, reopenTournament } from "./repository";
 import { localUploadUrl } from "@/lib/shared/uploads";
@@ -890,11 +891,18 @@ async function writePlayoffRound(
           match.teamBId !== plan[index].pairing.teamBId),
     )
     .map((match) => match.id);
+  // Sous `try` : la création de la table est avalée par un `catch` dans
+  // `database.ts`, et une base à qui elle manque n'a aucun rappel à effacer —
+  // ce n'est pas une raison de laisser l'arbre sur un tour périmé.
   if (rewritten.length > 0) {
-    await conn.execute(
-      `DELETE FROM bg_match_reminders WHERE match_id IN (${rewritten.map(() => "?").join(", ")})`,
-      rewritten,
-    );
+    try {
+      await conn.execute(
+        `DELETE FROM bg_match_reminders WHERE match_id IN (${rewritten.map(() => "?").join(", ")})`,
+        rewritten,
+      );
+    } catch (error) {
+      if (!isMissingTableError(error)) throw error;
+    }
   }
 }
 

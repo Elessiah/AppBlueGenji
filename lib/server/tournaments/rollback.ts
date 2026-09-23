@@ -361,14 +361,18 @@ async function deleteMatches(
 ): Promise<void> {
   for (const ids of chunk(matchIds)) {
     const placeholders = ids.map(() => "?").join(", ");
-    await connection.execute(
-      `DELETE FROM bg_match_reminders WHERE match_id IN (${placeholders})`,
-      ids,
-    );
-    // Sous `try` comme dans `./deletion.ts` : la création de cette table est
-    // avalée par un `catch` dans `database.ts`, et une base à qui elle manque
+    // Sous `try` comme dans `./deletion.ts` : la création de ces deux tables est
+    // avalée par un `catch` dans `database.ts`, et une base à qui l'une manque
     // rendrait sinon tout retour en arrière impossible — pour une table de
     // notifications, où il n'y aurait de toute façon rien à effacer.
+    try {
+      await connection.execute(
+        `DELETE FROM bg_match_reminders WHERE match_id IN (${placeholders})`,
+        ids,
+      );
+    } catch (error) {
+      if (!isMissingTableError(error)) throw error;
+    }
     try {
       await connection.execute(
         `DELETE FROM bg_referee_alerts WHERE match_id IN (${placeholders})`,
