@@ -203,7 +203,9 @@ describe("linkOAuthIdentity — on ne déplace jamais une porte", () => {
       discord_pseudo: "ancien_tag",
     });
 
-    await linkOAuthIdentity(7, identity({ handle: "nouveau_tag" }));
+    await expect(linkOAuthIdentity(7, identity({ handle: "nouveau_tag" }))).resolves.toBe(
+      "REFRESHED",
+    );
 
     const update = find(statements, "UPDATE bg_users SET discord_id")!;
     expect(update.sql).toContain("discord_verified_at = NOW()");
@@ -236,7 +238,7 @@ describe("linkOAuthIdentity — on ne déplace jamais une porte", () => {
   it("certifie le tag Discord en le rattachant", async () => {
     const { statements } = fakeDb(emptyRow);
 
-    await linkOAuthIdentity(7, identity());
+    await expect(linkOAuthIdentity(7, identity())).resolves.toBe("LINKED");
 
     const update = find(statements, "UPDATE bg_users SET discord_id")!;
     expect(update.sql).toContain("discord_pseudo = ?");
@@ -305,7 +307,7 @@ describe("linkOAuthIdentity — on ne déplace jamais une porte", () => {
 
     await expect(
       linkOAuthIdentity(7, identity({ avatarUrl: "https://cdn.discord.test/a.png" })),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe("LINKED");
 
     expect(find(statements, "UPDATE bg_users SET discord_id")).toBeDefined();
   });

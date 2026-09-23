@@ -166,7 +166,22 @@ async function subjectTakenByAnother(
 }
 
 /**
+ * Ce qu'un rattachement vient de faire.
+ *
+ * `REFRESHED` n'est pas un cas limite mais un geste à part entière : c'est
+ * **la même** identité, rapportée une seconde fois par le fournisseur. Rien ne
+ * change de porte ; seul ce que le fournisseur atteste est réécrit — pour
+ * Discord, le pseudo, certifié. C'est ainsi qu'un compte déjà relié certifie son
+ * tag sans passer par le bot : la résolution d'un tag par le bot balaie les
+ * serveurs qu'il partage avec le joueur, et un compte venu par OAuth n'en
+ * partage souvent aucun.
+ */
+export type OAuthLinkOutcome = "LINKED" | "REFRESHED";
+
+/**
  * Rattache cette identité au compte connecté.
+ *
+ * @returns `REFRESHED` si le compte portait déjà cette identité-là.
  *
  * @throws PROFILE_NOT_FOUND Le compte n'existe plus (ou vient d'être anonymisé).
  * @throws PROVIDER_ALREADY_LINKED Le compte porte **déjà** une autre identité de
@@ -175,7 +190,10 @@ async function subjectTakenByAnother(
  * @throws IDENTITY_ALREADY_LINKED Cette identité appartient à un autre compte du
  *   site. Le `SELECT` le dit lisiblement, l'index unique le tranche sous course.
  */
-export async function linkOAuthIdentity(userId: number, identity: OAuthIdentity): Promise<void> {
+export async function linkOAuthIdentity(
+  userId: number,
+  identity: OAuthIdentity,
+): Promise<OAuthLinkOutcome> {
   const row = await loadIdentityRow(userId);
   if (!row) throw new Error("PROFILE_NOT_FOUND");
 
@@ -249,6 +267,7 @@ export async function linkOAuthIdentity(userId: number, identity: OAuthIdentity)
     // prochaine connexion, `shouldImportRemoteAvatar` n'ayant toujours rien de
     // local à constater.
   });
+  return current === identity.subject ? "REFRESHED" : "LINKED";
 }
 
 /**

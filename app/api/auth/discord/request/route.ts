@@ -17,6 +17,12 @@ function mapRequestError(message: string): { code: string; status: number } {
     return { code: "BOT_INTERNAL_UNREACHABLE", status: 503 };
   }
 
+  // Le bot a reçu la demande de résolution mais n'a pas répondu à temps : un
+  // tag absent de ses serveurs, ou un bot surchargé — on ne sait pas lequel.
+  if (message === "BOT_RESOLVE_TIMEOUT") {
+    return { code: "BOT_RESOLVE_TIMEOUT", status: 504 };
+  }
+
   if (message === "BOT_INTERNAL_UNAUTHORIZED") {
     return { code: "BOT_INTERNAL_UNAUTHORIZED", status: 500 };
   }
