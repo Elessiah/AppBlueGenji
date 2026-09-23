@@ -155,7 +155,7 @@ describe("inscription par Discord", () => {
   it("annonce le compte qui vient de naître", async () => {
     fakeDb([]);
 
-    await createOrGetDiscordUser("123456789", "Nova");
+    await createOrGetDiscordUser("123456789", "Nova", undefined, { method: "DM_CODE" });
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
     expect(lines()[0]).not.toContain("Nova");
@@ -166,7 +166,9 @@ describe("inscription par Discord", () => {
   it("se tait à chaque connexion suivante", async () => {
     fakeDb([{ id: 7, google_sub: null, discord_id: "123456789" }]);
 
-    await expect(createOrGetDiscordUser("123456789", "Nova")).resolves.toBe(7);
+    await expect(
+      createOrGetDiscordUser("123456789", "Nova", undefined, { method: "DM_CODE" }),
+    ).resolves.toBe(7);
 
     expect(sendBotLog).not.toHaveBeenCalled();
   });
@@ -180,6 +182,8 @@ describe("le journal ne tient pas la connexion en otage", () => {
     (sendBotLog as jest.Mock).mockRejectedValue(new Error("ECONNREFUSED") as never);
     fakeDb([]);
 
-    await expect(createOrGetDiscordUser("123456789", "Nova")).resolves.toBe(4242);
+    await expect(
+      createOrGetDiscordUser("123456789", "Nova", undefined, { method: "DM_CODE" }),
+    ).resolves.toBe(4242);
   });
 });

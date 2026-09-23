@@ -129,7 +129,11 @@ describe("POST /api/auth/discord/verify — plafond d'énumération", () => {
 
     await attempt(VICTIM, "424242");
 
-    expect(createUserMock).toHaveBeenCalledWith(VICTIM, undefined, "keryan");
+    // Et la porte est nommée : ce chemin-ci ne laisse **aucune** autorisation
+    // d'application chez Discord, à la différence du bouton.
+    expect(createUserMock).toHaveBeenCalledWith(VICTIM, undefined, "keryan", {
+      method: "DM_CODE",
+    });
   });
 
   it("plafonne après la validation de forme, pas avant", async () => {

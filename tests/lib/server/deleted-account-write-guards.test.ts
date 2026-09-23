@@ -177,10 +177,12 @@ describe("connexions OAuth — une ligne supprimée ne reprend pas son identité
       .mockResolvedValue([{ affectedRows: 0 }] as never);
     await mockDb(execute);
 
-    await createOrGetDiscordUser("100000000000000001", undefined, "nova");
+    await createOrGetDiscordUser("100000000000000001", undefined, "nova", {
+      method: "DM_CODE",
+    });
 
     const update = execute.mock.calls.find(([sql]) =>
-      String(sql).includes("discord_verified_at = NOW()"),
+      String(sql).includes("discord_verified_at = CASE"),
     ) as [string, unknown[]];
     expect(update).toBeDefined();
     expect(update[0]).toMatch(/is_deleted = 0/);

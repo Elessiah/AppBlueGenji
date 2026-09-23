@@ -52,6 +52,7 @@ import {
 type Row = {
   google_sub: string | null;
   discord_id: string | null;
+  discord_link_method: "OAUTH" | "DM_CODE" | null;
   blizzard_sub: string | null;
   discord_pseudo: string | null;
   overwatch_battletag: string | null;
@@ -62,6 +63,7 @@ type Statement = { sql: string; params: unknown[] };
 const emptyRow: Row = {
   google_sub: null,
   discord_id: null,
+  discord_link_method: null,
   blizzard_sub: null,
   discord_pseudo: null,
   overwatch_battletag: null,
@@ -75,7 +77,7 @@ function fakeDb(row: Row | null, takenElsewhere: Record<string, boolean> = {}) {
     const q = String(sql).replace(/\s+/g, " ").trim();
     statements.push({ sql: q, params });
 
-    if (q.startsWith("SELECT google_sub, discord_id, blizzard_sub")) {
+    if (q.startsWith("SELECT google_sub, discord_id, discord_link_method")) {
       return [row ? [row] : [], []];
     }
 
@@ -103,7 +105,11 @@ function fakeDb(row: Row | null, takenElsewhere: Record<string, boolean> = {}) {
         others.some((column) => Boolean(current[column]));
       if (!matches) return [{ affectedRows: 0 }, []];
       current[guarded] = null;
-      if (guarded === "discord_id") current.discord_verified_at = null;
+      if (guarded === "discord_id") {
+        current.discord_verified_at = null;
+        // La méthode décrit le **rattachement** : détaché, il n'en reste rien.
+        current.discord_link_method = null;
+      }
       return [{ affectedRows: 1 }, []];
     }
 
@@ -147,11 +153,13 @@ describe("createOrGetOAuthUser", () => {
     });
 
     await expect(createOrGetOAuthUser(identity())).resolves.toBe(2);
+    // La porte est **nommée** : un aller-retour OAuth laisse une autorisation
+    // d'application chez Discord, le code en message privé n'en laisse aucune.
     expect(createOrGetDiscordUser).toHaveBeenCalledWith(
       "123456789012345678",
       undefined,
       "nova",
-      null,
+      { avatarUrl: null, method: "OAUTH" },
     );
 
     await expect(
@@ -167,16 +175,20 @@ describe("listAccountConnections", () => {
       ...emptyRow,
       discord_id: "123456789012345678",
       discord_pseudo: "nova",
+      discord_link_method: "DM_CODE",
       blizzard_sub: "bz-1",
       overwatch_battletag: "Nova#2143",
     });
 
     const connections = await listAccountConnections(7);
 
+    // La **méthode** voyage avec le reste, et elle ne concerne que Discord : les
+    // deux autres n'ont qu'une porte, et une ligne « rattaché par… » y serait du
+    // bruit sur chaque compte.
     expect(connections).toEqual([
-      { provider: "GOOGLE", linked: false, handle: null },
-      { provider: "DISCORD", linked: true, handle: "nova" },
-      { provider: "BLIZZARD", linked: true, handle: "Nova#2143" },
+      { provider: "GOOGLE", linked: false, handle: null, method: null },
+      { provider: "DISCORD", linked: true, handle: "nova", method: "DM_CODE" },
+      { provider: "BLIZZARD", linked: true, handle: "Nova#2143", method: null },
     ]);
   });
 
