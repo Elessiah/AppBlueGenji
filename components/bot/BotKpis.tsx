@@ -1,5 +1,7 @@
 import { Sparkline } from "./Sparkline";
 import { BotKpis as BotKpisType } from "@/lib/shared/types";
+import { botPayloadNumber } from "@/lib/shared/bot-payload";
+import { resolveBotKpiDelta } from "@/lib/shared/bot-kpi-delta";
 
 export function BotKpis({ kpis }: { kpis: BotKpisType | null }) {
   const entries = [
@@ -29,23 +31,45 @@ export function BotKpis({ kpis }: { kpis: BotKpisType | null }) {
 
   return (
     <div className="kpis">
-      {entries.map((entry) => (
-        <div key={entry.key} className="card card-ticks kpi">
-          <div className="kpi-head">
-            <span className="kpi-lbl">{entry.lbl}</span>
-            <span className="kpi-delta up">
-              ▲ {entry.data?.delta ?? "—"}
-            </span>
+      {entries.map((entry) => {
+        // `?? "—"` ne rattrape que `null` : un `delta` arrivé en objet tombait
+        // en enfant de React, qui lève « Objects are not valid as a React
+        // child » — la page entière en 500. Et le ton était écrit en dur
+        // (`up`, `▲`) : une baisse annoncée `-8 %` sortait en vert, flèche
+        // vers le haut. La règle vit dans `lib/shared/bot-kpi-delta.ts`.
+        const delta = resolveBotKpiDelta(entry.data?.delta);
+        return (
+          <div key={entry.key} className="card card-ticks kpi">
+            <div className="kpi-head">
+              <span className="kpi-lbl">{entry.lbl}</span>
+              {/* La flèche et la couleur sont un dessin : elles ne se lisent ni
+                  au lecteur d'écran ni en nuances de gris, d'où le sens écrit
+                  en toutes lettres. En `sr-only` **à côté** du texte, et non en
+                  `aria-label` : posé sur un `<span>` sans rôle (`generic`),
+                  un nom d'auteur est ignoré — la pastille n'aurait alors
+                  annoncé que « -8 % », sans son sens. Même piège, et même
+                  remède, que `app/(secured)/equipes/cards/TeamCard.tsx`. */}
+              <span className={"kpi-delta " + delta.tone}>
+                {delta.glyph ? <span aria-hidden="true">{delta.glyph} </span> : null}
+                {delta.label}
+                {delta.direction ? <span className="sr-only"> {delta.direction}</span> : null}
+              </span>
+            </div>
+            <div className="kpi-val">
+              {/* `entry.data ? entry.data.value.toLocaleString(…)` : la garde
+                  portait sur l'objet, jamais sur le champ. Une charge
+                  `{"servers": {}}` passait donc la condition et `.toLocaleString`
+                  levait sur `undefined`. Même charge non validée (`as BotKpis`)
+                  que la bande d'état et le tableau des serveurs. */}
+              {botPayloadNumber(entry.data?.value)?.toLocaleString("fr-FR") ?? "—"}
+              {entry.unit && <span className="unit">/ {entry.unit}</span>}
+            </div>
+            <div className="kpi-spark">
+              {Array.isArray(entry.data?.series) ? <Sparkline data={entry.data.series} /> : null}
+            </div>
           </div>
-          <div className="kpi-val">
-            {entry.data ? entry.data.value.toLocaleString("fr-FR") : "—"}
-            {entry.unit && <span className="unit">/ {entry.unit}</span>}
-          </div>
-          <div className="kpi-spark">
-            {entry.data?.series ? <Sparkline data={entry.data.series} /> : null}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

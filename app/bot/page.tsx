@@ -11,10 +11,9 @@ import { BotActivityChart } from "@/components/bot/BotActivityChart";
 import { BotServersTable } from "@/components/bot/BotServersTable";
 import { BotLiveFeed } from "@/components/bot/BotLiveFeed";
 import { BotLatencyCard } from "@/components/bot/BotLatencyCard";
-import { BotModules } from "@/components/bot/BotModules";
 import { BotCommands } from "@/components/bot/BotCommands";
 import { BotInviteCard } from "@/components/bot/BotInviteCard";
-import { fetchBotStats, fetchBotStatus, fetchBotKpis, fetchBotServers, fetchBotActivity, fetchBotModules } from '@/lib/server/bot-integration';
+import { fetchBotStats, fetchBotStatus, fetchBotKpis, fetchBotServers, fetchBotActivity } from '@/lib/server/bot-integration';
 
 export const metadata: Metadata = pageMetadata({
   title: "BlueGenji Bot",
@@ -36,9 +35,6 @@ export default async function BotPage() {
     fetchBotActivity('30j'),
   ]);
 
-  const firstGuildId = serversPayload?.servers?.[0]?.id ?? null;
-  const modules = firstGuildId ? await fetchBotModules(firstGuildId) : null;
-
   return (
     <>
       <PublicHeader />
@@ -53,7 +49,12 @@ export default async function BotPage() {
           <div className="bot-grid">
             <div className="bot-stack">
               <BotActivityChart initial={activity30j} />
-              <BotServersTable servers={serversPayload?.servers ?? null} />
+              {/* La charge entière, et non `serversPayload?.servers ?? null` :
+                  ce `??` ramenait « le bot a répondu sans champ `servers` » à
+                  « le bot n'a pas répondu », et le panneau annonçait
+                  « BOT INJOIGNABLE » pendant que la bande d'état, tirée du
+                  même `Promise.all`, affichait `OPERATIONAL` juste au-dessus. */}
+              <BotServersTable payload={serversPayload} />
             </div>
             <div className="bot-stack">
               <BotLiveFeed />
@@ -61,8 +62,6 @@ export default async function BotPage() {
             </div>
           </div>
 
-          <BotModules payload={modules} />
-          <div style={{ height: 24 }} />
           <BotCommands />
           <BotInviteCard />
         </div>

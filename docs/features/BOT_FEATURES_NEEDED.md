@@ -18,6 +18,12 @@ mocks.
 À exposer via un nouvel endpoint `GET /internal/status` :
 
 - [ ] **Uptime** — timestamp de démarrage du process (le front calcule la durée écoulée)
+- [ ] **Instant de la réponse** — l'horodatage auquel le bot a fabriqué la charge.
+      Sans lui, `botUptimeLabel` ne peut que faire `now − startupTs`, c'est-à-dire
+      soustraire une date d'**horloge du bot** à une date d'**horloge du visiteur** :
+      quelques secondes de dérive suffisent à rendre une durée négative, aujourd'hui
+      bornée à zéro faute de mieux. Avec lui, la page compte `uptimeMs + (now −
+      réception)` et ne mesure plus qu'un transit, sur sa seule horloge.
 - [ ] **Version** — version sémantique + build hash (ex: `v2.4.1 / 4f8a`)
 - [ ] **Date de build** — ISO 8601
 - [ ] **Gateway latency** — ping WebSocket Discord en ms (échantillonné en continu)
@@ -95,22 +101,36 @@ avec `/api/tournaments/[id]/stream` déjà en place) :
 
 ## 6. Modules — état et configuration par serveur
 
-Les 6 modules du design (Annonces, Scrims, Recrutement, Notifications, OAuth,
-Stats) doivent avoir un état persistant **par serveur Discord** :
+> **⚠ Section abandonnée côté site — ne rien construire ici sans rouvrir la
+> décision.** La grille « Modules » de `/bot` a été retirée : elle rendait son
+> en-tête (« 0 INSTALLÉS · 0 ACTIFS ») au-dessus d'une grille vide tant que le
+> bot n'exposait rien, et l'appel sortant `fetchBotModules` est parti avec elle.
+> **Le site ne consomme plus aucun de ces endpoints** et n'a plus d'écran où
+> afficher un compteur par module. Voir `CLAUDE.md`, section « Page `/bot` ».
+> Les lignes ci-dessous sont conservées pour mémoire, barrées : si le bot veut
+> des modules pour son propre compte, c'est un besoin du bot, pas une attente de
+> la plateforme.
 
-- [ ] **`GET  /internal/servers/:id/modules`** — liste les modules avec `on/off`
-- [ ] **`PUT  /internal/servers/:id/modules/:moduleKey`** — toggle on/off
-- [ ] **Persistence** : table dédiée (MySQL existant ou store du bot)
-- [ ] **Compteurs par module** : nb relais 30j, nb matchs 30j, nb annonces
-      actives, nb comptes liés, etc. (le design les affiche dans `mod-foot`)
-- [ ] **Garde-fou** : module `OAuth` non-toggleable (toujours on, dépendance
-      critique pour `/connexion` du site)
+- ~~**`GET  /internal/servers/:id/modules`** — liste les modules avec `on/off`~~
+- ~~**`PUT  /internal/servers/:id/modules/:moduleKey`** — toggle on/off~~
+- ~~**Persistence** : table dédiée (MySQL existant ou store du bot)~~
+- ~~**Compteurs par module** : nb relais 30j, nb matchs 30j, nb annonces
+      actives, nb comptes liés, etc.~~ (le bloc `mod-foot` qui les affichait
+      n'existe plus)
+- ~~**Garde-fou** : module `OAuth` non-toggleable~~ — la dépendance de
+      `/connexion` reste réelle, mais rien ne propose plus de la débrancher.
 
 ---
 
 ## 7. Slash commands
 
-Le design en liste 8. Vérifier l'implémentation existante et compléter :
+> **La page `/bot` ne liste plus les commandes.** Les huit entrées ci-dessous
+> venaient d'une liste écrite en dur (`components/bot/mocks.ts`, supprimée) :
+> c'était une maquette, jamais un inventaire. La page renvoie désormais à
+> `/bot/docs`, qui sert le Markdown du dépôt du bot **à chaud** — la liste qui
+> fait foi est donc celle du bot, et la tenir à jour veut dire tenir son
+> Markdown à jour. Ce qui suit reste une **feuille de route du bot**, à valider
+> commande par commande, et non une promesse déjà affichée quelque part.
 
 ### Publiques
 - [ ] **`/ping`** — vérifie latence et connexion bot
@@ -123,7 +143,8 @@ Le design en liste 8. Vérifier l'implémentation existante et compléter :
 
 ### Admin
 - [ ] **`/relay <channel>`** — configure un channel de relais inter-serveurs
-- [ ] **`/config <module>`** — toggle on/off d'un module sur le serveur courant
+- ~~**`/config <module>`** — toggle on/off d'un module sur le serveur courant~~
+      — dépend de la section 6, abandonnée côté site.
 
 Pour chaque commande :
 - [ ] **Aide intégrée** auto-générée à partir de la définition
@@ -156,10 +177,17 @@ Pour chaque commande :
   - [ ] `fetchBotKpis()` → KPIs avec séries
   - [ ] `fetchBotServers()` → liste serveurs
   - [ ] `fetchBotActivity(range)` → données chart
-  - [ ] `fetchBotModules(serverId)` / `toggleBotModule(serverId, key, on)`
+  - ~~`fetchBotModules(serverId)` / `toggleBotModule(serverId, key, on)`~~ —
+        **abandonné** : la section « Modules » de `/bot` a été retirée (elle
+        rendait son en-tête au-dessus d'une grille vide tant que le bot
+        n'exposait rien), et l'appel sortant est parti avec elle. Ne pas le
+        recréer sans rouvrir la décision — voir `CLAUDE.md`, section « Page `/bot` ».
 - [ ] **Endpoint SSE proxy** `/api/bot/feed/stream` (similaire à
       `/api/tournaments/[id]/stream`) pour le live feed
-- [ ] **Remplacer les mocks** dans [components/bot/mocks.ts](components/bot/mocks.ts) par les vrais fetchs
+- ~~**Remplacer les mocks** dans `components/bot/mocks.ts` par les vrais fetchs~~ —
+      **fait autrement** : le fichier a été supprimé. La liste de commandes
+      qu'il portait n'est pas refaite côté serveur, la section renvoie à
+      `/bot/docs`, qui lit le Markdown du bot à chaud.
 - [ ] **Mode dégradation gracieuse** : si le bot est down (circuit breaker
       déjà en place), afficher placeholders sans crash de la page
 

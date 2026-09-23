@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import type { BotDocSection } from "@/lib/shared/bot-doc-sections";
 
 /**
  * Documentation du bot Discord (projet `blueGenjiBot`).
@@ -14,73 +15,11 @@ import path from "node:path";
 export const BOT_PROJECT_DIR =
   process.env.BOT_DOCS_PATH?.trim() || path.resolve(process.cwd(), "..", "blueGenjiBot");
 
-export interface BotDocSection {
-  /** Segment d'URL sous `/bot/docs`. */
-  slug: string;
-  /** Titre affiché dans la nav et en tête de page. */
-  title: string;
-  /** Sur-titre mono affiché au-dessus du titre. */
-  eyebrow: string;
-  /** Résumé court affiché dans la nav. */
-  summary: string;
-  /** Chemin du fichier, relatif à la racine du projet du bot. */
-  file: string;
-}
-
-/**
- * Registre des documents exposés publiquement. C'est aussi le garde-fou contre
- * la traversée de chemin : seuls ces fichiers peuvent être lus, un slug inconnu
- * ne résout rien.
- */
-export const BOT_DOC_SECTIONS: BotDocSection[] = [
-  {
-    slug: "guide",
-    title: "Guide utilisateur",
-    eyebrow: "PRISE EN MAIN · FR",
-    summary: "Services, format des messages et commandes slash.",
-    file: "helpfr.md",
-  },
-  {
-    slug: "adhesions",
-    title: "Commandes d'adhésion",
-    eyebrow: "SERVEURS BLUEGENJI",
-    summary: "Envoi des documents d'adhésion, rappels et validations.",
-    file: "doc/adhesions-commands-user.md",
-  },
-  {
-    slug: "api-interne",
-    title: "API interne",
-    eyebrow: "INTÉGRATION · EXPRESS",
-    summary: "Endpoints HTTP consommés par la plateforme.",
-    file: "doc/internal-api.md",
-  },
-  {
-    slug: "architecture",
-    title: "Architecture",
-    eyebrow: "TECHNIQUE · MAIN",
-    summary: "Client Discord, intents et listeners du bot.",
-    file: "doc/main.md",
-  },
-  {
-    slug: "base-de-donnees",
-    title: "Base de données",
-    eyebrow: "TECHNIQUE · SQLITE",
-    summary: "Tables, messages dupliqués et salons partenaires.",
-    file: "doc/src/Bdd.md",
-  },
-  {
-    slug: "user-guide-en",
-    title: "User guide (EN)",
-    eyebrow: "GETTING STARTED · EN",
-    summary: "English version of the user guide.",
-    file: "help.md",
-  },
-];
-
-export function findBotDocSection(slug: string | undefined): BotDocSection | null {
-  const wanted = slug ?? BOT_DOC_SECTIONS[0].slug;
-  return BOT_DOC_SECTIONS.find((s) => s.slug === wanted) ?? null;
-}
+export type { BotDocSection } from "@/lib/shared/bot-doc-sections";
+// Réexportés — le registre lui-même vit dans `lib/shared/bot-doc-sections.ts`,
+// hors d'atteinte de `node:fs`, parce qu'un composant l'affiche. Voir l'en-tête
+// de ce module-là.
+export { BOT_DOC_SECTIONS, findBotDocSection } from "@/lib/shared/bot-doc-sections";
 
 export interface LoadedBotDoc {
   section: BotDocSection;
