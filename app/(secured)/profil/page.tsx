@@ -7,7 +7,6 @@ import { LogoutButton } from "@/components/logout-button";
 import { Coche } from "@/components/Coche";
 import type { FullProfileResponse } from "@/lib/shared/types";
 import {
-  accountDeletedWriteMessage,
   accountDeletionConfirmation,
   accountDeletionErrorMessage,
   accountDeletionOutcome,
@@ -22,7 +21,14 @@ import {
   discordTagLockNotice,
   isDiscordTagLocked,
 } from "@/lib/shared/discord-tag-lock";
-import { profileErrorMessage, profileLoadErrorMessage } from "./profile-errors";
+import {
+  avatarDeleteErrorMessage,
+  avatarUploadErrorMessage,
+  invitationResponseErrorMessage,
+  profileErrorMessage,
+  profileLoadErrorMessage,
+} from "./profile-errors";
+import { precheckImageUpload } from "@/lib/shared/image-upload-errors";
 import {
   BLIZZARD_BATTLETAG_NOTICE,
   DISCORD_TAG_UNVERIFIED_AUDIENCE,
@@ -45,9 +51,6 @@ const VISIBILITY_LABELS: Record<string, string> = {
   marvel: "Tag Marvel",
   major: "Majorité",
 };
-
-const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -161,7 +164,11 @@ export default function ProfilePage() {
       showSuccess(accept ? "Invitation acceptée." : "Invitation refusée.");
       await loadInvitations();
     } catch (e) {
-      showError((e as Error).message);
+      // Chaque chemin de la page lève un **code** et le traduit ici, dans son
+      // `catch` : c'est aussi là qu'arrivent les échecs qui n'en sont pas un
+      // (`TypeError` d'une coupure réseau, `SyntaxError` d'une réponse HTML), que
+      // le registre ramène à son repli au lieu d'afficher leur message anglais.
+      showError(invitationResponseErrorMessage((e as Error).message));
     }
   };
 
@@ -274,7 +281,7 @@ export default function ProfilePage() {
       });
       const payload = (await response.json()) as FullProfileResponse & { error?: string };
       if (!response.ok) {
-        throw new Error(accountDeletedWriteMessage(payload.error, "PROFILE_UPDATE_FAILED"));
+        throw new Error(payload.error || "PROFILE_UPDATE_FAILED");
       }
       setData(payload);
       // Le champ **et sa référence** se réalignent sur ce qui vient d'être
@@ -324,13 +331,13 @@ export default function ProfilePage() {
         body: JSON.stringify({ discordPseudo: null }),
       });
       const payload = (await response.json()) as FullProfileResponse & { error?: string };
-      // Quatrième écriture vers `PATCH /api/profile`, arrivée avec le verrou du
+      // Seconde écriture vers `PATCH /api/profile`, arrivée avec le verrou du
       // tag : elle passe par la même porte que la sauvegarde du profil, donc
       // elle peut recevoir le même 409 `ACCOUNT_DELETED` — le compte supprimé
-      // depuis un autre onglet pendant que celle-ci attendait son verrou. Sans
-      // le registre, le joueur lisait le code en capitales.
+      // depuis un autre onglet pendant que celle-ci attendait son verrou. Le
+      // code est traduit dans le `catch`, par le registre du profil.
       if (!response.ok) {
-        throw new Error(accountDeletedWriteMessage(payload.error, "PROFILE_UPDATE_FAILED"));
+        throw new Error(payload.error || "PROFILE_UPDATE_FAILED");
       }
       setData(payload);
       setDiscordPseudo("");
@@ -399,7 +406,7 @@ export default function ProfilePage() {
       // Le corps porte un **code**, pas une phrase : la traduction vit dans le
       // module pur, et un code inconnu retombe sur la phrase générique plutôt
       // que de s'afficher tel quel.
-      if (!response.ok) throw new Error(accountDeletionErrorMessage(payload.error));
+      if (!response.ok) throw new Error(payload.error || "ACCOUNT_DELETE_FAILED");
       // `reason` vaut `null` sur un effacement complet : c'est une réponse, pas
       // une absence de réponse. Le `mode` sert donc de témoin — il dit que le
       // serveur a bien répondu, là où un `??` sur le motif retomberait sur
@@ -410,7 +417,7 @@ export default function ProfilePage() {
         window.location.href = "/";
       }, 1200);
     } catch (e) {
-      showError((e as Error).message);
+      showError(accountDeletionErrorMessage((e as Error).message));
       setDeleting(false);
     }
   };
@@ -420,8 +427,9 @@ export default function ProfilePage() {
     event.target.value = "";
     if (!file) return;
 
-    if (!ACCEPTED_IMAGE_TYPES.includes(file.type) || file.size > MAX_IMAGE_BYTES) {
-      showError("Image trop lourde ou format non supporté");
+    const refusal = precheckImageUpload(file);
+    if (refusal) {
+      showError(avatarUploadErrorMessage(refusal));
       return;
     }
 
@@ -435,14 +443,14 @@ export default function ProfilePage() {
       });
       const payload = (await response.json()) as { avatarUrl?: string | null; error?: string };
       if (!response.ok) {
-        throw new Error(accountDeletedWriteMessage(payload.error, "AVATAR_UPLOAD_FAILED"));
+        throw new Error(payload.error || "AVATAR_UPLOAD_FAILED");
       }
       setData((prev) =>
         prev ? { ...prev, profile: { ...prev.profile, avatarUrl: payload.avatarUrl ?? null } } : prev,
       );
       showSuccess("Avatar mis à jour.");
     } catch (e) {
-      showError((e as Error).message);
+      showError(avatarUploadErrorMessage((e as Error).message));
     } finally {
       setAvatarBusy(false);
     }
@@ -454,14 +462,14 @@ export default function ProfilePage() {
       const response = await fetch("/api/profile/avatar", { method: "DELETE" });
       const payload = (await response.json()) as { avatarUrl?: string | null; error?: string };
       if (!response.ok) {
-        throw new Error(accountDeletedWriteMessage(payload.error, "AVATAR_DELETE_FAILED"));
+        throw new Error(payload.error || "AVATAR_DELETE_FAILED");
       }
       setData((prev) =>
         prev ? { ...prev, profile: { ...prev.profile, avatarUrl: null } } : prev,
       );
       showSuccess("Avatar supprimé.");
     } catch (e) {
-      showError((e as Error).message);
+      showError(avatarDeleteErrorMessage((e as Error).message));
     } finally {
       setAvatarBusy(false);
     }

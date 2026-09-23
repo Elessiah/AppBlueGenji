@@ -17,6 +17,7 @@
  * pur, et un repli qui n'invente rien quand le code est inconnu.
  */
 
+import { imageUploadErrorMessage } from "@/lib/shared/image-upload-errors";
 import { teamTagErrorMessage } from "@/lib/shared/team-tag";
 import { TEAM_NAME_MAX_LENGTH, TEAM_NAME_MIN_LENGTH } from "@/lib/shared/team-name";
 
@@ -75,13 +76,6 @@ const TEAM_ERRORS: Record<string, string> = {
   MEMBER_ACCOUNT_DELETED: "Ce compte a été supprimé : il ne peut pas recevoir la propriété de l'équipe.",
   NOT_A_GHOST_TEAM: "Cette équipe n'est plus une équipe fantôme : elle a déjà un propriétaire.",
 
-  // ── Logo ──
-  FILE_MISSING: "Aucune image reçue. Choisis un fichier.",
-  IMAGE_TOO_LARGE: "Image trop lourde : 5 Mo au maximum.",
-  IMAGE_FORMAT_INVALID: "Format non reconnu : PNG, JPEG ou WebP seulement.",
-  IMAGE_DIMENSIONS_INVALID: "Dimensions d'image non prises en charge.",
-  IMAGE_ANIMATED_NOT_SUPPORTED: "Les images animées ne sont pas acceptées.",
-
   // ── Replis des routes : chacun nomme le geste qui a échoué. ──
   TEAM_JOIN_FAILED: "La demande n'a pas pu être envoyée.",
   TEAM_LEAVE_FAILED: "Le départ n'a pas pu être enregistré.",
@@ -110,7 +104,8 @@ const FALLBACK = "L'opération a échoué.";
  * Message à afficher pour un code de refus.
  *
  * Les refus de forme du sigle ont leur propre registre (`teamTagErrorMessage`,
- * partagé avec la création) : il est consulté d'abord. Un code inconnu retombe
+ * partagé avec la création), ceux d'une image aussi (`imageUploadErrorMessage`,
+ * partagé avec l'avatar) : ils sont consultés d'abord. Un code inconnu retombe
  * sur une phrase générique **et non sur le code lui-même** : le jour où le
  * serveur en ajoute un, le joueur lit une phrase, pas un jeton.
  */
@@ -118,6 +113,10 @@ export function teamErrorMessage(code: string | null | undefined): string {
   if (!code) return FALLBACK;
   const tagMessage = teamTagErrorMessage(code);
   if (tagMessage) return tagMessage;
+  // Les refus du logo sont ceux de toute image téléversée : une seule rédaction,
+  // partagée avec l'avatar de `/profil`.
+  const imageMessage = imageUploadErrorMessage(code);
+  if (imageMessage) return imageMessage;
   // `code in` remonterait la chaîne de prototypes (« constructor »).
   return Object.prototype.hasOwnProperty.call(TEAM_ERRORS, code) ? TEAM_ERRORS[code] : FALLBACK;
 }

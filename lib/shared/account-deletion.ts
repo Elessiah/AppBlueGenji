@@ -232,19 +232,13 @@ export const ACCOUNT_DELETED_ERROR = "ACCOUNT_DELETED";
  * modification n'a pas pris, et non le code interne — toute l'interface est en
  * français.
  *
- * **Elle ne traduit que celui-là.** Tout autre code ressort **tel quel**, et le
- * `fallback` ne sert qu'à son absence : la fonction reprend exactement
- * l'idiome `payload.error || FALLBACK` qu'elle remplace, elle ne le corrige pas.
- * Dire qu'elle « laisse les autres codes au repli de l'appelant » serait faux,
- * et c'est une inexactitude qui compte ici : elle ferait croire que plus aucun
- * code en capitales ne peut atteindre un toast, alors que `PSEUDO_ALREADY_USED`
- * y arrive encore. Ces chemins-là sont un défaut préexistant, conséquence de
- * l'absence d'un registre d'erreurs pour `/profil` ; les couvrir demanderait une
- * phrase par code, ce que la suppression de compte n'avait pas à écrire.
+ * Une **phrase**, et non plus une fonction qui traduisait ce seul code et
+ * rendait les autres tels quels : c'est le registre de `/profil`
+ * (`app/(secured)/profil/profile-errors.ts`) qui traduit désormais chaque code,
+ * celui-ci compris. L'ancienne forme avait un second défaut, plus sournois : la
+ * sauvegarde du profil repassait sa phrase dans ce registre, qui ne la
+ * reconnaissait pas — et le joueur lisait « La sauvegarde a échoué » à la place
+ * de la seule explication juste.
  */
-export function accountDeletedWriteMessage(code: string | undefined, fallback: string): string {
-  if (code === ACCOUNT_DELETED_ERROR) {
-    return "Ce compte vient d'être supprimé : la modification n'a pas été enregistrée.";
-  }
-  return code || fallback;
-}
+export const ACCOUNT_DELETED_WRITE_MESSAGE =
+  "Ce compte vient d'être supprimé : la modification n'a pas été enregistrée.";

@@ -21,6 +21,7 @@ import { deleteStoredImage } from "@/lib/server/image-upload";
 import { syncSoloEntryIdentity, syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { importRemoteAvatar, shouldImportRemoteAvatar } from "@/lib/server/user-avatar-import";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
+import { PSEUDO_MAX_LENGTH, pseudoLength } from "@/lib/shared/pseudo";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { DISCORD_CODE_VALIDITY_MINUTES } from "@/lib/shared/processing-register";
@@ -919,11 +920,29 @@ export async function updateOwnProfile(
 ): Promise<void> {
   const db = await getDatabase();
 
-  if (patch.pseudo) {
-    const normalized = normalizePseudo(patch.pseudo);
+  // **Le pseudo est contrôlé avant d'être lu.** Le corps du `PATCH` n'est
+  // qu'*annoté*, jamais validé : `{"pseudo": 123}` partait dans
+  // `normalizePseudo`, dont le `.replace` levait un `TypeError` — et son message
+  // interne (`raw.replace is not a function`) ressortait tel quel dans le corps
+  // du 400. Même trou, même parade que pour `discordPseudo` plus bas.
+  //
+  // Deux saisies passaient aussi sans être des pseudos : une chaîne faite
+  // d'espaces, que la normalisation réduisait à `""` et que `COALESCE` écrivait
+  // (un compte sans nom dans les brackets), et un pseudo plus long que la
+  // colonne, refusé par MySQL avec un message qui nomme la colonne. Un pseudo
+  // **absent** reste un pseudo inchangé ; un pseudo **présent** doit en être un.
+  let nextPseudo: string | null = null;
+  if (patch.pseudo !== undefined) {
+    if (typeof patch.pseudo !== "string") throw new Error("INVALID_PSEUDO");
+    nextPseudo = normalizePseudo(patch.pseudo);
+    if (!nextPseudo) throw new Error("PSEUDO_EMPTY");
+    if (pseudoLength(nextPseudo) > PSEUDO_MAX_LENGTH) throw new Error("PSEUDO_TOO_LONG");
+  }
+
+  if (nextPseudo) {
     const [conflicts] = await db.execute<(RowDataPacket & { id: number })[]>(
       `SELECT id FROM bg_users WHERE pseudo = ? AND id <> ? LIMIT 1`,
-      [normalized, userId],
+      [nextPseudo, userId],
     );
     if (conflicts.length > 0) {
       throw new Error("PSEUDO_ALREADY_USED");
@@ -1064,7 +1083,7 @@ export async function updateOwnProfile(
          open_to_recruitment = COALESCE(?, open_to_recruitment)
      WHERE id = ? AND is_deleted = 0`,
     [
-      patch.pseudo ? normalizePseudo(patch.pseudo) : null,
+      nextPseudo,
       patch.overwatchBattletag !== undefined,
       patch.overwatchBattletag ?? null,
       patch.marvelRivalsTag !== undefined,
