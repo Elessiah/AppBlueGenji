@@ -703,8 +703,9 @@ export default function ProfilePage() {
                       onClick={() => setVerifyOpen(true)}
                       /* Sans tag enregistré il n'y a rien à *certifier* : le
                          geste est d'en poser un — et il se prouve tout seul,
-                         `startDiscordVerification` concluant sur place quand le
-                         tag résout vers l'identifiant déjà rattaché. */
+                         le dialogue renvoyant un compte rattaché chez Discord,
+                         qui nomme le pseudo et le rattachement l'écrit
+                         certifié. */
                       aria-label={
                         discordState.tag
                           ? "Certifier mon tag Discord"

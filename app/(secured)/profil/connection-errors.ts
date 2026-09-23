@@ -14,6 +14,8 @@
  * ne couvre que le cas où le serveur refuse un geste que l'écran croyait permis
  * — deux onglets ouverts, par exemple.
  */
+import { OAUTH_PROVIDER_LABELS, type OAuthProvider } from "@/lib/shared/oauth-providers";
+
 const CONNECTION_ERRORS: Record<string, string> = {
   // Le compte porte déjà une autre identité de ce fournisseur. On ne déplace
   // pas une porte d'entrée : au joueur de retirer l'ancienne d'abord, en
@@ -44,4 +46,22 @@ const CONNECTION_ERRORS: Record<string, string> = {
 export function connectionErrorMessage(code: string | null | undefined): string {
   if (!code) return "L'opération a échoué. Réessaie dans un instant.";
   return CONNECTION_ERRORS[code] ?? "L'opération a échoué. Réessaie dans un instant.";
+}
+
+/**
+ * La phrase du retour réussi d'un aller-retour de rattachement.
+ *
+ * Deux cas, parce que le même retour couvre deux gestes : **ajouter** une
+ * application, et **reconfirmer** celle qui l'était déjà — c'est le chemin par
+ * lequel un compte relié à Discord certifie son tag. Annoncer « rattaché » à qui
+ * l'était déjà décrirait un changement qui n'a pas eu lieu, et tairait celui qui
+ * a eu lieu : le pseudo a été relu auprès du fournisseur.
+ */
+export function connectionSuccessMessage(provider: OAuthProvider | null, refreshed: boolean): string {
+  if (!provider) return refreshed ? "Application reconfirmée." : "Application rattachée.";
+  const label = OAUTH_PROVIDER_LABELS[provider];
+  if (!refreshed) return `${label} est maintenant rattaché à ton compte.`;
+  return provider === "DISCORD"
+    ? "Discord reconfirmé : ton pseudo a été relu auprès de Discord."
+    : `${label} reconfirmé : les informations de ton compte ont été relues.`;
 }

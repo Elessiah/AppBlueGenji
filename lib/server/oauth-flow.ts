@@ -43,6 +43,7 @@ import {
   createOrGetOAuthUser,
   linkOAuthIdentity,
   type OAuthIdentity,
+  type OAuthLinkOutcome,
 } from "@/lib/server/account-identities";
 import {
   OAUTH_PROVIDER_SLUGS,
@@ -219,8 +220,9 @@ export async function completeOAuth(req: NextRequest, provider: OAuthProvider): 
     const user = await getCurrentUser();
     if (!user) return loginFailure(base, provider, "session");
 
+    let outcome: OAuthLinkOutcome;
     try {
-      await linkOAuthIdentity(user.id, identity);
+      outcome = await linkOAuthIdentity(user.id, identity);
     } catch (error) {
       // **Seuls les refus nommés voyagent.** `linkOAuthIdentity` ne lève pas que
       // ses trois refus : tout ce que `mysql2` fait remonter le traverse, et ce
@@ -234,6 +236,9 @@ export async function completeOAuth(req: NextRequest, provider: OAuthProvider): 
 
     const url = new URL(PROFILE_PATH, base);
     url.searchParams.set("connected", OAUTH_PROVIDER_SLUGS[provider]);
+    // Une identité **déjà** rattachée vient d'être relue, pas ajoutée : le
+    // profil le dit autrement (« rattaché » serait faux, il l'était déjà).
+    if (outcome === "REFRESHED") url.searchParams.set("refreshed", "1");
     return NextResponse.redirect(url);
   }
 

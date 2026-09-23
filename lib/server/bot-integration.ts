@@ -82,6 +82,24 @@ function emptyBotStats(): BotStats {
   };
 }
 
+/**
+ * Le code d'un appel au bot qui n'a pas abouti **côté réseau**.
+ *
+ * Deux faits différents, que le site confondait : le bot n'a pas répondu du
+ * tout (connexion refusée, hôte injoignable — `BOT_INTERNAL_UNREACHABLE`), ou il
+ * a reçu la demande mais n'a pas répondu à temps (`BOT_INTERNAL_TIMEOUT`). Le
+ * second est le cas ordinaire d'une résolution de tag : le bot balaie un à un
+ * les serveurs qu'il partage, et un tag qu'il ne trouve nulle part les parcourt
+ * **tous**. Rendu en « bot non joignable », il faisait passer un joueur absent
+ * des serveurs du bot pour une panne d'infrastructure.
+ */
+function botFetchFailureCode(error: unknown): string {
+  const name = (error as { name?: string } | null)?.name;
+  return name === "TimeoutError" || name === "AbortError"
+    ? "BOT_INTERNAL_TIMEOUT"
+    : "BOT_INTERNAL_UNREACHABLE";
+}
+
 async function safeReadError(response: Response): Promise<string> {
   try {
     const payload = (await response.json()) as { error?: string };
@@ -156,8 +174,8 @@ export async function resolveDiscordUser(handle: string): Promise<string> {
       cache: "no-store",
       signal: AbortSignal.timeout(BOT_LOGIN_FETCH_TIMEOUT_MS),
     });
-  } catch {
-    throw new Error("BOT_INTERNAL_UNREACHABLE");
+  } catch (error) {
+    throw new Error(botFetchFailureCode(error));
   }
 
   if (response.ok) {
@@ -193,8 +211,8 @@ export async function sendDiscordLoginCode(discordId: string, code: string): Pro
       cache: "no-store",
       signal: AbortSignal.timeout(BOT_LOGIN_FETCH_TIMEOUT_MS),
     });
-  } catch {
-    throw new Error("BOT_INTERNAL_UNREACHABLE");
+  } catch (error) {
+    throw new Error(botFetchFailureCode(error));
   }
 
   if (response.ok) return;

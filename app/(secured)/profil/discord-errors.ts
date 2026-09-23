@@ -27,6 +27,11 @@ const VERIFICATION_ERRORS: Record<string, string> = {
     "Certification indisponible pour le moment (bot non joignable). Réessaie plus tard.",
   BOT_INTERNAL_UNAUTHORIZED:
     "Certification indisponible (configuration interne). Signale-le à l'organisation.",
+  // Le bot a répondu trop tard : il cherche le tag sur chacun de ses serveurs,
+  // et un tag qu'il ne trouve nulle part les parcourt tous. La cause la plus
+  // probable est donc côté joueur, pas une panne — d'où la consigne.
+  BOT_INTERNAL_TIMEOUT:
+    "Le bot n'a pas retrouvé ton tag à temps. Vérifie qu'il est exact et que tu es sur le serveur BlueGenji, puis réessaie.",
 
   TOO_MANY_CODE_REQUESTS:
     "Trop de codes demandés pour ce compte Discord. Attends une quinzaine de minutes.",

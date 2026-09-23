@@ -22,6 +22,16 @@
  * dit lequel des deux vient de se produire, et c'est la seule différence entre
  * les deux parcours.
  *
+ * **L'écran n'emprunte plus le premier chemin.** Il suppose que le bot sache
+ * résoudre le tag, donc qu'il partage un serveur avec le joueur — ce qu'un
+ * compte venu par OAuth Discord n'a jamais eu à faire : la recherche balayait
+ * alors tous les serveurs du bot sans trouver personne, dépassait le délai de
+ * l'appel, et le profil annonçait « bot non joignable ». Un compte rattaché
+ * certifie donc par un aller-retour OAuth (`linkOAuthIdentity`, qui réécrit le
+ * pseudo nommé par Discord). Le chemin reste ici parce qu'il demeure une preuve
+ * juste, et qu'un compte rattaché entre l'ouverture du profil et le clic y
+ * aboutit encore.
+ *
  * **Ce module ne relie jamais deux comptes Discord.** Un compte du site dont le
  * `discord_id` est posé le garde : un tag qui résout ailleurs est refusé
  * (`DISCORD_ID_MISMATCH`) plutôt que de faire glisser l'identité de connexion
