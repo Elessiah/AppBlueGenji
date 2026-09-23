@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useState, useEffect, useRef } from "react";
+import { FormEvent, useCallback, useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import type {
@@ -49,6 +49,7 @@ import {
 import { SwissView } from "./_components/SwissView";
 import { EnduranceView } from "./_components/EnduranceView";
 import { EntrantProvider } from "./_lib/entrant-link";
+import { buildEntrantLogoMap } from "@/lib/shared/entrant-logos";
 import { MatchAnchorProvider } from "./_lib/match-anchor-context";
 import { useMatchAnchor } from "./_hooks/useMatchAnchor";
 import { TournamentProgress } from "./_components/TournamentProgress";
@@ -197,6 +198,15 @@ export default function TournamentDetailPage() {
       return previous;
     });
   }, [detail?.phases, detail?.currentPhaseId]);
+
+  // Logos des engagés pour toutes les vues du plateau (cartes de match, arbre,
+  // classements) : construits une fois depuis les inscrites, qui sont les seules
+  // à porter le logo — voir `lib/shared/entrant-logos.ts`. Mémorisés sur la
+  // liste reçue, pour ne pas redessiner chaque carte à chaque rendu de la page.
+  const entrantLogos = useMemo(
+    () => buildEntrantLogoMap(detail?.registrations ?? []),
+    [detail?.registrations],
+  );
 
   // Échec définitif avant même d'avoir reçu quoi que ce soit : sans ce cas, la
   // page resterait sur « Chargement… » pour toujours — le seul état où il ne
@@ -521,6 +531,7 @@ export default function TournamentDetailPage() {
     <EntrantProvider
       participantType={detail.card.participantType}
       soloUserIds={detail.soloUserIds}
+      logos={entrantLogos}
     >
       <MatchAnchorProvider
         targetMatchId={targetMatchId}

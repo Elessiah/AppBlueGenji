@@ -103,10 +103,12 @@ describe("Page de tournoi — engagés cliquables", () => {
     "TournamentProgress.tsx": "app/(secured)/tournois/[id]/_components/TournamentProgress.tsx",
   };
 
+  // `EntrantName` (nom précédé du logo de l'engagé) est le passage des vues de
+  // plateau ; il rend lui-même un `EntrantLink`, vérifié juste en dessous.
   for (const [name, path] of Object.entries(files)) {
     it(`${name} passe par EntrantLink, jamais par un chemin écrit à la main`, () => {
       const code = stripComments(read(path));
-      expect(code).toContain("<EntrantLink");
+      expect(code).toMatch(/<Entrant(Link|Name)\b/);
       // Un engagé est une équipe **ou** un joueur selon le tournoi : seul le
       // contexte (`soloUserIds`) sait lequel. Un `/equipes/${id}` écrit ici
       // mènerait à « Équipe non trouvée » sur un tournoi individuel.
@@ -115,11 +117,18 @@ describe("Page de tournoi — engagés cliquables", () => {
     });
   }
 
+  it("EntrantName rend le nom par EntrantLink, pas par un chemin écrit à la main", () => {
+    const code = stripComments(read("app/(secured)/tournois/[id]/_components/EntrantName.tsx"));
+    expect(code).toContain("<EntrantLink teamId={teamId}");
+    expect(code).not.toContain("`/equipes/${");
+    expect(code).not.toContain("`/joueurs/${");
+  });
+
   it("nomme la championne d'une survie et d'une ronde suisse par un lien", () => {
     for (const path of [files["SurvivalView.tsx"], files["SwissView.tsx"]]) {
       const code = stripComments(read(path));
       const banner = code.slice(code.indexOf("Championne"));
-      expect(banner.slice(0, 200)).toContain("<EntrantLink teamId={champion.teamId}>");
+      expect(banner.slice(0, 200)).toContain("<EntrantName teamId={champion.teamId}");
     }
   });
 
@@ -127,7 +136,7 @@ describe("Page de tournoi — engagés cliquables", () => {
     const code = stripComments(
       read("app/(secured)/tournois/[id]/_components/RegistrationsPanel.tsx"),
     );
-    expect(code).toContain("<EntrantLink className={styles.name} teamId={reg.teamId}>");
+    expect(code).toMatch(/<EntrantName\s+teamId=\{reg\.teamId\}\s+name=\{reg\.teamName\}\s+textClassName=\{styles\.name\}/);
   });
 
   it("laisse `.entity-link` seule porter l'affordance du nom d'un inscrit", () => {

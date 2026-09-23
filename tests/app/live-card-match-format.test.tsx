@@ -52,6 +52,8 @@ function match(roundLabel: string, matchFormat: MatchFormat | null = null): Land
     team2Name: "Beta",
     team1Href: "/equipes/1",
     team2Href: "/equipes/2",
+    team1LogoUrl: null,
+    team2LogoUrl: null,
     team1Score: 1,
     team2Score: 0,
     team1Seed: null,

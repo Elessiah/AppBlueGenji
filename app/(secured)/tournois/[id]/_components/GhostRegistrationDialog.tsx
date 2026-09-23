@@ -13,6 +13,7 @@ import {
 } from "@/lib/shared/ghost-registration";
 import { useParticipantWording } from "../_lib/entrant-link";
 import { mapBatchError } from "../_lib/error-map";
+import { EntrantLogo } from "./EntrantName";
 import styles from "./GhostRegistrationDialog.module.css";
 
 type GhostTeamOption = { id: number; name: string; logoUrl: string | null };
@@ -297,6 +298,7 @@ export function GhostRegistrationDialog({
                         onChange={() => toggle(team.id)}
                         disabled={busy}
                       />
+                      <EntrantLogo teamId={team.id} name={team.name} size={20} logoUrl={team.logoUrl} />
                       <span className={styles.optionName}>{team.name}</span>
                     </label>
                   );

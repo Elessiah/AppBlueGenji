@@ -28,6 +28,14 @@ export type LandingLiveMatch = {
    */
   team1Href: string | null;
   team2Href: string | null;
+  /**
+   * Logo de l'engagé — celui de l'équipe, ou la copie d'avatar d'une entrée
+   * solo (qui respecte déjà le réglage de visibilité de son joueur). Toujours
+   * un fichier du site (`localUploadUrl`), `null` sinon : la carte retombe
+   * alors sur l'initiale.
+   */
+  team1LogoUrl: string | null;
+  team2LogoUrl: string | null;
   team1Score: number | null;
   team2Score: number | null;
   /**

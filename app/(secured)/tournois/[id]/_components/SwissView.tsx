@@ -6,7 +6,7 @@ import { formatPoints } from "@/lib/shared/swiss";
 import { MatchScoreDraft } from "./BracketTree";
 import { MatchRow } from "./MatchRow";
 import { ScrollArea } from "@/components/cyber";
-import { EntrantLink } from "../_lib/entrant-link";
+import { EntrantName } from "./EntrantName";
 
 const COL_W = 226;
 const BORDER = "var(--border, #444)";
@@ -89,9 +89,9 @@ export function SwissView({
           }}
         >
           🏆 Championne —{" "}
-          <EntrantLink teamId={champion.teamId}>
+          <EntrantName teamId={champion.teamId} name={champion.teamName} logoSize={20}>
             <strong>{champion.teamName}</strong>
-          </EntrantLink>
+          </EntrantName>
         </div>
       )}
 
@@ -199,23 +199,18 @@ export function SwissView({
                   >
                     {team.rank}
                   </span>
-                  <EntrantLink
+                  <EntrantName
                     teamId={team.teamId}
+                    name={team.teamName}
                     title={team.teamName}
-                    style={{
-                      // Base non nulle : avec `flex: 1` (base 0), le nom ne pesait
-                      // rien dans la negociation d'espace et se faisait rogner a
-                      // quelques pixels par les colonnes fixes et le bouton
-                      // d'abandon. Il retrecit desormais comme les autres.
-                      flex: "1 1 72px",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      fontWeight: isMine ? 700 : 500,
-                    }}
-                  >
-                    {team.teamName}
-                  </EntrantLink>
+                    truncate
+                    // Base non nulle : avec `flex: 1` (base 0), le nom ne pesait
+                    // rien dans la negociation d'espace et se faisait rogner a
+                    // quelques pixels par les colonnes fixes et le bouton
+                    // d'abandon. Il retrecit desormais comme les autres.
+                    style={{ flex: "1 1 72px" }}
+                    textStyle={{ fontWeight: isMine ? 700 : 500 }}
+                  />
                   <span
                     className="num"
                     style={{ width: 34, textAlign: "right", fontWeight: 700 }}
@@ -365,20 +360,14 @@ export function SwissView({
                                 background: "var(--surface-1)",
                               }}
                             >
-                              <EntrantLink
+                              <EntrantName
                                 teamId={byeTeamId}
+                                name={match.team1Name}
                                 title={match.team1Name ?? undefined}
-                                style={{
-                                  color: "var(--text-0)",
-                                  fontWeight: 600,
-                                  display: "block",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {match.team1Name}
-                              </EntrantLink>
+                                truncate
+                                style={{ display: "flex" }}
+                                textStyle={{ color: "var(--text-0)", fontWeight: 600 }}
+                              />
                               <span style={{ fontSize: 11, color: ACCENT }}>
                                 ✓ Victoire d&apos;office
                               </span>

@@ -24,7 +24,8 @@ import {
   splitEnduranceMatches,
   splitPlayoffBrackets,
 } from "../_lib/endurance-sections";
-import { EntrantLink, useParticipantWording } from "../_lib/entrant-link";
+import { useParticipantWording } from "../_lib/entrant-link";
+import { EntrantName } from "./EntrantName";
 import { BracketSections } from "./BracketSections";
 import type { MatchScoreDraft } from "./BracketTree";
 import { EnduranceRoundPanels } from "./EnduranceRoundPanels";
@@ -180,9 +181,13 @@ function EnduranceHistory({
             >
               {/* Même affordance que le classement au-dessus : un nom d'engagé
                   mène toujours à sa fiche, d'une vue à l'autre. */}
-              <EntrantLink teamId={standing.teamId} className={styles.historyTeam}>
-                {standing.teamName}
-              </EntrantLink>
+              <EntrantName
+                teamId={standing.teamId}
+                name={standing.teamName}
+                title={standing.teamName}
+                truncate
+                className={styles.historyTeam}
+              />
               {standing.rounds.map((cell) => (
                 <span
                   key={cell.round}
@@ -276,7 +281,7 @@ function PenaltyLog({
             }
           >
             <span className={styles.penaltyAmount}>−{penalty.points}</span>
-            <EntrantLink teamId={penalty.teamId}>{penalty.teamName}</EntrantLink>
+            <EntrantName teamId={penalty.teamId} name={penalty.teamName} />
             <span className={styles.penaltyReason}>{penalty.reason}</span>
             <span className={styles.penaltyMeta}>
               M{penalty.round}
@@ -451,12 +456,11 @@ export function EnduranceView({
               }}
             >
               <span className="num">{standing.rank}</span>
-              <EntrantLink
+              <EntrantName
                 teamId={standing.teamId}
-                style={{ fontWeight: isMine ? 700 : undefined }}
-              >
-                {standing.teamName}
-              </EntrantLink>
+                name={standing.teamName}
+                textStyle={{ fontWeight: isMine ? 700 : undefined, overflowWrap: "anywhere" }}
+              />
               <span className="num">
                 {standing.points}
                 {/*
