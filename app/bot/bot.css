@@ -353,7 +353,7 @@
 .srv-table { padding: 6px 22px 16px; }
 .srv-head, .srv-row {
   display: grid;
-  /* La colonne d'état tient « ÉTAT DU RELAIS » et « ● Hors ligne » sur une
+  /* La colonne d'état tient « ÉTAT DU RELAIS » et « ○ Hors ligne » sur une
      ligne : à 70px, le renommage faisait passer l'en-tête sur deux lignes et
      les serveurs arrêtés avec lui, le tableau perdant sa hauteur de ligne. */
   grid-template-columns: 28px 1fr 80px 80px 115px 60px;
@@ -413,7 +413,7 @@
   font-family: var(--mono);
   font-size: 10px; letter-spacing: 0.14em;
   text-align: right;
-  /* « ● Hors ligne » ne se coupe pas en deux : une cellule qui passe sur deux
+  /* « ○ Hors ligne » ne se coupe pas en deux : une cellule qui passe sur deux
      lignes fait grandir toute la rangée. */
   white-space: nowrap;
 }
@@ -672,7 +672,7 @@
      Les pistes restantes sont **fixes** et non `auto` : l'en-tête et chaque
      rangée sont des grilles séparées, donc une piste `auto` se dimensionne sur
      le contenu de SA ligne. C'était sans conséquence tant que les états
-     tenaient en quatre signes (`● OK` / `○ OFF`) ; « ● Hors ligne » et
+     tenaient en quatre signes (`● OK` / `○ OFF`) ; « ○ Hors ligne » et
      « ● À jour » posaient la colonne à deux abscisses différentes, sous un
      en-tête qui ne surplombait ni l'une ni l'autre. */
   .srv-head, .srv-row {
