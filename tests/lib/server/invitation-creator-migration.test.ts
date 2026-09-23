@@ -83,8 +83,23 @@ describe("bg_team_invitations.created_by — l'auteur devient facultatif", () =>
     // n'est alors qu'un pas sans effet.
     const block = SQL.slice(
       SQL.indexOf("REFERENTIAL_CONSTRAINTS"),
-      SQL.indexOf("Migration: avatar + pseudo visibles"),
+      SQL.indexOf("`information_schema` inaccessible"),
     );
     expect([...block.matchAll(/\} catch \{/g)].length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("se joue après le `CREATE TABLE`, sinon la garde ne décide rien", () => {
+    // Les migrations d'un fichier se jouent dans l'ordre où elles y sont
+    // écrites. Placé parmi les migrations de colonnes de `bg_users` — trois
+    // cents lignes plus haut —, le bloc s'exécutait sur une base neuve
+    // **avant** que la table n'existe : les trois `ALTER` échouaient dans le
+    // vide, chacun avalé par son `catch`, et la clé n'était juste que parce que
+    // le `CREATE TABLE` d'en dessous la déclare déjà en `SET NULL`. La garde
+    // sur `DELETE_RULE` ne décidait alors rien sur ce chemin-là, alors que
+    // c'est précisément le chemin qu'elle est censée couvrir aussi.
+    const createTable = SQL.indexOf("CREATE TABLE IF NOT EXISTS bg_team_invitations");
+    const migration = SQL.indexOf("SELECT DELETE_RULE AS deleteRule");
+    expect(createTable).toBeGreaterThan(-1);
+    expect(migration).toBeGreaterThan(createTable);
   });
 });

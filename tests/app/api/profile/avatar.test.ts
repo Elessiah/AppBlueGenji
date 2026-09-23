@@ -191,3 +191,83 @@ describe("POST /api/profile/avatar — course avec la suppression du compte", ()
     expect(deleteStoredImage).not.toHaveBeenCalledWith("/uploads/avatars/old.webp");
   });
 });
+
+/**
+ * Le ménage du fichier est un **résidu**, jamais un échec.
+ *
+ * `deleteStoredImage` relève tout ce qui n'est pas `ENOENT` (disque en lecture
+ * seule, droits qui ont glissé après un déploiement), et il est appelé **après**
+ * l'écriture qui déréférence l'image. Laisser l'erreur remonter rendait donc un
+ * refus sur une modification déjà commitée : le `DELETE` n'ayant aucun
+ * `try/catch`, un `EACCES` sortait en 500 alors qu'`avatar_url` était bien
+ * vidée — l'écran ne posait pas son `setData` et continuait d'afficher l'avatar
+ * retiré jusqu'au rechargement suivant.
+ */
+describe("avatar — l'échec du ménage ne dément pas la base", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+    (updateUserAvatar as jest.Mock).mockResolvedValue(true as never);
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  function unlinkRefused(): Error {
+    const error = new Error("EACCES: permission denied") as Error & { code: string };
+    error.code = "EACCES";
+    return error;
+  }
+
+  it("DELETE rend 200 quand l'ancien fichier ne peut pas être retiré", async () => {
+    (getUserById as jest.Mock).mockResolvedValue({
+      avatarUrl: "/api/uploads/avatars/42-old.webp",
+    } as never);
+    (deleteStoredImage as jest.Mock).mockRejectedValue(unlinkRefused() as never);
+
+    const res = await DELETE();
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ avatarUrl: null });
+    // L'écriture, elle, a bien eu lieu : c'est ce que la réponse décrit.
+    expect(updateUserAvatar).toHaveBeenCalledWith(42, null);
+  });
+
+  it("POST rend 200 quand l'ancien fichier ne peut pas être retiré", async () => {
+    (getUserById as jest.Mock).mockResolvedValue({
+      avatarUrl: "/api/uploads/avatars/42-old.webp",
+    } as never);
+    (processAndStoreImage as jest.Mock).mockResolvedValue("/uploads/avatars/42-new.webp" as never);
+    (deleteStoredImage as jest.Mock).mockRejectedValue(unlinkRefused() as never);
+
+    const res = await POST(fileReq(pngFile()));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ avatarUrl: "/api/uploads/avatars/42-new.webp" });
+  });
+
+  it("POST garde son 409 quand le compte est supprimé et le fichier irretirable", async () => {
+    // Deux faits se disputent la réponse : le compte supprimé et l'`unlink`
+    // refusé. Seul le premier intéresse l'écran, qui n'a de phrase française
+    // que pour lui — le second sortait en 400 par le `catch` de la route.
+    (getUserById as jest.Mock).mockResolvedValue({ avatarUrl: null } as never);
+    (processAndStoreImage as jest.Mock).mockResolvedValue("/uploads/avatars/42-new.webp" as never);
+    (updateUserAvatar as jest.Mock).mockResolvedValue(false as never);
+    (deleteStoredImage as jest.Mock).mockRejectedValue(unlinkRefused() as never);
+
+    const res = await POST(fileReq(pngFile()));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "ACCOUNT_DELETED" });
+  });
+
+  it("laisse tout de même passer un échec d'écriture du fichier téléversé", async () => {
+    // La garde ne couvre que le **ménage**. Un téléversement qui ne s'écrit pas
+    // n'a rien produit : le refus est le fait à rendre.
+    (getUserById as jest.Mock).mockResolvedValue({ avatarUrl: null } as never);
+    (processAndStoreImage as jest.Mock).mockRejectedValue(new Error("IMAGE_TOO_LARGE") as never);
+
+    const res = await POST(fileReq(pngFile()));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "IMAGE_TOO_LARGE" });
+  });
+});

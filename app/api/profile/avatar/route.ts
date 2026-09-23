@@ -5,6 +5,27 @@ import { getUserById, updateUserAvatar } from "@/lib/server/users-service";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 
+/**
+ * Le ménage du fichier orphelin : un **résidu**, jamais un échec.
+ *
+ * `deleteStoredImage` relève toute erreur qui n'est pas `ENOENT`
+ * (`lib/server/image-upload.ts`) — un disque en lecture seule, des droits qui
+ * ont glissé après un déploiement. Or il est appelé **après** l'écriture qui
+ * déréférence l'image : la base dit déjà la vérité, et laisser l'erreur
+ * remonter rendrait un 500 sur une modification qui a bien eu lieu. L'écran ne
+ * poserait alors pas son `setData` et continuerait d'afficher l'avatar retiré
+ * jusqu'au prochain rechargement.
+ *
+ * Même arbitrage que le post-commit de `deleteOwnAccount`, pour la même raison.
+ */
+async function discardStoredImage(diskPath: string | null): Promise<void> {
+  try {
+    await deleteStoredImage(diskPath);
+  } catch {
+    // Fichier verrouillé ou disque en lecture seule : un résidu, pas un échec.
+  }
+}
+
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
@@ -29,10 +50,13 @@ export async function POST(req: Request) {
     // reprendre — servi par `/api/uploads/avatars/…`, il survivrait seul à un
     // compte effacé dont on vient de promettre qu'il ne resterait rien.
     if (!(await updateUserAvatar(user.id, servedUrl))) {
-      await deleteStoredImage(diskPath);
+      // Le refus est le fait à rendre. Un `unlink` qui échoue ici ne doit pas le
+      // masquer derrière un 400 : le compte est supprimé, c'est un 409 que
+      // l'écran attend pour le dire en français.
+      await discardStoredImage(diskPath);
       return fail(ACCOUNT_DELETED_ERROR, 409);
     }
-    await deleteStoredImage(toDiskUploadPath(current?.avatarUrl));
+    await discardStoredImage(toDiskUploadPath(current?.avatarUrl));
     return ok({ avatarUrl: servedUrl });
   } catch (error) {
     return fail((error as Error).message || "AVATAR_UPLOAD_FAILED", 400);
@@ -54,6 +78,6 @@ export async function DELETE() {
   // apparié serait faux. Ici, rien à reprendre — le fichier est encore là,
   // c'est le mode « anonymisation » qui l'emporte de son côté.
   if (!(await updateUserAvatar(user.id, null))) return fail(ACCOUNT_DELETED_ERROR, 409);
-  await deleteStoredImage(toDiskUploadPath(current?.avatarUrl));
+  await discardStoredImage(toDiskUploadPath(current?.avatarUrl));
   return ok({ avatarUrl: null });
 }

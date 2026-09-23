@@ -375,3 +375,77 @@ describe("entrée solo — avatar masqué", () => {
     expect(sql).toMatch(/visible_avatar/);
   });
 });
+
+/**
+ * Une entrée solo ne naît que pour un compte **vivant**.
+ *
+ * `bg_teams.solo_user_id` n'a volontairement aucune clé étrangère : rien en
+ * base n'empêche d'engager un compte supprimé. Le verrou pris sur la ligne
+ * ferme la course, mais il ne dit pas *ce que* la suppression a fait — des deux
+ * modes, seul l'effacement retire la ligne. Sur une **anonymisation** (le mode
+ * de tout compte ayant déjà joué), elle reste avec `is_deleted = 1`, et une
+ * inscription partie avant la suppression reprend après son commit : sans cette
+ * lecture, elle engageait `compte_supprime_<id>` dans un tournoi individuel —
+ * un engagé sans session ni identité, dont plus personne ne peut reporter le
+ * score ni déclarer l'abandon.
+ */
+describe("ensureSoloEntry — compte supprimé", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const DELETED = [
+    [{ pseudo: "compte_supprime_12", avatar_url: null, visible_avatar: 0, is_deleted: 1 }],
+    [],
+  ];
+
+  it("refuse une ligne anonymisée comme une ligne disparue", async () => {
+    const execute = jest.fn().mockResolvedValueOnce(DELETED as never);
+
+    await expect(ensureSoloEntry(fakeConnection(execute), 12)).rejects.toThrow("USER_NOT_FOUND");
+    // Le refus tombe sur la **première** lecture : ni recherche d'entrée
+    // existante, ni insertion.
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("ne resservirait pas davantage une entrée solo déjà née", async () => {
+    // Le compte anonymisé peut très bien avoir une entrée solo — c'est même le
+    // cas ordinaire, puisque cette entrée est l'une des traces qui imposent
+    // l'anonymisation. La resynchroniser est le travail de
+    // `syncSoloEntryIdentityOn` ; l'**engager de nouveau** ne l'est pas.
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce(DELETED as never)
+      .mockResolvedValueOnce([[{ id: 55 }], []] as never);
+
+    await expect(ensureSoloEntry(fakeConnection(execute), 12)).rejects.toThrow("USER_NOT_FOUND");
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("lit `is_deleted` dans la même requête que l'identité, sous le verrou", async () => {
+    // Une seconde requête laisserait un `await` entre la question et la
+    // réponse — exactement la course que le verrou est là pour fermer.
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce(USER as never)
+      .mockResolvedValueOnce(NO_ROW as never)
+      .mockResolvedValueOnce([{ insertId: 77 }] as never);
+
+    await ensureSoloEntry(fakeConnection(execute), 1);
+
+    const [sql] = execute.mock.calls[0] as [string];
+    expect(sql).toMatch(/is_deleted/);
+    expect(sql).toMatch(/FOR UPDATE/);
+  });
+
+  it("laisse passer un compte vivant dont la colonne ne dit rien", async () => {
+    // `USER` ne porte pas `is_deleted` : la garde compare à `1`, donc une
+    // colonne absente n'interdit rien. Sans cette précaution, un jeu de données
+    // d'essai ou une lecture partielle fermerait l'inscription à tout le monde.
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce(USER as never)
+      .mockResolvedValueOnce(NO_ROW as never)
+      .mockResolvedValueOnce([{ insertId: 77 }] as never);
+
+    await expect(ensureSoloEntry(fakeConnection(execute), 1)).resolves.toBe(77);
+  });
+});

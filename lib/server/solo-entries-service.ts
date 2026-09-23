@@ -30,6 +30,7 @@ type UserIdentityRow = RowDataPacket & {
   pseudo: string;
   avatar_url: string | null;
   visible_avatar: 0 | 1;
+  is_deleted: 0 | 1;
 };
 
 /**
@@ -70,7 +71,15 @@ function isDuplicateNameError(error: unknown): boolean {
  * gestes se disputent, et la suppression pose le même verrou : ou bien
  * l'inscription passe la première et la suppression *voit* l'entrée solo (donc
  * anonymise), ou bien la suppression passe la première et l'inscription ne
- * trouve plus personne (`USER_NOT_FOUND`).
+ * trouve plus de compte **vivant**.
+ *
+ * « Plus personne » ne se lit **pas** sur la seule absence de ligne : des deux
+ * modes de suppression, seul l'*effacement* la fait disparaître, et
+ * l'*anonymisation* la laisse en place avec `is_deleted = 1`. La colonne
+ * voyage donc avec l'identité, et c'est `ensureSoloEntry` qui la lit — jamais
+ * cette fonction, que `syncSoloEntryIdentityOn` appelle légitimement sur une
+ * ligne anonymisée, dont le pseudo `compte_supprime_<id>` est précisément ce
+ * qu'il faut recopier sur l'entrée solo déjà née.
  *
  * Une lecture verrouillante lit toujours la **dernière version commitée**, là
  * où une lecture ordinaire se contenterait de l'instantané de la transaction.
@@ -81,7 +90,7 @@ async function loadUserIdentity(
   lock = false,
 ): Promise<UserIdentityRow | null> {
   const [rows] = await connection.execute<UserIdentityRow[]>(
-    `SELECT pseudo, avatar_url, visible_avatar
+    `SELECT pseudo, avatar_url, visible_avatar, is_deleted
      FROM bg_users
      WHERE id = ?
      LIMIT 1${lock ? " FOR UPDATE" : ""}`,
@@ -143,8 +152,18 @@ export async function ensureSoloEntry(
 ): Promise<number> {
   // Verrouillant : l'entrée solo qui va naître ne pend à aucune clé étrangère,
   // c'est ce verrou-là qui la tient à une ligne `bg_users` bien vivante.
+  //
+  // « Vivante » est la condition entière, et l'existence de la ligne n'en dit
+  // que la moitié : des deux modes de suppression, seul l'*effacement* la fait
+  // disparaître. Sur une **anonymisation** — le mode qu'obtient justement tout
+  // compte portant déjà une trace de tournoi —, la ligne reste, et une
+  // inscription partie avant la suppression reprend après son commit pour
+  // engager `compte_supprime_412` dans un tournoi individuel. Cet engagé-là
+  // n'a plus ni session ni identité : personne ne peut plus reporter son
+  // score ni l'abandonner, et il faut l'en retirer à la main. Le refus est le
+  // même que pour une ligne disparue, parce que c'est le même fait.
   const user = await loadUserIdentity(connection, userId, true);
-  if (!user) throw new Error("USER_NOT_FOUND");
+  if (!user || user.is_deleted === 1) throw new Error("USER_NOT_FOUND");
 
   const existing = await findSoloEntry(connection, userId);
   if (existing !== null) {
