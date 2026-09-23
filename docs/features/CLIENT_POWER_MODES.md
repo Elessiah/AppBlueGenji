@@ -73,7 +73,10 @@ sont des faits, pas des estimations.
 
 ## Témoin (`components/client-power-badge.tsx`)
 
-Pastille en bas à droite, sous les boutons flottants. Elle n'apparaît que pour
+Pastille en bas à droite, sous les boutons flottants — **centrée en bas sous
+720 px**, là où le bouton « ? » descend dans le coin (même point de rupture que
+lui, sans quoi elle le recouvrirait). Son panneau passe devant les boutons
+flottants (`z-index` 110 contre 100). Elle n'apparaît que pour
 un régime qui **tient page regardée** — match, machine à la peine, mouvement
 réduit —, jamais pour la seule absence de focus : la cliquer rendrait le focus,
 donc le régime complet, et elle disparaîtrait sous le pointeur. Un clic ouvre le
