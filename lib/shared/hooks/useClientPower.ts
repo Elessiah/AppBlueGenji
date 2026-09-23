@@ -31,10 +31,14 @@ import {
  *
  * Il tient aussi la **mesure de cadence d'affichage** : un relevé de
  * {@link FRAME_SAMPLE_SIZE} images, trois secondes après l'arrivée (pour ne pas
- * mesurer l'hydratation), puis toutes les cinq minutes, et seulement quand la
- * page a le focus — une fenêtre en arrière-plan peut être bridée par le système
- * sans que la machine soit en cause. Un relevé, c'est une seconde et demie de
- * rappels `requestAnimationFrame` vides : rien au regard de ce qu'il économise.
+ * mesurer l'hydratation), puis toutes les cinq minutes **tant qu'aucun ralenti
+ * n'a été constaté**, et seulement quand la page a le focus — une fenêtre en
+ * arrière-plan peut être bridée par le système sans que la machine soit en
+ * cause. Un ralenti constaté tient jusqu'au rechargement : remesuré en éco,
+ * animations coupées, il disparaîtrait, et la page oscillerait entre les deux
+ * régimes (`isSlowFrameInterval`). Le témoin offre de l'ignorer. Un relevé,
+ * c'est une seconde et demie de rappels `requestAnimationFrame` vides : rien au
+ * regard de ce qu'il économise.
  */
 
 type Listener = () => void;
@@ -58,7 +62,7 @@ const SERVER_STATE: ClientPowerState = {
 
 /** Premier relevé : après l'hydratation et le premier rendu du contenu. */
 const FIRST_SAMPLE_DELAY_MS = 3_000;
-/** Relevés suivants : l'économiseur de batterie a pu être coupé, ou le jeu fermé. */
+/** Relevés suivants : un ralenti peut survenir en cours de route (batterie passée en économie, jeu lancé). */
 const RESAMPLE_INTERVAL_MS = 5 * 60_000;
 /** Délai après le retour du focus avant un relevé en attente. */
 const REFOCUS_SAMPLE_DELAY_MS = 1_000;
@@ -160,6 +164,7 @@ function scheduleSample(delayMs: number): void {
  */
 function startSample(): void {
   sampleTimer = null;
+  if (slowFrames) return;
   if (readAttention() !== "FOCUSED") {
     samplePending = true;
     return;
@@ -180,9 +185,10 @@ function startSample(): void {
     const interval = medianFrameInterval(stamps);
     if (interval !== null) {
       probe = { ...probe, frameIntervalMs: Math.round(interval * 10) / 10 };
-      slowFrames = isSlowFrameInterval(interval, slowFrames);
+      slowFrames = isSlowFrameInterval(interval);
     }
-    scheduleSample(RESAMPLE_INTERVAL_MS);
+    // Ralenti constaté : on ne remesure plus (voir l'en-tête du module).
+    if (!slowFrames) scheduleSample(RESAMPLE_INTERVAL_MS);
     refresh(true);
   };
   sampleFrame = requestAnimationFrame(step);
@@ -208,7 +214,13 @@ function refresh(force = false): void {
 
   const attention = readAttention();
   // Un relevé attendait le focus : le voici.
-  if (samplePending && attention === "FOCUSED" && sampleTimer === null && sampleFrame === 0) {
+  if (
+    samplePending &&
+    !slowFrames &&
+    attention === "FOCUSED" &&
+    sampleTimer === null &&
+    sampleFrame === 0
+  ) {
     samplePending = false;
     scheduleSample(REFOCUS_SAMPLE_DELAY_MS);
   }
@@ -306,6 +318,21 @@ function getSnapshot(): ClientPowerState {
 
 function getServerSnapshot(): ClientPowerState {
   return SERVER_STATE;
+}
+
+/**
+ * Abonnement **sans rendu**, pour qui ne lit le régime que dans des refs et des
+ * minuteurs. `useClientPower()` re-rend son composant à chaque changement de
+ * régime — c'est-à-dire à chaque alt-tab : négligeable pour une pastille, pas
+ * pour la page d'un tournoi, dont l'arbre compterait 254 cartes à redessiner.
+ */
+export function subscribeClientPower(listener: Listener): () => void {
+  return subscribe(listener);
+}
+
+/** Situation courante, hors React (voir {@link subscribeClientPower}). */
+export function getClientPowerInput(): ClientPowerInput {
+  return current.input;
 }
 
 /** Tout l'état, mesures comprises — pour le témoin. */

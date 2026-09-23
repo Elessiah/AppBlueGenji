@@ -47,6 +47,7 @@ export function LogoWithGlow({
   useEffect(() => {
     if (!tilts) return;
 
+    const wrap = wrapRef.current;
     let raf = 0;
     const tick = () => {
       raf = 0;
@@ -83,6 +84,11 @@ export function LogoWithGlow({
     return () => {
       window.removeEventListener("mousemove", onMove);
       if (raf !== 0) cancelAnimationFrame(raf);
+      // Le halo se remet droit : laissé à sa dernière inclinaison, il resterait
+      // de travers pendant tout le régime éco ou match.
+      target.current = { x: 0, y: 0 };
+      current.current = { x: 0, y: 0 };
+      if (wrap) wrap.style.transform = "";
     };
   }, [size, tilts]);
 

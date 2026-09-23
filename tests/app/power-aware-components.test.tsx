@@ -101,6 +101,12 @@ describe("flux du tournoi", () => {
     expect(hook).toMatch(/if \(quietAfter === null\) \{\s*if \(quietRef\.current\) \{\s*quietRef\.current = false;\s*reconnectRef\.current\?\.\(\);/);
   });
 
+  it("suit le régime sans re-rendre la page", () => {
+    // Par `useClientPower()`, chaque alt-tab redessinerait l'arbre entier.
+    expect(hook).not.toContain("useClientPower()");
+    expect(hook).toContain("const unsubscribe = subscribeClientPower(apply);");
+  });
+
   it("déclare le match à tous les onglets du site", () => {
     expect(hook).toContain("useMatchFocusLease(matchFocus);");
   });

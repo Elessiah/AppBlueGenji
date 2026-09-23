@@ -6,8 +6,18 @@ import { mapError } from "../_lib/error-map";
 import { playAlertChime } from "../_lib/sounds";
 import { clearAttention, raiseAttention } from "../_lib/attention";
 import { isPersonalAlert, touchesViewerMatches, viewerAlert } from "@/lib/shared/viewer-alerts";
-import { nextViewerMatchFocusChangeAt, viewerMatchFocus } from "@/lib/shared/client-power";
-import { useClientPower, useMatchFocusLease } from "@/lib/shared/hooks/useClientPower";
+import {
+  nextViewerMatchFocusChangeAt,
+  powerPolicy,
+  viewerMatchFocus,
+  type ClientPowerInput,
+  type ClientPowerPolicy,
+} from "@/lib/shared/client-power";
+import {
+  getClientPowerInput,
+  subscribeClientPower,
+  useMatchFocusLease,
+} from "@/lib/shared/hooks/useClientPower";
 import {
   applyLiveMessage,
   fatalFailure,
@@ -59,6 +69,9 @@ import {
 /** Plafond d'un `setTimeout` (~24,8 jours) : au-delà, il se déclencherait tout de suite. */
 const MAX_TIMEOUT_MS = 2_147_483_647;
 
+/** Point de départ du régime, avant la première lecture du magasin. */
+const FULL_POWER_INPUT: ClientPowerInput = { attention: "FOCUSED", matchFocus: false };
+
 export function useTournamentLive(tournamentId: number) {
   const { showError } = useToast();
   /** État **rendu** — peut retarder sur `stateRef`, qui est l'état reçu. */
@@ -76,9 +89,14 @@ export function useTournamentLive(tournamentId: number) {
   /** Rouvre le flux. Renseigné par l'effet, remis à null au démontage. */
   const reconnectRef = useRef<(() => void) | null>(null);
 
-  const policy = useClientPower();
-  const policyRef = useRef(policy);
-  policyRef.current = policy;
+  /**
+   * Régime de charge, suivi **sans rendu** : lu dans des refs et des minuteurs
+   * seulement. Par le hook `useClientPower`, chaque alt-tab re-rendrait la page — et
+   * avec elle l'arbre entier du plateau —, exactement le coût qu'on retire ici.
+   * Part du régime complet : la souscription corrige dès le montage.
+   */
+  const policyRef = useRef<ClientPowerPolicy>(powerPolicy(FULL_POWER_INPUT));
+  const quietTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Un état reçu attend d'être rendu. */
   const pendingRenderRef = useRef(false);
   const renderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -159,32 +177,52 @@ export function useTournamentLive(tournamentId: number) {
     [flushRender, updateMatchFocus],
   );
 
-  // Changement de régime : ce qui attendait est rendu dès qu'on peut le voir.
-  const renderDelay = policy.snapshotRenderDelayMs;
   useEffect(() => {
-    if (!pendingRenderRef.current) return;
-    if (renderDelay === 0) flushRender();
-    else if (renderDelay !== null && renderTimerRef.current === null) {
-      renderTimerRef.current = setTimeout(flushRender, renderDelay);
-    }
-  }, [renderDelay, flushRender]);
+    const apply = () => {
+      const previous = policyRef.current;
+      const next = powerPolicy(getClientPowerInput());
+      policyRef.current = next;
 
-  // Palier spectateur pour un onglet caché hors match ; palier normal au retour.
-  const quietAfter = policy.quietStreamAfterMs;
-  useEffect(() => {
-    if (quietAfter === null) {
-      if (quietRef.current) {
-        quietRef.current = false;
-        reconnectRef.current?.();
+      // Ce qui attendait est rendu dès qu'on peut le voir.
+      const delay = next.snapshotRenderDelayMs;
+      if (pendingRenderRef.current) {
+        if (delay === 0) flushRender();
+        else if (delay !== null && renderTimerRef.current === null) {
+          renderTimerRef.current = setTimeout(flushRender, delay);
+        }
       }
-      return;
-    }
-    const timer = setTimeout(() => {
-      quietRef.current = true;
-      reconnectRef.current?.();
-    }, quietAfter);
-    return () => clearTimeout(timer);
-  }, [quietAfter]);
+
+      // Palier spectateur pour un onglet caché hors match ; palier normal au retour.
+      const quietAfter = next.quietStreamAfterMs;
+      if (quietAfter === previous.quietStreamAfterMs) return;
+      if (quietTimerRef.current !== null) {
+        clearTimeout(quietTimerRef.current);
+        quietTimerRef.current = null;
+      }
+      if (quietAfter === null) {
+        if (quietRef.current) {
+          quietRef.current = false;
+          reconnectRef.current?.();
+        }
+        return;
+      }
+      quietTimerRef.current = setTimeout(() => {
+        quietTimerRef.current = null;
+        quietRef.current = true;
+        reconnectRef.current?.();
+      }, quietAfter);
+    };
+
+    const unsubscribe = subscribeClientPower(apply);
+    apply();
+    return () => {
+      unsubscribe();
+      if (quietTimerRef.current !== null) {
+        clearTimeout(quietTimerRef.current);
+        quietTimerRef.current = null;
+      }
+    };
+  }, [flushRender]);
 
   // Au démontage : aucun minuteur ni titre d'appel ne survit à la page.
   useEffect(
@@ -459,11 +497,6 @@ export function useTournamentLive(tournamentId: number) {
 
   return {
     tournament: state.detail,
-    /**
-     * Le lecteur a une rencontre en cours (régime `MATCH`,
-     * `lib/shared/client-power.ts`) — lu sur le dernier état reçu.
-     */
-    matchFocus,
     matches: state.detail?.matches ?? [],
     isLive,
     /**

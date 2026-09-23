@@ -12,6 +12,8 @@ import { attentionDocumentTitle, type ViewerAlert } from "@/lib/shared/viewer-al
 
 /** Titre d'origine, gardé tant qu'un appel est affiché. */
 let baseTitle: string | null = null;
+/** Titre que l'appel a posé : seul celui-là est à nous de retirer. */
+let appliedTitle: string | null = null;
 
 function pageIsWatched(): boolean {
   try {
@@ -23,8 +25,11 @@ function pageIsWatched(): boolean {
 
 function restore(): void {
   if (baseTitle === null) return;
-  document.title = baseTitle;
+  // Le titre a pu changer depuis — une navigation vers une autre page l'a
+  // réécrit : remettre l'ancien écraserait celui de la page qui s'affiche.
+  if (document.title === appliedTitle) document.title = baseTitle;
   baseTitle = null;
+  appliedTitle = null;
   window.removeEventListener("focus", onReturn);
   document.removeEventListener("visibilitychange", onReturn);
 }
@@ -36,12 +41,18 @@ function onReturn(): void {
 /** Signale l'évènement dans le titre, sauf si le lecteur regarde déjà la page. */
 export function raiseAttention(alert: ViewerAlert): void {
   if (pageIsWatched()) return;
+  // Un titre réécrit par quelqu'un d'autre depuis le dernier appel devient la
+  // nouvelle base : c'est lui qu'on remettra.
+  if (baseTitle !== null && document.title !== appliedTitle) {
+    baseTitle = document.title;
+  }
   if (baseTitle === null) {
     baseTitle = document.title;
     window.addEventListener("focus", onReturn);
     document.addEventListener("visibilitychange", onReturn);
   }
-  document.title = attentionDocumentTitle(alert, baseTitle);
+  appliedTitle = attentionDocumentTitle(alert, baseTitle);
+  document.title = appliedTitle;
 }
 
 /** Retire l'appel (démontage de la page : le titre suivant ne doit pas en hériter). */

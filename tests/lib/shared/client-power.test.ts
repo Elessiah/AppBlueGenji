@@ -18,7 +18,6 @@ import {
   powerReasons,
   pruneMatchFocusLeases,
   QUIET_STREAM_AFTER_MS,
-  RECOVERED_FRAME_INTERVAL_MS,
   resolvePowerMode,
   showsPowerBadge,
   SLOW_FRAME_INTERVAL_MS,
@@ -277,22 +276,13 @@ describe("performances limitées", () => {
   });
 
   it("repère un affichage bridé à 30 images/s, pas un écran à 60 Hz", () => {
-    expect(isSlowFrameInterval(1000 / 30, false)).toBe(true);
-    expect(isSlowFrameInterval(1000 / 60, false)).toBe(false);
-    expect(isSlowFrameInterval(SLOW_FRAME_INTERVAL_MS, false)).toBe(false);
+    expect(isSlowFrameInterval(1000 / 30)).toBe(true);
+    expect(isSlowFrameInterval(1000 / 60)).toBe(false);
+    expect(isSlowFrameInterval(SLOW_FRAME_INTERVAL_MS)).toBe(false);
   });
 
-  it("ne ressort du ralenti qu'une fois nettement revenu (hystérésis)", () => {
-    // Entre les deux seuils, l'état précédent tient : pas de va-et-vient.
-    const between = (SLOW_FRAME_INTERVAL_MS + RECOVERED_FRAME_INTERVAL_MS) / 2;
-    expect(isSlowFrameInterval(between, true)).toBe(true);
-    expect(isSlowFrameInterval(between, false)).toBe(false);
-    expect(isSlowFrameInterval(RECOVERED_FRAME_INTERVAL_MS - 1, true)).toBe(false);
-  });
-
-  it("garde l'état précédent tant qu'aucune mesure n'est venue", () => {
-    expect(isSlowFrameInterval(null, true)).toBe(true);
-    expect(isSlowFrameInterval(null, false)).toBe(false);
+  it("ne conclut rien tant qu'aucune mesure n'est venue", () => {
+    expect(isSlowFrameInterval(null)).toBe(false);
   });
 
   it("nomme les limites de la machine", () => {
@@ -304,6 +294,16 @@ describe("performances limitées", () => {
     ]);
     expect(performanceLimits({ cores: 8, memoryGb: 8, frameIntervalMs: 40 }, true)).toEqual(["SLOW_FRAMES"]);
     expect(performanceLimits({ cores: 16, memoryGb: 8, frameIntervalMs: 7 }, false)).toEqual([]);
+  });
+
+  it("ne croit pas les deux cœurs d'un navigateur anti-empreinte", () => {
+    // Firefox `resistFingerprinting` et Tor Browser annoncent toujours deux
+    // cœurs et ne déclarent aucune mémoire : on ne conclut rien.
+    expect(performanceLimits({ cores: 2, memoryGb: null, frameIntervalMs: 7 }, false)).toEqual([]);
+    // La cadence mesurée, elle, vaut partout.
+    expect(performanceLimits({ cores: 2, memoryGb: null, frameIntervalMs: 40 }, true)).toEqual([
+      "SLOW_FRAMES",
+    ]);
   });
 
   it("ne suppose rien de ce que le navigateur ne dit pas", () => {

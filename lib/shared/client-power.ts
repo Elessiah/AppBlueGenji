@@ -204,11 +204,6 @@ export const LOW_MEMORY_GB_MAX = 2;
  * suit plus. Un écran à 60 Hz en donne 16,7, à 144 Hz 6,9.
  */
 export const SLOW_FRAME_INTERVAL_MS = 28;
-/**
- * Seuil de **sortie**, plus bas que celui d'entrée : sans cet écart, une mesure
- * à la limite ferait basculer la page d'un régime à l'autre à chaque relevé.
- */
-export const RECOVERED_FRAME_INTERVAL_MS = 22;
 /** Nombre d'images mesurées par relevé (≈ 1,5 s à 60 Hz). */
 export const FRAME_SAMPLE_SIZE = 90;
 
@@ -230,20 +225,39 @@ export function medianFrameInterval(timestamps: readonly number[]): number | nul
   return intervals.length % 2 === 0 ? (intervals[mid - 1] + intervals[mid]) / 2 : intervals[mid];
 }
 
-/** L'affichage est-il ralenti ? `wasSlow` applique l'hystérésis. */
-export function isSlowFrameInterval(intervalMs: number | null, wasSlow: boolean): boolean {
-  if (intervalMs === null) return wasSlow;
-  return wasSlow ? intervalMs > RECOVERED_FRAME_INTERVAL_MS : intervalMs > SLOW_FRAME_INTERVAL_MS;
+/**
+ * L'affichage est-il ralenti ? `null` (pas encore mesuré) ne conclut rien.
+ *
+ * Aucun seuil de sortie : une fois le ralenti constaté, l'appelant **ne mesure
+ * plus** (voir `useClientPower`). Une mesure prise en éco — animations coupées —
+ * n'est pas comparable à celle qui l'a déclenché : une machine lente *à cause*
+ * des animations du site mesurerait vite, repasserait en régime complet,
+ * ralentirait et rebasculerait, indéfiniment. Aucun écart entre deux seuils ne
+ * casse une boucle de rétroaction ; seul le fait de ne pas remesurer le fait.
+ */
+export function isSlowFrameInterval(intervalMs: number | null): boolean {
+  return intervalMs !== null && intervalMs > SLOW_FRAME_INTERVAL_MS;
 }
 
 /**
- * Limites constatées. `slowFrames` est l'état d'hystérésis tenu par l'appelant
- * ({@link isSlowFrameInterval}) : il dépend des relevés précédents, pas du seul
- * dernier.
+ * Limites constatées. `slowFrames` est tenu par l'appelant : un ralenti constaté
+ * le reste jusqu'au rechargement ({@link isSlowFrameInterval}).
  */
 export function performanceLimits(probe: PerformanceProbe, slowFrames: boolean): PerformanceLimit[] {
   const limits: PerformanceLimit[] = [];
-  if (probe.cores !== null && probe.cores > 0 && probe.cores <= LOW_CORES_MAX) limits.push("LOW_CORES");
+  // Le nombre de cœurs n'est cru que si le navigateur déclare **aussi** sa
+  // mémoire (Chromium, qui ne maquille ni l'un ni l'autre) : Firefox en mode
+  // anti-empreinte (`resistFingerprinting`) et Tor Browser annoncent toujours
+  // deux cœurs, et tiendraient en éco une machine à seize. Une vraie machine
+  // modeste sous Firefox est de toute façon rattrapée par la cadence mesurée.
+  if (
+    probe.memoryGb !== null &&
+    probe.cores !== null &&
+    probe.cores > 0 &&
+    probe.cores <= LOW_CORES_MAX
+  ) {
+    limits.push("LOW_CORES");
+  }
   if (probe.memoryGb !== null && probe.memoryGb > 0 && probe.memoryGb <= LOW_MEMORY_GB_MAX) {
     limits.push("LOW_MEMORY");
   }

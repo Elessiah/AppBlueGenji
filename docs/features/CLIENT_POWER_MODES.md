@@ -53,14 +53,19 @@ par l'évènement `storage` : l'accueil ouvert à côté se calme aussi.
 
 Trois signaux (`performanceLimits`) :
 
-- **processeur** : `navigator.hardwareConcurrency` ≤ 2 ;
+- **processeur** : `navigator.hardwareConcurrency` ≤ 2 (voir la réserve plus bas) ;
 - **mémoire** : `navigator.deviceMemory` ≤ 2 Go (Chromium seulement) ;
 - **cadence mesurée** : médiane de 90 intervalles `requestAnimationFrame`, trois
   secondes après l'arrivée puis toutes les cinq minutes, **page au focus
-  seulement**. Au-delà de 28 ms (sous ~36 i/s) → ralenti ; retour sous 22 ms
-  (hystérésis, pour ne pas osciller). C'est le seul signal qui attrape le
-  bridage **imposé** — économiseur de batterie à 30 i/s, mode « efficacité »,
-  jeu qui accapare la carte graphique —, qu'aucune API ne dit.
+  seulement**. Au-delà de 28 ms (sous ~36 i/s) → ralenti. C'est le seul signal
+  qui attrape le bridage **imposé** — économiseur de batterie à 30 i/s, mode
+  « efficacité », jeu qui accapare la carte graphique —, qu'aucune API ne dit.
+  Un ralenti constaté **tient jusqu'au rechargement** : remesuré en éco,
+  animations coupées, il disparaîtrait, et une machine lente *à cause* des
+  animations du site oscillerait d'un régime à l'autre toutes les cinq minutes.
+- le nombre de cœurs n'est cru que si le navigateur déclare **aussi** sa
+  mémoire : Firefox en mode anti-empreinte et Tor Browser annoncent toujours
+  deux cœurs.
 
 Le lecteur peut **ignorer la détection** depuis le témoin
 (`bg_power_ignore_perf`). Match, focus et onglet caché ne s'ignorent pas : ce
