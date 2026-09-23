@@ -29,6 +29,15 @@ export default defineConfig({
   workers: process.env.CI || process.env.E2E_AUTH_USER ? 1 : undefined,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
 
+  // Une assertion d'URL qui suit une navigation du routeur client attend en
+  // réalité une compilation : le serveur de développement compile chaque page à
+  // sa première demande. Sous plusieurs workers — le défaut local, le CI n'en a
+  // qu'un —, cette compilation dépassait les 5 s par défaut, et un test
+  // échouait sur une page encore affichée (le refus du consentement RGPD, qui
+  // mène à `/`). Le délai est donc posé ici, pour toute la suite, et non sur la
+  // seule assertion où la panne s'est vue.
+  expect: { timeout: 15_000 },
+
   use: {
     baseURL,
     trace: "on-first-retry",

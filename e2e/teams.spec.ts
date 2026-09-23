@@ -50,7 +50,7 @@ test.describe("Gestion d'équipe (authentifié)", () => {
     page.on("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: /Dissoudre l'équipe/ }).click();
     await expect(page.getByText(/Équipe dissoute\. Ses statistiques/)).toBeVisible();
-    await page.waitForURL("**/equipes", { timeout: 5000 });
+    await page.waitForURL("**/equipes");
 
     // La fiche reste consultable mais affiche le bandeau « dissoute ».
     await page.goto(teamUrl);

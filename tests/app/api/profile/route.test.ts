@@ -6,6 +6,7 @@ jest.mock("@/lib/server/users-service");
 import { GET, PATCH } from "@/app/api/profile/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getFullProfile, updateOwnProfile } from "@/lib/server/users-service";
+import { profilePatchRequest } from "../../../helpers/profile-request";
 
 /**
  * Lecture et écriture de **son** profil. Les refus de `PATCH` sont couverts par
@@ -19,14 +20,6 @@ const user = { id: 42 } as Awaited<ReturnType<typeof getCurrentUser>>;
 const profile = { profile: { pseudo: "Nova" } } as unknown as Awaited<
   ReturnType<typeof getFullProfile>
 >;
-
-function patchReq(body: unknown) {
-  return new Request("http://localhost/api/profile", {
-    method: "PATCH",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -70,7 +63,7 @@ describe("PATCH /api/profile — compte visé", () => {
   it("refuse l'appel anonyme sans rien écrire", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(null);
 
-    const res = await PATCH(patchReq({ pseudo: "Nova" }));
+    const res = await PATCH(profilePatchRequest({ pseudo: "Nova" }));
 
     expect(res.status).toBe(401);
     expect(updateOwnProfile).not.toHaveBeenCalled();
@@ -82,7 +75,7 @@ describe("PATCH /api/profile — compte visé", () => {
     jest.mocked(getFullProfile).mockResolvedValue(profile);
 
     const body = { id: 7, userId: 7, visibility: { avatar: false } };
-    await PATCH(patchReq(body));
+    await PATCH(profilePatchRequest(body));
 
     expect(updateOwnProfile).toHaveBeenCalledWith(42, body);
     expect(getFullProfile).toHaveBeenCalledWith({ id: 42 }, 42);

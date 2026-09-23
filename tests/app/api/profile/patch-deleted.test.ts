@@ -6,17 +6,10 @@ jest.mock("@/lib/server/users-service");
 import { PATCH } from "@/app/api/profile/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getFullProfile, updateOwnProfile } from "@/lib/server/users-service";
+import { profilePatchRequest } from "../../../helpers/profile-request";
 import { PROFILE_INPUT_ERRORS } from "@/lib/shared/profile-input-errors";
 
 const user = { id: 42 } as Awaited<ReturnType<typeof getCurrentUser>>;
-
-function patchReq(body: unknown) {
-  return new Request("http://localhost/api/profile", {
-    method: "PATCH",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
 
 /**
  * La sauvegarde de profil arrivée **après** la suppression du compte.
@@ -37,7 +30,7 @@ describe("PATCH /api/profile — course avec la suppression du compte", () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
     (updateOwnProfile as jest.Mock).mockRejectedValue(new Error("ACCOUNT_DELETED") as never);
 
-    const res = await PATCH(patchReq({ pseudo: "Nova" }));
+    const res = await PATCH(profilePatchRequest({ pseudo: "Nova" }));
 
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "ACCOUNT_DELETED" });
@@ -49,11 +42,11 @@ describe("PATCH /api/profile — course avec la suppression du compte", () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
 
     (updateOwnProfile as jest.Mock).mockRejectedValue(new Error("PSEUDO_ALREADY_USED") as never);
-    expect((await PATCH(patchReq({ pseudo: "Nova" }))).status).toBe(409);
+    expect((await PATCH(profilePatchRequest({ pseudo: "Nova" }))).status).toBe(409);
 
     jest.spyOn(console, "error").mockImplementation(() => undefined);
     (updateOwnProfile as jest.Mock).mockRejectedValue(new Error("BOOM") as never);
-    expect((await PATCH(patchReq({ pseudo: "Nova" }))).status).toBe(400);
+    expect((await PATCH(profilePatchRequest({ pseudo: "Nova" }))).status).toBe(400);
   });
 
   it("rend le profil relu quand l'écriture passe", async () => {
@@ -61,7 +54,7 @@ describe("PATCH /api/profile — course avec la suppression du compte", () => {
     (updateOwnProfile as jest.Mock).mockResolvedValue(undefined as never);
     (getFullProfile as jest.Mock).mockResolvedValue({ profile: { pseudo: "Nova" } } as never);
 
-    const res = await PATCH(patchReq({ pseudo: "Nova" }));
+    const res = await PATCH(profilePatchRequest({ pseudo: "Nova" }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ profile: { pseudo: "Nova" } });
   });
@@ -87,7 +80,7 @@ describe("PATCH /api/profile — aucun message interne ne sort", () => {
     async (code) => {
       (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
       (updateOwnProfile as jest.Mock).mockRejectedValue(new Error(code) as never);
-      const res = await PATCH(patchReq({ pseudo: "Nova" }));
+      const res = await PATCH(profilePatchRequest({ pseudo: "Nova" }));
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({ error: code });
     },
@@ -100,7 +93,7 @@ describe("PATCH /api/profile — aucun message interne ne sort", () => {
   ])("remplace « %s » par le code générique", async (message) => {
     (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
     (updateOwnProfile as jest.Mock).mockRejectedValue(new Error(message) as never);
-    const res = await PATCH(patchReq({ pseudo: "Nova" }));
+    const res = await PATCH(profilePatchRequest({ pseudo: "Nova" }));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "PROFILE_UPDATE_FAILED" });
     // Le message reste au journal du serveur, pour qui doit le lire.

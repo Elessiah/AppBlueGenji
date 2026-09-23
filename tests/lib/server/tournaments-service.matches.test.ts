@@ -150,7 +150,20 @@ describe("tournaments-service: match state machine", () => {
         const q = sql.replace(/\s+/g, " ").trim();
         calls.push({ sql: q, params });
         if (q.includes("FROM bg_tournaments")) {
-          return [[{ format: "SINGLE", match_format_type: null, match_format_value: null }], []];
+          return [
+            [
+              {
+                format: "SINGLE",
+                match_format_type: null,
+                match_format_value: null,
+                match_format_max_maps: null,
+                match_format_draws: 0,
+                endurance_playoff_format_type: null,
+                endurance_playoff_format_value: null,
+              },
+            ],
+            [],
+          ];
         }
         if (q.startsWith("SELECT") && q.includes("FROM bg_matches")) {
           return [

@@ -31,14 +31,9 @@ test.describe("Consentement RGPD", () => {
     await page.goto("/connexion");
     await page.getByRole("button", { name: /^Refuser$/ }).click();
 
-    // Retour en arrière total : on quitte /connexion…
-    //
-    // Le délai est celui d'une navigation, pas d'une assertion (5 s) : le refus
-    // mène à `/` par le routeur client, et un serveur de développement compile
-    // la page à sa première demande. Sous plusieurs workers — le défaut local,
-    // le CI n'en a qu'un — cette compilation dépassait les 5 s et le test
-    // échouait sur une page encore affichée.
-    await expect(page).not.toHaveURL(/\/connexion/, { timeout: 30_000 });
+    // Retour en arrière total : on quitte /connexion (délai : voir `expect` dans
+    // `playwright.config.ts`)…
+    await expect(page).not.toHaveURL(/\/connexion/);
     // …et rien n'a été persisté.
     const consent = await page.evaluate(() => window.localStorage.getItem("bg_rgpd_consent"));
     expect(consent).toBeNull();
