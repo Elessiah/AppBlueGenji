@@ -13,7 +13,7 @@ import {
   discordTagLockNotice,
   isDiscordTagLocked,
 } from "@/lib/shared/discord-tag-lock";
-import { profileErrorMessage } from "./profile-errors";
+import { profileErrorMessage, profileLoadErrorMessage } from "./profile-errors";
 import {
   BLIZZARD_BATTLETAG_NOTICE,
   DISCORD_TAG_UNVERIFIED_AUDIENCE,
@@ -92,20 +92,46 @@ export default function ProfilePage() {
     }
   };
 
-  const [discordStateBusy, setDiscordStateBusy] = useState(false);
+  // **Vrai dès le premier rendu** : une lecture part au montage, et partir de
+  // `false` laissait une fenêtre — entre le premier rendu et l'effet — où
+  // l'écran annonçait une panne de lecture avant d'avoir essayé quoi que ce
+  // soit.
+  const [discordStateBusy, setDiscordStateBusy] = useState(true);
+
+  /**
+   * Le numéro de la **dernière lecture lancée**.
+   *
+   * Deux lectures peuvent être en vol en même temps — sauvegarder puis retirer
+   * son tag dans la foulée en lance deux —, et rien ne garantit qu'elles
+   * reviennent dans l'ordre. Celle du `PATCH`, revenue après celle du retrait,
+   * reposait `{tag, verified: true}` : l'écran gardait la pastille et « les
+   * administrateurs le voient » à côté d'un champ vidé, jusqu'au rechargement.
+   *
+   * Une `ref` et non un état : elle ne doit provoquer aucun rendu, et doit être
+   * lue à sa valeur **du moment**, pas à celle figée dans la fermeture.
+   */
+  const discordReadSeq = useRef(0);
 
   const loadDiscordState = async () => {
+    const seq = (discordReadSeq.current += 1);
     setDiscordStateBusy(true);
     try {
       const res = await fetch("/api/profile/discord", { cache: "no-store" });
       if (!res.ok) return;
-      setDiscordState((await res.json()) as { tag: string | null; verified: boolean; linked: boolean });
+      const payload = (await res.json()) as { tag: string | null; verified: boolean; linked: boolean };
+      // Une lecture dépassée n'écrit rien : ce qu'elle a vu est plus vieux que
+      // ce que l'écran affiche déjà.
+      if (seq !== discordReadSeq.current) return;
+      setDiscordState(payload);
     } catch {
       // Silencieux, mais **pas anodin** : l'état reste `linked: null`, donc le
       // champ reste verrouillé. Le reste du formulaire s'enregistre normalement,
       // et le bouton « Réessayer » ci-dessous rouvre le seul chemin fermé.
     } finally {
-      setDiscordStateBusy(false);
+      // L'attente ne se lève que sur la **dernière** lecture : la dépassée qui
+      // rentre la première rouvrait sinon « Réessayer » alors qu'une lecture
+      // court encore, et faisait annoncer une panne pendant ce temps-là.
+      if (seq === discordReadSeq.current) setDiscordStateBusy(false);
     }
   };
 
@@ -137,7 +163,12 @@ export default function ProfilePage() {
       if (!response.ok) {
         const errorCode = payload.error || "PROFILE_LOAD_FAILED";
         if (errorCode === "PROFILE_NOT_FOUND") {
-          showError(profileErrorMessage(errorCode));
+          // Chemin de **lecture** : le repli doit l'être aussi. `PROFILE_NOT_FOUND`
+          // est nommé dans le registre, donc les deux fonctions rendent
+          // aujourd'hui la même phrase — mais le jour où ce code en sortirait,
+          // celle-ci annoncerait « La sauvegarde a échoué » à un visiteur qui
+          // vient d'ouvrir la page, le défaut même que ce registre sépare.
+          showError(profileLoadErrorMessage(errorCode));
           setTimeout(() => router.push("/"), 1500);
           return;
         }
@@ -159,10 +190,14 @@ export default function ProfilePage() {
         major: !!v.major,
       });
     };
-    // Les chemins de **lecture** passent par le même registre que les écritures :
+    // Les chemins de **lecture** passent par le registre, comme les écritures —
     // `profile-errors.ts` s'interdit en toutes lettres de laisser sortir un code
-    // en capitales dans un toast, et un `UNAUTHORIZED` brut n'aide personne.
-    load().catch((e) => showError(profileErrorMessage((e as Error).message)));
+    // en capitales dans un toast, et un `UNAUTHORIZED` brut n'aide personne —
+    // mais avec **leur** repli : « La sauvegarde a échoué » annonçait à un
+    // visiteur qui vient d'ouvrir la page l'échec d'un geste qu'il n'a pas
+    // fait. Les codes nommés (session expirée, compte introuvable) gardent
+    // leur phrase, qui vaut des deux côtés.
+    load().catch((e) => showError(profileLoadErrorMessage((e as Error).message)));
   }, [showError, router]);
 
   /**
@@ -282,6 +317,13 @@ export default function ProfilePage() {
       setData(payload);
       setDiscordPseudo("");
       setSavedDiscordPseudo("");
+      // L'état est posé **depuis la réponse**, et non attendu d'une seconde
+      // lecture : `loadDiscordState` se tait quand elle échoue, et l'écran
+      // gardait alors la pastille et « ce pseudo est certifié : les
+      // administrateurs le voient » à côté d'un champ qu'on vient de vider. La
+      // réponse du `PATCH` porte déjà la vérité — le tag est parti, donc la
+      // certification avec (toute modification du tag la défait).
+      setDiscordState((prev) => ({ ...prev, tag: null, verified: false }));
       await loadDiscordState();
       showSuccess("Tag Discord retiré.");
     } catch (e) {
@@ -393,6 +435,13 @@ export default function ProfilePage() {
           onVerified={(tag) => {
             setVerifyOpen(false);
             setDiscordPseudo(tag);
+            // La certification **écrit** le tag en base : la référence suit, au
+            // même titre qu'après une sauvegarde. Laissée en arrière, elle
+            // faisait resoumettre ce tag à chaque enregistrement ultérieur —
+            // et un tag déplacé entre-temps faisait alors mourir tout le
+            // `PATCH` en 409, exactement ce que cette référence existe pour
+            // empêcher.
+            setSavedDiscordPseudo(tag);
             setDiscordState((prev) => ({ ...prev, tag, verified: true, linked: true }));
           }}
         />
@@ -645,7 +694,7 @@ export default function ProfilePage() {
                 elle ne doit pas différer d'un écran à l'autre. */}
             <p id="profile-discord-hint" className={s.hint}>
               {discordLocked
-                ? discordTagLockNotice(discordState)
+                ? discordTagLockNotice({ ...discordState, pending: discordStateBusy })
                 : `Tag non certifié : ${DISCORD_TAG_UNVERIFIED_AUDIENCE} Certifie-le pour qu'elle puisse le faire.`}
             </p>
           </div>

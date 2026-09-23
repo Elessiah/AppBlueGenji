@@ -125,7 +125,12 @@ describe("La page dit ce qu'elle fait des identifiants", () => {
     // détacher Discord décertifie), donc implique `discordLocked` : une branche
     // « certifié, non verrouillé » ne serait jamais rendue. Deux cas donc, et
     // deux seulement — la phrase du verrou, puis celle du tag non certifié.
-    expect(page).toContain("discordTagLockNotice(discordState)");
+    // L'attente passe à la phrase plutôt que d'être devinée : « pas encore lu »
+    // et « lecture échouée » se confondaient en un seul `linked: null`, et le
+    // verrou annonçait une panne pendant le temps normal d'un aller-retour.
+    expect(page).toContain(
+      "discordTagLockNotice({ ...discordState, pending: discordStateBusy })",
+    );
     expect(page).toContain("DISCORD_TAG_UNVERIFIED_AUDIENCE");
   });
 

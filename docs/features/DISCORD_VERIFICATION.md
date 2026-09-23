@@ -189,16 +189,28 @@ fenêtre où le site exposait un tag inventé.
 D'où la règle, écrite **une fois** dans un module pur et tenue aux deux bouts :
 
 - **L'écran** passe le champ en `readOnly` (et non `disabled` : la valeur reste
-  lisible au lecteur d'écran et atteignable au clavier) et **retire le bouton**
-  de certification — il n'a plus rien à prouver. Il en met un autre à la place,
-  « Retirer mon tag » : le champ ne se vidant plus à la main, la sortie que le
-  serveur accepte n'existerait nulle part ailleurs.
+  lisible au lecteur d'écran et atteignable au clavier) et **retire
+  « Recertifier »** — il ne ferait que reposer ce que Discord dit déjà. Il ne
+  retire pas les gestes qui ont encore un objet : « Certifier mon tag » tant que
+  le tag enregistré ne l'est pas, « Enregistrer mon tag » quand il n'y en a
+  aucun, « Retirer mon tag » dès qu'il y en a un — le champ ne se vidant plus à
+  la main, cette sortie n'existerait nulle part ailleurs. Le détail des trois
+  états est plus bas, section « Où le tag s'affiche ».
 - **La route** refuse la réécriture en **409 `DISCORD_TAG_LOCKED`** : la saisie
   est bonne, c'est l'état du compte qui l'interdit. Le refus ne tombe que sur un
-  tag **différent** du tag stocké — le formulaire renvoie le champ à chaque
-  sauvegarde, refuser sur sa seule présence rendrait tout le profil
-  inenregistrable — et la comparaison est insensible à la casse, comme celle qui
-  décide de la décertification.
+  tag **différent** du tag stocké, et la comparaison est **exacte, casse
+  comprise**. Elle ne l'a pas toujours été : elle tolérait la casse parce que le
+  formulaire renvoyait le champ à chaque sauvegarde et que refuser sur sa seule
+  présence rendait tout le profil inenregistrable. Le client ne soumet plus ce
+  champ que s'il a changé, et la tolérance est devenue nuisible — laisser passer
+  une différence de casse rendait un **200 qui n'écrivait rien**, l'écriture
+  gardant la valeur stockée quoi qu'ait décidé ce contrôle (constaté contre un
+  vrai MySQL : la colonne restait sur son orthographe d'origine pendant que la
+  route annonçait « Profil mis à jour »). Le refus dit maintenant ce que
+  l'écriture fait : c'est Discord qui nomme ce tag, sa casse comprise. La
+  comparaison qui décide de la **décertification** reste, elle, insensible à la
+  casse — elle répond à une autre question, « la preuve porte-t-elle encore sur
+  ce tag ? », et les pseudos Discord sont eux-mêmes insensibles à la casse.
 - **L'écriture** garde le tag par elle-même :
   `discord_pseudo = CASE WHEN NOT ? THEN discord_pseudo WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_pseudo ELSE ? END`.
   Le `SELECT` donne le refus lisible, la requête tranche la course — un
@@ -256,7 +268,15 @@ d'abord), un `undefined` glissait entre les branches et *ouvrait* le champ, ce
 que l'écran rend atteignable en alimentant cet état par un `as` sur une réponse
 JSON que rien ne valide.
 
-Le verrou porte alors **sa propre sortie** : un bouton « Réessayer » relit
+**Attendre n'est pas échouer**, et les deux se disaient pareil : le profil se
+rend dès que `GET /api/profile` répond, régulièrement avant
+`GET /api/profile/discord`, si bien que la phrase annonçait une panne pendant le
+temps normal d'un aller-retour. Un drapeau `pending` les sépare — l'appelant est
+le seul à savoir laquelle des deux, et le module reste pur en se contentant de
+ne plus supposer. L'attente se dit alors comme une attente, sans cause ni geste :
+il n'y a rien à réessayer tant que le premier essai n'a pas répondu.
+
+Le verrou porte sinon **sa propre sortie** : un bouton « Réessayer » relit
 l'état sans rechargement. Sans lui, une panne de lecture coûtait bien plus que
 le champ — tous les gestes étant sous `linked === true`, « Retirer mon tag »
 disparaissait avec eux, c'est-à-dire la seule annulation d'exposition que le

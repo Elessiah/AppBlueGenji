@@ -80,8 +80,17 @@ describe("discordTagLockNotice", () => {
   it("nomme le bouton de l'écran avant la reconnexion, sur un tag absent", () => {
     // L'écran rend « Enregistrer mon tag » dans cet état : renvoyer d'abord
     // vers une reconnexion par Discord, c'est ignorer le geste d'à côté.
+    //
+    // Les deux repères sont **exigés présents** avant d'être comparés : cette
+    // assertion a longtemps cherché une chaîne que la phrase ne contenait pas,
+    // si bien qu'`indexOf` rendait -1 et que le test passait quoi qu'il
+    // arrive — intervertir les deux gestes ne l'aurait pas fait tomber.
     const notice = discordTagLockNotice({ tag: null, verified: false, linked: true });
-    expect(notice.indexOf("Enregistre-le")).toBeLessThan(notice.indexOf("reconnecte-toi"));
+    const button = notice.indexOf("Enregistrer mon tag");
+    const reconnect = notice.indexOf("reconnecte-toi");
+    expect(button).toBeGreaterThanOrEqual(0);
+    expect(reconnect).toBeGreaterThanOrEqual(0);
+    expect(button).toBeLessThan(reconnect);
   });
 
   it("ne nomme que des gestes qui existent à l'écran", () => {
@@ -142,6 +151,50 @@ describe("discordTagLockNotice — rattachement inconnu", () => {
     expect(notice).toContain("lecture seule");
     expect(notice.toLowerCase()).toContain("réessaie");
     expect(notice.toLowerCase()).toContain("recharge la page");
+  });
+});
+
+describe("discordTagLockNotice — lecture en cours", () => {
+  /**
+   * « Pas encore lu » et « lecture échouée » se confondaient en un seul
+   * `linked: null` : la phrase annonçait une panne pendant le temps normal d'un
+   * aller-retour, le profil se rendant dès que `GET /api/profile` répond — ce
+   * qui arrive régulièrement avant `GET /api/profile/discord`.
+   */
+  const pending = discordTagLockNotice({
+    tag: null,
+    verified: false,
+    linked: null,
+    pending: true,
+  });
+
+  it("n'annonce aucune panne et ne propose rien à réessayer", () => {
+    expect(pending).not.toContain("Impossible");
+    expect(pending.toLowerCase()).not.toContain("réessaie");
+    expect(pending.toLowerCase()).not.toContain("recharge");
+  });
+
+  it("dit tout de même pourquoi le champ est fermé", () => {
+    expect(pending).toContain("lecture seule");
+  });
+
+  it("se distingue de l'échec, qui garde sa sortie", () => {
+    const failed = discordTagLockNotice({ tag: null, verified: false, linked: null });
+    expect(failed).not.toBe(pending);
+    expect(failed.toLowerCase()).toContain("réessaie");
+  });
+
+  it("s'efface dès que l'état est connu — un rattachement lu n'attend plus rien", () => {
+    // Le drapeau ne doit pas masquer un état déjà établi : une seconde lecture
+    // lancée à la main ne doit pas faire régresser la phrase.
+    const linked = discordTagLockNotice({
+      tag: "keryan",
+      verified: true,
+      linked: true,
+      pending: true,
+    });
+    expect(linked).toContain("certifié");
+    expect(linked).not.toContain("Lecture de l'état");
   });
 });
 

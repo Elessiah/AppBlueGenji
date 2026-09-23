@@ -60,3 +60,104 @@ describe("champ Discord — un état illisible garde une sortie", () => {
     expect(unknown).not.toContain("setVerifyOpen(true)");
   });
 });
+
+describe("champ Discord — la référence suit toute écriture du tag", () => {
+  /**
+   * Trois chemins écrivent `discord_pseudo` depuis cet écran : la sauvegarde du
+   * profil, la certification et le retrait. Chacun doit réaligner
+   * `savedDiscordPseudo`, qui décide si la **prochaine** sauvegarde parle de ce
+   * champ — laissée en arrière, elle resoumet un tag déjà écrit, et un tag
+   * déplacé entre-temps fait alors mourir tout le `PATCH` en 409.
+   */
+  it("réaligne après une certification, pas seulement après une sauvegarde", () => {
+    const onVerified = page.slice(page.indexOf("onVerified={(tag) =>"));
+    expect(onVerified.slice(0, 700)).toContain("setSavedDiscordPseudo(tag);");
+  });
+
+  it("couvre les trois chemins d'écriture", () => {
+    expect([...page.matchAll(/setSavedDiscordPseudo\(/g)].length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("réaligne le champ **en même temps** que sa référence", () => {
+    // Les deux doivent bouger ensemble : réaligner la seule référence les
+    // faisait diverger dès que le tag avait bougé ailleurs, et la sauvegarde
+    // suivante resoumettait celui du montage — 409, sans issue puisque le champ
+    // est en lecture seule.
+    const field = [...page.matchAll(/setDiscordPseudo\(payload\.profile\.discordPseudo/g)];
+    const ref = [...page.matchAll(/setSavedDiscordPseudo\(payload\.profile\.discordPseudo/g)];
+    expect(field.length).toBe(ref.length);
+    expect(field.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("champ Discord — un retrait ne laisse pas la pastille mentir", () => {
+  it("pose l'état depuis la réponse, sans attendre une seconde lecture", () => {
+    // `loadDiscordState` se tait quand elle échoue : l'écran gardait alors la
+    // pastille et « ce pseudo est certifié » à côté d'un champ qu'on vient de
+    // vider. La réponse du `PATCH` porte déjà la vérité.
+    const removal = page.slice(page.indexOf("const onDiscordTagRemove"));
+    const posted = removal.indexOf("setDiscordState((prev) => ({ ...prev, tag: null, verified: false }))");
+    const reload = removal.indexOf("await loadDiscordState()");
+    expect(posted).toBeGreaterThanOrEqual(0);
+    expect(posted).toBeLessThan(reload);
+  });
+});
+
+describe("profil — un échec de lecture ne s'annonce pas comme un échec de sauvegarde", () => {
+  it("le chargement a son propre repli", () => {
+    expect(page).toContain("profileLoadErrorMessage((e as Error).message)");
+  });
+
+  it("et les écritures gardent le leur", () => {
+    // Les **deux** écritures du tag — la sauvegarde du formulaire et le retrait
+    // — et elles seules. Un troisième appel se trouvait sur le chemin de
+    // *chargement*, où il annonçait « La sauvegarde a échoué » le jour où le
+    // code cesserait d'être nommé : compter « au moins trois » figeait donc le
+    // défaut que cette séparation corrige.
+    expect([...page.matchAll(/profileErrorMessage\(/g)]).toHaveLength(2);
+    for (const handler of ["const onSubmit", "const onDiscordTagRemove"]) {
+      const body = page.slice(page.indexOf(handler));
+      expect(body.slice(0, body.indexOf("\n  };"))).toContain("profileErrorMessage(");
+    }
+  });
+
+  it("aucun chemin de lecture ne retombe sur le repli d'une écriture", () => {
+    // Le `load()` du `useEffect` porte les deux : son `catch` et le refus
+    // `PROFILE_NOT_FOUND` qu'il traite avant de rediriger.
+    const effect = page.slice(page.indexOf("const load = async"));
+    const body = effect.slice(0, effect.indexOf("profileLoadErrorMessage") + 30);
+    expect(body).not.toContain("profileErrorMessage(");
+  });
+});
+
+describe("champ Discord — l'attente ne se dit pas comme une panne", () => {
+  it("part en lecture dès le premier rendu", () => {
+    // Partir de `false` laissait une fenêtre — entre le premier rendu et
+    // l'effet — où l'écran annonçait une panne avant d'avoir essayé.
+    expect(page).toContain("useState(true);");
+    const declaration = page.slice(page.indexOf("const [discordStateBusy"));
+    expect(declaration.slice(0, 80)).toContain("useState(true)");
+  });
+
+  it("passe l'attente à la phrase, qui ne la devine pas", () => {
+    expect(page).toContain("discordTagLockNotice({ ...discordState, pending: discordStateBusy })");
+  });
+});
+
+describe("champ Discord — deux lectures en vol ne se marchent pas dessus", () => {
+  /**
+   * Sauvegarder puis retirer son tag dans la foulée lance deux lectures, et
+   * rien ne garantit qu'elles reviennent dans l'ordre. Celle du `PATCH`,
+   * revenue après celle du retrait, reposait `{tag, verified: true}` : la
+   * pastille et « les administrateurs le voient » à côté d'un champ vidé.
+   */
+  it("numérote les lectures et jette celles qui sont dépassées", () => {
+    expect(page).toContain("const discordReadSeq = useRef(0)");
+    expect(page).toContain("const seq = (discordReadSeq.current += 1)");
+    expect(page).toContain("if (seq !== discordReadSeq.current) return;");
+  });
+
+  it("ne lève l'attente que sur la dernière — sinon « Réessayer » rouvre trop tôt", () => {
+    expect(page).toContain("if (seq === discordReadSeq.current) setDiscordStateBusy(false)");
+  });
+});
