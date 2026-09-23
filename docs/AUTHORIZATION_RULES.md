@@ -138,8 +138,9 @@ pouvoir sur la plateforme.
   lecteur. Privée de son unique usage, une colonne d'adresses ne pesait plus que
   d'un côté — c'est ce qu'une fuite fait le plus regretter. Discord est demandé
   en `identify` seul, Blizzard en `openid` seul : ni adresse, ni liste de
-  serveurs. Les lignes écrites avant cette règle gardent leur adresse jusqu'à
-  purge (voir `ERREUR.txt`).
+  serveurs. Les lignes écrites avant cette règle gardaient leur adresse ;
+  la colonne a depuis été retirée, ce qui les a effacées du même geste (voir
+  `docs/DATABASE_SCHEMA.md`).
 
   **L'intention d'un aller-retour est scellée à l'aller.** `LOGIN` ouvre une
   session, `LINK` rattache au compte connecté ; la valeur vit dans le cookie

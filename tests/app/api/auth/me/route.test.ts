@@ -28,7 +28,6 @@ describe("GET /api/auth/me", () => {
     const response = {
       id: 1,
       pseudo: "player",
-      email: "user@example.com",
       isAdmin: false,
     };
     expect(response.id).toBeDefined();

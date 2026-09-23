@@ -34,8 +34,9 @@ import type {
  * preuve autrement plus solide qu'une adresse dont le site n'est pas
  * l'émetteur. Privée de son unique lecteur, la colonne `bg_users.email` ne
  * pesait plus que d'un côté : une liste d'adresses est exactement ce qu'une
- * fuite fait le plus regretter, et la garder « au cas où » revient à en
- * assumer le risque pour un usage qui n'existe pas.
+ * fuite fait le plus regretter, et la garder « au cas où » revient à en assumer
+ * le risque pour un usage qui n'existe pas. Elle a donc été **supprimée**, ce
+ * qui a effacé du même geste les adresses collectées avant la règle.
  *
  * C'est aussi pourquoi `emailVerified` a disparu avec elle : il ne servait qu'à
  * garder ce rattachement honnête.
@@ -1051,7 +1052,6 @@ export async function anonymizeOwnAccount(userId: number): Promise<void> {
          discord_id = NULL,
          google_sub = NULL,
          blizzard_sub = NULL,
-         email = NULL,
          visible_avatar = 0,
          visible_overwatch = 0,
          visible_marvel = 0,
@@ -1240,7 +1240,6 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       discord_id: string | null;
       google_sub: string | null;
       blizzard_sub: string | null;
-      email: string | null;
       is_adult: 0 | 1 | null;
       is_admin: 0 | 1;
       visible_avatar: 0 | 1;
@@ -1252,7 +1251,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     })[]
   >(
     `SELECT id, pseudo, avatar_url, overwatch_battletag, marvel_rivals_tag,
-            discord_pseudo, discord_verified_at, discord_id, google_sub, blizzard_sub, email, is_adult, is_admin,
+            discord_pseudo, discord_verified_at, discord_id, google_sub, blizzard_sub, is_adult, is_admin,
             visible_avatar, visible_overwatch, visible_marvel, visible_major,
             open_to_recruitment, created_at
      FROM bg_users
@@ -1274,7 +1273,6 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     account: {
       id: Number(row.id),
       pseudo: row.pseudo,
-      email: row.email,
       discordId: row.discord_id,
       discordPseudo: row.discord_pseudo,
       // L'export RGPD dit **tout** ce que le site détient : la date de

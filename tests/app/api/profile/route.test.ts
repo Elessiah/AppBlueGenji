@@ -24,7 +24,6 @@ describe("GET/PUT /api/profile", () => {
         id: 1,
         pseudo: "player",
         visible: false,
-        email: "user@example.com",
       };
       expect(profile.id).toBeDefined();
       expect(profile.visible).toBeDefined();
