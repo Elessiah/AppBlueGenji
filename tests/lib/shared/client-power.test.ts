@@ -297,8 +297,9 @@ describe("performances limitées", () => {
   });
 
   it("ne croit pas les deux cœurs d'un navigateur anti-empreinte", () => {
-    // Firefox `resistFingerprinting` et Tor Browser annoncent toujours deux
-    // cœurs et ne déclarent aucune mémoire : on ne conclut rien.
+    // Firefox `resistFingerprinting` et Tor Browser maquillent le nombre de
+    // cœurs (deux, selon les versions) et ne déclarent aucune mémoire : on ne
+    // conclut rien.
     expect(performanceLimits({ cores: 2, memoryGb: null, frameIntervalMs: 7 }, false)).toEqual([]);
     // La cadence mesurée, elle, vaut partout.
     expect(performanceLimits({ cores: 2, memoryGb: null, frameIntervalMs: 40 }, true)).toEqual([

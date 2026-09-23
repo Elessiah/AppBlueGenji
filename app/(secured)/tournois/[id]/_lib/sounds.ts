@@ -11,9 +11,9 @@ const ALERT_FREQUENCY: Partial<Record<ViewerAlert, number>> = {
 
 /**
  * Signal sonore bref. Le contexte audio est **refermé** une fois la note jouée :
- * il en était ouvert un nouveau à chaque signal, jamais rendu — de la mémoire et
- * un fil audio de plus à chaque score confirmé, sur un poste qui fait tourner un
- * jeu à côté (et Chrome cesse d'en créer passé une limite).
+ * il en était ouvert un nouveau à chaque signal, jamais rendu — un contexte
+ * ouvert garde sa mémoire et son rendu audio actif, et il s'en ajoutait un à
+ * chaque score confirmé, sur un poste qui fait tourner un jeu à côté.
  */
 export function playAlertChime(alert: ViewerAlert) {
   const frequency = ALERT_FREQUENCY[alert];

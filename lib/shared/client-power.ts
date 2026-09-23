@@ -248,9 +248,10 @@ export function performanceLimits(probe: PerformanceProbe, slowFrames: boolean):
   const limits: PerformanceLimit[] = [];
   // Le nombre de cœurs n'est cru que si le navigateur déclare **aussi** sa
   // mémoire (Chromium, qui ne maquille ni l'un ni l'autre) : Firefox en mode
-  // anti-empreinte (`resistFingerprinting`) et Tor Browser annoncent toujours
-  // deux cœurs, et tiendraient en éco une machine à seize. Une vraie machine
-  // modeste sous Firefox est de toute façon rattrapée par la cadence mesurée.
+  // anti-empreinte (`resistFingerprinting`) et Tor Browser annoncent un nombre
+  // de cœurs **maquillé** — deux, selon les versions —, qui tiendrait en éco
+  // une machine à seize. Une vraie machine modeste sous Firefox est de toute
+  // façon rattrapée par la cadence mesurée.
   if (
     probe.memoryGb !== null &&
     probe.cores !== null &&

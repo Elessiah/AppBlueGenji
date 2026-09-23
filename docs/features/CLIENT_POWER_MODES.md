@@ -66,8 +66,8 @@ Trois signaux (`performanceLimits`) :
   animations coupées, il disparaîtrait, et une machine lente *à cause* des
   animations du site oscillerait d'un régime à l'autre toutes les cinq minutes.
 - le nombre de cœurs n'est cru que si le navigateur déclare **aussi** sa
-  mémoire : Firefox en mode anti-empreinte et Tor Browser annoncent toujours
-  deux cœurs.
+  mémoire : Firefox en mode anti-empreinte et Tor Browser annoncent un nombre
+  de cœurs maquillé (deux, selon les versions).
 
 Le lecteur peut **ignorer la détection** depuis le témoin
 (`bg_power_ignore_perf`). Match, focus et onglet caché ne s'ignorent pas : ce
