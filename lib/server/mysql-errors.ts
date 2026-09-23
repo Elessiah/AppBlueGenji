@@ -39,13 +39,10 @@ export function isTransactionAborted(error: unknown): boolean {
  * `bg_referee_alerts` et `bg_endurance_penalties`. Une base où leur création a
  * échoué reste debout, et c'est à leurs lecteurs de s'en accommoder plutôt que
  * d'emporter la fonctionnalité qui les appelle : un rappel perdu vaut mieux
- * qu'un report de score en erreur.
- *
- * **Tous ne le font pas encore**, et ce prédicat ne le garantit pas tout seul :
- * les `DELETE FROM bg_match_reminders` de `tournaments/deletion.ts` et
- * `tournaments/rollback.ts` n'ont pas la garde que portent leurs voisins, si
- * bien qu'une base sans cette table rendrait tout tournoi indélébile. Défaut
- * préexistant, consigné dans `ERREUR.txt`.
+ * qu'un report de score en erreur. Les purges en particulier — suppression
+ * d'un tournoi, retour en arrière, réécriture d'un tour de play-off — gardent
+ * chacun de leurs `DELETE` sur ces tables : sans quoi une base qui en manque
+ * rendrait tout tournoi indélébile pour une table de notifications.
  *
  * Les autres tables ne sont **pas** tolérées : le site n'a rien à servir sans
  * elles, et ce prédicat n'a donc pas à couvrir leur absence.
