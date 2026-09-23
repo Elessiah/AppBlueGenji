@@ -1,4 +1,4 @@
-import { BotServerEntry } from "@/lib/shared/types";
+import { BotServerEntry, BotServersPayload } from "@/lib/shared/types";
 import { botRelayAccessibleLabel, resolveBotRelayState } from "@/lib/shared/bot-relay-status";
 import {
   botPayloadColor,
@@ -7,15 +7,6 @@ import {
   botPayloadText,
 } from "@/lib/shared/bot-payload";
 
-/**
- * Le tableau des serveurs où le bot est installé.
- *
- * La colonne d'état s'intitulait « STATUS » et rendait `● OK` / `● LAG` /
- * `○ OFF`. Elle s'intitule désormais « ÉTAT DU RELAIS » et se lit en français ;
- * la traduction elle-même vit dans `lib/shared/bot-relay-status.ts`, module pur
- * et testé, parce qu'elle ne dépend d'aucun rendu. Les valeurs renvoyées par le
- * bot sont inchangées.
- */
 /**
  * Le nombre de barres rendues par cellule de tendance. La série arrive du bot
  * sans borne ; on garde les plus **récentes**, une tendance se lisant par sa
@@ -32,33 +23,63 @@ import {
  */
 const MAX_SPARKLINE_POINTS = 10;
 
-export function BotServersTable({ servers }: { servers: BotServerEntry[] | null }) {
-  // Même précaution que sur `sparkline` juste en dessous, et pour la même
-  // raison : `fetchBotServers` fait un simple `as BotServersPayload` sur du
-  // JSON reçu. Un `?? []` ne rattrape que `null` — une charge qui rangerait
-  // les serveurs par identifiant passerait tout droit et `list.map` rendrait
-  // la page entière en 500.
-  // …et le `filter` ne fait pas double emploi avec l'`Array.isArray` : une
-  // charge `{"servers": [null]}` est un tableau, elle passe la première garde,
-  // et `s.status` lève au premier tour de boucle — exactement le 500 que la
-  // ligne au-dessus vient d'écarter, une indirection plus loin.
-  const list = (Array.isArray(servers) ? servers : []).filter(
+/**
+ * Le tableau des serveurs où le bot est installé.
+ *
+ * La colonne d'état s'intitulait « STATUS » et rendait `● OK` / `● LAG` /
+ * `○ OFF`. Elle s'intitule désormais « ÉTAT DU RELAIS » et se lit en français ;
+ * la traduction elle-même vit dans `lib/shared/bot-relay-status.ts`, module pur
+ * et testé, parce qu'elle ne dépend d'aucun rendu. Les valeurs renvoyées par le
+ * bot sont inchangées.
+ *
+ * **Il reçoit la charge entière, et non son champ `servers`.**
+ *
+ * Il sépare deux silences — « le bot n'a rien dit » et « le bot a dit quelque
+ * chose que la page ne sait pas lire » — et cette différence ne se lit **que**
+ * sur la charge : une fois le champ extrait, `null` (aucune réponse) et
+ * `undefined` (une réponse sans champ `servers`) sont la même valeur, qu'un
+ * `?? null` chez l'appelant achevait de confondre. Le panneau annonçait alors
+ * « BOT INJOIGNABLE » pendant que la bande d'état, tirée du **même**
+ * `Promise.all`, affichait `OPERATIONAL` juste au-dessus.
+ *
+ * Même raisonnement que `botStatusOf` dans `lib/shared/bot-status-summary.ts`,
+ * et pour la même raison : c'est le seul endroit qui voie encore la
+ * différence. `fetchBotServers` est la seule source de `null` ici — coupe-
+ * circuit ouvert, appel échoué, réponse non `ok`.
+ */
+export function BotServersTable({ payload }: { payload: BotServersPayload | null }) {
+  // Même précaution que sur `sparkline` plus bas, et pour la même raison :
+  // `fetchBotServers` fait un simple `as BotServersPayload` sur du JSON reçu.
+  // Un `?? []` ne rattrape que `null` — une charge qui rangerait les serveurs
+  // par identifiant passerait tout droit et `list.map` rendrait la page
+  // entière en 500.
+  const rows: unknown[] | null =
+    payload !== null && Array.isArray(payload.servers) ? payload.servers : null;
+  // Le `filter` ne fait pas double emploi avec l'`Array.isArray` : une charge
+  // `{"servers": [null]}` est un tableau, elle passe la première garde, et
+  // `s.status` lève au premier tour de boucle — exactement le 500 que la ligne
+  // au-dessus vient d'écarter, une indirection plus loin.
+  const list = (rows ?? []).filter(
     (s): s is BotServerEntry => s !== null && typeof s === "object",
   );
 
-  // **Trois faits, jamais un seul chiffre.** `fetchBotServers` rend `null` dès
-  // que le coupe-circuit est ouvert, que l'appel échoue ou que la réponse n'est
-  // pas `ok` : ramener ce `null` à une liste vide faisait affirmer « aucun
-  // serveur » — c'est-à-dire que le bot n'est installé nulle part — quand la
-  // seule chose vraie était qu'on n'en sait rien. Même règle que la case
-  // « Status » juste au-dessus, et que le compteur de membres Discord de
-  // l'accueil : refus en `null`, jamais en zéro.
+  // **Trois faits, jamais un seul chiffre.** Ramener l'absence de réponse à une
+  // liste vide faisait affirmer « aucun serveur » — c'est-à-dire que le bot
+  // n'est installé nulle part — quand la seule chose vraie était qu'on n'en
+  // sait rien. Même règle que la case « Status » juste au-dessus, et que le
+  // compteur de membres Discord de l'accueil : refus en `null`, jamais en zéro.
+  //
+  // Et « AUCUN SERVEUR » se juge sur la liste **reçue**, pas sur la liste
+  // filtrée : une charge `{"servers": [null, null]}` est bien un tableau, elle
+  // perd ses deux entrées au filtre, et le panneau annonçait alors le même
+  // « le bot n'est installé nulle part » sur une réponse qui n'était
+  // simplement pas lisible. Zéro reste réservé à un zéro constaté.
   const meta =
-    servers === null
+    payload === null
       ? "BOT INJOIGNABLE"
-      : !Array.isArray(servers)
+      : rows === null || (rows.length > 0 && list.length === 0)
         ? "RÉPONSE ILLISIBLE"
-        : list.length === 0
+        : rows.length === 0
           ? "AUCUN SERVEUR"
           : // On ne dit rien de l'ordre ni du total : `fetchBotServers(8)`
             // **plafonne** la demande, et le tri par activité est encore une

@@ -62,6 +62,53 @@ describe("BotKpis — une charge amputée ne fait pas tomber la page", () => {
   });
 });
 
+describe("BotKpis — la pastille de variation dit ce qu'elle colore", () => {
+  it("ne fait pas passer une baisse pour une hausse", () => {
+    // La pastille était écrite en dur : `className="kpi-delta up"` et un `▲`
+    // littéral, quelle que soit la valeur reçue. Une baisse annoncée `-8 %`
+    // sortait donc en vert, flèche vers le haut — et c'est la couleur qu'on
+    // lit en premier, pas le signe.
+    const html = renderToStaticMarkup(
+      <BotKpis kpis={kpis({ servers: entry({ delta: "-8 %" }) } as Partial<BotKpisType>)} />,
+    );
+    expect(html).toContain('class="kpi-delta down"');
+    expect(html).toContain("▼");
+  });
+
+  it("garde le vert pour une hausse signée", () => {
+    const html = renderToStaticMarkup(
+      <BotKpis kpis={kpis({ servers: entry({ delta: "+4" }) } as Partial<BotKpisType>)} />,
+    );
+    expect(html).toContain('class="kpi-delta up"');
+    expect(html).toContain("▲");
+  });
+
+  it("n'affirme aucun sens sur une variation sans signe", () => {
+    const html = renderToStaticMarkup(
+      <BotKpis
+        kpis={
+          {
+            servers: entry({ delta: "12 %" }),
+            channels: entry({ delta: "12 %" }),
+            messages: entry({ delta: "12 %" }),
+            relays: entry({ delta: "12 %" }),
+          } as unknown as BotKpisType
+        }
+      />,
+    );
+    expect(html).toContain('class="kpi-delta flat"');
+    expect(html).not.toContain("▲");
+    expect(html).not.toContain("▼");
+  });
+
+  it("ne met pas de flèche devant le tiret d'une tuile vide", () => {
+    const html = renderToStaticMarkup(<BotKpis kpis={null} />);
+    expect(html).not.toContain("▲");
+    expect(html).not.toContain("▼");
+    expect(html).toContain("—");
+  });
+});
+
 describe("Sparkline — pas de courbe plutôt qu'une courbe fausse", () => {
   it("trace une courbe à partir de deux points", () => {
     const html = renderToStaticMarkup(<Sparkline data={[1, 4, 2]} />);

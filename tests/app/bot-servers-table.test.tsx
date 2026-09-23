@@ -1,7 +1,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
 import { BotServersTable } from "@/components/bot/BotServersTable";
-import type { BotServerEntry } from "@/lib/shared/types";
+import type { BotServerEntry, BotServersPayload } from "@/lib/shared/types";
 
 /**
  * Le tableau « Serveurs connectés » de `/bot`, **rendu** plutôt que relu.
@@ -31,8 +31,16 @@ function server(overrides: Partial<BotServerEntry> = {}): BotServerEntry {
   } as BotServerEntry;
 }
 
+/** La charge telle que `fetchBotServers` la rend : ses trois autres champs ne
+ *  servent pas au panneau, mais les omettre ferait tester autre chose. */
+const payload = (servers: unknown): BotServersPayload =>
+  ({ servers, total: 0, limit: 8, offset: 0 }) as unknown as BotServersPayload;
+
+/** Le cas courant : le bot a répondu, voici sa liste. */
 const render = (servers: BotServerEntry[] | null) =>
-  renderToStaticMarkup(<BotServersTable servers={servers} />);
+  renderToStaticMarkup(
+    <BotServersTable payload={servers === null ? null : payload(servers)} />,
+  );
 
 describe("BotServersTable — l'état du relais", () => {
   it("dit les trois états connus en français", () => {
@@ -225,7 +233,7 @@ describe("BotServersTable — la charge n'est pas validée, une case fade vaut m
     // `s.status` lève juste après — le 500 que la garde était censée écarter.
     const html = renderToStaticMarkup(
       <BotServersTable
-        servers={[null, server({ id: "9", name: "Vertex" }), undefined] as unknown as BotServerEntry[]}
+        payload={payload([null, server({ id: "9", name: "Vertex" }), undefined])}
       />,
     );
     expect(html).toContain("Vertex");
@@ -237,7 +245,7 @@ describe("BotServersTable — la charge n'est pas validée, une case fade vaut m
     // toutes les barres sortaient en `height: NaN%`, sans une erreur.
     const html = renderToStaticMarkup(
       <BotServersTable
-        servers={[server({ sparkline: [4, "n/a", 8, null] as unknown as number[] })]}
+        payload={payload([server({ sparkline: [4, "n/a", 8, null] as unknown as number[] })])}
       />,
     );
     expect(html).not.toContain("NaN");
@@ -303,5 +311,46 @@ describe("BotServersTable — le panneau ne dit que ce qu'il sait", () => {
   it("accorde le singulier", () => {
     expect(render([server()])).toContain("1 SERVEUR AFFICHÉ");
     expect(render([server({ id: "1" }), server({ id: "2" })])).toContain("2 SERVEURS AFFICHÉS");
+  });
+
+  it("ne confond pas « aucune réponse » avec « une réponse sans liste »", () => {
+    // Le panneau recevait `serversPayload?.servers ?? null` : ce `??`
+    // ramenait les deux à `null`, et le panneau annonçait « BOT INJOIGNABLE »
+    // pendant que la bande d'état, tirée du même `Promise.all`, affichait
+    // `OPERATIONAL` juste au-dessus. La différence ne se lit que sur la
+    // charge, d'où la charge en prop.
+    const answered = renderToStaticMarkup(
+      <BotServersTable payload={{} as unknown as BotServersPayload} />,
+    );
+    expect(answered).toContain("RÉPONSE ILLISIBLE");
+    expect(answered).not.toContain("BOT INJOIGNABLE");
+
+    const nulled = renderToStaticMarkup(<BotServersTable payload={payload(null)} />);
+    expect(nulled).toContain("RÉPONSE ILLISIBLE");
+    expect(nulled).not.toContain("BOT INJOIGNABLE");
+
+    const silent = renderToStaticMarkup(<BotServersTable payload={null} />);
+    expect(silent).toContain("BOT INJOIGNABLE");
+    expect(silent).not.toContain("RÉPONSE ILLISIBLE");
+  });
+
+  it("ne dit pas « aucun serveur » d'une liste que le filtre a vidée", () => {
+    // `{"servers": [null, null]}` est bien un tableau, il perd ses deux
+    // entrées au filtre — et « AUCUN SERVEUR » affirmerait alors que le bot
+    // n'est installé nulle part sur une réponse qui n'était pas lisible.
+    // Zéro reste réservé à un zéro constaté.
+    const html = renderToStaticMarkup(<BotServersTable payload={payload([null, null])} />);
+    expect(html).toContain("RÉPONSE ILLISIBLE");
+    expect(html).not.toContain("AUCUN SERVEUR");
+
+    // Un tableau réellement vide, lui, est un zéro constaté.
+    expect(render([])).toContain("AUCUN SERVEUR");
+  });
+
+  it("ne compte que les rangées qu'il montre quand une entrée est écartée", () => {
+    const html = renderToStaticMarkup(
+      <BotServersTable payload={payload([null, server({ id: "1" }), server({ id: "2" })])} />,
+    );
+    expect(html).toContain("2 SERVEURS AFFICHÉS");
   });
 });

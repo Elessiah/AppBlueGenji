@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { BotActivity } from "@/lib/shared/types";
-import { botPayloadNumber } from "@/lib/shared/bot-payload";
+import { botPayloadLabel, botPayloadNumber } from "@/lib/shared/bot-payload";
 
 export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
   const [range, setRange] = useState<"7j" | "30j" | "90j">("30j");
@@ -55,17 +55,29 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
 
   const relays = Array.isArray(data.relays) ? data.relays : [];
   const scrims = Array.isArray(data.scrims) ? data.scrims : [];
+  // Un point ramené à un nombre affichable, **borné des deux côtés** — la même
+  // règle que la colonne « tendance » de `BotServersTable`, et pour les mêmes
+  // deux raisons : un point non numérique rendait `height: NaN%` et un point
+  // négatif `height: -400%`, deux déclarations que le navigateur laisse
+  // tomber en silence. La barre disparaît alors sans qu'aucune erreur ne le
+  // signale — la panne muette, pas l'exception.
+  const point = (v: unknown) => Math.max(0, botPayloadNumber(v) ?? 0);
   // `reduce` et non `Math.max(...relays, ...scrims, 1)` : ce dernier passe les
   // deux séries en arguments d'appel, ce qui est un `RangeError` au-delà de
   // ~100 000 points, et rendrait `NaN` sur un point non numérique — la charge
   // arrive par un `as BotActivityPayload` sur du JSON reçu. La graine à 1 reste
   // le garde-fou contre la division par zéro d'une série plate.
-  const max = [...relays, ...scrims].reduce<number>(
-    (m, v) => Math.max(m, botPayloadNumber(v) ?? 0),
-    1,
-  );
-  const labels = data.labels ?? [];
-  const avgPerDay = data.avgPerDay ?? 0;
+  const max = [...relays, ...scrims].reduce<number>((m, v) => Math.max(m, point(v)), 1);
+  // `?? []` ne rattrape que `null` : des libellés rangés par index
+  // (`{"0": "01/09"}`) passaient tout droit et `labels.map` levait
+  // « labels.map is not a function ». `BotActivityChart` étant rendu côté
+  // serveur dans `app/bot/page.tsx`, cette exception-là ne fait pas une case
+  // vide : elle sert **toute** la page en 500 — bien pire que l'axe sans
+  // libellés qu'on rend ici.
+  const labels = Array.isArray(data.labels) ? data.labels : [];
+  // Même charge non validée : un objet tombait dans `Math.round`, qui rend
+  // `NaN`, et la légende annonçait « MOY. NaN / JOUR ».
+  const avgPerDay = botPayloadNumber(data.avgPerDay) ?? 0;
 
   return (
     <section className="panel">
@@ -94,20 +106,36 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
             <span>{max}</span>
           </div>
           <div className="bars">
-            {relays.map((v, i) => (
-              <div key={i} style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 1.5, height: "100%" }}>
-                <div className="bar" style={{ height: `${(v / max) * 100}%`, flex: 1 }} title={`${v} relais`} />
-                <div
-                  className="bar relais"
-                  style={{ height: `${(scrims[i] / max) * 100}%`, flex: 0.4 }}
-                  title={`${scrims[i]} scrims`}
-                />
-              </div>
-            ))}
+            {relays.map((v, i) => {
+              // Les hauteurs passaient les valeurs **brutes** alors que `max`
+              // venait d'être durci : une série `scrims` plus courte que
+              // `relays` (ou absente) donnait `scrims[i] === undefined`, donc
+              // `height: NaN%` et un `title="undefined scrims"`. Les barres
+              // ambre disparaissaient sans une erreur.
+              const relay = point(v);
+              const scrim = point(scrims[i]);
+              return (
+                <div key={i} style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 1.5, height: "100%" }}>
+                  <div className="bar" style={{ height: `${(relay / max) * 100}%`, flex: 1 }} title={`${relay} relais`} />
+                  <div
+                    className="bar relais"
+                    style={{ height: `${(scrim / max) * 100}%`, flex: 0.4 }}
+                    title={`${scrim} scrims`}
+                  />
+                </div>
+              );
+            })}
           </div>
         </div>
         <div className="x-axis">
-          {labels.length > 0 ? labels.map((d) => <span key={d}>{d}</span>) : null}
+          {/* `key={d}` sur le libellé lui-même : deux dates identiques dans la
+              série donnaient deux clés identiques, donc un avertissement React
+              et une réconciliation qui ne tient plus au changement de plage.
+              Et un libellé arrivé en objet tombait en enfant de React, qui
+              lève — toute la page en 500. */}
+          {labels.map((d, i) => (
+            <span key={i}>{botPayloadLabel(d)}</span>
+          ))}
         </div>
         <div className="chart-legend">
           <span className="lg">RELAIS INTER-SERVEUR</span>

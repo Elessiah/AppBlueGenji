@@ -49,7 +49,12 @@ export default async function BotPage() {
           <div className="bot-grid">
             <div className="bot-stack">
               <BotActivityChart initial={activity30j} />
-              <BotServersTable servers={serversPayload?.servers ?? null} />
+              {/* La charge entière, et non `serversPayload?.servers ?? null` :
+                  ce `??` ramenait « le bot a répondu sans champ `servers` » à
+                  « le bot n'a pas répondu », et le panneau annonçait
+                  « BOT INJOIGNABLE » pendant que la bande d'état, tirée du
+                  même `Promise.all`, affichait `OPERATIONAL` juste au-dessus. */}
+              <BotServersTable payload={serversPayload} />
             </div>
             <div className="bot-stack">
               <BotLiveFeed />
