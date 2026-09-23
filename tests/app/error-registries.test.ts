@@ -229,3 +229,27 @@ describe("motifs de rattachement autorisés dans l'URL", () => {
     expect(connectionErrorMessage(code)).not.toBe(connectionErrorMessage(UNKNOWN_CODE));
   });
 });
+
+/**
+ * **L'ID ne remplace pas le serveur commun.** Saisir son identifiant saute la
+ * recherche du tag par le bot, pas la règle de Discord : un bot n'écrit en privé
+ * qu'à qui partage un serveur avec lui. Les refus disaient « utilise plutôt ton
+ * ID Discord » précisément là où l'ID ne changeait rien.
+ */
+describe("registre des refus de connexion — l'ID Discord n'est pas un contournement", () => {
+  it.each(["DISCORD_USER_NOT_FOUND", "DISCORD_DM_FAILED"])(
+    "« %s » renvoie vers un serveur commun ou le bouton Discord, jamais vers l'ID",
+    (code) => {
+      const message = loginErrorMessage(code);
+      expect(message).not.toMatch(/\bID\b/);
+      expect(message).toContain("serveur BlueGenji");
+      expect(message).toContain("bouton Discord");
+    },
+  );
+
+  it("n'offre l'ID, sur un délai dépassé, qu'à qui partage déjà un serveur avec le bot", () => {
+    const message = loginErrorMessage("BOT_RESOLVE_TIMEOUT");
+    expect(message).toMatch(/Si tu es sur un de ses serveurs, utilise plutôt ton ID Discord/);
+    expect(message).toContain("bouton Discord");
+  });
+});
