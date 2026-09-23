@@ -66,11 +66,13 @@ la base, le journal local est intact et rien ne manque.
    site en service.
 2. Si la machine a été perdue, récupérer le journal sur OneDrive :
    `rclone copy onedrive-crypt:deletions/account-deletions.jsonl data/`.
-3. Simuler, puis rejouer :
+3. Simuler, puis rejouer — **avec `NODE_ENV=production`**, sans quoi le script
+   lit `.env` au lieu de `.env.production` et meurt sur `DB_HOST` (le shell du
+   serveur n'exporte pas `NODE_ENV`, seul pm2 le pose) :
 
    ```bash
-   npm run replay:deletions -- --dry-run
-   npm run replay:deletions
+   NODE_ENV=production npm run replay:deletions -- --dry-run
+   NODE_ENV=production npm run replay:deletions
    ```
 
 4. Redémarrer le site.
