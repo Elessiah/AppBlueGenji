@@ -18,6 +18,12 @@ mocks.
 À exposer via un nouvel endpoint `GET /internal/status` :
 
 - [ ] **Uptime** — timestamp de démarrage du process (le front calcule la durée écoulée)
+- [ ] **Instant de la réponse** — l'horodatage auquel le bot a fabriqué la charge.
+      Sans lui, `botUptimeLabel` ne peut que faire `now − startupTs`, c'est-à-dire
+      soustraire une date d'**horloge du bot** à une date d'**horloge du visiteur** :
+      quelques secondes de dérive suffisent à rendre une durée négative, aujourd'hui
+      bornée à zéro faute de mieux. Avec lui, la page compte `uptimeMs + (now −
+      réception)` et ne mesure plus qu'un transit, sur sa seule horloge.
 - [ ] **Version** — version sémantique + build hash (ex: `v2.4.1 / 4f8a`)
 - [ ] **Date de build** — ISO 8601
 - [ ] **Gateway latency** — ping WebSocket Discord en ms (échantillonné en continu)

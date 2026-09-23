@@ -109,13 +109,33 @@ export function botStatusSummary(status: string | null | undefined): string {
  * 3. **`now` est un argument.** C'est ce qui rend la fonction pure, donc
  *    testable sans horloge truquée — et le composant se contente de lui passer
  *    `Date.now()` à chaque seconde.
+ *
+ * **Ce que le calcul est vraiment, et ce qu'il n'est pas.** La forme héritée
+ * s'écrivait `uptimeMs/1000 + (now − startupTs − uptimeMs)/1000`, comme si elle
+ * partait de la durée annoncée puis y ajoutait le temps écoulé depuis. Elle ne
+ * le fait pas : `uptimeMs` s'y **annule**, et il ne reste que `now − startupTs`.
+ * Deux conséquences qu'il vaut mieux lire ici que déduire d'une soustraction :
+ *
+ * - la durée est mesurée **entre deux horloges** — celle du bot pour
+ *   `startupTs`, celle du visiteur pour `now` —, d'où la borne à zéro du
+ *   point 2, qui est le seul remède possible tant que la charge ne porte pas
+ *   l'instant de sa propre fabrication ;
+ * - `uptimeMs` ne pèse que sur la **présence** : une charge qui l'omet rend
+ *   « — » bien que la durée soit calculable. C'est délibéré — une charge à
+ *   laquelle il manque un champ du type est une charge qu'on ne sait pas lire,
+ *   et le panneau dit « je ne sais pas » plutôt que d'afficher un chiffre tiré
+ *   de la moitié qui reste.
+ *
+ * L'expression est donc écrite sous sa forme réduite, et un test la fige :
+ * la réécrire « pour repartir de `uptimeMs` » ne changerait rien au résultat et
+ * remettrait la même illusion.
  */
 export function botUptimeLabel(status: BotStatus | null | undefined, now: number): string | null {
   const base = botPayloadNumber(status?.startupTs);
   const uptimeMs = botPayloadNumber(status?.uptimeMs);
   if (base === null || uptimeMs === null) return null;
 
-  const elapsed = Math.max(0, Math.floor(uptimeMs / 1000) + Math.floor((now - base - uptimeMs) / 1000));
+  const elapsed = Math.max(0, Math.floor((now - base) / 1000));
   const d = Math.floor(elapsed / 86400);
   const h = Math.floor((elapsed % 86400) / 3600);
   const m = Math.floor((elapsed % 3600) / 60);

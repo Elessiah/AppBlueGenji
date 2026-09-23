@@ -169,6 +169,29 @@ describe("botUptimeLabel — la case « Uptime » se teste enfin", () => {
     expect(label).not.toContain("-");
   });
 
+  it("ne compte que depuis `startupTs` — `uptimeMs` s'annule dans la formule", () => {
+    // La forme héritée (`uptimeMs/1000 + (now − startupTs − uptimeMs)/1000`)
+    // se lisait comme « la durée annoncée, plus le temps écoulé depuis » ;
+    // `uptimeMs` s'y annule. Deux charges qui ne diffèrent que par lui rendent
+    // donc la **même** durée, et le savoir évite d'aller chercher dans ce champ
+    // une précision qu'il n'apporte pas.
+    const now = 1_700_000_000_000;
+    const base = now - 3_600_000;
+    const court = botUptimeLabel({ startupTs: base, uptimeMs: 1 } as never, now);
+    const long = botUptimeLabel({ startupTs: base, uptimeMs: 3_600_000 } as never, now);
+    expect(court).toBe(long);
+    expect(court).toBe("0j 1h 00m 00s");
+  });
+
+  it("exige tout de même `uptimeMs`, absent du calcul mais pas de la charge", () => {
+    // Une charge à laquelle il manque un champ du type est une charge qu'on ne
+    // sait pas lire : le panneau dit « — » plutôt que d'afficher un chiffre
+    // tiré de la moitié qui reste. C'est un choix, pas une conséquence du
+    // calcul — d'où ce cas, qui le fige.
+    const now = 1_700_000_000_000;
+    expect(botUptimeLabel({ startupTs: now - 3_600_000 } as never, now)).toBeNull();
+  });
+
   it("ne rend jamais NaN quel que soit l'instant demandé", () => {
     for (const now of [0, startupTs, startupTs + 1e12, Number.MAX_SAFE_INTEGER]) {
       const label = botUptimeLabel({ startupTs, uptimeMs } as never, now);
