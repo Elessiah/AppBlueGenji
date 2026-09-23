@@ -18,6 +18,11 @@ mocks.
 À exposer via un nouvel endpoint `GET /internal/status` :
 
 - [ ] **Uptime** — timestamp de démarrage du process (le front calcule la durée écoulée)
+- [ ] **Disponibilité sur une période** (ex. « 99,9 % sur 90 jours ») — **non
+      mesurée**, ni par le bot ni par le site. La case « Uptime » de `/bot`
+      affichait un « 99.97 % · 90 derniers jours » inventé ; elle ne dit plus
+      que « depuis le dernier démarrage ». Une vraie mesure demanderait un
+      historique des arrêts, qu'un processus redémarré ne peut pas tenir seul.
 - [ ] **Instant de la réponse** — l'horodatage auquel le bot a fabriqué la charge.
       Sans lui, `botUptimeLabel` ne peut que faire `now − startupTs`, c'est-à-dire
       soustraire une date d'**horloge du bot** à une date d'**horloge du visiteur** :
@@ -157,10 +162,17 @@ Pour chaque commande :
 ## 8. OAuth & invitation
 
 - [ ] **URL d'invitation officielle** avec scopes
-      `bot + applications.commands` et permissions integer `1099511627776`
-      (déjà dans le design ; doit correspondre aux scopes réellement utilisés)
-- [ ] **Wizard de setup** déclenché au join sur un nouveau serveur
-      (auto-déclaration, prompt admin pour configurer les modules)
+      `bot + applications.commands` et un entier de permissions qui corresponde
+      à ce que le bot fait réellement. Le défaut du site, `1099511627776`, ne
+      demande que `MODERATE_MEMBERS` (bit 40) ; la carte d'invitation de `/bot`
+      affiche désormais les permissions **déduites** de l'entier
+      (`lib/shared/discord-permissions.ts`), si bien qu'un mauvais entier se
+      voit à l'écran — c'est `DISCORD_BOT_PERMISSIONS` qu'il faut régler.
+- [x] **Message de bienvenue** au join sur un nouveau serveur :
+      `runSetupWizard` (`src/utils/setupWizard.ts` du bot) écrit **en privé au
+      propriétaire** la liste des modules et les commandes de réglage. Ce n'est
+      pas un assistant interactif dans le serveur — la carte d'invitation dit
+      désormais ce qu'il est, et rien de plus.
 - [ ] **Endpoint OAuth callback** côté site déjà géré pour le login utilisateur
       (`/api/auth/google/callback` équivalent à créer pour Discord si pas déjà
       présent) — vérifier qu'on n'a pas un trou ici
