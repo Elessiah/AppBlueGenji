@@ -17,6 +17,7 @@ import {
 import { useToast } from "@/components/ui/toast";
 import { useResourceLoader } from "@/lib/shared/hooks/useResourceLoader";
 import { StatsPanel } from "@/components/stats/StatsPanel";
+import styles from "./player.module.css";
 import { formatRate } from "@/lib/shared/stats";
 
 export default function PlayerDetailPage() {
@@ -91,6 +92,15 @@ export default function PlayerDetailPage() {
   }
 
   if (!data) return null;
+
+  // Un BattleTag masqué au public n'arrive jusqu'ici que pour son titulaire, ou
+  // pour un lecteur que la règle d'exposition autorise (même match, arbitrage).
+  const battletagHint =
+    data.profile.overwatchBattletag && !data.profile.visibility.overwatch
+      ? data.isSelf
+        ? "Masqué au public : seuls les joueurs de tes matchs et l'arbitrage le lisent, le temps d'un tournoi."
+        : "Masqué au public : tu le lis parce qu'un tournoi en cours vous réunit. Ne le diffuse pas."
+      : null;
 
   // Équipe courante = seule ligne de timeline encore ouverte (leftAt === null).
   const activeTeam = data.teamsTimeline.find((entry) => entry.leftAt === null) ?? null;
@@ -181,8 +191,23 @@ export default function PlayerDetailPage() {
         </div>
         <div className="form-grid">
           <div className="field">
-            <label>BattleTag Overwatch</label>
-            <input value={data.profile.overwatchBattletag || "Masqué"} readOnly />
+            <label htmlFor="player-battletag">BattleTag Overwatch</label>
+            <input
+              id="player-battletag"
+              value={data.profile.overwatchBattletag || "Masqué"}
+              readOnly
+              aria-describedby={battletagHint ? "player-battletag-hint" : undefined}
+            />
+            {/*
+              Un BattleTag masqué qui s'affiche quand même doit le dire : sans
+              cette phrase, le lecteur à qui un match l'ouvre le croirait public,
+              et le titulaire ne saurait pas qui le lit encore.
+            */}
+            {battletagHint && (
+              <p id="player-battletag-hint" className={styles.hint}>
+                {battletagHint}
+              </p>
+            )}
           </div>
           <div className="field">
             <label>Tag Marvel Rivals</label>
