@@ -22,7 +22,7 @@ const PROFILE_ERRORS: Record<string, string> = {
   // une chaîne est écarté par le service plutôt que de faire lever `.trim()`.
   INVALID_DISCORD_PSEUDO: "Le tag Discord doit être du texte. Ressaisis-le.",
 
-  UNAUTHORIZED: "Reconnecte-toi pour modifier ton profil.",
+  UNAUTHORIZED: "Ta session a expiré. Reconnecte-toi.",
   PROFILE_NOT_FOUND: "Ton compte est introuvable. Reconnecte-toi.",
 };
 
@@ -39,7 +39,10 @@ const LOAD_FALLBACK = "Impossible de charger ton profil. Réessaie dans un insta
  *
  * Les codes nommés ne bougent pas : une session expirée ou un compte
  * introuvable se disent pareil des deux côtés, et les dupliquer les ferait
- * diverger. Ce qui change est le seul repli, qui est précisément la phrase
+ * diverger. Encore faut-il qu'ils se disent **sans nommer de geste** :
+ * « Reconnecte-toi pour *modifier* ton profil » annonçait au visiteur qui vient
+ * d'ouvrir la page une action qu'il n'a pas faite — le défaut même que cette
+ * séparation corrige, revenu par le partage. Ce qui change est le seul repli, qui est précisément la phrase
  * qu'on prononce quand on ne sait pas — et « La sauvegarde a échoué » annonçait
  * alors à un visiteur qui vient d'ouvrir la page l'échec d'un geste qu'il n'a
  * pas fait.

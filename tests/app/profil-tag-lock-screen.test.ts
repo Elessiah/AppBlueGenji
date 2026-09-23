@@ -126,3 +126,21 @@ describe("champ Discord — l'attente ne se dit pas comme une panne", () => {
     expect(page).toContain("discordTagLockNotice({ ...discordState, pending: discordStateBusy })");
   });
 });
+
+describe("champ Discord — deux lectures en vol ne se marchent pas dessus", () => {
+  /**
+   * Sauvegarder puis retirer son tag dans la foulée lance deux lectures, et
+   * rien ne garantit qu'elles reviennent dans l'ordre. Celle du `PATCH`,
+   * revenue après celle du retrait, reposait `{tag, verified: true}` : la
+   * pastille et « les administrateurs le voient » à côté d'un champ vidé.
+   */
+  it("numérote les lectures et jette celles qui sont dépassées", () => {
+    expect(page).toContain("const discordReadSeq = useRef(0)");
+    expect(page).toContain("const seq = (discordReadSeq.current += 1)");
+    expect(page).toContain("if (seq !== discordReadSeq.current) return;");
+  });
+
+  it("ne lève l'attente que sur la dernière — sinon « Réessayer » rouvre trop tôt", () => {
+    expect(page).toContain("if (seq === discordReadSeq.current) setDiscordStateBusy(false)");
+  });
+});

@@ -86,18 +86,40 @@ export default function ProfilePage() {
   // soit.
   const [discordStateBusy, setDiscordStateBusy] = useState(true);
 
+  /**
+   * Le numéro de la **dernière lecture lancée**.
+   *
+   * Deux lectures peuvent être en vol en même temps — sauvegarder puis retirer
+   * son tag dans la foulée en lance deux —, et rien ne garantit qu'elles
+   * reviennent dans l'ordre. Celle du `PATCH`, revenue après celle du retrait,
+   * reposait `{tag, verified: true}` : l'écran gardait la pastille et « les
+   * administrateurs le voient » à côté d'un champ vidé, jusqu'au rechargement.
+   *
+   * Une `ref` et non un état : elle ne doit provoquer aucun rendu, et doit être
+   * lue à sa valeur **du moment**, pas à celle figée dans la fermeture.
+   */
+  const discordReadSeq = useRef(0);
+
   const loadDiscordState = async () => {
+    const seq = (discordReadSeq.current += 1);
     setDiscordStateBusy(true);
     try {
       const res = await fetch("/api/profile/discord", { cache: "no-store" });
       if (!res.ok) return;
-      setDiscordState((await res.json()) as { tag: string | null; verified: boolean; linked: boolean });
+      const payload = (await res.json()) as { tag: string | null; verified: boolean; linked: boolean };
+      // Une lecture dépassée n'écrit rien : ce qu'elle a vu est plus vieux que
+      // ce que l'écran affiche déjà.
+      if (seq !== discordReadSeq.current) return;
+      setDiscordState(payload);
     } catch {
       // Silencieux, mais **pas anodin** : l'état reste `linked: null`, donc le
       // champ reste verrouillé. Le reste du formulaire s'enregistre normalement,
       // et le bouton « Réessayer » ci-dessous rouvre le seul chemin fermé.
     } finally {
-      setDiscordStateBusy(false);
+      // L'attente ne se lève que sur la **dernière** lecture : la dépassée qui
+      // rentre la première rouvrait sinon « Réessayer » alors qu'une lecture
+      // court encore, et faisait annoncer une panne pendant ce temps-là.
+      if (seq === discordReadSeq.current) setDiscordStateBusy(false);
     }
   };
 

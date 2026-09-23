@@ -390,10 +390,29 @@ describe("updateOwnProfile — un compte Discord rattaché possède son tag", ()
     expect(find(queries, "UPDATE bg_users")).toBeDefined();
   });
 
-  it("tolère la casse : le formulaire ne renvoie pas toujours l'orthographe exacte", async () => {
+  it("refuse une différence de casse, parce que l'écriture ne l'appliquerait pas", async () => {
+    // Le contrôle était insensible à la casse pour une raison qui a disparu :
+    // le formulaire renvoyait le tag à chaque sauvegarde, et refuser sur sa
+    // seule présence rendait tout le profil inenregistrable. Le client ne
+    // soumet plus ce champ que s'il a **changé**.
+    //
+    // Laisser passer rendait alors un **200 qui n'écrivait rien** : le `CASE`
+    // de l'`UPDATE` garde la valeur stockée dès qu'un `discord_id` est posé,
+    // quoi qu'ait décidé ce contrôle. Vérifié contre un vrai MySQL — la colonne
+    // restait sur son orthographe d'origine pendant que la route annonçait
+    // « Profil mis à jour ». Le refus dit désormais ce que l'écriture fait.
     const { queries } = lockedDb("100000000000000001", "Keryan");
 
-    await updateOwnProfile(7, { discordPseudo: "keryan" });
+    await expect(updateOwnProfile(7, { discordPseudo: "keryan" })).rejects.toThrow(
+      "DISCORD_TAG_LOCKED",
+    );
+    expect(find(queries, "UPDATE bg_users")).toBeUndefined();
+  });
+
+  it("laisse passer l'orthographe exacte, elle", async () => {
+    const { queries } = lockedDb("100000000000000001", "Keryan");
+
+    await updateOwnProfile(7, { discordPseudo: "Keryan" });
 
     expect(find(queries, "UPDATE bg_users")).toBeDefined();
   });

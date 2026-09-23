@@ -929,10 +929,19 @@ export async function updateOwnProfile(
     })[]>(`SELECT discord_id, discord_pseudo FROM bg_users WHERE id = ? LIMIT 1`, [userId]);
     const lockRow = lockRows[0];
     if (lockRow && isDiscordTagLocked({ linked: Boolean(lockRow.discord_id) })) {
-      const stored = lockRow.discord_pseudo ?? "";
-      const sameTag =
-        stored.localeCompare(nextDiscordPseudo, "fr", { sensitivity: "base" }) === 0;
-      if (!sameTag) throw new Error(DISCORD_TAG_LOCKED);
+      // Comparaison **exacte**, casse comprise, et c'est un durcissement
+      // délibéré. Elle était insensible à la casse pour une raison qui a
+      // disparu : le formulaire renvoyait le tag à chaque sauvegarde, et
+      // refuser sur sa seule présence rendait tout le profil inenregistrable.
+      // Le client ne soumet plus ce champ que s'il a **changé**, si bien qu'une
+      // différence de casse ne peut plus venir que d'un appel direct.
+      //
+      // Or laisser passer une telle différence rendait un **200 qui n'écrivait
+      // rien** : le `CASE` de l'`UPDATE` garde la valeur stockée dès qu'un
+      // `discord_id` est posé, quoi qu'ait décidé ce contrôle. Le refus lisible
+      // annonce désormais ce que l'écriture fait vraiment — c'est Discord qui
+      // nomme ce tag, sa casse comprise.
+      if (lockRow.discord_pseudo !== nextDiscordPseudo) throw new Error(DISCORD_TAG_LOCKED);
     }
   }
 

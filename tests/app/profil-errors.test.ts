@@ -79,6 +79,17 @@ describe("profileLoadErrorMessage", () => {
     }
   });
 
+  it("et ces codes partagés ne nomment aucun geste", () => {
+    // Le partage ne vaut que si la phrase convient des deux côtés :
+    // « Reconnecte-toi pour **modifier** ton profil » annonçait au visiteur qui
+    // vient d'ouvrir la page une action qu'il n'a pas faite — le défaut même
+    // que la séparation corrige, revenu par le partage.
+    for (const code of ["UNAUTHORIZED", "PROFILE_NOT_FOUND"]) {
+      const message = profileLoadErrorMessage(code);
+      expect(message).not.toMatch(/modifier|sauvegarde|enregistr/i);
+    }
+  });
+
   it("ne laisse jamais sortir le code brut", () => {
     for (const code of ["ER_LOCK_DEADLOCK", "BOOM", null, undefined, ""]) {
       expect(profileLoadErrorMessage(code)).not.toMatch(/[A-Z]{4,}_[A-Z]{4,}/);
