@@ -167,12 +167,154 @@ certifié sur un tag qu'il vient de changer.
 L'anonymisation du compte efface le tag **et** sa date : une date restée seule
 ferait d'un compte anonymisé un compte « vérifié » sans tag.
 
+## Un compte Discord rattaché possède son tag
+
+> **Le champ se lit, il ne se saisit plus** — `lib/shared/discord-tag-lock.ts`.
+
+Deux façons d'écrire `bg_users.discord_pseudo` coexistaient sans se connaître :
+la **saisie libre** de `/profil`, que la certification vient prouver ensuite, et
+le **rattachement OAuth** — connexion par Discord ou ajout de Discord dans
+« Applications connectées » —, qui écrit le pseudo que Discord nomme lui-même et
+le pose certifié (`linkOAuthIdentity`).
+
+Laisser la première ouverte une fois la seconde faite ne pouvait produire que du
+faux. Le champ invitait à réécrire à la main une donnée que le fournisseur venait
+d'attester, et **toute modification défait la certification** (section
+précédente) : le joueur perdait donc, d'une faute de frappe, la seule chose qui
+rendait son tag visible de l'arbitrage, pour se voir ensuite proposer un bouton
+« Recertifier » qui ne fait que replacer ce que Discord disait déjà. Un
+aller-retour entier pour revenir au point de départ, avec entre les deux une
+fenêtre où le site exposait un tag inventé.
+
+D'où la règle, écrite **une fois** dans un module pur et tenue aux deux bouts :
+
+- **L'écran** passe le champ en `readOnly` (et non `disabled` : la valeur reste
+  lisible au lecteur d'écran et atteignable au clavier) et **retire
+  « Recertifier »** — il ne ferait que reposer ce que Discord dit déjà. Il ne
+  retire pas les gestes qui ont encore un objet : « Certifier mon tag » tant que
+  le tag enregistré ne l'est pas, « Enregistrer mon tag » quand il n'y en a
+  aucun, « Retirer mon tag » dès qu'il y en a un — le champ ne se vidant plus à
+  la main, cette sortie n'existerait nulle part ailleurs. Le détail des trois
+  états est plus bas, section « Où le tag s'affiche ».
+- **La route** refuse la réécriture en **409 `DISCORD_TAG_LOCKED`** : la saisie
+  est bonne, c'est l'état du compte qui l'interdit. Le refus ne tombe que sur un
+  tag **différent** du tag stocké, et la comparaison est **exacte, casse
+  comprise**. Elle ne l'a pas toujours été : elle tolérait la casse parce que le
+  formulaire renvoyait le champ à chaque sauvegarde et que refuser sur sa seule
+  présence rendait tout le profil inenregistrable. Le client ne soumet plus ce
+  champ que s'il a changé, et la tolérance est devenue nuisible — laisser passer
+  une différence de casse rendait un **200 qui n'écrivait rien**, l'écriture
+  gardant la valeur stockée quoi qu'ait décidé ce contrôle (constaté contre un
+  vrai MySQL : la colonne restait sur son orthographe d'origine pendant que la
+  route annonçait « Profil mis à jour »). Le refus dit maintenant ce que
+  l'écriture fait : c'est Discord qui nomme ce tag, sa casse comprise. La
+  comparaison qui décide de la **décertification** reste, elle, insensible à la
+  casse — elle répond à une autre question, « la preuve porte-t-elle encore sur
+  ce tag ? », et les pseudos Discord sont eux-mêmes insensibles à la casse.
+- **L'écriture** garde le tag par elle-même :
+  `discord_pseudo = CASE WHEN NOT ? THEN discord_pseudo WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_pseudo ELSE ? END`.
+  Le `SELECT` donne le refus lisible, la requête tranche la course — un
+  rattachement peut tomber entre les deux. Un `CASE` jumeau couvre
+  `discord_verified_at`, qui n'a aucune raison de tomber quand rien ne change.
+
+### Retirer son tag reste possible
+
+Un compte rattaché ne peut pas **inventer** un autre tag ; il peut en revanche
+**retirer** le sien, et ce n'est pas une exception. Effacer son tag *est* le
+geste d'annulation de l'exposition, le seul que le site offre — il n'existe
+aucune route de décertification.
+
+Le lui refuser enfermerait le cas le plus courant, un compte **né par Discord** :
+son tag est certifié donc lisible de l'arbitrage, et détacher Discord lui serait
+refusé en `LAST_CONNECTION` faute d'une autre porte. Il ne lui resterait que la
+suppression du compte. D'où la forme du verrou : il ne mord que sur une valeur
+**non nulle** et différente, et l'effacement n'interroge même pas le
+rattachement.
+
+### Un champ absent n'est pas un champ vidé
+
+`discordPseudo` manquant valait `null`, donc un effacement : une requête
+partielle qui ne parlait pas du tag le supprimait, et sa certification avec.
+Aucun appelant ne le faisait — le formulaire renvoie toujours le champ —, mais
+le verrou en aurait fait un **409 sur tout compte rattaché**, ce qui rend la
+distinction obligatoire autant que juste. D'où le premier `WHEN` des deux
+`CASE` : « le patch parle-t-il du tag ? ».
+
+Le verrou se lit sur le **rattachement seul**, ni sur le tag ni sur la
+certification. Un compte rattaché dont Discord n'a donné aucun pseudo affichable
+— un `username` entièrement numérique, que `normalizeDiscordHandle` écarte —
+reste donc verrouillé : ce qu'il saisirait ne serait de toute façon pas
+certifiable (la certification vérifie que le tag résout vers *son* identifiant
+Discord, et rejette le même numérique), donc invisible de tous. Un champ ouvert
+sur rien est un piège, pas une liberté ; l'aide du champ le dit en toutes
+lettres plutôt que de laisser croire à un chargement raté.
+
+Le refus **nomme les deux gestes qui le lèvent**, et seulement ceux qui existent
+toujours : se renommer sur Discord puis se reconnecter (la connexion réécrit le
+tag et le recertifie), ou **retirer son tag** — le geste d'annulation de
+l'exposition, que la route accepte parce qu'il n'efface rien d'autre. Détacher
+Discord depuis « Applications connectées » rend bien le tag à la saisie libre
+(`unlinkOAuthIdentity`), mais la phrase ne le nomme pas : ce n'est pas un geste
+pour le cas le plus courant, un compte **né** par Discord, à qui ce bouton est
+refusé en `LAST_CONNECTION` faute d'une autre porte. Un refus qui nomme une
+sortie inexistante se lit comme une panne.
+
+**Un rattachement inconnu verrouille aussi.** L'écran reçoit l'état par un appel
+à part, donc il ne le connaît pas au premier rendu et pas du tout si l'appel
+échoue : `linked` y vaut alors `null`, et `checkDiscordTagEdit` refuse
+(`UNKNOWN_LINK`). Le prédicat teste les deux valeurs **connues** et fait
+retomber tout le reste sur l'inconnu — écrit dans l'autre sens (`=== null`
+d'abord), un `undefined` glissait entre les branches et *ouvrait* le champ, ce
+que l'écran rend atteignable en alimentant cet état par un `as` sur une réponse
+JSON que rien ne valide.
+
+**Attendre n'est pas échouer**, et les deux se disaient pareil : le profil se
+rend dès que `GET /api/profile` répond, régulièrement avant
+`GET /api/profile/discord`, si bien que la phrase annonçait une panne pendant le
+temps normal d'un aller-retour. Un drapeau `pending` les sépare — l'appelant est
+le seul à savoir laquelle des deux, et le module reste pur en se contentant de
+ne plus supposer. L'attente se dit alors comme une attente, sans cause ni geste :
+il n'y a rien à réessayer tant que le premier essai n'a pas répondu.
+
+Le verrou porte sinon **sa propre sortie** : un bouton « Réessayer » relit
+l'état sans rechargement. Sans lui, une panne de lecture coûtait bien plus que
+le champ — tous les gestes étant sous `linked === true`, « Retirer mon tag »
+disparaissait avec eux, c'est-à-dire la seule annulation d'exposition que le
+site offre, et il n'existait aucun recours hors d'un rechargement manuel. Le défaut inverse n'était pas tenable — le champ ouvert
+laissait saisir un tag que la route refuse en 409, et ce refus emporte **toute**
+la sauvegarde, le `PATCH` étant indivisible. L'aide du champ dit alors le verrou
+et sa sortie (recharger), sans affirmer un rattachement que rien n'établit.
+
 ## Où le tag s'affiche
 
-- **`/profil`** — le sien, toujours, avec la pastille et le bouton de
-  certification. L'état vient de `GET /api/profile/discord`, qui parle du tag
-  **enregistré** : un champ modifié sans être sauvegardé ne gagne ni ne perd la
-  pastille.
+- **`/profil`** — le sien, toujours, avec la pastille. Le champ passe en lecture
+  seule dès que le compte porte un `discord_id` (section précédente), mais les
+  **gestes restent** : « Certifier mon tag » tant que le tag enregistré n'est pas
+  certifié — un tag saisi avant la règle, ou rattaché sans que Discord ait donné
+  de pseudo certifiable —, et « Retirer mon tag », seule sortie de l'exposition.
+  Ces deux gestes sont sous le **rattachement**, jamais sous la présence d'un
+  tag : posés sur le tag, ils disparaissaient tous les deux à l'état que le
+  retrait vient de produire (rattaché, sans tag), ne laissant qu'une reconnexion
+  par Discord. Sans tag enregistré le bouton dit « Enregistrer mon tag » : il n'y
+  a rien à *certifier*, et le geste se prouve seul — `startDiscordVerification`
+  conclut sur place quand le tag résout vers l'identifiant déjà rattaché.
+  **Le formulaire ne soumet que ce qu'il a changé** : il renvoyait le tag de son
+  instantané de montage à chaque sauvegarde, si bien qu'un tag réécrit ailleurs
+  entre-temps (renommage sur Discord puis connexion depuis un autre appareil)
+  faisait refuser **tout** le `PATCH` en 409, pseudo et visibilités emportés par
+  un champ auquel personne n'avait touché. La clé est omise quand la valeur n'a
+  pas bougé, ce qui n'efface rien : `updateOwnProfile` ne touche `discord_pseudo`
+  que si le patch en parle.
+  La condition porte sur la **valeur**, et non sur le verrou, parce que le verrou
+  se lit sur un état que l'écran peut avoir périmé : un onglet ouvert avant le
+  rattachement porte encore `linked: false`, et c'est exactement le cas où le
+  refus tombe. La valeur, elle, dit ce qu'il faut savoir — ce champ a-t-il
+  quelque chose à écrire ?
+  Ce qui disparaît sur un compte rattaché est « Recertifier » : il ne ferait que
+  reposer ce que Discord dit déjà. L'état vient de `GET /api/profile/discord`, qui parle
+  du tag **enregistré** : un champ modifié sans être sauvegardé ne gagne ni ne
+  perd la pastille — et c'est le même état qui décide du verrou, jamais la
+  saisie en cours.
 - **`/joueurs/[id]`** — le tag si le serveur l'a laissé passer, « Masqué » sinon,
   et **la pastille dans les deux cas** quand le joueur est certifié. « Masqué »
   couvre aussi bien le tag filtré que le tag absent, exactement comme les deux
