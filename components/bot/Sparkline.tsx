@@ -16,10 +16,20 @@ export function Sparkline({ data, color = "var(--blue-500)" }: SparklineProps) {
   // Même prémisse que le reste de `/bot` : la charge arrive par un `as` sur du
   // JSON reçu par le réseau. Un point non numérique empoisonnait `Math.max`, et
   // toute la courbe sortait en « MNaN,NaN » — un cadre vide, sans une erreur.
-  const points = (Array.isArray(data) ? data : [])
-    .map(botPayloadNumber)
-    .filter((v): v is number => v !== null)
-    .slice(-MAX_POINTS);
+  const read = (Array.isArray(data) ? data : []).slice(-MAX_POINTS).map(botPayloadNumber);
+
+  // **Un point illisible retire la courbe, il ne se retire pas d'elle.** Les
+  // écarter un à un (`.filter`) laissait tracer les survivants, et l'abscisse
+  // se **redistribuait** silencieusement sur eux : une série
+  // `[10, "n/a", 12, "n/a", 14]` rendait trois points serrés, une tendance
+  // plus dense et plus raide que la donnée, sans rien qui signale les trous.
+  // Une courbe est une **forme**, pas une liste : un trou ne s'y représente
+  // pas, et le combler par un zéro serait pire encore — ce serait affirmer une
+  // valeur que le bot n'a pas donnée (« jamais zéro pour dire je ne sais
+  // pas », la règle du panneau d'à côté et du compteur Discord de l'accueil).
+  // D'où le seul repli qui ne mente sur rien : pas de courbe.
+  if (read.some((v) => v === null)) return null;
+  const points = read as number[];
 
   // Deux points au minimum. Avec un seul, `i / (n - 1)` vaut `0 / 0` : le
   // chemin est `NaN` de bout en bout. Avec zéro, `Math.max` rend `-Infinity` et

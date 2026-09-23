@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { BOT_DOC_SECTIONS } from "@/lib/server/bot-docs";
+import { BOT_DOC_SECTIONS } from "@/lib/shared/bot-doc-sections";
 
 const ROOT = join(__dirname, "..", "..");
 const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
@@ -87,6 +87,17 @@ describe("/bot — les commandes renvoient à leur source", () => {
       expect(typeof section.slug).toBe("string");
       expect(section.summary.length).toBeGreaterThan(0);
     }
+  });
+
+  it("prend le registre dans `lib/shared`, jamais dans `lib/server`", () => {
+    // `lib/server/bot-docs.ts` importe `node:fs/promises` au premier niveau :
+    // l'import ne passe aujourd'hui que parce que ce composant est un
+    // composant serveur, et le premier `"use client"` ajouté ici (un filtre
+    // sur la liste, par exemple) casserait la compilation sur une erreur de
+    // résolution qui ne nomme pas sa cause. La convention du projet doit être
+    // vraie par construction, pas par vigilance.
+    expect(commands).not.toContain("@/lib/server/");
+    expect(commands).toContain('from "@/lib/shared/bot-doc-sections"');
   });
 
   it("ne numérote plus une section unique", () => {

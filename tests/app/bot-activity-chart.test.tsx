@@ -134,6 +134,23 @@ describe("BotActivityChart — une charge abîmée ne fait pas tomber la page", 
     expect(html).not.toContain("Infinity");
   });
 
+  it("plafonne le nombre de colonnes, et gradue l'axe sur ce qu'il dessine", () => {
+    // C'est la seule série de la page que le client **redemande**
+    // (`/api/bot/activity` laisse passer le corps du bot tel quel) : cinquante
+    // mille points y écrivaient trois nœuds DOM chacun, et l'onglet se fige.
+    // Ne pas lever n'est pas la même chose que rester utilisable.
+    const huge = Array.from({ length: 5_000 }, () => 1);
+    // La dernière valeur est la plus grande : si les colonnes gardées sont
+    // bien les plus récentes, elle est dessinée — et l'axe la porte.
+    huge[huge.length - 1] = 42;
+    const html = render(activity({ relays: huge, scrims: [], labels: [] }));
+    const bars = [...html.matchAll(/title="\d+ relais"/g)];
+    expect(bars.length).toBeLessThanOrEqual(120);
+    expect(html).toContain('title="42 relais"');
+    // L'axe des ordonnées est gradué sur la fenêtre affichée.
+    expect(html).toContain(">42<");
+  });
+
   it("ne passe jamais les séries en arguments d'appel", () => {
     // `Math.max(...relays, ...scrims, 1)` est un `RangeError` au-delà de
     // ~100 000 points — une charge du bot suffirait à rendre la page en 500.

@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { BOT_DOC_SECTIONS } from "@/lib/server/bot-docs";
+// Le registre vient de `lib/shared` et non de `lib/server/bot-docs.ts`, qui
+// importe `node:fs` : « `lib/server/*` ne s'importe jamais depuis un composant »
+// doit rester vrai sans dépendre de ce que ce fichier-ci est aujourd'hui.
+import { BOT_DOC_SECTIONS } from "@/lib/shared/bot-doc-sections";
 
 /**
  * Les commandes du bot — **renvoyées à leur source**, jamais recopiées.

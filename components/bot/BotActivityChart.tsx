@@ -4,6 +4,13 @@ import { useState, useEffect } from "react";
 import { BotActivity } from "@/lib/shared/types";
 import { botPayloadLabel, botPayloadNumber } from "@/lib/shared/bot-payload";
 
+/**
+ * Le nombre de colonnes tracées. La plage la plus large offerte par la page
+ * est de 90 jours ; la borne laisse donc la marge d'un point par jour, et ne
+ * coupe que des charges qui ne décrivent plus une activité quotidienne.
+ */
+const MAX_COLUMNS = 120;
+
 export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
   const [range, setRange] = useState<"7j" | "30j" | "90j">("30j");
   const [data, setData] = useState<BotActivity | null>(initial);
@@ -53,8 +60,19 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
     );
   }
 
-  const relays = Array.isArray(data.relays) ? data.relays : [];
-  const scrims = Array.isArray(data.scrims) ? data.scrims : [];
+  // Plafonné à ce que le graphe peut dire, comme la colonne « tendance » du
+  // tableau des serveurs (`MAX_SPARKLINE_POINTS`) et comme `Sparkline`
+  // (`MAX_POINTS`). C'est la **seule** série de la page que le client
+  // **redemande** (`/api/bot/activity`, qui valide `range` et laisse passer le
+  // corps du bot tel quel), donc la seule qu'un navigateur reçoive sans être
+  // jamais passée par un rendu serveur. Cinquante mille points y écrivaient
+  // trois nœuds DOM chacun — l'onglet se fige. Ne pas lever n'est pas la même
+  // chose que rester utilisable.
+  //
+  // On garde les plus **récentes** : une activité se lit par sa fin, et la
+  // plage la plus large proposée (90 jours) tient largement sous la borne.
+  const relays = (Array.isArray(data.relays) ? data.relays : []).slice(-MAX_COLUMNS);
+  const scrims = (Array.isArray(data.scrims) ? data.scrims : []).slice(-MAX_COLUMNS);
   // Un point ramené à un nombre affichable, **borné des deux côtés** — la même
   // règle que la colonne « tendance » de `BotServersTable`, et pour les mêmes
   // deux raisons : un point non numérique rendait `height: NaN%` et un point
@@ -62,12 +80,17 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
   // tomber en silence. La barre disparaît alors sans qu'aucune erreur ne le
   // signale — la panne muette, pas l'exception.
   const point = (v: unknown) => Math.max(0, botPayloadNumber(v) ?? 0);
-  // `reduce` et non `Math.max(...relays, ...scrims, 1)` : ce dernier passe les
-  // deux séries en arguments d'appel, ce qui est un `RangeError` au-delà de
-  // ~100 000 points, et rendrait `NaN` sur un point non numérique — la charge
-  // arrive par un `as BotActivityPayload` sur du JSON reçu. La graine à 1 reste
-  // le garde-fou contre la division par zéro d'une série plate.
-  const max = [...relays, ...scrims].reduce<number>((m, v) => Math.max(m, point(v)), 1);
+  // Deux passes plutôt qu'un `[...relays, ...scrims]` : la concaténation
+  // recopiait les deux séries entières pour n'en tirer qu'un nombre. Et
+  // surtout pas `Math.max(...relays, ...scrims, 1)`, qui les passerait en
+  // **arguments d'appel** — un `RangeError` au-delà de ~100 000 points, et
+  // `NaN` sur un point non numérique. La graine à 1 reste le garde-fou contre
+  // la division par zéro d'une série plate.
+  //
+  // Le maximum se lit sur la fenêtre **affichée** : gradué sur des points que
+  // le plafond vient d'écarter, l'axe décrirait un graphe qu'on ne dessine pas.
+  const highest = (serie: unknown[]) => serie.reduce<number>((m, v) => Math.max(m, point(v)), 1);
+  const max = Math.max(highest(relays), highest(scrims));
   // `?? []` ne rattrape que `null` : des libellés rangés par index
   // (`{"0": "01/09"}`) passaient tout droit et `labels.map` levait
   // « labels.map is not a function ». `BotActivityChart` étant rendu côté
@@ -82,7 +105,9 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
   // scrims. Seule l'asymétrie inverse était couverte. Une colonne sans point
   // d'un côté y porte un zéro, ce que `point` donne déjà.
   const columns = Math.max(relays.length, scrims.length);
-  const labels = Array.isArray(data.labels) ? data.labels : [];
+  // Les libellés suivent la même fenêtre que les barres : découpés autrement,
+  // l'axe compterait des jours que le graphe ne montre plus.
+  const labels = (Array.isArray(data.labels) ? data.labels : []).slice(-MAX_COLUMNS);
   // Même charge non validée : un objet tombait dans `Math.round`, qui rend
   // `NaN`, et la légende annonçait « MOY. NaN / JOUR ».
   const avgPerDay = botPayloadNumber(data.avgPerDay) ?? 0;

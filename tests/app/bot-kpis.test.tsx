@@ -157,10 +157,23 @@ describe("Sparkline — pas de courbe plutôt qu'une courbe fausse", () => {
     expect(renderToStaticMarkup(<Sparkline data={[5]} />)).toBe("");
   });
 
-  it("écarte les points qui ne sont pas des nombres", () => {
-    const html = renderToStaticMarkup(
-      <Sparkline data={[1, "n/a", null, 4, Number.NaN, 2] as unknown as number[]} />,
-    );
+  it("ne trace rien plutôt qu'une courbe dont l'abscisse s'est redistribuée", () => {
+    // Écarter les points illisibles un à un laissait tracer les survivants, et
+    // l'abscisse se resserrait sur eux : la tendance se lisait plus dense et
+    // plus raide que la donnée, sans rien qui signale les trous. Une courbe
+    // est une forme, pas une liste — et combler par un zéro affirmerait une
+    // valeur que le bot n'a pas donnée.
+    for (const serie of [
+      [1, "n/a", null, 4, Number.NaN, 2],
+      [1, 2, 3, "n/a"],
+      ["n/a", 1, 2, 3],
+    ]) {
+      expect(renderToStaticMarkup(<Sparkline data={serie as unknown as number[]} />)).toBe("");
+    }
+  });
+
+  it("trace une série entièrement lisible, sans NaN", () => {
+    const html = renderToStaticMarkup(<Sparkline data={[1, 4, 2, 8, 5]} />);
     expect(html).toContain("<svg");
     expect(html).not.toContain("NaN");
     expect(html).not.toContain("Infinity");
