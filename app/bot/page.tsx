@@ -14,6 +14,8 @@ import { BotLatencyCard } from "@/components/bot/BotLatencyCard";
 import { BotCommands } from "@/components/bot/BotCommands";
 import { BotInviteCard } from "@/components/bot/BotInviteCard";
 import { fetchBotStats, fetchBotStatus, fetchBotKpis, fetchBotServers, fetchBotActivity } from '@/lib/server/bot-integration';
+import { getCurrentUser } from "@/lib/server/auth";
+import { isStaffMember } from "@/lib/shared/permissions";
 
 export const metadata: Metadata = pageMetadata({
   title: "BlueGenji Bot",
@@ -27,13 +29,15 @@ export const metadata: Metadata = pageMetadata({
 export const revalidate = 30;
 
 export default async function BotPage() {
-  const [, status, kpis, serversPayload, activity30j] = await Promise.all([
+  const [, status, kpis, serversPayload, activity30j, user] = await Promise.all([
     fetchBotStats(),
     fetchBotStatus(),
     fetchBotKpis(),
     fetchBotServers(8),
     fetchBotActivity('30j'),
+    getCurrentUser(),
   ]);
+  const isStaff = isStaffMember(user);
 
   return (
     <>
@@ -62,7 +66,7 @@ export default async function BotPage() {
             </div>
           </div>
 
-          <BotCommands />
+          <BotCommands isStaff={isStaff} />
           <BotInviteCard />
         </div>
       </main>

@@ -8,24 +8,67 @@ import {
   renderInline,
   renderMarkdown,
 } from "@/lib/server/bot-docs";
+import { visibleBotDocSections, BOT_LEGAL_LINKS } from "@/lib/shared/bot-doc-sections";
 
 describe("findBotDocSection", () => {
   it("retourne la première section quand aucun slug n'est fourni", () => {
-    expect(findBotDocSection(undefined)).toBe(BOT_DOC_SECTIONS[0]);
+    expect(findBotDocSection(undefined, true)).toBe(BOT_DOC_SECTIONS[0]);
   });
 
-  it("résout un slug connu", () => {
-    expect(findBotDocSection("api-interne")?.file).toBe("doc/internal-api.md");
+  it("résout un slug connu pour le staff", () => {
+    expect(findBotDocSection("api-interne", true)?.file).toBe("doc/internal-api.md");
   });
 
   it("refuse un slug inconnu ou une tentative de traversée de chemin", () => {
-    expect(findBotDocSection("inconnu")).toBeNull();
-    expect(findBotDocSection("../../.env")).toBeNull();
+    expect(findBotDocSection("inconnu", true)).toBeNull();
+    expect(findBotDocSection("../../.env", true)).toBeNull();
   });
 
   it("n'expose que des slugs uniques", () => {
     const slugs = BOT_DOC_SECTIONS.map((s) => s.slug);
     expect(new Set(slugs).size).toBe(slugs.length);
+  });
+
+  it("cache une page réservée au staff à un visiteur sans rôle", () => {
+    expect(findBotDocSection("api-interne", false)).toBeNull();
+    expect(findBotDocSection("architecture", false)).toBeNull();
+    expect(findBotDocSection("base-de-donnees", false)).toBeNull();
+    expect(findBotDocSection("adhesions", false)).toBeNull();
+  });
+
+  it("garde les pages publiques accessibles sans rôle", () => {
+    expect(findBotDocSection("guide", false)?.file).toBe("helpfr.md");
+    expect(findBotDocSection("user-guide-en", false)?.file).toBe("help.md");
+  });
+});
+
+describe("visibleBotDocSections", () => {
+  it("filtre les sections réservées au staff pour un visiteur sans rôle", () => {
+    const sections = visibleBotDocSections(false);
+    expect(sections.every((s) => !s.staffOnly)).toBe(true);
+    expect(sections.map((s) => s.slug)).toEqual(["guide", "user-guide-en"]);
+  });
+
+  it("rend toutes les sections au staff", () => {
+    expect(visibleBotDocSections(true)).toEqual(BOT_DOC_SECTIONS);
+  });
+});
+
+describe("BOT_LEGAL_LINKS", () => {
+  it("pointe vers les pages légales du bot, hors du registre `/bot/docs`", () => {
+    expect(BOT_LEGAL_LINKS.map((l) => l.href)).toEqual([
+      "/privacy-policy-bot",
+      "/terms-of-service-bot",
+    ]);
+  });
+
+  it("n'expose que des slugs uniques et distincts de `BOT_DOC_SECTIONS`", () => {
+    const legalSlugs = BOT_LEGAL_LINKS.map((l) => l.slug);
+    expect(new Set(legalSlugs).size).toBe(legalSlugs.length);
+    const docSlugs = new Set(BOT_DOC_SECTIONS.map((s) => s.slug));
+    for (const slug of legalSlugs) {
+      expect(docSlugs.has(slug)).toBe(false);
+    }
   });
 });
 

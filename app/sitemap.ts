@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { BOT_DOC_SECTIONS } from "@/lib/shared/bot-doc-sections";
+import { visibleBotDocSections } from "@/lib/shared/bot-doc-sections";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { publicSitemapRoutes } from "@/lib/shared/sitemap";
 
@@ -29,7 +29,7 @@ export const dynamic = "force-dynamic";
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = siteCanonicalBase();
 
-  return publicSitemapRoutes(BOT_DOC_SECTIONS.map((section) => section.slug)).map((route) => ({
+  return publicSitemapRoutes(visibleBotDocSections(false).map((section) => section.slug)).map((route) => ({
     url: `${base}${route.path === "/" ? "" : route.path}`,
     changeFrequency: route.changeFrequency,
     priority: route.priority,
