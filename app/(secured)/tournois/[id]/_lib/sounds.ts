@@ -1,12 +1,12 @@
 import type { ViewerAlert } from "@/lib/shared/viewer-alerts";
 
+/** Filet de sécurité : au-delà, le contexte est refermé même si la note n'a pas fini. */
+export const CHIME_CLOSE_FALLBACK_MS = 1_000;
+
 /**
  * Hauteur du signal par évènement : deux notes distinctes, pour qu'on sache
  * sans regarder s'il faut rejoindre son match ou confirmer un score.
  */
-/** Filet de sécurité : au-delà, le contexte est refermé même si la note n'a pas fini. */
-export const CHIME_CLOSE_FALLBACK_MS = 1_000;
-
 const ALERT_FREQUENCY: Partial<Record<ViewerAlert, number>> = {
   SCORE_TO_CONFIRM: 880,
   MATCH_READY: 660,
