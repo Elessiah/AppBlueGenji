@@ -10,6 +10,7 @@ import { getDatabase } from "@/lib/server/database";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { registerTeamsByIds } from "@/lib/server/tournaments/registration";
 import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
+import { fakePool } from "../../helpers/sql-double";
 
 /**
  * Le lot est **tout ou rien**, et c'est ce niveau-ci qui le tient : une seule
@@ -27,18 +28,18 @@ function mockConnection() {
     rollback: jest.fn(),
     release: jest.fn(),
   };
-  (getDatabase as jest.Mock).mockResolvedValue({
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
     execute: jest.fn(),
     getConnection: jest.fn(async () => connection),
-  } as never);
+  }));
   return connection;
 }
 
 describe("registerGhostTeams", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (flushBotLogs as jest.Mock).mockReturnValue(undefined);
-    (discardBotLogs as jest.Mock).mockReturnValue(undefined);
+    jest.mocked(flushBotLogs).mockReturnValue(undefined);
+    jest.mocked(discardBotLogs).mockReturnValue(undefined);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -46,7 +47,7 @@ describe("registerGhostTeams", () => {
 
   it("écrit tout le lot dans une seule transaction, et publie une seule fois", async () => {
     const connection = mockConnection();
-    (registerTeamsByIds as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(registerTeamsByIds).mockResolvedValue(undefined);
 
     await registerGhostTeams(5, [900, 901, 902]);
 
@@ -63,8 +64,8 @@ describe("registerGhostTeams", () => {
 
   it("défait tout le lot au premier refus, sans rien publier", async () => {
     const connection = mockConnection();
-    (registerTeamsByIds as jest.Mock).mockRejectedValue(
-      Object.assign(new Error("ALREADY_REGISTERED"), { teamId: 901 }) as never,
+    jest.mocked(registerTeamsByIds).mockRejectedValue(
+      Object.assign(new Error("ALREADY_REGISTERED"), { teamId: 901 }),
     );
 
     await expect(registerGhostTeams(5, [900, 901])).rejects.toThrow("ALREADY_REGISTERED");
@@ -80,8 +81,8 @@ describe("registerGhostTeams", () => {
 
   it("laisse remonter l'engagé nommé par le refus", async () => {
     mockConnection();
-    (registerTeamsByIds as jest.Mock).mockRejectedValue(
-      Object.assign(new Error("NOT_A_GHOST_TEAM"), { teamId: 901 }) as never,
+    jest.mocked(registerTeamsByIds).mockRejectedValue(
+      Object.assign(new Error("NOT_A_GHOST_TEAM"), { teamId: 901 }),
     );
 
     const error = await registerGhostTeams(5, [900, 901]).catch((e) => e);

@@ -6,6 +6,7 @@ import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie";
 import { reconcileSurvival } from "@/lib/server/tournaments/survival";
 import { reconcileSwiss } from "@/lib/server/tournaments/swiss";
 import { createMatch, finishTournament } from "@/lib/server/tournaments/repository";
+import type { SqlMock } from "../helpers/sql-double";
 
 /**
  * Corriger le score de la **finale d'un tournoi terminé**.
@@ -34,12 +35,12 @@ function makeConn(answers: [string, unknown][]) {
     return found ? found[1] : [[]];
   });
   return { execute } as never as Parameters<typeof reconcileEndurance>[1] & {
-    execute: jest.Mock;
+    execute: SqlMock;
   };
 }
 
 /** Les rangs finaux écrits par la réconciliation, équipe vers rang. */
-function writtenRanks(conn: { execute: jest.Mock }): Map<number, number> {
+function writtenRanks(conn: { execute: SqlMock }): Map<number, number> {
   const ranks = new Map<number, number>();
   for (const [sql, params] of conn.execute.mock.calls) {
     if (!String(sql).includes("bg_tournament_registrations SET final_rank")) continue;
@@ -60,9 +61,9 @@ function writtenRanks(conn: { execute: jest.Mock }): Map<number, number> {
 }
 
 /** Une manche, une ronde ou un tour a-t-il été reposé ? */
-function posedAnything(conn: { execute: jest.Mock }): boolean {
+function posedAnything(conn: { execute: SqlMock }): boolean {
   return (
-    (createMatch as jest.Mock).mock.calls.length > 0 ||
+    jest.mocked(createMatch).mock.calls.length > 0 ||
     conn.execute.mock.calls.some(([sql]) => {
       const query = String(sql);
       return (

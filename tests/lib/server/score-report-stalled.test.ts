@@ -11,7 +11,7 @@ import { queueBotLog, queueRefereeAlert } from "@/lib/server/tournaments/bot-log
 type Queued = { kind: string } & Record<string, unknown>;
 
 function queued(): Queued[] {
-  return (queueRefereeAlert as jest.Mock).mock.calls.map((call) => call[1] as Queued);
+  return jest.mocked(queueRefereeAlert).mock.calls.map((call) => call[1] as Queued);
 }
 
 /** Connexion factice : `rows` répond aux SELECT, les écritures sont comptées. */
@@ -55,9 +55,9 @@ function expiredRow(overrides: Record<string, unknown>): Record<string, unknown>
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (queueBotLog as jest.Mock).mockReturnValue(true);
+  jest.mocked(queueBotLog).mockReturnValue(true);
   // `queueRefereeAlert` réserve puis met en file, et rend « l'alerte partira-t-elle ? ».
-  (queueRefereeAlert as jest.Mock).mockResolvedValue(true as never);
+  jest.mocked(queueRefereeAlert).mockResolvedValue(true);
 });
 
 describe("resolveExpiredScoreReports", () => {
@@ -228,7 +228,7 @@ describe("resolveExpiredScoreReports", () => {
 
     // La marque est déjà posée : le chemin réservé le dit en rendant `false`,
     // et rien d'autre ne doit se produire — l'alerte est déjà partie.
-    (queueRefereeAlert as jest.Mock).mockResolvedValue(false as never);
+    jest.mocked(queueRefereeAlert).mockResolvedValue(false);
 
     await resolveExpiredScoreReports(connection, 12);
 

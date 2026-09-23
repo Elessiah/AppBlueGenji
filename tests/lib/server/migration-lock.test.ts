@@ -9,6 +9,7 @@ import {
   withMigrationLock,
 } from "@/lib/server/migration-lock";
 
+
 /**
  * Le démarrage rejoue tout le schéma, et `next dev` lance plusieurs processus :
  * sans verrou nommé, deux `ALTER TABLE` concurrents sur la même table font
@@ -53,7 +54,7 @@ describe("withMigrationLock", () => {
     expect(result).toBe("fait");
     expect(order).toEqual(["get", "migrations", "release"]);
     // Une seule connexion : le verrou est lié à la session, pas à la requête.
-    expect((pool.getConnection as jest.Mock).mock.calls).toHaveLength(1);
+    expect(jest.mocked(pool.getConnection).mock.calls).toHaveLength(1);
     expect(connection.release).toHaveBeenCalledTimes(1);
     expect(connection.destroy).not.toHaveBeenCalled();
   });

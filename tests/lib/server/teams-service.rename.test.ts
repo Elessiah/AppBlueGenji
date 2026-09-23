@@ -5,6 +5,7 @@ jest.mock("@/lib/server/database");
 import { updateTeamMeta } from "@/lib/server/teams-service";
 import { assertTeamNameAvailable, isTeamNameConflict } from "@/lib/server/team-tags";
 import { getDatabase } from "@/lib/server/database";
+import { type SqlMock, fakePool } from "../../helpers/sql-double";
 
 /**
  * Renommer une équipe : mêmes bornes qu'à la création, unicité dite en
@@ -21,12 +22,12 @@ function dupError(key: string) {
   return Object.assign(new Error(message), { code: "ER_DUP_ENTRY", sqlMessage: message });
 }
 
-let execute: jest.Mock;
+let execute: SqlMock;
 
 beforeEach(() => {
   jest.clearAllMocks();
   execute = jest.fn();
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 });
 
 const wrote = () => execute.mock.calls.some(([sql]) => /UPDATE bg_teams/.test(String(sql)));
@@ -38,7 +39,7 @@ describe("updateTeamMeta — nom", () => {
     ["de deux caractères", "ab"],
     ["de 61 caractères", "a".repeat(61)],
   ])("refuse un nom %s sans rien écrire", async (_label, name) => {
-    execute.mockResolvedValueOnce(owner as never);
+    execute.mockResolvedValueOnce(owner);
 
     await expect(updateTeamMeta(1, 7, { name })).rejects.toThrow("INVALID_TEAM_NAME");
     expect(wrote()).toBe(false);
@@ -46,8 +47,8 @@ describe("updateTeamMeta — nom", () => {
 
   it("refuse un nom déjà porté par une autre équipe, avant d'écrire", async () => {
     execute
-      .mockResolvedValueOnce(owner as never)
-      .mockResolvedValueOnce([[{ id: 9 }]] as never); // nom pris
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce([[{ id: 9 }]]); // nom pris
 
     await expect(updateTeamMeta(1, 7, { name: "Dragon Squad" })).rejects.toThrow("TEAM_NAME_ALREADY_USED");
     expect(wrote()).toBe(false);
@@ -55,9 +56,9 @@ describe("updateTeamMeta — nom", () => {
 
   it("laisse l'équipe garder son propre nom (casse comprise)", async () => {
     execute
-      .mockResolvedValueOnce(owner as never)
-      .mockResolvedValueOnce([[]] as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     await updateTeamMeta(1, 7, { name: "  Rolex  " });
 
@@ -71,31 +72,31 @@ describe("updateTeamMeta — nom", () => {
 
   it("traduit la course entre deux renommages vers le même nom", async () => {
     execute
-      .mockResolvedValueOnce(owner as never)
-      .mockResolvedValueOnce([[]] as never)
-      .mockRejectedValueOnce(dupError("bg_teams.name") as never);
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce([[]])
+      .mockRejectedValueOnce(dupError("bg_teams.name"));
 
     await expect(updateTeamMeta(1, 7, { name: "Dragon Squad" })).rejects.toThrow("TEAM_NAME_ALREADY_USED");
   });
 
   it("garde la traduction du sigle quand c'est lui qui entre en collision", async () => {
     execute
-      .mockResolvedValueOnce(owner as never)
-      .mockResolvedValueOnce([[]] as never) // tag libre au SELECT
-      .mockRejectedValueOnce(dupError("uniq_bg_teams_tag") as never);
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce([[]]) // tag libre au SELECT
+      .mockRejectedValueOnce(dupError("uniq_bg_teams_tag"));
 
     await expect(updateTeamMeta(1, 7, { tag: "BG" })).rejects.toThrow("TEAM_TAG_ALREADY_USED");
   });
 
   it("vérifie les droits avant la forme : un intrus n'apprend rien du nom", async () => {
-    execute.mockResolvedValueOnce([[]] as never);
+    execute.mockResolvedValueOnce([[]]);
     await expect(updateTeamMeta(99, 7, { name: "" })).rejects.toThrow("FORBIDDEN");
   });
 
   it("ne touche pas au nom quand le patch ne le porte pas", async () => {
     execute
-      .mockResolvedValueOnce(owner as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     await updateTeamMeta(1, 7, { description: "Nouvelle description" });
 

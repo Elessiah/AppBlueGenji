@@ -22,14 +22,15 @@ import {
   transferTeamOwnership,
   updateTeamMeta,
 } from "@/lib/server/teams-service";
+import { authUser } from "../../../helpers/auth-user";
+import { teamDetailResponse } from "../../../helpers/team-detail";
 
 /**
  * Routes de la fiche d'équipe en mode gestion : ce qu'elles transmettent au
  * service, et le statut HTTP de chaque refus qu'elles connaissent.
  */
 
-type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
-const player = { id: 2, isAdmin: false, roles: [] } as unknown as SessionUser;
+const player = authUser({ id: 2, isAdmin: false, roles: [] });
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
@@ -47,8 +48,8 @@ async function errorOf(res: Response) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (getCurrentUser as jest.Mock).mockResolvedValue(player as never);
-  (getTeamDetail as jest.Mock).mockResolvedValue({} as never);
+  jest.mocked(getCurrentUser).mockResolvedValue(player);
+  jest.mocked(getTeamDetail).mockResolvedValue(teamDetailResponse());
 });
 
 describe.each([
@@ -56,7 +57,7 @@ describe.each([
   ["POST /api/teams/[id]/invitations", invitationsPost],
 ])("%s — rôles d'invitation", (_label, route) => {
   it("transmet les rôles choisis au service", async () => {
-    (inviteToTeam as jest.Mock).mockResolvedValue("INVITED" as never);
+    jest.mocked(inviteToTeam).mockResolvedValue("INVITED");
 
     const res = await route(req("POST", { pseudo: " Nova ", roles: ["TANK", "MANAGER"] }), params("7"));
 
@@ -65,7 +66,7 @@ describe.each([
   });
 
   it("laisse le service poser son défaut quand le corps ne dit rien", async () => {
-    (inviteToTeam as jest.Mock).mockResolvedValue("INVITED" as never);
+    jest.mocked(inviteToTeam).mockResolvedValue("INVITED");
 
     await route(req("POST", { pseudo: "Nova" }), params("7"));
 
@@ -75,14 +76,14 @@ describe.each([
   it.each(["INVITATION_NOT_PENDING", "TEAM_DELETED", "TEAM_NOT_JOINABLE", "PLAYER_ACCOUNT_DELETED"])(
     "rend %s — un état changé pendant l'arrivée — en 409",
     async (code) => {
-      (inviteToTeam as jest.Mock).mockRejectedValue(new Error(code) as never);
+      jest.mocked(inviteToTeam).mockRejectedValue(new Error(code));
       const res = await route(req("POST", { pseudo: "Nova" }), params("7"));
       expect(res.status).toBe(409);
     },
   );
 
   it("rend MISSING_ROLE en 400", async () => {
-    (inviteToTeam as jest.Mock).mockRejectedValue(new Error("MISSING_ROLE") as never);
+    jest.mocked(inviteToTeam).mockRejectedValue(new Error("MISSING_ROLE"));
 
     const res = await route(req("POST", { pseudo: "Nova", roles: [] }), params("7"));
 
@@ -93,19 +94,22 @@ describe.each([
 
 describe("GET /api/teams/[id]/invitations", () => {
   it("rend les demandes reçues et les invitations envoyées", async () => {
-    (listTeamPendingInvitations as jest.Mock).mockResolvedValue({
-      requests: [{ id: 1 }],
-      invitations: [{ id: 2 }],
-    } as never);
+    const pending = {
+      requests: [{ id: 1, userId: 3, pseudo: "Candidat", createdAt: "2026-01-01T00:00:00.000Z" }],
+      invitations: [
+        { id: 2, userId: 4, pseudo: "Invité", roles: ["DPS" as const], createdAt: "2026-01-01T00:00:00.000Z" },
+      ],
+    };
+    jest.mocked(listTeamPendingInvitations).mockResolvedValue(pending);
 
     const res = await invitationsGet(req("GET"), params("7"));
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ requests: [{ id: 1 }], invitations: [{ id: 2 }] });
+    expect(await res.json()).toEqual(pending);
   });
 
   it("refuse en 403 qui ne gère pas l'équipe", async () => {
-    (listTeamPendingInvitations as jest.Mock).mockRejectedValue(new Error("FORBIDDEN") as never);
+    jest.mocked(listTeamPendingInvitations).mockRejectedValue(new Error("FORBIDDEN"));
 
     const res = await invitationsGet(req("GET"), params("7"));
 
@@ -115,7 +119,7 @@ describe("GET /api/teams/[id]/invitations", () => {
 
 describe("DELETE /api/invitations/[id]", () => {
   it("rejette un visiteur anonyme", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     const res = await invitationDelete(req("DELETE"), params("5"));
     expect(res.status).toBe(401);
     expect(cancelInvitation).not.toHaveBeenCalled();
@@ -128,7 +132,7 @@ describe("DELETE /api/invitations/[id]", () => {
   });
 
   it("retire l'invitation au nom de l'appelant", async () => {
-    (cancelInvitation as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(cancelInvitation).mockResolvedValue(undefined);
     const res = await invitationDelete(req("DELETE"), params("5"));
     expect(res.status).toBe(200);
     expect(cancelInvitation).toHaveBeenCalledWith(2, 5);
@@ -139,7 +143,7 @@ describe("DELETE /api/invitations/[id]", () => {
     ["INVITATION_NOT_FOUND", 404],
     ["INVITATION_NOT_PENDING", 409],
   ])("rend %s en %i", async (code, status) => {
-    (cancelInvitation as jest.Mock).mockRejectedValue(new Error(code) as never);
+    jest.mocked(cancelInvitation).mockRejectedValue(new Error(code));
     const res = await invitationDelete(req("DELETE"), params("5"));
     expect(res.status).toBe(status);
     expect(await errorOf(res)).toBe(code);
@@ -151,7 +155,7 @@ describe("PATCH /api/teams/[id] — nom", () => {
     ["INVALID_TEAM_NAME", 400],
     ["TEAM_NAME_ALREADY_USED", 409],
   ])("rend %s en %i", async (code, status) => {
-    (updateTeamMeta as jest.Mock).mockRejectedValue(new Error(code) as never);
+    jest.mocked(updateTeamMeta).mockRejectedValue(new Error(code));
     const res = await teamPatch(req("PATCH", { name: "x" }), params("7"));
     expect(res.status).toBe(status);
     expect(await errorOf(res)).toBe(code);
@@ -167,7 +171,7 @@ describe("POST /api/teams — mêmes bornes qu'au renommage", () => {
   });
 
   it("compte un emoji pour un caractère, comme la colonne", async () => {
-    (createTeam as jest.Mock).mockResolvedValue(11 as never);
+    jest.mocked(createTeam).mockResolvedValue(11);
     const name = "🐉".repeat(60);
     const res = await teamCreate(req("POST", { name }));
     expect(res.status).toBe(201);
@@ -177,13 +181,13 @@ describe("POST /api/teams — mêmes bornes qu'au renommage", () => {
 
 describe("refus de gestion traduits en statuts", () => {
   it("DELETE members : CANNOT_KICK_OWNER en 409", async () => {
-    (removeTeamMember as jest.Mock).mockRejectedValue(new Error("CANNOT_KICK_OWNER") as never);
+    jest.mocked(removeTeamMember).mockRejectedValue(new Error("CANNOT_KICK_OWNER"));
     const res = await membersDelete(req("DELETE", { userId: 3 }), params("7"));
     expect(res.status).toBe(409);
   });
 
   it("transfert vers un compte supprimé : MEMBER_ACCOUNT_DELETED en 409", async () => {
-    (transferTeamOwnership as jest.Mock).mockRejectedValue(new Error("MEMBER_ACCOUNT_DELETED") as never);
+    jest.mocked(transferTeamOwnership).mockRejectedValue(new Error("MEMBER_ACCOUNT_DELETED"));
     const res = await transferPost(req("POST", { newOwnerUserId: 3 }), params("7"));
     expect(res.status).toBe(409);
     expect(await errorOf(res)).toBe("MEMBER_ACCOUNT_DELETED");
@@ -210,7 +214,7 @@ describe("champs d'équipe non textuels", () => {
   });
 
   it("laisse passer null — qui vaut « retirer » — et l'absence", async () => {
-    (updateTeamMeta as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(updateTeamMeta).mockResolvedValue(undefined);
     const res = await teamPatch(req("PATCH", { name: "Rolex", tag: null }), params("7"));
     expect(res.status).toBe(200);
   });

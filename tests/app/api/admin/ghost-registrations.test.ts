@@ -9,11 +9,10 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { listGhostTeams } from "@/lib/server/ghost-teams-service";
 import { registerGhostTeams } from "@/lib/server/tournaments-service";
 import { GHOST_BATCH_MAX } from "@/lib/shared/ghost-registration";
+import { authUser } from "../../../helpers/auth-user";
 
-type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
-
-const player = { id: 2, isAdmin: false, roles: [] } as unknown as SessionUser;
-const arbitre = { id: 3, isAdmin: false, roles: ["ARBITRE"] } as unknown as SessionUser;
+const player = authUser({ id: 2, isAdmin: false, roles: [] });
+const arbitre = authUser({ id: 3, isAdmin: false, roles: ["ARBITRE"] });
 
 function jsonReq(body: unknown) {
   return new Request("http://localhost/api/admin/tournaments/5/ghost-registrations", {
@@ -42,25 +41,25 @@ describe("GET /api/admin/tournaments/[id]/ghost-registrations", () => {
   });
 
   it("rejette un visiteur anonyme avec 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     expect((await GET(getReq(), params("5"))).status).toBe(401);
   });
 
   it("rejette un joueur sans permission tournois avec 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(player as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
     expect((await GET(getReq(), params("5"))).status).toBe(403);
     expect(listGhostTeams).not.toHaveBeenCalled();
   });
 
   it("rejette un identifiant de tournoi invalide avec 400", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     expect((await GET(getReq(), params("abc"))).status).toBe(400);
     expect(listGhostTeams).not.toHaveBeenCalled();
   });
 
   it("ne propose que les fantômes encore libres de ce tournoi", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
-    (listGhostTeams as jest.Mock).mockResolvedValue([{ id: 1, name: "Alpha", logoUrl: null }] as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(listGhostTeams).mockResolvedValue([{ id: 1, name: "Alpha", logoUrl: null }]);
 
     const res = await GET(getReq(), params("5"));
 
@@ -80,7 +79,7 @@ describe("POST /api/admin/tournaments/[id]/ghost-registrations", () => {
   });
 
   it("rejette un visiteur anonyme avec 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
 
     const res = await POST(jsonReq({ teamIds: [4] }), params("5"));
 
@@ -89,7 +88,7 @@ describe("POST /api/admin/tournaments/[id]/ghost-registrations", () => {
   });
 
   it("rejette un joueur sans permission tournois avec 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(player as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
 
     const res = await POST(jsonReq({ teamIds: [4] }), params("5"));
 
@@ -98,8 +97,8 @@ describe("POST /api/admin/tournaments/[id]/ghost-registrations", () => {
   });
 
   it("inscrit un lot d'équipes fantômes en une transaction", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
-    (registerGhostTeams as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(registerGhostTeams).mockResolvedValue(undefined);
 
     const res = await POST(jsonReq({ teamIds: [4, 7, 9] }), params("5"));
 
@@ -110,8 +109,8 @@ describe("POST /api/admin/tournaments/[id]/ghost-registrations", () => {
   });
 
   it("inscrit une seule fantôme par le même chemin", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
-    (registerGhostTeams as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(registerGhostTeams).mockResolvedValue(undefined);
 
     const res = await POST(jsonReq({ teamIds: [4] }), params("5"));
 
@@ -120,8 +119,8 @@ describe("POST /api/admin/tournaments/[id]/ghost-registrations", () => {
   });
 
   it("dédoublonne la sélection avant d'ouvrir la transaction", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
-    (registerGhostTeams as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(registerGhostTeams).mockResolvedValue(undefined);
 
     const res = await POST(jsonReq({ teamIds: [4, 7, 4] }), params("5"));
 
@@ -139,7 +138,7 @@ describe("POST /api/admin/tournaments/[id]/ghost-registrations", () => {
     [{ teamIds: [4, -1] }, "INVALID_TEAM_IDS"],
     [{ teamIds: [4, 1.5] }, "INVALID_TEAM_IDS"],
   ])("refuse une sélection illisible (%p) en 400", async (body, error) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
 
     const res = await POST(jsonReq(body), params("5"));
 
@@ -149,7 +148,7 @@ describe("POST /api/admin/tournaments/[id]/ghost-registrations", () => {
   });
 
   it("refuse un lot au-delà du plafond de forme", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
 
     const teamIds = Array.from({ length: GHOST_BATCH_MAX + 1 }, (_, index) => index + 1);
     const res = await POST(jsonReq({ teamIds }), params("5"));
@@ -164,8 +163,8 @@ describe("POST /api/admin/tournaments/[id]/ghost-registrations", () => {
     ["TOURNAMENT_FULL", 409],
     ["TOURNAMENT_NOT_FOUND", 404],
   ])("mappe %s sur %i, sans nommer d'engagé", async (message, status) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
-    (registerGhostTeams as jest.Mock).mockRejectedValue(new Error(message) as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(registerGhostTeams).mockRejectedValue(new Error(message));
 
     const res = await POST(jsonReq({ teamIds: [4, 7] }), params("5"));
 
@@ -179,8 +178,8 @@ describe("POST /api/admin/tournaments/[id]/ghost-registrations", () => {
     ["TEAM_ALREADY_DELETED", 409],
     ["TEAM_NOT_FOUND", 404],
   ])("joint l'engagé en cause à %s (%i)", async (message, status) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
-    (registerGhostTeams as jest.Mock).mockRejectedValue(teamScoped(message, 7) as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(registerGhostTeams).mockRejectedValue(teamScoped(message, 7));
 
     const res = await POST(jsonReq({ teamIds: [4, 7] }), params("5"));
 
@@ -189,7 +188,7 @@ describe("POST /api/admin/tournaments/[id]/ghost-registrations", () => {
   });
 
   it("rejette un identifiant de tournoi invalide avec 400", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
 
     const res = await POST(jsonReq({ teamIds: [4] }), params("abc"));
 
@@ -198,8 +197,8 @@ describe("POST /api/admin/tournaments/[id]/ghost-registrations", () => {
   });
 
   it("remonte une panne inattendue en 500", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
-    (registerGhostTeams as jest.Mock).mockRejectedValue(new Error("ER_LOCK_DEADLOCK") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(registerGhostTeams).mockRejectedValue(new Error("ER_LOCK_DEADLOCK"));
 
     const res = await POST(jsonReq({ teamIds: [4] }), params("5"));
 

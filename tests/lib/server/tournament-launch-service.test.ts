@@ -11,16 +11,20 @@ import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
 import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 import { computeTournamentState } from "@/lib/shared/tournament-state";
+import { type SqlMock, fakePool } from "../../helpers/sql-double";
+import type { TournamentRow } from "@/lib/server/tournaments/_internal";
+import type { RowOverrides } from "../../helpers/row-overrides";
+import { tournamentRow } from "../../helpers/tournament-rows";
 
-type ExecuteMock = jest.Mock;
+type ExecuteMock = SqlMock;
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
 /** Ligne d'un tournoi aux inscriptions, coup d'envoi dans deux jours. */
-function registrationRow(overrides: Record<string, unknown> = {}) {
+function registrationRow(overrides: RowOverrides<TournamentRow> = {}): TournamentRow {
   const now = Date.now();
-  return {
+  return tournamentRow({
     id: 7,
     name: "BlueGenji Open",
     state: "REGISTRATION",
@@ -29,14 +33,14 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
     registration_close_at: new Date(now + DAY),
     start_at: new Date(now + 2 * DAY),
     ...overrides,
-  };
+  });
 }
 
 /**
  * Connexion dont le `SELECT … FOR UPDATE` rend `row`, et le `COUNT(*)` des
  * inscriptions rend `entrants`.
  */
-function mockTournament(row: Record<string, unknown>, entrants = 8) {
+function mockTournament(row: TournamentRow, entrants = 8) {
   const execute = jest.fn(async (sql: string) => {
     if (/FROM bg_tournaments/.test(sql)) return [[row]];
     if (/FROM bg_tournament_registrations/.test(sql)) return [[{ c: entrants }]];
@@ -51,10 +55,10 @@ function mockTournament(row: Record<string, unknown>, entrants = 8) {
     release: jest.fn(),
   };
 
-  (getDatabase as jest.Mock).mockResolvedValue({
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
     execute: jest.fn(),
     getConnection: jest.fn(async () => connection),
-  } as never);
+  }));
 
   return { execute, connection };
 }
@@ -70,10 +74,11 @@ describe("launchTournamentNow", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // La synchronisation rend la ligne telle qu'elle est après lancement.
-    (syncTournamentState as jest.Mock).mockResolvedValue({
-      row: { state: "RUNNING" },
+    jest.mocked(syncTournamentState).mockResolvedValue({
+      row: registrationRow({ state: "RUNNING" }),
       stateChanged: true,
-    } as never);
+      contentChanged: false,
+    });
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -146,10 +151,11 @@ describe("launchTournamentNow", () => {
 
   it("remonte l'état réel quand le plateau se clôt faute d'adversaires", async () => {
     mockTournament(registrationRow(), 1);
-    (syncTournamentState as jest.Mock).mockResolvedValue({
-      row: { state: "FINISHED" },
+    jest.mocked(syncTournamentState).mockResolvedValue({
+      row: registrationRow({ state: "FINISHED" }),
       stateChanged: true,
-    } as never);
+      contentChanged: false,
+    });
 
     await expect(launchTournamentNow(7)).resolves.toMatchObject({
       state: "FINISHED",
@@ -191,10 +197,10 @@ describe("launchTournamentNow", () => {
       rollback: jest.fn(),
       release: jest.fn(),
     };
-    (getDatabase as jest.Mock).mockResolvedValue({
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({
       execute: jest.fn(),
       getConnection: jest.fn(async () => connection),
-    } as never);
+    }));
 
     await expect(launchTournamentNow(7)).rejects.toThrow("TOURNAMENT_NOT_FOUND");
     expect(connection.release).toHaveBeenCalledTimes(1);
@@ -202,7 +208,7 @@ describe("launchTournamentNow", () => {
 
   it("annule les dates abrégées si l'initialisation du format échoue", async () => {
     const { connection } = mockTournament(registrationRow());
-    (syncTournamentState as jest.Mock).mockRejectedValue(new Error("ER_LOCK_DEADLOCK") as never);
+    jest.mocked(syncTournamentState).mockRejectedValue(new Error("ER_LOCK_DEADLOCK"));
 
     await expect(launchTournamentNow(7)).rejects.toThrow("ER_LOCK_DEADLOCK");
 

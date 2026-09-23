@@ -18,7 +18,7 @@ describe("GET /api/uploads/[...path]", () => {
   });
 
   it("serves an existing webp from disk with the right content-type", async () => {
-    (readFile as jest.Mock).mockResolvedValue(Buffer.from([0x52, 0x49, 0x46, 0x46]) as never);
+    jest.mocked(readFile).mockResolvedValue(Buffer.from([0x52, 0x49, 0x46, 0x46]));
     const res = await GET(new Request("http://localhost"), params(["sponsors", "a.webp"]));
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/webp");
@@ -26,7 +26,7 @@ describe("GET /api/uploads/[...path]", () => {
   });
 
   it("returns 404 when the file is missing", async () => {
-    (readFile as jest.Mock).mockRejectedValue(new Error("ENOENT") as never);
+    jest.mocked(readFile).mockRejectedValue(new Error("ENOENT"));
     const res = await GET(new Request("http://localhost"), params(["sponsors", "missing.webp"]));
     expect(res.status).toBe(404);
     expect(readFile).toHaveBeenCalled();

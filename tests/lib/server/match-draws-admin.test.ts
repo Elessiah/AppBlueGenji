@@ -93,7 +93,7 @@ function fakeConnection(options: {
 describe("adminResolveMatch — match nul en qualification", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (tryAutoResolveByes as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
   });
 
   it("clôt la rencontre sans vainqueur ni perdant", async () => {
@@ -102,7 +102,7 @@ describe("adminResolveMatch — match nul en qualification", () => {
     expect(finalizeMatch).toHaveBeenCalledTimes(1);
     // Ni vainqueur ni perdant : `finalizeMatch` écrit deux colonnes vides et ne
     // propage rien — c'est exactement ce qu'un nul veut dire.
-    expect((finalizeMatch as jest.Mock).mock.calls[0][3]).toEqual({
+    expect(jest.mocked(finalizeMatch).mock.calls[0][3]).toEqual({
       team1Score: 2,
       team2Score: 2,
       winnerTeamId: null,
@@ -113,7 +113,7 @@ describe("adminResolveMatch — match nul en qualification", () => {
   it("accepte un score sous l'objectif : une map nulle a arrêté la rencontre", async () => {
     await adminResolveMatch(fakeConnection({ round: 3 }), 10, 2, 1);
 
-    expect((finalizeMatch as jest.Mock).mock.calls[0][3]).toMatchObject({
+    expect(jest.mocked(finalizeMatch).mock.calls[0][3]).toMatchObject({
       winnerTeamId: 100,
       loserTeamId: 200,
     });
@@ -130,7 +130,7 @@ describe("adminResolveMatch — match nul en qualification", () => {
 describe("adminResolveMatch — l'arbre final exige un vainqueur", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (tryAutoResolveByes as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
   });
 
   it("refuse un nul sur une manche de play-off, malgré la qualification ouverte", async () => {
@@ -158,7 +158,7 @@ describe("adminResolveMatch — l'arbre final exige un vainqueur", () => {
 
     // FT2 : l'objectif est 2, et 2-1 est donc un résultat plein.
     await adminResolveMatch(conn, 10, 2, 1);
-    expect((finalizeMatch as jest.Mock).mock.calls[0][3]).toMatchObject({ winnerTeamId: 100 });
+    expect(jest.mocked(finalizeMatch).mock.calls[0][3]).toMatchObject({ winnerTeamId: 100 });
   });
 
   it("refuse en play-off un score qui dépasse l'objectif propre de l'arbre", async () => {
@@ -175,7 +175,7 @@ describe("adminResolveMatch — l'arbre final exige un vainqueur", () => {
 describe("adminResolveMatch — les autres formats ferment les égalités de force", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (tryAutoResolveByes as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
   });
 
   it("ignore un drapeau d'égalité posé sur un tournoi à élimination simple", async () => {
@@ -194,7 +194,7 @@ describe("adminResolveMatch — les autres formats ferment les égalités de for
 describe("adminSaveMatchScores — un match nul est tranché", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (tryAutoResolveByes as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
   });
 
   /** Connexion factice rendant un match **déjà clos sans vainqueur**. */

@@ -9,13 +9,14 @@ import {
   syncSiteVisitStatsToBot,
 } from "@/lib/server/site-visits-service";
 import { SITE_VISIT_WINDOW_MINUTES } from "@/lib/shared/site-visits";
+import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
 
-async function mockDb(execute: jest.Mock) {
+async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 }
 
 const FULL_ROW = {
@@ -42,7 +43,7 @@ describe("recordSiteVisit", () => {
   });
 
   it("enregistre une visite et le signale", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await expect(recordSiteVisit({ userId: 12, path: "/tournois" })).resolves.toEqual({
@@ -51,7 +52,7 @@ describe("recordSiteVisit", () => {
   });
 
   it("ne crée rien quand la visite tombe dans la fenêtre de session", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 0 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }]);
     await mockDb(execute);
 
     await expect(recordSiteVisit({ userId: 12, path: "/tournois" })).resolves.toEqual({
@@ -60,7 +61,7 @@ describe("recordSiteVisit", () => {
   });
 
   it("stocke une empreinte hachée, jamais l'IP ni le user-agent", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await recordSiteVisit({ ip: "203.0.113.7", userAgent: "Firefox/130", path: "/" });
@@ -72,7 +73,7 @@ describe("recordSiteVisit", () => {
   });
 
   it("normalise le chemin avant insertion", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await recordSiteVisit({ path: "https://bluegenji.fr/equipes/12?tab=roster" });
@@ -82,7 +83,7 @@ describe("recordSiteVisit", () => {
   });
 
   it("marque un compte connecté sans jamais écrire son identifiant", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await recordSiteVisit({ userId: 321, path: "/profil" });
@@ -98,7 +99,7 @@ describe("recordSiteVisit", () => {
   });
 
   it("marque un visiteur anonyme comme non connecté", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await recordSiteVisit({ userId: null, ip: "1.2.3.4", userAgent: "Chrome" });
@@ -109,7 +110,7 @@ describe("recordSiteVisit", () => {
   });
 
   it("l'empreinte d'un compte dépend du sel : sans le secret, on ne la renverse pas", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
     const saved = process.env.VISIT_HASH_SALT;
 
@@ -127,7 +128,7 @@ describe("recordSiteVisit", () => {
   });
 
   it("donne la même empreinte à deux visites du même compte", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await recordSiteVisit({ userId: 5, ip: "1.2.3.4", userAgent: "Chrome" });
@@ -148,7 +149,7 @@ describe("getSiteVisitStats", () => {
   });
 
   it("projette la ligne agrégée", async () => {
-    const execute = jest.fn().mockResolvedValue([[FULL_ROW]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[FULL_ROW]]);
     await mockDb(execute);
 
     await expect(getSiteVisitStats()).resolves.toEqual({
@@ -167,7 +168,7 @@ describe("getSiteVisitStats", () => {
   });
 
   it("rend des zéros sur une table vierge (SUM renvoie NULL)", async () => {
-    const execute = jest.fn().mockResolvedValue([
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([
       [
         {
           total_visits: 0,
@@ -183,14 +184,14 @@ describe("getSiteVisitStats", () => {
           last_visit_at: null,
         },
       ],
-    ] as never);
+    ]);
     await mockDb(execute);
 
     await expect(getSiteVisitStats()).resolves.toEqual(emptySiteVisitStats());
   });
 
   it("signale une lecture impossible par null, pas par des zéros", async () => {
-    const execute = jest.fn().mockRejectedValue(new Error("DB_DOWN") as never);
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("DB_DOWN"));
     await mockDb(execute);
 
     // Distinction essentielle : des zéros écraseraient l'instantané du bot.
@@ -198,7 +199,7 @@ describe("getSiteVisitStats", () => {
   });
 
   it("dégrade en statistiques vides si aucune ligne n'est renvoyée", async () => {
-    const execute = jest.fn().mockResolvedValue([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
     await mockDb(execute);
 
     await expect(getSiteVisitStats()).resolves.toEqual(emptySiteVisitStats());
@@ -215,7 +216,7 @@ describe("plafond de débit par IP", () => {
   });
 
   it("coupe un client qui fabrique une empreinte neuve à chaque requête", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     const results: boolean[] = [];
@@ -230,7 +231,7 @@ describe("plafond de débit par IP", () => {
   });
 
   it("compte les IP séparément", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     for (let i = 0; i < 30; i += 1) {
@@ -244,7 +245,7 @@ describe("plafond de débit par IP", () => {
   });
 
   it("regroupe les requêtes sans IP sous une même clé plutôt que de les ignorer", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     const results: boolean[] = [];
@@ -258,7 +259,7 @@ describe("plafond de débit par IP", () => {
 
   it("ne décompte que les insertions, pas les chargements absorbés par la fenêtre", async () => {
     // Sortie NAT partagée : beaucoup de requêtes, peu d'insertions.
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 0 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }]);
     await mockDb(execute);
 
     for (let i = 0; i < 200; i += 1) {
@@ -266,7 +267,7 @@ describe("plafond de débit par IP", () => {
     }
 
     // Le quota est intact : un vrai nouveau visiteur derrière la même IP passe.
-    execute.mockResolvedValue([{ affectedRows: 1 }] as never);
+    execute.mockResolvedValue([{ affectedRows: 1 }]);
     await expect(recordSiteVisit({ ip: "203.0.113.7", userAgent: "Nouveau" })).resolves.toEqual({
       recorded: true,
     });
@@ -277,7 +278,7 @@ describe("syncSiteVisitStatsToBot", () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     resetSiteVisitSyncThrottle();
-    await mockDb(jest.fn().mockResolvedValue([[FULL_ROW]] as never));
+    await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[FULL_ROW]]));
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -311,7 +312,7 @@ describe("syncSiteVisitStatsToBot", () => {
 
   it("n'écrase jamais l'instantané du bot avec des zéros si la lecture échoue", async () => {
     const { pushSiteVisitStats } = await import("@/lib/server/bot-integration");
-    await mockDb(jest.fn().mockRejectedValue(new Error("DB_DOWN") as never));
+    await mockDb(jest.fn<SqlQuery>().mockRejectedValue(new Error("DB_DOWN")));
 
     await expect(syncSiteVisitStatsToBot()).resolves.toBe(false);
     expect(pushSiteVisitStats).not.toHaveBeenCalled();
@@ -319,18 +320,18 @@ describe("syncSiteVisitStatsToBot", () => {
 
   it("ne consomme pas la cadence après un échec de lecture", async () => {
     const { pushSiteVisitStats } = await import("@/lib/server/bot-integration");
-    await mockDb(jest.fn().mockRejectedValue(new Error("DB_DOWN") as never));
+    await mockDb(jest.fn<SqlQuery>().mockRejectedValue(new Error("DB_DOWN")));
     await syncSiteVisitStatsToBot();
 
     // La base revient : la visite suivante doit pouvoir synchroniser aussitôt.
-    await mockDb(jest.fn().mockResolvedValue([[FULL_ROW]] as never));
+    await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[FULL_ROW]]));
     await expect(syncSiteVisitStatsToBot()).resolves.toBe(true);
     expect(pushSiteVisitStats).toHaveBeenCalledTimes(1);
   });
 
   it("pousse bien des zéros quand la table est réellement vide", async () => {
     const { pushSiteVisitStats } = await import("@/lib/server/bot-integration");
-    await mockDb(jest.fn().mockResolvedValue([[]] as never));
+    await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
 
     await expect(syncSiteVisitStatsToBot()).resolves.toBe(true);
     expect(pushSiteVisitStats).toHaveBeenCalledWith(emptySiteVisitStats());
@@ -355,7 +356,7 @@ describe("visitHashSalt", () => {
 
 describe("recordSiteVisit — sans secret en production", () => {
   it("ne compte rien plutôt que de compter de façon réversible, et le dit une fois", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
     resetVisitRateLimit();
     const env = { ...process.env };

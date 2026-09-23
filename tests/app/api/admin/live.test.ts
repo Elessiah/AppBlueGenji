@@ -14,14 +14,13 @@ import {
   setMatchOnAir,
   setTournamentLiveUrl,
 } from "@/lib/server/tournaments/live-streams";
+import { authUser } from "../../../helpers/auth-user";
 
-type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
-
-const player = { id: 2, isAdmin: false, roles: [] } as unknown as SessionUser;
-const arbitre = { id: 3, isAdmin: false, roles: ["ARBITRE"] } as unknown as SessionUser;
-const caster = { id: 4, isAdmin: false, roles: ["CASTER"] } as unknown as SessionUser;
-const cm = { id: 5, isAdmin: false, roles: ["COMMUNITY_MANAGER"] } as unknown as SessionUser;
-const admin = { id: 1, isAdmin: true, roles: ["ADMIN"] } as unknown as SessionUser;
+const player = authUser({ id: 2, isAdmin: false, roles: [] });
+const arbitre = authUser({ id: 3, isAdmin: false, roles: ["ARBITRE"] });
+const caster = authUser({ id: 4, isAdmin: false, roles: ["CASTER"] });
+const cm = authUser({ id: 5, isAdmin: false, roles: ["COMMUNITY_MANAGER"] });
+const admin = authUser({ id: 1, isAdmin: true, roles: ["ADMIN"] });
 
 function req(url: string, method: string, body: unknown) {
   return new Request(url, {
@@ -48,14 +47,14 @@ afterEach(() => {
 
 describe("PUT /api/admin/tournaments/[id]/live", () => {
   it("rejette un visiteur anonyme avec 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     const res = await putTournamentLive(tournamentReq({ liveUrl: null }), tournamentParams("5"));
     expect(res.status).toBe(401);
     expect(setTournamentLiveUrl).not.toHaveBeenCalled();
   });
 
   it("rejette un joueur sans permission tournois avec 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(player as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
     expect(
       (await putTournamentLive(tournamentReq({ liveUrl: null }), tournamentParams("5"))).status,
     ).toBe(403);
@@ -63,7 +62,7 @@ describe("PUT /api/admin/tournaments/[id]/live", () => {
   });
 
   it("rejette un CASTER : la chaîne officielle engage l'organisation", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(caster as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
     expect(
       (await putTournamentLive(tournamentReq({ liveUrl: "https://twitch.tv/x" }), tournamentParams("5")))
         .status,
@@ -72,15 +71,15 @@ describe("PUT /api/admin/tournaments/[id]/live", () => {
   });
 
   it("rejette un community manager avec 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(cm as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(cm);
     expect(
       (await putTournamentLive(tournamentReq({ liveUrl: null }), tournamentParams("5"))).status,
     ).toBe(403);
   });
 
   it("accepte un arbitre et renvoie l'URL normalisée", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
-    (setTournamentLiveUrl as jest.Mock).mockResolvedValue("https://twitch.tv/bg" as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setTournamentLiveUrl).mockResolvedValue("https://twitch.tv/bg");
 
     const res = await putTournamentLive(
       tournamentReq({ liveUrl: "twitch.tv/bg" }),
@@ -93,15 +92,15 @@ describe("PUT /api/admin/tournaments/[id]/live", () => {
   });
 
   it("accepte un admin", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (setTournamentLiveUrl as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(setTournamentLiveUrl).mockResolvedValue(null);
     expect(
       (await putTournamentLive(tournamentReq({ liveUrl: null }), tournamentParams("5"))).status,
     ).toBe(200);
   });
 
   it("refuse un id de tournoi invalide", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     for (const id of ["abc", "0", "-3"]) {
       const res = await putTournamentLive(tournamentReq({ liveUrl: null }), tournamentParams(id));
       expect(res.status).toBe(400);
@@ -111,7 +110,7 @@ describe("PUT /api/admin/tournaments/[id]/live", () => {
   });
 
   it("refuse un liveUrl qui n'est pas une chaîne", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const res = await putTournamentLive(tournamentReq({ liveUrl: 42 }), tournamentParams("5"));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "INVALID_STREAM_URL" });
@@ -119,15 +118,15 @@ describe("PUT /api/admin/tournaments/[id]/live", () => {
   });
 
   it("traduit INVALID_STREAM_URL en 400 et TOURNAMENT_NOT_FOUND en 404", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
 
-    (setTournamentLiveUrl as jest.Mock).mockRejectedValue(new Error("INVALID_STREAM_URL") as never);
+    jest.mocked(setTournamentLiveUrl).mockRejectedValue(new Error("INVALID_STREAM_URL"));
     expect(
       (await putTournamentLive(tournamentReq({ liveUrl: "https://nope.fr" }), tournamentParams("5")))
         .status,
     ).toBe(400);
 
-    (setTournamentLiveUrl as jest.Mock).mockRejectedValue(new Error("TOURNAMENT_NOT_FOUND") as never);
+    jest.mocked(setTournamentLiveUrl).mockRejectedValue(new Error("TOURNAMENT_NOT_FOUND"));
     expect(
       (await putTournamentLive(tournamentReq({ liveUrl: null }), tournamentParams("5"))).status,
     ).toBe(404);
@@ -136,14 +135,14 @@ describe("PUT /api/admin/tournaments/[id]/live", () => {
 
 describe("PUT /api/admin/matches/[matchId]/live", () => {
   it("rejette un visiteur anonyme avec 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     expect((await putMatchLive(matchReq("PUT", { trigger: "AUTO" }), matchParams("42"))).status).toBe(
       401,
     );
   });
 
   it("rejette un joueur sans permission live avec 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(player as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
     expect((await putMatchLive(matchReq("PUT", { trigger: "AUTO" }), matchParams("42"))).status).toBe(
       403,
     );
@@ -151,8 +150,8 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
   });
 
   it("accepte un CASTER — c'est tout l'intérêt du rôle", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(caster as never);
-    (setMatchLiveConfig as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(setMatchLiveConfig).mockResolvedValue(undefined);
 
     const res = await putMatchLive(
       matchReq("PUT", { trigger: "MANUAL", liveUrl: "kick.com/bg" }),
@@ -167,31 +166,31 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
   });
 
   it("accepte un arbitre — il cumule tournaments et live", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
-    (setMatchLiveConfig as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setMatchLiveConfig).mockResolvedValue(undefined);
     expect((await putMatchLive(matchReq("PUT", { trigger: "AUTO" }), matchParams("42"))).status).toBe(
       200,
     );
   });
 
   it("rejette un community manager avec 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(cm as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(cm);
     expect((await putMatchLive(matchReq("PUT", { trigger: "AUTO" }), matchParams("42"))).status).toBe(
       403,
     );
   });
 
   it("démarque le match quand trigger est absent ou null", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(caster as never);
-    (setMatchLiveConfig as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(setMatchLiveConfig).mockResolvedValue(undefined);
 
     await putMatchLive(matchReq("PUT", {}), matchParams("42"));
     expect(setMatchLiveConfig).toHaveBeenCalledWith(42, { trigger: null, liveUrl: null });
   });
 
   it("accepte le mode START_TIME", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(caster as never);
-    (setMatchLiveConfig as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(setMatchLiveConfig).mockResolvedValue(undefined);
 
     const res = await putMatchLive(matchReq("PUT", { trigger: "START_TIME" }), matchParams("42"));
 
@@ -203,7 +202,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
   });
 
   it("refuse un mode inconnu", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(caster as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
     const res = await putMatchLive(matchReq("PUT", { trigger: "SOMETIMES" }), matchParams("42"));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "INVALID_LIVE_TRIGGER" });
@@ -211,7 +210,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
   });
 
   it("refuse un liveUrl qui n'est pas une chaîne", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(caster as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
     const res = await putMatchLive(
       matchReq("PUT", { trigger: "AUTO", liveUrl: { href: "x" } }),
       matchParams("42"),
@@ -221,29 +220,29 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
   });
 
   it("refuse un id de match invalide", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(caster as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
     const res = await putMatchLive(matchReq("PUT", { trigger: "AUTO" }), matchParams("nope"));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "INVALID_MATCH_ID" });
   });
 
   it("traduit les erreurs du service", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(caster as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
 
-    (setMatchLiveConfig as jest.Mock).mockRejectedValue(new Error("MATCH_NOT_FOUND") as never);
+    jest.mocked(setMatchLiveConfig).mockRejectedValue(new Error("MATCH_NOT_FOUND"));
     expect((await putMatchLive(matchReq("PUT", { trigger: "AUTO" }), matchParams("42"))).status).toBe(
       404,
     );
 
-    (setMatchLiveConfig as jest.Mock).mockRejectedValue(new Error("INVALID_STREAM_URL") as never);
+    jest.mocked(setMatchLiveConfig).mockRejectedValue(new Error("INVALID_STREAM_URL"));
     expect((await putMatchLive(matchReq("PUT", { trigger: "AUTO" }), matchParams("42"))).status).toBe(
       400,
     );
 
     // Conflit d'état, pas de saisie : la date manque sur le match, pas dans la
     // requête — c'est un 409, comme les autres refus de l'antenne.
-    (setMatchLiveConfig as jest.Mock).mockRejectedValue(
-      new Error("MATCH_START_AT_REQUIRED") as never,
+    jest.mocked(setMatchLiveConfig).mockRejectedValue(
+      new Error("MATCH_START_AT_REQUIRED"),
     );
     const res = await putMatchLive(matchReq("PUT", { trigger: "START_TIME" }), matchParams("42"));
     expect(res.status).toBe(409);
@@ -253,14 +252,14 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
 
 describe("POST /api/admin/matches/[matchId]/live", () => {
   it("rejette un visiteur anonyme avec 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     expect(
       (await postMatchOnAir(matchReq("POST", { onAir: true }), matchParams("42"))).status,
     ).toBe(401);
   });
 
   it("rejette un joueur sans permission live avec 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(player as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
     expect(
       (await postMatchOnAir(matchReq("POST", { onAir: true }), matchParams("42"))).status,
     ).toBe(403);
@@ -268,8 +267,8 @@ describe("POST /api/admin/matches/[matchId]/live", () => {
   });
 
   it("ouvre l'antenne pour un CASTER", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(caster as never);
-    (setMatchOnAir as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(setMatchOnAir).mockResolvedValue(undefined);
 
     const res = await postMatchOnAir(matchReq("POST", { onAir: true }), matchParams("42"));
 
@@ -279,15 +278,15 @@ describe("POST /api/admin/matches/[matchId]/live", () => {
   });
 
   it("referme l'antenne", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(caster as never);
-    (setMatchOnAir as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(setMatchOnAir).mockResolvedValue(undefined);
 
     await postMatchOnAir(matchReq("POST", { onAir: false }), matchParams("42"));
     expect(setMatchOnAir).toHaveBeenCalledWith(42, false);
   });
 
   it("exige un onAir booléen — une chaîne « false » ne doit pas ouvrir l'antenne", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(caster as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
     for (const onAir of ["true", "false", 1, 0, null, undefined]) {
       const res = await postMatchOnAir(matchReq("POST", { onAir }), matchParams("42"));
       expect(res.status).toBe(400);
@@ -297,14 +296,14 @@ describe("POST /api/admin/matches/[matchId]/live", () => {
   });
 
   it("traduit les conflits du service en 409", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(caster as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
 
-    (setMatchOnAir as jest.Mock).mockRejectedValue(new Error("LIVE_TRIGGER_NOT_MANUAL") as never);
+    jest.mocked(setMatchOnAir).mockRejectedValue(new Error("LIVE_TRIGGER_NOT_MANUAL"));
     expect(
       (await postMatchOnAir(matchReq("POST", { onAir: true }), matchParams("42"))).status,
     ).toBe(409);
 
-    (setMatchOnAir as jest.Mock).mockRejectedValue(new Error("MATCH_NOT_LIVE_READY") as never);
+    jest.mocked(setMatchOnAir).mockRejectedValue(new Error("MATCH_NOT_LIVE_READY"));
     expect(
       (await postMatchOnAir(matchReq("POST", { onAir: true }), matchParams("42"))).status,
     ).toBe(409);

@@ -10,6 +10,7 @@ import {
   startEndurancePlayoffs,
 } from "@/lib/server/tournaments/bg-survie";
 import { createMatch, finishTournament } from "@/lib/server/tournaments/repository";
+import type { SqlMock } from "../helpers/sql-double";
 
 type Row = Record<string, unknown>;
 
@@ -64,7 +65,7 @@ function makeConn(results: unknown[], overrides: [string, unknown][] = []) {
   });
 
   return { execute } as never as Parameters<typeof generateEnduranceRound>[1] & {
-    execute: jest.Mock;
+    execute: SqlMock;
   };
 }
 
@@ -151,7 +152,7 @@ describe("generateEnduranceRound", () => {
   });
 
   it("crée un match par couple et laisse l'équipe impaire au repos", async () => {
-    (createMatch as jest.Mock).mockResolvedValue(77 as never);
+    jest.mocked(createMatch).mockResolvedValue(77);
     const conn = makeConn([
       [[tournamentRow({ endurance_playoff_size: 2 })]],
       [[standingRow(1), standingRow(2), standingRow(3)]],
@@ -201,7 +202,7 @@ describe("generateEnduranceRound", () => {
   });
 
   it("apparie encore la dernière manche autorisée", async () => {
-    (createMatch as jest.Mock).mockResolvedValue(77 as never);
+    jest.mocked(createMatch).mockResolvedValue(77);
     const conn = makeConn([
       [
         [
@@ -239,7 +240,7 @@ describe("startEndurancePlayoffs", () => {
   });
 
   it("applique le tableau imposé 8v4, 6v2, 1v5, 3v7", async () => {
-    (createMatch as jest.Mock).mockResolvedValue(77 as never);
+    jest.mocked(createMatch).mockResolvedValue(77);
     // Huit équipes classées 1..8 (points décroissants).
     const standings = Array.from({ length: 8 }, (_, index) =>
       standingRow(index + 1, { points: 20 - index, rank: index + 1 }),
@@ -326,14 +327,14 @@ describe("enchaînement des tours de play-offs", () => {
   }
 
   /** Appariements posés en base par ce `reconcileEndurance`. */
-  function writtenPairings(conn: { execute: jest.Mock }) {
+  function writtenPairings(conn: { execute: SqlMock }) {
     return conn.execute.mock.calls.filter(([sql]) =>
       String(sql).includes("team1_id = ?, team2_id = ?, status = ?"),
     );
   }
 
   it("fait passer le tour au dernier vainqueur quand ils sont en nombre impair", async () => {
-    (createMatch as jest.Mock).mockResolvedValue(77 as never);
+    jest.mocked(createMatch).mockResolvedValue(77);
     // Six qualifiées : le tableau imposé ne s'applique pas, l'arbre part sur un
     // appariement haut contre bas — 1v6, 2v5, 3v4 — et trois vainqueurs.
     const conn = makeConn(
@@ -355,7 +356,7 @@ describe("enchaînement des tours de play-offs", () => {
   });
 
   it("apparie normalement un nombre pair de vainqueurs", async () => {
-    (createMatch as jest.Mock).mockResolvedValue(77 as never);
+    jest.mocked(createMatch).mockResolvedValue(77);
     // Huit qualifiées : le tableau imposé 8v4, 6v2, 1v5, 3v7.
     const conn = makeConn(
       [],
@@ -442,7 +443,7 @@ describe("reconcileEndurance", () => {
   });
 
   /** Classement persisté par une réconciliation, indexé par équipe. */
-  function persistedPoints(conn: { execute: jest.Mock }): Map<unknown, number> {
+  function persistedPoints(conn: { execute: SqlMock }): Map<unknown, number> {
     return new Map(
       conn.execute.mock.calls
         .filter(([sql]) => String(sql).includes("INSERT INTO bg_endurance_standings"))
@@ -587,7 +588,7 @@ describe("reconcileEndurance — plafond de manches", () => {
   }
 
   /** Statut persisté par la réconciliation, indexé par équipe. */
-  function persistedStatuses(conn: { execute: jest.Mock }): Map<unknown, unknown> {
+  function persistedStatuses(conn: { execute: SqlMock }): Map<unknown, unknown> {
     return new Map(
       conn.execute.mock.calls
         .filter(([sql]) => String(sql).includes("INSERT INTO bg_endurance_standings"))
@@ -599,7 +600,7 @@ describe("reconcileEndurance — plafond de manches", () => {
   }
 
   it("écarte les non-qualifiées à la dernière manche sans vider leur capital", async () => {
-    (createMatch as jest.Mock).mockResolvedValue(77 as never);
+    jest.mocked(createMatch).mockResolvedValue(77);
     const conn = makeConn(cappedState());
 
     await reconcileEndurance(5, conn);
@@ -623,7 +624,7 @@ describe("reconcileEndurance — plafond de manches", () => {
   });
 
   it("enchaîne sur les play-offs dès le plafond atteint", async () => {
-    (createMatch as jest.Mock).mockResolvedValue(77 as never);
+    jest.mocked(createMatch).mockResolvedValue(77);
     // Les deux rencontres de la manche 2 sont jouées : la bascule attend
     // l'achèvement de la manche, elle doit donc pouvoir le constater.
     const conn = makeConn(cappedState(), ROUND_PLAYED);
@@ -683,7 +684,7 @@ describe("reconcileEndurance — réappariement après correction", () => {
   }
 
   it("défait et régénère la manche courante quand ses couples sont périmés", async () => {
-    (createMatch as jest.Mock).mockResolvedValue(77 as never);
+    jest.mocked(createMatch).mockResolvedValue(77);
     // En base : 1 vs 2 et 3 vs 4, alors que le classement rejoué attend 2 vs 4.
     const conn = makeConn(
       stateWithStaleRound([
@@ -704,7 +705,7 @@ describe("reconcileEndurance — réappariement après correction", () => {
   });
 
   it("laisse la manche en place quand ses couples sont toujours valides", async () => {
-    (createMatch as jest.Mock).mockResolvedValue(77 as never);
+    jest.mocked(createMatch).mockResolvedValue(77);
     // 2 vs 4 puis 1 vs 3 : exactement ce que le classement rejoué produit.
     const conn = makeConn(
       stateWithStaleRound([

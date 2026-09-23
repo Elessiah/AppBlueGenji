@@ -9,6 +9,7 @@ jest.mock("@/lib/server/account-deletion-journal");
 import { deleteOwnAccount } from "@/lib/server/users-service";
 import { getDatabase } from "@/lib/server/database";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
+import { fakePool } from "../../helpers/sql-double";
 
 /**
  * `deleteOwnAccount` consigne la suppression au journal — **après** le commit,
@@ -36,16 +37,16 @@ function fakeDb(options: { failOn?: string } = {}) {
     rollback: jest.fn(async () => {}),
     release: jest.fn(() => {}),
   };
-  (getDatabase as jest.Mock).mockResolvedValue({
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
     execute,
     getConnection: jest.fn(async () => connection),
-  } as never);
+  }));
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
   order.length = 0;
-  (recordAccountDeletion as jest.Mock).mockImplementation(async () => {
+  jest.mocked(recordAccountDeletion).mockImplementation(async () => {
     order.push("journal");
   });
 });
@@ -55,7 +56,7 @@ describe("deleteOwnAccount — journal des suppressions", () => {
     fakeDb();
     await deleteOwnAccount(7);
     expect(recordAccountDeletion).toHaveBeenCalledTimes(1);
-    const [recorded] = (recordAccountDeletion as jest.Mock).mock.calls[0] as [Record<string, unknown>];
+    const [recorded] = jest.mocked(recordAccountDeletion).mock.calls[0];
     expect(recorded).toMatchObject({ userId: 7, accountCreatedAt: "2026-01-02 03:04:05" });
     expect(Number.isFinite(Date.parse(String(recorded.deletedAt)))).toBe(true);
   });
@@ -74,7 +75,7 @@ describe("deleteOwnAccount — journal des suppressions", () => {
 
   it("ne consigne rien pour un compte introuvable", async () => {
     fakeDb();
-    (getDatabase as jest.Mock).mockResolvedValue({
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({
       getConnection: jest.fn(async () => ({
         execute: jest.fn(async () => [[]]),
         beginTransaction: jest.fn(async () => {}),
@@ -82,7 +83,7 @@ describe("deleteOwnAccount — journal des suppressions", () => {
         rollback: jest.fn(async () => {}),
         release: jest.fn(() => {}),
       })),
-    } as never);
+    }));
     await expect(deleteOwnAccount(7)).rejects.toThrow("USER_NOT_FOUND");
     expect(recordAccountDeletion).not.toHaveBeenCalled();
   });

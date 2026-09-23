@@ -7,9 +7,10 @@ import { GET, POST } from "@/app/api/association/bureau/route";
 import { PUT, DELETE } from "@/app/api/association/bureau/[id]/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/bureau-service";
+import { authUser } from "../../../helpers/auth-user";
 
-const admin = { id: 1, isAdmin: true } as Awaited<ReturnType<typeof getCurrentUser>>;
-const normalUser = { id: 2, isAdmin: false } as Awaited<ReturnType<typeof getCurrentUser>>;
+const admin = authUser({ id: 1, isAdmin: true });
+const normalUser = authUser({ id: 2, isAdmin: false });
 
 function jsonReq(method: string, body: unknown) {
   return new Request("http://localhost/api/association/bureau", {
@@ -33,7 +34,7 @@ describe("GET /api/association/bureau", () => {
 
   it("returns the public list without auth", async () => {
     const members = [{ id: 1, name: "Léo", role: "Président", initials: "LP", color: "c" }];
-    (service.listBureauMembers as jest.Mock).mockResolvedValue(members as never);
+    jest.mocked(service.listBureauMembers).mockResolvedValue(members);
 
     const res = await GET();
     expect(res.status).toBe(200);
@@ -50,21 +51,21 @@ describe("POST /api/association/bureau", () => {
   });
 
   it("rejects anonymous users with 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     const res = await POST(jsonReq("POST", { name: "X", role: "Y" }));
     expect(res.status).toBe(401);
   });
 
   it("rejects non-admins with 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(normalUser as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(normalUser);
     const res = await POST(jsonReq("POST", { name: "X", role: "Y" }));
     expect(res.status).toBe(403);
   });
 
   it("creates a member for admins", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const member = { id: 5, name: "X", role: "Y", initials: "X", color: "c" };
-    (service.createBureauMember as jest.Mock).mockResolvedValue(member as never);
+    jest.mocked(service.createBureauMember).mockResolvedValue(member);
 
     const res = await POST(jsonReq("POST", { name: "X", role: "Y" }));
     expect(res.status).toBe(201);
@@ -72,8 +73,8 @@ describe("POST /api/association/bureau", () => {
   });
 
   it("returns 400 with the validation error message", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.createBureauMember as jest.Mock).mockRejectedValue(new Error("NAME_REQUIRED") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createBureauMember).mockRejectedValue(new Error("NAME_REQUIRED"));
 
     const res = await POST(jsonReq("POST", { name: "", role: "Y" }));
     expect(res.status).toBe(400);
@@ -90,22 +91,22 @@ describe("PUT /api/association/bureau/[id]", () => {
   });
 
   it("rejects non-admins with 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(normalUser as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(normalUser);
     const res = await PUT(jsonReq("PUT", { name: "X", role: "Y" }), params("1"));
     expect(res.status).toBe(403);
   });
 
   it("rejects an invalid id with 400", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const res = await PUT(jsonReq("PUT", { name: "X", role: "Y" }), params("abc"));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "INVALID_ID" });
   });
 
   it("updates a member for admins", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const member = { id: 3, name: "X", role: "Y", initials: "X", color: "c" };
-    (service.updateBureauMember as jest.Mock).mockResolvedValue(member as never);
+    jest.mocked(service.updateBureauMember).mockResolvedValue(member);
 
     const res = await PUT(jsonReq("PUT", { name: "X", role: "Y" }), params("3"));
     expect(res.status).toBe(200);
@@ -113,8 +114,8 @@ describe("PUT /api/association/bureau/[id]", () => {
   });
 
   it("returns 404 when the member does not exist", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.updateBureauMember as jest.Mock).mockRejectedValue(new Error("BUREAU_MEMBER_NOT_FOUND") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.updateBureauMember).mockRejectedValue(new Error("BUREAU_MEMBER_NOT_FOUND"));
 
     const res = await PUT(jsonReq("PUT", { name: "X", role: "Y" }), params("99"));
     expect(res.status).toBe(404);
@@ -130,22 +131,22 @@ describe("DELETE /api/association/bureau/[id]", () => {
   });
 
   it("rejects anonymous users with 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     const res = await DELETE(jsonReq("DELETE", {}), params("1"));
     expect(res.status).toBe(401);
   });
 
   it("deletes a member for admins", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.deleteBureauMember as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.deleteBureauMember).mockResolvedValue(undefined);
 
     const res = await DELETE(jsonReq("DELETE", {}), params("4"));
     expect(res.status).toBe(200);
   });
 
   it("returns 404 when the member does not exist", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.deleteBureauMember as jest.Mock).mockRejectedValue(new Error("BUREAU_MEMBER_NOT_FOUND") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.deleteBureauMember).mockRejectedValue(new Error("BUREAU_MEMBER_NOT_FOUND"));
 
     const res = await DELETE(jsonReq("DELETE", {}), params("99"));
     expect(res.status).toBe(404);

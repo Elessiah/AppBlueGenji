@@ -7,6 +7,7 @@ import { clearCache } from "@/lib/server/cache";
 import { getDatabase } from "@/lib/server/database";
 import { getDiscordCommunity } from "@/lib/server/discord-community";
 import { getLandingStats } from "@/lib/server/landing-service";
+import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 
 /**
  * Les chiffres du site et ceux du Discord voyagent ensemble jusqu'à l'accueil,
@@ -18,9 +19,9 @@ const mockedDb = getDatabase as jest.MockedFunction<typeof getDatabase>;
 const mockedDiscord = getDiscordCommunity as jest.MockedFunction<typeof getDiscordCommunity>;
 
 function countsRow(players: number, teams: number, tournaments: number) {
-  return {
-    execute: jest.fn(async () => [[{ players, teams, tournaments }], []]),
-  };
+  return fakePool({
+    execute: jest.fn<SqlQuery>(async () => [[{ players, teams, tournaments }], []]),
+  });
 }
 
 describe("compteurs de l'accueil", () => {
@@ -34,7 +35,7 @@ describe("compteurs de l'accueil", () => {
   });
 
   it("joint la fréquentation Discord aux chiffres du site", async () => {
-    mockedDb.mockResolvedValue(countsRow(150, 25, 10) as never);
+    mockedDb.mockResolvedValue(countsRow(150, 25, 10));
     mockedDiscord.mockResolvedValue({ memberCount: 1284, onlineCount: 213 });
 
     await expect(getLandingStats()).resolves.toEqual({
@@ -46,7 +47,7 @@ describe("compteurs de l'accueil", () => {
   });
 
   it("garde les chiffres du site quand Discord ne répond pas", async () => {
-    mockedDb.mockResolvedValue(countsRow(150, 25, 10) as never);
+    mockedDb.mockResolvedValue(countsRow(150, 25, 10));
     mockedDiscord.mockResolvedValue(null);
 
     const stats = await getLandingStats();
@@ -78,7 +79,7 @@ describe("compteurs de l'accueil", () => {
     mockedDb.mockImplementation(async () => {
       await Promise.resolve();
       dbResolved = true;
-      return countsRow(1, 1, 1) as never;
+      return countsRow(1, 1, 1);
     });
     mockedDiscord.mockImplementation(async () => {
       discordStarted = !dbResolved;

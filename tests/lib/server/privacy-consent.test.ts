@@ -9,12 +9,13 @@ import {
   loadPendingPrivacyChanges,
 } from "@/lib/server/privacy-consent";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
+import { fakePool } from "../../helpers/sql-double";
 
 const flat = (sql: unknown) => String(sql).replace(/\s+/g, " ").trim();
 
 function mockExecute(result: unknown[]) {
   const execute = jest.fn(async () => [result]);
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return execute;
 }
 

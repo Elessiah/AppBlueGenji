@@ -13,6 +13,8 @@ import { resolveUserEntrantTeamId } from "@/lib/server/tournaments/registration"
 import { syncTournamentState } from "@/lib/server/tournaments/state";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { qualifyDestinationMatchId } from "@/app/(secured)/tournois/[id]/_lib/bracket-sections";
+import type { TournamentRow } from "@/lib/server/tournaments/_internal";
+import { tournamentRow } from "../../helpers/tournament-rows";
 
 describe("tournaments-service: match state machine", () => {
   // Avancement réel : on exerce `finalizeMatch` avec une connexion mockée et on
@@ -198,11 +200,12 @@ describe("tournaments-service: match state machine", () => {
     const completion = (calls: Call[]) =>
       calls.find((c) => c.sql.includes("status = 'COMPLETED'"));
 
-    function reporterIs(teamId: number | null, state = "RUNNING") {
+    function reporterIs(teamId: number | null, state: TournamentRow["state"] = "RUNNING") {
       jest.mocked(syncTournamentState).mockResolvedValue({
-        row: { id: 1, state, participant_type: "TEAM" },
+        row: tournamentRow({ id: 1, state, participant_type: "TEAM" }),
         stateChanged: false,
-      } as never);
+        contentChanged: false,
+      });
       jest.mocked(resolveUserEntrantTeamId).mockResolvedValue(teamId);
     }
 

@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { exportOwnData } from "@/lib/server/users-service";
+import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
-async function mockDb(execute: jest.Mock) {
+async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 }
 
 function exportRow(overrides: Record<string, unknown> = {}) {
@@ -61,12 +62,12 @@ describe("exportOwnData", () => {
 
   it("includes raw account identifiers reserved to the owner (discord, google, blizzard)", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[exportRow()]] as never) // identifiants bruts
-      .mockResolvedValueOnce([[fullProfileRow()]] as never) // getFullProfile: user row
-      .mockResolvedValueOnce([[]] as never) // timeline
-      .mockResolvedValueOnce([[]] as never) // stats: appartenances (aucune)
-      .mockResolvedValueOnce([[]] as never); // (inutilisé : le joueur n'a aucune équipe)
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[exportRow()]]) // identifiants bruts
+      .mockResolvedValueOnce([[fullProfileRow()]]) // getFullProfile: user row
+      .mockResolvedValueOnce([[]]) // timeline
+      .mockResolvedValueOnce([[]]) // stats: appartenances (aucune)
+      .mockResolvedValueOnce([[]]); // (inutilisé : le joueur n'a aucune équipe)
     await mockDb(execute);
 
     const data = await exportOwnData(42);
@@ -96,12 +97,12 @@ describe("exportOwnData", () => {
 
   it("exporte le pseudo tel quel, tous réglages coupés", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[exportRow({ visible_avatar: 0, open_to_recruitment: 0 })]] as never)
-      .mockResolvedValueOnce([[fullProfileRow({ visible_avatar: 0, open_to_recruitment: 0 })]] as never)
-      .mockResolvedValueOnce([[]] as never)
-      .mockResolvedValueOnce([[]] as never)
-      .mockResolvedValueOnce([[]] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[exportRow({ visible_avatar: 0, open_to_recruitment: 0 })]])
+      .mockResolvedValueOnce([[fullProfileRow({ visible_avatar: 0, open_to_recruitment: 0 })]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     const data = await exportOwnData(42);
@@ -109,7 +110,7 @@ describe("exportOwnData", () => {
   });
 
   it("throws PROFILE_NOT_FOUND when the account does not exist or is deleted", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     await expect(exportOwnData(999)).rejects.toThrow("PROFILE_NOT_FOUND");
@@ -120,12 +121,12 @@ describe("exportOwnData", () => {
 describe("exportOwnData — plus aucune adresse", () => {
   it("n'expose aucun champ `email` : la colonne n'existe plus", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[exportRow()]] as never)
-      .mockResolvedValueOnce([[fullProfileRow()]] as never)
-      .mockResolvedValueOnce([[]] as never)
-      .mockResolvedValueOnce([[]] as never)
-      .mockResolvedValueOnce([[]] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[exportRow()]])
+      .mockResolvedValueOnce([[fullProfileRow()]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     const data = await exportOwnData(42);
@@ -135,12 +136,12 @@ describe("exportOwnData — plus aucune adresse", () => {
 
   it("ne la demande pas non plus en base", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[exportRow()]] as never)
-      .mockResolvedValueOnce([[fullProfileRow()]] as never)
-      .mockResolvedValueOnce([[]] as never)
-      .mockResolvedValueOnce([[]] as never)
-      .mockResolvedValueOnce([[]] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[exportRow()]])
+      .mockResolvedValueOnce([[fullProfileRow()]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     await exportOwnData(42);

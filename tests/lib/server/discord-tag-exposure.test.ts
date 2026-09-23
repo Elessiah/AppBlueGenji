@@ -15,6 +15,8 @@ import {
 } from "@/lib/server/users-service";
 import { getDatabase } from "@/lib/server/database";
 import { getPlayerEntityStats } from "@/lib/server/stats-service";
+import { fakePool } from "../../helpers/sql-double";
+import { emptyDeepStats } from "@/lib/shared/stats";
 
 /**
  * Le tag Discord **en base** : ce qui le certifie, ce qui le décertifie, et ce
@@ -58,10 +60,10 @@ function fakeDb(handler?: (q: string, params: unknown[]) => unknown) {
     rollback: jest.fn(async () => {}),
     release: jest.fn(() => {}),
   };
-  (getDatabase as jest.Mock).mockResolvedValue({
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
     execute,
     getConnection: jest.fn(async () => connection),
-  } as never);
+  }));
   return { queries, execute, connection };
 }
 
@@ -85,10 +87,10 @@ function tagParams(params: unknown[]): { touches: unknown[]; tags: unknown[] } {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (getPlayerEntityStats as jest.Mock).mockResolvedValue({
-    stats: {},
+  jest.mocked(getPlayerEntityStats).mockResolvedValue({
+    stats: emptyDeepStats(),
     tournaments: [],
-  } as never);
+  });
 });
 
 describe("updateOwnProfile — la certification suit le tag", () => {

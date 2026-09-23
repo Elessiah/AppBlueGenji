@@ -8,9 +8,10 @@ import { POST } from "@/app/api/tournaments/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/tournaments-service";
 import * as perms from "@/lib/shared/permissions";
+import { authUser } from "../../../helpers/auth-user";
 
-const admin = { id: 1, isAdmin: true } as Awaited<ReturnType<typeof getCurrentUser>>;
-const noPerms = { id: 2, isAdmin: false } as Awaited<ReturnType<typeof getCurrentUser>>;
+const admin = authUser({ id: 1, isAdmin: true });
+const noPerms = authUser({ id: 2, isAdmin: false });
 
 function jsonReq(body: unknown) {
   return new Request("http://localhost/api/tournaments", {
@@ -48,9 +49,9 @@ const phase2 = {
 describe("POST /api/tournaments — mode MULTI avec phases", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (perms.can as jest.Mock).mockReturnValue(true);
-    (service.createTournament as jest.Mock).mockResolvedValue(42 as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(perms.can).mockReturnValue(true);
+    jest.mocked(service.createTournament).mockResolvedValue(42);
   });
 
   afterEach(() => {
@@ -410,7 +411,7 @@ describe("POST /api/tournaments — mode MULTI avec phases", () => {
 
   describe("permissions", () => {
     it("retourne 403 si l'utilisateur n'a pas la permission 'tournaments'", async () => {
-      (perms.can as jest.Mock).mockReturnValue(false);
+      jest.mocked(perms.can).mockReturnValue(false);
 
       const res = await POST(
         jsonReq({
@@ -426,7 +427,7 @@ describe("POST /api/tournaments — mode MULTI avec phases", () => {
     });
 
     it("retourne 401 si pas authentifié", async () => {
-      (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+      jest.mocked(getCurrentUser).mockResolvedValue(null);
 
       const res = await POST(
         jsonReq({
@@ -443,8 +444,8 @@ describe("POST /api/tournaments — mode MULTI avec phases", () => {
 
   describe("erreurs serveur", () => {
     it("remonte une erreur de date invalide", async () => {
-      (service.createTournament as jest.Mock).mockRejectedValueOnce(
-        new Error("INVALID_DATES") as never,
+      jest.mocked(service.createTournament).mockRejectedValueOnce(
+        new Error("INVALID_DATES"),
       );
 
       const res = await POST(
@@ -460,7 +461,7 @@ describe("POST /api/tournaments — mode MULTI avec phases", () => {
     });
 
     it("retourne 500 sur erreur interne", async () => {
-      (service.createTournament as jest.Mock).mockRejectedValueOnce(new Error("DATABASE_ERROR") as never);
+      jest.mocked(service.createTournament).mockRejectedValueOnce(new Error("DATABASE_ERROR"));
 
       const res = await POST(
         jsonReq({

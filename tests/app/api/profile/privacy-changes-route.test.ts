@@ -7,8 +7,9 @@ import { POST } from "@/app/api/profile/privacy-changes/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { acknowledgePrivacyChanges } from "@/lib/server/privacy-consent";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
+import { authUser } from "../../../helpers/auth-user";
 
-const user = { id: 42 } as Awaited<ReturnType<typeof getCurrentUser>>;
+const user = authUser({ id: 42 });
 
 function req(body: unknown) {
   return new Request("http://localhost/api/profile/privacy-changes", {
@@ -21,12 +22,12 @@ function req(body: unknown) {
 describe("POST /api/profile/privacy-changes", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
-    (acknowledgePrivacyChanges as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
+    jest.mocked(acknowledgePrivacyChanges).mockResolvedValue(undefined);
   });
 
   it("refuse un visiteur sans session", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     expect((await POST(req({ changeIds: [PRIVACY_CHANGES[0].id] }))).status).toBe(401);
     expect(acknowledgePrivacyChanges).not.toHaveBeenCalled();
   });

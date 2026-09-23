@@ -4,6 +4,7 @@ jest.mock("@/lib/server/database");
 
 import { requestToJoinTeam } from "@/lib/server/teams-service";
 import { getDatabase } from "@/lib/server/database";
+import { type SqlMock, fakePool } from "../../helpers/sql-double";
 
 /**
  * Ce qui ne se rejoint pas.
@@ -30,7 +31,7 @@ async function mockJoinDb(team: Record<string, unknown> | null) {
     if (text.includes("FROM bg_teams")) return [team === null ? [] : [team], []];
     return [[], []];
   });
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return execute;
 }
 
@@ -38,7 +39,7 @@ function joinableTeam(overrides: Record<string, unknown> = {}) {
   return { id: 5, deleted_at: null, is_ghost: 0, solo_user_id: null, ...overrides };
 }
 
-const wrote = (execute: jest.Mock, fragment: string) =>
+const wrote = (execute: SqlMock, fragment: string) =>
   execute.mock.calls.some(([sql]) => String(sql).includes(fragment));
 
 describe("requestToJoinTeam — ni une fantôme ni une entrée solo", () => {

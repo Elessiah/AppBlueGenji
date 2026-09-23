@@ -10,6 +10,7 @@ import {
   resetPrivacyNotificationThrottle,
 } from "@/lib/server/privacy-change-notifications";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
+import { fakePool } from "../../helpers/sql-double";
 
 const NOW = new Date(`${PRIVACY_CHANGES.at(-1)!.publishedAt}T12:00:00Z`);
 const flat = (sql: unknown) => String(sql).replace(/\s+/g, " ").trim();
@@ -50,7 +51,7 @@ function fakeDb(options: { candidates?: Candidate[]; done?: { user_id: number; c
   };
   const execute = jest.fn(handler);
   const query = jest.fn(handler);
-  (getDatabase as jest.Mock).mockResolvedValue({ execute, query } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, query }));
   return calls;
 }
 
@@ -58,8 +59,8 @@ describe("dispatchPrivacyChangeNotifications", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetPrivacyNotificationThrottle();
-    (isBotCircuitOpen as jest.Mock).mockReturnValue(false);
-    (pushDiscordDirectMessages as jest.Mock).mockResolvedValue({ sent: 1, unresolved: [], failed: [] } as never);
+    jest.mocked(isBotCircuitOpen).mockReturnValue(false);
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
   });
   afterEach(() => {
     resetPrivacyNotificationThrottle();
@@ -71,7 +72,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
 
     expect(sent).toBe(1);
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
-    const [message, recipients, context] = (pushDiscordDirectMessages as jest.Mock).mock.calls[0] as [
+    const [message, recipients, context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0] as [
       string,
       unknown[],
       string,
@@ -105,7 +106,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
       ],
     });
     await dispatchPrivacyChangeNotifications(NOW);
-    const recipients = (pushDiscordDirectMessages as jest.Mock).mock.calls[0][1];
+    const recipients = jest.mocked(pushDiscordDirectMessages).mock.calls[0][1];
     expect(recipients).toEqual([
       { discordId: null, handle: "nova", label: "Nova" },
       { discordId: "200000000000000002", handle: null, label: "Faux" },
@@ -116,7 +117,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
     const [first, ...rest] = PRIVACY_CHANGES;
     fakeDb({ candidates: [candidate()], done: [{ user_id: 1, change_id: first.id }] });
     await dispatchPrivacyChangeNotifications(NOW);
-    const message = (pushDiscordDirectMessages as jest.Mock).mock.calls[0][0] as string;
+    const message = jest.mocked(pushDiscordDirectMessages).mock.calls[0][0] as string;
     expect(message).not.toContain(first.title);
     for (const change of rest) expect(message).toContain(change.title);
   });
@@ -131,11 +132,11 @@ describe("dispatchPrivacyChangeNotifications", () => {
     fakeDb({ candidates: [candidate({ id: 1 }), candidate({ id: 2, pseudo: "Kai", discord_id: "3" })] });
     await dispatchPrivacyChangeNotifications(NOW);
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
-    expect((pushDiscordDirectMessages as jest.Mock).mock.calls[0][1]).toHaveLength(2);
+    expect(jest.mocked(pushDiscordDirectMessages).mock.calls[0][1]).toHaveLength(2);
   });
 
   it("bot injoignable : rend la réservation pour réessayer", async () => {
-    (pushDiscordDirectMessages as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue(null);
     const calls = fakeDb({ candidates: [candidate()] });
     expect(await dispatchPrivacyChangeNotifications(NOW)).toBe(0);
     const release = calls.find((c) => c.sql.startsWith("DELETE FROM bg_privacy_change_notifications"));
@@ -144,14 +145,14 @@ describe("dispatchPrivacyChangeNotifications", () => {
   });
 
   it("membre introuvable : la réservation reste (la modale prend le relais)", async () => {
-    (pushDiscordDirectMessages as jest.Mock).mockResolvedValue({ sent: 0, unresolved: ["Nova"], failed: [] } as never);
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 0, unresolved: ["Nova"], failed: [] });
     const calls = fakeDb({ candidates: [candidate()] });
     await dispatchPrivacyChangeNotifications(NOW);
     expect(calls.some((c) => c.sql.startsWith("DELETE"))).toBe(false);
   });
 
   it("coupe-circuit ouvert : ni lecture ni réservation", async () => {
-    (isBotCircuitOpen as jest.Mock).mockReturnValue(true);
+    jest.mocked(isBotCircuitOpen).mockReturnValue(true);
     const calls = fakeDb({ candidates: [candidate()] });
     expect(await dispatchPrivacyChangeNotifications(NOW)).toBe(0);
     expect(calls).toHaveLength(0);

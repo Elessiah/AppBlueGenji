@@ -7,6 +7,7 @@ jest.mock("@/lib/server/api-guard", () => ({
   LANDING_READ_RULE: { name: "landing-read", limit: 180, windowMs: 60_000 },
 }));
 
+import { NextResponse } from "next/server";
 import { GET } from "@/app/api/landing/sponsors/[id]/logo/route";
 import { enforceRateLimit } from "@/lib/server/api-guard";
 import { getSponsorLogoUrl } from "@/lib/server/sponsors-service";
@@ -37,10 +38,10 @@ function upstream(
 }
 
 function mockFetch(...responses: Response[]) {
-  const fn = jest.fn();
-  for (const res of responses) fn.mockResolvedValueOnce(res as never);
-  fn.mockResolvedValue(upstream(null, { status: 404 }) as never);
-  global.fetch = fn as unknown as typeof fetch;
+  const fn = jest.fn<typeof fetch>();
+  for (const res of responses) fn.mockResolvedValueOnce(res);
+  fn.mockResolvedValue(upstream(null, { status: 404 }));
+  global.fetch = fn;
   return fn;
 }
 
@@ -49,7 +50,7 @@ describe("GET /api/landing/sponsors/[id]/logo", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (enforceRateLimit as jest.Mock).mockReturnValue(null as never);
+    jest.mocked(enforceRateLimit).mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -58,7 +59,7 @@ describe("GET /api/landing/sponsors/[id]/logo", () => {
   });
 
   it("relays a remote logo from our own origin", async () => {
-    (getSponsorLogoUrl as jest.Mock).mockResolvedValue("https://cdn.example.com/logo.png" as never);
+    jest.mocked(getSponsorLogoUrl).mockResolvedValue("https://cdn.example.com/logo.png");
     const fetchMock = mockFetch(upstream(PNG, { headers: { "content-type": "image/png" } }));
 
     const res = await call();
@@ -74,12 +75,12 @@ describe("GET /api/landing/sponsors/[id]/logo", () => {
   });
 
   it("returns 404 for a sponsor without a logo", async () => {
-    (getSponsorLogoUrl as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getSponsorLogoUrl).mockResolvedValue(null);
     expect((await call()).status).toBe(404);
   });
 
   it("returns 404 for a logo we host ourselves — /api/uploads serves it", async () => {
-    (getSponsorLogoUrl as jest.Mock).mockResolvedValue("/uploads/sponsors/1-abc.webp" as never);
+    jest.mocked(getSponsorLogoUrl).mockResolvedValue("/uploads/sponsors/1-abc.webp");
     const fetchMock = mockFetch();
     expect((await call()).status).toBe(404);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -93,44 +94,44 @@ describe("GET /api/landing/sponsors/[id]/logo", () => {
   });
 
   it("never reaches a host on the machine's own network", async () => {
-    (getSponsorLogoUrl as jest.Mock).mockResolvedValue("https://169.254.169.254/latest/meta-data" as never);
+    jest.mocked(getSponsorLogoUrl).mockResolvedValue("https://169.254.169.254/latest/meta-data");
     const fetchMock = mockFetch();
     expect((await call()).status).toBe(404);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("refuses a logo served in clear text", async () => {
-    (getSponsorLogoUrl as jest.Mock).mockResolvedValue("http://cdn.example.com/logo.png" as never);
+    jest.mocked(getSponsorLogoUrl).mockResolvedValue("http://cdn.example.com/logo.png");
     const fetchMock = mockFetch();
     expect((await call()).status).toBe(404);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("returns 404 when the database is unreachable", async () => {
-    (getSponsorLogoUrl as jest.Mock).mockRejectedValue(new Error("ECONNREFUSED") as never);
+    jest.mocked(getSponsorLogoUrl).mockRejectedValue(new Error("ECONNREFUSED"));
     expect((await call()).status).toBe(404);
   });
 
   it("refuses an upstream that is not an accepted image", async () => {
-    (getSponsorLogoUrl as jest.Mock).mockResolvedValue("https://cdn.example.com/logo.png" as never);
+    jest.mocked(getSponsorLogoUrl).mockResolvedValue("https://cdn.example.com/logo.png");
     mockFetch(upstream(PNG, { headers: { "content-type": "text/html" } }));
     expect((await call()).status).toBe(404);
   });
 
   it("refuses an svg — it would run script on our origin", async () => {
-    (getSponsorLogoUrl as jest.Mock).mockResolvedValue("https://cdn.example.com/logo.svg" as never);
+    jest.mocked(getSponsorLogoUrl).mockResolvedValue("https://cdn.example.com/logo.svg");
     mockFetch(upstream(PNG, { headers: { "content-type": "image/svg+xml" } }));
     expect((await call()).status).toBe(404);
   });
 
   it("refuses an upstream error", async () => {
-    (getSponsorLogoUrl as jest.Mock).mockResolvedValue("https://cdn.example.com/logo.png" as never);
+    jest.mocked(getSponsorLogoUrl).mockResolvedValue("https://cdn.example.com/logo.png");
     mockFetch(upstream(null, { status: 500 }));
     expect((await call()).status).toBe(404);
   });
 
   it("refuses an upstream that announces more than the size cap", async () => {
-    (getSponsorLogoUrl as jest.Mock).mockResolvedValue("https://cdn.example.com/logo.png" as never);
+    jest.mocked(getSponsorLogoUrl).mockResolvedValue("https://cdn.example.com/logo.png");
     mockFetch(
       upstream(PNG, {
         headers: { "content-type": "image/png", "content-length": String(6 * 1024 * 1024) },
@@ -140,20 +141,20 @@ describe("GET /api/landing/sponsors/[id]/logo", () => {
   });
 
   it("refuses an empty body", async () => {
-    (getSponsorLogoUrl as jest.Mock).mockResolvedValue("https://cdn.example.com/logo.png" as never);
+    jest.mocked(getSponsorLogoUrl).mockResolvedValue("https://cdn.example.com/logo.png");
     mockFetch(upstream(new Uint8Array(0), { headers: { "content-type": "image/png" } }));
     expect((await call()).status).toBe(404);
   });
 
   it("returns 404 when the fetch itself fails", async () => {
-    (getSponsorLogoUrl as jest.Mock).mockResolvedValue("https://cdn.example.com/logo.png" as never);
+    jest.mocked(getSponsorLogoUrl).mockResolvedValue("https://cdn.example.com/logo.png");
     const fn = jest.fn<() => Promise<Response>>().mockRejectedValue(new Error("timeout"));
     global.fetch = fn as unknown as typeof fetch;
     expect((await call()).status).toBe(404);
   });
 
   it("follows a redirect and relays the final image", async () => {
-    (getSponsorLogoUrl as jest.Mock).mockResolvedValue("https://cdn.example.com/logo.png" as never);
+    jest.mocked(getSponsorLogoUrl).mockResolvedValue("https://cdn.example.com/logo.png");
     const fetchMock = mockFetch(
       upstream(null, { status: 302, headers: { location: "https://cdn2.example.com/logo.png" } }),
       upstream(PNG, { headers: { "content-type": "image/png" } }),
@@ -165,7 +166,7 @@ describe("GET /api/landing/sponsors/[id]/logo", () => {
   });
 
   it("revalidates the host on each hop — a redirect cannot smuggle in an internal address", async () => {
-    (getSponsorLogoUrl as jest.Mock).mockResolvedValue("https://cdn.example.com/logo.png" as never);
+    jest.mocked(getSponsorLogoUrl).mockResolvedValue("https://cdn.example.com/logo.png");
     const fetchMock = mockFetch(
       upstream(null, { status: 302, headers: { location: "http://169.254.169.254/latest/meta-data" } }),
       upstream(PNG, { headers: { "content-type": "image/png" } }),
@@ -176,7 +177,7 @@ describe("GET /api/landing/sponsors/[id]/logo", () => {
   });
 
   it("gives up on a redirect loop instead of following it forever", async () => {
-    (getSponsorLogoUrl as jest.Mock).mockResolvedValue("https://cdn.example.com/logo.png" as never);
+    jest.mocked(getSponsorLogoUrl).mockResolvedValue("https://cdn.example.com/logo.png");
     const fn = jest
       .fn<() => Promise<Response>>()
       .mockResolvedValue(
@@ -189,13 +190,13 @@ describe("GET /api/landing/sponsors/[id]/logo", () => {
   });
 
   it("refuses a redirect without a destination", async () => {
-    (getSponsorLogoUrl as jest.Mock).mockResolvedValue("https://cdn.example.com/logo.png" as never);
+    jest.mocked(getSponsorLogoUrl).mockResolvedValue("https://cdn.example.com/logo.png");
     mockFetch(upstream(null, { status: 302 }));
     expect((await call()).status).toBe(404);
   });
 
   it("ignores the `v` cache-busting parameter — it is read by the optimiser, not by us", async () => {
-    (getSponsorLogoUrl as jest.Mock).mockResolvedValue("https://cdn.example.com/logo.png" as never);
+    jest.mocked(getSponsorLogoUrl).mockResolvedValue("https://cdn.example.com/logo.png");
     mockFetch(upstream(PNG, { headers: { "content-type": "image/png" } }));
 
     const res = await GET(
@@ -206,8 +207,8 @@ describe("GET /api/landing/sponsors/[id]/logo", () => {
   });
 
   it("returns the rate limiter's answer before touching the database", async () => {
-    const tooMany = new Response(null, { status: 429 });
-    (enforceRateLimit as jest.Mock).mockReturnValue(tooMany as never);
+    const tooMany = new NextResponse(null, { status: 429 });
+    jest.mocked(enforceRateLimit).mockReturnValue(tooMany);
     const fetchMock = mockFetch();
 
     expect((await call()).status).toBe(429);

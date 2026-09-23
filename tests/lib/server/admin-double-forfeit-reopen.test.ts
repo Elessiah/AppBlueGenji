@@ -65,8 +65,8 @@ describe("adminResolveMatch — correction qui rouvre une exemption", () => {
   });
 
   it("rouvre le tournoi quand la cascade a rouvert une rencontre close", async () => {
-    (detachDownstreamOutcome as jest.Mock).mockResolvedValue(1 as never);
-    (reopenTournament as jest.Mock).mockResolvedValue(true as never);
+    jest.mocked(detachDownstreamOutcome).mockResolvedValue(1);
+    jest.mocked(reopenTournament).mockResolvedValue(true);
     const { conn, writes } = fakeConnection();
 
     await adminResolveMatch(conn, 10, 3, 0);
@@ -77,8 +77,8 @@ describe("adminResolveMatch — correction qui rouvre une exemption", () => {
   });
 
   it("rouvre aussi la phase d'un tournoi multi-phases clos", async () => {
-    (detachDownstreamOutcome as jest.Mock).mockResolvedValue(2 as never);
-    (reopenTournament as jest.Mock).mockResolvedValue(true as never);
+    jest.mocked(detachDownstreamOutcome).mockResolvedValue(2);
+    jest.mocked(reopenTournament).mockResolvedValue(true);
     const { conn, writes } = fakeConnection(42);
 
     await adminResolveMatch(conn, 10, 3, 0);
@@ -87,8 +87,8 @@ describe("adminResolveMatch — correction qui rouvre une exemption", () => {
   });
 
   it("ne touche pas à la phase courante d'un tournoi encore en cours", async () => {
-    (detachDownstreamOutcome as jest.Mock).mockResolvedValue(1 as never);
-    (reopenTournament as jest.Mock).mockResolvedValue(false as never);
+    jest.mocked(detachDownstreamOutcome).mockResolvedValue(1);
+    jest.mocked(reopenTournament).mockResolvedValue(false);
     const { conn, writes } = fakeConnection(42, "RUNNING");
 
     await adminResolveMatch(conn, 10, 3, 0);
@@ -99,8 +99,8 @@ describe("adminResolveMatch — correction qui rouvre une exemption", () => {
   it("refuse de rouvrir une rencontre d'une phase close d'un tournoi en cours", async () => {
     // La phase suivante a été lancée sur ses qualifiées : une rencontre rouverte
     // ici ne serait plus jamais relue, et les qualifiées ne suivraient pas.
-    (detachDownstreamOutcome as jest.Mock).mockResolvedValue(1 as never);
-    (reopenTournament as jest.Mock).mockResolvedValue(false as never);
+    jest.mocked(detachDownstreamOutcome).mockResolvedValue(1);
+    jest.mocked(reopenTournament).mockResolvedValue(false);
     const { conn, writes } = fakeConnection(42, "FINISHED");
 
     await expect(adminResolveMatch(conn, 10, 3, 0)).rejects.toThrow(
@@ -110,7 +110,7 @@ describe("adminResolveMatch — correction qui rouvre une exemption", () => {
   });
 
   it("ne rouvre rien quand la cascade n'a rien rouvert", async () => {
-    (detachDownstreamOutcome as jest.Mock).mockResolvedValue(0 as never);
+    jest.mocked(detachDownstreamOutcome).mockResolvedValue(0);
     const { conn } = fakeConnection();
 
     await adminResolveMatch(conn, 10, undefined, undefined, undefined, true);

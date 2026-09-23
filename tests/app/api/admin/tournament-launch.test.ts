@@ -5,14 +5,13 @@ jest.mock("@/lib/server/tournaments/launch");
 
 import { POST } from "@/app/api/admin/tournaments/[id]/launch/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import { launchTournamentNow } from "@/lib/server/tournaments/launch";
+import { launchTournamentNow, type LaunchedTournament } from "@/lib/server/tournaments/launch";
+import { authUser } from "../../../helpers/auth-user";
 
-type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
-
-const admin = { id: 1, pseudo: "Root", isAdmin: true, roles: ["ADMIN"] } as unknown as SessionUser;
-const arbitre = { id: 2, pseudo: "Sifflet", isAdmin: false, roles: ["ARBITRE"] } as unknown as SessionUser;
-const caster = { id: 3, pseudo: "Micro", isAdmin: false, roles: ["CASTER"] } as unknown as SessionUser;
-const player = { id: 4, pseudo: "Joueur", isAdmin: false, roles: [] } as unknown as SessionUser;
+const admin = authUser({ id: 1, pseudo: "Root", isAdmin: true, roles: ["ADMIN"] });
+const arbitre = authUser({ id: 2, pseudo: "Sifflet", isAdmin: false, roles: ["ARBITRE"] });
+const caster = authUser({ id: 3, pseudo: "Micro", isAdmin: false, roles: ["CASTER"] });
+const player = authUser({ id: 4, pseudo: "Joueur", isAdmin: false, roles: [] });
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
@@ -23,12 +22,12 @@ function launch(id: string) {
   );
 }
 
-const launched = { id: 7, name: "BlueGenji Open", state: "RUNNING", entrantCount: 12 };
+const launched: LaunchedTournament = { id: 7, name: "BlueGenji Open", state: "RUNNING", entrantCount: 12 };
 
 describe("POST /api/admin/tournaments/[id]/launch", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (launchTournamentNow as jest.Mock).mockResolvedValue(launched as never);
+    jest.mocked(launchTournamentNow).mockResolvedValue(launched);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -41,7 +40,7 @@ describe("POST /api/admin/tournaments/[id]/launch", () => {
     // suppression définitive.
     ["un arbitre", arbitre],
   ])("lance le tournoi pour %s", async (_label, user) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
 
     const res = await launch("7");
 
@@ -51,7 +50,7 @@ describe("POST /api/admin/tournaments/[id]/launch", () => {
   });
 
   it("rejette un visiteur anonyme avec 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
 
     const res = await launch("7");
 
@@ -65,7 +64,7 @@ describe("POST /api/admin/tournaments/[id]/launch", () => {
     ["un caster", caster],
     ["un joueur ordinaire", player],
   ])("rejette %s avec 403", async (_label, user) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
 
     const res = await launch("7");
 
@@ -75,7 +74,7 @@ describe("POST /api/admin/tournaments/[id]/launch", () => {
   });
 
   it.each(["abc", "0", "-3", "1.5"])("refuse l'identifiant invalide %s", async (id) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
 
     const res = await launch(id);
 
@@ -85,8 +84,8 @@ describe("POST /api/admin/tournaments/[id]/launch", () => {
   });
 
   it("répond 404 pour un tournoi inconnu", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (launchTournamentNow as jest.Mock).mockRejectedValue(new Error("TOURNAMENT_NOT_FOUND") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(launchTournamentNow).mockRejectedValue(new Error("TOURNAMENT_NOT_FOUND"));
 
     const res = await launch("7");
 
@@ -97,8 +96,8 @@ describe("POST /api/admin/tournaments/[id]/launch", () => {
   it.each(["TOURNAMENT_ALREADY_STARTED", "TOURNAMENT_ALREADY_FINISHED"])(
     "répond 409 quand il n'y a plus rien à abréger (%s)",
     async (code) => {
-      (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-      (launchTournamentNow as jest.Mock).mockRejectedValue(new Error(code) as never);
+      jest.mocked(getCurrentUser).mockResolvedValue(admin);
+      jest.mocked(launchTournamentNow).mockRejectedValue(new Error(code));
 
       const res = await launch("7");
 
@@ -108,8 +107,8 @@ describe("POST /api/admin/tournaments/[id]/launch", () => {
   );
 
   it.each(["INVALID_DATES", "INVALID_DATE_ORDER"])("répond 400 sur %s", async (code) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (launchTournamentNow as jest.Mock).mockRejectedValue(new Error(code) as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(launchTournamentNow).mockRejectedValue(new Error(code));
 
     const res = await launch("7");
 
@@ -118,8 +117,8 @@ describe("POST /api/admin/tournaments/[id]/launch", () => {
   });
 
   it("répond 500 sans laisser fuir le message du moteur", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (launchTournamentNow as jest.Mock).mockRejectedValue(new Error("ER_LOCK_DEADLOCK") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(launchTournamentNow).mockRejectedValue(new Error("ER_LOCK_DEADLOCK"));
     const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
     const res = await launch("7");

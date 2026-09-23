@@ -8,6 +8,7 @@ jest.mock("@/lib/server/image-upload");
 import { deleteOwnAccount, getAccountDeletionPlan } from "@/lib/server/users-service";
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
+import { fakePool } from "../../helpers/sql-double";
 
 /**
  * L'écriture de la suppression : ce qu'elle efface, ce qu'elle garde, et ce
@@ -66,10 +67,10 @@ function fakeDb(
     release: jest.fn(() => {}),
   };
 
-  (getDatabase as jest.Mock).mockResolvedValue({
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
     execute,
     getConnection: jest.fn(async () => connection),
-  } as never);
+  }));
   return { queries, connection };
 }
 
@@ -363,7 +364,7 @@ describe("deleteOwnAccount — le fichier de l'avatar", () => {
   });
 
   it("un disque récalcitrant ne fait pas échouer une suppression commitée", async () => {
-    (deleteStoredImage as jest.Mock).mockImplementation(() => {
+    jest.mocked(deleteStoredImage).mockImplementation(() => {
       throw new Error("EACCES");
     });
     fakeDb(EMPTY, { avatarUrl: "/api/uploads/avatars/7-gh.webp" });

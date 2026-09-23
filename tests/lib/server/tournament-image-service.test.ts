@@ -13,6 +13,7 @@ import {
   updateTournamentImageSettings,
 } from "@/lib/server/tournaments/image";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { fakePool } from "../../helpers/sql-double";
 
 /**
  * Écriture de l'image d'un tournoi : fichier, cadrage, et ménage du disque.
@@ -48,7 +49,7 @@ function mockTournament(current: string | null | undefined, options: { failOnUpd
     rollback: jest.fn(),
     release: jest.fn(),
   };
-  (getDatabase as jest.Mock).mockResolvedValue({ getConnection: jest.fn(async () => connection) } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ getConnection: jest.fn(async () => connection) }));
   return { execute, connection };
 }
 
@@ -57,8 +58,8 @@ const cover = { fit: "COVER" as const, focusX: 20, focusY: 80 };
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (processAndStoreImage as jest.Mock).mockResolvedValue(NEW_DISK as never);
-  (deleteStoredImage as jest.Mock).mockResolvedValue(undefined as never);
+  jest.mocked(processAndStoreImage).mockResolvedValue(NEW_DISK);
+  jest.mocked(deleteStoredImage).mockResolvedValue(undefined);
 });
 afterEach(() => {
   jest.restoreAllMocks();
@@ -83,7 +84,7 @@ describe("setTournamentImage", () => {
   it("convertit avant d'ouvrir la transaction : sharp ne tient jamais le verrou", async () => {
     const { connection } = mockTournament(null);
     const order: string[] = [];
-    (processAndStoreImage as jest.Mock).mockImplementation(async () => {
+    jest.mocked(processAndStoreImage).mockImplementation(async () => {
       order.push("process");
       return NEW_DISK;
     });
@@ -101,7 +102,7 @@ describe("setTournamentImage", () => {
     connection.commit.mockImplementation(async () => {
       committed = true;
     });
-    (deleteStoredImage as jest.Mock).mockImplementation(async () => {
+    jest.mocked(deleteStoredImage).mockImplementation(async () => {
       expect(committed).toBe(true);
     });
 
@@ -138,7 +139,7 @@ describe("setTournamentImage", () => {
 
   it("n'écrit rien en base quand le fichier est refusé", async () => {
     const { execute } = mockTournament(OLD_URL);
-    (processAndStoreImage as jest.Mock).mockRejectedValue(new Error("IMAGE_FORMAT_INVALID") as never);
+    jest.mocked(processAndStoreImage).mockRejectedValue(new Error("IMAGE_FORMAT_INVALID"));
 
     await expect(setTournamentImage(7, pngFile(), cover)).rejects.toThrow("IMAGE_FORMAT_INVALID");
     expect(execute).not.toHaveBeenCalled();
@@ -148,7 +149,7 @@ describe("setTournamentImage", () => {
   it("un ménage raté ne défait pas l'enregistrement, déjà acquis", async () => {
     mockTournament(OLD_URL);
     const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
-    (deleteStoredImage as jest.Mock).mockRejectedValue(new Error("EPERM") as never);
+    jest.mocked(deleteStoredImage).mockRejectedValue(new Error("EPERM"));
 
     await expect(setTournamentImage(7, pngFile(), cover)).resolves.toEqual({ url: NEW_URL, ...cover });
     expect(log).toHaveBeenCalled();
@@ -201,7 +202,7 @@ describe("removeTournamentImage", () => {
     connection.commit.mockImplementation(async () => {
       committed = true;
     });
-    (deleteStoredImage as jest.Mock).mockImplementation(async () => {
+    jest.mocked(deleteStoredImage).mockImplementation(async () => {
       expect(committed).toBe(true);
     });
 

@@ -77,7 +77,7 @@ describe("GET /api/bot/feed/stream — garde-fous", () => {
     for (let i = 0; i < MAX_BOT_FEED_STREAMS_PER_CLIENT; i += 1) {
       held.push(await GET(request()));
     }
-    (globalThis.fetch as jest.Mock).mockClear();
+    jest.mocked(globalThis.fetch).mockClear();
 
     const refused = await GET(request());
 

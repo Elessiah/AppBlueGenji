@@ -16,6 +16,7 @@ import { checkEntrantEligibility } from "@/lib/server/tournaments/registration-e
 import { findSoloEntry } from "@/lib/server/solo-entries-service";
 import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import type { TournamentSnapshot } from "@/lib/shared/types";
+import { fakeConnection } from "../helpers/sql-double";
 
 /**
  * Le **bouton** d'inscription et ce que le serveur ferait au clic.
@@ -49,13 +50,11 @@ function snapshot(overrides: Record<string, unknown> = {}): TournamentSnapshot {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (withConnection as jest.Mock).mockImplementation(async (fn: unknown) =>
-    (fn as (c: unknown) => unknown)({}),
-  );
-  (getTournamentPreview as jest.Mock).mockResolvedValue(null as never);
-  (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 42, roles: ["OWNER"] } as never);
+  jest.mocked(withConnection).mockImplementation((fn) => fn(fakeConnection({})));
+  jest.mocked(getTournamentPreview).mockResolvedValue(null);
+  jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 42, teamName: "Équipe", roles: ["OWNER"] });
   eligibilityMock.mockResolvedValue(null);
-  (findSoloEntry as jest.Mock).mockResolvedValue(null as never);
+  jest.mocked(findSoloEntry).mockResolvedValue(null);
 });
 
 describe("canRegister — les conditions ferment le bouton", () => {
@@ -122,7 +121,7 @@ describe("la lecture de roster n'a lieu que si elle peut changer la réponse", (
   });
 
   it("ne lit rien pour un joueur sans équipe", async () => {
-    (getUserActiveTeam as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getUserActiveTeam).mockResolvedValue(null);
 
     const context = await getTournamentViewerContext(snapshot(), 7);
 
@@ -133,7 +132,7 @@ describe("la lecture de roster n'a lieu que si elle peut changer la réponse", (
   it("ne lit rien pour un joueur sans qualité pour engager", async () => {
     // Le refus de qualité prime : il renvoie à quelqu'un d'autre, alors que les
     // conditions désignent un geste que ce joueur n'aurait pas à faire.
-    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 42, roles: ["DPS"] } as never);
+    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 42, teamName: "Équipe", roles: ["DPS"] });
 
     const context = await getTournamentViewerContext(snapshot(), 7);
 

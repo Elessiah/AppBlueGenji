@@ -133,8 +133,8 @@ describe("adminSaveMatchScores — respect du format de match", () => {
 describe("adminResolveMatch — respect du format de match", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (finalizeMatch as jest.Mock).mockResolvedValue(undefined as never);
-    (tryAutoResolveByes as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(finalizeMatch).mockResolvedValue(undefined);
+    jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
   });
 
   it("accepte un 3-2 en BO5 et désigne le vainqueur", async () => {

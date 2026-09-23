@@ -8,6 +8,7 @@ import { adoptRemoteAvatar } from "@/lib/server/users-service";
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { importRemoteAvatar, shouldImportRemoteAvatar } from "@/lib/server/user-avatar-import";
+import { fakePool } from "../../helpers/sql-double";
 
 /**
  * La copie de la photo d'un fournisseur, et la course la plus longue de toutes.
@@ -39,17 +40,17 @@ function fakeDb(options: { alive: boolean }) {
     // que porte la requête elle-même.
     return [options.alive ? [{ avatar_url: null }] : []];
   });
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return { queries };
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (shouldImportRemoteAvatar as jest.Mock).mockReturnValue(true);
-  (importRemoteAvatar as jest.Mock).mockResolvedValue(
-    "/api/uploads/avatars/7-new.webp" as never,
+  jest.mocked(shouldImportRemoteAvatar).mockReturnValue(true);
+  jest.mocked(importRemoteAvatar).mockResolvedValue(
+    "/api/uploads/avatars/7-new.webp",
   );
-  (deleteStoredImage as jest.Mock).mockResolvedValue(undefined as never);
+  jest.mocked(deleteStoredImage).mockResolvedValue(undefined);
 });
 
 describe("adoptRemoteAvatar — la photo ne se pose pas sur une ligne morte", () => {
@@ -94,7 +95,7 @@ describe("adoptRemoteAvatar — la photo ne se pose pas sur une ligne morte", ()
       alive = false;
       return [rows];
     });
-    (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
     await adoptRemoteAvatar(7, "https://cdn.example.invalid/a.png");
 
@@ -104,14 +105,14 @@ describe("adoptRemoteAvatar — la photo ne se pose pas sur une ligne morte", ()
   it("ne remonte jamais un disque récalcitrant — la fonction est silencieuse par contrat", async () => {
     fakeDb({ alive: false });
     // Lecture vivante forcée : on veut atteindre le ménage.
-    (getDatabase as jest.Mock).mockResolvedValue({
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({
       execute: jest.fn(async (sql: string) =>
         String(sql).trim().startsWith("UPDATE")
           ? [{ affectedRows: 0 }]
           : [[{ avatar_url: null }]],
       ),
-    } as never);
-    (deleteStoredImage as jest.Mock).mockRejectedValue(new Error("EROFS") as never);
+    }));
+    jest.mocked(deleteStoredImage).mockRejectedValue(new Error("EROFS"));
 
     await expect(
       adoptRemoteAvatar(7, "https://cdn.example.invalid/a.png"),

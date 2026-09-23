@@ -8,10 +8,11 @@ import {
   syncSoloEntryIdentity,
 } from "@/lib/server/solo-entries-service";
 import { getDatabase } from "@/lib/server/database";
+import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
-type ExecuteMock = jest.Mock;
+type ExecuteMock = SqlMock;
 
 function fakeConnection(execute: ExecuteMock): PoolConnection {
   return { execute } as unknown as PoolConnection;
@@ -47,10 +48,10 @@ describe("ensureSoloEntry", () => {
 
   it("crée l'entrée solo au nom du joueur, sans membre ni caractère fantôme", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce(USER as never) // identité du compte
-      .mockResolvedValueOnce(NO_ROW as never) // aucune entrée existante
-      .mockResolvedValueOnce([{ insertId: 77 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(USER) // identité du compte
+      .mockResolvedValueOnce(NO_ROW) // aucune entrée existante
+      .mockResolvedValueOnce([{ insertId: 77 }]);
 
     await expect(ensureSoloEntry(fakeConnection(execute), 1)).resolves.toBe(77);
 
@@ -62,10 +63,10 @@ describe("ensureSoloEntry", () => {
 
   it("verrouille la ligne du compte avant de créer l'entrée — aucune clé étrangère ne la tient", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce(USER as never)
-      .mockResolvedValueOnce(NO_ROW as never)
-      .mockResolvedValueOnce([{ insertId: 77 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(USER)
+      .mockResolvedValueOnce(NO_ROW)
+      .mockResolvedValueOnce([{ insertId: 77 }]);
 
     await ensureSoloEntry(fakeConnection(execute), 1);
 
@@ -76,13 +77,13 @@ describe("ensureSoloEntry", () => {
 
   it("laisse la resynchronisation hors transaction lire sans verrouiller", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[{ id: 55 }], []] as never)
-      .mockResolvedValueOnce(USER as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
-    (getDatabase as jest.Mock).mockResolvedValue({
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 55 }], []])
+      .mockResolvedValueOnce(USER)
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({
       getConnection: jest.fn(async () => ({ execute, release: jest.fn() })),
-    } as never);
+    }));
 
     await syncSoloEntryIdentity(1);
 
@@ -93,10 +94,10 @@ describe("ensureSoloEntry", () => {
 
   it("réutilise l'entrée existante et resynchronise son identité", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce(USER as never)
-      .mockResolvedValueOnce([[{ id: 55 }], []] as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(USER)
+      .mockResolvedValueOnce([[{ id: 55 }], []])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     await expect(ensureSoloEntry(fakeConnection(execute), 1)).resolves.toBe(55);
 
@@ -109,12 +110,12 @@ describe("ensureSoloEntry", () => {
 
   it("bascule sur le nom suffixé quand le pseudo est déjà pris par une équipe", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce(USER as never)
-      .mockResolvedValueOnce(NO_ROW as never)
-      .mockRejectedValueOnce(duplicateName() as never) // « ShadowNinja » est pris
-      .mockResolvedValueOnce(NO_ROW as never) // pas de course concurrente
-      .mockResolvedValueOnce([{ insertId: 91 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(USER)
+      .mockResolvedValueOnce(NO_ROW)
+      .mockRejectedValueOnce(duplicateName()) // « ShadowNinja » est pris
+      .mockResolvedValueOnce(NO_ROW) // pas de course concurrente
+      .mockResolvedValueOnce([{ insertId: 91 }]);
 
     await expect(ensureSoloEntry(fakeConnection(execute), 4)).resolves.toBe(91);
 
@@ -126,36 +127,36 @@ describe("ensureSoloEntry", () => {
     // Deux inscriptions simultanées : la seconde bute sur l'unicité de
     // `solo_user_id` et doit adopter l'entrée déjà créée.
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce(USER as never)
-      .mockResolvedValueOnce(NO_ROW as never)
-      .mockRejectedValueOnce(duplicateName() as never)
-      .mockResolvedValueOnce([[{ id: 33 }], []] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(USER)
+      .mockResolvedValueOnce(NO_ROW)
+      .mockRejectedValueOnce(duplicateName())
+      .mockResolvedValueOnce([[{ id: 33 }], []]);
 
     await expect(ensureSoloEntry(fakeConnection(execute), 4)).resolves.toBe(33);
   });
 
   it("remonte une erreur SQL qui n'est pas un doublon", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce(USER as never)
-      .mockResolvedValueOnce(NO_ROW as never)
-      .mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK") as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(USER)
+      .mockResolvedValueOnce(NO_ROW)
+      .mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
 
     await expect(ensureSoloEntry(fakeConnection(execute), 4)).rejects.toThrow("ER_LOCK_DEADLOCK");
   });
 
   it("échoue si tous les noms candidats sont pris", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce(USER as never)
-      .mockResolvedValueOnce(NO_ROW as never)
-      .mockRejectedValueOnce(duplicateName() as never)
-      .mockResolvedValueOnce(NO_ROW as never)
-      .mockRejectedValueOnce(duplicateName() as never)
-      .mockResolvedValueOnce(NO_ROW as never)
-      .mockRejectedValueOnce(duplicateName() as never)
-      .mockResolvedValueOnce(NO_ROW as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(USER)
+      .mockResolvedValueOnce(NO_ROW)
+      .mockRejectedValueOnce(duplicateName())
+      .mockResolvedValueOnce(NO_ROW)
+      .mockRejectedValueOnce(duplicateName())
+      .mockResolvedValueOnce(NO_ROW)
+      .mockRejectedValueOnce(duplicateName())
+      .mockResolvedValueOnce(NO_ROW);
 
     await expect(ensureSoloEntry(fakeConnection(execute), 4)).rejects.toThrow(
       "SOLO_ENTRY_NAME_UNAVAILABLE",
@@ -163,7 +164,7 @@ describe("ensureSoloEntry", () => {
   });
 
   it("refuse un compte inconnu", async () => {
-    const execute = jest.fn().mockResolvedValueOnce(NO_ROW as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(NO_ROW);
     await expect(ensureSoloEntry(fakeConnection(execute), 404)).rejects.toThrow("USER_NOT_FOUND");
     expect(execute).toHaveBeenCalledTimes(1);
   });
@@ -171,12 +172,12 @@ describe("ensureSoloEntry", () => {
 
 describe("findSoloEntry", () => {
   it("renvoie null quand le joueur n'a jamais joué en individuel", async () => {
-    const execute = jest.fn().mockResolvedValue(NO_ROW as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue(NO_ROW);
     await expect(findSoloEntry(fakeConnection(execute), 8)).resolves.toBeNull();
   });
 
   it("renvoie l'identifiant de l'entrée", async () => {
-    const execute = jest.fn().mockResolvedValue([[{ id: 12 }], []] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ id: 12 }], []]);
     await expect(findSoloEntry(fakeConnection(execute), 8)).resolves.toBe(12);
   });
 });
@@ -189,14 +190,14 @@ describe("syncSoloEntryIdentity", () => {
   async function mockPool(execute: ExecuteMock) {
     const { getDatabase } = await import("@/lib/server/database");
     const release = jest.fn();
-    (getDatabase as jest.Mock).mockResolvedValue({
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({
       getConnection: jest.fn(async () => ({ execute, release })),
-    } as never);
+    }));
     return release;
   }
 
   it("ne touche à rien si le joueur n'a pas d'entrée solo", async () => {
-    const execute = jest.fn().mockResolvedValue(NO_ROW as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue(NO_ROW);
     const release = await mockPool(execute);
 
     await syncSoloEntryIdentity(3);
@@ -207,10 +208,10 @@ describe("syncSoloEntryIdentity", () => {
 
   it("recopie pseudo et avatar sur l'entrée", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[{ id: 5 }], []] as never)
-      .mockResolvedValueOnce([[{ pseudo: "Nova", avatar_url: null }], []] as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 5 }], []])
+      .mockResolvedValueOnce([[{ pseudo: "Nova", avatar_url: null }], []])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockPool(execute);
 
     await syncSoloEntryIdentity(3);
@@ -222,11 +223,11 @@ describe("syncSoloEntryIdentity", () => {
 
   it("laisse le nom en place si le nouveau pseudo est déjà pris", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[{ id: 5 }], []] as never)
-      .mockResolvedValueOnce([[{ pseudo: "Nova", avatar_url: null }], []] as never)
-      .mockRejectedValueOnce(duplicateName() as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 5 }], []])
+      .mockResolvedValueOnce([[{ pseudo: "Nova", avatar_url: null }], []])
+      .mockRejectedValueOnce(duplicateName())
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockPool(execute);
 
     // Un renommage de profil ne doit pas échouer à cause de l'entrée solo.
@@ -238,19 +239,19 @@ describe("syncSoloEntryIdentity", () => {
 
 describe("loadSoloUserIds", () => {
   it("n'interroge pas la base sans engagé", async () => {
-    const execute = jest.fn();
+    const execute = jest.fn<SqlQuery>();
     await expect(loadSoloUserIds(fakeConnection(execute), [])).resolves.toEqual({});
     expect(execute).not.toHaveBeenCalled();
   });
 
   it("associe chaque entrée solo à son joueur", async () => {
-    const execute = jest.fn().mockResolvedValue([
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([
       [
         { id: 7, solo_user_id: 70 },
         { id: 9, solo_user_id: 90 },
       ],
       [],
-    ] as never);
+    ]);
 
     await expect(loadSoloUserIds(fakeConnection(execute), [7, 8, 9])).resolves.toEqual({
       7: 70,
@@ -277,8 +278,8 @@ describe("findSoloEntryUser", () => {
   });
 
   async function withRows(rows: unknown[]) {
-    const execute = jest.fn().mockResolvedValue([rows, []] as never);
-    (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([rows, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
     return execute;
   }
 
@@ -329,10 +330,10 @@ describe("entrée solo — avatar masqué", () => {
 
   it("n'écrit aucun logo quand le joueur a masqué son avatar", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce(USER_HIDDEN_AVATAR as never)
-      .mockResolvedValueOnce(NO_ROW as never)
-      .mockResolvedValueOnce([{ insertId: 77 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(USER_HIDDEN_AVATAR)
+      .mockResolvedValueOnce(NO_ROW)
+      .mockResolvedValueOnce([{ insertId: 77 }]);
 
     await expect(ensureSoloEntry(fakeConnection(execute), 1)).resolves.toBe(77);
 
@@ -344,13 +345,13 @@ describe("entrée solo — avatar masqué", () => {
     // Le geste qui compte : masquer son avatar après coup doit **retirer**
     // l'image de l'entrée solo, pas seulement cesser de la reposer.
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[{ id: 55 }], []] as never) // findSoloEntry
-      .mockResolvedValueOnce(USER_HIDDEN_AVATAR as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
-    (getDatabase as jest.Mock).mockResolvedValue({
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 55 }], []]) // findSoloEntry
+      .mockResolvedValueOnce(USER_HIDDEN_AVATAR)
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({
       getConnection: jest.fn(async () => ({ execute, release: jest.fn() })),
-    } as never);
+    }));
 
     await syncSoloEntryIdentity(1);
 
@@ -364,10 +365,10 @@ describe("entrée solo — avatar masqué", () => {
     // Le pseudo identifie le joueur en bracket, en roster et en feuille de
     // match : `applyVisibility` ne le masque pas non plus.
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce(USER_HIDDEN_AVATAR as never)
-      .mockResolvedValueOnce(NO_ROW as never)
-      .mockResolvedValueOnce([{ insertId: 77 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(USER_HIDDEN_AVATAR)
+      .mockResolvedValueOnce(NO_ROW)
+      .mockResolvedValueOnce([{ insertId: 77 }]);
 
     await ensureSoloEntry(fakeConnection(execute), 1);
 
@@ -378,10 +379,10 @@ describe("entrée solo — avatar masqué", () => {
   it("lit `visible_avatar` avec l'identité du compte", async () => {
     // Colonne absente → `undefined === 1` est faux → tout logo disparaîtrait.
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce(USER as never)
-      .mockResolvedValueOnce(NO_ROW as never)
-      .mockResolvedValueOnce([{ insertId: 77 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(USER)
+      .mockResolvedValueOnce(NO_ROW)
+      .mockResolvedValueOnce([{ insertId: 77 }]);
 
     await ensureSoloEntry(fakeConnection(execute), 1);
 
@@ -414,7 +415,7 @@ describe("ensureSoloEntry — compte supprimé", () => {
   ];
 
   it("refuse une ligne anonymisée comme une ligne disparue", async () => {
-    const execute = jest.fn().mockResolvedValueOnce(DELETED as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(DELETED);
 
     await expect(ensureSoloEntry(fakeConnection(execute), 12)).rejects.toThrow("USER_NOT_FOUND");
     // Le refus tombe sur la **première** lecture : ni recherche d'entrée
@@ -428,9 +429,9 @@ describe("ensureSoloEntry — compte supprimé", () => {
     // l'anonymisation. La resynchroniser est le travail de
     // `syncSoloEntryIdentityOn` ; l'**engager de nouveau** ne l'est pas.
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce(DELETED as never)
-      .mockResolvedValueOnce([[{ id: 55 }], []] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(DELETED)
+      .mockResolvedValueOnce([[{ id: 55 }], []]);
 
     await expect(ensureSoloEntry(fakeConnection(execute), 12)).rejects.toThrow("USER_NOT_FOUND");
     expect(execute).toHaveBeenCalledTimes(1);
@@ -440,10 +441,10 @@ describe("ensureSoloEntry — compte supprimé", () => {
     // Une seconde requête laisserait un `await` entre la question et la
     // réponse — exactement la course que le verrou est là pour fermer.
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce(USER as never)
-      .mockResolvedValueOnce(NO_ROW as never)
-      .mockResolvedValueOnce([{ insertId: 77 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(USER)
+      .mockResolvedValueOnce(NO_ROW)
+      .mockResolvedValueOnce([{ insertId: 77 }]);
 
     await ensureSoloEntry(fakeConnection(execute), 1);
 
@@ -457,10 +458,10 @@ describe("ensureSoloEntry — compte supprimé", () => {
     // colonne absente n'interdit rien. Sans cette précaution, un jeu de données
     // d'essai ou une lecture partielle fermerait l'inscription à tout le monde.
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce(USER as never)
-      .mockResolvedValueOnce(NO_ROW as never)
-      .mockResolvedValueOnce([{ insertId: 77 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(USER)
+      .mockResolvedValueOnce(NO_ROW)
+      .mockResolvedValueOnce([{ insertId: 77 }]);
 
     await expect(ensureSoloEntry(fakeConnection(execute), 1)).resolves.toBe(77);
   });

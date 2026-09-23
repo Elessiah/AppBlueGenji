@@ -11,6 +11,7 @@ import {
   setUserRoles,
   updateOwnProfile,
 } from "@/lib/server/users-service";
+import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 /**
  * Ce qu'une ligne morte ne doit plus accepter ni fournir.
@@ -36,13 +37,13 @@ import {
  * passe `syncSoloEntryIdentity` — le témoin le plus direct qu'une identité a
  * été (ou non) republiée dans les brackets.
  */
-async function mockDb(execute: jest.Mock) {
+async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
   const getConnection = jest.fn(async () => ({
     execute: jest.fn<() => Promise<unknown>>().mockResolvedValue([[], []]),
     release: () => undefined,
   }));
-  (getDatabase as jest.Mock).mockResolvedValue({ execute, getConnection } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, getConnection }));
   return getConnection;
 }
 
@@ -55,7 +56,7 @@ describe("updateOwnProfile — une ligne supprimée n'accepte plus rien", () => 
   });
 
   it("borne l'écriture aux comptes vivants", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await updateOwnProfile(42, { pseudo: "Nova" });
@@ -70,14 +71,14 @@ describe("updateOwnProfile — une ligne supprimée n'accepte plus rien", () => 
   it("refuse la sauvegarde arrivée après l'anonymisation", async () => {
     // `affectedRows` compte les lignes **appariées** (mysql2 pose `FOUND_ROWS`) :
     // zéro ne dit pas « rien n'a changé » mais « aucune ligne vivante ».
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 0 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }]);
     await mockDb(execute);
 
     await expect(updateOwnProfile(42, { pseudo: "Nova" })).rejects.toThrow("ACCOUNT_DELETED");
   });
 
   it("ne republie pas l'identité de l'entrée solo quand l'écriture est refusée", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 0 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }]);
     const getConnection = await mockDb(execute);
 
     await expect(updateOwnProfile(42, { pseudo: "Nova" })).rejects.toThrow("ACCOUNT_DELETED");
@@ -89,7 +90,7 @@ describe("updateOwnProfile — une ligne supprimée n'accepte plus rien", () => 
   });
 
   it("laisse passer une sauvegarde ordinaire, resynchronisation comprise", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     const getConnection = await mockDb(execute);
 
     await expect(updateOwnProfile(42, { pseudo: "Nova" })).resolves.toBeUndefined();
@@ -106,7 +107,7 @@ describe("getUserIdByPseudo — un compte supprimé ne se rattache plus", () => 
   });
 
   it("écarte les lignes mortes en base, pas côté appelant", async () => {
-    const execute = jest.fn().mockResolvedValue([[{ id: 7 }]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ id: 7 }]]);
     await mockDb(execute);
 
     await getUserIdByPseudo("Nova");
@@ -116,7 +117,7 @@ describe("getUserIdByPseudo — un compte supprimé ne se rattache plus", () => 
   });
 
   it("rend null quand aucune ligne vivante ne porte le pseudo", async () => {
-    const execute = jest.fn().mockResolvedValue([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
     await mockDb(execute);
 
     // `null` est exactement ce que les deux appelants traduisent en
@@ -139,9 +140,9 @@ describe("setUserRoles — la course se dit, elle ne se tait pas", () => {
     // d'administration affichait les rôles comme sauvegardés alors qu'aucune
     // ligne n'avait bougé.
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[{ id: 7 }]] as never)
-      .mockResolvedValueOnce([{ affectedRows: 0 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 7 }]])
+      .mockResolvedValueOnce([{ affectedRows: 0 }]);
     await mockDb(execute);
 
     await expect(setUserRoles(7, ["ARBITRE"])).rejects.toThrow("USER_NOT_FOUND");
@@ -149,9 +150,9 @@ describe("setUserRoles — la course se dit, elle ne se tait pas", () => {
 
   it("rend les rôles normalisés quand l'écriture a bien apparié la ligne", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[{ id: 7 }]] as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 7 }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await expect(setUserRoles(7, ["ARBITRE"])).resolves.toEqual(["ARBITRE"]);
@@ -188,9 +189,9 @@ describe("connexions OAuth — une ligne supprimée ne reprend pas son identité
     // Le `SELECT` a résolu le compte avant la suppression ; l'`UPDATE` arrive
     // après son commit.
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[{ id: 412 }], []] as never) // compte résolu sur discord_id
-      .mockResolvedValue([{ affectedRows: 0 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 412 }], []]) // compte résolu sur discord_id
+      .mockResolvedValue([{ affectedRows: 0 }]);
     await mockDb(execute);
 
     await createOrGetDiscordUser("100000000000000001", undefined, "nova", {
@@ -206,9 +207,9 @@ describe("connexions OAuth — une ligne supprimée ne reprend pas son identité
 
   it("Blizzard : ne repose pas le BattleTag sur un compte mort", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[{ id: 412 }], []] as never) // compte résolu sur blizzard_sub
-      .mockResolvedValue([{ affectedRows: 0 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 412 }], []]) // compte résolu sur blizzard_sub
+      .mockResolvedValue([{ affectedRows: 0 }]);
     await mockDb(execute);
 
     await createOrGetBlizzardUser("sub-412", "Nova#2143");

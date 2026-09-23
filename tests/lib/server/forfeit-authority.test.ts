@@ -14,6 +14,8 @@ import { resolveUserEntrant } from "@/lib/server/tournaments/registration";
 import { loadTournamentRow } from "@/lib/server/tournaments/repository";
 import { discardBotLogs, flushBotLogs, queueBotLog } from "@/lib/server/tournaments/bot-logs";
 import { forfeitEnduranceTeam } from "@/lib/server/tournaments/bg-survie";
+import { fakePool } from "../../helpers/sql-double";
+import { tournamentRow } from "../../helpers/tournament-rows";
 
 /**
  * **Le droit d'abandonner, relu dans la transaction qui l'écrit.**
@@ -45,10 +47,10 @@ function mockConnection() {
     rollback: jest.fn(),
     release: jest.fn(),
   };
-  (getDatabase as jest.Mock).mockResolvedValue({
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
     execute: jest.fn(),
     getConnection: jest.fn(async () => connection),
-  } as never);
+  }));
   return connection;
 }
 
@@ -58,11 +60,11 @@ const entrant = (teamId: number | null, canActForEntrant: boolean) =>
 describe("forfeitTournamentTeamPublic — qualité pour désengager", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (flushBotLogs as jest.Mock).mockReturnValue(undefined);
-    (discardBotLogs as jest.Mock).mockReturnValue(undefined);
-    (queueBotLog as jest.Mock).mockReturnValue(undefined);
-    tournamentRowMock.mockResolvedValue({ id: TOURNAMENT_ID, participant_type: "TEAM" } as never);
-    forfeitEngineMock.mockResolvedValue(undefined as never);
+    jest.mocked(flushBotLogs).mockReturnValue(undefined);
+    jest.mocked(discardBotLogs).mockReturnValue(undefined);
+    jest.mocked(queueBotLog).mockReturnValue(true);
+    tournamentRowMock.mockResolvedValue(tournamentRow({ id: TOURNAMENT_ID, participant_type: "TEAM" }));
+    forfeitEngineMock.mockResolvedValue(undefined);
   });
 
   it("laisse passer un représentant de l'engagé", async () => {
@@ -119,7 +121,7 @@ describe("forfeitTournamentTeamPublic — qualité pour désengager", () => {
 
   it("refuse sur un tournoi introuvable, sans consulter l'appartenance", async () => {
     mockConnection();
-    tournamentRowMock.mockResolvedValue(null as never);
+    tournamentRowMock.mockResolvedValue(null);
 
     await expect(forfeitTournamentTeamPublic(TOURNAMENT_ID, TEAM_ID, 42)).rejects.toThrow(
       "TOURNAMENT_NOT_FOUND",

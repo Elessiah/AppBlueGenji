@@ -28,6 +28,8 @@ import { reconcileSurvival } from "@/lib/server/tournaments/survival";
 import { reconcileSwiss } from "@/lib/server/tournaments/swiss";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
 import type { PhaseFormat, TournamentFormat, TournamentState } from "@/lib/shared/types";
+import { fakePool } from "../../helpers/sql-double";
+import { tournamentRow, phaseRow } from "../../helpers/tournament-rows";
 
 type MatchSeed = {
   id: number;
@@ -139,15 +141,16 @@ function setup(options: {
     rollback: jest.fn(),
     release: jest.fn(),
   };
-  (getDatabase as jest.Mock).mockResolvedValue({
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
     execute: jest.fn(),
     getConnection: jest.fn(async () => connection),
-  } as never);
-  (syncTournamentState as jest.Mock).mockResolvedValue({
-    row: options.missing ? null : { id: 7, state: options.state ?? "RUNNING" },
+  }));
+  jest.mocked(syncTournamentState).mockResolvedValue({
+    row: options.missing ? null : tournamentRow({ id: 7, state: options.state ?? "RUNNING" }),
     stateChanged: false,
-  } as never);
-  (loadPhases as jest.Mock).mockResolvedValue((options.phases ?? []) as never);
+    contentChanged: false,
+  });
+  jest.mocked(loadPhases).mockResolvedValue((options.phases ?? []).map((phase) => phaseRow(phase)));
 
   return { execute, connection };
 }
@@ -156,15 +159,15 @@ beforeEach(() => {
   jest.clearAllMocks();
   for (const fn of [
     tryAutoResolveByes,
-    reconcileSurvival,
-    reconcileSwiss,
     reconcileEndurance,
     reconcilePhases,
     resetRegistrationRanks,
     pushTeamToTarget,
   ]) {
-    (fn as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(fn).mockResolvedValue(undefined);
   }
+  jest.mocked(reconcileSurvival).mockResolvedValue({ done: false, standings: [] });
+  jest.mocked(reconcileSwiss).mockResolvedValue({ done: false, ranked: [] });
 });
 
 describe("rollbackCurrentRound — gardes", () => {

@@ -32,6 +32,7 @@ import {
   unlinkOAuthIdentity,
   type OAuthIdentity,
 } from "@/lib/server/account-identities";
+import { fakePool } from "../../helpers/sql-double";
 
 /**
  * **Les portes d'entrée d'un compte : deux règles, et rien d'autre.**
@@ -116,7 +117,7 @@ function fakeDb(row: Row | null, takenElsewhere: Record<string, boolean> = {}) {
     return [{ affectedRows: 1 }, []];
   });
 
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return { execute, statements };
 }
 
@@ -134,14 +135,14 @@ const identity = (overrides: Partial<OAuthIdentity> = {}): OAuthIdentity => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (adoptRemoteAvatar as jest.Mock).mockResolvedValue(undefined as never);
+  jest.mocked(adoptRemoteAvatar).mockResolvedValue(undefined);
 });
 
 describe("createOrGetOAuthUser", () => {
   it("aiguille vers la fonction du fournisseur, sans en oublier un", async () => {
-    (createOrGetGoogleUser as jest.Mock).mockResolvedValue(1 as never);
-    (createOrGetDiscordUser as jest.Mock).mockResolvedValue(2 as never);
-    (createOrGetBlizzardUser as jest.Mock).mockResolvedValue(3 as never);
+    jest.mocked(createOrGetGoogleUser).mockResolvedValue(1);
+    jest.mocked(createOrGetDiscordUser).mockResolvedValue(2);
+    jest.mocked(createOrGetBlizzardUser).mockResolvedValue(3);
 
     await expect(
       createOrGetOAuthUser(identity({ provider: "GOOGLE", subject: "sub", handle: null })),
@@ -315,7 +316,7 @@ describe("linkOAuthIdentity — on ne déplace jamais une porte", () => {
     // rattachement a échoué » sur une identité **déjà écrite** — que la liste
     // d'à côté montrait rattachée dans le même écran.
     const { statements } = fakeDb(emptyRow);
-    (adoptRemoteAvatar as jest.Mock).mockRejectedValue(new Error("ER_LOCK_DEADLOCK") as never);
+    jest.mocked(adoptRemoteAvatar).mockRejectedValue(new Error("ER_LOCK_DEADLOCK"));
 
     await expect(
       linkOAuthIdentity(7, identity({ avatarUrl: "https://cdn.discord.test/a.png" })),

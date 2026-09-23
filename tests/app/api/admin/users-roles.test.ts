@@ -6,9 +6,10 @@ jest.mock("@/lib/server/users-service");
 import { POST } from "@/app/api/admin/users/[id]/roles/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/users-service";
+import { authUser } from "../../../helpers/auth-user";
 
-const admin = { id: 1, isAdmin: true } as Awaited<ReturnType<typeof getCurrentUser>>;
-const normalUser = { id: 2, isAdmin: false } as Awaited<ReturnType<typeof getCurrentUser>>;
+const admin = authUser({ id: 1, isAdmin: true });
+const normalUser = authUser({ id: 2, isAdmin: false });
 
 function jsonReq(body: unknown) {
   return new Request("http://localhost/api/admin/users/7/roles", {
@@ -31,14 +32,14 @@ describe("POST /api/admin/users/[id]/roles", () => {
   });
 
   it("rejects anonymous users with 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     const res = await POST(jsonReq({ roles: ["ARBITRE"] }), params("7"));
     expect(res.status).toBe(401);
     expect(service.setUserRoles).not.toHaveBeenCalled();
   });
 
   it("rejects non-admins with 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(normalUser as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(normalUser);
     const res = await POST(jsonReq({ roles: ["ARBITRE"] }), params("7"));
     expect(res.status).toBe(403);
     expect(service.setUserRoles).not.toHaveBeenCalled();
@@ -50,13 +51,13 @@ describe("POST /api/admin/users/[id]/roles", () => {
     // pas plus de l'attribution des rôles qu'un compte nu. Le test tient
     // l'équivalence entre la permission et `isAdmin` — c'est elle qui permet à
     // §1.4 de n'avoir qu'une seule exception, la suppression d'un tournoi.
-    const staff = {
+    const staff = authUser({
       id: 3,
       isAdmin: false,
       roles: ["ARBITRE", "CASTER", "COMMUNITY_MANAGER", "RECRUTEUR"],
-    } as Awaited<ReturnType<typeof getCurrentUser>>;
+    });
 
-    (getCurrentUser as jest.Mock).mockResolvedValue(staff as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(staff);
     const res = await POST(jsonReq({ roles: ["ADMIN"] }), params("7"));
     expect(res.status).toBe(403);
     expect(service.setUserRoles).not.toHaveBeenCalled();
@@ -69,22 +70,22 @@ describe("POST /api/admin/users/[id]/roles", () => {
       ReturnType<typeof getCurrentUser>
     >;
 
-    (getCurrentUser as jest.Mock).mockResolvedValue(rolesAdmin as never);
-    (service.setUserRoles as jest.Mock).mockResolvedValue(["ARBITRE"] as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(rolesAdmin);
+    jest.mocked(service.setUserRoles).mockResolvedValue(["ARBITRE"]);
     const res = await POST(jsonReq({ roles: ["ARBITRE"] }), params("7"));
     expect(res.status).toBe(200);
     expect(service.setUserRoles).toHaveBeenCalledWith(7, ["ARBITRE"]);
   });
 
   it("rejects invalid ids with 400", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const res = await POST(jsonReq({ roles: [] }), params("abc"));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "INVALID_ID" });
   });
 
   it("prevents an admin from modifying their own roles", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const res = await POST(jsonReq({ roles: [] }), params("1"));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "CANNOT_MODIFY_SELF" });
@@ -92,7 +93,7 @@ describe("POST /api/admin/users/[id]/roles", () => {
   });
 
   it("rejects a non-array roles payload with 400", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const res = await POST(jsonReq({ roles: "ARBITRE" }), params("7"));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "INVALID_PAYLOAD" });
@@ -100,7 +101,7 @@ describe("POST /api/admin/users/[id]/roles", () => {
   });
 
   it("rejects unknown role values with 400", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const res = await POST(jsonReq({ roles: ["ARBITRE", "NOPE"] }), params("7"));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "INVALID_PAYLOAD" });
@@ -108,8 +109,8 @@ describe("POST /api/admin/users/[id]/roles", () => {
   });
 
   it("assigns cumulative roles for admins", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.setUserRoles as jest.Mock).mockResolvedValue(["ARBITRE", "RECRUTEUR"] as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockResolvedValue(["ARBITRE", "RECRUTEUR"]);
 
     const res = await POST(jsonReq({ roles: ["ARBITRE", "RECRUTEUR"] }), params("7"));
     expect(res.status).toBe(200);
@@ -118,8 +119,8 @@ describe("POST /api/admin/users/[id]/roles", () => {
   });
 
   it("accepts an empty roles array (revokes all)", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.setUserRoles as jest.Mock).mockResolvedValue([] as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockResolvedValue([]);
 
     const res = await POST(jsonReq({ roles: [] }), params("7"));
     expect(res.status).toBe(200);
@@ -127,8 +128,8 @@ describe("POST /api/admin/users/[id]/roles", () => {
   });
 
   it("returns 404 when the target user does not exist", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.setUserRoles as jest.Mock).mockRejectedValue(new Error("USER_NOT_FOUND") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockRejectedValue(new Error("USER_NOT_FOUND"));
 
     const res = await POST(jsonReq({ roles: ["ADMIN"] }), params("7"));
     expect(res.status).toBe(404);

@@ -22,6 +22,8 @@ import {
   resetTournamentBroadcast,
   tournamentAudience,
 } from "@/lib/server/tournament-broadcast";
+import type { PlatformRole } from "@/lib/shared/permissions";
+import { authUser } from "../../../helpers/auth-user";
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
@@ -36,7 +38,7 @@ function rightsPassedToViewerContext(): {
   canManageLive?: boolean;
   canDelete?: boolean;
 } {
-  return (getTournamentViewerContext as jest.Mock).mock.calls[0][2] as Record<string, boolean>;
+  return jest.mocked(getTournamentViewerContext).mock.calls[0][2] as Record<string, boolean>;
 }
 
 function snapshotWith(registrations: { teamId: number }[]): TournamentSnapshot {
@@ -83,9 +85,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   resetRateLimit();
   resetTournamentBroadcast();
-  (getCurrentUser as jest.Mock).mockResolvedValue({ id: 1, isAdmin: false, roles: [] } as never);
-  (getVisibleTournamentSnapshot as jest.Mock).mockResolvedValue(snapshotWith([]) as never);
-  (getTournamentViewerContext as jest.Mock).mockResolvedValue(viewerWith() as never);
+  jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 1, isAdmin: false, roles: [] }));
+  jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(snapshotWith([]));
+  jest.mocked(getTournamentViewerContext).mockResolvedValue(viewerWith());
 });
 
 afterEach(() => {
@@ -96,7 +98,7 @@ afterEach(() => {
 
 describe("GET /api/tournaments/[id]/stream — accès", () => {
   it("refuse un visiteur non connecté", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     expect((await GET(new Request("http://t/"), params("5"))).status).toBe(401);
   });
 
@@ -108,7 +110,7 @@ describe("GET /api/tournaments/[id]/stream — accès", () => {
   it("répond 404 sur un tournoi inconnu plutôt que d'ouvrir un flux vide", async () => {
     // C'est ce 404 que la lecture de secours du client traduit en échec
     // définitif : sans lui, la page réessaierait pour l'éternité.
-    (getVisibleTournamentSnapshot as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(null);
     expect((await GET(new Request("http://t/"), params("5"))).status).toBe(404);
   });
 });
@@ -122,11 +124,11 @@ describe("GET /api/tournaments/[id]/stream — palier décidé par le serveur", 
   it("passe le staff tournois en prioritaire", async () => {
     // Le palier se lit sur les permissions de l'utilisateur, pas sur le contexte
     // du lecteur : c'est le serveur qui décide, à partir du rôle.
-    (getCurrentUser as jest.Mock).mockResolvedValue(
-      { id: 1, isAdmin: false, roles: ["ARBITRE"] } as never,
+    jest.mocked(getCurrentUser).mockResolvedValue(
+      authUser({ id: 1, isAdmin: false, roles: ["ARBITRE"] }),
     );
-    (getTournamentViewerContext as jest.Mock).mockResolvedValue(
-      viewerWith({ isAdmin: true }) as never,
+    jest.mocked(getTournamentViewerContext).mockResolvedValue(
+      viewerWith({ isAdmin: true }),
     );
     const message = await firstMessage(await GET(new Request("http://t/"), params("5")));
     expect(message.tier).toBe("PRIORITY");
@@ -137,8 +139,8 @@ describe("GET /api/tournaments/[id]/stream — palier décidé par le serveur", 
     // spectateur lui ferait décrire un plateau vieux de vingt secondes. Il n'a
     // pourtant pas la permission `tournaments` — son palier se lit sur son rôle,
     // pas sur `viewer.isAdmin`.
-    (getCurrentUser as jest.Mock).mockResolvedValue(
-      { id: 1, isAdmin: false, roles: ["CASTER"] } as never,
+    jest.mocked(getCurrentUser).mockResolvedValue(
+      authUser({ id: 1, isAdmin: false, roles: ["CASTER"] }),
     );
     const message = await firstMessage(await GET(new Request("http://t/"), params("5")));
     expect(message.tier).toBe("PRIORITY");
@@ -147,11 +149,11 @@ describe("GET /api/tournaments/[id]/stream — palier décidé par le serveur", 
   });
 
   it("passe un engagé du tournoi en prioritaire", async () => {
-    (getVisibleTournamentSnapshot as jest.Mock).mockResolvedValue(
-      snapshotWith([{ teamId: 42 }]) as never,
+    jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(
+      snapshotWith([{ teamId: 42 }]),
     );
-    (getTournamentViewerContext as jest.Mock).mockResolvedValue(
-      viewerWith({ myTeamId: 42 }) as never,
+    jest.mocked(getTournamentViewerContext).mockResolvedValue(
+      viewerWith({ myTeamId: 42 }),
     );
     const message = await firstMessage(await GET(new Request("http://t/"), params("5")));
     expect(message.tier).toBe("PRIORITY");
@@ -160,11 +162,11 @@ describe("GET /api/tournaments/[id]/stream — palier décidé par le serveur", 
   it("sert le palier standard à un engagé qui le demande (onglet caché, `?quiet=1`)", async () => {
     // Régime de charge (`lib/shared/client-power.ts`) : un onglet caché depuis
     // une minute, hors match, se déclasse lui-même pour libérer la salle.
-    (getVisibleTournamentSnapshot as jest.Mock).mockResolvedValue(
-      snapshotWith([{ teamId: 42 }]) as never,
+    jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(
+      snapshotWith([{ teamId: 42 }]),
     );
-    (getTournamentViewerContext as jest.Mock).mockResolvedValue(
-      viewerWith({ myTeamId: 42 }) as never,
+    jest.mocked(getTournamentViewerContext).mockResolvedValue(
+      viewerWith({ myTeamId: 42 }),
     );
     const message = await firstMessage(await GET(new Request("http://t/?quiet=1"), params("5")));
     expect(message.tier).toBe("STANDARD");
@@ -180,8 +182,8 @@ describe("GET /api/tournaments/[id]/stream — palier décidé par le serveur", 
   });
 
   it("ne déclasse que sur `quiet=1` exactement", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(
-      { id: 1, isAdmin: false, roles: ["ARBITRE"] } as never,
+    jest.mocked(getCurrentUser).mockResolvedValue(
+      authUser({ id: 1, isAdmin: false, roles: ["ARBITRE"] }),
     );
     const kept = await firstMessage(await GET(new Request("http://t/?quiet=true"), params("5")));
     expect(kept.tier).toBe("PRIORITY");
@@ -191,8 +193,8 @@ describe("GET /api/tournaments/[id]/stream — palier décidé par le serveur", 
 
   it("laisse en standard une équipe qui n'est pas inscrite ici", async () => {
     // Avoir une équipe ne suffit pas : il faut être engagé dans CE tournoi.
-    (getTournamentViewerContext as jest.Mock).mockResolvedValue(
-      viewerWith({ myTeamId: 42 }) as never,
+    jest.mocked(getTournamentViewerContext).mockResolvedValue(
+      viewerWith({ myTeamId: 42 }),
     );
     const message = await firstMessage(await GET(new Request("http://t/"), params("5")));
     expect(message.tier).toBe("STANDARD");
@@ -202,8 +204,8 @@ describe("GET /api/tournaments/[id]/stream — palier décidé par le serveur", 
     // Le flux est le chemin nominal : la lecture REST ne sert qu'en secours. Si
     // le droit de diffusion ne voyageait que par elle, un arbitre n'aurait ses
     // commandes d'antenne qu'après une coupure du direct.
-    (getCurrentUser as jest.Mock).mockResolvedValue(
-      { id: 1, isAdmin: false, roles: ["CASTER"] } as never,
+    jest.mocked(getCurrentUser).mockResolvedValue(
+      authUser({ id: 1, isAdmin: false, roles: ["CASTER"] }),
     );
     await firstMessage(await GET(new Request("http://t/"), params("5")));
 
@@ -236,8 +238,8 @@ describe("GET /api/tournaments/[id]/stream — palier décidé par le serveur", 
 
 describe("GET /api/tournaments/[id]/stream — droit de suppression", () => {
   it("accorde la suppression à un administrateur", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(
-      { id: 1, isAdmin: true, roles: ["ADMIN"] } as never,
+    jest.mocked(getCurrentUser).mockResolvedValue(
+      authUser({ id: 1, isAdmin: true, roles: ["ADMIN"] }),
     );
 
     await GET(new Request("http://t/"), params("5"));
@@ -245,14 +247,14 @@ describe("GET /api/tournaments/[id]/stream — droit de suppression", () => {
     expect(rightsPassedToViewerContext().canDelete).toBe(true);
   });
 
-  it.each([
+  it.each<[string, PlatformRole[]]>([
     ["un arbitre", ["ARBITRE"]],
     ["un caster", ["CASTER"]],
     ["un joueur ordinaire", []],
   ])("la refuse à %s, malgré la permission `tournaments`", async (_label, roles) => {
     // Le droit doit voyager par les deux portes — ce flux et la lecture REST de
     // secours —, et se refuser à l'identique sur les deux.
-    (getCurrentUser as jest.Mock).mockResolvedValue({ id: 2, isAdmin: false, roles } as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 2, isAdmin: false, roles }));
 
     await GET(new Request("http://t/"), params("5"));
 
@@ -324,7 +326,7 @@ describe("GET /api/tournaments/[id]/stream — plafonds", () => {
 describe("GET /api/tournaments/[id]/stream — garde de visibilité", () => {
   /** Droits passés à la garde de visibilité : `[id, { canManage }]`. */
   function visibilityCall() {
-    return (getVisibleTournamentSnapshot as jest.Mock).mock.calls[0];
+    return jest.mocked(getVisibleTournamentSnapshot).mock.calls[0];
   }
 
   it("lit sans droit de gestion pour un simple spectateur", async () => {
@@ -337,8 +339,8 @@ describe("GET /api/tournaments/[id]/stream — garde de visibilité", () => {
   });
 
   it("accorde la gestion à un arbitre, qui voit donc les tournois non publiés", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(
-      { id: 1, isAdmin: false, roles: ["ARBITRE"] } as never,
+    jest.mocked(getCurrentUser).mockResolvedValue(
+      authUser({ id: 1, isAdmin: false, roles: ["ARBITRE"] }),
     );
 
     const response = await GET(new Request("http://t/"), params("5"));
@@ -350,8 +352,8 @@ describe("GET /api/tournaments/[id]/stream — garde de visibilité", () => {
   it("laisse le cast sans droit de gestion : il ne voit pas les tournois non publiés", async () => {
     // `casting` donne l'aperçu du plateau, pas l'accès à un tournoi que le staff
     // n'a pas encore annoncé — c'est déjà l'audience de la liste des invisibles.
-    (getCurrentUser as jest.Mock).mockResolvedValue(
-      { id: 1, isAdmin: false, roles: ["CASTER"] } as never,
+    jest.mocked(getCurrentUser).mockResolvedValue(
+      authUser({ id: 1, isAdmin: false, roles: ["CASTER"] }),
     );
 
     const response = await GET(new Request("http://t/"), params("5"));
@@ -363,7 +365,7 @@ describe("GET /api/tournaments/[id]/stream — garde de visibilité", () => {
   it("répond 404 — et non 403 — quand la garde refuse", async () => {
     // Un 403 confirmerait l'existence du tournoi qu'on cherche justement à
     // cacher, l'identifiant étant un entier consécutif.
-    (getVisibleTournamentSnapshot as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(null);
 
     const response = await GET(new Request("http://t/"), params("5"));
 

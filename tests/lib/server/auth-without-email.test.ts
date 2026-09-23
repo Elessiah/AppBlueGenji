@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { createOrGetGoogleUser } from "@/lib/server/users-service";
 import { getDatabase } from "@/lib/server/database";
 import { buildGoogleAuthorizationUrl } from "@/lib/server/google-oauth";
+import { fakePool } from "../../helpers/sql-double";
 
 /**
  * **L'authentification ne dépend d'aucune adresse e-mail.**
@@ -44,7 +45,7 @@ function fakeDb(handler?: (sql: string) => unknown) {
     if (handled !== undefined) return handled;
     return [[]];
   });
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return { queries };
 }
 

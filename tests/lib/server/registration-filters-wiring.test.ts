@@ -16,6 +16,9 @@ import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { ensureSoloEntry, findSoloEntry } from "@/lib/server/solo-entries-service";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
 import { loadTournamentRow } from "@/lib/server/tournaments/repository";
+import type { TournamentRow } from "@/lib/server/tournaments/_internal";
+import type { RowOverrides } from "../../helpers/row-overrides";
+import { tournamentRow } from "../../helpers/tournament-rows";
 
 /**
  * Les conditions d'inscription, **là où elles s'appliquent et là où elles ne
@@ -31,9 +34,7 @@ import { loadTournamentRow } from "@/lib/server/tournaments/repository";
  * Voir `docs/features/REGISTRATION_FILTERS.md`.
  */
 
-type Row = Record<string, unknown>;
-
-const TOURNAMENT: Row = {
+const TOURNAMENT = tournamentRow({
   id: 5,
   state: "REGISTRATION",
   max_teams: 16,
@@ -41,7 +42,7 @@ const TOURNAMENT: Row = {
   registration_discord_requirement: "ANY_PLAYER",
   registration_blizzard_requirement: "NONE",
   registration_min_players: 5,
-};
+});
 
 /** Un membre du roster, tel que la base le rend aux conditions d'inscription. */
 type Member = { discord: boolean; blizzard: boolean };
@@ -60,8 +61,8 @@ const withBlizzard = (...flags: boolean[]): Member[] =>
  * `roster` décrit le roster que la base rendra : les deux drapeaux que lisent
  * les conditions. `registrations` compte les inscrits.
  */
-function mockConnection(roster: Member[], overrides: Row = {}) {
-  const tournament = { ...TOURNAMENT, ...overrides };
+function mockConnection(roster: Member[], overrides: RowOverrides<TournamentRow> = {}) {
+  const tournament: TournamentRow = { ...TOURNAMENT, ...overrides };
   const inserts: unknown[][] = [];
 
   const execute = jest.fn(async (sql: string, params: unknown[] = []) => {
@@ -95,20 +96,25 @@ function mockConnection(roster: Member[], overrides: Row = {}) {
     throw new Error(`requête inattendue : ${q}`);
   });
 
-  (syncTournamentState as jest.Mock).mockResolvedValue({ row: tournament } as never);
-  (loadTournamentRow as jest.Mock).mockResolvedValue(tournament as never);
+  jest.mocked(syncTournamentState).mockResolvedValue({
+    row: tournament,
+    stateChanged: false,
+    contentChanged: false,
+  });
+  jest.mocked(loadTournamentRow).mockResolvedValue(tournament);
 
   return { connection: { execute } as unknown as PoolConnection, inserts };
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (getUserActiveTeam as jest.Mock).mockResolvedValue({
+  jest.mocked(getUserActiveTeam).mockResolvedValue({
     teamId: 42,
+    teamName: "Équipe",
     roles: ["OWNER"],
-  } as never);
-  (findSoloEntry as jest.Mock).mockResolvedValue(null as never);
-  (ensureSoloEntry as jest.Mock).mockResolvedValue(999 as never);
+  });
+  jest.mocked(findSoloEntry).mockResolvedValue(null);
+  jest.mocked(ensureSoloEntry).mockResolvedValue(999);
 });
 
 describe("inscription d'un joueur", () => {
@@ -161,10 +167,11 @@ describe("inscription d'un joueur", () => {
   it("juge la qualité d'engager **avant** les conditions", async () => {
     // Un joueur du roster doit lire qu'il n'a pas la charge de l'équipe, et non
     // qu'elle est trop petite : c'est son droit qui manque, pas l'effectif.
-    (getUserActiveTeam as jest.Mock).mockResolvedValue({
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
       teamId: 42,
+      teamName: "Équipe",
       roles: ["DPS"],
-    } as never);
+    });
     const { connection } = mockConnection([]);
 
     await expect(registerCurrentUserTeam(connection, 5, 7)).rejects.toThrow("NOT_TEAM_MANAGER");

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { createTeam, softDeleteTeam, updateTeamMeta } from "@/lib/server/teams-service";
+import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
@@ -16,8 +17,8 @@ type Exec = jest.Mock<(sql: string, params?: unknown[]) => Promise<unknown>>;
 
 async function mockDb() {
   const { getDatabase } = await import("@/lib/server/database");
-  const poolExecute = jest.fn() as Exec;
-  const connectionExecute = jest.fn() as Exec;
+  const poolExecute = jest.fn<SqlQuery>() as Exec;
+  const connectionExecute = jest.fn<SqlQuery>() as Exec;
   const connection = {
     execute: connectionExecute,
     beginTransaction: jest.fn(),
@@ -25,10 +26,10 @@ async function mockDb() {
     rollback: jest.fn(),
     release: jest.fn(),
   };
-  (getDatabase as jest.Mock).mockResolvedValue({
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
     execute: poolExecute,
     getConnection: jest.fn(async () => connection),
-  } as never);
+  }));
   return { poolExecute, connectionExecute, connection };
 }
 
@@ -108,7 +109,7 @@ describe("createTeam — sigle", () => {
         Object.assign(new Error("Duplicate entry 'DRGN' for key 'bg_teams.uniq_bg_teams_tag'"), {
           code: "ER_DUP_ENTRY",
           sqlMessage: "Duplicate entry 'DRGN' for key 'bg_teams.uniq_bg_teams_tag'",
-        }) as never,
+        }),
       ); // …pris à l'insertion
 
     await expect(createTeam(1, "Dragon Squad", null, "DRGN")).rejects.toThrow(

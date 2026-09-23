@@ -21,12 +21,13 @@ import { reconcileSurvival } from "@/lib/server/tournaments/survival";
 import { reconcileSwiss } from "@/lib/server/tournaments/swiss";
 import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie";
 import { reconcilePhases } from "@/lib/server/tournaments/phases";
+import type { TournamentRow } from "@/lib/server/tournaments/_internal";
+import type { RowOverrides } from "../helpers/row-overrides";
+import { tournamentRow } from "../helpers/tournament-rows";
 
-type Row = Record<string, unknown>;
-
-function runningRow(overrides: Row = {}): Row {
+function runningRow(overrides: RowOverrides<TournamentRow> = {}): TournamentRow {
   const past = new Date(Date.now() - 86_400_000);
-  return {
+  return tournamentRow({
     id: 5,
     state: "RUNNING",
     format: "SWISS",
@@ -36,7 +37,7 @@ function runningRow(overrides: Row = {}): Row {
     start_at: past,
     bracket_size: 8,
     ...overrides,
-  };
+  });
 }
 
 const connection = {} as never;
@@ -50,16 +51,17 @@ const reconcilers = {
 
 function resetMocks(): void {
   jest.clearAllMocks();
-  (createBracketIfMissing as jest.Mock).mockResolvedValue({
+  jest.mocked(createBracketIfMissing).mockResolvedValue({
     finished: false,
     created: false,
-  } as never);
-  (resolveExpiredScoreReports as jest.Mock).mockResolvedValue(0 as never);
-  (tryAutoResolveByes as jest.Mock).mockResolvedValue(undefined as never);
-  (finalizeTournamentIfDone as jest.Mock).mockResolvedValue(undefined as never);
-  for (const reconcile of Object.values(reconcilers)) {
-    (reconcile as jest.Mock).mockResolvedValue(undefined as never);
-  }
+  });
+  jest.mocked(resolveExpiredScoreReports).mockResolvedValue(0);
+  jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
+  jest.mocked(finalizeTournamentIfDone).mockResolvedValue(undefined);
+  jest.mocked(reconcileSurvival).mockResolvedValue({ done: false, standings: [] });
+  jest.mocked(reconcileSwiss).mockResolvedValue({ done: false, ranked: [] });
+  jest.mocked(reconcileEndurance).mockResolvedValue(undefined);
+  jest.mocked(reconcilePhases).mockResolvedValue(undefined);
 }
 
 /**
@@ -76,11 +78,11 @@ describe("syncTournamentState — réconciliation après un report tranché par 
     jest.restoreAllMocks();
   });
 
-  it.each(Object.keys(reconcilers))(
+  it.each(Object.keys(reconcilers) as (keyof typeof reconcilers)[])(
     "rappelle le moteur %s quand une manche vient d'être tranchée",
     async (format) => {
-      (loadTournamentRow as jest.Mock).mockResolvedValue(runningRow({ format }) as never);
-      (resolveExpiredScoreReports as jest.Mock).mockResolvedValue(1 as never);
+      jest.mocked(loadTournamentRow).mockResolvedValue(runningRow({ format }));
+      jest.mocked(resolveExpiredScoreReports).mockResolvedValue(1);
 
       await syncTournamentState(connection, 5);
 
@@ -95,10 +97,10 @@ describe("syncTournamentState — réconciliation après un report tranché par 
     },
   );
 
-  it.each(Object.keys(reconcilers))(
+  it.each(Object.keys(reconcilers) as (keyof typeof reconcilers)[])(
     "ne rappelle pas le moteur %s quand aucun report n'a expiré",
     async (format) => {
-      (loadTournamentRow as jest.Mock).mockResolvedValue(runningRow({ format }) as never);
+      jest.mocked(loadTournamentRow).mockResolvedValue(runningRow({ format }));
 
       await syncTournamentState(connection, 5);
 
@@ -106,11 +108,11 @@ describe("syncTournamentState — réconciliation après un report tranché par 
     },
   );
 
-  it.each(["SINGLE", "DOUBLE"])(
+  it.each<TournamentRow["format"]>(["SINGLE", "DOUBLE"])(
     "ne rappelle aucun moteur pour un tournoi %s : le plateau se propage seul",
     async (format) => {
-      (loadTournamentRow as jest.Mock).mockResolvedValue(runningRow({ format }) as never);
-      (resolveExpiredScoreReports as jest.Mock).mockResolvedValue(2 as never);
+      jest.mocked(loadTournamentRow).mockResolvedValue(runningRow({ format }));
+      jest.mocked(resolveExpiredScoreReports).mockResolvedValue(2);
 
       await syncTournamentState(connection, 5);
 
@@ -122,18 +124,18 @@ describe("syncTournamentState — réconciliation après un report tranché par 
   );
 
   it("réconcilie avant de finaliser", async () => {
-    (loadTournamentRow as jest.Mock).mockResolvedValue(runningRow({ format: "SWISS" }) as never);
-    (resolveExpiredScoreReports as jest.Mock).mockResolvedValue(1 as never);
+    jest.mocked(loadTournamentRow).mockResolvedValue(runningRow({ format: "SWISS" }));
+    jest.mocked(resolveExpiredScoreReports).mockResolvedValue(1);
 
     const order: string[] = [];
-    (reconcileSwiss as jest.Mock).mockImplementation((() => {
+    jest.mocked(reconcileSwiss).mockImplementation((() => {
       order.push("reconcile");
-      return Promise.resolve();
-    }) as never);
-    (finalizeTournamentIfDone as jest.Mock).mockImplementation((() => {
+      return Promise.resolve({ done: false, ranked: [] });
+    }));
+    jest.mocked(finalizeTournamentIfDone).mockImplementation((() => {
       order.push("finalize");
       return Promise.resolve();
-    }) as never);
+    }));
 
     await syncTournamentState(connection, 5);
 
@@ -145,16 +147,16 @@ describe("syncTournamentState — réconciliation après un report tranché par 
 
   it("ne réconcilie rien tant que le tournoi n'est pas en cours", async () => {
     const future = new Date(Date.now() + 86_400_000);
-    (loadTournamentRow as jest.Mock).mockResolvedValue(
+    jest.mocked(loadTournamentRow).mockResolvedValue(
       runningRow({
         format: "SWISS",
         state: "UPCOMING",
         registration_open_at: future,
         registration_close_at: future,
         start_at: future,
-      }) as never,
+      }),
     );
-    (resolveExpiredScoreReports as jest.Mock).mockResolvedValue(1 as never);
+    jest.mocked(resolveExpiredScoreReports).mockResolvedValue(1);
 
     await syncTournamentState(connection, 5);
 
@@ -174,11 +176,11 @@ describe("syncTournamentState — `contentChanged`", () => {
   });
 
   it("est vrai quand le plateau vient d'être créé", async () => {
-    (loadTournamentRow as jest.Mock).mockResolvedValue(runningRow({ format: "SINGLE" }) as never);
-    (createBracketIfMissing as jest.Mock).mockResolvedValue({
+    jest.mocked(loadTournamentRow).mockResolvedValue(runningRow({ format: "SINGLE" }));
+    jest.mocked(createBracketIfMissing).mockResolvedValue({
       finished: false,
       created: true,
-    } as never);
+    });
 
     const result = await syncTournamentState(connection, 5);
 
@@ -187,8 +189,8 @@ describe("syncTournamentState — `contentChanged`", () => {
   });
 
   it("est vrai quand une manche a été tranchée par le délai", async () => {
-    (loadTournamentRow as jest.Mock).mockResolvedValue(runningRow({ format: "SWISS" }) as never);
-    (resolveExpiredScoreReports as jest.Mock).mockResolvedValue(1 as never);
+    jest.mocked(loadTournamentRow).mockResolvedValue(runningRow({ format: "SWISS" }));
+    jest.mocked(resolveExpiredScoreReports).mockResolvedValue(1);
 
     const result = await syncTournamentState(connection, 5);
 
@@ -196,7 +198,7 @@ describe("syncTournamentState — `contentChanged`", () => {
   });
 
   it("est faux quand l'entretien n'a rien écrit", async () => {
-    (loadTournamentRow as jest.Mock).mockResolvedValue(runningRow({ format: "SINGLE" }) as never);
+    jest.mocked(loadTournamentRow).mockResolvedValue(runningRow({ format: "SINGLE" }));
 
     const result = await syncTournamentState(connection, 5);
 
@@ -205,13 +207,13 @@ describe("syncTournamentState — `contentChanged`", () => {
 
   it("est faux hors d'un tournoi en cours", async () => {
     const future = new Date(Date.now() + 86_400_000);
-    (loadTournamentRow as jest.Mock).mockResolvedValue(
+    jest.mocked(loadTournamentRow).mockResolvedValue(
       runningRow({
         state: "UPCOMING",
         registration_open_at: future,
         registration_close_at: future,
         start_at: future,
-      }) as never,
+      }),
     );
 
     const result = await syncTournamentState(connection, 5);

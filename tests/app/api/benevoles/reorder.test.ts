@@ -6,9 +6,10 @@ jest.mock("@/lib/server/benevoles-service");
 import { PUT } from "@/app/api/benevoles/reorder/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/benevoles-service";
+import { authUser } from "../../../helpers/auth-user";
 
-const admin = { id: 1, isAdmin: true } as Awaited<ReturnType<typeof getCurrentUser>>;
-const normalUser = { id: 2, isAdmin: false } as Awaited<ReturnType<typeof getCurrentUser>>;
+const admin = authUser({ id: 1, isAdmin: true });
+const normalUser = authUser({ id: 2, isAdmin: false });
 
 function jsonReq(body: unknown) {
   return new Request("http://localhost/api/benevoles/reorder", {
@@ -27,21 +28,21 @@ describe("PUT /api/benevoles/reorder", () => {
   });
 
   it("rejects anonymous users with 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     const res = await PUT(jsonReq({ categories: ["Dev", "Arbitre"] }));
     expect(res.status).toBe(401);
     expect(service.reorderBenevoleCategories).not.toHaveBeenCalled();
   });
 
   it("rejects non-admins with 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(normalUser as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(normalUser);
     const res = await PUT(jsonReq({ categories: ["Dev", "Arbitre"] }));
     expect(res.status).toBe(403);
     expect(service.reorderBenevoleCategories).not.toHaveBeenCalled();
   });
 
   it("returns 400 for invalid JSON body", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const res = await PUT(new Request("http://localhost/api/benevoles/reorder", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -52,7 +53,7 @@ describe("PUT /api/benevoles/reorder", () => {
   });
 
   it("rejects an empty category list with 400", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const res = await PUT(jsonReq({ categories: [] }));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "CATEGORIES_EMPTY" });
@@ -60,15 +61,15 @@ describe("PUT /api/benevoles/reorder", () => {
   });
 
   it("rejects a duplicate category with 400", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const res = await PUT(jsonReq({ categories: ["Dev", "Dev"] }));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "DUPLICATE_CATEGORY" });
   });
 
   it("reorders categories for admins", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.reorderBenevoleCategories as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.reorderBenevoleCategories).mockResolvedValue(undefined);
 
     const res = await PUT(jsonReq({ categories: ["Caster", "Dev", "Arbitre"] }));
     expect(res.status).toBe(200);
@@ -76,8 +77,8 @@ describe("PUT /api/benevoles/reorder", () => {
   });
 
   it("surfaces service errors as 400", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.reorderBenevoleCategories as jest.Mock).mockRejectedValue(new Error("BOOM") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.reorderBenevoleCategories).mockRejectedValue(new Error("BOOM"));
     const res = await PUT(jsonReq({ categories: ["Dev"] }));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "BOOM" });

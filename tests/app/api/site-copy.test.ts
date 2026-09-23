@@ -6,13 +6,13 @@ jest.mock("@/lib/server/site-copy-service");
 import { DELETE, GET, PATCH } from "@/app/api/site-copy/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getSiteCopy, resetSiteCopy, setSiteCopy } from "@/lib/server/site-copy-service";
+import { defaultSiteCopy } from "@/lib/shared/site-copy";
+import { authUser } from "../../helpers/auth-user";
 
-type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
+const visitor = authUser({ id: 2, isAdmin: false, roles: [] });
+const cm = authUser({ id: 3, isAdmin: false, roles: ["COMMUNITY_MANAGER"] });
 
-const visitor = { id: 2, isAdmin: false, roles: [] } as unknown as SessionUser;
-const cm = { id: 3, isAdmin: false, roles: ["COMMUNITY_MANAGER"] } as unknown as SessionUser;
-
-const copy = { "home.hero.title": "Titre" };
+const copy = { ...defaultSiteCopy(), "home.hero.title": "Titre" };
 
 function patchReq(body: unknown) {
   return new Request("http://localhost/api/site-copy", {
@@ -36,7 +36,7 @@ describe("GET /api/site-copy", () => {
   });
 
   it("est public : les textes servent au rendu de la vitrine", async () => {
-    (getSiteCopy as jest.Mock).mockResolvedValue(copy as never);
+    jest.mocked(getSiteCopy).mockResolvedValue(copy);
 
     const res = await GET();
 
@@ -55,22 +55,22 @@ describe("PATCH /api/site-copy", () => {
   });
 
   it("rejette un visiteur anonyme avec 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
 
     expect((await PATCH(patchReq({ key: "home.hero.title", value: "x" }))).status).toBe(401);
     expect(setSiteCopy).not.toHaveBeenCalled();
   });
 
   it("rejette un membre sans permission showcase avec 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(visitor as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(visitor);
 
     expect((await PATCH(patchReq({ key: "home.hero.title", value: "x" }))).status).toBe(403);
     expect(setSiteCopy).not.toHaveBeenCalled();
   });
 
   it("laisse un Community Manager éditer", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(cm as never);
-    (setSiteCopy as jest.Mock).mockResolvedValue(copy as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(cm);
+    jest.mocked(setSiteCopy).mockResolvedValue(copy);
 
     const res = await PATCH(patchReq({ key: "home.hero.title", value: "Titre" }));
 
@@ -80,15 +80,15 @@ describe("PATCH /api/site-copy", () => {
   });
 
   it("renvoie 404 pour une clé inconnue", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(cm as never);
-    (setSiteCopy as jest.Mock).mockRejectedValue(new Error("UNKNOWN_COPY_KEY") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(cm);
+    jest.mocked(setSiteCopy).mockRejectedValue(new Error("UNKNOWN_COPY_KEY"));
 
     expect((await PATCH(patchReq({ key: "nope", value: "x" }))).status).toBe(404);
   });
 
   it("renvoie 400 pour un texte vide", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(cm as never);
-    (setSiteCopy as jest.Mock).mockRejectedValue(new Error("COPY_EMPTY") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(cm);
+    jest.mocked(setSiteCopy).mockRejectedValue(new Error("COPY_EMPTY"));
 
     const res = await PATCH(patchReq({ key: "home.hero.title", value: "" }));
 
@@ -97,7 +97,7 @@ describe("PATCH /api/site-copy", () => {
   });
 
   it("rejette un corps sans clé", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(cm as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(cm);
 
     expect((await PATCH(patchReq({ value: "x" }))).status).toBe(400);
     expect(setSiteCopy).not.toHaveBeenCalled();
@@ -113,15 +113,15 @@ describe("DELETE /api/site-copy", () => {
   });
 
   it("rejette un membre sans permission showcase", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(visitor as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(visitor);
 
     expect((await DELETE(deleteReq("home.hero.title"))).status).toBe(403);
     expect(resetSiteCopy).not.toHaveBeenCalled();
   });
 
   it("rétablit le texte d'origine", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(cm as never);
-    (resetSiteCopy as jest.Mock).mockResolvedValue(copy as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(cm);
+    jest.mocked(resetSiteCopy).mockResolvedValue(copy);
 
     const res = await DELETE(deleteReq("home.hero.title"));
 
@@ -130,7 +130,7 @@ describe("DELETE /api/site-copy", () => {
   });
 
   it("exige une clé", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(cm as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(cm);
 
     expect((await DELETE(deleteReq())).status).toBe(400);
     expect(resetSiteCopy).not.toHaveBeenCalled();

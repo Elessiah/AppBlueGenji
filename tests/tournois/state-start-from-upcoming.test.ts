@@ -36,8 +36,8 @@ import {
 } from "@/lib/server/tournaments/bg-survie";
 import { initializeMultiTournament, reconcilePhases } from "@/lib/server/tournaments/phases";
 import { queueBotLog } from "@/lib/server/tournaments/bot-logs";
-
-type Row = Record<string, unknown>;
+import type { TournamentRow } from "@/lib/server/tournaments/_internal";
+import { tournamentRow } from "../helpers/tournament-rows";
 
 const DAY = 86_400_000;
 const past = (days: number) => new Date(Date.now() - days * DAY);
@@ -48,8 +48,8 @@ const past = (days: number) => new Date(Date.now() - days * DAY);
  * inscriptions et son heure de début (`computeTournamentState` y rend
  * `UPCOMING`), et donc le point de départ le plus courant vers `RUNNING`.
  */
-function fromUpcoming(format: string): Row {
-  return {
+function fromUpcoming(format: TournamentRow["format"]): TournamentRow {
+  return tournamentRow({
     id: 7,
     state: "UPCOMING",
     format,
@@ -59,7 +59,7 @@ function fromUpcoming(format: string): Row {
     registration_close_at: past(2),
     start_at: past(1),
     bracket_size: null,
-  };
+  });
 }
 
 const connection = {} as never;
@@ -67,25 +67,25 @@ const connection = {} as never;
 describe("syncTournamentState — coup d'envoi depuis UPCOMING", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (createBracketIfMissing as jest.Mock).mockResolvedValue({ finished: false } as never);
-    (resolveExpiredScoreReports as jest.Mock).mockResolvedValue(undefined as never);
-    (tryAutoResolveByes as jest.Mock).mockResolvedValue(undefined as never);
-    (finalizeTournamentIfDone as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(createBracketIfMissing).mockResolvedValue({ finished: false, created: false });
+    jest.mocked(resolveExpiredScoreReports).mockResolvedValue(0);
+    jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
+    jest.mocked(finalizeTournamentIfDone).mockResolvedValue(undefined);
     // Plateau garni : la clôture pour cause de plateau désert ne s'en mêle pas.
-    (finalizeUnderfilledTournament as jest.Mock).mockResolvedValue(false as never);
+    jest.mocked(finalizeUnderfilledTournament).mockResolvedValue(false);
   });
 
   /** La ligne est relue une fois passée `RUNNING` (entretien du bloc final). */
-  function starting(row: Row): void {
-    (loadTournamentRow as jest.Mock)
-      .mockResolvedValueOnce(row as never)
-      .mockResolvedValue({ ...row, state: "RUNNING" } as never);
+  function starting(row: TournamentRow): void {
+    jest.mocked(loadTournamentRow)
+      .mockResolvedValueOnce(row)
+      .mockResolvedValue({ ...row, state: "RUNNING" });
   }
 
   it.each([
-    ["SWISS", initializeSwissTournament, generateSwissRound, reconcileSwiss],
-    ["SURVIVAL", initializeSurvivalTournament, generateSurvivalRound, reconcileSurvival],
-    ["BG_SURVIE", initializeEnduranceTournament, generateEnduranceRound, reconcileEndurance],
+    ["SWISS" as const, initializeSwissTournament, generateSwissRound, reconcileSwiss],
+    ["SURVIVAL" as const, initializeSurvivalTournament, generateSurvivalRound, reconcileSurvival],
+    ["BG_SURVIE" as const, initializeEnduranceTournament, generateEnduranceRound, reconcileEndurance],
   ])(
     "initialise le moteur %s alors que l'état de départ n'est pas REGISTRATION",
     async (format, initialize, generate, reconcile) => {
@@ -148,10 +148,10 @@ describe("syncTournamentState — coup d'envoi depuis UPCOMING", () => {
   it("ne réinitialise rien sur un tournoi déjà en cours", async () => {
     // Aucun changement d'état : le bloc de départ n'est pas traversé, et une
     // seconde amorce écraserait le classement d'un tournoi entamé.
-    (loadTournamentRow as jest.Mock).mockResolvedValue({
+    jest.mocked(loadTournamentRow).mockResolvedValue({
       ...fromUpcoming("SWISS"),
       state: "RUNNING",
-    } as never);
+    });
 
     await syncTournamentState(connection, 7);
 

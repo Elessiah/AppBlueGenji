@@ -6,9 +6,10 @@ jest.mock("@/lib/server/image-upload");
 import { POST } from "@/app/api/landing/sponsors/logo/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { processAndStoreImage } from "@/lib/server/image-upload";
+import { authUser } from "../../../helpers/auth-user";
 
-const admin = { id: 1, isAdmin: true } as Awaited<ReturnType<typeof getCurrentUser>>;
-const normalUser = { id: 2, isAdmin: false } as Awaited<ReturnType<typeof getCurrentUser>>;
+const admin = authUser({ id: 1, isAdmin: true });
+const normalUser = authUser({ id: 2, isAdmin: false });
 
 function fileReq(file?: File) {
   const form = new FormData();
@@ -29,25 +30,25 @@ describe("POST /api/landing/sponsors/logo", () => {
   });
 
   it("rejects anonymous users with 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     expect((await POST(fileReq(pngFile()))).status).toBe(401);
   });
 
   it("rejects non-admins with 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(normalUser as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(normalUser);
     expect((await POST(fileReq(pngFile()))).status).toBe(403);
   });
 
   it("returns 400 when no file is provided", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const res = await POST(fileReq());
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "FILE_MISSING" });
   });
 
   it("stores the logo and returns its served url for admins", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (processAndStoreImage as jest.Mock).mockResolvedValue("/uploads/sponsors/1-abc.webp" as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/sponsors/1-abc.webp");
 
     const res = await POST(fileReq(pngFile()));
     expect(res.status).toBe(200);
@@ -58,8 +59,8 @@ describe("POST /api/landing/sponsors/logo", () => {
   });
 
   it("surfaces processing errors as 400", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (processAndStoreImage as jest.Mock).mockRejectedValue(new Error("IMAGE_TOO_LARGE") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(processAndStoreImage).mockRejectedValue(new Error("IMAGE_TOO_LARGE"));
 
     const res = await POST(fileReq(pngFile()));
     expect(res.status).toBe(400);

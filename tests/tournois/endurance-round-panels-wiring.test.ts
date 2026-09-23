@@ -9,6 +9,7 @@ import { createMatch } from "@/lib/server/tournaments/repository";
 import type { BracketMatch, MatchStatus } from "@/lib/shared/types";
 import { endurancePlayoffLinks } from "@/app/(secured)/tournois/[id]/_lib/endurance-sections";
 import { bracketMatch } from "../helpers/bracket-match";
+import type { SqlMock } from "../helpers/sql-double";
 
 const ROOT = join(__dirname, "..", "..");
 const TOURNAMENT_DIR = join("app", "(secured)", "tournois", "[id]");
@@ -238,14 +239,14 @@ describe("endurancePlayoffLinks — accordé sur ce que crée le moteur", () => 
     });
 
     return { execute } as never as Parameters<typeof reconcileEndurance>[1] & {
-      execute: jest.Mock;
+      execute: SqlMock;
     };
   }
 
   beforeEach(() => {
     jest.clearAllMocks();
     let nextId = 200;
-    (createMatch as jest.Mock).mockImplementation(async () => (nextId += 1) as never);
+    jest.mocked(createMatch).mockImplementation(async () => (nextId += 1));
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -257,7 +258,7 @@ describe("endurancePlayoffLinks — accordé sur ce que crée le moteur", () => 
 
     // Ce que le service a créé : une rencontre par appel à `createMatch`, dont
     // les équipes sont posées par l'`UPDATE` qui suit.
-    const created = (createMatch as jest.Mock).mock.results.map(
+    const created = jest.mocked(createMatch).mock.results.map(
       (result) => (result.value as Promise<number>) as unknown,
     );
     expect(created).toHaveLength(2);

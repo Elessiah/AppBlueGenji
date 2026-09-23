@@ -14,6 +14,9 @@ import { registerCurrentUserTeam, registerTeamsByIds } from "@/lib/server/tourna
 import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
+import type { TournamentRow } from "@/lib/server/tournaments/_internal";
+import type { RowOverrides } from "../../helpers/row-overrides";
+import { tournamentRow } from "../../helpers/tournament-rows";
 
 /**
  * Les évènements sont réservés **au point de passage unique** de chaque fait —
@@ -25,12 +28,12 @@ import { syncTournamentState } from "@/lib/server/tournaments/state";
 type Queued = { kind: string } & Record<string, unknown>;
 
 function queued(): Queued[] {
-  return (queueBotLog as jest.Mock).mock.calls.map((call) => call[1] as Queued);
+  return jest.mocked(queueBotLog).mock.calls.map((call) => call[1] as Queued);
 }
 
 /** Les évènements passés par le chemin réservé aux alertes arbitre. */
 function alerted(): Queued[] {
-  return (queueRefereeAlert as jest.Mock).mock.calls.map((call) => call[1] as Queued);
+  return jest.mocked(queueRefereeAlert).mock.calls.map((call) => call[1] as Queued);
 }
 
 /** Connexion factice : `rows` répond aux SELECT, les UPDATE sont comptés. */
@@ -50,15 +53,19 @@ function fakeConnection(options: {
 }
 
 /** Ce que `syncTournamentState` rend au module testé. */
-function mockTournamentState(row: Record<string, unknown>): void {
-  (syncTournamentState as jest.Mock).mockResolvedValue({ row, stateChanged: false } as never);
+function mockTournamentState(row: RowOverrides<TournamentRow>): void {
+  jest.mocked(syncTournamentState).mockResolvedValue({
+    row: tournamentRow(row),
+    stateChanged: false,
+    contentChanged: false,
+  });
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (tryAutoResolveByes as jest.Mock).mockResolvedValue(undefined as never);
-  (queueBotLog as jest.Mock).mockReturnValue(true);
-  (queueRefereeAlert as jest.Mock).mockResolvedValue(true as never);
+  jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
+  jest.mocked(queueBotLog).mockReturnValue(true);
+  jest.mocked(queueRefereeAlert).mockResolvedValue(true);
 });
 
 describe("finishTournament", () => {
@@ -100,12 +107,23 @@ describe("finalizeUnderfilledTournament", () => {
 });
 
 describe("inscription", () => {
-  const TOURNAMENT = { id: 12, state: "REGISTRATION", max_teams: 16, participant_type: "TEAM" };
+  const TOURNAMENT = tournamentRow({
+    id: 12,
+    state: "REGISTRATION",
+    max_teams: 16,
+    participant_type: "TEAM",
+  });
 
-  /** Base minimale : tournoi ouvert, aucune inscrite, équipe existante. */
+  /**
+   * Base minimale : tournoi ouvert, aucune inscrite, équipe existante dont le
+   * roster remplit les conditions par défaut (cinq joueurs, Discord certifié).
+   */
   function registrationConnection(): PoolConnection {
     return fakeConnection({
       rows: (q) => {
+        if (q.includes("FROM bg_team_members")) {
+          return Array.from({ length: 5 }, () => ({ verified: 1, blizzard: 0 }));
+        }
         if (q.includes("COUNT(*)")) return [{ c: 0 }];
         if (q.includes("FROM bg_teams")) return [{ id: 900, is_ghost: 1, deleted_at: null }];
         if (q.includes("FROM bg_tournaments")) return [TOURNAMENT];
@@ -119,7 +137,7 @@ describe("inscription", () => {
   });
 
   it("réserve une ligne d'inscription joueur", async () => {
-    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 101, roles: ["OWNER"] } as never);
+    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 101, teamName: "Équipe", roles: ["OWNER"] });
 
     await registerCurrentUserTeam(registrationConnection(), 12, 42);
 
@@ -139,12 +157,15 @@ describe("inscription", () => {
   it("ne réserve rien quand l'inscription est refusée", async () => {
     const connection = fakeConnection({
       rows: (q) => {
+        if (q.includes("FROM bg_team_members")) {
+          return Array.from({ length: 5 }, () => ({ verified: 1, blizzard: 0 }));
+        }
         if (q.includes("COUNT(*)")) return [{ c: 1 }]; // déjà inscrite
         if (q.includes("FROM bg_tournaments")) return [TOURNAMENT];
         return [];
       },
     });
-    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 101, roles: ["OWNER"] } as never);
+    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 101, teamName: "Équipe", roles: ["OWNER"] });
 
     await expect(registerCurrentUserTeam(connection, 12, 42)).rejects.toThrow("ALREADY_REGISTERED");
     expect(queueBotLog).not.toHaveBeenCalled();
@@ -220,7 +241,7 @@ describe("reportMatchScore", () => {
   }
 
   beforeEach(() => {
-    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 101, roles: ["OWNER"] } as never);
+    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 101, teamName: "Équipe", roles: ["OWNER"] });
     mockTournamentState({
       id: 12,
       state: "RUNNING",

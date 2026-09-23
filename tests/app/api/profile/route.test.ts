@@ -7,6 +7,7 @@ import { GET, PATCH } from "@/app/api/profile/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getFullProfile, updateOwnProfile } from "@/lib/server/users-service";
 import { profilePatchRequest } from "../../../helpers/profile-request";
+import { authUser, fullProfileResponse } from "../../../helpers/auth-user";
 
 /**
  * Lecture et écriture de **son** profil. Les refus de `PATCH` sont couverts par
@@ -15,11 +16,9 @@ import { profilePatchRequest } from "../../../helpers/profile-request";
  * compte visé est toujours celui de la session, jamais une valeur du corps.
  */
 
-const user = { id: 42 } as Awaited<ReturnType<typeof getCurrentUser>>;
+const user = authUser({ id: 42 });
 // La route rend le profil tel quel : sa forme n'est pas ce qui est testé ici.
-const profile = { profile: { pseudo: "Nova" } } as unknown as Awaited<
-  ReturnType<typeof getFullProfile>
->;
+const profile = fullProfileResponse({ profile: { pseudo: "Nova" } });
 
 beforeEach(() => {
   jest.clearAllMocks();

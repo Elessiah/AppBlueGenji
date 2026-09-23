@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import type { PoolConnection } from "mysql2/promise";
 
 jest.mock("@/lib/server/tournaments/repository");
 jest.mock("@/lib/server/tournaments/phases-repository");
@@ -18,30 +17,33 @@ import {
 import { loadPhaseTeamIds } from "@/lib/server/tournaments/phases-repository";
 import { createSingleEliminationBracket } from "@/lib/server/tournaments/bracket-single";
 import { createDoubleEliminationBracket } from "@/lib/server/tournaments/bracket-double";
+import { type SqlQuery, fakeConnection } from "../../helpers/sql-double";
+import type { TournamentRow } from "@/lib/server/tournaments/_internal";
+import type { RowOverrides } from "../../helpers/row-overrides";
+import { tournamentRow } from "../../helpers/tournament-rows";
 
-const connection = {
-  execute: jest.fn(async () => [[], []]),
-} as unknown as PoolConnection;
+const execute = jest.fn<SqlQuery>(async () => [[], []]);
+const connection = fakeConnection({ execute });
 
-function tournamentRow(overrides: Record<string, unknown> = {}) {
-  return {
+function tournament(overrides: RowOverrides<TournamentRow> = {}): TournamentRow {
+  return tournamentRow({
     id: 5,
     format: "SINGLE",
     bracket_size: null,
     has_third_place_match: 0,
     ...overrides,
-  } as never;
+  });
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (loadRegisteredTeamIds as jest.Mock).mockResolvedValue([1, 2, 3, 4] as never);
-  (loadPhaseTeamIds as jest.Mock).mockResolvedValue([1, 2, 3, 4] as never);
-  (hasExistingMatches as jest.Mock).mockResolvedValue(false as never);
-  (deleteAllMatches as jest.Mock).mockResolvedValue(undefined as never);
-  (deletePhaseMatches as jest.Mock).mockResolvedValue(undefined as never);
-  (createSingleEliminationBracket as jest.Mock).mockResolvedValue(undefined as never);
-  (createDoubleEliminationBracket as jest.Mock).mockResolvedValue(undefined as never);
+  jest.mocked(loadRegisteredTeamIds).mockResolvedValue([1, 2, 3, 4]);
+  jest.mocked(loadPhaseTeamIds).mockResolvedValue([1, 2, 3, 4]);
+  jest.mocked(hasExistingMatches).mockResolvedValue(false);
+  jest.mocked(deleteAllMatches).mockResolvedValue(undefined);
+  jest.mocked(deletePhaseMatches).mockResolvedValue(undefined);
+  jest.mocked(createSingleEliminationBracket).mockResolvedValue(undefined);
+  jest.mocked(createDoubleEliminationBracket).mockResolvedValue(undefined);
 });
 
 /**
@@ -69,32 +71,32 @@ describe("createBracketIfMissing — l'annonce revient à l'appelant", () => {
   });
 
   it("annonce un plateau créé", async () => {
-    const result = await createBracketIfMissing(connection, tournamentRow());
+    const result = await createBracketIfMissing(connection, tournament());
 
     expect(createSingleEliminationBracket).toHaveBeenCalled();
     expect(result).toEqual({ finished: false, created: true });
   });
 
   it("annonce un plateau créé en double élimination", async () => {
-    const result = await createBracketIfMissing(connection, tournamentRow({ format: "DOUBLE" }));
+    const result = await createBracketIfMissing(connection, tournament({ format: "DOUBLE" }));
 
     expect(createDoubleEliminationBracket).toHaveBeenCalled();
     expect(result).toEqual({ finished: false, created: true });
   });
 
   it("n'annonce rien quand le plateau est déjà là", async () => {
-    (hasExistingMatches as jest.Mock).mockResolvedValue(true as never);
+    jest.mocked(hasExistingMatches).mockResolvedValue(true);
 
-    const result = await createBracketIfMissing(connection, tournamentRow({ bracket_size: 4 }));
+    const result = await createBracketIfMissing(connection, tournament({ bracket_size: 4 }));
 
     expect(result).toEqual({ finished: false, created: false });
     expect(createSingleEliminationBracket).not.toHaveBeenCalled();
   });
 
   it("reconstruit et annonce quand l'effectif a périmé la taille", async () => {
-    (hasExistingMatches as jest.Mock).mockResolvedValue(true as never);
+    jest.mocked(hasExistingMatches).mockResolvedValue(true);
 
-    const result = await createBracketIfMissing(connection, tournamentRow({ bracket_size: 8 }));
+    const result = await createBracketIfMissing(connection, tournament({ bracket_size: 8 }));
 
     expect(deleteAllMatches).toHaveBeenCalled();
     expect(result).toEqual({ finished: false, created: true });
@@ -103,21 +105,21 @@ describe("createBracketIfMissing — l'annonce revient à l'appelant", () => {
   it("n'annonce aucun plateau sur un tournoi clos faute d'adversaires", async () => {
     // Le tournoi est clos sur-le-champ : il n'y a pas de plateau à annoncer, et
     // c'est la bascule d'état qui se voit.
-    (loadRegisteredTeamIds as jest.Mock).mockResolvedValue([7] as never);
+    jest.mocked(loadRegisteredTeamIds).mockResolvedValue([7]);
 
-    const result = await createBracketIfMissing(connection, tournamentRow());
+    const result = await createBracketIfMissing(connection, tournament());
 
     expect(result).toEqual({ finished: true, created: false });
   });
 
   it("n'annonce rien pour une phase réduite à une qualifiée", async () => {
-    (loadPhaseTeamIds as jest.Mock).mockResolvedValue([7] as never);
-    (connection.execute as jest.Mock).mockResolvedValue([
+    jest.mocked(loadPhaseTeamIds).mockResolvedValue([7]);
+    execute.mockResolvedValue([
       [{ c: 0, bracket_size: null }],
       [],
-    ] as never);
+    ]);
 
-    const result = await createBracketIfMissing(connection, tournamentRow({ format: "MULTI" }), {
+    const result = await createBracketIfMissing(connection, tournament({ format: "MULTI" }), {
       phaseId: 3,
       format: "SINGLE",
     });

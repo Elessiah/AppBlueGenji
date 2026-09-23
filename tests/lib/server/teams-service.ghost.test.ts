@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { isGhostTeam, softDeleteTeam, updateTeamLogo, updateTeamMeta } from "@/lib/server/teams-service";
+import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
-async function mockDb(execute: jest.Mock, connectionExecute?: jest.Mock) {
+async function mockDb(execute: SqlMock, connectionExecute?: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
   const connection = {
     execute: connectionExecute ?? execute,
@@ -12,10 +13,10 @@ async function mockDb(execute: jest.Mock, connectionExecute?: jest.Mock) {
     rollback: jest.fn(),
     release: jest.fn(),
   };
-  (getDatabase as jest.Mock).mockResolvedValue({
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
     execute,
     getConnection: jest.fn(async () => connection),
-  } as never);
+  }));
   return connection;
 }
 
@@ -36,14 +37,14 @@ describe("isGhostTeam", () => {
     // Une fantôme dissoute n'est plus administrable.
     [{ is_ghost: 1, deleted_at: new Date() }, false],
   ])("%p → %s", async (row, expected) => {
-    const execute = jest.fn().mockResolvedValue([[row]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[row]]);
     await mockDb(execute);
 
     await expect(isGhostTeam(3)).resolves.toBe(expected);
   });
 
   it("renvoie false pour une équipe inconnue", async () => {
-    const execute = jest.fn().mockResolvedValue([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
     await mockDb(execute);
 
     await expect(isGhostTeam(3)).resolves.toBe(false);
@@ -60,11 +61,11 @@ describe("updateTeamMeta — dérogation staff sur les équipes fantômes", () =
 
   it("autorise un non-membre avec la permission tournois sur une fantôme", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce(NOT_A_MEMBER as never) // userOwnsTeam
-      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]] as never) // isGhostTeam
-      .mockResolvedValueOnce([[]] as never) // nom libre (assertTeamNameAvailable)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never); // UPDATE
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(NOT_A_MEMBER) // userOwnsTeam
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]]) // isGhostTeam
+      .mockResolvedValueOnce([[]]) // nom libre (assertTeamNameAvailable)
+      .mockResolvedValueOnce([{ affectedRows: 1 }]); // UPDATE
     await mockDb(execute);
 
     await updateTeamMeta(99, 3, { name: "Nouveau nom" }, true);
@@ -76,9 +77,9 @@ describe("updateTeamMeta — dérogation staff sur les équipes fantômes", () =
 
   it("refuse le même staff sur une équipe réelle", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce(NOT_A_MEMBER as never)
-      .mockResolvedValueOnce([[{ is_ghost: 0, deleted_at: null }]] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(NOT_A_MEMBER)
+      .mockResolvedValueOnce([[{ is_ghost: 0, deleted_at: null }]]);
     await mockDb(execute);
 
     await expect(updateTeamMeta(99, 3, { name: "Pirate" }, true)).rejects.toThrow("FORBIDDEN");
@@ -86,7 +87,7 @@ describe("updateTeamMeta — dérogation staff sur les équipes fantômes", () =
   });
 
   it("refuse un non-membre sans la permission, même sur une fantôme", async () => {
-    const execute = jest.fn().mockResolvedValueOnce(NOT_A_MEMBER as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(NOT_A_MEMBER);
     await mockDb(execute);
 
     await expect(updateTeamMeta(99, 3, { name: "Pirate" }, false)).rejects.toThrow("FORBIDDEN");
@@ -105,10 +106,10 @@ describe("updateTeamLogo — dérogation staff", () => {
 
   it("autorise le staff sur une fantôme", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce(NOT_A_MEMBER as never) // getMemberRoles
-      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]] as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(NOT_A_MEMBER) // getMemberRoles
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await updateTeamLogo(99, 3, "/api/uploads/teams/x.webp", true);
@@ -120,9 +121,9 @@ describe("updateTeamLogo — dérogation staff", () => {
 
   it("refuse le staff sur une équipe réelle", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce(NOT_A_MEMBER as never)
-      .mockResolvedValueOnce([[{ is_ghost: 0, deleted_at: null }]] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(NOT_A_MEMBER)
+      .mockResolvedValueOnce([[{ is_ghost: 0, deleted_at: null }]]);
     await mockDb(execute);
 
     await expect(updateTeamLogo(99, 3, null, true)).rejects.toThrow("FORBIDDEN");
@@ -139,11 +140,11 @@ describe("softDeleteTeam — dérogation staff", () => {
 
   it("laisse le staff supprimer une fantôme", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[{ deleted_at: null }]] as never) // teamIsDeleted
-      .mockResolvedValueOnce(NOT_A_MEMBER as never) // userOwnsTeam
-      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]] as never); // isGhostTeam
-    const connectionExecute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ deleted_at: null }]]) // teamIsDeleted
+      .mockResolvedValueOnce(NOT_A_MEMBER) // userOwnsTeam
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]]); // isGhostTeam
+    const connectionExecute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     const connection = await mockDb(execute, connectionExecute);
 
     await softDeleteTeam(99, 3, true);
@@ -154,17 +155,17 @@ describe("softDeleteTeam — dérogation staff", () => {
 
   it("refuse le staff sur une équipe réelle", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[{ deleted_at: null }]] as never)
-      .mockResolvedValueOnce(NOT_A_MEMBER as never)
-      .mockResolvedValueOnce([[{ is_ghost: 0, deleted_at: null }]] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ deleted_at: null }]])
+      .mockResolvedValueOnce(NOT_A_MEMBER)
+      .mockResolvedValueOnce([[{ is_ghost: 0, deleted_at: null }]]);
     await mockDb(execute);
 
     await expect(softDeleteTeam(99, 3, true)).rejects.toThrow("FORBIDDEN");
   });
 
   it("refuse une équipe déjà dissoute avant tout contrôle de droits", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[{ deleted_at: new Date() }]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[{ deleted_at: new Date() }]]);
     await mockDb(execute);
 
     await expect(softDeleteTeam(99, 3, true)).rejects.toThrow("TEAM_ALREADY_DELETED");

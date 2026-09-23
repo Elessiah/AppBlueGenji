@@ -28,6 +28,9 @@ import {
 } from "@/lib/server/tournaments/finalization";
 import { loadSwissRanking, reconcileSwiss } from "@/lib/server/tournaments/swiss";
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
+import type { SqlMock } from "../helpers/sql-double";
+import type { TournamentRow, PhaseRow } from "@/lib/server/tournaments/_internal";
+import { phaseRow as basePhaseRow, registrationRow, tournamentRow } from "../helpers/tournament-rows";
 
 /**
  * Corriger le score de la finale d'un tournoi **MULTI** terminé.
@@ -55,13 +58,13 @@ const PHASE_2 = 422;
 const phaseTeams = new Map<number, PhaseTeam[]>();
 
 /** Ce que le tournoi et sa phase courante racontent d'eux-mêmes. */
-let tournamentState = "FINISHED";
+let tournamentState: TournamentRow["state"] = "FINISHED";
 let currentPhaseId: number | null = PHASE_2;
-let phaseStates: Record<number, string> = { [PHASE_1]: "FINISHED", [PHASE_2]: "FINISHED" };
-let tournamentFormat = "MULTI";
+let phaseStates: Record<number, PhaseRow["state"]> = { [PHASE_1]: "FINISHED", [PHASE_2]: "FINISHED" };
+let tournamentFormat: TournamentRow["format"] = "MULTI";
 
-function phaseRow(id: number, position: number) {
-  return {
+function phaseRow(id: number, position: number): PhaseRow {
+  return basePhaseRow({
     id,
     tournament_id: TOURNAMENT_ID,
     position,
@@ -83,7 +86,7 @@ function phaseRow(id: number, position: number) {
     started_at: new Date(),
     finished_at: position === 2 ? new Date("2026-09-01T12:00:00Z") : new Date(),
     created_at: new Date(),
-  };
+  });
 }
 
 /**
@@ -99,11 +102,11 @@ function makeConn() {
     }
     return [[], undefined];
   });
-  return { execute } as unknown as PoolConnection & { execute: jest.Mock };
+  return { execute } as unknown as PoolConnection & { execute: SqlMock };
 }
 
 /** Les rangs finaux écrits par la finalisation, équipe vers rang. */
-function writtenFinalRanks(conn: { execute: jest.Mock }): Map<number, number> {
+function writtenFinalRanks(conn: { execute: SqlMock }): Map<number, number> {
   const ranks = new Map<number, number>();
   for (const call of conn.execute.mock.calls) {
     const sql = String(call[0]);
@@ -138,28 +141,30 @@ beforeEach(() => {
     { teamId: 2, seed: 2, rank: 2, qualified: false },
   ]);
 
-  (loadTournamentRow as jest.Mock).mockImplementation(async () => ({
-    id: TOURNAMENT_ID,
-    format: tournamentFormat,
-    state: tournamentState,
-    current_phase_id: currentPhaseId,
-  }));
-  (getRegistrationRows as jest.Mock).mockImplementation(async () =>
-    [1, 2, 3, 4].map((team_id) => ({ team_id, tournament_id: TOURNAMENT_ID })),
+  jest.mocked(loadTournamentRow).mockImplementation(async () =>
+    tournamentRow({
+      id: TOURNAMENT_ID,
+      format: tournamentFormat,
+      state: tournamentState,
+      current_phase_id: currentPhaseId,
+    }),
   );
-  (finishTournament as jest.Mock).mockImplementation(async () => undefined);
+  jest.mocked(getRegistrationRows).mockImplementation(async () =>
+    [1, 2, 3, 4].map((team_id) => registrationRow({ team_id })),
+  );
+  jest.mocked(finishTournament).mockImplementation(async () => undefined);
 
-  (loadPhases as jest.Mock).mockImplementation(async () => [
+  jest.mocked(loadPhases).mockImplementation(async () => [
     phaseRow(PHASE_1, 1),
     phaseRow(PHASE_2, 2),
   ]);
-  (loadPhase as jest.Mock).mockImplementation(async (_conn: unknown, id: unknown) =>
+  jest.mocked(loadPhase).mockImplementation(async (_conn, id) =>
     Number(id) === PHASE_1 ? phaseRow(PHASE_1, 1) : phaseRow(PHASE_2, 2),
   );
-  (loadPhaseTeamIds as jest.Mock).mockImplementation(async (_conn: unknown, phaseId: unknown) =>
+  jest.mocked(loadPhaseTeamIds).mockImplementation(async (_conn: unknown, phaseId: unknown) =>
     (phaseTeams.get(Number(phaseId)) ?? []).map((team) => team.teamId),
   );
-  (savePhaseResults as jest.Mock).mockImplementation(
+  jest.mocked(savePhaseResults).mockImplementation(
     async (
       _conn: unknown,
       phaseId: unknown,
@@ -175,7 +180,7 @@ beforeEach(() => {
       }
     },
   );
-  (loadPhaseStandings as jest.Mock).mockImplementation(async (_conn: unknown, phaseId: unknown) => {
+  jest.mocked(loadPhaseStandings).mockImplementation(async (_conn: unknown, phaseId: unknown) => {
     const teams = [...(phaseTeams.get(Number(phaseId)) ?? [])];
     teams.sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999) || a.seed - b.seed);
     return teams.map<TournamentPhaseStanding>((team) => ({
@@ -190,18 +195,16 @@ beforeEach(() => {
   // Les écritures d'état sont **retenues** : `reconcilePhases` se rappelle
   // lui-même après avoir lancé une phase, et des mocks amnésiques le feraient
   // tourner en rond sur la même phase.
-  (setPhaseState as jest.Mock).mockImplementation(
-    async (_conn: unknown, phaseId: unknown, state: unknown) => {
-      phaseStates[Number(phaseId)] = String(state);
-    },
-  );
-  (setCurrentPhase as jest.Mock).mockImplementation(
+  jest.mocked(setPhaseState).mockImplementation(async (_conn, phaseId, state) => {
+    phaseStates[phaseId] = state;
+  });
+  jest.mocked(setCurrentPhase).mockImplementation(
     async (_conn: unknown, _tournamentId: unknown, phaseId: unknown) => {
       currentPhaseId = phaseId === null ? null : Number(phaseId);
     },
   );
-  (updatePhaseResolution as jest.Mock).mockImplementation(async () => undefined);
-  (insertPhaseTeams as jest.Mock).mockImplementation(
+  jest.mocked(updatePhaseResolution).mockImplementation(async () => undefined);
+  jest.mocked(insertPhaseTeams).mockImplementation(
     async (_conn: unknown, _tournamentId: unknown, phaseId: unknown, teams: unknown) => {
       phaseTeams.set(
         Number(phaseId),
@@ -217,8 +220,8 @@ beforeEach(() => {
 
   // La finale est jouée, et le rejeu du bracket donne désormais l'équipe 2
   // championne — c'est la correction de score que l'on suit.
-  (isEliminationPhaseComplete as jest.Mock).mockImplementation(async () => true);
-  (rankEliminationPhase as jest.Mock).mockImplementation(async () => ranked([2, 1]));
+  jest.mocked(isEliminationPhaseComplete).mockImplementation(async () => true);
+  jest.mocked(rankEliminationPhase).mockImplementation(async () => ranked([2, 1]));
 });
 
 /** Rangs d'élimination à la suite, sans ex æquo ni double forfait. */
@@ -286,13 +289,13 @@ describe("reconcilePhases sur un tournoi MULTI terminé", () => {
 
   it("délègue au moteur de la phase quand elle est en ronde suisse", async () => {
     phaseStates = { [PHASE_1]: "FINISHED", [PHASE_2]: "FINISHED" };
-    (loadPhase as jest.Mock).mockImplementation(async () => ({
+    jest.mocked(loadPhase).mockImplementation(async () => ({
       ...phaseRow(PHASE_2, 2),
       format: "SWISS",
       swiss_total_rounds: 3,
     }));
-    (reconcileSwiss as jest.Mock).mockImplementation(async () => ({ done: true, ranked: [] }));
-    (loadSwissRanking as jest.Mock).mockImplementation(async () => [2, 1]);
+    jest.mocked(reconcileSwiss).mockImplementation(async () => ({ done: true, ranked: [] }));
+    jest.mocked(loadSwissRanking).mockImplementation(async () => [2, 1]);
 
     const conn = makeConn();
     await reconcilePhases(TOURNAMENT_ID, conn);
@@ -302,7 +305,7 @@ describe("reconcilePhases sur un tournoi MULTI terminé", () => {
   });
 
   it("ne touche à rien si la phase n'est pas complète", async () => {
-    (isEliminationPhaseComplete as jest.Mock).mockImplementation(async () => false);
+    jest.mocked(isEliminationPhaseComplete).mockImplementation(async () => false);
 
     const conn = makeConn();
     await reconcilePhases(TOURNAMENT_ID, conn);
@@ -334,7 +337,7 @@ describe("reconcilePhases — les états qui ne se relisent pas", () => {
     expect(finishTournament).not.toHaveBeenCalled();
   });
 
-  it.each(["UPCOMING", "REGISTRATION"])("ignore un tournoi en état %s", async (state) => {
+  it.each<TournamentRow["state"]>(["UPCOMING", "REGISTRATION"])("ignore un tournoi en état %s", async (state) => {
     tournamentState = state;
 
     const conn = makeConn();
@@ -360,8 +363,8 @@ describe("reconcilePhases — le chemin ordinaire reste intact", () => {
     tournamentState = "RUNNING";
     phaseStates = { [PHASE_1]: "RUNNING", [PHASE_2]: "PENDING" };
     currentPhaseId = PHASE_1;
-    (loadPhase as jest.Mock).mockImplementation(async () => phaseRow(PHASE_1, 1));
-    (rankEliminationPhase as jest.Mock).mockImplementation(async () => ranked([1, 2, 3, 4]));
+    jest.mocked(loadPhase).mockImplementation(async () => phaseRow(PHASE_1, 1));
+    jest.mocked(rankEliminationPhase).mockImplementation(async () => ranked([1, 2, 3, 4]));
 
     const conn = makeConn();
     await reconcilePhases(TOURNAMENT_ID, conn);

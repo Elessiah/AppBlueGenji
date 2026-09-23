@@ -6,9 +6,10 @@ jest.mock("@/lib/server/bureau-service");
 import { PUT } from "@/app/api/association/bureau/reorder/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/bureau-service";
+import { authUser } from "../../../helpers/auth-user";
 
-const admin = { id: 1, isAdmin: true } as Awaited<ReturnType<typeof getCurrentUser>>;
-const normalUser = { id: 2, isAdmin: false } as Awaited<ReturnType<typeof getCurrentUser>>;
+const admin = authUser({ id: 1, isAdmin: true });
+const normalUser = authUser({ id: 2, isAdmin: false });
 
 function jsonReq(body: unknown) {
   return new Request("http://localhost/api/association/bureau/reorder", {
@@ -27,21 +28,21 @@ describe("PUT /api/association/bureau/reorder", () => {
   });
 
   it("rejects anonymous users with 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     const res = await PUT(jsonReq({ ids: [1, 2] }));
     expect(res.status).toBe(401);
     expect(service.reorderBureauMembers).not.toHaveBeenCalled();
   });
 
   it("rejects non-admins with 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(normalUser as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(normalUser);
     const res = await PUT(jsonReq({ ids: [1, 2] }));
     expect(res.status).toBe(403);
     expect(service.reorderBureauMembers).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid ids payload with 400", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const res = await PUT(jsonReq({ ids: [1, 1] }));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "DUPLICATE_ID" });
@@ -49,8 +50,8 @@ describe("PUT /api/association/bureau/reorder", () => {
   });
 
   it("reorders for admins", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.reorderBureauMembers as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.reorderBureauMembers).mockResolvedValue(undefined);
 
     const res = await PUT(jsonReq({ ids: [3, 1, 2] }));
     expect(res.status).toBe(200);
@@ -58,8 +59,8 @@ describe("PUT /api/association/bureau/reorder", () => {
   });
 
   it("returns 400 when the service throws", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.reorderBureauMembers as jest.Mock).mockRejectedValue(new Error("BOOM") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.reorderBureauMembers).mockRejectedValue(new Error("BOOM"));
 
     const res = await PUT(jsonReq({ ids: [1, 2] }));
     expect(res.status).toBe(400);

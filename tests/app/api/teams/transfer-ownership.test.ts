@@ -6,10 +6,10 @@ jest.mock("@/lib/server/teams-service");
 import { POST as transferRoute } from "@/app/api/teams/[id]/transfer-ownership/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getTeamDetail, transferTeamOwnership } from "@/lib/server/teams-service";
+import { authUser } from "../../../helpers/auth-user";
+import { teamDetailResponse } from "../../../helpers/team-detail";
 
-type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
-
-const owner = { id: 4, isAdmin: false, roles: [] } as unknown as SessionUser;
+const owner = authUser({ id: 4, isAdmin: false, roles: [] });
 
 function jsonReq(body: unknown) {
   return new Request("http://localhost/api/teams/7/transfer-ownership", {
@@ -30,7 +30,7 @@ describe("POST /api/teams/[id]/transfer-ownership", () => {
   });
 
   it("rejette un visiteur anonyme avec 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
 
     const res = await transferRoute(jsonReq({ newOwnerUserId: 9 }), params("7"));
 
@@ -39,7 +39,7 @@ describe("POST /api/teams/[id]/transfer-ownership", () => {
   });
 
   it.each(["0", "-3", "abc"])("rejette un identifiant d'équipe invalide (%s)", async (id) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(owner as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(owner);
 
     const res = await transferRoute(jsonReq({ newOwnerUserId: 9 }), params(id));
 
@@ -51,7 +51,7 @@ describe("POST /api/teams/[id]/transfer-ownership", () => {
   it.each([[undefined], [0], [1.5], ["9"]])(
     "rejette un destinataire invalide (%s)",
     async (newOwnerUserId) => {
-      (getCurrentUser as jest.Mock).mockResolvedValue(owner as never);
+      jest.mocked(getCurrentUser).mockResolvedValue(owner);
 
       const res = await transferRoute(jsonReq({ newOwnerUserId }), params("7"));
 
@@ -62,10 +62,10 @@ describe("POST /api/teams/[id]/transfer-ownership", () => {
   );
 
   it("transfère la propriété et renvoie la fiche à jour", async () => {
-    const detail = { team: { id: 7, name: "Dragons" }, members: [] };
-    (getCurrentUser as jest.Mock).mockResolvedValue(owner as never);
-    (transferTeamOwnership as jest.Mock).mockResolvedValue(undefined as never);
-    (getTeamDetail as jest.Mock).mockResolvedValue(detail as never);
+    const detail = teamDetailResponse({ team: { id: 7, name: "Dragons" } });
+    jest.mocked(getCurrentUser).mockResolvedValue(owner);
+    jest.mocked(transferTeamOwnership).mockResolvedValue(undefined);
+    jest.mocked(getTeamDetail).mockResolvedValue(detail);
 
     const res = await transferRoute(jsonReq({ newOwnerUserId: 9 }), params("7"));
 
@@ -81,8 +81,8 @@ describe("POST /api/teams/[id]/transfer-ownership", () => {
     ["MEMBER_NOT_FOUND", 404],
     ["TRANSFER_TO_SELF", 400],
   ])("traduit %s en %i", async (message, status) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(owner as never);
-    (transferTeamOwnership as jest.Mock).mockRejectedValue(new Error(message) as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(owner);
+    jest.mocked(transferTeamOwnership).mockRejectedValue(new Error(message));
 
     const res = await transferRoute(jsonReq({ newOwnerUserId: 9 }), params("7"));
 
@@ -92,8 +92,8 @@ describe("POST /api/teams/[id]/transfer-ownership", () => {
   });
 
   it("retombe sur 400 pour une erreur inattendue", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(owner as never);
-    (transferTeamOwnership as jest.Mock).mockRejectedValue(new Error("DB_DOWN") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(owner);
+    jest.mocked(transferTeamOwnership).mockRejectedValue(new Error("DB_DOWN"));
 
     const res = await transferRoute(jsonReq({ newOwnerUserId: 9 }), params("7"));
 

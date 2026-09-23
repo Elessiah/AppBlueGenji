@@ -12,6 +12,7 @@ import {
 } from "@/lib/server/tournaments/bot-logs";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
+import { type SqlMock, fakePool } from "../../helpers/sql-double";
 
 /** Une connexion ne sert ici que de clé : la file est indexée par identité. */
 function fakeConnection(): PoolConnection {
@@ -50,17 +51,17 @@ const MATCH_ROW = {
  * Câble la base : chaque requête rend la première ligne restante.
  * L'ordre suffit — les résolutions sont séquentielles, une entrée à la fois.
  */
-function mockDb(rows: unknown[][]): jest.Mock {
+function mockDb(rows: unknown[][]): SqlMock {
   const execute = jest.fn<() => Promise<unknown>>();
   for (const result of rows) execute.mockResolvedValueOnce([result]);
   execute.mockResolvedValue([[]]);
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
-  return execute as unknown as jest.Mock;
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  return execute as unknown as SqlMock;
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (sendBotLog as jest.Mock).mockResolvedValue(undefined as never);
+  jest.mocked(sendBotLog).mockResolvedValue(undefined);
 });
 
 describe("file par transaction", () => {
@@ -95,7 +96,7 @@ describe("file par transaction", () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
-    expect((sendBotLog as jest.Mock).mock.calls[0][0]).toContain("Coup d'envoi");
+    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("Coup d'envoi");
   });
 
   it("ne vide la file qu'une fois : deux flushs ne dupliquent pas la ligne", async () => {
@@ -144,13 +145,13 @@ describe("file par transaction", () => {
     mockDb([]);
     flushBotLogs(connection);
     // La file est plafonnée à 32 entrées : au-delà, rien n'est retenu.
-    expect((sendBotLog as jest.Mock).mock.calls.length).toBeLessThanOrEqual(32);
+    expect(jest.mocked(sendBotLog).mock.calls.length).toBeLessThanOrEqual(32);
   });
 
   it("n'échoue jamais quand le bot est injoignable", async () => {
     const connection = fakeConnection();
     mockDb([[TOURNAMENT_ROW]]);
-    (sendBotLog as jest.Mock).mockRejectedValue(new Error("ECONNREFUSED") as never);
+    jest.mocked(sendBotLog).mockRejectedValue(new Error("ECONNREFUSED"));
 
     queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
     expect(() => flushBotLogs(connection)).not.toThrow();
@@ -231,9 +232,9 @@ describe("resolveBotLogs", () => {
 
   it("perd la ligne fautive, pas les suivantes", async () => {
     const execute = jest.fn<() => Promise<unknown>>();
-    execute.mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT") as never);
+    execute.mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT"));
     execute.mockResolvedValueOnce([[TOURNAMENT_ROW]]);
-    (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
     const messages = await resolveBotLogs([
       { kind: "tournament_started", tournamentId: 12 },

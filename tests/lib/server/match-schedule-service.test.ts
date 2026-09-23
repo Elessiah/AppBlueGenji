@@ -5,10 +5,11 @@ jest.mock("@/lib/server/tournaments/notifications");
 
 import { setMatchStartAt } from "@/lib/server/tournaments/match-schedule";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
-async function mockDb(execute: jest.Mock) {
+async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 }
 
 /**
@@ -17,9 +18,9 @@ async function mockDb(execute: jest.Mock) {
  */
 function found(startAt: Date | null = null) {
   return jest
-    .fn()
-    .mockResolvedValueOnce([[{ id: 42, tournament_id: 7, start_at: startAt }]] as never)
-    .mockResolvedValue([{ affectedRows: 1 }] as never);
+    .fn<SqlQuery>()
+    .mockResolvedValueOnce([[{ id: 42, tournament_id: 7, start_at: startAt }]])
+    .mockResolvedValue([{ affectedRows: 1 }]);
 }
 
 beforeEach(() => {
@@ -95,7 +96,7 @@ describe("setMatchStartAt", () => {
   });
 
   it("refuse une date inexploitable avant même de lire le match", async () => {
-    const execute = jest.fn();
+    const execute = jest.fn<SqlQuery>();
     await mockDb(execute);
 
     await expect(setMatchStartAt(42, "demain soir")).rejects.toThrow("INVALID_MATCH_START_AT");
@@ -104,7 +105,7 @@ describe("setMatchStartAt", () => {
   });
 
   it("refuse une date hors bornes", async () => {
-    const execute = jest.fn();
+    const execute = jest.fn<SqlQuery>();
     await mockDb(execute);
 
     await expect(setMatchStartAt(42, "1970-01-01T00:00:00Z")).rejects.toThrow(
@@ -114,7 +115,7 @@ describe("setMatchStartAt", () => {
   });
 
   it("signale un match introuvable sans rien écrire", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     await expect(setMatchStartAt(999, "2026-08-29T18:30:00Z")).rejects.toThrow("MATCH_NOT_FOUND");

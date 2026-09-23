@@ -6,6 +6,7 @@ jest.mock("@/lib/server/stats-service");
 
 import { updateOwnProfile } from "@/lib/server/users-service";
 import { getDatabase } from "@/lib/server/database";
+import { fakePool } from "../../helpers/sql-double";
 
 /**
  * **La moitié serveur du verrou du BattleTag** (`lib/shared/battletag-lock.ts`).
@@ -37,7 +38,7 @@ function fakeDb(row: { blizzard_sub: string | null; overwatch_battletag: string 
     if (q.startsWith("UPDATE bg_users")) return [{ affectedRows: 1 }, []];
     return [[], []];
   });
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return { queries };
 }
 

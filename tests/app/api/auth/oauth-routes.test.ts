@@ -31,8 +31,8 @@ const request = (path: string) => new NextRequest(`http://localhost:3000${path}`
 beforeEach(() => {
   jest.clearAllMocks();
   const redirect = NextResponse.redirect("http://localhost:3000/tournois");
-  startMock.mockResolvedValue(redirect as never);
-  completeMock.mockResolvedValue(redirect as never);
+  startMock.mockResolvedValue(redirect);
+  completeMock.mockResolvedValue(redirect);
 });
 
 /** Une ligne de table : le segment d'URL, la route, et la porte qu'elle nomme. */

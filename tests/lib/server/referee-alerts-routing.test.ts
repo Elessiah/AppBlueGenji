@@ -19,6 +19,7 @@ import {
   sendBotLog,
 } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
+import { type SqlMock, fakePool } from "../../helpers/sql-double";
 
 /**
  * Une connexion ne sert ici que de clé : la file est indexée par identité.
@@ -72,12 +73,12 @@ const TOURNAMENT_ROW = {
  * Câble la base : chaque requête rend la première ligne restante.
  * L'ordre suffit — les résolutions sont séquentielles, une entrée à la fois.
  */
-function mockDb(rows: unknown[][]): jest.Mock {
+function mockDb(rows: unknown[][]): SqlMock {
   const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>();
   for (const result of rows) execute.mockResolvedValueOnce([result]);
   execute.mockResolvedValue([[]]);
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
-  return execute as unknown as jest.Mock;
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  return execute as unknown as SqlMock;
 }
 
 /**
@@ -89,9 +90,9 @@ const DELIVERED = { sent: 1, unresolved: [], failed: [] };
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (isBotCircuitOpen as jest.Mock).mockReturnValue(false);
-  (sendBotLog as jest.Mock).mockResolvedValue(undefined as never);
-  (pushRefereeAlert as jest.Mock).mockResolvedValue(DELIVERED as never);
+  jest.mocked(isBotCircuitOpen).mockReturnValue(false);
+  jest.mocked(sendBotLog).mockResolvedValue(undefined);
+  jest.mocked(pushRefereeAlert).mockResolvedValue(DELIVERED);
 });
 
 describe("routage vers deux transports", () => {
@@ -196,7 +197,7 @@ describe("routage vers deux transports", () => {
   it("ne lève pas quand pushRefereeAlert rejette (bot injoignable)", async () => {
     const connection = fakeConnection();
     mockDb([[MATCH_ROW]]);
-    (pushRefereeAlert as jest.Mock).mockRejectedValue(new Error("ECONNREFUSED") as never);
+    jest.mocked(pushRefereeAlert).mockRejectedValue(new Error("ECONNREFUSED"));
 
     queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
     expect(() => flushBotLogs(connection)).not.toThrow();
@@ -211,7 +212,7 @@ describe("routage vers deux transports", () => {
   it("poursuit la file quand pushRefereeAlert rend null (bot injoignable)", async () => {
     const connection = fakeConnection();
     mockDb([[MATCH_ROW], [TOURNAMENT_ROW]]);
-    (pushRefereeAlert as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(pushRefereeAlert).mockResolvedValue(null);
 
     queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
     queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
@@ -228,11 +229,11 @@ describe("routage vers deux transports", () => {
   it("traite un rôle arbitre non configuré comme un envoi réussi", async () => {
     const connection = fakeConnection();
     mockDb([[MATCH_ROW]]);
-    (pushRefereeAlert as jest.Mock).mockResolvedValue({
+    jest.mocked(pushRefereeAlert).mockResolvedValue({
       sent: 0,
       unresolved: [],
       failed: [],
-    } as never);
+    });
 
     queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
     flushBotLogs(connection);
@@ -244,7 +245,7 @@ describe("routage vers deux transports", () => {
 
 describe("réservation rendue quand l'alerte n'est pas remise", () => {
   /** Les requêtes d'écriture vues sur le pool, après le flush. */
-  function writes(execute: jest.Mock): { sql: string; params: unknown[] }[] {
+  function writes(execute: SqlMock): { sql: string; params: unknown[] }[] {
     return execute.mock.calls
       .map((call) => ({ sql: String(call[0]), params: (call[1] ?? []) as unknown[] }))
       .filter((call) => call.sql.trim().startsWith("DELETE"));
@@ -255,7 +256,7 @@ describe("réservation rendue quand l'alerte n'est pas remise", () => {
   it("libère la réservation quand l'escalade n'est pas remise", async () => {
     const connection = fakeConnection();
     const execute = mockDb([[MATCH_ROW]]);
-    (pushRefereeAlert as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(pushRefereeAlert).mockResolvedValue(null);
 
     queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
     flushBotLogs(connection);
@@ -271,7 +272,7 @@ describe("réservation rendue quand l'alerte n'est pas remise", () => {
   it("libère aussi la réservation quand le transport rejette", async () => {
     const connection = fakeConnection();
     const execute = mockDb([[MATCH_ROW]]);
-    (pushRefereeAlert as jest.Mock).mockRejectedValue(new Error("ECONNREFUSED") as never);
+    jest.mocked(pushRefereeAlert).mockRejectedValue(new Error("ECONNREFUSED"));
 
     queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
     flushBotLogs(connection);
@@ -284,11 +285,11 @@ describe("réservation rendue quand l'alerte n'est pas remise", () => {
   it("garde la réservation quand l'escalade est bien remise", async () => {
     const connection = fakeConnection();
     const execute = mockDb([[MATCH_ROW]]);
-    (pushRefereeAlert as jest.Mock).mockResolvedValue({
+    jest.mocked(pushRefereeAlert).mockResolvedValue({
       sent: 2,
       unresolved: [],
       failed: [],
-    } as never);
+    });
 
     queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
     flushBotLogs(connection);
@@ -302,7 +303,7 @@ describe("réservation rendue quand l'alerte n'est pas remise", () => {
   it("libère la réservation d'un conflit non remis", async () => {
     const connection = fakeConnection();
     const execute = mockDb([[MATCH_ROW]]);
-    (pushRefereeAlert as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(pushRefereeAlert).mockResolvedValue(null);
 
     queueBotLog(connection, { kind: "score_conflict", matchId: 31, claimId: 88 });
     flushBotLogs(connection);
@@ -336,7 +337,7 @@ describe("réservation rendue quand l'alerte n'est pas remise", () => {
   it("ne libère rien pour une alerte sans réservation", async () => {
     const connection = fakeConnection();
     const execute = mockDb([[MATCH_ROW]]);
-    (pushRefereeAlert as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(pushRefereeAlert).mockResolvedValue(null);
 
     queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
     flushBotLogs(connection);
@@ -349,7 +350,7 @@ describe("réservation rendue quand l'alerte n'est pas remise", () => {
   it("ne libère rien pour un évènement de journal", async () => {
     const connection = fakeConnection();
     const execute = mockDb([[TOURNAMENT_ROW]]);
-    (sendBotLog as jest.Mock).mockRejectedValue(new Error("ECONNREFUSED") as never);
+    jest.mocked(sendBotLog).mockRejectedValue(new Error("ECONNREFUSED"));
 
     queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
     flushBotLogs(connection);
@@ -376,7 +377,7 @@ describe("conflit et escalade dans la même transaction", () => {
 
     // Un seul message : celui du conflit.
     expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
-    expect((pushRefereeAlert as jest.Mock).mock.calls[0][0]).toContain("contradictoires");
+    expect(jest.mocked(pushRefereeAlert).mock.calls[0][0]).toContain("contradictoires");
     // Et l'escalade écartée **garde** sa réservation : la rendre la ferait
     // repartir au balayage suivant, soit le doublon qu'on vient d'éviter.
     const deletes = execute.mock.calls
@@ -404,7 +405,7 @@ describe("conflit et escalade dans la même transaction", () => {
   it("envoie l'escalade quand le conflit n'a finalement pas été remis", async () => {
     const connection = fakeConnection();
     mockDb([[MATCH_ROW], [MATCH_ROW]]);
-    (pushRefereeAlert as jest.Mock).mockResolvedValueOnce(null as never);
+    jest.mocked(pushRefereeAlert).mockResolvedValueOnce(null);
 
     queueBotLog(connection, { kind: "score_conflict", matchId: 31, claimId: 88 });
     queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
@@ -557,7 +558,7 @@ describe("réservation d'une alerte arbitre", () => {
   it("ne réserve rien tant que le coupe-circuit est ouvert", async () => {
     const connection = fakeConnection();
     const execute = mockDb([]);
-    (isBotCircuitOpen as jest.Mock).mockReturnValue(true);
+    jest.mocked(isBotCircuitOpen).mockReturnValue(true);
 
     const queuedNow = await queueRefereeAlert(connection, {
       kind: "score_report_stalled",
@@ -576,7 +577,7 @@ describe("réservation d'une alerte arbitre", () => {
   it("ne réserve pas deux fois une manche qui a déjà sa ligne", async () => {
     const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>();
     // La lecture trouve la réservation ; aucune écriture ne doit suivre.
-    execute.mockResolvedValue([[{ 1: 1 }], []] as never);
+    execute.mockResolvedValue([[{ 1: 1 }], []]);
     const connection = { execute } as unknown as PoolConnection;
     mockDb([]);
 
@@ -593,8 +594,8 @@ describe("réservation d'une alerte arbitre", () => {
   // Manche vierge : la lecture ne trouve rien, la réservation est posée.
   it("réserve quand la manche n'a pas encore sa ligne", async () => {
     const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>();
-    execute.mockResolvedValueOnce([[], []] as never);
-    execute.mockResolvedValueOnce([{ affectedRows: 1, insertId: 501 }, []] as never);
+    execute.mockResolvedValueOnce([[], []]);
+    execute.mockResolvedValueOnce([{ affectedRows: 1, insertId: 501 }, []]);
     const connection = { execute } as unknown as PoolConnection;
     mockDb([]);
 

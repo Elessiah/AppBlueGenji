@@ -4,6 +4,7 @@ jest.mock("next/headers", () => ({ cookies: jest.fn() }));
 
 import { cookies } from "next/headers";
 import { consumeOAuthState, saveOAuthState } from "@/lib/server/oauth-state";
+import { fakeCookieStore } from "../../helpers/cookie-store";
 
 /**
  * **Le cookie qui traverse un aller-retour OAuth.**
@@ -30,7 +31,7 @@ function fakeCookies(stored?: string): CookieStore {
     get: jest.fn(() => (stored === undefined ? undefined : { value: stored })),
     set: jest.fn(),
   };
-  (cookies as jest.Mock).mockResolvedValue(store as never);
+  jest.mocked(cookies).mockResolvedValue(fakeCookieStore(store));
   return store;
 }
 

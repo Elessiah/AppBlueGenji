@@ -8,6 +8,8 @@ import { getTeamDetail } from "@/lib/server/teams-service";
 import { getDatabase } from "@/lib/server/database";
 import { getTeamEntityStats } from "@/lib/server/stats-service";
 import { getTeamRankingPosition } from "@/lib/server/ranking-service";
+import { fakePool } from "../../helpers/sql-double";
+import { emptyDeepStats } from "@/lib/shared/stats";
 
 /**
  * `visible_avatar` sur le roster d'une **fiche** d'équipe.
@@ -61,9 +63,9 @@ async function mockDb(members: Record<string, unknown>[]) {
     return [[], []];
   });
 
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
-  (getTeamEntityStats as jest.Mock).mockResolvedValue({ stats: null, tournaments: [] } as never);
-  (getTeamRankingPosition as jest.Mock).mockResolvedValue(null as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  jest.mocked(getTeamEntityStats).mockResolvedValue({ stats: emptyDeepStats(), tournaments: [] });
+  jest.mocked(getTeamRankingPosition).mockResolvedValue({ position: null, total: 0, points: 500, placementPoints: 0 });
   return execute;
 }
 

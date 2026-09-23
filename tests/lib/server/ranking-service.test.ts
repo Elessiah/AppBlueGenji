@@ -8,6 +8,7 @@ import {
 import { clearCache } from "@/lib/server/cache";
 import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
 import { RANKING_BASE_POINTS, ratingTransfer, replayRanking } from "@/lib/shared/ranking";
+import { type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
@@ -62,9 +63,9 @@ function fakeDb(matches: Row[], teams: Row[], entrants: Row[] = [], placements: 
   });
 }
 
-async function mockDb(execute: jest.Mock) {
+async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return execute;
 }
 

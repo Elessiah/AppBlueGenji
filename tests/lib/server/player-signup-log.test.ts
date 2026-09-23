@@ -16,6 +16,7 @@ import {
   createOrGetDiscordUser,
   createOrGetGoogleUser,
 } from "@/lib/server/users-service";
+import { fakePool } from "../../helpers/sql-double";
 
 /**
  * **Une ligne au journal Discord quand un joueur s'inscrit — une seule, et au
@@ -69,19 +70,19 @@ function fakeDb(rows: Row[]) {
     return [[], []];
   });
 
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return { execute };
 }
 
-const lines = () => (sendBotLog as jest.Mock).mock.calls.map((call) => String(call[0]));
+const lines = () => jest.mocked(sendBotLog).mock.calls.map((call) => String(call[0]));
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (ensureUniquePseudo as jest.Mock).mockImplementation(async (source: unknown) => String(source));
-  (sendBotLog as jest.Mock).mockResolvedValue(undefined as never);
+  jest.mocked(ensureUniquePseudo).mockImplementation(async (source: unknown) => String(source));
+  jest.mocked(sendBotLog).mockResolvedValue(undefined);
   // La photo de profil ne concerne pas ce fichier : rien à copier, donc aucun
   // appel sortant en marge de celui qu'on mesure.
-  (shouldImportRemoteAvatar as jest.Mock).mockReturnValue(false);
+  jest.mocked(shouldImportRemoteAvatar).mockReturnValue(false);
 });
 
 describe("inscription par Google", () => {
@@ -179,7 +180,7 @@ describe("le journal ne tient pas la connexion en otage", () => {
     // `sendBotLog` avale déjà ses erreurs ; ce test garde la propriété au cas où
     // une version future les laisserait passer. Un bot endormi ne doit ni faire
     // échouer une connexion, ni la rendre plus lente : l'envoi n'est pas attendu.
-    (sendBotLog as jest.Mock).mockRejectedValue(new Error("ECONNREFUSED") as never);
+    jest.mocked(sendBotLog).mockRejectedValue(new Error("ECONNREFUSED"));
     fakeDb([]);
 
     await expect(

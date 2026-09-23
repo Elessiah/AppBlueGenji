@@ -16,14 +16,17 @@ import {
   resolveExpiredScoreReports,
 } from "@/lib/server/tournaments/finalization";
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
+import type { TournamentRow } from "@/lib/server/tournaments/_internal";
+import type { RowOverrides } from "../../helpers/row-overrides";
+import { tournamentRow } from "../../helpers/tournament-rows";
 
 const connection = {} as never;
 
 const PAST = new Date(Date.now() - 86_400_000);
 const FUTURE = new Date(Date.now() + 86_400_000);
 
-function row(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return {
+function row(overrides: RowOverrides<TournamentRow> = {}): TournamentRow {
+  return tournamentRow({
     id: 5,
     state: "REGISTRATION",
     format: "SINGLE",
@@ -33,27 +36,27 @@ function row(overrides: Record<string, unknown> = {}): Record<string, unknown> {
     start_at: PAST,
     bracket_size: 8,
     ...overrides,
-  };
+  });
 }
 
 function queuedKinds(): string[] {
-  return (queueBotLog as jest.Mock).mock.calls.map(
+  return jest.mocked(queueBotLog).mock.calls.map(
     (call) => (call[1] as { kind: string }).kind,
   );
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (createBracketIfMissing as jest.Mock).mockResolvedValue({ finished: false } as never);
-  (resolveExpiredScoreReports as jest.Mock).mockResolvedValue(undefined as never);
-  (tryAutoResolveByes as jest.Mock).mockResolvedValue(undefined as never);
-  (finalizeTournamentIfDone as jest.Mock).mockResolvedValue(undefined as never);
-  (finalizeUnderfilledTournament as jest.Mock).mockResolvedValue(false as never);
+  jest.mocked(createBracketIfMissing).mockResolvedValue({ finished: false, created: false });
+  jest.mocked(resolveExpiredScoreReports).mockResolvedValue(0);
+  jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
+  jest.mocked(finalizeTournamentIfDone).mockResolvedValue(undefined);
+  jest.mocked(finalizeUnderfilledTournament).mockResolvedValue(false);
 });
 
 describe("syncTournamentState — coup d'envoi", () => {
   it("réserve la ligne de lancement quand le tournoi passe en cours", async () => {
-    (loadTournamentRow as jest.Mock).mockResolvedValue(row() as never);
+    jest.mocked(loadTournamentRow).mockResolvedValue(row());
 
     await syncTournamentState(connection, 5);
 
@@ -64,7 +67,7 @@ describe("syncTournamentState — coup d'envoi", () => {
     // Le cas le plus courant, et celui qu'une condition sur l'état *de départ*
     // manquerait : entre la clôture des inscriptions et l'heure de début, un
     // tournoi repasse par UPCOMING.
-    (loadTournamentRow as jest.Mock).mockResolvedValue(row({ state: "UPCOMING" }) as never);
+    jest.mocked(loadTournamentRow).mockResolvedValue(row({ state: "UPCOMING" }));
 
     await syncTournamentState(connection, 5);
 
@@ -72,12 +75,12 @@ describe("syncTournamentState — coup d'envoi", () => {
   });
 
   it("ne réserve rien à l'ouverture des inscriptions", async () => {
-    (loadTournamentRow as jest.Mock).mockResolvedValue(
+    jest.mocked(loadTournamentRow).mockResolvedValue(
       row({
         state: "UPCOMING",
         registration_close_at: FUTURE,
         start_at: FUTURE,
-      }) as never,
+      }),
     );
 
     await syncTournamentState(connection, 5);
@@ -86,7 +89,7 @@ describe("syncTournamentState — coup d'envoi", () => {
   });
 
   it("ne réserve rien sur un tournoi déjà en cours", async () => {
-    (loadTournamentRow as jest.Mock).mockResolvedValue(row({ state: "RUNNING" }) as never);
+    jest.mocked(loadTournamentRow).mockResolvedValue(row({ state: "RUNNING" }));
 
     await syncTournamentState(connection, 5);
 
@@ -97,8 +100,8 @@ describe("syncTournamentState — coup d'envoi", () => {
     // La clôture sur-le-champ précède toute initialisation : elle sort de la
     // synchronisation avant même que l'état ne bascule, et c'est
     // `finalizeUnderfilledTournament` qui pose sa propre ligne.
-    (finalizeUnderfilledTournament as jest.Mock).mockResolvedValue(true as never);
-    (loadTournamentRow as jest.Mock).mockResolvedValue(row() as never);
+    jest.mocked(finalizeUnderfilledTournament).mockResolvedValue(true);
+    jest.mocked(loadTournamentRow).mockResolvedValue(row());
 
     await syncTournamentState(connection, 5);
 

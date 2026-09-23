@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import crypto from "node:crypto";
 import { createSession, getCurrentUser, clearSession, ensureUniquePseudo } from "@/lib/server/auth";
+import { type SqlQuery, fakePool } from "../../helpers/sql-double";
+import { fakeCookieStore } from "../../helpers/cookie-store";
 
 const originalEnv = { ...process.env };
 
@@ -45,7 +47,7 @@ describe("auth", () => {
   describe("createSession", () => {
     it("throws when database connection fails", async () => {
       const { getDatabase } = await import("@/lib/server/database");
-      (getDatabase as jest.Mock).mockRejectedValue(new Error("DB connection failed") as never);
+      jest.mocked(getDatabase).mockRejectedValue(new Error("DB connection failed"));
 
       await expect(createSession(1)).rejects.toThrow("DB connection failed");
     });
@@ -54,9 +56,9 @@ describe("auth", () => {
       const { getDatabase } = await import("@/lib/server/database");
       const { cookies } = await import("next/headers");
 
-      const mockExecute = jest.fn().mockResolvedValue([] as never);
-      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute } as never);
-      (cookies as jest.Mock).mockRejectedValue(new Error("Cookie error") as never);
+      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
+      jest.mocked(cookies).mockRejectedValue(new Error("Cookie error"));
 
       await expect(createSession(1)).rejects.toThrow("Cookie error");
     });
@@ -67,11 +69,11 @@ describe("auth", () => {
       const { getDatabase } = await import("@/lib/server/database");
       const { cookies } = await import("next/headers");
 
-      const mockExecute = jest.fn().mockResolvedValue([[]] as never);
-      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute } as never);
+      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
 
       const mockCookieStore = { get: jest.fn().mockReturnValue(undefined) };
-      (cookies as jest.Mock).mockResolvedValue(mockCookieStore as never);
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore(mockCookieStore));
 
       const user = await getCurrentUser();
       expect(user).toBeNull();
@@ -82,10 +84,10 @@ describe("auth", () => {
       const { cookies } = await import("next/headers");
 
       const mockCookieStore = { get: jest.fn().mockReturnValue({ value: "test-token" }) };
-      (cookies as jest.Mock).mockResolvedValue(mockCookieStore as never);
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore(mockCookieStore));
 
-      const mockExecute = jest.fn().mockResolvedValue([[]] as never);
-      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute } as never);
+      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
 
       const user = await getCurrentUser();
       expect(user).toBeNull();
@@ -96,10 +98,10 @@ describe("auth", () => {
       const { cookies } = await import("next/headers");
 
       const mockCookieStore = { get: jest.fn().mockReturnValue({ value: "expired-token" }) };
-      (cookies as jest.Mock).mockResolvedValue(mockCookieStore as never);
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore(mockCookieStore));
 
-      const mockExecute = jest.fn().mockResolvedValue([[]] as never);
-      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute } as never);
+      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
 
       const user = await getCurrentUser();
       expect(user).toBeNull();
@@ -110,7 +112,7 @@ describe("auth", () => {
       const { cookies } = await import("next/headers");
 
       const mockCookieStore = { get: jest.fn().mockReturnValue({ value: "valid-token" }) };
-      (cookies as jest.Mock).mockResolvedValue(mockCookieStore as never);
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore(mockCookieStore));
 
       const mockUser = {
         id: 1,
@@ -122,8 +124,8 @@ describe("auth", () => {
         is_admin: 0,
       };
 
-      const mockExecute = jest.fn().mockResolvedValue([[mockUser]] as never);
-      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute } as never);
+      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([[mockUser]]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
 
       const user = await getCurrentUser();
       expect(user).not.toBeNull();
@@ -159,9 +161,9 @@ describe("auth", () => {
       const { getDatabase } = await import("@/lib/server/database");
       const { cookies } = await import("next/headers");
 
-      const mockExecute = jest.fn().mockResolvedValue([[bypassUser]] as never);
-      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute } as never);
-      (cookies as jest.Mock).mockResolvedValue(mockNoCookie() as never);
+      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([[bypassUser]]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore(mockNoCookie()));
 
       return getCurrentUser();
     }
@@ -196,9 +198,9 @@ describe("auth", () => {
       const { getDatabase } = await import("@/lib/server/database");
       const { cookies } = await import("next/headers");
 
-      const mockExecute = jest.fn().mockResolvedValue([[bypassUser]] as never);
-      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute } as never);
-      (cookies as jest.Mock).mockResolvedValue(mockNoCookie() as never);
+      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([[bypassUser]]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore(mockNoCookie()));
 
       expect(await getCurrentUser()).toBeNull();
     });
@@ -210,9 +212,9 @@ describe("auth", () => {
       const { getDatabase } = await import("@/lib/server/database");
       const { cookies } = await import("next/headers");
 
-      const mockExecute = jest.fn().mockResolvedValue([[bypassUser]] as never);
-      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute } as never);
-      (cookies as jest.Mock).mockResolvedValue(mockNoCookie() as never);
+      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([[bypassUser]]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore(mockNoCookie()));
 
       expect(await getCurrentUser()).toBeNull();
     });
@@ -228,10 +230,10 @@ describe("auth", () => {
         get: jest.fn().mockReturnValue({ value: "test-token" }),
         set: mockCookieSet,
       };
-      (cookies as jest.Mock).mockResolvedValue(mockCookieStore as never);
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore(mockCookieStore));
 
-      const mockExecute = jest.fn().mockResolvedValue([] as never);
-      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute } as never);
+      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
 
       await clearSession();
 
@@ -247,7 +249,7 @@ describe("auth", () => {
         get: jest.fn().mockReturnValue(undefined),
         set: mockCookieSet,
       };
-      (cookies as jest.Mock).mockResolvedValue(mockCookieStore as never);
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore(mockCookieStore));
 
       await clearSession();
 
@@ -259,8 +261,8 @@ describe("auth", () => {
     it("returns pseudo when it is available", async () => {
       const { getDatabase } = await import("@/lib/server/database");
 
-      const mockExecute = jest.fn().mockResolvedValue([[{ c: 0 }]] as never);
-      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute } as never);
+      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([[{ c: 0 }]]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
 
       const result = await ensureUniquePseudo("NewPlayer");
       expect(result).toBeTruthy();
@@ -277,7 +279,7 @@ describe("auth", () => {
         }
         return Promise.resolve([[{ c: 0 }]]); // Suffixed version available
       });
-      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute } as never);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
 
       const result = await ensureUniquePseudo("Player");
       expect(result).toContain("_");
@@ -286,8 +288,8 @@ describe("auth", () => {
     it("handles empty slug with fallback player ID", async () => {
       const { getDatabase } = await import("@/lib/server/database");
 
-      const mockExecute = jest.fn().mockResolvedValue([[{ c: 0 }]] as never);
-      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute } as never);
+      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([[{ c: 0 }]]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
 
       // Use special characters that slug away to nothing
       const result = await ensureUniquePseudo("!!!___");
@@ -297,8 +299,8 @@ describe("auth", () => {
     it("applies normalizePseudo before slugifying", async () => {
       const { getDatabase } = await import("@/lib/server/database");
 
-      const mockExecute = jest.fn().mockResolvedValue([[{ c: 0 }]] as never);
-      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute } as never);
+      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([[{ c: 0 }]]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
 
       // Multiple spaces should normalize
       const result = await ensureUniquePseudo("Test   User");
@@ -308,8 +310,8 @@ describe("auth", () => {
     it("respects 40 character limit from slugifyPseudo", async () => {
       const { getDatabase } = await import("@/lib/server/database");
 
-      const mockExecute = jest.fn().mockResolvedValue([[{ c: 0 }]] as never);
-      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute } as never);
+      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([[{ c: 0 }]]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
 
       const longName = "a".repeat(50);
       const result = await ensureUniquePseudo(longName);
@@ -321,8 +323,8 @@ describe("auth", () => {
       const { getDatabase } = await import("@/lib/server/database");
 
       // Always return that pseudo exists
-      const mockExecute = jest.fn().mockResolvedValue([[{ c: 1 }]] as never);
-      (getDatabase as jest.Mock).mockResolvedValue({ execute: mockExecute } as never);
+      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([[{ c: 1 }]]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
 
       const result = await ensureUniquePseudo("player");
       // Should use timestamp fallback

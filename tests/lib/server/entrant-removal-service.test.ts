@@ -10,6 +10,10 @@ import { getDatabase } from "@/lib/server/database";
 import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
+import { type SqlMock, fakePool } from "../../helpers/sql-double";
+import type { TournamentRow } from "@/lib/server/tournaments/_internal";
+import type { RowOverrides } from "../../helpers/row-overrides";
+import { tournamentRow } from "../../helpers/tournament-rows";
 
 /**
  * `removeTournamentEntrant` — ce que la transaction doit garantir.
@@ -27,14 +31,14 @@ import { syncTournamentState } from "@/lib/server/tournaments/state";
  * 4. **les rangs se referment**, et le journal ne part qu'après le commit.
  */
 
-type ExecuteMock = jest.Mock;
+type ExecuteMock = SqlMock;
 
 const HOUR = 3_600_000;
 
 /** Ligne d'un tournoi aux inscriptions, coup d'envoi dans deux heures. */
-function registrationRow(overrides: Record<string, unknown> = {}) {
+function registrationRow(overrides: RowOverrides<TournamentRow> = {}): TournamentRow {
   const now = Date.now();
-  return {
+  return tournamentRow({
     id: 7,
     name: "BlueGenji Open",
     state: "REGISTRATION",
@@ -45,7 +49,7 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
     registration_close_at: new Date(now + HOUR),
     start_at: new Date(now + 2 * HOUR),
     ...overrides,
-  };
+  });
 }
 
 /**
@@ -55,7 +59,7 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
  * renumérotation relit, et ce que le comptage final doit rendre.
  */
 function mockConnection(
-  row: Record<string, unknown> | null,
+  row: TournamentRow | null,
   options: { entrantName?: string | null; remaining?: number[] } = {},
 ) {
   const { entrantName = "Team Nova", remaining = [101, 103, 104] } = options;
@@ -93,16 +97,16 @@ function mockConnection(
     release: jest.fn(),
   };
 
-  (getDatabase as jest.Mock).mockResolvedValue({
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
     execute: jest.fn(),
     getConnection: jest.fn(async () => connection),
-  } as never);
+  }));
 
-  (syncTournamentState as jest.Mock).mockResolvedValue({
+  jest.mocked(syncTournamentState).mockResolvedValue({
     row,
     stateChanged: false,
     contentChanged: false,
-  } as never);
+  });
 
   return { execute, connection, sqls };
 }
@@ -202,7 +206,7 @@ describe("removeTournamentEntrant", () => {
     expect(connection.release).toHaveBeenCalledTimes(1);
   });
 
-  it.each([
+  it.each<[string, RowOverrides<TournamentRow>, string]>([
     ["en cours", { state: "RUNNING" }, "ENTRANT_REMOVAL_TOURNAMENT_STARTED"],
     ["terminé", { state: "FINISHED" }, "ENTRANT_REMOVAL_TOURNAMENT_FINISHED"],
     [
