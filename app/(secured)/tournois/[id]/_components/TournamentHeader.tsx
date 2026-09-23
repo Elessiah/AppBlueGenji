@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { CyberButton, Pill } from "@/components/cyber";
+import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
 import type { RefreshTier } from "@/lib/shared/refresh-tiers";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { participantWording } from "@/lib/shared/participants";
@@ -42,6 +43,8 @@ interface TournamentHeaderProps {
   /** Abréger le calendrier et démarrer sur-le-champ (staff `tournaments`). */
   onLaunchNow: () => void;
   onLiveSaved: () => void;
+  /** Ouvre le réglage de l'image (illustration ou logo) (staff `tournaments`). */
+  onEditImage: () => void;
 }
 
 /**
@@ -76,6 +79,7 @@ export function TournamentHeader({
   onGuestRegister,
   onLaunchNow,
   onLiveSaved,
+  onEditImage,
 }: TournamentHeaderProps) {
   const { card } = detail;
   const wording = participantWording(card.participantType);
@@ -84,6 +88,10 @@ export function TournamentHeader({
   // Le seul refus d'inscription qui ne se lise pas tout seul sur la page :
   // avoir une équipe sans en avoir la charge (`_lib/register-entry.ts`).
   const registerNotice = frozen ? null : registerBlockedNotice(detail);
+  const showEdit = canShowEditButton(card, detail.isAdmin);
+  // L'image se règle dans tous les états, contrairement au formulaire : elle
+  // est décorative et n'engage aucune règle du moteur.
+  const showImageEdit = detail.isAdmin && !frozen;
 
   return (
     <div className="ds-header green">
@@ -102,7 +110,18 @@ export function TournamentHeader({
           </div>
         </div>
 
+        {/* Illustration : un bandeau entre les outils du lecteur et l'identité,
+            à sa place d'affiche. Un logo, lui, se met à côté du nom. */}
+        <TournamentImageBanner
+          image={card.image}
+          sizes="(max-width: 1280px) 100vw, 1200px"
+          className={s.banner}
+          fade={false}
+          priority
+        />
+
         <div className={s.identity}>
+          <TournamentImageEmblem image={card.image} size={88} className={s.emblem} priority />
           <div className={s.identityText}>
             <div className={s.eyebrow}>
               <span className={`${s.state} ${TONE_CLASS[state.tone]}`}>{state.label}</span>
@@ -112,11 +131,26 @@ export function TournamentHeader({
             {card.description && <p className={s.description}>{card.description}</p>}
           </div>
 
-          {canShowEditButton(card, detail.isAdmin) && (
+          {(showEdit || showImageEdit) && (
             <div className={s.identityActions}>
-              <CyberButton asChild variant="ghost" style={{ fontSize: 13, padding: "6px 16px" }}>
-                <Link href={`/tournois/${card.id}/modifier`}>Modifier</Link>
-              </CyberButton>
+              {showImageEdit && (
+                <CyberButton
+                  variant="ghost"
+                  onClick={onEditImage}
+                  // « Image » seul ne dit pas de quoi, hors contexte ; le nom
+                  // accessible commence par le texte affiché (WCAG 2.5.3).
+                  aria-label={card.image ? "Image du tournoi" : undefined}
+                  aria-haspopup="dialog"
+                  style={{ fontSize: 13, padding: "6px 16px" }}
+                >
+                  {card.image ? "Image" : "Ajouter une image"}
+                </CyberButton>
+              )}
+              {showEdit && (
+                <CyberButton asChild variant="ghost" style={{ fontSize: 13, padding: "6px 16px" }}>
+                  <Link href={`/tournois/${card.id}/modifier`}>Modifier</Link>
+                </CyberButton>
+              )}
             </div>
           )}
         </div>

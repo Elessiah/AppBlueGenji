@@ -8,6 +8,7 @@ import type {
 } from "./registration-filters";
 import type { PlatformRole } from "./permissions";
 import type { TournamentPreview } from "./tournament-preview";
+import type { TournamentImage } from "./tournament-image";
 import type { DeepStats, TeamRankingPosition } from "./stats";
 
 export type TournamentFormat =
@@ -405,6 +406,12 @@ export type TournamentCard = {
    * diffusion annoncée. Les matchs n'en héritent jamais (`lib/shared/live-streams.ts`).
    */
   liveUrl: string | null;
+  /**
+   * Illustration ou logo du tournoi, **facultatif** (`null` = aucune image).
+   * Toujours un fichier du site ; le cadrage (mode, point focal) voyage avec
+   * lui — voir `lib/shared/tournament-image.ts`.
+   */
+  image: TournamentImage | null;
 };
 
 export type TournamentBuckets = {

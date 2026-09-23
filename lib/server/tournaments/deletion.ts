@@ -34,7 +34,9 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { deleteStoredImage } from "@/lib/server/image-upload";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
+import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { publishUpdatedEvent } from "./notifications";
 
 /** Identité du tournoi effacé, pour le message de confirmation et les logs. */
@@ -43,6 +45,7 @@ export type DeletedTournament = { id: number; name: string };
 interface TournamentIdentityRow extends RowDataPacket {
   id: number;
   name: string;
+  image_url: string | null;
 }
 
 /**
@@ -144,15 +147,30 @@ export async function deleteTournament(tournamentId: number): Promise<DeletedTou
     await connection.beginTransaction();
 
     const [rows] = await connection.execute<TournamentIdentityRow[]>(
-      `SELECT id, name FROM bg_tournaments WHERE id = ? LIMIT 1`,
+      // Verrouillante : l'image relevée ici est celle qu'on effacera. Une
+      // lecture ordinaire laissait un envoi concurrent poser un nouveau fichier
+      // entre ce SELECT et le DELETE — fichier que plus aucune ligne ne
+      // désignerait (`lib/server/tournaments/image.ts` prend le même verrou).
+      `SELECT id, name, image_url FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`,
       [tournamentId],
     );
     if (rows.length === 0) throw new Error("TOURNAMENT_NOT_FOUND");
     const deleted: DeletedTournament = { id: Number(rows[0].id), name: rows[0].name };
+    // Relevé sous la transaction : la ligne partie, plus rien ne désigne le
+    // fichier, qui resterait servi par `/api/uploads/…` indéfiniment.
+    const imagePath = toDiskUploadPath(rows[0].image_url ?? null);
 
     await purgeTournamentRows(connection, tournamentId);
 
     await connection.commit();
+
+    // Après le commit, jamais avant : un `unlink` ne se défait pas. Un échec
+    // de ménage ne défait pas la suppression, déjà acquise — il se journalise.
+    try {
+      await deleteStoredImage(imagePath);
+    } catch (error) {
+      console.error(`[tournaments] image du tournoi ${tournamentId} non effacée`, error);
+    }
 
     // Même point de passage que toute autre écriture (`./notifications`), et il
     // suffit : il vide l'instantané, l'aperçu et les listes — sans quoi le

@@ -3,13 +3,17 @@
 import Link from "next/link";
 import { participantWording } from "@/lib/shared/participants";
 import type { TournamentCard } from "@/lib/shared/types";
+import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
+import { CARD_IMAGE_SIZES } from "./card-image";
 import s from "../tournois.module.css";
 
 interface FinishedCardProps {
   t: TournamentCard;
+  /** Bandeau chargé en priorité : premières cartes illustrées de la page (`priorityBannerIds`). */
+  priority?: boolean;
 }
 
-export function FinishedCard({ t }: FinishedCardProps) {
+export function FinishedCard({ t, priority }: FinishedCardProps) {
   const wording = participantWording(t.participantType);
   const gameLabel = t.game === "OW" ? "OVERWATCH" : "MARVEL RIVALS";
   const formatLabel = t.format === "DOUBLE" ? "Double élimination" : "Élimination simple";
@@ -23,6 +27,12 @@ export function FinishedCard({ t }: FinishedCardProps) {
   return (
     <Link href={`/tournois/${t.id}`} style={{ textDecoration: "none" }}>
       <article className={`${s.card} ${s.cardDone}`} data-state="done">
+        <TournamentImageBanner
+          image={t.image}
+          sizes={CARD_IMAGE_SIZES}
+          className={s.cardBanner}
+          priority={priority}
+        />
         <div className={`${s.cardRibbon} ${s.cardRibbonDone}`}>
           Terminé · {finishDate}
         </div>
@@ -33,6 +43,7 @@ export function FinishedCard({ t }: FinishedCardProps) {
             <span className={s.dot}>◆</span>
             {formatLabel}
           </div>
+          <TournamentImageEmblem image={t.image} size={40} />
         </div>
 
         <h3 className={s.cardTitle}>{t.name}</h3>

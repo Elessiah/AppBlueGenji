@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/notifications");
+jest.mock("@/lib/server/image-upload");
 
 import { deleteTournament } from "@/lib/server/tournaments/deletion";
 import { getDatabase } from "@/lib/server/database";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { deleteStoredImage } from "@/lib/server/image-upload";
 
 type ExecuteMock = jest.Mock;
 
@@ -30,10 +32,10 @@ function mockConnection(execute: ExecuteMock) {
 }
 
 /** Connexion dont le SELECT d'identité renvoie le tournoi demandé. */
-function mockExistingTournament(name = "BlueGenji Open") {
+function mockExistingTournament(name = "BlueGenji Open", imageUrl: string | null = null) {
   const execute = jest.fn(async (sql: string) => {
-    if (/SELECT id, name FROM bg_tournaments/.test(sql)) {
-      return [[{ id: 7, name }]];
+    if (/SELECT id, name, image_url FROM bg_tournaments/.test(sql)) {
+      return [[{ id: 7, name, image_url: imageUrl }]];
     }
     return [{ affectedRows: 1 }];
   }) as unknown as ExecuteMock;
@@ -41,7 +43,12 @@ function mockExistingTournament(name = "BlueGenji Open") {
 }
 
 describe("deleteTournament", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // `clearAllMocks` garde les implémentations : un rejet posé par un test
+    // déborderait sur le suivant.
+    (deleteStoredImage as jest.Mock).mockResolvedValue(undefined as never);
+  });
   afterEach(() => jest.restoreAllMocks());
 
   it("rend l'identité du tournoi supprimé", async () => {
@@ -149,7 +156,7 @@ describe("deleteTournament", () => {
 
   it("annule la transaction et ne publie rien si une requête échoue", async () => {
     const execute = jest.fn(async (sql: string) => {
-      if (/SELECT id, name FROM bg_tournaments/.test(sql)) return [[{ id: 7, name: "Open" }]];
+      if (/SELECT id, name, image_url FROM bg_tournaments/.test(sql)) return [[{ id: 7, name: "Open" }]];
       if (/DELETE FROM bg_matches/.test(sql)) throw new Error("ER_LOCK_DEADLOCK");
       return [{ affectedRows: 1 }];
     }) as unknown as ExecuteMock;
@@ -163,5 +170,46 @@ describe("deleteTournament", () => {
     // Publier ici viderait les caches et fermerait les flux d'un tournoi
     // toujours vivant : les lecteurs quitteraient la fiche pour rien.
     expect(publishUpdatedEvent).not.toHaveBeenCalled();
+    expect(deleteStoredImage).not.toHaveBeenCalled();
+  });
+
+  it("relève l'image sous verrou, avant toute suppression", async () => {
+    const { execute } = mockExistingTournament("Open", "/api/uploads/tournaments/7-a.webp");
+    await deleteTournament(7);
+    // Un envoi concurrent ne peut plus poser un fichier que plus rien ne désignerait.
+    expect(statements(execute)[0]).toBe(
+      "SELECT id, name, image_url FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE",
+    );
+  });
+
+  it("efface le fichier de l'image du tournoi, après le commit", async () => {
+    const { connection } = mockExistingTournament("Open", "/api/uploads/tournaments/7-a.webp");
+    let committed = false;
+    connection.commit.mockImplementation(async () => {
+      committed = true;
+    });
+    (deleteStoredImage as jest.Mock).mockImplementation(async () => {
+      // Un `unlink` ne se défait pas : il ne part qu'une fois la ligne effacée.
+      expect(committed).toBe(true);
+    });
+
+    await deleteTournament(7);
+    expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/tournaments/7-a.webp");
+  });
+
+  it("un ménage de fichier raté ne fait pas échouer une suppression déjà acquise", async () => {
+    mockExistingTournament("Open", "/api/uploads/tournaments/7-a.webp");
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    (deleteStoredImage as jest.Mock).mockRejectedValue(new Error("EPERM") as never);
+
+    await expect(deleteTournament(7)).resolves.toEqual({ id: 7, name: "Open" });
+    expect(log).toHaveBeenCalled();
+    expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it("n'efface aucun fichier pour un tournoi sans image", async () => {
+    mockExistingTournament("Open", null);
+    await deleteTournament(7);
+    expect(deleteStoredImage).not.toHaveBeenCalledWith(expect.any(String));
   });
 });

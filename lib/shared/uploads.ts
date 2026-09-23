@@ -4,6 +4,15 @@
 // helpers convertissent entre la forme « servie » (stockée en base, rendue dans
 // les <img>) et la forme « disque » (utilisée pour supprimer le fichier).
 
+/**
+ * Limites d'un téléversement d'image, écrites une fois pour le serveur
+ * (`lib/server/image-upload.ts`, qui fait foi) et pour les écrans qui refusent
+ * un fichier avant même de l'envoyer — deux copies auraient fini par annoncer
+ * au visiteur une limite que le serveur n'applique plus.
+ */
+export const IMAGE_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
+export const IMAGE_UPLOAD_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
+
 const SERVED_PREFIX = "/api/uploads/";
 const DISK_PREFIX = "/uploads/";
 

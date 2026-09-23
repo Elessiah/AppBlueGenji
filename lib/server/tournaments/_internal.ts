@@ -8,6 +8,7 @@ import {
   type PlayerRequirement,
 } from "@/lib/shared/registration-filters";
 import { normalizeStreamUrl, type MatchLiveTrigger } from "@/lib/shared/live-streams";
+import { parseTournamentImage } from "@/lib/shared/tournament-image";
 
 export type TournamentRow = RowDataPacket & {
   id: number;
@@ -50,6 +51,15 @@ export type TournamentRow = RowDataPacket & {
   registration_min_players: number;
   /** Chaîne officielle du tournoi ; NULL = aucune diffusion annoncée. */
   live_url: string | null;
+  /**
+   * Illustration ou logo (`lib/shared/tournament-image.ts`) ; NULL = aucune.
+   * Facultatifs dans le type : seules les lectures qui rendent une carte les
+   * sélectionnent.
+   */
+  image_url?: string | null;
+  image_fit?: string | null;
+  image_focus_x?: number | null;
+  image_focus_y?: number | null;
 };
 
 export type RegistrationRow = RowDataPacket & {
@@ -207,6 +217,8 @@ export function mapCard(row: TournamentListRow): TournamentCard {
     // ressortir en `href`. Une URL sans schéma, notamment, deviendrait un lien
     // *relatif* et renverrait le visiteur dans le site au lieu de la chaîne.
     liveUrl: normalizeStreamUrl(row.live_url),
+    // Filtrée à la sortie (`localUploadUrl`) : seul un fichier du site ressort.
+    image: parseTournamentImage(row.image_url, row.image_fit, row.image_focus_x, row.image_focus_y),
   };
 }
 

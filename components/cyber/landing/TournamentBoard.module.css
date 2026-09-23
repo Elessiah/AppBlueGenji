@@ -164,3 +164,24 @@
   }
 }
 
+
+/* Illustration du tournoi (facultative) : bandeau qui déborde jusqu'aux bords
+   de la carte — les marges négatives reprennent son `padding`, et le `gap` de
+   la colonne flex est compensé en bas. */
+.featuredBanner {
+  margin: -20px -20px -4px;
+  height: 140px;
+}
+
+.upcomingBanner {
+  margin: -18px -18px -2px;
+  height: 84px;
+}
+
+/* Logo : pastille à gauche du nom. */
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}

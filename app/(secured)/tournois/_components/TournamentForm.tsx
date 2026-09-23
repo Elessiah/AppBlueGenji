@@ -32,6 +32,8 @@ import { useToast } from "@/components/ui/toast";
 import { CyberCard, CyberButton } from "@/components/cyber";
 import { phaseErrorMessage } from "../creer/phase-form";
 import { FormatSettings } from "./FormatSettings";
+import { TournamentImagePicker } from "./TournamentImagePicker";
+import { initialImagePickerValue, type ImagePickerValue } from "../_lib/image-picker";
 import {
   EYEBROW,
   FULL_WIDTH,
@@ -74,7 +76,12 @@ export type TournamentFormProps = {
   initialValues: TournamentFormValues;
   editableFields: ReadonlySet<TournamentField>;
   submitLabel: string;
-  onSubmit: (values: TournamentFormValues) => Promise<void>;
+  /**
+   * `image` : brouillon d'illustration, rempli à la **création** seulement —
+   * l'image d'un tournoi existant se règle depuis sa fiche, dans tous les états
+   * (`TournamentImageDialog`), là où ce formulaire se ferme au coup d'envoi.
+   */
+  onSubmit: (values: TournamentFormValues, image: ImagePickerValue) => Promise<void>;
   explanationId?: string;
 };
 
@@ -105,6 +112,7 @@ export function TournamentForm({
     initialValues.matchFormat?.value ?? DEFAULT_MATCH_FORMAT.value,
   );
   const [loading, setLoading] = useState(false);
+  const [image, setImage] = useState<ImagePickerValue>(() => initialImagePickerValue(null));
 
   const { format, maxTeams, phases } = values;
   const wording = participantWording(values.participantType);
@@ -196,7 +204,7 @@ export function TournamentForm({
         }
       }
 
-      await onSubmit(values);
+      await onSubmit(values, image);
     } catch (e) {
       showError((e as Error).message);
     } finally {
@@ -250,6 +258,15 @@ export function TournamentForm({
             </div>
           </div>
         </section>
+
+        {mode === "create" && (
+          <section style={SECTION_SEPARATOR}>
+            <p className="eyebrow" style={EYEBROW}>
+              Image
+            </p>
+            <TournamentImagePicker existing={null} value={image} onChange={setImage} disabled={loading} />
+          </section>
+        )}
 
         <section style={SECTION_SEPARATOR}>
           <p className="eyebrow" style={EYEBROW}>

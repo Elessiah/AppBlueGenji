@@ -57,6 +57,7 @@ import { RollbackRoundDialog } from "./_components/RollbackRoundDialog";
 import { EndurancePenaltyDialog } from "./_components/EndurancePenaltyDialog";
 import { LaunchTournamentDialog } from "./_components/LaunchTournamentDialog";
 import { TournamentHeader } from "./_components/TournamentHeader";
+import { TournamentImageDialog } from "./_components/TournamentImageDialog";
 
 /** « Arbre » ne veut rien dire dans les formats à classement, qui n'en ont pas. */
 const BOARD_TITLES: Record<TournamentFormat, string> = {
@@ -85,6 +86,7 @@ export default function TournamentDetailPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rollbackDialogOpen, setRollbackDialogOpen] = useState(false);
   const [launchDialogOpen, setLaunchDialogOpen] = useState(false);
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
   // On retient l'**identifiant** du match en cours de configuration, pas l'objet :
   // la page se recharge par SSE, et un objet capturé à l'ouverture deviendrait
   // périmé — le dialogue rejouerait alors une configuration dépassée par-dessus
@@ -138,6 +140,8 @@ export default function TournamentDetailPage() {
   // Même précaution : lancer le tournoi qu'on croyait regarder serait pire
   // encore qu'un dialogue de suppression laissé ouvert sur la mauvaise cible.
   useEffect(() => setLaunchDialogOpen(false), [tournamentId]);
+  // L'image enregistrée depuis ce dialogue irait sinon habiller un autre tournoi.
+  useEffect(() => setImageDialogOpen(false), [tournamentId]);
   useEffect(() => setIssueTarget(undefined), [tournamentId]);
   // Même précaution : une sanction ne doit pas se retrouver adressée à l'engagé
   // d'un autre tournoi parce que la page a changé de cible sous le dialogue.
@@ -556,6 +560,7 @@ export default function TournamentDetailPage() {
           onGuestRegister={() => setGhostRegistrationOpen(true)}
           onLaunchNow={() => setLaunchDialogOpen(true)}
           onLiveSaved={() => void refresh()}
+          onEditImage={() => setImageDialogOpen(true)}
         />
 
         <div className="ds-block" style={{ marginBottom: 20 }}>
@@ -920,6 +925,15 @@ export default function TournamentDetailPage() {
           key={matchForSchedule.id}
           match={matchForSchedule}
           onClose={() => setMatchForScheduleId(null)}
+          onSaved={() => void refresh()}
+        />
+      )}
+
+      {imageDialogOpen && detail.isAdmin && !frozen && (
+        <TournamentImageDialog
+          tournamentId={detail.card.id}
+          image={detail.card.image}
+          onClose={() => setImageDialogOpen(false)}
           onSaved={() => void refresh()}
         />
       )}

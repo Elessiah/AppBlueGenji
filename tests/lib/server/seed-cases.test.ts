@@ -380,3 +380,34 @@ describe("conditions d'inscription", () => {
     }
   });
 });
+
+describe("seed — illustration ou logo d'un tournoi", () => {
+  const illustrated = TOURNAMENTS.filter((t) => t.image);
+
+  it("couvre les deux modes, un point focal décentré, et reste l'exception", () => {
+    expect(illustrated.some((t) => t.image!.fit === "COVER")).toBe(true);
+    expect(illustrated.some((t) => t.image!.fit === "CONTAIN")).toBe(true);
+    expect(
+      illustrated.some((t) => t.image!.fit === "COVER" && (t.image!.focusX ?? 50) !== 50),
+    ).toBe(true);
+    // L'image est facultative : la plupart des tournois n'en ont pas, et c'est
+    // ce cas-là que la matrice doit continuer de montrer d'abord.
+    expect(illustrated.length).toBeLessThan(TOURNAMENTS.length / 4);
+  });
+
+  it("place une image dans les états qui ont chacun leur carte", () => {
+    const states = new Set(illustrated.map((t) => t.state));
+    for (const state of STATES) expect(states.has(state)).toBe(true);
+  });
+
+  it("déclare des points focaux dans les bornes", () => {
+    for (const { image } of illustrated) {
+      for (const focus of [image!.focusX, image!.focusY]) {
+        if (focus === undefined) continue;
+        expect(Number.isInteger(focus)).toBe(true);
+        expect(focus).toBeGreaterThanOrEqual(0);
+        expect(focus).toBeLessThanOrEqual(100);
+      }
+    }
+  });
+});

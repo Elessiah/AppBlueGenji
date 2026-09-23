@@ -1372,6 +1372,10 @@ html {
   height: 10px;
   border: 1px solid var(--blue-500);
   opacity: 0.6;
+  /* Au-dessus d'un bandeau d'illustration de tournoi, positionné lui aussi ;
+     sans capter le clic de ce qui se trouve dessous. */
+  z-index: 1;
+  pointer-events: none;
 }
 
 .card-ticks::before {

@@ -16,6 +16,7 @@ import { RegistrationCard } from "./cards/RegistrationCard";
 import { UpcomingCard } from "./cards/UpcomingCard";
 import { FinishedCard } from "./cards/FinishedCard";
 import { StateCard } from "./cards/StateCard";
+import { priorityBannerIds } from "./cards/card-image";
 import { Section } from "./Section";
 import {
   filterBuckets,
@@ -175,6 +176,15 @@ export default function TournamentsPage() {
   const showHidden = isAdmin && hiddenTournaments.length > 0;
   const ix = (position: number) => String(position + (showHidden ? 1 : 0)).padStart(2, "0");
 
+  // Bandeaux d'illustration chargés en priorité : les premiers dans l'ordre
+  // d'affichage des sections ouvertes d'office (les terminés sont repliés).
+  const priorityBanners = priorityBannerIds([
+    ...(showHidden ? filteredHidden : []),
+    ...filteredBuckets.running,
+    ...filteredBuckets.registration,
+    ...filteredBuckets.upcoming,
+  ]);
+
   // Les pastilles comptent ce que la page montre : pour le staff, les invisibles
   // en font partie.
   const countGame = (key: GameFilter) =>
@@ -285,7 +295,7 @@ export default function TournamentsPage() {
             >
               {filteredHidden.map((t) => (
                 <div key={t.id} className={s.hiddenCard}>
-                  <StateCard t={t} />
+                  <StateCard t={t} priority={priorityBanners.has(t.id)} />
                 </div>
               ))}
             </Section>
@@ -300,7 +310,7 @@ export default function TournamentsPage() {
             dataCols="2"
           >
             {filteredBuckets.running.map((t) => (
-              <RunningCard key={t.id} t={t} />
+              <RunningCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
             ))}
           </Section>
 
@@ -312,7 +322,7 @@ export default function TournamentsPage() {
             emptyMsg="Aucun tournoi en phase d'inscription pour le moment."
           >
             {filteredBuckets.registration.map((t) => (
-              <RegistrationCard key={t.id} t={t} />
+              <RegistrationCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
             ))}
           </Section>
 
@@ -324,7 +334,7 @@ export default function TournamentsPage() {
             emptyMsg="Aucun tournoi prévu pour les prochains jours."
           >
             {filteredBuckets.upcoming.map((t) => (
-              <UpcomingCard key={t.id} t={t} />
+              <UpcomingCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
             ))}
           </Section>
 

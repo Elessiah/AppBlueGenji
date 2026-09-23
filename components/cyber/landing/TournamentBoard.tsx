@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CyberButton, CyberCard, MiniBracket, Pill } from "@/components/cyber";
+import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 import { activeTournamentCards, inferGameCode, inferGameLabel, inferGameShortLabel } from "@/lib/shared/landing";
 import styles from "./TournamentBoard.module.css";
@@ -34,6 +35,11 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
         <CyberCard ticks className={styles.featured}>
           {featured ? (
             <>
+              <TournamentImageBanner
+                image={featured.image}
+                sizes="(max-width: 900px) 100vw, 640px"
+                className={styles.featuredBanner}
+              />
               <div className={styles.badgeRow}>
                 <Pill variant={featured.state === "RUNNING" ? "live" : "blue"}>
                   {featured.state === "RUNNING" ? "EN COURS" : inferGameShortLabel(featured.name)}
@@ -42,7 +48,10 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
               </div>
 
               <div className={styles.gameEyebrow}>{inferGameLabel(featured.name).toUpperCase()}</div>
-              <h3 className={styles.featuredTitle}>{makeTitle(featured)}</h3>
+              <div className={styles.titleRow}>
+                <TournamentImageEmblem image={featured.image} size={56} />
+                <h3 className={styles.featuredTitle}>{makeTitle(featured)}</h3>
+              </div>
               <div className={styles.phase}>{featured.state} · BRACKET</div>
               <MiniBracket matches={miniBracket} />
 
@@ -77,13 +86,21 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
 
           return (
             <CyberCard key={card.id} ticks className={styles.upcoming}>
+              <TournamentImageBanner
+                image={card.image}
+                sizes="(max-width: 900px) 100vw, 420px"
+                className={styles.upcomingBanner}
+              />
               <div className={styles.cardTop}>
                 <Pill variant="blue">{code.toUpperCase()}</Pill>
                 <span className="mono">{game.toUpperCase()}</span>
               </div>
 
               <div className={styles.cardGame}>{game}</div>
-              <h3 className={styles.cardTitle}>{card.name}</h3>
+              <div className={styles.titleRow}>
+                <TournamentImageEmblem image={card.image} size={40} />
+                <h3 className={styles.cardTitle}>{card.name}</h3>
+              </div>
 
               <div className={styles.metaGrid}>
                 <div>
