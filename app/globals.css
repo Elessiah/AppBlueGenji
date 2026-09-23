@@ -408,7 +408,12 @@ select {
   color: var(--text-1);
 }
 
-.field input,
+/* `:not([type="checkbox"])` n'est pas décoratif : ces trois règles décrivent un
+   champ de saisie (largeur pleine, rembourrage, anneau vert au focus) et ont la
+   même spécificité que l'apparence de case posée plus bas — une case placée dans
+   un `.field` en héritait donc le rembourrage, qui, `appearance` retirée, la
+   rendait rectangulaire, et l'anneau vert au clic. */
+.field input:not([type="checkbox"]):not([type="radio"]),
 .field textarea,
 .field select {
   width: 100%;
@@ -420,7 +425,7 @@ select {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
-.field input:focus,
+.field input:not([type="checkbox"]):not([type="radio"]):focus,
 .field textarea:focus,
 .field select:focus {
   outline: none;
@@ -448,7 +453,7 @@ select {
   background-color: rgba(10, 11, 15, 0.92);
 }
 
-.field input:disabled,
+.field input:not([type="checkbox"]):not([type="radio"]):disabled,
 .field textarea:disabled,
 .field select:disabled {
   opacity: 0.6;
@@ -489,13 +494,37 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
   pointer-events: none;
 }
 
-.checkbox-card:hover::before {
+/* Le survol ne parle que d'une carte **cliquable**. Verrouillée, elle n'a plus
+   ni `onClick` ni case active : le halo bleu et le balayage annonçaient alors un
+   geste qui ne se passe pas. L'opacité qui les recouvrait a disparu — elle
+   effaçait la bordure de la case, seule à la dessiner.
+
+   La condition se lit sur **le contrôle**, jamais sur un attribut à poser : un
+   `:not([data-locked])` est une autorisation par défaut, donc une carte ajoutée
+   demain sans l'attribut garderait le halo d'un clic qu'elle ne rend pas — le
+   « il faut s'en souvenir » que cette feuille refuse partout ailleurs (c'est la
+   raison même pour laquelle l'apparence des cases est posée sur l'élément).
+   `input:enabled` dit exactement ce que `data-locked` restituait : dans les deux
+   écrans qui posent cette carte, le même prédicat écrit le verrou et le
+   `disabled` de la case. Une carte sans case active n'a aucun geste à annoncer.
+
+   Sur un moteur qui ne comprendrait pas `:has()`, les deux règles sont jetées :
+   ni halo ni balayage, sur **aucune** carte — le `::before` reste parqué à
+   `left: -100%`. Ce n'est donc pas « rien ne change », c'est le survol qui
+   disparaît partout. La dégradation va dans le bon sens et c'est pourquoi elle
+   est acceptée telle quelle : ces deux règles ne portent qu'une promesse de
+   clic, et ne rien promettre vaut mieux que le promettre à tort. */
+.checkbox-card:hover:has(input:enabled)::before {
   left: 150%;
 }
 
-.checkbox-card:hover {
-  border-color: var(--blue-500);
-  background-color: rgba(90, 200, 255, 0.08);
+.checkbox-card:hover:has(input:enabled) {
+  /* Ni `border-color` ni `background-color` ici : les deux écrans qui posent
+     cette carte les écrivent **en ligne** (le cadre dit coché / décoché /
+     verrouillé, trois valeurs qu'une feuille ne connaît pas), et un style en
+     ligne bat la règle sans `!important`. Déclarées, elles ne s'appliquaient
+     donc jamais — et laissaient croire, à qui lit la feuille, que le survol
+     change le cadre. Il ne change que ce qui suit. */
   box-shadow: 0 2px 12px rgba(90, 200, 255, 0.14);
 }
 
@@ -1158,6 +1187,12 @@ html {
   --blue-100: #dff2ff;
   --blue-300: #8fd5ff;
   --blue-500: #5ac8ff;
+  /* Le même bleu, en composantes, pour les transparences. `--blue-rgb` (89,
+     212, 255) est le bleu **hérité** et n'est pas celui-ci : les mélanger sur
+     un même contrôle pose une bordure d'une teinte sur un fond d'une autre —
+     12 points de vert d'écart —, et faisait changer de teinte la bordure d'une
+     case cochée au moment précis où le clavier s'y pose. */
+  --blue-500-rgb: 90, 200, 255;
   --blue-600: #2aa8e6;
   --blue-700: #1b6a8f;
   --blue-glow: rgba(90, 200, 255, 0.14);
@@ -1374,4 +1409,213 @@ html {
 .sponsor-slot:hover {
   border-color: rgba(90, 200, 255, 0.5) !important;
   background: rgba(90, 200, 255, 0.05) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Cases à cocher et boutons radio — une seule apparence, posée sur l'élément
+
+   Huit écrans posent un `<input type="checkbox">` nu (sélection d'équipes
+   invitées, options de format, confirmation d'un retour en arrière, filtres de
+   recrutement…), deux autres un `<input type="radio">`. Aucun n'était habillé :
+   la case restait celle du système — carré blanc, taille dictée par l'OS, coche
+   bleu Windows — sur un fond noir profond, et deux écrans voisins n'avaient pas
+   la même. Le seul réglage posé ici ou là, `accent-color`, ne teinte que la case
+   **cochée** : décochée, elle restait blanche.
+
+   La règle est donc posée sur l'élément lui-même plutôt que sur une classe ou un
+   composant : une case ajoutée demain hérite de l'apparence sans que personne
+   ait à s'en souvenir — c'est la seule façon de fermer une panne qui tient
+   justement à ce qu'on l'oublie. `Coche` (`components/Coche.tsx`, pastille à
+   part entière) n'y échappe pas par spécificité : son input reste habillé par
+   cette règle, mais il est masqué en ligne (`opacity: 0`, 0×0,
+   `pointer-events: none`), si bien que rien ne s'en peint.
+
+   Les deux contrôles partagent tout sauf leur marque — ils sont donc écrits
+   ensemble : le radio n'est qu'une case ronde. Les séparer aurait laissé deux
+   copies qui divergent au premier réglage, et `MatchLiveDialog` les montre
+   justement l'un sous l'autre dans le même panneau.
+
+   Corollaire à tenir : une règle de feuille visant un `input` nu (`.x input`)
+   a la même spécificité que celle-ci et la déborde sur les propriétés qu'elle
+   déclare — d'où le `:not([type="checkbox"]):not([type="radio"])` posé sur
+   `.field input` plus haut (chaîné, et non `:not(a, b)` : la liste dans un
+   `:not()` est du Sélecteurs 4, et un moteur qui ne la comprend pas jette la
+   règle **entière**, donc aussi le `.field textarea` qui la partage), et le test qui balaie les feuilles pour qu'aucune
+   ne recommence.
+
+   La marque est dessinée en `background-image` et non en `::after` : un input
+   est un élément remplacé, ses pseudo-éléments ne sont pas garantis.
+   ───────────────────────────────────────────────────────────────────────────── */
+input[type="checkbox"],
+input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  /* `padding: 0` n'est pas une redondance : la boîte est en `border-box`, si
+     bien qu'un rembourrage hérité d'une règle voisine repousse la taille
+     au-delà des 16 px demandés et rend la case rectangulaire. */
+  padding: 0;
+  /* La bordure **est** le contrôle tant qu'il est décoché : rien d'autre ne le
+     dessine. `--line-strong` (0,24 de blanc) rend ≈ 2,1:1 sur le fond du site,
+     sous les 3:1 qu'un contour de contrôle demande (WCAG 1.4.11) — d'où une
+     valeur propre, qui monte à ≈ 4,6:1. Le token reste ce qu'il est ailleurs :
+     il borde des surfaces, pas des cases de 16 px. */
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: var(--r-cy-sm);
+  background: rgba(10, 11, 15, 0.88);
+  cursor: pointer;
+  display: inline-grid;
+  place-content: center;
+  transition: border-color 0.15s ease, background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+/* La seule chose qui distingue un radio d'une case : il est rond. */
+input[type="radio"] {
+  border-radius: 50%;
+}
+
+/* Le survol ne parle que d'une case au repos. Écrit sans ses deux exclusions,
+   il pèse plus lourd (`:not()` compte son argument) que `:checked` et que
+   `:focus-visible` : la souris posée sur une case cochée la faisait paraître
+   moins cochée, et sur une case parcourue au clavier, elle affaiblissait le
+   seul repère du parcours. */
+input[type="checkbox"]:hover:not(:disabled):not(:checked):not(:focus-visible),
+input[type="radio"]:hover:not(:disabled):not(:checked):not(:focus-visible) {
+  border-color: rgba(var(--blue-500-rgb), 0.55);
+}
+
+input[type="checkbox"]:checked,
+input[type="radio"]:checked {
+  border-color: rgba(var(--blue-500-rgb), 0.8);
+  background-color: var(--blue-500);
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+input[type="checkbox"]:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%2305060a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M2.5 6.2l2.4 2.4 4.6-5'/%3E%3C/svg%3E");
+  background-size: 12px 12px;
+}
+
+input[type="radio"]:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='2.6' fill='%2305060a'/%3E%3C/svg%3E");
+  background-size: 12px 12px;
+}
+
+/* Un anneau visible au clavier : la case nue n'en avait aucun une fois
+   `appearance` retirée, et c'est le seul repère d'un parcours au clavier. */
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
+  outline: none;
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px rgba(var(--blue-500-rgb), 0.28);
+}
+
+/* L'état désactivé se dit en **couleurs**, jamais en `opacity` : une opacité se
+   multiplie avec celle d'un parent — une carte verrouillée en porte déjà une —
+   et la bordure, qui porte seule le contrôle décoché, finissait effacée par le
+   produit des deux. Une couleur, elle, ne se compose pas. */
+input[type="checkbox"]:disabled,
+input[type="radio"]:disabled {
+  /* Désactivée et décochée, la case n'est **que** sa bordure : `appearance: none`
+     a retiré le carré gris que le système dessinait dessous, et plus rien ne
+     remplit la boîte. À 0,2 de blanc elle rendait ≈ 1,7:1 sur le fond du site —
+     moins que le `--line-strong` que cette même règle refuse pour la case
+     active —, donc un trou dans la page à côté d'une étiquette. Le cas est
+     durable, pas transitoire : le radio `START_TIME` de `MatchLiveDialog` reste
+     désactivé tant que le match n'a pas de date. 0,32 la remet à ≈ 2,7:1 : bien
+     en deçà de la case active (≈ 4,6:1), donc toujours lisible comme éteinte,
+     mais présente. */
+  border-color: rgba(255, 255, 255, 0.32);
+  background-color: rgba(255, 255, 255, 0.04);
+  cursor: not-allowed;
+}
+
+/* Cochée **et** désactivée : sans cette reprise, la règle ci-dessus (plus bas
+   dans la feuille, à spécificité égale) effacerait le bleu et la marque
+   flotterait sur un fond vide. */
+input[type="checkbox"]:disabled:checked,
+input[type="radio"]:disabled:checked {
+  border-color: rgba(var(--blue-500-rgb), 0.45);
+  background-color: rgba(var(--blue-500-rgb), 0.55);
+}
+
+/* Contrastes forcés : on rend la main au système, et c'est la seule réponse
+   juste. Le mode force la `background-color` mais **pas** l'image de fond, si
+   bien qu'une coche presque noire se retrouverait sur un fond noir imposé —
+   cochée et décochée deviennent alors indiscernables. L'anneau de focus étant
+   un `box-shadow`, lui aussi supprimé, l'`outline` native le remplace. */
+@media (forced-colors: active) {
+  input[type="checkbox"],
+  input[type="radio"] {
+    appearance: auto;
+    -webkit-appearance: auto;
+    /* La **boîte** revient au système en même temps que le dessin : `appearance`
+       rend la marque, pas les métriques, et une case native épinglée à 16 px
+       reste la nôtre. Le mode contrastes forcés va de pair avec le
+       grossissement du texte sous Windows — le contrôle natif s'y dimensionne
+       sur la police, et l'enfermer dans nos 16 px le rogne à côté d'une
+       étiquette deux fois plus grande. `display: inline-grid` et
+       `place-content` n'ont d'ailleurs plus rien à centrer, la marque n'étant
+       plus dessinée par nous ; le `border-radius` non plus, qui arrondissait
+       une boîte dont nous ne peignons plus le fond. `flex-shrink: 0` reste :
+       il protège le contrôle d'une rangée flex, quelle que soit sa taille.
+
+       Marge et rembourrage reviennent avec le reste (`revert`, donc la valeur
+       de la feuille du navigateur) : le `margin: 0` de la règle de base est
+       posé pour une case **de 16 px que nous dessinons**, et il écrase la marge
+       propre du contrôle natif (`3px 3px 3px 4px` sur Chromium). Les
+       conteneurs d'aujourd'hui espacent tous au `gap`, donc rien n'y paraît ;
+       le prochain écrit sans lui collerait la case à son étiquette dans le seul
+       mode que personne ne relit. Rendre la boîte à moitié, c'est se garder la
+       moitié du défaut. */
+    width: auto;
+    height: auto;
+    margin: revert;
+    padding: revert;
+    display: inline-block;
+    place-content: normal;
+    border: none;
+    border-radius: 0;
+    background-image: none;
+  }
+
+  input[type="checkbox"]:checked,
+  input[type="radio"]:checked {
+    background-image: none;
+  }
+
+  input[type="checkbox"]:focus-visible,
+  input[type="radio"]:focus-visible {
+    outline: 2px solid;
+    outline-offset: 2px;
+  }
+}
+
+/* Pastille `Coche` — l'anneau de focus, relayé par le frère de l'input.
+
+   L'input est masqué : c'est lui qui reçoit le focus, la pastille qui se voit.
+   Le relais est en CSS et **pas** en état React, parce que `:focus-visible`
+   n'est pas un instantané : il bascule aussi quand on presse une touche sur un
+   élément **déjà** focalisé (clic à la souris, puis Espace), et aucun second
+   évènement ne vient le dire — un état échantillonné à `onFocus` restait donc
+   muet au moment précis où le clavier prend la main. Le sélecteur de frère
+   (Sélecteurs 3) suit l'état au lieu de l'échantillonner. */
+.coche-input:focus-visible ~ .coche-pill {
+  box-shadow: 0 0 0 3px rgba(var(--coche-rgb), 0.28);
+}
+
+/* Contrastes forcés : le mode supprime les `box-shadow`, donc l'anneau ci-dessus
+   avec eux. L'`outline` native de la case ne le remplace pas ici — la case est
+   masquée en ligne (`opacity: 0`, 0×0), un contour posé dessus ne peint rien.
+   C'est donc la **pastille**, seule chose visible, qui doit le porter. */
+@media (forced-colors: active) {
+  .coche-input:focus-visible ~ .coche-pill {
+    outline: 2px solid;
+    outline-offset: 2px;
+  }
 }
