@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ClientPowerState } from "@/lib/shared/hooks/useClientPower";
 import { UNKNOWN_PROBE } from "@/lib/shared/client-power";
+import { readSource } from "../helpers/read-source";
 
 /**
  * Le témoin du régime de charge. Les effets ne tournent pas au rendu serveur :
@@ -82,5 +83,15 @@ describe("ClientPowerBadge", () => {
     const html = renderToStaticMarkup(<ClientPowerBadge />);
     expect(html).toMatch(/<button type="button"[^>]*>.*Mode éco<\/button>/);
     expect(html).not.toContain("aria-label=");
+  });
+
+  it("passe devant les boutons flottants quand son panneau s'ouvre", () => {
+    // Le panneau monte dans la zone du bouton « ? » (`.cta-float-help`, 100).
+    const css = readSource("components/client-power-badge.module.css");
+    const globals = readSource("app/globals.css");
+    const rootZ = Number(/\.root \{[^}]*z-index: (\d+);/.exec(css)?.[1]);
+    const fabZ = Number(/\.cta-float-help \{[^}]*z-index: (\d+);/.exec(globals)?.[1]);
+    expect(fabZ).toBeGreaterThan(0);
+    expect(rootZ).toBeGreaterThan(fabZ);
   });
 });

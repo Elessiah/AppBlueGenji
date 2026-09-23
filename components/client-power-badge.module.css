@@ -1,10 +1,12 @@
 /* Témoin du régime de charge. Sous les boutons flottants (`.cta-float-*`,
-   ancrés à 78 px du bas), à l'opposé des notifications (en bas à gauche). */
+   ancrés à 78 px du bas), à l'opposé des notifications (en bas à gauche).
+   Au-dessus d'eux dans l'empilement (100) : fermée, la pastille ne les croise
+   pas ; ouvert, le panneau monte dans leur zone et doit passer devant. */
 .root {
   position: fixed;
   right: 28px;
   bottom: 24px;
-  z-index: 90;
+  z-index: 110;
   display: flex;
   flex-direction: column;
   align-items: flex-end;

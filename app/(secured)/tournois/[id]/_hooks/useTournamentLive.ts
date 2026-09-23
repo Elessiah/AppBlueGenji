@@ -99,6 +99,8 @@ export function useTournamentLive(tournamentId: number) {
   const quietTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Un état reçu attend d'être rendu. */
   const pendingRenderRef = useRef(false);
+  /** Dernier état **rendu** : sans détail, la page affiche encore « Chargement… ». */
+  const renderedRef = useRef<LiveState>(INITIAL_LIVE_STATE);
   const renderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Flux ouvert au palier spectateur (`?quiet=1`). */
   const quietRef = useRef(false);
@@ -115,6 +117,7 @@ export function useTournamentLive(tournamentId: number) {
       clearTimeout(renderTimerRef.current);
       renderTimerRef.current = null;
     }
+    renderedRef.current = stateRef.current;
     setState(stateRef.current);
   }, []);
 
@@ -163,9 +166,14 @@ export function useTournamentLive(tournamentId: number) {
       pendingRenderRef.current = true;
       // Onglet caché : rien avant le retour (l'effet sur le régime s'en charge).
       if (delay === null) return;
-      // Le match du lecteur ne se regroupe pas : c'est ce qu'il regarde.
+      // Ne se regroupent pas : une page encore vide (rien n'a été *rendu*, même
+      // si quelque chose a été reçu onglet caché), et le match du lecteur,
+      // c'est ce qu'il regarde.
       const urgent =
-        !previous.detail || !next.detail || touchesViewerMatches(previous.detail, next.detail);
+        !renderedRef.current.detail ||
+        !previous.detail ||
+        !next.detail ||
+        touchesViewerMatches(previous.detail, next.detail);
       if (urgent) {
         flushRender();
         return;
@@ -188,7 +196,8 @@ export function useTournamentLive(tournamentId: number) {
       // jeu si l'onglet vient d'être caché. Le rendu reste dû, pour le retour.
       const delay = next.snapshotRenderDelayMs;
       if (pendingRenderRef.current) {
-        if (delay === 0) flushRender();
+        // Une page encore vide ne patiente pas : les données sont là.
+        if (delay === 0 || (delay !== null && !renderedRef.current.detail)) flushRender();
         else if (delay === null) {
           if (renderTimerRef.current !== null) {
             clearTimeout(renderTimerRef.current);
@@ -328,6 +337,7 @@ export function useTournamentLive(tournamentId: number) {
     stateRef.current = INITIAL_LIVE_STATE;
     lastUpdateAtRef.current = 0;
     lastFetchAtRef.current = 0;
+    renderedRef.current = INITIAL_LIVE_STATE;
     setState(INITIAL_LIVE_STATE);
     setIsLive(false);
     setFatal(null);

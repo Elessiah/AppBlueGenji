@@ -113,6 +113,16 @@ describe("flux du tournoi", () => {
     expect(hook).toMatch(/if \(quietAfter === null\) \{\s*if \(quietRef\.current\) \{\s*quietRef\.current = false;\s*reconnectRef\.current\?\.\(\);/);
   });
 
+  it("ne fait jamais patienter une page encore vide", () => {
+    // Ouverte onglet caché puis montrée sur un second écran en match : les
+    // données sont là, « Chargement… » ne doit pas durer cinq secondes.
+    expect(hook).toContain("renderedRef.current = stateRef.current;");
+    expect(hook).toMatch(/const urgent =\s*!renderedRef\.current\.detail \|\|/);
+    expect(hook).toContain(
+      "if (delay === 0 || (delay !== null && !renderedRef.current.detail)) flushRender();",
+    );
+  });
+
   it("désarme le regroupement quand l'onglet passe en veille", () => {
     // Le rendu reste dû, mais pas derrière le jeu.
     expect(hook).toMatch(
