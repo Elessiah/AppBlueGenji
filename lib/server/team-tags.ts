@@ -11,10 +11,14 @@
  * et c'est l'`INSERT` de la seconde qui échoue. Un service qui écrit un sigle
  * doit donc faire les deux : appeler `assertTeamTagAvailable` avant, et
  * envelopper son écriture dans `mapTeamTagConflict`.
+ *
+ * Le **nom**, l'autre unique de la table, suit la même paire en fin de module
+ * (`assertTeamNameAvailable`, `isTeamNameConflict`).
  */
 import type { RowDataPacket } from "mysql2/promise";
 import type { SqlParams } from "@/lib/server/database";
 import { TEAM_TAG_ALREADY_USED, checkTeamTag } from "@/lib/shared/team-tag";
+import { TEAM_NAME_ALREADY_USED } from "@/lib/shared/team-name";
 
 /** Nom de l'index unique posé par la migration (`lib/server/database.ts`). */
 const TAG_INDEX = "uniq_bg_teams_tag";
@@ -90,4 +94,48 @@ export async function mapTeamTagConflict<T>(write: () => Promise<T>): Promise<T>
     if (isTeamTagConflict(error)) throw new Error(TEAM_TAG_ALREADY_USED);
     throw error;
   }
+}
+
+// ───────────────────────────── Nom ─────────────────────────────
+//
+// Le nom est l'autre unique de `bg_teams`. Il vit ici parce que c'est ce module
+// qui sait lire une violation d'unicité de la table : les deux traductions
+// doivent se départager l'une l'autre, pas se deviner chacune de leur côté.
+
+/** Index de la contrainte d'unicité de l'entrée solo, à ne jamais lire comme un nom. */
+const SOLO_INDEX = "uniq_bg_teams_solo_user";
+
+/**
+ * Refuse un nom déjà porté par une autre équipe. Même rôle que
+ * `assertTeamTagAvailable` : le refus lisible du cas courant, l'index unique
+ * restant le seul juge d'une course (`isTeamNameConflict`).
+ */
+export async function assertTeamNameAvailable(
+  executor: Executor,
+  name: string,
+  excludeTeamId?: number,
+): Promise<void> {
+  const params: SqlParams = [name];
+  let sql = `SELECT id FROM bg_teams WHERE name = ?`;
+  if (excludeTeamId !== undefined) {
+    sql += ` AND id <> ?`;
+    params.push(excludeTeamId);
+  }
+  sql += ` LIMIT 1`;
+
+  const [rows] = await executor.execute<(RowDataPacket & { id: number })[]>(sql, params);
+  if (rows.length > 0) throw new Error(TEAM_NAME_ALREADY_USED);
+}
+
+/**
+ * Vrai si l'erreur MySQL est la violation de l'unicité du **nom** — ni celle du
+ * sigle, ni celle de l'entrée solo. L'index du nom n'est pas nommé dans le
+ * schéma (`name … UNIQUE`) : c'est donc par exclusion des deux autres qu'on le
+ * reconnaît, `bg_teams` n'en portant que trois.
+ */
+export function isTeamNameConflict(error: unknown): boolean {
+  const err = error as { code?: string; message?: string; sqlMessage?: string };
+  if (err?.code !== "ER_DUP_ENTRY") return false;
+  const text = `${err.sqlMessage ?? ""} ${err.message ?? ""}`;
+  return !text.includes(TAG_INDEX) && !text.includes(SOLO_INDEX);
 }

@@ -4,6 +4,7 @@ import { getTeamDetail, softDeleteTeam, updateTeamMeta } from "@/lib/server/team
 import { findSoloEntryUser } from "@/lib/server/solo-entries-service";
 import { can } from "@/lib/shared/permissions";
 import { TEAM_TAG_ALREADY_USED, isTeamTagRejection } from "@/lib/shared/team-tag";
+import { INVALID_TEAM_NAME, TEAM_NAME_ALREADY_USED } from "@/lib/shared/team-name";
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -57,6 +58,8 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     const message = (error as Error).message;
     if (message === "FORBIDDEN") return fail(message, 403);
     if (message === TEAM_TAG_ALREADY_USED) return fail(message, 409);
+    if (message === TEAM_NAME_ALREADY_USED) return fail(message, 409);
+    if (message === INVALID_TEAM_NAME) return fail(message, 400);
     if (isTeamTagRejection(message)) return fail(message, 400);
     return fail(message || "TEAM_UPDATE_FAILED", 400);
   }

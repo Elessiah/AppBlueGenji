@@ -26,31 +26,48 @@ export function useResourceLoader<T>(
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
-  const fetcher = useCallback(async () => {
-    setState({ status: "loading", data: null, error: null });
-    try {
-      const res = await fetch(url, { cache: "no-store" });
-      if (res.status === 404) {
-        const body = (await res.json().catch(() => ({}))) as NotFoundPayload;
-        setState({ status: "not-found", data: null, error: null });
-        optionsRef.current?.onNotFoundRedirect?.(body);
-        return;
+  /**
+   * Lecture de la ressource. `silent` : relecture **en arrière-plan** — la page
+   * garde ses données pendant l'appel, et un échec passager ne les retire pas.
+   *
+   * Sans elle, chaque geste d'une page de gestion (exclure un membre, changer
+   * un rôle) repassait l'écran entier en « Chargement… » : tout se démontait —
+   * saisie en cours, position de défilement, modale ouverte — pour se remonter
+   * une demi-seconde plus tard.
+   */
+  const load = useCallback(
+    async (silent: boolean) => {
+      if (!silent) setState({ status: "loading", data: null, error: null });
+      try {
+        const res = await fetch(url, { cache: "no-store" });
+        if (res.status === 404) {
+          const body = (await res.json().catch(() => ({}))) as NotFoundPayload;
+          setState({ status: "not-found", data: null, error: null });
+          optionsRef.current?.onNotFoundRedirect?.(body);
+          return;
+        }
+        if (!res.ok) {
+          if (silent) return;
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          setState({ status: "error", data: null, error: body.error ?? `HTTP_${res.status}` });
+          return;
+        }
+        const data = (await res.json()) as T;
+        setState({ status: "ready", data, error: null });
+      } catch (e) {
+        if (silent) return;
+        setState({ status: "error", data: null, error: (e as Error).message });
       }
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setState({ status: "error", data: null, error: body.error ?? `HTTP_${res.status}` });
-        return;
-      }
-      const data = (await res.json()) as T;
-      setState({ status: "ready", data, error: null });
-    } catch (e) {
-      setState({ status: "error", data: null, error: (e as Error).message });
-    }
-  }, [url]);
+    },
+    [url],
+  );
+
+  const fetcher = useCallback(() => load(false), [load]);
+  const revalidate = useCallback(() => load(true), [load]);
 
   useEffect(() => {
     fetcher();
   }, [fetcher]);
 
-  return { ...state, refresh: fetcher };
+  return { ...state, refresh: fetcher, revalidate };
 }

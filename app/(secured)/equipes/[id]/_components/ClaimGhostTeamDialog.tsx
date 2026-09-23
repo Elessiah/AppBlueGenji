@@ -1,7 +1,12 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import { useToast } from "@/components/ui/toast";
+import { teamErrorMessage } from "../../_lib/team-errors";
+import { jsonRequest, teamApi } from "../_lib/team-api";
+import { TeamDialog } from "./TeamDialog";
+import { PlayerPseudoCombobox } from "./PlayerPseudoCombobox";
+import styles from "../team.module.css";
 
 interface ClaimGhostTeamDialogProps {
   teamId: number;
@@ -19,109 +24,57 @@ export function ClaimGhostTeamDialog({ teamId, teamName, onClose, onChanged }: C
   const { showError, showSuccess } = useToast();
   const [pseudo, setPseudo] = useState("");
   const [busy, setBusy] = useState(false);
+  const trimmed = pseudo.trim();
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
+  const submit = async () => {
+    if (busy || !trimmed) return;
     setBusy(true);
     try {
-      const response = await fetch(`/api/teams/${teamId}/claim`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ pseudo: pseudo.trim() }),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "TEAM_CLAIM_FAILED");
-      showSuccess(`${pseudo.trim()} est désormais propriétaire de ${teamName}.`);
+      await teamApi(`/api/teams/${teamId}/claim`, jsonRequest("POST", { pseudo: trimmed }), "TEAM_CLAIM_FAILED");
+      showSuccess(`${trimmed} est désormais propriétaire de ${teamName}.`);
       onClose();
       onChanged();
     } catch (e) {
-      showError((e as Error).message);
-    } finally {
+      showError(teamErrorMessage((e as Error).message));
       setBusy(false);
     }
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="claim-ghost-title"
-      onClick={() => {
-        if (!busy) onClose();
-      }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 80,
-        background: "rgba(6, 8, 12, 0.72)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
-    >
-      <form
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={submit}
-        style={{
-          width: "100%",
-          maxWidth: 460,
-          background: "var(--cyber-bg-2, #14181f)",
-          border: "1px solid rgba(255,157,46,0.4)",
-          borderRadius: "var(--r-cy-md, 12px)",
-          boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
-          padding: 22,
-        }}
-      >
-        <h3 id="claim-ghost-title" style={{ margin: 0, fontSize: 18, color: "var(--ink, #e6e9ef)" }}>
-          Attribuer l&apos;équipe à un joueur
-        </h3>
-        <p style={{ marginTop: 6, fontSize: 13, color: "var(--text-2, #9aa4b2)" }}>
-          {teamName} cessera d&apos;être une équipe fantôme : le joueur en devient propriétaire et
-          gère lui-même son roster. L&apos;historique de tournois est conservé.
-        </p>
-
-        <div className="field" style={{ marginTop: 16 }}>
-          <label htmlFor="claim-pseudo">Pseudo du joueur</label>
-          <input
-            id="claim-pseudo"
-            value={pseudo}
-            onChange={(e) => setPseudo(e.target.value)}
-            placeholder="Pseudo exact sur le site"
-            required
-            autoFocus
-          />
-          <span style={{ fontSize: 11, color: "var(--text-2, #9aa4b2)" }}>
-            Le joueur ne doit appartenir à aucune autre équipe.
-          </span>
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-          <button
-            type="button"
-            className="btn ghost"
-            disabled={busy}
-            onClick={onClose}
-            style={{ padding: "8px 18px", fontSize: 13 }}
-          >
+    <TeamDialog
+      title="Attribuer l'équipe à un joueur"
+      onClose={onClose}
+      busy={busy}
+      onSubmit={submit}
+      allowOverflow
+      footer={
+        <>
+          <button type="button" className="btn ghost" disabled={busy} onClick={onClose}>
             Annuler
           </button>
-          <button
-            type="submit"
-            className="btn"
-            disabled={busy || pseudo.trim().length === 0}
-            style={{
-              padding: "8px 20px",
-              fontSize: 13,
-              background: "rgba(255,157,46,0.16)",
-              borderColor: "rgba(255,157,46,0.38)",
-              opacity: busy || pseudo.trim().length === 0 ? 0.5 : 1,
-            }}
-          >
+          <button type="submit" className={`btn ${styles.primaryButton}`} disabled={busy || !trimmed}>
             {busy ? "Attribution…" : "Attribuer l'équipe"}
           </button>
-        </div>
-      </form>
-    </div>
+        </>
+      }
+    >
+      <p>
+        {teamName} cessera d&apos;être une équipe fantôme : le joueur en devient propriétaire et
+        gère lui-même son roster. L&apos;historique de tournois est conservé.
+      </p>
+      <div className="field">
+        <label htmlFor="claim-pseudo">Pseudo du joueur</label>
+        <PlayerPseudoCombobox
+          id="claim-pseudo"
+          value={pseudo}
+          onChange={setPseudo}
+          placeholder="Commence à taper un pseudo…"
+          describedBy="claim-pseudo-help"
+        />
+        <p id="claim-pseudo-help" className={styles.help}>
+          Seuls les joueurs sans équipe sont proposés : il ne doit appartenir à aucune autre.
+        </p>
+      </div>
+    </TeamDialog>
   );
 }

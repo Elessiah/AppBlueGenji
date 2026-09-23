@@ -1,405 +1,105 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { LogoWithGlow } from "@/components/logo-with-glow";
 import type { TeamDetailResponse } from "@/lib/shared/types";
 import { formatRate } from "@/lib/shared/stats";
-import { useToast } from "@/components/ui/toast";
-import {
-  TEAM_TAG_MAX_LENGTH,
-  TEAM_TAG_MIN_LENGTH,
-  displayTeamTag,
-  normalizeTeamTag,
-  teamTagErrorMessage,
-} from "@/lib/shared/team-tag";
-import { TransferOwnershipDialog } from "./TransferOwnershipDialog";
-import { ClaimGhostTeamDialog } from "./ClaimGhostTeamDialog";
+import { displayTeamTag } from "@/lib/shared/team-tag";
+import headerStyles from "./TeamHeader.module.css";
 
 interface TeamHeaderProps {
   team: TeamDetailResponse;
-  onChanged: () => void;
-  canManage: boolean;
-  viewerIsOwner: boolean;
 }
 
-const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-
-export function TeamHeader({ team, onChanged, canManage, viewerIsOwner }: TeamHeaderProps) {
-  const { showError, showSuccess } = useToast();
-  const router = useRouter();
-  const [name, setName] = useState(team.team.name);
-  const [tag, setTag] = useState(team.team.tag ?? "");
-  const [description, setDescription] = useState(team.team.description ?? "");
-  const [logoBusy, setLogoBusy] = useState(false);
-  const logoFileRef = useRef<HTMLInputElement | null>(null);
-  const [transferOpen, setTransferOpen] = useState(false);
-  const [claimOpen, setClaimOpen] = useState(false);
-  const [deleteBusy, setDeleteBusy] = useState(false);
-
-  // Équipe fantôme administrée au titre de la permission `tournaments` : le
-  // staff n'en est pas propriétaire, mais dispose des mêmes actions destructives.
-  const managedAsGhost = team.managedAsGhost;
-
-  const deleteTeam = async () => {
-    if (!window.confirm(
-      "Dissoudre cette équipe ? Le nom, la description et le logo seront effacés et les membres détachés, mais les statistiques et l'historique resteront conservés. Action irréversible.",
-    )) {
-      return;
-    }
-    setDeleteBusy(true);
-    try {
-      const response = await fetch(`/api/teams/${team.team.id}`, { method: "DELETE" });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "TEAM_DELETE_FAILED");
-      showSuccess("Équipe dissoute. Ses statistiques restent consultables.");
-      setTimeout(() => router.push("/equipes"), 1000);
-    } catch (e) {
-      showError((e as Error).message);
-      setDeleteBusy(false);
-    }
-  };
-
-  const saveMeta = async (event: FormEvent) => {
-    event.preventDefault();
-    try {
-      const response = await fetch(`/api/teams/${team.team.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          name,
-          description: description.trim() || null,
-          tag: tag.trim() || null,
-        }),
-      });
-      const payload = (await response.json()) as TeamDetailResponse & { error?: string };
-      if (!response.ok) throw new Error(payload.error || "TEAM_UPDATE_FAILED");
-      showSuccess("Équipe mise à jour.");
-      onChanged();
-    } catch (e) {
-      const code = (e as Error).message;
-      showError(teamTagErrorMessage(code) ?? code);
-    }
-  };
-
-  const onLogoChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    if (!ACCEPTED_IMAGE_TYPES.includes(file.type) || file.size > MAX_IMAGE_BYTES) {
-      showError("Image trop lourde ou format non supporté");
-      return;
-    }
-
-    setLogoBusy(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const response = await fetch(`/api/teams/${team.team.id}/logo`, {
-        method: "POST",
-        body: formData,
-      });
-      const payload = (await response.json()) as { logoUrl?: string | null; error?: string };
-      if (!response.ok) throw new Error(payload.error || "LOGO_UPLOAD_FAILED");
-      showSuccess("Logo mis à jour.");
-      onChanged();
-    } catch (e) {
-      showError((e as Error).message);
-    } finally {
-      setLogoBusy(false);
-    }
-  };
-
-  const onLogoDelete = async () => {
-    setLogoBusy(true);
-    try {
-      const response = await fetch(`/api/teams/${team.team.id}/logo`, { method: "DELETE" });
-      const payload = (await response.json()) as { logoUrl?: string | null; error?: string };
-      if (!response.ok) throw new Error(payload.error || "LOGO_DELETE_FAILED");
-      showSuccess("Logo supprimé.");
-      onChanged();
-    } catch (e) {
-      showError((e as Error).message);
-    } finally {
-      setLogoBusy(false);
-    }
-  };
+/**
+ * Identité de l'équipe et ses chiffres clés — rien d'autre.
+ *
+ * L'en-tête portait aussi le formulaire des paramètres : pour qui gère
+ * l'équipe, le haut de la fiche était un formulaire, et le roster — ce qu'on
+ * vient voir — commençait sous la ligne de flottaison. Les paramètres vivent
+ * désormais dans `TeamSettings`, sous le roster.
+ */
+export function TeamHeader({ team }: TeamHeaderProps) {
+  const stats = [
+    { label: "Tournois joués", value: team.stats.tournamentsPlayed },
+    { label: "Podiums", value: team.stats.podiums },
+    { label: "Victoires", value: team.stats.matchesWon },
+    { label: "Défaites", value: team.stats.matchesLost },
+    { label: "Ratio de victoires", value: formatRate(team.stats.winRate) },
+    // Absent des réponses de mutation, qui ne calculent pas le classement.
+    ...(team.ranking
+      ? [
+          {
+            label: "Classement du site",
+            value: team.ranking.position ? `#${team.ranking.position}` : "—",
+          },
+        ]
+      : []),
+  ];
 
   return (
-    <>
-      <div className="ds-header orange">
-        <div className="ds-header-body">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              {team.team.logoUrl ? (
-                <LogoWithGlow
-                  src={team.team.logoUrl}
-                  alt={team.team.name}
-                  width={56}
-                  height={56}
-                  size="sm"
-                  borderRadius={12}
-                  borderColor="rgba(255,157,46,0.3)"
-                />
-              ) : (
-                <div
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: 12,
-                    border: "1.5px dashed rgba(255,157,46,0.3)",
-                    background: "rgba(255,157,46,0.07)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 22,
-                  }}
-                >
-                  🛡
-                </div>
-              )}
-              <div>
-                <h1 className="ds-title orange" style={{ fontSize: "clamp(26px, 3vw, 40px)", marginBottom: 6 }}>
-                  {team.team.name}
-                  {team.team.isGhost && (
-                    <span
-                      className="mono"
-                      title="Équipe fantôme, créée par le staff"
-                      style={{
-                        marginLeft: 12,
-                        verticalAlign: "middle",
-                        fontSize: 10,
-                        letterSpacing: "0.18em",
-                        color: "var(--ink-mute)",
-                        border: "1px solid var(--line-soft)",
-                        borderRadius: 999,
-                        padding: "3px 9px",
-                      }}
-                    >
-                      FANTÔME
-                    </span>
-                  )}
-                </h1>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-                  {/* Sigle de l'équipe — à défaut, les initiales de son nom :
-                      la ligne ne disparaît pas selon que l'équipe en a choisi
-                      un ou non. */}
-                  <span
-                    className="mono"
-                    title={team.team.tag ? "Sigle de l'équipe" : "Initiales — cette équipe n'a pas encore de sigle"}
-                    style={{
-                      fontSize: 11,
-                      letterSpacing: "0.2em",
-                      color: team.team.tag ? "#ff9d2e" : "var(--ink-mute)",
-                      border: "1px solid rgba(255,157,46,0.25)",
-                      borderRadius: 999,
-                      padding: "3px 10px",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {displayTeamTag(team.team.tag, team.team.name)}
+    <div className="ds-header orange">
+      <div className="ds-header-body">
+        <div className={headerStyles.top}>
+          <div className={headerStyles.identity}>
+            {team.team.logoUrl ? (
+              <LogoWithGlow
+                src={team.team.logoUrl}
+                alt={`Logo de ${team.team.name}`}
+                width={56}
+                height={56}
+                size="sm"
+                borderRadius={12}
+                borderColor="rgba(255,157,46,0.3)"
+              />
+            ) : (
+              <div className={headerStyles.logoFallback} aria-hidden>
+                🛡
+              </div>
+            )}
+            <div className={headerStyles.titles}>
+              <h1 className={`ds-title orange ${headerStyles.name}`}>
+                {team.team.name}
+                {team.team.isGhost && (
+                  <span className={`mono ${headerStyles.ghostBadge}`} title="Équipe fantôme, créée par le staff">
+                    FANTÔME
                   </span>
-                  <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14, maxWidth: 560 }}>
-                    {team.team.description || "Historique compétitif et gestion du roster"}
-                  </p>
-                </div>
+                )}
+              </h1>
+              <div className={headerStyles.subline}>
+                {/* Sigle de l'équipe — à défaut, les initiales de son nom :
+                    la ligne ne disparaît pas selon que l'équipe en a choisi
+                    un ou non. */}
+                <span
+                  className={`mono ${headerStyles.tag}`}
+                  data-chosen={team.team.tag ? "true" : "false"}
+                  title={team.team.tag ? "Sigle de l'équipe" : "Initiales — cette équipe n'a pas encore de sigle"}
+                >
+                  {displayTeamTag(team.team.tag, team.team.name)}
+                </span>
+                {/* Pas de phrase de remplacement : « Historique compétitif et
+                    gestion du roster » s'affichait à tout visiteur d'une équipe
+                    sans description, comme si l'équipe l'avait écrite. */}
+                {team.team.description ? (
+                  <p className={headerStyles.description}>{team.team.description}</p>
+                ) : null}
               </div>
             </div>
-            <Link href="/equipes" className="btn ghost" style={{ padding: "9px 18px", fontSize: 13, flexShrink: 0 }}>
-              ← Équipes
-            </Link>
           </div>
+          <Link href="/equipes" className={`btn ghost ${headerStyles.back}`}>
+            ← Équipes
+          </Link>
+        </div>
 
-          <div className="ds-stats" style={{ marginTop: 28 }}>
-            {[
-              { label: "Tournois joués", value: team.stats.tournamentsPlayed },
-              { label: "Podiums", value: team.stats.podiums },
-              { label: "Victoires", value: team.stats.matchesWon },
-              { label: "Défaites", value: team.stats.matchesLost },
-              { label: "Ratio de victoires", value: formatRate(team.stats.winRate) },
-              // Absent des réponses de mutation, qui ne calculent pas le classement.
-              ...(team.ranking
-                ? [{
-                    label: "Classement du site",
-                    value: team.ranking.position ? `#${team.ranking.position}` : "—",
-                  }]
-                : []),
-            ].map((stat) => (
-              <div key={stat.label} className="ds-stat orange">
-                <div className="ds-stat-label">{stat.label}</div>
-                <div className="ds-stat-value">{stat.value}</div>
-              </div>
-            ))}
-          </div>
+        <div className={`ds-stats ${headerStyles.stats}`}>
+          {stats.map((stat) => (
+            <div key={stat.label} className="ds-stat orange">
+              <div className="ds-stat-label">{stat.label}</div>
+              <div className="ds-stat-value">{stat.value}</div>
+            </div>
+          ))}
         </div>
       </div>
-
-      {canManage && (
-        <div className="ds-block" style={{ marginBottom: 20, borderColor: "rgba(255,157,46,0.18)" }}>
-          <div className="ds-section-title orange">
-            <h2>Paramètres de l'équipe</h2>
-          </div>
-          <form onSubmit={saveMeta}>
-            <div className="form-grid">
-              <div className="field">
-                <label htmlFor="team-meta-name">Nom de l&apos;équipe</label>
-                <input id="team-meta-name" value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
-              <div className="field">
-                <label htmlFor="team-meta-tag">Sigle</label>
-                <input
-                  id="team-meta-tag"
-                  value={tag}
-                  onChange={(e) => setTag(normalizeTeamTag(e.target.value))}
-                  minLength={TEAM_TAG_MIN_LENGTH}
-                  maxLength={TEAM_TAG_MAX_LENGTH}
-                  pattern="[A-Za-z0-9]*"
-                  placeholder="BG"
-                  aria-describedby="team-meta-tag-help"
-                  style={{ textTransform: "uppercase", letterSpacing: "0.12em", maxWidth: 160 }}
-                />
-                <p id="team-meta-tag-help" style={{ fontSize: 11, color: "var(--text-2)", margin: "6px 0 0" }}>
-                  {TEAM_TAG_MIN_LENGTH} à {TEAM_TAG_MAX_LENGTH} lettres ou chiffres, unique sur le site — laisser vide pour ne pas en avoir
-                </p>
-              </div>
-              <div className="field" style={{ gridColumn: "1 / -1" }}>
-                <label>Description</label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                  placeholder="Présente ton équipe…"
-                />
-              </div>
-              <div className="field">
-                <label>Logo</label>
-                <input
-                  ref={logoFileRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={onLogoChange}
-                  style={{ display: "none" }}
-                />
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={logoBusy}
-                    onClick={() => logoFileRef.current?.click()}
-                    style={{
-                      padding: "9px 18px",
-                      fontSize: 13,
-                      opacity: logoBusy ? 0.6 : 1,
-                      cursor: logoBusy ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    {logoBusy ? "Envoi…" : "Changer le logo"}
-                  </button>
-                  {team.team.logoUrl ? (
-                    <button
-                      type="button"
-                      className="btn ghost"
-                      disabled={logoBusy}
-                      onClick={onLogoDelete}
-                      style={{
-                        padding: "9px 18px",
-                        fontSize: 13,
-                        opacity: logoBusy ? 0.6 : 1,
-                        cursor: logoBusy ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      Supprimer
-                    </button>
-                  ) : null}
-                </div>
-                <p style={{ fontSize: 11, color: "var(--text-2)", margin: "6px 0 0" }}>
-                  PNG, JPEG ou WebP — 5 Mo max
-                </p>
-              </div>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginTop: 16,
-                gap: 12,
-                flexWrap: "wrap",
-              }}
-            >
-              {viewerIsOwner || managedAsGhost ? (
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {managedAsGhost ? (
-                    <button
-                      type="button"
-                      className="btn ghost"
-                      onClick={() => setClaimOpen(true)}
-                      style={{ padding: "10px 18px", fontSize: 12, borderColor: "rgba(255,157,46,0.35)" }}
-                    >
-                      Attribuer à un joueur
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn ghost"
-                      onClick={() => setTransferOpen(true)}
-                      style={{ padding: "10px 18px", fontSize: 12, borderColor: "rgba(255,157,46,0.35)" }}
-                    >
-                      Transférer la propriété
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    onClick={deleteTeam}
-                    disabled={deleteBusy}
-                    style={{
-                      padding: "10px 18px",
-                      fontSize: 12,
-                      color: "var(--red-live, #ff5a6e)",
-                      borderColor: "rgba(255,90,110,0.4)",
-                      opacity: deleteBusy ? 0.6 : 1,
-                      cursor: deleteBusy ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    {deleteBusy ? "Dissolution…" : managedAsGhost ? "Supprimer l'équipe fantôme" : "Dissoudre l'équipe"}
-                  </button>
-                </div>
-              ) : (
-                <span />
-              )}
-              <button
-                type="submit"
-                className="btn"
-                style={{ padding: "10px 24px", background: "rgba(255,157,46,0.14)", borderColor: "rgba(255,157,46,0.35)" }}
-              >
-                Mettre à jour
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {transferOpen && (
-        <TransferOwnershipDialog
-          teamId={team.team.id}
-          members={team.members}
-          onClose={() => setTransferOpen(false)}
-          onChanged={onChanged}
-        />
-      )}
-
-      {claimOpen && (
-        <ClaimGhostTeamDialog
-          teamId={team.team.id}
-          teamName={team.team.name}
-          onClose={() => setClaimOpen(false)}
-          onChanged={onChanged}
-        />
-      )}
-    </>
+    </div>
   );
 }

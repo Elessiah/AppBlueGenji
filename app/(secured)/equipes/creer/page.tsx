@@ -5,12 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useToast } from "@/components/ui/toast";
 import { CyberCard, CyberButton } from "@/components/cyber";
-import {
-  TEAM_TAG_MAX_LENGTH,
-  TEAM_TAG_MIN_LENGTH,
-  normalizeTeamTag,
-  teamTagErrorMessage,
-} from "@/lib/shared/team-tag";
+import { TEAM_TAG_MAX_LENGTH, TEAM_TAG_MIN_LENGTH, normalizeTeamTag } from "@/lib/shared/team-tag";
+import { TEAM_NAME_MAX_LENGTH, TEAM_NAME_MIN_LENGTH } from "@/lib/shared/team-name";
+import { membershipErrorMessage, teamErrorMessage } from "../_lib/team-errors";
 
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -60,16 +57,18 @@ export default function CreateTeamPage() {
           body: formData,
         });
         if (!logoResponse.ok) {
-          const logoPayload = (await logoResponse.json()) as { error?: string };
-          showError(logoPayload.error || "LOGO_UPLOAD_FAILED");
+          const logoPayload = (await logoResponse.json().catch(() => ({}))) as { error?: string };
+          // L'équipe existe : c'est le logo seul qui manque, et la fiche
+          // permet de le reposer.
+          showError(`Équipe créée, mais sans logo : ${teamErrorMessage(logoPayload.error || "LOGO_UPLOAD_FAILED")}`);
         }
       }
 
       router.push(`/equipes/${payload.teamId}`);
       router.refresh();
     } catch (e) {
-      const code = (e as Error).message;
-      showError(teamTagErrorMessage(code) ?? code);
+      // Le créateur devient propriétaire : `USER_ALREADY_IN_TEAM` parle de lui.
+      showError(membershipErrorMessage((e as Error).message));
     } finally {
       setLoading(false);
     }
@@ -95,6 +94,8 @@ export default function CreateTeamPage() {
               <input
                 id="team-name"
                 required
+                minLength={TEAM_NAME_MIN_LENGTH}
+                maxLength={TEAM_NAME_MAX_LENGTH}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Mon équipe"

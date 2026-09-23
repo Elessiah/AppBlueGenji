@@ -100,7 +100,10 @@ export function Coche({
           transition: "border-color 0.15s, background 0.15s, box-shadow 0.15s",
         }}
       >
+        {/* La coche est un dessin : l'état est déjà dit par la case (cochée),
+            la lire en plus ferait annoncer « ✓ DPS » au lecteur d'écran. */}
         <span
+          aria-hidden
           style={{
             flexShrink: 0,
             width: 16,

@@ -6,9 +6,9 @@ import {
   TEAM_TAG_MAX_LENGTH,
   TEAM_TAG_MIN_LENGTH,
   normalizeTeamTag,
-  teamTagErrorMessage,
 } from "@/lib/shared/team-tag";
 import s from "./GhostTeamDialog.module.css";
+import { teamErrorMessage } from "./_lib/team-errors";
 
 type GhostTeamDialogProps = {
   onClose: () => void;
@@ -48,8 +48,7 @@ export function GhostTeamDialog({ onClose, onCreated }: GhostTeamDialogProps) {
       onCreated();
       onClose();
     } catch (e) {
-      const code = (e as Error).message;
-      showError(teamTagErrorMessage(code) ?? code);
+      showError(teamErrorMessage((e as Error).message));
     } finally {
       setBusy(false);
     }

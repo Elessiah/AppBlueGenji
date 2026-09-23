@@ -1,14 +1,28 @@
 ﻿import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase, type SqlParams } from "@/lib/server/database";
 import { parseRoles, toIso } from "@/lib/server/serialization";
-import type { TeamDetailResponse, TeamListItem, TeamMember, TeamRole } from "@/lib/shared/types";
+import type {
+  TeamDetailResponse,
+  TeamJoinRequest,
+  TeamListItem,
+  TeamMember,
+  TeamRole,
+  TeamSentInvitation,
+} from "@/lib/shared/types";
 import { getUserIdByPseudo, sanitizeRoles } from "@/lib/server/users-service";
 import { getTeamEntityStats } from "@/lib/server/stats-service";
 import { getTeamRankingPosition, loadTeamRanking } from "@/lib/server/ranking-service";
 import { compareRankedTeams, rankingMatchJoinSql } from "@/lib/shared/ranking";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
-import { assertTeamTagAvailable, mapTeamTagConflict, resolveTeamTag } from "@/lib/server/team-tags";
+import {
+  assertTeamNameAvailable,
+  assertTeamTagAvailable,
+  isTeamNameConflict,
+  mapTeamTagConflict,
+  resolveTeamTag,
+} from "@/lib/server/team-tags";
+import { TEAM_NAME_ALREADY_USED, checkTeamName } from "@/lib/shared/team-name";
 import { localUploadUrl } from "@/lib/shared/uploads";
 
 /**
@@ -24,6 +38,7 @@ type TeamMemberRow = RowDataPacket & {
   pseudo: string;
   avatar_url: string | null;
   visible_avatar: 0 | 1;
+  is_deleted: 0 | 1;
   roles_json: string;
   joined_at: Date;
 };
@@ -45,6 +60,7 @@ function mapMember(row: TeamMemberRow, viewerUserId: number | null): TeamMember 
     ),
     roles: parseRoles(row.roles_json),
     joinedAt: toIso(row.joined_at) ?? new Date().toISOString(),
+    isDeleted: row.is_deleted === 1,
   };
 }
 
@@ -414,6 +430,7 @@ export async function getTeamDetail(
       u.pseudo,
       u.avatar_url,
       u.visible_avatar,
+      u.is_deleted,
       tm.roles_json,
       tm.joined_at
      FROM bg_team_members tm
@@ -445,9 +462,10 @@ export async function getTeamDetail(
   }
 
   let viewerInvitation: TeamDetailResponse["viewerInvitation"] = "NONE";
+  let viewerInvitationId: number | null = null;
   if (!isDeleted && viewerMembership === "NONE") {
-    const [inv] = await db.execute<(RowDataPacket & { kind: "INVITE" | "REQUEST" })[]>(
-      `SELECT kind
+    const [inv] = await db.execute<(RowDataPacket & { id: number; kind: "INVITE" | "REQUEST" })[]>(
+      `SELECT id, kind
        FROM bg_team_invitations
        WHERE team_id = ? AND user_id = ? AND status = 'PENDING'
        ORDER BY created_at DESC
@@ -456,6 +474,7 @@ export async function getTeamDetail(
     );
     if (inv.length > 0) {
       viewerInvitation = inv[0].kind === "INVITE" ? "INVITED" : "REQUESTED";
+      viewerInvitationId = Number(inv[0].id);
     }
   }
 
@@ -476,8 +495,10 @@ export async function getTeamDetail(
     ranking,
     canManage,
     managedAsGhost,
+    viewerUserId,
     viewerMembership,
     viewerInvitation,
+    viewerInvitationId,
   };
 }
 
@@ -503,8 +524,14 @@ export async function updateTeamMeta(
   const params: SqlParams = [];
 
   if (patch.name !== undefined) {
+    // Mêmes bornes qu'à la création : le renommage n'en contrôlait aucune, si
+    // bien qu'un nom vide s'enregistrait et qu'un nom trop long partait en
+    // erreur MySQL brute jusqu'à la notification.
+    const check = checkTeamName(patch.name);
+    if (!check.ok) throw new Error(check.reason);
+    await assertTeamNameAvailable(db, check.name, teamId);
     updates.push("name = ?");
-    params.push(patch.name.trim());
+    params.push(check.name);
   }
 
   if (patch.description !== undefined) {
@@ -524,8 +551,15 @@ export async function updateTeamMeta(
   if (updates.length === 0) return;
 
   params.push(teamId);
-  await mapTeamTagConflict(() =>
-    db.execute(`UPDATE bg_teams SET ${updates.join(", ")} WHERE id = ?`, params));
+  try {
+    await mapTeamTagConflict(() =>
+      db.execute(`UPDATE bg_teams SET ${updates.join(", ")} WHERE id = ?`, params));
+  } catch (error) {
+    // La course entre deux renommages vers le même nom : le `SELECT` préalable
+    // les a laissés passer tous les deux, l'index tranche.
+    if (isTeamNameConflict(error)) throw new Error(TEAM_NAME_ALREADY_USED);
+    throw error;
+  }
 }
 
 export async function updateTeamLogo(
@@ -725,6 +759,18 @@ export async function transferTeamOwnership(
     throw new Error("MEMBER_NOT_FOUND");
   }
 
+  // Un compte anonymisé garde sa ligne d'appartenance : lui confier l'équipe
+  // la laisserait sans personne capable d'ouvrir une session pour la conduire,
+  // et l'état serait définitif — seul le propriétaire transfère ou dissout, et
+  // il ne peut être ni exclu ni partir.
+  const [targetAccount] = await db.execute<(RowDataPacket & { is_deleted: 0 | 1 })[]>(
+    `SELECT is_deleted FROM bg_users WHERE id = ? LIMIT 1`,
+    [newOwnerUserId],
+  );
+  if (targetAccount.length === 0 || targetAccount[0].is_deleted === 1) {
+    throw new Error("MEMBER_ACCOUNT_DELETED");
+  }
+
   const newOwnerRoles: TeamRole[] = ["OWNER", ...targetRoles.filter((r) => r !== "OWNER")];
 
   const oldOwnerRemaining = requesterRoles.filter((r) => r !== "OWNER");
@@ -853,35 +899,125 @@ async function userHasActiveTeam(userId: number): Promise<boolean> {
   return rows.length > 0;
 }
 
-async function insertMembership(teamId: number, userId: number, roles: TeamRole[]): Promise<void> {
-  const db = await getDatabase();
+/**
+ * Fait entrer un joueur dans une équipe en acceptant une invitation ou une
+ * demande — **en une seule transaction**.
+ *
+ * Les trois chemins d'acceptation (le joueur accepte, la gestion accepte, une
+ * invitation croise une demande) lisaient `status = 'PENDING'`, relisaient
+ * « ce joueur a-t-il une équipe ? », inséraient l'appartenance puis marquaient
+ * l'invitation, en quatre instructions sur le pool : deux acceptations
+ * simultanées — le joueur clique « Rejoindre » pendant que la gestion accepte sa
+ * demande, ou deux équipes l'acceptent au même instant — passaient toutes deux
+ * les contrôles, et l'invariant « une seule équipe active » n'est tenu par aucun
+ * index.
+ *
+ * Le verrou est celui de la ligne du **joueur**, en toute première instruction
+ * (sous `REPEATABLE READ`, c'est la première lecture ordinaire qui fige
+ * l'instantané : placée avant l'attente, elle ferait lire un monde périmé). C'est
+ * aussi celui que prennent la suppression de compte et la création d'une entrée
+ * solo : une acceptation ne peut donc pas non plus rattacher un compte qu'on est
+ * en train d'anonymiser. L'invitation est ensuite **réservée** par un `UPDATE`
+ * conditionné à `PENDING`, relu sur `affectedRows` — une réponse arrivée entre
+ * la lecture de l'appelant et ici l'emporte.
+ *
+ * @param roles rôles posés à l'arrivée ; vide (demande, invitation d'avant la
+ *   colonne) → `DPS`, le défaut d'origine. `OWNER` n'est jamais posé ici.
+ */
+async function acceptIntoTeam(
+  invitationId: number,
+  teamId: number,
+  userId: number,
+  roles: TeamRole[],
+): Promise<void> {
   const filtered = sanitizeRoles(roles).filter((r) => r !== "OWNER");
   const payload = filtered.length === 0 ? ["DPS"] : filtered;
-  await db.execute(
-    `INSERT INTO bg_team_members (team_id, user_id, roles_json) VALUES (?, ?, ?)`,
-    [teamId, userId, JSON.stringify(payload)],
-  );
-  // Toute autre invitation/demande en attente de ce joueur devient caduque.
-  await db.execute(
-    `UPDATE bg_team_invitations
-     SET status = 'CANCELLED', responded_at = NOW()
-     WHERE user_id = ? AND status = 'PENDING'`,
-    [userId],
-  );
+
+  const db = await getDatabase();
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [account] = await connection.execute<(RowDataPacket & { is_deleted: 0 | 1 })[]>(
+      `SELECT is_deleted FROM bg_users WHERE id = ? FOR UPDATE`,
+      [userId],
+    );
+    if (account.length === 0 || account[0].is_deleted === 1) throw new Error("USER_NOT_FOUND");
+
+    const [claimed] = await connection.execute<ResultSetHeader>(
+      `UPDATE bg_team_invitations
+       SET status = 'ACCEPTED', responded_at = NOW()
+       WHERE id = ? AND status = 'PENDING'`,
+      [invitationId],
+    );
+    if (Number(claimed.affectedRows) === 0) throw new Error("INVITATION_NOT_PENDING");
+
+    const [active] = await connection.execute<(RowDataPacket & { id: number })[]>(
+      `SELECT id FROM bg_team_members WHERE user_id = ? AND left_at IS NULL LIMIT 1`,
+      [userId],
+    );
+    if (active.length > 0) throw new Error("USER_ALREADY_IN_TEAM");
+
+    await connection.execute(
+      `INSERT INTO bg_team_members (team_id, user_id, roles_json) VALUES (?, ?, ?)`,
+      [teamId, userId, JSON.stringify(payload)],
+    );
+    // Toute autre invitation/demande en attente de ce joueur devient caduque.
+    await connection.execute(
+      `UPDATE bg_team_invitations
+       SET status = 'CANCELLED', responded_at = NOW()
+       WHERE user_id = ? AND status = 'PENDING'`,
+      [userId],
+    );
+
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 async function findPendingInvitation(
   teamId: number,
   userId: number,
-): Promise<{ id: number; kind: "INVITE" | "REQUEST" } | null> {
+): Promise<{ id: number; kind: "INVITE" | "REQUEST"; roles: TeamRole[] } | null> {
   const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { id: number; kind: "INVITE" | "REQUEST" })[]>(
-    `SELECT id, kind FROM bg_team_invitations
+  const [rows] = await db.execute<
+    (RowDataPacket & { id: number; kind: "INVITE" | "REQUEST"; roles_json: unknown })[]
+  >(
+    `SELECT id, kind, roles_json FROM bg_team_invitations
      WHERE team_id = ? AND user_id = ? AND status = 'PENDING'
      ORDER BY created_at DESC LIMIT 1`,
     [teamId, userId],
   );
-  return rows.length === 0 ? null : { id: Number(rows[0].id), kind: rows[0].kind };
+  return rows.length === 0
+    ? null
+    : { id: Number(rows[0].id), kind: rows[0].kind, roles: invitationRoles(rows[0].roles_json) };
+}
+
+/**
+ * Rôles portés par une invitation, tels qu'ils seront posés à l'arrivée du
+ * joueur. Une invitation sans rôle (demande d'adhésion, ou invitation émise
+ * avant la colonne) rend une liste vide : `acceptIntoTeam` pose alors `DPS`,
+ * le défaut d'origine.
+ */
+function invitationRoles(raw: unknown): TeamRole[] {
+  return raw == null ? [] : parseRoles(raw);
+}
+
+/**
+ * Rôles demandés à l'invitation : ceux que la gestion peut distribuer, jamais
+ * `OWNER` (il se transfère). Absents, ils valent le défaut d'origine ; présents
+ * mais vides, c'est un refus — même règle que `updateTeamMemberRoles`, un membre
+ * sans rôle n'existant pas.
+ */
+function resolveInviteRoles(roles: readonly TeamRole[] | undefined): TeamRole[] {
+  if (roles === undefined) return ["DPS"];
+  const filtered = sanitizeRoles([...roles]).filter((role) => role !== "OWNER");
+  if (filtered.length === 0) throw new Error("MISSING_ROLE");
+  return filtered;
 }
 
 /**
@@ -889,8 +1025,14 @@ async function findPendingInvitation(
  * Si une demande (REQUEST) du joueur est déjà en attente, l'invitation la valide
  * directement et le joueur rejoint l'équipe.
  */
-export async function inviteToTeam(requesterId: number, teamId: number, pseudo: string): Promise<"INVITED" | "JOINED"> {
+export async function inviteToTeam(
+  requesterId: number,
+  teamId: number,
+  pseudo: string,
+  roles?: readonly TeamRole[],
+): Promise<"INVITED" | "JOINED"> {
   if (!(await userCanManageTeam(teamId, requesterId))) throw new Error("FORBIDDEN");
+  const inviteRoles = resolveInviteRoles(roles);
 
   const userId = await getUserIdByPseudo(pseudo);
   if (!userId) throw new Error("USER_NOT_FOUND");
@@ -898,21 +1040,16 @@ export async function inviteToTeam(requesterId: number, teamId: number, pseudo: 
 
   const existing = await findPendingInvitation(teamId, userId);
   if (existing?.kind === "REQUEST") {
-    const db = await getDatabase();
-    await insertMembership(teamId, userId, ["DPS"]);
-    await db.execute(
-      `UPDATE bg_team_invitations SET status = 'ACCEPTED', responded_at = NOW() WHERE id = ?`,
-      [existing.id],
-    );
+    await acceptIntoTeam(existing.id, teamId, userId, inviteRoles);
     return "JOINED";
   }
   if (existing?.kind === "INVITE") throw new Error("ALREADY_INVITED");
 
   const db = await getDatabase();
   await db.execute(
-    `INSERT INTO bg_team_invitations (team_id, user_id, created_by, kind, status)
-     VALUES (?, ?, ?, 'INVITE', 'PENDING')`,
-    [teamId, userId, requesterId],
+    `INSERT INTO bg_team_invitations (team_id, user_id, created_by, kind, roles_json, status)
+     VALUES (?, ?, ?, 'INVITE', ?, 'PENDING')`,
+    [teamId, userId, requesterId, JSON.stringify(inviteRoles)],
   );
   return "INVITED";
 }
@@ -950,11 +1087,7 @@ export async function requestToJoinTeam(userId: number, teamId: number): Promise
 
   const existing = await findPendingInvitation(teamId, userId);
   if (existing?.kind === "INVITE") {
-    await insertMembership(teamId, userId, ["DPS"]);
-    await db.execute(
-      `UPDATE bg_team_invitations SET status = 'ACCEPTED', responded_at = NOW() WHERE id = ?`,
-      [existing.id],
-    );
+    await acceptIntoTeam(existing.id, teamId, userId, existing.roles);
     return "JOINED";
   }
   if (existing?.kind === "REQUEST") throw new Error("ALREADY_REQUESTED");
@@ -978,8 +1111,8 @@ export async function respondToInvitation(
   accept: boolean,
 ): Promise<void> {
   const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { team_id: number; user_id: number; kind: "INVITE" | "REQUEST"; status: string })[]>(
-    `SELECT team_id, user_id, kind, status FROM bg_team_invitations WHERE id = ? LIMIT 1`,
+  const [rows] = await db.execute<(RowDataPacket & { team_id: number; user_id: number; kind: "INVITE" | "REQUEST"; status: string; roles_json: unknown })[]>(
+    `SELECT team_id, user_id, kind, status, roles_json FROM bg_team_invitations WHERE id = ? LIMIT 1`,
     [invitationId],
   );
   if (rows.length === 0) throw new Error("INVITATION_NOT_FOUND");
@@ -1001,11 +1134,8 @@ export async function respondToInvitation(
   }
 
   if (await userHasActiveTeam(Number(inv.user_id))) throw new Error("USER_ALREADY_IN_TEAM");
-  await insertMembership(Number(inv.team_id), Number(inv.user_id), ["DPS"]);
-  await db.execute(
-    `UPDATE bg_team_invitations SET status = 'ACCEPTED', responded_at = NOW() WHERE id = ?`,
-    [invitationId],
-  );
+  // Une demande (REQUEST) ne porte aucun rôle : `acceptIntoTeam` pose DPS.
+  await acceptIntoTeam(invitationId, Number(inv.team_id), Number(inv.user_id), invitationRoles(inv.roles_json));
 }
 
 /** Invitations (INVITE) en attente adressées au joueur. */
@@ -1031,11 +1161,85 @@ export async function listUserInvitations(userId: number): Promise<
   }));
 }
 
+/**
+ * Invitations (INVITE) envoyées par l'équipe et encore sans réponse (vue
+ * gestion). Sans cette liste, une invitation partie ne se voyait plus nulle
+ * part : ni pour savoir qui attendre, ni pour la retirer après une erreur de
+ * pseudo — réinviter le même joueur ne rendant que `ALREADY_INVITED`.
+ */
+export async function listTeamSentInvitations(
+  teamId: number,
+  requesterId: number,
+): Promise<TeamSentInvitation[]> {
+  if (!(await userCanManageTeam(teamId, requesterId))) throw new Error("FORBIDDEN");
+  const db = await getDatabase();
+  const [rows] = await db.execute<(InvitationRow & { roles_json: unknown })[]>(
+    `SELECT i.id, i.team_id, t.name AS team_name, i.user_id, u.pseudo, i.kind, i.roles_json, i.created_at
+     FROM bg_team_invitations i
+     JOIN bg_teams t ON t.id = i.team_id
+     JOIN bg_users u ON u.id = i.user_id
+     WHERE i.team_id = ? AND i.kind = 'INVITE' AND i.status = 'PENDING'
+     ORDER BY i.created_at DESC`,
+    [teamId],
+  );
+  return rows.map((r) => {
+    const roles = invitationRoles(r.roles_json);
+    return {
+      id: Number(r.id),
+      userId: Number(r.user_id),
+      pseudo: r.pseudo,
+      // Invitation d'avant la colonne : le joueur arrivera en DPS, on le dit.
+      roles: roles.length === 0 ? (["DPS"] as TeamRole[]) : roles,
+      createdAt: toIso(r.created_at) ?? new Date().toISOString(),
+    };
+  });
+}
+
+/**
+ * Retire une invitation ou une demande encore en attente.
+ *
+ * A qualité celui qui l'a émise, au sens de l'acte et non de la ligne : une
+ * **invitation** est l'acte de l'équipe (toute sa gestion, quel que soit le
+ * membre qui l'a envoyée — `created_by` peut d'ailleurs être `NULL`), une
+ * **demande** est l'acte du joueur. Le destinataire, lui, répond par
+ * `respondToInvitation`.
+ *
+ * L'écriture est conditionnée à `status = 'PENDING'` : une réponse arrivée entre
+ * la lecture et l'écriture l'emporte, et l'annulation est refusée plutôt que de
+ * réécrire une invitation déjà acceptée.
+ */
+export async function cancelInvitation(actingUserId: number, invitationId: number): Promise<void> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<
+    (RowDataPacket & { team_id: number; user_id: number; kind: "INVITE" | "REQUEST"; status: string })[]
+  >(
+    `SELECT team_id, user_id, kind, status FROM bg_team_invitations WHERE id = ? LIMIT 1`,
+    [invitationId],
+  );
+  if (rows.length === 0) throw new Error("INVITATION_NOT_FOUND");
+  const inv = rows[0];
+  if (inv.status !== "PENDING") throw new Error("INVITATION_NOT_PENDING");
+
+  if (inv.kind === "INVITE") {
+    if (!(await userCanManageTeam(Number(inv.team_id), actingUserId))) throw new Error("FORBIDDEN");
+  } else if (Number(inv.user_id) !== actingUserId) {
+    throw new Error("FORBIDDEN");
+  }
+
+  const [res] = await db.execute<ResultSetHeader>(
+    `UPDATE bg_team_invitations
+     SET status = 'CANCELLED', responded_at = NOW()
+     WHERE id = ? AND status = 'PENDING'`,
+    [invitationId],
+  );
+  if (Number(res.affectedRows) === 0) throw new Error("INVITATION_NOT_PENDING");
+}
+
 /** Demandes (REQUEST) en attente pour une équipe (vue gestion). */
 export async function listTeamJoinRequests(
   teamId: number,
   requesterId: number,
-): Promise<{ id: number; userId: number; pseudo: string; createdAt: string }[]> {
+): Promise<TeamJoinRequest[]> {
   if (!(await userCanManageTeam(teamId, requesterId))) throw new Error("FORBIDDEN");
   const db = await getDatabase();
   const [rows] = await db.execute<InvitationRow[]>(
