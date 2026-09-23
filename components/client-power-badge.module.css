@@ -32,6 +32,9 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .pill:hover {
@@ -98,6 +101,27 @@
   color: var(--text-2, #8c95a6);
   font-family: var(--font-mono), monospace;
   font-size: 11px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pill {
+    transition: none;
+  }
+}
+
+/* Contrastes forcés : le système retire les fonds, la pastille disparaîtrait —
+   c'est pourtant elle qui distingue le match de l'éco. Et l'anneau de focus
+   passe en `outline`, déjà le cas ici, que le mode respecte. */
+@media (forced-colors: active) {
+  .dot {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+
+  .pill,
+  .panel {
+    border-color: CanvasText;
+  }
 }
 
 @media (max-width: 640px) {
