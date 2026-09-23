@@ -17,6 +17,7 @@ import {
   registerToCsv,
   type ProcessingActivity,
 } from "@/lib/shared/processing-register";
+import { SITE_HOST } from "@/lib/shared/site-host";
 
 const controller = registerController("rgpd@exemple.invalid");
 const byRef = (ref: string) => PROCESSING_ACTIVITIES.find((a) => a.ref === ref) as ProcessingActivity;
@@ -126,6 +127,19 @@ describe("registerController", () => {
     expect(controller.contactEmail).toBe("rgpd@exemple.invalid");
     expect(controller.legalForm).toMatch(/loi 1901/);
   });
+
+  it("déclare l'hébergeur des mentions légales comme sous-traitant, en France", () => {
+    expect(controller.host).toContain(SITE_HOST.name);
+    expect(controller.host).toContain(SITE_HOST.address);
+    expect(controller.host).toMatch(/sous-traitant/);
+    expect(controller.host).toMatch(/hébergées en France/);
+  });
+
+  it("les mentions légales affichent le même hébergeur, sans copie", () => {
+    const page = readFileSync(join(__dirname, "..", "..", "..", "app", "mentions-legales", "page.tsx"), "utf8");
+    expect(page).toContain("{SITE_HOST.address}");
+    expect(page).not.toContain("Chemin Fourchue");
+  });
 });
 
 describe("csvCell", () => {
@@ -167,6 +181,7 @@ describe("registerToCsv", () => {
     expect(col("Date de mise à jour")).toBe(REGISTER_UPDATED_AT);
     expect(col("Durées de conservation").split("\n")).toEqual(byRef("T09").retention);
     expect(col("Responsable du traitement")).toContain("rgpd@exemple.invalid");
+    expect(col("Hébergeur (sous-traitant)")).toContain(SITE_HOST.address);
   });
 
   it("accepte une liste de traitements fournie", () => {
