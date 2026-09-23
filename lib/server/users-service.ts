@@ -16,6 +16,7 @@ import {
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
+import { listPrivacyAcknowledgments } from "@/lib/server/privacy-consent";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { syncSoloEntryIdentity, syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { importRemoteAvatar, shouldImportRemoteAvatar } from "@/lib/server/user-avatar-import";
@@ -1663,6 +1664,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     stats: full.stats,
     teamsTimeline: full.teamsTimeline,
     tournaments: full.tournaments,
+    privacyAcknowledgments: await listPrivacyAcknowledgments(userId),
   };
 }
 

@@ -1,0 +1,235 @@
+/* Modale des changements du traitement des données.
+   Au-dessus de la mise en avant du recrutement (1200) : c'est un choix à faire,
+   pas une annonce qu'on écarte. */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.modal {
+  width: min(640px, 100%);
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px;
+  background: var(--cyber-bg-1, #0c0f14);
+  border: 1px solid rgba(90, 200, 255, 0.3);
+  border-radius: var(--r-cy-lg, 14px);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.75),
+    0 0 40px rgba(90, 200, 255, calc(0.12 * var(--glow, 1)));
+}
+
+.modal:focus {
+  outline: none;
+}
+
+.title {
+  margin: 4px 0 0;
+  font-family: var(--font-sans);
+  font-size: clamp(20px, 3vw, 26px);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.intro,
+.policyLink {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink-mute);
+}
+
+.policyLink {
+  font-size: 13px;
+}
+
+.policyLink a,
+.warning a {
+  color: var(--blue-300);
+  text-decoration: underline;
+  text-decoration-color: rgba(90, 200, 255, 0.4);
+  text-underline-offset: 2px;
+}
+
+.policyLink a:focus-visible,
+.warning a:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* La liste défile seule : le titre et les deux boutons restent en vue, quel
+   que soit le nombre de changements cumulés. */
+.changes {
+  flex: 1 1 auto;
+  min-height: 120px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-md, 10px);
+  background: var(--cyber-bg-2, #10141b);
+}
+
+.changes:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+.changeList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.change {
+  padding: 16px 18px;
+}
+
+.change + .change {
+  border-top: 1px solid var(--line-soft);
+}
+
+.changeHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.changeTitle {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.changeDate {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--blue-300);
+  white-space: nowrap;
+}
+
+.changeSummary {
+  margin: 8px 0 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.changeDetails {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-mute);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap-reverse;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+/* Le refus n'est pas un lien discret qu'on devine : il a la taille d'un bouton,
+   dans la couleur du danger, sans rivaliser avec l'acceptation. */
+.refuse,
+.confirmDelete {
+  min-height: 40px;
+  padding: 10px 16px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--danger);
+  background: transparent;
+  border: 1px solid rgba(var(--danger-rgb), 0.4);
+  border-radius: var(--r-cy-sm, 8px);
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.refuse:hover:not(:disabled),
+.confirmDelete:hover:not(:disabled) {
+  background: rgba(var(--danger-rgb), 0.1);
+  border-color: rgba(var(--danger-rgb), 0.6);
+}
+
+/* À la confirmation, le bouton destructeur devient le geste principal de
+   l'étape — plein, donc sans ambiguïté sur ce qu'il fait. */
+.confirmDelete {
+  color: #fff;
+  background: rgba(var(--danger-rgb), 0.85);
+  border-color: rgba(var(--danger-rgb), 0.9);
+}
+
+.confirmDelete:hover:not(:disabled) {
+  background: rgb(var(--danger-rgb));
+}
+
+.refuse:focus-visible,
+.confirmDelete:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+.refuse:disabled,
+.confirmDelete:disabled {
+  cursor: not-allowed;
+  color: var(--ink-dim);
+  background: transparent;
+  border-color: var(--line-soft);
+}
+
+.dangerEyebrow {
+  color: var(--danger);
+}
+
+.warning {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid rgba(var(--danger-rgb), 0.35);
+  border-radius: var(--r-cy-md, 10px);
+  background: rgba(var(--danger-rgb), 0.08);
+}
+
+.warning p {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+@media (max-width: 480px) {
+  .modal {
+    padding: 20px 16px;
+  }
+
+  /* Pleine largeur au pouce ; le libellé reste centré, pas collé à gauche. */
+  .actions > * {
+    flex: 1 1 100%;
+    justify-content: center;
+    text-align: center;
+  }
+}

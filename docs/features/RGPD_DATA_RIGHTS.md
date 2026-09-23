@@ -61,6 +61,17 @@ affichées dans le tableau « Données collectées ») :
   `bluegenji-donnees-<id>.json`).
 - **UI** : bouton « Exporter mes données » sur `/profil`.
 
+## 4. Changements du traitement — acceptation par les comptes existants
+
+Le consentement de la section 2 ne vaut que pour la politique en vigueur à
+l'inscription. Quand elle change, chaque compte existant voit une modale qui
+**cumule** les changements qu'il n'a pas encore acceptés, avec deux issues :
+« J'accepte » ou « Je refuse, je supprime mon compte » (confirmation et
+avertissement d'irréversibilité). Les comptes joignables sur Discord en reçoivent
+aussi un résumé en message privé. Déclencher = ajouter une entrée à
+`PRIVACY_CHANGES` (`lib/shared/privacy-changes.ts`). Voir
+`docs/features/PRIVACY_CHANGES_CONSENT.md`.
+
 ## Fichiers concernés
 
 | Fichier | Rôle |
@@ -72,3 +83,6 @@ affichées dans le tableau « Données collectées ») :
 | `app/api/profile/export/route.ts` | Endpoint d'export RGPD |
 | `lib/server/users-service.ts` | `exportOwnData()` / `deleteOwnAccount()` |
 | `app/(secured)/profil/page.tsx` | Bouton d'export + mentions OW/Marvel |
+| `lib/shared/privacy-changes.ts` | Registre des changements du traitement |
+| `components/privacy/PrivacyChangesModal.tsx` | Modale d'acceptation des changements |
+| `app/api/profile/privacy-changes/route.ts` | Enregistrement de l'acceptation |

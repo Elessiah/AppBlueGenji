@@ -751,6 +751,11 @@ export type PersonalDataExport = {
   stats: ProfileStats;
   teamsTimeline: UserTeamTimeline[];
   tournaments: TeamHistoryRow[];
+  /**
+   * Changements du traitement des données acceptés, avec leur date — la trace
+   * du consentement (`lib/shared/privacy-changes.ts`).
+   */
+  privacyAcknowledgments: { changeId: string; acceptedAt: string }[];
 };
 
 export type TeamDetailResponse = {
