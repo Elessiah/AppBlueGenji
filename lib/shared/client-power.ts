@@ -352,8 +352,18 @@ export function powerReasonLabel(reason: PowerReason, probe: PerformanceProbe): 
  * page, qui repasserait en régime complet et le ferait disparaître sous le
  * pointeur ; et cette cause-là se lève d'elle-même au premier clic. En veille,
  * personne ne le verrait.
+ *
+ * Une exception, `ignoredLimits` : le lecteur a demandé d'ignorer une limite
+ * **constatée**. La page repasse alors en régime complet, mais le témoin reste —
+ * c'est lui qui porte la case qui défait ce choix, et il dit ce qui a été vu.
  */
-export function showsPowerBadge(mode: ClientPowerMode, reasons: readonly PowerReason[]): boolean {
+export function showsPowerBadge(
+  mode: ClientPowerMode,
+  reasons: readonly PowerReason[],
+  ignoredLimits = false,
+): boolean {
+  if (mode === "SLEEP") return false;
+  if (ignoredLimits) return true;
   if (mode !== "ECO" && mode !== "MATCH") return false;
   return reasons.some((reason) => reason !== "BACKGROUND" && reason !== "HIDDEN");
 }

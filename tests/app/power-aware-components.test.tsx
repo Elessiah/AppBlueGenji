@@ -73,6 +73,18 @@ describe("horloges", () => {
   });
 });
 
+describe("magasin du régime", () => {
+  it("ne re-rend pas ses consommateurs à chaque mesure de cadence", () => {
+    // `current` change d'identité à chaque relevé publié ; `current.input`
+    // seulement quand le régime peut changer.
+    const source = readSource("lib/shared/hooks/useClientPower.ts");
+    expect(source).toMatch(
+      /export function useClientPowerInput\(\): ClientPowerInput \{[\s\S]{0,300}useSyncExternalStore\(subscribe, getInputSnapshot, getServerInputSnapshot\)/,
+    );
+    expect(source).toMatch(/function getInputSnapshot\(\): ClientPowerInput \{\s*return current\.input;/);
+  });
+});
+
 describe("flux du bot", () => {
   it("se ferme onglet caché et repart de l'historique au retour", () => {
     const source = readSource("components/bot/BotLiveFeed.tsx");

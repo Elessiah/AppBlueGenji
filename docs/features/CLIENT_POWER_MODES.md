@@ -78,7 +78,10 @@ un régime qui **tient page regardée** — match, machine à la peine, mouvemen
 réduit —, jamais pour la seule absence de focus : la cliquer rendrait le focus,
 donc le régime complet, et elle disparaîtrait sous le pointeur. Un clic ouvre le
 détail : ce que le régime retire, les raisons (dont la cadence mesurée), le
-matériel déclaré, et la case « Ignorer la détection de performances ».
+matériel déclaré, et la case « Ignorer la détection de performances ». Quand
+cette case est cochée sur une limite constatée, la page repasse en régime
+complet mais le témoin **reste** (« Mode complet », avec ce qui a été constaté) :
+c'est lui qui porte la case qui défait ce choix.
 
 Pour un diagnostic à distance, `<html data-power="full|eco|match|sleep">` et
 `data-motion="on|off"` se lisent dans l'inspecteur.

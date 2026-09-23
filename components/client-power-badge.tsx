@@ -16,15 +16,16 @@ import styles from "./client-power-badge.module.css";
  * Témoin du régime de charge, en bas à droite.
  *
  * Il n'apparaît que lorsque la page **retire** quelque chose (`ECO`, `MATCH`)
- * pour une raison qui tient page regardée (`showsPowerBadge`) : en régime
- * complet il n'a rien à dire, et en veille personne ne le voit. Son
- * rôle est de rendre le mode éco **visible** — un joueur qui trouve la page
- * « figée » doit pouvoir lire pourquoi, et nous le dire —, d'où la liste des
- * raisons, avec la cadence mesurée, derrière un clic.
+ * pour une raison qui tient page regardée (`showsPowerBadge`) : en veille
+ * personne ne le voit. Son rôle est de rendre le mode éco **visible** — un
+ * joueur qui trouve la page « figée » doit pouvoir lire pourquoi, et nous le
+ * dire —, d'où la liste des raisons, avec la cadence mesurée, derrière un clic.
  *
  * Il porte aussi le seul recours contre une détection qui se trompe : ignorer
- * la détection de performances. Le focus, l'onglet caché et le match, eux, ne
- * s'ignorent pas — ce sont des faits, pas des estimations.
+ * la détection de performances. Il reste donc affiché tant que ce choix tient,
+ * régime complet compris — c'est lui qui permet de le défaire. Le focus,
+ * l'onglet caché et le match, eux, ne s'ignorent pas : ce sont des faits, pas
+ * des estimations.
  */
 export function ClientPowerBadge() {
   const { input, probe, limits, ignorePerformance } = useClientPowerState();
@@ -51,7 +52,8 @@ export function ClientPowerBadge() {
   }, [open]);
 
   const reasons = powerReasons(input, limits);
-  if (!showsPowerBadge(mode, reasons)) return null;
+  const ignoredLimits = ignorePerformance && limits.length > 0;
+  if (!showsPowerBadge(mode, reasons, ignoredLimits)) return null;
 
   const label = `Mode ${powerModeLabel(mode).toLowerCase()}`;
 
@@ -67,6 +69,12 @@ export function ClientPowerBadge() {
                 <li key={reason}>{powerReasonLabel(reason, probe)}</li>
               ))}
             </ul>
+          )}
+          {ignoredLimits && (
+            <p className={styles.text}>
+              Détection ignorée à ta demande. Constaté :{" "}
+              {limits.map((limit) => powerReasonLabel(limit, probe)).join(" ; ")}.
+            </p>
           )}
           {(limits.length > 0 || ignorePerformance) && (
             <label className={styles.toggle}>

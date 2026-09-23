@@ -330,6 +330,15 @@ describe("témoin", () => {
     expect(showsPowerBadge("MATCH", ["MATCH", "BACKGROUND"])).toBe(true);
   });
 
+  it("reste affiché quand le lecteur a ignoré une limite constatée", () => {
+    // Régime complet, mais le témoin porte la case qui défait ce choix.
+    expect(showsPowerBadge("FULL", [], true)).toBe(true);
+    expect(showsPowerBadge("ECO", ["BACKGROUND"], true)).toBe(true);
+    expect(showsPowerBadge("FULL", [], false)).toBe(false);
+    // En veille, personne ne le verrait.
+    expect(showsPowerBadge("SLEEP", [], true)).toBe(false);
+  });
+
   it("dit pourquoi, dans l'ordre où cela décide", () => {
     expect(
       powerReasons(input({ attention: "BACKGROUND", matchFocus: true, performanceLimited: true }), [

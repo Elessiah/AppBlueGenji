@@ -59,6 +59,19 @@ describe("ClientPowerBadge", () => {
     expect(html).toContain('data-mode="match"');
   });
 
+  it("reste affiché, en régime complet, quand la détection est ignorée", () => {
+    // Sans lui, la case qui défait ce choix serait introuvable.
+    state = {
+      ...base({ performanceLimited: false }),
+      probe: { cores: 2, memoryGb: 2, frameIntervalMs: 16 },
+      limits: ["LOW_CORES"],
+      ignorePerformance: true,
+    };
+    const html = renderToStaticMarkup(<ClientPowerBadge />);
+    expect(html).toContain("Mode complet");
+    expect(html).toContain('data-mode="full"');
+  });
+
   it("se tait sur un second écran sans autre raison", () => {
     state = base({ attention: "BACKGROUND" });
     expect(renderToStaticMarkup(<ClientPowerBadge />)).toBe("");

@@ -342,7 +342,18 @@ export function useClientPowerState(): ClientPowerState {
 
 /** Situation brute : attention, match, préférence de mouvement, performances. */
 export function useClientPowerInput(): ClientPowerInput {
-  return useClientPowerState().input;
+  // Instantané propre : `current` change d'identité à chaque mesure publiée,
+  // `current.input` seulement quand le régime peut changer. Lire le premier
+  // re-rendrait tous les consommateurs à chaque relevé de cadence.
+  return useSyncExternalStore(subscribe, getInputSnapshot, getServerInputSnapshot);
+}
+
+function getInputSnapshot(): ClientPowerInput {
+  return current.input;
+}
+
+function getServerInputSnapshot(): ClientPowerInput {
+  return SERVER_STATE.input;
 }
 
 /** Ce que la page a le droit de coûter en ce moment. */
