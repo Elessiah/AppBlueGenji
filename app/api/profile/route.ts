@@ -5,6 +5,12 @@ import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { DISCORD_TAG_LOCKED } from "@/lib/shared/discord-tag-lock";
 import { isProfileInputError } from "@/lib/shared/profile-input-errors";
 
+/** Les refus de `deleteOwnAccount` qui sortent tels quels : ils ont un sens pour l'écran. */
+const ACCOUNT_DELETION_REFUSALS: ReadonlySet<string> = new Set([
+  "ACCOUNT_STILL_REFERENCED",
+  "USER_NOT_FOUND",
+]);
+
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
@@ -73,6 +79,13 @@ export async function DELETE() {
     await clearSession();
     return ok({ deleted: true, ...plan });
   } catch (error) {
-    return fail((error as Error).message || "ACCOUNT_DELETE_FAILED", 400);
+    // Deux refus nommés — la course sur une clé étrangère (le second essai
+    // anonymisera) et un compte déjà introuvable. Tout le reste est une panne
+    // dont le message est interne (MySQL nomme base, table et contrainte) : il
+    // reste au journal, le client reçoit le code générique.
+    const message = (error as Error).message;
+    if (ACCOUNT_DELETION_REFUSALS.has(message)) return fail(message, 400);
+    console.error("[profile] DELETE failed:", error);
+    return fail("ACCOUNT_DELETE_FAILED", 400);
   }
 }
