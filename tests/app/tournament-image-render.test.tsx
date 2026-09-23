@@ -1,0 +1,115 @@
+import { describe, expect, it } from "@jest/globals";
+import { renderToStaticMarkup } from "react-dom/server";
+import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
+import { FinishedCard } from "@/app/(secured)/tournois/cards/FinishedCard";
+import { RegistrationCard } from "@/app/(secured)/tournois/cards/RegistrationCard";
+import { RunningCard } from "@/app/(secured)/tournois/cards/RunningCard";
+import { UpcomingCard } from "@/app/(secured)/tournois/cards/UpcomingCard";
+import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
+import type { TournamentImage } from "@/lib/shared/tournament-image";
+import type { TournamentCard } from "@/lib/shared/types";
+
+/**
+ * Rendu de l'image d'un tournoi : une **illustration** devient un bandeau
+ * cadré sur son point focal, un **logo** une pastille à côté du nom, et un
+ * tournoi **sans image** garde exactement sa carte d'avant — l'image est
+ * facultative, son absence ne doit laisser ni case vide ni repli inventé.
+ */
+
+const URL = "/api/uploads/tournaments/7-abc.webp";
+const cover: TournamentImage = { url: URL, fit: "COVER", focusX: 20, focusY: 75 };
+const logo: TournamentImage = { url: URL, fit: "CONTAIN", focusX: 50, focusY: 50 };
+
+const imgTags = (markup: string) => markup.match(/<img\b[^>]*>/g) ?? [];
+
+function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
+  return {
+    id: 7,
+    name: "BlueGenji Open",
+    description: null,
+    format: "SINGLE",
+    game: "OW",
+    participantType: "TEAM",
+    maxTeams: 8,
+    registeredTeams: 4,
+    state: "REGISTRATION",
+    startVisibilityAt: "2026-08-01T10:00:00.000Z",
+    registrationOpenAt: "2026-08-05T10:00:00.000Z",
+    registrationCloseAt: "2026-08-20T10:00:00.000Z",
+    startAt: "2026-08-25T18:00:00.000Z",
+    hasThirdPlaceMatch: false,
+    survivalRoundsBeforeFirstCut: null,
+    survivalRoundsPerCut: null,
+    phases: null,
+    matchFormat: null,
+    endurancePlayoffFormat: null,
+    registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
+    liveUrl: null,
+    image: null,
+    ...overrides,
+  };
+}
+
+describe("TournamentImageBanner", () => {
+  it("rend une illustration cadrée sur son point focal, en image décorative", () => {
+    const [img] = imgTags(renderToStaticMarkup(<TournamentImageBanner image={cover} sizes="100vw" />));
+    expect(img).toBeDefined();
+    expect(img).toContain('alt=""');
+    expect(img).toMatch(/object-position:20% 75%/);
+    // Passé par l'optimiseur de Next : redimensionné, jamais servi tel quel.
+    expect(img).toContain(encodeURIComponent(URL));
+  });
+
+  it("ne rend rien pour un logo ni sans image", () => {
+    expect(renderToStaticMarkup(<TournamentImageBanner image={logo} sizes="100vw" />)).toBe("");
+    expect(renderToStaticMarkup(<TournamentImageBanner image={null} sizes="100vw" />)).toBe("");
+  });
+});
+
+describe("TournamentImageEmblem", () => {
+  it("rend un logo entier, à la taille demandée", () => {
+    const markup = renderToStaticMarkup(<TournamentImageEmblem image={logo} size={64} />);
+    expect(imgTags(markup)).toHaveLength(1);
+    expect(markup).toContain("--tournament-emblem-size:64px");
+    expect(imgTags(markup)[0]).toContain('alt=""');
+  });
+
+  it("ne rend rien pour une illustration ni sans image", () => {
+    expect(renderToStaticMarkup(<TournamentImageEmblem image={cover} size={40} />)).toBe("");
+    expect(renderToStaticMarkup(<TournamentImageEmblem image={null} size={40} />)).toBe("");
+  });
+});
+
+describe("cartes de /tournois", () => {
+  const cards = [
+    ["à venir", UpcomingCard, "UPCOMING"],
+    ["inscriptions", RegistrationCard, "REGISTRATION"],
+    ["en cours", RunningCard, "RUNNING"],
+    ["terminé", FinishedCard, "FINISHED"],
+  ] as const;
+
+  it.each(cards)("carte %s : aucune image quand le tournoi n'en a pas", (_, Card, state) => {
+    expect(imgTags(renderToStaticMarkup(<Card t={card({ state })} />))).toHaveLength(0);
+  });
+
+  it.each(cards)("carte %s : une illustration en bandeau, avant le nom", (_, Card, state) => {
+    const markup = renderToStaticMarkup(<Card t={card({ state, image: cover })} />);
+    const imgs = imgTags(markup);
+    expect(imgs).toHaveLength(1);
+    expect(imgs[0]).toMatch(/object-position:20% 75%/);
+    expect(markup.indexOf("<img")).toBeLessThan(markup.indexOf("BlueGenji Open"));
+  });
+
+  it.each(cards)("carte %s : un logo en pastille, sans bandeau", (_, Card, state) => {
+    const markup = renderToStaticMarkup(<Card t={card({ state, image: logo })} />);
+    const imgs = imgTags(markup);
+    expect(imgs).toHaveLength(1);
+    expect(imgs[0]).not.toContain("object-position");
+    expect(markup).toContain("--tournament-emblem-size:40px");
+  });
+
+  it("l'image reste dans la carte : aucune seconde ancre", () => {
+    const markup = renderToStaticMarkup(<RegistrationCard t={card({ image: cover })} />);
+    expect(markup.match(/<a\b/g)).toHaveLength(1);
+  });
+});
