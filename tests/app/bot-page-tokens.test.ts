@@ -67,3 +67,16 @@ describe("/bot — n'emploie que des jetons que le site définit", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe("/bot — les pastilles d'en-tête de panneau ont un habillage", () => {
+  const css = read(join(ROOT, "app", "bot", "bot.css"));
+
+  it("habille `.chip` et distingue la pastille active", () => {
+    // Sans règle, les plages du graphe s'affichaient en boutons natifs blancs,
+    // et rien ne disait laquelle était affichée.
+    expect(css).toMatch(/\.panel-head \.chip \{[^}]*border:/);
+    expect(css).toMatch(/\.panel-head \.chip-on[,\s][^{]*\{[^}]*background:/);
+    // Et le parcours clavier garde un repère, de la même teinte que l'état actif.
+    expect(css).toMatch(/\.panel-head \.chip:focus-visible \{[^}]*outline:/);
+  });
+});

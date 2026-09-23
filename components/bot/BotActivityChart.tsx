@@ -78,6 +78,7 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
                 className={"chip " + (range === r ? "chip-on" : "")}
                 onClick={() => setRange(r as ActivityRange)}
                 aria-label={`Filtrer par ${r}`}
+                aria-pressed={range === r}
               >
                 {r}
               </button>
@@ -157,6 +158,7 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
               className={"chip " + (range === r ? "chip-on" : "")}
               onClick={() => setRange(r as ActivityRange)}
               aria-label={`Filtrer par ${r}`}
+              aria-pressed={range === r}
             >
               {r}
             </button>

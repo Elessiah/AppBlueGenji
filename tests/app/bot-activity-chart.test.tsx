@@ -35,6 +35,12 @@ describe("BotActivityChart — une charge saine", () => {
     expect(html).toContain("01/09");
   });
 
+  it("annonce la plage affichée aux technologies d'assistance", () => {
+    const html = render(activity());
+    expect(html).toMatch(/aria-pressed="true"[^>]*>30j</);
+    expect(html.match(/aria-pressed="false"/g)).toHaveLength(2);
+  });
+
   it("dit « Données indisponibles » plutôt que d'inventer un graphe vide", () => {
     expect(render(null)).toContain("Données indisponibles");
   });

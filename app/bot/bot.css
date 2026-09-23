@@ -266,9 +266,31 @@
 .chart-tools {
   display: flex; gap: 6px;
 }
-.chart-tools .chip {
+/* `.chip` n'a pas de style global : sans cette règle, les pastilles d'en-tête
+   de panneau (plages du graphe, pause du flux) s'affichaient en boutons
+   natifs, blancs, et **rien** ne distinguait la plage affichée des deux autres. */
+.panel-head .chip {
+  font-family: var(--font-mono);
   font-size: 10px;
+  letter-spacing: 0.12em;
   padding: 4px 10px;
+  border: 1px solid var(--line-strong-cy);
+  border-radius: var(--r-cy-sm);
+  background: transparent;
+  color: var(--ink-mute);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.panel-head .chip:hover { color: var(--ink); border-color: var(--line-strong); }
+.panel-head .chip:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+.panel-head .chip-on,
+.panel-head .chip-on:hover {
+  color: var(--blue-100);
+  border-color: rgba(var(--blue-500-rgb), 0.5);
+  background: rgba(var(--blue-500-rgb), 0.12);
 }
 .chart {
   height: 220px;
