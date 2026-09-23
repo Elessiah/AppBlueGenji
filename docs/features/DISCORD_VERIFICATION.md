@@ -119,10 +119,10 @@ passer par l'identifiant / le bouton Discord). L'**envoi du code** garde
 rien, et le message privé est peut-être parti.
 
 **La recherche du bot est bornée** (dépôt `blueGenjiBot`,
-`src/notifications/resolveHandle.ts`). Elle consulte d'abord le cache des membres,
-puis les serveurs BlueGenji, puis les autres, cinq de front, sous un délai total
-de 2,5 s — inférieur aux 3 s du site, pour que la réponse arrive avant
-l'abandon. Un tag absent de tous les serveurs rend donc de nouveau un `404` dans
+`src/notifications/resolveHandle.ts`). Elle interroge les serveurs BlueGenji, puis
+les autres, cinq de front, sous un délai total de 2,5 s : inférieur aux 3 s du
+site, pour que la réponse arrive avant l'abandon. Le cache des membres n'est pas
+consulté, il désignerait l'ancien titulaire d'un pseudo renommé. Un tag absent de tous les serveurs rend donc de nouveau un `404` dans
 les temps ; à l'échéance, le bot répond lui-même `504 BOT_RESOLVE_TIMEOUT`, que
 `resolveDiscordUser` lit sur le **statut**. Le délai côté site reste le filet pour
 un bot trop chargé pour répondre du tout.
