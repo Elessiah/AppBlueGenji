@@ -12,6 +12,10 @@ import { loginErrorMessage, oauthErrorMessage } from "./_lib/login-errors";
 import { OAuthButtons } from "./_components/OAuthButtons";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { isCertifiableDiscordHandle } from "@/lib/shared/discord-identity";
+import {
+  DISCORD_CERTIFICATION_UNDO,
+  DISCORD_TAG_AUDIENCE,
+} from "@/lib/shared/identity-sharing";
 
 const CONSENT_STORAGE_KEY = "bg_rgpd_consent";
 
@@ -227,10 +231,8 @@ export default function LoginPage() {
                 */}
                 {isCertifiableDiscordHandle(handle) && (
                   <span className="mono" style={{ fontSize: 10, color: "var(--ink-dim)", letterSpacing: "0.08em", marginTop: 4, lineHeight: 1.5 }}>
-                    Te connecter par Discord <strong>certifie ce tag</strong> : les administrateurs
-                    le voient, et les arbitres tant que tu es engagé dans un tournoi. Jamais
-                    personne d&apos;autre. Modifier ton tag depuis <em>Mon profil</em> annule la
-                    certification.
+                    Te connecter par Discord <strong>certifie ce tag</strong> :{" "}
+                    {DISCORD_TAG_AUDIENCE} {DISCORD_CERTIFICATION_UNDO}
                   </span>
                 )}
               </div>

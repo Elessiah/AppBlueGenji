@@ -14,8 +14,20 @@ import {
   isDiscordTagLocked,
 } from "@/lib/shared/discord-tag-lock";
 import { profileErrorMessage, profileLoadErrorMessage } from "./profile-errors";
+import {
+  BLIZZARD_BATTLETAG_NOTICE,
+  DISCORD_TAG_UNVERIFIED_AUDIENCE,
+  GAME_TAG_NOTICE,
+} from "@/lib/shared/identity-sharing";
+import {
+  PROFILE_SECTION_BY_ID,
+  profileSectionIdFromHash,
+  visibleProfileSections,
+} from "./_lib/profile-sections";
+import { ProfileSection } from "./_components/ProfileSection";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
+import s from "./profil.module.css";
 
 // Le pseudo n'est plus masquable : identité de base du joueur sur la plateforme.
 const VISIBILITY_LABELS: Record<string, string> = {
@@ -188,6 +200,36 @@ export default function ProfilePage() {
     load().catch((e) => showError(profileLoadErrorMessage((e as Error).message)));
   }, [showError, router]);
 
+  /**
+   * **Le saut vers l'ancre se rejoue une fois la section montée.**
+   *
+   * Le navigateur n'honore le fragment d'une URL collée qu'au chargement du
+   * document, c'est-à-dire au moment précis où la page n'affiche encore que
+   * « Chargement du profil… » : aucune section n'existe, il ne trouve rien, et
+   * il n'y revient jamais — `/profil#compte` déposait donc son lecteur en haut
+   * de la page. Les liens de la navigation marchaient, eux, parce qu'on clique
+   * forcément après la réponse.
+   *
+   * L'ancre demandée est lue **une seule fois, au montage**, et non à chaque
+   * passage de l'effet : `window.location.hash` garde le dernier lien cliqué,
+   * et `data` est remplacé à chaque sauvegarde — relire le fragment aurait
+   * remonté le lecteur à la section qu'il avait visitée dix minutes plus tôt au
+   * moment où il enregistre son profil depuis une autre.
+   */
+  const [requestedSection] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : profileSectionIdFromHash(window.location.hash),
+  );
+  const sectionHonoured = useRef(false);
+  useEffect(() => {
+    if (!data || !requestedSection || sectionHonoured.current) return;
+    // Une section conditionnelle peut n'être pas encore là : on retentera au
+    // prochain rendu plutôt que de tenir le saut pour fait.
+    const target = document.getElementById(requestedSection);
+    if (!target) return;
+    sectionHonoured.current = true;
+    target.scrollIntoView({ block: "start" });
+  }, [data, invitations.length, requestedSection]);
+
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     try {
@@ -224,13 +266,15 @@ export default function ProfilePage() {
       const payload = (await response.json()) as FullProfileResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "PROFILE_UPDATE_FAILED");
       setData(payload);
-      // Le champ **et sa référence**, comme au chargement. Réaligner la seule
-      // référence les faisait diverger dès que le tag avait bougé ailleurs : la
-      // sauvegarde suivante resoumettait celui du montage et mourait en 409
-      // `DISCORD_TAG_LOCKED` — précisément ce que cette référence existe pour
-      // empêcher —, sans autre issue qu'un rechargement puisque le champ est en
-      // lecture seule. Le champ affichait en prime un tag que l'aide juste en
-      // dessous contredisait.
+      // Le champ **et sa référence** se réalignent sur ce qui vient d'être
+      // enregistré. Le champ, parce qu'il est en lecture seule dès que le
+      // compte est rattaché et que c'est le seul endroit où le tag s'affiche :
+      // sans lui, un tag réécrit ailleurs entre le chargement et la sauvegarde
+      // (renommage sur Discord puis connexion depuis un autre appareil)
+      // laissait la pastille et la phrase du verrou annoncer le tag frais à
+      // côté d'un champ resté sur celui du montage. La référence, parce que
+      // c'est elle qui décide si la prochaine sauvegarde parle de ce champ —
+      // laissée en arrière, elle resoumettrait un tag déjà écrit.
       setDiscordPseudo(payload.profile.discordPseudo || "");
       setSavedDiscordPseudo(payload.profile.discordPseudo || "");
       // Une sauvegarde qui change le tag **annule la certification** côté
@@ -362,10 +406,24 @@ export default function ProfilePage() {
   // cours de saisie : le formulaire ne doit ni ouvrir ni fermer ce qu'il montre.
   const discordLocked = isDiscordTagLocked(discordState);
 
-  if (!data) return <section className="ds-block" style={{ color: "var(--text-2)" }}>Chargement du profil...</section>;
+  if (!data) {
+    return (
+      <section className="ds-block" style={{ color: "var(--text-1)" }}>
+        Chargement du profil…
+      </section>
+    );
+  }
+
+  // Les sections viennent du registre, et la navigation n'annonce que celles que
+  // la page a de quoi remplir : un lien d'ancre ne peut donc pas désigner une
+  // section absente. La **recherche par ancre**, elle, reste totale — indexer la
+  // liste filtrée rendrait `undefined` sur la section conditionnelle, sans que
+  // le typage le voie.
+  const sections = visibleProfileSections({ invitations: invitations.length });
+  const sectionById = PROFILE_SECTION_BY_ID;
 
   return (
-    <section className="fade-in">
+    <section className={`fade-in ${s.page}`}>
       {verifyOpen && (
         <DiscordVerificationDialog
           initialTag={discordPseudo}
@@ -388,37 +446,60 @@ export default function ProfilePage() {
           }}
         />
       )}
+
       <div className="ds-header">
-        <div className="ds-header-body" style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          <UserAvatar
-            src={data.profile.avatarUrl}
-            pseudo={data.profile.pseudo}
-            size={60}
-          />
-          <div>
-            <h1 className="ds-title blue" style={{ fontSize: "clamp(28px, 3vw, 42px)", marginBottom: 6 }}>
-              Mon profil
-            </h1>
-            <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-              Pseudo et avatar publics par défaut — chaque information reste masquable
+        <div className={`ds-header-body ${s.header}`}>
+          <UserAvatar src={data.profile.avatarUrl} pseudo={data.profile.pseudo} size={64} />
+          <div className={s.headerText}>
+            <h1 className={`ds-title blue ${s.title}`}>Mon profil</h1>
+            <p className={s.subtitle}>
+              Ton pseudo et ton avatar sont publics ; tout le reste se règle ici, champ par
+              champ.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="ds-block" style={{ marginBottom: 20 }}>
-        <div className="ds-section-title blue">
-          <h2>Informations</h2>
-        </div>
+      {/* Une page de réglages se parcourt rarement en entier : les ancres mènent
+          droit à la section cherchée, et le bas de page — export et suppression —
+          cesse d'exiger de traverser le reste. */}
+      <nav className={s.nav} aria-label="Sections du profil">
+        {sections.map((entry) => (
+          <a key={entry.id} href={`#${entry.id}`} className={s.navLink}>
+            {entry.title}
+          </a>
+        ))}
+      </nav>
 
-        <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* `display: contents` aurait été plus court, mais plusieurs moteurs
+          retirent alors l'élément de l'arbre d'accessibilité : le formulaire
+          cesserait d'être annoncé comme tel. Une colonne au même écartement que
+          la page donne la même mise en page sans rien perdre. */}
+      <form onSubmit={onSubmit} className={s.formSections}>
+        <ProfileSection section={sectionById.identite}>
           <div className="form-grid">
             <div className="field">
-              <label>Pseudo site</label>
-              <input value={pseudo} onChange={(e) => setPseudo(e.target.value)} />
+              <label htmlFor="profile-pseudo">Pseudo site</label>
+              <input
+                id="profile-pseudo"
+                value={pseudo}
+                onChange={(e) => setPseudo(e.target.value)}
+                aria-describedby="profile-pseudo-hint"
+              />
+              <p id="profile-pseudo-hint" className={s.hint}>
+                C&apos;est lui qui t&apos;identifie dans les brackets, les rosters et les
+                feuilles de match. Il n&apos;est pas masquable.
+              </p>
             </div>
-            <div className="field">
-              <label>Avatar</label>
+            {/* L'avatar n'a pas de champ à étiqueter — le `<input type="file">`
+                est caché et les deux contrôles sont des boutons : « Avatar »
+                nomme donc un **groupe** (un `<label>` sans `for` n'étiquette
+                rien, et le lecteur d'écran n'annonçait pas à quoi se
+                rapportaient les deux boutons). */}
+            <div className="field" role="group" aria-labelledby="profile-avatar-label">
+              <span id="profile-avatar-label" className={s.groupLabel}>
+                Avatar
+              </span>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -426,197 +507,203 @@ export default function ProfilePage() {
                 onChange={onAvatarChange}
                 style={{ display: "none" }}
               />
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div className={s.avatarActions}>
                 <button
                   type="button"
                   className="btn"
                   disabled={avatarBusy}
                   onClick={() => fileInputRef.current?.click()}
-                  style={{
-                    padding: "9px 18px",
-                    fontSize: 13,
-                    opacity: avatarBusy ? 0.6 : 1,
-                    cursor: avatarBusy ? "not-allowed" : "pointer",
-                  }}
+                  style={{ padding: "9px 18px", fontSize: 13 }}
                 >
                   {avatarBusy ? "Envoi…" : "Changer l'avatar"}
                 </button>
-                {data?.profile.avatarUrl ? (
+                {data.profile.avatarUrl ? (
                   <button
                     type="button"
                     className="btn ghost"
                     disabled={avatarBusy}
                     onClick={onAvatarDelete}
-                    style={{
-                      padding: "9px 18px",
-                      fontSize: 13,
-                      opacity: avatarBusy ? 0.6 : 1,
-                      cursor: avatarBusy ? "not-allowed" : "pointer",
-                    }}
+                    /* Le nom accessible commence par le texte affiché (WCAG
+                       2.5.3) et lève l'ambiguïté avec « Supprimer mon compte »,
+                       plus bas : parcourus hors contexte, deux « Supprimer » ne
+                       se distinguent pas. */
+                    aria-label="Supprimer mon avatar"
+                    style={{ padding: "9px 18px", fontSize: 13 }}
                   >
                     Supprimer
                   </button>
                 ) : null}
               </div>
-              <p style={{ fontSize: 11, color: "var(--text-2)", margin: "6px 0 0" }}>
-                PNG, JPEG ou WebP — 5 Mo max
-              </p>
+              <p className={`${s.hint} ${s.hintMuted}`}>PNG, JPEG ou WebP — 5 Mo max.</p>
             </div>
             <div className="field">
-              <label>BattleTag Overwatch</label>
-              <input value={overwatchBattletag} onChange={(e) => setOverwatchBattletag(e.target.value)} placeholder="Pseudo#1234" />
-              <p style={{ fontSize: 11, color: "var(--text-2)", margin: "6px 0 0" }}>
-                Sert uniquement à ce que les autres joueurs puissent t&apos;ajouter en jeu — jamais pour des statistiques.
-              </p>
-            </div>
-            <div className="field">
-              <label>Tag Marvel Rivals</label>
-              <input value={marvelRivalsTag} onChange={(e) => setMarvelRivalsTag(e.target.value)} />
-              <p style={{ fontSize: 11, color: "var(--text-2)", margin: "6px 0 0" }}>
-                Sert uniquement à ce que les autres joueurs puissent t&apos;ajouter en jeu — jamais pour des statistiques.
-              </p>
-            </div>
-            <div className="field">
-              <label htmlFor="profile-discord">
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  Pseudo Discord
-                  {discordState.verified ? <VerifiedBadge /> : null}
-                </span>
-              </label>
-              <input
-                id="profile-discord"
-                value={discordPseudo}
-                onChange={(e) => setDiscordPseudo(e.target.value)}
-                placeholder="ton_pseudo"
-                aria-describedby="profile-discord-hint"
-                /* Un compte Discord rattaché possède son tag : le champ le
-                   montre, il ne le prend plus. `readOnly` et non `disabled` —
-                   la valeur reste lisible au lecteur d'écran et atteignable au
-                   clavier, ce qu'un champ désactivé perd. */
-                readOnly={discordLocked}
-                aria-readonly={discordLocked || undefined}
-              />
-              {discordLocked ? (
-                // Le verrou interdit de **changer** le tag, pas de le prouver ni
-                // de le retirer — et ces deux gestes doivent exister à l'écran.
-                // Sans le premier, un compte rattaché dont le tag n'est pas
-                // certifié (tag saisi avant la règle, ou pseudo Discord
-                // numérique) ne pourrait plus rien en faire ; sans le second, la
-                // sortie que le serveur accepte n'existerait nulle part, un
-                // compte né par Discord ne pouvant pas non plus se détacher
-                // (`LAST_CONNECTION`).
-                //
-                // La condition porte sur le **rattachement**, pas sur le tag :
-                // posée sur le tag, elle ne rendait aucun bouton à l'état que le
-                // retrait vient justement de produire (rattaché, sans tag), et
-                // la seule sortie restante était de se reconnecter par Discord.
-                // Sur un état **inconnu**, en revanche, rien ne s'affiche — on
-                // ne propose pas un geste dont on ignore s'il a un objet.
-                discordState.linked !== true ? (
-                  // Un état illisible verrouille le champ **et** ferait
-                  // disparaître tous les gestes, « Retirer mon tag » compris —
-                  // la seule annulation d'exposition que le site offre. Une
-                  // panne de lecture ne doit pas coûter cela : le verrou reste
-                  // (on n'écrase pas un pseudo que Discord aurait nommé), mais
-                  // il porte sa propre sortie, sans rechargement.
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-                    <button
-                      type="button"
-                      className="btn ghost"
-                      onClick={() => void loadDiscordState()}
-                      disabled={discordStateBusy}
-                      aria-label="Réessayer la lecture de l'état Discord"
-                      style={{ padding: "7px 14px", fontSize: 12 }}
-                    >
-                      {discordStateBusy ? "Lecture…" : "Réessayer"}
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-                    {discordState.verified ? null : (
-                      <button
-                        type="button"
-                        className="btn"
-                        onClick={() => setVerifyOpen(true)}
-                        /* Sans tag enregistré il n'y a rien à *certifier* : le
-                           geste est d'en poser un — et il se prouve tout seul,
-                           `startDiscordVerification` concluant sur place quand
-                           le tag résout vers l'identifiant déjà rattaché. */
-                        aria-label={
-                          discordState.tag
-                            ? "Certifier mon tag Discord"
-                            : "Enregistrer mon tag Discord"
-                        }
-                        style={{ padding: "7px 14px", fontSize: 12 }}
-                      >
-                        {discordState.tag ? "Certifier mon tag" : "Enregistrer mon tag"}
-                      </button>
-                    )}
-                    {discordState.tag ? (
-                      <button
-                        type="button"
-                        className="btn ghost"
-                        onClick={onDiscordTagRemove}
-                        disabled={discordTagBusy}
-                        aria-label="Retirer mon tag Discord"
-                        style={{ padding: "7px 14px", fontSize: 12 }}
-                      >
-                        {discordTagBusy ? "Retrait…" : "Retirer mon tag"}
-                      </button>
-                    ) : null}
-                  </div>
-                )
-              ) : (
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => setVerifyOpen(true)}
-                    /* « Recertifier » seul ne dit pas quoi : le libellé
-                       accessible commence par le texte visible (WCAG 2.5.3) et
-                       ajoute l'objet. */
-                    aria-label={
-                      discordState.verified
-                        ? "Recertifier mon tag Discord"
-                        : "Certifier mon tag Discord"
-                    }
-                    style={{ padding: "7px 14px", fontSize: 12 }}
-                  >
-                    {discordState.verified ? "Recertifier" : "Certifier mon tag"}
-                  </button>
-                </div>
-              )}
-              <p id="profile-discord-hint" style={{ fontSize: 11, color: "var(--text-2)", margin: "6px 0 0", lineHeight: 1.6 }}>
-                {discordLocked
-                  ? discordTagLockNotice({ ...discordState, pending: discordStateBusy })
-                  : discordState.verified
-                    ? "Tag certifié : les administrateurs le voient, et les arbitres pendant tes tournois. Le modifier annule la certification."
-                    : "Tag non certifié : personne ne le voit, pas même les administrateurs. Certifie-le pour que l'organisation puisse te joindre pendant un tournoi."}
-              </p>
-            </div>
-            <div className="field">
-              <label>Statut majeur</label>
-              <select value={isAdult} onChange={(e) => setIsAdult(e.target.value)}>
+              <label htmlFor="profile-adult">Statut majeur</label>
+              <select
+                id="profile-adult"
+                value={isAdult}
+                onChange={(e) => setIsAdult(e.target.value)}
+                aria-describedby="profile-adult-hint"
+              >
                 <option value="unknown">Non renseigné</option>
                 <option value="yes">Oui (18+)</option>
                 <option value="no">Non (mineur)</option>
               </select>
+              <p id="profile-adult-hint" className={s.hint}>
+                Certains tournois distinguent les catégories d&apos;âge. Masquable ci-dessous.
+              </p>
             </div>
           </div>
+        </ProfileSection>
 
-          <div>
-            <p
-              style={{
-                fontSize: 11,
-                textTransform: "uppercase",
-                letterSpacing: "0.09em",
-                color: "var(--text-2)",
-                margin: "0 0 12px",
-              }}
-            >
-              Visibilité publique
+        <ProfileSection section={sectionById.jeux}>
+          <div className="form-grid">
+            <div className="field">
+              <label htmlFor="profile-battletag">BattleTag Overwatch</label>
+              <input
+                id="profile-battletag"
+                value={overwatchBattletag}
+                onChange={(e) => setOverwatchBattletag(e.target.value)}
+                placeholder="Pseudo#1234"
+                aria-describedby="profile-battletag-hint"
+              />
+              <p id="profile-battletag-hint" className={s.hint}>
+                {GAME_TAG_NOTICE} {BLIZZARD_BATTLETAG_NOTICE}
+              </p>
+            </div>
+            <div className="field">
+              <label htmlFor="profile-marvel">Tag Marvel Rivals</label>
+              <input
+                id="profile-marvel"
+                value={marvelRivalsTag}
+                onChange={(e) => setMarvelRivalsTag(e.target.value)}
+                aria-describedby="profile-marvel-hint"
+              />
+              <p id="profile-marvel-hint" className={s.hint}>
+                {GAME_TAG_NOTICE}
+              </p>
+            </div>
+          </div>
+        </ProfileSection>
+
+        <ProfileSection section={sectionById.discord}>
+          <div className="field">
+            <label htmlFor="profile-discord">
+              <span className={s.fieldLabelRow}>
+                Pseudo Discord
+                {discordState.verified ? <VerifiedBadge /> : null}
+              </span>
+            </label>
+            <input
+              id="profile-discord"
+              value={discordPseudo}
+              onChange={(e) => setDiscordPseudo(e.target.value)}
+              placeholder="ton_pseudo"
+              aria-describedby="profile-discord-hint"
+              /* Un compte Discord rattaché possède son tag : le champ le
+                 montre, il ne le prend plus. `readOnly` et non `disabled` —
+                 la valeur reste lisible au lecteur d'écran et atteignable au
+                 clavier, ce qu'un champ désactivé perd. */
+              readOnly={discordLocked}
+              aria-readonly={discordLocked || undefined}
+            />
+            {discordLocked ? (
+              // Le verrou interdit de **changer** le tag, pas de le prouver ni
+              // de le retirer — et ces deux gestes doivent exister à l'écran.
+              // La condition porte sur le **rattachement**, pas sur le tag :
+              // posée sur le tag, elle ne rendait aucun bouton à l'état que le
+              // retrait vient justement de produire (rattaché, sans tag). Sur un
+              // état **inconnu**, le verrou porte sa propre sortie : faire
+              // disparaître tous les gestes ferait disparaître « Retirer mon
+              // tag », la seule annulation d'exposition que le site offre, et
+              // une panne de lecture ne doit pas coûter cela.
+              discordState.linked !== true ? (
+                <div className={s.actionsRow}>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={() => void loadDiscordState()}
+                    disabled={discordStateBusy}
+                    aria-label="Réessayer la lecture de l'état Discord"
+                    style={{ padding: "7px 14px", fontSize: 12 }}
+                  >
+                    {discordStateBusy ? "Lecture…" : "Réessayer"}
+                  </button>
+                </div>
+              ) : (
+                <div className={s.actionsRow}>
+                  {discordState.verified ? null : (
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => setVerifyOpen(true)}
+                      /* Sans tag enregistré il n'y a rien à *certifier* : le
+                         geste est d'en poser un — et il se prouve tout seul,
+                         `startDiscordVerification` concluant sur place quand le
+                         tag résout vers l'identifiant déjà rattaché. */
+                      aria-label={
+                        discordState.tag
+                          ? "Certifier mon tag Discord"
+                          : "Enregistrer mon tag Discord"
+                      }
+                      style={{ padding: "7px 14px", fontSize: 12 }}
+                    >
+                      {discordState.tag ? "Certifier mon tag" : "Enregistrer mon tag"}
+                    </button>
+                  )}
+                  {discordState.tag ? (
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={onDiscordTagRemove}
+                      disabled={discordTagBusy}
+                      aria-label="Retirer mon tag Discord"
+                      style={{ padding: "7px 14px", fontSize: 12 }}
+                    >
+                      {discordTagBusy ? "Retrait…" : "Retirer mon tag"}
+                    </button>
+                  ) : null}
+                </div>
+              )
+            ) : (
+              <div className={s.actionsRow}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setVerifyOpen(true)}
+                  /* « Recertifier » seul ne dit pas quoi : le libellé
+                     accessible commence par le texte visible (WCAG 2.5.3) et
+                     ajoute l'objet. */
+                  aria-label={
+                    discordState.verified
+                      ? "Recertifier mon tag Discord"
+                      : "Certifier mon tag Discord"
+                  }
+                  style={{ padding: "7px 14px", fontSize: 12 }}
+                >
+                  {discordState.verified ? "Recertifier" : "Certifier mon tag"}
+                </button>
+              </div>
+            )}
+            {/* **Deux cas seulement, et non trois.** Un tag certifié appartient
+                forcément à un compte rattaché — `writeVerifiedTag` écrit
+                `discord_id`, et détacher Discord décertifie —, donc `verified`
+                implique `discordLocked` : la branche « certifié, non verrouillé »
+                ne pouvait jamais être atteinte. C'est la phrase du verrou qui
+                énonce alors l'exposition. L'annonce du tag **non** certifié, elle,
+                vient de la source partagée avec `/connexion` : c'est une promesse,
+                elle ne doit pas différer d'un écran à l'autre. */}
+            <p id="profile-discord-hint" className={s.hint}>
+              {discordLocked
+                ? discordTagLockNotice({ ...discordState, pending: discordStateBusy })
+                : `Tag non certifié : ${DISCORD_TAG_UNVERIFIED_AUDIENCE} Certifie-le pour qu'elle puisse le faire.`}
             </p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+          </div>
+        </ProfileSection>
+
+        <ProfileSection section={sectionById.confidentialite}>
+          <div className={s.toggleGroup}>
+            <p className={s.toggleGroupTitle}>Visible par les autres joueurs</p>
+            <div className={s.toggleRow}>
               {Object.entries(visibility).map(([key, value]) => (
                 <Coche
                   key={key}
@@ -629,77 +716,64 @@ export default function ProfilePage() {
                 />
               ))}
             </div>
-            <p style={{ fontSize: 11, color: "var(--text-2)", margin: "10px 0 0" }}>
+            <p className={s.hint}>
               Ton pseudo reste toujours visible : c&apos;est lui qui t&apos;identifie dans les
-              brackets, les rosters et les feuilles de match.
+              brackets, les rosters et les feuilles de match. Ton tag Discord, lui, ne suit
+              pas ces réglages — il a les siens, ci-dessus.
             </p>
           </div>
 
-          <div>
-            <p
-              style={{
-                fontSize: 11,
-                textTransform: "uppercase",
-                letterSpacing: "0.09em",
-                color: "var(--text-2)",
-                margin: "0 0 12px",
-              }}
-            >
-              Recrutement
-            </p>
-            <Coche
-              label="Ouvert aux propositions d'équipe"
-              checked={openToRecruitment}
-              theme="joueur"
-              onChange={() => setOpenToRecruitment((v) => !v)}
-            />
-            <p style={{ fontSize: 11, color: "var(--text-2)", margin: "10px 0 0" }}>
-              Décoché, tu n&apos;apparais plus dans le filtre « Free agents » de l&apos;annuaire et
-              les équipes savent que tu ne souhaites pas être contacté.
+          <div className={s.toggleGroup}>
+            <p className={s.toggleGroupTitle}>Recrutement</p>
+            <div className={s.toggleRow}>
+              <Coche
+                label="Ouvert aux propositions d'équipe"
+                checked={openToRecruitment}
+                theme="joueur"
+                onChange={() => setOpenToRecruitment((v) => !v)}
+              />
+            </div>
+            <p className={s.hint}>
+              Décoché, tu n&apos;apparais plus dans le filtre « Free agents » de
+              l&apos;annuaire et ta carte n&apos;annonce plus que tu cherches une équipe.
             </p>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <button
-              type="submit"
-              className="btn"
-              style={{
-                padding: "11px 28px",
-                background: "rgba(89,212,255,0.15)",
-                borderColor: "rgba(89,212,255,0.35)",
-              }}
-            >
-              Sauvegarder
-            </button>
-          </div>
-        </form>
-      </div>
+        </ProfileSection>
 
-      <ConnectedAppsSection onChanged={loadDiscordState} />
+        {/* Le pied appartient au **formulaire**, pas à sa dernière section : il
+            couvre quatre sections, et son unique bouton, posé au fond de la
+            quatrième, était hors de vue pour qui arrive par une ancre. Collé au
+            bas de la fenêtre, il reste atteignable depuis n'importe laquelle. */}
+        <div className={s.formFoot}>
+          <button type="submit" className={`btn ${s.save}`}>
+            Sauvegarder
+          </button>
+        </div>
+      </form>
+
+      <ProfileSection section={sectionById.connexions}>
+        <ConnectedAppsSection onChanged={loadDiscordState} />
+      </ProfileSection>
 
       {invitations.length > 0 && (
-        <div className="ds-block" style={{ marginBottom: 20 }}>
-          <div className="ds-section-title blue">
-            <h2>Invitations d&apos;équipe ({invitations.length})</h2>
-          </div>
+        <ProfileSection section={sectionById.invitations}>
           <div className="table-like">
             {invitations.map((inv) => (
               <div className="table-row" key={inv.id} style={{ alignItems: "center" }}>
                 <TeamLink teamId={inv.teamId}>{inv.teamName}</TeamLink>
-                <span style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <span className={s.inviteActions}>
                   <button
                     type="button"
-                    className="btn"
+                    className={`btn ${s.inviteButton}`}
                     onClick={() => respondInvitation(inv.id, true)}
-                    style={{ padding: "4px 12px", fontSize: 12 }}
                   >
                     Accepter
                   </button>
                   <button
                     type="button"
-                    className="btn ghost"
+                    className={`btn ghost ${s.inviteButton}`}
                     onClick={() => respondInvitation(inv.id, false)}
-                    style={{ padding: "4px 12px", fontSize: 12 }}
                   >
                     Refuser
                   </button>
@@ -707,14 +781,11 @@ export default function ProfilePage() {
               </div>
             ))}
           </div>
-        </div>
+        </ProfileSection>
       )}
 
-      <div className="ds-block">
-        <div className="ds-section-title blue">
-          <h2>Statistiques plateforme</h2>
-        </div>
-        <div className="ds-stats">
+      <ProfileSection section={sectionById.statistiques}>
+        <div className={s.stats}>
           {[
             { label: "Tournois joués", value: data.stats.tournamentsPlayed },
             { label: "Tournois gagnés", value: data.stats.tournamentsWon },
@@ -722,60 +793,32 @@ export default function ProfilePage() {
             { label: "Défaites", value: data.stats.matchesLost },
             { label: "Meilleur rang", value: data.stats.bestRank ?? "—" },
           ].map((stat) => (
-            <div key={stat.label} className="ds-stat">
-              <div className="ds-stat-label">{stat.label}</div>
-              <div className="ds-stat-value">{stat.value}</div>
+            <div key={stat.label} className={s.stat}>
+              <div className={s.statLabel}>{stat.label}</div>
+              <div className={s.statValue}>{stat.value}</div>
             </div>
           ))}
         </div>
-      </div>
+      </ProfileSection>
 
-      <div
-        style={{
-          marginTop: 12,
-          paddingTop: 20,
-          borderTop: "1px solid var(--line)",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 12,
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <a
-            href="/api/profile/export"
-            download
-            className="btn ghost"
-            style={{
-              padding: "10px 18px",
-              fontSize: 13,
-              textDecoration: "none",
-              display: "inline-flex",
-              alignItems: "center",
-            }}
-          >
-            Exporter mes données
-          </a>
-          <button
-            type="button"
-            className="btn ghost"
-            onClick={onDeleteAccount}
-            disabled={deleting}
-            style={{
-              padding: "10px 18px",
-              fontSize: 13,
-              color: "var(--red-live, #ff5a6e)",
-              borderColor: "rgba(255,90,110,0.4)",
-              opacity: deleting ? 0.6 : 1,
-              cursor: deleting ? "not-allowed" : "pointer",
-            }}
-          >
-            {deleting ? "Suppression…" : "Supprimer mon compte"}
-          </button>
+      <ProfileSection section={sectionById.compte} className={s.dangerSection}>
+        <div className={s.accountActions}>
+          <div className={s.accountActionsLeft}>
+            <a href="/api/profile/export" download className={`btn ghost ${s.accountButton}`}>
+              Exporter mes données
+            </a>
+            <button
+              type="button"
+              className={`btn ghost ${s.accountButton} ${s.deleteButton}`}
+              onClick={onDeleteAccount}
+              disabled={deleting}
+            >
+              {deleting ? "Suppression…" : "Supprimer mon compte"}
+            </button>
+          </div>
+          <LogoutButton />
         </div>
-        <LogoutButton />
-      </div>
+      </ProfileSection>
     </section>
   );
 }

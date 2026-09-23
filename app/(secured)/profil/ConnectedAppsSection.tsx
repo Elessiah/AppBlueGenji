@@ -37,6 +37,7 @@ import {
   type OAuthProvider,
 } from "@/lib/shared/oauth-providers";
 import { connectionErrorMessage } from "./connection-errors";
+import s from "./profil.module.css";
 
 /** Ce que chaque porte apporte au compte, en plus d'une session. */
 const PROVIDER_NOTES: Record<OAuthProvider, string> = {
@@ -129,13 +130,18 @@ export function ConnectedAppsSection({
     }
   };
 
+  /*
+    **Aucun cadre, aucun titre : la section les porte déjà.** Ce bloc vivait
+    seul sur la page et se dessinait lui-même : son propre cadre, son propre
+    titre de niveau 2. Rendu
+    depuis `<ProfileSection>`, qui pose l'un et l'autre depuis le registre, il
+    donnait une carte dans une carte et le titre « Applications connectées »
+    écrit deux fois au même niveau. Le composant ne rend donc plus que son
+    contenu ; l'ancre, le titre et la promesse viennent du registre.
+  */
   return (
-    <div className="ds-block" style={{ marginBottom: 20 }}>
-      <div className="ds-section-title blue">
-        <h2>Applications connectées</h2>
-      </div>
-
-      <p style={{ fontSize: 12, color: "var(--text-2)", margin: "0 0 16px", lineHeight: 1.6 }}>
+    <>
+      <p className={`${s.hint} ${s.hintMuted}`} style={{ marginTop: 0, marginBottom: 16 }}>
         Ton compte n&apos;a pas de mot de passe : il s&apos;ouvre par les applications
         rattachées ci-dessous. Tu peux en ajouter plusieurs pour ne jamais rester à la porte —
         la dernière ne peut pas être retirée.
@@ -218,6 +224,6 @@ export function ConnectedAppsSection({
           })}
         </div>
       )}
-    </div>
+    </>
   );
 }
