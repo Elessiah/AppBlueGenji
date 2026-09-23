@@ -65,14 +65,19 @@ export type RankedEntry = { teamId: number; rank: number };
  *
  * Une rencontre gagnée **par exemption** — la finale d'un tableau dont l'autre
  * demi-finale a été close en double forfait — consomme elle aussi ses deux
- * places : la seconde reste vacante, faute de finaliste battue, et la
- * gagnante de la petite finale reste 3ᵉ. La faire remonter à la 2ᵉ place
- * récompenserait une défaite en demi-finale d'un rang qu'aucun match ne lui a
- * donné.
+ * places quand `byeLeavesVacancy` est posé : la seconde reste vacante, faute
+ * de finaliste battue, et la gagnante de la petite finale reste 3ᵉ. La faire
+ * remonter à la 2ᵉ place récompenserait une défaite en demi-finale d'un rang
+ * qu'aucun match ne lui a donné. L'appelant ne le pose que si le tableau porte
+ * un double forfait : une exemption **structurelle** (la « finale » d'une phase
+ * tronquée peut en être une) garde la numérotation d'avant, sans trou.
  *
  * @returns les rangs attribués, et la prochaine place libre.
  */
-export function podiumRanks(matches: (PodiumMatch | null | undefined)[]): {
+export function podiumRanks(
+  matches: (PodiumMatch | null | undefined)[],
+  options: { byeLeavesVacancy?: boolean } = {},
+): {
   entries: RankedEntry[];
   nextRank: number;
 } {
@@ -93,6 +98,13 @@ export function podiumRanks(matches: (PodiumMatch | null | undefined)[]): {
     }
 
     if (match.winnerTeamId === null && match.loserTeamId === null) continue;
+
+    if (match.loserTeamId === null && !options.byeLeavesVacancy) {
+      entries.push({ teamId: match.winnerTeamId as number, rank: next });
+      next += 1;
+      continue;
+    }
+
     if (match.winnerTeamId !== null) entries.push({ teamId: match.winnerTeamId, rank: next });
     if (match.loserTeamId !== null) entries.push({ teamId: match.loserTeamId, rank: next + 1 });
     next += 2;

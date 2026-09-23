@@ -64,19 +64,39 @@ describe("podiumRanks — rangs d'un podium", () => {
     ).toEqual({ entries: [], nextRank: 1 });
   });
 
+  const byeFinal: PodiumMatch = {
+    team1Id: 5,
+    team2Id: null,
+    winnerTeamId: 5,
+    loserTeamId: null,
+    doubleForfeit: false,
+  };
+
   it("laisse la 2ᵉ place vacante derrière une finale gagnée par exemption", () => {
     // L'autre demi-finale a été close en double forfait : la finale est une
     // exemption, et la gagnante de la petite finale reste 3ᵉ.
-    const podium = podiumRanks([
-      { team1Id: 5, team2Id: null, winnerTeamId: 5, loserTeamId: null, doubleForfeit: false },
-      { team1Id: 6, team2Id: null, winnerTeamId: 6, loserTeamId: null, doubleForfeit: false },
-    ]);
+    const podium = podiumRanks(
+      [
+        byeFinal,
+        { team1Id: 6, team2Id: null, winnerTeamId: 6, loserTeamId: null, doubleForfeit: false },
+      ],
+      { byeLeavesVacancy: true },
+    );
     expect(podium).toEqual({
       entries: [
         { teamId: 5, rank: 1 },
         { teamId: 6, rank: 3 },
       ],
       nextRank: 5,
+    });
+  });
+
+  it("garde la numérotation d'avant pour une exemption structurelle", () => {
+    // La « finale » d'une phase tronquée peut être une exemption, sans aucun
+    // double forfait : pas de trou dans les rangs.
+    expect(podiumRanks([byeFinal])).toEqual({
+      entries: [{ teamId: 5, rank: 1 }],
+      nextRank: 2,
     });
   });
 

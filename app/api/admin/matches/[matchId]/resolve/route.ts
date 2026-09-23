@@ -23,7 +23,8 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   // sans vainqueur (`lib/shared/double-forfeit.ts`). Un booléen strict, et
   // exclusif de tout le reste : un corps qui porterait aussi un score ou une
   // équipe dirait deux choses, et on ne choisit pas à la place de l'arbitre.
-  if (body.doubleForfeit !== undefined && body.doubleForfeit !== false) {
+  // `null` vaut absence, comme pour les trois autres champs.
+  if (body.doubleForfeit !== undefined && body.doubleForfeit !== null && body.doubleForfeit !== false) {
     if (body.doubleForfeit !== true) return fail("INVALID_REQUEST", 400);
     const mixed = [body.team1Score, body.team2Score, body.forfeitTeamId].some(
       (value) => value !== undefined && value !== null,

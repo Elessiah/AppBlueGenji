@@ -1041,10 +1041,16 @@ async function finalizeEndurance(
   // Une finale ou une petite finale close sur un double forfait laisse sa
   // première place vacante et range ses deux engagées ex æquo à la seconde :
   // la règle est celle des tableaux à élimination (`podiumRanks`).
-  const podium = podiumRanks([
-    toPodium(finalMatches.find((match) => match.bracket !== "THIRD_PLACE")),
-    toPodium(finalMatches.find((match) => match.bracket === "THIRD_PLACE")),
-  ]);
+  // Une finale ou une petite finale d'exemption n'existe dans cet arbre que
+  // par un double forfait (le tirage n'en produit aucune au dernier tour) : sa
+  // seconde place est donc toujours vacante.
+  const podium = podiumRanks(
+    [
+      toPodium(finalMatches.find((match) => match.bracket !== "THIRD_PLACE")),
+      toPodium(finalMatches.find((match) => match.bracket === "THIRD_PLACE")),
+    ],
+    { byeLeavesVacancy: true },
+  );
 
   const ranks = appendSequentialRanks(
     podium,

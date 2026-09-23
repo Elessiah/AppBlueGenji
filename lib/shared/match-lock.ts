@@ -119,7 +119,9 @@ export function hasScoreInput(match: MatchScoreState): boolean {
 /**
  * Matchs dont le contenu dépend du résultat de `match`.
  *
- * · Élimination simple / double : les matchs cibles du vainqueur et du perdant.
+ * · Élimination simple / double : les matchs cibles du vainqueur et du perdant,
+ *   **à travers** les rencontres que le moteur a closes d'office (exemptions,
+ *   matchs fantômes) — voir {@link bracketDependents}.
  * · Survie / ronde suisse / BlueGenji Survie : pas de liens de bracket — les
  *   appariements du round suivant sont recalculés à partir du classement, donc
  *   tout round ultérieur dépend du résultat.

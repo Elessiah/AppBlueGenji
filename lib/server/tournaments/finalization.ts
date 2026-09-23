@@ -115,10 +115,27 @@ export async function rankEliminationPhase(
     }
   }
 
+  // Qui a été sorti par un double forfait : les deux finalistes d'une finale
+  // non jouée comme les deux engagées d'un tour intermédiaire.
+  const [forfeitedRows] = await connection.execute<(RowDataPacket & { team_id: number })[]>(
+    `SELECT team1_id AS team_id FROM bg_matches
+     WHERE tournament_id = ? AND phase_id = ? AND status = 'COMPLETED' AND double_forfeit = 1
+       AND team1_id IS NOT NULL
+     UNION
+     SELECT team2_id AS team_id FROM bg_matches
+     WHERE tournament_id = ? AND phase_id = ? AND status = 'COMPLETED' AND double_forfeit = 1
+       AND team2_id IS NOT NULL`,
+    [tournamentId, phaseId, tournamentId, phaseId],
+  );
+  const forfeited = new Set(forfeitedRows.map((row) => Number(row.team_id)));
+
   // Une finale close sur un double forfait ne fait pas de championne : ses deux
   // engagées partagent la 2ᵉ place (`podiumRanks`, règle partagée avec l'arbre
-  // final d'une BlueGenji Survie).
-  const podium = podiumRanks(podiumMatches);
+  // final d'une BlueGenji Survie). Une finale gagnée par exemption ne laisse
+  // sa 2ᵉ place vacante que si le tableau porte un double forfait : sinon
+  // l'exemption est structurelle (la « finale » d'une phase tronquée peut en
+  // être une), et la numérotation reste celle d'avant.
+  const podium = podiumRanks(podiumMatches, { byeLeavesVacancy: forfeited.size > 0 });
   const placed = podium.entries.map((entry) => entry.teamId);
 
   // Le reste du tableau, par victoires puis défaites. Un double forfait est une
@@ -160,20 +177,6 @@ export async function rankEliminationPhase(
   // tout entier sur son bilan. La garde d'avant (aucun podium → aucun rang)
   // n'existait que pour éviter une liste `NOT IN` vide.
   const rest = rankingRows.map((row) => Number(row.team_id));
-
-  // Qui a été sorti par un double forfait : les deux finalistes d'une finale
-  // non jouée comme les deux engagées d'un tour intermédiaire.
-  const [forfeitedRows] = await connection.execute<(RowDataPacket & { team_id: number })[]>(
-    `SELECT team1_id AS team_id FROM bg_matches
-     WHERE tournament_id = ? AND phase_id = ? AND status = 'COMPLETED' AND double_forfeit = 1
-       AND team1_id IS NOT NULL
-     UNION
-     SELECT team2_id AS team_id FROM bg_matches
-     WHERE tournament_id = ? AND phase_id = ? AND status = 'COMPLETED' AND double_forfeit = 1
-       AND team2_id IS NOT NULL`,
-    [tournamentId, phaseId, tournamentId, phaseId],
-  );
-  const forfeited = new Set(forfeitedRows.map((row) => Number(row.team_id)));
 
   return appendSequentialRanks(podium, rest).map((entry) => ({
     ...entry,

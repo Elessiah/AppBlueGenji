@@ -60,6 +60,15 @@ describe("POST /api/admin/matches/[matchId]/resolve — double forfait", () => {
     expect(adminResolveMatch).not.toHaveBeenCalled();
   });
 
+  it("traite `doubleForfeit: null` comme une absence, comme les autres champs", async () => {
+    const res = await resolveRoute(
+      req("POST", { doubleForfeit: null, forfeitTeamId: null, team1Score: 3, team2Score: 1 }),
+      params,
+    );
+    expect(res.status).toBe(200);
+    expect(adminResolveMatch).toHaveBeenCalledWith(42, 3, 1, undefined, false);
+  });
+
   it("traite `doubleForfeit: false` comme une saisie ordinaire", async () => {
     const res = await resolveRoute(
       req("POST", { doubleForfeit: false, team1Score: 3, team2Score: 1 }),
