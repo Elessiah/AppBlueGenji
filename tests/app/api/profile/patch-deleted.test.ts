@@ -6,6 +6,7 @@ jest.mock("@/lib/server/users-service");
 import { PATCH } from "@/app/api/profile/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getFullProfile, updateOwnProfile } from "@/lib/server/users-service";
+import { PROFILE_INPUT_ERRORS } from "@/lib/shared/profile-input-errors";
 
 const user = { id: 42 } as Awaited<ReturnType<typeof getCurrentUser>>;
 
@@ -75,7 +76,7 @@ describe("PATCH /api/profile — aucun message interne ne sort", () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
-  it.each(["INVALID_PSEUDO", "PSEUDO_EMPTY", "PSEUDO_TOO_LONG", "INVALID_DISCORD_PSEUDO"])(
+  it.each([...PROFILE_INPUT_ERRORS])(
     "rend le refus de saisie %s tel quel, en 400",
     async (code) => {
       (getCurrentUser as jest.Mock).mockResolvedValue(user as never);

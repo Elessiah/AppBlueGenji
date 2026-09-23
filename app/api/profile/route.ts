@@ -3,17 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { deleteOwnAccount, getFullProfile, updateOwnProfile } from "@/lib/server/users-service";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { DISCORD_TAG_LOCKED } from "@/lib/shared/discord-tag-lock";
-
-/**
- * Les refus d'une **saisie** que `updateOwnProfile` sait nommer — la seule
- * liste de codes qui sorte de cette route en 400 tels quels.
- */
-const PROFILE_INPUT_ERRORS: ReadonlySet<string> = new Set([
-  "INVALID_PSEUDO",
-  "PSEUDO_EMPTY",
-  "PSEUDO_TOO_LONG",
-  "INVALID_DISCORD_PSEUDO",
-]);
+import { isProfileInputError } from "@/lib/shared/profile-input-errors";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -60,7 +50,7 @@ export async function PATCH(req: Request) {
     // La saisie est bonne, c'est l'état du compte qui l'interdit : un compte
     // Discord rattaché possède son tag (`lib/shared/discord-tag-lock.ts`).
     if (message === DISCORD_TAG_LOCKED) return fail(message, 409);
-    if (PROFILE_INPUT_ERRORS.has(message)) return fail(message, 400);
+    if (isProfileInputError(message)) return fail(message, 400);
     // Tout le reste est une panne, pas un refus : un corps illisible (le
     // `SyntaxError` de `req.json()`), une erreur MySQL, un `TypeError`. Leur
     // message est **interne** — il nomme une colonne, une fonction, un jeton —

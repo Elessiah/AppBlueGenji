@@ -108,9 +108,21 @@ const FALLBACK = "L'opération a échoué.";
  * partagé avec l'avatar) : ils sont consultés d'abord. Un code inconnu retombe
  * sur une phrase générique **et non sur le code lui-même** : le jour où le
  * serveur en ajoute un, le joueur lit une phrase, pas un jeton.
+ *
+ * `fallbackCode` nomme le repli du geste (`INVITATION_RESPOND_FAILED`…) : il
+ * sert au code absent **et** au code inconnu — le `TypeError` d'une coupure
+ * réseau arrive dans le même `catch` que les refus du serveur, et « L'opération
+ * a échoué » ne dirait pas laquelle.
  */
-export function teamErrorMessage(code: string | null | undefined): string {
-  if (!code) return FALLBACK;
+export function teamErrorMessage(
+  code: string | null | undefined,
+  fallbackCode?: string,
+): string {
+  const fallback = () =>
+    fallbackCode && Object.prototype.hasOwnProperty.call(TEAM_ERRORS, fallbackCode)
+      ? TEAM_ERRORS[fallbackCode]
+      : FALLBACK;
+  if (!code) return fallback();
   const tagMessage = teamTagErrorMessage(code);
   if (tagMessage) return tagMessage;
   // Les refus du logo sont ceux de toute image téléversée : une seule rédaction,
@@ -118,7 +130,7 @@ export function teamErrorMessage(code: string | null | undefined): string {
   const imageMessage = imageUploadErrorMessage(code);
   if (imageMessage) return imageMessage;
   // `code in` remonterait la chaîne de prototypes (« constructor »).
-  return Object.prototype.hasOwnProperty.call(TEAM_ERRORS, code) ? TEAM_ERRORS[code] : FALLBACK;
+  return Object.prototype.hasOwnProperty.call(TEAM_ERRORS, code) ? TEAM_ERRORS[code] : fallback();
 }
 
 /**
@@ -130,7 +142,10 @@ export function teamErrorMessage(code: string | null | undefined): string {
  * rejoindre, c'est soi (« tu »). Le dire à la troisième personne à qui vient de
  * cliquer « Rejoindre » le laisserait chercher de quel joueur il s'agit.
  */
-export function membershipErrorMessage(code: string | null | undefined): string {
+export function membershipErrorMessage(
+  code: string | null | undefined,
+  fallbackCode?: string,
+): string {
   if (code === "USER_ALREADY_IN_TEAM") return "Tu appartiens déjà à une équipe : quitte-la d'abord.";
-  return teamErrorMessage(code);
+  return teamErrorMessage(code, fallbackCode);
 }

@@ -197,3 +197,22 @@ describe("invitationResponseErrorMessage", () => {
     }
   });
 });
+
+describe("profileLoadErrorMessage — seuls les codes sans geste sont partagés", () => {
+  it("n'annonce pas une modification perdue à qui vient d'ouvrir la page", () => {
+    // La phrase du compte supprimé dit que « la modification n'a pas été
+    // enregistrée » : juste pour une écriture, fausse pour une lecture.
+    expect(profileLoadErrorMessage("ACCOUNT_DELETED")).toBe(profileLoadErrorMessage("BOOM"));
+    expect(profileLoadErrorMessage("PSEUDO_ALREADY_USED")).toBe(profileLoadErrorMessage("BOOM"));
+  });
+});
+
+describe("invitationResponseErrorMessage — repli du geste", () => {
+  it("nomme le geste aussi sur un code inconnu ou une coupure réseau", () => {
+    const expected = invitationResponseErrorMessage(undefined);
+    expect(expected).toMatch(/invitation/);
+    for (const code of ["Failed to fetch", "BOOM", "constructor"]) {
+      expect(invitationResponseErrorMessage(code)).toBe(expected);
+    }
+  });
+});

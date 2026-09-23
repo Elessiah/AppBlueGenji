@@ -153,7 +153,19 @@ Côté serveur, les deux routes d'écriture ne laissent plus sortir qu'une **lis
 fermée** de codes : `PATCH /api/profile` rendait le message de n'importe quelle
 exception (`raw.replace is not a function` sur un `{"pseudo": 123}`, le message
 MySQL d'un pseudo trop long), `POST /api/profile/avatar` celui d'un décodage raté.
-Le reste part au journal et le client reçoit le code générique. Le pseudo, enfin,
+Le reste part au journal et le client reçoit le code générique. Cette liste
+(`PROFILE_INPUT_ERRORS`, `lib/shared/profile-input-errors.ts`) est la **même**
+que celle dont le registre de l'écran doit la phrase — il est typé dessus, un
+code ajouté sans phrase ne compile pas. Les codes partagés avec la **lecture** de
+la page sont les seuls qui ne nomment aucun geste (session, compte introuvable) :
+la phrase du compte supprimé dit qu'une modification est perdue, elle reste aux
+écritures. La course entre deux joueurs prenant le même pseudo à la même seconde
+— tous deux passent le `SELECT` — est tranchée par l'index unique, dont le
+doublon est rendu `PSEUDO_ALREADY_USED`. Le précontrôle d'image sert aussi la
+création et la fiche d'équipe, et le registre des équipes accepte le repli du
+geste (`teamErrorMessage(code, "LOGO_UPLOAD_FAILED")`), si bien qu'une coupure
+réseau pendant une réponse à une invitation dit encore de quelle réponse il
+s'agit. Le pseudo, enfin,
 est validé avant d'être lu : `INVALID_PSEUDO` (pas une chaîne), `PSEUDO_EMPTY`
 (que des espaces — la normalisation l'écrivait vide) et `PSEUDO_TOO_LONG` (au-delà
 des 40 caractères de la colonne, comptés comme MySQL les compte, `lib/shared/pseudo.ts`).

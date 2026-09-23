@@ -8,7 +8,7 @@ import {
   type AccountDeletionPlan,
   type AccountTrace,
 } from "@/lib/shared/account-deletion";
-import { isReferencedRowError } from "@/lib/server/mysql-errors";
+import { isDuplicateEntryError, isReferencedRowError } from "@/lib/server/mysql-errors";
 import {
   DISCORD_TAG_LOCKED,
   isDiscordTagLocked,
@@ -1059,51 +1059,63 @@ export async function updateOwnProfile(
   // une ligne fraîchement anonymisée — puis `syncSoloEntryIdentity` republiait
   // ce pseudo dans les brackets et jusqu'à la carte de match en direct de la
   // vitrine. La suppression est irréversible : c'est elle qui doit gagner.
-  const [result] = await db.execute<ResultSetHeader>(
-    `UPDATE bg_users
-     SET pseudo = COALESCE(?, pseudo),
-         overwatch_battletag = CASE WHEN ? THEN ? ELSE overwatch_battletag END,
-         marvel_rivals_tag = CASE WHEN ? THEN ? ELSE marvel_rivals_tag END,
-         discord_verified_at = CASE
-           WHEN NOT ? THEN discord_verified_at
-           WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_verified_at
-           WHEN discord_pseudo <=> ? THEN discord_verified_at
-           ELSE NULL
-         END,
-         discord_pseudo = CASE
-           WHEN NOT ? THEN discord_pseudo
-           WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_pseudo
-           ELSE ?
-         END,
-         is_adult = CASE WHEN ? THEN ? ELSE is_adult END,
-         visible_avatar = COALESCE(?, visible_avatar),
-         visible_overwatch = COALESCE(?, visible_overwatch),
-         visible_marvel = COALESCE(?, visible_marvel),
-         visible_major = COALESCE(?, visible_major),
-         open_to_recruitment = COALESCE(?, open_to_recruitment)
-     WHERE id = ? AND is_deleted = 0`,
-    [
-      nextPseudo,
-      patch.overwatchBattletag !== undefined,
-      patch.overwatchBattletag ?? null,
-      patch.marvelRivalsTag !== undefined,
-      patch.marvelRivalsTag ?? null,
-      touchesDiscordTag,
-      nextDiscordPseudo,
-      nextDiscordPseudo,
-      touchesDiscordTag,
-      nextDiscordPseudo,
-      nextDiscordPseudo,
-      patch.isAdult !== undefined,
-      patch.isAdult ?? null,
-      patch.visibility?.avatar ?? null,
-      patch.visibility?.overwatch ?? null,
-      patch.visibility?.marvel ?? null,
-      patch.visibility?.major ?? null,
-      patch.openToRecruitment ?? null,
-      userId,
-    ],
-  );
+  let result: ResultSetHeader;
+  try {
+    [result] = await db.execute<ResultSetHeader>(
+      `UPDATE bg_users
+       SET pseudo = COALESCE(?, pseudo),
+           overwatch_battletag = CASE WHEN ? THEN ? ELSE overwatch_battletag END,
+           marvel_rivals_tag = CASE WHEN ? THEN ? ELSE marvel_rivals_tag END,
+           discord_verified_at = CASE
+             WHEN NOT ? THEN discord_verified_at
+             WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_verified_at
+             WHEN discord_pseudo <=> ? THEN discord_verified_at
+             ELSE NULL
+           END,
+           discord_pseudo = CASE
+             WHEN NOT ? THEN discord_pseudo
+             WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_pseudo
+             ELSE ?
+           END,
+           is_adult = CASE WHEN ? THEN ? ELSE is_adult END,
+           visible_avatar = COALESCE(?, visible_avatar),
+           visible_overwatch = COALESCE(?, visible_overwatch),
+           visible_marvel = COALESCE(?, visible_marvel),
+           visible_major = COALESCE(?, visible_major),
+           open_to_recruitment = COALESCE(?, open_to_recruitment)
+       WHERE id = ? AND is_deleted = 0`,
+      [
+        nextPseudo,
+        patch.overwatchBattletag !== undefined,
+        patch.overwatchBattletag ?? null,
+        patch.marvelRivalsTag !== undefined,
+        patch.marvelRivalsTag ?? null,
+        touchesDiscordTag,
+        nextDiscordPseudo,
+        nextDiscordPseudo,
+        touchesDiscordTag,
+        nextDiscordPseudo,
+        nextDiscordPseudo,
+        patch.isAdult !== undefined,
+        patch.isAdult ?? null,
+        patch.visibility?.avatar ?? null,
+        patch.visibility?.overwatch ?? null,
+        patch.visibility?.marvel ?? null,
+        patch.visibility?.major ?? null,
+        patch.openToRecruitment ?? null,
+        userId,
+      ],
+    );
+  } catch (error) {
+    // Le `SELECT` d'unicité plus haut donne le refus lisible ; l'index unique
+    // tranche la **course** — deux joueurs qui prennent le même pseudo à la
+    // même seconde passent tous deux le `SELECT`. Seul `pseudo` est unique
+    // parmi les colonnes que cette écriture touche : un doublon ne peut venir
+    // que de lui, et le second joueur doit lire « pseudo déjà pris », pas un
+    // échec générique.
+    if (isDuplicateEntryError(error)) throw new Error("PSEUDO_ALREADY_USED");
+    throw error;
+  }
   // `affectedRows` compte les lignes **appariées** (mysql2 pose `FOUND_ROWS`),
   // pas celles qui ont changé : zéro ne dit donc pas « rien à modifier » mais
   // bien « la ligne vivante n'existe plus ». On sort avant la synchronisation

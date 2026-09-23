@@ -86,3 +86,30 @@ describe("updateOwnProfile — le pseudo est validé avant d'être lu", () => {
     ).toBe(false);
   });
 });
+
+describe("updateOwnProfile — la course sur l'index unique du pseudo", () => {
+  beforeEach(() => jest.clearAllMocks());
+  afterEach(() => jest.restoreAllMocks());
+
+  it("dit « pseudo déjà pris » quand l'index tranche entre deux sauvegardes simultanées", async () => {
+    // Les deux joueurs passent le `SELECT` d'unicité ; c'est l'`UPDATE` du
+    // second qui bute sur l'index.
+    const execute = await mockDb();
+    execute.mockImplementation(async (sql: string) => {
+      if (/^\s*UPDATE/.test(sql)) {
+        throw Object.assign(new Error("Duplicate entry 'Nova' for key 'pseudo'"), { code: "ER_DUP_ENTRY" });
+      }
+      return [[]];
+    });
+    await expect(updateOwnProfile(42, { pseudo: "Nova" })).rejects.toThrow("PSEUDO_ALREADY_USED");
+  });
+
+  it("laisse passer toute autre panne telle quelle", async () => {
+    const execute = await mockDb();
+    execute.mockImplementation(async (sql: string) => {
+      if (/^\s*UPDATE/.test(sql)) throw Object.assign(new Error("deadlock"), { code: "ER_LOCK_DEADLOCK" });
+      return [[]];
+    });
+    await expect(updateOwnProfile(42, { pseudo: "Nova" })).rejects.toThrow("deadlock");
+  });
+});
