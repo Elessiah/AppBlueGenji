@@ -169,13 +169,23 @@ export function BotServersTable({ payload }: { payload: BotServersPayload | null
                     nombre mal typé se contentait de mal s'afficher. */}
                 {botPayloadLabel(s.name)}
               </span>
-              {/* `?? 0` ne rattrape que `null` : un compte arrivé en chaîne
-                  tombait sur `String.prototype.toLocaleString`, qui ne groupe
-                  rien — « 12345 » à côté d'un « 12 345 », soit deux échelles
-                  dans la même colonne —, et un objet rendait « [object
-                  Object] ». Aucune exception, donc aucun signal. */}
-              <span className="srv-num" role="cell">{(botPayloadNumber(s.memberCount) ?? 0).toLocaleString("fr-FR")}</span>
-              <span className="srv-num" role="cell">{(botPayloadNumber(s.relays30j) ?? 0).toLocaleString("fr-FR")}</span>
+              {/* Deux gardes, deux raisons. `botPayloadNumber` d'abord : un
+                  compte arrivé en chaîne tombait sur
+                  `String.prototype.toLocaleString`, qui ne groupe rien —
+                  « 12345 » à côté d'un « 12 345 », soit deux échelles dans la
+                  même colonne —, et un objet rendait « [object Object] ».
+                  Aucune exception, donc aucun signal.
+
+                  Puis le repli sur « — » et **jamais sur zéro**, qui est la
+                  règle du panneau juste au-dessus (« refus en `null`, jamais en
+                  zéro ») et celle de `BotLatencyCard`. Un `?? 0` la contredisait
+                  au moment même où il durcissait la lecture : une valeur
+                  illisible sortait « 0 », c'est-à-dire un serveur Discord
+                  **sans aucun membre** — un fait faux, là où la chaîne mal
+                  typée n'était que mal formatée. Le zéro reste réservé à un
+                  zéro reçu ; ne pas savoir se dit. */}
+              <span className="srv-num" role="cell">{botPayloadNumber(s.memberCount)?.toLocaleString("fr-FR") ?? "—"}</span>
+              <span className="srv-num" role="cell">{botPayloadNumber(s.relays30j)?.toLocaleString("fr-FR") ?? "—"}</span>
               <span
                 className={"srv-status " + relay.tone}
                 role="cell"

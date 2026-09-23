@@ -126,19 +126,22 @@ describe("BotServersTable — une charge abîmée ne fait pas tomber la page", (
     const html = render([broken]);
     expect(html).toContain("Sans rien");
     expect(html).toContain("Inconnu");
-    // `memberCount` et `relays30j` absents : zéro affiché, aucune exception.
-    // On compte les **cellules** chiffrées : un `toContain("0")` passait sur le
-    // « 01 » du rang, donc quoi que ces deux cases contiennent.
+    // `memberCount` et `relays30j` absents : un tiret, jamais un zéro — un
+    // serveur où le bot est installé ne peut pas avoir zéro membre, et le
+    // panneau au-dessus tient déjà la règle (« refus en `null`, jamais en
+    // zéro »). On compte les **cellules** chiffrées : un `toContain("0")`
+    // passait sur le « 01 » du rang, donc quoi que ces deux cases contiennent.
     expect([...html.matchAll(/class="srv-num"[^>]*>([^<]*)</g)].map((m) => m[1])).toEqual([
-      "0",
-      "0",
+      "—",
+      "—",
     ]);
   });
 
   it("ne laisse pas un compte de mauvais type défaire le format français", () => {
-    // `?? 0` ne rattrape que `null` : une chaîne tombe sur
-    // `String.prototype.toLocaleString`, qui ne groupe rien, et un objet rend
-    // « [object Object] » — dans une colonne de nombres, sans une erreur.
+    // Une chaîne tombe sur `String.prototype.toLocaleString`, qui ne groupe
+    // rien, et un objet rend « [object Object] » — dans une colonne de
+    // nombres, sans une erreur. Le repli est un **tiret** : rendre « 0 »
+    // remplacerait un nombre mal formaté par un nombre faux, ce qui est pire.
     const html = render([
       server({
         memberCount: "12345" as unknown as number,
@@ -148,8 +151,8 @@ describe("BotServersTable — une charge abîmée ne fait pas tomber la page", (
     expect(html).not.toContain("[object Object]");
     expect(html).not.toContain(">12345<");
     expect([...html.matchAll(/class="srv-num"[^>]*>([^<]*)</g)].map((m) => m[1])).toEqual([
-      "0",
-      "0",
+      "—",
+      "—",
     ]);
   });
 
@@ -203,6 +206,19 @@ describe("BotServersTable — une charge abîmée ne fait pas tomber la page", (
     // Un compte groupé à côté d'un compte brut se lisait comme deux échelles.
     expect(html).toContain((12345).toLocaleString("fr-FR"));
     expect(html).toContain((54321).toLocaleString("fr-FR"));
+  });
+
+  it("garde le zéro reçu, qui n'est pas le tiret de l'inconnu", () => {
+    // Le repli sur « — » ne doit pas avaler un zéro **constaté** : un serveur
+    // sans aucun relais sur 30 jours est un fait, et l'afficher « — » le
+    // rendrait aussi illisible que le « 0 » inventé qu'on vient de retirer.
+    // C'est la même distinction que le panneau tient plus haut entre
+    // « AUCUN SERVEUR » et « RÉPONSE ILLISIBLE ».
+    const html = render([server({ memberCount: 0, relays30j: 0 })]);
+    expect([...html.matchAll(/class="srv-num"[^>]*>([^<]*)</g)].map((m) => m[1])).toEqual([
+      "0",
+      "0",
+    ]);
   });
 
   it("ne passe jamais la série en arguments d'appel, et n'en rend pas cinquante mille", () => {
