@@ -95,6 +95,11 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t10.retention.join(" ")).toMatch(/Durée du compte/);
   });
 
+  it("compte les joueurs d'un même match parmi les destinataires des profils", () => {
+    // Un BattleTag masqué leur reste lisible (`lib/shared/battletag-visibility.ts`).
+    expect(byRef("T01").recipients.join(" ")).toMatch(/Joueurs d'un même match.*BattleTag même masqué/);
+  });
+
   it("ne déclare aucune adresse e-mail collectée", () => {
     expect(byRef("T01").dataCategories.join(" ")).toMatch(/aucune adresse e-mail/i);
   });
