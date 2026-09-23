@@ -1131,6 +1131,22 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
 
     plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
 
+    // **Les visites se détachent dans les deux modes**, et c'est pour cela que
+    // le geste vit ici plutôt que dans `eraseAccount`. `bg_site_visits` n'a
+    // **aucune** clé étrangère (une cascade y effacerait l'historique de
+    // fréquentation) : ce qu'il faut retirer est le lien vers une personne, pas
+    // le fait qu'une page ait été vue — et une anonymisation qui garderait ce
+    // lien laisserait la trace de navigation complète attachée à une ligne que
+    // son palmarès public suffit souvent à rapprocher d'un nom. La ligne garde
+    // son empreinte salée, donc elle continue de compter comme visite ; elle ne
+    // compte simplement plus comme visite **identifiée**.
+    //
+    // Posé **avant** la bascule : après l'effacement, la ligne du compte n'est
+    // plus là pour dire de qui il s'agissait.
+    await connection.execute(`UPDATE bg_site_visits SET user_id = NULL WHERE user_id = ?`, [
+      userId,
+    ]);
+
     if (plan.mode === "ERASE") {
       await eraseAccount(connection, userId);
     } else {
@@ -1189,16 +1205,14 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
 /**
  * L'effacement pur et simple, sous le verrou de `deleteOwnAccount`.
  *
- * Les cascades déjà déclarées font l'essentiel (sessions, appartenances,
- * invitations) ; `bg_endurance_penalties.created_by` passe à `NULL`, la
- * sanction restant due. Seules les visites demandent un geste : elles n'ont
- * **aucune** clé étrangère (une cascade y effacerait l'historique de
- * fréquentation), et c'est le lien vers une personne qu'il faut retirer, pas le
- * fait qu'une page ait été vue — d'où un détachement, et **avant** l'effacement
- * qui rendrait la ligne introuvable.
+ * Les cascades déjà déclarées font tout (sessions, appartenances, invitations
+ * reçues) ; `bg_endurance_penalties.created_by` et `bg_team_invitations`
+ * .`created_by` passent à `NULL`, la sanction restant due et l'invitation
+ * restant l'acte de l'équipe. Les visites, elles, sont détachées par
+ * `deleteOwnAccount` avant la bascule : elles n'ont aucune clé étrangère et le
+ * geste vaut pour les **deux** modes.
  */
 async function eraseAccount(connection: PoolConnection, userId: number): Promise<void> {
-  await connection.execute(`UPDATE bg_site_visits SET user_id = NULL WHERE user_id = ?`, [userId]);
   await connection.execute(`DELETE FROM bg_users WHERE id = ?`, [userId]);
 }
 

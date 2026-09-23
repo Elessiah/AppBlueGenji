@@ -264,7 +264,9 @@ export default function ProfilePage() {
     try {
       const response = await fetch("/api/profile/avatar", { method: "DELETE" });
       const payload = (await response.json()) as { avatarUrl?: string | null; error?: string };
-      if (!response.ok) throw new Error(payload.error || "AVATAR_DELETE_FAILED");
+      if (!response.ok) {
+        throw new Error(accountDeletedWriteMessage(payload.error, "AVATAR_DELETE_FAILED"));
+      }
       setData((prev) =>
         prev ? { ...prev, profile: { ...prev.profile, avatarUrl: null } } : prev,
       );

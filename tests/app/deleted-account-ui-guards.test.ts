@@ -27,18 +27,30 @@ describe("interface — un compte supprimé ne se propose ni ne se raconte en co
     expect(MEMBERS).toMatch(/\.filter\(\(p\) => !p\.isDeleted/);
   });
 
-  it("traduit ACCOUNT_DELETED sur les deux écritures du profil", () => {
-    // Sauvegarde du profil **et** téléversement d'avatar : ce sont les deux
-    // seules écritures qui peuvent perdre leur course contre la suppression.
+  it("traduit ACCOUNT_DELETED sur **toutes** les écritures du profil", () => {
+    // Sauvegarde du profil, téléversement d'avatar **et retrait d'avatar** :
+    // les trois écritures qui peuvent perdre leur course contre la suppression.
+    // Le retrait manquait à l'appel — il part par la même route que le
+    // téléversement et se fait refuser par la même garde.
     const calls = PROFIL.match(/accountDeletedWriteMessage\(/g) ?? [];
-    expect(calls).toHaveLength(2);
-    expect(PROFIL).toContain('accountDeletedWriteMessage(payload.error, "PROFILE_UPDATE_FAILED")');
-    expect(PROFIL).toContain('accountDeletedWriteMessage(payload.error, "AVATAR_UPLOAD_FAILED")');
+    expect(calls).toHaveLength(3);
+    for (const code of [
+      "PROFILE_UPDATE_FAILED",
+      "AVATAR_UPLOAD_FAILED",
+      "AVATAR_DELETE_FAILED",
+    ]) {
+      expect(PROFIL).toContain(`accountDeletedWriteMessage(payload.error, "${code}")`);
+    }
   });
 
-  it("ne laisse plus le code brut remonter au toast sur ces deux chemins", () => {
-    expect(PROFIL).not.toContain('payload.error || "PROFILE_UPDATE_FAILED"');
-    expect(PROFIL).not.toContain('payload.error || "AVATAR_UPLOAD_FAILED"');
+  it("ne laisse plus le code brut remonter au toast sur ces trois chemins", () => {
+    for (const code of [
+      "PROFILE_UPDATE_FAILED",
+      "AVATAR_UPLOAD_FAILED",
+      "AVATAR_DELETE_FAILED",
+    ]) {
+      expect(PROFIL).not.toContain(`payload.error || "${code}"`);
+    }
   });
 
   /**

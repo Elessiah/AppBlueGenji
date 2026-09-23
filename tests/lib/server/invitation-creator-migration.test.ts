@@ -57,14 +57,34 @@ describe("bg_team_invitations.created_by — l'auteur devient facultatif", () =>
     expect(add).toBeGreaterThan(modify);
   });
 
-  it("ne rejoue la manœuvre que sur une colonne encore NOT NULL", () => {
+  it("ne rejoue la manœuvre que tant que la clé ne dit pas SET NULL", () => {
     // La condition n'est pas une optimisation : sans elle, la clé serait
     // détruite et reposée à chaque démarrage.
-    const guard = SQL.indexOf("invitationCreatorNullable === \"NO\"");
+    //
+    // Elle porte sur la **règle de la clé**, et non sur la nullabilité de la
+    // colonne — ce n'est pas la même question. La manœuvre est en trois temps
+    // et rien ne garantit qu'elle aille au bout (processus tué, déploiement,
+    // droits manquants) : lue sur `IS_NULLABLE`, elle disait « c'est fait » dès
+    // la deuxième instruction, et la clé pouvait rester absente pour toujours
+    // sans un signal. Lue sur `DELETE_RULE`, elle ne dit « c'est fait » que
+    // lorsque la clé existe *et* dit ce qu'il faut.
+    const guard = SQL.indexOf('invitationCreatorRule !== "SET NULL"');
     const drop = SQL.indexOf("DROP FOREIGN KEY fk_bg_team_inv_creator");
     expect(guard).toBeGreaterThan(-1);
     expect(drop).toBeGreaterThan(guard);
-    expect(SQL).toContain("TABLE_NAME = 'bg_team_invitations'");
-    expect(SQL).toContain("COLUMN_NAME = 'created_by'");
+    expect(SQL).toContain("FROM information_schema.REFERENTIAL_CONSTRAINTS");
+    expect(SQL).toContain("CONSTRAINT_NAME = 'fk_bg_team_inv_creator'");
+  });
+
+  it("ne laisse aucune de ses trois instructions faire tomber le démarrage", () => {
+    // Une migration qui **lève** casse `getDatabase()`, donc toutes les routes
+    // de l'application : un filet qui casse le schéma est pire que le trou
+    // qu'il bouche. Retirer une clé déjà retirée ou reposer une clé déjà posée
+    // n'est alors qu'un pas sans effet.
+    const block = SQL.slice(
+      SQL.indexOf("REFERENTIAL_CONSTRAINTS"),
+      SQL.indexOf("Migration: avatar + pseudo visibles"),
+    );
+    expect([...block.matchAll(/\} catch \{/g)].length).toBeGreaterThanOrEqual(4);
   });
 });
