@@ -9,11 +9,20 @@ type CocheTheme = "tournoi" | "joueur" | "equipe";
  * ne peindrait rien — les accepter pour les jeter donne un réglage qui compile,
  * ne fait rien et ne le dit pas. Le compilateur les refuse donc, comme il refuse
  * de redéfinir le `type`.
+ *
+ * `disabled` sort avec eux, et c'est le plus grave des quatre : il ne fait pas
+ * *rien*, il fait la **moitié**. Posé sur l'input masqué, il bloque bien le
+ * geste — mais la pastille, seule chose visible, garde son cadre plein, sa
+ * couleur de texte et son `cursor: pointer` : le contrôle annonce un clic qu'il
+ * refuse. C'est exactement ce que cette feuille interdit ailleurs (une case
+ * désactivée se dit en couleurs, `globals.css`), et un réglage qui ment est pire
+ * qu'un réglage absent. Le jour où une pastille doit pouvoir s'éteindre, c'est
+ * ici que l'état se peint — pas chez l'appelant.
  */
 interface CocheProps
   extends Omit<
     InputHTMLAttributes<HTMLInputElement>,
-    "type" | "onChange" | "className" | "style"
+    "type" | "onChange" | "className" | "style" | "disabled"
   > {
   label: string;
   checked: boolean;

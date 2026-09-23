@@ -115,11 +115,14 @@ describe("pastille `Coche` — le focus passe par le CSS, jamais par React", () 
     expect(coche).not.toMatch(/useState.*[Ff]ocus/);
   });
 
-  it("refuse `className` et `style` au lieu de les recevoir pour rien", () => {
+  it("refuse `className`, `style` et `disabled` au lieu de les recevoir pour rien", () => {
     // La case est masquée en ligne (`opacity: 0`, 0×0) : un appelant qui la
     // réglerait par l'un des deux n'obtiendrait aucun effet et aucun
-    // avertissement. Le type les refuse, comme `type`.
-    expect(coche).toMatch(/"type" \| "onChange" \| "className" \| "style"/);
+    // avertissement. `disabled`, lui, en obtiendrait la moitié — le geste
+    // bloqué, la pastille intacte et son curseur toujours en « pointer » —, ce
+    // que cette PR refuse ailleurs pour toutes les cases. Le type les refuse
+    // tous les trois, comme `type`.
+    expect(coche).toMatch(/"type" \| "onChange" \| "className" \| "style" \| "disabled"/);
     expect(coche).not.toContain("props.className");
     expect(coche).not.toContain("props.style");
   });

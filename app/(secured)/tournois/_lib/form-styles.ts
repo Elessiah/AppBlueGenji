@@ -38,6 +38,13 @@ export const HINT: CSSProperties = {
  * Le verrou ne se dit **jamais** par une `opacity` : elle se multiplierait avec
  * la bordure de la case, seule à dessiner un contrôle décoché (`globals.css`),
  * et l'effacerait. Une couleur, elle, ne se compose pas.
+ *
+ * Les quatre bleus descendent tous du **même** token : `var(--blue-500)` pour
+ * l'opaque, `rgba(var(--blue-500-rgb), …)` pour les voiles — un style en ligne
+ * résout les propriétés personnalisées comme une feuille. Écrits en dur à côté
+ * d'un `var()`, ils auraient posé sur une même carte une bordure d'une teinte
+ * et un fond d'une autre au premier réglage du bleu du site : c'est la raison
+ * pour laquelle `--blue-500-rgb` existe (`globals.css`), elle vaut ici aussi.
  */
 export function checkboxCardChrome(
   checked: boolean,
@@ -45,10 +52,16 @@ export function checkboxCardChrome(
 ): { border: string; backgroundColor: string } {
   if (locked) {
     return checked
-      ? { border: "1.5px solid rgba(90, 200, 255, 0.25)", backgroundColor: "rgba(90, 200, 255, 0.03)" }
+      ? {
+          border: "1.5px solid rgba(var(--blue-500-rgb), 0.25)",
+          backgroundColor: "rgba(var(--blue-500-rgb), 0.03)",
+        }
       : { border: "1.5px solid var(--line-soft)", backgroundColor: "transparent" };
   }
   return checked
-    ? { border: "1.5px solid var(--blue-500)", backgroundColor: "rgba(90, 200, 255, 0.07)" }
+    ? {
+        border: "1.5px solid var(--blue-500)",
+        backgroundColor: "rgba(var(--blue-500-rgb), 0.07)",
+      }
     : { border: "1.5px solid var(--line-strong-cy)", backgroundColor: "transparent" };
 }

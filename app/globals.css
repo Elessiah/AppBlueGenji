@@ -506,9 +506,14 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
    raison même pour laquelle l'apparence des cases est posée sur l'élément).
    `input:enabled` dit exactement ce que `data-locked` restituait : dans les deux
    écrans qui posent cette carte, le même prédicat écrit le verrou et le
-   `disabled` de la case. Une carte sans case active n'a aucun geste à annoncer,
-   et un moteur qui ne comprendrait pas `:has()` jette une règle qui ne porte
-   que du chrome de survol — il n'emporte rien avec elle. */
+   `disabled` de la case. Une carte sans case active n'a aucun geste à annoncer.
+
+   Sur un moteur qui ne comprendrait pas `:has()`, les deux règles sont jetées :
+   ni halo ni balayage, sur **aucune** carte — le `::before` reste parqué à
+   `left: -100%`. Ce n'est donc pas « rien ne change », c'est le survol qui
+   disparaît partout. La dégradation va dans le bon sens et c'est pourquoi elle
+   est acceptée telle quelle : ces deux règles ne portent qu'une promesse de
+   clic, et ne rien promettre vaut mieux que le promettre à tort. */
 .checkbox-card:hover:has(input:enabled)::before {
   left: 150%;
 }
@@ -1558,9 +1563,20 @@ input[type="radio"]:disabled:checked {
        `place-content` n'ont d'ailleurs plus rien à centrer, la marque n'étant
        plus dessinée par nous ; le `border-radius` non plus, qui arrondissait
        une boîte dont nous ne peignons plus le fond. `flex-shrink: 0` reste :
-       il protège le contrôle d'une rangée flex, quelle que soit sa taille. */
+       il protège le contrôle d'une rangée flex, quelle que soit sa taille.
+
+       Marge et rembourrage reviennent avec le reste (`revert`, donc la valeur
+       de la feuille du navigateur) : le `margin: 0` de la règle de base est
+       posé pour une case **de 16 px que nous dessinons**, et il écrase la marge
+       propre du contrôle natif (`3px 3px 3px 4px` sur Chromium). Les
+       conteneurs d'aujourd'hui espacent tous au `gap`, donc rien n'y paraît ;
+       le prochain écrit sans lui collerait la case à son étiquette dans le seul
+       mode que personne ne relit. Rendre la boîte à moitié, c'est se garder la
+       moitié du défaut. */
     width: auto;
     height: auto;
+    margin: revert;
+    padding: revert;
     display: inline-block;
     place-content: normal;
     border: none;
