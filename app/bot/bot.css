@@ -609,9 +609,18 @@
   max-width: 460px;
   margin-bottom: 24px;
 }
-.invite-copy .row-actions { display: flex; gap: 10px; }
+.invite-copy .row-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 
 .perms { display: flex; flex-direction: column; gap: 6px; }
+/* Scopes et entier sur deux lignes : collés, l'entier se coupait au milieu. */
+.perms-foot {
+  display: flex; flex-direction: column; gap: 4px;
+  margin-top: 12px;
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.16em;
+  color: var(--ink-dim);
+  overflow-wrap: anywhere;
+}
 .perms .title {
   font-family: var(--font-mono);
   font-size: 10px; letter-spacing: 0.22em;

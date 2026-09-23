@@ -62,17 +62,15 @@ export function BotLiveFeed() {
     <section className="panel" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       <div className="panel-head">
         <span className="title">Flux temps réel</span>
-        <div className="row gap-2">
-          <button
-            // L'état « allumé » dit que la pause est **posée** : allumé pendant
-            // que le flux défile, « ■ PAUSE » en bleu se lisait « en pause ».
-            className={'chip' + (paused ? ' chip-on' : '')}
-            onClick={handlePauseToggle}
-            aria-label={paused ? 'Reprendre le flux' : 'Mettre en pause le flux'}
-          >
-            {paused ? '▶ REPRENDRE' : '■ PAUSE'}
-          </button>
-        </div>
+        <button
+          // L'état « allumé » dit que la pause est **posée** : allumé pendant
+          // que le flux défile, « ■ PAUSE » en bleu se lisait « en pause ».
+          className={'chip' + (paused ? ' chip-on' : '')}
+          onClick={handlePauseToggle}
+          aria-label={paused ? 'Reprendre le flux' : 'Mettre en pause le flux'}
+        >
+          {paused ? '▶ REPRENDRE' : '■ PAUSE'}
+        </button>
       </div>
       <div className="feed" style={{ flex: 1, maxHeight: 420, overflow: 'hidden' }}>
         {items.length === 0 ? (

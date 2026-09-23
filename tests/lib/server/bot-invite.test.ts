@@ -1,5 +1,10 @@
 import { describe, it, expect, afterEach } from "@jest/globals";
-import { botInviteUrl, DEFAULT_BOT_PERMISSIONS } from "@/lib/server/bot-invite";
+import {
+  BOT_INVITE_SCOPES,
+  botInviteScopesLabel,
+  botInviteUrl,
+  DEFAULT_BOT_PERMISSIONS,
+} from "@/lib/server/bot-invite";
 
 describe("botInviteUrl", () => {
   const originalClientId = process.env.DISCORD_BOT_CLIENT_ID;
@@ -37,5 +42,19 @@ describe("botInviteUrl", () => {
     process.env.DISCORD_BOT_CLIENT_ID = "111";
     process.env.DISCORD_BOT_PERMISSIONS = "8";
     expect(new URL(botInviteUrl()).searchParams.get("permissions")).toBe("8");
+  });
+});
+
+describe("BOT_INVITE_SCOPES", () => {
+  const originalClientId = process.env.DISCORD_BOT_CLIENT_ID;
+  afterEach(() => {
+    if (originalClientId === undefined) delete process.env.DISCORD_BOT_CLIENT_ID;
+    else process.env.DISCORD_BOT_CLIENT_ID = originalClientId;
+  });
+
+  it("est la liste que l'URL envoie, et celle que la page affiche", () => {
+    process.env.DISCORD_BOT_CLIENT_ID = "987654321098765432";
+    expect(new URL(botInviteUrl()).searchParams.get("scope")).toBe(BOT_INVITE_SCOPES.join(" "));
+    expect(botInviteScopesLabel()).toBe("BOT + APPLICATIONS.COMMANDS");
   });
 });
