@@ -108,20 +108,22 @@ export default function RgpdPage() {
               <td>
                 <span className={styles.badgeAmber}>{DONNEE_SAUVEGARDES.base}</span>
               </td>
-              <td>{DONNEE_SAUVEGARDES.duree}</td>
+              <td>{DONNEE_SAUVEGARDES.duree} **</td>
             </tr>
           </tbody>
         </table>
         <p style={{ marginTop: 16, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
           * Un compte qui n'a participé à aucun tournoi, n'en a organisé aucun et n'est
           propriétaire d'aucune équipe est <strong>entièrement effacé</strong> à sa suppression.
-          Sinon, ses données de profil sont anonymisées immédiatement. Dans les deux cas,
-          elles subsistent jusqu'à {BACKUP_RETENTION_DAYS} jours dans les copies de sauvegarde
-          chiffrées, qu'on ne peut pas modifier une à une ; si l'une d'elles devait être
-          restaurée, les suppressions intervenues depuis sont réappliquées avant la remise en
+          Sinon, ses données de profil sont anonymisées immédiatement. Les sessions
+          (cookie <code>bg_session</code>) expirent 30 jours après la connexion.
+        </p>
+        <p style={{ marginTop: 8, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
+          ** Une donnée supprimée subsiste jusqu'à {BACKUP_RETENTION_DAYS} jours dans les copies
+          de sauvegarde chiffrées, qu'on ne peut pas modifier une à une ; si l'une d'elles devait
+          être restaurée, les suppressions intervenues depuis sont réappliquées avant la remise en
           service. Les images téléversées (avatar, logo) sont retirées de la sauvegarde dans
-          l'heure. Les sessions (cookie <code>bg_session</code>) expirent 30 jours après la
-          connexion.
+          l'heure.
         </p>
       </section>
 
@@ -287,7 +289,7 @@ export default function RgpdPage() {
           </p>
         </div>
         <div className={styles.updateLine}>
-          Dernière mise à jour : juin 2026 · Applicable depuis la création de la plateforme
+          Dernière mise à jour : septembre 2026 · Applicable depuis la création de la plateforme
         </div>
       </section>
 
