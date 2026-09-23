@@ -100,7 +100,11 @@ function mockTournament(matchFormat: FakeFormat, format: TournamentRow["format"]
 describe("reportMatchScore — respect du format de match", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 100, teamName: "Équipe", roles: ["OWNER"] });
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 100,
+      teamName: "Équipe",
+      roles: ["OWNER"],
+    });
     jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
   });
 

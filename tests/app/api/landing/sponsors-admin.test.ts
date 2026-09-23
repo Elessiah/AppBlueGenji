@@ -36,7 +36,15 @@ describe("GET /api/landing/sponsors", () => {
   });
 
   it("returns the public list without auth", async () => {
-    const sponsors: Sponsor[] = [{ id: 1, name: "X", slug: "x", tier: "GOLD", logoUrl: null, websiteUrl: null, description: null }];
+    const sponsors: Sponsor[] = [{
+      id: 1,
+      name: "X",
+      slug: "x",
+      tier: "GOLD",
+      logoUrl: null,
+      websiteUrl: null,
+      description: null,
+    }];
     jest.mocked(service.listSponsors).mockResolvedValue(sponsors);
 
     const res = await GET();
@@ -65,7 +73,15 @@ describe("POST /api/landing/sponsors", () => {
 
   it("creates a sponsor for admins", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    const sponsor: Sponsor = { id: 5, name: "X", slug: "x", tier: "PARTNER", logoUrl: null, websiteUrl: null, description: null };
+    const sponsor: Sponsor = {
+      id: 5,
+      name: "X",
+      slug: "x",
+      tier: "PARTNER",
+      logoUrl: null,
+      websiteUrl: null,
+      description: null,
+    };
     jest.mocked(service.createSponsor).mockResolvedValue(sponsor);
 
     const res = await POST(jsonReq("POST", { name: "X" }));
@@ -104,7 +120,15 @@ describe("PUT /api/landing/sponsors/[id]", () => {
 
   it("updates a sponsor for admins", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    const sponsor: Sponsor = { id: 3, name: "X", slug: "x", tier: "GOLD", logoUrl: null, websiteUrl: null, description: null };
+    const sponsor: Sponsor = {
+      id: 3,
+      name: "X",
+      slug: "x",
+      tier: "GOLD",
+      logoUrl: null,
+      websiteUrl: null,
+      description: null,
+    };
     jest.mocked(service.updateSponsor).mockResolvedValue(sponsor);
 
     const res = await PUT(jsonReq("PUT", { name: "X", tier: "GOLD" }), params("3"));

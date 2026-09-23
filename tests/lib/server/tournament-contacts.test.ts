@@ -140,7 +140,8 @@ describe("GET /api/admin/tournaments/[id]/contacts", () => {
 
   it("refuse un compte sans la permission `tournaments`", async () => {
     // Le cast en fait partie : diffuser n'est pas joindre.
-    for (const roles of [[], ["CASTER"], ["COMMUNITY_MANAGER"], ["RECRUTEUR"]] satisfies PlatformRole[][]) {
+    const refused: PlatformRole[][] = [[], ["CASTER"], ["COMMUNITY_MANAGER"], ["RECRUTEUR"]];
+    for (const roles of refused) {
       jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 9, roles }));
       expect((await GET(request, { params })).status).toBe(403);
     }

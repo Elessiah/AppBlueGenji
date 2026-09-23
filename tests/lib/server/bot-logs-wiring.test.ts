@@ -137,7 +137,11 @@ describe("inscription", () => {
   });
 
   it("réserve une ligne d'inscription joueur", async () => {
-    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 101, teamName: "Équipe", roles: ["OWNER"] });
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 101,
+      teamName: "Équipe",
+      roles: ["OWNER"],
+    });
 
     await registerCurrentUserTeam(registrationConnection(), 12, 42);
 
@@ -165,7 +169,11 @@ describe("inscription", () => {
         return [];
       },
     });
-    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 101, teamName: "Équipe", roles: ["OWNER"] });
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 101,
+      teamName: "Équipe",
+      roles: ["OWNER"],
+    });
 
     await expect(registerCurrentUserTeam(connection, 12, 42)).rejects.toThrow("ALREADY_REGISTERED");
     expect(queueBotLog).not.toHaveBeenCalled();
@@ -241,7 +249,11 @@ describe("reportMatchScore", () => {
   }
 
   beforeEach(() => {
-    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 101, teamName: "Équipe", roles: ["OWNER"] });
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 101,
+      teamName: "Équipe",
+      roles: ["OWNER"],
+    });
     mockTournamentState({
       id: 12,
       state: "RUNNING",

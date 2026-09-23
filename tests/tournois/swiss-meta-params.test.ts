@@ -58,7 +58,9 @@ describe("loadSwissMeta — paramètres de la requête de classement", () => {
   });
 
   it("renvoie null hors mode suisse", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[{ ...tournamentRow, format: "SINGLE" }]]);
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ ...tournamentRow, format: "SINGLE" }]]);
     const conn = { execute } as never;
 
     await expect(loadSwissMeta(conn, 42)).resolves.toBeNull();

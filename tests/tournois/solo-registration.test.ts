@@ -55,7 +55,11 @@ describe("resolveUserEntrantTeamId", () => {
   });
 
   it("prend l'équipe active en tournoi par équipes", async () => {
-    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 12, teamName: "Équipe", roles: ["OWNER"] });
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 12,
+      teamName: "Équipe",
+      roles: ["OWNER"],
+    });
     const { connection } = fakeConnection();
 
     await expect(resolveUserEntrantTeamId(connection, tournament(), 3)).resolves.toBe(12);
@@ -92,7 +96,11 @@ describe("registerCurrentUserTeam", () => {
   });
 
   it("inscrit l'équipe active du joueur en tournoi par équipes", async () => {
-    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 12, teamName: "Équipe", roles: ["OWNER"] });
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 12,
+      teamName: "Équipe",
+      roles: ["OWNER"],
+    });
     const { connection, inserts } = fakeConnection({ registered: 3 });
 
     await registerCurrentUserTeam(connection, 5, 3);
@@ -230,7 +238,11 @@ describe("qualité pour engager son équipe", () => {
   });
 
   it.each<[TeamRole]>([["OWNER"], ["MANAGER"]])("accepte un %s", async (role) => {
-    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 12, teamName: "Équipe", roles: [role] });
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 12,
+      teamName: "Équipe",
+      roles: [role],
+    });
     const { connection, inserts } = fakeConnection();
 
     await registerCurrentUserTeam(connection, 5, 3);
@@ -283,14 +295,22 @@ describe("qualité pour engager son équipe", () => {
   });
 
   it("ferme le bouton d'inscription au membre sans rôle de gestion", async () => {
-    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 12, teamName: "Équipe", roles: ["HEAL"] });
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 12,
+      teamName: "Équipe",
+      roles: ["HEAL"],
+    });
     const { connection } = fakeConnection();
 
     await expect(canUserRegister(connection, 5, 3)).resolves.toBe(false);
   });
 
   it("laisse le bouton au propriétaire d'une équipe pas encore engagée", async () => {
-    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 12, teamName: "Équipe", roles: ["OWNER"] });
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 12,
+      teamName: "Équipe",
+      roles: ["OWNER"],
+    });
     const { connection } = fakeConnection();
 
     await expect(canUserRegister(connection, 5, 3)).resolves.toBe(true);

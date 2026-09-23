@@ -22,7 +22,12 @@ function launch(id: string) {
   );
 }
 
-const launched: LaunchedTournament = { id: 7, name: "BlueGenji Open", state: "RUNNING", entrantCount: 12 };
+const launched: LaunchedTournament = {
+  id: 7,
+  name: "BlueGenji Open",
+  state: "RUNNING",
+  entrantCount: 12,
+};
 
 describe("POST /api/admin/tournaments/[id]/launch", () => {
   beforeEach(() => {

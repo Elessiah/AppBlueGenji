@@ -61,7 +61,9 @@ describe("POST /api/profile/avatar", () => {
 
   it("deletes the previous avatar file (served url → disk path)", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
-    jest.mocked(getUserById).mockResolvedValue(publicUserProfile({ avatarUrl: "/api/uploads/avatars/old.webp" }));
+    jest
+      .mocked(getUserById)
+      .mockResolvedValue(publicUserProfile({ avatarUrl: "/api/uploads/avatars/old.webp" }));
     jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/avatars/new.webp");
 
     await POST(fileReq(pngFile()));
@@ -70,7 +72,9 @@ describe("POST /api/profile/avatar", () => {
 
   it("does not delete external avatar urls (google/discord)", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
-    jest.mocked(getUserById).mockResolvedValue(publicUserProfile({ avatarUrl: "https://cdn.discord.com/x.png" }));
+    jest
+      .mocked(getUserById)
+      .mockResolvedValue(publicUserProfile({ avatarUrl: "https://cdn.discord.com/x.png" }));
     jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/avatars/new.webp");
 
     await POST(fileReq(pngFile()));
@@ -123,7 +127,9 @@ describe("DELETE /api/profile/avatar", () => {
 
   it("clears the avatar and removes the stored file", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
-    jest.mocked(getUserById).mockResolvedValue(publicUserProfile({ avatarUrl: "/api/uploads/avatars/old.webp" }));
+    jest
+      .mocked(getUserById)
+      .mockResolvedValue(publicUserProfile({ avatarUrl: "/api/uploads/avatars/old.webp" }));
 
     const res = await DELETE();
     expect(res.status).toBe(200);

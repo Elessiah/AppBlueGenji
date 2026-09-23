@@ -48,7 +48,12 @@ function patchReq(body: unknown) {
 
 const deleteReq = () => new Request(URL_BASE, { method: "DELETE" });
 
-const saved: TournamentImage = { url: "/api/uploads/tournaments/5-a.webp", fit: "COVER", focusX: 50, focusY: 50 };
+const saved: TournamentImage = {
+  url: "/api/uploads/tournaments/5-a.webp",
+  fit: "COVER",
+  focusX: 50,
+  focusY: 50,
+};
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -219,7 +224,9 @@ describe("PATCH — change le cadrage seul", () => {
   });
 
   it("rend une image disparue entre-temps en 409", async () => {
-    jest.mocked(updateTournamentImageSettings).mockRejectedValue(new Error("TOURNAMENT_IMAGE_MISSING"));
+    jest
+      .mocked(updateTournamentImageSettings)
+      .mockRejectedValue(new Error("TOURNAMENT_IMAGE_MISSING"));
     const res = await PATCH(patchReq({ fit: "COVER", focusX: 1, focusY: 1 }), params());
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "TOURNAMENT_IMAGE_MISSING" });

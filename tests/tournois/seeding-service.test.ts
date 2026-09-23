@@ -37,7 +37,13 @@ async function mockDb() {
 }
 
 function tournament(overrides: RowOverrides<TournamentRow> = {}): TournamentRow {
-  return tournamentRow({ id: 5, state: "REGISTRATION", format: "SINGLE", manual_seeding: 0, ...overrides });
+  return tournamentRow({
+    id: 5,
+    state: "REGISTRATION",
+    format: "SINGLE",
+    manual_seeding: 0,
+    ...overrides,
+  });
 }
 
 /** Deux inscriptions : Alpha (seed 1) puis Beta (seed 2). */

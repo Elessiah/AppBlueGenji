@@ -63,7 +63,10 @@ describe("forfeitTournamentTeamPublic — qualité pour désengager", () => {
     jest.mocked(flushBotLogs).mockReturnValue(undefined);
     jest.mocked(discardBotLogs).mockReturnValue(undefined);
     jest.mocked(queueBotLog).mockReturnValue(true);
-    tournamentRowMock.mockResolvedValue(tournamentRow({ id: TOURNAMENT_ID, participant_type: "TEAM" }));
+    tournamentRowMock.mockResolvedValue(tournamentRow({
+      id: TOURNAMENT_ID,
+      participant_type: "TEAM",
+    }));
     forfeitEngineMock.mockResolvedValue(undefined);
   });
 

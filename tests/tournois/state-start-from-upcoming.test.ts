@@ -85,7 +85,12 @@ describe("syncTournamentState — coup d'envoi depuis UPCOMING", () => {
   it.each([
     ["SWISS" as const, initializeSwissTournament, generateSwissRound, reconcileSwiss],
     ["SURVIVAL" as const, initializeSurvivalTournament, generateSurvivalRound, reconcileSurvival],
-    ["BG_SURVIE" as const, initializeEnduranceTournament, generateEnduranceRound, reconcileEndurance],
+    [
+      "BG_SURVIE" as const,
+      initializeEnduranceTournament,
+      generateEnduranceRound,
+      reconcileEndurance,
+    ],
   ])(
     "initialise le moteur %s alors que l'état de départ n'est pas REGISTRATION",
     async (format, initialize, generate, reconcile) => {

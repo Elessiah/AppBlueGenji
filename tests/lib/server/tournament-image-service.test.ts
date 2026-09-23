@@ -49,7 +49,9 @@ function mockTournament(current: string | null | undefined, options: { failOnUpd
     rollback: jest.fn(),
     release: jest.fn(),
   };
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ getConnection: jest.fn(async () => connection) }));
+  jest
+    .mocked(getDatabase)
+    .mockResolvedValue(fakePool({ getConnection: jest.fn(async () => connection) }));
   return { execute, connection };
 }
 

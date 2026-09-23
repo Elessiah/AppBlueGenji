@@ -52,7 +52,11 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(withConnection).mockImplementation((fn) => fn(fakeConnection({})));
   jest.mocked(getTournamentPreview).mockResolvedValue(null);
-  jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 42, teamName: "Équipe", roles: ["OWNER"] });
+  jest.mocked(getUserActiveTeam).mockResolvedValue({
+    teamId: 42,
+    teamName: "Équipe",
+    roles: ["OWNER"],
+  });
   eligibilityMock.mockResolvedValue(null);
   jest.mocked(findSoloEntry).mockResolvedValue(null);
 });
@@ -132,7 +136,11 @@ describe("la lecture de roster n'a lieu que si elle peut changer la réponse", (
   it("ne lit rien pour un joueur sans qualité pour engager", async () => {
     // Le refus de qualité prime : il renvoie à quelqu'un d'autre, alors que les
     // conditions désignent un geste que ce joueur n'aurait pas à faire.
-    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 42, teamName: "Équipe", roles: ["DPS"] });
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 42,
+      teamName: "Équipe",
+      roles: ["DPS"],
+    });
 
     const context = await getTournamentViewerContext(snapshot(), 7);
 

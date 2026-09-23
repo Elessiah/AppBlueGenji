@@ -190,7 +190,11 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
       jest.doMock("@/lib/server/tournaments/state", () => ({
         computeTournamentState: () => "UPCOMING",
         hasPendingStateTransition: async () => false,
-        syncTournamentState: jest.fn(async () => ({ row: null, stateChanged: false, contentChanged: false })),
+        syncTournamentState: jest.fn(async () => ({
+          row: null,
+          stateChanged: false,
+          contentChanged: false,
+        })),
       }));
       jest.doMock("@/lib/server/database", () => {
         connection = {

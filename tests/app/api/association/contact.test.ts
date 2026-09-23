@@ -75,7 +75,11 @@ describe("PUT /api/association/contact", () => {
 
   it("coerces missing fields to empty strings before validating", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    jest.mocked(service.setContactInfo).mockResolvedValue({ email: "a@bg.fr", discordTag: "", discordUrl: "" });
+    jest.mocked(service.setContactInfo).mockResolvedValue({
+      email: "a@bg.fr",
+      discordTag: "",
+      discordUrl: "",
+    });
 
     const res = await PUT(jsonReq({ email: "a@bg.fr" }));
     expect(res.status).toBe(200);

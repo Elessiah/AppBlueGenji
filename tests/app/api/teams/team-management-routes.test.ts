@@ -97,7 +97,13 @@ describe("GET /api/teams/[id]/invitations", () => {
     const pending = {
       requests: [{ id: 1, userId: 3, pseudo: "Candidat", createdAt: "2026-01-01T00:00:00.000Z" }],
       invitations: [
-        { id: 2, userId: 4, pseudo: "Invité", roles: ["DPS" as const], createdAt: "2026-01-01T00:00:00.000Z" },
+        {
+          id: 2,
+          userId: 4,
+          pseudo: "Invité",
+          roles: ["DPS" as const],
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
       ],
     };
     jest.mocked(listTeamPendingInvitations).mockResolvedValue(pending);

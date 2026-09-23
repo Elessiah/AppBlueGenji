@@ -99,7 +99,11 @@ function mockRunningTournament(): void {
 describe("§4.3 — un engagé ne peut pas écraser un résultat déjà validé", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 100, teamName: "Équipe", roles: ["OWNER"] });
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 100,
+      teamName: "Équipe",
+      roles: ["OWNER"],
+    });
     jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
     mockRunningTournament();
   });

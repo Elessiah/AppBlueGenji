@@ -397,7 +397,11 @@ describe("getPlayerStats", () => {
     const execute = jest
       .fn<SqlQuery>()
       // Arrivé le 1er juin 2026.
-      .mockResolvedValueOnce([[{ team_id: 5, joined_at: new Date("2026-06-01T00:00:00Z"), left_at: null }]])
+      .mockResolvedValueOnce([[{
+        team_id: 5,
+        joined_at: new Date("2026-06-01T00:00:00Z"),
+        left_at: null,
+      }]])
       .mockResolvedValueOnce([
         [
           matchRow({ id: 1, tournament_id: 10, played_at: new Date("2026-01-10T18:00:00Z") }),
@@ -435,7 +439,11 @@ describe("getPlayerStats", () => {
     const execute = jest
       .fn<SqlQuery>()
       // Arrivé le 5 juin, tournoi commencé le 1er et terminé le 10.
-      .mockResolvedValueOnce([[{ team_id: 5, joined_at: new Date("2026-06-05T00:00:00Z"), left_at: null }]])
+      .mockResolvedValueOnce([[{
+        team_id: 5,
+        joined_at: new Date("2026-06-05T00:00:00Z"),
+        left_at: null,
+      }]])
       .mockResolvedValueOnce([[matchRow({ id: 1, tournament_id: 10 })]])
       .mockResolvedValueOnce([
         [
@@ -458,7 +466,11 @@ describe("getPlayerStats", () => {
     const execute = jest
       .fn<SqlQuery>()
       // Arrivé bien après le coup d'envoi, mais le tournoi n'est pas terminé.
-      .mockResolvedValueOnce([[{ team_id: 5, joined_at: new Date("2026-08-01T00:00:00Z"), left_at: null }]])
+      .mockResolvedValueOnce([[{
+        team_id: 5,
+        joined_at: new Date("2026-08-01T00:00:00Z"),
+        left_at: null,
+      }]])
       .mockResolvedValueOnce([[matchRow({ id: 1, tournament_id: 10 })]])
       .mockResolvedValueOnce([
         [runningRegistrationRow({ tournament_id: 10, start_at: new Date("2026-06-01T18:00:00Z") })],

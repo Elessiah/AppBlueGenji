@@ -278,7 +278,9 @@ describe("setMatchOnAir", () => {
   });
 
   it("refuse d'ouvrir l'antenne sur un match en AUTO", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[matchRow({ live_trigger: "AUTO" })]]);
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow({ live_trigger: "AUTO" })]]);
     await mockDb(execute);
 
     await expect(setMatchOnAir(42, true)).rejects.toThrow("LIVE_TRIGGER_NOT_MANUAL");

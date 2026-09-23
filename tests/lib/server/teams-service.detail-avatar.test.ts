@@ -65,7 +65,12 @@ async function mockDb(members: Record<string, unknown>[]) {
 
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   jest.mocked(getTeamEntityStats).mockResolvedValue({ stats: emptyDeepStats(), tournaments: [] });
-  jest.mocked(getTeamRankingPosition).mockResolvedValue({ position: null, total: 0, points: 500, placementPoints: 0 });
+  jest.mocked(getTeamRankingPosition).mockResolvedValue({
+    position: null,
+    total: 0,
+    points: 500,
+    placementPoints: 0,
+  });
   return execute;
 }
 

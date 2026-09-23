@@ -47,7 +47,10 @@ describe("transferTeamOwnership", () => {
       .fn<SqlQuery>()
       .mockResolvedValueOnce(member("OWNER", "CAPITAINE", "TANK")) // demandeur
       .mockResolvedValueOnce(member("DPS")); // cible
-    const connectionExecute = jest.fn<SqlQuery>().mockResolvedValueOnce(alive).mockResolvedValue([{ affectedRows: 1 }]);
+    const connectionExecute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(alive)
+      .mockResolvedValue([{ affectedRows: 1 }]);
     const connection = await mockDb(execute, connectionExecute);
 
     await transferTeamOwnership(1, 7, 2);
@@ -73,7 +76,10 @@ describe("transferTeamOwnership", () => {
       .fn<SqlQuery>()
       .mockResolvedValueOnce(member("OWNER"))
       .mockResolvedValueOnce(member("HEAL"));
-    const connectionExecute = jest.fn<SqlQuery>().mockResolvedValueOnce(alive).mockResolvedValue([{ affectedRows: 1 }]);
+    const connectionExecute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(alive)
+      .mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute, connectionExecute);
 
     await transferTeamOwnership(1, 7, 2);
@@ -87,7 +93,10 @@ describe("transferTeamOwnership", () => {
       .fn<SqlQuery>()
       .mockResolvedValueOnce(member("OWNER"))
       .mockResolvedValueOnce(member("OWNER", "TANK"));
-    const connectionExecute = jest.fn<SqlQuery>().mockResolvedValueOnce(alive).mockResolvedValue([{ affectedRows: 1 }]);
+    const connectionExecute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(alive)
+      .mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute, connectionExecute);
 
     await transferTeamOwnership(1, 7, 2);
@@ -161,7 +170,10 @@ describe("transferTeamOwnership", () => {
       .fn<SqlQuery>()
       .mockResolvedValueOnce(member("OWNER"))
       .mockResolvedValueOnce(member("DPS"));
-    const connectionExecute = jest.fn<SqlQuery>().mockResolvedValueOnce(alive).mockResolvedValue([{ affectedRows: 1 }]);
+    const connectionExecute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(alive)
+      .mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute, connectionExecute);
 
     await transferTeamOwnership(1, 7, 2);
@@ -204,7 +216,10 @@ describe("transferTeamOwnership", () => {
       .fn<SqlQuery>()
       .mockResolvedValueOnce(member("OWNER"))
       .mockResolvedValueOnce(member("DPS"));
-    const connectionExecute = jest.fn<SqlQuery>().mockResolvedValueOnce(alive).mockResolvedValue([{ affectedRows: 1 }]);
+    const connectionExecute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(alive)
+      .mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute, connectionExecute);
 
     await transferTeamOwnership(1, 7, 2);

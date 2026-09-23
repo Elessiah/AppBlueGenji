@@ -128,7 +128,9 @@ describe("sponsors-service", () => {
 
   describe("getSponsorLogoUrl", () => {
     it("returns the stored logo url", async () => {
-      await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[{ logoUrl: "/uploads/sponsors/1-a.webp" }]]));
+      await mockDb(jest
+        .fn<SqlQuery>()
+        .mockResolvedValue([[{ logoUrl: "/uploads/sponsors/1-a.webp" }]]));
       expect(await getSponsorLogoUrl(1)).toBe("/uploads/sponsors/1-a.webp");
     });
 

@@ -60,7 +60,11 @@ describe("dispatchPrivacyChangeNotifications", () => {
     jest.clearAllMocks();
     resetPrivacyNotificationThrottle();
     jest.mocked(isBotCircuitOpen).mockReturnValue(false);
-    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({
+      sent: 1,
+      unresolved: [],
+      failed: [],
+    });
   });
   afterEach(() => {
     resetPrivacyNotificationThrottle();
@@ -145,7 +149,11 @@ describe("dispatchPrivacyChangeNotifications", () => {
   });
 
   it("membre introuvable : la réservation reste (la modale prend le relais)", async () => {
-    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 0, unresolved: ["Nova"], failed: [] });
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({
+      sent: 0,
+      unresolved: ["Nova"],
+      failed: [],
+    });
     const calls = fakeDb({ candidates: [candidate()] });
     await dispatchPrivacyChangeNotifications(NOW);
     expect(calls.some((c) => c.sql.startsWith("DELETE"))).toBe(false);

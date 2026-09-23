@@ -105,14 +105,18 @@ describe("claimGhostTeam", () => {
   });
 
   it("refuse une équipe réelle", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[{ is_ghost: 0, deleted_at: null }]]);
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ is_ghost: 0, deleted_at: null }]]);
     await mockDb(execute);
 
     await expect(claimGhostTeam(3, 9)).rejects.toThrow("NOT_A_GHOST_TEAM");
   });
 
   it("refuse une équipe dissoute", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: new Date() }]]);
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: new Date() }]]);
     await mockDb(execute);
 
     await expect(claimGhostTeam(3, 9)).rejects.toThrow("TEAM_ALREADY_DELETED");
@@ -216,7 +220,9 @@ describe("listGhostTeams", () => {
   });
 
   it("écarte les fantômes déjà engagées dans le tournoi visé", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ id: 1, name: "Alpha", logo_url: null }]]);
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValue([[{ id: 1, name: "Alpha", logo_url: null }]]);
     await mockDb(execute);
 
     await expect(listGhostTeams(12)).resolves.toEqual([{ id: 1, name: "Alpha", logoUrl: null }]);

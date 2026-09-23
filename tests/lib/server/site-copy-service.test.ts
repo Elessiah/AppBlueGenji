@@ -32,7 +32,10 @@ describe("getSiteCopy", () => {
   it("écrase le défaut par la valeur enregistrée", async () => {
     const execute = jest
       .fn<SqlQuery>()
-      .mockResolvedValue([[{ setting_key: "copy_home.hero.title", setting_value: "Nouveau titre" }]]);
+      .mockResolvedValue([[{
+        setting_key: "copy_home.hero.title",
+        setting_value: "Nouveau titre",
+      }]]);
     await mockDb(execute);
 
     const copy = await getSiteCopy();

@@ -10,7 +10,9 @@ import { tournamentCard } from "./tournament-card";
  * carte passe par `tournamentCard()`, qui garde la même règle — un champ ajouté
  * au type ne se reporte qu'une fois.
  */
-export function tournamentSnapshot(overrides: Partial<TournamentSnapshot> = {}): TournamentSnapshot {
+export function tournamentSnapshot(
+  overrides: Partial<TournamentSnapshot> = {},
+): TournamentSnapshot {
   return {
     card: tournamentCard(),
     matches: [],

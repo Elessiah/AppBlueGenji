@@ -30,7 +30,11 @@ import { loadSwissRanking, reconcileSwiss } from "@/lib/server/tournaments/swiss
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
 import type { SqlMock } from "../helpers/sql-double";
 import type { TournamentRow, PhaseRow } from "@/lib/server/tournaments/_internal";
-import { phaseRow as basePhaseRow, registrationRow, tournamentRow } from "../helpers/tournament-rows";
+import {
+  phaseRow as basePhaseRow,
+  registrationRow,
+  tournamentRow,
+} from "../helpers/tournament-rows";
 
 /**
  * Corriger le score de la finale d'un tournoi **MULTI** terminé.
@@ -60,7 +64,10 @@ const phaseTeams = new Map<number, PhaseTeam[]>();
 /** Ce que le tournoi et sa phase courante racontent d'eux-mêmes. */
 let tournamentState: TournamentRow["state"] = "FINISHED";
 let currentPhaseId: number | null = PHASE_2;
-let phaseStates: Record<number, PhaseRow["state"]> = { [PHASE_1]: "FINISHED", [PHASE_2]: "FINISHED" };
+let phaseStates: Record<number, PhaseRow["state"]> = {
+  [PHASE_1]: "FINISHED",
+  [PHASE_2]: "FINISHED",
+};
 let tournamentFormat: TournamentRow["format"] = "MULTI";
 
 function phaseRow(id: number, position: number): PhaseRow {
@@ -337,15 +344,18 @@ describe("reconcilePhases — les états qui ne se relisent pas", () => {
     expect(finishTournament).not.toHaveBeenCalled();
   });
 
-  it.each<TournamentRow["state"]>(["UPCOMING", "REGISTRATION"])("ignore un tournoi en état %s", async (state) => {
-    tournamentState = state;
+  it.each<TournamentRow["state"]>(["UPCOMING", "REGISTRATION"])(
+    "ignore un tournoi en état %s",
+    async (state) => {
+      tournamentState = state;
 
-    const conn = makeConn();
-    await reconcilePhases(TOURNAMENT_ID, conn);
+      const conn = makeConn();
+      await reconcilePhases(TOURNAMENT_ID, conn);
 
-    expect(loadPhases).not.toHaveBeenCalled();
-    expect(savePhaseResults).not.toHaveBeenCalled();
-  });
+      expect(loadPhases).not.toHaveBeenCalled();
+      expect(savePhaseResults).not.toHaveBeenCalled();
+    },
+  );
 
   it("ignore un tournoi qui n'est pas MULTI", async () => {
     tournamentFormat = "SINGLE";

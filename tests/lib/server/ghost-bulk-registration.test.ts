@@ -213,7 +213,11 @@ describe("registerTeamsByIds", () => {
   });
 
   it("refuse un tournoi inconnu", async () => {
-    jest.mocked(syncTournamentState).mockResolvedValue({ row: null, stateChanged: false, contentChanged: false });
+    jest.mocked(syncTournamentState).mockResolvedValue({
+      row: null,
+      stateChanged: false,
+      contentChanged: false,
+    });
     const { connection } = fakeConnection({ teams: [ghost(900)] });
 
     await expect(registerTeamsByIds(connection, 12, [900])).rejects.toThrow("TOURNAMENT_NOT_FOUND");
@@ -305,7 +309,7 @@ describe("registerTeamsByIds", () => {
 
     await registerTeamsByIds(connection, 12, teamIds);
 
-    const kinds = jest.mocked(queueBotLog).mock.calls.map((call) => (call[1] as { kind: string }).kind);
+    const kinds = jest.mocked(queueBotLog).mock.calls.map((call) => call[1].kind);
     expect(kinds).toEqual(["registration", "registration", "registration"]);
   });
 
@@ -351,7 +355,11 @@ describe("ordre de verrouillage des points d'entrée", () => {
   const firstStatement = (connection: PoolConnection) => sqlOf(connection)[0];
 
   it("verrouille avant la moindre lecture, à l'inscription d'un joueur", async () => {
-    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 101, teamName: "Équipe", roles: ["OWNER"] });
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 101,
+      teamName: "Équipe",
+      roles: ["OWNER"],
+    });
     const { connection } = fakeConnection({ teams: [] });
 
     await registerCurrentUserTeam(connection, 12, 42);
@@ -363,7 +371,11 @@ describe("ordre de verrouillage des points d'entrée", () => {
     // Verrou du tournoi en main, emprunter une *seconde* place du pool arme un
     // convoi : le porteur du verrou attend une connexion que les transactions
     // bloquées sur son verrou ne rendront pas avant `innodb_lock_wait_timeout`.
-    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 101, teamName: "Équipe", roles: ["OWNER"] });
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 101,
+      teamName: "Équipe",
+      roles: ["OWNER"],
+    });
     const { connection } = fakeConnection({ teams: [] });
 
     await registerCurrentUserTeam(connection, 12, 42);
