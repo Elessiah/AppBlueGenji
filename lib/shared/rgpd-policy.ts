@@ -1,3 +1,5 @@
+import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
+
 export type LegalBase = "Consentement" | "Intérêt légitime";
 
 export interface DonneEntry {
@@ -103,6 +105,24 @@ export const DONNEE_TOURNOIS: DonneEntry = {
   finalite: "Historique compétitif, classements, palmarès",
   base: "Intérêt légitime",
   duree: "Indéfini (voir §03)",
+};
+
+/**
+ * Les copies de sauvegarde — la seule donnée du tableau qui ne se lit pas sur le
+ * site, et la seule qui survive un temps à une suppression.
+ *
+ * La page disait qu'elles « peuvent subsister quelques jours » ; elles étaient
+ * gardées six mois. La durée vient désormais de la constante que le script de
+ * sauvegarde doit respecter (`BACKUP_RETENTION_DAYS`), et la phrase nomme les
+ * deux choses qui rendent cette survie acceptable : le chiffrement (Microsoft
+ * héberge sans pouvoir lire) et le rejeu des suppressions à la restauration.
+ */
+export const DONNEE_SAUVEGARDES: DonneEntry = {
+  donnee: "Copies de sauvegarde",
+  finalite:
+    "Reprise après incident (panne, corruption). Chiffrées avant envoi, avec une clé que seule l'association détient, puis hébergées chez Microsoft (OneDrive)",
+  base: "Intérêt légitime",
+  duree: `${BACKUP_RETENTION_DAYS} jours au plus`,
 };
 
 export const DROITS: DroitEntry[] = [

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
+import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import {
   DONNEES_PROFIL,
+  DONNEE_SAUVEGARDES,
   DONNEE_TOURNOIS,
   DROITS,
   RGPD_CONTACT_EMAIL_FALLBACK,
@@ -166,5 +168,17 @@ describe("DROITS", () => {
 describe("RGPD_CONTACT_EMAIL_FALLBACK", () => {
   it("is a valid email address", () => {
     expect(RGPD_CONTACT_EMAIL_FALLBACK).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
+  });
+});
+
+describe("DONNEE_SAUVEGARDES", () => {
+  it("annonce la durée réelle des sauvegardes, pas « quelques jours »", () => {
+    expect(DONNEE_SAUVEGARDES.duree).toBe(`${BACKUP_RETENTION_DAYS} jours au plus`);
+    expect(BACKUP_RETENTION_DAYS).toBe(30);
+  });
+
+  it("nomme l'hébergeur et le chiffrement", () => {
+    expect(DONNEE_SAUVEGARDES.finalite).toMatch(/Microsoft/);
+    expect(DONNEE_SAUVEGARDES.finalite).toMatch(/chiffrées/i);
   });
 });

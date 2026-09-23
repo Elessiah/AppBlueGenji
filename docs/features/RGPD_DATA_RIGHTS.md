@@ -34,8 +34,9 @@ affichées dans le tableau « Données collectées ») :
   **joué** est **anonymisé** immédiatement — pseudo neutralisé, identités,
   coordonnées et avatar effacés, la ligne restant pour que le palmarès des
   équipes adverses tienne debout. Dans les deux cas c'est immédiat, jamais un
-  job différé ; des copies de sauvegarde techniques peuvent subsister quelques
-  jours. Voir `docs/features/ACCOUNT_DELETION.md`.
+  job différé. Les copies de sauvegarde chiffrées gardent le compte **30 jours au
+  plus**, et une restauration rejoue les suppressions intervenues depuis. Voir
+  `docs/features/ACCOUNT_DELETION.md` et `docs/features/BACKUP_DATA_PROTECTION.md`.
 - **Aucune mention de SIRET / RNA** (données non publiées) sur le site.
 
 ## 2. Consentement à l'inscription

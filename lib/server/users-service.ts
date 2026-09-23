@@ -21,6 +21,7 @@ import { syncSoloEntryIdentity, syncSoloEntryIdentityOn } from "@/lib/server/sol
 import { importRemoteAvatar, shouldImportRemoteAvatar } from "@/lib/server/user-avatar-import";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
+import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { formatPlayerSignupLog, type PlayerSignupProvider } from "@/lib/shared/bot-logs";
 import { isDiscordNumericId, visibleDiscordTag } from "@/lib/shared/discord-identity";
 import { can, sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
@@ -1222,6 +1223,10 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
   // se défait pas, et une transaction annulée rendrait un compte vivant sans sa
   // photo.
   let orphanedAvatar: string | null = null;
+  // La date de création, relue sous le verrou : c'est elle qui permet au rejeu
+  // de reconnaître **ce** compte-là après une restauration, l'identifiant seul
+  // pouvant avoir été réattribué (`lib/shared/account-deletion-journal.ts`).
+  let accountCreatedAt = "";
 
   try {
     await connection.beginTransaction();
@@ -1246,12 +1251,14 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
     const [locked] = await connection.execute<(RowDataPacket & {
       avatar_url: string | null;
       discord_id: string | null;
+      created_at: string;
     })[]>(
-      `SELECT avatar_url, discord_id FROM bg_users WHERE id = ? FOR UPDATE`,
+      `SELECT avatar_url, discord_id, created_at FROM bg_users WHERE id = ? FOR UPDATE`,
       [userId],
     );
     if (locked.length === 0) throw new Error("USER_NOT_FOUND");
     orphanedAvatar = toDiskUploadPath(locked[0].avatar_url);
+    accountCreatedAt = String(locked[0].created_at);
 
     plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
 
@@ -1322,6 +1329,15 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
   } catch {
     // Fichier verrouillé ou disque en lecture seule : un résidu, pas un échec.
   }
+
+  // Consignée **après** le commit, pour qu'une restauration de sauvegarde la
+  // rejoue (`npm run replay:deletions`). Ne lève jamais : la suppression a eu
+  // lieu, quoi qu'il arrive au journal.
+  await recordAccountDeletion({
+    userId,
+    accountCreatedAt,
+    deletedAt: new Date().toISOString(),
+  });
 
   return plan;
 }

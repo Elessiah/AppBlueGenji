@@ -327,6 +327,15 @@ une phrase française qui nomme la suite : **réessayer**, le second passage lis
 la trace neuve et anonymisant. Tout code inconnu retombe sur la phrase générique
 — une notification est lue par un joueur, jamais par qui a nommé le code.
 
+## Les sauvegardes
+
+Une suppression ne peut pas atteindre les archives chiffrées déjà envoyées sur
+OneDrive : le compte y survit jusqu'à leur purge (30 jours). Pour qu'une
+restauration ne le fasse pas revenir, `deleteOwnAccount` consigne chaque
+suppression **après le commit** dans un journal hors de la base
+(`recordAccountDeletion`), que `npm run replay:deletions` rejoue sur la base
+restaurée. Voir `docs/features/BACKUP_DATA_PROTECTION.md`.
+
 ## Voir aussi
 
 - `docs/AUTHORIZATION_RULES.md` — qui peut supprimer quoi.
