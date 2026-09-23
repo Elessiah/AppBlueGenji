@@ -127,7 +127,9 @@ Deux entrées ouvrent le registre, datées du 23 septembre 2026 :
    (plus d'adresse e-mail, rattachement des connexions par le joueur seul,
    exposition d'un tag Discord certifié, BattleTag écrit par Blizzard, avatars
    copiés chez nous, effacement ou anonymisation, cookies techniques).
-2. **`2026-09-sauvegardes-chiffrees`** — sauvegardes chiffrées de 30 jours et
-   journal des suppressions rejoué à la restauration. **Dépend de
-   `feature/backup-deletion-journal`** : cette entrée ne doit pas partir en
-   production avant elle.
+2. **`2026-09-sauvegardes-chiffrees`** — sauvegardes chiffrées et journal des
+   suppressions rejoué à la restauration (`docs/features/BACKUP_DATA_PROTECTION.md`).
+   Ses durées sont lues sur `BACKUP_RETENTION_DAYS` et
+   `ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS`, celles que `/rgpd` affiche : la
+   modale ne peut pas annoncer une autre durée que la politique. Changer ces
+   constantes est un nouveau changement du traitement, donc une nouvelle entrée.

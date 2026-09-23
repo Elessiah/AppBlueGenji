@@ -1,5 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
+  BACKUP_RETENTION_DAYS,
+} from "@/lib/shared/account-deletion-journal";
+import {
   INVALID_PRIVACY_CHANGES,
   PRIVACY_CHANGES,
   PRIVACY_CHANGE_ID_MAX_LENGTH,
@@ -37,10 +41,11 @@ describe("PRIVACY_CHANGES — intégrité du registre", () => {
     expect(PRIVACY_CHANGES[0].id).toBe("2026-09-recapitulatif-rgpd");
   });
 
-  it("porte le changement des sauvegardes chiffrées (feature/backup-deletion-journal)", () => {
+  it("porte le changement des sauvegardes chiffrées, aux durées que /rgpd affiche", () => {
     const backup = PRIVACY_CHANGES.find((entry) => entry.id === "2026-09-sauvegardes-chiffrees");
     expect(backup).toBeDefined();
-    expect(backup!.details.join(" ")).toMatch(/30 jours/);
+    expect(backup!.summary).toContain(`${BACKUP_RETENTION_DAYS} jours`);
+    expect(backup!.details.join(" ")).toContain(`${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours`);
     expect(backup!.details.join(" ")).toMatch(/journal/);
   });
 

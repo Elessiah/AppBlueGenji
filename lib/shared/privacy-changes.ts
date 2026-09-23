@@ -22,6 +22,11 @@
  * Voir `docs/features/PRIVACY_CHANGES_CONSENT.md`.
  */
 
+import {
+  ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
+  BACKUP_RETENTION_DAYS,
+} from "@/lib/shared/account-deletion-journal";
+
 /** Un changement du traitement des données, tel qu'il est présenté au joueur. */
 export type PrivacyChange = {
   /**
@@ -73,16 +78,19 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Seuls des cookies techniques sont déposés. La fréquentation du site est mesurée par une empreinte non réversible (jamais ton adresse IP), et le flux d'activité public du bot n'affiche aucun identifiant Discord.",
     ],
   },
+  // Durées lues sur les constantes que `/rgpd` affiche déjà : la modale ne peut
+  // pas annoncer une autre durée que la politique. Les changer est en soi un
+  // changement du traitement — il appelle une **nouvelle** entrée.
   {
     id: "2026-09-sauvegardes-chiffrees",
     publishedAt: "2026-09-23",
     title: "Sauvegardes chiffrées et suppressions garanties",
     summary:
-      "La plateforme est sauvegardée dans des archives chiffrées gardées 30 jours, et une suppression de compte reste acquise même si une sauvegarde est restaurée.",
+      `La plateforme est sauvegardée dans des archives chiffrées gardées ${BACKUP_RETENTION_DAYS} jours, et une suppression de compte reste acquise même si une sauvegarde est restaurée.`,
     details: [
-      "La base de données est sauvegardée chaque semaine dans une archive chiffrée avant envoi, avec une clé que seule l'association détient, puis hébergée chez Microsoft (OneDrive), qui la stocke sans pouvoir la lire. Chaque archive est détruite au bout de 30 jours, sans passer par une corbeille.",
+      `La base de données est sauvegardée chaque semaine dans une archive chiffrée avant envoi, avec une clé que seule l'association détient, puis hébergée chez Microsoft (OneDrive), qui la stocke sans pouvoir la lire. Chaque archive est détruite au bout de ${BACKUP_RETENTION_DAYS} jours, sans passer par une corbeille.`,
       "Les images téléversées (avatars, logos) sont copiées, chiffrées, chaque heure. Une image retirée du site disparaît de la sauvegarde dans l'heure.",
-      "Une donnée supprimée peut donc subsister jusqu'à 30 jours dans ces archives, qu'on ne peut pas corriger une à une. Pour qu'elle ne revienne jamais, chaque suppression de compte est notée dans un journal — numéro et date de création du compte, date de suppression, rien d'autre — gardé 60 jours : si une sauvegarde devait être restaurée, les suppressions intervenues depuis sont réappliquées avant la remise en service.",
+      `Une donnée supprimée peut donc subsister jusqu'à ${BACKUP_RETENTION_DAYS} jours dans ces archives, qu'on ne peut pas corriger une à une. Pour qu'elle ne revienne jamais, chaque suppression de compte est notée dans un journal — numéro et date de création du compte, date de suppression, rien d'autre — gardé ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours : si une sauvegarde devait être restaurée, les suppressions intervenues depuis sont réappliquées avant la remise en service.`,
     ],
   },
 ];
