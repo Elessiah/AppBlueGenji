@@ -72,6 +72,22 @@ export function isDuplicateEntryError(error: unknown): boolean {
 }
 
 /**
+ * `true` si une clé étrangère en `RESTRICT` a refusé l'effacement d'une ligne
+ * encore référencée.
+ *
+ * Le cas est atteignable par une **course** que le code ne peut pas fermer :
+ * les contrôles de clé étrangère lisent la dernière version commitée et non
+ * l'instantané de la transaction, si bien qu'une ligne créée après la lecture
+ * des traces peut retenir une suppression que celle-ci avait jugée possible.
+ * Le message brut de MySQL nomme alors la table, la contrainte et la base —
+ * il n'a rien à faire dans une notification d'interface.
+ */
+export function isReferencedRowError(error: unknown): boolean {
+  const code = errorCode(error);
+  return code === "ER_ROW_IS_REFERENCED_2" || code === "ER_ROW_IS_REFERENCED";
+}
+
+/**
  * `true` si la migration n'avait **rien à faire** — au regard de l'instruction
  * qu'elle jouait.
  *

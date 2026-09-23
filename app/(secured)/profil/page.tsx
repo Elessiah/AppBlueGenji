@@ -6,6 +6,15 @@ import { useRouter } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
 import { Coche } from "@/components/Coche";
 import type { FullProfileResponse } from "@/lib/shared/types";
+import {
+  accountDeletedWriteMessage,
+  accountDeletionConfirmation,
+  accountDeletionErrorMessage,
+  accountDeletionOutcome,
+  RETENTION_UNKNOWN,
+  type AccountDeletionPlan,
+  type ConfirmationSubject,
+} from "@/lib/shared/account-deletion";
 import { useToast } from "@/components/ui/toast";
 import { TeamLink } from "@/components/entity-link";
 import { VerifiedBadge } from "@/components/discord-tag";
@@ -264,7 +273,9 @@ export default function ProfilePage() {
         }),
       });
       const payload = (await response.json()) as FullProfileResponse & { error?: string };
-      if (!response.ok) throw new Error(payload.error || "PROFILE_UPDATE_FAILED");
+      if (!response.ok) {
+        throw new Error(accountDeletedWriteMessage(payload.error, "PROFILE_UPDATE_FAILED"));
+      }
       setData(payload);
       // Le champ **et sa référence** se réalignent sur ce qui vient d'être
       // enregistré. Le champ, parce qu'il est en lecture seule dès que le
@@ -313,7 +324,14 @@ export default function ProfilePage() {
         body: JSON.stringify({ discordPseudo: null }),
       });
       const payload = (await response.json()) as FullProfileResponse & { error?: string };
-      if (!response.ok) throw new Error(payload.error || "PROFILE_UPDATE_FAILED");
+      // Quatrième écriture vers `PATCH /api/profile`, arrivée avec le verrou du
+      // tag : elle passe par la même porte que la sauvegarde du profil, donc
+      // elle peut recevoir le même 409 `ACCOUNT_DELETED` — le compte supprimé
+      // depuis un autre onglet pendant que celle-ci attendait son verrou. Sans
+      // le registre, le joueur lisait le code en capitales.
+      if (!response.ok) {
+        throw new Error(accountDeletedWriteMessage(payload.error, "PROFILE_UPDATE_FAILED"));
+      }
       setData(payload);
       setDiscordPseudo("");
       setSavedDiscordPseudo("");
@@ -334,17 +352,60 @@ export default function ProfilePage() {
   };
 
   const onDeleteAccount = async () => {
-    if (!window.confirm(
-      "Supprimer définitivement ton compte ? Tes informations personnelles seront effacées (le compte devient anonyme), mais tes statistiques resteront conservées. Cette action est irréversible.",
-    )) {
+    // Le bouton se ferme **avant** l'aller-retour d'aperçu, et non après la
+    // confirmation : `window.confirm` bloquait à lui seul le second clic tant
+    // qu'il était la première instruction, mais un `await` posé devant lui
+    // rouvre la fenêtre — deux clics, deux confirmations, deux `DELETE`, dont
+    // le second échoue en 400 et affiche une erreur juste après le succès.
+    if (deleting) return;
+    setDeleting(true);
+
+    // Le motif est demandé avant la confirmation : « effacé » et « anonymisé »
+    // ne sont pas la même promesse, et « tes statistiques restent » ne veut
+    // rien dire à qui n'en a aucune. Le serveur repose la question à l'écriture
+    // — ceci informe, cela tranche.
+    //
+    // Tant que l'aperçu n'a pas répondu, l'écran ne sait **rien** — pas même
+    // lequel des deux modes s'appliquera. Il partait d'une hypothèse
+    // (`TOURNAMENTS`), qu'il gardait quand la requête échouait : le joueur
+    // consentait alors à devenir anonyme et pouvait être effacé entièrement.
+    // Sur un geste irréversible, on décrit l'incertitude plutôt que d'inventer
+    // la moitié rassurante.
+    //
+    // `previewed` part de la **même** valeur que `subject`, et non de `null` :
+    // sur ce type, `null` n'est pas « je ne sais pas » mais « il ne restera
+    // rien ». Initialisé à `null`, un aperçu en échec faisait annoncer un
+    // effacement complet dès que la réponse du serveur devenait illisible —
+    // l'unique endroit du fichier où l'inconnu redevenait une promesse.
+    let subject: ConfirmationSubject = RETENTION_UNKNOWN;
+    let previewed: ConfirmationSubject = RETENTION_UNKNOWN;
+    try {
+      const preview = await fetch("/api/profile/deletion", { cache: "no-store" });
+      if (preview.ok) {
+        previewed = ((await preview.json()) as AccountDeletionPlan).reason;
+        subject = previewed;
+      }
+    } catch {
+      // Injoignable : la phrase qui ne promet ni conservation ni effacement.
+    }
+    if (!window.confirm(accountDeletionConfirmation(subject))) {
+      setDeleting(false);
       return;
     }
-    setDeleting(true);
+
     try {
       const response = await fetch("/api/profile", { method: "DELETE" });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "ACCOUNT_DELETE_FAILED");
-      showSuccess("Compte supprimé. Tes statistiques restent conservées de façon anonyme.");
+      const payload = (await response.json()) as { error?: string } & Partial<AccountDeletionPlan>;
+      // Le corps porte un **code**, pas une phrase : la traduction vit dans le
+      // module pur, et un code inconnu retombe sur la phrase générique plutôt
+      // que de s'afficher tel quel.
+      if (!response.ok) throw new Error(accountDeletionErrorMessage(payload.error));
+      // `reason` vaut `null` sur un effacement complet : c'est une réponse, pas
+      // une absence de réponse. Le `mode` sert donc de témoin — il dit que le
+      // serveur a bien répondu, là où un `??` sur le motif retomberait sur
+      // l'aperçu au moment précis où le serveur annonce qu'il n'a rien gardé.
+      const applied: ConfirmationSubject = payload.mode ? payload.reason ?? null : previewed;
+      showSuccess(accountDeletionOutcome(applied));
       setTimeout(() => {
         window.location.href = "/";
       }, 1200);
@@ -373,7 +434,9 @@ export default function ProfilePage() {
         body: formData,
       });
       const payload = (await response.json()) as { avatarUrl?: string | null; error?: string };
-      if (!response.ok) throw new Error(payload.error || "AVATAR_UPLOAD_FAILED");
+      if (!response.ok) {
+        throw new Error(accountDeletedWriteMessage(payload.error, "AVATAR_UPLOAD_FAILED"));
+      }
       setData((prev) =>
         prev ? { ...prev, profile: { ...prev.profile, avatarUrl: payload.avatarUrl ?? null } } : prev,
       );
@@ -390,7 +453,9 @@ export default function ProfilePage() {
     try {
       const response = await fetch("/api/profile/avatar", { method: "DELETE" });
       const payload = (await response.json()) as { avatarUrl?: string | null; error?: string };
-      if (!response.ok) throw new Error(payload.error || "AVATAR_DELETE_FAILED");
+      if (!response.ok) {
+        throw new Error(accountDeletedWriteMessage(payload.error, "AVATAR_DELETE_FAILED"));
+      }
       setData((prev) =>
         prev ? { ...prev, profile: { ...prev.profile, avatarUrl: null } } : prev,
       );

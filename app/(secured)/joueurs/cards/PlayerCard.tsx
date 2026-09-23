@@ -45,7 +45,10 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
   const teamColor = player.team ? getPaletteColor(player.team.colorIndex) : "var(--ink-mute)";
 
   return (
-    <article className={s.plCard} style={{ "--c": teamColor } as React.CSSProperties}>
+    <article
+      className={`${s.plCard} ${player.isDeleted ? s.plCardDeleted : ""}`}
+      style={{ "--c": teamColor } as React.CSSProperties}
+    >
       <Link
         href={`/joueurs/${player.id}`}
         className={s.cardOverlay}
@@ -67,6 +70,7 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
           </div>
         </div>
         <div className={s.plPseudo}>{player.pseudo}</div>
+        {player.isDeleted && <div className={s.plDeletedMark}>Compte supprimé</div>}
         <div className={s.plTeam}>
           {/* Le statut est demandé **une fois** : brancher ici sur `player.team`
               et là sur le statut partagé remettrait la règle à deux endroits,
@@ -82,7 +86,15 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
                 <em>{player.team.name.toUpperCase()}</em>
               </TeamLink>
             </>
-          ) : (
+          ) : player.isDeleted ? null : (
+            // Le statut d'un compte sans équipe est une **invitation à
+            // recruter** — « FREE AGENT » ouvertement, « SANS ÉQUIPE » par
+            // défaut —, et un compte supprimé est justement celui qu'on ne peut
+            // plus rattacher : `getUserIdByPseudo` refuse son pseudo en
+            // `USER_NOT_FOUND`. Affiché sous « Compte supprimé », il envoyait le
+            // recruteur vers un refus. Le roster, lui, se garde :
+            // l'anonymisation retire l'identité, pas l'appartenance — c'est un
+            // fait, pas une offre.
             <span className={s.plNoTeam}>
               {PLAYER_ROSTER_STATUS_LABEL[playerRosterStatus(player)]}
             </span>

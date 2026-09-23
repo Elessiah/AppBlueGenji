@@ -706,6 +706,77 @@
   letter-spacing: -0.01em;
   text-align: center;
 }
+/* Compte anonymisé : la carte reste lisible — on la consulte pour remonter un
+   ancien match — mais elle ne doit pas se confondre avec un joueur qu'on peut
+   encore contacter. En retrait, donc, et nommée.
+
+   Le retrait est posé sur les **décorations**, une par une, et jamais sur la
+   carte entière : `opacity` se multiplie de parent à enfant et aucun enfant ne
+   peut la défaire, si bien qu'une carte à 0.55 rendait illisible la mention qui
+   explique justement pourquoi elle est en retrait — et le survol qui la relevait
+   n'existe pas au doigt. La mention, elle, garde son plein contraste : c'est la
+   seule chose que la carte ait de plus à dire. */
+.plCardDeleted .plAvatarWrap,
+.plCardDeleted .plPseudo,
+.plCardDeleted .plRoles,
+.plCardDeleted .plStats,
+.plCardDeleted .plTags {
+  opacity: 0.55;
+  filter: saturate(0.35);
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+.plCardDeleted:hover .plAvatarWrap,
+.plCardDeleted:hover .plPseudo,
+.plCardDeleted:hover .plRoles,
+.plCardDeleted:hover .plStats,
+.plCardDeleted:hover .plTags,
+.plCardDeleted:focus-within .plAvatarWrap,
+.plCardDeleted:focus-within .plPseudo,
+.plCardDeleted:focus-within .plRoles,
+.plCardDeleted:focus-within .plStats,
+.plCardDeleted:focus-within .plTags {
+  opacity: 1;
+  filter: none;
+}
+
+/* `.plTeam` est le seul bloc en retrait qui contienne un lien : celui de
+   l'équipe, que `.aboveOverlay` (`z-index: 2`) fait passer **au-dessus** de la
+   plaque `.cardOverlay` (`z-index: 1`). Or `opacity < 1` comme `filter` créent
+   un **contexte d'empilement** : le `z-index: 2` se résoudrait alors à
+   l'intérieur de `.plTeam`, qui repasserait entier sous la plaque — le nom de
+   l'équipe mènerait à la fiche du joueur, sans qu'aucune règle de style ne
+   paraisse en cause. Le retrait se fait donc ici par la **couleur**, qui n'en
+   crée aucun. */
+.plCardDeleted .plTeam {
+  color: var(--ink-dim);
+  transition: color 0.15s ease;
+}
+
+.plCardDeleted .plTeam em {
+  color: var(--ink-mute);
+}
+
+.plCardDeleted:hover .plTeam,
+.plCardDeleted:focus-within .plTeam {
+  color: var(--ink-mute);
+}
+
+.plCardDeleted:hover .plTeam em,
+.plCardDeleted:focus-within .plTeam em {
+  color: var(--c, var(--blue-300));
+}
+
+.plDeletedMark {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  text-align: center;
+  margin-top: 2px;
+}
+
 .plTeam {
   font-family: var(--font-mono);
   font-size: 9px;

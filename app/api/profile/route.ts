@@ -1,7 +1,8 @@
 ﻿import { clearSession, getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
+import { deleteOwnAccount, getFullProfile, updateOwnProfile } from "@/lib/server/users-service";
+import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { DISCORD_TAG_LOCKED } from "@/lib/shared/discord-tag-lock";
-import { anonymizeOwnAccount, getFullProfile, updateOwnProfile } from "@/lib/server/users-service";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -41,6 +42,10 @@ export async function PATCH(req: Request) {
   } catch (error) {
     const message = (error as Error).message;
     if (message === "PSEUDO_ALREADY_USED") return fail(message, 409);
+    // Le compte a été supprimé pendant que la sauvegarde attendait son verrou :
+    // même refus que sur l'avatar, et même code — c'est un conflit d'état, pas
+    // une saisie fautive.
+    if (message === ACCOUNT_DELETED_ERROR) return fail(message, 409);
     // La saisie est bonne, c'est l'état du compte qui l'interdit : un compte
     // Discord rattaché possède son tag (`lib/shared/discord-tag-lock.ts`).
     if (message === DISCORD_TAG_LOCKED) return fail(message, 409);
@@ -53,9 +58,12 @@ export async function DELETE() {
   if (!user) return fail("UNAUTHORIZED", 401);
 
   try {
-    await anonymizeOwnAccount(user.id);
+    // Le plan voyage jusqu'à l'écran : « effacé » et « anonymisé » ne sont pas
+    // la même promesse, et le motif de la conservation encore moins — c'est le
+    // serveur qui vient de trancher les deux.
+    const plan = await deleteOwnAccount(user.id);
     await clearSession();
-    return ok({ deleted: true });
+    return ok({ deleted: true, ...plan });
   } catch (error) {
     return fail((error as Error).message || "ACCOUNT_DELETE_FAILED", 400);
   }

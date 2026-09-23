@@ -5,7 +5,7 @@ jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
 
 import {
-  anonymizeOwnAccount,
+  deleteOwnAccount,
   createOrGetDiscordUser,
   getFullProfile,
   getUserById,
@@ -42,10 +42,27 @@ function fakeDb(handler?: (q: string, params: unknown[]) => unknown) {
     queries.push({ sql: q, params });
     const handled = handler?.(q, params);
     if (handled !== undefined) return handled;
+    // Le verrou que prend la suppression rend la ligne du compte : sans elle,
+    // tout chemin d'écriture s'arrêterait sur `USER_NOT_FOUND`.
+    if (q.includes("SELECT avatar_url, discord_id FROM bg_users")) {
+      return [[{ avatar_url: null, discord_id: null }]];
+    }
     return [[]];
   });
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
-  return { queries, execute };
+  // La suppression écrit sous transaction, donc sur une connexion dédiée — la
+  // même `execute`, pour que le test continue de voir passer les requêtes.
+  const connection = {
+    execute,
+    beginTransaction: jest.fn(async () => {}),
+    commit: jest.fn(async () => {}),
+    rollback: jest.fn(async () => {}),
+    release: jest.fn(() => {}),
+  };
+  (getDatabase as jest.Mock).mockResolvedValue({
+    execute,
+    getConnection: jest.fn(async () => connection),
+  } as never);
+  return { queries, execute, connection };
 }
 
 const find = (queries: Query[], needle: string) =>
@@ -137,17 +154,32 @@ describe("updateOwnProfile — la certification suit le tag", () => {
   });
 });
 
-describe("anonymizeOwnAccount", () => {
+describe("deleteOwnAccount — anonymisation", () => {
+  /** Un compte qui a joué : la ligne doit rester, donc elle est anonymisée. */
+  const playedDb = () =>
+    fakeDb((sql) =>
+      sql.includes("AS tournaments")
+        ? [[{ tournaments: 1, organized: 0, owned: 0 }]]
+        : undefined,
+    );
+
   it("efface le tag **et** sa certification", async () => {
     // Une date restée seule ferait d'un compte anonymisé un compte « vérifié »
     // sans tag.
-    const { queries } = fakeDb();
+    const { queries } = playedDb();
 
-    await anonymizeOwnAccount(7);
+    await deleteOwnAccount(7);
 
     const update = find(queries, "UPDATE bg_users")!;
     expect(update.sql).toContain("discord_pseudo = NULL");
     expect(update.sql).toContain("discord_verified_at = NULL");
+  });
+
+  it("garde la ligne d'un compte qui a joué", async () => {
+    const { queries } = playedDb();
+
+    expect((await deleteOwnAccount(7)).mode).toBe("ANONYMIZE");
+    expect(find(queries, "DELETE FROM bg_users")).toBeUndefined();
   });
 });
 

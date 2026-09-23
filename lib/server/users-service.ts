@@ -1,7 +1,14 @@
 ﻿import crypto from "node:crypto";
-import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
+import {
+  ACCOUNT_DELETED_ERROR,
+  accountDeletionPlan,
+  type AccountDeletionPlan,
+  type AccountTrace,
+} from "@/lib/shared/account-deletion";
+import { isReferencedRowError } from "@/lib/server/mysql-errors";
 import {
   DISCORD_TAG_LOCKED,
   isDiscordTagLocked,
@@ -9,9 +16,11 @@ import {
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
-import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
+import { deleteStoredImage } from "@/lib/server/image-upload";
+import { syncSoloEntryIdentity, syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { importRemoteAvatar, shouldImportRemoteAvatar } from "@/lib/server/user-avatar-import";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
+import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { formatPlayerSignupLog, type PlayerSignupProvider } from "@/lib/shared/bot-logs";
 import { isDiscordNumericId, visibleDiscordTag } from "@/lib/shared/discord-identity";
 import { can, sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
@@ -82,6 +91,7 @@ type UserRow = RowDataPacket & {
   visible_major: 0 | 1;
   open_to_recruitment: 0 | 1;
   is_admin?: 0 | 1;
+  is_deleted?: 0 | 1;
   platform_roles_json?: string | null;
   created_at: Date;
 };
@@ -224,14 +234,21 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
       visible_marvel,
       visible_major,
       open_to_recruitment,
+      is_deleted,
       created_at
      FROM bg_users
      ORDER BY is_deleted ASC, pseudo ASC`,
   );
 
-  const baseUsers = rows.map((row) =>
-    applyVisibility(mapPublicUser(row), Number(row.id) === viewerId),
-  );
+  // `isDeleted` voyage jusqu'à l'annuaire, qui masque ces comptes par défaut :
+  // un compte anonymisé n'est plus personne, mais sa ligne reste nécessaire à
+  // qui remonte un ancien match. Le filtre est côté client, comme les autres de
+  // cet écran — la liste entière y est déjà, et ces lignes ne portent plus rien
+  // de personnel.
+  const baseUsers = rows.map((row) => ({
+    ...applyVisibility(mapPublicUser(row), Number(row.id) === viewerId),
+    isDeleted: Boolean(row.is_deleted),
+  }));
   const userIds = baseUsers.map((u) => u.id);
 
   // Les badges de jeu se dérivent des tags bruts : jouer à OW/MR n'est pas
@@ -395,7 +412,7 @@ export async function adoptRemoteAvatar(userId: number, picture: string | undefi
 
   const db = await getDatabase();
   const [rows] = await db.execute<(RowDataPacket & { avatar_url: string | null })[]>(
-    `SELECT avatar_url FROM bg_users WHERE id = ? LIMIT 1`,
+    `SELECT avatar_url FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
     [userId],
   );
   if (rows.length === 0) return;
@@ -404,7 +421,26 @@ export async function adoptRemoteAvatar(userId: number, picture: string | undefi
   const stored = await importRemoteAvatar(picture, userId);
   if (!stored) return;
 
-  await db.execute(`UPDATE bg_users SET avatar_url = ? WHERE id = ?`, [stored, userId]);
+  // Même condition, même raison que le téléversement ordinaire — avec un délai
+  // plus long encore : entre la lecture ci-dessus et cette écriture, il y a un
+  // téléchargement sortant et un traitement d'image, soit des secondes pendant
+  // lesquelles le joueur peut supprimer son compte depuis un autre onglet. La
+  // photo repartait alors sur la ligne anonymisée, publiquement servie par
+  // `/api/uploads/avatars/…` et republiée sur l'entrée solo à la prochaine
+  // resynchronisation. Le fichier est déjà sur le disque dans les deux modes —
+  // sur un compte **effacé** la ligne n'existe même plus —, d'où le ménage :
+  // sans lui, une photo personnelle orpheline survivait à un compte dont on
+  // venait de promettre qu'il ne resterait rien.
+  const [result] = await db.execute<ResultSetHeader>(
+    `UPDATE bg_users SET avatar_url = ? WHERE id = ? AND is_deleted = 0`,
+    [stored, userId],
+  );
+  if (Number(result.affectedRows) === 0) {
+    await deleteStoredImage(toDiskUploadPath(stored)).catch(() => {
+      // Disque récalcitrant : un résidu, et rien à annoncer — l'appelant a déjà
+      // avalé les refus de cette fonction par construction.
+    });
+  }
 }
 
 /**
@@ -446,11 +482,25 @@ export async function createOrGetDiscordUser(
   if (existing.length > 0) {
     const userId = Number(existing[0].id);
     if (handle) {
+      // `is_deleted = 0` ferme ici la course que ferment déjà `writeVerifiedTag`,
+      // `updateOwnProfile` et les trois écritures de `linkOAuthIdentity` — et
+      // c'est celle qui coûte le plus cher des quatre. Une connexion Discord
+      // partie avant la suppression a résolu son compte sur le `discord_id`
+      // d'alors ; elle reprend **après** le commit de `deleteOwnAccount`, qui
+      // vient de vider tag et certification. Sans la condition, elle réécrivait
+      // le vrai pseudo Discord sur la ligne anonymisée **et le recertifiait** :
+      // `canViewDiscordTag` rouvre alors cette coordonnée à l'arbitrage de tout
+      // tournoi encore vivant où l'engagé figure — précisément ce que
+      // l'anonymisation venait d'effacer.
+      //
+      // La session, elle, n'est pas le sujet : `getCurrentUser` et la lecture
+      // par jeton portent déjà `is_deleted = 0`, donc celle que la connexion
+      // s'apprête à ouvrir ne résoudra personne.
       await db.execute(
         `UPDATE bg_users
          SET discord_pseudo = ?,
              discord_verified_at = NOW()
-         WHERE id = ?`,
+         WHERE id = ? AND is_deleted = 0`,
         [handle, userId],
       );
     }
@@ -504,7 +554,16 @@ export async function createOrGetBlizzardUser(sub: string, battletag: string | n
   if (existing.length > 0) {
     const userId = Number(existing[0].id);
     if (tag) {
-      await db.execute(`UPDATE bg_users SET overwatch_battletag = ? WHERE id = ?`, [tag, userId]);
+      // Même course, même remède qu'au-dessus : une connexion Battle.net partie
+      // avant la suppression réécrivait le BattleTag sur la ligne que
+      // `anonymizeAccount` venait de mettre à `NULL`. La donnée est moins
+      // exposée que le tag Discord (aucune certification, et l'anonymisation
+      // force `visible_overwatch` à 0), mais c'est la même chose : une
+      // coordonnée personnelle qui repousse sur un compte vidé.
+      await db.execute(
+        `UPDATE bg_users SET overwatch_battletag = ? WHERE id = ? AND is_deleted = 0`,
+        [tag, userId],
+      );
     }
     return userId;
   }
@@ -974,7 +1033,15 @@ export async function updateOwnProfile(
   // rattachement peut tomber dans cet intervalle. La garde couvre du même geste
   // `discord_verified_at`, qui n'a alors aucune raison de tomber puisque rien ne
   // change.
-  await db.execute(
+  //
+  // `is_deleted = 0` ferme une **troisième** course, du même genre : une
+  // sauvegarde de profil déjà partie se bloque sur le verrou de
+  // `deleteOwnAccount` et reprend **après** son commit. Sans la condition, elle
+  // reposait le pseudo réel, le BattleTag, le tag Marvel et le tag Discord sur
+  // une ligne fraîchement anonymisée — puis `syncSoloEntryIdentity` republiait
+  // ce pseudo dans les brackets et jusqu'à la carte de match en direct de la
+  // vitrine. La suppression est irréversible : c'est elle qui doit gagner.
+  const [result] = await db.execute<ResultSetHeader>(
     `UPDATE bg_users
      SET pseudo = COALESCE(?, pseudo),
          overwatch_battletag = CASE WHEN ? THEN ? ELSE overwatch_battletag END,
@@ -996,7 +1063,7 @@ export async function updateOwnProfile(
          visible_marvel = COALESCE(?, visible_marvel),
          visible_major = COALESCE(?, visible_major),
          open_to_recruitment = COALESCE(?, open_to_recruitment)
-     WHERE id = ?`,
+     WHERE id = ? AND is_deleted = 0`,
     [
       patch.pseudo ? normalizePseudo(patch.pseudo) : null,
       patch.overwatchBattletag !== undefined,
@@ -1019,6 +1086,11 @@ export async function updateOwnProfile(
       userId,
     ],
   );
+  // `affectedRows` compte les lignes **appariées** (mysql2 pose `FOUND_ROWS`),
+  // pas celles qui ont changé : zéro ne dit donc pas « rien à modifier » mais
+  // bien « la ligne vivante n'existe plus ». On sort avant la synchronisation
+  // de l'entrée solo, qui republierait l'identité qu'on vient de refuser.
+  if (result.affectedRows === 0) throw new Error(ACCOUNT_DELETED_ERROR);
 
   // L'entrée solo (tournois individuels) affiche le pseudo **et l'avatar** du
   // joueur dans les brackets : elle suit le renommage, et aussi la bascule de
@@ -1030,14 +1102,247 @@ export async function updateOwnProfile(
 }
 
 /**
- * Anonymise (« supprime ») le compte de l'utilisateur : toutes les données
- * personnelles sont effacées et les moyens de connexion révoqués, mais les
- * statistiques et l'historique générés par la plateforme sont conservés
- * (les adhésions d'équipe restent rattachées à un profil anonyme).
+ * Pool ou connexion de transaction : la lecture des traces se fait sur l'une ou
+ * sur l'autre selon qu'on **informe** (route de prévisualisation, hors
+ * transaction) ou qu'on **écrit** (suppression, sous verrou).
  */
-export async function anonymizeOwnAccount(userId: number): Promise<void> {
+type SqlRunner = Pick<PoolConnection, "execute">;
+
+/**
+ * Ce que ce compte laisse derrière lui, en **une** requête.
+ *
+ * Trois `EXISTS` indexés plutôt que trois allers-retours : la suppression est
+ * un geste unique, ses trois questions se posent au même instant et sur le même
+ * instantané. Les poser séparément laisserait un `await` entre elles — un
+ * tournoi créé entre la deuxième et la troisième et la ligne partirait quand
+ * même, sur une base qui la refuse.
+ *
+ * L'engagement se lit sur **toute** appartenance, close comprise : un joueur
+ * parti d'une équipe a tout de même joué ses matchs sous ses couleurs.
+ */
+async function loadAccountTrace(
+  runner: SqlRunner,
+  userId: number,
+): Promise<AccountTrace> {
+  const [rows] = await runner.execute<(RowDataPacket & {
+    tournaments: number;
+    organized: number;
+    owned: number;
+  })[]>(
+    `SELECT
+       (
+         EXISTS (
+           SELECT 1
+           FROM bg_tournament_registrations r
+           JOIN bg_team_members tm ON tm.team_id = r.team_id AND tm.user_id = ?
+         )
+         -- L'entrée solo compte **par elle-même** : elle n'a pas de clé
+         -- étrangère (une cascade effacerait l'engagé, et avec lui l'historique
+         -- des matchs), donc l'effacement du compte la laisserait pendre sur un
+         -- identifiant disparu.
+         OR EXISTS (SELECT 1 FROM bg_teams WHERE solo_user_id = ?)
+       ) AS tournaments,
+       EXISTS (
+         SELECT 1 FROM bg_tournaments WHERE organizer_user_id = ?
+       ) AS organized,
+       EXISTS (
+         SELECT 1
+         FROM bg_team_members m
+         JOIN bg_teams t ON t.id = m.team_id AND t.deleted_at IS NULL
+         WHERE m.user_id = ? AND m.left_at IS NULL
+           AND JSON_CONTAINS(m.roles_json, '"OWNER"')
+       ) AS owned`,
+    [userId, userId, userId, userId],
+  );
+  const row = rows[0];
+  // Une ligne absente **n'est pas** une absence de trace : lue en booléens, elle
+  // donnerait trois `false`, donc `ERASE` — le seul dénouement qui ne se défait
+  // pas, et l'exact contraire de la règle conservatrice du module pur. La
+  // requête en rend toujours une aujourd'hui (des sous-requêtes scalaires, sans
+  // `FROM`) ; le jour où elle porte un `FROM bg_users`, l'anomalie doit lever et
+  // non effacer.
+  if (!row) throw new Error("ACCOUNT_TRACE_UNAVAILABLE");
+  return {
+    tournaments: Boolean(row.tournaments),
+    organizedTournaments: Boolean(row.organized),
+    ownedTeams: Boolean(row.owned),
+  };
+}
+
+/**
+ * Ce que la suppression **ferait** à ce compte, sans rien écrire.
+ *
+ * L'écran doit annoncer le geste avant le clic : une confirmation qui promet la
+ * conservation des statistiques à un compte qui n'en a aucune est un mensonge
+ * poli, et l'inverse serait pire. La question n'est posée qu'au moment où elle
+ * peut changer la réponse — sur le chemin de la suppression, jamais à chaque
+ * chargement du profil.
+ *
+ * Ce n'est **pas** une promesse : l'écriture repose la question sur son propre
+ * instantané. Rien n'interdit qu'un tournoi soit créé entre les deux, et c'est
+ * l'écriture qui fait foi.
+ */
+export async function getAccountDeletionPlan(userId: number): Promise<AccountDeletionPlan> {
   const db = await getDatabase();
-  await db.execute(
+  return accountDeletionPlan(await loadAccountTrace(db, userId));
+}
+
+/**
+ * Supprimer son compte — **effacé** s'il ne laisse rien, anonymisé sinon.
+ *
+ * Le mode est décidé par `accountDeletionMode` (`lib/shared/account-deletion.ts`),
+ * partagé avec l'écran qui annonce le geste avant le clic : une confirmation
+ * qui promet la conservation des statistiques à un compte qui n'en a aucune est
+ * un mensonge poli, et l'inverse serait pire.
+ *
+ * Lecture des traces et écriture vivent dans **une seule transaction**, sous un
+ * verrou pris sur la ligne du compte : une trace relue hors transaction laisse
+ * un `await` entre la question et la réponse, et l'effacement d'un compte ne se
+ * défait pas. La transaction ferme au passage l'état intermédiaire des deux
+ * écritures de l'effacement — un `DELETE` refusé après le détachement des
+ * visites laissait un compte vivant dont la fréquentation était anonymisée pour
+ * toujours.
+ *
+ * Deux choses échappent à la transaction, chacune pour sa raison : le **fichier
+ * de l'avatar**, qu'un `unlink` ne rendrait pas (il part après le commit), et
+ * les tables sans clé étrangère, dont seul le verrou du compte protège
+ * — `bg_teams.solo_user_id` en particulier, que `ensureSoloEntry` verrouille de
+ * son côté.
+ *
+ * Rend le plan appliqué — le mode **et** le motif —, pour que la route puisse
+ * le dire au joueur : « tes statistiques restent » ne veut rien dire à qui n'en
+ * a aucune et dont la ligne n'est retenue que par une équipe à transférer.
+ */
+export async function deleteOwnAccount(userId: number): Promise<AccountDeletionPlan> {
+  const db = await getDatabase();
+  const connection = await db.getConnection();
+  let plan: AccountDeletionPlan;
+  // Le fichier de l'avatar, relevé **avant** l'effacement : la ligne partie, son
+  // chemin ne se retrouve plus. Il ne part qu'après le commit — un `unlink` ne
+  // se défait pas, et une transaction annulée rendrait un compte vivant sans sa
+  // photo.
+  let orphanedAvatar: string | null = null;
+
+  try {
+    await connection.beginTransaction();
+
+    // Verrou en **toute première instruction**, et lecture des traces juste
+    // après : sous `REPEATABLE READ`, c'est la première lecture *ordinaire* qui
+    // fige l'instantané, si bien qu'une trace lue avant le verrou daterait
+    // d'avant l'attente. Le compte est ici la ressource disputée, et une
+    // inscription en tournoi individuel pose le même verrou (`ensureSoloEntry`)
+    // — seul moyen de tenir une entrée solo, qui n'a volontairement aucune clé
+    // étrangère et resterait sinon à pendre sur un identifiant disparu.
+    //
+    // L'inscription d'une **équipe** n'est pas couverte, et c'est assumé : elle
+    // n'écrit que `bg_tournament_registrations`, qui ne référence que l'équipe,
+    // sans jamais toucher `bg_team_members` — aucune clé étrangère ne tranche
+    // donc cette course-là. Un membre qui supprime son compte à l'instant où sa
+    // capitaine engage l'équipe est effacé alors qu'il figurait au roster
+    // engagé. Rien ne pend (son appartenance part en cascade), l'équipe garde
+    // son inscription et ses matchs, et ce qu'il perd est son propre historique
+    // — ce qu'il venait de demander. Le fermer coûterait un verrou sur la ligne
+    // de **chaque** membre à chaque inscription.
+    const [locked] = await connection.execute<(RowDataPacket & {
+      avatar_url: string | null;
+      discord_id: string | null;
+    })[]>(
+      `SELECT avatar_url, discord_id FROM bg_users WHERE id = ? FOR UPDATE`,
+      [userId],
+    );
+    if (locked.length === 0) throw new Error("USER_NOT_FOUND");
+    orphanedAvatar = toDiskUploadPath(locked[0].avatar_url);
+
+    plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
+
+    // **Les visites se détachent dans les deux modes**, et c'est pour cela que
+    // le geste vit ici plutôt que dans `eraseAccount`. `bg_site_visits` n'a
+    // **aucune** clé étrangère (une cascade y effacerait l'historique de
+    // fréquentation) : ce qu'il faut retirer est le lien vers une personne, pas
+    // le fait qu'une page ait été vue — et une anonymisation qui garderait ce
+    // lien laisserait la trace de navigation complète attachée à une ligne que
+    // son palmarès public suffit souvent à rapprocher d'un nom. La ligne garde
+    // son empreinte salée, donc elle continue de compter comme visite ; elle ne
+    // compte simplement plus comme visite **identifiée**.
+    //
+    // Posé **avant** la bascule : après l'effacement, la ligne du compte n'est
+    // plus là pour dire de qui il s'agissait.
+    await connection.execute(`UPDATE bg_site_visits SET user_id = NULL WHERE user_id = ?`, [
+      userId,
+    ]);
+
+    if (plan.mode === "ERASE") {
+      await eraseAccount(connection, userId);
+    } else {
+      await anonymizeAccount(connection, userId);
+    }
+
+    // Les défis de connexion par message privé, relevés sur la ligne **avant**
+    // qu'elle ne parte ou ne soit vidée de son identifiant.
+    //
+    // `bg_discord_login_challenges` n'a **aucune clé étrangère** — elle est
+    // indexée sur un identifiant Discord, pas sur un compte du site —, donc
+    // aucune cascade ne la couvre, et son seul ménage est la purge des lignes
+    // expirées depuis un jour, déclenchée par la demande de code d'un *autre*
+    // joueur : un soir calme, l'identifiant Discord du compte effacé reste en
+    // base indéfiniment, alors qu'on vient de promettre qu'il ne resterait rien.
+    // C'est la même coordonnée que le tag, et le seul geste des deux modes qui
+    // regarde une table hors de `bg_users`, avec le détachement des visites.
+    const discordId = locked[0].discord_id;
+    if (discordId) {
+      await connection.execute(
+        `DELETE FROM bg_discord_login_challenges WHERE discord_id = ?`,
+        [discordId],
+      );
+    }
+
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    // Une clé étrangère en `RESTRICT` peut encore refuser l'effacement : ses
+    // contrôles lisent la dernière version commitée et non l'instantané de la
+    // transaction, donc un tournoi créé après la lecture des traces retient la
+    // ligne. Le message brut de MySQL nomme la base, la table et la contrainte
+    // — il partirait tel quel dans la notification, `DELETE /api/profile`
+    // rendant le message de l'erreur. Un code stable à la place : le second
+    // essai lira la trace et anonymisera, ce qui est la bonne réponse.
+    if (isReferencedRowError(error)) throw new Error("ACCOUNT_STILL_REFERENCED");
+    throw error;
+  } finally {
+    connection.release();
+  }
+
+  // Les deux modes effacent la photo : l'un fait disparaître la ligne, l'autre
+  // met `avatar_url` à `NULL` — dans les deux cas le fichier resterait servi
+  // par `/api/uploads/avatars/...`, donc une donnée personnelle publique que
+  // plus aucune ligne ne désigne. L'échec est **avalé** : la suppression est
+  // commitée, annoncer un refus au joueur serait faux.
+  try {
+    await deleteStoredImage(orphanedAvatar);
+  } catch {
+    // Fichier verrouillé ou disque en lecture seule : un résidu, pas un échec.
+  }
+
+  return plan;
+}
+
+/**
+ * L'effacement pur et simple, sous le verrou de `deleteOwnAccount`.
+ *
+ * Les cascades déjà déclarées font tout (sessions, appartenances, invitations
+ * reçues) ; `bg_endurance_penalties.created_by` et `bg_team_invitations`
+ * .`created_by` passent à `NULL`, la sanction restant due et l'invitation
+ * restant l'acte de l'équipe. Les visites, elles, sont détachées par
+ * `deleteOwnAccount` avant la bascule : elles n'ont aucune clé étrangère et le
+ * geste vaut pour les **deux** modes.
+ */
+async function eraseAccount(connection: PoolConnection, userId: number): Promise<void> {
+  await connection.execute(`DELETE FROM bg_users WHERE id = ?`, [userId]);
+}
+
+/** L'anonymisation : la ligne reste, tout ce qui désigne une personne part. */
+async function anonymizeAccount(connection: PoolConnection, userId: number): Promise<void> {
+  await connection.execute(
     `UPDATE bg_users
      SET pseudo = CONCAT('compte_supprime_', id),
          avatar_url = NULL,
@@ -1061,19 +1366,60 @@ export async function anonymizeOwnAccount(userId: number): Promise<void> {
      WHERE id = ?`,
     [userId],
   );
-  await db.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
-  // Le pseudo anonymisé doit aussi remplacer le nom affiché en tournoi.
-  await syncSoloEntryIdentity(userId);
+  await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
+  // Les invitations et demandes **en attente** sont annulées, et c'est le seul
+  // chemin par lequel un compte supprimé rejoignait encore une équipe vivante.
+  // Une demande d'adhésion (`REQUEST`) déposée avant la suppression reste
+  // visible du gérant, qui n'a aucune raison de deviner : l'accepter passe par
+  // `respondToInvitation`, qui travaille sur un identifiant et non sur un
+  // pseudo — le filtre de `getUserIdByPseudo` ne l'atteint pas. Le compte
+  // réapparaissait alors au roster, à la fiche d'équipe et « avec équipe » à
+  // l'annuaire. Dans l'autre sens, une invitation adressée au compte n'a plus
+  // personne pour l'accepter : ses sessions viennent d'être effacées et ses
+  // identités avec.
+  //
+  // `CANCELLED` plutôt qu'un `DELETE` : la ligne ne nomme plus personne (le
+  // pseudo est anonymisé), et l'équipe garde la trace d'un échange qui a eu
+  // lieu. Le mode « effacement » n'a rien à faire ici — la cascade emporte la
+  // table avec la ligne.
+  await connection.execute(
+    `UPDATE bg_team_invitations
+        SET status = 'CANCELLED', responded_at = NOW()
+      WHERE user_id = ? AND status = 'PENDING'`,
+    [userId],
+  );
+  // Le pseudo anonymisé doit aussi remplacer le nom affiché en tournoi — sur la
+  // connexion de la transaction, sans quoi le renommage survivrait à un
+  // rollback de l'anonymisation qui l'a motivé.
+  await syncSoloEntryIdentityOn(connection, userId);
 }
 
-export async function updateUserAvatar(userId: number, avatarPath: string | null): Promise<void> {
+/**
+ * Pose (ou retire) l'avatar d'un compte **vivant**, et dit si l'écriture a eu
+ * lieu.
+ *
+ * La condition `is_deleted = 0` n'est pas une précaution de style : un
+ * téléversement déjà parti se bloque sur le verrou de `deleteOwnAccount` et
+ * reprend **après** son commit. Sans elle, il reposait une photo personnelle
+ * toute neuve sur une ligne fraîchement anonymisée — publiquement servie par
+ * `/api/uploads/avatars/…`, c'est-à-dire précisément ce que la suppression
+ * venait d'effacer. Sur un compte effacé, la ligne a disparu et l'écriture ne
+ * touche rien, mais le fichier, lui, est déjà sur le disque : d'où un booléen
+ * rendu, que l'appelant traduit en ménage.
+ */
+export async function updateUserAvatar(
+  userId: number,
+  avatarPath: string | null,
+): Promise<boolean> {
   const db = await getDatabase();
-  await db.execute(
-    `UPDATE bg_users SET avatar_url = ? WHERE id = ?`,
+  const [result] = await db.execute<ResultSetHeader>(
+    `UPDATE bg_users SET avatar_url = ? WHERE id = ? AND is_deleted = 0`,
     [avatarPath, userId],
   );
+  if (result.affectedRows === 0) return false;
   // Le logo de l'entrée solo est l'avatar du joueur.
   await syncSoloEntryIdentity(userId);
+  return true;
 }
 
 /**
@@ -1329,18 +1675,51 @@ export async function setUserRoles(
   // Ne persister en JSON que les rôles cumulables non-ADMIN (ADMIN ⇔ is_admin).
   const nonAdminRoles = sanitized.filter((role) => role !== "ADMIN");
 
-  await db.execute(
-    `UPDATE bg_users SET is_admin = ?, platform_roles_json = ? WHERE id = ?`,
+  // Le `SELECT` ci-dessus donne le **refus lisible** (`USER_NOT_FOUND`), la
+  // condition ici tranche la **course** : les deux ne font pas double emploi,
+  // c'est le même partage qu'entre le contrôle préalable d'un sigle d'équipe et
+  // son index unique. Un `await` sépare la lecture de l'écriture, et une
+  // suppression de compte glissée entre les deux laissait un rôle de
+  // plateforme posé sur une ligne anonymisée — invisible de `getCurrentUser`,
+  // qui filtre déjà les lignes mortes, mais bien listé à l'écran des rôles, qui
+  // rend les comptes supprimés.
+  const [result] = await db.execute<ResultSetHeader>(
+    `UPDATE bg_users SET is_admin = ?, platform_roles_json = ? WHERE id = ? AND is_deleted = 0`,
     [isAdmin ? 1 : 0, JSON.stringify(nonAdminRoles), targetUserId],
   );
+  // Et la course se **dit**, elle ne se tait pas : `affectedRows` compte les
+  // lignes appariées (mysql2 pose `FOUND_ROWS`), donc zéro ne signifie pas
+  // « rien à modifier » mais « la ligne vivante a disparu entre les deux ».
+  // Rendre `sanitized` sans regarder affichait les rôles comme enregistrés à
+  // l'écran d'administration alors que rien ne l'avait été. C'est le refus que
+  // le `SELECT` ci-dessus donne déjà, et le même geste que `updateOwnProfile`
+  // et `updateUserAvatar`, qui refusent bruyamment sur la même condition.
+  if (result.affectedRows === 0) throw new Error("USER_NOT_FOUND");
 
   return sanitized;
 }
 
+/**
+ * Résout un pseudo vers le compte **vivant** qui le porte.
+ *
+ * Ses deux appelants nomment un joueur pour l'**attacher à une équipe** —
+ * `inviteToTeam` et la reprise d'une équipe fantôme, qui en fait un `OWNER`. Un
+ * compte anonymisé garde une ligne et donc un pseudo (`compte_supprime_412`) :
+ * sans la condition, il restait invitable, et une demande d'adhésion déposée
+ * avant la suppression le faisait même **rejoindre** le roster séance tenante —
+ * soit rattacher à une équipe vivante un compte dont on vient de promettre
+ * qu'il ne servirait plus à rien. Pire côté fantôme : il en devenait
+ * propriétaire, sans personne pour ouvrir la session qui l'administre.
+ *
+ * Le filtre est posé ici et pas chez les appelants parce que c'est **l'unique**
+ * traduction « pseudo → compte à rattacher », et que les deux traitent déjà le
+ * `null` en `USER_NOT_FOUND` — ce qui est exactement ce qu'un compte supprimé
+ * doit être pour eux.
+ */
 export async function getUserIdByPseudo(pseudo: string): Promise<number | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_users WHERE pseudo = ? LIMIT 1`,
+    `SELECT id FROM bg_users WHERE pseudo = ? AND is_deleted = 0 LIMIT 1`,
     [normalizePseudo(pseudo)],
   );
 

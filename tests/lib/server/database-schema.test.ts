@@ -321,21 +321,36 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     }
   });
 
-  it("ne lit `information_schema` que pour le filet, jamais pour migrer", () => {
+  it("ne lit `information_schema` pour migrer qu'à l'endroit où rien d'autre ne peut répondre", () => {
     // L'ancien fichier l'interrogeait pour décider s'il devait jouer un
-    // rattrapage — une lecture par démarrage et par cas. La seule qui subsiste
-    // ne **répare** rien : elle dit qu'une base est en retard, et s'arrête là.
-    // Quatre lectures, toutes dans le filet : les types des colonnes témoins,
-    // puis **toutes** les colonnes déclarées, puis les index nommés, puis la
-    // largeur des clés primaires — aucune de ces trois dernières ne se lisant
-    // dans `COLUMNS`.
+    // rattrapage — une lecture par démarrage et par cas. Le contrôle portait
+    // donc « aucune lecture hors du filet », et c'est l'invariant qu'il tenait.
+    //
+    // Il en reste **une**, et elle ne ressemble pas aux anciennes : la règle de
+    // `fk_bg_team_inv_creator` ne se déduit d'aucun `try` tolérant. Une clef
+    // étrangère se remplace en trois instructions dont aucune n'est idempotente,
+    // et « c'est déjà fait » ne se lit ni sur un code d'erreur ni sur la
+    // nullabilité de la colonne (elle bascule à la deuxième des trois, donc une
+    // passe interrompue se croirait terminée). `DELETE_RULE` est le seul endroit
+    // qui dise la vérité : la clef existe **et** dit ce qu'il faut.
+    //
+    // Le contrôle garde donc son objet — on ne relit pas `information_schema`
+    // pour décider d'un `ADD COLUMN` — en nommant l'exception plutôt qu'en
+    // levant le compte, sans quoi il ne verrait plus rien revenir.
     const reads = [...sql.matchAll(/FROM information_schema/gi)];
-    expect(reads).toHaveLength(4);
+    expect(reads).toHaveLength(5);
+
     const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
     expect([...net.matchAll(/FROM information_schema/gi)]).toHaveLength(4);
     expect(net).toContain("information_schema.STATISTICS");
     expect(net).toContain("information_schema.COLUMNS");
     expect(net).toContain("console.error");
+
+    // La cinquième, et le fait qu'elle soit **seule** hors du filet.
+    const migrations = sql.slice(0, sql.indexOf("async function warnIfSchemaIsBehind"));
+    const outside = [...migrations.matchAll(/FROM\s+information_schema\.(\w+)/gi)].map((m) => m[1]);
+    expect(outside).toEqual(["REFERENTIAL_CONSTRAINTS"]);
+    expect(migrations).toContain("CONSTRAINT_NAME = 'fk_bg_team_inv_creator'");
   });
 
   it("voit les trois classes de retard, et pas seulement la colonne absente", () => {

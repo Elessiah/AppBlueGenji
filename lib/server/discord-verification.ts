@@ -65,12 +65,21 @@ type UserDiscordRow = RowDataPacket & {
   discord_verified_at: Date | null;
 };
 
+/**
+ * La ligne du compte, **si elle est encore vivante**.
+ *
+ * Un compte anonymisé garde sa ligne, mais plus aucune de ses identités : lui
+ * rendre son état Discord n'aurait rien à dire, et le laisser entrer dans une
+ * certification rouvrirait la porte que la suppression vient de fermer. Le
+ * `PROFILE_NOT_FOUND` de ses appelants est la bonne réponse — pour eux, ce
+ * compte n'existe plus.
+ */
 async function loadDiscordRow(userId: number): Promise<UserDiscordRow | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<UserDiscordRow[]>(
     `SELECT discord_id, discord_pseudo, discord_verified_at
      FROM bg_users
-     WHERE id = ?
+     WHERE id = ? AND is_deleted = 0
      LIMIT 1`,
     [userId],
   );
@@ -99,6 +108,15 @@ export async function getDiscordAccountState(userId: number): Promise<DiscordAcc
  * comptes du site qui certifieraient le même Discord au même instant : le
  * contrôle préalable donne le refus lisible, l'index donne la garantie. Même
  * paire que le sigle d'équipe.
+ *
+ * `is_deleted = 0` en tranche une autre, et c'est celle qui coûte le plus cher :
+ * une certification lancée avant une suppression de compte attend le verrou de
+ * `deleteOwnAccount` et reprend **après** son commit. Elle reposait alors
+ * `discord_id` sur la ligne fraîchement anonymisée — donc une **porte d'entrée**
+ * neuve, `createOrGetDiscordUser` retrouvant le compte par cet identifiant — et
+ * un tag personnel certifié, que `canViewDiscordTag` ouvre à l'arbitrage. La
+ * lecture préalable ne suffit pas : c'est l'écriture qui doit porter la
+ * condition, un `await` la sépare de son contrôle.
  */
 async function writeVerifiedTag(userId: number, discordId: string, tag: string): Promise<void> {
   const db = await getDatabase();
@@ -108,7 +126,7 @@ async function writeVerifiedTag(userId: number, discordId: string, tag: string):
        SET discord_id = COALESCE(discord_id, ?),
            discord_pseudo = ?,
            discord_verified_at = NOW()
-       WHERE id = ?`,
+       WHERE id = ? AND is_deleted = 0`,
       [discordId, tag, userId],
     );
     if (Number(result.affectedRows) === 0) throw new Error("PROFILE_NOT_FOUND");

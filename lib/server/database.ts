@@ -339,7 +339,12 @@ async function runMigrations(db: Pool): Promise<void> {
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       team_id BIGINT NOT NULL,
       user_id BIGINT NOT NULL,
-      created_by BIGINT NOT NULL,
+      -- NULL = l'auteur a supprimé son compte. L'invitation, elle, reste : elle
+      -- est l'acte de l'équipe (seule sa gestion peut l'émettre) et personne ne
+      -- lit jamais cette colonne. En NOT NULL avec sa cascade, l'effacement d'un
+      -- compte emportait silencieusement les invitations encore en attente chez
+      -- des tiers.
+      created_by BIGINT NULL,
       kind ENUM('INVITE', 'REQUEST') NOT NULL,
       status ENUM('PENDING', 'ACCEPTED', 'DECLINED', 'CANCELLED') NOT NULL DEFAULT 'PENDING',
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -352,9 +357,97 @@ async function runMigrations(db: Pool): Promise<void> {
       CONSTRAINT fk_bg_team_inv_user FOREIGN KEY (user_id)
         REFERENCES bg_users(id) ON DELETE CASCADE,
       CONSTRAINT fk_bg_team_inv_creator FOREIGN KEY (created_by)
-        REFERENCES bg_users(id) ON DELETE CASCADE
+        REFERENCES bg_users(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  // Migration: l'auteur d'une invitation peut disparaître, l'invitation reste.
+  //
+  // `bg_team_invitations.created_by` était `NOT NULL` en `ON DELETE CASCADE`.
+  // Tant qu'aucun compte ne s'effaçait vraiment, la cascade ne partait jamais ;
+  // l'effacement l'a réveillée, et elle emporte alors **les invitations encore
+  // en attente chez des tiers** — un gérant qui n'a jamais joué supprime son
+  // compte, et trois joueurs voient leur invitation disparaître sans que
+  // personne ne l'ait retirée. Or l'invitation est l'acte de l'équipe (seule sa
+  // gestion peut l'émettre), la colonne n'est **lue nulle part**, et le projet
+  // tranche déjà ce cas ailleurs de la même façon : `bg_endurance_penalties`
+  // .`created_by` passe à `NULL`, la sanction restant due.
+  //
+  // La condition n'est pas une optimisation : sans elle, chaque démarrage
+  // détruirait et reposerait la clé étrangère.
+  // La condition porte sur la **règle de la clé**, et non sur la nullabilité de
+  // la colonne. Ce n'est pas la même question : la manœuvre est en trois temps
+  // et rien ne garantit qu'elle aille au bout (processus tué, déploiement,
+  // droits manquants). Lue sur `IS_NULLABLE`, elle disait « c'est fait » dès la
+  // deuxième instruction — la clé pouvait rester absente pour toujours, sans un
+  // signal. Lue sur `DELETE_RULE`, elle ne dit « c'est fait » que lorsque la clé
+  // *existe* et *dit ce qu'il faut* ; tout état intermédiaire se retente au
+  // démarrage suivant.
+  //
+  // **Après** le `CREATE TABLE` ci-dessus, et non parmi les migrations de
+  // colonnes : sur une base neuve la table n'existe pas encore à cet
+  // endroit-là du fichier, les trois `ALTER` échouaient dans le vide et la
+  // garde sur `DELETE_RULE` ne décidait plus rien — la clé n'était juste que
+  // parce que le `CREATE TABLE` la déclare déjà en `SET NULL`. Ici, les deux
+  // chemins (base neuve, base peuplée) passent par la même vérification.
+  //
+  // Chaque instruction porte son `try`, comme le reste du fichier : une
+  // migration qui **lève** casse `getDatabase()`, donc toutes les routes de
+  // l'application — un filet qui casse le schéma est pire que le trou qu'il
+  // bouche. Retirer une clé déjà retirée ou reposer une clé déjà posée n'est
+  // alors qu'un pas sans effet, pas une panne.
+  try {
+    const [invitationCreatorRows] = await db.execute(
+      `SELECT DELETE_RULE AS deleteRule
+       FROM information_schema.REFERENTIAL_CONSTRAINTS
+       WHERE CONSTRAINT_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'bg_team_invitations'
+         AND CONSTRAINT_NAME = 'fk_bg_team_inv_creator'`
+    );
+    const invitationCreatorRule =
+      (invitationCreatorRows as { deleteRule?: string }[])[0]?.deleteRule ?? null;
+    if (invitationCreatorRule !== "SET NULL") {
+      // La clé part d'abord : une colonne référencée ne change pas de
+      // nullabilité tant qu'une contrainte s'appuie dessus.
+      try {
+        await db.execute(`ALTER TABLE bg_team_invitations DROP FOREIGN KEY fk_bg_team_inv_creator`);
+      } catch {
+        // Déjà retirée — passage précédent interrompu, ou base neuve.
+      }
+      try {
+        await db.execute(`ALTER TABLE bg_team_invitations MODIFY COLUMN created_by BIGINT NULL`);
+      } catch {
+        // Déjà nullable.
+      }
+      try {
+        await db.execute(`
+          ALTER TABLE bg_team_invitations
+          ADD CONSTRAINT fk_bg_team_inv_creator FOREIGN KEY (created_by)
+            REFERENCES bg_users(id) ON DELETE SET NULL
+        `);
+      } catch (error) {
+        // Reposée au prochain démarrage : la condition la redemandera tant
+        // qu'elle n'est pas en `SET NULL`. Mais « se retente » est une
+        // promesse, pas un constat : avalée sans un mot, une clé qui ne se
+        // repose **jamais** (droits manquants) laisse la règle d'avant, et
+        // effacer le compte d'une manageuse emporte alors en cascade les
+        // invitations encore en attente qu'elle avait adressées à des tiers.
+        // Une ligne au journal est le seul moyen de distinguer « c'est passé
+        // au démarrage suivant » de « ça ne passera plus ».
+        console.warn(
+          "[db] fk_bg_team_inv_creator non reposée en SET NULL — nouvel essai au prochain démarrage",
+          error,
+        );
+      }
+    }
+  } catch (error) {
+    // `information_schema` inaccessible : rien de tenté, rien de cassé — mais
+    // rien de vérifié non plus, et la clé peut être restée en `CASCADE`.
+    console.warn(
+      "[db] règle de fk_bg_team_inv_creator non vérifiable (information_schema)",
+      error,
+    );
+  }
 
   // ───────────────────────────────────────────────────────────────────────────
   // Tournois

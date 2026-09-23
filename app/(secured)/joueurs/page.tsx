@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/toast";
 import { Ticker } from "@/components/cyber/Ticker";
 import { BgCanvas } from "../_shared/BgCanvas";
 import { AnnuaireSearchField } from "../_shared/AnnuaireSearchField";
+import { Coche } from "@/components/Coche";
 import { PlayerCard } from "./cards/PlayerCard";
 import s from "../_shared/annuaire.module.css";
 
@@ -30,6 +31,11 @@ export default function PlayersPage() {
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sort, setSort] = useState<SortKey>("pseudo");
+  // Les comptes anonymisés sortent de l'annuaire **par défaut** : « compte_supprime_412 »
+  // n'est plus personne, et la ligne n'existe que pour qui remonte un ancien
+  // match. Décoché par défaut, donc, mais jamais retiré — c'est le seul moyen de
+  // retrouver un adversaire d'un tournoi passé.
+  const [showDeleted, setShowDeleted] = useState(false);
 
   useEffect(() => {
     fetch("/api/players", { cache: "no-store" })
@@ -43,9 +49,17 @@ export default function PlayersPage() {
       .catch((e) => showError((e as Error).message));
   }, [showError]);
 
+  // L'annuaire, comptes supprimés compris ou non : tout ce que la page montre
+  // ou compte en descend, sinon la case à cocher changerait la liste sans
+  // changer les compteurs qui la surmontent.
+  const listed = useMemo(
+    () => (showDeleted ? players : players.filter((p) => !p.isDeleted)),
+    [players, showDeleted],
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let r = players.filter((p) => {
+    let r = listed.filter((p) => {
       if (q && !`${p.pseudo} ${p.team?.name || ""}`.toLowerCase().includes(q)) return false;
       if (roleFilter !== "all" && !(p.roles || []).includes(roleFilter as PlayerRole)) return false;
       // Free agent = sans roster ET ouvert au recrutement : un joueur qui a
@@ -57,11 +71,19 @@ export default function PlayersPage() {
     if (sort === "pseudo") r.sort((a, b) => a.pseudo.localeCompare(b.pseudo, "fr"));
     if (sort === "tournaments") r.sort((a, b) => (b.tournamentsCount || 0) - (a.tournamentsCount || 0));
     return r;
-  }, [players, query, roleFilter, statusFilter, sort]);
+  }, [listed, query, roleFilter, statusFilter, sort]);
 
-  const freeAgents = players.filter(isFreeAgent).length;
-  const owCount = players.filter((p) => (p.games || []).includes("OW")).length;
-  const mrCount = players.filter((p) => (p.games || []).includes("MR")).length;
+  // Le prédicat partagé (#139) posé sur la liste **affichée** (#142) : les deux
+  // conditions du compteur venaient de branches différentes et aucune ne
+  // remplace l'autre — « free agent » se lit toujours sur l'ouverture au
+  // recrutement, et un compteur qui ne suivrait pas la case « comptes
+  // supprimés » contredirait la liste qu'il surmonte.
+  const freeAgents = listed.filter(isFreeAgent).length;
+  const owCount = listed.filter((p) => (p.games || []).includes("OW")).length;
+  const mrCount = listed.filter((p) => (p.games || []).includes("MR")).length;
+  // Celui-ci se compte sur **tout** l'annuaire : c'est l'étiquette de la case,
+  // et elle doit dire combien de comptes elle ferait apparaître.
+  const deletedCount = players.filter((p) => p.isDeleted).length;
 
   const accentStyle = {
     "--g-rgb": ACCENT_RGB,
@@ -100,7 +122,7 @@ export default function PlayersPage() {
           <div className={s.metrics}>
             <div className={s.metric}>
               <div className={s.metricNum}>
-                <em>{players.length}</em>
+                <em>{listed.length}</em>
               </div>
               <div className={s.metricLbl}>Profils référencés</div>
             </div>
@@ -165,6 +187,17 @@ export default function PlayersPage() {
                   </button>
                 ))}
               </div>
+              {deletedCount > 0 && (
+                <>
+                  <span style={{ color: "var(--ink-dim)" }}>·</span>
+                  <Coche
+                    label={`Comptes supprimés (${deletedCount})`}
+                    checked={showDeleted}
+                    onChange={setShowDeleted}
+                    theme="joueur"
+                  />
+                </>
+              )}
             </div>
             <div className={s.sortOpts}>
               <span style={{ color: "var(--ink-dim)" }}>Trier :</span>
