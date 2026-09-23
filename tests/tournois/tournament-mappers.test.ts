@@ -1,10 +1,11 @@
 import { describe, it, expect } from "@jest/globals";
 import { mapCard, mapMatch } from "@/lib/server/tournaments/_internal";
 import type { MatchRow, TournamentListRow } from "@/lib/server/tournaments/_internal";
+import type { RowOverrides } from "../helpers/row-overrides";
 
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
-const cardRow = (overrides: Partial<TournamentListRow> = {}): TournamentListRow =>
+const cardRow = (overrides: RowOverrides<TournamentListRow> = {}): TournamentListRow =>
   ({
     id: 1,
     name: "Cup",
@@ -26,7 +27,7 @@ const cardRow = (overrides: Partial<TournamentListRow> = {}): TournamentListRow 
     ...overrides,
   }) as unknown as TournamentListRow;
 
-const matchRow = (overrides: Partial<MatchRow> = {}): MatchRow =>
+const matchRow = (overrides: RowOverrides<MatchRow> = {}): MatchRow =>
   ({
     id: 1,
     tournament_id: 1,

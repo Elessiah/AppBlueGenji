@@ -29,6 +29,7 @@ function team(overrides: Partial<TeamListItem> = {}): TeamListItem {
   return {
     id: 12,
     name: "Dragon Squad",
+    tag: null,
     logoUrl: null,
     membersCount: 5,
     createdAt: ISO,

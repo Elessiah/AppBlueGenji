@@ -22,6 +22,10 @@ function match(overrides: Partial<MatchScoreState> = {}): MatchScoreState {
     team2Score: null,
     winnerTeamId: null,
     forfeitTeamId: null,
+    // Même lecture que la fabrique de `match-lock.test.ts` : un match qui
+    // porte un vainqueur est tranché — la production ne rend jamais l'un sans
+    // l'autre (`decided` vient du statut COMPLETED).
+    decided: overrides.winnerTeamId !== undefined && overrides.winnerTeamId !== null,
     hasPendingReport: false,
     nextWinnerMatchId: null,
     nextLoserMatchId: null,

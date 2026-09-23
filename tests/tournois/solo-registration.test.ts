@@ -16,8 +16,9 @@ import { ensureSoloEntry, findSoloEntry } from "@/lib/server/solo-entries-servic
 import { loadTournamentRow } from "@/lib/server/tournaments/repository";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
 import type { TournamentRow } from "@/lib/server/tournaments/_internal";
+import type { RowOverrides } from "../helpers/row-overrides";
 
-function tournament(overrides: Partial<TournamentRow> = {}): TournamentRow {
+function tournament(overrides: RowOverrides<TournamentRow> = {}): TournamentRow {
   return {
     id: 5,
     state: "REGISTRATION",
@@ -48,7 +49,9 @@ function fakeConnection(counts: { already?: number; registered?: number } = {}) 
 }
 
 describe("resolveUserEntrantTeamId", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("prend l'équipe active en tournoi par équipes", async () => {
     (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 12, roles: ["OWNER"] } as never);
@@ -162,7 +165,9 @@ describe("registerCurrentUserTeam", () => {
 });
 
 describe("canUserRegister", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("autorise un joueur sans entrée solo sur un tournoi individuel", async () => {
     // L'entrée sera créée à l'inscription : ne pas en avoir n'est pas un refus.

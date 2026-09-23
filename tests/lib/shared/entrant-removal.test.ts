@@ -170,12 +170,12 @@ describe("les phrases du refus", () => {
 });
 
 describe("couverture des états", () => {
-  it.each([
+  it.each<[TournamentState, ReturnType<typeof entrantRemovalBlockReason>]>([
     ["UPCOMING", null],
     ["REGISTRATION", null],
     ["RUNNING", "ENTRANT_REMOVAL_TOURNAMENT_STARTED"],
     ["FINISHED", "ENTRANT_REMOVAL_TOURNAMENT_FINISHED"],
-  ] as const)("%s → %s, calendrier neutre", (state, expected) => {
+  ])("%s → %s, calendrier neutre", (state, expected) => {
     // Calendrier volontairement « au milieu des inscriptions » : ce qui est
     // mesuré ici est la contribution de l'état stocké seul.
     expect(entrantRemovalBlockReason(tournament({ state: state as TournamentState }), NOW)).toBe(

@@ -19,7 +19,9 @@ function mockExecute(result: unknown[]) {
 }
 
 describe("loadPendingPrivacyChanges", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("lit création et acceptations en une seule requête, compte vivant seulement", async () => {
     const execute = mockExecute([{ created_at: "2025-01-01 10:00:00", change_id: null }]);
@@ -53,7 +55,9 @@ describe("loadPendingPrivacyChanges", () => {
 });
 
 describe("acknowledgePrivacyChanges", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("insère une ligne par changement, sans doublon et sur un compte vivant", async () => {
     const execute = mockExecute([]);

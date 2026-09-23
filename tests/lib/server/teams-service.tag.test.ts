@@ -38,8 +38,12 @@ function sqlOf(execute: Exec): string {
 }
 
 describe("createTeam — sigle", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("normalise le sigle et l'écrit avec l'équipe", async () => {
     const { poolExecute, connectionExecute } = await mockDb();
@@ -115,8 +119,12 @@ describe("createTeam — sigle", () => {
 });
 
 describe("updateTeamMeta — sigle", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   /** L'auteur est OWNER de l'équipe : première lecture du service. */
   function asOwner(poolExecute: Exec) {
@@ -189,8 +197,12 @@ describe("updateTeamMeta — sigle", () => {
 });
 
 describe("softDeleteTeam — sigle", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("libère le sigle en même temps que le nom", async () => {
     const { poolExecute, connectionExecute, connection } = await mockDb();

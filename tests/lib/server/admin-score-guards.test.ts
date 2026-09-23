@@ -115,7 +115,9 @@ function fakeConnection(
 }
 
 describe("adminSaveMatchScores — match déjà tranché", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("refuse d'enregistrer un score par-dessus un résultat acquis", async () => {
     // Cette route n'écrit que les scores : appliquée à un match tranché, elle
@@ -152,7 +154,9 @@ describe("adminSaveMatchScores — match déjà tranché", () => {
 });
 
 describe("forfait — l'équipe doit jouer le match", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("refuse un forfait déclaré pour une équipe étrangère (enregistrement)", async () => {
     const { conn, writes } = fakeConnection();

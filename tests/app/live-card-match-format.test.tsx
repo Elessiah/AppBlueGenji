@@ -2,8 +2,9 @@ import { describe, expect, it } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
 import { LiveCard } from "@/components/cyber/landing/LiveCard";
 import type { LandingLive, LandingLiveMatch } from "@/lib/shared/landing";
-import { MATCH_FORMAT_BOUNDS, matchFormatLabel } from "@/lib/shared/match-format";
-import type { MatchFormat, TournamentCard } from "@/lib/shared/types";
+import { MATCH_FORMAT_BOUNDS, matchFormatLabel, type MatchFormat } from "@/lib/shared/match-format";
+import type { TournamentCard } from "@/lib/shared/types";
+import { tournamentCard } from "../helpers/tournament-card";
 
 /**
  * La carte « en cours » de l'accueil annonce le format des matchs du tournoi.
@@ -22,7 +23,7 @@ import type { MatchFormat, TournamentCard } from "@/lib/shared/types";
 const ISO = "2026-09-01T18:00:00.000Z";
 
 function tournament(matchFormat: MatchFormat | null): TournamentCard {
-  return {
+  return tournamentCard({
     id: 7,
     name: "Coupe Genji",
     description: null,
@@ -42,7 +43,7 @@ function tournament(matchFormat: MatchFormat | null): TournamentCard {
     phases: null,
     matchFormat,
     liveUrl: null,
-  };
+  });
 }
 
 function match(roundLabel: string, matchFormat: MatchFormat | null = null): LandingLiveMatch {

@@ -45,8 +45,12 @@ function params(id: string) {
   return { params: Promise.resolve({ id }) };
 }
 
-beforeEach(() => jest.clearAllMocks());
-afterEach(() => jest.restoreAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 describe("GET /api/recruitment", () => {
   it("returns active ads for anonymous visitors", async () => {

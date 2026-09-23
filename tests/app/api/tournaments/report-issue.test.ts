@@ -35,7 +35,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   (reportTournamentIssue as jest.Mock).mockResolvedValue({ notifiedReferees: 2 } as never);
 });
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 describe("POST /api/tournaments/[id]/report-issue", () => {
   it("rejette un visiteur anonyme avec 401", async () => {

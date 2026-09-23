@@ -27,7 +27,9 @@ describe("POST /api/profile/avatar", () => {
     // L'écriture réussit, sauf mention contraire : un compte vivant.
     (updateUserAvatar as jest.Mock).mockResolvedValue(true as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejects anonymous users with 401", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
@@ -109,7 +111,9 @@ describe("DELETE /api/profile/avatar", () => {
     // implémentations, si bien que ce bloc vivait sur le réglage du voisin.
     (updateUserAvatar as jest.Mock).mockResolvedValue(true as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejects anonymous users with 401", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
@@ -171,7 +175,9 @@ describe("DELETE /api/profile/avatar", () => {
 });
 
 describe("POST /api/profile/avatar — course avec la suppression du compte", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   /**
    * Un téléversement parti avant la suppression reprend **après** son commit,
@@ -225,7 +231,9 @@ describe("avatar — l'échec du ménage ne dément pas la base", () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
     (updateUserAvatar as jest.Mock).mockResolvedValue(true as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   function unlinkRefused(): Error {
     const error = new Error("EACCES: permission denied") as Error & { code: string };

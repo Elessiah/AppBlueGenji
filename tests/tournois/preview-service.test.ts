@@ -81,7 +81,9 @@ describe("loadTournamentPreview", () => {
     jest.clearAllMocks();
     (loadPhases as jest.Mock).mockResolvedValue([] as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("ne lit rien pour un tournoi lancé", async () => {
     const preview = await run(tournament({ state: "RUNNING" }));
@@ -217,7 +219,7 @@ describe("loadTournamentPreview", () => {
 
     const preview = await run(tournament({ format: "MULTI" }));
 
-    expect(loadPhases).toHaveBeenCalledWith(connection, 7);
+    expect(loadPhases).toHaveBeenCalledWith(connection as never, 7);
     expect(preview?.format).toBe("SWISS");
     expect(preview?.rounds).toBe(3);
     expect(preview?.phasePlan).toHaveLength(2);

@@ -20,6 +20,7 @@ import {
   fetchDiscordUser,
 } from "@/lib/server/discord-oauth";
 import { buildBlizzardAuthorizationUrl, fetchBlizzardUser } from "@/lib/server/blizzard-oauth";
+import type { OAuthProvider } from "@/lib/shared/oauth-providers";
 
 /**
  * **L'aller-retour OAuth, écrit une fois pour trois portes.**
@@ -57,11 +58,11 @@ beforeEach(() => {
 });
 
 describe("startOAuth", () => {
-  it.each([
+  it.each<[OAuthProvider, string]>([
     ["GOOGLE", "https://accounts.google.test/auth"],
     ["DISCORD", "https://discord.test/auth"],
     ["BLIZZARD", "https://blizzard.test/auth"],
-  ] as const)("envoie chez %s et scelle l'état", async (provider, expected) => {
+  ])("envoie chez %s et scelle l'état", async (provider, expected) => {
     const response = await startOAuth(
       request("http://localhost:3000/api/auth/x/start?redirect=%2Ftournois"),
       provider,

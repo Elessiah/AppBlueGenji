@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
-import { Exo_2, Rajdhani, Inter, JetBrains_Mono, Orbitron } from "next/font/google";
 import "./globals.css";
+import { FONT_VARIABLES } from "./site-fonts";
 import { ToastProvider } from "@/components/ui/toast";
 import { RecruitmentHighlight } from "@/components/recruitment-highlight";
 import { VisitTracker } from "@/components/visit-tracker";
@@ -21,36 +21,6 @@ import {
 } from "@/lib/shared/recruitment";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/shared/share-metadata";
 import { DEFAULT_SHARE_IMAGE } from "@/lib/shared/page-metadata";
-
-const titleFont = Rajdhani({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  variable: "--font-title",
-});
-
-const bodyFont = Exo_2({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-body",
-});
-
-const sansFont = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-sans",
-});
-
-const monoFont = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-mono",
-});
-
-const displayFont = Orbitron({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  variable: "--font-display",
-});
 
 /**
  * Socle des métadonnées de partage, hérité par toutes les pages.
@@ -179,7 +149,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="fr">
-      <body className={`${titleFont.variable} ${bodyFont.variable} ${sansFont.variable} ${monoFont.variable} ${displayFont.variable}`}>
+      <body style={FONT_VARIABLES}>
         <ToastProvider>
           <VisitTracker />
           {!user && googleClientId && <GoogleOneTap clientId={googleClientId} nonce={nonce} />}

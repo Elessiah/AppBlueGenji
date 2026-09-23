@@ -297,7 +297,9 @@ describe("forfeitMatchScores — un seul chiffre pour tous les abandons", () => 
 });
 
 describe("loadEnduranceMeta — l'historique voyage jusqu'à la vue", () => {
-  beforeEach(() => jest.resetModules());
+  beforeEach(() => {
+    jest.resetModules();
+  });
 
   /**
    * Connexion factice : le tournoi, le classement joint aux équipes, puis les

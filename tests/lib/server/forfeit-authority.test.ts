@@ -135,8 +135,8 @@ describe("forfeitTournamentTeamPublic — qualité pour désengager", () => {
 
     await forfeitTournamentTeamPublic(TOURNAMENT_ID, TEAM_ID, 42);
 
-    expect(entrantMock).toHaveBeenCalledWith(connection, expect.anything(), 42);
-    expect(tournamentRowMock).toHaveBeenCalledWith(connection, TOURNAMENT_ID);
+    expect(entrantMock).toHaveBeenCalledWith(connection as never, expect.anything(), 42);
+    expect(tournamentRowMock).toHaveBeenCalledWith(connection as never, TOURNAMENT_ID);
     expect(connection.beginTransaction.mock.invocationCallOrder[0]).toBeLessThan(
       entrantMock.mock.invocationCallOrder[0],
     );

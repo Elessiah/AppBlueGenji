@@ -16,7 +16,7 @@ async function mockDb(execute: jest.Mock) {
       execute: jest.fn<() => Promise<unknown>>().mockResolvedValue([[], []]),
       release: () => undefined,
     }),
-  });
+  } as never);
 }
 
 /**
@@ -36,11 +36,15 @@ function profileUpdate(execute: jest.Mock): [string, unknown[]] {
 }
 
 describe("updateOwnProfile — pseudo non masquable + ouverture au recrutement", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("n'écrit plus jamais visible_pseudo", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }]);
+    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
     await mockDb(execute);
 
     await updateOwnProfile(42, { visibility: { avatar: false } });
@@ -51,7 +55,7 @@ describe("updateOwnProfile — pseudo non masquable + ouverture au recrutement",
   });
 
   it("persiste la fermeture au recrutement", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }]);
+    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
     await mockDb(execute);
 
     await updateOwnProfile(42, { openToRecruitment: false });
@@ -64,7 +68,7 @@ describe("updateOwnProfile — pseudo non masquable + ouverture au recrutement",
   });
 
   it("laisse la valeur inchangée quand le champ est absent du patch", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }]);
+    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
     await mockDb(execute);
 
     await updateOwnProfile(42, { isAdult: true });

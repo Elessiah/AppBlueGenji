@@ -11,7 +11,7 @@ jest.mock("@/lib/server/database");
 
 async function mockDb(execute: jest.Mock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute });
+  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
 }
 
 const ROW = {
@@ -35,7 +35,7 @@ const INPUT = {
 
 /** Répond aux SELECT par `rows`, aux écritures par un en-tête de résultat. */
 function db(rows: unknown[] = [ROW]): jest.Mock {
-  return jest.fn().mockImplementation(async (sql: string) => {
+  return jest.fn<any>().mockImplementation(async (sql: string) => {
     const query = String(sql).trim();
     if (!query.startsWith("SELECT")) return [{ insertId: 9, affectedRows: 1 }];
     // `resolveCategoryOrder` interroge aussi la table : elle attend une colonne
@@ -106,7 +106,7 @@ describe("benevoles-service — mutualisation de la lecture", () => {
   it("rend une liste vide quand la base est injoignable, sans la mettre en cache", async () => {
     const execute = jest
       .fn()
-      .mockRejectedValueOnce(new Error("DOWN"))
+      .mockRejectedValueOnce(new Error("DOWN") as never)
       .mockImplementation(async () => [[ROW]]);
     await mockDb(execute);
 

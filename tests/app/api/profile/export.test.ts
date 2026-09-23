@@ -6,6 +6,7 @@ jest.mock("@/lib/server/users-service");
 import { GET } from "@/app/api/profile/export/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { exportOwnData } from "@/lib/server/users-service";
+import { emptyDeepStats } from "@/lib/shared/stats";
 import type { PersonalDataExport } from "@/lib/shared/types";
 
 const user = { id: 42 } as Awaited<ReturnType<typeof getCurrentUser>>;
@@ -18,7 +19,9 @@ function sampleExport(): PersonalDataExport {
       pseudo: "player",
       discordId: "123",
       discordPseudo: "player#0001",
+      discordVerifiedAt: null,
       googleSub: null,
+      blizzardSub: null,
       isAdult: true,
       isAdmin: false,
       createdAt: "2026-01-01T00:00:00.000Z",
@@ -27,24 +30,23 @@ function sampleExport(): PersonalDataExport {
       avatarUrl: null,
       overwatchBattletag: "Player#1234",
       marvelRivalsTag: null,
-      visibility: { avatar: false, pseudo: true, overwatch: false, marvel: false, major: false },
+      visibility: { avatar: false, overwatch: false, marvel: false, major: false },
+      openToRecruitment: true,
     },
-    stats: {
-      tournamentsPlayed: 0,
-      tournamentsWon: 0,
-      matchesWon: 0,
-      matchesLost: 0,
-      bestRank: null,
-      averageRank: null,
-    },
+    stats: emptyDeepStats(new Date("2026-07-04T00:00:00.000Z")),
     teamsTimeline: [],
     tournaments: [],
+    privacyAcknowledgments: [],
   };
 }
 
 describe("GET /api/profile/export", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejects anonymous users with 401", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
@@ -65,9 +67,9 @@ describe("GET /api/profile/export", () => {
     const body = JSON.parse(await res.text()) as PersonalDataExport;
     expect(body.account.id).toBe(42);
     // L'adresse n'a plus de champ : la colonne a été retirée de `bg_users`, et
-    // l'export ne peut donc plus la porter (`docs/DATABASE_SCHEMA.md`). Le
-    // gabarit n'étant pas type-vérifié par ts-jest (`tsconfig.jest.json`
-    // n'inclut pas `tests/`), seule une assertion explicite tient la règle.
+    // l'export ne peut donc plus la porter (`docs/DATABASE_SCHEMA.md`). Le type
+    // refuse déjà un `email` dans le gabarit (`npm run typecheck`) ; l'assertion
+    // tient la règle sur ce que la route **renvoie**, qu'aucun type ne borne.
     expect(body.account).not.toHaveProperty("email");
   });
 

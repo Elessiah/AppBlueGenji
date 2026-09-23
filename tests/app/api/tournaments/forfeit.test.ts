@@ -33,7 +33,9 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
     (service.forfeitTournamentTeam as jest.Mock).mockResolvedValue(undefined as never);
     (service.getUserEntrant as jest.Mock).mockResolvedValue(entrant(null) as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejette les anonymes (401)", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);

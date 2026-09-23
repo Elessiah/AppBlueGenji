@@ -56,7 +56,7 @@ async function mockDb(options: {
     .mockResolvedValue([{ affectedRows: options.claimed === false ? 0 : 1 }]);
 
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ query, execute });
+  (getDatabase as jest.Mock).mockResolvedValue({ query, execute } as never);
   return { query, execute };
 }
 
@@ -78,7 +78,7 @@ beforeEach(() => {
     sent: 0,
     unresolved: [],
     failed: [],
-  });
+  } as never);
 });
 
 afterEach(() => {
@@ -112,7 +112,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
 
     await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
 
-    const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = execute.mock.calls[0] as unknown as [string, unknown[]];
     expect(sql).toMatch(/INSERT IGNORE INTO bg_match_reminders/);
     expect(params).toEqual([31, "PT1H"]);
   });
@@ -162,12 +162,12 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
 
     await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
 
-    const [sql] = query.mock.calls[0] as [string];
+    const [sql] = query.mock.calls[0] as unknown as [string];
     expect(sql).toMatch(/m\.start_at > NOW\(\)/);
     // Fenêtre de lecture = horizon + une journée de marge, pour que la manche
     // soit observée avant que le palier « une semaine » ne s'ouvre.
     expect(sql).toMatch(/DATE_ADD\(NOW\(\), INTERVAL \? SECOND\)/);
-    const [, params] = query.mock.calls[0] as [string, unknown[]];
+    const [, params] = query.mock.calls[0] as unknown as [string, unknown[]];
     expect(params).toEqual([8 * 24 * 60 * 60]);
     expect(sql).toMatch(/m\.status <> 'COMPLETED'/);
     // Jointure interne sur les deux engagées : un bye n'est pas un match.

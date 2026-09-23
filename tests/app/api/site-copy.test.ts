@@ -28,8 +28,12 @@ const deleteReq = (key?: string) =>
   });
 
 describe("GET /api/site-copy", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("est public : les textes servent au rendu de la vitrine", async () => {
     (getSiteCopy as jest.Mock).mockResolvedValue(copy as never);
@@ -43,8 +47,12 @@ describe("GET /api/site-copy", () => {
 });
 
 describe("PATCH /api/site-copy", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejette un visiteur anonyme avec 401", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
@@ -97,8 +105,12 @@ describe("PATCH /api/site-copy", () => {
 });
 
 describe("DELETE /api/site-copy", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejette un membre sans permission showcase", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(visitor as never);

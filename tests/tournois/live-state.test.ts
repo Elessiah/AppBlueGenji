@@ -93,6 +93,7 @@ const snapshot = (overrides: Partial<TournamentSnapshot> = {}): TournamentSnapsh
   currentPhaseId: null,
   phaseStandings: {},
   soloUserIds: {},
+  seedingSource: "REGISTRATION",
   version: "v1",
   ...overrides,
 });
@@ -106,6 +107,9 @@ const viewer = (overrides: Partial<TournamentViewerContext> = {}): TournamentVie
   canCreateReportsForTeamIds: [10],
   isAdmin: false,
   canDelete: false,
+  canManageLive: false,
+  registrationBlock: null,
+  preview: null,
   ...overrides,
 });
 

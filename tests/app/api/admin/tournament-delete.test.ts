@@ -28,7 +28,9 @@ describe("DELETE /api/admin/tournaments/[id]", () => {
     (deleteTournament as jest.Mock).mockResolvedValue({ id: 7, name: "BlueGenji Open" } as never);
     (sendBotLog as jest.Mock).mockResolvedValue(undefined as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("supprime le tournoi pour un administrateur", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);

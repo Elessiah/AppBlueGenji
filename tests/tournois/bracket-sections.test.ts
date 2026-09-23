@@ -9,8 +9,9 @@ import {
   qualifyLabelFor,
   stageName,
 } from "@/app/(secured)/tournois/[id]/_lib/bracket-sections";
+import { bracketMatch } from "../helpers/bracket-match";
 
-const mockMatch = (overrides: Partial<BracketMatch>): BracketMatch => ({
+const mockMatch = (overrides: Partial<BracketMatch>): BracketMatch => bracketMatch({
   id: 1,
   tournamentId: 1,
   bracket: "UPPER",

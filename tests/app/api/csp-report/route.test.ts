@@ -21,7 +21,9 @@ describe("POST /api/csp-report", () => {
     resetRateLimit(CSP_REPORT_RULE.name);
     (parseCspReport as jest.Mock).mockReturnValue([]);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("répond toujours 204, y compris sur un rapport lisible", async () => {
     const res = await POST(cspReq({ "csp-report": { "violated-directive": "img-src" } }));

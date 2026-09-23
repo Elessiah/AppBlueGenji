@@ -17,32 +17,36 @@ async function mockDb(execute: ExecuteMock, connectionExecute?: ExecuteMock) {
   (getDatabase as jest.Mock).mockResolvedValue({
     execute,
     getConnection: jest.fn(async () => connection),
-  });
+  } as never);
   return connection;
 }
 
 describe("createGhostTeam", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("insère une équipe marquée fantôme, sans aucun membre", async () => {
     // Deux requêtes : le sigle est cherché avant d'insérer (ici, aucun sigle
     // demandé, la recherche est donc court-circuitée).
-    const execute = jest.fn().mockResolvedValue([{ insertId: 42 }]);
+    const execute = jest.fn().mockResolvedValue([{ insertId: 42 }] as never);
     await mockDb(execute);
 
     await expect(createGhostTeam("  Les Fantômes  ", "  Équipe invitée  ")).resolves.toBe(42);
 
     expect(execute).toHaveBeenCalledTimes(1);
     const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
-    expect(sql).toMatch(/INSERT INTO bg_teams .*is_ghost/s);
+    expect(sql).toMatch(/INSERT INTO bg_teams [\s\S]*is_ghost/);
     expect(sql).toMatch(/VALUES \(\?, \?, NULL, \?, 1\)/);
     // Nom et description sont trimés ; le sigle absent vaut NULL.
     expect(params).toEqual(["Les Fantômes", null, "Équipe invitée"]);
   });
 
   it("normalise une description vide en NULL", async () => {
-    const execute = jest.fn().mockResolvedValue([{ insertId: 7 }]);
+    const execute = jest.fn().mockResolvedValue([{ insertId: 7 }] as never);
     await mockDb(execute);
 
     await createGhostTeam("Alpha Squad", "   ");
@@ -61,16 +65,20 @@ describe("createGhostTeam", () => {
 });
 
 describe("claimGhostTeam", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("nomme le joueur OWNER et lève le drapeau fantôme", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]]) // équipe
-      .mockResolvedValueOnce([[{ id: 9 }]]) // utilisateur
-      .mockResolvedValueOnce([[]]); // aucune équipe active
-    const connectionExecute = jest.fn().mockResolvedValue([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]] as never) // équipe
+      .mockResolvedValueOnce([[{ id: 9 }]] as never) // utilisateur
+      .mockResolvedValueOnce([[]] as never); // aucune équipe active
+    const connectionExecute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
     const connection = await mockDb(execute, connectionExecute);
 
     await claimGhostTeam(3, 9);
@@ -89,21 +97,21 @@ describe("claimGhostTeam", () => {
   });
 
   it("refuse une équipe inconnue", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[]]);
+    const execute = jest.fn().mockResolvedValueOnce([[]] as never);
     await mockDb(execute);
 
     await expect(claimGhostTeam(3, 9)).rejects.toThrow("TEAM_NOT_FOUND");
   });
 
   it("refuse une équipe réelle", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[{ is_ghost: 0, deleted_at: null }]]);
+    const execute = jest.fn().mockResolvedValueOnce([[{ is_ghost: 0, deleted_at: null }]] as never);
     await mockDb(execute);
 
     await expect(claimGhostTeam(3, 9)).rejects.toThrow("NOT_A_GHOST_TEAM");
   });
 
   it("refuse une équipe dissoute", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: new Date() }]]);
+    const execute = jest.fn().mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: new Date() }]] as never);
     await mockDb(execute);
 
     await expect(claimGhostTeam(3, 9)).rejects.toThrow("TEAM_ALREADY_DELETED");
@@ -112,8 +120,8 @@ describe("claimGhostTeam", () => {
   it("refuse un joueur inconnu ou anonymisé", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]])
-      .mockResolvedValueOnce([[]]);
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]] as never)
+      .mockResolvedValueOnce([[]] as never);
     await mockDb(execute);
 
     await expect(claimGhostTeam(3, 9)).rejects.toThrow("USER_NOT_FOUND");
@@ -128,10 +136,10 @@ describe("claimGhostTeam", () => {
   it("cherche le futur propriétaire sur is_deleted, jamais sur deleted_at", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]])
-      .mockResolvedValueOnce([[{ id: 9 }]])
-      .mockResolvedValueOnce([[]]);
-    const connectionExecute = jest.fn().mockResolvedValue([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]] as never)
+      .mockResolvedValueOnce([[{ id: 9 }]] as never)
+      .mockResolvedValueOnce([[]] as never);
+    const connectionExecute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
     await mockDb(execute, connectionExecute);
 
     await claimGhostTeam(3, 9);
@@ -145,9 +153,9 @@ describe("claimGhostTeam", () => {
   it("refuse un joueur déjà engagé dans une équipe", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]])
-      .mockResolvedValueOnce([[{ id: 9 }]])
-      .mockResolvedValueOnce([[{ id: 55 }]]);
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]] as never)
+      .mockResolvedValueOnce([[{ id: 9 }]] as never)
+      .mockResolvedValueOnce([[{ id: 55 }]] as never);
     await mockDb(execute);
 
     await expect(claimGhostTeam(3, 9)).rejects.toThrow("USER_ALREADY_IN_TEAM");
@@ -156,10 +164,10 @@ describe("claimGhostTeam", () => {
   it("annule la transaction si l'insertion du membre échoue", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]])
-      .mockResolvedValueOnce([[{ id: 9 }]])
-      .mockResolvedValueOnce([[]]);
-    const connectionExecute = jest.fn().mockRejectedValue(new Error("DB_DOWN"));
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]] as never)
+      .mockResolvedValueOnce([[{ id: 9 }]] as never)
+      .mockResolvedValueOnce([[]] as never);
+    const connectionExecute = jest.fn().mockRejectedValue(new Error("DB_DOWN") as never);
     const connection = await mockDb(execute, connectionExecute);
 
     await expect(claimGhostTeam(3, 9)).rejects.toThrow("DB_DOWN");
@@ -170,8 +178,12 @@ describe("claimGhostTeam", () => {
 });
 
 describe("listGhostTeams", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("ne renvoie que les fantômes encore actives", async () => {
     // La troisième ligne porte une URL étrangère : une fantôme est créée par le
@@ -184,7 +196,7 @@ describe("listGhostTeams", () => {
         { id: 2, name: "Beta", logo_url: "/api/uploads/teams/2-ab12cd34.webp" },
         { id: 3, name: "Gamma", logo_url: "https://placehold.co/128x128" },
       ],
-    ]);
+    ] as never);
     await mockDb(execute);
 
     await expect(listGhostTeams()).resolves.toEqual([
@@ -203,7 +215,7 @@ describe("listGhostTeams", () => {
   });
 
   it("écarte les fantômes déjà engagées dans le tournoi visé", async () => {
-    const execute = jest.fn().mockResolvedValue([[{ id: 1, name: "Alpha", logo_url: null }]]);
+    const execute = jest.fn().mockResolvedValue([[{ id: 1, name: "Alpha", logo_url: null }]] as never);
     await mockDb(execute);
 
     await expect(listGhostTeams(12)).resolves.toEqual([{ id: 1, name: "Alpha", logoUrl: null }]);

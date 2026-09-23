@@ -7,6 +7,7 @@ import {
   type MatchScoreState,
 } from "@/lib/shared/match-lock";
 import type { BracketMatch } from "@/lib/shared/types";
+import { bracketMatch } from "../../helpers/bracket-match";
 
 function match(overrides: Partial<MatchScoreState> = {}): MatchScoreState {
   return {
@@ -145,7 +146,7 @@ describe("match-lock — verrouillage de l'édition", () => {
 });
 
 describe("match-lock — adaptation depuis BracketMatch", () => {
-  const base: BracketMatch = {
+  const base: BracketMatch = bracketMatch({
     id: 3,
     tournamentId: 1,
     bracket: "UPPER",
@@ -169,7 +170,7 @@ describe("match-lock — adaptation depuis BracketMatch", () => {
     nextLoserSlot: null,
     scoreDeadlineAt: null,
     updatedAt: "2026-08-16T10:00:00.000Z",
-  };
+  });
 
   it("reporte les identifiants et les liens", () => {
     const state = fromBracketMatch(base);

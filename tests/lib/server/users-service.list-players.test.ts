@@ -5,7 +5,7 @@ jest.mock("@/lib/server/database");
 
 async function mockDb(execute: jest.Mock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute });
+  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
 }
 
 function userRow(overrides: Record<string, unknown> = {}) {
@@ -35,16 +35,20 @@ function userRow(overrides: Record<string, unknown> = {}) {
 async function runList(rows: Record<string, unknown>[], viewerId: number) {
   const execute = jest
     .fn()
-    .mockResolvedValueOnce([rows]) // bg_users
-    .mockResolvedValueOnce([[]]) // team memberships (équipe courante)
-    .mockResolvedValueOnce([[]]); // appartenances (loadPlayerRecords)
+    .mockResolvedValueOnce([rows] as never) // bg_users
+    .mockResolvedValueOnce([[]] as never) // team memberships (équipe courante)
+    .mockResolvedValueOnce([[]] as never); // appartenances (loadPlayerRecords)
   await mockDb(execute);
   return listPlayers(viewerId);
 }
 
 describe("listPlayers visibility", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("masks the avatar of other players when hidden", async () => {
     const players = await runList([userRow({ visible_avatar: 0 })], 999);
@@ -81,9 +85,9 @@ describe("listPlayers visibility", () => {
   it("filtre les engagements dans les deux branches de l'union", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce([[userRow({ id: 7 }), userRow({ id: 9, pseudo: "Other" })]])
-      .mockResolvedValueOnce([[]])
-      .mockResolvedValueOnce([[]]);
+      .mockResolvedValueOnce([[userRow({ id: 7 }), userRow({ id: 9, pseudo: "Other" })]] as never)
+      .mockResolvedValueOnce([[]] as never)
+      .mockResolvedValueOnce([[]] as never);
     await mockDb(execute);
 
     await listPlayers(999);
@@ -101,9 +105,9 @@ describe("listPlayers visibility", () => {
   it("ne compte plus victoires et défaites avec sa propre requête", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce([[userRow({ id: 7 })]])
-      .mockResolvedValueOnce([[]])
-      .mockResolvedValueOnce([[]]);
+      .mockResolvedValueOnce([[userRow({ id: 7 })]] as never)
+      .mockResolvedValueOnce([[]] as never)
+      .mockResolvedValueOnce([[]] as never);
     await mockDb(execute);
 
     await listPlayers(999);

@@ -8,8 +8,9 @@ jest.mock("@/lib/server/tournaments-service");
 import { generateMetadata } from "@/app/(secured)/tournois/[id]/layout";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
-import type { AuthUser } from "@/lib/shared/types";
+import type { AuthUser } from "@/lib/server/auth";
 import type { TournamentCard } from "@/lib/shared/types";
+import { tournamentCard } from "../helpers/tournament-card";
 
 /**
  * L'aperçu d'un lien de tournoi, du côté du câblage.
@@ -39,7 +40,7 @@ const mockedUser = jest.mocked(getCurrentUser);
 const mockedSnapshot = jest.mocked(getVisibleTournamentSnapshot);
 
 function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
-  return {
+  return tournamentCard({
     id: 42,
     name: "OW Open Cup",
     description: null,
@@ -60,7 +61,7 @@ function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
     matchFormat: null,
     liveUrl: null,
     ...overrides,
-  };
+  });
 }
 
 function user(overrides: Partial<AuthUser> = {}): AuthUser {
@@ -125,7 +126,8 @@ describe("generateMetadata de la fiche", () => {
     expect(meta.title).toEqual({ absolute: "OW Open Cup · Overwatch" });
     expect(meta.openGraph?.title).toBe("OW Open Cup · Overwatch");
     expect(meta.openGraph?.url).toBe("/tournois/42");
-    expect(meta.twitter?.card).toBe("summary_large_image");
+    // `twitter` est une union dont seule une branche porte `card`.
+    expect((meta.twitter as { card?: string } | null | undefined)?.card).toBe("summary_large_image");
     expect(String(meta.description)).toContain("Inscriptions ouvertes");
   });
 

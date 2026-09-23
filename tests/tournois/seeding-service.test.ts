@@ -37,7 +37,7 @@ async function mockDb() {
   const { getDatabase } = await import("@/lib/server/database");
   (getDatabase as jest.Mock).mockResolvedValue({
     getConnection: jest.fn(async () => connection),
-  });
+  } as never);
 }
 
 function tournament(overrides: Row = {}): Row {
@@ -76,7 +76,9 @@ describe("loadSeedingBoard", () => {
     jest.clearAllMocks();
     await mockDb();
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("renumérote un ordre à trous et signale l'ordre encore libre", async () => {
     (loadTournamentRow as jest.Mock).mockResolvedValue(tournament() as never);
@@ -116,7 +118,9 @@ describe("reorderSeeding", () => {
     await mockDb();
     connection.execute.mockResolvedValue(registrationRows() as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("écrit les seeds dans le nouvel ordre et marque le seeding manuel", async () => {
     (loadTournamentRow as jest.Mock).mockResolvedValue(tournament() as never);
@@ -149,8 +153,8 @@ describe("reorderSeeding", () => {
 
     await reorderSeeding(5, [2, 1]);
 
-    expect(flushBotLogs).toHaveBeenCalledWith(connection);
-    expect(discardBotLogs).toHaveBeenCalledWith(connection);
+    expect(flushBotLogs).toHaveBeenCalledWith(connection as never);
+    expect(discardBotLogs).toHaveBeenCalledWith(connection as never);
   });
 
   it("jette la file du journal quand la transaction échoue", async () => {
@@ -161,7 +165,7 @@ describe("reorderSeeding", () => {
     await expect(reorderSeeding(5, [2, 1])).rejects.toThrow("ER_LOCK_DEADLOCK");
 
     expect(flushBotLogs).not.toHaveBeenCalled();
-    expect(discardBotLogs).toHaveBeenCalledWith(connection);
+    expect(discardBotLogs).toHaveBeenCalledWith(connection as never);
   });
 
   it("détruit le plateau existant pour qu'il soit régénéré", async () => {
@@ -172,8 +176,8 @@ describe("reorderSeeding", () => {
 
     await reorderSeeding(5, [2, 1]);
 
-    expect(deleteAllMatches).toHaveBeenCalledWith(connection, 5);
-    expect(resetRegistrationRanks).toHaveBeenCalledWith(connection, 5);
+    expect(deleteAllMatches).toHaveBeenCalledWith(connection as never, 5);
+    expect(resetRegistrationRanks).toHaveBeenCalledWith(connection as never, 5);
     expect(
       connection.execute.mock.calls.some(([sql]) => String(sql).includes("bracket_size = NULL")),
     ).toBe(true);
@@ -194,8 +198,8 @@ describe("reorderSeeding", () => {
 
     // Le plateau est détruit ET le moteur du format est réamorcé : sans cela le
     // tournoi resterait indéfiniment sans aucun match.
-    expect(deleteAllMatches).toHaveBeenCalledWith(connection, 5);
-    expect(initializer()).toHaveBeenCalledWith(5, connection);
+    expect(deleteAllMatches).toHaveBeenCalledWith(connection as never, 5);
+    expect(initializer()).toHaveBeenCalledWith(5, connection as never);
   });
 
   it("purge l'état des phases avant de réamorcer un MULTI", async () => {

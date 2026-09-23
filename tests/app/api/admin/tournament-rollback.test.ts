@@ -57,7 +57,9 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
     (rollbackCurrentRound as jest.Mock).mockResolvedValue(rolledBack as never);
     (sendBotLog as jest.Mock).mockResolvedValue(true as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it.each([
     ["un administrateur", admin],

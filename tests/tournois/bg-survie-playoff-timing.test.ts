@@ -164,7 +164,9 @@ describe("reconcileEndurance — bascule en play-offs", () => {
     jest.clearAllMocks();
     (createMatch as jest.Mock).mockResolvedValue(99 as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("n'ouvre pas l'arbre tant que la manche courante n'est pas finie", async () => {
     // Deux rencontres jouées en 3-0 : deux équipes à 0 point, donc huit encore
@@ -214,7 +216,9 @@ describe("reconcileEndurance — manche périmée défaite", () => {
     jest.clearAllMocks();
     (createMatch as jest.Mock).mockResolvedValue(99 as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("défait la manche périmée", async () => {
     const conn = makeStaleRoundConn();

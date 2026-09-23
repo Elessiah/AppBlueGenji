@@ -26,8 +26,12 @@ function patchReq(body: unknown) {
  * — la saisie était bonne, c'est l'état de la ligne qui a changé sous elle.
  */
 describe("PATCH /api/profile — course avec la suppression du compte", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rend 409 et le code que l'écran sait traduire", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
@@ -74,7 +78,9 @@ describe("PATCH /api/profile — aucun message interne ne sort", () => {
     jest.clearAllMocks();
     jest.spyOn(console, "error").mockImplementation(() => undefined);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it.each([...PROFILE_INPUT_ERRORS])(
     "rend le refus de saisie %s tel quel, en 400",

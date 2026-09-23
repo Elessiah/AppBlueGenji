@@ -10,8 +10,12 @@ function params(path: string[]) {
 }
 
 describe("GET /api/uploads/[...path]", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("serves an existing webp from disk with the right content-type", async () => {
     (readFile as jest.Mock).mockResolvedValue(Buffer.from([0x52, 0x49, 0x46, 0x46]) as never);

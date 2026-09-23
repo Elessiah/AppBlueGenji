@@ -72,7 +72,9 @@ function resetMocks(): void {
  */
 describe("syncTournamentState — réconciliation après un report tranché par le délai", () => {
   beforeEach(resetMocks);
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it.each(Object.keys(reconcilers))(
     "rappelle le moteur %s quand une manche vient d'être tranchée",
@@ -167,7 +169,9 @@ describe("syncTournamentState — réconciliation après un report tranché par 
  */
 describe("syncTournamentState — `contentChanged`", () => {
   beforeEach(resetMocks);
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("est vrai quand le plateau vient d'être créé", async () => {
     (loadTournamentRow as jest.Mock).mockResolvedValue(runningRow({ format: "SINGLE" }) as never);

@@ -9,9 +9,10 @@ import { clearCache } from "@/lib/server/cache";
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import { findBroadcastingTournament } from "@/lib/server/tournaments/live-streams";
 import type { TournamentBuckets, TournamentCard, TournamentFormat } from "@/lib/shared/types";
+import { tournamentCard } from "../../helpers/tournament-card";
 
 function card(id: number, name: string, format: TournamentFormat = "SINGLE"): TournamentCard {
-  return {
+  return tournamentCard({
     id,
     name,
     description: null,
@@ -31,7 +32,7 @@ function card(id: number, name: string, format: TournamentFormat = "SINGLE"): To
     phases: null,
     matchFormat: null,
     liveUrl: null,
-  };
+  });
 }
 
 function buckets(running: TournamentCard[]): TournamentBuckets {

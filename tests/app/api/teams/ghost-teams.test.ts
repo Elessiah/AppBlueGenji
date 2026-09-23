@@ -29,8 +29,12 @@ function jsonReq(body: unknown, url = "http://localhost/api/teams") {
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
 describe("POST /api/teams — création d'équipe fantôme", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("refuse un joueur sans permission tournois avec 403", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(player as never);
@@ -79,8 +83,12 @@ describe("POST /api/teams — création d'équipe fantôme", () => {
 });
 
 describe("POST /api/teams/[id]/claim", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejette un visiteur anonyme avec 401", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);

@@ -18,6 +18,11 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
+      # `next build` ne vérifie que le code de l'application : `tests/` est
+      # exclu de `tsconfig.json`, et ts-jest ne fait que transpiler. Sans ce
+      # contrôle, un test peut contredire les types qu'il exerce sans rien dire.
+      - name: Typecheck (app + tests)
+        run: npm run typecheck
 
   build:
     name: Build

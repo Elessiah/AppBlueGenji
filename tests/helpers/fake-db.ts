@@ -1,3 +1,4 @@
+import { jest } from "@jest/globals";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
 type TableName = "bg_users" | "bg_tournaments" | "bg_tournament_registrations" | "bg_matches";
@@ -63,7 +64,7 @@ export class FakeDatabase {
     };
   }
 
-  private async executeSql(sql: string, params?: any[]): Promise<[any[], any]> {
+  private async executeSql(sql: string, params?: any[]): Promise<[any, any]> {
     // Simplified SQL execution - expand as needed for tests
     const lowerSql = sql.toLowerCase();
 

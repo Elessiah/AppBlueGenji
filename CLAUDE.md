@@ -12,6 +12,7 @@ BlueGenji Esport is a French esports platform for amateur Marvel Rivals and Over
 npm run dev          # Dev server with Turbopack
 npm run build        # Production build
 npm run lint         # ESLint
+npm run typecheck    # tsc sur l'application **et** sur tests/, en un programme (tsconfig.typecheck.json) — joué par le CI
 npm test             # Jest test suite
 npm run test:coverage
 npm run seed         # Populate MySQL with test data (matrice de cas, voir ci-dessous)
@@ -287,6 +288,7 @@ Classes utilitaires : `.eyebrow`, `.display`, `.mono`, `.logotype`, `.num`, `.fa
 - **Monospace** : JetBrains Mono (`var(--font-mono)`)
 - **Display** : Orbitron (animations logo hero)
 - Legacy : Rajdhani, Exo_2 conservés mais dépréciés
+- **Hébergées dans le dépôt** (`app/fonts/`, licence OFL de chaque famille à côté), déclarées par `next/font/local` dans `app/site-fonts.ts` et posées sur `<body>` par `FONT_VARIABLES` — **jamais `next/font/google`**, qui télécharge les fichiers chez Google au démarrage de `next dev` et à la compilation : le job E2E en dépendait et échouait par intermittence sans réseau. **Un fichier par sous-ensemble de glyphes**, comme Google les servait : `subsets: ["latin"]` ne limitait que le **préchargement**, pas les fichiers — ne livrer que le latin rendait en Arial le `Ł` d'un pseudo ou un nom cyrillique, lettre par lettre. Chaque sous-ensemble est un appel `localFont` (options **littérales**, un seul `unicode-range` par appel), seul le latin est préchargé, et `fontStack` (`lib/shared/font-stack.ts`) recompose la pile : tous les sous-ensembles, **puis** le repli ajusté (calé sur Arial, qui a les glyphes latin-ext — placé avant, il les servirait). Turbopack ignore `declarations` en 15.5 : en `next dev` tous les sous-ensembles se téléchargent, la production (webpack) émet bien les `unicode-range`. Fichiers et plages viennent de Fontsource v5.3.0. Un balayage (`tests/app/self-hosted-fonts.test.ts`) refuse tout import de `next/font/google`, tout fichier cité absent ou embarqué sans être cité, et tout sous-ensemble préchargé ou sans `unicode-range`.
 
 ### Notifications & Toasts
 Règle universelle : via `useToast()` (`@/components/ui/toast`), bottom-left overlay, jamais inline. `showError(message)`, `showSuccess(message)`.
@@ -322,6 +324,7 @@ Règle universelle : via `useToast()` (`@/components/ui/toast`), bottom-left ove
 - Chaque feature développée doit être accompagnée d'une couverture de tests complète et efficace (`npm test`).
 - Les tests doivent couvrir les cas nominaux, les cas limites et les cas d'erreur.
 - Aucune feature n'est considérée comme terminée sans ses tests associés.
+- **Les tests sont type-vérifiés** (`npm run typecheck`, configuration `tsconfig.typecheck.json`) : `tsconfig.json` exclut `tests/` et ts-jest ne fait que transpiler, si bien qu'un millier d'erreurs s'y étaient accumulées sans bruit — fixtures périmées (un champ ajouté au type n'était jamais reporté dans les fabriques de test) et contrats écrits au type (`@ts-expect-error`) qui ne vérifiaient rien. Une fabrique rend donc l'objet **complet** du type du jour. Quatre pièges de `@jest/globals` : un `jest.fn()` sans type fait de `mockResolvedValue(x)` un paramètre `never` (les `x as never` hérités taisent le type de la valeur simulée : dans un test neuf, préférer `jest.mocked(fn)` ou `jest.fn<typeof fn>()`, qui la vérifient) ; `it.each([...] as const)` est refusé (tuples `readonly`), la table se type par `it.each<[A, B]>([...])` ; et `Partial<LigneMysql>` refuse tout littéral à cause du `constructor` de `RowDataPacket` — `RowOverrides<T>` (`tests/helpers/row-overrides.ts`) le retire ; enfin, depuis Jest 30, `toHaveBeenCalledWith` confronte ses arguments à la signature de la fonction simulée, et un double partiel de connexion (`{ execute, … }`) s'y passe `as never`. Une `TournamentCard` ou un `BracketMatch` de test part de `tournamentCard()` / `bracketMatch()` (`tests/helpers/`) : une fabrique locale n'écrit que ses valeurs propres, un champ ajouté au type ne se reporte qu'une fois.
 
 ### Branches
 - Pour chaque demande de feature, créer une branche dédiée : `feature/<nom-de-la-feature>` (kebab-case, anglais de préférence).
@@ -333,7 +336,7 @@ Règle universelle : via `useToast()` (`@/components/ui/toast`), bottom-left ove
 - Si une erreur ne peut pas être corrigée automatiquement, l'expliquer clairement et proposer une piste de résolution.
 
 ### CI / Qualité
-- Le CI GitHub Actions (`.github/workflows/ci.yml`) vérifie à chaque PR : lint → build → tests (dans cet ordre, enchaînés via `needs:`).
+- Le CI GitHub Actions (`.github/workflows/ci.yml`) vérifie à chaque PR : lint (+ `npm run typecheck`) → build → tests (dans cet ordre, enchaînés via `needs:`).
 - Ne pas merger si le CI est rouge.
 
 ### Erreurs préexistantes (`ERREUR.txt`)
@@ -384,6 +387,6 @@ Ajouter le trailer avec `git commit --trailer 'Co-authored-by: <modèle> <norepl
 
    **Cycler la revue** : corriger les points remontés, commiter, pousser, puis **relancer une revue complète**. Répéter jusqu'à ce qu'un cycle ne remonte plus aucun finding. Une seule passe ne suffit pas : les corrections d'un cycle en révèlent d'autres, et les zones non couvertes par le premier passage doivent l'être par les suivants.
 
-   Ne rendre la main à l'utilisateur qu'une fois un cycle terminé **sans finding**, avec `npm test`, `npm run lint` et `npx tsc --noEmit` verts.
+   Ne rendre la main à l'utilisateur qu'une fois un cycle terminé **sans finding**, avec `npm test`, `npm run lint` et `npm run typecheck` verts.
 
    **Valider aussi en conditions réelles** : les tests simulent MySQL et ne peuvent pas détecter une colonne manquante ou une requête invalide. Lancer `npm run seed` avant de conclure — c'est le seul contrôle qui exerce réellement les migrations et le SQL. (Le worktree a besoin d'une copie du `.env` du dépôt parent ; il est déjà couvert par `.gitignore`.)

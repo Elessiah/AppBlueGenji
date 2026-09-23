@@ -6,7 +6,13 @@ import {
   PROFILE_SECTIONS,
   profileSectionIdFromHash,
   visibleProfileSections,
+  type ProfileSection,
 } from "@/app/(secured)/profil/_lib/profile-sections";
+
+// Le registre est `as const` : chaque entrée garde son type littéral, si bien
+// que `requires` n'existe pas sur celles qui ne le portent pas. Le test lit le
+// registre sous son type déclaré, comme `visibleProfileSections`.
+const SECTIONS: readonly ProfileSection[] = PROFILE_SECTIONS;
 
 const ROOT = join(__dirname, "..", "..");
 const page = readFileSync(join(ROOT, "app/(secured)/profil/page.tsx"), "utf8");
@@ -59,7 +65,7 @@ describe("visibleProfileSections", () => {
 
   it("ne filtre que les sections qui déclarent un `requires`", () => {
     const hidden = visibleProfileSections({ invitations: 0 }).map((s) => s.id);
-    for (const section of PROFILE_SECTIONS) {
+    for (const section of SECTIONS) {
       if (section.requires === undefined) expect(hidden).toContain(section.id);
     }
   });
@@ -68,7 +74,7 @@ describe("visibleProfileSections", () => {
     // La section conditionnelle du registre doit nommer sa condition : sans
     // cela, le filtre retomberait sur un `id !== "invitations"` en dur qu'une
     // deuxième section conditionnelle porterait sans effet.
-    const conditional = PROFILE_SECTIONS.filter((s) => s.requires !== undefined);
+    const conditional = SECTIONS.filter((s) => s.requires !== undefined);
     expect(conditional.length).toBeGreaterThan(0);
     for (const section of conditional) {
       expect(section.requires).toBe("invitations");

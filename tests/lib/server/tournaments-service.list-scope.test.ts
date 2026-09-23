@@ -7,8 +7,12 @@ jest.mock("@/lib/server/database");
 // La liste publique est mutualisée (`lib/server/tournaments/list-cache.ts`) :
 // sans cette remise à zéro, le deuxième cas serait servi depuis le cache du
 // premier et ne toucherait jamais la base.
-beforeEach(() => clearCache());
-afterEach(() => clearCache());
+beforeEach(() => {
+  clearCache();
+});
+afterEach(() => {
+  clearCache();
+});
 
 type ExecuteMock = jest.Mock;
 
@@ -19,7 +23,7 @@ type ExecuteMock = jest.Mock;
  */
 async function mockDb(execute: ExecuteMock) {
   const { getDatabase } = await import("@/lib/server/database");
-  const connectionExecute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined]);
+  const connectionExecute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined] as never);
   const connection = {
     execute: connectionExecute,
     beginTransaction: jest.fn(),
@@ -30,7 +34,7 @@ async function mockDb(execute: ExecuteMock) {
   (getDatabase as jest.Mock).mockResolvedValue({
     execute,
     getConnection: jest.fn(async () => connection),
-  });
+  } as never);
   return connectionExecute;
 }
 
@@ -46,11 +50,15 @@ function whereClause(sql: string): string {
 }
 
 describe("listTournamentBuckets — portée", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("ne montre par défaut que les tournois déjà visibles", async () => {
-    const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined]);
+    const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined] as never);
     await mockDb(execute);
 
     await listTournamentBuckets(null);
@@ -62,7 +70,7 @@ describe("listTournamentBuckets — portée", () => {
   });
 
   it("prend exactement le complément avec hiddenOnly", async () => {
-    const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined]);
+    const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined] as never);
     await mockDb(execute);
 
     await listTournamentBuckets(null, { hiddenOnly: true });
@@ -77,7 +85,7 @@ describe("listTournamentBuckets — portée", () => {
   });
 
   it("ne filtre pas par organisateur : le staff voit tous les invisibles", async () => {
-    const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined]);
+    const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined] as never);
     await mockDb(execute);
 
     await listTournamentBuckets(null, { hiddenOnly: true });
@@ -87,7 +95,7 @@ describe("listTournamentBuckets — portée", () => {
   });
 
   it("retombe sur la vue publique quand hiddenOnly est faux", async () => {
-    const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined]);
+    const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined] as never);
     await mockDb(execute);
 
     await listTournamentBuckets(null, { hiddenOnly: false });
@@ -97,7 +105,7 @@ describe("listTournamentBuckets — portée", () => {
   });
 
   it("garde la recherche par nom dans la portée invisible", async () => {
-    const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined]);
+    const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined] as never);
     await mockDb(execute);
 
     await listTournamentBuckets("  Marvel  ", { hiddenOnly: true });

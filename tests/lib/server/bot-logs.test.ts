@@ -54,7 +54,7 @@ function mockDb(rows: unknown[][]): jest.Mock {
   const execute = jest.fn<() => Promise<unknown>>();
   for (const result of rows) execute.mockResolvedValueOnce([result]);
   execute.mockResolvedValue([[]]);
-  (getDatabase as jest.Mock).mockResolvedValue({ execute });
+  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
   return execute as unknown as jest.Mock;
 }
 
@@ -144,7 +144,7 @@ describe("file par transaction", () => {
     mockDb([]);
     flushBotLogs(connection);
     // La file est plafonnée à 32 entrées : au-delà, rien n'est retenu.
-    expect(sendBotLog.mock.calls.length).toBeLessThanOrEqual(32);
+    expect((sendBotLog as jest.Mock).mock.calls.length).toBeLessThanOrEqual(32);
   });
 
   it("n'échoue jamais quand le bot est injoignable", async () => {
@@ -233,7 +233,7 @@ describe("resolveBotLogs", () => {
     const execute = jest.fn<() => Promise<unknown>>();
     execute.mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT") as never);
     execute.mockResolvedValueOnce([[TOURNAMENT_ROW]]);
-    (getDatabase as jest.Mock).mockResolvedValue({ execute });
+    (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
 
     const messages = await resolveBotLogs([
       { kind: "tournament_started", tournamentId: 12 },
