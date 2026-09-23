@@ -10,6 +10,7 @@ import {
   RGPD_CONTACT_EMAIL_FALLBACK,
 } from "@/lib/shared/rgpd-policy";
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
+import { privacyPolicyUpdatedLabel } from "@/lib/shared/privacy-changes";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = pageMetadata({
@@ -21,6 +22,10 @@ export const metadata: Metadata = pageMetadata({
 
 export default function RgpdPage() {
   const contactEmail = process.env.RGPD_CONTACT_EMAIL ?? RGPD_CONTACT_EMAIL_FALLBACK;
+  // La date suit le dernier changement présenté aux joueurs
+  // (`lib/shared/privacy-changes.ts`) : écrite à la main, elle restait en juin
+  // pendant que la politique changeait.
+  const updatedLabel = privacyPolicyUpdatedLabel() ?? "septembre 2026";
   return (
     <main style={{ position: "relative", zIndex: 1 }}>
       <PublicHeader />
@@ -289,7 +294,7 @@ export default function RgpdPage() {
           </p>
         </div>
         <div className={styles.updateLine}>
-          Dernière mise à jour : septembre 2026 · Applicable depuis la création de la plateforme
+          Dernière mise à jour : {updatedLabel} · Applicable depuis la création de la plateforme
         </div>
       </section>
 

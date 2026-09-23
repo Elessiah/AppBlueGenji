@@ -6,8 +6,12 @@ import { ToastProvider } from "@/components/ui/toast";
 import { RecruitmentHighlight } from "@/components/recruitment-highlight";
 import { VisitTracker } from "@/components/visit-tracker";
 import { GoogleOneTap } from "@/components/auth/google-one-tap";
+import { PrivacyChangesModal } from "@/components/privacy/PrivacyChangesModal";
 import { getHighlightedAd } from "@/lib/server/recruitment-service";
 import { getCurrentUser } from "@/lib/server/auth";
+import { loadPendingPrivacyChanges } from "@/lib/server/privacy-consent";
+import { dispatchPrivacyChangeNotifications } from "@/lib/server/privacy-change-notifications";
+import type { PrivacyChange } from "@/lib/shared/privacy-changes";
 import { siteMetadataBase } from "@/lib/server/site-url";
 import { CSP_NONCE_HEADER, PATHNAME_HEADER } from "@/lib/shared/csp";
 import {
@@ -93,6 +97,28 @@ export const metadata: Metadata = {
 const RECRUITMENT_PAGE = "/recrutement";
 
 /**
+ * Page où la modale des changements de confidentialité se tait : elle y
+ * couvrirait la politique même qu'elle invite à lire. Elle revient à la page
+ * suivante.
+ */
+const PRIVACY_POLICY_PAGE = "/rgpd";
+
+/**
+ * Les changements de confidentialité que le compte connecté n'a pas acceptés.
+ * Une panne de lecture ne doit pas faire tomber la mise en page : la modale
+ * reviendra au chargement suivant.
+ */
+async function pendingChangesFor(userId: number | undefined): Promise<PrivacyChange[]> {
+  if (userId === undefined) return [];
+  try {
+    return await loadPendingPrivacyChanges(userId);
+  } catch (error) {
+    console.error("[privacy-changes] lecture impossible", error);
+    return [];
+  }
+}
+
+/**
  * Mise en page racine.
  *
  * Elle est `async` et lit les en-têtes de requête, et c'est **cette lecture**
@@ -143,6 +169,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // est mémoïsé par requête (`cache()` de React), donc cet appel ne coûte rien
   // de plus sur les pages où `PublicHeader`/`PublicFooter` le lisent déjà.
   const user = await getCurrentUser();
+  const pathname = requestHeaders.get(PATHNAME_HEADER);
+  const privacyChanges =
+    pathname === PRIVACY_POLICY_PAGE ? [] : await pendingChangesFor(user?.id);
+  // L'annonce Discord des mêmes changements, entraînée par le trafic comme les
+  // rappels de match : étranglée, à vol unique, jamais attendue — la page ne
+  // doit ni ralentir ni tomber à cause du bot.
+  void dispatchPrivacyChangeNotifications().catch(() => undefined);
   const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim() || null;
   // Même nonce que celui que le middleware appose sur les scripts de Next :
   // c'est lui qui rend le `<script src="…gsi/client">` recevable sous
@@ -155,7 +188,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <ToastProvider>
           <VisitTracker />
           {!user && googleClientId && <GoogleOneTap clientId={googleClientId} nonce={nonce} />}
-          <RecruitmentHighlight ad={ad} dismissed={dismissed} onAdPage={onRecruitmentPage} />
+          {/* Deux modales ne se superposent pas : tant qu'un choix de
+              confidentialité est dû, la mise en avant du recrutement se tait
+              (la banderole, elle, reste). */}
+          <RecruitmentHighlight
+            ad={ad}
+            dismissed={dismissed || (privacyChanges.length > 0 && ad?.highlight === "MODAL")}
+            onAdPage={onRecruitmentPage}
+          />
+          <PrivacyChangesModal changes={privacyChanges} />
           {children}
         </ToastProvider>
       </body>
