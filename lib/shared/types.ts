@@ -646,19 +646,6 @@ export type BotActivity = {
   avgPerDay: number;
 };
 
-export type BotModuleKey = "annonces" | "scrims" | "recrutement" | "notifications" | "oauth" | "stats";
-
-export type BotModuleEntry = {
-  key: BotModuleKey;
-  enabled: boolean;
-  count30j: number;
-};
-
-export type BotModulesPayload = {
-  guildId: string;
-  modules: BotModuleEntry[];
-};
-
 export type BotFeedEvent = {
   id: number;
   ts: string;
