@@ -1,10 +1,13 @@
 import { describe, expect, it } from "@jest/globals";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { BOT_DOC_SECTIONS } from "@/lib/shared/bot-doc-sections";
+import { readSource } from "../helpers/read-source";
 
 const ROOT = join(__dirname, "..", "..");
-const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
+// Les motifs ci-dessous ancrent des règles sur `\n\}\n` : lus en CRLF sur un
+// poste Windows, ils y échouaient seuls (voir `readSource`).
+const read = readSource;
 
 const page = read("app/bot/page.tsx");
 const commands = read("components/bot/BotCommands.tsx");

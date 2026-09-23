@@ -64,7 +64,9 @@ export function BotLiveFeed() {
         <span className="title">Flux temps réel</span>
         <div className="row gap-2">
           <button
-            className={'chip ' + (paused ? '' : 'chip-on')}
+            // L'état « allumé » dit que la pause est **posée** : allumé pendant
+            // que le flux défile, « ■ PAUSE » en bleu se lisait « en pause ».
+            className={'chip' + (paused ? ' chip-on' : '')}
             onClick={handlePauseToggle}
             aria-label={paused ? 'Reprendre le flux' : 'Mettre en pause le flux'}
           >

@@ -38,7 +38,7 @@ export function BotHero() {
             <span className="badge">
               <DiscordIcon /> APP
             </span>
-            <span className="mono" style={{ fontSize: 10, letterSpacing: "0.18em", color: "var(--fg-dim)" }}>
+            <span className="mono" style={{ fontSize: 10, letterSpacing: "0.18em", color: "var(--ink-dim)" }}>
               VÉRIFIÉ
             </span>
           </div>
@@ -69,7 +69,7 @@ export function BotHero() {
             </svg>
           </a>
         </div>
-        <span className="mono" style={{ fontSize: 10, letterSpacing: "0.18em", color: "var(--fg-dim)" }}>
+        <span className="mono" style={{ fontSize: 10, letterSpacing: "0.18em", color: "var(--ink-dim)" }}>
           OAUTH2 · BOT + APPLICATIONS.COMMANDS · GRATUIT
         </span>
       </div>

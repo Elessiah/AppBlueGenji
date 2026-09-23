@@ -21,7 +21,7 @@
   gap: 4px;
   padding: 12px 14px;
   border: 1px solid transparent;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-cy-sm);
   text-decoration: none;
   transition: background .15s, border-color .15s;
 }
@@ -66,7 +66,7 @@
 .docs-content h4,
 .docs-content h5,
 .docs-content h6 {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -108,7 +108,7 @@
 }
 
 .docs-content code {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: 12px;
   color: var(--blue-300);
   padding: 2px 6px;
@@ -123,7 +123,7 @@
   margin: 0 0 16px;
   padding: 16px 18px;
   border: 1px solid var(--line);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-cy-sm);
   background: rgba(0, 0, 0, 0.3);
   overflow-x: auto;
 }
@@ -147,7 +147,7 @@
   margin-top: 32px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.16em;
   color: var(--ink-dim);
@@ -161,7 +161,7 @@
   line-height: 1.6;
 }
 .docs-missing .code {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: 12px;
   color: var(--amber);
 }
