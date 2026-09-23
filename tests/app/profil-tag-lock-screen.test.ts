@@ -101,3 +101,17 @@ describe("profil — un échec de lecture ne s'annonce pas comme un échec de sa
     expect([...page.matchAll(/profileErrorMessage\(/g)].length).toBeGreaterThanOrEqual(3);
   });
 });
+
+describe("champ Discord — l'attente ne se dit pas comme une panne", () => {
+  it("part en lecture dès le premier rendu", () => {
+    // Partir de `false` laissait une fenêtre — entre le premier rendu et
+    // l'effet — où l'écran annonçait une panne avant d'avoir essayé.
+    expect(page).toContain("useState(true);");
+    const declaration = page.slice(page.indexOf("const [discordStateBusy"));
+    expect(declaration.slice(0, 80)).toContain("useState(true)");
+  });
+
+  it("passe l'attente à la phrase, qui ne la devine pas", () => {
+    expect(page).toContain("discordTagLockNotice({ ...discordState, pending: discordStateBusy })");
+  });
+});

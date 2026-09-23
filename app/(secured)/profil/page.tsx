@@ -80,7 +80,11 @@ export default function ProfilePage() {
     }
   };
 
-  const [discordStateBusy, setDiscordStateBusy] = useState(false);
+  // **Vrai dès le premier rendu** : une lecture part au montage, et partir de
+  // `false` laissait une fenêtre — entre le premier rendu et l'effet — où
+  // l'écran annonçait une panne de lecture avant d'avoir essayé quoi que ce
+  // soit.
+  const [discordStateBusy, setDiscordStateBusy] = useState(true);
 
   const loadDiscordState = async () => {
     setDiscordStateBusy(true);
@@ -549,7 +553,7 @@ export default function ProfilePage() {
               )}
               <p id="profile-discord-hint" style={{ fontSize: 11, color: "var(--text-2)", margin: "6px 0 0", lineHeight: 1.6 }}>
                 {discordLocked
-                  ? discordTagLockNotice(discordState)
+                  ? discordTagLockNotice({ ...discordState, pending: discordStateBusy })
                   : discordState.verified
                     ? "Tag certifié : les administrateurs le voient, et les arbitres pendant tes tournois. Le modifier annule la certification."
                     : "Tag non certifié : personne ne le voit, pas même les administrateurs. Certifie-le pour que l'organisation puisse te joindre pendant un tournoi."}

@@ -93,7 +93,26 @@ export function discordTagLockNotice(state: {
   tag: string | null;
   verified: boolean;
   linked: boolean | null;
+  /**
+   * La lecture de l'état est **en cours**.
+   *
+   * Sans ce drapeau, « pas encore lu » et « lecture échouée » se confondaient
+   * en un seul `linked: null`, et la phrase annonçait une panne pendant le
+   * temps normal d'un aller-retour — le profil se rendant dès que
+   * `GET /api/profile` répond, ce qui arrive régulièrement avant
+   * `GET /api/profile/discord`. C'est exactement ce que `profile-errors.ts`
+   * s'interdit : affirmer une cause qu'on ne connaît pas.
+   *
+   * L'appelant est le seul à savoir laquelle des deux : le module reste pur, il
+   * se contente de ne plus supposer.
+   */
+  pending?: boolean;
 }): string {
+  // L'attente se dit comme une attente, sans cause ni geste : il n'y a rien à
+  // réessayer tant que le premier essai n'a pas répondu.
+  if (state.pending && state.linked !== true) {
+    return "Lecture de l'état de ton compte Discord… Le champ reste en lecture seule le temps de savoir si Discord a nommé ce pseudo.";
+  }
   // L'état n'est pas encore connu — ou ne l'a jamais été, l'appel ayant échoué.
   // On ne décrit alors **ni** un rattachement ni son absence : on nomme le
   // verrou, sa raison et sa sortie. Prétendre ici que le compte est rattaché

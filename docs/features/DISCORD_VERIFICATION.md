@@ -259,7 +259,15 @@ d'abord), un `undefined` glissait entre les branches et *ouvrait* le champ, ce
 que l'écran rend atteignable en alimentant cet état par un `as` sur une réponse
 JSON que rien ne valide.
 
-Le verrou porte alors **sa propre sortie** : un bouton « Réessayer » relit
+**Attendre n'est pas échouer**, et les deux se disaient pareil : le profil se
+rend dès que `GET /api/profile` répond, régulièrement avant
+`GET /api/profile/discord`, si bien que la phrase annonçait une panne pendant le
+temps normal d'un aller-retour. Un drapeau `pending` les sépare — l'appelant est
+le seul à savoir laquelle des deux, et le module reste pur en se contentant de
+ne plus supposer. L'attente se dit alors comme une attente, sans cause ni geste :
+il n'y a rien à réessayer tant que le premier essai n'a pas répondu.
+
+Le verrou porte sinon **sa propre sortie** : un bouton « Réessayer » relit
 l'état sans rechargement. Sans lui, une panne de lecture coûtait bien plus que
 le champ — tous les gestes étant sous `linked === true`, « Retirer mon tag »
 disparaissait avec eux, c'est-à-dire la seule annulation d'exposition que le

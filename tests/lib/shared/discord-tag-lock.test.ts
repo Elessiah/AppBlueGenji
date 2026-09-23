@@ -154,6 +154,50 @@ describe("discordTagLockNotice — rattachement inconnu", () => {
   });
 });
 
+describe("discordTagLockNotice — lecture en cours", () => {
+  /**
+   * « Pas encore lu » et « lecture échouée » se confondaient en un seul
+   * `linked: null` : la phrase annonçait une panne pendant le temps normal d'un
+   * aller-retour, le profil se rendant dès que `GET /api/profile` répond — ce
+   * qui arrive régulièrement avant `GET /api/profile/discord`.
+   */
+  const pending = discordTagLockNotice({
+    tag: null,
+    verified: false,
+    linked: null,
+    pending: true,
+  });
+
+  it("n'annonce aucune panne et ne propose rien à réessayer", () => {
+    expect(pending).not.toContain("Impossible");
+    expect(pending.toLowerCase()).not.toContain("réessaie");
+    expect(pending.toLowerCase()).not.toContain("recharge");
+  });
+
+  it("dit tout de même pourquoi le champ est fermé", () => {
+    expect(pending).toContain("lecture seule");
+  });
+
+  it("se distingue de l'échec, qui garde sa sortie", () => {
+    const failed = discordTagLockNotice({ tag: null, verified: false, linked: null });
+    expect(failed).not.toBe(pending);
+    expect(failed.toLowerCase()).toContain("réessaie");
+  });
+
+  it("s'efface dès que l'état est connu — un rattachement lu n'attend plus rien", () => {
+    // Le drapeau ne doit pas masquer un état déjà établi : une seconde lecture
+    // lancée à la main ne doit pas faire régresser la phrase.
+    const linked = discordTagLockNotice({
+      tag: "keryan",
+      verified: true,
+      linked: true,
+      pending: true,
+    });
+    expect(linked).toContain("certifié");
+    expect(linked).not.toContain("Lecture de l'état");
+  });
+});
+
 describe("DISCORD_TAG_LOCKED", () => {
   it("est le code que la route rend en 409", () => {
     expect(DISCORD_TAG_LOCKED).toBe("DISCORD_TAG_LOCKED");
