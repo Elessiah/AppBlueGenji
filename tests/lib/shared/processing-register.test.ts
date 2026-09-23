@@ -76,7 +76,7 @@ describe("PROCESSING_ACTIVITIES", () => {
   });
 
   it("déclare les transferts vers Discord partout où Discord achemine des messages", () => {
-    for (const ref of ["T02", "T04", "T05", "T08"]) {
+    for (const ref of ["T02", "T04", "T05", "T08", "T10"]) {
       expect(byRef(ref).transfers.join(" ")).toMatch(/Discord/);
     }
   });
@@ -85,6 +85,13 @@ describe("PROCESSING_ACTIVITIES", () => {
     const retention = byRef("T04").retention.join(" ");
     expect(retention).not.toMatch(/durée de vie du match/);
     expect(retention).toMatch(/sans limite/);
+  });
+
+  it("déclare l'acceptation des changements de politique et leur annonce Discord", () => {
+    const t10 = byRef("T10");
+    expect(t10.dataCategories.join(" ")).toMatch(/accept/i);
+    expect(t10.subPurposes.join(" ")).toMatch(/Discord/);
+    expect(t10.retention.join(" ")).toMatch(/Durée du compte/);
   });
 
   it("ne déclare aucune adresse e-mail collectée", () => {
