@@ -226,7 +226,10 @@
     padding: 20px 16px;
   }
 
+  /* Pleine largeur au pouce ; le libellé reste centré, pas collé à gauche. */
   .actions > * {
     flex: 1 1 100%;
+    justify-content: center;
+    text-align: center;
   }
 }
