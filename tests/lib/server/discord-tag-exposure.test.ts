@@ -51,6 +51,21 @@ function fakeDb(handler?: (q: string, params: unknown[]) => unknown) {
 const find = (queries: Query[], needle: string) =>
   queries.find((q) => q.sql.includes(needle));
 
+/**
+ * Les six paramètres que l'écriture consacre au tag Discord, nommés.
+ *
+ * Deux `CASE` jumeaux — l'un pour `discord_verified_at`, l'autre pour
+ * `discord_pseudo` — prennent chacun « le patch parle-t-il du tag ? » puis la
+ * valeur visée, deux fois. Les compter à la main par leur indice rendait ces
+ * tests illisibles et faux au premier paramètre inséré devant.
+ */
+function tagParams(params: unknown[]): { touches: unknown[]; tags: unknown[] } {
+  return {
+    touches: [params[5], params[8]],
+    tags: [params[6], params[7], params[9], params[10]],
+  };
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   (getPlayerEntityStats as jest.Mock).mockResolvedValue({
@@ -71,7 +86,7 @@ describe("updateOwnProfile — la certification suit le tag", () => {
     // placé après il lirait déjà la valeur neuve — donc ne verrait jamais de
     // changement, donc ne décertifierait jamais rien.
     const caseIndex = update!.sql.indexOf("discord_verified_at = CASE");
-    const assignIndex = update!.sql.indexOf("discord_pseudo = ?");
+    const assignIndex = update!.sql.indexOf("discord_pseudo = CASE");
     expect(caseIndex).toBeGreaterThanOrEqual(0);
     expect(assignIndex).toBeGreaterThan(caseIndex);
   });
@@ -86,27 +101,39 @@ describe("updateOwnProfile — la certification suit le tag", () => {
     expect(find(queries, "UPDATE bg_users")!.sql).toContain("discord_pseudo <=> ?");
   });
 
-  it("passe le même tag aux deux emplacements : la comparaison porte sur ce qui sera écrit", async () => {
+  it("passe le même tag aux six emplacements : les deux `CASE` doivent lire ce qui sera écrit", async () => {
     const { queries } = fakeDb();
 
     await updateOwnProfile(7, { pseudo: "Nova", discordPseudo: "keryan" });
 
-    const params = find(queries, "UPDATE bg_users")!.params;
-    // Positions 3 et 4 : le paramètre du `CASE`, puis celui de l'affectation.
-    expect(params[3]).toBe("keryan");
-    expect(params[4]).toBe("keryan");
+    expect(tagParams(find(queries, "UPDATE bg_users")!.params)).toEqual({
+      touches: [true, true],
+      tags: ["keryan", "keryan", "keryan", "keryan"],
+    });
   });
 
-  it("efface le tag quand il est absent du patch, et la certification avec", async () => {
+  it("efface le tag quand le formulaire l'a vidé, et la certification avec", async () => {
     // Le formulaire envoie la fiche entière : un champ vidé arrive à `null`, et
     // c'est bien un changement de tag.
     const { queries } = fakeDb();
 
+    await updateOwnProfile(7, { pseudo: "Nova", discordPseudo: null });
+
+    expect(tagParams(find(queries, "UPDATE bg_users")!.params)).toEqual({
+      touches: [true, true],
+      tags: [null, null, null, null],
+    });
+  });
+
+  it("ne touche pas au tag quand le patch n'en parle pas — absent n'est pas vidé", async () => {
+    // Une requête partielle qui ne mentionne pas le tag le supprimait, et sa
+    // certification avec. Aucun appelant ne le faisait, mais le verrou du
+    // rattachement en aurait fait un refus en 409 sur tout compte lié.
+    const { queries } = fakeDb();
+
     await updateOwnProfile(7, { pseudo: "Nova" });
 
-    const params = find(queries, "UPDATE bg_users")!.params;
-    expect(params[3]).toBeNull();
-    expect(params[4]).toBeNull();
+    expect(tagParams(find(queries, "UPDATE bg_users")!.params).touches).toEqual([false, false]);
   });
 });
 
@@ -334,6 +361,236 @@ describe("les lectures qui n'ont pas à connaître le tag", () => {
 
     for (const query of queries.filter((q) => q.sql.includes("FROM bg_users"))) {
       expect(query.sql).not.toContain("discord_pseudo");
+    }
+  });
+});
+
+describe("updateOwnProfile — un compte Discord rattaché possède son tag", () => {
+  /** Le `SELECT` du verrou, avec le rattachement et le tag qu'on veut lui faire lire. */
+  const lockedDb = (discordId: string | null, storedTag: string | null) =>
+    fakeDb((sql) =>
+      sql.startsWith("SELECT discord_id, discord_pseudo")
+        ? [[{ discord_id: discordId, discord_pseudo: storedTag }]]
+        : undefined,
+    );
+
+  it("refuse une réécriture du tag quand un compte Discord est rattaché", async () => {
+    lockedDb("100000000000000001", "keryan");
+
+    await expect(updateOwnProfile(7, { discordPseudo: "quelquun_dautre" })).rejects.toThrow(
+      "DISCORD_TAG_LOCKED",
+    );
+  });
+
+  it("laisse passer la sauvegarde qui renvoie le tag déjà stocké", async () => {
+    const { queries } = lockedDb("100000000000000001", "keryan");
+
+    await updateOwnProfile(7, { discordPseudo: "keryan", isAdult: true });
+
+    expect(find(queries, "UPDATE bg_users")).toBeDefined();
+  });
+
+  it("refuse une différence de casse, parce que l'écriture ne l'appliquerait pas", async () => {
+    // Le contrôle était insensible à la casse pour une raison qui a disparu :
+    // le formulaire renvoyait le tag à chaque sauvegarde, et refuser sur sa
+    // seule présence rendait tout le profil inenregistrable. Le client ne
+    // soumet plus ce champ que s'il a **changé**.
+    //
+    // Laisser passer rendait alors un **200 qui n'écrivait rien** : le `CASE`
+    // de l'`UPDATE` garde la valeur stockée dès qu'un `discord_id` est posé,
+    // quoi qu'ait décidé ce contrôle. Vérifié contre un vrai MySQL — la colonne
+    // restait sur son orthographe d'origine pendant que la route annonçait
+    // « Profil mis à jour ». Le refus dit désormais ce que l'écriture fait.
+    const { queries } = lockedDb("100000000000000001", "Keryan");
+
+    await expect(updateOwnProfile(7, { discordPseudo: "keryan" })).rejects.toThrow(
+      "DISCORD_TAG_LOCKED",
+    );
+    expect(find(queries, "UPDATE bg_users")).toBeUndefined();
+  });
+
+  it("laisse passer l'orthographe exacte, elle", async () => {
+    const { queries } = lockedDb("100000000000000001", "Keryan");
+
+    await updateOwnProfile(7, { discordPseudo: "Keryan" });
+
+    expect(find(queries, "UPDATE bg_users")).toBeDefined();
+  });
+
+  it("traite un tag absent des deux côtés comme inchangé", async () => {
+    const { queries } = lockedDb("100000000000000001", null);
+
+    await updateOwnProfile(7, { discordPseudo: null });
+
+    expect(find(queries, "UPDATE bg_users")).toBeDefined();
+  });
+
+  it("n'oppose aucun verrou à un compte sans Discord rattaché", async () => {
+    const { queries } = lockedDb(null, "ancien_tag");
+
+    await updateOwnProfile(7, { discordPseudo: "nouveau_tag" });
+
+    expect(find(queries, "UPDATE bg_users")).toBeDefined();
+  });
+
+  it("garde le tag dans l'écriture elle-même — le refus lisible ne tient pas la course", async () => {
+    // La forme de l'écriture ne dépend pas de la ligne lue : c'est elle, et non
+    // le `SELECT`, qui tient un rattachement survenu entre les deux.
+    const { queries } = lockedDb(null, null);
+
+    await updateOwnProfile(7, { discordPseudo: "keryan" });
+
+    const sql = find(queries, "UPDATE bg_users")!.sql;
+    expect(sql).toContain(
+      "discord_pseudo = CASE WHEN NOT ? THEN discord_pseudo WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_pseudo ELSE ? END",
+    );
+  });
+
+  it("ne décertifie pas un compte rattaché, dont le tag ne peut pas bouger", async () => {
+    const { queries } = lockedDb(null, null);
+    // Même remarque : c'est la requête qu'on lit, pas son résultat.
+
+    await updateOwnProfile(7, {});
+
+    const sql = find(queries, "UPDATE bg_users")!.sql;
+    expect(sql).toContain("WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_verified_at");
+  });
+});
+
+describe("updateOwnProfile — retirer son tag reste possible", () => {
+  const lockedDb = (discordId: string | null, storedTag: string | null) =>
+    fakeDb((sql) =>
+      sql.includes("SELECT discord_id, discord_pseudo")
+        ? [[{ discord_id: discordId, discord_pseudo: storedTag }]]
+        : undefined,
+    );
+
+  it("laisse un compte rattaché effacer son tag — c'est le seul geste d'annulation", async () => {
+    // Sans lui, un compte né par Discord n'a aucune sortie : son tag est
+    // certifié donc lisible de l'arbitrage, et détacher Discord lui est refusé
+    // en `LAST_CONNECTION` faute d'une autre porte.
+    const { queries } = lockedDb("100000000000000001", "keryan");
+
+    await updateOwnProfile(7, { discordPseudo: null });
+
+    expect(find(queries, "UPDATE bg_users")).toBeDefined();
+  });
+
+  it("n'interroge même pas le rattachement pour un effacement", async () => {
+    const { queries } = lockedDb("100000000000000001", "keryan");
+
+    await updateOwnProfile(7, { discordPseudo: null });
+
+    expect(find(queries, "SELECT discord_id, discord_pseudo")).toBeUndefined();
+  });
+
+  it("refuse toujours d'y écrire un autre tag", async () => {
+    const { queries } = lockedDb("100000000000000001", "keryan");
+
+    await expect(updateOwnProfile(7, { discordPseudo: "quelquun_dautre" })).rejects.toThrow(
+      "DISCORD_TAG_LOCKED",
+    );
+    expect(find(queries, "UPDATE bg_users")).toBeUndefined();
+  });
+});
+
+describe("updateOwnProfile — un tag vidé est un tag vidé", () => {
+  const lockedDb = (discordId: string | null, storedTag: string | null) =>
+    fakeDb((sql) =>
+      sql.includes("SELECT discord_id, discord_pseudo")
+        ? [[{ discord_id: discordId, discord_pseudo: storedTag }]]
+        : undefined,
+    );
+
+  it("traite la chaîne vide comme `null` — c'est le même geste", async () => {
+    // Un formulaire rend `""`, un appel direct rend `null` : les distinguer
+    // faisait de l'un un effacement et de l'autre une réécriture, donc un 409
+    // sur un compte rattaché.
+    const { queries } = lockedDb("100000000000000001", "keryan");
+
+    await updateOwnProfile(7, { discordPseudo: "" });
+
+    expect(find(queries, "UPDATE bg_users")).toBeDefined();
+  });
+
+  it("n'écrit jamais une chaîne vide dans la colonne", async () => {
+    const { queries } = lockedDb(null, null);
+
+    await updateOwnProfile(7, { discordPseudo: "   " });
+
+    expect(tagParams(find(queries, "UPDATE bg_users")!.params).tags).toEqual([
+      null,
+      null,
+      null,
+      null,
+    ]);
+  });
+});
+
+describe("updateOwnProfile — un patch partiel ne vide pas les champs voisins", () => {
+  /**
+   * Quatre colonnes nullables recevaient `null` dès que le patch ne les
+   * mentionnait pas. Longtemps sans conséquence — le formulaire renvoie la fiche
+   * entière — jusqu'au premier appel partiel, qui a vidé les trois voisines du
+   * champ qu'il visait sans rien afficher avant un rechargement.
+   */
+  const partial = async (patch: Parameters<typeof updateOwnProfile>[1]) => {
+    const { queries } = fakeDb();
+    await updateOwnProfile(7, patch);
+    return find(queries, "UPDATE bg_users")!;
+  };
+
+  it("garde le BattleTag, le tag Marvel et la majorité quand le patch n'en parle pas", async () => {
+    const update = await partial({ discordPseudo: null });
+
+    // Positions 1, 3 et 11 : « le patch parle-t-il de ce champ ? »
+    expect([update.params[1], update.params[3], update.params[11]]).toEqual([false, false, false]);
+  });
+
+  it("les écrit dès que le patch les mentionne, valeur vide comprise", async () => {
+    const update = await partial({ overwatchBattletag: null, isAdult: false });
+
+    expect([update.params[1], update.params[2]]).toEqual([true, null]);
+    expect([update.params[11], update.params[12]]).toEqual([true, false]);
+  });
+
+  it("passe les quatre colonnes par le même `CASE`", async () => {
+    const update = await partial({ pseudo: "Nova" });
+
+    for (const column of ["overwatch_battletag", "marvel_rivals_tag", "is_adult"]) {
+      expect(update.sql).toContain(`${column} = CASE WHEN ? THEN ? ELSE ${column} END`);
+    }
+  });
+
+  it("laisse les colonnes NOT NULL à COALESCE, qui suffit", async () => {
+    const update = await partial({ pseudo: "Nova" });
+
+    expect(update.sql).toContain("visible_avatar = COALESCE(?, visible_avatar)");
+    expect(update.sql).toContain("open_to_recruitment = COALESCE(?, open_to_recruitment)");
+  });
+});
+
+describe("updateOwnProfile — le tag doit être du texte", () => {
+  /**
+   * Le corps du `PATCH` n'est qu'**annoté**, jamais validé : `{"discordPseudo":
+   * 123}` faisait lever `.trim()`, et la route rendait le message interne du
+   * `TypeError` tel quel dans le corps du 400. Un refus nommé vaut mieux qu'une
+   * fuite d'interne — et rien n'est écrit.
+   */
+  it.each([[123], [true], [{}], [[]]])("refuse %p sans rien écrire", async (value) => {
+    const { queries } = fakeDb();
+
+    await expect(
+      updateOwnProfile(7, { discordPseudo: value as never }),
+    ).rejects.toThrow("INVALID_DISCORD_PSEUDO");
+    expect(find(queries, "UPDATE bg_users")).toBeUndefined();
+  });
+
+  it("laisse passer les deux formes légitimes du champ vide", async () => {
+    for (const value of ["", null] as const) {
+      const { queries } = fakeDb();
+      await updateOwnProfile(7, { discordPseudo: value });
+      expect(find(queries, "UPDATE bg_users")).toBeDefined();
     }
   });
 });

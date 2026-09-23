@@ -460,6 +460,35 @@ select {
   cursor: not-allowed;
 }
 
+/* Champ en lecture seule : la valeur reste lisible et atteignable au clavier,
+   contrairement à un champ désactivé — seule l'invitation à écrire tombe, d'où
+   un fond en retrait et l'absence de halo au focus. */
+.field input[readonly],
+.field textarea[readonly] {
+  background: rgba(10, 11, 15, 0.55);
+  border-color: var(--line-soft);
+  color: var(--text-1);
+  cursor: default;
+  /* `.field input:focus` déclare le halo vert plus haut, à **specificité
+     égale** : sans reset explicite ici, un clic de souris sur le champ
+     verrouillé rendait une bordure neutre *avec* le halo de la saisie — soit
+     exactement l'invitation à écrire que la règle vient retirer. La règle
+     `:focus-visible` ci-dessous, plus spécifique, repose ensuite l'anneau
+     neutre du parcours clavier. */
+  box-shadow: none;
+}
+
+/* Le halo vert d'un champ modifiable inviterait à écrire ; l'anneau doit tout de
+   même rester **visible**, sinon un parcours au clavier traverse le champ sans
+   aucun repère (`outline: none` est déjà posé plus haut). D'où un anneau neutre,
+   distinct de celui de la saisie. */
+.field input[readonly]:focus-visible,
+.field textarea[readonly]:focus-visible {
+  border-color: var(--text-2);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
+  background: rgba(10, 11, 15, 0.55);
+}
+
 input[type="datetime-local"] {
   appearance: none;
   cursor: pointer;

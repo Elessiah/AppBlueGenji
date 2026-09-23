@@ -2,6 +2,10 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
+import {
+  DISCORD_TAG_LOCKED,
+  isDiscordTagLocked,
+} from "@/lib/shared/discord-tag-lock";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
@@ -868,7 +872,79 @@ export async function updateOwnProfile(
     }
   }
 
-  const nextDiscordPseudo = patch.discordPseudo === undefined ? null : patch.discordPseudo;
+  // **Un champ absent du patch n'est pas un champ vidé.** Quatre colonnes
+  // nullables — le tag Discord, les deux identifiants de jeu et la majorité —
+  // recevaient `null` dès que le patch ne les mentionnait pas : une requête
+  // partielle les effaçait toutes, et la certification avec. Longtemps sans
+  // conséquence, le formulaire renvoyant la fiche entière ; le premier appel
+  // partiel (le bouton « Retirer mon tag ») a vidé les trois voisines du champ
+  // qu'il visait, sans rien afficher avant un rechargement.
+  //
+  // Les quatre passent donc par le même `CASE WHEN ? THEN ? ELSE col END`, piloté
+  // par « le patch parle-t-il de ce champ ? ». `visible_*` et
+  // `open_to_recruitment` n'en ont pas besoin : `COALESCE` suffit à des colonnes
+  // `NOT NULL`.
+  const touchesDiscordTag = patch.discordPseudo !== undefined;
+  // Un champ **vidé** arrive en chaîne vide depuis un formulaire et en `null`
+  // depuis un appel direct : c'est le même geste, et les distinguer laissait
+  // l'un passer pour un effacement et l'autre pour une réécriture — donc un 409
+  // sur un compte rattaché, et une chaîne vide écrite dans la colonne sur les
+  // autres.
+  //
+  // Le type est contrôlé ici et non à la route : le corps du `PATCH` n'est
+  // qu'*annoté*, jamais validé, si bien qu'un `{"discordPseudo": 123}` faisait
+  // lever `.trim()` — un `TypeError` dont le message interne ressortait tel quel
+  // dans le corps du 400. Les voisines n'ont pas ce besoin : elles passent à
+  // mysql2 sans être lues.
+  if (
+    touchesDiscordTag &&
+    patch.discordPseudo !== null &&
+    typeof patch.discordPseudo !== "string"
+  ) {
+    throw new Error("INVALID_DISCORD_PSEUDO");
+  }
+  const nextDiscordPseudo = (patch.discordPseudo ?? "").trim() || null;
+
+  // **Un compte Discord rattaché possède son tag** (`lib/shared/discord-tag-lock.ts`) :
+  // il ne peut pas en **inventer** un autre, Discord ayant nommé celui-là.
+  //
+  // Il peut en revanche le **retirer**, et ce n'est pas une exception : effacer
+  // son tag *est* le geste d'annulation de l'exposition, le seul que le site
+  // offre — il n'existe aucune route de décertification. Le lui refuser
+  // enfermerait le cas le plus courant, un compte né par Discord : son tag est
+  // certifié donc lisible de l'arbitrage, et détacher Discord lui serait refusé
+  // en `LAST_CONNECTION` faute d'une autre porte. Il ne lui resterait que la
+  // suppression du compte.
+  //
+  // Le refus est lisible — l'écran verrouille déjà le champ, mais la route est
+  // atteignable sans lui —, et il ne tombe que sur une **réécriture** : le
+  // formulaire renvoie le tag à chaque sauvegarde, refuser sur sa seule présence
+  // rendrait tout le profil inenregistrable. La comparaison est celle de la
+  // colonne (insensible à la casse et aux accents, `utf8mb4_0900_ai_ci`), sans
+  // quoi une correction de casse serait refusée là où la certification, elle, y
+  // survit.
+  if (touchesDiscordTag && nextDiscordPseudo !== null) {
+    const [lockRows] = await db.execute<(RowDataPacket & {
+      discord_id: string | null;
+      discord_pseudo: string | null;
+    })[]>(`SELECT discord_id, discord_pseudo FROM bg_users WHERE id = ? LIMIT 1`, [userId]);
+    const lockRow = lockRows[0];
+    if (lockRow && isDiscordTagLocked({ linked: Boolean(lockRow.discord_id) })) {
+      // Comparaison **exacte**, casse comprise, et c'est un durcissement
+      // délibéré. Elle était insensible à la casse pour une raison qui a
+      // disparu : le formulaire renvoyait le tag à chaque sauvegarde, et
+      // refuser sur sa seule présence rendait tout le profil inenregistrable.
+      // Le client ne soumet plus ce champ que s'il a **changé**, si bien qu'une
+      // différence de casse ne peut plus venir que d'un appel direct.
+      //
+      // Or laisser passer une telle différence rendait un **200 qui n'écrivait
+      // rien** : le `CASE` de l'`UPDATE` garde la valeur stockée dès qu'un
+      // `discord_id` est posé, quoi qu'ait décidé ce contrôle. Le refus lisible
+      // annonce désormais ce que l'écriture fait vraiment — c'est Discord qui
+      // nomme ce tag, sa casse comprise.
+      if (lockRow.discord_pseudo !== nextDiscordPseudo) throw new Error(DISCORD_TAG_LOCKED);
+    }
+  }
 
   // **La certification se perd à chaque changement de tag.** Elle ne dit pas
   // « ce compte a un Discord » (c'est `discord_id`) mais « le tag stocké a été
@@ -891,14 +967,30 @@ export async function updateOwnProfile(
   // insensibles à la casse, la preuve continue de désigner le même compte —, et
   // c'est la raison de ne **pas** durcir ceci en comparaison binaire : on
   // recertifierait pour une majuscule.
+  //
+  // `discord_pseudo` est en outre **gardé tel quel** quand un `discord_id` est
+  // posé : le refus lisible ci-dessus nomme la règle, cette branche la tient —
+  // une lecture puis une écriture laissent un `await` entre les deux, et le
+  // rattachement peut tomber dans cet intervalle. La garde couvre du même geste
+  // `discord_verified_at`, qui n'a alors aucune raison de tomber puisque rien ne
+  // change.
   await db.execute(
     `UPDATE bg_users
      SET pseudo = COALESCE(?, pseudo),
-         overwatch_battletag = ?,
-         marvel_rivals_tag = ?,
-         discord_verified_at = CASE WHEN discord_pseudo <=> ? THEN discord_verified_at ELSE NULL END,
-         discord_pseudo = ?,
-         is_adult = ?,
+         overwatch_battletag = CASE WHEN ? THEN ? ELSE overwatch_battletag END,
+         marvel_rivals_tag = CASE WHEN ? THEN ? ELSE marvel_rivals_tag END,
+         discord_verified_at = CASE
+           WHEN NOT ? THEN discord_verified_at
+           WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_verified_at
+           WHEN discord_pseudo <=> ? THEN discord_verified_at
+           ELSE NULL
+         END,
+         discord_pseudo = CASE
+           WHEN NOT ? THEN discord_pseudo
+           WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_pseudo
+           ELSE ?
+         END,
+         is_adult = CASE WHEN ? THEN ? ELSE is_adult END,
          visible_avatar = COALESCE(?, visible_avatar),
          visible_overwatch = COALESCE(?, visible_overwatch),
          visible_marvel = COALESCE(?, visible_marvel),
@@ -907,11 +999,18 @@ export async function updateOwnProfile(
      WHERE id = ?`,
     [
       patch.pseudo ? normalizePseudo(patch.pseudo) : null,
-      patch.overwatchBattletag === undefined ? null : patch.overwatchBattletag,
-      patch.marvelRivalsTag === undefined ? null : patch.marvelRivalsTag,
+      patch.overwatchBattletag !== undefined,
+      patch.overwatchBattletag ?? null,
+      patch.marvelRivalsTag !== undefined,
+      patch.marvelRivalsTag ?? null,
+      touchesDiscordTag,
       nextDiscordPseudo,
       nextDiscordPseudo,
-      patch.isAdult === undefined ? null : patch.isAdult,
+      touchesDiscordTag,
+      nextDiscordPseudo,
+      nextDiscordPseudo,
+      patch.isAdult !== undefined,
+      patch.isAdult ?? null,
       patch.visibility?.avatar ?? null,
       patch.visibility?.overwatch ?? null,
       patch.visibility?.marvel ?? null,
