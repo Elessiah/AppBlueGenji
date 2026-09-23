@@ -219,7 +219,7 @@ describe("loadTournamentPreview", () => {
 
     const preview = await run(tournament({ format: "MULTI" }));
 
-    expect(loadPhases).toHaveBeenCalledWith(connection, 7);
+    expect(loadPhases).toHaveBeenCalledWith(connection as never, 7);
     expect(preview?.format).toBe("SWISS");
     expect(preview?.rounds).toBe(3);
     expect(preview?.phasePlan).toHaveLength(2);

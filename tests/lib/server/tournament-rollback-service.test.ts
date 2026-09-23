@@ -736,11 +736,11 @@ describe("rollbackCurrentRound — entretien et diffusion", () => {
 
     await rollbackCurrentRound(7);
 
-    expect(tryAutoResolveByes).toHaveBeenCalledWith(connection, 7);
-    expect(reconcileSurvival).toHaveBeenCalledWith(7, connection);
-    expect(reconcileSwiss).toHaveBeenCalledWith(7, connection);
-    expect(reconcileEndurance).toHaveBeenCalledWith(7, connection);
-    expect(reconcilePhases).toHaveBeenCalledWith(7, connection);
+    expect(tryAutoResolveByes).toHaveBeenCalledWith(connection as never, 7);
+    expect(reconcileSurvival).toHaveBeenCalledWith(7, connection as never);
+    expect(reconcileSwiss).toHaveBeenCalledWith(7, connection as never);
+    expect(reconcileEndurance).toHaveBeenCalledWith(7, connection as never);
+    expect(reconcilePhases).toHaveBeenCalledWith(7, connection as never);
   });
 
   it("publie une seule fois, après le commit", async () => {
@@ -757,7 +757,7 @@ describe("rollbackCurrentRound — entretien et diffusion", () => {
     expect(connection.commit).toHaveBeenCalled();
     expect(publishUpdatedEvent).toHaveBeenCalledTimes(1);
     expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
-    expect(flushBotLogs).toHaveBeenCalledWith(connection);
+    expect(flushBotLogs).toHaveBeenCalledWith(connection as never);
   });
 
   it("ne publie ni ne journalise quand la transaction échoue", async () => {

@@ -197,7 +197,7 @@ describe("removeTournamentEntrant", () => {
     expect(connection.rollback).not.toHaveBeenCalled();
     // La synchronisation a pu réserver une ligne de journal : elle ne part
     // qu'une fois la transaction acquise.
-    expect(flushBotLogs).toHaveBeenCalledWith(connection);
+    expect(flushBotLogs).toHaveBeenCalledWith(connection as never);
     expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
     expect(connection.release).toHaveBeenCalledTimes(1);
   });
@@ -223,7 +223,7 @@ describe("removeTournamentEntrant", () => {
     expect(publishUpdatedEvent).not.toHaveBeenCalled();
     // La file est jetée sur l'échec : un tournoi n'est jamais annoncé lancé par
     // une transaction qui a rendu la main sur une erreur.
-    expect(discardBotLogs).toHaveBeenCalledWith(connection);
+    expect(discardBotLogs).toHaveBeenCalledWith(connection as never);
   });
 
   it("refuse un tournoi inconnu sans rien écrire", async () => {

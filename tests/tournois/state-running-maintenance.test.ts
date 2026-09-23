@@ -59,7 +59,7 @@ describe("syncTournamentState — entretien d'un tournoi en cours", () => {
 
       await syncTournamentState(connection, 5);
 
-      expect(createBracketIfMissing).toHaveBeenCalledWith(connection, row);
+      expect(createBracketIfMissing).toHaveBeenCalledWith(connection, row as never);
       // Sans transition d'état, rien ne doit être réécrit sur le tournoi.
       expect(updateTournamentState).not.toHaveBeenCalled();
     },

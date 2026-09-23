@@ -52,7 +52,7 @@ describe("registerGhostTeams", () => {
 
     expect(connection.beginTransaction).toHaveBeenCalledTimes(1);
     expect(registerTeamsByIds).toHaveBeenCalledTimes(1);
-    expect(registerTeamsByIds).toHaveBeenCalledWith(connection, 5, [900, 901, 902]);
+    expect(registerTeamsByIds).toHaveBeenCalledWith(connection as never, 5, [900, 901, 902]);
     expect(connection.commit).toHaveBeenCalledTimes(1);
     expect(connection.rollback).not.toHaveBeenCalled();
     expect(flushBotLogs).toHaveBeenCalledTimes(1);

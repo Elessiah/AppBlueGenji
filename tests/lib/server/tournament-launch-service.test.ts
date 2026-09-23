@@ -95,7 +95,7 @@ describe("launchTournamentNow", () => {
     expect(String(execute.mock.calls.find((c) => /UPDATE bg_tournaments/.test(String((c as [string])[0])))?.[0])).not.toMatch(
       /state\s*=/,
     );
-    expect(syncTournamentState).toHaveBeenCalledWith(connection, 7);
+    expect(syncTournamentState).toHaveBeenCalledWith(connection as never, 7);
     expect(connection.commit).toHaveBeenCalledTimes(1);
     expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
   });
@@ -140,8 +140,8 @@ describe("launchTournamentNow", () => {
 
     // La synchronisation a pu réserver une ligne (départ, ou clôture faute
     // d'adversaires) : elle ne part qu'une fois la transaction acquise.
-    expect(flushBotLogs).toHaveBeenCalledWith(connection);
-    expect(discardBotLogs).toHaveBeenCalledWith(connection);
+    expect(flushBotLogs).toHaveBeenCalledWith(connection as never);
+    expect(discardBotLogs).toHaveBeenCalledWith(connection as never);
   });
 
   it("remonte l'état réel quand le plateau se clôt faute d'adversaires", async () => {
