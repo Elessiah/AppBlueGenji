@@ -29,6 +29,7 @@ import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { DISCORD_CODE_VALIDITY_MINUTES } from "@/lib/shared/processing-register";
 import { formatPlayerSignupLog, type PlayerSignupProvider } from "@/lib/shared/bot-logs";
 import { isDiscordNumericId, visibleDiscordTag } from "@/lib/shared/discord-identity";
+import { battletagNeedsTournamentContext, visibleBattletag } from "@/lib/shared/battletag-visibility";
 import { can, sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 import { getPlayerEntityStats, loadPlayerRecords } from "@/lib/server/stats-service";
 import type {
@@ -1572,6 +1573,41 @@ async function isInActiveTournament(userId: number): Promise<boolean> {
   return rows.length > 0;
 }
 
+/**
+ * Deux joueurs sont-ils engagés dans un **même match** d'un tournoi vivant ?
+ *
+ * C'est la condition qui ouvre un BattleTag masqué aux autres joueurs du match
+ * (`lib/shared/battletag-visibility.ts`) : ils en ont besoin pour s'ajouter en
+ * jeu. Même borne que {@link isInActiveTournament} (tout état sauf `FINISHED`)
+ * et mêmes formes d'engagement — appartenance **en cours** à une équipe, ou
+ * entrée solo. Coéquipiers compris : ils disputent le même match.
+ *
+ * La requête part des engagés du titulaire — quelques lignes — plutôt que de
+ * balayer les matchs de tous les tournois vivants.
+ */
+async function sharesLiveMatch(userId: number, otherUserId: number): Promise<boolean> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { c: number })[]>(
+    `SELECT 1 AS c
+     FROM (
+       SELECT tm.team_id FROM bg_team_members tm WHERE tm.user_id = ? AND tm.left_at IS NULL
+       UNION
+       SELECT te.id FROM bg_teams te WHERE te.solo_user_id = ?
+     ) mine
+     JOIN bg_matches m ON m.team1_id = mine.team_id OR m.team2_id = mine.team_id
+     JOIN bg_tournaments t ON t.id = m.tournament_id
+     JOIN (
+       SELECT tm.team_id FROM bg_team_members tm WHERE tm.user_id = ? AND tm.left_at IS NULL
+       UNION
+       SELECT te.id FROM bg_teams te WHERE te.solo_user_id = ?
+     ) theirs ON theirs.team_id IN (m.team1_id, m.team2_id)
+     WHERE t.state <> 'FINISHED'
+     LIMIT 1`,
+    [userId, userId, otherUserId, otherUserId],
+  );
+  return rows.length > 0;
+}
+
 /** Le lecteur d'une fiche, tel que les règles de visibilité le demandent. */
 export type ProfileViewer = {
   id: number;
@@ -1627,13 +1663,34 @@ export async function getFullProfile(
   // lorsqu'elle peut changer la réponse — un administrateur voit de toute façon,
   // le lecteur ordinaire ne voit de toute façon pas, et une requête de plus sur
   // chaque fiche consultée n'aurait servi à personne.
+  // La question est partagée avec le BattleTag ci-dessous : posée une fois au plus.
+  let activeTournament: Promise<boolean> | null = null;
+  const targetInActiveTournament = () => (activeTournament ??= isInActiveTournament(targetUserId));
+
   const needsTournamentCheck =
     !isSelf && !viewerIsAdmin && can(viewer, "tournaments") && discordVerified;
   profile.discordPseudo = visibleDiscordTag(userRows[0].discord_pseudo, viewer, {
     userId: targetUserId,
     verified: discordVerified,
-    inActiveTournament: needsTournamentCheck ? await isInActiveTournament(targetUserId) : false,
+    inActiveTournament: needsTournamentCheck ? await targetInActiveTournament() : false,
   });
+
+  // **Le BattleTag masqué ne l'est pas pour tout le monde** : les autres joueurs
+  // d'un match et l'arbitrage d'un tournoi vivant le lisent encore — ce que la
+  // modale de `/profil` annonce au joueur quand il le masque. `applyVisibility`
+  // l'a effacé plus haut sans connaître le lecteur ; la règle le repose ici, sur
+  // la valeur brute.
+  const rawBattletag = userRows[0].overwatch_battletag;
+  const battletagSubject = { userId: targetUserId, visible: profile.visibility.overwatch };
+  if (battletagNeedsTournamentContext(rawBattletag, viewer, battletagSubject)) {
+    const shares = await sharesLiveMatch(targetUserId, viewerId);
+    profile.overwatchBattletag = visibleBattletag(rawBattletag, viewer, {
+      ...battletagSubject,
+      sharesLiveMatch: shares,
+      inActiveTournament:
+        !shares && can(viewer, "tournaments") ? await targetInActiveTournament() : false,
+    });
+  }
   // **La pastille ne suit pas le tag** (`canSeeDiscordVerification`) : le tag dit
   // *comment* joindre le joueur, la certification dit seulement *qu'il est
   // joignable*. Le second fait ne nomme personne — et il manque à quelqu'un de

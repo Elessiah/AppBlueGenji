@@ -92,8 +92,9 @@ export function BattletagVisibilityNotice({ onClose }: { onClose: () => void }) 
             }}
           >
             <li>
-              <strong>Les autres joueurs de chaque match que tu disputes</strong> —
-              c&apos;est par lui qu&apos;on s&apos;ajoute en jeu pour lancer la partie.
+              <strong>Les autres joueurs de chaque match que tu disputes</strong>, le
+              temps du tournoi — c&apos;est par lui qu&apos;on s&apos;ajoute en jeu pour
+              lancer la partie.
             </li>
             <li>
               <strong>Les arbitres et les administrateurs</strong> des tournois où tu es
