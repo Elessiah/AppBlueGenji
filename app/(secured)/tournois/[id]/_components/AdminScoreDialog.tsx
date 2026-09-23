@@ -14,6 +14,7 @@ import {
 import { useScoreForm } from "../_hooks/useScoreForm";
 import { parseScoreInput, scoreBlockerMessage } from "../_lib/score-form";
 import { useMatchFormat } from "../_lib/match-format-context";
+import { EntrantLogo } from "./EntrantName";
 import styles from "./AdminScoreDialog.module.css";
 
 interface AdminScoreDialogProps {
@@ -25,6 +26,8 @@ interface AdminScoreDialogProps {
 
 interface ScoreStepperProps {
   id: string;
+  /** Engagé du côté saisi — sert à son emblème ; `null` sur une case vide. */
+  teamId: number | null;
   teamName: string;
   value: string;
   max: number;
@@ -37,7 +40,7 @@ interface ScoreStepperProps {
  * balises identiques recopiés l'un sous l'autre — une correction sur l'un se
  * perdait sur l'autre.
  */
-function ScoreStepper({ id, teamName, value, max, disabled, onChange }: ScoreStepperProps) {
+function ScoreStepper({ id, teamId, teamName, value, max, disabled, onChange }: ScoreStepperProps) {
   const parsed = parseScoreInput(value);
   // Un champ vide n'est pas une erreur : c'est un score pas encore saisi. Seule
   // une valeur illisible ou hors plage se signale en rouge.
@@ -47,7 +50,10 @@ function ScoreStepper({ id, teamName, value, max, disabled, onChange }: ScoreSte
   return (
     <div>
       <label className={styles.sideLabel} htmlFor={id}>
-        {teamName}
+        {/* L'emblème est décoratif : le nom accessible du champ reste le nom
+            de l'équipe, écrit juste à côté. */}
+        <EntrantLogo teamId={teamId} name={teamName} size={20} />
+        <span className={styles.sideLabelText}>{teamName}</span>
       </label>
       <div className={styles.stepper}>
         <button
@@ -261,6 +267,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
           <div className={styles.scores}>
             <ScoreStepper
               id="admin-score-team1"
+              teamId={match.team1Id}
               teamName={team1}
               value={form.score1}
               max={maxScore}
@@ -272,6 +279,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
             </span>
             <ScoreStepper
               id="admin-score-team2"
+              teamId={match.team2Id}
               teamName={team2}
               value={form.score2}
               max={maxScore}

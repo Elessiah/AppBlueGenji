@@ -6,11 +6,11 @@ import { fromBracketMatch, isScoreEditLocked } from "@/lib/shared/match-lock";
 import { matchFormatLabel, matchWinsRequired } from "@/lib/shared/match-format";
 import { matchAnchorId } from "@/lib/shared/match-anchor";
 import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
-import { EntrantLink } from "../_lib/entrant-link";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { useIssueReport } from "../_lib/issue-report-context";
 import { useHighlightedMatch } from "../_lib/match-anchor-context";
 import { MatchLiveStrip } from "./MatchLiveStrip";
+import { EntrantName } from "./EntrantName";
 
 const CARD_W = 210;
 const BORDER = "var(--border, #444)";
@@ -131,37 +131,29 @@ export function MatchRow({
       }}
     >
       <div style={{ ...rowStyle(team1Win), borderBottom: `1px solid ${BORDER}` }}>
-        {match.team1Id ? (
-          <EntrantLink
-            teamId={match.team1Id}
-            title={team1Display}
-            style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, display: "block" }}
-          >
-            {team1Display}
-          </EntrantLink>
-        ) : (
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-            {team1Display}
-          </span>
-        )}
+        {/* Emblème compris : il garde sa case même sur une ligne vide (TBD,
+            BYE), pour que les deux noms de la carte commencent au même endroit. */}
+        <EntrantName
+          teamId={match.team1Id}
+          name={team1Display}
+          title={team1Display}
+          truncate
+          style={{ flex: 1 }}
+        />
         <strong style={{ marginLeft: 8, color: team1Win ? "var(--green)" : team1Forfeits ? "rgba(255,157,46,0.9)" : "var(--text-2)" }}>
           {team1Score}
         </strong>
       </div>
       <div style={rowStyle(team2Win)}>
-        {match.team2Id ? (
-          <EntrantLink
-            teamId={match.team2Id}
-            title={team2Display}
-            style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, display: "block" }}
-          >
-            {team2Display}
-          </EntrantLink>
-        ) : (
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-            {team2Display}
-          </span>
-        )}
+        {/* Emblème compris : il garde sa case même sur une ligne vide (TBD,
+            BYE), pour que les deux noms de la carte commencent au même endroit. */}
+        <EntrantName
+          teamId={match.team2Id}
+          name={team2Display}
+          title={team2Display}
+          truncate
+          style={{ flex: 1 }}
+        />
         <strong style={{ marginLeft: 8, color: team2Win ? "var(--green)" : team2Forfeits ? "rgba(255,157,46,0.9)" : "var(--text-2)" }}>
           {team2Score}
         </strong>

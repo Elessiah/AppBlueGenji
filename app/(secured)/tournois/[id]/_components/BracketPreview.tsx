@@ -7,7 +7,8 @@ import {
   type PreviewPairingKind,
   type TournamentPreview,
 } from "@/lib/shared/tournament-preview";
-import { EntrantLink, useParticipantWording } from "../_lib/entrant-link";
+import { useParticipantWording } from "../_lib/entrant-link";
+import { EntrantName } from "./EntrantName";
 
 interface BracketPreviewProps {
   preview: TournamentPreview;
@@ -51,15 +52,17 @@ function EntrantCell({ pairing, side }: { pairing: PreviewPairing; side: "A" | "
   }
 
   return (
-    <span style={{ display: "inline-flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 8, minWidth: 0 }}>
       <span className="num" style={{ fontSize: 11, color: "var(--text-2)" }}>
         #{entrant.seed}
       </span>
       {/* Pas d'ellipse : sur une colonne étroite, un nom d'équipe qui passe à
           la ligne reste lisible là où un nom tronqué ne l'est plus. */}
-      <EntrantLink teamId={entrant.teamId} style={{ overflowWrap: "anywhere" }}>
-        {entrant.teamName}
-      </EntrantLink>
+      <EntrantName
+        teamId={entrant.teamId}
+        name={entrant.teamName}
+        textStyle={{ overflowWrap: "anywhere" }}
+      />
     </span>
   );
 }

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { CSSProperties } from "react";
 import { TEAM_TAG_MAX_LENGTH } from "@/lib/shared/team-tag";
 import styles from "./TeamSigil.module.css";
@@ -12,6 +13,13 @@ interface TeamSigilProps {
   label: string;
   color?: string;
   size?: 24 | 32 | 40;
+  /**
+   * Logo de l'équipe, s'il y en a un : il prend la place du texte dans le même
+   * cadre, qui garde sa taille et sa couleur. `label` reste obligatoire — c'est
+   * le repli quand l'équipe n'a pas de logo. Toujours un fichier du site
+   * (`localUploadUrl`) : `next/image` lève sur une origine étrangère.
+   */
+  logoUrl?: string | null;
 }
 
 /**
@@ -30,6 +38,7 @@ export function TeamSigil({
   label,
   color = "var(--blue-500)",
   size = 32,
+  logoUrl = null,
 }: TeamSigilProps) {
   const radius = size === 24 ? "4px" : size === 32 ? "6px" : "6px";
   // Le cadre est carré et de taille fixe : c'est le texte qui s'y adapte, pas
@@ -50,7 +59,12 @@ export function TeamSigil({
         } as CSSProperties
       }
     >
-      {text}
+      {logoUrl ? (
+        // Décoratif : le nom de l'équipe est toujours écrit à côté de l'emblème.
+        <Image src={logoUrl} alt="" width={size} height={size} className={styles.logo} />
+      ) : (
+        text
+      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { DiscordTag } from "@/components/discord-tag";
 import { useToast } from "@/components/ui/toast";
 import { contactsPanelView } from "../_lib/contacts-panel-view";
 import { mapError } from "../_lib/error-map";
+import { EntrantName } from "./EntrantName";
 import styles from "./EntrantContactsPanel.module.css";
 
 /**
@@ -141,7 +142,12 @@ export function EntrantContactsPanel({ tournamentId }: { tournamentId: number })
             entrants?.map((entrant) => (
               <div key={entrant.teamId} className={styles.group}>
                 <div className={styles.groupHead}>
-                  <span className={styles.teamName}>{entrant.teamName}</span>
+                  <EntrantName
+                    teamId={entrant.teamId}
+                    name={entrant.teamName}
+                    logoSize={20}
+                    textClassName={styles.teamName}
+                  />
                   {!entrant.reachable && (
                     <span className={styles.unreachable}>Aucun contact certifié</span>
                   )}

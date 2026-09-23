@@ -1,0 +1,61 @@
+/* Emblème d'un engagé : logo de l'équipe (ou avatar copié d'une entrée solo),
+   sinon l'initiale de son nom. Le cadre est carré et de taille fixe, posé hors
+   de toute négociation flex (`flex-shrink: 0`) : c'est lui qui garde les noms
+   alignés d'une ligne à l'autre, logo ou pas. */
+.logo {
+  --size: 16px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 var(--size);
+  width: var(--size);
+  height: var(--size);
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line-soft, rgba(255, 255, 255, 0.08));
+  box-sizing: border-box;
+  color: var(--ink-mute, var(--text-2));
+  font-size: calc(var(--size) * 0.56);
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
+}
+
+/* Un logo n'est jamais rogné : une bannière ou un logo en portrait tient entier
+   dans la case, sur un fond neutre. Posé hors du flux, pour qu'une taille
+   intrinsèque d'image ne puisse pas élargir la case (cf. l'annuaire). */
+.logoImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Case vide (à déterminer, exemption) : la place est réservée, rien n'est
+   dessiné. Sans elle, le nom de la ligne voisine commencerait plus à droite. */
+.empty {
+  background: none;
+  border-color: transparent;
+}
+
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.text {
+  min-width: 0;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -127,7 +127,9 @@
 }
 
 .sideLabel {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0 0 8px;
   font-size: 11.5px;
   font-weight: 700;
@@ -135,6 +137,10 @@
   text-transform: uppercase;
   color: var(--blue-400, #5ac8ff);
   overflow-wrap: anywhere;
+}
+
+.sideLabelText {
+  min-width: 0;
 }
 
 .stepper {

@@ -107,6 +107,8 @@ type LiveMatchRow = RowDataPacket & {
   team2_name: string | null;
   team1_solo_user_id: number | null;
   team2_solo_user_id: number | null;
+  team1_logo_url: string | null;
+  team2_logo_url: string | null;
   team1_score: number | null;
   team2_score: number | null;
   team1_seed: number | null;
@@ -202,6 +204,8 @@ async function loadLandingLive(): Promise<LandingLive | null> {
         t2.name AS team2_name,
         t1.solo_user_id AS team1_solo_user_id,
         t2.solo_user_id AS team2_solo_user_id,
+        t1.logo_url AS team1_logo_url,
+        t2.logo_url AS team2_logo_url,
         m.team1_score,
         m.team2_score,
         r1.seed AS team1_seed,
@@ -250,6 +254,10 @@ async function loadLandingLive(): Promise<LandingLive | null> {
           team2Name: currentRow.team2_name,
           team1Href: entrantHrefFor(currentRow.team1_id, currentRow.team1_solo_user_id),
           team2Href: entrantHrefFor(currentRow.team2_id, currentRow.team2_solo_user_id),
+          // Filtré à la sortie comme partout : la vitrine est lue sans compte,
+          // et `next/image` lèverait sur une origine étrangère.
+          team1LogoUrl: localUploadUrl(currentRow.team1_logo_url),
+          team2LogoUrl: localUploadUrl(currentRow.team2_logo_url),
           team1Score: currentRow.team1_score === null ? null : Number(currentRow.team1_score),
           team2Score: currentRow.team2_score === null ? null : Number(currentRow.team2_score),
           team1Seed: seedOrderIsTheDraw ? toSeed(currentRow.team1_seed) : null,

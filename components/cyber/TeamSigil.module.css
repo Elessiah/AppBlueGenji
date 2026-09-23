@@ -1,4 +1,5 @@
 .root {
+  position: relative;
   width: var(--size);
   height: var(--size);
   border: 1px solid var(--c);
@@ -16,4 +17,14 @@
   line-height: 1;
   letter-spacing: 0.02em;
   overflow: hidden;
+}
+
+/* Logo d'équipe à la place du sigle : jamais rogné (bannière, portrait), posé
+   hors du flux pour que sa taille intrinsèque n'élargisse pas la case. */
+.logo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }

@@ -8,7 +8,7 @@ import {
   formatStageCountdown,
 } from "@/lib/shared/tournament-progress";
 import type { TournamentDetail } from "@/lib/shared/types";
-import { EntrantLink } from "../_lib/entrant-link";
+import { EntrantName } from "./EntrantName";
 import styles from "./TournamentProgress.module.css";
 
 interface TournamentProgressProps {
@@ -176,9 +176,11 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
           champion ? (
             <>
               <span>Vainqueur :</span>
-              <EntrantLink teamId={champion.teamId} className={styles.footStrong}>
-                {champion.teamName}
-              </EntrantLink>
+              <EntrantName
+                teamId={champion.teamId}
+                name={champion.teamName}
+                textClassName={styles.footStrong}
+              />
             </>
           ) : (
             <span>Le tournoi est clos.</span>

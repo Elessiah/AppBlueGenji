@@ -17,7 +17,8 @@ import {
   entrantRemovalBlockReason,
 } from "@/lib/shared/entrant-removal";
 import type { TournamentDetail } from "@/lib/shared/types";
-import { EntrantLink, useParticipantWording } from "../_lib/entrant-link";
+import { useParticipantWording } from "../_lib/entrant-link";
+import { EntrantName } from "./EntrantName";
 import { mapError } from "../_lib/error-map";
 import { useTournamentNow } from "@/lib/shared/hooks/useTournamentNow";
 import { useSeedingDrag } from "../_hooks/useSeedingDrag";
@@ -278,9 +279,11 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
                 </span>
               )}
               <span className={styles.seed}>#{index + 1}</span>
-              <EntrantLink className={styles.name} teamId={reg.teamId}>
-                {reg.teamName}
-              </EntrantLink>
+              <EntrantName
+                teamId={reg.teamId}
+                name={reg.teamName}
+                textClassName={styles.name}
+              />
               <span className={styles.muted}>{formatLocalDateTime(reg.registeredAt)}</span>
               <span className={styles.muted}>{reg.finalRank ?? "-"}</span>
               {showActions && (

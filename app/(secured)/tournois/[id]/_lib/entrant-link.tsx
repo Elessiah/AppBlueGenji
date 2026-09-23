@@ -3,6 +3,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { EntityLink, type EntityLinkProps } from "@/components/entity-link";
 import { entrantHref, participantWording, type ParticipantType } from "@/lib/shared/participants";
+import { entrantLogoUrl, type EntrantLogoMap } from "@/lib/shared/entrant-logos";
 
 /**
  * Contexte « type de participant » de la page de tournoi.
@@ -13,26 +14,31 @@ import { entrantHref, participantWording, type ParticipantType } from "@/lib/sha
  * une fois en haut de la page :
  * - `entrantLink(teamId)` renvoie vers `/joueurs/[id]` pour une entrée solo,
  *   vers `/equipes/[id]` sinon ;
- * - `wording` fournit le vocabulaire (« équipe » / « joueur ») des libellés.
+ * - `wording` fournit le vocabulaire (« équipe » / « joueur ») des libellés ;
+ * - `useEntrantLogo(teamId)` rend le logo de l'engagé (`lib/shared/entrant-logos.ts`).
  */
 type EntrantContextValue = {
   participantType: ParticipantType;
   soloUserIds: Record<number, number>;
+  /** Logos des engagés, construits depuis les inscrites (`buildEntrantLogoMap`). */
+  logos: EntrantLogoMap;
 };
 
 const EntrantContext = createContext<EntrantContextValue>({
   participantType: "TEAM",
   soloUserIds: {},
+  logos: {},
 });
 
 export function EntrantProvider({
   participantType,
   soloUserIds,
+  logos,
   children,
 }: EntrantContextValue & { children: ReactNode }) {
   const value = useMemo(
-    () => ({ participantType, soloUserIds }),
-    [participantType, soloUserIds],
+    () => ({ participantType, soloUserIds, logos }),
+    [participantType, soloUserIds, logos],
   );
   return <EntrantContext.Provider value={value}>{children}</EntrantContext.Provider>;
 }
@@ -41,6 +47,12 @@ export function EntrantProvider({
 export function useEntrantLink(): (teamId: number) => string {
   const { soloUserIds } = useContext(EntrantContext);
   return useMemo(() => (teamId: number) => entrantHref(teamId, soloUserIds), [soloUserIds]);
+}
+
+/** Logo de l'engagé, ou `null` (pas de logo, case vide, engagé inconnu). */
+export function useEntrantLogo(teamId: number | null): string | null {
+  const { logos } = useContext(EntrantContext);
+  return entrantLogoUrl(logos, teamId);
 }
 
 /** Vocabulaire du type de participant du tournoi affiché. */
