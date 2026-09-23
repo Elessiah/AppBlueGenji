@@ -106,6 +106,30 @@ une donnée, elle ne publie rien.
 Un compte Battle.net sans BattleTag n'efface rien — on ne détruit pas une saisie
 avec du vide.
 
+**Et le champ cesse d'être saisissable** (`lib/shared/battletag-lock.ts`). Deux
+écrivains qui ne se connaissaient pas ne pouvaient produire qu'une promesse
+intenable : le formulaire acceptait une correction, l'écrivait, l'affichait — et
+la connexion suivante l'effaçait sans rien dire. Rattaché, le champ passe donc en
+lecture seule, la route refuse la réécriture en **409** (`BATTLETAG_LOCKED`), et
+la phrase du verrou nomme les deux gestes qui restent : retirer Blizzard depuis
+« Applications connectées » pour en **changer**, décocher « BattleTag OW » pour
+cesser de le **publier**.
+
+**Le retrait du champ est refusé aussi, et c'est là que la règle s'écarte de
+celle du tag Discord**, qui l'autorise. Effacer son tag Discord *est*
+l'annulation d'une exposition, et le seul geste que le site offre — il n'existe
+aucune route de décertification, et le refuser enfermerait un compte né par
+Discord. Le BattleTag n'atteste rien : ce qui le publie est un réglage à part
+que le joueur garde entièrement en main, si bien que l'annulation existe déjà
+ailleurs — pendant qu'un effacement du champ serait, lui, défait à la prochaine
+connexion Battle.net.
+
+Comme pour le tag Discord, **un rattachement inconnu verrouille** : l'écran reçoit
+la liste par un appel à part, donc il ne la connaît pas au premier rendu. Ouvrir
+à tort laisse saisir une valeur que la route refusera en 409, et ce refus emporte
+**toute** la sauvegarde, le `PATCH` étant indivisible ; verrouiller à tort ne coûte
+qu'un rechargement.
+
 ### « Applications connectées » (`/profil`)
 
 La section liste les trois portes, rattachées ou non, et porte les deux règles de
@@ -135,6 +159,33 @@ la laisser exposerait à l'organisation un tag que plus rien ne couvre. Le tag
 redevient une saisie ordinaire — invisible de tous, administrateurs compris. Le
 BattleTag, lui, survit au détachement de Blizzard : il n'est ni une porte
 d'entrée ni une attestation.
+
+**La ligne Discord dit par quelle porte elle est passée**
+(`bg_users.discord_link_method`, `ENUM('DM_CODE','OAUTH')`). Discord est le seul
+fournisseur à en avoir deux — le bouton, et le code à six chiffres reçu en
+message privé — et elles aboutissent au même `discord_id`, mais ne laissent pas
+la même trace **chez Discord** : l'une y pose une autorisation d'application,
+que le joueur peut y consulter et révoquer, l'autre non. C'est exactement ce
+qu'une liste d'applications connectées doit dire, et « Rattaché » ne le disait
+pas.
+
+`OAUTH` l'emporte et ne redescend jamais : une autorisation donnée existe chez
+Discord tant que le joueur ne la retire pas, qu'il se connecte ensuite par code
+ou non. La colonne ne dit donc pas « comment je me suis connecté la dernière
+fois » mais « sur quoi ce rattachement repose ». Elle est posée par les deux
+portes (`createOrGetDiscordUser` reçoit un `method` **obligatoire**, et
+`linkOAuthIdentity` écrit `'OAUTH'` dans la même instruction que `discord_id`),
+et **effacée par le détachement** — elle décrit un rattachement, pas un compte.
+
+`NULL` = on ne sait pas, et c'est **définitif** pour les rattachements antérieurs
+à la colonne : ils ne portent aucune trace de leur porte, et leur en attribuer
+une serait affirmer ce qu'on ignore. Aucun remplissage à la migration, donc, et
+l'écran n'en dit alors rien (`connectionMethodLabel` rend `null`).
+
+La liste est en outre chargée **une fois pour la page** : elle a un second
+lecteur depuis le verrou du BattleTag, et deux `fetch` pour la même donnée en
+feraient deux vérités — le temps d'un retrait, la section dirait « Rattacher »
+pendant que le champ d'en haut resterait fermé.
 
 ## Pièges
 
@@ -175,6 +226,8 @@ rattachement aboutit quand même.
 | --- | --- |
 | Registre des fournisseurs (pur) | `lib/shared/oauth-providers.ts` |
 | Règles de rattachement/détachement (pur) | `lib/shared/account-connections.ts` |
+| Verrou du BattleTag (pur) | `lib/shared/battletag-lock.ts` |
+| Verrou du tag Discord (pur) | `lib/shared/discord-tag-lock.ts` |
 | Aller-retour, partagé par les trois | `lib/server/oauth-flow.ts` |
 | Cookie d'état | `lib/server/oauth-state.ts` |
 | Clients | `lib/server/{google,discord,blizzard}-oauth.ts` |
@@ -183,6 +236,8 @@ rattachement aboutit quand même.
 | Routes | `app/api/auth/<slug>/{start,callback}/route.ts` |
 | API du profil | `app/api/profile/connections/{route.ts,[provider]/route.ts}` |
 | Écrans | `app/connexion/_components/OAuthButtons.tsx`, `app/(secured)/profil/ConnectedAppsSection.tsx` |
+| Liste des rattachements, côté page | `app/(secured)/profil/useAccountConnections.ts` |
+| Ce que masquer le BattleTag ne fait pas | `app/(secured)/profil/BattletagVisibilityNotice.tsx` |
 | Refus en français | `app/connexion/_lib/login-errors.ts`, `app/(secured)/profil/connection-errors.ts` |
 
 ## Configuration

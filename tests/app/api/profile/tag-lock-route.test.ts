@@ -45,6 +45,32 @@ describe("PATCH /api/profile — tag Discord verrouillé", () => {
     expect((await response.json()).error).toBe("DISCORD_TAG_LOCKED");
   });
 
+  it("rend 409 sur BATTLETAG_LOCKED, de la même nature", async () => {
+    // Un compte Blizzard rattaché possède son BattleTag
+    // (`lib/shared/battletag-lock.ts`) : la saisie est bonne, c'est l'état du
+    // compte qui l'interdit. Sans cette ligne, le refus retombait sur le 400
+    // générique et le joueur lisait « La sauvegarde a échoué » sur un refus
+    // qu'on sait pourtant nommer.
+    updateMock.mockRejectedValue(new Error("BATTLETAG_LOCKED") as never);
+
+    const response = await patch({ overwatchBattletag: "Autre#9999" });
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toBe("BATTLETAG_LOCKED");
+  });
+
+  it("rend 400 sur un BattleTag qui n'est pas du texte", async () => {
+    // Une **saisie** fautive, elle, reste un 400 : la valeur doit être lue pour
+    // être comparée à celle de Blizzard, et le refus est nommé plutôt que laissé
+    // au `TypeError`.
+    updateMock.mockRejectedValue(new Error("INVALID_OVERWATCH_BATTLETAG") as never);
+
+    const response = await patch({ overwatchBattletag: 123 });
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("INVALID_OVERWATCH_BATTLETAG");
+  });
+
   it("garde 409 pour le pseudo déjà pris — les deux refus d'état cohabitent", async () => {
     updateMock.mockRejectedValue(new Error("PSEUDO_ALREADY_USED") as never);
 

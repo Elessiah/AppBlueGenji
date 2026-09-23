@@ -189,12 +189,18 @@ describe("createOrGetDiscordUser — entrer par Discord certifie le tag", () => 
       q.startsWith("SELECT id FROM bg_users WHERE discord_id") ? [[{ id: 7 }]] : undefined,
     );
 
-    await createOrGetDiscordUser("900000000000000001", undefined, "keryan");
+    await createOrGetDiscordUser("900000000000000001", undefined, "keryan", {
+      method: "DM_CODE",
+    });
 
     const update = find(queries, "UPDATE bg_users");
     expect(update).toBeDefined();
-    expect(update!.sql).toContain("discord_verified_at = NOW()");
-    expect(update!.params).toEqual(["keryan", 7]);
+    expect(update!.sql).toContain("discord_verified_at = CASE WHEN ? THEN NOW()");
+    // Le drapeau du `CASE` est vrai : il y a bien un tag à écrire et à certifier.
+    expect(update!.params).toEqual([true, "keryan", true, 7]);
+    // La porte est notée au passage, et le code en message privé ne dégrade
+    // jamais un rattachement déjà noué par le bouton.
+    expect(update!.sql).toContain("discord_link_method = COALESCE(discord_link_method, 'DM_CODE')");
   });
 
   it("ne touche à rien quand la demande portait un identifiant numérique", async () => {
@@ -203,9 +209,16 @@ describe("createOrGetDiscordUser — entrer par Discord certifie le tag", () => 
       q.startsWith("SELECT id FROM bg_users WHERE discord_id") ? [[{ id: 7 }]] : undefined,
     );
 
-    await createOrGetDiscordUser("900000000000000001", undefined, "900000000000000001");
+    await createOrGetDiscordUser("900000000000000001", undefined, "900000000000000001", {
+      method: "OAUTH",
+    });
 
-    expect(find(queries, "UPDATE bg_users")).toBeUndefined();
+    // L'écriture part tout de même — elle note la **porte** franchie, qui ne
+    // dépend pas de ce que Discord a nommé — mais ses deux `CASE` sont fermés :
+    // ni le tag stocké ni sa certification ne bougent.
+    const update = find(queries, "UPDATE bg_users")!;
+    expect(update.params).toEqual([false, null, false, 7]);
+    expect(update.sql).toContain("discord_link_method = 'OAUTH'");
   });
 
   it("crée un compte neuf avec son tag certifié", async () => {
@@ -216,13 +229,18 @@ describe("createOrGetDiscordUser — entrer par Discord certifie le tag", () => 
       return undefined;
     });
 
-    const userId = await createOrGetDiscordUser("900000000000000002", "Nova", "keryan");
+    const userId = await createOrGetDiscordUser("900000000000000002", "Nova", "keryan", {
+      method: "OAUTH",
+    });
 
     expect(userId).toBe(42);
     const insert = find(queries, "INSERT INTO bg_users")!;
     expect(insert.sql).toContain("discord_verified_at");
     expect(insert.sql).toContain("NOW()");
     expect(insert.params).toContain("keryan");
+    // Un compte né par une porte porte le nom de cette porte dès sa ligne.
+    expect(insert.sql).toContain("discord_link_method");
+    expect(insert.params).toContain("OAUTH");
   });
 
   it("crée un compte sans certification quand aucun tag n'a été prouvé", async () => {
@@ -233,9 +251,15 @@ describe("createOrGetDiscordUser — entrer par Discord certifie le tag", () => 
       return undefined;
     });
 
-    await createOrGetDiscordUser("900000000000000002", "Nova");
+    await createOrGetDiscordUser("900000000000000002", "Nova", undefined, {
+      method: "DM_CODE",
+    });
 
-    expect(find(queries, "INSERT INTO bg_users")!.sql).toContain("NULL");
+    const insert = find(queries, "INSERT INTO bg_users")!;
+    expect(insert.sql).toContain("NULL");
+    // Pas de tag certifié, mais une porte franchie : les deux faits sont
+    // distincts, et le second s'écrit quand même.
+    expect(insert.params).toContain("DM_CODE");
   });
 });
 
@@ -589,9 +613,16 @@ describe("updateOwnProfile — un patch partiel ne vide pas les champs voisins",
   it("passe les quatre colonnes par le même `CASE`", async () => {
     const update = await partial({ pseudo: "Nova" });
 
-    for (const column of ["overwatch_battletag", "marvel_rivals_tag", "is_adult"]) {
+    for (const column of ["marvel_rivals_tag", "is_adult"]) {
       expect(update.sql).toContain(`${column} = CASE WHEN ? THEN ? ELSE ${column} END`);
     }
+    // Le BattleTag a le même `CASE` **plus une branche** : un compte Blizzard
+    // rattaché possède ce champ, et le garde quoi qu'on soumette
+    // (`lib/shared/battletag-lock.ts`). Le refus lisible nomme la règle, cette
+    // branche la tient — une lecture puis une écriture laissent un `await`
+    // entre elles, et le rattachement peut tomber dans cet intervalle.
+    expect(update.sql).toContain("WHEN NOT ? THEN overwatch_battletag");
+    expect(update.sql).toContain("WHEN blizzard_sub IS NOT NULL THEN overwatch_battletag");
   });
 
   it("laisse les colonnes NOT NULL à COALESCE, qui suffit", async () => {

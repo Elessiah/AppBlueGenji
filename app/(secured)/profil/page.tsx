@@ -21,6 +21,7 @@ import {
   discordTagLockNotice,
   isDiscordTagLocked,
 } from "@/lib/shared/discord-tag-lock";
+import { battletagLockNotice, isBattletagLocked } from "@/lib/shared/battletag-lock";
 import {
   avatarDeleteErrorMessage,
   avatarUploadErrorMessage,
@@ -44,6 +45,8 @@ import {
 import { ProfileSection } from "./_components/ProfileSection";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
+import { BattletagVisibilityNotice } from "./BattletagVisibilityNotice";
+import { useAccountConnections } from "./useAccountConnections";
 import s from "./profil.module.css";
 
 // Le pseudo n'est plus masquable : identité de base du joueur sur la plateforme.
@@ -61,6 +64,18 @@ export default function ProfilePage() {
 
   const [pseudo, setPseudo] = useState("");
   const [overwatchBattletag, setOverwatchBattletag] = useState("");
+  /**
+   * Le BattleTag **tel qu'il est enregistré**, pour savoir si la sauvegarde a
+   * quelque chose à en dire.
+   *
+   * Même raison que `savedDiscordPseudo` : le champ est en lecture seule dès
+   * que Blizzard est rattaché, et renvoyer l'instantané du montage à chaque
+   * sauvegarde ferait refuser **tout** le `PATCH` en 409 dès que Blizzard
+   * l'aurait réécrit entre-temps — une connexion Battle.net depuis un autre
+   * appareil suffit. Omettre la clé n'efface rien : le service ne touche la
+   * colonne que si le patch en parle.
+   */
+  const [savedOverwatchBattletag, setSavedOverwatchBattletag] = useState("");
   const [marvelRivalsTag, setMarvelRivalsTag] = useState("");
   const [discordPseudo, setDiscordPseudo] = useState("");
   // État Discord du compte, lu à part du formulaire : la certification porte sur
@@ -195,6 +210,7 @@ export default function ProfilePage() {
       setData(payload);
       setPseudo(payload.profile.pseudo);
       setOverwatchBattletag(payload.profile.overwatchBattletag || "");
+      setSavedOverwatchBattletag(payload.profile.overwatchBattletag || "");
       setMarvelRivalsTag(payload.profile.marvelRivalsTag || "");
       setDiscordPseudo(payload.profile.discordPseudo || "");
       setSavedDiscordPseudo(payload.profile.discordPseudo || "");
@@ -266,12 +282,26 @@ export default function ProfilePage() {
       // exactement ce qu'il faut savoir : ce champ a-t-il quelque chose à
       // écrire ?
       const touchesDiscordTag = discordPseudo.trim() !== savedDiscordPseudo.trim();
+      // Même règle pour le BattleTag, et pour la même raison : la condition
+      // porte sur la **valeur**, jamais sur le verrou — celui-ci se lit sur un
+      // état que l'écran peut avoir périmé (un onglet ouvert avant un
+      // rattachement porte encore « non rattaché »), et c'est précisément le
+      // cas où le refus tombe. La valeur, elle, dit ce qu'il faut savoir : ce
+      // champ a-t-il quelque chose à écrire ?
+      const touchesBattletag =
+        overwatchBattletag.trim() !== savedOverwatchBattletag.trim();
       const response = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           pseudo,
-          overwatchBattletag: overwatchBattletag.trim() ? overwatchBattletag.trim() : null,
+          ...(touchesBattletag
+            ? {
+                overwatchBattletag: overwatchBattletag.trim()
+                  ? overwatchBattletag.trim()
+                  : null,
+              }
+            : {}),
           marvelRivalsTag: marvelRivalsTag.trim() ? marvelRivalsTag.trim() : null,
           ...(touchesDiscordTag
             ? { discordPseudo: discordPseudo.trim() ? discordPseudo.trim() : null }
@@ -297,6 +327,13 @@ export default function ProfilePage() {
       // laissée en arrière, elle resoumettrait un tag déjà écrit.
       setDiscordPseudo(payload.profile.discordPseudo || "");
       setSavedDiscordPseudo(payload.profile.discordPseudo || "");
+      // Le champ **et** sa référence se réalignent sur ce qui vient d'être
+      // enregistré : le champ parce qu'il est en lecture seule sous un compte
+      // Blizzard rattaché et que c'est le seul endroit où le BattleTag
+      // s'affiche, la référence parce que c'est elle qui décide si la prochaine
+      // sauvegarde parle de ce champ.
+      setOverwatchBattletag(payload.profile.overwatchBattletag || "");
+      setSavedOverwatchBattletag(payload.profile.overwatchBattletag || "");
       // Une sauvegarde qui change le tag **annule la certification** côté
       // serveur : la pastille doit tomber dans le même geste, sinon l'écran
       // annonce une exposition qui n'existe plus.
@@ -481,6 +518,31 @@ export default function ProfilePage() {
   // cours de saisie : le formulaire ne doit ni ouvrir ni fermer ce qu'il montre.
   const discordLocked = isDiscordTagLocked(discordState);
 
+  // La liste des rattachements est chargée **ici** et non dans la section d'en
+  // bas, qui la recevait : elle a deux lecteurs, et deux `fetch` en feraient
+  // deux vérités (`useAccountConnections.ts`).
+  const {
+    connections,
+    pending: connectionsPending,
+    reload: reloadConnections,
+  } = useAccountConnections();
+  // `null` n'est pas « aucun rattachement » mais « pas encore lue » : le verrou
+  // porte donc, comme celui du tag Discord, sur un état à trois valeurs.
+  const blizzardLinked =
+    connections === null
+      ? null
+      : connections.some((c) => c.provider === "BLIZZARD" && c.linked);
+  const battletagLocked = isBattletagLocked({ linked: blizzardLinked });
+
+  /**
+   * La modale qui dit ce que « décoché » ne fait pas.
+   *
+   * Elle ne s'ouvre qu'à la bascule vers **masqué**, et sur le seul BattleTag :
+   * c'est le seul réglage de ce groupe dont la promesse dépasse ce que le site
+   * tient (`BattletagVisibilityNotice.tsx`).
+   */
+  const [battletagNoticeOpen, setBattletagNoticeOpen] = useState(false);
+
   if (!data) {
     return (
       <section className="ds-block" style={{ color: "var(--text-1)" }}>
@@ -499,6 +561,9 @@ export default function ProfilePage() {
 
   return (
     <section className={`fade-in ${s.page}`}>
+      {battletagNoticeOpen && (
+        <BattletagVisibilityNotice onClose={() => setBattletagNoticeOpen(false)} />
+      )}
       {verifyOpen && (
         <DiscordVerificationDialog
           initialTag={discordPseudo}
@@ -643,9 +708,24 @@ export default function ProfilePage() {
                 onChange={(e) => setOverwatchBattletag(e.target.value)}
                 placeholder="Pseudo#1234"
                 aria-describedby="profile-battletag-hint"
+                /* Un compte Blizzard rattaché possède son BattleTag : le champ
+                   le montre, il ne le prend plus. `readOnly` et non `disabled`
+                   — la valeur reste lisible au lecteur d'écran et atteignable
+                   au clavier, ce qu'un champ désactivé perd. */
+                readOnly={battletagLocked}
+                aria-readonly={battletagLocked || undefined}
               />
+              {/* Verrouillé, la phrase du module **remplace** l'annonce : celle-ci
+                  prévient de ce qui arrivera si un compte Blizzard est rattaché,
+                  et il l'est déjà. */}
               <p id="profile-battletag-hint" className={s.hint}>
-                {GAME_TAG_NOTICE} {BLIZZARD_BATTLETAG_NOTICE}
+                {battletagLocked
+                  ? battletagLockNotice({
+                      tag: overwatchBattletag.trim() || null,
+                      linked: blizzardLinked,
+                      pending: connectionsPending,
+                    })
+                  : `${GAME_TAG_NOTICE} ${BLIZZARD_BATTLETAG_NOTICE}`}
               </p>
             </div>
             <div className="field">
@@ -789,9 +869,15 @@ export default function ProfilePage() {
                   label={VISIBILITY_LABELS[key] ?? key}
                   checked={value}
                   theme="joueur"
-                  onChange={() =>
-                    setVisibility((prev) => ({ ...prev, [key]: !prev[key as keyof typeof prev] }))
-                  }
+                  onChange={() => {
+                    // La bascule se fait **sans condition** : la modale informe,
+                    // elle ne demande rien. L'ouvrir avant d'écrire l'état ferait
+                    // d'un « J'ai compris » la condition d'un geste déjà fait.
+                    setVisibility((prev) => ({ ...prev, [key]: !prev[key as keyof typeof prev] }));
+                    // Et seulement dans **ce** sens : rendre public ne surprend
+                    // personne, c'est masquer qui promet plus que le site ne tient.
+                    if (key === "overwatch" && value) setBattletagNoticeOpen(true);
+                  }}
                 />
               ))}
             </div>
@@ -832,7 +918,11 @@ export default function ProfilePage() {
       </form>
 
       <ProfileSection section={sectionById.connexions}>
-        <ConnectedAppsSection onChanged={loadDiscordState} />
+        <ConnectedAppsSection
+          connections={connections}
+          reload={reloadConnections}
+          onChanged={loadDiscordState}
+        />
       </ProfileSection>
 
       {invitations.length > 0 && (

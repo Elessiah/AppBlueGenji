@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   buildAccountConnections,
+  connectionMethodLabel,
   checkConnectionUnlink,
   connectionUnlinkRefusalMessage,
   linkedConnectionCount,
@@ -23,6 +24,7 @@ const connections = (linked: Partial<Record<OAuthProvider, boolean>>): AccountCo
   OAUTH_PROVIDERS.map((provider) => ({
     provider,
     linked: linked[provider] === true,
+    method: null,
     handle: null,
   }));
 
@@ -37,11 +39,13 @@ describe("buildAccountConnections", () => {
     expect(built.find((c) => c.provider === "DISCORD")).toEqual({
       provider: "DISCORD",
       linked: true,
+      method: null,
       handle: "nova",
     });
     expect(built.find((c) => c.provider === "GOOGLE")).toEqual({
       provider: "GOOGLE",
       linked: false,
+      method: null,
       handle: null,
     });
   });
@@ -50,11 +54,17 @@ describe("buildAccountConnections", () => {
     // `discord_pseudo` survit au détachement de `discord_id` : le tag reste une
     // saisie du joueur. Il ne doit pas pour autant faire croire à un
     // rattachement.
-    const built = buildAccountConnections({ DISCORD: { subject: null, handle: "nova" } });
+    const built = buildAccountConnections({
+      DISCORD: { subject: null, handle: "nova", method: "OAUTH" },
+    });
 
+    // La **méthode** part avec le tag, et pour la même raison : elle décrit un
+    // rattachement, pas un compte. Laissée là, elle ferait annoncer « rattaché
+    // par le bouton Discord » à côté d'un bouton « Rattacher ».
     expect(built.find((c) => c.provider === "DISCORD")).toEqual({
       provider: "DISCORD",
       linked: false,
+      method: null,
       handle: null,
     });
   });
@@ -117,6 +127,54 @@ describe("connectionUnlinkRefusalMessage", () => {
       for (const provider of OAUTH_PROVIDERS) {
         expect(connectionUnlinkRefusalMessage(refusal, provider)).not.toContain(refusal);
       }
+    }
+  });
+});
+
+describe("connectionMethodLabel — par quelle porte ce Discord est arrivé", () => {
+  /**
+   * Discord est le **seul** fournisseur à en avoir deux : le bouton, et le code
+   * reçu en message privé. Elles aboutissent au même `discord_id` et ouvrent les
+   * mêmes sessions, mais ne laissent pas la même trace **chez Discord** — l'une
+   * y pose une autorisation d'application, que le joueur peut consulter et
+   * révoquer de son côté, l'autre non. C'est exactement ce qu'une liste
+   * d'applications connectées doit dire, et « Rattaché » ne le disait pas.
+   */
+  const discord = (method: "OAUTH" | "DM_CODE" | null) =>
+    buildAccountConnections({ DISCORD: { subject: "123", handle: "nova", method } }).find(
+      (c) => c.provider === "DISCORD",
+    )!;
+
+  it("distingue les deux portes en toutes lettres", () => {
+    expect(connectionMethodLabel(discord("OAUTH"))).toContain("bouton Discord");
+    expect(connectionMethodLabel(discord("DM_CODE"))).toContain("message privé");
+  });
+
+  it("se tait sur un rattachement antérieur à cette information", () => {
+    // Les comptes reliés avant la colonne ne se classent pas après coup : leur
+    // inventer une porte serait affirmer ce qu'on ignore.
+    expect(connectionMethodLabel(discord(null))).toBeNull();
+  });
+
+  it("se tait sur les fournisseurs à porte unique", () => {
+    // Une ligne « rattaché par… » sous Google et Blizzard serait du bruit sur
+    // chaque compte : il n'y a rien à distinguer.
+    const google = buildAccountConnections({
+      GOOGLE: { subject: "g-1", method: "OAUTH" },
+    }).find((c) => c.provider === "GOOGLE")!;
+    expect(connectionMethodLabel(google)).toBeNull();
+  });
+
+  it("se tait sur une porte détachée", () => {
+    const detached = buildAccountConnections({
+      DISCORD: { subject: null, method: "OAUTH" },
+    }).find((c) => c.provider === "DISCORD")!;
+    expect(connectionMethodLabel(detached)).toBeNull();
+  });
+
+  it("ne laisse jamais sortir un jeton en capitales", () => {
+    for (const method of ["OAUTH", "DM_CODE"] as const) {
+      expect(connectionMethodLabel(discord(method))).not.toContain(method);
     }
   });
 });

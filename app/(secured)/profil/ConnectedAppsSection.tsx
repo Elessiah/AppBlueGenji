@@ -21,10 +21,11 @@
  * (`lib/shared/account-connections.ts`), si bien qu'un bouton actif mène
  * toujours quelque part.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import {
   checkConnectionUnlink,
+  connectionMethodLabel,
   connectionUnlinkRefusalMessage,
   type AccountConnection,
 } from "@/lib/shared/account-connections";
@@ -48,6 +49,21 @@ const PROVIDER_NOTES: Record<OAuthProvider, string> = {
 
 export function ConnectedAppsSection({
   /**
+   * La liste, **chargée par la page** (`useAccountConnections.ts`).
+   *
+   * Elle vivait ici, où elle n'avait qu'un lecteur. Elle en a un second depuis
+   * que le champ « BattleTag Overwatch » se verrouille sous un compte Blizzard
+   * rattaché, et deux `fetch` pour la même donnée en feraient deux vérités :
+   * le temps d'un retrait, la section dirait « Rattacher » pendant que le champ
+   * d'en haut resterait fermé.
+   *
+   * `null` = pas encore lue, ce que la section annonce plutôt que de rendre une
+   * liste vide — qui se lirait « aucune application », l'inverse de la vérité.
+   */
+  connections,
+  /** Relit la liste après une écriture, pour les **deux** lecteurs à la fois. */
+  reload,
+  /**
    * Appelée dès qu'un rattachement ou un retrait a abouti.
    *
    * Rattacher Discord **certifie** le tag, le retirer **décertifie** : la
@@ -58,26 +74,12 @@ export function ConnectedAppsSection({
    */
   onChanged,
 }: {
+  connections: AccountConnection[] | null;
+  reload: () => Promise<void>;
   onChanged?: () => void;
 }): React.ReactElement {
   const { showError, showSuccess } = useToast();
-  const [connections, setConnections] = useState<AccountConnection[] | null>(null);
   const [busy, setBusy] = useState<OAuthProvider | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/profile/connections", { cache: "no-store" });
-      if (!res.ok) return;
-      const payload = (await res.json()) as { connections?: AccountConnection[] };
-      setConnections(payload.connections ?? []);
-    } catch {
-      // Silencieux : la section reste vide, le reste du profil est utilisable.
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   // Le retour d'un aller-retour de rattachement. L'URL est **nettoyée** dans la
   // foulée : sans cela, un rafraîchissement rejouerait le message, et un profil
@@ -119,7 +121,7 @@ export function ConnectedAppsSection({
       const payload = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(payload.error ?? "");
       showSuccess(`${OAUTH_PROVIDER_LABELS[provider]} a été retiré de ton compte.`);
-      await load();
+      await reload();
       onChanged?.();
     } catch (e) {
       // Traduit ici et non au `throw` : une coupure réseau lève un `TypeError`
@@ -157,6 +159,11 @@ export function ConnectedAppsSection({
             const handleLabel = OAUTH_PROVIDER_HANDLE_LABELS[connection.provider];
             const slug = OAUTH_PROVIDER_SLUGS[connection.provider];
             const detailsId = `connection-details-${slug}`;
+            const methodId = `connection-method-${slug}`;
+            // Calculé une fois : la condition et le rendu doivent dire la même
+            // chose, et le module est la seule autorité sur « y a-t-il quelque
+            // chose à dire ? ».
+            const methodLabel = connection.linked ? connectionMethodLabel(connection) : null;
             return (
               <div
                 className="table-row"
@@ -172,6 +179,25 @@ export function ConnectedAppsSection({
                         : "Rattaché"
                       : PROVIDER_NOTES[connection.provider]}
                   </span>
+                  {/*
+                    **Ce que « Rattaché » ne disait pas.** Discord a deux portes
+                    — le bouton, et le code reçu en message privé — et elles ne
+                    laissent pas la même trace : l'une pose une autorisation
+                    d'application chez Discord, que le joueur peut y révoquer,
+                    l'autre non. C'est exactement ce qu'une liste d'applications
+                    connectées doit dire. La phrase vient du module pur, qui
+                    rend `null` quand il n'y a rien à dire — un fournisseur à
+                    porte unique, ou un rattachement antérieur à cette colonne,
+                    qui ne se classe pas après coup.
+                  */}
+                  {methodLabel ? (
+                    <span
+                      id={methodId}
+                      style={{ fontSize: 11, color: "var(--ink-dim)", lineHeight: 1.5 }}
+                    >
+                      {methodLabel}
+                    </span>
+                  ) : null}
                   {/*
                     **Le motif vit dans la colonne de texte, pas à la place du
                     bouton.** Posé dans la cellule d'actions — large de la
@@ -197,7 +223,11 @@ export function ConnectedAppsSection({
                         disabled={busy !== null}
                         onClick={() => unlink(connection.provider)}
                         aria-label={`Retirer ${label} de mon compte`}
-                        aria-describedby={detailsId}
+                        /* La **porte** fait partie de ce qui décrit ce bouton :
+                           laissée hors de la description, elle n'était lue par
+                           personne au clavier — un lecteur d'écran qui parcourt
+                           les contrôles ne rencontre jamais le texte voisin. */
+                        aria-describedby={methodLabel ? `${detailsId} ${methodId}` : detailsId}
                         style={{ padding: "4px 12px", fontSize: 12 }}
                       >
                         {busy === connection.provider ? "Retrait…" : "Retirer"}

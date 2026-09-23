@@ -20,6 +20,10 @@ function sampleExport(): PersonalDataExport {
       discordId: "123",
       discordPseudo: "player#0001",
       discordVerifiedAt: null,
+      // La porte par laquelle le Discord a été rattaché fait partie de ce que
+      // l'export rend : `null` ici, comme sur un rattachement antérieur à la
+      // colonne (`lib/shared/account-connections.ts`).
+      discordLinkMethod: null,
       googleSub: null,
       blizzardSub: null,
       isAdult: true,
