@@ -50,9 +50,9 @@ function fakeDb(
       throw options.failWith ?? new Error("DB_DOWN");
     }
     if (q.includes("AS tournaments")) return [[trace]];
-    if (q.includes("SELECT avatar_url, discord_id FROM bg_users")) {
+    if (q.includes("SELECT avatar_url, discord_id, created_at FROM bg_users")) {
       return [
-        options.missing ? [] : [{ avatar_url: avatarUrl, discord_id: options.discordId ?? null }],
+        options.missing ? [] : [{ avatar_url: avatarUrl, discord_id: options.discordId ?? null, created_at: "2026-01-02 03:04:05" }],
       ];
     }
     return [[]];

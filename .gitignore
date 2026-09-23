@@ -87,3 +87,7 @@ Thumbs.db
 # Claude Code — état local, jamais versionné
 .claude/worktrees/
 .claude/settings.local.json
+
+# Journal des suppressions de compte (lib/server/account-deletion-journal.ts) :
+# hors du dépôt, jamais servi, copié sur OneDrive par la sauvegarde du bot.
+/data/

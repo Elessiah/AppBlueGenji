@@ -18,7 +18,8 @@
     "test:e2e:report": "playwright show-report",
     "seed": "tsx lib/server/seed.ts",
     "seed:view": "tsx lib/server/seed-view.ts",
-    "backfill:avatars": "tsx lib/server/backfill-avatars.ts"
+    "backfill:avatars": "tsx lib/server/backfill-avatars.ts",
+    "replay:deletions": "tsx lib/server/replay-account-deletions.ts"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",

@@ -4,10 +4,12 @@ import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import {
   DONNEES_PROFIL,
+  DONNEE_SAUVEGARDES,
   DONNEE_TOURNOIS,
   DROITS,
   RGPD_CONTACT_EMAIL_FALLBACK,
 } from "@/lib/shared/rgpd-policy";
+import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = pageMetadata({
@@ -100,14 +102,26 @@ export default function RgpdPage() {
               </td>
               <td>{DONNEE_TOURNOIS.duree}</td>
             </tr>
+            <tr>
+              <td>{DONNEE_SAUVEGARDES.donnee}</td>
+              <td>{DONNEE_SAUVEGARDES.finalite}</td>
+              <td>
+                <span className={styles.badgeAmber}>{DONNEE_SAUVEGARDES.base}</span>
+              </td>
+              <td>{DONNEE_SAUVEGARDES.duree}</td>
+            </tr>
           </tbody>
         </table>
         <p style={{ marginTop: 16, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
           * Un compte qui n'a participé à aucun tournoi, n'en a organisé aucun et n'est
           propriétaire d'aucune équipe est <strong>entièrement effacé</strong> à sa suppression.
-          Sinon, ses données de profil sont anonymisées immédiatement
-          (des copies de sauvegarde techniques peuvent subsister quelques jours). Les sessions
-          (cookie <code>bg_session</code>) expirent 30 jours après la connexion.
+          Sinon, ses données de profil sont anonymisées immédiatement. Dans les deux cas,
+          elles subsistent jusqu'à {BACKUP_RETENTION_DAYS} jours dans les copies de sauvegarde
+          chiffrées, qu'on ne peut pas modifier une à une ; si l'une d'elles devait être
+          restaurée, les suppressions intervenues depuis sont réappliquées avant la remise en
+          service. Les images téléversées (avatar, logo) sont retirées de la sauvegarde dans
+          l'heure. Les sessions (cookie <code>bg_session</code>) expirent 30 jours après la
+          connexion.
         </p>
       </section>
 

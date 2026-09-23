@@ -10,6 +10,7 @@ module.exports = {
         '\\.(css|scss|sass)$': '<rootDir>/tests/__mocks__/style-mock.cjs',
         '^@/(.*)$': '<rootDir>/$1',
     },
+    setupFiles: ['<rootDir>/tests/setup-env.cjs'],
     moduleFileExtensions: ['ts', 'tsx', 'js'],
     testMatch: ['**/tests/**/*.test.(ts|tsx|js)'],
     // Ignore les worktrees Claude Code imbriqués (`.claude/worktrees/*`) : sans
