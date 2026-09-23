@@ -24,7 +24,7 @@ import { SITE_VISIT_WINDOW_MINUTES } from "@/lib/shared/site-visits";
 import { SITE_HOST } from "@/lib/shared/site-host";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-09-24";
+export const REGISTER_UPDATED_AT = "2026-09-23";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
