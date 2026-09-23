@@ -103,11 +103,12 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   const isParticipant =
     viewer.myTeamId !== null &&
     snapshot.registrations.some((row) => row.teamId === viewer.myTeamId);
-  //
+
   // `?quiet=1` : l'onglet est caché depuis une minute et son lecteur n'a pas de
   // match en cours (`lib/shared/client-power.ts`). Il **demande** le palier
-  // spectateur — il recevra encore l'annonce de son match, vingt secondes plus
-  // tard au pire — et libère le budget de sortie de la salle pour ceux qui
+  // spectateur — il recevra encore l'annonce de son match, à la fenêtre des
+  // spectateurs (vingt secondes d'ordinaire, jusqu'à une minute quand le budget
+  // de sortie d'une grosse salle l'élargit) — et libère ce budget pour ceux qui
   // jouent. Un client ne peut que se déclasser ainsi, jamais se promouvoir.
   const tier = wantsQuietStream(req)
     ? "STANDARD"

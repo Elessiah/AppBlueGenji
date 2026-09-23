@@ -123,4 +123,6 @@ Pour un diagnostic à distance, `<html data-power="full|eco|match|sleep">` et
 soit le lecteur. Le paramètre **ne sait que déclasser** : aucune valeur ne
 promeut un spectateur. Un engagé dont l'onglet dort libère ainsi le budget de
 sortie de la salle (`ROOM_BYTES_PER_SECOND`) pour ceux qui jouent, et reçoit
-encore l'annonce de son match — vingt secondes plus tard au pire.
+encore l'annonce de son match, à la fenêtre des spectateurs : vingt secondes
+d'ordinaire, jusqu'à une minute quand le budget de sortie d'une grosse salle
+l'élargit (`MAX_BUDGET_DELAY_MS`, qui vaut pour tous les paliers).
