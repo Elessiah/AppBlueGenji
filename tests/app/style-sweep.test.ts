@@ -19,6 +19,11 @@ describe("balayage — ce qui reprend la main sur la règle d'élément", () => 
     ["une opacité, qui efface la bordure seule à dessiner une case décochée", ".a input:disabled { opacity: 0.6; cursor: not-allowed; }"],
     ["un `:is(…)` qui enveloppe l'élément nu", ".panel :is(input, textarea) { padding: 8px; }"],
     ["un commentaire au-dessus, qui servait de laissez-passer", "/* note */\n.a input { width: auto; }"],
+    // `all` rend la case au système d'un seul mot, sans en nommer aucun autre :
+    // c'est l'idiome courant de remise à zéro d'un contrôle de formulaire, donc
+    // la forme la plus probable de la panne que ce balayage ferme.
+    ["`all: unset`, qui rend la case au système sans rien nommer", ".a input { all: unset; }"],
+    ["`inline-size`, qui est `width` sous son nom logique", ".a input { inline-size: 40px; }"],
   ])("voit %s", (_label, css) => {
     expect(offenders(css)).toHaveLength(1);
   });
@@ -58,6 +63,8 @@ describe("balayage — ce qu'il laisse passer, et doit laisser passer", () => {
       '.a input:not([type="checkbox"]):not([type="radio"]) { width: auto; }',
     ],
     ["une propriété qui ne touche pas la boîte", "input, textarea { font: inherit; }"],
+    // `all` est tenu au nom exact : `transition: all …` le nomme sans le poser.
+    ["un `all` qui n'est qu'une valeur de transition", "input { transition: all 0.2s ease; }"],
   ])("laisse %s", (_label, css) => {
     expect(offenders(css)).toEqual([]);
   });
@@ -94,6 +101,8 @@ describe("balayage en ligne — ce qui reprend la main", () => {
       "un type calculé, qui ne met pas la case hors d'atteinte",
       '<input type={isRadio ? "radio" : "checkbox"} style={{ width: 18, accentColor: "#f00" }} />',
     ],
+    ["un `all`, qui rend la case au système d'un mot", checkbox('style={{ all: "revert" }}')],
+    ["`inlineSize`, qui est `width` sous son nom logique", checkbox("style={{ inlineSize: 40 }}")],
   ])("voit %s", (_label, jsx) => {
     expect(inline(jsx)).toHaveLength(1);
   });

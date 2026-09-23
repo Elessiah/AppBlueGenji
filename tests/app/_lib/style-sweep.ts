@@ -19,6 +19,23 @@ export const ROOT = join(__dirname, "..", "..", "..");
 export const globals = readFileSync(join(ROOT, "app", "globals.css"), "utf8");
 
 /**
+ * Les commentaires en moins, remplacés par une espace (jamais par rien : deux
+ * jetons que le commentaire séparait resteraient sinon collés).
+ *
+ * Une feuille se lit ici par motifs, et **un commentaire nomme ce qu'il
+ * explique** : la règle de base ouvre justement sur « `padding: 0` n'est pas une
+ * redondance », si bien qu'un contrôle cherchant `padding:\s*0` était satisfait
+ * par la prose et non par la déclaration — on pouvait retirer le vrai `padding`
+ * sans qu'un seul test bronche. Le symétrique guette à l'autre bout : le jour où
+ * l'on écrit le mot `opacity` dans le commentaire de la règle `:disabled`, le
+ * contrôle qui l'y interdit part au rouge sans qu'aucune déclaration n'ait
+ * bougé. Un commentaire explique une règle, il ne la prouve pas.
+ */
+export function stripComments(css: string): string {
+  return css.replace(/\/\*[\s\S]*?\*\//g, " ");
+}
+
+/**
  * Le corps de la première règle dont le sélecteur correspond.
  *
  * La recherche se fait sur un **motif** et non sur une chaîne : un sélecteur
@@ -29,7 +46,11 @@ export const globals = readFileSync(join(ROOT, "app", "globals.css"), "utf8");
  * échouer le **chargement du module**, donc les vingt contrôles d'un coup et
  * sans dire lequel.
  */
-export function blockFor(pattern: RegExp, css: string = globals): string {
+export function blockFor(pattern: RegExp, source: string = globals): string {
+  // Les commentaires partent **avant** la recherche, et pas seulement du corps
+  // rendu : un commentaire précédant la règle peut porter le motif du sélecteur
+  // et faire découper la mauvaise règle.
+  const css = stripComments(source);
   const at = css.search(pattern);
   if (at < 0) throw new Error(`Règle introuvable dans globals.css : ${pattern}`);
   const open = css.indexOf("{", at);
@@ -80,6 +101,12 @@ export function walk(dir: string, suffix: string, found: string[] = []): string[
  * classe est un geste délibéré, pas un débordement qu'on n'a pas vu venir.
  */
 export const BOX_PROPERTIES = [
+  // `all` d'abord, parce qu'il vaut tous les autres à lui seul : `all: unset`
+  // ou `all: revert` sur un `input` nu rend la case au système d'un mot, sans
+  // nommer aucune des propriétés listées en dessous. C'est un idiome courant de
+  // remise à zéro d'un contrôle de formulaire, donc la forme la plus probable
+  // de la panne que ce balayage existe pour fermer.
+  "all",
   "appearance",
   // Le motif s'ancre sur un début de déclaration : `-webkit-appearance` commence
   // par un tiret, `appearance` seul ne l'atteint donc pas. Or c'est lui qui
@@ -90,6 +117,11 @@ export const BOX_PROPERTIES = [
   "accent-color",
   "width",
   "height",
+  // Les mêmes en **logique** : `inline-size` et `block-size` sont `width` et
+  // `height` sous un autre nom, et le motif s'ancrant sur un début de
+  // déclaration, aucun des deux précédents ne les atteint.
+  "inline-size",
+  "block-size",
   "padding",
   // Tenu **exactement**, sans sa famille, là où les autres sont des familles :
   // le raccourci défait le `margin: 0` global, mais `margin-top` aligne la case
@@ -137,12 +169,19 @@ export const BOX_PROPERTIES = [
 /**
  * Les propriétés tenues **au nom exact**, quand toutes les autres le sont en
  * famille (`border` attrape `border-color`, `background` attrape
- * `background-image`…). Une seule y figure, et pour la raison qui vaut déjà en
- * ligne : `margin-top` n'habille pas la case, il l'aligne sur la première ligne
- * de son étiquette, et dépend donc de la taille du texte d'à côté — aucune
- * règle globale ne peut le prendre à la place d'un écran.
+ * `background-image`…). Deux y figurent, pour deux raisons opposées.
+ *
+ * `margin`, parce que la famille en dirait trop : `margin-top` n'habille pas la
+ * case, il l'aligne sur la première ligne de son étiquette, et dépend donc de la
+ * taille du texte d'à côté — aucune règle globale ne peut le prendre à la place
+ * d'un écran. C'est déjà l'exception que s'accorde le balayage des styles en
+ * ligne (`INLINE_BANNED`).
+ *
+ * `all`, parce qu'elle n'a pas de famille : c'est un nom complet, et le suffixe
+ * ouvert de la forme générale lui ferait attraper la première propriété
+ * inventée qui commencerait par ces trois lettres.
  */
-const EXACT_PROPERTIES = new Set(["margin"]);
+const EXACT_PROPERTIES = new Set(["margin", "all"]);
 
 /**
  * Un `input` sans `[type=…]` accolé : ce compound-là attrape les cases. La
@@ -242,7 +281,7 @@ export function bareInputOffenders(path: string, css: string): Offender[] {
   // Les commentaires partent **d'abord** : le découpage naïf ci-dessous les
   // replie dans le sélecteur, si bien qu'une règle précédée d'un commentaire —
   // la forme même que laisse ce correctif — passait tout entière au travers.
-  const stripped = css.replace(/\/\*[\s\S]*?\*\//g, " ");
+  const stripped = stripComments(css);
   // Découpage volontairement naïf (`sélecteur { déclarations }`) : ces feuilles
   // n'ont ni `@media` imbriqué dans une règle ni accolade dans une valeur.
   for (const [, rawSelector, body] of stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
@@ -280,6 +319,10 @@ export function bareInputOffenders(path: string, css: string): Offender[] {
  * la plus forte de la garde était donc la plus permissive. D'où des familles
  * (`border…`, `background…`, `outline…`) plutôt qu'une liste de noms.
  *
+ * `all` ouvre la liste pour la même raison qu'en feuille : `all: "revert"` rend
+ * la case au système d'un mot, sans en nommer aucune autre. `inlineSize` et
+ * `blockSize` sont `width` et `height` sous leur nom logique.
+ *
  * `margin` fait seul exception à la famille : le raccourci est tenu — il défait
  * le `margin: 0` global — mais pas `marginTop`, qui aligne la case de 16 px sur
  * la première ligne de son étiquette sans rien changer à sa boîte. Quatre
@@ -287,7 +330,7 @@ export function bareInputOffenders(path: string, css: string): Offender[] {
  * prendre à leur place : il dépend de la taille du texte d'à côté.
  */
 export const INLINE_BANNED =
-  /\b(width|minWidth|maxWidth|height|minHeight|maxHeight|accentColor|[A-Za-z]*[Aa]ppearance|padding[A-Za-z]*|margin|display|border[A-Za-z]*|background[A-Za-z]*|box[A-Za-z]*|outline[A-Za-z]*|opacity|flex[A-Za-z]*|transform|scale|rotate|translate|zoom)\s*:/;
+  /\b(all|width|minWidth|maxWidth|inlineSize|blockSize|height|minHeight|maxHeight|accentColor|[A-Za-z]*[Aa]ppearance|padding[A-Za-z]*|margin|display|border[A-Za-z]*|background[A-Za-z]*|box[A-Za-z]*|outline[A-Za-z]*|opacity|flex[A-Za-z]*|transform|scale|rotate|translate|zoom)\s*:/;
 
 /**
  * La fin de la balise, cherchée sur le **premier `>` de premier niveau** et non

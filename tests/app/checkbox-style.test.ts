@@ -9,8 +9,17 @@ import {
   checkboxBlock,
   globals,
   inlineOffenders,
+  stripComments,
   walk,
 } from "./_lib/style-sweep";
+
+/**
+ * La feuille **sans ses commentaires** : ils nomment ce qu'ils expliquent, et
+ * un contrôle qui cherche une déclaration au motif se contenterait de la prose
+ * qui la commente (`stripComments`). Ce fichier ne lit donc jamais `globals`
+ * directement.
+ */
+const sheet = stripComments(globals);
 
 /**
  * L'apparence d'une case à cocher est posée **sur l'élément**, une fois.
@@ -52,7 +61,7 @@ describe("règle de base", () => {
 
   it("habille aussi le bouton radio, qui n'est qu'une case ronde", () => {
     // Les deux partagent une seule règle : les séparer les ferait diverger.
-    expect(globals).toMatch(/input\[type="checkbox"\]\s*,\s*input\[type="radio"\]/);
+    expect(sheet).toMatch(/input\[type="checkbox"\]\s*,\s*input\[type="radio"\]/);
   });
 
   it("donne un anneau de focus clavier — `appearance: none` le retire", () => {
@@ -69,7 +78,7 @@ describe("règle de base", () => {
 });
 
 describe("contrastes forcés — la main revient au système", () => {
-  const forced = globals.slice(globals.indexOf("@media (forced-colors: active)"));
+  const forced = sheet.slice(sheet.indexOf("@media (forced-colors: active)"));
 
   it("rend le dessin **et** les métriques", () => {
     // Le mode force la couleur de fond mais **pas** l'image : une coche presque
@@ -97,7 +106,7 @@ describe("contrastes forcés — la main revient au système", () => {
   it("en donne une aussi à la pastille `Coche`, seule visible", () => {
     // Son seul repère est un `box-shadow`, que le mode supprime ; et l'`outline`
     // posée sur la case ne peint rien — `Coche` la masque en ligne.
-    const pill = globals
+    const pill = sheet
       .split("@media (forced-colors: active)")
       .slice(1)
       .find((block) => block.slice(0, 400).includes(".coche-input:focus-visible ~ .coche-pill"));
@@ -111,18 +120,44 @@ describe("pastille `Coche` — le focus passe par le CSS, jamais par React", () 
   it("relaie le focus par un sélecteur frère", () => {
     // Un état React redessinerait la pastille à chaque tabulation, et ne saurait
     // pas distinguer le clavier de la souris comme `:focus-visible` le fait.
-    expect(globals).toContain(".coche-input:focus-visible ~ .coche-pill");
+    expect(sheet).toContain(".coche-input:focus-visible ~ .coche-pill");
     expect(coche).not.toMatch(/useState.*[Ff]ocus/);
   });
 
-  it("refuse `className`, `style` et `disabled` au lieu de les recevoir pour rien", () => {
-    // La case est masquée en ligne (`opacity: 0`, 0×0) : un appelant qui la
-    // réglerait par l'un des deux n'obtiendrait aucun effet et aucun
-    // avertissement. `disabled`, lui, en obtiendrait la moitié — le geste
-    // bloqué, la pastille intacte et son curseur toujours en « pointer » —, ce
-    // que cette PR refuse ailleurs pour toutes les cases. Le type les refuse
-    // tous les trois, comme `type`.
-    expect(coche).toMatch(/"type" \| "onChange" \| "className" \| "style" \| "disabled"/);
+  /**
+   * La clause `Omit` de `CocheProps`, isolée du reste du fichier.
+   *
+   * Le `>` de fermeture se reconnaît à l'accolade qui le suit : celui
+   * d'`InputHTMLAttributes<HTMLInputElement>` est suivi d'une virgule, donc la
+   * recherche paresseuse ne s'y arrête pas.
+   *
+   * On lit **la clause**, pas la ligne : une union se réordonne et se replie
+   * sans rien changer à ce qu'elle dit, et un motif posé sur son orthographe
+   * exacte partirait au rouge sur une simple mise en forme. Le contrôle ne peut
+   * pas être de type : `isolatedModules` met ts-jest en transpilation seule et
+   * `tsconfig.json` exclut `tests/`, donc **rien ne type-vérifie un test** ici
+   * (voir `ERREUR.txt`) — un `@ts-expect-error` y serait muet.
+   */
+  const omitted = coche.match(/Omit<([\s\S]*?)>\s*\{/)?.[1] ?? "";
+
+  it("isole bien la clause `Omit`", () => {
+    // Sans quoi les cinq contrôles ci-dessous passeraient sur une chaîne vide.
+    expect(omitted).toContain("InputHTMLAttributes<HTMLInputElement>");
+  });
+
+  // `className` et `style` ne peindraient rien : la case est masquée en ligne
+  // (`opacity: 0`, 0×0), un appelant n'obtiendrait aucun effet et aucun
+  // avertissement. `disabled` en obtiendrait la **moitié** — le geste bloqué,
+  // la pastille intacte et son curseur toujours en « pointer » —, ce que cette
+  // règle refuse partout ailleurs pour les cases.
+  it.each(["type", "onChange", "className", "style", "disabled"])(
+    "refuse `%s` au lieu de le recevoir pour rien",
+    (key) => {
+      expect(omitted).toContain(`"${key}"`);
+    },
+  );
+
+  it("n'en reçoit aucun pour le jeter en silence", () => {
     expect(coche).not.toContain("props.className");
     expect(coche).not.toContain("props.style");
   });
