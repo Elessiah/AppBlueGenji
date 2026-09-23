@@ -257,6 +257,8 @@ describe("emblème — alignement et cas limites", () => {
     const label = css.slice(css.indexOf(".label {"));
 
     expect(label.slice(0, label.indexOf("}"))).toContain("align-items: baseline");
+    // Dans une phrase, le nom se pose sur la ligne de base du texte voisin.
+    expect(label.slice(0, label.indexOf("}"))).not.toContain("vertical-align");
     expect(css).toMatch(/\.label > \.logo \{\s*align-self: center;/);
   });
 
