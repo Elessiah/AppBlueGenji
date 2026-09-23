@@ -293,9 +293,12 @@
   background: rgba(var(--blue-500-rgb), 0.12);
 }
 /* Le graphe de la plage précédente reste en place le temps de la réponse,
-   mais s'efface : il ne décrit plus la pastille allumée au-dessus. */
+   mais s'efface : il ne décrit plus la pastille allumée au-dessus. La
+   transition est sur la règle de base, pour valoir dans les deux sens. */
+.chart-wrap .chart,
+.chart-wrap .x-axis { transition: opacity 0.15s; }
 .chart-wrap.is-loading .chart,
-.chart-wrap.is-loading .x-axis { opacity: 0.35; transition: opacity 0.15s; }
+.chart-wrap.is-loading .x-axis { opacity: 0.35; }
 .chart {
   height: 220px;
   display: grid;
