@@ -17,15 +17,21 @@ const LOGIN_ERRORS: Record<string, string> = {
   BOT_INTERNAL_UNREACHABLE:
     "Connexion Discord indisponible (bot non joignable). Tu peux passer par Google.",
   // Le bot a répondu trop tard : tag absent de ses serveurs ou bot surchargé,
-  // sans qu'on sache lequel. Les deux sorties évitent la recherche par tag.
+  // sans qu'on sache lequel. Les deux sorties évitent la recherche par tag —
+  // l'ID ne vaut pourtant que dans le second cas : sans serveur commun, Discord
+  // refuse le message privé quel que soit l'identifiant, d'où la condition dite.
   BOT_RESOLVE_TIMEOUT:
-    "La recherche de ton tag par le bot n'a pas abouti à temps. Utilise plutôt ton ID Discord, ou passe par le bouton Discord.",
+    "La recherche de ton tag par le bot n'a pas abouti à temps. Si tu es sur un de ses serveurs, utilise plutôt ton ID Discord ; sinon, passe par le bouton Discord.",
   BOT_INTERNAL_UNAUTHORIZED:
     "Connexion Discord indisponible (token interne invalide). Tu peux passer par Google.",
+  // Sur une saisie par ID, c'est aussi ce qui arrive sans serveur commun : la
+  // recherche est sautée, et c'est Discord qui refuse l'envoi.
   DISCORD_DM_FAILED:
-    "Impossible de t'envoyer le code en message privé : ouvre tes DM sur le serveur BlueGenji, puis réessaie.",
+    "Impossible de t'envoyer le code en message privé : le bot doit partager un serveur avec toi, et tes DM doivent y être ouverts. Rejoins le serveur BlueGenji, ou passe par le bouton Discord.",
+  // Tag inconnu de tous les serveurs du bot : saisir l'ID ne changerait rien, le
+  // message privé serait refusé faute de serveur commun.
   DISCORD_USER_NOT_FOUND:
-    "Tag introuvable : le bot doit partager un serveur avec toi. Utilise plutôt ton ID Discord.",
+    "Tag introuvable : le bot doit partager un serveur avec toi. Rejoins le serveur BlueGenji, ou passe par le bouton Discord.",
   FAILED_TO_SEND_CODE: "Le code n'a pas pu être envoyé. Réessaie dans un instant.",
 
   INVALID_DISCORD_HANDLE: "Renseigne ton tag Discord ou ton ID.",
