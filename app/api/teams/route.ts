@@ -4,7 +4,12 @@ import { createTeam, getUserActiveTeam, listTeams } from "@/lib/server/teams-ser
 import { createGhostTeam } from "@/lib/server/ghost-teams-service";
 import { can } from "@/lib/shared/permissions";
 import { TEAM_TAG_ALREADY_USED, checkTeamTag } from "@/lib/shared/team-tag";
-import { TEAM_NAME_ALREADY_USED, checkTeamName } from "@/lib/shared/team-name";
+import {
+  INVALID_TEAM_FIELDS,
+  TEAM_NAME_ALREADY_USED,
+  checkTeamName,
+  teamFieldsAreText,
+} from "@/lib/shared/team-name";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -30,6 +35,7 @@ export async function POST(req: Request) {
       tag?: string | null;
       ghost?: boolean;
     };
+    if (!teamFieldsAreText(body, ["name", "description", "tag"])) return fail(INVALID_TEAM_FIELDS, 400);
     // Mêmes bornes qu'au renommage (`updateTeamMeta`) : une seule règle.
     const nameCheck = checkTeamName(body.name);
     if (!nameCheck.ok) return fail(nameCheck.reason, 400);

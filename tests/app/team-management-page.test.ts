@@ -288,3 +288,11 @@ describe("correctifs de la troisième revue", () => {
     expect(creer).toContain("checkTeamName(name)");
   });
 });
+
+describe("correctifs de la quatrième revue", () => {
+  it("la modale « équipe fantôme » contrôle le nom comme le reste de la page", () => {
+    const ghost = stripComments(readFileSync(join(ROOT, "app", "(secured)", "equipes", "GhostTeamDialog.tsx"), "utf8"));
+    expect(ghost).not.toMatch(/minLength=\{3\}|maxLength=\{60\}/);
+    expect(ghost).toContain("checkTeamName(name)");
+  });
+});

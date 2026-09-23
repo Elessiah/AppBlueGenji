@@ -189,3 +189,29 @@ describe("refus de gestion traduits en statuts", () => {
     expect(await errorOf(res)).toBe("MEMBER_ACCOUNT_DELETED");
   });
 });
+
+describe("champs d'équipe non textuels", () => {
+  it.each([
+    [{ name: "Rolex", description: 5 }],
+    [{ name: "Rolex", tag: 5 }],
+    [{ name: 123 }],
+  ])("PATCH refuse %p par un code nommé, sans atteindre le service", async (body) => {
+    const res = await teamPatch(req("PATCH", body), params("7"));
+    expect(res.status).toBe(400);
+    expect(await errorOf(res)).toBe("INVALID_TEAM_FIELDS");
+    expect(updateTeamMeta).not.toHaveBeenCalled();
+  });
+
+  it("POST refuse une description numérique sans rien créer", async () => {
+    const res = await teamCreate(req("POST", { name: "Rolex", description: 5 }));
+    expect(res.status).toBe(400);
+    expect(await errorOf(res)).toBe("INVALID_TEAM_FIELDS");
+    expect(createTeam).not.toHaveBeenCalled();
+  });
+
+  it("laisse passer null — qui vaut « retirer » — et l'absence", async () => {
+    (updateTeamMeta as jest.Mock).mockResolvedValue(undefined as never);
+    const res = await teamPatch(req("PATCH", { name: "Rolex", tag: null }), params("7"));
+    expect(res.status).toBe(200);
+  });
+});

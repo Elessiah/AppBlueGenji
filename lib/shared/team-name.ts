@@ -27,6 +27,25 @@ export const TEAM_NAME_ALREADY_USED = "TEAM_NAME_ALREADY_USED";
 
 export type TeamNameCheck = { ok: true; name: string } | { ok: false; reason: typeof INVALID_TEAM_NAME };
 
+/** Refus d'un corps dont un champ d'équipe n'est ni du texte ni `null` (400). */
+export const INVALID_TEAM_FIELDS = "INVALID_TEAM_FIELDS";
+
+/**
+ * Vrai si chacun des champs nommés est absent, `null` ou du texte.
+ *
+ * Le corps d'une requête n'est qu'annoté : un nombre à la place d'une
+ * description ou d'un sigle faisait lever `.trim()` au fond du service, et le
+ * message du moteur JavaScript partait au client. Le contrôle se pose à la
+ * route, avant tout — le sigle ne peut pas le faire lui-même, où « pas du
+ * texte » deviendrait « pas de sigle » et effacerait celui de l'équipe.
+ */
+export function teamFieldsAreText(body: Record<string, unknown>, fields: readonly string[]): boolean {
+  return fields.every((field) => {
+    const value = body[field];
+    return value === undefined || value === null || typeof value === "string";
+  });
+}
+
 /** Nombre de caractères d'un nom, tel que la base le compte. */
 export function teamNameLength(name: string): number {
   return Array.from(name).length;

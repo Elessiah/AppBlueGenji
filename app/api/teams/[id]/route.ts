@@ -4,7 +4,12 @@ import { getTeamDetail, softDeleteTeam, updateTeamMeta } from "@/lib/server/team
 import { findSoloEntryUser } from "@/lib/server/solo-entries-service";
 import { can } from "@/lib/shared/permissions";
 import { TEAM_TAG_ALREADY_USED, isTeamTagRejection } from "@/lib/shared/team-tag";
-import { INVALID_TEAM_NAME, TEAM_NAME_ALREADY_USED } from "@/lib/shared/team-name";
+import {
+  INVALID_TEAM_FIELDS,
+  INVALID_TEAM_NAME,
+  TEAM_NAME_ALREADY_USED,
+  teamFieldsAreText,
+} from "@/lib/shared/team-name";
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -44,6 +49,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
 
   try {
     const body = (await req.json()) as { name?: string; description?: string | null; tag?: string | null };
+    if (!teamFieldsAreText(body, ["name", "description", "tag"])) return fail(INVALID_TEAM_FIELDS, 400);
     const managesGhostTeams = can(user, "tournaments");
     await updateTeamMeta(
       user.id,

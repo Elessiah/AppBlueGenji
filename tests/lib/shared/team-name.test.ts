@@ -4,6 +4,7 @@ import {
   TEAM_NAME_MAX_LENGTH,
   TEAM_NAME_MIN_LENGTH,
   checkTeamName,
+  teamFieldsAreText,
   teamNameLength,
 } from "@/lib/shared/team-name";
 
@@ -57,4 +58,18 @@ describe("checkTeamName — entrée non textuelle", () => {
       expect(checkTeamName(raw)).toEqual({ ok: false, reason: INVALID_TEAM_NAME });
     },
   );
+});
+
+describe("teamFieldsAreText", () => {
+  it("accepte texte, null et absence", () => {
+    expect(teamFieldsAreText({ name: "a", tag: null }, ["name", "tag", "description"])).toBe(true);
+  });
+
+  it.each([5, true, {}, []])("refuse %p dans un champ nommé", (value) => {
+    expect(teamFieldsAreText({ description: value }, ["description"])).toBe(false);
+  });
+
+  it("ignore les champs qu'on ne lui nomme pas", () => {
+    expect(teamFieldsAreText({ ghost: true }, ["name"])).toBe(true);
+  });
 });
