@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CyberButton, ScrollArea } from "@/components/cyber";
@@ -75,10 +75,20 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
   });
 
   // Changer d'étape remplace les boutons sous le focus : on le repose sur le
-  // premier bouton de l'étape (« Retour » à la confirmation — le geste sûr).
+  // geste **sûr** de l'étape — « Retour » à la confirmation, la liste des
+  // changements au retour en lecture, jamais le bouton de refus. Rien au
+  // montage : `useDialogBehavior` y a déjà placé le focus sur la liste, et le
+  // premier bouton de la lecture est justement celui qui mène à la suppression.
+  const mountedStep = useRef(step);
   useEffect(() => {
-    if (!open) return;
-    dialogRef.current?.querySelector<HTMLElement>("button")?.focus();
+    if (!open || mountedStep.current === step) return;
+    mountedStep.current = step;
+    const dialog = dialogRef.current;
+    const target =
+      step === "CONFIRM_DELETE"
+        ? dialog?.querySelector<HTMLElement>("button")
+        : dialog?.querySelector<HTMLElement>('[role="region"]');
+    (target ?? dialog)?.focus();
     // `dialogRef` est stable ; seul le changement d'étape compte.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);

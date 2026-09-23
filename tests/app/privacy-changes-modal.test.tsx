@@ -91,6 +91,16 @@ describe("PrivacyChangesModal — contrats du geste", () => {
     expect(source).not.toMatch(/overlay[^>]*onClick/);
   });
 
+  it("ne pose jamais le focus sur le bouton de refus", () => {
+    // Au montage, rien : la liste reçoit le focus. En confirmation, le premier
+    // bouton est « Retour » ; au retour en lecture, c'est la liste.
+    expect(source).toContain("mountedStep.current === step");
+    expect(source).toContain(`querySelector<HTMLElement>('[role="region"]')`);
+    const confirmStep = source.slice(source.indexOf("SUPPRESSION DÉFINITIVE"));
+    expect(confirmStep.indexOf("Retour")).toBeGreaterThan(-1);
+    expect(confirmStep.indexOf("Retour")).toBeLessThan(confirmStep.indexOf("Supprimer définitivement mon compte"));
+  });
+
   it("passe par useToast pour les retours, jamais un message en ligne", () => {
     expect(source).toContain("useToast()");
     expect(source).toContain("showError(");
