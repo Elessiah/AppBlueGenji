@@ -1,14 +1,26 @@
 import { BotStatus } from "@/lib/shared/types";
+import { botPayloadNumber } from "@/lib/shared/bot-payload";
 
 export function BotLatencyCard({ status }: { status: BotStatus | null }) {
-  const gateway = status?.gatewayLatency ?? 0;
-  const cpu = status?.cpuUsage ?? 0;
-  const ram = status?.ramUsage ?? 0;
+  // La carte reçoit **la même charge** que la bande d'état juste au-dessus, et
+  // `fetchBotStatus` la rend par un simple `as BotStatus` sur du JSON reçu : un
+  // `?? 0` ne rattrape que `null` et `undefined`, si bien qu'un `cpuUsage`
+  // arrivé en chaîne traversait le garde-fou et faisait lever le `.toFixed()`
+  // qui suit — toute la page `/bot` en 500. `botPayloadNumber` écarte aussi le
+  // `NaN`, qui ne lève pas mais finit en `width: NaN%`.
+  const gateway = botPayloadNumber(status?.gatewayLatency) ?? 0;
+  const cpu = botPayloadNumber(status?.cpuUsage) ?? 0;
+  const ram = botPayloadNumber(status?.ramUsage) ?? 0;
+
+  // Les barres sont bornées **des deux côtés** : une valeur négative rendrait
+  // une largeur négative, déclaration invalide que le navigateur laisse tomber
+  // — la barre garderait alors celle du rendu précédent.
+  const bar = (ratio: number) => Math.max(0, Math.min(ratio, 1)) * 100;
 
   const cells = [
-    { label: "GATEWAY", value: gateway === 0 ? "—" : gateway, unit: "ms", width: Math.min(gateway / 100, 1) * 100 },
-    { label: "CPU", value: cpu === 0 ? "—" : cpu.toFixed(1), unit: "%", width: Math.min(cpu, 100) },
-    { label: "RAM", value: ram === 0 ? "—" : ram.toFixed(0), unit: "MB", width: Math.min(ram / 1024, 1) * 100 },
+    { label: "GATEWAY", value: gateway === 0 ? "—" : gateway, unit: "ms", width: bar(gateway / 100) },
+    { label: "CPU", value: cpu === 0 ? "—" : cpu.toFixed(1), unit: "%", width: bar(cpu / 100) },
+    { label: "RAM", value: ram === 0 ? "—" : ram.toFixed(0), unit: "MB", width: bar(ram / 1024) },
   ];
 
   return (

@@ -9,6 +9,7 @@ import {
   phaseFormatLabel,
   phaseSummary,
 } from "./phase-form";
+import { checkboxCardChrome } from "../_lib/form-styles";
 
 const HINT: CSSProperties = {
   margin: "2px 0 0",
@@ -501,6 +502,9 @@ export function PhaseCard({
                 </label>
                 <div
                   className="checkbox-card"
+                  // Même carte, même verrou que `FormatSettings` : le survol
+                  // perd son halo dès que la case est `disabled`, sans qu'aucun
+                  // attribut n'ait à le redire.
                   onClick={
                     disabled
                       ? undefined
@@ -515,17 +519,13 @@ export function PhaseCard({
                     alignItems: "flex-start",
                     gap: 12,
                     padding: "14px 16px",
-                    border: `1.5px solid ${
-                      phase.hasThirdPlaceMatch
-                        ? "var(--blue-500)"
-                        : "var(--line-strong-cy)"
-                    }`,
+                    // Même chrome que la carte jumelle du formulaire, par la
+                    // même fonction : le verrou se lit sur le cadre, pas
+                    // seulement sur le texte.
+                    ...checkboxCardChrome(phase.hasThirdPlaceMatch, disabled),
                     borderRadius: 10,
                     cursor: disabled ? "not-allowed" : "pointer",
                     transition: "border-color 0.2s ease, background-color 0.2s ease",
-                    backgroundColor: phase.hasThirdPlaceMatch
-                      ? "rgba(90, 200, 255, 0.07)"
-                      : "transparent",
                   }}
                 >
                   <input
@@ -539,14 +539,9 @@ export function PhaseCard({
                         hasThirdPlaceMatch: e.target.checked,
                       })
                     }
-                    style={{
-                      width: 18,
-                      height: 18,
-                      accentColor: "var(--blue-500)",
-                      cursor: "pointer",
-                      flexShrink: 0,
-                      marginTop: 2,
-                    }}
+                    // Taille, teinte et curseur viennent de `globals.css` :
+                    // les redire en ligne reprendrait la main sur la règle.
+                    style={{ marginTop: 2 }}
                   />
                   <div style={{ flex: 1 }}>
                     <label
@@ -554,16 +549,19 @@ export function PhaseCard({
                       style={{
                         display: "block",
                         margin: "0 0 4px",
-                        cursor: "pointer",
+                        cursor: disabled ? "not-allowed" : "pointer",
                         userSelect: "none",
                         fontSize: 14,
                         fontWeight: 500,
-                        color: "var(--ink)",
+                        // Ternir en **couleurs** et non en `opacity` : celle-ci
+                        // se multiplierait avec la bordure de la case, seule à
+                        // la dessiner. Même traitement que `FormatSettings`.
+                        color: disabled ? "var(--ink-mute)" : "var(--ink)",
                       }}
                     >
                       Petite finale
                     </label>
-                    <p style={{ ...HINT, margin: 0 }}>
+                    <p style={{ ...HINT, margin: 0, ...(disabled ? { color: "var(--ink-dim)" } : {}) }}>
                       Ajoute un match pour déterminer la 3ᵉ place entre les deux
                       perdants des demi-finales.
                     </p>

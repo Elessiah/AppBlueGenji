@@ -170,7 +170,9 @@ vainqueur (fait avancer le tournoi, irréversible).
 
 - Recherche par pseudo / équipe.
 - Filtre par **rôle** : Tous, DPS, Tank, Heal, Coach.
-- Filtre par **statut** : Tous, Free agents (sans roster).
+- Filtre par **statut** : Tous, Free agents (sans roster **et** ouverts aux propositions
+  d'équipe — un joueur qui a décoché le réglage en sort, et sa carte annonce alors
+  « SANS ÉQUIPE » et non « FREE AGENT »).
 - Tri : Pseudo, Tournois.
 - 🧪 Cliquer un profil → page joueur publique (infos visibles, stats, historique).
 

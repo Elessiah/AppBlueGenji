@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { BOT_DOC_SECTIONS } from "@/lib/server/bot-docs";
+import { BOT_DOC_SECTIONS } from "@/lib/shared/bot-doc-sections";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { publicSitemapRoutes } from "@/lib/shared/sitemap";
 
