@@ -91,10 +91,17 @@ function isEngineResolved(row: CascadeRow): boolean {
  * Vide un créneau d'aval et défait tout ce qui en était descendu.
  *
  * `keepTeamId` : l'équipe que la correction va reposer dans ce créneau. S'il
- * l'occupe déjà et que la cible n'a pas été close d'office, il n'y a rien à
- * défaire — la cible est exactement ce qu'elle sera après la correction. Une
- * cible close d'office est toujours rouverte : elle a été tranchée sur l'état
- * d'avant, que la correction vient de changer.
+ * l'occupe déjà, il n'y a rien à défaire — même close d'office, la cible est
+ * exactement ce qu'elle sera après la correction : son exemption tient à
+ * **l'autre** créneau, que la correction ne touche pas. La rouvrir ferait
+ * rouvrir puis reclore un tournoi pour un score corrigé sans changer de
+ * vainqueur (date de clôture redatée, clôture annoncée deux fois).
+ *
+ * `force` : la cible **amont** vient d'être rouverte. Son résultat n'est plus
+ * acquis, donc tout ce qu'il avait fait descendre doit l'être aussi — y compris
+ * quand le créneau semble déjà juste : un match fantôme rouvert (deux créneaux
+ * vides, aucune équipe à reposer) a causé l'exemption de sa cible, qui n'a plus
+ * lieu d'être.
  */
 async function vacateSlot(
   connection: PoolConnection,
@@ -102,6 +109,7 @@ async function vacateSlot(
   slot: number,
   keepTeamId: number | null,
   depth: number,
+  force: boolean,
 ): Promise<number> {
   if (depth > MAX_DEPTH) return 0;
   const target = await loadRow(connection, targetId);
@@ -111,7 +119,7 @@ async function vacateSlot(
   const currentId = current === null ? null : Number(current);
   const closed = target.status === "COMPLETED";
 
-  if (currentId === keepTeamId && !closed) return 0;
+  if (currentId === keepTeamId && !(force && closed)) return 0;
 
   let reopened = 0;
   if (closed) {
@@ -122,7 +130,7 @@ async function vacateSlot(
     }
     // Ce que l'exemption avait fait monter redescend, en entier : la cible sera
     // tranchée de nouveau, et rien ne dit encore par qui.
-    reopened += 1 + (await undoPropagation(connection, target, null, null, depth + 1));
+    reopened += 1 + (await undoPropagation(connection, target, null, null, depth + 1, true));
     await connection.execute(
       `UPDATE bg_matches
        SET team1_score = NULL, team2_score = NULL,
@@ -161,6 +169,7 @@ async function undoPropagation(
   nextWinnerTeamId: number | null,
   nextLoserTeamId: number | null,
   depth: number,
+  force: boolean,
 ): Promise<number> {
   const links: [number | null, number | null, number | null][] = [
     [match.next_winner_match_id, match.next_winner_slot, nextWinnerTeamId],
@@ -170,7 +179,7 @@ async function undoPropagation(
   let reopened = 0;
   for (const [targetId, slot, keep] of links) {
     if (targetId === null || slot === null) continue;
-    reopened += await vacateSlot(connection, Number(targetId), Number(slot), keep, depth);
+    reopened += await vacateSlot(connection, Number(targetId), Number(slot), keep, depth, force);
   }
   return reopened;
 }
@@ -193,5 +202,5 @@ export async function detachDownstreamOutcome(
   match: CascadeLinks,
   next: { winnerTeamId: number | null; loserTeamId: number | null },
 ): Promise<number> {
-  return undoPropagation(connection, match, next.winnerTeamId, next.loserTeamId, 0);
+  return undoPropagation(connection, match, next.winnerTeamId, next.loserTeamId, 0, false);
 }

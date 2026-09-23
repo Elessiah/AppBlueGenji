@@ -510,17 +510,34 @@ export async function adminResolveMatch(
   // sinon il resterait « terminé » sur une rencontre que plus personne ne peut
   // saisir (`reportMatchScore` exige `RUNNING`, l'entretien ne visite que
   // `RUNNING`). Il se reclôt de lui-même si le tableau est de nouveau complet.
-  if (reopened > 0 && (await reopenTournament(connection, tournamentId))) {
-    // Dans un tournoi multi-phases clos, la phase du match est la dernière :
-    // elle doit repartir elle aussi, `reconcilePhases` n'avançant qu'une phase
-    // `RUNNING` d'un tournoi en cours.
+  if (reopened > 0) {
     const phaseId = Number(match.phase_id ?? 0);
-    if (phaseId > 0) {
-      await connection.execute(
-        `UPDATE bg_tournament_phases SET state = 'RUNNING', finished_at = NULL
-         WHERE id = ? AND state = 'FINISHED'`,
-        [phaseId],
-      );
+    const phaseFinished =
+      phaseId > 0 &&
+      (
+        await connection.execute<(RowDataPacket & { state: string })[]>(
+          `SELECT state FROM bg_tournament_phases WHERE id = ? LIMIT 1`,
+          [phaseId],
+        )
+      )[0][0]?.state === "FINISHED";
+
+    if (await reopenTournament(connection, tournamentId)) {
+      // Dans un tournoi multi-phases clos, la phase du match est la dernière :
+      // elle doit repartir elle aussi, `reconcilePhases` n'avançant qu'une
+      // phase `RUNNING` d'un tournoi en cours.
+      if (phaseFinished) {
+        await connection.execute(
+          `UPDATE bg_tournament_phases SET state = 'RUNNING', finished_at = NULL WHERE id = ?`,
+          [phaseId],
+        );
+      }
+    } else if (phaseFinished) {
+      // Tournoi en cours, phase du match **déjà close** : une phase suivante a
+      // été lancée sur ses qualifiées. Rouvrir une rencontre ici la laisserait
+      // à jamais « à jouer » — `reconcilePhases` ne relit que la phase
+      // courante — et les qualifiées ne suivraient pas. On refuse : la
+      // correction passe par un retour en arrière, qui défait la phase suivante.
+      throw new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES");
     }
   }
 

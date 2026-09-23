@@ -214,6 +214,28 @@ describe("detachDownstreamOutcome — résultat corrigé en double forfait", () 
 });
 
 describe("detachDownstreamOutcome — rien à défaire", () => {
+  it("laisse en place une exemption close quand le même vainqueur y retourne", async () => {
+    // L'exemption de la finale tient à l'autre créneau (demi en double
+    // forfait) : corriger le score de la demi sans changer de vainqueur ne la
+    // remet pas en cause, et ne doit rien rouvrir.
+    const { conn, get } = board([
+      row({
+        id: 2,
+        status: "COMPLETED",
+        team1_id: 7,
+        team2_id: null,
+        team1_score: 1,
+        team2_score: 0,
+        winner_team_id: 7,
+      }),
+    ]);
+
+    await expect(
+      detachDownstreamOutcome(conn, links(2, 1), { winnerTeamId: 7, loserTeamId: 8 }),
+    ).resolves.toBe(0);
+    expect(get(2)).toMatchObject({ status: "COMPLETED", winner_team_id: 7, team1_id: 7 });
+  });
+
   it("laisse la cible en place quand la même équipe y retourne", async () => {
     const { conn, get } = board([
       row({ id: 2, status: "READY", team1_id: 7, team2_id: 10, live_started_at: "2026-09-23" }),

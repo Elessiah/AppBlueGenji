@@ -75,6 +75,18 @@ complet. `detachDownstreamOutcome` rend pour cela le nombre de rencontres
 closes qu'il a rouvertes ; l'arbre d'une BG Survie applique la même règle quand
 `repairPlayoffBracket` réécrit un tour dans un tournoi clos.
 
+Deux bornes :
+
+- **même vainqueur, rien à rouvrir.** Corriger le score d'une rencontre sans en
+  changer le vainqueur laisse en place l'exemption d'aval : elle tient à
+  l'autre créneau. Seule la cascade (une rencontre amont rouverte) force la
+  réouverture, un match fantôme rouvert invalidant l'exemption qu'il avait
+  causée ;
+- **phase close d'un tournoi en cours** (multi-phases) : la correction est
+  refusée (409). La phase suivante a été lancée sur ses qualifiées, et une
+  rencontre rouverte dans une phase close ne serait plus jamais relue ; la voie
+  est le retour en arrière, qui défait la phase suivante.
+
 **Le verrou suit la chaîne.** `dependentMatches` (`lib/shared/match-lock.ts`)
 traverse désormais les rencontres **tranchées sans saisie** (exemptions, matchs
 fantômes) : c'est la première rencontre réellement disputée au bout de la
