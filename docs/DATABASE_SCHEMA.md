@@ -102,7 +102,7 @@ voit qu'une :
 |---|---|---|
 | Colonne **absente** | `bg_matches.phase_id` | « Unknown column » sur la première requête qui la nomme |
 | Colonne présente mais du **mauvais type** | `bg_tournaments.game` doit contenir `'OW'` et **plus** `'OW2'` | Une base restée avant la conversion `ENUM('OW2','MR')` → `ENUM('OW','MR')` porte bien la colonne, et rend « Data truncated for column 'game' » au premier tournoi écrit |
-| Colonne qui devait **partir** | `bg_users.email` | Le `DROP` est best-effort, jamais rejoué dans le processus (la porte mémorise une passe qui se résout toujours), et `anonymizeOwnAccount` a perdu son `email = NULL` dans la même version : les adresses resteraient, sans que rien ne les efface |
+| Colonne qui devait **partir** | `bg_users.email` (la colonne, pas ses valeurs : le filet ne lit qu'`information_schema`, c'est le repli ci-dessous qui compte les adresses) | Le `DROP` est best-effort, jamais rejoué dans le processus (la porte mémorise une passe qui se résout toujours), et `anonymizeOwnAccount` a perdu son `email = NULL` dans la même version : les adresses resteraient, sans que rien ne les efface |
 | **Index** absent | `uniq_bg_teams_tag`, `uniq_bg_teams_solo_user` | La plus silencieuse de toutes : un index unique manquant ne fait *rien* tomber, il cesse seulement de trancher la course qu'il existe pour trancher — deux équipes créées au même instant prendraient le même sigle, et `mapTeamTagConflict` traduirait un `ER_DUP_ENTRY` qui n'arrive plus jamais |
 
 Le témoin de type porte sur les **deux** faits : une base à demi convertie

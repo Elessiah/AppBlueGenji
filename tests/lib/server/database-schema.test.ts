@@ -352,7 +352,11 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     // porte mémorisant une passe qui se résout toujours ; et
     // `anonymizeOwnAccount` a perdu son `email = NULL` dans la même version.
     const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
-    expect(net).toContain("les adresses y sont encore");
+    expect(net).toContain("la colonne reste à retirer à la main");
+    // Le filet ne lit qu'`information_schema` : il ne sait **pas** si des
+    // adresses subsistent, et l'affirmer se contredisait avec le repli qui
+    // venait de les vider, dans le même démarrage.
+    expect(net).not.toContain("les adresses y sont encore");
   });
 
   it("surveille aussi les index, que `COLUMNS` ne montre pas", () => {

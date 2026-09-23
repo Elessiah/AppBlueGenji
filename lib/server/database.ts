@@ -1027,7 +1027,15 @@ async function warnIfSchemaIsBehind(db: Pool): Promise<void> {
       const type = found.get(name);
       if (witness.absent) {
         if (type !== undefined) {
-          gaps.push(`${name} devrait avoir disparu (les adresses y sont encore)`);
+          // Le filet dit l'état du **schéma**, jamais celui des données : il ne
+          // lit qu'`information_schema`. Annoncer « les adresses y sont
+          // encore » était donc une affirmation qu'il ne peut pas soutenir — et
+          // fausse précisément dans le cas qui compte, celui où le repli sans
+          // DDL vient de les vider : les deux lignes se contredisaient dans le
+          // même démarrage. Ce qu'il sait, et qui suffit, c'est que la colonne
+          // est toujours là. Combien d'adresses ont été effacées, c'est le repli
+          // qui le dit, parce que lui seul a compté.
+          gaps.push(`${name} devrait avoir disparu — la colonne reste à retirer à la main`);
         }
       } else if (type === undefined) {
         gaps.push(`${name} manque`);
