@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { DiscordIcon } from "./DiscordIcon";
 import { CyberButton } from "@/components/cyber";
-import { botInvitePermissions, botInviteUrl } from "@/lib/server/bot-invite";
+import { botInvitePermissions, botInviteScopesLabel, botInviteUrl } from "@/lib/server/bot-invite";
 import { decodeDiscordPermissions } from "@/lib/shared/discord-permissions";
 
 export function BotInviteCard() {
@@ -27,7 +27,8 @@ export function BotInviteCard() {
           </h3>
           <p>
             Un seul OAuth, et tous les modules sont actifs d'office. À son arrivée, le bot écrit en
-            privé au propriétaire du serveur la liste des modules et les commandes pour les régler.
+            privé au propriétaire du serveur — s'il accepte les messages privés — la liste des modules
+            et les commandes pour les régler.
           </p>
           <div className="row-actions">
             <CyberButton asChild variant="primary">
@@ -76,7 +77,7 @@ export function BotInviteCard() {
             </div>
           )}
           <div className="perms-foot">
-            <span>SCOPES · BOT + APPLICATIONS.COMMANDS</span>
+            <span>SCOPES · {botInviteScopesLabel()}</span>
             <span>INTEGER · {permissions}</span>
           </div>
         </div>

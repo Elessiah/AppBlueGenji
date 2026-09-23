@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { BotHero } from "@/components/bot/BotHero";
 import { BotInviteCard } from "@/components/bot/BotInviteCard";
 import { BotStatusStrip } from "@/components/bot/BotStatusStrip";
+import { BOT_INVITE_SCOPES } from "@/lib/server/bot-invite";
 
 /**
  * Les derniers restes de la maquette de `/bot` : des valeurs que rien ne
@@ -50,6 +51,14 @@ describe("BotHero — ne se donne ni identifiant ni statut inventés", () => {
   });
 });
 
+describe("Scopes — affichés depuis la liste que l'URL envoie", () => {
+  it("dit dans le héros et la carte les scopes de l'invitation", () => {
+    const label = BOT_INVITE_SCOPES.map((s) => s.toUpperCase()).join(" + ");
+    expect(renderToStaticMarkup(<BotHero />)).toContain(`OAUTH2 · ${label} · GRATUIT`);
+    expect(renderToStaticMarkup(<BotInviteCard />)).toContain(`SCOPES · ${label}`);
+  });
+});
+
 describe("BotInviteCard — les permissions se lisent sur l'entier envoyé", () => {
   it("affiche ce que le défaut demande réellement", () => {
     delete process.env.DISCORD_BOT_PERMISSIONS;
@@ -89,5 +98,7 @@ describe("BotInviteCard — les permissions se lisent sur l'entier envoyé", () 
     expect(html).not.toContain("wizard");
     expect(html).not.toContain("90 SECONDES");
     expect(html).toContain("en privé au propriétaire du serveur");
+    // …sans promettre un message que des messages privés fermés arrêtent.
+    expect(html).toContain("s&#x27;il accepte les messages privés");
   });
 });

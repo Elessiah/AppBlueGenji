@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { DiscordIcon } from "./DiscordIcon";
 import { CyberButton } from "@/components/cyber";
-import { botInviteUrl } from "@/lib/server/bot-invite";
+import { botInviteScopesLabel, botInviteUrl } from "@/lib/server/bot-invite";
 
 export function BotHero() {
   const inviteUrl = botInviteUrl();
@@ -67,7 +67,7 @@ export function BotHero() {
           </CyberButton>
         </div>
         <span className="mono" style={{ fontSize: 10, letterSpacing: "0.18em", color: "var(--ink-dim)" }}>
-          OAUTH2 · BOT + APPLICATIONS.COMMANDS · GRATUIT
+          OAUTH2 · {botInviteScopesLabel()} · GRATUIT
         </span>
       </div>
     </div>
