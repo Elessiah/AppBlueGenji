@@ -249,7 +249,9 @@ describe("registre des refus de connexion — l'ID Discord n'est pas un contourn
 
   it("n'offre l'ID, sur un délai dépassé, qu'à qui partage déjà un serveur avec le bot", () => {
     const message = loginErrorMessage("BOT_RESOLVE_TIMEOUT");
-    expect(message).toMatch(/Si tu es sur un de ses serveurs, utilise plutôt ton ID Discord/);
+    // L'ID n'est proposé que sous condition d'un serveur que le joueur peut
+    // vérifier, et le bouton Discord reste la sortie de qui n'y est pas.
+    expect(message).toMatch(/Si tu es sur le serveur BlueGenji[^.]*\bID\b/);
     expect(message).toContain("bouton Discord");
   });
 });

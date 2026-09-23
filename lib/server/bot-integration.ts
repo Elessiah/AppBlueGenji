@@ -297,9 +297,10 @@ export async function pushSiteVisitStats(stats: SiteVisitStats): Promise<void> {
  * Destinataire d'un message privé Discord, tel que le site le connaît.
  *
  * `discordId` est renseigné pour tout compte entré ou certifié par Discord
- * (OAuth ou code), et prime ; à défaut, le `handle` (tag) suffit au bot, qui retrouve le membre **sur le serveur
- * BlueGenji** — la seule population qu'il démarche. Un joueur qui n'y est pas
- * ne reçoit aucune tentative d'envoi, et revient dans `unresolved`.
+ * (OAuth ou code), et prime ; à défaut, le `handle` (tag) suffit. Dans les deux
+ * cas, le bot ne cherche le membre que **sur le serveur BlueGenji** — la seule
+ * population qu'il démarche. Un joueur qui n'y est pas ne reçoit aucune
+ * tentative d'envoi, et revient dans `unresolved`.
  */
 export type DiscordRecipient = {
   discordId: string | null;
