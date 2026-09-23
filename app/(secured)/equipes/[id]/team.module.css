@@ -582,3 +582,49 @@
 .dangerActions {
   margin-top: 12px;
 }
+
+/* ── Finitions : survol et focus ───────────────────────── */
+
+.rosterRow:not(.rosterHeader):hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.viewerRow:hover {
+  background: rgba(var(--orange-rgb), 0.08);
+}
+
+.suggestion:hover {
+  background: rgba(var(--orange-rgb), 0.08);
+}
+
+/* La carte d'un choix de transfert porte un bouton radio : l'anneau de focus
+   du bouton est petit, la carte entière le relaie au clavier. */
+.choice:focus-within {
+  border-color: rgba(var(--orange-rgb), 0.55);
+  box-shadow: 0 0 0 2px rgba(var(--orange-rgb), 0.22);
+}
+
+.choice:hover {
+  border-color: rgba(var(--orange-rgb), 0.3);
+}
+
+.dangerButton:not(:disabled):hover {
+  background: rgba(255, 90, 110, 0.12);
+}
+
+@media (forced-colors: active) {
+  .rolePill,
+  .youTag {
+    border-color: CanvasText;
+  }
+
+  .suggestion[aria-selected="true"] {
+    outline: 2px solid Highlight;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page :global(.btn) {
+    transition: none;
+  }
+}
