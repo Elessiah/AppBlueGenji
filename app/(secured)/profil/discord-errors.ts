@@ -22,7 +22,7 @@ const VERIFICATION_ERRORS: Record<string, string> = {
   DISCORD_USER_NOT_FOUND:
     "Tag introuvable : le bot doit partager un serveur avec toi. Rejoins le serveur BlueGenji, puis réessaie.",
   DISCORD_DM_FAILED:
-    "Impossible de t'envoyer le code en message privé : ouvre tes DM sur le serveur BlueGenji, puis réessaie.",
+    "Impossible de t'envoyer le code en message privé : ouvre tes DM sur un serveur que tu partages avec le bot (le serveur BlueGenji, par exemple), puis réessaie.",
   BOT_INTERNAL_UNREACHABLE:
     "Certification indisponible pour le moment (bot non joignable). Réessaie plus tard.",
   BOT_INTERNAL_UNAUTHORIZED:

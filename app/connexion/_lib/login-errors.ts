@@ -18,10 +18,12 @@ const LOGIN_ERRORS: Record<string, string> = {
     "Connexion Discord indisponible (bot non joignable). Tu peux passer par Google.",
   // Le bot a répondu trop tard : tag absent de ses serveurs ou bot surchargé,
   // sans qu'on sache lequel. Les deux sorties évitent la recherche par tag —
-  // l'ID ne vaut pourtant que dans le second cas : sans serveur commun, Discord
-  // refuse le message privé quel que soit l'identifiant, d'où la condition dite.
+  // l'ID ne vaut pourtant que pour un joueur qui **est** sur un serveur du bot,
+  // mais que le balayage de toutes les guildes n'a pas atteint à temps : sans
+  // serveur commun, Discord refuse le message privé quel que soit l'identifiant.
+  // La condition nomme le seul serveur que le joueur peut vérifier.
   BOT_RESOLVE_TIMEOUT:
-    "La recherche de ton tag par le bot n'a pas abouti à temps. Si tu es sur un de ses serveurs, utilise plutôt ton ID Discord ; sinon, passe par le bouton Discord.",
+    "La recherche de ton tag par le bot n'a pas abouti à temps. Si tu es sur le serveur BlueGenji, utilise plutôt ton ID Discord ; sinon, passe par le bouton Discord.",
   BOT_INTERNAL_UNAUTHORIZED:
     "Connexion Discord indisponible (token interne invalide). Tu peux passer par Google.",
   // Sur une saisie par ID, c'est aussi ce qui arrive sans serveur commun : la
