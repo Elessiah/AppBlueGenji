@@ -49,6 +49,7 @@ import {
   buildAccountConnections,
   checkConnectionUnlink,
   type AccountConnection,
+  type ConnectionMethod,
 } from "@/lib/shared/account-connections";
 import { OAUTH_PROVIDERS, type OAuthProvider } from "@/lib/shared/oauth-providers";
 
@@ -84,6 +85,7 @@ const SUBJECT_COLUMNS: Record<OAuthProvider, "google_sub" | "discord_id" | "bliz
 type IdentityRow = RowDataPacket & {
   google_sub: string | null;
   discord_id: string | null;
+  discord_link_method: ConnectionMethod | null;
   blizzard_sub: string | null;
   discord_pseudo: string | null;
   overwatch_battletag: string | null;
@@ -92,7 +94,8 @@ type IdentityRow = RowDataPacket & {
 async function loadIdentityRow(userId: number): Promise<IdentityRow | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<IdentityRow[]>(
-    `SELECT google_sub, discord_id, blizzard_sub, discord_pseudo, overwatch_battletag
+    `SELECT google_sub, discord_id, discord_link_method, blizzard_sub,
+            discord_pseudo, overwatch_battletag
      FROM bg_users
      WHERE id = ? AND is_deleted = 0
      LIMIT 1`,
@@ -104,7 +107,11 @@ async function loadIdentityRow(userId: number): Promise<IdentityRow | null> {
 function connectionsFromRow(row: IdentityRow): AccountConnection[] {
   return buildAccountConnections({
     GOOGLE: { subject: row.google_sub },
-    DISCORD: { subject: row.discord_id, handle: row.discord_pseudo },
+    DISCORD: {
+      subject: row.discord_id,
+      handle: row.discord_pseudo,
+      method: row.discord_link_method,
+    },
     BLIZZARD: { subject: row.blizzard_sub, handle: row.overwatch_battletag },
   });
 }
@@ -139,7 +146,12 @@ export async function createOrGetOAuthUser(identity: OAuthIdentity): Promise<num
         picture: identity.avatarUrl ?? undefined,
       });
     case "DISCORD":
-      return createOrGetDiscordUser(identity.subject, undefined, identity.handle, identity.avatarUrl);
+      // La porte est nommée, jamais devinée : c'est un aller-retour OAuth, donc
+      // une autorisation d'application posée chez Discord.
+      return createOrGetDiscordUser(identity.subject, undefined, identity.handle, {
+        avatarUrl: identity.avatarUrl,
+        method: "OAUTH",
+      });
     case "BLIZZARD":
       return createOrGetBlizzardUser(identity.subject, identity.handle);
   }
@@ -224,13 +236,22 @@ export async function linkOAuthIdentity(
       // `normalizeDiscordHandle` — on ne publie pas une suite de chiffres là où
       // un arbitre attend un nom — et le compte se rattache alors sans que son
       // tag soit certifié.
+      //
+      // `discord_link_method` est posé dans la **même** instruction, et à
+      // `OAUTH` sans condition : c'est ce que ce rattachement-ci est, et il
+      // l'emporte sur une valeur plus ancienne — une autorisation donnée existe
+      // chez Discord jusqu'à ce que le joueur la retire, qu'il se connecte
+      // ensuite par code ou non (`lib/shared/account-connections.ts`).
       const handle = normalizeDiscordHandle(identity.handle);
       [result] = await db.execute<ResultSetHeader>(
         handle
           ? `UPDATE bg_users
-             SET discord_id = ?, discord_pseudo = ?, discord_verified_at = NOW()
+             SET discord_id = ?, discord_pseudo = ?, discord_verified_at = NOW(),
+                 discord_link_method = 'OAUTH'
              WHERE id = ? AND is_deleted = 0`
-          : `UPDATE bg_users SET discord_id = ? WHERE id = ? AND is_deleted = 0`,
+          : `UPDATE bg_users
+             SET discord_id = ?, discord_link_method = 'OAUTH'
+             WHERE id = ? AND is_deleted = 0`,
         handle ? [identity.subject, handle, userId] : [identity.subject, userId],
       );
     } else if (identity.provider === "BLIZZARD") {
@@ -312,8 +333,15 @@ export async function unlinkOAuthIdentity(userId: number, provider: OAuthProvide
   // Discord perd sa certification dans la même instruction : ce sont les deux
   // faces d'une preuve unique, et une base où l'une serait passée sans l'autre
   // exposerait à l'organisation un tag que plus rien ne couvre.
+  //
+  // La **méthode** part avec : elle ne décrit pas le compte mais le
+  // rattachement, et un compte détaché n'en a plus. La laisser ferait annoncer
+  // « rattaché par le bouton Discord » au prochain rattachement par code, tant
+  // que celui-ci n'aurait pas réécrit la colonne.
   const clearedColumns =
-    provider === "DISCORD" ? "discord_id = NULL, discord_verified_at = NULL" : `${column} = NULL`;
+    provider === "DISCORD"
+      ? "discord_id = NULL, discord_verified_at = NULL, discord_link_method = NULL"
+      : `${column} = NULL`;
 
   const db = await getDatabase();
   const [result] = await db.execute<ResultSetHeader>(

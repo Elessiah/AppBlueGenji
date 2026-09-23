@@ -42,6 +42,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
 import { isDuplicateEntryError } from "@/lib/server/mysql-errors";
+import type { ConnectionMethod } from "@/lib/shared/account-connections";
 import {
   consumeDiscordChallenge,
   createDiscordLoginChallenge,
@@ -127,17 +128,31 @@ export async function getDiscordAccountState(userId: number): Promise<DiscordAcc
  * un tag personnel certifié, que `canViewDiscordTag` ouvre à l'arbitrage. La
  * lecture préalable ne suffit pas : c'est l'écriture qui doit porter la
  * condition, un `await` la sépare de son contrôle.
+ *
+ * `method` suit `discord_id` : `DM_CODE` quand c'est **ce geste** qui vient de
+ * poser l'identifiant, et `null` — ne touche à rien — quand le compte le
+ * portait déjà. La distinction n'est pas cosmétique : la certification
+ * immédiate d'un compte **déjà rattaché** ne franchit aucune porte, et lui
+ * attribuer `DM_CODE` réécrirait en « code en message privé » un rattachement
+ * noué par le bouton. Le `COALESCE` de `discord_id` et celui de la méthode
+ * disent donc la même chose, chacun de son côté.
  */
-async function writeVerifiedTag(userId: number, discordId: string, tag: string): Promise<void> {
+async function writeVerifiedTag(
+  userId: number,
+  discordId: string,
+  tag: string,
+  method: ConnectionMethod | null,
+): Promise<void> {
   const db = await getDatabase();
   try {
     const [result] = await db.execute<ResultSetHeader>(
       `UPDATE bg_users
        SET discord_id = COALESCE(discord_id, ?),
            discord_pseudo = ?,
-           discord_verified_at = NOW()
+           discord_verified_at = NOW(),
+           discord_link_method = ${method === null ? "discord_link_method" : "COALESCE(discord_link_method, ?)"}
        WHERE id = ? AND is_deleted = 0`,
-      [discordId, tag, userId],
+      method === null ? [discordId, tag, userId] : [discordId, tag, method, userId],
     );
     if (Number(result.affectedRows) === 0) throw new Error("PROFILE_NOT_FOUND");
   } catch (error) {
@@ -214,7 +229,9 @@ export async function startDiscordVerification(
   // **La preuve existe déjà** : ce compte s'est connecté par ce Discord. Le tag
   // vient d'être résolu vers ce même identifiant, il n'y a plus rien à prouver.
   if (row.discord_id === discordId) {
-    await writeVerifiedTag(userId, discordId, tag);
+    // Aucune porte franchie : le rattachement existait avant ce geste, et ce
+    // n'est pas à lui de dire par où il est passé.
+    await writeVerifiedTag(userId, discordId, tag, null);
     return { status: "VERIFIED", tag };
   }
 
@@ -267,6 +284,9 @@ export async function confirmDiscordVerification(
   if (!proof) throw new Error("CODE_INVALID_OR_EXPIRED");
   if (!proof.handle) throw new Error("INVALID_DISCORD_HANDLE");
 
-  await writeVerifiedTag(userId, discordId, proof.handle);
+  // Le code reçu en message privé **est** la porte, ici : sur un compte qui ne
+  // portait pas encore de `discord_id`, cette écriture le pose, et c'est donc
+  // ce geste-là qui a noué le rattachement.
+  await writeVerifiedTag(userId, discordId, proof.handle, "DM_CODE");
   return { tag: proof.handle };
 }

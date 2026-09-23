@@ -1,4 +1,5 @@
 ﻿import type { EnduranceRoundCell, EnduranceStatus } from "./bg-survie";
+import type { ConnectionMethod } from "./account-connections";
 import type { MatchFormat } from "./match-format";
 import type { MatchLiveTrigger } from "./live-streams";
 import type { ParticipantType } from "./participants";
@@ -734,6 +735,13 @@ export type PersonalDataExport = {
     discordPseudo: string | null;
     /** Date de certification du tag Discord (`null` = jamais prouvé). */
     discordVerifiedAt: string | null;
+    /**
+     * La porte par laquelle le rattachement Discord a été noué — le bouton
+     * (`OAUTH`) ou le code en message privé (`DM_CODE`). `null` quand rien
+     * n'est rattaché, ou quand le rattachement est antérieur à
+     * l'enregistrement de cette information.
+     */
+    discordLinkMethod: ConnectionMethod | null;
     googleSub: string | null;
     /** Identifiant Battle.net (`null` si aucun compte Blizzard n'est rattaché). */
     blizzardSub: string | null;

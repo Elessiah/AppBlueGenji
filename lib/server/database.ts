@@ -216,6 +216,13 @@ async function runMigrations(db: Pool): Promise<void> {
   // le dit — mais « le tag de `discord_pseudo` a été prouvé par son titulaire »,
   // ce qui se perd à chaque modification du tag.
   //
+  // `discord_link_method` dit une **troisième** chose, et la seule des trois qui
+  // parle du fournisseur plutôt que du compte : sur quoi le rattachement repose
+  // — un aller-retour OAuth, qui laisse une autorisation d'application chez
+  // Discord, ou le code reçu en message privé, qui n'en laisse aucune. `NULL`
+  // sur les rattachements antérieurs à la colonne : ils ne se classent pas après
+  // coup (`lib/shared/account-connections.ts`).
+  //
   // `visible_pseudo` survit sans lecteur : le pseudo n'est plus masquable (c'est
   // l'identité de base du joueur : brackets, rosters, feuilles de match), la
   // colonne est conservée pour ne pas casser les installs.
@@ -227,6 +234,7 @@ async function runMigrations(db: Pool): Promise<void> {
       discord_id VARCHAR(40) NULL UNIQUE,
       discord_pseudo VARCHAR(64) NULL,
       discord_verified_at DATETIME NULL,
+      discord_link_method ENUM('DM_CODE', 'OAUTH') NULL,
       google_sub VARCHAR(191) NULL UNIQUE,
       blizzard_sub VARCHAR(191) NULL UNIQUE,
       is_adult TINYINT(1) NULL DEFAULT NULL,
@@ -1053,6 +1061,12 @@ async function runMigrations(db: Pool): Promise<void> {
     // Le retrait de `user_id` suit, plus bas, avec les autres `DROP COLUMN`.
     `ALTER TABLE bg_site_visits ADD COLUMN authenticated TINYINT(1) NOT NULL DEFAULT 0
        AFTER visitor_key`,
+    // Sur quoi repose le rattachement Discord : le bouton (OAuth) ou le code en
+    // message privé. `NULL` par défaut, et **aucun remplissage** — les
+    // rattachements existants ne portent aucune trace de leur porte, et leur en
+    // attribuer une serait affirmer ce qu'on ignore.
+    `ALTER TABLE bg_users ADD COLUMN discord_link_method ENUM('DM_CODE', 'OAUTH') NULL
+       AFTER discord_verified_at`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

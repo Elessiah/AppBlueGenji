@@ -49,7 +49,13 @@ export async function POST(req: Request) {
       return fail("CODE_INVALID_OR_EXPIRED", 401);
     }
 
-    const userId = await createOrGetDiscordUser(discordId, body.pseudo, proof.handle);
+    // La porte est nommée : ce chemin-ci ne laisse **aucune** autorisation
+    // d'application chez Discord, à la différence du bouton. Et elle ne
+    // dégrade jamais un rattachement déjà noué par OAuth — c'est la fonction
+    // appelée qui tient cette règle (`lib/shared/account-connections.ts`).
+    const userId = await createOrGetDiscordUser(discordId, body.pseudo, proof.handle, {
+      method: "DM_CODE",
+    });
     await createSession(userId);
 
     return ok({ success: true });

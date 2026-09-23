@@ -18,6 +18,7 @@ export const PROFILE_INPUT_ERRORS = [
   "PSEUDO_EMPTY",
   "PSEUDO_TOO_LONG",
   "INVALID_DISCORD_PSEUDO",
+  "INVALID_OVERWATCH_BATTLETAG",
 ] as const;
 
 export type ProfileInputError = (typeof PROFILE_INPUT_ERRORS)[number];

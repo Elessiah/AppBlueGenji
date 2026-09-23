@@ -9,6 +9,8 @@ import {
   type AccountTrace,
 } from "@/lib/shared/account-deletion";
 import { isDuplicateEntryError, isReferencedRowError } from "@/lib/server/mysql-errors";
+import type { ConnectionMethod } from "@/lib/shared/account-connections";
+import { BATTLETAG_LOCKED, isBattletagLocked } from "@/lib/shared/battletag-lock";
 import {
   DISCORD_TAG_LOCKED,
   isDiscordTagLocked,
@@ -457,22 +459,48 @@ export async function adoptRemoteAvatar(userId: number, picture: string | undefi
  * handle-là. Les deux valeurs désignent donc le même compte Discord, et la plus
  * récente est la bonne — un pseudo Discord se change, et c'est précisément le cas
  * où le tag stocké est périmé.
+ *
+ * `door.method` dit **par quelle des deux portes Discord** on arrive : les deux
+ * chemins — l'aller-retour OAuth et le code reçu en message privé — passent par
+ * cette même fonction et y arrivent avec les mêmes arguments. Seul l'appelant
+ * sait lequel il est, d'où un paramètre obligatoire plutôt qu'un défaut
+ * (`lib/shared/account-connections.ts`).
  */
 export async function createOrGetDiscordUser(
   discordId: string,
-  pseudoInput?: string,
-  verifiedHandle?: string | null,
-  /**
-   * Photo de profil Discord, à **copier** chez nous comme celle de Google.
-   *
-   * Le code par message privé n'en rapporte aucune — le bot ne résout qu'un
-   * identifiant —, l'aller-retour OAuth si. Elle ne remplace jamais un avatar
-   * déjà téléversé (`shouldImportRemoteAvatar`).
-   */
-  avatarUrl?: string | null,
+  pseudoInput: string | undefined,
+  verifiedHandle: string | null | undefined,
+  door: {
+    /**
+     * Photo de profil Discord, à **copier** chez nous comme celle de Google.
+     *
+     * Le code par message privé n'en rapporte aucune — le bot ne résout qu'un
+     * identifiant —, l'aller-retour OAuth si. Elle ne remplace jamais un avatar
+     * déjà téléversé (`shouldImportRemoteAvatar`).
+     */
+    avatarUrl?: string | null;
+    /**
+     * **Par quelle porte** on arrive, et c'est l'appelant qui le sait.
+     *
+     * Le paramètre est obligatoire, et c'est délibéré : un défaut ferait
+     * silencieusement classer la porte ajoutée demain, et la valeur ne se
+     * devine pas d'ici — les deux chemins arrivent avec exactement les mêmes
+     * arguments, à l'avatar près, qu'un compte Discord peut aussi ne pas
+     * avoir.
+     */
+    method: ConnectionMethod;
+  },
 ): Promise<number> {
   const db = await getDatabase();
   const handle = normalizeDiscordHandle(verifiedHandle);
+  const avatarUrl = door.avatarUrl;
+  // `OAUTH` s'impose, `DM_CODE` ne se pose que faute de mieux : une autorisation
+  // d'application donnée à Discord existe chez lui tant que le joueur ne la
+  // retire pas, et une connexion par code, plus tard, ne la défait pas
+  // (`lib/shared/account-connections.ts`). Un rattachement antérieur à la
+  // colonne (`NULL`) se laisse donc nommer par la première porte qui repasse.
+  const methodSql =
+    door.method === "OAUTH" ? `'OAUTH'` : `COALESCE(discord_link_method, 'DM_CODE')`;
 
   const [existing] = await db.execute<(RowDataPacket & { id: number })[]>(
     `SELECT id FROM bg_users WHERE discord_id = ? LIMIT 1`,
@@ -481,29 +509,34 @@ export async function createOrGetDiscordUser(
 
   if (existing.length > 0) {
     const userId = Number(existing[0].id);
-    if (handle) {
-      // `is_deleted = 0` ferme ici la course que ferment déjà `writeVerifiedTag`,
-      // `updateOwnProfile` et les trois écritures de `linkOAuthIdentity` — et
-      // c'est celle qui coûte le plus cher des quatre. Une connexion Discord
-      // partie avant la suppression a résolu son compte sur le `discord_id`
-      // d'alors ; elle reprend **après** le commit de `deleteOwnAccount`, qui
-      // vient de vider tag et certification. Sans la condition, elle réécrivait
-      // le vrai pseudo Discord sur la ligne anonymisée **et le recertifiait** :
-      // `canViewDiscordTag` rouvre alors cette coordonnée à l'arbitrage de tout
-      // tournoi encore vivant où l'engagé figure — précisément ce que
-      // l'anonymisation venait d'effacer.
-      //
-      // La session, elle, n'est pas le sujet : `getCurrentUser` et la lecture
-      // par jeton portent déjà `is_deleted = 0`, donc celle que la connexion
-      // s'apprête à ouvrir ne résoudra personne.
-      await db.execute(
-        `UPDATE bg_users
-         SET discord_pseudo = ?,
-             discord_verified_at = NOW()
-         WHERE id = ? AND is_deleted = 0`,
-        [handle, userId],
-      );
-    }
+    // `is_deleted = 0` ferme ici la course que ferment déjà `writeVerifiedTag`,
+    // `updateOwnProfile` et les trois écritures de `linkOAuthIdentity` — et
+    // c'est celle qui coûte le plus cher des quatre. Une connexion Discord
+    // partie avant la suppression a résolu son compte sur le `discord_id`
+    // d'alors ; elle reprend **après** le commit de `deleteOwnAccount`, qui
+    // vient de vider tag et certification. Sans la condition, elle réécrivait
+    // le vrai pseudo Discord sur la ligne anonymisée **et le recertifiait** :
+    // `canViewDiscordTag` rouvre alors cette coordonnée à l'arbitrage de tout
+    // tournoi encore vivant où l'engagé figure — précisément ce que
+    // l'anonymisation venait d'effacer.
+    //
+    // La session, elle, n'est pas le sujet : `getCurrentUser` et la lecture
+    // par jeton portent déjà `is_deleted = 0`, donc celle que la connexion
+    // s'apprête à ouvrir ne résoudra personne.
+    //
+    // Le tag reste **conditionnel** — un identifiant numérique n'a rien à
+    // certifier —, la méthode non : elle décrit la porte qu'on vient de
+    // franchir, que Discord ait nommé un pseudo affichable ou pas. Les deux
+    // dans la même instruction, plutôt qu'une seconde écriture qui laisserait
+    // un `await` entre elles.
+    await db.execute(
+      `UPDATE bg_users
+       SET discord_pseudo = CASE WHEN ? THEN ? ELSE discord_pseudo END,
+           discord_verified_at = CASE WHEN ? THEN NOW() ELSE discord_verified_at END,
+           discord_link_method = ${methodSql}
+       WHERE id = ? AND is_deleted = 0`,
+      [Boolean(handle), handle, Boolean(handle), userId],
+    );
     await adoptRemoteAvatar(userId, avatarUrl ?? undefined);
     return userId;
   }
@@ -512,9 +545,10 @@ export async function createOrGetDiscordUser(
   const pseudo = await ensureUniquePseudo(rawPseudo);
 
   const [created] = await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_users (pseudo, discord_id, discord_pseudo, discord_verified_at)
-     VALUES (?, ?, ?, ${handle ? "NOW()" : "NULL"})`,
-    [pseudo, discordId, handle],
+    `INSERT INTO bg_users (pseudo, discord_id, discord_pseudo, discord_verified_at,
+                           discord_link_method)
+     VALUES (?, ?, ?, ${handle ? "NOW()" : "NULL"}, ?)`,
+    [pseudo, discordId, handle, door.method],
   );
 
   const userId = Number(created.insertId);
@@ -1023,6 +1057,42 @@ export async function updateOwnProfile(
     }
   }
 
+  // **Un compte Blizzard rattaché possède son BattleTag**
+  // (`lib/shared/battletag-lock.ts`), et contrairement au tag Discord il ne
+  // peut pas non plus l'**effacer** : ce qui publie ce champ est un réglage à
+  // part (`visible_overwatch`), que le joueur garde en main, et un effacement
+  // serait de toute façon défait à la prochaine connexion Battle.net.
+  //
+  // Le type est contrôlé ici, comme pour le tag Discord et pour la même raison :
+  // le corps du `PATCH` n'est qu'*annoté*, jamais validé, et il faut lire la
+  // valeur pour la comparer.
+  const touchesBattletag = patch.overwatchBattletag !== undefined;
+  if (
+    touchesBattletag &&
+    patch.overwatchBattletag !== null &&
+    typeof patch.overwatchBattletag !== "string"
+  ) {
+    throw new Error("INVALID_OVERWATCH_BATTLETAG");
+  }
+  const nextBattletag = (patch.overwatchBattletag ?? "").trim() || null;
+
+  if (touchesBattletag) {
+    const [lockRows] = await db.execute<(RowDataPacket & {
+      blizzard_sub: string | null;
+      overwatch_battletag: string | null;
+    })[]>(`SELECT blizzard_sub, overwatch_battletag FROM bg_users WHERE id = ? LIMIT 1`, [userId]);
+    const lockRow = lockRows[0];
+    if (lockRow && isBattletagLocked({ linked: Boolean(lockRow.blizzard_sub) })) {
+      // Comparaison **exacte**, casse comprise : un BattleTag la conserve, et
+      // c'est Blizzard qui la fixe. Le client ne soumet ce champ que s'il a
+      // changé, si bien qu'une différence de casse ne peut plus venir que d'un
+      // appel direct — qui recevrait sinon un **200 n'écrivant rien**, le
+      // `CASE` de l'`UPDATE` gardant la valeur stockée dès qu'un `blizzard_sub`
+      // est posé.
+      if (lockRow.overwatch_battletag !== nextBattletag) throw new Error(BATTLETAG_LOCKED);
+    }
+  }
+
   // **La certification se perd à chaque changement de tag.** Elle ne dit pas
   // « ce compte a un Discord » (c'est `discord_id`) mais « le tag stocké a été
   // prouvé » : un tag réécrit n'a rien prouvé, et le laisser certifié exposerait
@@ -1052,6 +1122,16 @@ export async function updateOwnProfile(
   // `discord_verified_at`, qui n'a alors aucune raison de tomber puisque rien ne
   // change.
   //
+  // `overwatch_battletag` est **gardé tel quel** dès qu'un `blizzard_sub` est
+  // posé, pour la même raison que `discord_pseudo` l'est sous un `discord_id` :
+  // le refus lisible ci-dessus nomme la règle, cette branche la tient — une
+  // lecture puis une écriture laissent un `await` entre elles, et le
+  // rattachement Battle.net peut tomber dans cet intervalle. Sans la clause
+  // `? IS NOT NULL` que porte la branche Discord, et c'est la règle et non un
+  // oubli : effacer le BattleTag n'est pas ici un geste d'annulation — il en
+  // existe un, la case « BattleTag OW » — et la prochaine connexion Blizzard le
+  // réécrirait.
+  //
   // `is_deleted = 0` ferme une **troisième** course, du même genre : une
   // sauvegarde de profil déjà partie se bloque sur le verrou de
   // `deleteOwnAccount` et reprend **après** son commit. Sans la condition, elle
@@ -1064,7 +1144,11 @@ export async function updateOwnProfile(
     [result] = await db.execute<ResultSetHeader>(
       `UPDATE bg_users
        SET pseudo = COALESCE(?, pseudo),
-           overwatch_battletag = CASE WHEN ? THEN ? ELSE overwatch_battletag END,
+           overwatch_battletag = CASE
+             WHEN NOT ? THEN overwatch_battletag
+             WHEN blizzard_sub IS NOT NULL THEN overwatch_battletag
+             ELSE ?
+           END,
            marvel_rivals_tag = CASE WHEN ? THEN ? ELSE marvel_rivals_tag END,
            discord_verified_at = CASE
              WHEN NOT ? THEN discord_verified_at
@@ -1086,8 +1170,8 @@ export async function updateOwnProfile(
        WHERE id = ? AND is_deleted = 0`,
       [
         nextPseudo,
-        patch.overwatchBattletag !== undefined,
-        patch.overwatchBattletag ?? null,
+        touchesBattletag,
+        nextBattletag,
         patch.marvelRivalsTag !== undefined,
         patch.marvelRivalsTag ?? null,
         touchesDiscordTag,
@@ -1386,6 +1470,9 @@ async function anonymizeAccount(connection: PoolConnection, userId: number): Pro
          discord_verified_at = NULL,
          is_adult = NULL,
          discord_id = NULL,
+         -- La méthode décrit un rattachement, pas un compte : les trois portes
+         -- partant, il n'en reste aucun à décrire.
+         discord_link_method = NULL,
          google_sub = NULL,
          blizzard_sub = NULL,
          visible_avatar = 0,
@@ -1615,6 +1702,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       discord_pseudo: string | null;
       discord_verified_at: Date | null;
       discord_id: string | null;
+      discord_link_method: ConnectionMethod | null;
       google_sub: string | null;
       blizzard_sub: string | null;
       is_adult: 0 | 1 | null;
@@ -1628,7 +1716,8 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     })[]
   >(
     `SELECT id, pseudo, avatar_url, overwatch_battletag, marvel_rivals_tag,
-            discord_pseudo, discord_verified_at, discord_id, google_sub, blizzard_sub, is_adult, is_admin,
+            discord_pseudo, discord_verified_at, discord_id, discord_link_method,
+            google_sub, blizzard_sub, is_adult, is_admin,
             visible_avatar, visible_overwatch, visible_marvel, visible_major,
             open_to_recruitment, created_at
      FROM bg_users
@@ -1656,6 +1745,11 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       // certification en fait partie, c'est elle qui justifie l'exposition du
       // tag à l'organisation.
       discordVerifiedAt: toIso(row.discord_verified_at),
+      // Et ce que le site sait de la **porte** par laquelle ce Discord est
+      // arrivé : c'est une donnée détenue, elle est donc rendue — `null` sur
+      // les rattachements antérieurs à la colonne, qui ne se classent pas après
+      // coup.
+      discordLinkMethod: row.discord_link_method,
       googleSub: row.google_sub,
       blizzardSub: row.blizzard_sub,
       isAdult: row.is_adult === null ? null : Boolean(row.is_adult),

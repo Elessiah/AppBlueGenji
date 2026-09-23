@@ -36,6 +36,9 @@ const INPUT_ERRORS: Record<ProfileInputError, string> = {
   // Même trou pour le tag : écarté par le service plutôt que de faire lever
   // `.trim()`.
   INVALID_DISCORD_PSEUDO: "Le tag Discord doit être du texte. Ressaisis-le.",
+  // Et pour le BattleTag, qu'il faut désormais lire pour le comparer à celui
+  // que Blizzard a posé (`lib/shared/battletag-lock.ts`).
+  INVALID_OVERWATCH_BATTLETAG: "Le BattleTag doit être du texte. Ressaisis-le.",
 };
 
 /** Les refus d'une **écriture** : saisie, état du compte, verrou du tag. */
@@ -48,6 +51,12 @@ const WRITE_ERRORS: Record<string, string> = {
   // existent à l'écran.
   DISCORD_TAG_LOCKED:
     "Ton compte Discord est rattaché : ce tag vient de lui. Renomme-toi sur Discord puis reconnecte-toi pour en changer, ou retire-le.",
+
+  // Le BattleTag suit la même règle avec **un geste de moins** : Blizzard le
+  // réécrit à chaque connexion, donc l'effacer ne durerait pas. Ce qui le
+  // publie est la case « BattleTag OW », et c'est elle que la phrase nomme.
+  BATTLETAG_LOCKED:
+    "Ton compte Blizzard est rattaché : ce BattleTag vient de lui. Retire Blizzard depuis « Applications connectées » pour en changer, ou décoche « BattleTag OW » pour cesser de le publier.",
 
   // La sauvegarde est partie avant la suppression du compte et a attendu son
   // verrou : la phrase dit que **rien** n'a été écrit.
