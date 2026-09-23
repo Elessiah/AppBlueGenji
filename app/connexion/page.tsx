@@ -142,8 +142,9 @@ export default function LoginPage() {
             {/*
               Le séparateur **nomme** ce qui suit. « OU » seul laissait croire à
               une variante du bouton Discord juste au-dessus, alors que c'est un
-              autre chemin, réservé aux membres du serveur : le bot doit pouvoir
-              écrire en message privé, donc partager un serveur avec le joueur.
+              autre chemin, qui suppose un serveur commun : un bot ne peut écrire en
+              message privé qu'à quelqu'un avec qui il partage un serveur — c'est
+              Discord qui refuse l'envoi sinon, que la saisie soit un tag ou un ID.
             */}
             <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 16px", color: "var(--ink-dim)" }}>
               <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
@@ -165,16 +166,16 @@ export default function LoginPage() {
                   required
                 />
                 <span className="mono" style={{ fontSize: 10, color: "var(--ink-dim)", letterSpacing: "0.08em", marginTop: 4, lineHeight: 1.5 }}>
-                  Réservé aux membres de notre serveur : le bot doit pouvoir t&apos;écrire en
-                  privé. Le tag fonctionne s&apos;il partage un serveur avec toi, sinon utilise ton
-                  ID Discord,{" "}
+                  Le bot doit partager un serveur avec toi pour t&apos;écrire en privé, que tu
+                  saisisses ton tag ou ton ID : l&apos;ID évite seulement la recherche de ton tag.
+                  Pas encore sur un de ses serveurs ?{" "}
                   <Link
                     href={DISCORD_INVITE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ color: "var(--blue-300)", textDecoration: "underline" }}
                   >
-                    rejoins-nous
+                    Rejoins-nous
                   </Link>{" "}
                   — ou passe simplement par le bouton Discord ci-dessus, qui marche sans serveur
                   commun.
@@ -224,8 +225,8 @@ export default function LoginPage() {
                   quelque chose à annuler.
 
                   Elle ne s'affiche **que si la saisie est un tag** : un
-                  identifiant numérique (le repli quand le bot ne partage aucun
-                  serveur) ne certifie rien, et promettre une certification qui
+                  identifiant numérique (qui évite la recherche du tag par le
+                  bot) ne certifie rien, et promettre une certification qui
                   n'aura pas lieu est pire que se taire. Le prédicat est celui
                   du serveur, pas une seconde lecture du même motif.
                 */}
