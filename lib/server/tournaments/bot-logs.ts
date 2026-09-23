@@ -721,6 +721,7 @@ type MatchLogRow = RowDataPacket & {
   team1_score: number | null;
   team2_score: number | null;
   forfeit_team_id: number | null;
+  double_forfeit: number | null;
   is_bye: number | null;
   team1_name: string | null;
   team2_name: string | null;
@@ -738,6 +739,7 @@ async function loadMatch(matchId: number): Promise<MatchLogRow | null> {
         m.team1_score,
         m.team2_score,
         m.forfeit_team_id,
+        m.double_forfeit,
         m.is_bye,
         t1.name AS team1_name,
         t2.name AS team2_name,
@@ -829,7 +831,11 @@ async function resolveOne(entry: PendingBotLog): Promise<string | null> {
       // Un forfait arbitré ne porte aucun score : c'est le seul cas où leur
       // absence décrit un match bel et bien tranché.
       const forfeit = match.forfeit_team_id !== null;
-      if (!forfeit && (match.team1_score === null || match.team2_score === null)) return null;
+      // Le double forfait non plus : il se clôt sans le moindre score.
+      const doubleForfeit = Number(match.double_forfeit ?? 0) === 1;
+      if (!forfeit && !doubleForfeit && (match.team1_score === null || match.team2_score === null)) {
+        return null;
+      }
       return formatMatchResultLog({
         tournament: { id: Number(match.tournament_id), name: match.tournament_name },
         bracket: String(match.bracket),
@@ -839,6 +845,7 @@ async function resolveOne(entry: PendingBotLog): Promise<string | null> {
         team1Score: match.team1_score === null ? null : Number(match.team1_score),
         team2Score: match.team2_score === null ? null : Number(match.team2_score),
         forfeit,
+        doubleForfeit,
       });
     }
 

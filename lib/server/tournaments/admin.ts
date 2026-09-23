@@ -11,6 +11,7 @@ import { MatchRow } from "./_internal";
 import { forfeitMatchScores, loadTournamentMatchFormat } from "./repository";
 import { finalizeMatch } from "./scoring";
 import { tryAutoResolveByes } from "./byes";
+import { detachDownstreamOutcome } from "./bracket-cascade";
 
 interface DependentMatchRow extends RowDataPacket {
   id: number;
@@ -21,12 +22,13 @@ interface DependentMatchRow extends RowDataPacket {
   team2_score: number | null;
   winner_team_id: number | null;
   forfeit_team_id: number | null;
+  double_forfeit: number | null;
   team1_reported_at: string | null;
   team2_reported_at: string | null;
 }
 
 const DEPENDENT_COLUMNS = `id, round_number, team1_id, team2_id, team1_score, team2_score,
-   winner_team_id, forfeit_team_id, status, team1_reported_at, team2_reported_at`;
+   winner_team_id, forfeit_team_id, double_forfeit, status, team1_reported_at, team2_reported_at`;
 
 /** Mêmes colonnes, qualifiées par l'alias `m` (requêtes avec jointure). */
 const DEPENDENT_COLUMNS_M = DEPENDENT_COLUMNS.split(",")
@@ -43,6 +45,7 @@ function toMatchScoreState(row: DependentMatchRow): MatchScoreState {
     team2Score: row.team2_score === null ? null : Number(row.team2_score),
     winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
     forfeitTeamId: row.forfeit_team_id === null ? null : Number(row.forfeit_team_id),
+    doubleForfeit: row.status === "COMPLETED" && Number(row.double_forfeit ?? 0) === 1,
     decided: row.status === "COMPLETED",
     hasPendingReport: row.team1_reported_at !== null || row.team2_reported_at !== null,
     nextWinnerMatchId: null,
@@ -165,18 +168,57 @@ export async function checkDownstreamMatchesHaveNoScores(
     );
     dependents = rows;
   } else {
-    const targets = [current.next_winner_match_id, current.next_loser_match_id]
-      .filter((id): id is number => id !== null && id !== undefined)
-      .map(Number);
-    if (targets.length === 0) return;
+    // Élimination : les cibles de bracket, **à travers** les rencontres que le
+    // moteur a closes d'office. Un double forfait vide un créneau, l'exemption
+    // qui en naît fait monter l'adversaire d'un tour, et corriger le résultat
+    // amont défait toute cette chaîne (`./bracket-cascade.ts`) : c'est la
+    // première rencontre réellement disputée au bout qui doit verrouiller, pas
+    // la cible directe, qui n'a jamais été jouée. Le parcours vit dans le module
+    // partagé, pour que l'interface cache le bouton exactement là où le serveur
+    // refuse.
+    if (current.next_winner_match_id === null && current.next_loser_match_id === null) return;
 
-    const [rows] = await connection.execute<DependentMatchRow[]>(
-      `SELECT ${DEPENDENT_COLUMNS}
+    const [rows] = await connection.execute<
+      (DependentMatchRow & {
+        next_winner_match_id: number | null;
+        next_loser_match_id: number | null;
+      })[]
+    >(
+      `SELECT ${DEPENDENT_COLUMNS}, next_winner_match_id, next_loser_match_id
        FROM bg_matches
-       WHERE id IN (${targets.map(() => "?").join(", ")})`,
-      targets,
+       WHERE tournament_id = ? AND phase_id = ?`,
+      [Number(current.tournament_id), Number(current.phase_id ?? 0)],
     );
-    dependents = rows;
+
+    const states = rows.map((row) => ({
+      ...toMatchScoreState(row),
+      nextWinnerMatchId:
+        row.next_winner_match_id === null ? null : Number(row.next_winner_match_id),
+      nextLoserMatchId: row.next_loser_match_id === null ? null : Number(row.next_loser_match_id),
+    }));
+    // Le point de départ du parcours se lit sur la ligne déjà chargée : seuls
+    // ses liens d'aval comptent, et ils y sont.
+    const self: MatchScoreState = {
+      id: Number(match.id),
+      roundNumber: Number(current.round_number),
+      team1Id: null,
+      team2Id: null,
+      team1Score: null,
+      team2Score: null,
+      winnerTeamId: null,
+      forfeitTeamId: null,
+      decided: true,
+      hasPendingReport: false,
+      nextWinnerMatchId:
+        current.next_winner_match_id === null ? null : Number(current.next_winner_match_id),
+      nextLoserMatchId:
+        current.next_loser_match_id === null ? null : Number(current.next_loser_match_id),
+    };
+
+    if (dependentMatches(self, states, current.format).some(hasScoreInput)) {
+      throw new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES");
+    }
+    return;
   }
 
   if (dependents.map(toMatchScoreState).some(hasScoreInput)) {
@@ -351,12 +393,23 @@ export async function adminSaveMatchScores(
   }
 }
 
+/**
+ * Tranche une rencontre par l'arbitrage : un score, un forfait nominatif
+ * (`forfeitTeamId`) ou un **double forfait** (`doubleForfeit`), exclusifs.
+ *
+ * Le double forfait (`lib/shared/double-forfeit.ts`) clôt la rencontre sans
+ * vainqueur, sans perdant nommé et sans score : chaque moteur y lit une défaite
+ * pour les deux. Dans un tableau à élimination, personne ne monte — le créneau
+ * d'aval reste vide et devient une exemption —, et corriger un résultat défait
+ * d'abord ce que l'ancien avait fait descendre (`./bracket-cascade.ts`).
+ */
 export async function adminResolveMatch(
   connection: PoolConnection,
   matchId: number,
   team1Score?: number,
   team2Score?: number,
   forfeitTeamId?: number,
+  doubleForfeit = false,
 ): Promise<void> {
   const [matches] = await connection.execute<MatchRow[]>(
     `SELECT
@@ -389,7 +442,22 @@ export async function adminResolveMatch(
   let resultTeam1Score: number | null;
   let resultTeam2Score: number | null;
 
-  if (forfeitTeamId !== undefined) {
+  if (doubleForfeit) {
+    // Un seul geste à la fois : un double forfait n'a ni score ni équipe à
+    // désigner, et la route refuse déjà le mélange — la garde vaut pour tout
+    // appelant du service.
+    if (forfeitTeamId !== undefined || team1Score !== undefined || team2Score !== undefined) {
+      throw new Error("INVALID_REQUEST");
+    }
+    winnerTeamId = null;
+    loserTeamId = null;
+    // Pas de score, et surtout pas 0-0 : un 0-0 clos sans vainqueur est un
+    // **match nul** partout où l'on relit les colonnes (classement du site,
+    // fiches, capital d'endurance). Sans score, l'assiette du classement
+    // (`playedMatchSql`) l'écarte d'elle-même — aucune rencontre n'a eu lieu.
+    resultTeam1Score = null;
+    resultTeam2Score = null;
+  } else if (forfeitTeamId !== undefined) {
     assertForfeitBelongsToMatch(match, forfeitTeamId);
 
     winnerTeamId =
@@ -428,6 +496,12 @@ export async function adminResolveMatch(
     throw new Error("INVALID_REQUEST");
   }
 
+  // Effets en cascade : ce que l'**ancien** résultat avait fait descendre dans
+  // le tableau (une équipe dans un créneau, ou une exemption close d'office
+  // faute d'équipe) est défait avant que le nouveau ne soit propagé. Sans effet
+  // hors élimination — un match sans lien d'aval n'a rien propagé.
+  await detachDownstreamOutcome(connection, match, { winnerTeamId, loserTeamId });
+
   await finalizeMatch(connection, tournamentId, match, {
     team1Score: resultTeam1Score,
     team2Score: resultTeam2Score,
@@ -435,17 +509,10 @@ export async function adminResolveMatch(
     loserTeamId,
   });
 
-  if (forfeitTeamId !== undefined) {
-    await connection.execute(
-      `UPDATE bg_matches SET forfeit_team_id = ? WHERE id = ?`,
-      [forfeitTeamId, matchId],
-    );
-  } else {
-    await connection.execute(
-      `UPDATE bg_matches SET forfeit_team_id = NULL WHERE id = ?`,
-      [matchId],
-    );
-  }
+  await connection.execute(
+    `UPDATE bg_matches SET forfeit_team_id = ?, double_forfeit = ? WHERE id = ?`,
+    [forfeitTeamId ?? null, doubleForfeit ? 1 : 0, matchId],
+  );
 
   await tryAutoResolveByes(connection, tournamentId);
 }

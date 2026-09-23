@@ -7,6 +7,7 @@ import {
   finishTournament,
 } from "./repository";
 import { matchWinnerSide, type MatchFormat } from "@/lib/shared/match-format";
+import { appendSequentialRanks, podiumRanks, type PodiumMatch } from "@/lib/shared/double-forfeit";
 
 export async function isEliminationPhaseComplete(
   connection: PoolConnection,
@@ -27,12 +28,52 @@ export async function isEliminationPhaseComplete(
      FROM bg_matches
      WHERE tournament_id = ? AND phase_id = ?
        AND winner_team_id IS NULL
+       AND NOT (status = 'COMPLETED' AND double_forfeit = 1)
        AND (team1_id IS NOT NULL OR team2_id IS NOT NULL)`,
     [tournamentId, phaseId],
   );
 
+  // Un double forfait est tranché sans vainqueur : sans l'exception ci-dessus,
+  // la rencontre resterait « à jouer » pour toujours, et le plateau avec elle —
+  // c'est la fin des matchs qui clôt un tableau.
   return Number(unfinished[0]?.c ?? 0) === 0;
 }
+
+/** Un rang de phase à élimination. */
+export type EliminationRank = {
+  teamId: number;
+  /** Rang final ; deux équipes peuvent le partager (double forfait au podium). */
+  rank: number;
+  /**
+   * L'équipe a été sortie par un **double forfait** : elle a perdu sans que
+   * personne ne gagne. Une phase intermédiaire ne la qualifie jamais, même si
+   * son rang tombe dans la cible — elle est éliminée comme n'importe quelle
+   * perdante, et la place laissée vide ne se repêche pas.
+   */
+  eliminatedByDoubleForfeit: boolean;
+};
+
+type PodiumRow = RowDataPacket & {
+  team1_id: number | null;
+  team2_id: number | null;
+  winner_team_id: number | null;
+  loser_team_id: number | null;
+  status: string;
+  double_forfeit: number | null;
+};
+
+function toPodiumMatch(row: PodiumRow | undefined): PodiumMatch | null {
+  if (!row) return null;
+  return {
+    team1Id: row.team1_id === null ? null : Number(row.team1_id),
+    team2Id: row.team2_id === null ? null : Number(row.team2_id),
+    winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
+    loserTeamId: row.loser_team_id === null ? null : Number(row.loser_team_id),
+    doubleForfeit: row.status === "COMPLETED" && Number(row.double_forfeit ?? 0) === 1,
+  };
+}
+
+const PODIUM_COLUMNS = `team1_id, team2_id, winner_team_id, loser_team_id, status, double_forfeit`;
 
 export async function rankEliminationPhase(
   connection: PoolConnection,
@@ -40,97 +81,104 @@ export async function rankEliminationPhase(
   phaseId: number,
   format: "SINGLE" | "DOUBLE",
   hasThirdPlaceMatch: boolean,
-): Promise<number[]> {
-  const rankedTeams: number[] = [];
+): Promise<EliminationRank[]> {
+  const podiumMatches: (PodiumMatch | null)[] = [];
 
   if (format === "DOUBLE") {
-    const [grandFinalRows] = await connection.execute<
-      (RowDataPacket & { winner_team_id: number | null; loser_team_id: number | null })[]
-    >(
-      `SELECT winner_team_id, loser_team_id
+    const [grandFinalRows] = await connection.execute<PodiumRow[]>(
+      `SELECT ${PODIUM_COLUMNS}
        FROM bg_matches
        WHERE tournament_id = ? AND phase_id = ? AND bracket = 'GRAND' AND round_number = 1`,
       [tournamentId, phaseId],
     );
-    const grandFinal = grandFinalRows[0];
-    if (grandFinal?.winner_team_id) {
-      rankedTeams.push(Number(grandFinal.winner_team_id));
-    }
-    if (grandFinal?.loser_team_id) {
-      rankedTeams.push(Number(grandFinal.loser_team_id));
-    }
+    podiumMatches.push(toPodiumMatch(grandFinalRows[0]));
   } else {
-    const [upperFinalRows] = await connection.execute<
-      (RowDataPacket & { winner_team_id: number | null; loser_team_id: number | null })[]
-    >(
-      `SELECT winner_team_id, loser_team_id
+    const [upperFinalRows] = await connection.execute<PodiumRow[]>(
+      `SELECT ${PODIUM_COLUMNS}
        FROM bg_matches
        WHERE tournament_id = ? AND phase_id = ? AND bracket = 'UPPER'
        ORDER BY round_number DESC
        LIMIT 1`,
       [tournamentId, phaseId],
     );
-    const upperFinal = upperFinalRows[0];
-    if (upperFinal?.winner_team_id) {
-      rankedTeams.push(Number(upperFinal.winner_team_id));
-    }
-    if (upperFinal?.loser_team_id) {
-      rankedTeams.push(Number(upperFinal.loser_team_id));
-    }
+    podiumMatches.push(toPodiumMatch(upperFinalRows[0]));
 
     if (hasThirdPlaceMatch) {
-      const [thirdPlaceRows] = await connection.execute<
-        (RowDataPacket & { winner_team_id: number | null; loser_team_id: number | null })[]
-      >(
-        `SELECT winner_team_id, loser_team_id
+      const [thirdPlaceRows] = await connection.execute<PodiumRow[]>(
+        `SELECT ${PODIUM_COLUMNS}
          FROM bg_matches
          WHERE tournament_id = ? AND phase_id = ? AND bracket = 'THIRD_PLACE'
          LIMIT 1`,
         [tournamentId, phaseId],
       );
-      const thirdPlace = thirdPlaceRows[0];
-      if (thirdPlace?.winner_team_id) {
-        rankedTeams.push(Number(thirdPlace.winner_team_id));
-      }
-      if (thirdPlace?.loser_team_id) {
-        rankedTeams.push(Number(thirdPlace.loser_team_id));
-      }
+      podiumMatches.push(toPodiumMatch(thirdPlaceRows[0]));
     }
   }
 
-  if (rankedTeams.length > 0) {
-    const placeholders = rankedTeams.map(() => "?").join(",");
-    const [rankingRows] = await connection.execute<
-      (RowDataPacket & {
-        team_id: number;
-        wins: number;
-        losses: number;
-        last_progress_at: Date | null;
-      })[]
-    >(
-      `SELECT
-        r.team_id,
-        COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0) AS wins,
-        COALESCE(SUM(CASE WHEN m.loser_team_id = r.team_id THEN 1 ELSE 0 END), 0) AS losses,
-        MAX(CASE
-          WHEN m.winner_team_id = r.team_id OR m.loser_team_id = r.team_id
-            THEN m.updated_at
-          ELSE NULL
-        END) AS last_progress_at
-       FROM bg_tournament_registrations r
-       LEFT JOIN bg_matches m ON m.tournament_id = r.tournament_id AND m.phase_id = ?
-       WHERE r.tournament_id = ? AND r.team_id NOT IN (${placeholders})
-       GROUP BY r.team_id
-       ORDER BY wins DESC, losses ASC, last_progress_at DESC`,
-      [phaseId, tournamentId, ...rankedTeams],
-    );
+  // Une finale close sur un double forfait ne fait pas de championne : ses deux
+  // engagées partagent la 2ᵉ place (`podiumRanks`, règle partagée avec l'arbre
+  // final d'une BlueGenji Survie).
+  const podium = podiumRanks(podiumMatches);
+  const placed = podium.entries.map((entry) => entry.teamId);
 
-    for (const row of rankingRows) {
-      rankedTeams.push(Number(row.team_id));
-    }
-  }
+  // Le reste du tableau, par victoires puis défaites. Un double forfait est une
+  // défaite pour **chacune** de ses deux engagées — aucune ne figure dans
+  // `loser_team_id`, faute d'une gagnante à lui opposer.
+  const involved = `(m.team1_id = r.team_id OR m.team2_id = r.team_id)`;
+  const doubleForfeited = `(m.status = 'COMPLETED' AND m.double_forfeit = 1 AND ${involved})`;
+  const exclusion =
+    placed.length > 0 ? `AND r.team_id NOT IN (${placed.map(() => "?").join(",")})` : "";
+  const [rankingRows] = await connection.execute<
+    (RowDataPacket & {
+      team_id: number;
+      wins: number;
+      losses: number;
+      last_progress_at: Date | null;
+    })[]
+  >(
+    `SELECT
+      r.team_id,
+      COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0) AS wins,
+      COALESCE(SUM(CASE
+        WHEN m.loser_team_id = r.team_id OR ${doubleForfeited} THEN 1 ELSE 0
+      END), 0) AS losses,
+      MAX(CASE
+        WHEN m.winner_team_id = r.team_id OR m.loser_team_id = r.team_id OR ${doubleForfeited}
+          THEN m.updated_at
+        ELSE NULL
+      END) AS last_progress_at
+     FROM bg_tournament_registrations r
+     LEFT JOIN bg_matches m ON m.tournament_id = r.tournament_id AND m.phase_id = ?
+     WHERE r.tournament_id = ? ${exclusion}
+     GROUP BY r.team_id
+     ORDER BY wins DESC, losses ASC, last_progress_at DESC`,
+    [phaseId, tournamentId, ...placed],
+  );
 
-  return rankedTeams;
+  // Le reste est rangé même sans podium — une finale fantôme (deux doubles
+  // forfaits en demi-finale) ne désigne personne, et le plateau se range alors
+  // tout entier sur son bilan. La garde d'avant (aucun podium → aucun rang)
+  // n'existait que pour éviter une liste `NOT IN` vide.
+  const rest = rankingRows.map((row) => Number(row.team_id));
+
+  // Qui a été sorti par un double forfait : les deux finalistes d'une finale
+  // non jouée comme les deux engagées d'un tour intermédiaire.
+  const [forfeitedRows] = await connection.execute<(RowDataPacket & { team_id: number })[]>(
+    `SELECT team1_id AS team_id FROM bg_matches
+     WHERE tournament_id = ? AND phase_id = ? AND status = 'COMPLETED' AND double_forfeit = 1
+       AND team1_id IS NOT NULL
+     UNION
+     SELECT team2_id AS team_id FROM bg_matches
+     WHERE tournament_id = ? AND phase_id = ? AND status = 'COMPLETED' AND double_forfeit = 1
+       AND team2_id IS NOT NULL`,
+    [tournamentId, phaseId, tournamentId, phaseId],
+  );
+  const forfeited = new Set(forfeitedRows.map((row) => Number(row.team_id)));
+
+  return appendSequentialRanks(podium, rest).map((entry) => ({
+    ...entry,
+    eliminatedByDoubleForfeit: forfeited.has(entry.teamId),
+  }));
 }
 
 /**
@@ -250,15 +298,13 @@ export async function finalizeTournamentIfDone(
     Boolean(tournamentMeta?.has_third_place_match),
   );
 
-  let rank = 1;
-  for (const teamId of rankedTeams) {
+  for (const { teamId, rank } of rankedTeams) {
     await connection.execute(
       `UPDATE bg_tournament_registrations
        SET final_rank = ?
        WHERE tournament_id = ? AND team_id = ?`,
       [rank, tournamentId, teamId],
     );
-    rank += 1;
   }
 }
 

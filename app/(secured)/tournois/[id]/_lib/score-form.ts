@@ -9,6 +9,12 @@ export interface ScoreFormState {
   score1: string;
   score2: string;
   forfeitTeamId?: number;
+  /**
+   * Les deux engagées déclarent forfait (`lib/shared/double-forfeit.ts`).
+   * Exclusif de `forfeitTeamId` et des scores : le hook garde les deux
+   * sélections mutuellement exclusives.
+   */
+  doubleForfeit?: boolean;
 }
 
 /**
@@ -30,6 +36,7 @@ export function scoreFormStateFor(match: BracketMatch | null): ScoreFormState {
     score1: match?.team1Score !== null && match?.team1Score !== undefined ? String(match.team1Score) : "",
     score2: match?.team2Score !== null && match?.team2Score !== undefined ? String(match.team2Score) : "",
     forfeitTeamId: match?.forfeitTeamId ?? undefined,
+    doubleForfeit: match?.doubleForfeit === true ? true : undefined,
   };
 }
 
@@ -64,6 +71,7 @@ export function storedResultSignature(match: BracketMatch | null): string {
     match.team1Score ?? "∅",
     match.team2Score ?? "∅",
     match.forfeitTeamId ?? "∅",
+    match.doubleForfeit ? "FF2" : "∅",
     match.winnerTeamId ?? "∅",
     match.status,
   ].join("|");
@@ -75,7 +83,8 @@ export function isUntouched(state: ScoreFormState, match: BracketMatch | null): 
   return (
     state.score1 === pristine.score1 &&
     state.score2 === pristine.score2 &&
-    state.forfeitTeamId === pristine.forfeitTeamId
+    state.forfeitTeamId === pristine.forfeitTeamId &&
+    (state.doubleForfeit === true) === (pristine.doubleForfeit === true)
   );
 }
 
@@ -89,7 +98,8 @@ export type ScoreFormBlocker =
   | "EXCEEDS_FORMAT"
   | "BELOW_FORMAT"
   | "DRAW"
-  | "ALREADY_DECIDED";
+  | "ALREADY_DECIDED"
+  | "DOUBLE_FORFEIT";
 
 export interface ScoreFormDecision {
   /** Scores prêts à envoyer, ou `null` quand la saisie n'est pas exploitable. */
@@ -125,6 +135,19 @@ export function decideScoreForm(
   options: { format: MatchFormat | null; decided: boolean },
 ): ScoreFormDecision {
   const { format, decided } = options;
+
+  // Le double forfait tranche la rencontre à lui seul — sans score ni
+  // vainqueur —, il n'y a donc rien à « enregistrer en cours de match » : seule
+  // la validation l'écrit, et elle seule propage dans le plateau.
+  if (state.doubleForfeit === true) {
+    return {
+      scores: null,
+      canSave: false,
+      canResolve: true,
+      saveBlocker: "DOUBLE_FORFEIT",
+      resolveBlocker: null,
+    };
+  }
 
   // Le forfait remplace le score : il désigne le vainqueur à lui seul, sans
   // manche jouée, et n'a donc rien à respecter du format.
@@ -205,6 +228,8 @@ export function scoreBlockerMessage(
       return matchScoreViolationMessage(format, "SCORE_BELOW_MATCH_FORMAT");
     case "DRAW":
       return "Les scores ne peuvent pas être égaux : il faut un vainqueur.";
+    case "DOUBLE_FORFEIT":
+      return "Un double forfait tranche le match : il s'écrit avec « Valider le résultat ».";
     case "ALREADY_DECIDED":
       return "Ce match est déjà tranché. Corrige-le avec « Valider le résultat » pour que le vainqueur et la suite du plateau suivent.";
   }

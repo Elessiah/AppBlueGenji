@@ -229,6 +229,12 @@ export type SurvivalMatchOutcome = {
   loserTeamId: number | null;
   /** Victoire d'office : compte comme une victoire, mais interdit un second bye. */
   isBye: boolean;
+  /**
+   * Double forfait : les deux engagées, qui perdent **toutes les deux** la
+   * rencontre (`lib/shared/double-forfeit.ts`). `winnerTeamId` et
+   * `loserTeamId` sont alors vides, faute d'une gagnante à opposer.
+   */
+  doubleForfeitTeamIds?: readonly number[] | null;
 };
 
 /** Abandon déclaré : événement externe, non déductible des matchs. */
@@ -311,6 +317,10 @@ export function replaySurvival(input: ReplaySurvivalInput): SurvivalStanding[] {
         const loser = state.get(match.loserTeamId);
         if (loser) loser.losses += 1;
       }
+      for (const teamId of match.doubleForfeitTeamIds ?? []) {
+        const loser = state.get(teamId);
+        if (loser) loser.losses += 1;
+      }
     }
 
     // 2. Abandons déclarés pendant ce round (avant la coupe, comme en production).
@@ -327,6 +337,14 @@ export function replaySurvival(input: ReplaySurvivalInput): SurvivalStanding[] {
       if (shouldEliminateBarrageLoser(activeStandings().length, targetTeams)) {
         const loserId = roundMatches.find((m) => m.loserTeamId !== null)?.loserTeamId ?? null;
         if (loserId !== null) eliminate(loserId, round, "ELIMINATED");
+        // Un barrage clos sur un double forfait a deux perdantes : les deux
+        // sortent. L'effectif reste alors impair, et la parité se rattrape comme
+        // après un abandon — par la victoire d'office des manches suivantes.
+        for (const match of roundMatches) {
+          for (const teamId of match.doubleForfeitTeamIds ?? []) {
+            eliminate(teamId, round, "ELIMINATED");
+          }
+        }
       }
       continue;
     }

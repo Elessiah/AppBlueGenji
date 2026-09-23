@@ -28,6 +28,10 @@ export const ERROR_MESSAGES: Record<string, string> = {
   ADMIN_RESOLVE_FAILED: "Erreur lors de la résolution du match.",
   INVALID_FORFEIT_TEAM_ID: "Le forfait doit désigner une des deux équipes du match.",
   MISSING_SCORES_OR_FORFEIT: "Scores ou forfait requis.",
+  DOUBLE_FORFEIT_EXCLUSIVE:
+    "Un double forfait ne porte ni score ni équipe désignée : retire-les avant de valider.",
+  DOUBLE_FORFEIT_RESOLVE_ONLY:
+    "Un double forfait tranche le match : utilise « Valider le résultat ».",
   TOURNAMENT_FULL: "Ce tournoi est complet.",
   // Formulation neutre : l'inscrit est une équipe ou un joueur selon le tournoi.
   ALREADY_REGISTERED: "Inscription déjà enregistrée pour ce tournoi.",

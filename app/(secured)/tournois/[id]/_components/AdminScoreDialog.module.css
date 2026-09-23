@@ -245,6 +245,12 @@
   overflow-wrap: anywhere;
 }
 
+/* Le double forfait tient sa ligne : il ne désigne pas une troisième équipe,
+   il dit « aucune des deux ». */
+.forfeitBoth {
+  flex-basis: 100%;
+}
+
 .forfeit:hover:not(:disabled) {
   background: rgba(255, 157, 46, 0.12);
 }

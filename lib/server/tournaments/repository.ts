@@ -286,6 +286,7 @@ export async function getMatchRows(
       m.winner_team_id,
       m.loser_team_id,
       m.forfeit_team_id,
+      m.double_forfeit,
       m.next_winner_match_id,
       m.next_winner_slot,
       m.next_loser_match_id,
