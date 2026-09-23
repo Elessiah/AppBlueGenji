@@ -359,3 +359,29 @@
     margin-bottom: 4px;
   }
 }
+
+/* Impression — « Enregistrer en PDF » est le chemin le plus court pour joindre
+   le registre à un courrier : une fiche ne se coupe pas entre deux pages, et les
+   gris pensés pour un fond noir redeviennent lisibles sur papier blanc. */
+@media print {
+  .registerCard {
+    break-inside: avoid;
+  }
+
+  .registerTable th,
+  .registerTable td,
+  .registerTitle,
+  .registerLabel {
+    color: #000 !important;
+  }
+
+  .registerTable th,
+  .registerTable td {
+    border-bottom-color: #ccc;
+  }
+
+  .registerActions,
+  .registerToc {
+    display: none;
+  }
+}
