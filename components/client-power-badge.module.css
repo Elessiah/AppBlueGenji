@@ -126,9 +126,16 @@
   }
 }
 
-@media (max-width: 640px) {
+/* Sous 720 px, le bouton « ? » descend dans le coin (`bottom: 20px`,
+   `right: 18px`, même point de rupture dans `app/globals.css`) : laissé à
+   droite, le témoin le recouvrirait. Il passe au centre, entre les
+   notifications (à gauche) et les boutons flottants (à droite). */
+@media (max-width: 720px) {
   .root {
-    right: 16px;
+    right: auto;
+    left: 50%;
     bottom: 16px;
+    align-items: center;
+    transform: translateX(-50%);
   }
 }

@@ -94,4 +94,17 @@ describe("ClientPowerBadge", () => {
     expect(fabZ).toBeGreaterThan(0);
     expect(rootZ).toBeGreaterThan(fabZ);
   });
+
+  it("s'écarte du bouton « ? » quand celui-ci descend dans le coin, sur mobile", () => {
+    // Même point de rupture des deux côtés : sans quoi une plage de largeurs
+    // garderait le témoin à droite pendant que le bouton y descend.
+    const css = readSource("components/client-power-badge.module.css");
+    const globals = readSource("app/globals.css");
+    const fabBreakpoint = /@media \(max-width: (\d+)px\) \{\s*\.cta-float-help \{/.exec(globals)?.[1];
+    const badge = /@media \(max-width: (\d+)px\) \{\s*\.root \{([^}]*)\}/.exec(css);
+    expect(fabBreakpoint).toBeDefined();
+    expect(badge?.[1]).toBe(fabBreakpoint);
+    expect(badge?.[2]).toContain("left: 50%;");
+    expect(badge?.[2]).toContain("transform: translateX(-50%);");
+  });
 });
