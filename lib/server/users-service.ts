@@ -1588,24 +1588,34 @@ async function isInActiveTournament(userId: number): Promise<boolean> {
  * entrée solo. Coéquipiers compris : ils disputent le même match.
  *
  * La requête part des engagés du titulaire — quelques lignes — plutôt que de
- * balayer les matchs de tous les tournois vivants.
+ * balayer les matchs de tous les tournois vivants, et en **deux branches**, une
+ * par côté du match : une jointure `team1_id = … OR team2_id = …` n'utilise
+ * aucun des deux index et balayait `bg_matches` en entier (vu à l'`EXPLAIN`).
  */
 async function sharesLiveMatch(userId: number, otherUserId: number): Promise<boolean> {
   const db = await getDatabase();
   const [rows] = await db.execute<(RowDataPacket & { c: number })[]>(
-    `SELECT 1 AS c
-     FROM (
+    `WITH mine AS (
        SELECT tm.team_id FROM bg_team_members tm WHERE tm.user_id = ? AND tm.left_at IS NULL
        UNION
        SELECT te.id FROM bg_teams te WHERE te.solo_user_id = ?
-     ) mine
-     JOIN bg_matches m ON m.team1_id = mine.team_id OR m.team2_id = mine.team_id
+     ), theirs AS (
+       SELECT tm.team_id FROM bg_team_members tm WHERE tm.user_id = ? AND tm.left_at IS NULL
+       UNION
+       SELECT te.id FROM bg_teams te WHERE te.solo_user_id = ?
+     )
+     SELECT 1 AS c
+     FROM mine
+     JOIN bg_matches m ON m.team1_id = mine.team_id
      JOIN bg_tournaments t ON t.id = m.tournament_id
-     JOIN (
-       SELECT tm.team_id FROM bg_team_members tm WHERE tm.user_id = ? AND tm.left_at IS NULL
-       UNION
-       SELECT te.id FROM bg_teams te WHERE te.solo_user_id = ?
-     ) theirs ON theirs.team_id IN (m.team1_id, m.team2_id)
+     JOIN theirs ON theirs.team_id IN (m.team1_id, m.team2_id)
+     WHERE t.state <> 'FINISHED'
+     UNION ALL
+     SELECT 1 AS c
+     FROM mine
+     JOIN bg_matches m ON m.team2_id = mine.team_id
+     JOIN bg_tournaments t ON t.id = m.tournament_id
+     JOIN theirs ON theirs.team_id IN (m.team1_id, m.team2_id)
      WHERE t.state <> 'FINISHED'
      LIMIT 1`,
     [userId, userId, otherUserId, otherUserId],
