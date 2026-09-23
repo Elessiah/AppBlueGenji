@@ -45,6 +45,6 @@ test.describe("Compte vierge (authentifié, DEV_AUTH=fresh)", () => {
     page.on("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: "Supprimer mon compte" }).click();
     await expect(page.getByText(/Compte supprimé/)).toBeVisible();
-    await page.waitForURL("**/", { timeout: 5000 });
+    await page.waitForURL("**/");
   });
 });

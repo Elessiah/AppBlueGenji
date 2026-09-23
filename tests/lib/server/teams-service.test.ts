@@ -1,200 +1,210 @@
-import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 
-describe("teams-service", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+import { getDatabase } from "@/lib/server/database";
+import {
+  canManageTeam,
+  leaveTeam,
+  removeTeamMember,
+  updateTeamMemberRoles,
+} from "@/lib/server/teams-service";
+import type { TeamRole } from "@/lib/shared/types";
+
+/**
+ * Gestion du roster : qui a la main, et sur qui.
+ *
+ * Deux rôles seulement donnent la main (`OWNER`, `MANAGER` —
+ * `lib/shared/team-roles.ts`) ; les cinq autres sont sportifs, `CAPITAINE`
+ * compris. Le propriétaire ne se retire ni ne se destitue par ces chemins : il
+ * transfère d'abord la propriété.
+ */
+
+const TEAM_ID = 7;
+const OWNER_ID = 1;
+const MANAGER_ID = 2;
+const CAPTAIN_ID = 3;
+const DPS_ID = 4;
+const OUTSIDER_ID = 99;
+
+const ROSTER: Record<number, TeamRole[]> = {
+  [OWNER_ID]: ["OWNER", "TANK"],
+  [MANAGER_ID]: ["MANAGER"],
+  [CAPTAIN_ID]: ["CAPITAINE", "HEAL"],
+  [DPS_ID]: ["DPS"],
+};
+
+type Execute = (sql: string, params?: unknown[]) => Promise<unknown>;
+let execute: jest.Mock<Execute>;
+
+/**
+ * Base simulée : la lecture des rôles d'un membre répond depuis `roster`, toute
+ * écriture rend `affectedRows`.
+ */
+function useDatabase(roster: Record<number, TeamRole[]> = ROSTER, affectedRows = 1) {
+  execute = jest.fn<Execute>(async (sql, params = []) => {
+    if (/SELECT roles_json\s+FROM bg_team_members/.test(sql)) {
+      const roles = roster[Number(params[1])];
+      return [roles ? [{ roles_json: JSON.stringify(roles) }] : [], []];
+    }
+    return [{ affectedRows }, []];
+  });
+  jest.mocked(getDatabase).mockResolvedValue({ execute } as never);
+}
+
+const updates = () =>
+  execute.mock.calls.filter(([sql]) => /UPDATE bg_team_members/.test(sql));
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  useDatabase();
+});
+
+describe("canManageTeam", () => {
+  it.each([
+    ["le propriétaire", OWNER_ID, true],
+    ["le manager", MANAGER_ID, true],
+    ["le capitaine — rôle sportif, pas de gestion", CAPTAIN_ID, false],
+    ["un DPS", DPS_ID, false],
+    ["un non-membre", OUTSIDER_ID, false],
+  ])("%s → %s", async (_label, userId, expected) => {
+    await expect(canManageTeam(TEAM_ID, userId)).resolves.toBe(expected);
   });
 
-  afterEach(() => {
-    jest.restoreAllMocks();
+  it("ne lit que l'appartenance active de l'équipe visée", async () => {
+    await canManageTeam(TEAM_ID, DPS_ID);
+    const [sql, params] = execute.mock.calls[0];
+    expect(sql).toMatch(/left_at IS NULL/);
+    expect(params).toEqual([TEAM_ID, DPS_ID]);
+  });
+});
+
+describe("updateTeamMemberRoles", () => {
+  it.each([
+    ["un rôle sportif", DPS_ID],
+    ["le capitaine", CAPTAIN_ID],
+    ["un non-membre", OUTSIDER_ID],
+  ])("refuse la demande d'%s sans rien écrire", async (_label, requesterId) => {
+    await expect(updateTeamMemberRoles(requesterId, TEAM_ID, DPS_ID, ["HEAL"])).rejects.toThrow(
+      "FORBIDDEN",
+    );
+    expect(updates()).toHaveLength(0);
   });
 
-  describe("team creation", () => {
-    it("creates team with normalized name", () => {
-      const rawName = "  My Team  ";
-      const normalized = rawName.trim();
-      expect(normalized).toBe("My Team");
-    });
-
-    it("auto-adds organizer as OWNER", () => {
-      const userId = 1;
-      const roles = ["OWNER"];
-      expect(roles).toContain("OWNER");
-    });
-
-    it("rejects duplicate team names", () => {
-      const exists = true;
-      const canCreate = !exists;
-      expect(canCreate).toBe(false);
-    });
-
-    it("generates team created_at timestamp", () => {
-      const createdAt = new Date();
-      expect(createdAt).toBeDefined();
-      expect(createdAt.getTime()).toBeGreaterThan(0);
-    });
+  it("interdit au manager de toucher aux rôles du propriétaire", async () => {
+    await expect(updateTeamMemberRoles(MANAGER_ID, TEAM_ID, OWNER_ID, ["DPS"])).rejects.toThrow(
+      "FORBIDDEN",
+    );
+    expect(updates()).toHaveLength(0);
   });
 
-  describe("team member management", () => {
-    it("OWNER can add members", () => {
-      const requesterRole: string = "OWNER";
-      const canAdd = requesterRole === "OWNER" || requesterRole === "CAPITAINE";
-      expect(canAdd).toBe(true);
-    });
-
-    it("CAPITAINE can add members", () => {
-      const requesterRole: string = "CAPITAINE";
-      const canAdd = requesterRole === "OWNER" || requesterRole === "CAPITAINE";
-      expect(canAdd).toBe(true);
-    });
-
-    it("DPS cannot add members", () => {
-      const requesterRole: string = "DPS";
-      const canAdd = requesterRole === "OWNER" || requesterRole === "CAPITAINE";
-      expect(canAdd).toBe(false);
-    });
-
-    it("member join is recorded with timestamp", () => {
-      const joinedAt = new Date();
-      expect(joinedAt).toBeDefined();
-    });
-
-    it("member leave is recorded with timestamp", () => {
-      const leftAt = new Date();
-      expect(leftAt).toBeDefined();
-    });
+  it("refuse une cible qui n'est pas dans le roster", async () => {
+    await expect(updateTeamMemberRoles(OWNER_ID, TEAM_ID, OUTSIDER_ID, ["DPS"])).rejects.toThrow(
+      "MEMBER_NOT_FOUND",
+    );
+    expect(updates()).toHaveLength(0);
   });
 
-  describe("team roles", () => {
-    it("player can have single role", () => {
-      const roles = ["TANK"];
-      expect(roles.length).toBe(1);
-    });
-
-    it("player can have multiple roles", () => {
-      const roles = ["TANK", "DPS"];
-      expect(roles.length).toBe(2);
-    });
-
-    it("player can have up to 7 roles", () => {
-      const roles = ["COACH", "TANK", "DPS", "HEAL", "CAPITAINE", "MANAGER", "OWNER"];
-      expect(roles.length).toBe(7);
-    });
-
-    it("roles are stored as JSON", () => {
-      const roles = ["TANK", "DPS"];
-      const json = JSON.stringify(roles);
-      const parsed = JSON.parse(json);
-      expect(parsed).toEqual(roles);
-    });
-
-    it("updating roles replaces old roles", () => {
-      const oldRoles = ["TANK"];
-      const newRoles = ["DPS", "HEAL"];
-      expect(oldRoles).not.toEqual(newRoles);
-    });
+  it("remplace les rôles de la cible, doublons retirés", async () => {
+    await updateTeamMemberRoles(MANAGER_ID, TEAM_ID, DPS_ID, ["TANK", "TANK", "HEAL"]);
+    expect(updates()).toHaveLength(1);
+    expect(updates()[0][1]).toEqual([JSON.stringify(["TANK", "HEAL"]), TEAM_ID, DPS_ID]);
   });
 
-  describe("team member removal", () => {
-    it("OWNER cannot be removed", () => {
-      const role = "OWNER";
-      const canRemove = role !== "OWNER";
-      expect(canRemove).toBe(false);
-    });
-
-    it("member can remove themselves", () => {
-      const requesterIsTarget = true;
-      const canRemove = requesterIsTarget;
-      expect(canRemove).toBe(true);
-    });
-
-    it("OWNER can remove any member except self", () => {
-      const requesterRole: string = "OWNER";
-      const targetRole: string = "DPS";
-      const targetIsOwner = targetRole === "OWNER";
-      const canRemove = requesterRole === "OWNER" && !targetIsOwner;
-      expect(canRemove).toBe(true);
-    });
-
-    it("non-OWNER cannot remove others", () => {
-      const requesterRole: string = "DPS";
-      const targetRole = "TANK";
-      const requesterIsTarget = false;
-      const canRemove = requesterIsTarget || requesterRole === "OWNER";
-      expect(canRemove).toBe(false);
-    });
+  it("ne laisse pas conférer OWNER par ce chemin", async () => {
+    await updateTeamMemberRoles(OWNER_ID, TEAM_ID, DPS_ID, ["OWNER", "COACH"]);
+    expect(updates()[0][1]).toEqual([JSON.stringify(["COACH"]), TEAM_ID, DPS_ID]);
   });
 
-  describe("team history", () => {
-    it("tracks tournament participations", () => {
-      const tournaments = [
-        { id: 1, name: "Tournament 1" },
-        { id: 2, name: "Tournament 2" },
-      ];
-      expect(tournaments.length).toBe(2);
-    });
-
-    it("records wins and losses per tournament", () => {
-      const tournament = { id: 1, wins: 2, losses: 1 };
-      expect(tournament.wins).toBe(2);
-      expect(tournament.losses).toBe(1);
-    });
-
-    it("calculates total tournament record", () => {
-      const tournaments = [
-        { wins: 2, losses: 1 },
-        { wins: 3, losses: 2 },
-      ];
-      const totalWins = tournaments.reduce((sum, t) => sum + t.wins, 0);
-      const totalLosses = tournaments.reduce((sum, t) => sum + t.losses, 0);
-      expect(totalWins).toBe(5);
-      expect(totalLosses).toBe(3);
-    });
+  it("garde OWNER au propriétaire, en tête de ses rôles", async () => {
+    await updateTeamMemberRoles(OWNER_ID, TEAM_ID, OWNER_ID, ["DPS"]);
+    expect(updates()[0][1]).toEqual([JSON.stringify(["OWNER", "DPS"]), TEAM_ID, OWNER_ID]);
   });
 
-  describe("team visibility", () => {
-    it("team member list visible to team", () => {
-      const isTeamMember = true;
-      const canSeeMembers = isTeamMember;
-      expect(canSeeMembers).toBe(true);
-    });
-
-    it("team stats visible to all", () => {
-      const isPublic = true;
-      expect(isPublic).toBe(true);
-    });
-
-    it("team members visible in profile if public", () => {
-      const teamPublic = true;
-      const canSeeTeam = teamPublic;
-      expect(canSeeTeam).toBe(true);
-    });
+  it.each([
+    ["aucun rôle", [] as TeamRole[]],
+    ["OWNER seul, qui est retiré", ["OWNER"] as TeamRole[]],
+  ])("refuse %s", async (_label, roles) => {
+    await expect(updateTeamMemberRoles(OWNER_ID, TEAM_ID, DPS_ID, roles)).rejects.toThrow(
+      "MISSING_ROLE",
+    );
+    expect(updates()).toHaveLength(0);
   });
 
-  describe("team queries", () => {
-    it("get team by ID", () => {
-      const teamId = 1;
-      expect(teamId).toBe(1);
-    });
+  it("rend MEMBER_NOT_FOUND si la cible est partie entre la lecture et l'écriture", async () => {
+    useDatabase(ROSTER, 0);
+    await expect(updateTeamMemberRoles(OWNER_ID, TEAM_ID, DPS_ID, ["HEAL"])).rejects.toThrow(
+      "MEMBER_NOT_FOUND",
+    );
+  });
+});
 
-    it("get team by name", () => {
-      const teamName = "My Team";
-      expect(teamName).toBeTruthy();
-    });
+describe("removeTeamMember", () => {
+  it.each([
+    ["un rôle sportif", DPS_ID],
+    ["le capitaine", CAPTAIN_ID],
+    ["un non-membre", OUTSIDER_ID],
+  ])("refuse l'exclusion demandée par %s", async (_label, requesterId) => {
+    await expect(removeTeamMember(requesterId, TEAM_ID, MANAGER_ID)).rejects.toThrow("FORBIDDEN");
+    expect(updates()).toHaveLength(0);
+  });
 
-    it("list teams paginated", () => {
-      const teams = [{ id: 1 }, { id: 2 }, { id: 3 }];
-      const page1 = teams.slice(0, 2);
-      expect(page1.length).toBe(2);
-    });
+  it("refuse de s'exclure soi-même — c'est `leaveTeam`", async () => {
+    await expect(removeTeamMember(MANAGER_ID, TEAM_ID, MANAGER_ID)).rejects.toThrow(
+      "OWNER_CANNOT_LEAVE",
+    );
+    expect(updates()).toHaveLength(0);
+  });
 
-    it("filter teams by player", () => {
-      const userId = 5;
-      const teams = [{ id: 1, members: [5, 6] }, { id: 2, members: [7, 8] }];
-      const filtered = teams.filter((t) => t.members.includes(userId));
-      expect(filtered.length).toBe(1);
-    });
+  it("refuse d'exclure le propriétaire", async () => {
+    await expect(removeTeamMember(MANAGER_ID, TEAM_ID, OWNER_ID)).rejects.toThrow(
+      "CANNOT_KICK_OWNER",
+    );
+    expect(updates()).toHaveLength(0);
+  });
+
+  it("refuse une cible absente du roster", async () => {
+    await expect(removeTeamMember(OWNER_ID, TEAM_ID, OUTSIDER_ID)).rejects.toThrow(
+      "MEMBER_NOT_FOUND",
+    );
+  });
+
+  it.each([
+    ["le propriétaire", OWNER_ID],
+    ["le manager", MANAGER_ID],
+  ])("laisse %s exclure un joueur, en datant son départ", async (_label, requesterId) => {
+    await removeTeamMember(requesterId, TEAM_ID, DPS_ID);
+    expect(updates()).toHaveLength(1);
+    const [sql, params] = updates()[0];
+    expect(sql).toMatch(/SET left_at = NOW\(\)/);
+    expect(params).toEqual([TEAM_ID, DPS_ID]);
+  });
+
+  it("rend MEMBER_NOT_FOUND si la cible est partie entre-temps", async () => {
+    useDatabase(ROSTER, 0);
+    await expect(removeTeamMember(OWNER_ID, TEAM_ID, DPS_ID)).rejects.toThrow("MEMBER_NOT_FOUND");
+  });
+});
+
+describe("leaveTeam", () => {
+  it("refuse un joueur qui n'est pas membre", async () => {
+    await expect(leaveTeam(OUTSIDER_ID, TEAM_ID)).rejects.toThrow("NOT_A_MEMBER");
+    expect(updates()).toHaveLength(0);
+  });
+
+  it("oblige le propriétaire à transférer d'abord", async () => {
+    await expect(leaveTeam(OWNER_ID, TEAM_ID)).rejects.toThrow("OWNER_MUST_TRANSFER");
+    expect(updates()).toHaveLength(0);
+  });
+
+  it.each([
+    ["le manager", MANAGER_ID],
+    ["un joueur", DPS_ID],
+  ])("laisse partir %s, en datant son départ", async (_label, userId) => {
+    await leaveTeam(userId, TEAM_ID);
+    expect(updates()).toHaveLength(1);
+    const [sql, params] = updates()[0];
+    expect(sql).toMatch(/SET left_at = NOW\(\)/);
+    expect(params).toEqual([TEAM_ID, userId]);
   });
 });

@@ -6,6 +6,7 @@ jest.mock("@/lib/server/users-service");
 import { PATCH } from "@/app/api/profile/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getFullProfile, updateOwnProfile } from "@/lib/server/users-service";
+import { profilePatchRequest } from "../../../helpers/profile-request";
 
 /**
  * Le refus du tag verrouillé, traduit en HTTP.
@@ -20,13 +21,7 @@ const updateMock = updateOwnProfile as jest.MockedFunction<typeof updateOwnProfi
 const profileMock = getFullProfile as jest.MockedFunction<typeof getFullProfile>;
 
 function patch(body: unknown) {
-  return PATCH(
-    new Request("http://localhost:3000/api/profile", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    }),
-  );
+  return PATCH(profilePatchRequest(body));
 }
 
 beforeEach(() => {

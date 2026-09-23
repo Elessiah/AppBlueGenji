@@ -11,7 +11,9 @@ import { defineConfig, devices } from "@playwright/test";
  * Déterminisme du bypass d'auth : `DEV_AUTH_USER_ID` est imposé explicitement au
  * serveur de test (et a priorité sur le `.env`, que Next.js n'écrase pas) :
  *  - non authentifié (défaut)        → `""`  → bypass désactivé, les routes
- *    `(secured)` redirigent vers /connexion (cf. `auth.spec.ts`) ;
+ *    `(secured)` rendent la carte « Connexion requise » (cf. `auth.spec.ts`).
+ *    Vérifié sur un poste dont le `.env` pose un identifiant : la valeur vide
+ *    survit au chargement de `@next/env`, `/api/profile` répond 401 ;
  *  - authentifié (`E2E_AUTH_USER`)   → cet id → bypass actif (cf. `tournaments.spec.ts`).
  */
 const PORT = process.env.E2E_PORT || "3100";
@@ -26,6 +28,15 @@ export default defineConfig({
   // ils ne sont pas parallélisables. On sérialise dès que le bypass est actif.
   workers: process.env.CI || process.env.E2E_AUTH_USER ? 1 : undefined,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
+
+  // Une assertion d'URL qui suit une navigation du routeur client attend en
+  // réalité une compilation : le serveur de développement compile chaque page à
+  // sa première demande. Sous plusieurs workers — le défaut local, le CI n'en a
+  // qu'un —, cette compilation dépassait les 5 s par défaut, et un test
+  // échouait sur une page encore affichée (le refus du consentement RGPD, qui
+  // mène à `/`). Le délai est donc posé ici, pour toute la suite, et non sur la
+  // seule assertion où la panne s'est vue.
+  expect: { timeout: 15_000 },
 
   use: {
     baseURL,

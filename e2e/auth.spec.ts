@@ -31,7 +31,8 @@ test.describe("Consentement RGPD", () => {
     await page.goto("/connexion");
     await page.getByRole("button", { name: /^Refuser$/ }).click();
 
-    // Retour en arrière total : on quitte /connexion…
+    // Retour en arrière total : on quitte /connexion (délai : voir `expect` dans
+    // `playwright.config.ts`)…
     await expect(page).not.toHaveURL(/\/connexion/);
     // …et rien n'a été persisté.
     const consent = await page.evaluate(() => window.localStorage.getItem("bg_rgpd_consent"));
