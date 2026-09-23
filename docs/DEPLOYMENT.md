@@ -12,6 +12,28 @@ de se déclarer fini. Un déploiement qui ne contrôle rien annonce un succès
 qu'il n'a pas constaté : c'est ainsi qu'une panne reste invisible jusqu'au
 premier visiteur.
 
+## `npm ci` : scripts d'installation et paquets dépréciés
+
+Le serveur tourne sous **npm 12**, qui bloque par défaut les scripts
+d'installation des dépendances et en liste chaque omission à la fin de
+`npm ci`. Le champ `allowScripts` de `package.json` les **refuse
+explicitement** (`false`), ce qui fait taire l'avertissement sans rien casser :
+
+| Paquet | Script | Pourquoi on s'en passe |
+|---|---|---|
+| `esbuild` (via `tsx`) | vérifie le binaire, remplace le lanceur JS | le binaire arrive par la dépendance optionnelle `@esbuild/<plateforme>` — vérifié en prod : `tsx` et `esbuild` fonctionnent sans lui |
+| `unrs-resolver` (ESLint, Jest) | repli si la liaison native manque | idem, `@unrs/resolver-binding-<plateforme>` |
+| `@parcel/watcher` (Jest) | compilation depuis les sources si aucun binaire | idem, et ne sert qu'au mode `--watch` |
+
+Un nouveau paquet à script apparaîtra de nouveau dans l'avertissement : le
+relire (`npm install-scripts ls`), puis le refuser (`npm install-scripts deny
+<pkg>`) ou, s'il en a réellement besoin, l'approuver (`npm install-scripts
+approve <pkg>`, épinglé à la version relue).
+
+Les avertissements `deprecated` de `glob@7`/`inflight` venaient de Jest 29 ;
+Jest 30 et l'override `test-exclude@^8` (le dernier à tirer `glob@10`, lui
+aussi déprécié) les ont fait disparaître.
+
 ## Les journaux : `pm2 flush`, jamais `rm`
 
 **C'est le piège qui a mis le site à terre le 16/09/2026**, et il ne ressemble
