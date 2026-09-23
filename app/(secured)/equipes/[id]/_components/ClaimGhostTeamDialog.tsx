@@ -46,7 +46,6 @@ export function ClaimGhostTeamDialog({ teamId, teamName, onClose, onChanged }: C
       onClose={onClose}
       busy={busy}
       onSubmit={submit}
-      allowOverflow
       footer={
         <>
           <button type="button" className="btn ghost" disabled={busy} onClick={onClose}>

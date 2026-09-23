@@ -26,6 +26,14 @@ ligne dans ces composants.
 `_components/TeamDialog.tsx` est le cadre unique des modales de la page (rôles,
 transfert, attribution d'une fantôme, confirmations).
 
+- **Le voile défile, pas le panneau** : `margin: auto` centre la modale quand
+  elle tient et la colle en haut quand elle déborde ; une liste de suggestions
+  qu'elle porte n'est jamais rognée à son bord.
+- **Échap revient d'abord au contrôle qui a quelque chose d'ouvert** : l'écouteur
+  de `useDialogBehavior` est posé en capture sur `window` et passait avant le
+  champ ; il ignore désormais Échap quand la cible porte `aria-expanded="true"`
+  (liste de suggestions ouverte). Le premier Échap ferme la liste, le second la
+  modale.
 - **Portail vers `document.body`.** Les modales étaient rendues dans la page, donc
   dans `<section class="fade-in">`. L'animation `fade-in-up … both` laisse un
   `transform` posé une fois terminée, et un élément transformé devient la
@@ -94,8 +102,15 @@ chemins d'acceptation. Ils lisaient `PENDING`, relisaient « a-t-il une équipe 
 inséraient puis marquaient l'invitation, en quatre instructions sur le pool :
 deux acceptations simultanées passaient toutes deux. Verrou sur la ligne du
 **joueur** en première instruction (celui de la suppression de compte et de
-l'entrée solo), puis réservation de l'invitation par un `UPDATE … WHERE status =
-'PENDING'` relu sur `affectedRows`.
+l'entrée solo), puis relecture de l'**équipe** sous verrou partagé (une
+dissolution concurrente rattacherait sinon le joueur à une équipe morte :
+`TEAM_DELETED`), puis réservation de l'invitation par un `UPDATE … WHERE status =
+'PENDING'` relu sur `affectedRows`. L'ordre équipe → invitation est celui de
+`softDeleteTeam` : l'inverser ouvrirait un interblocage avec elle. Un état changé
+pendant l'arrivée (`JOIN_CONFLICTS` : invitation tranchée, équipe dissoute,
+compte supprimé — `PLAYER_ACCOUNT_DELETED`) sort en **409** sur toutes les routes
+qui y mènent. Demandes et invitations en attente se lisent d'un seul appel
+(`listTeamPendingInvitations`, un contrôle de droits, une requête).
 
 ## Paramètres
 
@@ -129,7 +144,10 @@ en « Unexpected token '<' » ou « Failed to fetch ».
 ## Rechargement silencieux
 
 `useResourceLoader` expose `revalidate` : relecture en arrière-plan qui garde les
-données affichées et ignore un échec passager. `refresh` repassait la page
+données affichées et ignore un échec passager. Chaque lecture est numérotée, et
+seule la dernière lancée s'applique : deux gestes rapprochés ne peuvent plus voir
+la réponse ancienne écraser la récente. Un lien d'entrée solo ne fait plus
+clignoter « introuvable » pendant sa redirection vers le profil. `refresh` repassait la page
 entière en « Chargement… » après chaque geste — saisie, défilement et modale
 démontés puis remontés.
 

@@ -17,8 +17,7 @@ import {
   createTeam,
   getTeamDetail,
   inviteToTeam,
-  listTeamJoinRequests,
-  listTeamSentInvitations,
+  listTeamPendingInvitations,
   removeTeamMember,
   transferTeamOwnership,
   updateTeamMeta,
@@ -73,6 +72,15 @@ describe.each([
     expect(inviteToTeam).toHaveBeenCalledWith(2, 7, "Nova", undefined);
   });
 
+  it.each(["INVITATION_NOT_PENDING", "TEAM_DELETED", "TEAM_NOT_JOINABLE", "PLAYER_ACCOUNT_DELETED"])(
+    "rend %s — un état changé pendant l'arrivée — en 409",
+    async (code) => {
+      (inviteToTeam as jest.Mock).mockRejectedValue(new Error(code) as never);
+      const res = await route(req("POST", { pseudo: "Nova" }), params("7"));
+      expect(res.status).toBe(409);
+    },
+  );
+
   it("rend MISSING_ROLE en 400", async () => {
     (inviteToTeam as jest.Mock).mockRejectedValue(new Error("MISSING_ROLE") as never);
 
@@ -85,8 +93,10 @@ describe.each([
 
 describe("GET /api/teams/[id]/invitations", () => {
   it("rend les demandes reçues et les invitations envoyées", async () => {
-    (listTeamJoinRequests as jest.Mock).mockResolvedValue([{ id: 1 }] as never);
-    (listTeamSentInvitations as jest.Mock).mockResolvedValue([{ id: 2 }] as never);
+    (listTeamPendingInvitations as jest.Mock).mockResolvedValue({
+      requests: [{ id: 1 }],
+      invitations: [{ id: 2 }],
+    } as never);
 
     const res = await invitationsGet(req("GET"), params("7"));
 
@@ -95,8 +105,7 @@ describe("GET /api/teams/[id]/invitations", () => {
   });
 
   it("refuse en 403 qui ne gère pas l'équipe", async () => {
-    (listTeamJoinRequests as jest.Mock).mockRejectedValue(new Error("FORBIDDEN") as never);
-    (listTeamSentInvitations as jest.Mock).mockRejectedValue(new Error("FORBIDDEN") as never);
+    (listTeamPendingInvitations as jest.Mock).mockRejectedValue(new Error("FORBIDDEN") as never);
 
     const res = await invitationsGet(req("GET"), params("7"));
 

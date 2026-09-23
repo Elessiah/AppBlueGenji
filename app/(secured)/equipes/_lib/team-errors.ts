@@ -70,6 +70,7 @@ const TEAM_ERRORS: Record<string, string> = {
   INVALID_TEAM_NAME: `Le nom de l'équipe doit compter de ${TEAM_NAME_MIN_LENGTH} à ${TEAM_NAME_MAX_LENGTH} caractères.`,
   TEAM_NAME_ALREADY_USED: "Ce nom est déjà porté par une autre équipe.",
   TRANSFER_TO_SELF: "Tu es déjà propriétaire de cette équipe.",
+  PLAYER_ACCOUNT_DELETED: "Ce joueur a supprimé son compte : il ne peut plus rejoindre d'équipe.",
   MEMBER_ACCOUNT_DELETED: "Ce compte a été supprimé : il ne peut pas recevoir la propriété de l'équipe.",
   NOT_A_GHOST_TEAM: "Cette équipe n'est plus une équipe fantôme : elle a déjà un propriétaire.",
 

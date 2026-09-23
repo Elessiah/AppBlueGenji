@@ -6,6 +6,8 @@ import { UserAvatar } from "@/components/user-avatar";
 import { formatLocalDate } from "@/lib/shared/dates";
 import type { TeamMember, TeamRole, TeamSentInvitation } from "@/lib/shared/types";
 import { DEFAULT_INVITE_ROLES, sortTeamMembers } from "@/lib/shared/team-role-display";
+import { useToast } from "@/components/ui/toast";
+import { teamErrorMessage } from "../../_lib/team-errors";
 import { useMemberManagement } from "../_hooks/useMemberManagement";
 import { RolesDialog, type RolesDialogTarget } from "./RolesDialog";
 import { RolePills } from "./RolePills";
@@ -42,6 +44,7 @@ export function MembersSection({
   const [rolesTarget, setRolesTarget] = useState<RolesDialogTarget | null>(null);
   const [kickTarget, setKickTarget] = useState<TeamMember | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const { showError } = useToast();
 
   const refreshAll = () => {
     onChanged();
@@ -50,11 +53,16 @@ export function MembersSection({
   const { addMember, removeMember, updateRoles, cancelInvitation } = useMemberManagement(teamId, refreshAll);
 
   const sortedMembers = sortTeamMembers(members);
-  const canInvite = memberPseudo.trim().length > 0 && memberRoles.length > 0 && !inviting;
+  const canInvite = memberPseudo.trim().length > 0 && !inviting;
 
   const invite = async (event: FormEvent) => {
     event.preventDefault();
     if (!canInvite) return;
+    // Refus dit en notification, pas par un bouton grisé muet.
+    if (memberRoles.length === 0) {
+      showError(teamErrorMessage("MISSING_ROLE"));
+      return;
+    }
     setInviting(true);
     const ok = await addMember(memberPseudo.trim(), memberRoles);
     setInviting(false);
@@ -204,11 +212,6 @@ export function MembersSection({
               <RolePicker selected={memberRoles} onChange={setMemberRoles} />
             </div>
             <div className={styles.formFooter}>
-              {memberRoles.length === 0 ? (
-                <span className={styles.help} role="status">
-                  Choisis au moins un rôle.
-                </span>
-              ) : null}
               <button type="submit" className={`btn ${styles.primaryButton}`} disabled={!canInvite}>
                 {inviting ? "Envoi…" : "Inviter"}
               </button>

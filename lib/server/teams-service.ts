@@ -917,7 +917,9 @@ async function userHasActiveTeam(userId: number): Promise<boolean> {
  * l'instantané : placée avant l'attente, elle ferait lire un monde périmé). C'est
  * aussi celui que prennent la suppression de compte et la création d'une entrée
  * solo : une acceptation ne peut donc pas non plus rattacher un compte qu'on est
- * en train d'anonymiser. L'invitation est ensuite **réservée** par un `UPDATE`
+ * en train d'anonymiser. L'équipe est relue ensuite (une dissolution concurrente
+ * rattacherait sinon le joueur à une équipe morte), puis l'invitation est
+ * **réservée** par un `UPDATE`
  * conditionné à `PENDING`, relu sur `affectedRows` — une réponse arrivée entre
  * la lecture de l'appelant et ici l'emporte.
  *
@@ -942,7 +944,21 @@ async function acceptIntoTeam(
       `SELECT is_deleted FROM bg_users WHERE id = ? FOR UPDATE`,
       [userId],
     );
-    if (account.length === 0 || account[0].is_deleted === 1) throw new Error("USER_NOT_FOUND");
+    if (account.length === 0 || account[0].is_deleted === 1) throw new Error("PLAYER_ACCOUNT_DELETED");
+
+    // L'équipe est relue **sous verrou partagé**, et avant l'invitation : la
+    // dissolution (`softDeleteTeam`) écrit l'équipe puis annule ses
+    // invitations ; prendre les deux dans le même ordre qu'elle interdit
+    // l'interblocage, et une dissolution commitée pendant l'attente est vue.
+    const [teams] = await connection.execute<
+      (RowDataPacket & { id: number; deleted_at: Date | null; is_ghost: 0 | 1; solo_user_id: number | null })[]
+    >(
+      `SELECT id, deleted_at, is_ghost, solo_user_id FROM bg_teams WHERE id = ? FOR SHARE`,
+      [teamId],
+    );
+    if (teams.length === 0) throw new Error("TEAM_NOT_FOUND");
+    if (teams[0].deleted_at !== null) throw new Error("TEAM_DELETED");
+    if (teams[0].is_ghost === 1 || teams[0].solo_user_id !== null) throw new Error("TEAM_NOT_JOINABLE");
 
     const [claimed] = await connection.execute<ResultSetHeader>(
       `UPDATE bg_team_invitations
@@ -1162,37 +1178,56 @@ export async function listUserInvitations(userId: number): Promise<
 }
 
 /**
- * Invitations (INVITE) envoyées par l'équipe et encore sans réponse (vue
- * gestion). Sans cette liste, une invitation partie ne se voyait plus nulle
- * part : ni pour savoir qui attendre, ni pour la retirer après une erreur de
- * pseudo — réinviter le même joueur ne rendant que `ALREADY_INVITED`.
+ * Ce qui attend une réponse, vue gestion : les demandes (REQUEST) reçues et
+ * les invitations (INVITE) envoyées — un seul contrôle de droits, une seule
+ * requête.
+ *
+ * Les invitations envoyées ne se voyaient nulle part : ni pour savoir qui
+ * attendre, ni pour en retirer une après une erreur de pseudo — réinviter le
+ * même joueur ne rendant que `ALREADY_INVITED`.
  */
-export async function listTeamSentInvitations(
+export async function listTeamPendingInvitations(
   teamId: number,
   requesterId: number,
-): Promise<TeamSentInvitation[]> {
+): Promise<{ requests: TeamJoinRequest[]; invitations: TeamSentInvitation[] }> {
   if (!(await userCanManageTeam(teamId, requesterId))) throw new Error("FORBIDDEN");
   const db = await getDatabase();
-  const [rows] = await db.execute<(InvitationRow & { roles_json: unknown })[]>(
-    `SELECT i.id, i.team_id, t.name AS team_name, i.user_id, u.pseudo, i.kind, i.roles_json, i.created_at
+  const [rows] = await db.execute<
+    (RowDataPacket & {
+      id: number;
+      user_id: number;
+      pseudo: string;
+      kind: "INVITE" | "REQUEST";
+      roles_json: unknown;
+      created_at: Date;
+    })[]
+  >(
+    `SELECT i.id, i.user_id, u.pseudo, i.kind, i.roles_json, i.created_at
      FROM bg_team_invitations i
-     JOIN bg_teams t ON t.id = i.team_id
      JOIN bg_users u ON u.id = i.user_id
-     WHERE i.team_id = ? AND i.kind = 'INVITE' AND i.status = 'PENDING'
+     WHERE i.team_id = ? AND i.status = 'PENDING'
      ORDER BY i.created_at DESC`,
     [teamId],
   );
-  return rows.map((r) => {
-    const roles = invitationRoles(r.roles_json);
-    return {
+
+  const requests: TeamJoinRequest[] = [];
+  const invitations: TeamSentInvitation[] = [];
+  for (const r of rows) {
+    const base = {
       id: Number(r.id),
       userId: Number(r.user_id),
       pseudo: r.pseudo,
-      // Invitation d'avant la colonne : le joueur arrivera en DPS, on le dit.
-      roles: roles.length === 0 ? (["DPS"] as TeamRole[]) : roles,
       createdAt: toIso(r.created_at) ?? new Date().toISOString(),
     };
-  });
+    if (r.kind === "REQUEST") {
+      requests.push(base);
+    } else {
+      const roles = invitationRoles(r.roles_json);
+      // Invitation d'avant la colonne : le joueur arrivera en DPS, on le dit.
+      invitations.push({ ...base, roles: roles.length === 0 ? (["DPS"] as TeamRole[]) : roles });
+    }
+  }
+  return { requests, invitations };
 }
 
 /**
@@ -1233,29 +1268,5 @@ export async function cancelInvitation(actingUserId: number, invitationId: numbe
     [invitationId],
   );
   if (Number(res.affectedRows) === 0) throw new Error("INVITATION_NOT_PENDING");
-}
-
-/** Demandes (REQUEST) en attente pour une équipe (vue gestion). */
-export async function listTeamJoinRequests(
-  teamId: number,
-  requesterId: number,
-): Promise<TeamJoinRequest[]> {
-  if (!(await userCanManageTeam(teamId, requesterId))) throw new Error("FORBIDDEN");
-  const db = await getDatabase();
-  const [rows] = await db.execute<InvitationRow[]>(
-    `SELECT i.id, i.team_id, t.name AS team_name, i.user_id, u.pseudo, i.kind, i.created_at
-     FROM bg_team_invitations i
-     JOIN bg_teams t ON t.id = i.team_id
-     JOIN bg_users u ON u.id = i.user_id
-     WHERE i.team_id = ? AND i.kind = 'REQUEST' AND i.status = 'PENDING'
-     ORDER BY i.created_at DESC`,
-    [teamId],
-  );
-  return rows.map((r) => ({
-    id: Number(r.id),
-    userId: Number(r.user_id),
-    pseudo: r.pseudo,
-    createdAt: toIso(r.created_at) ?? new Date().toISOString(),
-  }));
 }
 

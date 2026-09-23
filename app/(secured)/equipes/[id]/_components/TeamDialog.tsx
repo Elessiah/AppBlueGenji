@@ -14,8 +14,6 @@ interface TeamDialogProps {
   /** Présent : le panneau est un formulaire, Entrée le soumet. */
   onSubmit?: () => void;
   tone?: "default" | "danger";
-  /** La modale contient une liste déroulante qui doit pouvoir déborder. */
-  allowOverflow?: boolean;
   children: ReactNode;
   footer: ReactNode;
 }
@@ -45,7 +43,6 @@ export function TeamDialog({
   busy = false,
   onSubmit,
   tone = "default",
-  allowOverflow = false,
   children,
   footer,
 }: TeamDialogProps) {
@@ -76,7 +73,6 @@ export function TeamDialog({
     tabIndex: -1,
     className: styles.dialog,
     "data-tone": tone,
-    "data-allow-overflow": allowOverflow ? "true" : undefined,
     onClick: (e: React.MouseEvent) => e.stopPropagation(),
   };
 

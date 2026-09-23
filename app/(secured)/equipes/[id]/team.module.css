@@ -181,8 +181,12 @@
   border-top: none;
 }
 
+/* Piste d'actions de **largeur fixe**, jamais `auto` : l'en-tête et chaque
+   ligne sont des grilles séparées, et une piste `auto` se dimensionne sur le
+   contenu de *sa* ligne — la ligne du propriétaire (un bouton) et celle d'un
+   joueur (deux) posaient les colonnes à des abscisses différentes. */
 .withActions {
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.6fr) minmax(0, 0.8fr) auto;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.6fr) minmax(0, 0.8fr) 168px;
 }
 
 .rosterHeader {
@@ -250,7 +254,7 @@
   }
 
   .rosterRow,
-  .withActions {
+  .rosterRow.withActions {
     grid-template-columns: 1fr;
     gap: 8px;
   }
@@ -315,6 +319,10 @@
   position: relative;
 }
 
+/* Défile à la main, et c'est voulu : `<ScrollArea>` pose `tabIndex={0}` sur la
+   zone, or le motif `combobox` garde le focus dans le champ — une liste
+   atteignable à la tabulation ferait un arrêt clavier de trop, qui ne répond
+   pas aux flèches. */
 .suggestions {
   position: absolute;
   top: calc(100% + 4px);
@@ -482,17 +490,23 @@
   z-index: 90;
   background: rgba(6, 8, 12, 0.72);
   display: flex;
-  align-items: center;
   justify-content: center;
   padding: 16px;
+  /* Le voile défile, pas le panneau : une modale plus haute que l'écran reste
+     entière et atteignable, et une liste de suggestions qu'elle porte n'est
+     jamais coupée à son bord. Pas de `<ScrollArea>` ici — il rendrait le voile
+     focalisable (`tabIndex={0}`) et en ferait une région nommée, alors que le
+     voile n'est qu'une couche de présentation. */
   overflow-y: auto;
 }
 
 .dialog {
   width: 100%;
   max-width: 460px;
-  max-height: calc(100vh - 32px);
-  overflow-y: auto;
+  /* `margin: auto` centre la modale quand elle tient, et la colle en haut du
+     voile quand elle déborde — là où `align-items: center` la rognerait des
+     deux côtés, haut inatteignable compris. */
+  margin: auto;
   background: var(--cyber-bg-2, #14181f);
   border: 1px solid rgba(var(--orange-rgb), 0.4);
   border-radius: var(--r-cy-md, 12px);
@@ -503,12 +517,6 @@
 
 .dialog[data-tone="danger"] {
   border-color: rgba(255, 90, 110, 0.45);
-}
-
-/* La liste d'autocomplétion d'une modale doit pouvoir en sortir : la modale
-   défile sur petit écran, mais une liste coupée à son bord ne servirait à rien. */
-.dialog[data-allow-overflow="true"] {
-  overflow: visible;
 }
 
 .dialogTitle {
@@ -544,7 +552,12 @@
 .choiceList {
   margin-top: 14px;
   max-height: 280px;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.choiceGroup {
   display: flex;
   flex-direction: column;
   gap: 6px;

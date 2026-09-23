@@ -1,12 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import {
-  getTeamDetail,
-  inviteToTeam,
-  listTeamJoinRequests,
-  listTeamSentInvitations,
-} from "@/lib/server/teams-service";
-import { inviteRolesFromBody } from "@/lib/server/team-invite-roles";
+import { getTeamDetail, inviteToTeam, listTeamPendingInvitations } from "@/lib/server/teams-service";
+import { JOIN_CONFLICTS, inviteRolesFromBody } from "@/lib/server/team-invite-roles";
 
 /**
  * Ce qui attend une réponse, vue gestion : les demandes (REQUEST) reçues et
@@ -21,11 +16,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   if (!Number.isInteger(teamId) || teamId <= 0) return fail("INVALID_TEAM_ID", 400);
 
   try {
-    const [requests, invitations] = await Promise.all([
-      listTeamJoinRequests(teamId, user.id),
-      listTeamSentInvitations(teamId, user.id),
-    ]);
-    return ok({ requests, invitations });
+    return ok(await listTeamPendingInvitations(teamId, user.id));
   } catch (error) {
     const message = (error as Error).message;
     if (message === "FORBIDDEN") return fail(message, 403);
@@ -56,6 +47,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     if (message === "USER_ALREADY_IN_TEAM") return fail(message, 409);
     if (message === "ALREADY_INVITED") return fail(message, 409);
     if (message === "MISSING_ROLE") return fail(message, 400);
+    if (JOIN_CONFLICTS.has(message)) return fail(message, 409);
     return fail(message || "TEAM_INVITE_FAILED", 400);
   }
 }

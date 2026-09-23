@@ -35,27 +35,39 @@ export function useResourceLoader<T>(
    * saisie en cours, position de défilement, modale ouverte — pour se remonter
    * une demi-seconde plus tard.
    */
+  /**
+   * Numéro de la dernière lecture lancée. Deux gestes rapprochés lancent deux
+   * relectures, et rien ne garantit qu'elles reviennent dans l'ordre : sans ce
+   * compteur, la réponse la plus ancienne pouvait arriver la dernière et
+   * remettre à l'écran un état que le geste suivant venait de changer.
+   */
+  const latestRef = useRef(0);
+
   const load = useCallback(
     async (silent: boolean) => {
+      const seq = ++latestRef.current;
+      const isLatest = () => seq === latestRef.current;
       if (!silent) setState({ status: "loading", data: null, error: null });
       try {
         const res = await fetch(url, { cache: "no-store" });
         if (res.status === 404) {
           const body = (await res.json().catch(() => ({}))) as NotFoundPayload;
+          if (!isLatest()) return;
           setState({ status: "not-found", data: null, error: null });
           optionsRef.current?.onNotFoundRedirect?.(body);
           return;
         }
         if (!res.ok) {
-          if (silent) return;
+          if (silent || !isLatest()) return;
           const body = (await res.json().catch(() => ({}))) as { error?: string };
           setState({ status: "error", data: null, error: body.error ?? `HTTP_${res.status}` });
           return;
         }
         const data = (await res.json()) as T;
+        if (!isLatest()) return;
         setState({ status: "ready", data, error: null });
       } catch (e) {
-        if (silent) return;
+        if (silent || !isLatest()) return;
         setState({ status: "error", data: null, error: (e as Error).message });
       }
     },

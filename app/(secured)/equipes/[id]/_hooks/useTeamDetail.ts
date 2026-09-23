@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
 import { useResourceLoader } from "@/lib/shared/hooks/useResourceLoader";
@@ -7,6 +8,9 @@ import { teamErrorMessage } from "../../_lib/team-errors";
 export function useTeamDetail(teamId: number) {
   const router = useRouter();
   const { showError } = useToast();
+  // Un lien d'entrée solo mène au profil : pendant la redirection, la page ne
+  // doit afficher ni « introuvable » ni rien qui ressemble à une erreur.
+  const [redirecting, setRedirecting] = useState(false);
 
   const { status, data, error, revalidate } = useResourceLoader<TeamDetailResponse>(
     `/api/teams/${teamId}`,
@@ -17,6 +21,7 @@ export function useTeamDetail(teamId: number) {
         // erreur — le lien était valide.
         const soloUserId = payload.soloUserId;
         if (typeof soloUserId === "number") {
+          setRedirecting(true);
           router.replace(`/joueurs/${soloUserId}`);
           return;
         }
@@ -29,8 +34,8 @@ export function useTeamDetail(teamId: number) {
 
   return {
     team: data,
-    loading: status === "loading",
-    error: status === "not-found" || status === "error" ? error ?? status : null,
+    loading: status === "loading" || redirecting,
+    error: !redirecting && (status === "not-found" || status === "error") ? error ?? status : null,
     /**
      * Relecture **silencieuse** après un geste : la fiche reste affichée
      * pendant l'appel au lieu de repasser par « Chargement… ».

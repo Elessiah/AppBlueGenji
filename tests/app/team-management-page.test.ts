@@ -209,3 +209,61 @@ describe("messages qui changent de sujet", () => {
     expect(teamErrorMessage("toString")).toBe(teamErrorMessage("UN_CODE_INCONNU"));
   });
 });
+
+describe("correctifs de la première revue", () => {
+  const css = read("team.module.css");
+  const block = (selector: string) => {
+    const start = css.indexOf(`${selector} {`);
+    expect(start).toBeGreaterThan(-1);
+    return css.slice(start, css.indexOf("}", start));
+  };
+
+  it("un lien d'entrée solo ne fait pas clignoter « introuvable » pendant la redirection", () => {
+    const hook = stripComments(read("_hooks", "useTeamDetail.ts"));
+    expect(hook).toContain("setRedirecting(true)");
+    expect(hook).toMatch(/error: !redirecting &&/);
+    expect(hook).toMatch(/loading: status === "loading" \|\| redirecting/);
+  });
+
+  it("la piste d'actions du roster a une largeur fixe, jamais `auto`", () => {
+    const withActions = block(".withActions");
+    expect(withActions).toMatch(/grid-template-columns:[^;]*\d+px;/);
+    expect(withActions).not.toMatch(/\bauto\b/);
+  });
+
+  it("le panneau d'une modale ne défile ni ne rogne : c'est le voile qui défile", () => {
+    const dialog = stripComments(block(".dialog"));
+    expect(dialog).not.toMatch(/overflow/);
+    expect(dialog).not.toMatch(/max-height/);
+    expect(dialog).toMatch(/margin:\s*auto/);
+    expect(css).not.toContain("data-allow-overflow");
+  });
+
+  it("la liste du transfert défile par ScrollArea", () => {
+    const transfer = read("_components", "TransferOwnershipDialog.tsx");
+    expect(transfer).toMatch(/<ScrollArea orientation="y" className=\{styles\.choiceList\}/);
+    expect(stripComments(block(".choiceList"))).not.toMatch(/overflow/);
+  });
+
+  it("un refus de rôles se dit en notification, pas en ligne", () => {
+    const roles = stripComments(read("_components", "RolesDialog.tsx"));
+    const members = stripComments(read("_components", "MembersSection.tsx"));
+    for (const src of [roles, members]) {
+      expect(src).toContain('showError(teamErrorMessage("MISSING_ROLE"))');
+      expect(src).not.toContain('role="status"');
+    }
+  });
+
+  it("Échap revient d'abord au contrôle qui a quelque chose d'ouvert", () => {
+    const hook = readFileSync(join(ROOT, "lib", "shared", "hooks", "useDialogBehavior.ts"), "utf8");
+    const escape = hook.slice(hook.indexOf('event.key === "Escape"'), hook.indexOf("closeRef.current()"));
+    expect(escape).toContain('getAttribute?.("aria-expanded") === "true"');
+  });
+
+  it("les relectures ne s'appliquent que si elles sont les dernières lancées", () => {
+    const loader = stripComments(readFileSync(join(ROOT, "lib", "shared", "hooks", "useResourceLoader.ts"), "utf8"));
+    expect(loader).toContain("const seq = ++latestRef.current");
+    const ready = loader.slice(0, loader.indexOf('setState({ status: "ready"'));
+    expect(ready.slice(ready.lastIndexOf("res.json()"))).toContain("if (!isLatest()) return;");
+  });
+});

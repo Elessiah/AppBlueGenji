@@ -7,7 +7,7 @@ import {
   removeTeamMember,
   updateTeamMemberRoles,
 } from "@/lib/server/teams-service";
-import { inviteRolesFromBody } from "@/lib/server/team-invite-roles";
+import { JOIN_CONFLICTS, inviteRolesFromBody } from "@/lib/server/team-invite-roles";
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -39,6 +39,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     if (message === "USER_ALREADY_IN_TEAM") return fail(message, 409);
     if (message === "ALREADY_INVITED") return fail(message, 409);
     if (message === "MISSING_ROLE") return fail(message, 400);
+    if (JOIN_CONFLICTS.has(message)) return fail(message, 409);
     return fail(message || "TEAM_MEMBER_ADD_FAILED", 400);
   }
 }

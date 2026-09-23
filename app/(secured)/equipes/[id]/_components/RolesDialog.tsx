@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import type { TeamRole } from "@/lib/shared/types";
+import { useToast } from "@/components/ui/toast";
+import { teamErrorMessage } from "../../_lib/team-errors";
 import { TeamDialog } from "./TeamDialog";
 import { RolePicker } from "./RolePicker";
 import styles from "../team.module.css";
@@ -26,6 +28,7 @@ interface RolesDialogProps {
 export function RolesDialog({ target, onClose, onSave }: RolesDialogProps) {
   const [selected, setSelected] = useState(target.selected);
   const [pending, setPending] = useState(false);
+  const { showError } = useToast();
 
   const unchanged =
     selected.length === target.selected.length && selected.every((role) => target.selected.includes(role));
@@ -39,7 +42,13 @@ export function RolesDialog({ target, onClose, onSave }: RolesDialogProps) {
     !selected.includes("MANAGER");
 
   const save = async () => {
-    if (empty || unchanged || pending) return;
+    if (unchanged || pending) return;
+    // Le refus se dit en notification, comme tout message d'erreur du site —
+    // et non par un bouton grisé sans explication.
+    if (empty) {
+      showError(teamErrorMessage("MISSING_ROLE"));
+      return;
+    }
     setPending(true);
     const ok = await onSave(selected);
     // Refus : la modale reste ouverte avec la sélection, pour corriger.
@@ -57,7 +66,7 @@ export function RolesDialog({ target, onClose, onSave }: RolesDialogProps) {
           <button type="button" className="btn ghost" onClick={onClose} disabled={pending}>
             Annuler
           </button>
-          <button type="submit" className={`btn ${styles.primaryButton}`} disabled={empty || unchanged || pending}>
+          <button type="submit" className={`btn ${styles.primaryButton}`} disabled={unchanged || pending}>
             {pending ? "Enregistrement…" : "Enregistrer"}
           </button>
         </>
@@ -70,13 +79,8 @@ export function RolesDialog({ target, onClose, onSave }: RolesDialogProps) {
         </p>
       ) : null}
       <RolePicker selected={selected} onChange={setSelected} />
-      {empty ? (
-        <p className={styles.help} role="status">
-          Choisis au moins un rôle : un membre sans rôle n&apos;existe pas.
-        </p>
-      ) : null}
       {dropsOwnManagement ? (
-        <p className={styles.help} role="status">
+        <p className={styles.help}>
           Sans le rôle de manager, tu ne pourras plus gérer le roster de l&apos;équipe.
         </p>
       ) : null}

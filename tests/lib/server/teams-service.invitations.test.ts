@@ -9,7 +9,7 @@ jest.mock("@/lib/server/users-service", () => {
 import {
   cancelInvitation,
   inviteToTeam,
-  listTeamSentInvitations,
+  listTeamPendingInvitations,
   requestToJoinTeam,
   respondToInvitation,
 } from "@/lib/server/teams-service";
@@ -101,11 +101,10 @@ function run(sql: string, params: unknown[], inTransaction: boolean): unknown {
   }
   if (/FROM bg_team_invitations i/.test(text)) {
     const [teamId] = params as number[];
-    const kind = /i\.kind = 'INVITE'/.test(text) ? "INVITE" : "REQUEST";
     return [
       state.invitations
-        .filter((i) => i.team_id === teamId && i.kind === kind && i.status === "PENDING")
-        .map((i) => ({ ...i, pseudo: `joueur${i.user_id}`, team_name: "Équipe" })),
+        .filter((i) => i.team_id === teamId && i.status === "PENDING")
+        .map((i) => ({ ...i, pseudo: `joueur${i.user_id}` })),
     ];
   }
   if (/SELECT id, deleted_at, is_ghost, solo_user_id FROM bg_teams/.test(text)) {
@@ -328,9 +327,43 @@ describe("acceptation atomique", () => {
     const inv = invite();
     state.deletedUsers.add(42);
 
-    await expect(respondToInvitation(42, inv.id, true)).rejects.toThrow("USER_NOT_FOUND");
+    await expect(respondToInvitation(42, inv.id, true)).rejects.toThrow("PLAYER_ACCOUNT_DELETED");
     expect(rolesOf(42)).toBeUndefined();
     expect(inv.status).toBe("PENDING");
+  });
+});
+
+describe("acceptation — l'équipe doit encore exister", () => {
+  it("refuse une équipe dissoute pendant l'attente, sans consommer l'invitation", async () => {
+    const inv = invite();
+    state.teams[7].deleted_at = new Date();
+
+    await expect(respondToInvitation(42, inv.id, true)).rejects.toThrow("TEAM_DELETED");
+
+    expect(rolesOf(42)).toBeUndefined();
+    expect(inv.status).toBe("PENDING");
+    expect(connection.rollback).toHaveBeenCalled();
+  });
+
+  it("refuse une équipe devenue fantôme", async () => {
+    const inv = invite();
+    state.teams[7].is_ghost = 1;
+    await expect(respondToInvitation(42, inv.id, true)).rejects.toThrow("TEAM_NOT_JOINABLE");
+  });
+
+  it("verrouille dans l'ordre de la dissolution : joueur, équipe, puis invitation", async () => {
+    // `softDeleteTeam` écrit l'équipe puis ses invitations ; prendre
+    // l'invitation avant l'équipe ouvrirait un interblocage avec elle.
+    const inv = invite();
+    await respondToInvitation(42, inv.id, true);
+
+    const sqls = connection.execute.mock.calls.map(([sql]) => String(sql).replace(/\s+/g, " "));
+    const user = sqls.findIndex((q) => /FROM bg_users WHERE id = \? FOR UPDATE/.test(q));
+    const team = sqls.findIndex((q) => /FROM bg_teams WHERE id = \? FOR SHARE/.test(q));
+    const claim = sqls.findIndex((q) => /SET status = 'ACCEPTED'/.test(q));
+    expect(user).toBe(0);
+    expect(team).toBeGreaterThan(user);
+    expect(claim).toBeGreaterThan(team);
   });
 });
 
@@ -389,24 +422,33 @@ describe("cancelInvitation", () => {
   });
 });
 
-describe("listTeamSentInvitations", () => {
-  it("rend les invitations en attente de l'équipe, rôles compris", async () => {
+describe("listTeamPendingInvitations", () => {
+  it("sépare demandes reçues et invitations envoyées, rôles compris", async () => {
     invite({ roles_json: ["TANK"] });
     invite({ user_id: 43, roles_json: null });
     invite({ user_id: 44, status: "DECLINED" });
     invite({ user_id: 45, kind: "REQUEST" });
 
-    const list = await listTeamSentInvitations(7, 1);
+    const { requests, invitations } = await listTeamPendingInvitations(7, 1);
 
-    expect(list.map((i) => [i.userId, i.roles])).toEqual([
+    expect(invitations.map((i) => [i.userId, i.roles])).toEqual([
       [42, ["TANK"]],
       // Invitation d'avant la colonne : le joueur arrivera en DPS, on le dit.
       [43, ["DPS"]],
     ]);
-    expect(list[0].createdAt).toBe("2026-09-22T10:00:00.000Z");
+    expect(invitations[0].createdAt).toBe("2026-09-22T10:00:00.000Z");
+    expect(requests).toEqual([
+      { id: expect.any(Number), userId: 45, pseudo: "joueur45", createdAt: "2026-09-22T10:00:00.000Z" },
+    ]);
+  });
+
+  it("ne contrôle les droits qu'une fois et ne lit qu'une fois", async () => {
+    const db = (await getDatabase()) as unknown as { execute: jest.Mock };
+    await listTeamPendingInvitations(7, 1);
+    expect(db.execute).toHaveBeenCalledTimes(2);
   });
 
   it("est réservée à la gestion", async () => {
-    await expect(listTeamSentInvitations(7, 42)).rejects.toThrow("FORBIDDEN");
+    await expect(listTeamPendingInvitations(7, 42)).rejects.toThrow("FORBIDDEN");
   });
 });

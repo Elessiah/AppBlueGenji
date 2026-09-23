@@ -18,3 +18,16 @@ export function inviteRolesFromBody(raw: unknown): TeamRole[] | undefined {
   if (!Array.isArray(raw)) return [];
   return raw.filter((role): role is TeamRole => typeof role === "string");
 }
+
+/**
+ * Refus d'une **arrivée** dans une équipe que l'état a rendue impossible entre
+ * la lecture et l'écriture (`acceptIntoTeam`) — des conflits (409), pas des
+ * saisies fautives : l'invitation a déjà reçu une réponse, l'équipe a été
+ * dissoute, ou le joueur a supprimé son compte.
+ */
+export const JOIN_CONFLICTS: ReadonlySet<string> = new Set([
+  "INVITATION_NOT_PENDING",
+  "TEAM_DELETED",
+  "TEAM_NOT_JOINABLE",
+  "PLAYER_ACCOUNT_DELETED",
+]);
