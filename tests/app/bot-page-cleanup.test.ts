@@ -76,8 +76,12 @@ describe("/bot — les commandes renvoient à leur source", () => {
   });
 
   it("mène à `/bot/docs`, qui lit le Markdown du bot à chaud", () => {
-    expect(commands).toContain("BOT_DOC_SECTIONS");
-    expect(commands).toContain("/bot/docs/${section.slug}");
+    expect(commands).toContain("visibleBotDocSections");
+    expect(commands).toContain("/bot/docs/${s.slug}");
+  });
+
+  it("ajoute les pages légales du bot à la même liste", () => {
+    expect(commands).toContain("BOT_LEGAL_LINKS");
   });
 
   it("couvre tous les documents du registre, sans seconde liste", () => {
