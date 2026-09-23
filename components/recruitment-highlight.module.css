@@ -28,6 +28,7 @@
   background: var(--blue-300, #5ac8ff);
   box-shadow: 0 0 8px rgba(90, 200, 255, 0.9);
   animation: bannerPulse 2s ease-in-out infinite;
+  animation-play-state: var(--deco-anim-state);
 }
 
 @keyframes bannerPulse {

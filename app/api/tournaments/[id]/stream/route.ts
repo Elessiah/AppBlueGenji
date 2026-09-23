@@ -33,6 +33,15 @@ export const dynamic = "force-dynamic";
  */
 const HEARTBEAT_MS = 25_000;
 
+/** Le client demande-t-il le palier spectateur (onglet caché, hors match) ? */
+function wantsQuietStream(req: Request): boolean {
+  try {
+    return new URL(req.url).searchParams.get("quiet") === "1";
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) {
@@ -94,7 +103,16 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   const isParticipant =
     viewer.myTeamId !== null &&
     snapshot.registrations.some((row) => row.teamId === viewer.myTeamId);
-  const tier = resolveRefreshTier({ isStaff: narratesLive, isParticipant });
+
+  // `?quiet=1` : l'onglet est caché depuis une minute et son lecteur n'a pas de
+  // match en cours (`lib/shared/client-power.ts`). Il **demande** le palier
+  // spectateur — il recevra encore l'annonce de son match, à la fenêtre des
+  // spectateurs (vingt secondes d'ordinaire, jusqu'à une minute quand le budget
+  // de sortie d'une grosse salle l'élargit) — et libère ce budget pour ceux qui
+  // jouent. Un client ne peut que se déclasser ainsi, jamais se promouvoir.
+  const tier = wantsQuietStream(req)
+    ? "STANDARD"
+    : resolveRefreshTier({ isStaff: narratesLive, isParticipant });
 
   // Un onglet ouvre un flux. Le plafond ne gêne personne d'ordinaire ; il évite
   // qu'un client en boucle de reconnexion accapare la machine.

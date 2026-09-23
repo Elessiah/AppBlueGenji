@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useClock } from "@/lib/shared/hooks/useClock";
 import styles from "./CountdownStrip.module.css";
 
 interface CountdownStripProps {
@@ -9,13 +9,8 @@ interface CountdownStripProps {
 }
 
 function useCountdown(targetISO: string) {
-  const [now, setNow] = useState<Date | null>(null);
-
-  useEffect(() => {
-    setNow(new Date());
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
+  // Horloge soumise au régime de charge : arrêtée onglet caché, recalée au retour.
+  const now = useClock(1000);
 
   const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -24,7 +19,7 @@ function useCountdown(targetISO: string) {
   }
 
   const target = new Date(targetISO);
-  let delta = Math.max(0, target.getTime() - now.getTime());
+  let delta = Math.max(0, target.getTime() - now);
   const d = Math.floor(delta / 86400000);
   delta -= d * 86400000;
   const h = Math.floor(delta / 3600000);

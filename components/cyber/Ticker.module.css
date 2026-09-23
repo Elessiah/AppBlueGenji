@@ -15,6 +15,7 @@
   height: 100%;
   align-items: center;
   animation: cy-tk 58s linear infinite;
+  animation-play-state: var(--deco-anim-state);
   padding-left: 48px;
 }
 

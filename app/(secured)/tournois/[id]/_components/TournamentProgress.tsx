@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useClock } from "@/lib/shared/hooks/useClock";
 import { ScrollArea } from "@/components/cyber";
 import {
   computeRunningRatio,
@@ -40,18 +40,15 @@ function shortDateTime(iso: string): string {
  * qu'on recharge la page.
  */
 export function TournamentProgress({ detail }: TournamentProgressProps) {
-  const [now, setNow] = useState(() => Date.now());
-
   // Un tournoi terminé ne bouge plus : ni jalon à franchir, ni compte à rebours,
   // ni matchs à rejouer. Laisser battre l'horloge y ferait re-parcourir tous les
   // matchs du plateau toutes les 30 s, indéfiniment, pour un affichage figé.
+  // L'horloge s'arrête aussi onglet caché (`useClock`, régime de charge).
   const isFinished = detail.card.state === "FINISHED";
-
-  useEffect(() => {
-    if (isFinished) return;
-    const timer = setInterval(() => setNow(Date.now()), TICK_MS);
-    return () => clearInterval(timer);
-  }, [isFinished]);
+  const clock = useClock(TICK_MS, !isFinished);
+  // Avant le montage, l'instant du rendu : la page est rendue côté client, et
+  // la frise ne doit pas passer par un état vide.
+  const now = clock ?? Date.now();
 
   const playedRatio = computeRunningRatio({
     format: detail.card.format,

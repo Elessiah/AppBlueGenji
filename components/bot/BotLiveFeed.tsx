@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { BotFeedEvent } from '@/lib/shared/types';
+import { useClientPower } from '@/lib/shared/hooks/useClientPower';
 
 export function BotLiveFeed() {
   const [items, setItems] = useState<BotFeedEvent[]>([]);
@@ -21,7 +22,35 @@ export function BotLiveFeed() {
     pausedRef.current = paused;
   }, [paused]);
 
+  /**
+   * Onglet caché depuis une minute : le flux est **fermé**, et avec lui la
+   * connexion que le site tient vers le bot pour ce lecteur. Personne ne lit un
+   * défilé d'évènements dans un onglet qu'il ne regarde pas, et le bot rejoue
+   * son historique récent à chaque connexion : au retour, la liste repart de
+   * cet historique plutôt que de le recoller sous ce qu'elle montrait déjà (il
+   * s'y afficherait en double, dans le désordre).
+   */
+  const { quietStreamAfterMs } = useClientPower();
+  const [suspended, setSuspended] = useState(false);
   useEffect(() => {
+    if (quietStreamAfterMs === null) {
+      setSuspended(false);
+      return;
+    }
+    const timer = setTimeout(() => setSuspended(true), quietStreamAfterMs);
+    return () => clearTimeout(timer);
+  }, [quietStreamAfterMs]);
+
+  const everSuspendedRef = useRef(false);
+  useEffect(() => {
+    if (suspended) {
+      everSuspendedRef.current = true;
+      return;
+    }
+    if (everSuspendedRef.current) {
+      setItems([]);
+      setBuffer([]);
+    }
     const es = new EventSource('/api/bot/feed/stream');
 
     const handleMessage = (event: MessageEvent) => {
@@ -45,7 +74,7 @@ export function BotLiveFeed() {
       es.removeEventListener('feed', handleMessage);
       es.close();
     };
-  }, []);
+  }, [suspended]);
 
   const handlePauseToggle = () => {
     if (paused) {

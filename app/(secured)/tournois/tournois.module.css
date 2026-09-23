@@ -468,6 +468,7 @@
   background: var(--red-live);
   box-shadow: 0 0 0 0 rgba(255, 77, 94, 0.6);
   animation: pulse 1.6s infinite;
+  animation-play-state: var(--deco-anim-state);
 }
 
 @keyframes pulse {
@@ -631,6 +632,7 @@
   color: #4fe0a2;
   box-shadow: 0 0 0 0 rgba(79, 224, 162, 0.6);
   animation: pulseGreen 1.6s infinite;
+  animation-play-state: var(--deco-anim-state);
 }
 
 @keyframes pulseGreen {

@@ -250,6 +250,13 @@ export default function RgpdPage() {
               vous reconnaître, ni de vous suivre d'un site à l'autre (sameSite=strict). Le
               premier dure sept jours, le second le temps de votre visite.
             </li>
+            <li>
+              <strong>bg_match_focus</strong> et <strong>bg_power_ignore_perf</strong> — deux
+              valeurs du stockage local de votre navigateur, <strong>jamais transmises</strong> au
+              serveur. La première allège les autres onglets du site pendant votre match (un
+              numéro d&apos;onglet tiré au hasard et une échéance de vingt minutes au plus) ; la
+              seconde retient votre choix d&apos;ignorer la détection de performances du mode éco.
+            </li>
           </ul>
           <p>
             Aucun bandeau de consentement cookies n'est requis pour ces cookies strictement

@@ -1,3 +1,4 @@
+import { viewerAlert } from "@/lib/shared/viewer-alerts";
 import { describe, expect, it } from "@jest/globals";
 import type {
   BracketMatch,
@@ -16,7 +17,6 @@ import {
   shouldCommitFetched,
   shouldRefreshViewerContext,
   reconnectDelayMs,
-  shouldPlayScoreReady,
   type LiveState,
 } from "@/app/(secured)/tournois/[id]/_lib/live-state";
 
@@ -327,7 +327,13 @@ describe("applyLiveMessage — droit de s'inscrire", () => {
   });
 });
 
-describe("shouldPlayScoreReady", () => {
+// Le signal « score à confirmer » est désormais l'une des annonces de
+// `viewerAlert` (`lib/shared/viewer-alerts.ts`) ; ces cas le rejouent sur de
+// vrais `TournamentDetail`, la forme que le flux lui passe.
+describe("signal « score à confirmer » (viewerAlert)", () => {
+  const rings = (before: TournamentDetail | null, after: TournamentDetail) =>
+    viewerAlert(before, after) === "SCORE_TO_CONFIRM";
+
   const detail = (matches: BracketMatch[], myTeamId: number | null = 10): TournamentDetail => ({
     ...snapshot({ matches }),
     ...viewer({ myTeamId }),
@@ -336,23 +342,23 @@ describe("shouldPlayScoreReady", () => {
   it("sonne quand un match du lecteur passe en attente de confirmation", () => {
     const before = detail([match({ status: "READY" })]);
     const after = detail([match({ status: "AWAITING_CONFIRMATION" })]);
-    expect(shouldPlayScoreReady(before, after)).toBe(true);
+    expect(rings(before, after)).toBe(true);
   });
 
   it("ne sonne pas pour le match des autres", () => {
     // Un spectateur n'a rien à confirmer : le signal ne le concerne pas.
     const before = detail([match({ status: "READY", team1Id: 30, team2Id: 40 })]);
     const after = detail([match({ status: "AWAITING_CONFIRMATION", team1Id: 30, team2Id: 40 })]);
-    expect(shouldPlayScoreReady(before, after)).toBe(false);
+    expect(rings(before, after)).toBe(false);
   });
 
   it("ne sonne pas deux fois pour la même attente", () => {
     const state = detail([match({ status: "AWAITING_CONFIRMATION" })]);
-    expect(shouldPlayScoreReady(state, state)).toBe(false);
+    expect(rings(state, state)).toBe(false);
   });
 
   it("ne sonne pas au premier chargement", () => {
-    expect(shouldPlayScoreReady(null, detail([match({ status: "AWAITING_CONFIRMATION" })]))).toBe(
+    expect(rings(null, detail([match({ status: "AWAITING_CONFIRMATION" })]))).toBe(
       false,
     );
   });
@@ -360,7 +366,7 @@ describe("shouldPlayScoreReady", () => {
   it("ne sonne pas pour un lecteur non engagé", () => {
     const before = detail([match({ status: "READY" })], null);
     const after = detail([match({ status: "AWAITING_CONFIRMATION" })], null);
-    expect(shouldPlayScoreReady(before, after)).toBe(false);
+    expect(rings(before, after)).toBe(false);
   });
 
   it("sonne pour un second match du lecteur", () => {
@@ -369,7 +375,7 @@ describe("shouldPlayScoreReady", () => {
       match({ id: 1, status: "AWAITING_CONFIRMATION" }),
       match({ id: 2, status: "AWAITING_CONFIRMATION" }),
     ]);
-    expect(shouldPlayScoreReady(before, after)).toBe(true);
+    expect(rings(before, after)).toBe(true);
   });
 });
 

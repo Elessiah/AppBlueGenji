@@ -1,0 +1,141 @@
+/* Témoin du régime de charge. Sous les boutons flottants (`.cta-float-*`,
+   ancrés à 78 px du bas), à l'opposé des notifications (en bas à gauche).
+   Au-dessus d'eux dans l'empilement (100) : fermée, la pastille ne les croise
+   pas ; ouvert, le panneau monte dans leur zone et doit passer devant. */
+.root {
+  position: fixed;
+  right: 28px;
+  bottom: 24px;
+  z-index: 110;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  font-family: var(--font-mono), monospace;
+  pointer-events: none;
+}
+
+.root > * {
+  pointer-events: auto;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 3px 10px;
+  border: 1px solid rgba(90, 200, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(7, 8, 10, 0.86);
+  color: var(--ink-mute, #c4ccd8);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.pill:hover {
+  border-color: rgba(90, 200, 255, 0.5);
+  color: var(--ink, #eef3fa);
+}
+
+.pill:focus-visible {
+  outline: 2px solid var(--blue-300, #5ac8ff);
+  outline-offset: 2px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--blue-300, #5ac8ff);
+}
+
+/* En match, la pastille prend l'ambre : un régime choisi par le site pour le
+   joueur, pas une limite de sa machine. */
+.root[data-mode="match"] .dot {
+  background: var(--amber, #ffb547);
+}
+
+.panel {
+  width: min(320px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border: 1px solid rgba(90, 200, 255, 0.28);
+  border-radius: 12px;
+  background: rgba(10, 12, 16, 0.96);
+  color: var(--text-1, #c4ccd8);
+  font-family: var(--font-sans), sans-serif;
+  font-size: 12px;
+  line-height: 1.45;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.title {
+  margin: 0 0 4px;
+  color: var(--ink, #eef3fa);
+  font-weight: 600;
+}
+
+.text {
+  margin: 0 0 8px;
+}
+
+.reasons {
+  margin: 0 0 8px;
+  padding-left: 16px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  cursor: pointer;
+}
+
+.mono {
+  margin: 0;
+  color: var(--text-2, #8c95a6);
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pill {
+    transition: none;
+  }
+}
+
+/* Contrastes forcés : le système retire les fonds, et le point disparaîtrait.
+   Il est redonné dans la couleur du texte — le libellé, lui, dit déjà « éco »
+   ou « match ». L'anneau de focus est une `outline`, que le mode respecte. */
+@media (forced-colors: active) {
+  .dot {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+
+  .pill,
+  .panel {
+    border-color: CanvasText;
+  }
+}
+
+/* Sous 720 px, le bouton « ? » descend dans le coin (`bottom: 20px`,
+   `right: 18px`, même point de rupture dans `app/globals.css`) : laissé à
+   droite, le témoin le recouvrirait. Il passe au centre, entre les
+   notifications (à gauche) et les boutons flottants (à droite). */
+@media (max-width: 720px) {
+  .root {
+    right: auto;
+    left: 50%;
+    bottom: 16px;
+    align-items: center;
+    transform: translateX(-50%);
+  }
+}

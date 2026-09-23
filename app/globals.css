@@ -1,4 +1,5 @@
 :root {
+  --deco-anim-state: running;
   --bg-0: #07080a;
   --bg-1: #0d0f13;
   --bg-2: #14161c;
@@ -19,6 +20,23 @@
   --radius: 16px;
   --radius-sm: 10px;
   --shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* Régime de charge (`lib/shared/client-power.ts`) : toute animation décorative
+   infinie lit `animation-play-state: var(--deco-anim-state)` (jeton déclaré
+   ci-dessus). `ClientPowerRoot` pose `data-motion="off"` quand la page n'est pas
+   regardée, que la machine est à la peine ou que le lecteur est en match — une
+   animation en pause ne produit plus aucune image, et le processeur comme la
+   carte graphique reviennent au jeu. La préférence système de mouvement réduit
+   fait de même dès le premier rendu, avant l'hydratation. */
+html[data-motion="off"] {
+  --deco-anim-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --deco-anim-state: paused;
+  }
 }
 
 * {
@@ -808,6 +826,7 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
     0 0 28px rgba(89, 212, 255, 0.22),
     inset 0 1px 0 rgba(89, 212, 255, 0.15);
   animation: ctaGlowCyan 3.2s ease-in-out infinite;
+  animation-play-state: var(--deco-anim-state);
 }
 
 .cta-float-home.home:hover {
@@ -1340,6 +1359,7 @@ html {
   background: var(--red-live);
   box-shadow: 0 0 0 0 rgba(255, 77, 94, 0.6);
   animation: cy-pulse 1.6s infinite;
+  animation-play-state: var(--deco-anim-state);
 }
 
 @keyframes cy-pulse {

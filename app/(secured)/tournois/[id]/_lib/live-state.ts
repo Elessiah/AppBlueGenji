@@ -14,7 +14,6 @@
  *   exactement ce qu'on cherche à supprimer.
  */
 import type {
-  BracketMatch,
   TournamentDetail,
   TournamentSnapshot,
   TournamentViewerContext,
@@ -161,43 +160,6 @@ function canRegisterIn(snapshot: TournamentSnapshot, viewer: TournamentViewerCon
   // En individuel, un joueur sans entrée solo peut s'inscrire : elle sera créée
   // à ce moment-là.
   return isSoloTournament(snapshot.card.participantType) || viewer.myTeamId !== null;
-}
-
-function awaitingConfirmationIds(matches: BracketMatch[], teamId: number | null): Set<number> {
-  if (teamId === null) return new Set();
-  return new Set(
-    matches
-      .filter(
-        (match) =>
-          match.status === "AWAITING_CONFIRMATION" &&
-          (match.team1Id === teamId || match.team2Id === teamId),
-      )
-      .map((match) => match.id),
-  );
-}
-
-/**
- * Faut-il jouer le signal sonore « score à confirmer » ?
- *
- * Uniquement quand un match **du lecteur** vient d'entrer en attente de
- * confirmation. Le flux ne portant plus l'événement brut mais l'état, c'est la
- * comparaison des deux instantanés qui le dit — et le son ne dérange plus les
- * spectateurs, qui n'ont rien à confirmer.
- */
-export function shouldPlayScoreReady(
-  previous: TournamentDetail | null,
-  next: TournamentDetail,
-): boolean {
-  if (!previous) return false;
-  if (next.myTeamId === null) return false;
-
-  const before = awaitingConfirmationIds(previous.matches, previous.myTeamId);
-  const after = awaitingConfirmationIds(next.matches, next.myTeamId);
-
-  for (const id of after) {
-    if (!before.has(id)) return true;
-  }
-  return false;
 }
 
 /**
