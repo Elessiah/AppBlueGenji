@@ -27,7 +27,7 @@ export function BotInviteCard() {
             privé au propriétaire du serveur la liste des modules et les commandes pour les régler.
           </p>
           <div className="row-actions">
-            <CyberButton asChild variant="primary" style={{ padding: "14px 22px" }}>
+            <CyberButton asChild variant="primary">
               <a href={inviteUrl} target="_blank" rel="noreferrer">
                 <DiscordIcon />
                 Inviter le bot
@@ -82,8 +82,9 @@ export function BotInviteCard() {
               )}
             </>
           )}
-          <div style={{ marginTop: 12, fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.16em", color: "var(--ink-dim)" }}>
-            SCOPES · BOT + APPLICATIONS.COMMANDS · INTEGER · {permissions}
+          <div className="perms-foot">
+            <span>SCOPES · BOT + APPLICATIONS.COMMANDS</span>
+            <span>INTEGER · {permissions}</span>
           </div>
         </div>
       </div>
