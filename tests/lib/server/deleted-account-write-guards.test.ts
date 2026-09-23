@@ -1,8 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 jest.mock("@/lib/server/database");
 
-import { getUserIdByPseudo, updateOwnProfile } from "@/lib/server/users-service";
+import {
+  createOrGetBlizzardUser,
+  createOrGetDiscordUser,
+  getUserIdByPseudo,
+  updateOwnProfile,
+} from "@/lib/server/users-service";
 
 /**
  * Ce qu'une ligne morte ne doit plus accepter ni fournir.
@@ -106,5 +113,80 @@ describe("getUserIdByPseudo — un compte supprimé ne se rattache plus", () => 
     // `null` est exactement ce que les deux appelants traduisent en
     // `USER_NOT_FOUND` : rien à apprendre de plus chez eux.
     await expect(getUserIdByPseudo("compte_supprime_412")).resolves.toBeNull();
+  });
+});
+
+/**
+ * Les **connexions** aussi arrivent après le commit de la suppression.
+ *
+ * Ces deux chemins résolvent leur compte sur une identité de fournisseur
+ * (`discord_id`, `blizzard_sub`) que l'anonymisation vient de mettre à `NULL` :
+ * une connexion déjà partie a lu l'identifiant d'avant, et son écriture retombe
+ * sur la ligne vidée. C'est la même course que la sauvegarde de profil, mais
+ * par la porte d'entrée, et pas la moins chère des deux — la branche Discord
+ * **recertifie** le tag qu'elle réécrit, et `canViewDiscordTag` rouvre alors
+ * une coordonnée à l'arbitrage de tout tournoi encore vivant où l'engagé
+ * anonymisé figure.
+ *
+ * La session ouverte dans la foulée, elle, n'est pas le sujet : `getCurrentUser`
+ * et la lecture par jeton portent déjà `is_deleted = 0`.
+ */
+describe("connexions OAuth — une ligne supprimée ne reprend pas son identité", () => {
+  beforeEach(() => jest.clearAllMocks());
+  afterEach(() => jest.restoreAllMocks());
+
+  it("Discord : ne réécrit ni le tag ni sa certification sur un compte mort", async () => {
+    // Le `SELECT` a résolu le compte avant la suppression ; l'`UPDATE` arrive
+    // après son commit.
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([[{ id: 412 }], []] as never) // compte résolu sur discord_id
+      .mockResolvedValue([{ affectedRows: 0 }] as never);
+    await mockDb(execute);
+
+    await createOrGetDiscordUser("100000000000000001", undefined, "nova");
+
+    const update = execute.mock.calls.find(([sql]) =>
+      String(sql).includes("discord_verified_at = NOW()"),
+    ) as [string, unknown[]];
+    expect(update).toBeDefined();
+    expect(update[0]).toMatch(/is_deleted = 0/);
+  });
+
+  it("Blizzard : ne repose pas le BattleTag sur un compte mort", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce([[{ id: 412 }], []] as never) // compte résolu sur blizzard_sub
+      .mockResolvedValue([{ affectedRows: 0 }] as never);
+    await mockDb(execute);
+
+    await createOrGetBlizzardUser("sub-412", "Nova#2143");
+
+    const update = execute.mock.calls.find(([sql]) =>
+      String(sql).includes("SET overwatch_battletag = ?"),
+    ) as [string, unknown[]];
+    expect(update).toBeDefined();
+    expect(update[0]).toMatch(/is_deleted = 0/);
+  });
+
+  it("ne laisse plus aucune écriture de `bg_users` sans sa garde", () => {
+    // Le contrôle qui tient vraiment : la règle est « toute écriture sur
+    // `bg_users` porte `is_deleted = 0` », et elle se perd au prochain chemin
+    // ajouté si rien ne la relit en bloc. Trois exceptions nommées, et elles
+    // seules — l'anonymisation *pose* le drapeau, la migration de démarrage
+    // rattrape des colonnes de visibilité, et le rapatriement d'avatars ne
+    // sélectionne que des URL distantes, qu'une ligne anonymisée n'a plus.
+    const source = readFileSync(
+      join(__dirname, "..", "..", "..", "lib", "server", "users-service.ts"),
+      "utf8",
+    );
+    const writes = [...source.matchAll(/UPDATE bg_users\b[\s\S]{0,400}?`/g)].map((m) => m[0]);
+    expect(writes.length).toBeGreaterThanOrEqual(5);
+    for (const write of writes) {
+      // `anonymizeAccount` est celle qui écrit `is_deleted = 1` : elle ne peut
+      // pas se garder elle-même.
+      if (write.includes("is_deleted = 1")) continue;
+      expect(write).toMatch(/is_deleted = 0/);
+    }
   });
 });

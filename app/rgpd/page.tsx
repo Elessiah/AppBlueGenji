@@ -136,8 +136,9 @@ export default function RgpdPage() {
           («&nbsp;Joueur supprimé&nbsp;») dans les archives. Un compte qui n'a jamais été
           engagé dans un tournoi n'a, lui, aucun palmarès à préserver : il est effacé
           entièrement, sans ligne résiduelle — à deux réserves près, où sa ligne reste parce
-          qu'elle est le titulaire de quelque chose qui survit : s'il a <strong>organisé</strong>
-          un tournoi, ou s'il est <strong>propriétaire d'une équipe</strong> (transférer ou
+          qu'elle est le titulaire de quelque chose qui survit : s'il a{" "}
+          <strong>organisé</strong> un tournoi, ou s'il est{" "}
+          <strong>propriétaire d'une équipe</strong> (transférer ou
           dissoudre l'équipe avant la suppression rétablit l'effacement complet).
         </div>
         <div className={styles.prose} style={{ marginTop: 20 }}>

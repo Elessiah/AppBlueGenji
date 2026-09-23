@@ -477,11 +477,25 @@ export async function createOrGetDiscordUser(
   if (existing.length > 0) {
     const userId = Number(existing[0].id);
     if (handle) {
+      // `is_deleted = 0` ferme ici la course que ferment déjà `writeVerifiedTag`,
+      // `updateOwnProfile` et les trois écritures de `linkOAuthIdentity` — et
+      // c'est celle qui coûte le plus cher des quatre. Une connexion Discord
+      // partie avant la suppression a résolu son compte sur le `discord_id`
+      // d'alors ; elle reprend **après** le commit de `deleteOwnAccount`, qui
+      // vient de vider tag et certification. Sans la condition, elle réécrivait
+      // le vrai pseudo Discord sur la ligne anonymisée **et le recertifiait** :
+      // `canViewDiscordTag` rouvre alors cette coordonnée à l'arbitrage de tout
+      // tournoi encore vivant où l'engagé figure — précisément ce que
+      // l'anonymisation venait d'effacer.
+      //
+      // La session, elle, n'est pas le sujet : `getCurrentUser` et la lecture
+      // par jeton portent déjà `is_deleted = 0`, donc celle que la connexion
+      // s'apprête à ouvrir ne résoudra personne.
       await db.execute(
         `UPDATE bg_users
          SET discord_pseudo = ?,
              discord_verified_at = NOW()
-         WHERE id = ?`,
+         WHERE id = ? AND is_deleted = 0`,
         [handle, userId],
       );
     }
@@ -535,7 +549,16 @@ export async function createOrGetBlizzardUser(sub: string, battletag: string | n
   if (existing.length > 0) {
     const userId = Number(existing[0].id);
     if (tag) {
-      await db.execute(`UPDATE bg_users SET overwatch_battletag = ? WHERE id = ?`, [tag, userId]);
+      // Même course, même remède qu'au-dessus : une connexion Battle.net partie
+      // avant la suppression réécrivait le BattleTag sur la ligne que
+      // `anonymizeAccount` venait de mettre à `NULL`. La donnée est moins
+      // exposée que le tag Discord (aucune certification, et l'anonymisation
+      // force `visible_overwatch` à 0), mais c'est la même chose : une
+      // coordonnée personnelle qui repousse sur un compte vidé.
+      await db.execute(
+        `UPDATE bg_users SET overwatch_battletag = ? WHERE id = ? AND is_deleted = 0`,
+        [tag, userId],
+      );
     }
     return userId;
   }
@@ -1554,8 +1577,16 @@ export async function setUserRoles(
   // Ne persister en JSON que les rôles cumulables non-ADMIN (ADMIN ⇔ is_admin).
   const nonAdminRoles = sanitized.filter((role) => role !== "ADMIN");
 
+  // Le `SELECT` ci-dessus donne le **refus lisible** (`USER_NOT_FOUND`), la
+  // condition ici tranche la **course** : les deux ne font pas double emploi,
+  // c'est le même partage qu'entre le contrôle préalable d'un sigle d'équipe et
+  // son index unique. Un `await` sépare la lecture de l'écriture, et une
+  // suppression de compte glissée entre les deux laissait un rôle de
+  // plateforme posé sur une ligne anonymisée — invisible de `getCurrentUser`,
+  // qui filtre déjà les lignes mortes, mais bien listé à l'écran des rôles, qui
+  // rend les comptes supprimés.
   await db.execute(
-    `UPDATE bg_users SET is_admin = ?, platform_roles_json = ? WHERE id = ?`,
+    `UPDATE bg_users SET is_admin = ?, platform_roles_json = ? WHERE id = ? AND is_deleted = 0`,
     [isAdmin ? 1 : 0, JSON.stringify(nonAdminRoles), targetUserId],
   );
 
