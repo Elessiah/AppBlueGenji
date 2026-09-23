@@ -87,10 +87,14 @@ function emptyBotStats(): BotStats {
  *
  * Deux faits différents, que le site confondait : le bot n'a pas répondu du
  * tout (connexion refusée — `BOT_INTERNAL_UNREACHABLE`), ou il a reçu la
- * demande mais n'a pas répondu à temps (`BOT_RESOLVE_TIMEOUT`). Le second est le
- * cas ordinaire d'un tag absent des serveurs du bot : il les balaie un à un, et
- * un tag qu'il ne trouve nulle part les parcourt **tous**. Rendu en « bot non
- * joignable », il faisait passer un joueur absent de ces serveurs pour une panne.
+ * demande mais n'a pas répondu à temps (`BOT_RESOLVE_TIMEOUT`). Le second était
+ * le cas ordinaire d'un tag absent des serveurs du bot, qu'il balayait alors un
+ * à un : rendu en « bot non joignable », il faisait passer un joueur absent de
+ * ces serveurs pour une panne. Le bot interroge désormais ses serveurs de front,
+ * sous un délai plus court que le nôtre, et répond lui-même `504
+ * BOT_RESOLVE_TIMEOUT` à l'échéance (voir {@link resolveDiscordUser}) : ce
+ * chemin-ci ne reste que pour un bot trop chargé pour répondre du tout, ou d'une
+ * version antérieure.
  *
  * Réservé à la résolution, et le nom le dit : un envoi de code qui dépasse son
  * délai survient **après** une résolution réussie — le tag n'y est pour rien, et
@@ -198,6 +202,12 @@ export async function resolveDiscordUser(handle: string): Promise<string> {
   }
   if (response.status === 404) {
     throw new Error("DISCORD_USER_NOT_FOUND");
+  }
+  // Le bot borne sa recherche et répond 504 quand des serveurs n'ont pas
+  // répondu à temps : le joueur y est peut-être, ce n'est pas un « introuvable ».
+  // Lu sur le statut et non sur le corps, qu'un relais pourrait réécrire.
+  if (response.status === 504) {
+    throw new Error("BOT_RESOLVE_TIMEOUT");
   }
 
   throw new Error(await safeReadError(response));
