@@ -307,7 +307,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Journal des suppressions de compte, rejoué après toute restauration",
     ],
     legalBasis: "Intérêt légitime (continuité du service)",
-    dataSubjects: ["Toutes les personnes des traitements T01 à T08"],
+    dataSubjects: ["Toutes les personnes des autres traitements du registre"],
     dataCategories: ["Copie de l'ensemble des données ci-dessus", "Journal des suppressions : identifiant et date de création du compte, date de suppression"],
     sensitiveData: "Aucune",
     retention: [
@@ -325,6 +325,27 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Clés de déchiffrement conservées hors du serveur",
       "Suppressions de compte rejouées avant toute remise en service après restauration",
     ],
+  },
+  {
+    ref: "T10",
+    name: "Information des joueurs sur les changements de politique",
+    purpose: "Informer chaque compte d'un changement du traitement de ses données, et recueillir son acceptation ou son refus",
+    subPurposes: [
+      "Présenter les changements non encore acceptés à la connexion (« J'accepte » ou « Je refuse, je supprime mon compte »)",
+      "Annoncer chaque changement une fois en message privé Discord aux comptes joignables",
+    ],
+    legalBasis: "Obligation d'information (RGPD, articles 12 à 14) et consentement du joueur",
+    dataSubjects: ["Joueurs inscrits sur le site"],
+    dataCategories: [
+      "Changements acceptés par le compte, avec la date d'acceptation",
+      "Annonces Discord déjà envoyées au compte, avec leur date",
+      "Identifiant Discord ou pseudo Discord certifié, pour adresser l'annonce",
+    ],
+    sensitiveData: "Aucune",
+    retention: ["Durée du compte (effacées avec lui)"],
+    recipients: ["Le joueur lui-même", "Discord, qui achemine le message privé"],
+    transfers: ["États-Unis : Discord (acheminement des messages privés), dans le cadre des garanties propres à Discord"],
+    security: [...COMMON_SECURITY, "Une annonce réservée avant l'envoi, pour qu'aucun compte ne la reçoive deux fois"],
   },
 ];
 
