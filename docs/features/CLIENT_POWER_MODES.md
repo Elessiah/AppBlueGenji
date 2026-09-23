@@ -17,8 +17,10 @@ l'utilisateur. Règle écrite une fois, dans `lib/shared/client-power.ts` (pur).
 | `MATCH` | le lecteur a une rencontre en cours (de « prête » au résultat) | figées | **mémoire rendue** | immédiat si la page a le focus ; sinon regroupé toutes les 5 s, **sauf son propre match** | palier normal |
 | `SLEEP` | onglet caché | figées | mémoire rendue | **au retour** seulement | palier spectateur après 60 s, hors match |
 
-Ce qui ne s'arrête **jamais** : le flux SSE, et la détection des évènements qui
-concernent le lecteur. Couper le flux ferait manquer l'annonce qu'on attend.
+Ce qui ne s'arrête **jamais** : le flux SSE **du tournoi**, et la détection des
+évènements qui concernent le lecteur. Couper ce flux ferait manquer l'annonce
+qu'on attend. (Le flux de `/bot`, lui, se ferme onglet caché : il n'annonce rien
+à personne.)
 
 ## Annonces quand on ne regarde pas (`lib/shared/viewer-alerts.ts`)
 
@@ -94,7 +96,10 @@ Pour un diagnostic à distance, `<html data-power="full|eco|match|sleep">` et
 - **Magasin unique** (`lib/shared/hooks/useClientPower.ts`) : un seul jeu
   d'écouteurs (visibilité, focus, `storage`, mouvement réduit) pour toute la
   page, via `useSyncExternalStore`. `useClientPower()` rend la politique,
-  `useClientPowerState()` tout l'état (témoin).
+  `useClientPowerState()` tout l'état (témoin). Une **page entière** ne s'y
+  abonne pas par un hook — elle serait re-rendue à chaque alt-tab — mais par
+  `subscribeClientPower` / `getClientPowerInput`, lus dans des refs (c'est ce
+  que fait `useTournamentLive`).
 - **Animations CSS** : toute animation **infinie** lit
   `animation-play-state: var(--deco-anim-state)`, jeton que `ClientPowerRoot`
   passe à `paused` sous `html[data-motion="off"]` (et la préférence système de

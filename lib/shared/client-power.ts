@@ -25,10 +25,11 @@
  *   attendent le retour pour être rendus, et hors match le flux descend au
  *   palier spectateur après une minute (le serveur y gagne autant que le poste).
  *
- * Ce qu'on ne coupe **jamais** : le flux SSE lui-même et la détection des
+ * Ce qu'on ne coupe **jamais** : le flux SSE du tournoi et la détection des
  * évènements qui concernent le lecteur (match prêt, score à confirmer, manche
  * suivante), qui déclenchent le signal sonore et le titre d'onglet même quand
- * rien n'est rendu. Couper le flux ferait manquer l'annonce qu'on attend.
+ * rien n'est rendu. Couper ce flux ferait manquer l'annonce qu'on attend — le
+ * flux de `/bot`, qui n'annonce rien à personne, se ferme, lui, onglet caché.
  *
  * Module pur : aucune dépendance au navigateur, testable tel quel.
  */
