@@ -226,10 +226,11 @@ noierait la seule qui compte.
 **Trois `CREATE TABLE` ne suivent pas cette règle**, et ce n'est pas un oubli :
 `bg_match_reminders`, `bg_referee_alerts` et `bg_endurance_penalties` gardent un
 `catch` muet, parce que c'est le contrat qu'`isMissingTableError` décrit et sur
-lequel s'appuient les chemins de notification, `tournaments/deletion.ts` et
-`tournaments/rollback.ts` — une base où leur création a échoué reste debout, et
-un rappel, une alerte ou une sanction perdus valent mieux qu'un report de score
-en erreur. Les autres tables ne sont pas tolérées : le site n'a rien à servir
+lequel s'appuient les chemins de notification, `tournaments/deletion.ts`,
+`tournaments/rollback.ts` et les lectures des sanctions de `tournaments/bg-survie.ts`
+(`rowsOrEmptyIfMissingTable` : une table absente se lit vide) — une base où leur
+création a échoué reste debout, et un rappel, une alerte ou une sanction perdus
+valent mieux qu'un report de score en erreur. Les autres tables ne sont pas tolérées : le site n'a rien à servir
 sans elles.
 
 ### Ce qui ne pouvait pas être replié
