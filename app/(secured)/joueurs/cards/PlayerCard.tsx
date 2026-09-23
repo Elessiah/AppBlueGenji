@@ -5,6 +5,10 @@ import Link from "next/link";
 import type { PublicUserProfile } from "@/lib/shared/types";
 import { avatarInitial } from "@/lib/shared/avatar";
 import { getPaletteColor } from "@/lib/shared/palette";
+import {
+  PLAYER_ROSTER_STATUS_LABEL,
+  playerRosterStatus,
+} from "@/lib/shared/player-roster-status";
 import { TeamLink } from "@/components/entity-link";
 import s from "../../_shared/annuaire.module.css";
 
@@ -64,9 +68,12 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
         </div>
         <div className={s.plPseudo}>{player.pseudo}</div>
         <div className={s.plTeam}>
-          {player.team ? (
+          {/* Le statut est demandé **une fois** : brancher ici sur `player.team`
+              et là sur le statut partagé remettrait la règle à deux endroits,
+              ce que le module existe justement pour éviter. */}
+          {playerRosterStatus(player) === "ROSTER" && player.team ? (
             <>
-              ROSTER ·{" "}
+              {PLAYER_ROSTER_STATUS_LABEL.ROSTER} ·{" "}
               <TeamLink
                 teamId={player.team.id}
                 className={s.aboveOverlay}
@@ -76,7 +83,9 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
               </TeamLink>
             </>
           ) : (
-            <span style={{ color: "var(--ink-dim)" }}>FREE AGENT</span>
+            <span className={s.plNoTeam}>
+              {PLAYER_ROSTER_STATUS_LABEL[playerRosterStatus(player)]}
+            </span>
           )}
         </div>
       </div>
