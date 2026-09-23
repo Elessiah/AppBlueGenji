@@ -63,7 +63,7 @@ export function BotStatusStrip({ status }: { status: BotStatus | null }) {
       <div className="status-cell">
         <span className="lbl">Uptime</span>
         <span className="val">{uptime}</span>
-        <span className="sub">99.97 % · 90 derniers jours</span>
+        <span className="sub">Depuis le dernier démarrage</span>
       </div>
       <div className="status-cell">
         <span className="lbl">Version</span>
@@ -73,12 +73,12 @@ export function BotStatusStrip({ status }: { status: BotStatus | null }) {
       <div className="status-cell">
         <span className="lbl">Gateway latency</span>
         <span className="val">{latency === null ? "—" : `${latency} ms`}</span>
-        <span className="sub">Discord WS · OVH Gravelines</span>
+        <span className="sub">Passerelle Discord · WebSocket</span>
       </div>
       <div className="status-cell">
         <span className="lbl">Shards</span>
         <span className="val">{shards}</span>
-        <span className="sub">Auto-sharding actif</span>
+        <span className="sub">Connexions à la passerelle</span>
       </div>
     </div>
   );

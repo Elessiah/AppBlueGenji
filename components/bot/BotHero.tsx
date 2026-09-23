@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DiscordIcon } from "./DiscordIcon";
-import { botInviteUrl } from "@/lib/server/bot-invite";
+import { CyberButton } from "@/components/cyber";
+import { botInviteScopesLabel, botInviteUrl } from "@/lib/server/bot-invite";
 
 export function BotHero() {
   const inviteUrl = botInviteUrl();
@@ -33,13 +34,12 @@ export function BotHero() {
           <h1 className="bot-title">
             BlueGenji <span className="accent">Bot</span>
           </h1>
+          {/* Ni identifiant ni « vérifié » : le site ne lit ni le pseudo
+              Discord du bot ni son statut de vérification, et un « #8242 »
+              inventé se lisait comme l'adresse à laquelle le trouver. */}
           <div className="bot-handle">
-            <span className="h">@BlueGenji Bot#8242</span>
             <span className="badge">
               <DiscordIcon /> APP
-            </span>
-            <span className="mono" style={{ fontSize: 10, letterSpacing: "0.18em", color: "var(--ink-dim)" }}>
-              VÉRIFIÉ
             </span>
           </div>
         </div>
@@ -47,30 +47,27 @@ export function BotHero() {
 
       <div className="bot-cta">
         <div className="row-actions">
-          <Link className="btn btn-ghost" href="/bot/docs">
-            Documentation
-          </Link>
-          <a
-            className="btn btn-primary"
-            href={inviteUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <DiscordIcon />
-            Inviter sur mon serveur
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M3 8h10M9 4l4 4-4 4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </a>
+          <CyberButton asChild variant="ghost">
+            <Link href="/bot/docs">Documentation</Link>
+          </CyberButton>
+          <CyberButton asChild variant="primary">
+            <a href={inviteUrl} target="_blank" rel="noreferrer">
+              <DiscordIcon />
+              Inviter sur mon serveur
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d="M3 8h10M9 4l4 4-4 4"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </a>
+          </CyberButton>
         </div>
         <span className="mono" style={{ fontSize: 10, letterSpacing: "0.18em", color: "var(--ink-dim)" }}>
-          OAUTH2 · BOT + APPLICATIONS.COMMANDS · GRATUIT
+          OAUTH2 · {botInviteScopesLabel()} · GRATUIT
         </span>
       </div>
     </div>
