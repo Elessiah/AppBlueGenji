@@ -164,8 +164,9 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  minLength={TEAM_NAME_MIN_LENGTH}
-                  maxLength={TEAM_NAME_MAX_LENGTH}
+                  // Pas de `minLength`/`maxLength` : le navigateur compte des
+                  // unités UTF-16, la base des caractères — un emoji en vaut
+                  // deux ici, un là. `checkTeamName` fait foi et arme le bouton.
                   aria-invalid={!nameCheck.ok}
                   aria-describedby="team-meta-name-help"
                 />

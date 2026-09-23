@@ -277,3 +277,14 @@ describe("correctifs de la première revue", () => {
     expect(ready.slice(ready.lastIndexOf("res.json()"))).toContain("if (!isLatest()) return;");
   });
 });
+
+describe("correctifs de la troisième revue", () => {
+  it("le champ du nom ne porte pas de bornes natives, qui comptent des unités UTF-16", () => {
+    const settings = stripComments(read("_components", "TeamSettings.tsx"));
+    const creer = stripComments(readFileSync(join(ROOT, "app", "(secured)", "equipes", "creer", "page.tsx"), "utf8"));
+    expect(settings).not.toContain("maxLength={TEAM_NAME_MAX_LENGTH}");
+    expect(settings).not.toContain("minLength={TEAM_NAME_MIN_LENGTH}");
+    expect(creer).not.toContain("maxLength={TEAM_NAME_MAX_LENGTH}");
+    expect(creer).toContain("checkTeamName(name)");
+  });
+});

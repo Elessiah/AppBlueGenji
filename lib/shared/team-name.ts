@@ -32,9 +32,15 @@ export function teamNameLength(name: string): number {
   return Array.from(name).length;
 }
 
-/** Valide une saisie de nom et rend sa forme canonique (sans espaces de bordure). */
-export function checkTeamName(raw: string | null | undefined): TeamNameCheck {
-  const name = (raw ?? "").trim();
+/**
+ * Valide une saisie de nom et rend sa forme canonique (sans espaces de bordure).
+ *
+ * Prend `unknown` : le corps d'une requête n'est qu'annoté, et un nom qui n'est
+ * pas du texte (`{ "name": 123 }`) faisait lever `.trim()` — le message du
+ * moteur JavaScript partait alors au client à la place d'un refus nommé.
+ */
+export function checkTeamName(raw: unknown): TeamNameCheck {
+  const name = typeof raw === "string" ? raw.trim() : "";
   const length = teamNameLength(name);
   if (length < TEAM_NAME_MIN_LENGTH || length > TEAM_NAME_MAX_LENGTH) {
     return { ok: false, reason: INVALID_TEAM_NAME };

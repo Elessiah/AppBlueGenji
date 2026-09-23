@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useToast } from "@/components/ui/toast";
 import { CyberCard, CyberButton } from "@/components/cyber";
 import { TEAM_TAG_MAX_LENGTH, TEAM_TAG_MIN_LENGTH, normalizeTeamTag } from "@/lib/shared/team-tag";
-import { TEAM_NAME_MAX_LENGTH, TEAM_NAME_MIN_LENGTH } from "@/lib/shared/team-name";
+import { TEAM_NAME_MAX_LENGTH, TEAM_NAME_MIN_LENGTH, checkTeamName } from "@/lib/shared/team-name";
 import { membershipErrorMessage, teamErrorMessage } from "../_lib/team-errors";
 
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
@@ -35,6 +35,11 @@ export default function CreateTeamPage() {
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    const nameCheck = checkTeamName(name);
+    if (!nameCheck.ok) {
+      showError(teamErrorMessage(nameCheck.reason));
+      return;
+    }
     setLoading(true);
     try {
       const response = await fetch("/api/teams", {
@@ -94,12 +99,17 @@ export default function CreateTeamPage() {
               <input
                 id="team-name"
                 required
-                minLength={TEAM_NAME_MIN_LENGTH}
-                maxLength={TEAM_NAME_MAX_LENGTH}
+                // Bornes contrôlées par `checkTeamName` à l'envoi, pas par
+                // `minLength`/`maxLength` : le navigateur compte des unités
+                // UTF-16, la base des caractères.
+                aria-describedby="team-name-help"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Mon équipe"
               />
+              <p id="team-name-help" style={{ fontSize: 12, color: "var(--text-1)", margin: "6px 0 0" }}>
+                {TEAM_NAME_MIN_LENGTH} à {TEAM_NAME_MAX_LENGTH} caractères, unique sur le site.
+              </p>
             </div>
             <div className="field">
               <label htmlFor="team-tag">Sigle (optionnel)</label>

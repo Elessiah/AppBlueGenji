@@ -46,3 +46,15 @@ describe("checkTeamName", () => {
     expect(TEAM_NAME_MAX_LENGTH).toBe(60);
   });
 });
+
+describe("checkTeamName — entrée non textuelle", () => {
+  it.each([[123], [{ name: "Rolex" }], [["Rolex"]], [true]])(
+    "refuse %p par un code nommé, sans lever",
+    (raw) => {
+      // Le corps d'une requête n'est qu'annoté : `.trim()` sur un nombre levait
+      // un TypeError dont le message moteur partait au client.
+      expect(() => checkTeamName(raw)).not.toThrow();
+      expect(checkTeamName(raw)).toEqual({ ok: false, reason: INVALID_TEAM_NAME });
+    },
+  );
+});
