@@ -52,6 +52,8 @@ function matchRow(overrides: Record<string, unknown> = {}) {
     team2_name: "Bravo",
     team1_solo_user_id: null,
     team2_solo_user_id: null,
+    team1_logo_url: null,
+    team2_logo_url: null,
     team1_score: null,
     team2_score: null,
     team1_seed: 1,
@@ -282,6 +284,29 @@ describe("getLandingLive — fiche des engagés du match", () => {
 
     expect(live?.currentMatch?.team1Href).toBe("/equipes/11");
     expect(live?.currentMatch?.team2Href).toBeNull();
+  });
+
+  it("expose le logo de chaque engagé, servi par le site", async () => {
+    await mockDb([
+      matchRow({ team1_logo_url: "/api/uploads/teams/a.webp", team2_logo_url: null }),
+    ]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+
+    expect(live?.currentMatch?.team1LogoUrl).toBe("/api/uploads/teams/a.webp");
+    expect(live?.currentMatch?.team2LogoUrl).toBeNull();
+  });
+
+  it("écarte un logo d'origine étrangère : la vitrine est lue sans compte", async () => {
+    // `next/image` lèverait au rendu sur un hôte absent de `remotePatterns`.
+    await mockDb([
+      matchRow({ team1_logo_url: "https://placehold.co/128x128/png", team2_logo_url: "//x.invalid/l.png" }),
+    ]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+
+    expect(live?.currentMatch?.team1LogoUrl).toBeNull();
+    expect(live?.currentMatch?.team2LogoUrl).toBeNull();
   });
 
   it("panache équipe et entrée solo sans confondre les deux côtés", async () => {

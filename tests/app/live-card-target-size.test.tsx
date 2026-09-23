@@ -138,6 +138,8 @@ describe("LiveCard — taille des cibles de l'accueil", () => {
         team2Name: "Beta",
         team1Href: "/equipes/1",
         team2Href: "/equipes/2",
+        team1LogoUrl: null,
+        team2LogoUrl: null,
         team1Score: 1,
         team2Score: 0,
         team1Seed: null,
