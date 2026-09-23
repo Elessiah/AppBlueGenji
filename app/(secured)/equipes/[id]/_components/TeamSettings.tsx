@@ -8,14 +8,13 @@ import { useToast } from "@/components/ui/toast";
 import { TEAM_TAG_MAX_LENGTH, TEAM_TAG_MIN_LENGTH, checkTeamTag, normalizeTeamTag } from "@/lib/shared/team-tag";
 import { TEAM_NAME_MAX_LENGTH, TEAM_NAME_MIN_LENGTH, checkTeamName } from "@/lib/shared/team-name";
 import { teamErrorMessage } from "../../_lib/team-errors";
+import { precheckImageUpload } from "@/lib/shared/image-upload-errors";
+import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/uploads";
 import { jsonRequest, teamApi } from "../_lib/team-api";
 import { TransferOwnershipDialog } from "./TransferOwnershipDialog";
 import { ClaimGhostTeamDialog } from "./ClaimGhostTeamDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
 import styles from "../team.module.css";
-
-const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 interface TeamSettingsProps {
   team: TeamDetailResponse;
@@ -97,12 +96,9 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
     event.target.value = "";
     if (!file) return;
 
-    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-      showError(teamErrorMessage("IMAGE_FORMAT_INVALID"));
-      return;
-    }
-    if (file.size > MAX_IMAGE_BYTES) {
-      showError(teamErrorMessage("IMAGE_TOO_LARGE"));
+    const refusal = precheckImageUpload(file);
+    if (refusal) {
+      showError(teamErrorMessage(refusal));
       return;
     }
 
@@ -244,7 +240,7 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
             <input
               ref={logoFileRef}
               type="file"
-              accept="image/png,image/jpeg,image/webp"
+              accept={IMAGE_UPLOAD_MIME_TYPES.join(",")}
               onChange={onLogoChange}
               className={styles.visuallyHidden}
               tabIndex={-1}
@@ -266,7 +262,7 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
               ) : null}
             </div>
           </div>
-          <p className={styles.help}>PNG, JPEG ou WebP — 5 Mo au maximum.</p>
+          <p className={styles.help}>PNG, JPEG ou WebP — {IMAGE_UPLOAD_MAX_BYTES / (1024 * 1024)} Mo au maximum.</p>
         </div>
 
         {ownsIdentity ? (

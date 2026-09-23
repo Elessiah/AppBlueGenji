@@ -88,3 +88,26 @@ describe("DELETE /api/profile", () => {
     expect(deleteMock).not.toHaveBeenCalled();
   });
 });
+
+describe("DELETE /api/profile — aucun message interne ne sort", () => {
+  it.each(["ACCOUNT_STILL_REFERENCED", "USER_NOT_FOUND"])("rend le refus nommé %s tel quel", async (code) => {
+    (getCurrentUser as jest.Mock).mockResolvedValue({ id: 42 } as never);
+    (deleteOwnAccount as jest.Mock).mockRejectedValue(new Error(code) as never);
+    const res = await DELETE();
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: code });
+  });
+
+  it("remplace le message d'une panne par le code générique", async () => {
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    (getCurrentUser as jest.Mock).mockResolvedValue({ id: 42 } as never);
+    (deleteOwnAccount as jest.Mock).mockRejectedValue(
+      new Error("Deadlock found when trying to get lock; try restarting transaction") as never,
+    );
+    const res = await DELETE();
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "ACCOUNT_DELETE_FAILED" });
+    expect(log).toHaveBeenCalled();
+    log.mockRestore();
+  });
+});

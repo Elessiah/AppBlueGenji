@@ -115,6 +115,61 @@ l'effacement gardaient le survol, le soulèvement, le reflet et `cursor: pointer
 tout en refusant le clic. La feuille de la page le pose, en `:global(.btn)` —
 CSS Modules hacherait un `.btn` local et la règle ne s'appliquerait à rien.
 
+## Les messages d'erreur
+
+Chaque geste de la page lève un **code** et le traduit dans son `catch`, jamais
+au `throw` : c'est là qu'arrivent aussi les échecs qui n'en portent pas — le
+`TypeError` d'une coupure réseau, le `SyntaxError` d'une réponse HTML —, dont le
+message anglais partait sinon tel quel dans la notification. Quatre chemins
+toastaient d'ailleurs le code brut du serveur (`INVITATION_RESPOND_FAILED`,
+`AVATAR_UPLOAD_FAILED`, `IMAGE_TOO_LARGE`…), et la sauvegarde avalait la seule
+phrase juste d'un compte supprimé entre-temps : elle repassait la traduction
+d'`ACCOUNT_DELETED` dans le registre, qui ne la reconnaissait pas et répondait
+« La sauvegarde a échoué ».
+
+Une fonction par geste dans `profile-errors.ts`, parce que c'est le **repli**
+qui change d'un geste à l'autre — « La sauvegarde a échoué » est faux pour un
+avatar comme pour une invitation — alors que les codes nommés (session expirée,
+compte supprimé) se disent partout pareil :
+
+| Geste | Traduction | Consulte d'abord |
+| --- | --- | --- |
+| Sauvegarde, retrait du tag | `profileErrorMessage` | — |
+| Lecture de la page | `profileLoadErrorMessage` | — |
+| Envoi d'un avatar | `avatarUploadErrorMessage` | `imageUploadErrorMessage` |
+| Retrait de l'avatar | `avatarDeleteErrorMessage` | — |
+| Réponse à une invitation | `invitationResponseErrorMessage` | `membershipErrorMessage` (registre des équipes) |
+| Suppression du compte | `accountDeletionErrorMessage` | — |
+
+Les refus d'image vivent dans `lib/shared/image-upload-errors.ts`, partagé avec
+le logo d'équipe : ils naissent tous de `processAndStoreImage`, et ce que le
+joueur doit changer à son fichier ne dépend pas de l'écran. `precheckImageUpload`
+dit **laquelle** des deux conditions manque avant l'envoi (« trop lourde ou
+format non supporté » laissait deviner). Les invitations, elles, appartiennent
+au domaine des équipes, qui a déjà son registre : on l'emprunte plutôt que de le
+recopier.
+
+Côté serveur, les deux routes d'écriture ne laissent plus sortir qu'une **liste
+fermée** de codes : `PATCH /api/profile` rendait le message de n'importe quelle
+exception (`raw.replace is not a function` sur un `{"pseudo": 123}`, le message
+MySQL d'un pseudo trop long), `POST /api/profile/avatar` celui d'un décodage raté.
+Le reste part au journal et le client reçoit le code générique. Cette liste
+(`PROFILE_INPUT_ERRORS`, `lib/shared/profile-input-errors.ts`) est la **même**
+que celle dont le registre de l'écran doit la phrase — il est typé dessus, un
+code ajouté sans phrase ne compile pas. Les codes partagés avec la **lecture** de
+la page sont les seuls qui ne nomment aucun geste (session, compte introuvable) :
+la phrase du compte supprimé dit qu'une modification est perdue, elle reste aux
+écritures. La course entre deux joueurs prenant le même pseudo à la même seconde
+— tous deux passent le `SELECT` — est tranchée par l'index unique, dont le
+doublon est rendu `PSEUDO_ALREADY_USED`. Le précontrôle d'image sert aussi la
+création et la fiche d'équipe, et le registre des équipes accepte le repli du
+geste (`teamErrorMessage(code, "LOGO_UPLOAD_FAILED")`), si bien qu'une coupure
+réseau pendant une réponse à une invitation dit encore de quelle réponse il
+s'agit. Le pseudo, enfin,
+est validé avant d'être lu : `INVALID_PSEUDO` (pas une chaîne), `PSEUDO_EMPTY`
+(que des espaces — la normalisation l'écrivait vide) et `PSEUDO_TOO_LONG` (au-delà
+des 40 caractères de la colonne, comptés comme MySQL les compte, `lib/shared/pseudo.ts`).
+
 ## La zone de danger
 
 « Mon compte » est la dernière section et **ne ressemble à aucune autre** :
@@ -156,8 +211,10 @@ Sur `/profil`, le cas « certifié » est énoncé par la **phrase du verrou**
 rattachement : un tag certifié appartient toujours à un compte rattaché
 (`writeVerifiedTag` écrit `discord_id`, et détacher Discord décertifie), donc le
 champ est toujours verrouillé — une branche « certifié, non verrouillé »
-n'aurait jamais été rendue. Réserve connue : cette phrase-là **recopie** encore
-l'exposition au lieu de composer `DISCORD_TAG_AUDIENCE` (voir `ERREUR.txt`).
+n'aurait jamais été rendue. Cette phrase **compose** `DISCORD_TAG_AUDIENCE` (et
+`DISCORD_TAG_UNVERIFIED_AUDIENCE` pour le cas non certifié) au lieu de recopier
+l'exposition : c'était la seule que `/profil` affichait au tag certifié, et un
+ajustement de la constante l'aurait laissée promettre un autre public.
 
 Le test de `/connexion` porte désormais sur ces constantes **et** sur le fait que
 la page les emploie : c'est strictement plus fort que l'ancienne lecture

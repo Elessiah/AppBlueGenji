@@ -117,12 +117,14 @@ export function ConnectedAppsSection({
         method: "DELETE",
       });
       const payload = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(connectionErrorMessage(payload.error));
+      if (!res.ok) throw new Error(payload.error ?? "");
       showSuccess(`${OAUTH_PROVIDER_LABELS[provider]} a été retiré de ton compte.`);
       await load();
       onChanged?.();
     } catch (e) {
-      showError((e as Error).message);
+      // Traduit ici et non au `throw` : une coupure réseau lève un `TypeError`
+      // dont le message anglais partait sinon tel quel dans la notification.
+      showError(connectionErrorMessage((e as Error).message));
     } finally {
       setBusy(null);
     }

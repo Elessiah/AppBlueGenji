@@ -83,6 +83,22 @@ describe("POST /api/profile/avatar", () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "IMAGE_TOO_LARGE" });
   });
+
+  it("garde au journal le message d'une panne qui n'est pas un refus d'image", async () => {
+    // Un décodage raté ou un disque en lecture seule portent un message interne
+    // (chemin, bibliothèque) qui partait tel quel dans le corps du 400.
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+    (getUserById as jest.Mock).mockResolvedValue({ avatarUrl: null } as never);
+    (processAndStoreImage as jest.Mock).mockRejectedValue(
+      new Error("EACCES: permission denied, open '/srv/app/public/uploads/avatars/x.webp'") as never,
+    );
+
+    const res = await POST(fileReq(pngFile()));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "AVATAR_UPLOAD_FAILED" });
+    expect(console.error).toHaveBeenCalled();
+  });
 });
 
 describe("DELETE /api/profile/avatar", () => {

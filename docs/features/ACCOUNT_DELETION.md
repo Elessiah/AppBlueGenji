@@ -204,8 +204,9 @@ changé — zéro ne dit donc pas « rien à modifier » mais « aucune ligne vi
 L'avatar rend alors un booléen, que la route traduit en ménage (le fichier est
 déjà sur le disque, il faut le reprendre) ; le profil lève `ACCOUNT_DELETED`, que
 la route rend en **409** — la saisie était bonne, c'est l'état de la ligne qui a
-changé sous elle — et que `accountDeletedWriteMessage` met en français dans la
-notification. Ni l'un ni l'autre n'atteint la resynchronisation de l'entrée solo,
+changé sous elle — et que le registre de `/profil`
+(`app/(secured)/profil/profile-errors.ts`) met en français dans la
+notification, par la phrase `ACCOUNT_DELETED_WRITE_MESSAGE`. Ni l'un ni l'autre n'atteint la resynchronisation de l'entrée solo,
 qui est la moitié la plus visible du dégât.
 
 Les mêmes secondes séparent le contrôle de l'écriture sur deux chemins plus

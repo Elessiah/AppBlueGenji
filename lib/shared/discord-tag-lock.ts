@@ -27,6 +27,11 @@
  * établi (le serveur en base, le client depuis `GET /api/profile/discord`).
  */
 
+import {
+  DISCORD_TAG_AUDIENCE,
+  DISCORD_TAG_UNVERIFIED_AUDIENCE,
+} from "@/lib/shared/identity-sharing";
+
 /**
  * Refus de l'écriture manuelle du tag.
  *
@@ -145,7 +150,11 @@ export function discordTagLockNotice(state: {
     // que personne ne voit ce tag. Proposer d'arrêter une exposition qui
     // n'existe pas pousserait à effacer une donnée sans raison. Le retrait reste
     // offert par le bouton d'à côté, il n'a simplement rien à promettre.
-    return `Ton compte Discord est rattaché, mais ce pseudo n'est pas certifié — personne ne le voit. ${rename} Tu peux aussi le retirer.`;
+    return `Ton compte Discord est rattaché, mais ce pseudo n'est pas certifié : ${DISCORD_TAG_UNVERIFIED_AUDIENCE} ${rename} Tu peux aussi le retirer.`;
   }
-  return `Ton compte Discord est rattaché et ce pseudo est certifié : les administrateurs le voient, et les arbitres pendant tes tournois. ${rename} Pour cesser d'être joignable, retire-le.`;
+  // Qui lit le tag est une **promesse** du site, rédigée une seule fois dans
+  // `identity-sharing.ts` et partagée avec `/connexion` : la recopier ici
+  // laisserait les deux écrans promettre deux publics différents au premier
+  // ajustement de l'un.
+  return `Ton compte Discord est rattaché et ce pseudo est certifié : ${DISCORD_TAG_AUDIENCE} ${rename} Pour cesser d'être joignable, retire-le.`;
 }

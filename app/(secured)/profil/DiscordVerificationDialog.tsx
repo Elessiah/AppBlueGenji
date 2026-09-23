@@ -80,7 +80,7 @@ export function DiscordVerificationDialog({
         discordId?: string;
         expiresAt?: string;
       };
-      if (!response.ok) throw new Error(discordVerificationErrorMessage(payload.error));
+      if (!response.ok) throw new Error(payload.error ?? "");
 
       if (payload.status === "VERIFIED") {
         showSuccess("Tag Discord certifié.");
@@ -95,7 +95,9 @@ export function DiscordVerificationDialog({
         ).toLocaleTimeString()}).`,
       );
     } catch (e) {
-      showError((e as Error).message);
+      // Traduit ici et non au `throw` : une coupure réseau lève un `TypeError`
+      // dont le message anglais partait sinon tel quel dans la notification.
+      showError(discordVerificationErrorMessage((e as Error).message));
     } finally {
       setLoading(false);
     }
@@ -111,11 +113,13 @@ export function DiscordVerificationDialog({
         body: JSON.stringify({ discordId, code }),
       });
       const payload = (await response.json()) as { error?: string; tag?: string };
-      if (!response.ok) throw new Error(discordVerificationErrorMessage(payload.error));
+      if (!response.ok) throw new Error(payload.error ?? "");
       showSuccess("Tag Discord certifié.");
       onVerified(payload.tag ?? handle);
     } catch (e) {
-      showError((e as Error).message);
+      // Traduit ici et non au `throw` : une coupure réseau lève un `TypeError`
+      // dont le message anglais partait sinon tel quel dans la notification.
+      showError(discordVerificationErrorMessage((e as Error).message));
     } finally {
       setLoading(false);
     }

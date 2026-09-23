@@ -1,6 +1,12 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  avatarDeleteErrorMessage,
+  avatarUploadErrorMessage,
+  profileErrorMessage,
+} from "@/app/(secured)/profil/profile-errors";
+import { ACCOUNT_DELETED_ERROR, ACCOUNT_DELETED_WRITE_MESSAGE } from "@/lib/shared/account-deletion";
 
 const ROOT = join(__dirname, "..", "..");
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
@@ -30,34 +36,38 @@ describe("interface — un compte supprimé ne se propose ni ne se raconte en co
   });
 
   it("traduit ACCOUNT_DELETED sur **toutes** les écritures du profil", () => {
-    // Sauvegarde du profil, téléversement d'avatar, retrait d'avatar **et
-    // retrait du tag Discord** : les quatre écritures qui peuvent perdre leur
-    // course contre la suppression. La dernière est arrivée avec le verrou du
-    // tag (#140) et n'existait pas quand cette garde a été écrite — elle part
-    // vers `PATCH /api/profile`, exactement comme la sauvegarde du profil, donc
-    // elle reçoit le même 409.
-    //
-    // Le compte est **exact** et non un minimum : c'est lui qui a fait tomber
-    // ce contrôle au moment de la fusion, et c'est tout ce qu'on lui demande —
-    // qu'une écriture ajoutée ailleurs ne puisse pas entrer sans passer ici.
-    const calls = PROFIL.match(/accountDeletedWriteMessage\(/g) ?? [];
-    expect(calls).toHaveLength(4);
-    for (const code of [
-      "PROFILE_UPDATE_FAILED",
-      "AVATAR_UPLOAD_FAILED",
-      "AVATAR_DELETE_FAILED",
-    ]) {
-      expect(PROFIL).toContain(`accountDeletedWriteMessage(payload.error, "${code}")`);
-    }
+    // Sauvegarde du profil et retrait du tag Discord partent vers
+    // `PATCH /api/profile` ; téléversement et retrait d'avatar vers
+    // `/api/profile/avatar`. Les quatre peuvent perdre leur course contre la
+    // suppression et recevoir le 409 : chacune passe par un registre qui
+    // connaît le code.
+    expect(profileErrorMessage(ACCOUNT_DELETED_ERROR)).toBe(ACCOUNT_DELETED_WRITE_MESSAGE);
+    expect(avatarUploadErrorMessage(ACCOUNT_DELETED_ERROR)).toBe(ACCOUNT_DELETED_WRITE_MESSAGE);
+    expect(avatarDeleteErrorMessage(ACCOUNT_DELETED_ERROR)).toBe(ACCOUNT_DELETED_WRITE_MESSAGE);
+    // Les deux écritures du profil traduisent dans leur `catch` par ce registre.
+    expect(PROFIL.match(/showError\(profileErrorMessage\(/g) ?? []).toHaveLength(2);
+    expect(PROFIL).toContain("showError(avatarUploadErrorMessage((e as Error).message))");
+    expect(PROFIL).toContain("showError(avatarDeleteErrorMessage((e as Error).message))");
   });
 
-  it("ne laisse plus le code brut remonter au toast sur ces trois chemins", () => {
+  it("ne traduit plus deux fois : la phrase du compte supprimé survit à la sauvegarde", () => {
+    // La sauvegarde levait la phrase déjà traduite puis la repassait dans le
+    // registre, qui ne la reconnaissait pas : le joueur lisait « La sauvegarde a
+    // échoué » à la place de la seule explication juste. On lève le code.
+    expect(PROFIL).not.toContain("accountDeletedWriteMessage");
+    expect(PROFIL).toContain('throw new Error(payload.error || "PROFILE_UPDATE_FAILED")');
+  });
+
+  it("ne laisse plus aucun message brut remonter au toast", () => {
+    // Ni un code serveur, ni le message anglais d'un `TypeError` réseau : tout
+    // `showError` de la page passe par une traduction.
+    expect(PROFIL).not.toContain("showError((e as Error).message)");
     for (const code of [
       "PROFILE_UPDATE_FAILED",
       "AVATAR_UPLOAD_FAILED",
       "AVATAR_DELETE_FAILED",
     ]) {
-      expect(PROFIL).not.toContain(`payload.error || "${code}"`);
+      expect(PROFIL).not.toContain(`showError(payload.error || "${code}")`);
     }
   });
 

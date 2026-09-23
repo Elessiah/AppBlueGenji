@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
 import { getUserById, updateUserAvatar } from "@/lib/server/users-service";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
+import { isImageUploadError } from "@/lib/shared/image-upload-errors";
 import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 
 /**
@@ -59,7 +60,13 @@ export async function POST(req: Request) {
     await discardStoredImage(toDiskUploadPath(current?.avatarUrl));
     return ok({ avatarUrl: servedUrl });
   } catch (error) {
-    return fail((error as Error).message || "AVATAR_UPLOAD_FAILED", 400);
+    // Seuls les refus d'image sortent tels quels : ils disent au joueur quoi
+    // changer à son fichier. Le reste (décodage, écriture sur disque) porte un
+    // message interne, gardé au journal du serveur.
+    const message = (error as Error).message;
+    if (isImageUploadError(message)) return fail(message, 400);
+    console.error("[profile] avatar upload failed:", error);
+    return fail("AVATAR_UPLOAD_FAILED", 400);
   }
 }
 
