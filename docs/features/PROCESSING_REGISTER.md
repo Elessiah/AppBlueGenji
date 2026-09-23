@@ -67,5 +67,3 @@ Ce que le registre dit honnêtement et qui mériterait une décision :
   garde l'identifiant du compte connecté tant que celui-ci existe. La CNIL
   recommande 13 mois au plus pour ce type de statistiques.
 - **Journal Discord du staff (T05)** : aucune purge automatique du salon.
-- **Hébergement du serveur** : le registre ne nomme pas son pays. À compléter
-  une fois confirmé.

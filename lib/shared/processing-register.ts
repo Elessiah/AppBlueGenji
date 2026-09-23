@@ -21,6 +21,7 @@
  */
 import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import { SITE_VISIT_WINDOW_MINUTES } from "@/lib/shared/site-visits";
+import { SITE_HOST } from "@/lib/shared/site-host";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
 export const REGISTER_UPDATED_AT = "2026-09-24";
@@ -39,6 +40,8 @@ export interface RegisterController {
   seat: string;
   contactEmail: string;
   dpo: string;
+  /** Hébergeur du site, sous-traitant : il héberge les données de tous les traitements. */
+  host: string;
 }
 
 export interface ProcessingActivity {
@@ -68,6 +71,7 @@ export function registerController(contactEmail: string): RegisterController {
     seat: "Janvilliers (France)",
     contactEmail,
     dpo: "Aucun délégué à la protection des données désigné (désignation non obligatoire) — contact RGPD à l'adresse ci-dessus",
+    host: `${SITE_HOST.name} (${SITE_HOST.status.toLowerCase()}, SIREN ${SITE_HOST.siren}), ${SITE_HOST.address} — sous-traitant, données hébergées en ${SITE_HOST.country}`,
   };
 }
 
@@ -358,6 +362,7 @@ export const REGISTER_EXPORT_COLUMNS = [
   "Date de mise à jour",
   "Responsable du traitement",
   "Délégué à la protection des données",
+  "Hébergeur (sous-traitant)",
   "Finalité principale",
   "Sous-finalités",
   "Base légale",
@@ -406,6 +411,7 @@ export function registerToCsv(
     REGISTER_UPDATED_AT,
     controllerText,
     controller.dpo,
+    controller.host,
     a.purpose,
     listCell(a.subPurposes),
     a.legalBasis,
