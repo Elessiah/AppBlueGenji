@@ -292,7 +292,7 @@ describe("Autres écrans — noms cliquables", () => {
     [
       "roster d'une équipe",
       "app/(secured)/equipes/[id]/_components/MembersSection.tsx",
-      "<PlayerLink userId={member.userId}>{member.pseudo}</PlayerLink>",
+      "<PlayerLink userId={member.userId}",
     ],
     [
       "demandes d'adhésion",

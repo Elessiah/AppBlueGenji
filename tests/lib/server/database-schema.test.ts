@@ -39,6 +39,7 @@ describe("Schéma — les colonnes autrefois ajoutées par ALTER vivent dans leu
     ["bg_survival_standings", ["phase_id"]],
     ["bg_endurance_standings", ["draws"]],
     ["bg_benevoles", ["category_order"]],
+    ["bg_team_invitations", ["roles_json"]],
   ])("%s", (name, columns) => {
     const definition = table(name);
     for (const column of columns) {
@@ -199,6 +200,7 @@ describe("Schéma — la règle des deux endroits", () => {
         "bg_tournaments.registration_discord_requirement",
         "bg_tournaments.registration_min_players",
         "bg_tournaments.registration_blizzard_requirement",
+        "bg_team_invitations.roles_json",
       ]),
     );
   });

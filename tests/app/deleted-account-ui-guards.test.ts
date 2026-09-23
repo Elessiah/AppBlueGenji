@@ -5,7 +5,9 @@ import { join } from "node:path";
 const ROOT = join(__dirname, "..", "..");
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 
-const MEMBERS = read("app/(secured)/equipes/[id]/_components/MembersSection.tsx");
+// L'autocomplétion vit dans son propre composant depuis qu'elle sert aussi
+// l'attribution d'une fantôme.
+const MEMBERS = read("app/(secured)/equipes/[id]/_components/PlayerPseudoCombobox.tsx");
 const PROFIL = read("app/(secured)/profil/page.tsx");
 
 /**
@@ -24,7 +26,7 @@ const PROFIL = read("app/(secured)/profil/page.tsx");
  */
 describe("interface — un compte supprimé ne se propose ni ne se raconte en code", () => {
   it("écarte les comptes supprimés des suggestions de recrutement", () => {
-    expect(MEMBERS).toMatch(/\.filter\(\(p\) => !p\.isDeleted/);
+    expect(MEMBERS).toMatch(/\.filter\(\s*\(p\) =>\s*!p\.isDeleted/);
   });
 
   it("traduit ACCOUNT_DELETED sur **toutes** les écritures du profil", () => {

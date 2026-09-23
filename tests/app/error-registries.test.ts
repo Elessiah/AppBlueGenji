@@ -2,7 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 
 import { loginErrorMessage, oauthErrorMessage } from "@/app/connexion/_lib/login-errors";
 import { connectionErrorMessage } from "@/app/(secured)/profil/connection-errors";
-import { membershipErrorMessage } from "@/app/(secured)/equipes/_lib/membership-errors";
+import { membershipErrorMessage, teamErrorMessage } from "@/app/(secured)/equipes/_lib/team-errors";
 import { OAUTH_PROVIDERS, OAUTH_PROVIDER_SLUGS } from "@/lib/shared/oauth-providers";
 import { LINK_REFUSALS } from "@/lib/shared/account-connections";
 
@@ -56,6 +56,55 @@ const MEMBERSHIP_CODES = [
   "INVITATION_RESPOND_FAILED",
 ];
 
+/**
+ * Tout ce que les routes de **gestion** d'une équipe peuvent rendre :
+ * `teams`, `teams/[id]` (+ `members`, `invitations`, `logo`, `claim`,
+ * `transfer-ownership`), `invitations/[id]` (réponse et retrait), plus le code
+ * que pose le client quand la requête n'aboutit pas.
+ */
+const TEAM_CODES = [
+  ...MEMBERSHIP_CODES,
+  "NETWORK_ERROR",
+  "TEAM_ALREADY_DELETED",
+  "MISSING_PSEUDO",
+  "INVALID_PSEUDO",
+  "USER_NOT_FOUND",
+  "ALREADY_INVITED",
+  "MISSING_USER_ID",
+  "MEMBER_NOT_FOUND",
+  "MISSING_ROLE",
+  "CANNOT_KICK_OWNER",
+  "OWNER_CANNOT_LEAVE",
+  "INVALID_TEAM_NAME",
+  "TEAM_NAME_ALREADY_USED",
+  "TEAM_TAG_TOO_SHORT",
+  "TEAM_TAG_TOO_LONG",
+  "TEAM_TAG_NOT_ALPHANUMERIC",
+  "TEAM_TAG_ALREADY_USED",
+  "TRANSFER_TO_SELF",
+  "NOT_A_GHOST_TEAM",
+  "FILE_MISSING",
+  "IMAGE_TOO_LARGE",
+  "IMAGE_FORMAT_INVALID",
+  "IMAGE_DIMENSIONS_INVALID",
+  "IMAGE_ANIMATED_NOT_SUPPORTED",
+  "INVITATION_CANCEL_FAILED",
+  "INVITATIONS_LOAD_FAILED",
+  "TEAM_MEMBER_ADD_FAILED",
+  "TEAM_INVITE_FAILED",
+  "TEAM_MEMBER_REMOVE_FAILED",
+  "TEAM_MEMBER_UPDATE_FAILED",
+  "TEAM_UPDATE_FAILED",
+  "TEAM_CREATE_FAILED",
+  "GHOST_TEAM_CREATE_FAILED",
+  "TEAMS_LOAD_FAILED",
+  "TEAM_DELETE_FAILED",
+  "TEAM_CLAIM_FAILED",
+  "TEAM_OWNERSHIP_TRANSFER_FAILED",
+  "LOGO_UPLOAD_FAILED",
+  "LOGO_DELETE_FAILED",
+];
+
 /** Tout ce que `/api/profile/connections[/:provider]` et le rappel OAuth peuvent rendre. */
 const CONNECTION_CODES = [
   "PROVIDER_ALREADY_LINKED",
@@ -82,6 +131,7 @@ const UNKNOWN_CODE = "UN_CODE_QUE_PERSONNE_NE_CONNAIT";
 describe.each([
   ["connexion", loginErrorMessage, LOGIN_CODES] as const,
   ["adhésion à une équipe", membershipErrorMessage, MEMBERSHIP_CODES] as const,
+  ["gestion d'une équipe", teamErrorMessage, TEAM_CODES] as const,
   ["applications connectées", connectionErrorMessage, CONNECTION_CODES] as const,
 ])("registre des refus — %s", (_label, translate, codes) => {
   it.each(codes)("traduit %s par une phrase qui lui est propre", (code) => {
