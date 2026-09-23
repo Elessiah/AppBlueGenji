@@ -159,6 +159,11 @@ export function ConnectedAppsSection({
             const handleLabel = OAUTH_PROVIDER_HANDLE_LABELS[connection.provider];
             const slug = OAUTH_PROVIDER_SLUGS[connection.provider];
             const detailsId = `connection-details-${slug}`;
+            const methodId = `connection-method-${slug}`;
+            // Calculé une fois : la condition et le rendu doivent dire la même
+            // chose, et le module est la seule autorité sur « y a-t-il quelque
+            // chose à dire ? ».
+            const methodLabel = connection.linked ? connectionMethodLabel(connection) : null;
             return (
               <div
                 className="table-row"
@@ -175,15 +180,6 @@ export function ConnectedAppsSection({
                       : PROVIDER_NOTES[connection.provider]}
                   </span>
                   {/*
-                    **Le motif vit dans la colonne de texte, pas à la place du
-                    bouton.** Posé dans la cellule d'actions — large de la
-                    largeur d'un bouton —, il s'y repliait en quatre lignes de
-                    chasse fixe alignées à droite : une phrase qu'on déchiffre au
-                    lieu de la lire, à l'endroit précis où l'œil cherche un
-                    contrôle. Ici elle se lit d'un trait, et la cellule
-                    d'actions reste vide, ce qui est l'information.
-                  */}
-                  {/*
                     **Ce que « Rattaché » ne disait pas.** Discord a deux portes
                     — le bouton, et le code reçu en message privé — et elles ne
                     laissent pas la même trace : l'une pose une autorisation
@@ -194,11 +190,23 @@ export function ConnectedAppsSection({
                     porte unique, ou un rattachement antérieur à cette colonne,
                     qui ne se classe pas après coup.
                   */}
-                  {connection.linked && connectionMethodLabel(connection) ? (
-                    <span style={{ fontSize: 11, color: "var(--ink-dim)", lineHeight: 1.5 }}>
-                      {connectionMethodLabel(connection)}
+                  {methodLabel ? (
+                    <span
+                      id={methodId}
+                      style={{ fontSize: 11, color: "var(--ink-dim)", lineHeight: 1.5 }}
+                    >
+                      {methodLabel}
                     </span>
                   ) : null}
+                  {/*
+                    **Le motif vit dans la colonne de texte, pas à la place du
+                    bouton.** Posé dans la cellule d'actions — large de la
+                    largeur d'un bouton —, il s'y repliait en quatre lignes de
+                    chasse fixe alignées à droite : une phrase qu'on déchiffre au
+                    lieu de la lire, à l'endroit précis où l'œil cherche un
+                    contrôle. Ici elle se lit d'un trait, et la cellule
+                    d'actions reste vide, ce qui est l'information.
+                  */}
                   {connection.linked && refusal === "LAST_CONNECTION" ? (
                     <span style={{ fontSize: 11, color: "var(--amber)", lineHeight: 1.5, marginTop: 2 }}>
                       {connectionUnlinkRefusalMessage(refusal, connection.provider)}
@@ -215,7 +223,11 @@ export function ConnectedAppsSection({
                         disabled={busy !== null}
                         onClick={() => unlink(connection.provider)}
                         aria-label={`Retirer ${label} de mon compte`}
-                        aria-describedby={detailsId}
+                        /* La **porte** fait partie de ce qui décrit ce bouton :
+                           laissée hors de la description, elle n'était lue par
+                           personne au clavier — un lecteur d'écran qui parcourt
+                           les contrôles ne rencontre jamais le texte voisin. */
+                        aria-describedby={methodLabel ? `${detailsId} ${methodId}` : detailsId}
                         style={{ padding: "4px 12px", fontSize: 12 }}
                       >
                         {busy === connection.provider ? "Retrait…" : "Retirer"}

@@ -97,10 +97,21 @@ describe("la liste des rattachements n'a qu'une source", () => {
 describe("« Applications connectées » — la porte du rattachement Discord", () => {
   it("affiche le geste quand le module a quelque chose à en dire", () => {
     expect(section).toContain("connectionMethodLabel(connection)");
+    expect(section).toContain("{methodLabel ? (");
   });
 
   it("ne le rend jamais sur une porte détachée", () => {
-    expect(section).toContain("connection.linked && connectionMethodLabel(connection)");
+    expect(section).toContain(
+      "connection.linked ? connectionMethodLabel(connection) : null",
+    );
+  });
+
+  it("le fait lire par le bouton « Retirer », pas seulement par l'œil", () => {
+    // Un lecteur d'écran qui parcourt les contrôles ne rencontre jamais le
+    // texte voisin : la porte doit entrer dans la description du bouton.
+    expect(section).toContain(
+      "aria-describedby={methodLabel ? `${detailsId} ${methodId}` : detailsId}",
+    );
   });
 
   it("n'écrit aucune des deux phrases en dur — elles vivent avec la règle", () => {
