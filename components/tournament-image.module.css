@@ -1,0 +1,52 @@
+/* Illustration et logo de tournoi — voir `components/tournament-image.tsx`.
+   La hauteur et les marges d'un bandeau sont décidées par l'écran qui le pose
+   (classe `className`) : une carte le fait déborder jusqu'à ses bords, la fiche
+   le garde dans sa colonne. */
+
+.banner {
+  position: relative;
+  overflow: hidden;
+  background: var(--cyber-bg-2);
+  flex-shrink: 0;
+}
+
+/* Voile vers le fond : le bandeau se fond dans la carte au lieu de la couper
+   d'un trait, et le texte qui suit reste sur un fond calme. Posé au-dessus de
+   l'image (qui est positionnée par `next/image`), sous le contenu de la carte. */
+.bannerFade::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(5, 7, 10, 0) 45%, var(--tournament-banner-fade, var(--cyber-bg-1)) 100%);
+  pointer-events: none;
+}
+
+.cover {
+  object-fit: cover;
+}
+
+/* Pastille de logo : cadre discret, l'image entière dedans. Le côté vient de
+   `--tournament-emblem-size`, posée par le composant ; l'image est hors du flux (`fill`), pour
+   que ses dimensions intrinsèques n'étirent jamais la pastille (cf. les logos
+   d'équipe de l'annuaire). */
+.emblem {
+  position: relative;
+  width: var(--tournament-emblem-size, 40px);
+  height: var(--tournament-emblem-size, 40px);
+  flex-shrink: 0;
+  border-radius: 12px;
+  border: 1px solid var(--line-soft);
+  background:
+    radial-gradient(circle at 50% 35%, rgba(90, 200, 255, 0.10), transparent 70%),
+    var(--cyber-bg-2);
+  overflow: hidden;
+}
+
+.emblemFrame {
+  position: absolute;
+  inset: 12%;
+}
+
+.contain {
+  object-fit: contain;
+}

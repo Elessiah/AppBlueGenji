@@ -379,6 +379,11 @@
   display: flex;
   flex-direction: column;
   min-height: 260px;
+  /* Remplit la cellule de grille (le lien qui l'enveloppe y est étiré) : une
+     carte portant un bandeau d'illustration est plus haute que ses voisines, et
+     la rangée se lisait en escalier. Le pied, en `margin-top: auto`, reste
+     aligné d'une carte à l'autre. */
+  height: 100%;
   overflow: hidden;
   transition: border-color 0.2s, transform 0.2s;
 }
@@ -405,6 +410,9 @@
   border: 1px solid var(--blue-500);
   opacity: 0.3;
   pointer-events: none;
+  /* Au-dessus du bandeau d'illustration, qui est positionné et viendrait
+     sinon masquer le repère du coin haut. */
+  z-index: 1;
 }
 
 .card::before {
@@ -419,6 +427,15 @@
   right: 6px;
   border-left: none;
   border-top: none;
+}
+
+/* Illustration du tournoi (facultative) : bandeau qui déborde jusqu'aux bords
+   de la carte — les marges négatives reprennent son `padding`. Bas, pour que la
+   carte reste d'abord une fiche à lire : l'image annonce, elle ne remplace pas
+   le nom. Un logo, lui, prend la pastille de `.cardHead`. */
+.cardBanner {
+  margin: -22px -22px 16px;
+  height: 112px;
 }
 
 /* live ribbon */

@@ -275,3 +275,26 @@
     gap: 8px;
   }
 }
+
+/* ---------- Illustration et logo (facultatifs) ---------- */
+
+/* Illustration : bandeau d'affiche, cadré sur le point focal choisi. Bas et
+   large, pour annoncer le tournoi sans repousser ses faits sous la ligne de
+   flottaison. */
+.banner {
+  height: clamp(120px, 20vw, 220px);
+  border-radius: var(--r-cy-md, 12px);
+  border: 1px solid var(--line-soft, rgba(180, 210, 230, 0.1));
+}
+
+/* Logo : pastille à gauche du nom, alignée sur l'eyebrow. */
+.emblem {
+  margin-top: 2px;
+}
+
+@media (max-width: 640px) {
+  .identity .emblem {
+    width: 64px;
+    height: 64px;
+  }
+}

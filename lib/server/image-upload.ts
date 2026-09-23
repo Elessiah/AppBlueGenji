@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
 import path from "node:path";
-import { unlink, writeFile } from "node:fs/promises";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
 import sharp from "sharp";
 
-export type UploadKind = "avatar" | "team-logo" | "sponsor-logo" | "benevole-photo";
+export type UploadKind = "avatar" | "team-logo" | "sponsor-logo" | "benevole-photo" | "tournament-image";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const MAX_DIMENSION = 8000;
@@ -11,7 +11,7 @@ const ALLOWED_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 const KIND_CONFIG: Record<
   UploadKind,
-  { dir: string; relPrefix: string; width: number; height: number; fit: "cover" | "contain"; quality: number }
+  { dir: string; relPrefix: string; width: number; height: number; fit: "cover" | "contain" | "inside"; quality: number }
 > = {
   avatar: {
     dir: path.join(process.cwd(), "public", "uploads", "avatars"),
@@ -47,6 +47,20 @@ const KIND_CONFIG: Record<
     height: 256,
     fit: "cover",
     quality: 80,
+  },
+  // Illustration ou logo d'un tournoi : **ni recadrée ni agrandie**, seulement
+  // réduite si l'un de ses côtés dépasse 1600 px. Le cadrage se décide au rendu
+  // (point focal, mode logo — `lib/shared/tournament-image.ts`) : c'est ce qui
+  // laisse passer n'importe quel format, d'une bannière 21:9 à un logo en
+  // portrait, là où un gabarit fixe aurait rogné l'un ou bordé l'autre. La
+  // transparence d'un logo survit (WebP avec couche alpha).
+  "tournament-image": {
+    dir: path.join(process.cwd(), "public", "uploads", "tournaments"),
+    relPrefix: "/uploads/tournaments/",
+    width: 1600,
+    height: 1600,
+    fit: "inside",
+    quality: 82,
   },
 };
 
@@ -154,16 +168,22 @@ export async function storeImageBuffer(
   const resized =
     config.fit === "cover"
       ? pipeline.resize(config.width, config.height, { fit: "cover", position: "centre" })
-      : pipeline.resize(config.width, config.height, {
-          fit: "contain",
-          background: { r: 0, g: 0, b: 0, alpha: 0 },
-        });
+      : config.fit === "inside"
+        ? pipeline.resize(config.width, config.height, { fit: "inside", withoutEnlargement: true })
+        : pipeline.resize(config.width, config.height, {
+            fit: "contain",
+            background: { r: 0, g: 0, b: 0, alpha: 0 },
+          });
 
   const output = await resized.webp({ quality: config.quality }).toBuffer();
 
   const hash = crypto.randomBytes(8).toString("hex");
   const filename = `${ownerId}-${hash}.webp`;
   const absPath = path.join(config.dir, filename);
+  // Le dossier d'un gabarit ajouté après coup n'existe pas forcément sur un
+  // serveur déjà déployé (seul son `.gitkeep` le crée) : l'écriture ne doit pas
+  // en dépendre.
+  await mkdir(config.dir, { recursive: true });
   await writeFile(absPath, output);
 
   return `${config.relPrefix}${filename}`;
@@ -175,7 +195,8 @@ export async function deleteStoredImage(relativePath: string | null | undefined)
     relativePath.startsWith("/uploads/avatars/") ||
     relativePath.startsWith("/uploads/teams/") ||
     relativePath.startsWith("/uploads/sponsors/") ||
-    relativePath.startsWith("/uploads/benevoles/");
+    relativePath.startsWith("/uploads/benevoles/") ||
+    relativePath.startsWith("/uploads/tournaments/");
   if (!allowed) return;
 
   const safeRelative = relativePath.replace(/^\/+/, "");

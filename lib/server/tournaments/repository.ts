@@ -357,6 +357,10 @@ export async function getTournamentListRow(
       t.registration_blizzard_requirement,
       t.registration_min_players,
       t.live_url,
+      t.image_url,
+      t.image_fit,
+      t.image_focus_x,
+      t.image_focus_y,
       COALESCE(COUNT(r.id), 0) AS registered_teams
      FROM bg_tournaments t
      LEFT JOIN bg_tournament_registrations r ON r.tournament_id = t.id
@@ -392,7 +396,11 @@ export async function getTournamentListRow(
       t.registration_discord_requirement,
       t.registration_blizzard_requirement,
       t.registration_min_players,
-      t.live_url`,
+      t.live_url,
+      t.image_url,
+      t.image_fit,
+      t.image_focus_x,
+      t.image_focus_y`,
     [tournamentId],
   );
 

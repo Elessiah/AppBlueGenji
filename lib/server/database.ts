@@ -512,6 +512,12 @@ async function runMigrations(db: Pool): Promise<void> {
       endurance_playoff_format_value INT NULL,
       current_phase_id BIGINT NULL,
       live_url VARCHAR(255) NULL,
+      -- Illustration ou logo, facultatif (\`lib/shared/tournament-image.ts\`) :
+      -- fichier stocké sans recadrage, cadrage décidé au rendu.
+      image_url VARCHAR(255) NULL,
+      image_fit ENUM('COVER', 'CONTAIN') NOT NULL DEFAULT 'COVER',
+      image_focus_x TINYINT UNSIGNED NOT NULL DEFAULT 50,
+      image_focus_y TINYINT UNSIGNED NOT NULL DEFAULT 50,
       start_visibility_at DATETIME NOT NULL,
       registration_open_at DATETIME NOT NULL,
       registration_close_at DATETIME NOT NULL,
@@ -997,6 +1003,11 @@ async function runMigrations(db: Pool): Promise<void> {
     // rien dire.
     `ALTER TABLE bg_tournaments ADD COLUMN registration_blizzard_requirement
        ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'NONE'`,
+    // Illustration ou logo d'un tournoi, facultatif.
+    `ALTER TABLE bg_tournaments ADD COLUMN image_url VARCHAR(255) NULL`,
+    `ALTER TABLE bg_tournaments ADD COLUMN image_fit ENUM('COVER', 'CONTAIN') NOT NULL DEFAULT 'COVER'`,
+    `ALTER TABLE bg_tournaments ADD COLUMN image_focus_x TINYINT UNSIGNED NOT NULL DEFAULT 50`,
+    `ALTER TABLE bg_tournaments ADD COLUMN image_focus_y TINYINT UNSIGNED NOT NULL DEFAULT 50`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

@@ -11,6 +11,7 @@ import {
   defaultTournamentFormValues,
   toApiPayload,
 } from "../_components/TournamentForm";
+import { applyImageChange, imagePickerChange } from "../_lib/image-picker";
 
 /**
  * Création d'un tournoi.
@@ -21,7 +22,7 @@ import {
  */
 export default function CreateTournamentPage() {
   const router = useRouter();
-  const { showError } = useToast();
+  const { showError, showSuccess } = useToast();
 
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store" })
@@ -72,7 +73,7 @@ export default function CreateTournamentPage() {
           initialValues={defaultTournamentFormValues()}
           editableFields={new Set(ALL_TOURNAMENT_FIELDS)}
           submitLabel="Créer le tournoi"
-          onSubmit={async (values) => {
+          onSubmit={async (values, image) => {
             const response = await fetch("/api/tournaments", {
               method: "POST",
               headers: { "content-type": "application/json" },
@@ -81,6 +82,17 @@ export default function CreateTournamentPage() {
             const payload = (await response.json()) as { error?: string; id?: number };
             if (!response.ok || !payload.id) {
               throw new Error(payload.error || "TOURNAMENT_CREATE_FAILED");
+            }
+            // L'image ne peut partir qu'une fois le tournoi né : elle se range sous
+            // son identifiant. Son échec ne défait pas la création — le tournoi
+            // existe, on le dit, et l'image s'ajoute ensuite depuis sa fiche.
+            try {
+              await applyImageChange(payload.id, imagePickerChange(null, image), image.file);
+              showSuccess("Tournoi créé.");
+            } catch (error) {
+              showError(
+                `Tournoi créé, mais son image n'a pas été enregistrée : ${(error as Error).message} Ajoute-la depuis la fiche du tournoi.`,
+              );
             }
             router.push(`/tournois/${payload.id}`);
             router.refresh();

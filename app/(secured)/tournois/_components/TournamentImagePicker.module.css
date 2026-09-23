@@ -1,0 +1,307 @@
+/* Sélecteur d'illustration / logo de tournoi — voir `TournamentImagePicker.tsx`. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ---------- Aucune image : une seule grande cible ---------- */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 132px;
+  padding: 22px 16px;
+  border: 1px dashed var(--line-strong-cy);
+  border-radius: var(--r-cy-md);
+  background: rgba(var(--blue-500-rgb), 0.02);
+  color: var(--ink);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.empty:hover:not(:disabled) {
+  border-color: rgba(var(--blue-500-rgb), 0.45);
+  background: rgba(var(--blue-500-rgb), 0.05);
+}
+
+.empty:focus-visible {
+  outline: 2px solid rgba(var(--blue-500-rgb), 0.6);
+  outline-offset: 3px;
+}
+
+.empty:disabled {
+  cursor: not-allowed;
+  color: var(--ink-mute);
+}
+
+.emptyIcon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(var(--blue-500-rgb), 0.35);
+  color: var(--blue-300);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.emptyTitle {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.emptyHint {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-mute);
+  max-width: 52ch;
+}
+
+/* ---------- Type d'image ---------- */
+
+.modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.mode {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--line-strong-cy);
+  border-radius: var(--r-cy-sm);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.mode:has(input:enabled):hover {
+  border-color: rgba(var(--blue-500-rgb), 0.45);
+}
+
+.modeActive {
+  border-color: var(--blue-500);
+  background: rgba(var(--blue-500-rgb), 0.07);
+}
+
+.mode input[type="radio"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.modeText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.modeLabel {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.modeHint {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-mute);
+}
+
+/* ---------- Illustration : point focal + aperçus ---------- */
+
+.editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.caption {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+/* La scène épouse exactement l'image (bloc « shrink-to-fit ») : un
+   pourcentage du marqueur désigne alors un point de l'image, sans calcul de
+   bandes vides. */
+.stage {
+  position: relative;
+  align-self: flex-start;
+  max-width: 100%;
+  border-radius: var(--r-cy-sm);
+  overflow: hidden;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+  line-height: 0;
+  background:
+    repeating-conic-gradient(rgba(255, 255, 255, 0.04) 0 25%, transparent 0 50%) 0 0 / 16px 16px,
+    var(--cyber-bg-2);
+}
+
+.stage:focus-visible {
+  outline: 2px solid rgba(var(--blue-500-rgb), 0.7);
+  outline-offset: 3px;
+}
+
+.stage[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.stageImage {
+  display: block;
+  max-width: 100%;
+  max-height: 260px;
+  width: auto;
+  height: auto;
+  pointer-events: none;
+}
+
+/* Réticule : anneau clair doublé d'un anneau sombre, lisible sur une image
+   claire comme sur une image sombre. */
+.marker {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.55),
+    0 0 12px rgba(var(--blue-500-rgb), 0.6);
+  pointer-events: none;
+}
+
+.marker::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border-radius: 50%;
+  background: var(--blue-300);
+}
+
+.hint {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-mute);
+}
+
+.previewStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.previewFigure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.previewFrame {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-cy-sm);
+  border: 1px solid var(--line-soft);
+  background: var(--cyber-bg-2);
+}
+
+/* Proportions réelles du site : bandeau de la fiche (≈ 5,5:1 sur grand
+   écran) et bandeau d'une carte (≈ 3,4:1). */
+.previewWide {
+  aspect-ratio: 5.5 / 1;
+}
+
+.previewCard {
+  aspect-ratio: 3.4 / 1;
+  max-width: 280px;
+}
+
+.previewImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.previewCaption {
+  font-size: 11.5px;
+  color: var(--ink-mute);
+}
+
+/* ---------- Logo ---------- */
+
+.logoPreview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.logoTile {
+  position: relative;
+  flex-shrink: 0;
+  width: 88px;
+  height: 88px;
+  border-radius: 12px;
+  border: 1px solid var(--line-soft);
+  background:
+    radial-gradient(circle at 50% 35%, rgba(var(--blue-500-rgb), 0.1), transparent 70%),
+    var(--cyber-bg-2);
+  overflow: hidden;
+}
+
+.logoImage {
+  position: absolute;
+  inset: 12%;
+  width: 76%;
+  height: 76%;
+  object-fit: contain;
+}
+
+.logoPreview .hint {
+  flex: 1 1 220px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 720px) {
+  .editor {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .empty,
+  .mode {
+    transition: none;
+  }
+}

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { participantWording } from "@/lib/shared/participants";
 import type { TournamentCard } from "@/lib/shared/types";
+import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
+import { CARD_IMAGE_SIZES } from "./card-image";
 import s from "../tournois.module.css";
 
 interface RunningCardProps {
@@ -24,6 +26,7 @@ export function RunningCard({ t }: RunningCardProps) {
   return (
     <Link href={`/tournois/${t.id}`} style={{ textDecoration: "none" }}>
       <article className={s.card} data-state="live" style={{ gridColumn: "span 2" }}>
+        <TournamentImageBanner image={t.image} sizes={CARD_IMAGE_SIZES} className={s.cardBanner} />
         <div className={`${s.cardRibbon} ${s.cardRibbonLive}`}>
           <span className={s.dot} />
           EN COURS
@@ -35,6 +38,7 @@ export function RunningCard({ t }: RunningCardProps) {
             <span className={s.dot}>◆</span>
             {formatLabel}
           </div>
+          <TournamentImageEmblem image={t.image} size={40} />
         </div>
 
         <h3 className={s.cardTitle}>{t.name}</h3>
