@@ -161,4 +161,55 @@ describe("BotLatencyCard — la même charge, la même garde", () => {
       expect(width).toBeLessThanOrEqual(100);
     }
   });
+
+  // Une case de mesure : la valeur affichée, sans l'unité qui la suit.
+  const cellValue = (html: string, label: string) => {
+    const at = html.indexOf(`>${label}<`);
+    const match = html.slice(at).match(/class="v ok">([^<]*?) </);
+    return match?.[1];
+  };
+
+  it("affiche un zéro reçu comme un zéro, pas comme un tiret", () => {
+    // Un bot au repos mesure réellement `cpuUsage: 0` : « — » au-dessus d'une
+    // barre à 0 % faisait se contredire les deux moitiés de la cellule.
+    const html = renderToStaticMarkup(
+      <BotLatencyCard status={{ ...status(), gatewayLatency: 0, cpuUsage: 0, ramUsage: 0 }} />,
+    );
+    expect(cellValue(html, "GATEWAY")).toBe("0");
+    expect(cellValue(html, "CPU")).toBe("0.0");
+    expect(cellValue(html, "RAM")).toBe("0");
+  });
+
+  it("réserve le tiret à une mesure illisible", () => {
+    const html = renderToStaticMarkup(
+      <BotLatencyCard
+        status={{ ...status(), gatewayLatency: null, cpuUsage: "12%", ramUsage: undefined } as unknown as BotStatus}
+      />,
+    );
+    expect(cellValue(html, "GATEWAY")).toBe("—");
+    expect(cellValue(html, "CPU")).toBe("—");
+    expect(cellValue(html, "RAM")).toBe("—");
+  });
+
+  it("tient une mesure négative pour illisible — la latence -1 d'avant le premier battement", () => {
+    const html = renderToStaticMarkup(
+      <BotLatencyCard status={{ ...status(), gatewayLatency: -1, cpuUsage: -40 }} />,
+    );
+    expect(cellValue(html, "GATEWAY")).toBe("—");
+    expect(cellValue(html, "CPU")).toBe("—");
+    expect(html).not.toContain(">-1 <");
+    expect(html).not.toContain("-40");
+  });
+
+  it("rend « — » partout sans charge du tout", () => {
+    const html = renderToStaticMarkup(<BotLatencyCard status={null} />);
+    for (const label of ["GATEWAY", "CPU", "RAM"]) expect(cellValue(html, label)).toBe("—");
+  });
+
+  it("affiche les mesures reçues", () => {
+    const html = renderToStaticMarkup(<BotLatencyCard status={status()} />);
+    expect(cellValue(html, "GATEWAY")).toBe("42");
+    expect(cellValue(html, "CPU")).toBe("12.0");
+    expect(cellValue(html, "RAM")).toBe("340");
+  });
 });

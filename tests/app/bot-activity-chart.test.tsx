@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
-import { BotActivityChart } from "@/components/bot/BotActivityChart";
+import { BotActivityChart, loadActivityRange } from "@/components/bot/BotActivityChart";
 import type { BotActivity } from "@/lib/shared/types";
 
 /**
@@ -104,8 +104,15 @@ describe("BotActivityChart — une charge abîmée ne fait pas tomber la page", 
     for (const avgPerDay of [{}, "beaucoup", null, Number.NaN]) {
       const html = render(activity({ avgPerDay: avgPerDay as unknown as number }));
       expect(html).not.toContain("NaN");
-      expect(html).toContain("MOY. 0 / JOUR");
+      // Ni zéro : « MOY. 0 / JOUR » annonçait une moyenne mesurée sur une
+      // charge que la page venait de juger illisible.
+      expect(html).not.toContain("MOY. 0 / JOUR");
+      expect(html).toContain("MOY. — / JOUR");
     }
+  });
+
+  it("garde le zéro pour un zéro reçu", () => {
+    expect(render(activity({ avgPerDay: 0 }))).toContain("MOY. 0 / JOUR");
   });
 
   it("dessine autant de colonnes que la plus longue des deux séries", () => {
@@ -158,5 +165,90 @@ describe("BotActivityChart — une charge abîmée ne fait pas tomber la page", 
     expect(() =>
       render(activity({ relays: huge, scrims: huge, labels: [] })),
     ).not.toThrow();
+  });
+});
+
+/**
+ * Le changement de plage, sans DOM : `loadActivityRange` est la seule partie du
+ * composant qui dépende de l'ordre d'arrivée des réponses. Chaque requête reçoit
+ * une promesse tenue à la main, pour faire arriver la plus ancienne en dernier.
+ */
+describe("loadActivityRange — une plage abandonnée n'écrit plus rien", () => {
+  type Pending = { url: string; signal: AbortSignal | undefined; settle: (res: Response | Error) => void };
+
+  function deferredFetcher() {
+    const pending: Pending[] = [];
+    const fetcher = ((url: string, init?: RequestInit) =>
+      new Promise<Response>((resolve, reject) => {
+        pending.push({
+          url,
+          signal: init?.signal ?? undefined,
+          settle: (res) => (res instanceof Error ? reject(res) : resolve(res)),
+        });
+      })) as unknown as typeof fetch;
+    return { pending, fetcher };
+  }
+
+  const ok = (body: unknown) => ({ ok: true, json: async () => body }) as unknown as Response;
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("ne laisse pas la réponse lente de « 90j » écraser « 7j »", async () => {
+    const { pending, fetcher } = deferredFetcher();
+    const applied: unknown[] = [];
+    const apply = (data: unknown) => applied.push(data);
+
+    // « 90j » puis « 7j » : React nettoie l'effet de la première plage avant
+    // de lancer la seconde.
+    const cancel90 = loadActivityRange("90j", apply, fetcher);
+    cancel90();
+    loadActivityRange("7j", apply, fetcher);
+
+    // La plus récente arrive d'abord, la plus ancienne ensuite.
+    pending[1].settle(ok({ range: "7j" }));
+    await flush();
+    pending[0].settle(ok({ range: "90j" }));
+    await flush();
+
+    expect(applied).toEqual([{ range: "7j" }]);
+  });
+
+  it("annule la requête elle-même, pas seulement son effet", () => {
+    const { pending, fetcher } = deferredFetcher();
+    const cancel = loadActivityRange("90j", () => {}, fetcher);
+    expect(pending[0].url).toBe("/api/bot/activity?range=90j");
+    expect(pending[0].signal?.aborted).toBe(false);
+    cancel();
+    expect(pending[0].signal?.aborted).toBe(true);
+  });
+
+  it("n'efface pas le graphe sur l'échec d'une plage abandonnée", async () => {
+    // Une requête interrompue rejette (`AbortError`) : son `catch` rend
+    // `null`, qui aurait remplacé le graphe de la plage suivante par
+    // « Données indisponibles ».
+    const { pending, fetcher } = deferredFetcher();
+    const applied: unknown[] = [];
+    const cancel = loadActivityRange("90j", (d) => applied.push(d), fetcher);
+    cancel();
+    pending[0].settle(new Error("AbortError"));
+    await flush();
+    expect(applied).toEqual([]);
+  });
+
+  it("remet la réponse de la plage courante, et `null` sur son échec", async () => {
+    const { pending, fetcher } = deferredFetcher();
+    const applied: unknown[] = [];
+    loadActivityRange("7j", (d) => applied.push(d), fetcher);
+    pending[0].settle(ok({ range: "7j" }));
+    await flush();
+
+    loadActivityRange("90j", (d) => applied.push(d), fetcher);
+    pending[1].settle({ ok: false, json: async () => ({}) } as unknown as Response);
+    await flush();
+
+    loadActivityRange("90j", (d) => applied.push(d), fetcher);
+    pending[2].settle(new Error("réseau"));
+    await flush();
+
+    expect(applied).toEqual([{ range: "7j" }, null, null]);
   });
 });

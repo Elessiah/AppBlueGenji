@@ -4,7 +4,11 @@ import { join } from "node:path";
 import { BOT_DOC_SECTIONS } from "@/lib/shared/bot-doc-sections";
 
 const ROOT = join(__dirname, "..", "..");
-const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
+// Fins de ligne ramenées à `\n` : un poste Windows extrait les fichiers en
+// CRLF (`core.autocrlf`), et les motifs ci-dessous qui ancrent une règle sur
+// `\n\}\n` échouaient là seulement, la CI lisant les mêmes octets en LF.
+const read = (relative: string) =>
+  readFileSync(join(ROOT, relative), "utf8").replace(/\r\n/g, "\n");
 
 const page = read("app/bot/page.tsx");
 const commands = read("components/bot/BotCommands.tsx");
