@@ -220,8 +220,9 @@ export function DiscordVerificationDialog({
                 clic. */}
             <p style={{ fontSize: 12.5, color: "var(--ink-mute)", margin: 0, lineHeight: 1.6 }}>
               Ton compte est déjà relié à Discord : c&apos;est Discord qui confirme ton pseudo. Tu
-              passes par sa page d&apos;autorisation, puis tu reviens ici, tag certifié — sans code ni
-              serveur commun avec le bot.
+              passes par sa page d&apos;autorisation, avec le compte Discord déjà relié, puis tu
+              reviens ici avec ton pseudo certifié — sans code ni serveur commun avec le bot. Un
+              pseudo fait uniquement de chiffres n&apos;est pas certifiable.
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
               <CyberButton variant="ghost" type="button" onClick={onClose}>

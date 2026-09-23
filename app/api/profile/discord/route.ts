@@ -54,7 +54,7 @@ function statusFor(message: string): number {
       return 502;
     case "BOT_INTERNAL_UNREACHABLE":
       return 503;
-    case "BOT_INTERNAL_TIMEOUT":
+    case "BOT_RESOLVE_TIMEOUT":
       return 504;
     default:
       return 500;

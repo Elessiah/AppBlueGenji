@@ -135,16 +135,18 @@ describe("bot-integration", () => {
       .spyOn(global, "fetch")
       .mockRejectedValue(new DOMException("The operation timed out.", "TimeoutError"));
 
-    await expect(resolveDiscordUser("keryan")).rejects.toThrow("BOT_INTERNAL_TIMEOUT");
+    await expect(resolveDiscordUser("keryan")).rejects.toThrow("BOT_RESOLVE_TIMEOUT");
   });
 
-  it("sendDiscordLoginCode rend aussi le dépassement de délai sous son nom", async () => {
+  it("sendDiscordLoginCode ne rend pas son délai dépassé en échec de recherche", async () => {
+    // L'envoi suit une résolution **réussie** : le tag n'y est pour rien, et le
+    // message privé est peut-être parti. Le code de la recherche serait faux.
     jest
       .spyOn(global, "fetch")
-      .mockRejectedValue(new DOMException("This operation was aborted", "AbortError"));
+      .mockRejectedValue(new DOMException("The operation timed out.", "TimeoutError"));
 
     await expect(sendDiscordLoginCode("123456789", "123456")).rejects.toThrow(
-      "BOT_INTERNAL_TIMEOUT",
+      "BOT_INTERNAL_UNREACHABLE",
     );
   });
 

@@ -83,20 +83,23 @@ function emptyBotStats(): BotStats {
 }
 
 /**
- * Le code d'un appel au bot qui n'a pas abouti **côté réseau**.
+ * Le code d'une **résolution de tag** qui n'a pas abouti côté réseau.
  *
  * Deux faits différents, que le site confondait : le bot n'a pas répondu du
- * tout (connexion refusée, hôte injoignable — `BOT_INTERNAL_UNREACHABLE`), ou il
- * a reçu la demande mais n'a pas répondu à temps (`BOT_INTERNAL_TIMEOUT`). Le
- * second est le cas ordinaire d'une résolution de tag : le bot balaie un à un
- * les serveurs qu'il partage, et un tag qu'il ne trouve nulle part les parcourt
- * **tous**. Rendu en « bot non joignable », il faisait passer un joueur absent
- * des serveurs du bot pour une panne d'infrastructure.
+ * tout (connexion refusée — `BOT_INTERNAL_UNREACHABLE`), ou il a reçu la
+ * demande mais n'a pas répondu à temps (`BOT_RESOLVE_TIMEOUT`). Le second est le
+ * cas ordinaire d'un tag absent des serveurs du bot : il les balaie un à un, et
+ * un tag qu'il ne trouve nulle part les parcourt **tous**. Rendu en « bot non
+ * joignable », il faisait passer un joueur absent de ces serveurs pour une panne.
+ *
+ * Réservé à la résolution, et le nom le dit : un envoi de code qui dépasse son
+ * délai survient **après** une résolution réussie — le tag n'y est pour rien, et
+ * le message privé est peut-être parti. Il garde donc son code d'origine.
  */
-function botFetchFailureCode(error: unknown): string {
+function resolveFailureCode(error: unknown): string {
   const name = (error as { name?: string } | null)?.name;
   return name === "TimeoutError" || name === "AbortError"
-    ? "BOT_INTERNAL_TIMEOUT"
+    ? "BOT_RESOLVE_TIMEOUT"
     : "BOT_INTERNAL_UNREACHABLE";
 }
 
@@ -175,7 +178,7 @@ export async function resolveDiscordUser(handle: string): Promise<string> {
       signal: AbortSignal.timeout(BOT_LOGIN_FETCH_TIMEOUT_MS),
     });
   } catch (error) {
-    throw new Error(botFetchFailureCode(error));
+    throw new Error(resolveFailureCode(error));
   }
 
   if (response.ok) {
@@ -211,8 +214,8 @@ export async function sendDiscordLoginCode(discordId: string, code: string): Pro
       cache: "no-store",
       signal: AbortSignal.timeout(BOT_LOGIN_FETCH_TIMEOUT_MS),
     });
-  } catch (error) {
-    throw new Error(botFetchFailureCode(error));
+  } catch {
+    throw new Error("BOT_INTERNAL_UNREACHABLE");
   }
 
   if (response.ok) return;

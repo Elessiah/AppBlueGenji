@@ -109,12 +109,21 @@ Le chemin serveur (`startDiscordVerification` qui conclut sur place quand le tag
 résout vers l'identifiant rattaché) est **conservé** : il reste une preuve juste,
 et un compte rattaché entre l'ouverture du profil et le clic y aboutit encore.
 
-**« Trop lent » n'est plus « injoignable ».** Un appel au bot qui dépasse son
-délai lève désormais `BOT_INTERNAL_TIMEOUT` (504), distinct de
-`BOT_INTERNAL_UNREACHABLE` (503, connexion refusée) : le premier est le cas
-ordinaire d'un tag absent des serveurs du bot, et sa phrase renvoie au geste
-(vérifier le tag, rejoindre le serveur, ou passer par l'identifiant / le bouton
-Discord) au lieu d'annoncer une panne.
+**« Trop lent » n'est plus « injoignable ».** Une **résolution de tag** qui
+dépasse son délai lève désormais `BOT_RESOLVE_TIMEOUT` (504), distinct de
+`BOT_INTERNAL_UNREACHABLE` (503, connexion refusée). Sa phrase nomme les deux
+causes possibles — tag absent des serveurs du bot, ou bot surchargé — sans en
+affirmer une, et renvoie au geste (vérifier le tag, rejoindre le serveur, ou
+passer par l'identifiant / le bouton Discord). L'**envoi du code** garde
+`BOT_INTERNAL_UNREACHABLE` : il suit une résolution réussie, le tag n'y est pour
+rien, et le message privé est peut-être parti.
+
+**Mauvais compte chez Discord.** Reconfirmer par OAuth en étant connecté, chez
+Discord, sous un autre compte que celui rattaché est refusé
+(`PROVIDER_ALREADY_LINKED`) : la phrase dit d'abord de revenir avec le bon compte,
+et ne propose le retrait qu'ensuite — l'inverse pousserait à détacher la bonne
+identité. Un pseudo Discord fait uniquement de chiffres reste non certifiable par
+ce chemin comme par les autres, et le dialogue le dit avant le clic.
 
 **Se connecter par Discord certifie le tag**, sans le moindre geste
 supplémentaire : la route de connexion **consomme** le défi
