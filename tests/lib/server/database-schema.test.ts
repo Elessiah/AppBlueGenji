@@ -385,6 +385,16 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     expect(net).toMatch(/n\s*<\s*3/);
   });
 
+  it("vide la liste retenue au début de chaque passe", () => {
+    // `createOnceGate` oublie ses échecs : une passe interrompue se rejoue dans
+    // le même processus. Sans remise à zéro, `createTable` empilerait une
+    // seconde copie de chaque DDL, et le filet annoncerait deux fois chaque
+    // colonne manquante — avec un compte deux fois trop grand.
+    const run = sql.slice(sql.indexOf("async function runMigrations"));
+    const head = run.slice(0, run.indexOf("await createTable"));
+    expect(head).toContain("DECLARED_TABLES.length = 0");
+  });
+
   it("dérive les colonnes surveillées du fichier au lieu de les choisir", () => {
     // Cinq témoins écrits à la main sur ~70 `ALTER` repliés laissaient
     // soixante-cinq façons d'être en retard sans que rien ne le dise. La liste

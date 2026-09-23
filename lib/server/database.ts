@@ -127,9 +127,20 @@ async function createTable(db: Pool, ddl: string): Promise<void> {
 /**
  * Les colonnes déclarées par un `CREATE TABLE`, et le nom de sa table.
  *
- * Découpage volontairement simple : ces déclarations sont écrites ici, d'une
- * seule main, une définition par ligne. Une ligne qui commence par un mot-clé de
- * contrainte n'est pas une colonne, et une ligne de commentaire SQL non plus.
+ * Le découpage se fait sur les virgules de **premier niveau** du corps, et non
+ * sur ses lignes : une définition n'occupe pas toujours une ligne, et trois
+ * écritures parfaitement ordinaires fabriquaient chacune une colonne
+ * inexistante — donc une alerte de retard sur un schéma à jour, et un filet
+ * qu'on finit par éteindre. La ligne de continuation d'une `FOREIGN KEY`
+ * (`REFERENCES bg_users(id) …`) commence par un mot qu'aucune liste de mots
+ * réservés n'écarte ; un commentaire `--` glissé entre deux colonnes se lit
+ * comme une définition de plus ; et une virgule prise dans un `DEFAULT 'a, b'`
+ * couperait une définition en deux. D'où un parcours qui compte les
+ * parenthèses et connaît les apostrophes.
+ *
+ * Ce qui reste écarté par son premier mot, ce sont les **clauses de clé**
+ * (`PRIMARY`, `UNIQUE`, `KEY`, `INDEX`, `CONSTRAINT`, `FOREIGN`, …) : elles
+ * décrivent la table, pas une colonne.
  */
 export function declaredColumns(ddl: string): { table: string; columns: string[] } | null {
   const named = /CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(/.exec(ddl);
@@ -183,6 +194,13 @@ export function declaredColumns(ddl: string): { table: string; columns: string[]
 }
 
 async function runMigrations(db: Pool): Promise<void> {
+  // La porte **oublie ses échecs** (`createOnceGate`) : une passe interrompue se
+  // rejoue dans le même processus, et la liste retenue par `createTable`
+  // doublerait à chaque reprise — le filet annoncerait alors deux fois chaque
+  // colonne manquante, et un compte deux fois trop grand. Elle appartient à la
+  // passe, pas au processus.
+  DECLARED_TABLES.length = 0;
+
   // ───────────────────────────────────────────────────────────────────────────
   // Comptes
   // ───────────────────────────────────────────────────────────────────────────
