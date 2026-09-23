@@ -327,7 +327,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
                     personne ne gagne, et dans un tableau la place laissée vide
                     fait passer l'adversaire suivant par exemption — un effet
                     qui descend l'arbre, et qu'on ne découvre pas après coup. */}
-                <p className={styles.forfeitHint}>
+                <p id="admin-score-forfeit-hint" className={styles.forfeitHint}>
                   {doubleForfeit
                     ? `${team1} et ${team2} déclarent toutes les deux forfait : le match est perdu pour les deux, personne ne se qualifie, et dans un tableau leur prochain adversaire passe le tour par exemption.`
                     : forfeiting
@@ -339,6 +339,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
                     type="button"
                     className={styles.forfeit}
                     aria-pressed={forfeitTeamId === match.team1Id}
+                    aria-describedby="admin-score-forfeit-hint"
                     onClick={() => toggleForfeit(match.team1Id)}
                     disabled={form.submitting || match.team1Id === null}
                   >
@@ -348,6 +349,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
                     type="button"
                     className={styles.forfeit}
                     aria-pressed={forfeitTeamId === match.team2Id}
+                    aria-describedby="admin-score-forfeit-hint"
                     onClick={() => toggleForfeit(match.team2Id)}
                     disabled={form.submitting || match.team2Id === null}
                   >
@@ -357,6 +359,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
                     type="button"
                     className={`${styles.forfeit} ${styles.forfeitBoth}`}
                     aria-pressed={doubleForfeit}
+                    aria-describedby="admin-score-forfeit-hint"
                     onClick={() => form.setDoubleForfeit(!doubleForfeit)}
                     disabled={form.submitting || match.team1Id === null || match.team2Id === null}
                   >

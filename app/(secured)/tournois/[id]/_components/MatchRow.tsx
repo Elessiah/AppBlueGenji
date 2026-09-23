@@ -176,8 +176,11 @@ export function MatchRow({
             letterSpacing: "0.06em",
             textTransform: "uppercase",
             textAlign: "center",
-            color: "var(--text-2)",
-            background: "rgba(255,255,255,0.03)",
+            // L'ambre des « FF » pour un double forfait : la mention dit la même
+            // chose que les deux scores, elle en prend la couleur. Le gris reste
+            // au nul, qui n'est ni une faute ni une absence.
+            color: isDoubleForfeit ? "rgba(255,157,46,0.9)" : "var(--text-2)",
+            background: isDoubleForfeit ? "rgba(255,157,46,0.06)" : "rgba(255,255,255,0.03)",
             borderTop: `1px solid ${BORDER}`,
           }}
         >

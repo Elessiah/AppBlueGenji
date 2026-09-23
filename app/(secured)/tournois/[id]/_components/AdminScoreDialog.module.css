@@ -249,6 +249,13 @@
    il dit « aucune des deux ». */
 .forfeitBoth {
   flex-basis: 100%;
+  border-style: dashed;
+}
+
+/* Choisi, il reprend le trait plein des deux autres : le pointillé ne dit que
+   « aucune des deux », pas « pas encore choisi ». */
+.forfeitBoth[aria-pressed="true"] {
+  border-style: solid;
 }
 
 .forfeit:hover:not(:disabled) {
