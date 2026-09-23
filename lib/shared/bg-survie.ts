@@ -226,6 +226,12 @@ export type EnduranceMatchOutcome = {
    * valeur : elles sont égales par définition, c'est ce qui fait le nul.
    */
   drawMaps?: number | null;
+  /**
+   * Double forfait : les deux engagées, dans l'ordre des sides. Chacune perd la
+   * rencontre **au score plein du format**, comme la perdante d'un forfait
+   * ordinaire (FT3 → −3) — `lib/shared/double-forfeit.ts`.
+   */
+  doubleForfeitTeamIds?: readonly [number, number] | null;
 };
 
 /**
@@ -677,6 +683,20 @@ export function replayEnduranceDetailed(input: ReplayEnduranceInput): EnduranceR
       // match : à ±1 un 2-2 ne déplace rien, à +2/−1 il rapporte deux points à
       // chacune. Le cas passe **avant** la lecture vainqueur/perdant, qui n'a
       // rien à lire ici.
+      // Double forfait : deux perdantes, et pas de gagnante pour empocher les
+      // maps. Chacune encaisse ce qu'encaisse la perdante d'un forfait
+      // ordinaire — le score plein du format, jamais un match blanc.
+      if (match.winnerTeamId === null && match.doubleForfeitTeamIds) {
+        const lostMaps = forfeitMapCount(matchFormat);
+        for (const teamId of match.doubleForfeitTeamIds) {
+          const team = standings.get(teamId);
+          if (!team || team.status !== "ACTIVE") continue;
+          team.losses += 1;
+          applyMapDelta(team, 0, lostMaps, config, round);
+        }
+        continue;
+      }
+
       if (match.winnerTeamId === null && match.drawTeamIds) {
         const [aId, bId] = match.drawTeamIds;
         const a = standings.get(aId);
@@ -927,30 +947,63 @@ export function planPlayoffFirstRound(
  * Un tour incomplet ne planifie rien : un vainqueur manquant vaudrait une
  * rencontre sans engagée, et il vaut mieux ne rien poser que poser un match
  * vide qui ne se refermerait jamais.
+ *
+ * **Double forfait** (`lib/shared/double-forfeit.ts`) : la rencontre est jouée
+ * mais ne qualifie personne. Son créneau reste **vacant**, et l'appariement
+ * garde sa position — le vainqueur du i-ᵉ match joue toujours le (i/2)-ᵉ du tour
+ * suivant, règle dont l'arbre dessiné dépend (`endurancePlayoffLinks`) :
+ *
+ * - un seul créneau vacant dans une paire → l'autre passe le tour
+ *   (exemption, posée comme le repli d'un effectif impair) ;
+ * - deux créneaux vacants → aucune rencontre, et la cascade continue : la
+ *   paire suivante décale d'autant. Le cas est rare (deux doubles forfaits
+ *   voisins), et poser un match sans engagée ne se refermerait jamais.
+ *
+ * La petite finale ne réunit que des demi-finalistes **battues** : une
+ * demi-finale close sur un double forfait n'en fournit aucune. S'il n'en reste
+ * qu'une, elle prend la 3ᵉ place par exemption ; s'il n'en reste aucune, il n'y
+ * a pas de petite finale.
  */
 export function planNextPlayoffRound(
-  decisive: { winnerTeamId: number | null; loserTeamId: number | null }[],
+  decisive: {
+    winnerTeamId: number | null;
+    loserTeamId: number | null;
+    doubleForfeit?: boolean;
+  }[],
 ): PlayoffRoundPlan {
-  const winners = decisive.map((match) => match.winnerTeamId);
-  if (winners.length < 2 || winners.some((teamId) => teamId === null)) return [];
+  if (decisive.length < 2) return [];
+  // Un vainqueur manquant hors double forfait = tour pas encore joué.
+  if (decisive.some((match) => match.winnerTeamId === null && !match.doubleForfeit)) return [];
+
+  const winners = decisive.map((match) => (match.doubleForfeit ? null : match.winnerTeamId));
 
   const plan: PlayoffRoundPlan = [];
   for (let index = 0; index < winners.length; index += 2) {
+    const pair = [winners[index], index + 1 < winners.length ? winners[index + 1] : null].filter(
+      (teamId): teamId is number => teamId !== null,
+    );
+    if (pair.length === 0) continue;
     plan.push({
       bracket: "UPPER",
-      pairing: {
-        teamAId: winners[index] as number,
-        teamBId: index + 1 < winners.length ? (winners[index + 1] as number) : null,
-      },
+      pairing: { teamAId: pair[0], teamBId: pair[1] ?? null },
     });
   }
 
   if (decisive.length === 2) {
     const losers = decisive
+      .filter((match) => !match.doubleForfeit)
       .map((match) => match.loserTeamId)
       .filter((teamId): teamId is number => teamId !== null);
-    if (losers.length === 2) {
-      plan.push({ bracket: "THIRD_PLACE", pairing: { teamAId: losers[0], teamBId: losers[1] } });
+    // Une seule battue ne reçoit la 3ᵉ place par exemption que si l'autre
+    // créneau a été vidé par un double forfait. Une demi-finale gagnée par
+    // exemption (effectif impair) n'a pas de battue, et ne donnait déjà pas de
+    // petite finale : ce comportement-là ne change pas.
+    const vacatedByDoubleForfeit = decisive.some((match) => match.doubleForfeit);
+    if (losers.length === 2 || (losers.length === 1 && vacatedByDoubleForfeit)) {
+      plan.push({
+        bracket: "THIRD_PLACE",
+        pairing: { teamAId: losers[0], teamBId: losers[1] ?? null },
+      });
     }
   }
 

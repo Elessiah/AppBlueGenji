@@ -105,6 +105,7 @@ interface RollbackMatchRow extends RowDataPacket {
   team2_score: number | null;
   winner_team_id: number | null;
   forfeit_team_id: number | null;
+  double_forfeit: number | null;
   status: string;
   team1_reported_at: string | null;
   team2_reported_at: string | null;
@@ -132,6 +133,9 @@ function toRollbackMatch(row: RollbackMatchRow): RollbackMatch {
     team2Score: row.team2_score === null ? null : Number(row.team2_score),
     winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
     forfeitTeamId: row.forfeit_team_id === null ? null : Number(row.forfeit_team_id),
+    // Un double forfait est une saisie, sans score ni vainqueur : sans lui, le
+    // stade qui n'en porte qu'un passerait pour vierge et ne se défairait pas.
+    doubleForfeit: row.status === "COMPLETED" && Number(row.double_forfeit ?? 0) === 1,
     decided: row.status === "COMPLETED",
     hasPendingReport: row.team1_reported_at !== null || row.team2_reported_at !== null,
     nextWinnerMatchId: row.next_winner_match_id === null ? null : Number(row.next_winner_match_id),
@@ -155,7 +159,7 @@ async function loadRollbackMatches(
   const [rows] = await connection.execute<RollbackMatchRow[]>(
     `SELECT m.id, m.bracket, m.round_number, m.phase_id, p.position AS phase_position,
             m.team1_id, m.team2_id, m.team1_score, m.team2_score,
-            m.winner_team_id, m.forfeit_team_id, m.status,
+            m.winner_team_id, m.forfeit_team_id, m.double_forfeit, m.status,
             m.team1_reported_at, m.team2_reported_at,
             m.next_winner_match_id, m.next_loser_match_id
      FROM bg_matches m
@@ -207,6 +211,7 @@ async function clearMatchResults(
            winner_team_id = NULL,
            loser_team_id = NULL,
            forfeit_team_id = NULL,
+           double_forfeit = 0,
            team1_report_score = NULL,
            team1_report_opponent_score = NULL,
            team1_reported_at = NULL,

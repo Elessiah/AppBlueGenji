@@ -45,7 +45,8 @@ import {
 } from "@/lib/shared/endurance-penalty";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { toIso } from "@/lib/server/serialization";
-import { createMatch, finishTournament } from "./repository";
+import { appendSequentialRanks, podiumRanks } from "@/lib/shared/double-forfeit";
+import { createMatch, finishTournament, reopenTournament } from "./repository";
 import { localUploadUrl } from "@/lib/shared/uploads";
 
 type TournamentEnduranceRow = RowDataPacket & {
@@ -325,10 +326,11 @@ async function loadQualificationOutcomes(
       winner_team_id: number | null;
       loser_team_id: number | null;
       forfeit_team_id: number | null;
+      double_forfeit: number | null;
     })[]
   >(
     `SELECT round_number, status, team1_id, team2_id, team1_score, team2_score,
-            winner_team_id, loser_team_id, forfeit_team_id
+            winner_team_id, loser_team_id, forfeit_team_id, double_forfeit
      FROM bg_matches
      WHERE tournament_id = ? AND phase_id = 0 AND round_number < ?
      ORDER BY round_number ASC, match_number ASC`,
@@ -378,6 +380,16 @@ async function loadQualificationOutcomes(
       // Les deux scores sont égaux sur un nul — le critère ci-dessus l'exige —
       // donc un seul chiffre suffit.
       drawMaps: drawn ? Number(row.team1_score) : 0,
+      // Double forfait : deux perdantes, lues sur les sides faute de colonnes
+      // vainqueur/perdant. Le statut est exigé comme pour le nul — un drapeau
+      // resté sur une ligne rouverte ne doit rien retirer à personne.
+      doubleForfeitTeamIds:
+        row.status === "COMPLETED" &&
+        Number(row.double_forfeit ?? 0) === 1 &&
+        row.team1_id !== null &&
+        row.team2_id !== null
+          ? ([Number(row.team1_id), Number(row.team2_id)] as const)
+          : null,
     };
   });
 }
@@ -474,7 +486,14 @@ export async function reconcileEndurance(
     // L'arbre se relit avant de s'enchaîner : une correction de score en amont
     // (un quart de finale, voire une manche qualificative) a pu périmer un tour
     // déjà posé, et rien d'autre ne le regarde.
-    await repairPlayoffBracket(conn, tournamentId, assignRanks(replayed), config);
+    const rewritten = await repairPlayoffBracket(conn, tournamentId, assignRanks(replayed), config);
+    // Un tour réécrit dans un tournoi **clos** : ce ne peut être qu'un tour
+    // d'exemptions né d'un double forfait (un tour joué porte une saisie, et
+    // n'est jamais réécrit). Corriger ce double forfait remet une vraie
+    // rencontre en jeu — le tournoi doit repartir avec elle, sinon il resterait
+    // « terminé » sur un arbre que plus personne ne peut jouer. Il se reclôt
+    // par le chemin ordinaire une fois la finale jouée.
+    if (rewritten && finished) await reopenTournament(conn, tournamentId);
     await finalizePlayoffsIfDone(conn, tournamentId);
     return;
   }
@@ -550,7 +569,7 @@ export async function reconcileEndurance(
  */
 const HAS_SCORE_INPUT_SQL = `(team1_score IS NOT NULL OR team2_score IS NOT NULL
             OR winner_team_id IS NOT NULL OR forfeit_team_id IS NOT NULL
-            OR status = 'AWAITING_CONFIRMATION')`;
+            OR double_forfeit = 1 OR status = 'AWAITING_CONFIRMATION')`;
 
 /** Un match de la manche porte-t-il déjà une saisie ? */
 async function roundHasScoreInput(
@@ -716,6 +735,8 @@ type PlayoffMatchRow = {
   teamBId: number | null;
   winnerTeamId: number | null;
   loserTeamId: number | null;
+  /** Rencontre close sur un double forfait : elle ne qualifie personne. */
+  doubleForfeit: boolean;
   hasScoreInput: boolean;
 };
 
@@ -758,11 +779,12 @@ async function loadPlayoffRoundMatches(
       winner_team_id: number | null;
       loser_team_id: number | null;
       forfeit_team_id: number | null;
+      double_forfeit: number | null;
       is_bye: number | null;
     })[]
   >(
     `SELECT id, bracket, status, team1_id, team2_id, team1_score, team2_score,
-            winner_team_id, loser_team_id, forfeit_team_id, is_bye
+            winner_team_id, loser_team_id, forfeit_team_id, double_forfeit, is_bye
      FROM bg_matches
      WHERE tournament_id = ? AND round_number = ?
      ORDER BY match_number ASC`,
@@ -777,6 +799,7 @@ async function loadPlayoffRoundMatches(
     teamBId: row.team2_id === null ? null : Number(row.team2_id),
     winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
     loserTeamId: row.loser_team_id === null ? null : Number(row.loser_team_id),
+    doubleForfeit: String(row.status) === "COMPLETED" && Number(row.double_forfeit ?? 0) === 1,
     hasScoreInput:
       Number(row.is_bye ?? 0) !== 1 &&
       row.team1_id !== null &&
@@ -785,6 +808,7 @@ async function loadPlayoffRoundMatches(
         row.team2_score !== null ||
         row.winner_team_id !== null ||
         row.forfeit_team_id != null ||
+        Number(row.double_forfeit ?? 0) === 1 ||
         String(row.status) === "AWAITING_CONFIRMATION"),
   }));
 }
@@ -833,7 +857,8 @@ async function writePlayoffRound(
       `UPDATE bg_matches SET
         team1_id = ?, team2_id = ?, status = ?, is_bye = ?,
         team1_score = ?, team2_score = ?,
-        winner_team_id = ?, loser_team_id = NULL, forfeit_team_id = NULL
+        winner_team_id = ?, loser_team_id = NULL, forfeit_team_id = NULL,
+        double_forfeit = 0
        WHERE id = ?`,
       [
         pairing.teamAId,
@@ -899,9 +924,9 @@ async function repairPlayoffBracket(
   tournamentId: number,
   standings: EnduranceStanding[],
   config: EnduranceConfig,
-): Promise<void> {
+): Promise<boolean> {
   const rounds = await loadPlayoffRoundNumbers(conn, tournamentId);
-  if (rounds.length === 0) return;
+  if (rounds.length === 0) return false;
 
   let plan = planPlayoffFirstRound(selectQualifiedTeamIds(standings, config), config);
 
@@ -909,14 +934,14 @@ async function repairPlayoffBracket(
     const matches = await loadPlayoffRoundMatches(conn, tournamentId, round);
 
     if (playoffRoundIsStale(plan, matches)) {
-      if (matches.some((match) => match.hasScoreInput)) return;
+      if (matches.some((match) => match.hasScoreInput)) return false;
 
       await writePlayoffRound(conn, tournamentId, round, plan, matches);
       await conn.execute(`DELETE FROM bg_matches WHERE tournament_id = ? AND round_number > ?`, [
         tournamentId,
         round,
       ]);
-      return;
+      return true;
     }
 
     // Tour conforme : le suivant se déduit de ses résultats — encore faut-il
@@ -924,11 +949,12 @@ async function repairPlayoffBracket(
     // part : `planNextPlayoffRound` rend un plan vide, et il n'y a plus rien à
     // relire en aval.
     const decisive = matches.filter((match) => match.bracket !== "THIRD_PLACE");
-    if (decisive.some((match) => match.status !== "COMPLETED")) return;
+    if (decisive.some((match) => match.status !== "COMPLETED")) return false;
 
     plan = planNextPlayoffRound(decisive);
-    if (plan.length === 0) return;
+    if (plan.length === 0) return false;
   }
+  return false;
 }
 
 /**
@@ -940,29 +966,54 @@ async function repairPlayoffBracket(
  * peuvent pas diverger.
  */
 async function finalizePlayoffsIfDone(conn: PoolConnection, tournamentId: number): Promise<void> {
-  const rounds = await loadPlayoffRoundNumbers(conn, tournamentId);
-  if (rounds.length === 0) return;
+  // Plusieurs tours d'affilée peuvent se poser en un seul entretien : un double
+  // forfait laisse un créneau vacant, et le tour suivant naît alors **déjà
+  // joué** — une exemption, que `writePlayoffRound` clôt sur place. Sans cette
+  // boucle, l'arbre attendrait un score que personne n'a à saisir. Le nombre de
+  // tours d'un arbre borne l'itération ; le plafond n'est qu'un garde-fou.
+  for (let step = 0; step < MAX_PLAYOFF_STEPS; step += 1) {
+    const rounds = await loadPlayoffRoundNumbers(conn, tournamentId);
+    if (rounds.length === 0) return;
 
-  const lastRound = rounds[rounds.length - 1];
-  const matches = await loadPlayoffRoundMatches(conn, tournamentId, lastRound);
+    const lastRound = rounds[rounds.length - 1];
+    const matches = await loadPlayoffRoundMatches(conn, tournamentId, lastRound);
 
-  const decisive = matches.filter((match) => match.bracket !== "THIRD_PLACE");
-  if (decisive.length === 0 || decisive.some((match) => match.status !== "COMPLETED")) return;
+    const decisive = matches.filter((match) => match.bracket !== "THIRD_PLACE");
+    if (decisive.length === 0 || decisive.some((match) => match.status !== "COMPLETED")) return;
 
-  // Une seule rencontre décisive terminée = finale jouée : reste à s'assurer que
-  // la petite finale l'est aussi avant de clore.
-  if (decisive.length === 1) {
-    if (matches.some((match) => match.status !== "COMPLETED")) return;
-    const standings = await loadEnduranceStandings(conn, tournamentId);
-    await finalizeEndurance(conn, tournamentId, standings, matches);
-    return;
+    // Une seule rencontre décisive terminée = finale jouée : reste à s'assurer
+    // que la petite finale l'est aussi avant de clore.
+    if (decisive.length === 1) {
+      if (matches.some((match) => match.status !== "COMPLETED")) return;
+      const standings = await loadEnduranceStandings(conn, tournamentId);
+      await finalizeEndurance(conn, tournamentId, standings, matches);
+      return;
+    }
+
+    const plan = planNextPlayoffRound(decisive);
+
+    // Les doubles forfaits ont vidé **tous** les créneaux du tour suivant : il
+    // n'y a plus personne pour jouer, et attendre ne ferait rien venir. Le
+    // tournoi se clôt sans championne, sur le classement de qualification.
+    if (!plan.some((entry) => entry.bracket === "UPPER")) {
+      if (decisive.some((match) => match.doubleForfeit)) {
+        const standings = await loadEnduranceStandings(conn, tournamentId);
+        await finalizeEndurance(conn, tournamentId, standings);
+      }
+      return;
+    }
+
+    await writePlayoffRound(conn, tournamentId, lastRound + 1, plan, []);
+
+    // On ne reboucle que sur un tour **né joué** — rien que des exemptions : un
+    // tour portant une vraie rencontre attend son score, et le relire tout de
+    // suite ne ferait qu'y constater qu'il n'est pas terminé.
+    if (plan.some((entry) => entry.pairing.teamBId !== null)) return;
   }
-
-  const plan = planNextPlayoffRound(decisive);
-  if (plan.length === 0) return;
-
-  await writePlayoffRound(conn, tournamentId, lastRound + 1, plan, []);
 }
+
+/** Plafond de tours posés en un seul entretien (un arbre en compte bien moins). */
+const MAX_PLAYOFF_STEPS = 16;
 
 /** Classement final : podium issu des play-offs, puis ordre d'élimination. */
 async function finalizeEndurance(
@@ -971,30 +1022,45 @@ async function finalizeEndurance(
   standings: EnduranceStanding[],
   finalMatches: {
     bracket: string;
+    teamAId: number | null;
+    teamBId: number | null;
     winnerTeamId: number | null;
     loserTeamId: number | null;
+    doubleForfeit: boolean;
   }[] = [],
 ): Promise<void> {
-  const podium: number[] = [];
+  const toPodium = (match: (typeof finalMatches)[number] | undefined) =>
+    match && {
+      team1Id: match.teamAId,
+      team2Id: match.teamBId,
+      winnerTeamId: match.winnerTeamId,
+      loserTeamId: match.loserTeamId,
+      doubleForfeit: match.doubleForfeit,
+    };
 
-  const final = finalMatches.find((match) => match.bracket !== "THIRD_PLACE");
-  const thirdPlace = finalMatches.find((match) => match.bracket === "THIRD_PLACE");
+  // Une finale ou une petite finale close sur un double forfait laisse sa
+  // première place vacante et range ses deux engagées ex æquo à la seconde :
+  // la règle est celle des tableaux à élimination (`podiumRanks`).
+  // Une finale ou une petite finale d'exemption n'existe dans cet arbre que
+  // par un double forfait (le tirage n'en produit aucune au dernier tour) : sa
+  // seconde place est donc toujours vacante.
+  const podium = podiumRanks(
+    [
+      toPodium(finalMatches.find((match) => match.bracket !== "THIRD_PLACE")),
+      toPodium(finalMatches.find((match) => match.bracket === "THIRD_PLACE")),
+    ],
+    { byeLeavesVacancy: true },
+  );
 
-  if (final?.winnerTeamId) podium.push(final.winnerTeamId);
-  if (final?.loserTeamId) podium.push(final.loserTeamId);
-  if (thirdPlace?.winnerTeamId) podium.push(thirdPlace.winnerTeamId);
-  if (thirdPlace?.loserTeamId) podium.push(thirdPlace.loserTeamId);
+  const ranks = appendSequentialRanks(
+    podium,
+    assignRanks(standings).map((standing) => standing.teamId),
+  );
 
-  const ranked = assignRanks(standings)
-    .map((standing) => standing.teamId)
-    .filter((teamId) => !podium.includes(teamId));
-
-  const order = [...podium, ...ranked];
-
-  for (let index = 0; index < order.length; index += 1) {
+  for (const { teamId, rank } of ranks) {
     await conn.execute(
       `UPDATE bg_tournament_registrations SET final_rank = ? WHERE tournament_id = ? AND team_id = ?`,
-      [index + 1, tournamentId, order[index]],
+      [rank, tournamentId, teamId],
     );
   }
 

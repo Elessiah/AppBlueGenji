@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import { Pill } from "@/components/cyber";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
-import { isMatchDrawn } from "@/lib/shared/match-outcome";
+import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
 import {
   forfeitMapCount,
   matchFormatDescription,
@@ -93,6 +93,9 @@ function ScoreStepper({ id, teamName, value, max, disabled, onChange }: ScoreSte
 
 /** Résultat déjà enregistré, en une phrase — ou `null` s'il n'y en a pas. */
 function storedResultLabel(match: BracketMatch, team1: string, team2: string): string | null {
+  if (isMatchDoubleForfeit(match)) {
+    return `Double forfait enregistré : ${team1} et ${team2} perdent toutes les deux.`;
+  }
   if (match.forfeitTeamId !== null) {
     const forfeiting = match.forfeitTeamId === match.team1Id ? team1 : team2;
     const beneficiary = match.forfeitTeamId === match.team1Id ? team2 : team1;
@@ -148,6 +151,9 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
   // libre — la même valeur que celle écrite en base par la route.
   const forfeitMaps = forfeitMapCount(matchFormat);
   const forfeitTeamId = form.forfeitTeamId;
+  const doubleForfeit = form.doubleForfeit;
+  // Un forfait, simple ou double, remplace le score saisi.
+  const anyForfeit = forfeitTeamId !== undefined || doubleForfeit;
   const forfeiting =
     forfeitTeamId === undefined
       ? null
@@ -156,13 +162,16 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
         : { out: team2, through: team1 };
   // Un forfait déjà posé ne se cache pas derrière un lien : il commande la
   // rencontre, et le replier laisserait croire à un match encore à jouer.
-  const showForfeit = forfeitOpen || forfeitTeamId !== undefined;
+  const showForfeit = forfeitOpen || anyForfeit;
 
   // Ce qui est en base ne se rappelle que s'il ne se lit pas déjà dans les
   // champs : un match tranché (les champs ne disent pas qui a gagné), ou une
   // saisie en cours qui recouvre l'ancienne valeur.
   const stored =
-    match.winnerTeamId !== null || isMatchDrawn(match) || form.dirty
+    match.winnerTeamId !== null ||
+    isMatchDrawn(match) ||
+    isMatchDoubleForfeit(match) ||
+    form.dirty
       ? storedResultLabel(match, team1, team2)
       : null;
   const blocker = form.decision.resolveBlocker ?? form.decision.saveBlocker;
@@ -186,6 +195,11 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
   const toggleForfeit = (teamId: number | null) => {
     if (teamId === null) return;
     form.setForfeitTeamId(forfeitTeamId === teamId ? undefined : teamId);
+  };
+
+  const closeForfeit = () => {
+    form.setForfeitTeamId(undefined);
+    form.setDoubleForfeit(false);
   };
 
   return (
@@ -250,7 +264,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
               teamName={team1}
               value={form.score1}
               max={maxScore}
-              disabled={form.submitting || forfeitTeamId !== undefined}
+              disabled={form.submitting || anyForfeit}
               onChange={form.setScore1}
             />
             <span className={styles.versus} aria-hidden="true">
@@ -261,7 +275,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
               teamName={team2}
               value={form.score2}
               max={maxScore}
-              disabled={form.submitting || forfeitTeamId !== undefined}
+              disabled={form.submitting || anyForfeit}
               onChange={form.setScore2}
             />
           </div>
@@ -283,7 +297,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
               type="button"
               className={styles.link}
               onClick={() => {
-                if (showForfeit) form.setForfeitTeamId(undefined);
+                if (showForfeit) closeForfeit();
                 setForfeitOpen(!showForfeit);
               }}
               aria-expanded={showForfeit}
@@ -293,7 +307,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
               {/* « Annuler le forfait » n'a de sens qu'une fois une équipe
                   désignée : panneau ouvert et vide, il n'y a que le panneau à
                   refermer. */}
-              {forfeitTeamId !== undefined
+              {anyForfeit
                 ? "Annuler le forfait"
                 : showForfeit
                   ? "Annuler"
@@ -309,16 +323,23 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
                     Le geste ne porte que sur **cette** manche : retirer une
                     équipe de tout le reste du tournoi se fait depuis son
                     classement, pas d'ici. */}
-                <p className={styles.forfeitHint}>
-                  {forfeiting
-                    ? `${forfeiting.out} déclare forfait sur cette manche : ${forfeiting.through} l'emporte ${forfeitMaps}-0, sans manche jouée.`
-                    : `Qui déclare forfait sur cette manche ? Son adversaire l'emporte ${forfeitMaps}-0, et les scores saisis sont ignorés.`}
+                {/* Le double forfait annonce ses conséquences avant le clic :
+                    personne ne gagne, et dans un tableau la place laissée vide
+                    fait passer l'adversaire suivant par exemption — un effet
+                    qui descend l'arbre, et qu'on ne découvre pas après coup. */}
+                <p id="admin-score-forfeit-hint" className={styles.forfeitHint}>
+                  {doubleForfeit
+                    ? `${team1} et ${team2} déclarent toutes les deux forfait : le match est perdu pour les deux, personne ne se qualifie, et dans un tableau leur prochain adversaire passe le tour par exemption.`
+                    : forfeiting
+                      ? `${forfeiting.out} déclare forfait sur cette manche : ${forfeiting.through} l'emporte ${forfeitMaps}-0, sans manche jouée.`
+                      : `Qui déclare forfait sur cette manche ? Son adversaire l'emporte ${forfeitMaps}-0, et les scores saisis sont ignorés.`}
                 </p>
                 <div className={styles.forfeitRow}>
                   <button
                     type="button"
                     className={styles.forfeit}
                     aria-pressed={forfeitTeamId === match.team1Id}
+                    aria-describedby="admin-score-forfeit-hint"
                     onClick={() => toggleForfeit(match.team1Id)}
                     disabled={form.submitting || match.team1Id === null}
                   >
@@ -328,10 +349,21 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
                     type="button"
                     className={styles.forfeit}
                     aria-pressed={forfeitTeamId === match.team2Id}
+                    aria-describedby="admin-score-forfeit-hint"
                     onClick={() => toggleForfeit(match.team2Id)}
                     disabled={form.submitting || match.team2Id === null}
                   >
                     {team2}
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.forfeit} ${styles.forfeitBoth}`}
+                    aria-pressed={doubleForfeit}
+                    aria-describedby="admin-score-forfeit-hint"
+                    onClick={() => form.setDoubleForfeit(!doubleForfeit)}
+                    disabled={form.submitting || match.team1Id === null || match.team2Id === null}
+                  >
+                    Les deux (double forfait)
                   </button>
                 </div>
               </div>

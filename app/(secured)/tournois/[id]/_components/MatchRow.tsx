@@ -5,7 +5,7 @@ import type { BracketMatch, TournamentFormat } from "@/lib/shared/types";
 import { fromBracketMatch, isScoreEditLocked } from "@/lib/shared/match-lock";
 import { matchFormatLabel, matchWinsRequired } from "@/lib/shared/match-format";
 import { matchAnchorId } from "@/lib/shared/match-anchor";
-import { isMatchDrawn } from "@/lib/shared/match-outcome";
+import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
 import { EntrantLink } from "../_lib/entrant-link";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { useIssueReport } from "../_lib/issue-report-context";
@@ -67,6 +67,11 @@ export function MatchRow({
   // de « pas encore joué ».
   const isDraw = isMatchDrawn(match);
 
+  // Double forfait : jouée, sans vainqueur, et perdue par les deux. Même besoin
+  // que le nul — rien ne teinte les lignes — mais pas le même mot : « Match
+  // nul » y annoncerait une rencontre disputée et partagée.
+  const isDoubleForfeit = isMatchDoubleForfeit(match);
+
   // Même règle que le garde-fou serveur (`lib/shared/match-lock.ts`) : le score
   // n'est plus éditable dès que la manche suivante porte une saisie.
   const scoreLocked = isScoreEditLocked(
@@ -93,8 +98,10 @@ export function MatchRow({
   // l'arbitrage peut noter un forfait sans valider le résultat, et le score plein
   // porté en face (3-0 en FT3) se lisait alors comme une rencontre jouée et
   // gagnée, sur un match que personne n'a encore remporté.
-  const team1Score = !isBye && match.forfeitTeamId === match.team1Id ? "FF" : (match.team1Score ?? "-");
-  const team2Score = !isBye && match.forfeitTeamId === match.team2Id ? "FF" : (match.team2Score ?? "-");
+  const team1Forfeits = !isBye && (isDoubleForfeit || match.forfeitTeamId === match.team1Id);
+  const team2Forfeits = !isBye && (isDoubleForfeit || match.forfeitTeamId === match.team2Id);
+  const team1Score = team1Forfeits ? "FF" : (match.team1Score ?? "-");
+  const team2Score = team2Forfeits ? "FF" : (match.team2Score ?? "-");
 
   return (
     <div
@@ -137,7 +144,7 @@ export function MatchRow({
             {team1Display}
           </span>
         )}
-        <strong style={{ marginLeft: 8, color: team1Win ? "var(--green)" : match.forfeitTeamId === match.team1Id ? "rgba(255,157,46,0.9)" : "var(--text-2)" }}>
+        <strong style={{ marginLeft: 8, color: team1Win ? "var(--green)" : team1Forfeits ? "rgba(255,157,46,0.9)" : "var(--text-2)" }}>
           {team1Score}
         </strong>
       </div>
@@ -155,12 +162,12 @@ export function MatchRow({
             {team2Display}
           </span>
         )}
-        <strong style={{ marginLeft: 8, color: team2Win ? "var(--green)" : match.forfeitTeamId === match.team2Id ? "rgba(255,157,46,0.9)" : "var(--text-2)" }}>
+        <strong style={{ marginLeft: 8, color: team2Win ? "var(--green)" : team2Forfeits ? "rgba(255,157,46,0.9)" : "var(--text-2)" }}>
           {team2Score}
         </strong>
       </div>
 
-      {isDraw && (
+      {(isDraw || isDoubleForfeit) && (
         <p
           style={{
             margin: 0,
@@ -169,12 +176,15 @@ export function MatchRow({
             letterSpacing: "0.06em",
             textTransform: "uppercase",
             textAlign: "center",
-            color: "var(--text-2)",
-            background: "rgba(255,255,255,0.03)",
+            // L'ambre des « FF » pour un double forfait : la mention dit la même
+            // chose que les deux scores, elle en prend la couleur. Le gris reste
+            // au nul, qui n'est ni une faute ni une absence.
+            color: isDoubleForfeit ? "rgba(255,157,46,0.9)" : "var(--text-2)",
+            background: isDoubleForfeit ? "rgba(255,157,46,0.06)" : "rgba(255,255,255,0.03)",
             borderTop: `1px solid ${BORDER}`,
           }}
         >
-          Match nul
+          {isDoubleForfeit ? "Double forfait" : "Match nul"}
         </p>
       )}
 

@@ -23,7 +23,25 @@ export type MatchOutcomeShape = {
   forfeitTeamId: number | null;
   team1Id: number | null;
   team2Id: number | null;
+  /**
+   * Les deux engagées ont déclaré forfait. Facultatif : une vue qui ne le porte
+   * pas se lit comme avant que le double forfait existe.
+   */
+  doubleForfeit?: boolean;
 };
+
+/**
+ * La rencontre s'est-elle close sur un **double forfait** ?
+ *
+ * Une rencontre close sans vainqueur ni score, dont les deux engagées sont
+ * perdantes (`lib/shared/double-forfeit.ts`). Le statut est exigé en plus du
+ * drapeau : une ligne rouverte par un retour en arrière ne doit rien annoncer.
+ */
+export function isMatchDoubleForfeit(
+  match: Pick<MatchOutcomeShape, "status" | "doubleForfeit">,
+): boolean {
+  return isMatchPlayed(match) && match.doubleForfeit === true;
+}
 
 /**
  * La rencontre est-elle jouée ?
@@ -42,12 +60,17 @@ export function isMatchPlayed(match: Pick<MatchOutcomeShape, "status">): boolean
  * par forfait — un forfait n'a pas de vainqueur au sens des colonnes de report
  * mais en désigne bien un. Les matchs à une seule équipe (bye) ou sans équipe
  * (match fantôme) sont écartés : leur score est posé par le moteur.
+ *
+ * Un **double forfait** n'est pas un nul non plus : il n'a pas de vainqueur,
+ * mais deux perdantes — le lire « Match nul » le ferait passer pour une
+ * rencontre disputée et partagée.
  */
 export function isMatchDrawn(match: MatchOutcomeShape): boolean {
   return (
     isMatchPlayed(match) &&
     match.winnerTeamId === null &&
     match.forfeitTeamId === null &&
+    match.doubleForfeit !== true &&
     match.team1Id !== null &&
     match.team2Id !== null
   );

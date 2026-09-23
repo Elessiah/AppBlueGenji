@@ -286,6 +286,7 @@ export async function getMatchRows(
       m.winner_team_id,
       m.loser_team_id,
       m.forfeit_team_id,
+      m.double_forfeit,
       m.next_winner_match_id,
       m.next_winner_slot,
       m.next_loser_match_id,
@@ -447,4 +448,37 @@ export async function resetRegistrationRanks(
      WHERE tournament_id = ?`,
     [tournamentId],
   );
+}
+
+/**
+ * Rouvre un tournoi terminé : il repasse « en cours », perd sa date de clôture
+ * et son classement final.
+ *
+ * `finishTournament` ne clôt qu'une fois (`state <> 'FINISHED'`) : remettre
+ * l'état et effacer la date suffisent à lui rendre son effet, et le tournoi se
+ * reclôt — ligne de journal et nouvelle championne comprises — dès que ce qui a
+ * été rouvert est rejoué. Le classement part avec : il désignait une championne
+ * que plus aucun match ne désigne.
+ *
+ * Appelé par la correction d'un résultat qui rouvre une rencontre close
+ * d'office — une exemption née d'un double forfait (`adminResolveMatch` après
+ * `./bracket-cascade.ts`, `reconcileEndurance` après `repairPlayoffBracket`).
+ * Le retour en arrière (`./rollback.ts`) garde la sienne, qu'il n'appelle que
+ * sur un tournoi qu'il sait terminé. Celle-ci ne rouvre **que** ce qui l'est :
+ * la plupart des corrections portent sur un tournoi en cours.
+ *
+ * @returns vrai si le tournoi était terminé et vient d'être rouvert.
+ */
+export async function reopenTournament(
+  connection: PoolConnection,
+  tournamentId: number,
+): Promise<boolean> {
+  const [result] = await connection.execute<ResultSetHeader>(
+    `UPDATE bg_tournaments SET state = 'RUNNING', finished_at = NULL
+     WHERE id = ? AND state = 'FINISHED'`,
+    [tournamentId],
+  );
+  if (Number(result?.affectedRows ?? 0) === 0) return false;
+  await resetRegistrationRanks(connection, tournamentId);
+  return true;
 }

@@ -24,6 +24,12 @@ export interface MatchScoreState {
   winnerTeamId: number | null;
   forfeitTeamId: number | null;
   /**
+   * Double forfait (`lib/shared/double-forfeit.ts`) : une saisie à part entière,
+   * qui ne laisse pourtant ni score, ni vainqueur, ni forfait nominatif.
+   * Facultatif — une vue qui ne le porte pas se lit comme avant.
+   */
+  doubleForfeit?: boolean;
+  /**
    * Le match est-il **tranché** ?
    *
    * Ce n'est pas « il a un vainqueur » : une rencontre peut se clore sans
@@ -77,6 +83,7 @@ export function fromBracketMatch(match: BracketMatch): MatchScoreState {
     team2Score: match.team2Score,
     winnerTeamId: match.winnerTeamId,
     forfeitTeamId: match.forfeitTeamId,
+    doubleForfeit: match.doubleForfeit,
     decided: match.status === "COMPLETED",
     hasPendingReport: match.status === "AWAITING_CONFIRMATION",
     nextWinnerMatchId: match.nextWinnerMatchId,
@@ -88,7 +95,10 @@ export function fromBracketMatch(match: BracketMatch): MatchScoreState {
 
 /**
  * Un match porte-t-il une saisie de score ? Compte comme saisie : un score (même
- * 0), un vainqueur, un forfait, ou un report en attente de confirmation.
+ * 0), un vainqueur, un forfait (simple ou double), ou un report en attente de
+ * confirmation. Le double forfait doit être nommé : il ne laisse ni score ni
+ * vainqueur, et passerait sinon pour une rencontre vierge — la manche amont se
+ * rouvrirait alors sur un résultat que l'arbitrage vient de trancher.
  *
  * Les matchs à une seule équipe (bye) ou sans équipe (match fantôme) sont exclus :
  * leur score est posé automatiquement par le moteur (1-0, 0-0), personne ne l'a
@@ -101,6 +111,7 @@ export function hasScoreInput(match: MatchScoreState): boolean {
     match.team2Score !== null ||
     match.winnerTeamId !== null ||
     match.forfeitTeamId !== null ||
+    match.doubleForfeit === true ||
     match.hasPendingReport
   );
 }
@@ -108,7 +119,9 @@ export function hasScoreInput(match: MatchScoreState): boolean {
 /**
  * Matchs dont le contenu dépend du résultat de `match`.
  *
- * · Élimination simple / double : les matchs cibles du vainqueur et du perdant.
+ * · Élimination simple / double : les matchs cibles du vainqueur et du perdant,
+ *   **à travers** les rencontres que le moteur a closes d'office (exemptions,
+ *   matchs fantômes) — voir {@link bracketDependents}.
  * · Survie / ronde suisse / BlueGenji Survie : pas de liens de bracket — les
  *   appariements du round suivant sont recalculés à partir du classement, donc
  *   tout round ultérieur dépend du résultat.
@@ -138,13 +151,52 @@ export function dependentMatches(
   if (effective === "SURVIVAL" || effective === "SWISS" || effective === "BG_SURVIE") {
     intraPhase = samePhase.filter((m) => m.roundNumber > match.roundNumber);
   } else {
-    const targets = [match.nextWinnerMatchId, match.nextLoserMatchId].filter(
-      (id): id is number => id !== null,
-    );
-    intraPhase = targets.length === 0 ? [] : samePhase.filter((m) => targets.includes(m.id));
+    intraPhase = bracketDependents(match, samePhase);
   }
 
   return [...intraPhase, ...laterPhases];
+}
+
+/**
+ * Les cibles de bracket d'un match, **à travers les rencontres que le moteur a
+ * résolues seul**.
+ *
+ * Une cible directe suffisait tant qu'un résultat ne pouvait qu'y poser une
+ * équipe. Le double forfait y pose un **vide** : le match suivant devient une
+ * exemption (bye) résolue par le moteur, qui fait avancer l'adversaire un tour
+ * plus loin — et deux doubles forfaits voisins font un match fantôme, dont la
+ * cible devient à son tour un bye. Corriger le résultat amont défait toute
+ * cette chaîne (`lib/server/tournaments/bracket-cascade.ts`) : ce qui compte
+ * n'est donc pas la cible directe, qui n'a jamais été jouée, mais la première
+ * rencontre **réellement disputée** au bout de la chaîne.
+ *
+ * Une rencontre résolue par le moteur se reconnaît à ce qu'elle est tranchée
+ * sans porter de saisie ({@link hasScoreInput} écarte byes et matchs
+ * fantômes) : on la traverse. Toute autre rencontre arrête le parcours — si
+ * elle porte une saisie, le verrou tombe ; sinon rien n'a été propagé plus loin.
+ */
+function bracketDependents(
+  match: MatchScoreState,
+  samePhase: MatchScoreState[],
+): MatchScoreState[] {
+  const byId = new Map(samePhase.map((m) => [m.id, m]));
+  const found: MatchScoreState[] = [];
+  const seen = new Set<number>([match.id]);
+  const queue: MatchScoreState[] = [match];
+
+  while (queue.length > 0) {
+    const current = queue.shift() as MatchScoreState;
+    for (const id of [current.nextWinnerMatchId, current.nextLoserMatchId]) {
+      if (id === null || seen.has(id)) continue;
+      seen.add(id);
+      const target = byId.get(id);
+      if (!target) continue;
+      found.push(target);
+      if (target.decided && !hasScoreInput(target)) queue.push(target);
+    }
+  }
+
+  return found;
 }
 
 /**

@@ -578,6 +578,7 @@ async function runMigrations(db: Pool): Promise<void> {
       winner_team_id BIGINT NULL,
       loser_team_id BIGINT NULL,
       forfeit_team_id BIGINT NULL,
+      double_forfeit BOOLEAN NOT NULL DEFAULT FALSE,
       next_winner_match_id BIGINT NULL,
       next_winner_slot TINYINT NULL,
       next_loser_match_id BIGINT NULL,
@@ -1003,6 +1004,11 @@ async function runMigrations(db: Pool): Promise<void> {
     // rien dire.
     `ALTER TABLE bg_tournaments ADD COLUMN registration_blizzard_requirement
        ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'NONE'`,
+    // Double forfait : les deux engagées d'une rencontre déclarent forfait. Une
+    // colonne à part plutôt qu'une valeur de `forfeit_team_id`, qui ne sait
+    // nommer qu'une équipe (`lib/shared/double-forfeit.ts`).
+    `ALTER TABLE bg_matches ADD COLUMN double_forfeit BOOLEAN NOT NULL DEFAULT FALSE
+       AFTER forfeit_team_id`,
     // Illustration ou logo d'un tournoi, facultatif.
     `ALTER TABLE bg_tournaments ADD COLUMN image_url VARCHAR(255) NULL`,
     `ALTER TABLE bg_tournaments ADD COLUMN image_fit ENUM('COVER', 'CONTAIN') NOT NULL DEFAULT 'COVER'`,

@@ -87,6 +87,13 @@ export type SwissMatchOutcome = {
   loserTeamId: number | null;
   /** Victoire d'office : rapporte `points.bye`, et interdit un second bye. */
   isBye: boolean;
+  /**
+   * Les deux engagées ont déclaré forfait : une défaite pour chacune, sans
+   * vainqueur (`lib/shared/double-forfeit.ts`). Sans ce drapeau, une rencontre
+   * close sans vainqueur se lit comme un nul et rapporterait un point à deux
+   * équipes absentes.
+   */
+  doubleForfeit?: boolean;
 };
 
 /** Abandon déclaré : événement externe, non déductible des matchs. */
@@ -151,6 +158,14 @@ export function replaySwiss(input: ReplaySwissInput): SwissStanding[] {
     }
 
     if (!team1 || !team2) continue;
+
+    if (match.doubleForfeit) {
+      team1.losses += 1;
+      team2.losses += 1;
+      team1.points += input.points.loss;
+      team2.points += input.points.loss;
+      continue;
+    }
 
     if (match.winnerTeamId === null) {
       // Match terminé sans vainqueur : match nul.
@@ -251,6 +266,9 @@ export function computeTiebreaks(
       const opponent = byId.get(isTeam1 ? match.team2Id : match.team1Id);
       if (!opponent) continue;
 
+      // Un double forfait n'a rien battu : il ne rapporte rien, pas même la
+      // moitié d'un nul.
+      if (match.doubleForfeit) continue;
       if (match.winnerTeamId === standing.teamId) sonnebornBerger += opponent.points;
       else if (match.winnerTeamId === null) sonnebornBerger += opponent.points / 2;
     }
