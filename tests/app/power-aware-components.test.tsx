@@ -52,7 +52,7 @@ describe("signal sonore", () => {
     // Un contexte neuf à chaque signal, jamais rendu : mémoire et fil audio de
     // plus à chaque score, sur un poste qui fait tourner un jeu.
     const source = readSource("app/(secured)/tournois/[id]/_lib/sounds.ts");
-    expect(source).toMatch(/oscillator\.onended = \(\) => \{\s*void context\.close\(\)/);
+    expect(source).toContain("oscillator.onended = close;");
   });
 });
 
