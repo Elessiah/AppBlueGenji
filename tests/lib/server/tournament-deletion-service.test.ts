@@ -173,6 +173,45 @@ describe("deleteTournament", () => {
     expect(deleteStoredImage).not.toHaveBeenCalled();
   });
 
+  describe("table des rappels absente", () => {
+    /** Connexion dont le `DELETE` des rappels lève l'erreur donnée. */
+    function mockRemindersFailing(code: string) {
+      const execute = jest.fn(async (sql: string) => {
+        if (/SELECT id, name, image_url FROM bg_tournaments/.test(sql)) {
+          return [[{ id: 7, name: "Open", image_url: null }]];
+        }
+        if (/bg_match_reminders/.test(sql)) throw Object.assign(new Error(code), { code });
+        return [{ affectedRows: 1 }];
+      }) as unknown as ExecuteMock;
+      return { execute, connection: mockConnection(execute) };
+    }
+
+    it("supprime quand même le tournoi : il n'y a aucun rappel à effacer", async () => {
+      // Sa création est avalée par un `catch` dans `database.ts` : une base à
+      // qui elle manque ne doit pas rendre tous ses tournois indélébiles.
+      const { execute, connection } = mockRemindersFailing("ER_NO_SUCH_TABLE");
+
+      await expect(deleteTournament(7)).resolves.toEqual({ id: 7, name: "Open" });
+
+      expect(connection.commit).toHaveBeenCalledTimes(1);
+      expect(connection.rollback).not.toHaveBeenCalled();
+      const sql = statements(execute);
+      expect(sql).toContain("DELETE FROM bg_matches WHERE tournament_id = ?");
+      expect(sql).toContain("DELETE FROM bg_tournaments WHERE id = ?");
+    });
+
+    it("n'avale aucune autre erreur : un interblocage a déjà défait la transaction", async () => {
+      const { execute, connection } = mockRemindersFailing("ER_LOCK_DEADLOCK");
+
+      await expect(deleteTournament(7)).rejects.toThrow("ER_LOCK_DEADLOCK");
+
+      expect(connection.rollback).toHaveBeenCalledTimes(1);
+      expect(connection.commit).not.toHaveBeenCalled();
+      expect(statements(execute)).not.toContain("DELETE FROM bg_matches WHERE tournament_id = ?");
+      expect(publishUpdatedEvent).not.toHaveBeenCalled();
+    });
+  });
+
   it("relève l'image sous verrou, avant toute suppression", async () => {
     const { execute } = mockExistingTournament("Open", "/api/uploads/tournaments/7-a.webp");
     await deleteTournament(7);
