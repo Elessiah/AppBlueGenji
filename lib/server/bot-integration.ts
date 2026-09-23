@@ -154,11 +154,15 @@ export async function fetchBotStats(): Promise<BotStats> {
  * - Un ID numérique (5–32 chiffres) est renvoyé tel quel, sans solliciter le bot (option de repli).
  * - Un tag (`pseudo` ou legacy `pseudo#1234`) est résolu par le bot s'il partage un serveur
  *   avec l'utilisateur, sinon `DISCORD_USER_NOT_FOUND` est levé.
+ *
+ * Le repli par ID ne saute que la **recherche** : l'envoi qui suit exige quand
+ * même un serveur commun, Discord refusant un message privé d'un bot à qui n'en
+ * partage aucun avec lui (`DISCORD_DM_FAILED`).
  */
 export async function resolveDiscordUser(handle: string): Promise<string> {
   const trimmed = handle.trim();
 
-  // Repli : ID numérique direct, pas besoin d'un serveur commun avec le bot.
+  // Repli : ID numérique direct, sans balayer les serveurs du bot.
   if (/^\d{5,32}$/.test(trimmed)) {
     return trimmed;
   }
@@ -292,8 +296,8 @@ export async function pushSiteVisitStats(stats: SiteVisitStats): Promise<void> {
 /**
  * Destinataire d'un message privé Discord, tel que le site le connaît.
  *
- * `discordId` n'est renseigné que pour les comptes liés par code Discord ; le
- * `handle` (tag) suffit au bot, qui retrouve le membre **sur le serveur
+ * `discordId` est renseigné pour tout compte entré ou certifié par Discord
+ * (OAuth ou code), et prime ; à défaut, le `handle` (tag) suffit au bot, qui retrouve le membre **sur le serveur
  * BlueGenji** — la seule population qu'il démarche. Un joueur qui n'y est pas
  * ne reçoit aucune tentative d'envoi, et revient dans `unresolved`.
  */
