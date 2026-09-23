@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { collapsedBoundaries } from "./_lib/jsx-spacing";
 
 const SOURCE = readFileSync(
   join(__dirname, "..", "..", "app", "rgpd", "page.tsx"),
@@ -20,23 +21,9 @@ const SOURCE = readFileSync(
  * La panne est **muette** : elle ne lève rien, ne casse aucune mise en page, et
  * ne se voit qu'à la lecture du texte rendu. Aucun test de composant ne
  * l'attrape non plus — la page ne se monte pas hors de Next (`PublicHeader`).
- * D'où un contrôle sur la source, qui est l'endroit où la règle se lit.
+ * D'où un contrôle sur la source, qui est l'endroit où la règle se lit
+ * (moteur partagé : `_lib/jsx-spacing.ts`, ici sur **toutes** les balises).
  */
-
-/** Les frontières où l'espace est perdue : `</tag>` en fin de ligne, mot ensuite. */
-function collapsedBoundaries(source: string): string[] {
-  const lines = source.split("\n");
-  const found: string[] = [];
-  for (let i = 0; i < lines.length - 1; i += 1) {
-    if (!/<\/[A-Za-z][\w.]*>\s*$/.test(lines[i])) continue;
-    // La ligne suivante doit commencer par du **texte** : un élément ou une
-    // accolade y apporte son propre espacement, et une balise fermante clôt
-    // simplement le parent.
-    if (!/^\s*[A-Za-zÀ-ÿ0-9(«]/.test(lines[i + 1])) continue;
-    found.push(`${i + 1}: ${lines[i].trim()} ⏎ ${lines[i + 1].trim().slice(0, 40)}`);
-  }
-  return found;
-}
 
 describe("/rgpd — les espaces survivent aux frontières d'éléments", () => {
   it("rend « organisé un tournoi », et non « organiséun tournoi »", () => {

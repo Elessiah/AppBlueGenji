@@ -42,9 +42,11 @@ export function isTransactionAborted(error: unknown): boolean {
  * qu'un report de score en erreur. Les purges — suppression d'un tournoi,
  * retour en arrière, réécriture d'un tour de play-off — passent toutes par
  * `ignoreMissingTable` : sans quoi une base qui en manque rendrait tout tournoi
- * indélébile pour une table de notifications. Les lectures passent par
- * `rowsOrEmptyIfMissingTable` : une table absente n'a rien pu enregistrer, et
- * la lire vide est exact.
+ * indélébile pour une table de notifications. Les lectures des **sanctions**
+ * passent par `rowsOrEmptyIfMissingTable` : une table absente n'a rien pu
+ * enregistrer, et la lire vide est exact. Pas celles des réservations
+ * (`refereeAlertExists`, `loadSentReminders`) : lire vide y laisserait passer
+ * une réservation, et leurs appelants avalent déjà l'échec.
  *
  * Les autres tables ne sont **pas** tolérées : le site n'a rien à servir sans
  * elles, et ce prédicat n'a donc pas à couvrir leur absence.

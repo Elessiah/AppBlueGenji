@@ -45,7 +45,11 @@ import {
 } from "@/lib/shared/endurance-penalty";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { toIso } from "@/lib/server/serialization";
-import { ignoreMissingTable, rowsOrEmptyIfMissingTable } from "@/lib/server/mysql-errors";
+import {
+  ignoreMissingTable,
+  isMissingTableError,
+  rowsOrEmptyIfMissingTable,
+} from "@/lib/server/mysql-errors";
 import { appendSequentialRanks, podiumRanks } from "@/lib/shared/double-forfeit";
 import { createMatch, finishTournament, reopenTournament } from "./repository";
 import { localUploadUrl } from "@/lib/shared/uploads";
@@ -1292,12 +1296,20 @@ export async function applyEndurancePenalty(
   // quoi le canal montrerait une espacement que la page ne montre pas.
   const normalized = normalizePenaltyReason(reason);
 
-  await conn.execute(
-    `INSERT INTO bg_endurance_penalties
-      (tournament_id, team_id, round_number, points, reason, created_by)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [tournamentId, teamId, round, Math.floor(points), normalized, authorId],
-  );
+  // Sans la table, la sanction ne peut pas s'écrire : on le dit par un code,
+  // sans quoi le message brut de MySQL (base et table nommées) partirait tel
+  // quel dans la notification de l'arbitre.
+  try {
+    await conn.execute(
+      `INSERT INTO bg_endurance_penalties
+        (tournament_id, team_id, round_number, points, reason, created_by)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [tournamentId, teamId, round, Math.floor(points), normalized, authorId],
+    );
+  } catch (error) {
+    if (isMissingTableError(error)) throw new Error("PENALTIES_UNAVAILABLE");
+    throw error;
+  }
 
   await reconcileEndurance(tournamentId, conn);
 

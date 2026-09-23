@@ -19,6 +19,7 @@ describe("loadScriptEnv", () => {
   let warn: jest.SpiedFunction<typeof console.warn>;
   const lifecycle = process.env.npm_lifecycle_event;
   const nodeEnv = process.env.NODE_ENV;
+  const dbHost = process.env.DB_HOST;
 
   beforeEach(() => {
     // Le module s'est déjà chargé une fois à l'import : on repart d'un compte nul.
@@ -28,6 +29,7 @@ describe("loadScriptEnv", () => {
     process.env.npm_lifecycle_event = "backfill:avatars";
     // Le shell du serveur : aucun NODE_ENV exporté. (Jest pose `test`.)
     delete (process.env as Record<string, string | undefined>).NODE_ENV;
+    delete process.env.DB_HOST;
   });
 
   afterEach(() => {
@@ -35,6 +37,8 @@ describe("loadScriptEnv", () => {
     if (lifecycle === undefined) delete process.env.npm_lifecycle_event;
     else process.env.npm_lifecycle_event = lifecycle;
     (process.env as Record<string, string | undefined>).NODE_ENV = nodeEnv;
+    if (dbHost === undefined) delete process.env.DB_HOST;
+    else process.env.DB_HOST = dbHost;
   });
 
   it("lit les fichiers de développement quand NODE_ENV est absent", () => {
@@ -71,6 +75,14 @@ describe("loadScriptEnv", () => {
 
     const paths = configMock.mock.calls.map(([options]) => (options as { path: string }).path);
     expect(paths).toContain(".env.production");
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("se tait quand le shell exporte déjà la base", () => {
+    onDisk(".env.production");
+    process.env.DB_HOST = "127.0.0.1";
+    loadScriptEnv();
+
     expect(warn).not.toHaveBeenCalled();
   });
 });

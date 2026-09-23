@@ -33,6 +33,9 @@ export function loadScriptEnv(nodeEnv: string | undefined = process.env.NODE_ENV
     nodeEnv,
     candidates.filter((path) => existsSync(path)),
     process.env.npm_lifecycle_event,
+    // Lu **après** dotenv : seul un shell qui l'exporte peut l'avoir posé ici,
+    // aucun fichier de développement n'existant quand l'avertissement parle.
+    Boolean(process.env.DB_HOST),
   );
   if (notice) console.warn(notice);
 }

@@ -55,6 +55,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       return fail(message, 400);
     }
     if (message === "TEAM_NOT_IN_TOURNAMENT") return fail(message, 404);
+    // Table des sanctions absente (création avalée par `database.ts`) : le
+    // service est indisponible, la demande n'avait rien de faux.
+    if (message === "PENALTIES_UNAVAILABLE") return fail(message, 503);
     return fail(message || "PENALTY_FAILED", 500);
   }
 }

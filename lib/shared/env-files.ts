@@ -30,8 +30,13 @@ export function envFileOrder(nodeEnv: string): string[] {
   return nodeEnv === "test" ? files.filter((file) => !file.endsWith(".local")) : files;
 }
 
-/** Fichiers qui ne sont lus qu'en production, et qu'un `NODE_ENV` absent ignore. */
-export const PRODUCTION_ENV_FILES = [".env.production.local", ".env.production"] as const;
+/**
+ * Fichiers qui ne sont lus qu'en production, et qu'un `NODE_ENV` absent ignore
+ * — dérivés d'`envFileOrder`, seule règle de nommage du module.
+ */
+export const PRODUCTION_ENV_FILES: readonly string[] = envFileOrder("production").filter(
+  (file) => !envFileOrder("development").includes(file),
+);
 
 /**
  * Phrase à afficher quand un script va manquer la configuration de production
@@ -46,21 +51,25 @@ export const PRODUCTION_ENV_FILES = [".env.production.local", ".env.production"]
  * est bien pire qu'un script qui s'arrête. On nomme la cause et le geste.
  *
  * Ne parle que lorsque le cas est sans ambiguïté : `NODE_ENV` absent, un
- * fichier de production présent, et **aucun** des fichiers que l'on s'apprête
- * à lire — donc rien d'autre ne fournira la configuration.
+ * fichier de production présent, **aucun** des fichiers que l'on s'apprête à
+ * lire, et une configuration toujours manquante — un shell qui exporte déjà la
+ * base n'a rien à relancer.
  *
  * @param nodeEnv Valeur brute de `NODE_ENV`, `undefined` ou vide si non posée.
  * @param existingFiles Chemins (parmi ceux d'`envFileOrder` et de
  *   `PRODUCTION_ENV_FILES`) qui existent sur le disque.
  * @param scriptName Nom du script npm lancé (`npm_lifecycle_event`), pour
  *   écrire la commande à relancer telle quelle.
+ * @param configured `true` si la configuration est déjà là malgré tout
+ *   (`DB_HOST` exporté par le shell) : il n'y a alors rien à signaler.
  */
 export function missingNodeEnvNotice(
   nodeEnv: string | undefined,
   existingFiles: readonly string[],
   scriptName?: string,
+  configured = false,
 ): string | null {
-  if (nodeEnv) return null;
+  if (nodeEnv || configured) return null;
   const present = new Set(existingFiles);
   const productionFile = PRODUCTION_ENV_FILES.find((file) => present.has(file));
   if (!productionFile) return null;

@@ -1,4 +1,4 @@
-import { envFileOrder, missingNodeEnvNotice } from "@/lib/shared/env-files";
+import { envFileOrder, missingNodeEnvNotice, PRODUCTION_ENV_FILES } from "@/lib/shared/env-files";
 
 describe("envFileOrder", () => {
   it("nomme d'abord le fichier de production, que `dotenv/config` ne lisait pas", () => {
@@ -95,8 +95,25 @@ describe("missingNodeEnvNotice", () => {
     ).toBeNull();
   });
 
+  it("se tait quand le shell fournit déjà la configuration", () => {
+    // `DB_HOST=… npm run backfill:avatars` sur une machine qui garde un
+    // `.env.production` : le script tourne, lui conseiller de relancer
+    // changerait sa source de configuration pour rien.
+    expect(missingNodeEnvNotice(undefined, [".env.production"], "backfill:avatars", true)).toBeNull();
+  });
+
   it("se tait quand il n'y a aucun fichier de production à manquer", () => {
     expect(missingNodeEnvNotice(undefined, [])).toBeNull();
     expect(missingNodeEnvNotice(undefined, [".env.staging"])).toBeNull();
+  });
+});
+
+describe("PRODUCTION_ENV_FILES", () => {
+  it("nomme exactement les fichiers que seule la production lit, dérivés d'envFileOrder", () => {
+    expect([...PRODUCTION_ENV_FILES]).toEqual([".env.production.local", ".env.production"]);
+    for (const file of PRODUCTION_ENV_FILES) {
+      expect(envFileOrder("production")).toContain(file);
+      expect(envFileOrder("development")).not.toContain(file);
+    }
   });
 });
