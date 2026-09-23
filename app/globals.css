@@ -496,14 +496,24 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
 
 /* Le survol ne parle que d'une carte **cliquable**. Verrouillée, elle n'a plus
    ni `onClick` ni case active : le halo bleu et le balayage annonçaient alors un
-   geste qui ne se passe pas. L'opacité qui les recouvrait a disparu (elle
-   effaçait la bordure de la case, seule à la dessiner), d'où `data-locked`, posé
-   par les deux écrans qui verrouillent cette carte. */
-.checkbox-card:not([data-locked]):hover::before {
+   geste qui ne se passe pas. L'opacité qui les recouvrait a disparu — elle
+   effaçait la bordure de la case, seule à la dessiner.
+
+   La condition se lit sur **le contrôle**, jamais sur un attribut à poser : un
+   `:not([data-locked])` est une autorisation par défaut, donc une carte ajoutée
+   demain sans l'attribut garderait le halo d'un clic qu'elle ne rend pas — le
+   « il faut s'en souvenir » que cette feuille refuse partout ailleurs (c'est la
+   raison même pour laquelle l'apparence des cases est posée sur l'élément).
+   `input:enabled` dit exactement ce que `data-locked` restituait : dans les deux
+   écrans qui posent cette carte, le même prédicat écrit le verrou et le
+   `disabled` de la case. Une carte sans case active n'a aucun geste à annoncer,
+   et un moteur qui ne comprendrait pas `:has()` jette une règle qui ne porte
+   que du chrome de survol — il n'emporte rien avec elle. */
+.checkbox-card:hover:has(input:enabled)::before {
   left: 150%;
 }
 
-.checkbox-card:not([data-locked]):hover {
+.checkbox-card:hover:has(input:enabled) {
   /* Ni `border-color` ni `background-color` ici : les deux écrans qui posent
      cette carte les écrivent **en ligne** (le cadre dit coché / décoché /
      verrouillé, trois valeurs qu'une feuille ne connaît pas), et un style en
@@ -1533,7 +1543,22 @@ input[type="radio"]:disabled:checked {
   input[type="radio"] {
     appearance: auto;
     -webkit-appearance: auto;
+    /* La **boîte** revient au système en même temps que le dessin : `appearance`
+       rend la marque, pas les métriques, et une case native épinglée à 16 px
+       reste la nôtre. Le mode contrastes forcés va de pair avec le
+       grossissement du texte sous Windows — le contrôle natif s'y dimensionne
+       sur la police, et l'enfermer dans nos 16 px le rogne à côté d'une
+       étiquette deux fois plus grande. `display: inline-grid` et
+       `place-content` n'ont d'ailleurs plus rien à centrer, la marque n'étant
+       plus dessinée par nous ; le `border-radius` non plus, qui arrondissait
+       une boîte dont nous ne peignons plus le fond. `flex-shrink: 0` reste :
+       il protège le contrôle d'une rangée flex, quelle que soit sa taille. */
+    width: auto;
+    height: auto;
+    display: inline-block;
+    place-content: normal;
     border: none;
+    border-radius: 0;
     background-image: none;
   }
 

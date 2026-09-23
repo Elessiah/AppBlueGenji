@@ -502,10 +502,9 @@ export function PhaseCard({
                 </label>
                 <div
                   className="checkbox-card"
-                  // Même carte, même verrou que `FormatSettings` : sans
-                  // `data-locked`, le survol garde son halo bleu sur un bloc
-                  // devenu inerte.
-                  data-locked={disabled ? "" : undefined}
+                  // Même carte, même verrou que `FormatSettings` : le survol
+                  // perd son halo dès que la case est `disabled`, sans qu'aucun
+                  // attribut n'ait à le redire.
                   onClick={
                     disabled
                       ? undefined

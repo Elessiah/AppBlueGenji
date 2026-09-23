@@ -372,10 +372,9 @@ export function FormatSettings({
           </label>
           <div
             className="checkbox-card"
-            // Verrouillée, la carte n'a plus de geste : `data-locked` retire le
-            // halo et le balayage du survol (`globals.css`), qui annonçaient un
-            // clic sans effet.
-            data-locked={locked("hasThirdPlaceMatch") ? "" : undefined}
+            // Verrouillée, la carte n'a plus de geste — et rien à déclarer pour
+            // le dire : `globals.css` retire le halo et le balayage du survol
+            // dès que la case qu'elle contient est `disabled`.
             onClick={
               locked("hasThirdPlaceMatch")
                 ? undefined

@@ -140,15 +140,29 @@ describe("Cases à cocher — apparence unique", () => {
     // Le halo et le balayage du survol annonçaient un clic que la carte
     // verrouillée ne rend pas — et l'opacité qui les recouvrait a dû partir,
     // elle effaçait la bordure de la case.
-    expect(globals).toContain(".checkbox-card:not([data-locked]):hover");
-    expect(globals).toContain(".checkbox-card:not([data-locked]):hover::before");
-    expect(globals).not.toMatch(/\.checkbox-card:hover/);
-    // Les deux écrans qui verrouillent cette carte doivent poser l'attribut.
+    expect(globals).toContain(".checkbox-card:hover:has(input:enabled)");
+    expect(globals).toContain(".checkbox-card:hover:has(input:enabled)::before");
+    // Et la condition se lit sur le contrôle, jamais sur un attribut à poser :
+    // un `:not([data-locked])` autorise par défaut, donc une carte ajoutée
+    // demain sans l'attribut annoncerait un clic qu'elle ne rend pas. Aucun
+    // survol de cette carte ne doit rester sans sa condition.
+    // Hors commentaires : la justification de la feuille **nomme** la forme
+    // qu'elle refuse, elle n'en est pas une occurrence.
+    const rules = globals.replace(/\/\*[\s\S]*?\*\//g, " ");
+    expect(rules).not.toContain("data-locked");
+    const hovers = [...rules.matchAll(/\.checkbox-card[^,{]*:hover[^,{]*/g)].map((m) => m[0]);
+    expect(hovers.length).toBeGreaterThanOrEqual(2);
+    for (const selector of hovers) expect(selector).toContain(":has(input:enabled)");
+    // Les deux écrans n'ont donc plus rien à déclarer : le `disabled` de leur
+    // case porte déjà le fait.
     for (const file of [
       join(ROOT, "app", "(secured)", "tournois", "_components", "FormatSettings.tsx"),
       join(ROOT, "app", "(secured)", "tournois", "creer", "PhaseCard.tsx"),
     ]) {
-      expect(readFileSync(file, "utf8")).toMatch(/data-locked=\{/);
+      const source = readFileSync(file, "utf8");
+      expect(source).not.toContain("data-locked");
+      expect(source).toMatch(/className="checkbox-card"/);
+      expect(source).toMatch(/type="checkbox"\n\s*disabled=\{/);
     }
   });
 
@@ -188,6 +202,15 @@ describe("Cases à cocher — apparence unique", () => {
     const forced = globals.slice(globals.indexOf("@media (forced-colors: active)"));
     expect(forced).toContain("appearance: auto");
     expect(forced).toContain("background-image: none");
+    // `appearance` rend le dessin, pas les métriques : une case native épinglée
+    // à nos 16 px reste la nôtre, et se rogne à côté d'un texte grossi — le
+    // mode allant justement de pair avec le grossissement sous Windows.
+    const box = forced.slice(0, forced.indexOf("}"));
+    expect(box).toContain("width: auto");
+    expect(box).toContain("height: auto");
+    // `inline-grid` n'a plus rien à centrer : la marque n'est plus la nôtre.
+    expect(box).toContain("display: inline-block");
+    expect(box).toContain("border-radius: 0");
     // Le `box-shadow` du focus est supprimé lui aussi : il faut une `outline`.
     expect(forced).toMatch(/outline: 2px solid/);
   });
@@ -375,6 +398,18 @@ function splitCompounds(part: string): string[] {
   return compounds;
 }
 
+/**
+ * Le compound **vise-t-il** un `input` ? Le contenu d'un `:has(…)` ou d'un
+ * `:not(…)` est une *condition* portée par le sujet, jamais le sujet :
+ * `.carte:has(input:enabled)` habille la carte, pas la case. Un `:is(…)` ou un
+ * `:where(…)`, eux, **sont** le sujet (`:is(input, textarea)` atteint bien
+ * l'élément), et restent donc en place. La négation est retirée après que
+ * `excludesBoth` l'a lue — elle n'y perd rien.
+ */
+function subjectOf(compound: string): string {
+  return compound.replace(/:(?:has|not)\([^()]*\)/g, "");
+}
+
 function bareInputOffenders(path: string, css: string): Offender[] {
   const offenders: Offender[] = [];
   // Les commentaires partent **d'abord** : le découpage naïf ci-dessous les
@@ -388,7 +423,7 @@ function bareInputOffenders(path: string, css: string): Offender[] {
     if (selector.startsWith("@") || selector === "") continue;
     const bare = splitSelectorList(selector)
       .flatMap((part) => splitCompounds(part))
-      .filter((compound) => BARE_INPUT.test(compound) && !excludesBoth(compound));
+      .filter((compound) => BARE_INPUT.test(subjectOf(compound)) && !excludesBoth(compound));
     if (bare.length === 0) continue;
     const declares = BOX_PROPERTIES.some((property) =>
       new RegExp(
@@ -491,6 +526,14 @@ describe("Cases à cocher — aucune feuille ne redéfinit l'apparence", () => {
     // Une classe **accolée** à l'élément reste vue : le motif n'exige pas que
     // l'`input` termine le compound, seulement qu'aucun `[type=…]` ne le suive.
     expect(bareInputOffenders("x.css", "input.maCase { width: 24px; }")).toHaveLength(1);
+    // Un `:has(…)` porte une **condition**, pas le sujet : la carte qui contient
+    // une case active est habillée, la case ne l'est pas.
+    const ancestor = ".carte:hover:has(input:enabled) { box-shadow: 0 0 2px red; }";
+    expect(bareInputOffenders("x.css", ancestor)).toEqual([]);
+    // Mais l'`input` **sujet** reste vu, condition ou pas.
+    expect(bareInputOffenders("x.css", ".carte:has(input) input { width: 20px; }")).toHaveLength(1);
+    // Et un `:is(…)`, lui, est bien le sujet — il ne doit pas suivre `:has(…)`.
+    expect(bareInputOffenders("x.css", ".a :is(input) { width: 20px; }")).toHaveLength(1);
     // La classe **seule**, elle, est hors de portée : rien dans la feuille ne
     // dit à quel élément elle est posée. C'est la limite du balayage, pas un
     // oubli — voir le commentaire de `BOX_PROPERTIES`.
@@ -523,10 +566,39 @@ describe("Cases à cocher — aucune feuille ne redéfinit l'apparence", () => {
 const INLINE_BANNED =
   /\b(width|minWidth|maxWidth|height|minHeight|maxHeight|accentColor|[A-Za-z]*[Aa]ppearance|padding[A-Za-z]*|margin|display|border[A-Za-z]*|background[A-Za-z]*|box[A-Za-z]*|outline[A-Za-z]*|opacity|flex[A-Za-z]*|transform|scale|rotate|translate|zoom)\s*:/;
 
+/**
+ * La fin de la balise, cherchée sur le **premier `>` de premier niveau** et non
+ * sur le premier `/>` venu.
+ *
+ * Une valeur d'attribut contient le sien : `icon={<Check />}` referme un autre
+ * élément *avant* la balise qui le porte, si bien que le découpage naïf coupait
+ * la balise en deux et n'y voyait jamais le `style` qui suit — un style en ligne
+ * passait alors la garde sans qu'aucun test n'échoue, et cette garde est la
+ * moitié forte de l'invariant (un style en ligne bat toute feuille). Les
+ * accolades et les guillemets mettent donc le `>` hors de portée, exactement
+ * comme le fait le parseur.
+ */
+function tagEnd(chunk: string): number {
+  let depth = 0;
+  let quote: string | null = null;
+  for (let index = 0; index < chunk.length; index += 1) {
+    const char = chunk[index];
+    if (quote !== null) {
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === "`") quote = char;
+    else if (char === "{") depth += 1;
+    else if (char === "}") depth -= 1;
+    else if (char === ">" && depth === 0) return index;
+  }
+  return -1;
+}
+
 function inlineOffenders(path: string, source: string): Offender[] {
   const offenders: Offender[] = [];
   for (const chunk of source.split("<input").slice(1)) {
-    const end = chunk.indexOf("/>");
+    const end = tagEnd(chunk);
     const tag = end === -1 ? chunk.slice(0, 600) : chunk.slice(0, end);
     // Le type peut être calculé (`type={isRadio ? "radio" : "checkbox"}`) : une
     // case écrite ainsi sortait avant d'avoir montré son style, et gardait donc
@@ -584,6 +656,24 @@ describe("Cases à cocher — aucun style en ligne ne reprend la main", () => {
     // Un étalement de props sans `style` ne porte aucune apparence.
     const spread = '<input type="checkbox" {...props} />';
     expect(inlineOffenders("x.tsx", spread)).toEqual([]);
+    // Un élément passé en attribut referme sa propre balise : le `/>` de
+    // `<Check />` n'est pas la fin de l'`input` qui le porte, et couper là
+    // faisait passer le `style` qui suit sans qu'aucun test n'échoue.
+    const nested =
+      '<input type="checkbox" icon={<Check />} style={{ width: 20 }} />';
+    expect(inlineOffenders("x.tsx", nested)).toHaveLength(1);
+    // Un `>` dans une chaîne ne ferme pas davantage la balise.
+    const quoted = '<input type="checkbox" title="a > b" style={{ width: 20 }} />';
+    expect(inlineOffenders("x.tsx", quoted)).toHaveLength(1);
+    // Ni celui d'une flèche, qui vit entre accolades.
+    const arrow =
+      '<input type="checkbox" onChange={(e) => set(e)} style={{ width: 20 }} />';
+    expect(inlineOffenders("x.tsx", arrow)).toHaveLength(1);
+    // Et la balise s'arrête bien à son `>` : le style du **voisin** ne lui est
+    // pas imputé.
+    const neighbour =
+      '<input type="checkbox" />\n<span style={{ width: 20 }} />';
+    expect(inlineOffenders("x.tsx", neighbour)).toEqual([]);
     // `marginTop` aligne la case sur la première ligne de son étiquette : il ne
     // touche pas à sa boîte, et aucune règle globale ne peut le décider, la
     // taille du texte d'à côté n'étant pas la même d'un écran à l'autre.
