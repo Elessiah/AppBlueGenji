@@ -189,10 +189,13 @@ fenêtre où le site exposait un tag inventé.
 D'où la règle, écrite **une fois** dans un module pur et tenue aux deux bouts :
 
 - **L'écran** passe le champ en `readOnly` (et non `disabled` : la valeur reste
-  lisible au lecteur d'écran et atteignable au clavier) et **retire le bouton**
-  de certification — il n'a plus rien à prouver. Il en met un autre à la place,
-  « Retirer mon tag » : le champ ne se vidant plus à la main, la sortie que le
-  serveur accepte n'existerait nulle part ailleurs.
+  lisible au lecteur d'écran et atteignable au clavier) et **retire
+  « Recertifier »** — il ne ferait que reposer ce que Discord dit déjà. Il ne
+  retire pas les gestes qui ont encore un objet : « Certifier mon tag » tant que
+  le tag enregistré ne l'est pas, « Enregistrer mon tag » quand il n'y en a
+  aucun, « Retirer mon tag » dès qu'il y en a un — le champ ne se vidant plus à
+  la main, cette sortie n'existerait nulle part ailleurs. Le détail des trois
+  états est plus bas, section « Où le tag s'affiche ».
 - **La route** refuse la réécriture en **409 `DISCORD_TAG_LOCKED`** : la saisie
   est bonne, c'est l'état du compte qui l'interdit. Le refus ne tombe que sur un
   tag **différent** du tag stocké — le formulaire renvoie le champ à chaque

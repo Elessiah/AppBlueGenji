@@ -1,5 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
-import { profileErrorMessage } from "@/app/(secured)/profil/profile-errors";
+import {
+  profileErrorMessage,
+  profileLoadErrorMessage,
+} from "@/app/(secured)/profil/profile-errors";
 import { discordVerificationErrorMessage } from "@/app/(secured)/profil/discord-errors";
 
 /**
@@ -55,5 +58,30 @@ describe("profileErrorMessage", () => {
     // lever `.trim()`, et le message interne du `TypeError` ressortait dans le
     // corps du 400.
     expect(profileErrorMessage("INVALID_DISCORD_PSEUDO")).toContain("tag Discord");
+  });
+});
+
+describe("profileLoadErrorMessage", () => {
+  /**
+   * Le même registre, avec le repli d'une **lecture**. « La sauvegarde a
+   * échoué » annonçait à un visiteur qui vient d'ouvrir la page l'échec d'un
+   * geste qu'il n'a pas fait.
+   */
+  it("ne parle pas de sauvegarde sur un code inconnu", () => {
+    const message = profileLoadErrorMessage("ER_LOCK_DEADLOCK");
+    expect(message).not.toMatch(/sauvegarde/i);
+    expect(message).toMatch(/charger/i);
+  });
+
+  it("partage les codes nommés avec les écritures — les dupliquer les ferait diverger", () => {
+    for (const code of ["UNAUTHORIZED", "PROFILE_NOT_FOUND"]) {
+      expect(profileLoadErrorMessage(code)).toBe(profileErrorMessage(code));
+    }
+  });
+
+  it("ne laisse jamais sortir le code brut", () => {
+    for (const code of ["ER_LOCK_DEADLOCK", "BOOM", null, undefined, ""]) {
+      expect(profileLoadErrorMessage(code)).not.toMatch(/[A-Z]{4,}_[A-Z]{4,}/);
+    }
   });
 });

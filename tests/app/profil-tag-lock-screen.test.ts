@@ -60,3 +60,44 @@ describe("champ Discord — un état illisible garde une sortie", () => {
     expect(unknown).not.toContain("setVerifyOpen(true)");
   });
 });
+
+describe("champ Discord — la référence suit toute écriture du tag", () => {
+  /**
+   * Trois chemins écrivent `discord_pseudo` depuis cet écran : la sauvegarde du
+   * profil, la certification et le retrait. Chacun doit réaligner
+   * `savedDiscordPseudo`, qui décide si la **prochaine** sauvegarde parle de ce
+   * champ — laissée en arrière, elle resoumet un tag déjà écrit, et un tag
+   * déplacé entre-temps fait alors mourir tout le `PATCH` en 409.
+   */
+  it("réaligne après une certification, pas seulement après une sauvegarde", () => {
+    const onVerified = page.slice(page.indexOf("onVerified={(tag) =>"));
+    expect(onVerified.slice(0, 700)).toContain("setSavedDiscordPseudo(tag);");
+  });
+
+  it("couvre les trois chemins d'écriture", () => {
+    expect([...page.matchAll(/setSavedDiscordPseudo\(/g)].length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe("champ Discord — un retrait ne laisse pas la pastille mentir", () => {
+  it("pose l'état depuis la réponse, sans attendre une seconde lecture", () => {
+    // `loadDiscordState` se tait quand elle échoue : l'écran gardait alors la
+    // pastille et « ce pseudo est certifié » à côté d'un champ qu'on vient de
+    // vider. La réponse du `PATCH` porte déjà la vérité.
+    const removal = page.slice(page.indexOf("const onDiscordTagRemove"));
+    const posted = removal.indexOf("setDiscordState((prev) => ({ ...prev, tag: null, verified: false }))");
+    const reload = removal.indexOf("await loadDiscordState()");
+    expect(posted).toBeGreaterThanOrEqual(0);
+    expect(posted).toBeLessThan(reload);
+  });
+});
+
+describe("profil — un échec de lecture ne s'annonce pas comme un échec de sauvegarde", () => {
+  it("le chargement a son propre repli", () => {
+    expect(page).toContain("profileLoadErrorMessage((e as Error).message)");
+  });
+
+  it("et les écritures gardent le leur", () => {
+    expect([...page.matchAll(/profileErrorMessage\(/g)].length).toBeGreaterThanOrEqual(3);
+  });
+});

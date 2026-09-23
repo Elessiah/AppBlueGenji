@@ -80,8 +80,17 @@ describe("discordTagLockNotice", () => {
   it("nomme le bouton de l'écran avant la reconnexion, sur un tag absent", () => {
     // L'écran rend « Enregistrer mon tag » dans cet état : renvoyer d'abord
     // vers une reconnexion par Discord, c'est ignorer le geste d'à côté.
+    //
+    // Les deux repères sont **exigés présents** avant d'être comparés : cette
+    // assertion a longtemps cherché une chaîne que la phrase ne contenait pas,
+    // si bien qu'`indexOf` rendait -1 et que le test passait quoi qu'il
+    // arrive — intervertir les deux gestes ne l'aurait pas fait tomber.
     const notice = discordTagLockNotice({ tag: null, verified: false, linked: true });
-    expect(notice.indexOf("Enregistre-le")).toBeLessThan(notice.indexOf("reconnecte-toi"));
+    const button = notice.indexOf("Enregistrer mon tag");
+    const reconnect = notice.indexOf("reconnecte-toi");
+    expect(button).toBeGreaterThanOrEqual(0);
+    expect(reconnect).toBeGreaterThanOrEqual(0);
+    expect(button).toBeLessThan(reconnect);
   });
 
   it("ne nomme que des gestes qui existent à l'écran", () => {

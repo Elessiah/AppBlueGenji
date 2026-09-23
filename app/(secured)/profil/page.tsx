@@ -13,7 +13,7 @@ import {
   discordTagLockNotice,
   isDiscordTagLocked,
 } from "@/lib/shared/discord-tag-lock";
-import { profileErrorMessage } from "./profile-errors";
+import { profileErrorMessage, profileLoadErrorMessage } from "./profile-errors";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
 
@@ -147,10 +147,14 @@ export default function ProfilePage() {
         major: !!v.major,
       });
     };
-    // Les chemins de **lecture** passent par le même registre que les écritures :
+    // Les chemins de **lecture** passent par le registre, comme les écritures —
     // `profile-errors.ts` s'interdit en toutes lettres de laisser sortir un code
-    // en capitales dans un toast, et un `UNAUTHORIZED` brut n'aide personne.
-    load().catch((e) => showError(profileErrorMessage((e as Error).message)));
+    // en capitales dans un toast, et un `UNAUTHORIZED` brut n'aide personne —
+    // mais avec **leur** repli : « La sauvegarde a échoué » annonçait à un
+    // visiteur qui vient d'ouvrir la page l'échec d'un geste qu'il n'a pas
+    // fait. Les codes nommés (session expirée, compte introuvable) gardent
+    // leur phrase, qui vaut des deux côtés.
+    load().catch((e) => showError(profileLoadErrorMessage((e as Error).message)));
   }, [showError, router]);
 
   const onSubmit = async (event: FormEvent) => {
@@ -230,6 +234,13 @@ export default function ProfilePage() {
       setData(payload);
       setDiscordPseudo("");
       setSavedDiscordPseudo("");
+      // L'état est posé **depuis la réponse**, et non attendu d'une seconde
+      // lecture : `loadDiscordState` se tait quand elle échoue, et l'écran
+      // gardait alors la pastille et « ce pseudo est certifié : les
+      // administrateurs le voient » à côté d'un champ qu'on vient de vider. La
+      // réponse du `PATCH` porte déjà la vérité — le tag est parti, donc la
+      // certification avec (toute modification du tag la défait).
+      setDiscordState((prev) => ({ ...prev, tag: null, verified: false }));
       await loadDiscordState();
       showSuccess("Tag Discord retiré.");
     } catch (e) {
@@ -327,6 +338,13 @@ export default function ProfilePage() {
           onVerified={(tag) => {
             setVerifyOpen(false);
             setDiscordPseudo(tag);
+            // La certification **écrit** le tag en base : la référence suit, au
+            // même titre qu'après une sauvegarde. Laissée en arrière, elle
+            // faisait resoumettre ce tag à chaque enregistrement ultérieur —
+            // et un tag déplacé entre-temps faisait alors mourir tout le
+            // `PATCH` en 409, exactement ce que cette référence existe pour
+            // empêcher.
+            setSavedDiscordPseudo(tag);
             setDiscordState((prev) => ({ ...prev, tag, verified: true, linked: true }));
           }}
         />
