@@ -84,8 +84,9 @@ suppression a échoué.
 
 ## Registre des traitements
 
-L'association doit inscrire les sauvegardes à son registre. Proposition, à
-recopier :
+Le registre est désormais **publié par le site** (`/rgpd/registre`, fiche
+`T09`, et son export `/rgpd/registre.csv`) — voir
+`docs/features/PROCESSING_REGISTER.md`. La fiche ci-dessous en est l'origine :
 
 - **Traitement** : sauvegarde de la plateforme BlueGenji (base de données,
   images téléversées).
