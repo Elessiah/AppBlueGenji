@@ -39,19 +39,37 @@ export function isTransactionAborted(error: unknown): boolean {
  * `bg_referee_alerts` et `bg_endurance_penalties`. Une base où leur création a
  * échoué reste debout, et c'est à leurs lecteurs de s'en accommoder plutôt que
  * d'emporter la fonctionnalité qui les appelle : un rappel perdu vaut mieux
- * qu'un report de score en erreur.
+ * qu'un report de score en erreur. Les purges — suppression d'un tournoi,
+ * retour en arrière, réécriture d'un tour de play-off — passent toutes par
+ * `ignoreMissingTable` : sans quoi une base qui en manque rendrait tout tournoi
+ * indélébile pour une table de notifications.
  *
- * **Tous ne le font pas encore**, et ce prédicat ne le garantit pas tout seul :
- * les `DELETE FROM bg_match_reminders` de `tournaments/deletion.ts` et
- * `tournaments/rollback.ts` n'ont pas la garde que portent leurs voisins, si
- * bien qu'une base sans cette table rendrait tout tournoi indélébile. Défaut
- * préexistant, consigné dans `ERREUR.txt`.
+ * **Tous les lecteurs ne le font pas encore** : les lectures de
+ * `bg_endurance_penalties` dans `tournaments/bg-survie.ts` (`loadPenalties`,
+ * `loadPenaltyRows`) n'ont pas de garde, si bien qu'une base sans cette table
+ * ferait échouer toute réconciliation BG Survie. Défaut préexistant, consigné
+ * dans `ERREUR.txt`.
  *
  * Les autres tables ne sont **pas** tolérées : le site n'a rien à servir sans
  * elles, et ce prédicat n'a donc pas à couvrir leur absence.
  */
 export function isMissingTableError(error: unknown): boolean {
   return errorCode(error) === "ER_NO_SUCH_TABLE";
+}
+
+/**
+ * Attend une écriture sur l'une des trois tables tolérées, en tenant son
+ * absence pour « rien à faire ».
+ *
+ * Toute autre erreur remonte — un interblocage, en particulier, a déjà défait
+ * la transaction, et poursuivre sur elle laisserait une purge à moitié faite.
+ */
+export async function ignoreMissingTable(write: Promise<unknown>): Promise<void> {
+  try {
+    await write;
+  } catch (error) {
+    if (!isMissingTableError(error)) throw error;
+  }
 }
 
 /**

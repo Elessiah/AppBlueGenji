@@ -337,6 +337,55 @@ describe("rollbackCurrentRound — écritures", () => {
     expect(statementWith(execute, "DELETE FROM bg_matches")?.[1]).toEqual([2, 3]);
     expect(statements(execute).some((sql) => sql.includes("SET team1_id = NULL"))).toBe(false);
   });
+
+  it.each([
+    ["bg_match_reminders"],
+    ["bg_referee_alerts"],
+  ])("supprime les manches suivantes même quand %s manque", async (table) => {
+    // Création avalée par un `catch` dans `database.ts` : une base à qui la
+    // table manque n'a rien à y effacer, et doit pouvoir reculer quand même.
+    const { execute, connection } = setup({
+      format: "SURVIVAL",
+      matches: [
+        playedRow({ id: 1, round_number: 1 }),
+        row({ id: 2, round_number: 2 }),
+      ],
+    });
+    const base = execute.getMockImplementation() as (sql: string) => Promise<unknown>;
+    execute.mockImplementation(async (sql: string) => {
+      if (sql.includes(`DELETE FROM ${table}`)) {
+        throw Object.assign(new Error("ER_NO_SUCH_TABLE"), { code: "ER_NO_SUCH_TABLE" });
+      }
+      return base(sql);
+    });
+
+    await rollbackCurrentRound(7);
+
+    expect(statementWith(execute, "DELETE FROM bg_matches")?.[1]).toEqual([2]);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("n'avale pas un interblocage sur les rappels : la transaction est défaite", async () => {
+    const { execute, connection } = setup({
+      format: "SURVIVAL",
+      matches: [
+        playedRow({ id: 1, round_number: 1 }),
+        row({ id: 2, round_number: 2 }),
+      ],
+    });
+    const base = execute.getMockImplementation() as (sql: string) => Promise<unknown>;
+    execute.mockImplementation(async (sql: string) => {
+      if (sql.includes("DELETE FROM bg_match_reminders")) {
+        throw Object.assign(new Error("ER_LOCK_DEADLOCK"), { code: "ER_LOCK_DEADLOCK" });
+      }
+      return base(sql);
+    });
+
+    await expect(rollbackCurrentRound(7)).rejects.toThrow("ER_LOCK_DEADLOCK");
+
+    expect(statementWith(execute, "DELETE FROM bg_matches")).toBeUndefined();
+    expect(connection.commit).not.toHaveBeenCalled();
+  });
 });
 
 describe("rollbackCurrentRound — re-remplissage du plateau", () => {

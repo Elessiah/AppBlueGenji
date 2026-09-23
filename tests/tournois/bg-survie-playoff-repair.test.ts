@@ -447,6 +447,61 @@ describe("reconcileEndurance — réparation de l'arbre final", () => {
     expect(cleanup?.[1]).toEqual([601]);
   });
 
+  it("réécrit le tour même quand la table des rappels manque", async () => {
+    // Création avalée par un `catch` dans `database.ts` : sans table, il n'y a
+    // aucun rappel à effacer — ce n'est pas une raison de laisser l'arbre
+    // annoncer une équipe qui vient de perdre son quart.
+    const conn = makeConn(
+      {
+        1000: [{ ...QUARTERS[0], winner: 4, loser: 8 }, ...QUARTERS.slice(1)],
+        1001: [
+          { id: 601, teams: [8, 6] },
+          { id: 602, teams: [1, 3] },
+        ],
+      },
+      RANKING,
+    );
+    const base = conn.execute.getMockImplementation() as (
+      sql: unknown,
+      params?: unknown,
+    ) => Promise<unknown>;
+    conn.execute.mockImplementation(async (sql: unknown, params?: unknown) => {
+      if (String(sql).includes("DELETE FROM bg_match_reminders")) {
+        throw Object.assign(new Error("ER_NO_SUCH_TABLE"), { code: "ER_NO_SUCH_TABLE" });
+      }
+      return base(sql, params);
+    });
+
+    await expect(reconcileEndurance(TOURNAMENT_ID, conn)).resolves.toBeUndefined();
+
+    expect(writes(conn).some((params) => params.includes(4))).toBe(true);
+  });
+
+  it("n'avale pas un interblocage sur les rappels", async () => {
+    const conn = makeConn(
+      {
+        1000: [{ ...QUARTERS[0], winner: 4, loser: 8 }, ...QUARTERS.slice(1)],
+        1001: [
+          { id: 601, teams: [8, 6] },
+          { id: 602, teams: [1, 3] },
+        ],
+      },
+      RANKING,
+    );
+    const base = conn.execute.getMockImplementation() as (
+      sql: unknown,
+      params?: unknown,
+    ) => Promise<unknown>;
+    conn.execute.mockImplementation(async (sql: unknown, params?: unknown) => {
+      if (String(sql).includes("DELETE FROM bg_match_reminders")) {
+        throw Object.assign(new Error("ER_LOCK_DEADLOCK"), { code: "ER_LOCK_DEADLOCK" });
+      }
+      return base(sql, params);
+    });
+
+    await expect(reconcileEndurance(TOURNAMENT_ID, conn)).rejects.toThrow("ER_LOCK_DEADLOCK");
+  });
+
   it("n'efface aucun rappel quand le tour est refait à neuf", async () => {
     // Les anciennes rencontres sont supprimées : leurs rappels partent avec
     // elles (`ON DELETE CASCADE`), il n'y a rien à effacer à part.
