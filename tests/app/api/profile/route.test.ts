@@ -1,64 +1,90 @@
-import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/users-service");
-jest.mock("next/headers");
 
-describe("GET/PUT /api/profile", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+import { GET, PATCH } from "@/app/api/profile/route";
+import { getCurrentUser } from "@/lib/server/auth";
+import { getFullProfile, updateOwnProfile } from "@/lib/server/users-service";
+
+/**
+ * Lecture et écriture de **son** profil. Les refus de `PATCH` sont couverts par
+ * `patch-deleted.test.ts` et `tag-lock-route.test.ts`, `DELETE` par
+ * `deletion-route.test.ts` ; ici, ce qui reste : `GET`, et le fait que le
+ * compte visé est toujours celui de la session, jamais une valeur du corps.
+ */
+
+const user = { id: 42 } as Awaited<ReturnType<typeof getCurrentUser>>;
+// La route rend le profil tel quel : sa forme n'est pas ce qui est testé ici.
+const profile = { profile: { pseudo: "Nova" } } as unknown as Awaited<
+  ReturnType<typeof getFullProfile>
+>;
+
+function patchReq(body: unknown) {
+  return new Request("http://localhost/api/profile", {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+
+describe("GET /api/profile", () => {
+  it("refuse l'appel anonyme sans rien lire", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
+
+    const res = await GET();
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "UNAUTHORIZED" });
+    expect(getFullProfile).not.toHaveBeenCalled();
   });
 
-  afterEach(() => {
-    jest.restoreAllMocks();
+  it("lit le profil du compte connecté, en tant que son titulaire", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
+    jest.mocked(getFullProfile).mockResolvedValue(profile);
+
+    const res = await GET();
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(profile);
+    // Lecteur = titulaire : c'est ce qui lui rend ses champs masqués.
+    expect(getFullProfile).toHaveBeenCalledWith({ id: 42 }, 42);
   });
 
-  describe("GET", () => {
-    it("returns 401 when not authenticated", async () => {
-      const status = 401;
-      expect(status).toBe(401);
-    });
+  it("rend 404 quand le compte n'existe plus", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
+    jest.mocked(getFullProfile).mockResolvedValue(null);
 
-    it("returns current user profile", async () => {
-      const profile = {
-        id: 1,
-        pseudo: "player",
-        visible: false,
-      };
-      expect(profile.id).toBeDefined();
-      expect(profile.visible).toBeDefined();
-    });
+    const res = await GET();
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "PROFILE_NOT_FOUND" });
+  });
+});
+
+describe("PATCH /api/profile — compte visé", () => {
+  it("refuse l'appel anonyme sans rien écrire", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
+
+    const res = await PATCH(patchReq({ pseudo: "Nova" }));
+
+    expect(res.status).toBe(401);
+    expect(updateOwnProfile).not.toHaveBeenCalled();
   });
 
-  describe("PUT", () => {
-    it("returns 401 when not authenticated", async () => {
-      const status = 401;
-      expect(status).toBe(401);
-    });
+  it("écrit sur le compte de la session, quel que soit l'identifiant du corps", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
+    jest.mocked(updateOwnProfile).mockResolvedValue(undefined);
+    jest.mocked(getFullProfile).mockResolvedValue(profile);
 
-    it("updates visibility setting", async () => {
-      const body = { visible: true };
-      const response = { visible: true };
-      expect(response.visible).toBe(body.visible);
-    });
+    const body = { id: 7, userId: 7, visibility: { avatar: false } };
+    await PATCH(patchReq(body));
 
-    it("rejects invalid payload", async () => {
-      const status = 400;
-      expect(status).toBe(400);
-    });
-
-    it("only user can update own profile", async () => {
-      const targetUserId: number = 1;
-      const currentUserId: number = 2;
-      const canUpdate = targetUserId === currentUserId;
-      expect(canUpdate).toBe(false);
-    });
-
-    it("returns updated profile", async () => {
-      const status = 200;
-      const profile = { visible: true };
-      expect(status).toBe(200);
-      expect(profile.visible).toBeDefined();
-    });
+    expect(updateOwnProfile).toHaveBeenCalledWith(42, body);
+    expect(getFullProfile).toHaveBeenCalledWith({ id: 42 }, 42);
   });
 });
