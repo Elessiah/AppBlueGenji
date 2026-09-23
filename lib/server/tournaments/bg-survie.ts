@@ -891,9 +891,9 @@ async function writePlayoffRound(
           match.teamBId !== plan[index].pairing.teamBId),
     )
     .map((match) => match.id);
-  // Sous `ignoreMissingTable` : la création de la table est avalée par un `catch` dans
-  // `database.ts`, et une base à qui elle manque n'a aucun rappel à effacer —
-  // ce n'est pas une raison de laisser l'arbre sur un tour périmé.
+  // Sous `ignoreMissingTable` : la création de la table est avalée par un
+  // `catch` dans `database.ts`, et une base à qui elle manque n'a aucun rappel
+  // à effacer — ce n'est pas une raison de laisser l'arbre sur un tour périmé.
   if (rewritten.length > 0) {
     await ignoreMissingTable(
       conn.execute(
