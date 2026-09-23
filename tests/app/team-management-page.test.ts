@@ -296,3 +296,12 @@ describe("correctifs de la quatrième revue", () => {
     expect(ghost).toContain("checkTeamName(name)");
   });
 });
+
+describe("correctifs de la cinquième revue", () => {
+  it("la liste d'attente n'applique que la dernière lecture lancée", () => {
+    const hook = stripComments(read("_hooks", "useTeamPendingInvitations.ts"));
+    expect(hook).toContain("const seq = ++latestRef.current");
+    const beforeSet = hook.slice(0, hook.indexOf("setRequests(payload.requests"));
+    expect(beforeSet.slice(beforeSet.lastIndexOf("res.json()"))).toContain("if (seq !== latestRef.current) return;");
+  });
+});

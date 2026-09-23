@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { TeamJoinRequest, TeamSentInvitation } from "@/lib/shared/types";
 
 /**
@@ -12,8 +12,15 @@ import type { TeamJoinRequest, TeamSentInvitation } from "@/lib/shared/types";
 export function useTeamPendingInvitations(teamId: number, enabled: boolean) {
   const [requests, setRequests] = useState<TeamJoinRequest[]>([]);
   const [invitations, setInvitations] = useState<TeamSentInvitation[]>([]);
+  /**
+   * Numéro de la dernière lecture lancée — même règle que `useResourceLoader` :
+   * deux gestes rapprochés lancent deux lectures, et la plus ancienne ne doit
+   * pas faire réapparaître une invitation que la seconde vient de retirer.
+   */
+  const latestRef = useRef(0);
 
   const reload = useCallback(async () => {
+    const seq = ++latestRef.current;
     if (!enabled) {
       setRequests([]);
       setInvitations([]);
@@ -21,11 +28,12 @@ export function useTeamPendingInvitations(teamId: number, enabled: boolean) {
     }
     try {
       const res = await fetch(`/api/teams/${teamId}/invitations`, { cache: "no-store" });
-      if (!res.ok) return;
+      if (!res.ok || seq !== latestRef.current) return;
       const payload = (await res.json()) as {
         requests?: TeamJoinRequest[];
         invitations?: TeamSentInvitation[];
       };
+      if (seq !== latestRef.current) return;
       setRequests(payload.requests ?? []);
       setInvitations(payload.invitations ?? []);
     } catch {
