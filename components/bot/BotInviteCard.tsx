@@ -71,7 +71,7 @@ export function BotInviteCard() {
               <span className="scope">{p.scope}</span>
             </div>
           ))}
-          <div style={{ marginTop: 12, fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.16em", color: "var(--fg-dim)" }}>
+          <div style={{ marginTop: 12, fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.16em", color: "var(--ink-dim)" }}>
             INTEGER · {permissions}
           </div>
         </div>

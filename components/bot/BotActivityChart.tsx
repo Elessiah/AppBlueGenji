@@ -11,8 +11,51 @@ import { botPayloadLabel, botPayloadNumber } from "@/lib/shared/bot-payload";
  */
 const MAX_COLUMNS = 120;
 
+type ActivityRange = "7j" | "30j" | "90j";
+
+/**
+ * Recharge une plage et remet sa réponse à `apply` — **tant qu'elle est encore
+ * demandée**. Rend la fonction qui l'annule, posée telle quelle en nettoyage de
+ * l'effet.
+ *
+ * Sans cette garde, cliquer « 90j » puis « 7j » assez vite laissait la réponse
+ * la plus lente écraser la plus récente : le graphe, l'axe et la moyenne
+ * décrivaient 90 jours sous une pastille qui annonçait « 7j », et rien ne le
+ * signalait, les deux réponses étant valides. L'annulation écarte la réponse
+ * *et* son échec : une requête abandonnée qui rejette ne doit pas non plus
+ * effacer le graphe de la plage qui l'a remplacée.
+ *
+ * Exportée pour être testée sans DOM : c'est la seule partie du composant qui
+ * dépende de l'ordre d'arrivée des réponses.
+ */
+export function loadActivityRange(
+  range: ActivityRange,
+  apply: (data: BotActivity | null) => void,
+  fetcher: typeof fetch = fetch,
+): () => void {
+  const controller = new AbortController();
+  let current = true;
+
+  (async () => {
+    let result: BotActivity | null;
+    try {
+      const res = await fetcher(`/api/bot/activity?range=${range}`, { signal: controller.signal });
+      if (!res.ok) throw new Error("Failed to fetch");
+      result = await res.json();
+    } catch {
+      result = null;
+    }
+    if (current) apply(result);
+  })();
+
+  return () => {
+    current = false;
+    controller.abort();
+  };
+}
+
 export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
-  const [range, setRange] = useState<"7j" | "30j" | "90j">("30j");
+  const [range, setRange] = useState<ActivityRange>("30j");
   const [data, setData] = useState<BotActivity | null>(initial);
 
   useEffect(() => {
@@ -20,19 +63,7 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
       setData(initial);
       return;
     }
-
-    const fetchData = async () => {
-      try {
-        const res = await fetch(`/api/bot/activity?range=${range}`);
-        if (!res.ok) throw new Error("Failed to fetch");
-        const result = await res.json();
-        setData(result);
-      } catch {
-        setData(null);
-      }
-    };
-
-    fetchData();
+    return loadActivityRange(range, setData);
   }, [range, initial]);
 
   if (!data) {
@@ -45,7 +76,7 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
               <button
                 key={r}
                 className={"chip " + (range === r ? "chip-on" : "")}
-                onClick={() => setRange(r as "7j" | "30j" | "90j")}
+                onClick={() => setRange(r as ActivityRange)}
                 aria-label={`Filtrer par ${r}`}
               >
                 {r}
@@ -109,8 +140,11 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
   // l'axe compterait des jours que le graphe ne montre plus.
   const labels = (Array.isArray(data.labels) ? data.labels : []).slice(-MAX_COLUMNS);
   // Même charge non validée : un objet tombait dans `Math.round`, qui rend
-  // `NaN`, et la légende annonçait « MOY. NaN / JOUR ».
-  const avgPerDay = botPayloadNumber(data.avgPerDay) ?? 0;
+  // `NaN`, et la légende annonçait « MOY. NaN / JOUR ». Le `null` est gardé
+  // jusqu'à l'affichage : un repli sur zéro annonçait « MOY. 0 / JOUR », une
+  // moyenne **mesurée**, sur une charge que la page venait de juger illisible.
+  // Le zéro reste réservé à un zéro reçu.
+  const avgPerDay = botPayloadNumber(data.avgPerDay);
 
   return (
     <section className="panel">
@@ -121,7 +155,7 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
             <button
               key={r}
               className={"chip " + (range === r ? "chip-on" : "")}
-              onClick={() => setRange(r as "7j" | "30j" | "90j")}
+              onClick={() => setRange(r as ActivityRange)}
               aria-label={`Filtrer par ${r}`}
             >
               {r}
@@ -173,7 +207,7 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
         <div className="chart-legend">
           <span className="lg">RELAIS INTER-SERVEUR</span>
           <span className="lg amber">SCRIMS PROPOSÉS</span>
-          <span style={{ marginLeft: "auto" }}>MOY. {Math.round(avgPerDay)} / JOUR</span>
+          <span style={{ marginLeft: "auto" }}>MOY. {avgPerDay === null ? "—" : Math.round(avgPerDay)} / JOUR</span>
         </div>
       </div>
     </section>
