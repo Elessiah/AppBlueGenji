@@ -326,6 +326,27 @@ export function powerModeDescription(mode: ClientPowerMode): string {
   }
 }
 
+/** « 2 cœurs » / « 1 cœur » — accordé, comme partout où le nombre s'affiche. */
+function coresLabel(cores: number | null): string {
+  if (cores === null) return "? cœurs";
+  return `${cores} cœur${cores > 1 ? "s" : ""}`;
+}
+
+/**
+ * Ligne de mesures du témoin : cadence mesurée, cœurs et mémoire déclarés. Ce
+ * que le navigateur ne dit pas n'est pas affiché (la cadence, seule mesurée,
+ * dit qu'elle ne l'est pas encore).
+ */
+export function powerProbeSummary(probe: PerformanceProbe): string {
+  return [
+    probe.frameIntervalMs ? `${Math.round(1000 / probe.frameIntervalMs)} i/s` : "i/s non mesuré",
+    probe.cores ? coresLabel(probe.cores) : null,
+    probe.memoryGb ? `${probe.memoryGb} Go` : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(" · ");
+}
+
 export function powerReasonLabel(reason: PowerReason, probe: PerformanceProbe): string {
   switch (reason) {
     case "HIDDEN":
@@ -337,7 +358,7 @@ export function powerReasonLabel(reason: PowerReason, probe: PerformanceProbe): 
     case "REDUCED_MOTION":
       return "Ton système demande de réduire les animations";
     case "LOW_CORES":
-      return `Processeur modeste (${probe.cores ?? "?"} cœur${(probe.cores ?? 0) > 1 ? "s" : ""})`;
+      return `Processeur modeste (${coresLabel(probe.cores)})`;
     case "LOW_MEMORY":
       return `Mémoire modeste (${probe.memoryGb ?? "?"} Go)`;
     case "SLOW_FRAMES":

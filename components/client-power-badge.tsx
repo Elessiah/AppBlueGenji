@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import {
   powerModeDescription,
   powerModeLabel,
+  powerProbeSummary,
   powerReasonLabel,
   powerReasons,
   resolvePowerMode,
@@ -34,6 +35,16 @@ export function ClientPowerBadge() {
   const panelId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
 
+  const reasons = powerReasons(input, limits);
+  const ignoredLimits = ignorePerformance && limits.length > 0;
+  const visible = showsPowerBadge(mode, reasons, ignoredLimits);
+
+  // Le témoin qui disparaît referme son détail : sans quoi il réapparaîtrait
+  // ouvert, de lui-même, au prochain match.
+  useEffect(() => {
+    if (!visible) setOpen(false);
+  }, [visible]);
+
   // Échap et clic à côté referment le détail.
   useEffect(() => {
     if (!open) return;
@@ -51,9 +62,7 @@ export function ClientPowerBadge() {
     };
   }, [open]);
 
-  const reasons = powerReasons(input, limits);
-  const ignoredLimits = ignorePerformance && limits.length > 0;
-  if (!showsPowerBadge(mode, reasons, ignoredLimits)) return null;
+  if (!visible) return null;
 
   const label = `Mode ${powerModeLabel(mode).toLowerCase()}`;
 
@@ -86,15 +95,7 @@ export function ClientPowerBadge() {
               Ignorer la détection de performances
             </label>
           )}
-          <p className={styles.mono}>
-            {[
-              probe.frameIntervalMs ? `${Math.round(1000 / probe.frameIntervalMs)} i/s` : "i/s non mesuré",
-              probe.cores ? `${probe.cores} cœurs` : null,
-              probe.memoryGb ? `${probe.memoryGb} Go` : null,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
+          <p className={styles.mono}>{powerProbeSummary(probe)}</p>
         </div>
       )}
       <button

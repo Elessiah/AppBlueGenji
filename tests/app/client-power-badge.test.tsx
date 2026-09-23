@@ -107,4 +107,16 @@ describe("ClientPowerBadge", () => {
     expect(badge?.[2]).toContain("left: 50%;");
     expect(badge?.[2]).toContain("transform: translateX(-50%);");
   });
+
+  it("referme son détail quand il disparaît, pour ne pas réapparaître ouvert", () => {
+    // Sans DOM, les effets ne tournent pas : on tient l'effet lui-même, et son
+    // ordre — il doit précéder le retour anticipé, faute de quoi il ne serait
+    // jamais appelé une fois le témoin masqué.
+    const source = readSource("components/client-power-badge.tsx");
+    const reset = source.indexOf("if (!visible) setOpen(false);");
+    const early = source.indexOf("if (!visible) return null;");
+    expect(reset).toBeGreaterThan(0);
+    expect(early).toBeGreaterThan(reset);
+  });
 });
+

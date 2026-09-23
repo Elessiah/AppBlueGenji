@@ -14,6 +14,7 @@ import {
   powerModeDescription,
   powerModeLabel,
   powerPolicy,
+  powerProbeSummary,
   powerReasonLabel,
   powerReasons,
   pruneMatchFocusLeases,
@@ -366,6 +367,16 @@ describe("témoin", () => {
     expect(powerReasonLabel("LOW_CORES", { ...probe, cores: 1 })).toBe("Processeur modeste (1 cœur)");
     expect(powerReasonLabel("LOW_MEMORY", probe)).toBe("Mémoire modeste (2 Go)");
     expect(powerReasonLabel("SLOW_FRAMES", UNKNOWN_PROBE)).toBe("Affichage ralenti");
+  });
+
+  it("résume les mesures, en accordant le nombre de cœurs", () => {
+    expect(powerProbeSummary({ cores: 8, memoryGb: 16, frameIntervalMs: 1000 / 60 })).toBe(
+      "60 i/s · 8 cœurs · 16 Go",
+    );
+    expect(powerProbeSummary({ cores: 1, memoryGb: null, frameIntervalMs: null })).toBe(
+      "i/s non mesuré · 1 cœur",
+    );
+    expect(powerProbeSummary(UNKNOWN_PROBE)).toBe("i/s non mesuré");
   });
 
   it("a un libellé et une phrase pour chaque raison et chaque régime", () => {
