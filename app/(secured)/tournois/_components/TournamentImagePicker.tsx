@@ -83,6 +83,8 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: T
   const { showError } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draggingRef = useRef(false);
+  // Un fichier survole la zone vide : on le dit avant qu'il soit lâché.
+  const [dropping, setDropping] = useState(false);
   const baseId = useId();
   const objectUrl = useObjectUrl(value.file);
 
@@ -137,15 +139,34 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: T
       {!hasImage ? (
         <button
           type="button"
-          className={s.empty}
+          className={`${s.empty} ${dropping ? s.emptyDropping : ""}`}
           disabled={disabled}
           onClick={() => fileInputRef.current?.click()}
+          // Glisser un fichier sur la zone vaut le choisir : c'est le geste
+          // qu'on tente d'abord devant une grande cible en pointillés.
+          onDragOver={(event) => {
+            if (disabled) return;
+            event.preventDefault();
+            setDropping(true);
+          }}
+          // `dragleave` part aussi en passant sur un enfant de la zone : on
+          // n'éteint l'état que quand le pointeur la quitte vraiment.
+          onDragLeave={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropping(false);
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDropping(false);
+            if (!disabled) void onFileChosen(event.dataTransfer.files?.[0]);
+          }}
           aria-describedby={hintId}
         >
           <span className={s.emptyIcon} aria-hidden="true">
             +
           </span>
-          <span className={s.emptyTitle}>Ajouter une illustration ou un logo</span>
+          <span className={s.emptyTitle}>
+            {dropping ? "Dépose l'image ici" : "Ajouter une illustration ou un logo"}
+          </span>
           <span id={hintId} className={s.emptyHint}>
             Facultatif · PNG, JPEG ou WebP, 5 Mo max · toutes dimensions acceptées, rien n&apos;est
             rogné à l&apos;envoi
@@ -153,7 +174,8 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: T
         </button>
       ) : (
         <>
-          <div className={s.modes} role="radiogroup" aria-label="Type d'image">
+          <fieldset className={s.modes}>
+            <legend className="sr-only">Type d&apos;image</legend>
             {TOURNAMENT_IMAGE_FITS.map((fit) => (
               <label key={fit} className={`${s.mode} ${settings.fit === fit ? s.modeActive : ""}`}>
                 <input
@@ -170,7 +192,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: T
                 </span>
               </label>
             ))}
-          </div>
+          </fieldset>
 
           {displayUrl && isCover && (
             <div className={s.editor}>

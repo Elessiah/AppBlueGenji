@@ -36,6 +36,12 @@
   outline-offset: 3px;
 }
 
+.emptyDropping {
+  border-style: solid;
+  border-color: var(--blue-500);
+  background: rgba(var(--blue-500-rgb), 0.08);
+}
+
 .empty:disabled {
   cursor: not-allowed;
   color: var(--ink-mute);
@@ -67,7 +73,13 @@
 
 /* ---------- Type d'image ---------- */
 
+/* Un `fieldset` : les deux choix forment un groupe nommé pour les lecteurs
+   d'écran. Ses marges et sa bordure natives sont retirées. */
 .modes {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 10px;

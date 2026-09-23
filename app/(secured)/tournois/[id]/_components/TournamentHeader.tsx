@@ -137,6 +137,10 @@ export function TournamentHeader({
                 <CyberButton
                   variant="ghost"
                   onClick={onEditImage}
+                  // « Image » seul ne dit pas de quoi, hors contexte ; le nom
+                  // accessible commence par le texte affiché (WCAG 2.5.3).
+                  aria-label={card.image ? "Image du tournoi" : undefined}
+                  aria-haspopup="dialog"
                   style={{ fontSize: 13, padding: "6px 16px" }}
                 >
                   {card.image ? "Image" : "Ajouter une image"}

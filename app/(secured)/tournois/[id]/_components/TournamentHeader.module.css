@@ -292,6 +292,13 @@
   margin-top: 2px;
 }
 
+/* Avec un logo, le texte accepte une base plus étroite : sans cela, sa base de
+   420 px le faisait passer sous la pastille dès la tablette, et le logo restait
+   seul sur sa ligne au-dessus du nom qu'il accompagne. */
+.identity:has(.emblem) .identityText {
+  flex-basis: 220px;
+}
+
 @media (max-width: 640px) {
   .identity .emblem {
     width: 64px;
