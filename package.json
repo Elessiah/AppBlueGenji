@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "sh start.sh",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.tests.json",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "e2e:install": "playwright install chromium",
