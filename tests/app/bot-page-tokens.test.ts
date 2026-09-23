@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import { readSource } from "../helpers/read-source";
 
 /**
@@ -162,7 +162,7 @@ describe("/bot — n'emploie que des classes que le site définit", () => {
 
   it("trouve bien des classes à confronter", () => {
     // Garde du balayage : un motif cassé rendrait l'ensemble vide — donc vert.
-    expect(botSheets.map((p) => relative(ROOT, p).replace(/\/g, "/"))).toEqual(
+    expect(botSheets.map((p) => relative(ROOT, p).split(sep).join("/"))).toEqual(
       expect.arrayContaining(["app/globals.css", "app/bot/bot.css", "app/bot/docs/docs.css"]),
     );
     for (const name of ["panel-head", "chip", "chip-on", "status-cell", "bot-cta"]) {
