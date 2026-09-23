@@ -77,6 +77,18 @@ describe("carte d'un compte anonymisé", () => {
     expect(onDecorations).toMatch(/opacity\s*:/);
   });
 
+  it("n'offre pas au recrutement un compte qu'on ne peut plus rattacher", () => {
+    // « FREE AGENT » invite à recruter, et c'est cette branche qui a fermé la
+    // porte : `getUserIdByPseudo` refuse le pseudo d'un compte supprimé en
+    // `USER_NOT_FOUND`. Sous « Compte supprimé », la mention menait le
+    // recruteur droit à ce refus — et la case « Comptes supprimés » qu'ajoute
+    // la même branche est ce qui l'expose.
+    const branch = CARD.slice(CARD.indexOf("<div className={s.plTeam}>"));
+    const freeAgent = branch.indexOf("FREE AGENT");
+    expect(freeAgent).toBeGreaterThan(-1);
+    expect(branch.slice(0, freeAgent)).toMatch(/player\.isDeleted \? null :/);
+  });
+
   it("laisse la mention à son plein contraste", () => {
     const mark = declarationsFor((s) => s === ".plDeletedMark");
     expect(mark).not.toMatch(STACKING);

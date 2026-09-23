@@ -211,7 +211,12 @@ describe("accountDeletedWriteMessage", () => {
     expect(message).toMatch(/pas été enregistrée/);
   });
 
-  it("laisse les autres codes au repli de l'appelant", () => {
+  it("rend tout autre code tel quel, et ne se sert du repli que sur son absence", () => {
+    // Le nom qu'avait ce cas — « laisse les autres codes au repli de
+    // l'appelant » — décrivait l'inverse de ce que les assertions vérifient :
+    // le repli ne sert qu'à un code **absent**. La fonction reprend l'idiome
+    // `payload.error || FALLBACK` qu'elle remplace ; elle ne ferme pas les
+    // chemins qui toastent encore un code en capitales.
     expect(accountDeletedWriteMessage("PSEUDO_ALREADY_USED", "PROFILE_UPDATE_FAILED")).toBe(
       "PSEUDO_ALREADY_USED",
     );

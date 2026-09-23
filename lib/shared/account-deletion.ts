@@ -232,8 +232,15 @@ export const ACCOUNT_DELETED_ERROR = "ACCOUNT_DELETED";
  * modification n'a pas pris, et non le code interne — toute l'interface est en
  * français.
  *
- * Les autres codes passent au `fallback` de l'appelant : ce n'est pas à cette
- * fonction de traduire un vocabulaire qu'elle ne connaît pas.
+ * **Elle ne traduit que celui-là.** Tout autre code ressort **tel quel**, et le
+ * `fallback` ne sert qu'à son absence : la fonction reprend exactement
+ * l'idiome `payload.error || FALLBACK` qu'elle remplace, elle ne le corrige pas.
+ * Dire qu'elle « laisse les autres codes au repli de l'appelant » serait faux,
+ * et c'est une inexactitude qui compte ici : elle ferait croire que plus aucun
+ * code en capitales ne peut atteindre un toast, alors que `PSEUDO_ALREADY_USED`
+ * y arrive encore. Ces chemins-là sont un défaut préexistant, conséquence de
+ * l'absence d'un registre d'erreurs pour `/profil` ; les couvrir demanderait une
+ * phrase par code, ce que la suppression de compte n'avait pas à écrire.
  */
 export function accountDeletedWriteMessage(code: string | undefined, fallback: string): string {
   if (code === ACCOUNT_DELETED_ERROR) {

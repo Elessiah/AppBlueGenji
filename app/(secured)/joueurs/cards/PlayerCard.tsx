@@ -79,7 +79,14 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
                 <em>{player.team.name.toUpperCase()}</em>
               </TeamLink>
             </>
-          ) : (
+          ) : player.isDeleted ? null : (
+            // « FREE AGENT » est une **invitation à recruter**, et un compte
+            // supprimé est justement celui qu'on ne peut plus rattacher à une
+            // équipe : `getUserIdByPseudo` refuse son pseudo en
+            // `USER_NOT_FOUND`. Affichée sous « Compte supprimé », la mention
+            // envoyait le recruteur vers un refus. Le roster, lui, se garde :
+            // l'anonymisation retire l'identité, pas l'appartenance — c'est un
+            // fait, pas une offre.
             <span style={{ color: "var(--ink-dim)" }}>FREE AGENT</span>
           )}
         </div>
