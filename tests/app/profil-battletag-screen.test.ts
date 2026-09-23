@@ -45,7 +45,20 @@ describe("champ BattleTag — ce que le formulaire soumet", () => {
     const field = [...page.matchAll(/setOverwatchBattletag\(payload\.profile\.overwatchBattletag/g)];
     const ref = [...page.matchAll(/setSavedOverwatchBattletag\(payload\.profile\.overwatchBattletag/g)];
     expect(field.length).toBe(ref.length);
-    expect(field.length).toBeGreaterThanOrEqual(2);
+    // **Deux, et exactement deux** : le chargement et la sauvegarde. Compter
+    // « au moins deux » laissait le doublon d'un seul chemin tenir lieu des
+    // deux, si bien que perdre le réalignement de la sauvegarde — le seul qui
+    // protège de quelque chose — n'aurait rien fait rougir.
+    expect(field).toHaveLength(2);
+  });
+
+  it("réaligne **dans la sauvegarde**, et pas seulement au chargement", () => {
+    // C'est là que le réalignement compte : sans lui, la sauvegarde suivante
+    // resoumet la valeur du montage, et un BattleTag réécrit par Blizzard
+    // entre-temps fait mourir tout le `PATCH` en 409.
+    const submit = page.slice(page.indexOf("const onSubmit"), page.indexOf("const onDiscordTagRemove"));
+    expect(submit).toContain("setOverwatchBattletag(payload.profile.overwatchBattletag");
+    expect(submit).toContain("setSavedOverwatchBattletag(payload.profile.overwatchBattletag");
   });
 });
 

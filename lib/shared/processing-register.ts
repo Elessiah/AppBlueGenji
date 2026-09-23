@@ -131,6 +131,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     dataCategories: [
       "Identifiants techniques opaques Google, Discord et Blizzard",
       "Identifiant Discord et pseudo Discord (connexion par code)",
+      "Porte de rattachement du compte Discord (bouton OAuth ou code en message privé)",
       "Code de connexion (conservé uniquement sous forme d'empreinte), nombre d'essais",
       "Adresse IP (en mémoire uniquement, pour limiter les essais — jamais écrite)",
     ],

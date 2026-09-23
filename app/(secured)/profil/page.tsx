@@ -214,13 +214,6 @@ export default function ProfilePage() {
       setMarvelRivalsTag(payload.profile.marvelRivalsTag || "");
       setDiscordPseudo(payload.profile.discordPseudo || "");
       setSavedDiscordPseudo(payload.profile.discordPseudo || "");
-      // Le champ **et** sa référence se réalignent sur ce qui vient d'être
-      // enregistré : le champ parce qu'il est en lecture seule sous un compte
-      // Blizzard rattaché et que c'est le seul endroit où le BattleTag
-      // s'affiche, la référence parce que c'est elle qui décide si la prochaine
-      // sauvegarde parle de ce champ.
-      setOverwatchBattletag(payload.profile.overwatchBattletag || "");
-      setSavedOverwatchBattletag(payload.profile.overwatchBattletag || "");
       setIsAdult(payload.profile.isAdult === null ? "unknown" : payload.profile.isAdult ? "yes" : "no");
       const v = payload.profile.visibility;
       setOpenToRecruitment(payload.profile.openToRecruitment !== false);
