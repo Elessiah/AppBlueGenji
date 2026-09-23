@@ -113,6 +113,13 @@ describe("flux du tournoi", () => {
     expect(hook).toMatch(/if \(quietAfter === null\) \{\s*if \(quietRef\.current\) \{\s*quietRef\.current = false;\s*reconnectRef\.current\?\.\(\);/);
   });
 
+  it("désarme le regroupement quand l'onglet passe en veille", () => {
+    // Le rendu reste dû, mais pas derrière le jeu.
+    expect(hook).toMatch(
+      /else if \(delay === null\) \{\s*if \(renderTimerRef\.current !== null\) \{\s*clearTimeout\(renderTimerRef\.current\);\s*renderTimerRef\.current = null;/,
+    );
+  });
+
   it("suit le régime sans re-rendre la page", () => {
     // Par `useClientPower()`, chaque alt-tab redessinerait l'arbre entier.
     expect(hook).not.toContain("useClientPower()");

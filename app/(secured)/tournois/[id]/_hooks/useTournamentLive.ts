@@ -183,11 +183,18 @@ export function useTournamentLive(tournamentId: number) {
       const next = powerPolicy(getClientPowerInput());
       policyRef.current = next;
 
-      // Ce qui attendait est rendu dès qu'on peut le voir.
+      // Ce qui attendait est rendu dès qu'on peut le voir — et pas avant : un
+      // regroupement armé hors focus ne doit pas redessiner l'arbre derrière le
+      // jeu si l'onglet vient d'être caché. Le rendu reste dû, pour le retour.
       const delay = next.snapshotRenderDelayMs;
       if (pendingRenderRef.current) {
         if (delay === 0) flushRender();
-        else if (delay !== null && renderTimerRef.current === null) {
+        else if (delay === null) {
+          if (renderTimerRef.current !== null) {
+            clearTimeout(renderTimerRef.current);
+            renderTimerRef.current = null;
+          }
+        } else if (renderTimerRef.current === null) {
           renderTimerRef.current = setTimeout(flushRender, delay);
         }
       }
