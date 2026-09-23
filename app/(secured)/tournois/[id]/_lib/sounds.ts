@@ -18,11 +18,14 @@ const ALERT_FREQUENCY: Partial<Record<ViewerAlert, number>> = {
  * ouvert garde sa mémoire et son rendu audio actif, et il s'en ajoutait un à
  * chaque score confirmé, sur un poste qui fait tourner un jeu à côté.
  *
- * Un contexte né **suspendu** (le navigateur bloque le son tant que la page n'a
- * reçu aucun geste — onglet ouvert depuis un lien, jamais cliqué) est refermé
- * sur-le-champ : son horloge n'avance pas, la note ne finirait jamais, et
- * `onended` ne viendrait jamais le refermer. Le minuteur de secours couvre le
- * reste — un contexte suspendu en cours de note.
+ * `onended` ne suffit pas : un contexte que le navigateur garde **suspendu**
+ * (son bloqué tant que la page n'a reçu aucun geste — onglet ouvert depuis un
+ * lien, jamais cliqué) a une horloge qui n'avance pas, la note n'y finit jamais
+ * et `onended` ne vient pas. D'où le minuteur de secours, qui le referme dans
+ * tous les cas. On ne juge **pas** sur `context.state` à la construction : la
+ * spécification y laisse tout contexte neuf à `"suspended"` jusqu'au démarrage
+ * effectif du rendu, si bien que refermer ce qui n'est pas encore `"running"`
+ * couperait le signal là où il allait sonner.
  */
 export function playAlertChime(alert: ViewerAlert) {
   const frequency = ALERT_FREQUENCY[alert];
@@ -35,10 +38,6 @@ export function playAlertChime(alert: ViewerAlert) {
       closed = true;
       void context.close().catch(() => undefined);
     };
-    if (context.state !== "running") {
-      close();
-      return;
-    }
     const oscillator = context.createOscillator();
     const gain = context.createGain();
     oscillator.frequency.value = frequency;

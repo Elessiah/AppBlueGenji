@@ -78,13 +78,23 @@ describe("playAlertChime", () => {
     expect(context.close).toHaveBeenCalledTimes(1);
   });
 
-  it("referme sur-le-champ un contexte né suspendu, sans rien jouer", () => {
-    // Son bloqué faute de geste sur la page : l'horloge n'avance pas, la note
-    // ne finirait jamais et `onended` ne viendrait jamais.
+  it("joue même sur un contexte encore suspendu à sa construction", () => {
+    // La spécification laisse tout contexte neuf à « suspended » jusqu'au
+    // démarrage effectif du rendu : le refermer là couperait le signal.
     nextState = "suspended";
     playAlertChime("SCORE_TO_CONFIRM");
     const [context] = created;
-    expect(context.started).toBe(false);
+    expect(context.started).toBe(true);
+    expect(context.close).not.toHaveBeenCalled();
+  });
+
+  it("referme un contexte resté suspendu, dont la note ne finit jamais", () => {
+    // Son bloqué faute de geste sur la page : l'horloge n'avance pas et
+    // `onended` ne vient pas — seul le filet de sécurité le referme.
+    nextState = "suspended";
+    playAlertChime("SCORE_TO_CONFIRM");
+    const [context] = created;
+    jest.advanceTimersByTime(CHIME_CLOSE_FALLBACK_MS);
     expect(context.close).toHaveBeenCalledTimes(1);
   });
 
