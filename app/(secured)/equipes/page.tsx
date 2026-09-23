@@ -10,6 +10,7 @@ import { AnnuaireSearchField } from "../_shared/AnnuaireSearchField";
 import { TeamCard } from "./cards/TeamCard";
 import { HighlightStrip } from "./cards/HighlightStrip";
 import { GhostTeamDialog } from "./GhostTeamDialog";
+import { teamErrorMessage } from "./_lib/team-errors";
 import s from "../_shared/annuaire.module.css";
 
 const ACCENT_RGB = "255, 157, 46";
@@ -52,7 +53,7 @@ export default function TeamsPage() {
         setActiveTeam(payload.activeTeam || null);
         setCanManageGhostTeams(payload.canManageGhostTeams === true);
       })
-      .catch((e) => showError((e as Error).message));
+      .catch((e) => showError(teamErrorMessage((e as Error).message)));
   }, [showError]);
 
   useEffect(() => {

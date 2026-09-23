@@ -6,9 +6,10 @@ import {
   TEAM_TAG_MAX_LENGTH,
   TEAM_TAG_MIN_LENGTH,
   normalizeTeamTag,
-  teamTagErrorMessage,
 } from "@/lib/shared/team-tag";
 import s from "./GhostTeamDialog.module.css";
+import { teamErrorMessage } from "./_lib/team-errors";
+import { checkTeamName } from "@/lib/shared/team-name";
 
 type GhostTeamDialogProps = {
   onClose: () => void;
@@ -30,6 +31,11 @@ export function GhostTeamDialog({ onClose, onCreated }: GhostTeamDialogProps) {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    const nameCheck = checkTeamName(name);
+    if (!nameCheck.ok) {
+      showError(teamErrorMessage(nameCheck.reason));
+      return;
+    }
     setBusy(true);
     try {
       const response = await fetch("/api/teams", {
@@ -48,8 +54,7 @@ export function GhostTeamDialog({ onClose, onCreated }: GhostTeamDialogProps) {
       onCreated();
       onClose();
     } catch (e) {
-      const code = (e as Error).message;
-      showError(teamTagErrorMessage(code) ?? code);
+      showError(teamErrorMessage((e as Error).message));
     } finally {
       setBusy(false);
     }
@@ -73,9 +78,10 @@ export function GhostTeamDialog({ onClose, onCreated }: GhostTeamDialogProps) {
               id="ghost-team-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              minLength={3}
-              maxLength={60}
               required
+              // Bornes contrôlées par `checkTeamName` à l'envoi : les
+              // `minLength`/`maxLength` natifs comptent des unités UTF-16,
+              // la base des caractères.
               autoFocus
             />
           </div>

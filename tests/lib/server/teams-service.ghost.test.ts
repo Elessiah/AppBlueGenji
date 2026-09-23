@@ -55,12 +55,13 @@ describe("updateTeamMeta — dérogation staff sur les équipes fantômes", () =
       .fn()
       .mockResolvedValueOnce(NOT_A_MEMBER) // userOwnsTeam
       .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]]) // isGhostTeam
+      .mockResolvedValueOnce([[]]) // nom libre (assertTeamNameAvailable)
       .mockResolvedValueOnce([{ affectedRows: 1 }]); // UPDATE
     await mockDb(execute);
 
     await updateTeamMeta(99, 3, { name: "Nouveau nom" }, true);
 
-    const [sql, params] = execute.mock.calls[2] as [string, unknown[]];
+    const [sql, params] = execute.mock.calls[3] as [string, unknown[]];
     expect(sql).toMatch(/UPDATE bg_teams SET name = \?/);
     expect(params).toEqual(["Nouveau nom", 3]);
   });

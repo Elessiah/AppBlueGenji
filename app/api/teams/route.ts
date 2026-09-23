@@ -4,6 +4,12 @@ import { createTeam, getUserActiveTeam, listTeams } from "@/lib/server/teams-ser
 import { createGhostTeam } from "@/lib/server/ghost-teams-service";
 import { can } from "@/lib/shared/permissions";
 import { TEAM_TAG_ALREADY_USED, checkTeamTag } from "@/lib/shared/team-tag";
+import {
+  INVALID_TEAM_FIELDS,
+  TEAM_NAME_ALREADY_USED,
+  checkTeamName,
+  teamFieldsAreText,
+} from "@/lib/shared/team-name";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -29,11 +35,11 @@ export async function POST(req: Request) {
       tag?: string | null;
       ghost?: boolean;
     };
-    const name = (body.name ?? "").trim();
-
-    if (name.length < 3 || name.length > 60) {
-      return fail("INVALID_TEAM_NAME", 400);
-    }
+    if (!teamFieldsAreText(body, ["name", "description", "tag"])) return fail(INVALID_TEAM_FIELDS, 400);
+    // Mêmes bornes qu'au renommage (`updateTeamMeta`) : une seule règle.
+    const nameCheck = checkTeamName(body.name);
+    if (!nameCheck.ok) return fail(nameCheck.reason, 400);
+    const name = nameCheck.name;
 
     // Forme du sigle contrôlée ici, avant toute écriture : le refus dit lequel
     // des trois défauts corriger, et le service n'a plus à s'en soucier.
@@ -57,7 +63,7 @@ export async function POST(req: Request) {
     // collision de sigle annoncée comme un nom déjà pris enverrait corriger le
     // mauvais champ.
     if (message === TEAM_TAG_ALREADY_USED) return fail(message, 409);
-    if (message.includes("Duplicate") || message.includes("duplicate")) return fail("TEAM_NAME_ALREADY_USED", 409);
+    if (message.includes("Duplicate") || message.includes("duplicate")) return fail(TEAM_NAME_ALREADY_USED, 409);
     return fail(message || "TEAM_CREATE_FAILED", 400);
   }
 }

@@ -68,13 +68,13 @@ describe("useTeamDetail — un identifiant d'entrée solo", () => {
     // clignotement d'erreur sur un chemin nominal.
     const branch = source.slice(
       source.indexOf("const soloUserId"),
-      source.indexOf('showError("TEAM_NOT_FOUND")'),
+      source.indexOf('showError(teamErrorMessage("TEAM_NOT_FOUND"))'),
     );
     expect(branch).toContain("return;");
   });
 
   it("garde le message et le repli pour une vraie équipe manquante", () => {
-    expect(source).toContain('showError("TEAM_NOT_FOUND")');
+    expect(source).toContain('showError(teamErrorMessage("TEAM_NOT_FOUND"))');
     expect(source).toContain('router.push("/equipes")');
   });
 

@@ -1,8 +1,12 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { getTeamDetail, inviteToTeam, listTeamJoinRequests } from "@/lib/server/teams-service";
+import { getTeamDetail, inviteToTeam, listTeamPendingInvitations } from "@/lib/server/teams-service";
+import { JOIN_CONFLICTS, inviteRolesFromBody } from "@/lib/server/team-invite-roles";
 
-/** Liste les demandes (REQUEST) en attente pour l'équipe — vue gestion. */
+/**
+ * Ce qui attend une réponse, vue gestion : les demandes (REQUEST) reçues et
+ * les invitations (INVITE) envoyées.
+ */
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
@@ -12,8 +16,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   if (!Number.isInteger(teamId) || teamId <= 0) return fail("INVALID_TEAM_ID", 400);
 
   try {
-    const requests = await listTeamJoinRequests(teamId, user.id);
-    return ok({ requests });
+    return ok(await listTeamPendingInvitations(teamId, user.id));
   } catch (error) {
     const message = (error as Error).message;
     if (message === "FORBIDDEN") return fail(message, 403);
@@ -31,10 +34,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!Number.isInteger(teamId) || teamId <= 0) return fail("INVALID_TEAM_ID", 400);
 
   try {
-    const body = (await req.json()) as { pseudo?: string };
+    const body = (await req.json()) as { pseudo?: string; roles?: unknown };
     if (!body.pseudo?.trim()) return fail("MISSING_PSEUDO", 400);
 
-    const result = await inviteToTeam(user.id, teamId, body.pseudo.trim());
+    const result = await inviteToTeam(user.id, teamId, body.pseudo.trim(), inviteRolesFromBody(body.roles));
     const detail = await getTeamDetail(teamId, user.id);
     return ok({ result, ...detail });
   } catch (error) {
@@ -43,6 +46,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     if (message === "USER_NOT_FOUND") return fail(message, 404);
     if (message === "USER_ALREADY_IN_TEAM") return fail(message, 409);
     if (message === "ALREADY_INVITED") return fail(message, 409);
+    if (message === "MISSING_ROLE") return fail(message, 400);
+    if (JOIN_CONFLICTS.has(message)) return fail(message, 409);
     return fail(message || "TEAM_INVITE_FAILED", 400);
   }
 }

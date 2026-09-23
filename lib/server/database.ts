@@ -346,6 +346,10 @@ async function runMigrations(db: Pool): Promise<void> {
       -- des tiers.
       created_by BIGINT NULL,
       kind ENUM('INVITE', 'REQUEST') NOT NULL,
+      -- Rôles proposés par la gestion avec une invitation (INVITE), posés à
+      -- l'arrivée du joueur. NULL sur une demande (REQUEST) et sur les
+      -- invitations d'avant la colonne : le joueur arrive alors en DPS.
+      roles_json JSON NULL,
       status ENUM('PENDING', 'ACCEPTED', 'DECLINED', 'CANCELLED') NOT NULL DEFAULT 'PENDING',
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       responded_at DATETIME NULL,
@@ -1014,6 +1018,9 @@ async function runMigrations(db: Pool): Promise<void> {
     `ALTER TABLE bg_tournaments ADD COLUMN image_fit ENUM('COVER', 'CONTAIN') NOT NULL DEFAULT 'COVER'`,
     `ALTER TABLE bg_tournaments ADD COLUMN image_focus_x TINYINT UNSIGNED NOT NULL DEFAULT 50`,
     `ALTER TABLE bg_tournaments ADD COLUMN image_focus_y TINYINT UNSIGNED NOT NULL DEFAULT 50`,
+    // Rôles portés par une invitation : le formulaire d'invitation les
+    // demandait, le serveur les jetait et le joueur arrivait toujours en DPS.
+    `ALTER TABLE bg_team_invitations ADD COLUMN roles_json JSON NULL`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

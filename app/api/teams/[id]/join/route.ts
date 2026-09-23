@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { getTeamDetail, requestToJoinTeam } from "@/lib/server/teams-service";
+import { JOIN_CONFLICTS } from "@/lib/server/team-invite-roles";
 
 export async function POST(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -23,6 +24,9 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     if (message === "TEAM_NOT_FOUND") return fail(message, 404);
     // Fantôme ou entrée solo : la ligne existe, mais elle ne se rejoint pas.
     if (message === "TEAM_NOT_JOINABLE") return fail(message, 409);
+    // Invitation acceptée par la demande (`acceptIntoTeam`) : un état qui a
+    // changé entre la lecture et l'écriture est un conflit, pas une saisie.
+    if (JOIN_CONFLICTS.has(message)) return fail(message, 409);
     return fail(message || "TEAM_JOIN_FAILED", 400);
   }
 }

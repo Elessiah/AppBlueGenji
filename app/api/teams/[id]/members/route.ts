@@ -7,6 +7,7 @@ import {
   removeTeamMember,
   updateTeamMemberRoles,
 } from "@/lib/server/teams-service";
+import { JOIN_CONFLICTS, inviteRolesFromBody } from "@/lib/server/team-invite-roles";
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -19,14 +20,16 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
 
   try {
-    const body = (await req.json()) as { pseudo?: string };
+    const body = (await req.json()) as { pseudo?: string; roles?: unknown };
     if (!body.pseudo?.trim()) {
       return fail("MISSING_PSEUDO", 400);
     }
 
     // Invitation plutôt qu'ajout forcé : le joueur doit accepter (ou sa demande
-    // en attente est validée directement → "JOINED").
-    const result = await inviteToTeam(user.id, teamId, body.pseudo.trim());
+    // en attente est validée directement → "JOINED"). Les rôles choisis
+    // voyagent avec l'invitation : le formulaire les demandait, la route les
+    // jetait, et le joueur arrivait toujours en DPS.
+    const result = await inviteToTeam(user.id, teamId, body.pseudo.trim(), inviteRolesFromBody(body.roles));
     const detail = await getTeamDetail(teamId, user.id);
     return ok({ result, ...detail });
   } catch (error) {
@@ -35,6 +38,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     if (message === "USER_NOT_FOUND") return fail(message, 404);
     if (message === "USER_ALREADY_IN_TEAM") return fail(message, 409);
     if (message === "ALREADY_INVITED") return fail(message, 409);
+    if (message === "MISSING_ROLE") return fail(message, 400);
+    if (JOIN_CONFLICTS.has(message)) return fail(message, 409);
     return fail(message || "TEAM_MEMBER_ADD_FAILED", 400);
   }
 }
@@ -91,6 +96,7 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
     if (message === "FORBIDDEN") return fail(message, 403);
     if (message === "MEMBER_NOT_FOUND") return fail(message, 404);
     if (message === "OWNER_CANNOT_LEAVE") return fail(message, 400);
+    if (message === "CANNOT_KICK_OWNER") return fail(message, 409);
     return fail(message || "TEAM_MEMBER_REMOVE_FAILED", 400);
   }
 }

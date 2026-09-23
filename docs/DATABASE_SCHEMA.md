@@ -78,6 +78,7 @@ Ce qu'elle contient aujourd'hui :
 | — (image de tournoi) | `bg_tournaments` | `image_fit` |
 | — (image de tournoi) | `bg_tournaments` | `image_focus_x` |
 | — (image de tournoi) | `bg_tournaments` | `image_focus_y` |
+| — (fiche d'équipe) | `bg_team_invitations` | `roles_json` — rôles proposés avec une invitation, posés à l'arrivée du joueur (`NULL` sur une demande, et sur les invitations d'avant la colonne : DPS) |
 
 Le coût est nul : chaque entrée retombe en silence quand la colonne est là, et le
 bloc ne fait rien sur une base neuve. **La liste est faite pour rétrécir** — une

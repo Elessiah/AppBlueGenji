@@ -330,6 +330,11 @@ export type TeamMember = {
   avatarUrl: string | null;
   roles: TeamRole[];
   joinedAt: string;
+  /**
+   * Compte anonymisé : l'anonymisation ne détache pas de l'équipe. Il reste au
+   * roster (l'historique en dépend), mais ne peut plus recevoir la propriété.
+   */
+  isDeleted: boolean;
 };
 
 export type TeamHistoryRow = {
@@ -777,7 +782,33 @@ export type TeamDetailResponse = {
    * `tournaments` (équipe fantôme) et non parce qu'il en est membre.
    */
   managedAsGhost: boolean;
+  /**
+   * Compte qui lit la fiche. La page le relisait par un second appel
+   * (`/api/profile`), si bien que ses propres boutons s'affichaient d'abord
+   * comme ceux d'un autre membre — « Exclure » sur sa propre ligne — le temps
+   * que la réponse arrive.
+   */
+  viewerUserId: number;
   // Relation du viewer à l'équipe (self-service / invitations).
   viewerMembership: "MEMBER" | "OWNER" | "NONE";
   viewerInvitation: "INVITED" | "REQUESTED" | "NONE";
+  /** Invitation ou demande en attente du viewer — ce qui permet de retirer sa demande. */
+  viewerInvitationId: number | null;
+};
+
+/** Invitation envoyée par une équipe, encore sans réponse (vue gestion). */
+export type TeamSentInvitation = {
+  id: number;
+  userId: number;
+  pseudo: string;
+  roles: TeamRole[];
+  createdAt: string;
+};
+
+/** Demande d'adhésion reçue par une équipe, encore sans réponse (vue gestion). */
+export type TeamJoinRequest = {
+  id: number;
+  userId: number;
+  pseudo: string;
+  createdAt: string;
 };

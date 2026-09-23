@@ -26,6 +26,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     if (message === "FORBIDDEN") return fail(message, 403);
     if (message === "MEMBER_NOT_FOUND") return fail(message, 404);
     if (message === "TRANSFER_TO_SELF") return fail(message, 400);
+    if (message === "MEMBER_ACCOUNT_DELETED") return fail(message, 409);
     return fail(message || "TEAM_OWNERSHIP_TRANSFER_FAILED", 400);
   }
 }
