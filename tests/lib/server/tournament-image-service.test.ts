@@ -60,7 +60,9 @@ beforeEach(() => {
   (processAndStoreImage as jest.Mock).mockResolvedValue(NEW_DISK as never);
   (deleteStoredImage as jest.Mock).mockResolvedValue(undefined as never);
 });
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 describe("setTournamentImage", () => {
   it("convertit le fichier sous le gabarit du tournoi, puis l'enregistre avec son cadrage", async () => {

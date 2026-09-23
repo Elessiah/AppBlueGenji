@@ -1,3 +1,4 @@
+import { describe, expect, it } from "@jest/globals";
 import { envFileOrder, missingNodeEnvNotice, PRODUCTION_ENV_FILES } from "@/lib/shared/env-files";
 
 describe("envFileOrder", () => {

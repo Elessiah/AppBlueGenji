@@ -37,7 +37,7 @@ async function mockDb() {
   const { getDatabase } = await import("@/lib/server/database");
   (getDatabase as jest.Mock).mockResolvedValue({
     getConnection: jest.fn(async () => connection),
-  });
+  } as never);
 }
 
 function tournament(overrides: Row = {}): Row {
@@ -76,7 +76,9 @@ describe("loadSeedingBoard", () => {
     jest.clearAllMocks();
     await mockDb();
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("renumérote un ordre à trous et signale l'ordre encore libre", async () => {
     (loadTournamentRow as jest.Mock).mockResolvedValue(tournament() as never);
@@ -116,7 +118,9 @@ describe("reorderSeeding", () => {
     await mockDb();
     connection.execute.mockResolvedValue(registrationRows() as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("écrit les seeds dans le nouvel ordre et marque le seeding manuel", async () => {
     (loadTournamentRow as jest.Mock).mockResolvedValue(tournament() as never);

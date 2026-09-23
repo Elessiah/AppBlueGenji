@@ -25,8 +25,12 @@ function req(body: unknown) {
 
 const params = (matchId: string) => ({ params: Promise.resolve({ matchId }) });
 
-beforeEach(() => jest.clearAllMocks());
-afterEach(() => jest.restoreAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 describe("PUT /api/admin/matches/[matchId]/schedule — permissions", () => {
   it("rejette un visiteur anonyme avec 401", async () => {

@@ -35,7 +35,9 @@ describe("POST /api/tournaments/[id]/penalties", () => {
     jest.clearAllMocks();
     (service.applyEndurancePenalty as jest.Mock).mockResolvedValue(undefined as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejette les anonymes (401)", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
@@ -147,7 +149,9 @@ describe("DELETE /api/tournaments/[id]/penalties/[penaltyId]", () => {
     jest.clearAllMocks();
     (service.liftEndurancePenalty as jest.Mock).mockResolvedValue(undefined as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejette les anonymes (401)", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);

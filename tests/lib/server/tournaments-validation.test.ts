@@ -4,6 +4,7 @@ import {
   validateDateOrder,
   validateTournamentInput,
 } from "@/lib/server/tournaments/validation";
+import type { TournamentFormat } from "@/lib/shared/types";
 
 const base = {
   name: "Coupe test",
@@ -266,7 +267,7 @@ describe("validateTournamentInput — petite finale", () => {
     );
   });
 
-  it.each([["DOUBLE"], ["SWISS"]] as const)(
+  it.each<[TournamentFormat]>([["DOUBLE"], ["SWISS"]])(
     "la neutralise en %s",
     (format) => {
       // Cette règle ne vivait que dans `createTournament` : une **édition**

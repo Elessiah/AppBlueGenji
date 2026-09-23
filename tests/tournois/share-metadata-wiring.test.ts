@@ -8,7 +8,8 @@ jest.mock("@/lib/server/tournaments-service");
 import { generateMetadata } from "@/app/(secured)/tournois/[id]/layout";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
-import type { AuthUser } from "@/lib/shared/types";
+import type { AuthUser } from "@/lib/server/auth";
+import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import type { TournamentCard } from "@/lib/shared/types";
 
 /**
@@ -58,7 +59,10 @@ function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
     survivalRoundsPerCut: null,
     phases: null,
     matchFormat: null,
+    endurancePlayoffFormat: null,
+    registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
     liveUrl: null,
+    image: null,
     ...overrides,
   };
 }
@@ -125,7 +129,8 @@ describe("generateMetadata de la fiche", () => {
     expect(meta.title).toEqual({ absolute: "OW Open Cup · Overwatch" });
     expect(meta.openGraph?.title).toBe("OW Open Cup · Overwatch");
     expect(meta.openGraph?.url).toBe("/tournois/42");
-    expect(meta.twitter?.card).toBe("summary_large_image");
+    // `twitter` est une union dont seule une branche porte `card`.
+    expect((meta.twitter as { card?: string } | null | undefined)?.card).toBe("summary_large_image");
     expect(String(meta.description)).toContain("Inscriptions ouvertes");
   });
 

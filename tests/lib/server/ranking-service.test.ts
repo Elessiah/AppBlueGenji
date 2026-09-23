@@ -50,7 +50,9 @@ function placementRow(tournamentId: number, teamId: number, rank: number, day = 
  * l'ordre n'a pas à être figé par un test.
  */
 function fakeDb(matches: Row[], teams: Row[], entrants: Row[] = [], placements: Row[] = []) {
-  return jest.fn(async (sql: unknown) => {
+  // `any` : le double tient lieu de `execute` de mysql2, dont les surcharges
+  // ne se décrivent pas avec une seule signature.
+  return jest.fn<any>(async (sql: unknown) => {
     const text = String(sql);
     if (text.includes("AS played_at")) return [matches];
     if (text.includes("AS awarded_at")) return [placements];
@@ -62,7 +64,7 @@ function fakeDb(matches: Row[], teams: Row[], entrants: Row[] = [], placements: 
 
 async function mockDb(execute: jest.Mock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute });
+  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
   return execute;
 }
 

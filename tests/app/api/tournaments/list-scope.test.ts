@@ -30,7 +30,9 @@ describe("GET /api/tournaments — portée", () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(player as never);
     (service.listTournamentBuckets as jest.Mock).mockResolvedValue(emptyBuckets as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("liste la vue publique sans portée", async () => {
     const res = await get("/api/tournaments");

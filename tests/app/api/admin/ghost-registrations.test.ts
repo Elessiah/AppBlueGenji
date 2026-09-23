@@ -34,8 +34,12 @@ function teamScoped(code: string, teamId: number) {
 }
 
 describe("GET /api/admin/tournaments/[id]/ghost-registrations", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejette un visiteur anonyme avec 401", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
@@ -68,8 +72,12 @@ describe("GET /api/admin/tournaments/[id]/ghost-registrations", () => {
 });
 
 describe("POST /api/admin/tournaments/[id]/ghost-registrations", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejette un visiteur anonyme avec 401", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);

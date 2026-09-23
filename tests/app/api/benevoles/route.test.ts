@@ -34,8 +34,12 @@ function params(id: string) {
 }
 
 describe("GET /api/benevoles", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("returns the public list without auth", async () => {
     (service.listBenevoles as jest.Mock).mockResolvedValue([sampleBenevole] as never);
@@ -53,8 +57,12 @@ describe("GET /api/benevoles", () => {
 });
 
 describe("POST /api/benevoles", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   const body = {
     firstName: "Marie",
@@ -104,8 +112,12 @@ describe("POST /api/benevoles", () => {
 });
 
 describe("PUT /api/benevoles/[id]", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   const body = {
     firstName: "Marie",
@@ -157,8 +169,12 @@ describe("PUT /api/benevoles/[id]", () => {
 });
 
 describe("DELETE /api/benevoles/[id]", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejects anonymous users with 401", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);

@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { LiveCard } from "@/components/cyber/landing/LiveCard";
 import type { LandingLive, LandingLiveMatch } from "@/lib/shared/landing";
 import type { MatchLiveState } from "@/lib/shared/live-streams";
+import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import type { TournamentCard } from "@/lib/shared/types";
 
 /**
@@ -37,7 +38,10 @@ function tournament(overrides: Partial<TournamentCard> = {}): TournamentCard {
     survivalRoundsPerCut: null,
     phases: null,
     matchFormat: null,
+    endurancePlayoffFormat: null,
+    registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
     liveUrl: null,
+    image: null,
     ...overrides,
   };
 }
@@ -57,6 +61,7 @@ function match(overrides: Partial<LandingLiveMatch> = {}): LandingLiveMatch {
     team2Seed: null,
     bracket: "UPPER",
     roundLabel: "Quart de finale",
+    matchFormat: null,
     liveState: "OFF",
     liveUrl: null,
     ...overrides,

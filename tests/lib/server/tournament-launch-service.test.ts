@@ -75,7 +75,9 @@ describe("launchTournamentNow", () => {
       stateChanged: true,
     } as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("abrège les jalons puis délègue le coup d'envoi à la synchronisation", async () => {
     const { execute, connection } = mockTournament(registrationRow(), 12);

@@ -132,11 +132,11 @@ const looksLikeToken = (message: string) => /^[A-Z][A-Z0-9_]*$/.test(message.tri
 /** Un code absent du registre rend cette phrase-ci, et elle ne dit rien. */
 const UNKNOWN_CODE = "UN_CODE_QUE_PERSONNE_NE_CONNAIT";
 
-describe.each([
-  ["connexion", loginErrorMessage, LOGIN_CODES] as const,
-  ["adhésion à une équipe", membershipErrorMessage, MEMBERSHIP_CODES] as const,
-  ["gestion d'une équipe", teamErrorMessage, TEAM_CODES] as const,
-  ["applications connectées", connectionErrorMessage, CONNECTION_CODES] as const,
+describe.each<[string, (code: string | null | undefined) => string, readonly string[]]>([
+  ["connexion", loginErrorMessage, LOGIN_CODES],
+  ["adhésion à une équipe", membershipErrorMessage, MEMBERSHIP_CODES],
+  ["gestion d'une équipe", teamErrorMessage, TEAM_CODES],
+  ["applications connectées", connectionErrorMessage, CONNECTION_CODES],
 ])("registre des refus — %s", (_label, translate, codes) => {
   it.each(codes)("traduit %s par une phrase qui lui est propre", (code) => {
     const message = translate(code);

@@ -34,7 +34,9 @@ describe("POST /api/tournaments — tournoi individuel", () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
     (service.createTournament as jest.Mock).mockResolvedValue(42 as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("transmet participantType SOLO", async () => {
     const res = await POST(jsonReq({ ...base, participantType: "SOLO" }));

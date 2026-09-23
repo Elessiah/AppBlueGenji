@@ -11,6 +11,7 @@ import {
   tournamentShareTitle,
   truncateForShare,
 } from "@/lib/shared/share-metadata";
+import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import type { TournamentCard } from "@/lib/shared/types";
 
 /**
@@ -43,7 +44,10 @@ function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
     survivalRoundsPerCut: null,
     phases: null,
     matchFormat: null,
+    endurancePlayoffFormat: null,
+    registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
     liveUrl: null,
+    image: null,
     ...overrides,
   };
 }

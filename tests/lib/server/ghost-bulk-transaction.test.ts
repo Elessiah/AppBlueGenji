@@ -40,7 +40,9 @@ describe("registerGhostTeams", () => {
     (flushBotLogs as jest.Mock).mockReturnValue(undefined);
     (discardBotLogs as jest.Mock).mockReturnValue(undefined);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("écrit tout le lot dans une seule transaction, et publie une seule fois", async () => {
     const connection = mockConnection();

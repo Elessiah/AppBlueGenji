@@ -34,17 +34,17 @@ describe("tournaments-service: match state machine", () => {
     it("match moves to COMPLETED when scores agree", () => {
       const team1Score = 3;
       const team1OpponentScore = 1;
-      const team2Score = 1;
-      const team2OpponentScore = 3;
+      const team2Score: number = 1;
+      const team2OpponentScore: number = 3;
       const scoresAgree = team1Score === team2OpponentScore && team2Score === team1OpponentScore;
       expect(scoresAgree).toBe(true);
     });
 
     it("match stays AWAITING_CONFIRMATION when scores disagree", () => {
-      const team1Score = 3;
-      const team1OpponentScore = 1;
-      const team2Score = 2;
-      const team2OpponentScore = 3;
+      const team1Score: number = 3;
+      const team1OpponentScore: number = 1;
+      const team2Score: number = 2;
+      const team2OpponentScore: number = 3;
       const scoresAgree = team1Score === team2OpponentScore && team2Score === team1OpponentScore;
       expect(scoresAgree).toBe(false);
     });
@@ -84,9 +84,9 @@ describe("tournaments-service: match state machine", () => {
     });
 
     it("cannot report score for non-participant", () => {
-      const team1Id = 1;
-      const team2Id = 2;
-      const reportingTeamId = 3;
+      const team1Id: number = 1;
+      const team2Id: number = 2;
+      const reportingTeamId: number = 3;
       const isParticipant = reportingTeamId === team1Id || reportingTeamId === team2Id;
       expect(isParticipant).toBe(false);
     });
@@ -158,7 +158,7 @@ describe("tournaments-service: match state machine", () => {
 
     it("bye-vs-team with feeder pending stays PENDING", () => {
       const matchStatus = "PENDING";
-      const feederMatchStatus = "PENDING";
+      const feederMatchStatus: string = "PENDING";
       const hasFeeder = feederMatchStatus !== "COMPLETED";
       const shouldWait = hasFeeder && matchStatus === "PENDING";
       expect(shouldWait).toBe(true);
@@ -276,10 +276,10 @@ describe("tournaments-service: match state machine", () => {
 
   describe("conflict resolution", () => {
     it("conflicting scores set admin_required flag", () => {
-      const team1Score = 3;
-      const team1OpponentScore = 1;
-      const team2Score = 2;
-      const team2OpponentScore = 3;
+      const team1Score: number = 3;
+      const team1OpponentScore: number = 1;
+      const team2Score: number = 2;
+      const team2OpponentScore: number = 3;
       const conflict = team1Score !== team2OpponentScore || team2Score !== team1OpponentScore;
       const adminRequired = conflict;
       expect(adminRequired).toBe(true);
@@ -320,8 +320,8 @@ describe("tournaments-service: match state machine", () => {
     });
 
     it("match records loser team ID", () => {
-      const winnerId = 5;
-      const loserId = 3;
+      const winnerId: number = 5;
+      const loserId: number = 3;
       const losersSet = loserId !== null && loserId !== winnerId;
       expect(losersSet).toBe(true);
     });

@@ -344,8 +344,8 @@ describe("pictogrammes distincts des alertes", () => {
       matchId: 101,
       bracket: "UPPER",
       roundNumber: 1,
-      team1: { name: "A", participantType: "TEAM" },
-      team2: { name: "B", participantType: "TEAM" },
+      team1: { name: "A", participantType: "TEAM" as const },
+      team2: { name: "B", participantType: "TEAM" as const },
     };
 
     const conflict = formatScoreConflictAlert(context);

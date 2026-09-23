@@ -24,7 +24,7 @@ async function mockDb(execute: ExecuteMock, connectionExecute?: ExecuteMock) {
   (getDatabase as jest.Mock).mockResolvedValue({
     execute,
     getConnection: jest.fn(async () => connection),
-  });
+  } as never);
   return connection;
 }
 
@@ -34,15 +34,19 @@ const absent = [[]];
 const alive = [[{ is_deleted: 0 }]];
 
 describe("transferTeamOwnership", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("déplace OWNER vers la cible et conserve les autres rôles de chacun", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce(member("OWNER", "CAPITAINE", "TANK")) // demandeur
-      .mockResolvedValueOnce(member("DPS")); // cible
-    const connectionExecute = jest.fn().mockResolvedValueOnce(alive).mockResolvedValue([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce(member("OWNER", "CAPITAINE", "TANK") as never) // demandeur
+      .mockResolvedValueOnce(member("DPS") as never); // cible
+    const connectionExecute = jest.fn().mockResolvedValueOnce(alive as never).mockResolvedValue([{ affectedRows: 1 }] as never);
     const connection = await mockDb(execute, connectionExecute);
 
     await transferTeamOwnership(1, 7, 2);
@@ -66,9 +70,9 @@ describe("transferTeamOwnership", () => {
     // sur DPS, comme à l'arrivée d'un membre (`acceptIntoTeam`).
     const execute = jest
       .fn()
-      .mockResolvedValueOnce(member("OWNER"))
-      .mockResolvedValueOnce(member("HEAL"));
-    const connectionExecute = jest.fn().mockResolvedValueOnce(alive).mockResolvedValue([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce(member("OWNER") as never)
+      .mockResolvedValueOnce(member("HEAL") as never);
+    const connectionExecute = jest.fn().mockResolvedValueOnce(alive as never).mockResolvedValue([{ affectedRows: 1 }] as never);
     await mockDb(execute, connectionExecute);
 
     await transferTeamOwnership(1, 7, 2);
@@ -80,9 +84,9 @@ describe("transferTeamOwnership", () => {
   it("ne duplique pas OWNER si la cible le porte déjà", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce(member("OWNER"))
-      .mockResolvedValueOnce(member("OWNER", "TANK"));
-    const connectionExecute = jest.fn().mockResolvedValueOnce(alive).mockResolvedValue([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce(member("OWNER") as never)
+      .mockResolvedValueOnce(member("OWNER", "TANK") as never);
+    const connectionExecute = jest.fn().mockResolvedValueOnce(alive as never).mockResolvedValue([{ affectedRows: 1 }] as never);
     await mockDb(execute, connectionExecute);
 
     await transferTeamOwnership(1, 7, 2);
@@ -100,7 +104,7 @@ describe("transferTeamOwnership", () => {
   });
 
   it("refuse un demandeur étranger à l'équipe", async () => {
-    const execute = jest.fn().mockResolvedValueOnce(absent);
+    const execute = jest.fn().mockResolvedValueOnce(absent as never);
     const connectionExecute = jest.fn();
     await mockDb(execute, connectionExecute);
 
@@ -111,7 +115,7 @@ describe("transferTeamOwnership", () => {
   it.each([["MANAGER"], ["CAPITAINE"], ["DPS"]])(
     "refuse un demandeur %s : seul le propriétaire transfère",
     async (role) => {
-      const execute = jest.fn().mockResolvedValueOnce(member(role));
+      const execute = jest.fn().mockResolvedValueOnce(member(role) as never);
       const connectionExecute = jest.fn();
       await mockDb(execute, connectionExecute);
 
@@ -123,8 +127,8 @@ describe("transferTeamOwnership", () => {
   it("refuse une cible qui n'est pas membre de l'équipe", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce(member("OWNER"))
-      .mockResolvedValueOnce(absent);
+      .mockResolvedValueOnce(member("OWNER") as never)
+      .mockResolvedValueOnce(absent as never);
     const connectionExecute = jest.fn();
     await mockDb(execute, connectionExecute);
 
@@ -138,9 +142,9 @@ describe("transferTeamOwnership", () => {
     // propriétaire transférant ou dissolvant, l'état devenait définitif.
     const execute = jest
       .fn()
-      .mockResolvedValueOnce(member("OWNER"))
-      .mockResolvedValueOnce(member("DPS"));
-    const connectionExecute = jest.fn().mockResolvedValueOnce([[{ is_deleted: 1 }]]);
+      .mockResolvedValueOnce(member("OWNER") as never)
+      .mockResolvedValueOnce(member("DPS") as never);
+    const connectionExecute = jest.fn().mockResolvedValueOnce([[{ is_deleted: 1 }]] as never);
     const connection = await mockDb(execute, connectionExecute);
 
     await expect(transferTeamOwnership(1, 7, 2)).rejects.toThrow("MEMBER_ACCOUNT_DELETED");
@@ -154,9 +158,9 @@ describe("transferTeamOwnership", () => {
     // les écritures recevait quand même la propriété.
     const execute = jest
       .fn()
-      .mockResolvedValueOnce(member("OWNER"))
-      .mockResolvedValueOnce(member("DPS"));
-    const connectionExecute = jest.fn().mockResolvedValueOnce(alive).mockResolvedValue([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce(member("OWNER") as never)
+      .mockResolvedValueOnce(member("DPS") as never);
+    const connectionExecute = jest.fn().mockResolvedValueOnce(alive as never).mockResolvedValue([{ affectedRows: 1 }] as never);
     await mockDb(execute, connectionExecute);
 
     await transferTeamOwnership(1, 7, 2);
@@ -170,7 +174,7 @@ describe("transferTeamOwnership", () => {
   it("refuse sur une équipe fantôme, qui n'a aucun membre", async () => {
     // Une fantôme s'attribue (`claimGhostTeam`), elle ne se transfère pas :
     // faute de ligne `bg_team_members`, le demandeur n'est jamais OWNER.
-    const execute = jest.fn().mockResolvedValueOnce(absent);
+    const execute = jest.fn().mockResolvedValueOnce(absent as never);
     await mockDb(execute);
 
     await expect(transferTeamOwnership(1, 7, 2)).rejects.toThrow("FORBIDDEN");
@@ -179,13 +183,13 @@ describe("transferTeamOwnership", () => {
   it("annule la transaction si une écriture échoue", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce(member("OWNER", "TANK"))
-      .mockResolvedValueOnce(member("DPS"));
+      .mockResolvedValueOnce(member("OWNER", "TANK") as never)
+      .mockResolvedValueOnce(member("DPS") as never);
     const connectionExecute = jest
       .fn()
-      .mockResolvedValueOnce(alive)
-      .mockResolvedValueOnce([{ affectedRows: 1 }])
-      .mockRejectedValueOnce(new Error("DB_DOWN"));
+      .mockResolvedValueOnce(alive as never)
+      .mockResolvedValueOnce([{ affectedRows: 1 }] as never)
+      .mockRejectedValueOnce(new Error("DB_DOWN") as never);
     const connection = await mockDb(execute, connectionExecute);
 
     await expect(transferTeamOwnership(1, 7, 2)).rejects.toThrow("DB_DOWN");
@@ -197,9 +201,9 @@ describe("transferTeamOwnership", () => {
   it("ne touche qu'aux adhésions actives des deux joueurs", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce(member("OWNER"))
-      .mockResolvedValueOnce(member("DPS"));
-    const connectionExecute = jest.fn().mockResolvedValueOnce(alive).mockResolvedValue([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce(member("OWNER") as never)
+      .mockResolvedValueOnce(member("DPS") as never);
+    const connectionExecute = jest.fn().mockResolvedValueOnce(alive as never).mockResolvedValue([{ affectedRows: 1 }] as never);
     await mockDb(execute, connectionExecute);
 
     await transferTeamOwnership(1, 7, 2);

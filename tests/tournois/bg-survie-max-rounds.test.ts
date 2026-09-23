@@ -23,6 +23,7 @@ function standing(teamId: number, points: number, previousRank = teamId): Endura
     seed: teamId,
     points,
     wins: 0,
+    draws: 0,
     losses: 0,
     status: "ACTIVE",
     eliminatedRound: null,

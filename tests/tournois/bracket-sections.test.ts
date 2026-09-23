@@ -39,6 +39,13 @@ const mockMatch = (overrides: Partial<BracketMatch>): BracketMatch => ({
   nextLoserSlot: null,
   scoreDeadlineAt: null,
   updatedAt: "2026-01-01T00:00:00.000Z",
+  doubleForfeit: false,
+  phaseId: 0,
+  phasePosition: null,
+  startAt: null,
+  liveTrigger: null,
+  liveUrl: null,
+  liveStartedAt: null,
   ...overrides,
 });
 

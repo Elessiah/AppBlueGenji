@@ -81,7 +81,9 @@ describe("loadTournamentPreview", () => {
     jest.clearAllMocks();
     (loadPhases as jest.Mock).mockResolvedValue([] as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("ne lit rien pour un tournoi lancé", async () => {
     const preview = await run(tournament({ state: "RUNNING" }));

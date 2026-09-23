@@ -4,6 +4,7 @@ jest.mock("@/lib/server/oauth-flow");
 
 import { NextRequest, NextResponse } from "next/server";
 import { completeOAuth, startOAuth } from "@/lib/server/oauth-flow";
+import type { OAuthProvider } from "@/lib/shared/oauth-providers";
 import { GET as googleStart } from "@/app/api/auth/google/start/route";
 import { GET as googleCallback } from "@/app/api/auth/google/callback/route";
 import { GET as discordStart } from "@/app/api/auth/discord/start/route";
@@ -34,12 +35,15 @@ beforeEach(() => {
   completeMock.mockResolvedValue(redirect as never);
 });
 
+/** Une ligne de table : le segment d'URL, la route, et la porte qu'elle nomme. */
+type RouteCase = [string, (req: NextRequest) => Promise<Response>, OAuthProvider];
+
 describe("routes de départ", () => {
-  it.each([
+  it.each<RouteCase>([
     ["google", googleStart, "GOOGLE"],
     ["discord", discordStart, "DISCORD"],
     ["blizzard", blizzardStart, "BLIZZARD"],
-  ] as const)("/api/auth/%s/start ouvre la porte %s", async (slug, handler, provider) => {
+  ])("/api/auth/%s/start ouvre la porte %s", async (slug, handler, provider) => {
     const req = request(`/api/auth/${slug}/start`);
     await handler(req);
     expect(startMock).toHaveBeenCalledWith(req, provider);
@@ -47,11 +51,11 @@ describe("routes de départ", () => {
 });
 
 describe("routes de rappel", () => {
-  it.each([
+  it.each<RouteCase>([
     ["google", googleCallback, "GOOGLE"],
     ["discord", discordCallback, "DISCORD"],
     ["blizzard", blizzardCallback, "BLIZZARD"],
-  ] as const)("/api/auth/%s/callback referme la porte %s", async (slug, handler, provider) => {
+  ])("/api/auth/%s/callback referme la porte %s", async (slug, handler, provider) => {
     const req = request(`/api/auth/${slug}/callback?code=abc&state=xyz`);
     await handler(req);
     expect(completeMock).toHaveBeenCalledWith(req, provider);

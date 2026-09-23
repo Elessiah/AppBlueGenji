@@ -13,7 +13,7 @@ jest.mock("@/lib/server/database");
 
 async function mockDb(execute: jest.Mock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute });
+  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
 }
 
 /** Ligne minimale d'annonce mise en avant, telle que la remonte la requête. */
@@ -63,7 +63,7 @@ describe("recruitment-service", () => {
             active: 1,
           },
         ],
-      ]);
+      ] as never);
       await mockDb(execute);
 
       const result = await listRecruitmentAds();
@@ -87,7 +87,7 @@ describe("recruitment-service", () => {
     });
 
     it("includes inactive ads when asked (admin view)", async () => {
-      const execute = jest.fn().mockResolvedValue([[]]);
+      const execute = jest.fn().mockResolvedValue([[]] as never);
       await mockDb(execute);
       await listRecruitmentAds(true);
       expect(execute.mock.calls[0][0]).not.toContain("WHERE active = 1");
@@ -95,7 +95,7 @@ describe("recruitment-service", () => {
 
     it("returns [] when the database is unreachable", async () => {
       const { getDatabase } = await import("@/lib/server/database");
-      (getDatabase as jest.Mock).mockRejectedValue(new Error("down"));
+      (getDatabase as jest.Mock).mockRejectedValue(new Error("down") as never);
       expect(await listRecruitmentAds()).toEqual([]);
     });
   });
@@ -116,7 +116,7 @@ describe("recruitment-service", () => {
             active: 1,
           },
         ],
-      ]);
+      ] as never);
       await mockDb(execute);
       const ad = await getHighlightedAd();
       expect(ad?.id).toBe(5);
@@ -124,7 +124,7 @@ describe("recruitment-service", () => {
     });
 
     it("returns null when there is nothing to highlight", async () => {
-      await mockDb(jest.fn().mockResolvedValue([[]]));
+      await mockDb(jest.fn().mockResolvedValue([[]] as never));
       expect(await getHighlightedAd()).toBeNull();
     });
 
@@ -136,7 +136,7 @@ describe("recruitment-service", () => {
           { ...HIGHLIGHT_ROW, id: 8, highlight: "MODAL" },
           { ...HIGHLIGHT_ROW, id: 9, highlight: "BANNER" },
         ],
-      ]);
+      ] as never);
       await mockDb(execute);
       expect((await getHighlightedAd())?.id).toBe(7);
     });
@@ -145,10 +145,10 @@ describe("recruitment-service", () => {
       // Garde-fou anti-divergence : la route et les badges de gestion doivent
       // désigner la même annonce, sur exactement les mêmes données.
       const rows = [
-        { ...HIGHLIGHT_ROW, id: 3, highlight: "BANNER" },
-        { ...HIGHLIGHT_ROW, id: 4, highlight: "MODAL" },
+        { ...HIGHLIGHT_ROW, id: 3, highlight: "BANNER" as const },
+        { ...HIGHLIGHT_ROW, id: 4, highlight: "MODAL" as const },
       ];
-      await mockDb(jest.fn().mockResolvedValue([rows]));
+      await mockDb(jest.fn().mockResolvedValue([rows] as never));
       const served = await getHighlightedAd();
       const expected = selectHighlightedAd(
         rows.map((r) => ({ ...r, active: Boolean(r.active), id: r.id })),
@@ -159,7 +159,7 @@ describe("recruitment-service", () => {
 
   describe("createRecruitmentAd", () => {
     it("inserts and returns the new ad", async () => {
-      const execute = jest.fn().mockResolvedValue([{ insertId: 9 }]);
+      const execute = jest.fn().mockResolvedValue([{ insertId: 9 }] as never);
       await mockDb(execute);
       const ad = await createRecruitmentAd({ title: "Recherche caster", domain: "CASTING" });
       expect(ad.id).toBe(9);
@@ -169,7 +169,7 @@ describe("recruitment-service", () => {
     });
 
     it("persists the contact tags (Discord id, preferred channel)", async () => {
-      const execute = jest.fn().mockResolvedValue([{ insertId: 10 }]);
+      const execute = jest.fn().mockResolvedValue([{ insertId: 10 }] as never);
       await mockDb(execute);
       const ad = await createRecruitmentAd({
         title: "Recherche arbitre",
@@ -203,8 +203,8 @@ describe("recruitment-service", () => {
       // affectedRows, donc l'enregistrement identique doit réussir.
       const execute = jest
         .fn()
-        .mockResolvedValueOnce([[{ id: 3 }]]) // SELECT existence
-        .mockResolvedValueOnce([{ affectedRows: 0 }]); // UPDATE no-op
+        .mockResolvedValueOnce([[{ id: 3 }]] as never) // SELECT existence
+        .mockResolvedValueOnce([{ affectedRows: 0 }] as never); // UPDATE no-op
       await mockDb(execute);
 
       const ad = await updateRecruitmentAd(3, { title: "Inchangé" });
@@ -214,7 +214,7 @@ describe("recruitment-service", () => {
     });
 
     it("throws NOT_FOUND when the ad does not exist", async () => {
-      await mockDb(jest.fn().mockResolvedValueOnce([[]]));
+      await mockDb(jest.fn().mockResolvedValueOnce([[]] as never));
       await expect(updateRecruitmentAd(999, { title: "X" })).rejects.toThrow(
         "RECRUITMENT_NOT_FOUND",
       );
@@ -232,14 +232,14 @@ describe("recruitment-service", () => {
 
   describe("deleteRecruitmentAd", () => {
     it("deletes an existing ad", async () => {
-      const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }]);
+      const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
       await mockDb(execute);
       await expect(deleteRecruitmentAd(4)).resolves.toBeUndefined();
       expect(execute).toHaveBeenCalledWith(expect.stringContaining("DELETE"), [4]);
     });
 
     it("throws NOT_FOUND when nothing is deleted", async () => {
-      await mockDb(jest.fn().mockResolvedValue([{ affectedRows: 0 }]));
+      await mockDb(jest.fn().mockResolvedValue([{ affectedRows: 0 }] as never));
       await expect(deleteRecruitmentAd(999)).rejects.toThrow("RECRUITMENT_NOT_FOUND");
     });
   });
@@ -266,7 +266,7 @@ describe("recruitment-service — mutualisation des lectures publiques", () => {
   });
 
   it("ne lit qu'une fois la bannière pour cent arrivées simultanées", async () => {
-    const execute = jest.fn().mockResolvedValue([[HIGHLIGHT_ROW]]);
+    const execute = jest.fn().mockResolvedValue([[HIGHLIGHT_ROW]] as never);
     await mockDb(execute);
 
     const results = await Promise.all(Array.from({ length: 100 }, () => getHighlightedAd()));
@@ -276,7 +276,7 @@ describe("recruitment-service — mutualisation des lectures publiques", () => {
   });
 
   it("ne lit qu'une fois la liste publique pour cent visiteurs simultanés", async () => {
-    const execute = jest.fn().mockResolvedValue([[HIGHLIGHT_ROW]]);
+    const execute = jest.fn().mockResolvedValue([[HIGHLIGHT_ROW]] as never);
     await mockDb(execute);
 
     await Promise.all(Array.from({ length: 100 }, () => listRecruitmentAds()));
@@ -288,7 +288,7 @@ describe("recruitment-service — mutualisation des lectures publiques", () => {
     // Elle contient les brouillons : partager sa réponse sous la même clé que la
     // liste publique les servirait à tout le monde. Même règle que la portée
     // `hiddenOnly` de la liste des tournois.
-    const execute = jest.fn().mockResolvedValue([[HIGHLIGHT_ROW]]);
+    const execute = jest.fn().mockResolvedValue([[HIGHLIGHT_ROW]] as never);
     await mockDb(execute);
 
     await listRecruitmentAds(true);
@@ -300,8 +300,8 @@ describe("recruitment-service — mutualisation des lectures publiques", () => {
   it("ne sert pas la liste du staff au public", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce([[HIGHLIGHT_ROW, { ...HIGHLIGHT_ROW, id: 6, active: 0 }]])
-      .mockResolvedValueOnce([[HIGHLIGHT_ROW]]);
+      .mockResolvedValueOnce([[HIGHLIGHT_ROW, { ...HIGHLIGHT_ROW, id: 6, active: 0 }]] as never)
+      .mockResolvedValueOnce([[HIGHLIGHT_ROW]] as never);
     await mockDb(execute);
 
     const staff = await listRecruitmentAds(true);
@@ -331,7 +331,7 @@ describe("recruitment-service — mutualisation des lectures publiques", () => {
     ],
     ["deleteRecruitmentAd", () => deleteRecruitmentAd(5)],
   ])("oublie la bannière après %s", async (_name, write) => {
-    const execute = jest.fn().mockImplementation(async (sql: string) =>
+    const execute = jest.fn<any>().mockImplementation(async (sql: string) =>
       String(sql).trim().startsWith("SELECT")
         ? [[HIGHLIGHT_ROW]]
         : [{ insertId: 9, affectedRows: 1 }],

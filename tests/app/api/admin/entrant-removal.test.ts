@@ -51,7 +51,9 @@ describe("DELETE /api/admin/tournaments/[id]/registrations/[teamId]", () => {
     (removeTournamentEntrant as jest.Mock).mockResolvedValue(removed as never);
     (sendBotLog as jest.Mock).mockResolvedValue(undefined as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it.each([
     ["un administrateur", admin],

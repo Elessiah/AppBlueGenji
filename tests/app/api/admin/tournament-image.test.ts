@@ -56,14 +56,16 @@ beforeEach(() => {
   (updateTournamentImageSettings as jest.Mock).mockResolvedValue(saved as never);
   (removeTournamentImage as jest.Mock).mockResolvedValue(undefined as never);
 });
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 describe("accès", () => {
-  const calls = [
+  const calls: [string, () => Promise<Response>][] = [
     ["POST", () => POST(uploadReq({ file: pngFile() }), params())],
     ["PATCH", () => PATCH(patchReq({ fit: "COVER", focusX: 50, focusY: 50 }), params())],
     ["DELETE", () => DELETE(deleteReq(), params())],
-  ] as const;
+  ];
 
   it.each(calls)("%s rejette un visiteur anonyme avec 401", async (_, call) => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
@@ -100,7 +102,9 @@ describe("accès", () => {
 });
 
 describe("POST — pose ou remplace l'image", () => {
-  beforeEach(() => (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never));
+  beforeEach(() => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
+  });
 
   it("transmet le fichier et son cadrage, et rend l'image", async () => {
     const res = await POST(uploadReq({ file: pngFile(), fit: "CONTAIN", focusX: "10", focusY: "90" }), params());
@@ -173,7 +177,9 @@ describe("POST — pose ou remplace l'image", () => {
 });
 
 describe("PATCH — change le cadrage seul", () => {
-  beforeEach(() => (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never));
+  beforeEach(() => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
+  });
 
   it("transmet les réglages validés", async () => {
     const res = await PATCH(patchReq({ fit: "CONTAIN", focusX: 0, focusY: 100 }), params());
@@ -221,7 +227,9 @@ describe("PATCH — change le cadrage seul", () => {
 });
 
 describe("DELETE — retire l'image", () => {
-  beforeEach(() => (getCurrentUser as jest.Mock).mockResolvedValue(admin as never));
+  beforeEach(() => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+  });
 
   it("retire et rend une image nulle", async () => {
     const res = await DELETE(deleteReq(), params());

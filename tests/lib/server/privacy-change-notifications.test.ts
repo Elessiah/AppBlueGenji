@@ -61,7 +61,9 @@ describe("dispatchPrivacyChangeNotifications", () => {
     (isBotCircuitOpen as jest.Mock).mockReturnValue(false);
     (pushDiscordDirectMessages as jest.Mock).mockResolvedValue({ sent: 1, unresolved: [], failed: [] } as never);
   });
-  afterEach(() => resetPrivacyNotificationThrottle());
+  afterEach(() => {
+    resetPrivacyNotificationThrottle();
+  });
 
   it("envoie un seul message qui cumule tous les changements dus", async () => {
     const calls = fakeDb({ candidates: [candidate()] });

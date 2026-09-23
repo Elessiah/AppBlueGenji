@@ -48,8 +48,8 @@ describe("GET/PUT /api/profile", () => {
     });
 
     it("only user can update own profile", async () => {
-      const targetUserId = 1;
-      const currentUserId = 2;
+      const targetUserId: number = 1;
+      const currentUserId: number = 2;
       const canUpdate = targetUserId === currentUserId;
       expect(canUpdate).toBe(false);
     });

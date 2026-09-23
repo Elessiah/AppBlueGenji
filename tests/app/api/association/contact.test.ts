@@ -21,8 +21,12 @@ function jsonReq(body: unknown) {
 }
 
 describe("GET /api/association/contact", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("returns the contact info without auth", async () => {
     (service.getContactInfo as jest.Mock).mockResolvedValue(CONTACT as never);
@@ -33,8 +37,12 @@ describe("GET /api/association/contact", () => {
 });
 
 describe("PUT /api/association/contact", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejects anonymous users with 401", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);

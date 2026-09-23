@@ -108,8 +108,12 @@ function mockConnection(
 }
 
 describe("removeTournamentEntrant", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("verrouille la ligne du tournoi avant toute lecture", () => {
     const { sqls } = mockConnection(registrationRow());

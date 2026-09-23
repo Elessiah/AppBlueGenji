@@ -64,7 +64,7 @@ async function mockDb(
     return [[]];
   });
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute });
+  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
   return execute;
 }
 

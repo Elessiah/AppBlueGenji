@@ -50,7 +50,12 @@ describe("validateSiteCopy", () => {
     expect(validateSiteCopy("nope", "x")).toEqual({ ok: false, error: "UNKNOWN_COPY_KEY" });
   });
 
-  it.each([["", "vide"], ["   ", "espaces"], [null, "null"], [undefined, "undefined"]])(
+  it.each<[string | null | undefined, string]>([
+    ["", "vide"],
+    ["   ", "espaces"],
+    [null, "null"],
+    [undefined, "undefined"],
+  ])(
     "refuse un texte %p (%s)",
     (value) => {
       expect(validateSiteCopy("home.hero.title", value)).toEqual({

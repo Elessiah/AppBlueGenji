@@ -215,6 +215,8 @@ function fakeDb(options: {
           loserTeamId: null,
           isBye: 0,
           hasScoreInput: false,
+          team1Score: null,
+          team2Score: null,
         });
         return [{ insertId: id }, []];
       }

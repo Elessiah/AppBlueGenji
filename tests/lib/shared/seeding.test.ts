@@ -22,6 +22,7 @@ function match(overrides: Partial<MatchScoreState> = {}): MatchScoreState {
     team2Score: null,
     winnerTeamId: null,
     forfeitTeamId: null,
+    decided: false,
     hasPendingReport: false,
     nextWinnerMatchId: null,
     nextLoserMatchId: null,

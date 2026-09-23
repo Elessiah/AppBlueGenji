@@ -1,4 +1,5 @@
 import { describe, it, expect } from "@jest/globals";
+import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import type { TournamentCard, TournamentBuckets } from "@/lib/shared/types";
 import {
   filterTournamentsByQuery,
@@ -9,14 +10,28 @@ import {
 } from "@/app/(secured)/tournois/_lib/buckets";
 
 const mockCard = (overrides?: Partial<TournamentCard>): TournamentCard => ({
-  id: "1",
+  id: 1,
   name: "Test Tournament",
   description: "A test tournament",
+  format: "SINGLE",
   game: "OW",
+  participantType: "TEAM",
   state: "UPCOMING",
+  startVisibilityAt: "2026-05-01T10:00:00Z",
+  registrationOpenAt: "2026-05-02T10:00:00Z",
+  registrationCloseAt: "2026-05-10T10:00:00Z",
   startAt: "2026-05-20T10:00:00Z",
   registeredTeams: 4,
   maxTeams: 8,
+  hasThirdPlaceMatch: false,
+  survivalRoundsBeforeFirstCut: null,
+  survivalRoundsPerCut: null,
+  phases: null,
+  matchFormat: null,
+  endurancePlayoffFormat: null,
+  registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
+  liveUrl: null,
+  image: null,
   ...overrides,
 });
 
@@ -164,22 +179,22 @@ describe("flattenBuckets", () => {
   it("remet les quatre paniers à plat dans l'ordre de lecture de la page", () => {
     const result = flattenBuckets(
       mockBuckets({
-        upcoming: [mockCard({ id: "3" })],
-        registration: [mockCard({ id: "2" })],
-        running: [mockCard({ id: "1" })],
-        finished: [mockCard({ id: "4" })],
+        upcoming: [mockCard({ id: 3 })],
+        registration: [mockCard({ id: 2 })],
+        running: [mockCard({ id: 1 })],
+        finished: [mockCard({ id: 4 })],
       }),
     );
 
-    expect(result.map((t) => t.id)).toEqual(["1", "2", "3", "4"]);
+    expect(result.map((t) => t.id)).toEqual([1, 2, 3, 4]);
   });
 
   it("préserve l'ordre interne de chaque panier", () => {
     const result = flattenBuckets(
-      mockBuckets({ finished: [mockCard({ id: "9" }), mockCard({ id: "5" })] }),
+      mockBuckets({ finished: [mockCard({ id: 9 }), mockCard({ id: 5 })] }),
     );
 
-    expect(result.map((t) => t.id)).toEqual(["9", "5"]);
+    expect(result.map((t) => t.id)).toEqual([9, 5]);
   });
 
   it("renvoie une liste vide pour des paniers vides", () => {

@@ -8,6 +8,7 @@ import { getLandingLive } from "@/lib/server/landing-service";
 import { clearCache } from "@/lib/server/cache";
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import { findBroadcastingTournament } from "@/lib/server/tournaments/live-streams";
+import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import type { TournamentBuckets, TournamentCard, TournamentFormat } from "@/lib/shared/types";
 
 function card(id: number, name: string, format: TournamentFormat = "SINGLE"): TournamentCard {
@@ -30,7 +31,10 @@ function card(id: number, name: string, format: TournamentFormat = "SINGLE"): To
     survivalRoundsPerCut: null,
     phases: null,
     matchFormat: null,
+    endurancePlayoffFormat: null,
+    registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
     liveUrl: null,
+    image: null,
   };
 }
 

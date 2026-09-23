@@ -71,7 +71,9 @@ const avatarOf = (detail: Awaited<ReturnType<typeof getTeamDetail>>, userId: num
   detail?.members.find((member) => member.userId === userId)?.avatarUrl;
 
 describe("getTeamDetail — avatar masqué sur le roster", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("masque l'avatar d'un membre qui l'a rendu privé", async () => {
     await mockDb([memberRow({ visible_avatar: 0 })]);

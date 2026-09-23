@@ -167,6 +167,13 @@ describe("endurancePlayoffLinks — accordé sur ce que crée le moteur", () => 
     nextLoserSlot: null,
     scoreDeadlineAt: null,
     updatedAt: "2026-01-01T00:00:00.000Z",
+    doubleForfeit: false,
+    phaseId: 0,
+    phasePosition: null,
+    startAt: null,
+    liveTrigger: null,
+    liveUrl: null,
+    liveStartedAt: null,
     ...overrides,
   });
 
@@ -246,7 +253,9 @@ describe("endurancePlayoffLinks — accordé sur ce que crée le moteur", () => 
     let nextId = 200;
     (createMatch as jest.Mock).mockImplementation(async () => (nextId += 1) as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("relie chaque quart au demi que le service lui a effectivement créé", async () => {
     const conn = makeConn();

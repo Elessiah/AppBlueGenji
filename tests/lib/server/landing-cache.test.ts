@@ -13,8 +13,12 @@ import {
  * l'effacement laisserait l'appel se faire dans le vide.
  */
 describe("cache de la vitrine", () => {
-  beforeEach(() => clearCache());
-  afterEach(() => clearCache());
+  beforeEach(() => {
+    clearCache();
+  });
+  afterEach(() => {
+    clearCache();
+  });
 
   it("mutualise les lectures d'une même clé", async () => {
     const loader = jest.fn(async () => "valeur");

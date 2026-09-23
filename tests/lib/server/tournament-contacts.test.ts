@@ -46,7 +46,9 @@ function fakeDb(rows: ContactRow[], state: string | null = "RUNNING") {
   return { execute };
 }
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+});
 
 describe("loadTournamentContacts", () => {
   it("groupe par engagé et signale ceux qu'on ne peut pas joindre", async () => {

@@ -75,8 +75,12 @@ function posedAnything(conn: { execute: jest.Mock }): boolean {
   );
 }
 
-beforeEach(() => jest.clearAllMocks());
-afterEach(() => jest.restoreAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 describe("reconcileEndurance sur un tournoi terminé", () => {
   function enduranceRow(overrides: Row = {}): Row {

@@ -59,6 +59,7 @@ function viewerWith(overrides: Partial<TournamentViewerContext> = {}): Tournamen
   return {
     canRegister: false,
     canRegisterEntrant: true,
+    registrationBlock: null,
     myTeamId: null,
     canCreateReportsForTeamIds: [],
     isAdmin: false,

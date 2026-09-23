@@ -56,11 +56,13 @@ function fakeConnection(phaseId = 0, phaseState = "FINISHED") {
   return { conn, writes };
 }
 
-const phaseReopen = (writes: { sql: string }[]) =>
+const phaseReopen = (writes: { sql: string; params: unknown[] }[]) =>
   writes.find((w) => w.sql.startsWith("UPDATE bg_tournament_phases SET state = 'RUNNING'"));
 
 describe("adminResolveMatch — correction qui rouvre une exemption", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("rouvre le tournoi quand la cascade a rouvert une rencontre close", async () => {
     (detachDownstreamOutcome as jest.Mock).mockResolvedValue(1 as never);

@@ -33,7 +33,9 @@ describe("POST /api/tournaments — mode Survie", () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
     (service.createTournament as jest.Mock).mockResolvedValue(42 as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("accepte le format SURVIVAL et transmet survivalRoundsPerCut", async () => {
     const res = await POST(jsonReq({ ...base, format: "SURVIVAL", survivalRoundsPerCut: 3 }));

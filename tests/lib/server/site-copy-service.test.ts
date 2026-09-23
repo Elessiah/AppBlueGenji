@@ -7,7 +7,7 @@ jest.mock("@/lib/server/database");
 
 async function mockDb(execute: jest.Mock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute });
+  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
 }
 
 describe("getSiteCopy", () => {
@@ -17,10 +17,12 @@ describe("getSiteCopy", () => {
     jest.clearAllMocks();
     clearCache();
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("sert les défauts quand rien n'est enregistré", async () => {
-    const execute = jest.fn().mockResolvedValue([[]]);
+    const execute = jest.fn().mockResolvedValue([[]] as never);
     await mockDb(execute);
 
     await expect(getSiteCopy()).resolves.toEqual(defaultSiteCopy());
@@ -29,7 +31,7 @@ describe("getSiteCopy", () => {
   it("écrase le défaut par la valeur enregistrée", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValue([[{ setting_key: "copy_home.hero.title", setting_value: "Nouveau titre" }]]);
+      .mockResolvedValue([[{ setting_key: "copy_home.hero.title", setting_value: "Nouveau titre" }]] as never);
     await mockDb(execute);
 
     const copy = await getSiteCopy();
@@ -42,14 +44,14 @@ describe("getSiteCopy", () => {
   it("ignore une valeur vide en base plutôt que de vider la page", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValue([[{ setting_key: "copy_home.hero.title", setting_value: "   " }]]);
+      .mockResolvedValue([[{ setting_key: "copy_home.hero.title", setting_value: "   " }]] as never);
     await mockDb(execute);
 
     expect((await getSiteCopy())["home.hero.title"]).toBe(defaultSiteCopy()["home.hero.title"]);
   });
 
   it("retombe sur les défauts si la base est injoignable", async () => {
-    const execute = jest.fn().mockRejectedValue(new Error("DB_DOWN"));
+    const execute = jest.fn().mockRejectedValue(new Error("DB_DOWN") as never);
     await mockDb(execute);
 
     await expect(getSiteCopy()).resolves.toEqual(defaultSiteCopy());
@@ -63,13 +65,15 @@ describe("setSiteCopy", () => {
     jest.clearAllMocks();
     clearCache();
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("upsert la valeur normalisée puis relit l'ensemble", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce([{ affectedRows: 1 }]) // upsert
-      .mockResolvedValueOnce([[{ setting_key: "copy_home.hero.title", setting_value: "Titre" }]]);
+      .mockResolvedValueOnce([{ affectedRows: 1 }] as never) // upsert
+      .mockResolvedValueOnce([[{ setting_key: "copy_home.hero.title", setting_value: "Titre" }]] as never);
     await mockDb(execute);
 
     const copy = await setSiteCopy("home.hero.title", "  Titre  ");
@@ -100,13 +104,15 @@ describe("resetSiteCopy", () => {
     jest.clearAllMocks();
     clearCache();
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("supprime la ligne pour revenir au texte d'origine", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce([{ affectedRows: 1 }])
-      .mockResolvedValueOnce([[]]);
+      .mockResolvedValueOnce([{ affectedRows: 1 }] as never)
+      .mockResolvedValueOnce([[]] as never);
     await mockDb(execute);
 
     const copy = await resetSiteCopy("home.hero.title");

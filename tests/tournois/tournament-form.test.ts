@@ -293,6 +293,9 @@ describe("toApiPayload — réglages du match nul", () => {
         enduranceMaxRounds: null,
         matchFormat: { type: "FT", value: 3, maxMaps: 4, drawsAllowed: true },
         endurancePlayoffFormat: { type: "BO", value: 5 },
+        registrationDiscordRequirement: "ANY_PLAYER",
+        registrationBlizzardRequirement: "NONE",
+        registrationMinPlayers: 5,
         phases: null,
       }),
     } as never);

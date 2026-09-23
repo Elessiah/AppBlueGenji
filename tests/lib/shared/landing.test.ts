@@ -7,6 +7,7 @@ import {
   inferGameLabel,
   inferGameShortLabel,
 } from "@/lib/shared/landing";
+import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import type { TournamentBuckets, TournamentCard, TournamentState } from "@/lib/shared/types";
 
 describe("inferGameLabel", () => {
@@ -59,7 +60,7 @@ function card(id: number, state: TournamentState, startAt = "2026-01-04T00:00:00
     name: `Tournoi ${id}`,
     description: null,
     format: "SINGLE",
-    game: "OVERWATCH",
+    game: "OW",
     participantType: "TEAM",
     maxTeams: 8,
     registeredTeams: 4,
@@ -74,7 +75,9 @@ function card(id: number, state: TournamentState, startAt = "2026-01-04T00:00:00
     phases: null,
     matchFormat: null,
     endurancePlayoffFormat: null,
+    registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
     liveUrl: null,
+    image: null,
   };
 }
 
