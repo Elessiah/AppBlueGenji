@@ -7,8 +7,10 @@ type ExecuteMock = jest.Mock;
 
 /**
  * `transferTeamOwnership` lit deux fois les rôles (demandeur puis cible) via le
- * pool, puis écrit les deux lignes dans une transaction. Les mocks suivent cet
- * ordre : `execute` sert les lectures, `connectionExecute` les écritures.
+ * pool, puis, dans une transaction, relit le compte cible sous verrou et écrit
+ * les deux lignes. Les mocks suivent cet ordre : `execute` sert les lectures du
+ * pool, `connectionExecute` la relecture verrouillée (`alive`) puis les
+ * écritures.
  */
 async function mockDb(execute: ExecuteMock, connectionExecute?: ExecuteMock) {
   const { getDatabase } = await import("@/lib/server/database");
@@ -39,7 +41,7 @@ describe("transferTeamOwnership", () => {
     const execute = jest
       .fn()
       .mockResolvedValueOnce(member("OWNER", "CAPITAINE", "TANK")) // demandeur
-      .mockResolvedValueOnce(member("DPS")) // cible;
+      .mockResolvedValueOnce(member("DPS")); // cible
     const connectionExecute = jest.fn().mockResolvedValueOnce(alive).mockResolvedValue([{ affectedRows: 1 }]);
     const connection = await mockDb(execute, connectionExecute);
 
