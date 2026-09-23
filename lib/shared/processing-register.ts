@@ -295,7 +295,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Journal des suppressions de compte, rejoué après toute restauration",
     ],
     legalBasis: "Intérêt légitime (continuité du service)",
-    dataSubjects: ["Toutes les personnes des traitements T01 à T08"],
+    dataSubjects: ["Toutes les personnes des autres traitements du registre"],
     dataCategories: ["Copie de l'ensemble des données ci-dessus", "Journal des suppressions : identifiant et date de création du compte, date de suppression"],
     sensitiveData: "Aucune",
     retention: [
