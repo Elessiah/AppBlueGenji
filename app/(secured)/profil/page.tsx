@@ -151,7 +151,12 @@ export default function ProfilePage() {
       if (!response.ok) {
         const errorCode = payload.error || "PROFILE_LOAD_FAILED";
         if (errorCode === "PROFILE_NOT_FOUND") {
-          showError(profileErrorMessage(errorCode));
+          // Chemin de **lecture** : le repli doit l'être aussi. `PROFILE_NOT_FOUND`
+          // est nommé dans le registre, donc les deux fonctions rendent
+          // aujourd'hui la même phrase — mais le jour où ce code en sortirait,
+          // celle-ci annoncerait « La sauvegarde a échoué » à un visiteur qui
+          // vient d'ouvrir la page, le défaut même que ce registre sépare.
+          showError(profileLoadErrorMessage(errorCode));
           setTimeout(() => router.push("/"), 1500);
           return;
         }

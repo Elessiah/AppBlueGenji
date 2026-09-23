@@ -109,7 +109,24 @@ describe("profil — un échec de lecture ne s'annonce pas comme un échec de sa
   });
 
   it("et les écritures gardent le leur", () => {
-    expect([...page.matchAll(/profileErrorMessage\(/g)].length).toBeGreaterThanOrEqual(3);
+    // Les **deux** écritures du tag — la sauvegarde du formulaire et le retrait
+    // — et elles seules. Un troisième appel se trouvait sur le chemin de
+    // *chargement*, où il annonçait « La sauvegarde a échoué » le jour où le
+    // code cesserait d'être nommé : compter « au moins trois » figeait donc le
+    // défaut que cette séparation corrige.
+    expect([...page.matchAll(/profileErrorMessage\(/g)]).toHaveLength(2);
+    for (const handler of ["const onSubmit", "const onDiscordTagRemove"]) {
+      const body = page.slice(page.indexOf(handler));
+      expect(body.slice(0, body.indexOf("\n  };"))).toContain("profileErrorMessage(");
+    }
+  });
+
+  it("aucun chemin de lecture ne retombe sur le repli d'une écriture", () => {
+    // Le `load()` du `useEffect` porte les deux : son `catch` et le refus
+    // `PROFILE_NOT_FOUND` qu'il traite avant de rediriger.
+    const effect = page.slice(page.indexOf("const load = async"));
+    const body = effect.slice(0, effect.indexOf("profileLoadErrorMessage") + 30);
+    expect(body).not.toContain("profileErrorMessage(");
   });
 });
 
