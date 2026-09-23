@@ -472,7 +472,7 @@ describe("reconcileEndurance — réparation de l'arbre final", () => {
       return base(sql, params);
     });
 
-    await expect(reconcileEndurance(TOURNAMENT_ID, conn)).resolves.not.toThrow();
+    await expect(reconcileEndurance(TOURNAMENT_ID, conn)).resolves.toBeUndefined();
 
     expect(writes(conn).some((params) => params.includes(4))).toBe(true);
   });

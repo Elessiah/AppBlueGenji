@@ -35,7 +35,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
-import { isMissingTableError } from "@/lib/server/mysql-errors";
+import { ignoreMissingTable } from "@/lib/server/mysql-errors";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { publishUpdatedEvent } from "./notifications";
 
@@ -79,37 +79,33 @@ async function purgeTournamentRows(
   await connection.execute(`DELETE FROM bg_endurance_standings WHERE tournament_id = ?`, [tournamentId]);
   // Les pénalités d'endurance portent un `tournament_id` : elles font partie de
   // la liste relisible de ce qui part, comme les classements au-dessus. Sous
-  // `try` pour la même raison que les alertes arbitre : sa création est avalée
+  // `ignoreMissingTable` pour la même raison que les alertes arbitre : sa création est avalée
   // par un `catch` dans `database.ts`, et une base à qui la table manquerait
   // rendrait sinon tous les tournois indéboulonnables.
-  try {
-    await connection.execute(`DELETE FROM bg_endurance_penalties WHERE tournament_id = ?`, [
+  await ignoreMissingTable(
+    connection.execute(`DELETE FROM bg_endurance_penalties WHERE tournament_id = ?`, [
       tournamentId,
-    ]);
-  } catch (error) {
-    if (!isMissingTableError(error)) throw error;
-  }
+    ]),
+  );
   // Les rappels de match pendent aux manches, pas au tournoi : on les efface
   // avant elles, à la main comme le reste, plutôt que de compter sur la cascade
-  // de `bg_match_reminders.match_id`. Sous `try` pour la même raison que les
-  // pénalités au-dessus : une base à qui la table manque n'a aucun rappel à
-  // effacer, et ne doit pas pour autant garder tous ses tournois.
-  try {
-    await connection.execute(
+  // de `bg_match_reminders.match_id`. Sous `ignoreMissingTable` pour la même
+  // raison que les pénalités au-dessus : une base à qui la table manque n'a
+  // aucun rappel à effacer, et ne doit pas pour autant garder tous ses tournois.
+  await ignoreMissingTable(
+    connection.execute(
       `DELETE r FROM bg_match_reminders r
        JOIN bg_matches m ON m.id = r.match_id
        WHERE m.tournament_id = ?`,
       [tournamentId],
-    );
-  } catch (error) {
-    if (!isMissingTableError(error)) throw error;
-  }
+    ),
+  );
   // Même remarque pour les réservations d'alerte arbitre : elles pendent aux
   // manches, et la liste relisible de ce qui part vaut mieux qu'une cascade que
   // personne ne relit — d'autant que la création de la table est avalée par un
   // `catch` dans `database.ts`, où une contrainte manquante passerait inaperçue.
   //
-  // Sous `try`, à la différence de ses voisines, mais **pour ce seul cas** : la
+  // Sous `ignoreMissingTable`, comme les rappels et les pénalités : la
   // contrainte qui protège `bg_matches` vit sur cette table-là, donc une base
   // où le `CREATE TABLE` avalé a échoué n'a ni table ni contrainte — le
   // `DELETE` y lèverait `ER_NO_SUCH_TABLE` et rendrait *tous* les tournois
@@ -117,16 +113,14 @@ async function purgeTournamentRows(
   // effacer non plus. Toute autre erreur remonte : un interblocage, par exemple,
   // annule la transaction, et poursuivre la purge sur une transaction défaite
   // laisserait un tournoi à moitié supprimé.
-  try {
-    await connection.execute(
+  await ignoreMissingTable(
+    connection.execute(
       `DELETE a FROM bg_referee_alerts a
        JOIN bg_matches m ON m.id = a.match_id
        WHERE m.tournament_id = ?`,
       [tournamentId],
-    );
-  } catch (error) {
-    if (!isMissingTableError(error)) throw error;
-  }
+    ),
+  );
   await connection.execute(`DELETE FROM bg_matches WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(`DELETE FROM bg_tournament_phases WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(
