@@ -338,6 +338,7 @@ tournoi) et le profil du titulaire. Rien de tout cela n'entre dans
 | Modifier / retirer le logo            | ✅ | ✅   | ❌ | ❌ |
 | Inviter un joueur                     | ✅ | ✅   | ❌ | ❌ |
 | Répondre à une demande d'adhésion     | ✅ | ✅   | ❌ | ❌ |
+| Retirer une invitation envoyée        | ✅ | ✅   | ❌ | ❌ |
 | Changer les rôles d'un membre         | ✅ | ✅ \* | ❌ | ❌ |
 | Exclure un membre                     | ✅ | ✅   | ❌ | ❌ |
 | **Inscrire l'équipe à un tournoi**    | ✅ | ✅   | ❌ | ❌ |
@@ -346,6 +347,7 @@ tournoi) et le profil du titulaire. Rien de tout cela n'entre dans
 | **Retirer l'équipe d'un tournoi**      | ✅ | ✅   | ❌ | ❌ |
 | Quitter l'équipe                      | ❌ \*\* | ✅ | ✅ | — |
 | Demander à rejoindre                  | — | —     | —  | ✅ |
+| Retirer sa propre demande             | — | —     | —  | ✅ |
 
 \* Un `MANAGER` ne peut pas toucher aux rôles de l'`OWNER`
 (`targetIsOwner && !requesterIsOwner` → `FORBIDDEN`).
@@ -366,11 +368,20 @@ Règles structurelles qui tiennent quel que soit le rôle :
 - Le rôle `OWNER` ne s'attribue **jamais** par la route des rôles : il est filtré
   de toute liste soumise (`filter(role => role !== "OWNER")`). Il ne se déplace
   que par `POST /api/teams/[id]/transfer-ownership`, appelé par l'`OWNER`
-  lui-même, vers un membre existant, et jamais vers soi-même.
+  lui-même, vers un membre existant, et jamais vers soi-même — ni vers un
+  compte **supprimé** (`MEMBER_ACCOUNT_DELETED`) : l'anonymisation ne détache pas
+  de l'équipe, et l'équipe n'aurait plus personne capable de la conduire.
 - Un membre doit garder au moins un rôle (`MISSING_ROLE`).
 - Un utilisateur n'appartient qu'à **une** équipe active à la fois
   (`USER_ALREADY_IN_TEAM`) — contrôlé à la création, à l'invitation, à la
-  demande d'adhésion et à l'acceptation.
+  demande d'adhésion et à l'acceptation. L'acceptation est **atomique**
+  (`acceptIntoTeam`) : verrou sur la ligne du joueur, puis invitation réservée
+  par un `UPDATE … WHERE status = 'PENDING'` — deux acceptations simultanées ne
+  peuvent plus toutes deux passer.
+- Retirer une invitation ou une demande en attente (`cancelInvitation`,
+  `DELETE /api/invitations/[id]`) revient à qui l'a émise, au sens de l'acte :
+  la **gestion** de l'équipe pour une invitation, le **joueur** pour sa demande.
+  Le destinataire, lui, répond (`respondToInvitation`).
 - Une équipe dissoute (`deleted_at`) n'est plus gérable : son nom et son sigle
   sont libérés, ses membres détachés, mais son historique de matchs demeure.
 - Il n'existe **aucun ajout direct** d'un membre : on invite, et l'invité
