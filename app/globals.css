@@ -1182,6 +1182,12 @@ html {
   --blue-100: #dff2ff;
   --blue-300: #8fd5ff;
   --blue-500: #5ac8ff;
+  /* Le même bleu, en composantes, pour les transparences. `--blue-rgb` (89,
+     212, 255) est le bleu **hérité** et n'est pas celui-ci : les mélanger sur
+     un même contrôle pose une bordure d'une teinte sur un fond d'une autre —
+     12 points de vert d'écart —, et faisait changer de teinte la bordure d'une
+     case cochée au moment précis où le clavier s'y pose. */
+  --blue-500-rgb: 90, 200, 255;
   --blue-600: #2aa8e6;
   --blue-700: #1b6a8f;
   --blue-glow: rgba(90, 200, 255, 0.14);
@@ -1474,12 +1480,12 @@ input[type="radio"] {
    seul repère du parcours. */
 input[type="checkbox"]:hover:not(:disabled):not(:checked):not(:focus-visible),
 input[type="radio"]:hover:not(:disabled):not(:checked):not(:focus-visible) {
-  border-color: rgba(var(--blue-rgb), 0.55);
+  border-color: rgba(var(--blue-500-rgb), 0.55);
 }
 
 input[type="checkbox"]:checked,
 input[type="radio"]:checked {
-  border-color: rgba(var(--blue-rgb), 0.8);
+  border-color: rgba(var(--blue-500-rgb), 0.8);
   background-color: var(--blue-500);
   background-repeat: no-repeat;
   background-position: center;
@@ -1501,7 +1507,7 @@ input[type="checkbox"]:focus-visible,
 input[type="radio"]:focus-visible {
   outline: none;
   border-color: var(--blue-500);
-  box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.28);
+  box-shadow: 0 0 0 3px rgba(var(--blue-500-rgb), 0.28);
 }
 
 /* L'état désactivé se dit en **couleurs**, jamais en `opacity` : une opacité se
@@ -1529,8 +1535,8 @@ input[type="radio"]:disabled {
    flotterait sur un fond vide. */
 input[type="checkbox"]:disabled:checked,
 input[type="radio"]:disabled:checked {
-  border-color: rgba(var(--blue-rgb), 0.45);
-  background-color: rgba(var(--blue-rgb), 0.55);
+  border-color: rgba(var(--blue-500-rgb), 0.45);
+  background-color: rgba(var(--blue-500-rgb), 0.55);
 }
 
 /* Contrastes forcés : on rend la main au système, et c'est la seule réponse

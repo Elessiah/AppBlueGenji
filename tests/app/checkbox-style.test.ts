@@ -166,6 +166,20 @@ describe("Cases à cocher — apparence unique", () => {
     }
   });
 
+  it("tient la case sur un seul bleu, bordure et fond", () => {
+    // `--blue-rgb` (89, 212, 255) est le bleu **hérité**, `--blue-500` (#5ac8ff,
+    // 90, 200, 255) celui du thème « cyber ». Mélangés, ils posaient la bordure
+    // d'une teinte sur le fond d'une autre — et la bordure d'une case cochée
+    // changeait de teinte au moment précis où le clavier s'y posait, le focus
+    // la reprenant sur `--blue-500`. La règle qui uniformise les cases ne peut
+    // pas être celle qui garde deux bleus.
+    expect(globals).toContain("--blue-500-rgb: 90, 200, 255;");
+    const start = globals.indexOf('input[type="checkbox"],\ninput[type="radio"] {');
+    const block = globals.slice(start, globals.indexOf("/* Pastille `Coche`", start));
+    expect(block).toContain("rgba(var(--blue-500-rgb)");
+    expect(block).not.toContain("--blue-rgb");
+  });
+
   it("ne laisse pas le survol effacer le coché ni le focus", () => {
     // `:not()` compte son argument : sans ses exclusions, le survol pèse plus
     // lourd que `:checked` et `:focus-visible`, et les défait tous les deux.
