@@ -241,6 +241,13 @@ const BOX_PROPERTIES = [
   "width",
   "height",
   "padding",
+  // Tenu **exactement**, sans sa famille, là où les autres sont des familles :
+  // le raccourci défait le `margin: 0` global, mais `margin-top` aligne la case
+  // de 16 px sur la première ligne de son étiquette sans rien changer à sa
+  // boîte. C'est déjà l'exception que s'accorde le balayage des styles en ligne
+  // (`INLINE_BANNED`, plus bas) ; la refuser ici rendrait illégale en feuille la
+  // déclaration même qu'on déclare légale en ligne — donc interdirait de sortir
+  // des styles en ligne, direction que ce correctif prend partout ailleurs.
   "margin",
   "display",
   "border",
@@ -278,6 +285,16 @@ const BOX_PROPERTIES = [
 ];
 
 /**
+ * Les propriétés tenues **au nom exact**, quand toutes les autres le sont en
+ * famille (`border` attrape `border-color`, `background` attrape
+ * `background-image`…). Une seule y figure, et pour la raison qui vaut déjà en
+ * ligne : `margin-top` n'habille pas la case, il l'aligne sur la première ligne
+ * de son étiquette, et dépend donc de la taille du texte d'à côté — aucune
+ * règle globale ne peut le prendre à la place d'un écran.
+ */
+const EXACT_PROPERTIES = new Set(["margin"]);
+
+/**
  * Un `input` sans `[type=…]` accolé : ce compound-là attrape les cases. La
  * parenthèse ouvrante compte parmi les débuts possibles — `:is(input, textarea)`
  * vise l'élément nu tout autant que `.x input`.
@@ -290,9 +307,21 @@ type Offender = { file: string; selector: string };
  * Le compound sort-il **les deux** contrôles ? L'exclusion ne vaut que dans un
  * `:not(…)` : un `:is([type="checkbox"], [type="radio"])` nomme les mêmes types
  * pour mieux les viser, et pèse alors plus lourd que la règle globale.
+ *
+ * Et elle ne vaut que **chaînée**, un `:not()` par type : la liste dans un
+ * `:not()` est du Sélecteurs 4, et un moteur qui ne la comprend pas jette la
+ * règle **entière** — le `.field textarea` qui la partage avec elle. C'est la
+ * raison écrite dans `app/globals.css` au-dessus de la règle des cases ; la
+ * bénir ici, c'était laisser passer la forme que le projet s'interdit, et une
+ * garde qui autorise ce que sa propre justification refuse ne garde rien. Un
+ * `:not(…)` portant une virgule est donc **ignoré** : le compound retombe sur
+ * l'`input` nu et le balayage le signale.
  */
 function excludesBoth(compound: string): boolean {
-  const negated = [...compound.matchAll(/:not\(([^()]*)\)/g)].map((m) => m[1]).join(" ");
+  const negated = [...compound.matchAll(/:not\(([^()]*)\)/g)]
+    .map((m) => m[1])
+    .filter((inner) => !inner.includes(","))
+    .join(" ");
   return negated.includes('[type="checkbox"]') && negated.includes('[type="radio"]');
 }
 
@@ -362,7 +391,9 @@ function bareInputOffenders(path: string, css: string): Offender[] {
       .filter((compound) => BARE_INPUT.test(compound) && !excludesBoth(compound));
     if (bare.length === 0) continue;
     const declares = BOX_PROPERTIES.some((property) =>
-      new RegExp(`(^|[;{\\s])${property}[\\w-]*\\s*:`).test(body),
+      new RegExp(
+        `(^|[;{\\s])${property}${EXACT_PROPERTIES.has(property) ? "(?![\\w-])" : "[\\w-]*"}\\s*:`,
+      ).test(body),
     );
     if (declares) {
       offenders.push({ file: relative(ROOT, path), selector: bare.join(", ") });
@@ -400,6 +431,14 @@ describe("Cases à cocher — aucune feuille ne redéfinit l'apparence", () => {
     expect(bareInputOffenders("x.css", '.a input[type="checkbox"] { width: auto; }')).toEqual([]);
     const excluded = '.a input:not([type="checkbox"]):not([type="radio"]) { width: auto; }';
     expect(bareInputOffenders("x.css", excluded)).toEqual([]);
+    // La **liste** dans un `:not()` ne vaut pas exclusion : un moteur qui ne la
+    // comprend pas jette la règle entière, ce que le projet s'interdit — la
+    // garde doit donc refuser la forme que sa propre justification refuse.
+    const listForm = '.a input:not([type="checkbox"], [type="radio"]) { width: auto; }';
+    expect(bareInputOffenders("x.css", listForm)).toHaveLength(1);
+    // Et une liste ne sauve pas davantage une chaîne à moitié écrite.
+    const mixed = '.a input:not([type="checkbox"], .x):not([type="radio"]) { width: auto; }';
+    expect(bareInputOffenders("x.css", mixed)).toHaveLength(1);
     // Nommer les deux types pour mieux les **viser** n'est pas les exclure.
     const targeted = '.a input:is([type="checkbox"], [type="radio"]) { width: auto; }';
     expect(bareInputOffenders("x.css", targeted)).toHaveLength(1);
@@ -431,6 +470,16 @@ describe("Cases à cocher — aucune feuille ne redéfinit l'apparence", () => {
     expect(bareInputOffenders("x.css", twoInputs)).toHaveLength(1);
     // Et une taille minimale étire la case hors de sa boîte de 16 px.
     expect(bareInputOffenders("x.css", ".a input { min-height: 44px; }")).toHaveLength(1);
+    // `margin` est tenu au nom exact, comme en ligne : le raccourci défait le
+    // `margin: 0` global…
+    expect(bareInputOffenders("x.css", ".a input { margin: 4px; }")).toHaveLength(1);
+    // …mais `margin-top` aligne la case sur sa première ligne de texte sans
+    // toucher à sa boîte. Le refuser en feuille alors qu'on l'accorde en ligne
+    // interdirait justement de sortir un style en ligne vers une feuille.
+    expect(bareInputOffenders("x.css", ".a input { margin-top: 2px; }")).toEqual([]);
+    // La famille reste la règle pour les autres : `border-color` refait la case
+    // décochée à lui seul.
+    expect(bareInputOffenders("x.css", ".a input { border-color: red; }")).toHaveLength(1);
     // Un `transform` ne collisionne pas, il se **compose** : la case garde ses
     // 16 px et s'affiche plus grande, sans qu'aucune déclaration ne se perde.
     expect(bareInputOffenders("x.css", ".a input { transform: scale(1.5); }")).toHaveLength(1);
