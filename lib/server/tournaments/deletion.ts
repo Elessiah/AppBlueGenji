@@ -79,9 +79,9 @@ async function purgeTournamentRows(
   await connection.execute(`DELETE FROM bg_endurance_standings WHERE tournament_id = ?`, [tournamentId]);
   // Les pénalités d'endurance portent un `tournament_id` : elles font partie de
   // la liste relisible de ce qui part, comme les classements au-dessus. Sous
-  // `ignoreMissingTable` pour la même raison que les alertes arbitre : sa création est avalée
-  // par un `catch` dans `database.ts`, et une base à qui la table manquerait
-  // rendrait sinon tous les tournois indéboulonnables.
+  // `ignoreMissingTable` pour la même raison que les alertes arbitre : sa
+  // création est avalée par un `catch` dans `database.ts`, et une base à qui la
+  // table manquerait rendrait sinon tous les tournois indéboulonnables.
   await ignoreMissingTable(
     connection.execute(`DELETE FROM bg_endurance_penalties WHERE tournament_id = ?`, [
       tournamentId,
