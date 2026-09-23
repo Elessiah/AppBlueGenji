@@ -128,14 +128,47 @@ describe("bot-integration", () => {
   });
 
   it("resolveDiscordUser distingue un bot trop lent d'un bot injoignable", async () => {
-    // Le bot balaie ses serveurs un à un : un tag absent de tous dépasse le
-    // délai. Le rendre en « injoignable » faisait passer un joueur hors des
-    // serveurs du bot pour une panne d'infrastructure.
+    // Un bot trop chargé (ou d'avant sa recherche bornée) dépasse notre délai.
+    // Le rendre en « injoignable » faisait passer un joueur hors des serveurs
+    // du bot pour une panne d'infrastructure.
     jest
       .spyOn(global, "fetch")
       .mockRejectedValue(new DOMException("The operation timed out.", "TimeoutError"));
 
     await expect(resolveDiscordUser("keryan")).rejects.toThrow("BOT_RESOLVE_TIMEOUT");
+  });
+
+  it("resolveDiscordUser lit le 504 du bot comme une recherche expirée, pas un tag introuvable", async () => {
+    // Le bot borne sa recherche sous notre délai : à l'échéance, des serveurs
+    // n'ont pas répondu et le joueur y est peut-être.
+    jest.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ error: "BOT_RESOLVE_TIMEOUT" }), {
+        status: 504,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    await expect(resolveDiscordUser("keryan")).rejects.toThrow("BOT_RESOLVE_TIMEOUT");
+  });
+
+  it("resolveDiscordUser se fie au statut 504, quel que soit le corps", async () => {
+    // Un relais qui répond à la place du bot n'écrit pas notre code d'erreur.
+    jest
+      .spyOn(global, "fetch")
+      .mockResolvedValue(new Response("<html>Gateway Timeout</html>", { status: 504 }));
+
+    await expect(resolveDiscordUser("keryan")).rejects.toThrow("BOT_RESOLVE_TIMEOUT");
+  });
+
+  it("resolveDiscordUser garde le code du bot sur une autre erreur", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ error: "INTERNAL_RESOLVE_ERROR" }), {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    await expect(resolveDiscordUser("keryan")).rejects.toThrow("INTERNAL_RESOLVE_ERROR");
   });
 
   it("sendDiscordLoginCode ne rend pas son délai dépassé en échec de recherche", async () => {
