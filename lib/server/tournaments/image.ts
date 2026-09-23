@@ -24,11 +24,10 @@ import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
 import {
   DEFAULT_IMAGE_SETTINGS,
-  parseTournamentImage,
   type TournamentImage,
   type TournamentImageSettings,
 } from "@/lib/shared/tournament-image";
-import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
+import { localUploadUrl, toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 import { publishUpdatedEvent } from "./notifications";
 
 type ImageRow = RowDataPacket & { image_url: string | null };
@@ -69,9 +68,11 @@ async function withLockedImage(
 
 /** Efface un fichier désormais inutile ; un échec se journalise sans remonter. */
 async function discardFile(url: string | null): Promise<void> {
-  await deleteStoredImage(toDiskUploadPath(url)).catch((error: unknown) => {
+  try {
+    await deleteStoredImage(toDiskUploadPath(url));
+  } catch (error) {
     console.error(`[tournaments] fichier d'image non effacé (${url})`, error);
-  });
+  }
 }
 
 /**
@@ -119,7 +120,10 @@ export async function updateTournamentImageSettings(
   settings: TournamentImageSettings,
 ): Promise<TournamentImage> {
   const url = await withLockedImage(tournamentId, async (connection, previousUrl) => {
-    if (previousUrl === null) throw new Error("TOURNAMENT_IMAGE_MISSING");
+    // Jugé sur l'URL **filtrée** (`localUploadUrl`), comme toute lecture : une
+    // adresse étrangère restée en base ne s'affiche pas, il n'y a donc rien à
+    // cadrer — et le refus doit tomber avant l'écriture, pas après.
+    if (localUploadUrl(previousUrl) === null) throw new Error("TOURNAMENT_IMAGE_MISSING");
     await connection.execute(
       `UPDATE bg_tournaments SET image_fit = ?, image_focus_x = ?, image_focus_y = ? WHERE id = ?`,
       [settings.fit, settings.focusX, settings.focusY, tournamentId],
@@ -127,11 +131,7 @@ export async function updateTournamentImageSettings(
   });
 
   publishUpdatedEvent(tournamentId);
-  // `parseTournamentImage` plutôt qu'un objet recomposé : l'URL relue passe par
-  // le même filtre de sortie que toute lecture.
-  const image = parseTournamentImage(url, settings.fit, settings.focusX, settings.focusY);
-  if (image === null) throw new Error("TOURNAMENT_IMAGE_MISSING");
-  return image;
+  return { url: url as string, ...settings };
 }
 
 /**

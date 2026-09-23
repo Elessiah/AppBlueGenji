@@ -162,9 +162,11 @@ export async function deleteTournament(tournamentId: number): Promise<DeletedTou
 
     // Après le commit, jamais avant : un `unlink` ne se défait pas. Un échec
     // de ménage ne défait pas la suppression, déjà acquise — il se journalise.
-    await deleteStoredImage(imagePath).catch((error: unknown) => {
+    try {
+      await deleteStoredImage(imagePath);
+    } catch (error) {
       console.error(`[tournaments] image du tournoi ${tournamentId} non effacée`, error);
-    });
+    }
 
     // Même point de passage que toute autre écriture (`./notifications`), et il
     // suffit : il vide l'instantané, l'aperçu et les listes — sans quoi le
