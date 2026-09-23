@@ -30,6 +30,13 @@ export interface BotDocSection {
   summary: string;
   /** Chemin du fichier, relatif à la racine du projet du bot. */
   file: string;
+  /**
+   * Réservée au staff (au moins un rôle de permission de plateforme). Ces
+   * pages décrivent le fonctionnement interne du bot (API, base de données,
+   * commandes d'adhésion réservées aux serveurs BlueGenji) et n'ont rien à
+   * dire à un visiteur sans rôle. Absent ou `false` = publique.
+   */
+  staffOnly?: boolean;
 }
 
 /**
@@ -51,6 +58,7 @@ export const BOT_DOC_SECTIONS: BotDocSection[] = [
     eyebrow: "SERVEURS BLUEGENJI",
     summary: "Envoi des documents d'adhésion, rappels et validations.",
     file: "doc/adhesions-commands-user.md",
+    staffOnly: true,
   },
   {
     slug: "api-interne",
@@ -58,6 +66,7 @@ export const BOT_DOC_SECTIONS: BotDocSection[] = [
     eyebrow: "INTÉGRATION · EXPRESS",
     summary: "Endpoints HTTP consommés par la plateforme.",
     file: "doc/internal-api.md",
+    staffOnly: true,
   },
   {
     slug: "architecture",
@@ -65,6 +74,7 @@ export const BOT_DOC_SECTIONS: BotDocSection[] = [
     eyebrow: "TECHNIQUE · MAIN",
     summary: "Client Discord, intents et listeners du bot.",
     file: "doc/main.md",
+    staffOnly: true,
   },
   {
     slug: "base-de-donnees",
@@ -72,6 +82,7 @@ export const BOT_DOC_SECTIONS: BotDocSection[] = [
     eyebrow: "TECHNIQUE · SQLITE",
     summary: "Tables, messages dupliqués et salons partenaires.",
     file: "doc/src/Bdd.md",
+    staffOnly: true,
   },
   {
     slug: "user-guide-en",
@@ -82,7 +93,49 @@ export const BOT_DOC_SECTIONS: BotDocSection[] = [
   },
 ];
 
-export function findBotDocSection(slug: string | undefined): BotDocSection | null {
-  const wanted = slug ?? BOT_DOC_SECTIONS[0].slug;
-  return BOT_DOC_SECTIONS.find((s) => s.slug === wanted) ?? null;
+/** Sous-ensemble visible par un visiteur sans rôle de permission de plateforme. */
+export function visibleBotDocSections(isStaff: boolean): BotDocSection[] {
+  return isStaff ? BOT_DOC_SECTIONS : BOT_DOC_SECTIONS.filter((s) => !s.staffOnly);
 }
+
+/**
+ * Résout un slug vers sa section, en respectant la même frontière que la nav :
+ * une page réservée au staff n'existe pas pour qui n'a aucun rôle — un `null`
+ * ici mène au même 404 qu'un slug inconnu, jamais à un refus qui confirmerait
+ * son existence.
+ */
+export function findBotDocSection(slug: string | undefined, isStaff: boolean): BotDocSection | null {
+  const wanted = slug ?? BOT_DOC_SECTIONS[0].slug;
+  const section = BOT_DOC_SECTIONS.find((s) => s.slug === wanted) ?? null;
+  if (section?.staffOnly && !isStaff) return null;
+  return section;
+}
+
+/**
+ * Un document légal, publié à sa propre adresse (`app/privacy-policy-bot`,
+ * `app/terms-of-service-bot`) plutôt que servi par `/bot/docs` : ce ne sont pas
+ * des fichiers Markdown relus chez le bot, mais des pages du site. Elles
+ * occupent la place laissée par les quatre pages techniques masquées au
+ * visiteur sans rôle — la seule doc du bot qui le concerne vraiment.
+ */
+export interface BotLegalLink {
+  slug: string;
+  title: string;
+  summary: string;
+  href: string;
+}
+
+export const BOT_LEGAL_LINKS: readonly BotLegalLink[] = [
+  {
+    slug: "confidentialite",
+    title: "Politique de confidentialité",
+    summary: "Données collectées par le bot, leur usage et leur durée de conservation.",
+    href: "/privacy-policy-bot",
+  },
+  {
+    slug: "conditions",
+    title: "Conditions d'utilisation",
+    summary: "Règles d'usage du bot, éligibilité et résiliation d'accès.",
+    href: "/terms-of-service-bot",
+  },
+];

@@ -145,3 +145,17 @@ export function canAny(
 ): boolean {
   return permissions.some((permission) => can(user, permission));
 }
+
+/**
+ * Vrai si l'utilisateur porte au moins un rôle de permission de plateforme
+ * (`ADMIN` compris). Sert à distinguer le staff — qui gère un domaine ou un
+ * autre, peu importe lequel — d'un simple visiteur ou joueur : pas un domaine
+ * précis, juste « a un rôle sur le site ».
+ */
+export function isStaffMember(
+  user: { roles?: readonly PlatformRole[]; isAdmin?: boolean } | null | undefined,
+): boolean {
+  if (!user) return false;
+  if (user.isAdmin) return true;
+  return (user.roles?.length ?? 0) > 0;
+}
