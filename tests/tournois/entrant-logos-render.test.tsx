@@ -242,3 +242,32 @@ describe("vues du tournoi — le nom d'un engagé porte son emblème", () => {
     expect(page).toContain("logos={entrantLogos}");
   });
 });
+
+describe("emblème — alignement et cas limites", () => {
+  const ROOT = join(__dirname, "..", "..");
+  const COMPONENTS = join(ROOT, "app", "(secured)", "tournois", "[id]", "_components");
+  const read = (file: string) => readFileSync(join(COMPONENTS, file), "utf8");
+  const stripComments = (code: string) => code.replace(/\/\*[\s\S]*?\*\//g, "");
+
+  it("aligne le conteneur sur la ligne de base du nom, l'emblème à part", () => {
+    // À côté d'un seed ou d'un « Vainqueur : », c'est la première ligne du nom
+    // qui fait foi, même quand il passe à la ligne ; une image n'a pas de ligne
+    // de base, l'emblème se centre donc seul.
+    const css = stripComments(read("EntrantName.module.css"));
+    const label = css.slice(css.indexOf(".label {"));
+
+    expect(label.slice(0, label.indexOf("}"))).toContain("align-items: baseline");
+    expect(css).toMatch(/\.label > \.logo \{\s*align-self: center;/);
+  });
+
+  it("garde le seed de l'aperçu sur la première ligne du nom", () => {
+    expect(read("BracketPreview.tsx")).toContain('alignItems: "baseline", gap: 8');
+  });
+
+  it("ne réserve pas de case blanche devant le libellé d'un côté vide du dialogue de score", () => {
+    expect(stripComments(read("AdminScoreDialog.tsx"))).toContain(
+      "{teamId !== null && <EntrantLogo teamId={teamId}",
+    );
+  });
+});
+

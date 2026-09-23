@@ -41,13 +41,21 @@
   border-color: transparent;
 }
 
+/* Le conteneur s'aligne sur la **ligne de base du nom** : à côté d'un seed ou
+   d'un « Vainqueur : », c'est la première ligne du nom qui fait foi, même quand
+   il passe à la ligne. L'emblème, qui n'a pas de texte à aligner (une image n'a
+   pas de ligne de base), se centre à part. */
 .label {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 6px;
   min-width: 0;
   max-width: 100%;
   vertical-align: middle;
+}
+
+.label > .logo {
+  align-self: center;
 }
 
 .text {

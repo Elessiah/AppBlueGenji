@@ -41,8 +41,13 @@ les inscrites.
 ## Ce qui ne casse pas l'interface
 
 - **Hauteur des cartes inchangée** : l'emblème de 16 px tient dans la ligne de
-  texte de 13 px, si bien qu'une ligne de match reste à 26,8 px — les
-  connecteurs de l'arbre, calés sur des emplacements fixes, ne bougent pas.
+  texte de 13 px, si bien qu'une ligne de match reste à ~27 px (26,8 px avant,
+  l'écart est sous le pixel) — les connecteurs de l'arbre, calés sur des
+  emplacements fixes de 140 px, ne bougent pas.
+- **Ligne de base** : le conteneur s'aligne sur la première ligne du nom (le
+  seed de l'aperçu reste en face d'elle même quand le nom passe à la ligne) ;
+  l'emblème, sans ligne de base, se centre à part. Le dialogue de score ne
+  réserve pas de case sur un côté vide, où elle ne ferait qu'un retrait blanc.
 - **Alignement** : une case vide (TBD, exemption) réserve la place de l'emblème
   sans rien dessiner, pour que les deux noms d'une carte commencent au même
   endroit.

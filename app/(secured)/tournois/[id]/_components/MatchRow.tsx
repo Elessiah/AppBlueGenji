@@ -145,8 +145,6 @@ export function MatchRow({
         </strong>
       </div>
       <div style={rowStyle(team2Win)}>
-        {/* Emblème compris : il garde sa case même sur une ligne vide (TBD,
-            BYE), pour que les deux noms de la carte commencent au même endroit. */}
         <EntrantName
           teamId={match.team2Id}
           name={team2Display}

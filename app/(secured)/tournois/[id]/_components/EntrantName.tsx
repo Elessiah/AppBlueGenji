@@ -6,8 +6,8 @@ import { avatarInitial } from "@/lib/shared/avatar";
 import { EntrantLink, useEntrantLogo } from "../_lib/entrant-link";
 import styles from "./EntrantName.module.css";
 
-/** Côtés d'emblème en usage : 16 px dans une ligne de texte, plus grand en exergue. */
-export type EntrantLogoSize = 16 | 20 | 24;
+/** Côtés d'emblème en usage : 16 px dans une ligne de texte, 20 px en exergue. */
+export type EntrantLogoSize = 16 | 20;
 
 type EntrantLogoProps = {
   /** Engagé représenté ; `null` pour une case vide (TBD, exemption). */

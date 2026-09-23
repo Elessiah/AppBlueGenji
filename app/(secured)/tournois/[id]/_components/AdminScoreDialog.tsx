@@ -51,8 +51,9 @@ function ScoreStepper({ id, teamId, teamName, value, max, disabled, onChange }: 
     <div>
       <label className={styles.sideLabel} htmlFor={id}>
         {/* L'emblème est décoratif : le nom accessible du champ reste le nom
-            de l'équipe, écrit juste à côté. */}
-        <EntrantLogo teamId={teamId} name={teamName} size={20} />
+            de l'équipe, écrit juste à côté. Pas de case réservée sur un côté
+            vide : seule, elle ne ferait qu'un retrait blanc devant le libellé. */}
+        {teamId !== null && <EntrantLogo teamId={teamId} name={teamName} size={20} />}
         <span className={styles.sideLabelText}>{teamName}</span>
       </label>
       <div className={styles.stepper}>

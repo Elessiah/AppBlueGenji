@@ -52,7 +52,7 @@ function EntrantCell({ pairing, side }: { pairing: PreviewPairing; side: "A" | "
   }
 
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+    <span style={{ display: "inline-flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
       <span className="num" style={{ fontSize: 11, color: "var(--text-2)" }}>
         #{entrant.seed}
       </span>
