@@ -39,19 +39,19 @@ describe("teams-service", () => {
 
   describe("team member management", () => {
     it("OWNER can add members", () => {
-      const requesterRole = "OWNER";
+      const requesterRole: string = "OWNER";
       const canAdd = requesterRole === "OWNER" || requesterRole === "CAPITAINE";
       expect(canAdd).toBe(true);
     });
 
     it("CAPITAINE can add members", () => {
-      const requesterRole = "CAPITAINE";
+      const requesterRole: string = "CAPITAINE";
       const canAdd = requesterRole === "OWNER" || requesterRole === "CAPITAINE";
       expect(canAdd).toBe(true);
     });
 
     it("DPS cannot add members", () => {
-      const requesterRole = "DPS";
+      const requesterRole: string = "DPS";
       const canAdd = requesterRole === "OWNER" || requesterRole === "CAPITAINE";
       expect(canAdd).toBe(false);
     });
@@ -111,15 +111,15 @@ describe("teams-service", () => {
     });
 
     it("OWNER can remove any member except self", () => {
-      const requesterRole = "OWNER";
-      const targetRole = "DPS";
+      const requesterRole: string = "OWNER";
+      const targetRole: string = "DPS";
       const targetIsOwner = targetRole === "OWNER";
       const canRemove = requesterRole === "OWNER" && !targetIsOwner;
       expect(canRemove).toBe(true);
     });
 
     it("non-OWNER cannot remove others", () => {
-      const requesterRole = "DPS";
+      const requesterRole: string = "DPS";
       const targetRole = "TANK";
       const requesterIsTarget = false;
       const canRemove = requesterIsTarget || requesterRole === "OWNER";

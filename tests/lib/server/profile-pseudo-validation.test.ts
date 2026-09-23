@@ -27,14 +27,18 @@ async function mockDb() {
   return execute;
 }
 
-function writtenPseudo(execute: jest.Mock): unknown {
+function writtenPseudo(execute: jest.Mock<(sql: string, params?: unknown[]) => Promise<unknown>>): unknown {
   const call = (execute.mock.calls as [string, unknown[]][]).find(([sql]) => /UPDATE bg_users/.test(sql));
   return call?.[1][0];
 }
 
 describe("updateOwnProfile — le pseudo est validé avant d'être lu", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it.each([123, null, true, ["Nova"], { pseudo: "Nova" }])(
     "refuse %p en INVALID_PSEUDO, sans toucher la base",
@@ -88,8 +92,12 @@ describe("updateOwnProfile — le pseudo est validé avant d'être lu", () => {
 });
 
 describe("updateOwnProfile — la course sur l'index unique du pseudo", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("dit « pseudo déjà pris » quand l'index tranche entre deux sauvegardes simultanées", async () => {
     // Les deux joueurs passent le `SELECT` d'unicité ; c'est l'`UPDATE` du

@@ -49,7 +49,9 @@ describe("deleteTournament", () => {
     // déborderait sur le suivant.
     (deleteStoredImage as jest.Mock).mockResolvedValue(undefined as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rend l'identité du tournoi supprimé", async () => {
     const { connection } = mockExistingTournament("Coupe d'Été");

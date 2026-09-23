@@ -8,6 +8,7 @@ import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie";
 import { createMatch } from "@/lib/server/tournaments/repository";
 import type { BracketMatch, MatchStatus } from "@/lib/shared/types";
 import { endurancePlayoffLinks } from "@/app/(secured)/tournois/[id]/_lib/endurance-sections";
+import { bracketMatch } from "../helpers/bracket-match";
 
 const ROOT = join(__dirname, "..", "..");
 const TOURNAMENT_DIR = join("app", "(secured)", "tournois", "[id]");
@@ -143,7 +144,7 @@ describe("endurancePlayoffLinks — accordé sur ce que crée le moteur", () => 
     { id: 104, match_number: 4, teams: [3, 7], winner: 3, loser: 7 },
   ];
 
-  const mockMatch = (overrides: Partial<BracketMatch>): BracketMatch => ({
+  const mockMatch = (overrides: Partial<BracketMatch>): BracketMatch => bracketMatch({
     id: 1,
     tournamentId: TOURNAMENT_ID,
     bracket: "UPPER",
@@ -246,7 +247,9 @@ describe("endurancePlayoffLinks — accordé sur ce que crée le moteur", () => 
     let nextId = 200;
     (createMatch as jest.Mock).mockImplementation(async () => (nextId += 1) as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("relie chaque quart au demi que le service lui a effectivement créé", async () => {
     const conn = makeConn();

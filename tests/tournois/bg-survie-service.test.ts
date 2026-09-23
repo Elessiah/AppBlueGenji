@@ -84,8 +84,12 @@ const ROUND_PLAYED: [string, unknown][] = [
 ];
 
 describe("initializeEnduranceTournament", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("sème le classement dans l'ordre du seeding et fige le barème", async () => {
     const conn = makeConn([
@@ -139,8 +143,12 @@ describe("initializeEnduranceTournament", () => {
 });
 
 describe("generateEnduranceRound", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("crée un match par couple et laisse l'équipe impaire au repos", async () => {
     (createMatch as jest.Mock).mockResolvedValue(77 as never);
@@ -223,8 +231,12 @@ describe("generateEnduranceRound", () => {
 });
 
 describe("startEndurancePlayoffs", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("applique le tableau imposé 8v4, 6v2, 1v5, 3v7", async () => {
     (createMatch as jest.Mock).mockResolvedValue(77 as never);
@@ -264,8 +276,12 @@ describe("startEndurancePlayoffs", () => {
 });
 
 describe("enchaînement des tours de play-offs", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   /**
    * Arbre final en place, dont le premier tour est **conforme au classement**.
@@ -363,8 +379,12 @@ describe("enchaînement des tours de play-offs", () => {
 });
 
 describe("reconcileEndurance", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("ne repose ni manche ni arbre sur un tournoi terminé", async () => {
     // Un tournoi clos rejoue bien son classement — corriger le score d'une
@@ -506,8 +526,12 @@ describe("reconcileEndurance", () => {
 });
 
 describe("reconcileEndurance — plafond de manches", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   /** Un match joué, rangé par side comme le fait la base. */
   function played(round: number, team1Id: number, team2Id: number, winnerTeamId: number) {
@@ -615,8 +639,12 @@ describe("reconcileEndurance — plafond de manches", () => {
 });
 
 describe("reconcileEndurance — réappariement après correction", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   /**
    * Manche 1 jouée (2 bat 1), manche 2 posée mais vierge. Le classement rejoué
@@ -693,8 +721,12 @@ describe("reconcileEndurance — réappariement après correction", () => {
 });
 
 describe("forfeitEnduranceTeam", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("marque l'équipe forfait et remet son capital à zéro", async () => {
     const conn = makeConn([

@@ -26,8 +26,12 @@ function params(id: string) {
 }
 
 describe("GET /api/landing/sponsors", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("returns the public list without auth", async () => {
     const sponsors = [{ id: 1, name: "X", slug: "x", tier: "GOLD", logoUrl: null, websiteUrl: null, description: null }];
@@ -40,8 +44,12 @@ describe("GET /api/landing/sponsors", () => {
 });
 
 describe("POST /api/landing/sponsors", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejects anonymous users with 401", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
@@ -73,8 +81,12 @@ describe("POST /api/landing/sponsors", () => {
 });
 
 describe("PUT /api/landing/sponsors/[id]", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejects non-admins with 403", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(normalUser as never);
@@ -130,8 +142,12 @@ describe("PUT /api/landing/sponsors/[id]", () => {
 });
 
 describe("DELETE /api/landing/sponsors/[id]", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejects anonymous users with 401", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);

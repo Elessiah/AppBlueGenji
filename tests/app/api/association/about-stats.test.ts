@@ -24,8 +24,12 @@ function params(id: string) {
 }
 
 describe("GET /api/association/about-stats", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("returns the public list without auth", async () => {
     const stats = [{ id: 1, value: "100%", label: "Bénévole" }];
@@ -38,8 +42,12 @@ describe("GET /api/association/about-stats", () => {
 });
 
 describe("POST /api/association/about-stats", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejects anonymous users with 401", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
@@ -74,8 +82,12 @@ describe("POST /api/association/about-stats", () => {
 });
 
 describe("PUT /api/association/about-stats/[id]", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejects non-admins with 403", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(normalUser as never);
@@ -110,8 +122,12 @@ describe("PUT /api/association/about-stats/[id]", () => {
 });
 
 describe("DELETE /api/association/about-stats/[id]", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejects anonymous users with 401", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);

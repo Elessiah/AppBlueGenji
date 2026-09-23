@@ -30,7 +30,9 @@ describe("POST /api/admin/tournaments/[id]/launch", () => {
     jest.clearAllMocks();
     (launchTournamentNow as jest.Mock).mockResolvedValue(launched as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it.each([
     ["un administrateur", admin],

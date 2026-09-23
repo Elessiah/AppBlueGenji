@@ -11,7 +11,6 @@ import type { PhaseFormat, PhaseState, TournamentFormat, TournamentPhase } from 
 function tournamentPhase(overrides: Partial<TournamentPhase> = {}): TournamentPhase {
   return {
     id: 1,
-    tournamentId: 1,
     position: 1,
     state: "PENDING",
     format: "SINGLE",
@@ -24,8 +23,9 @@ function tournamentPhase(overrides: Partial<TournamentPhase> = {}): TournamentPh
     survivalRoundsPerCut: 3,
     entrants: null,
     qualifiers: null,
-    skipped: false,
-    skipReason: null,
+    maxRounds: null,
+    startedAt: null,
+    finishedAt: null,
     ...overrides,
   };
 }

@@ -73,10 +73,10 @@ const TOURNAMENT_ROW = {
  * L'ordre suffit — les résolutions sont séquentielles, une entrée à la fois.
  */
 function mockDb(rows: unknown[][]): jest.Mock {
-  const execute = jest.fn<() => Promise<unknown>>();
+  const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>();
   for (const result of rows) execute.mockResolvedValueOnce([result]);
   execute.mockResolvedValue([[]]);
-  (getDatabase as jest.Mock).mockResolvedValue({ execute });
+  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
   return execute as unknown as jest.Mock;
 }
 
@@ -232,7 +232,7 @@ describe("routage vers deux transports", () => {
       sent: 0,
       unresolved: [],
       failed: [],
-    });
+    } as never);
 
     queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
     flushBotLogs(connection);
@@ -574,7 +574,7 @@ describe("réservation d'une alerte arbitre", () => {
    * et un `AUTO_INCREMENT` à chaque passage. Une lecture préalable l'écarte.
    */
   it("ne réserve pas deux fois une manche qui a déjà sa ligne", async () => {
-    const execute = jest.fn<() => Promise<unknown>>();
+    const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>();
     // La lecture trouve la réservation ; aucune écriture ne doit suivre.
     execute.mockResolvedValue([[{ 1: 1 }], []] as never);
     const connection = { execute } as unknown as PoolConnection;
@@ -592,7 +592,7 @@ describe("réservation d'une alerte arbitre", () => {
 
   // Manche vierge : la lecture ne trouve rien, la réservation est posée.
   it("réserve quand la manche n'a pas encore sa ligne", async () => {
-    const execute = jest.fn<() => Promise<unknown>>();
+    const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>();
     execute.mockResolvedValueOnce([[], []] as never);
     execute.mockResolvedValueOnce([{ affectedRows: 1, insertId: 501 }, []] as never);
     const connection = { execute } as unknown as PoolConnection;

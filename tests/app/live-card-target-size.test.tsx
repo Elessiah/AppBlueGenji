@@ -1,3 +1,4 @@
+import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { renderToStaticMarkup } from "react-dom/server";

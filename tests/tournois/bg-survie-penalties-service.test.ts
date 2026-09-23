@@ -76,7 +76,9 @@ function inserted(calls: [string, unknown[]][]): [string, unknown[]] | undefined
 }
 
 describe("applyEndurancePenalty", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("écrit la sanction sur la manche courante, motif normalisé et auteur inclus", async () => {
     const { conn, calls } = makeConn();
@@ -188,7 +190,9 @@ describe("applyEndurancePenalty", () => {
 });
 
 describe("liftEndurancePenalty", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("efface la ligne et rend l'engagé et le montant à l'appelant", async () => {
     // Le journal Discord se rédige après le commit, quand la ligne n'existe
@@ -270,7 +274,9 @@ describe("liftEndurancePenalty", () => {
 });
 
 describe("loadEnduranceMeta — pénalités", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   /** Connexion factice : un classement à deux équipes, une sanction sur la seconde. */
   function metaConnection(): PoolConnection {

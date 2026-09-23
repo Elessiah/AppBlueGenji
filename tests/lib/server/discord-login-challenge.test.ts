@@ -139,11 +139,13 @@ function pendingChallenge(overrides: Partial<Challenge> = {}): Challenge {
   };
 }
 
-const statementsOf = (execute: jest.Mock) =>
+const statementsOf = (execute: { mock: { calls: unknown[][] } }) =>
   execute.mock.calls.map(([sql]) => String(sql).replace(/\s+/g, " ").trim());
 
 describe("verifyDiscordChallenge — quota d'essais", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("accepte le bon code", async () => {
     fakeDb(pendingChallenge());
@@ -238,7 +240,9 @@ describe("verifyDiscordChallenge — quota d'essais", () => {
 });
 
 describe("createDiscordLoginChallenge — nombre de codes délivrables", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("délivre tant que la fenêtre n'est pas pleine", async () => {
     fakeDb(null, MAX_DISCORD_CODES_PER_WINDOW - 1);
@@ -296,7 +300,7 @@ describe("createDiscordLoginChallenge — nombre de codes délivrables", () => {
 
     await createDiscordLoginChallenge("123456789012345678");
 
-    const [, params] = connection.query.mock.calls[0] as [string, unknown[]];
+    const [, params] = connection.query.mock.calls[0] as unknown as [string, unknown[]];
     expect(String(params[0])).toContain("123456789012345678");
   });
 
@@ -358,7 +362,9 @@ describe("createDiscordLoginChallenge — nombre de codes délivrables", () => {
 });
 
 describe("discardDiscordChallenge", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("supprime la ligne, plutôt que de la marquer consommée", async () => {
     // Le comptage de la fenêtre porte sur `created_at` sans regarder

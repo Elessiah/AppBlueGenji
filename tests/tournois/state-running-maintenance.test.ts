@@ -47,7 +47,9 @@ describe("syncTournamentState — entretien d'un tournoi en cours", () => {
     (tryAutoResolveByes as jest.Mock).mockResolvedValue(undefined as never);
     (finalizeTournamentIfDone as jest.Mock).mockResolvedValue(undefined as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it.each(["SINGLE", "DOUBLE"])(
     "génère le plateau manquant d'un tournoi %s en cours",
@@ -57,7 +59,7 @@ describe("syncTournamentState — entretien d'un tournoi en cours", () => {
 
       await syncTournamentState(connection, 5);
 
-      expect(createBracketIfMissing).toHaveBeenCalledWith(connection, row);
+      expect(createBracketIfMissing).toHaveBeenCalledWith(connection, row as never);
       // Sans transition d'état, rien ne doit être réécrit sur le tournoi.
       expect(updateTournamentState).not.toHaveBeenCalled();
     },
@@ -147,7 +149,9 @@ describe("syncTournamentState — ce que `stateChanged` doit rapporter", () => {
     (tryAutoResolveByes as jest.Mock).mockResolvedValue(undefined as never);
     (finalizeTournamentIfDone as jest.Mock).mockResolvedValue(undefined as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("signale la clôture décidée par l'entretien lui-même", async () => {
     // `finalizeTournamentIfDone` peut passer le tournoi à FINISHED bien après la

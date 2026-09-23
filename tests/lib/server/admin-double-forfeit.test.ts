@@ -54,7 +54,9 @@ function fakeConnection(match: Record<string, unknown> = {}) {
 }
 
 describe("adminResolveMatch — double forfait", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("clôt la rencontre sans vainqueur, sans perdant et sans score", async () => {
     const { conn, writes } = fakeConnection();

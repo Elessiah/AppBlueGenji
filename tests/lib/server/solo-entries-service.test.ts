@@ -38,8 +38,12 @@ const USER_HIDDEN_AVATAR = [
 const NO_ROW = [[], []];
 
 describe("ensureSoloEntry", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("crée l'entrée solo au nom du joueur, sans membre ni caractère fantôme", async () => {
     const execute = jest
@@ -51,7 +55,7 @@ describe("ensureSoloEntry", () => {
     await expect(ensureSoloEntry(fakeConnection(execute), 1)).resolves.toBe(77);
 
     const [sql, params] = execute.mock.calls[2] as [string, unknown[]];
-    expect(sql).toMatch(/INSERT INTO bg_teams .*solo_user_id/s);
+    expect(sql).toMatch(/INSERT INTO bg_teams [\s\S]*solo_user_id/);
     expect(sql).toMatch(/VALUES \(\?, \?, NULL, 0, \?\)/);
     expect(params).toEqual(["ShadowNinja", "/api/uploads/avatars/1-ab.webp", 1]);
   });
@@ -178,7 +182,9 @@ describe("findSoloEntry", () => {
 });
 
 describe("syncSoloEntryIdentity", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   async function mockPool(execute: ExecuteMock) {
     const { getDatabase } = await import("@/lib/server/database");
@@ -263,8 +269,12 @@ describe("loadSoloUserIds", () => {
  * désigner une entrée solo — laquelle n'a pas de fiche d'équipe.
  */
 describe("findSoloEntryUser", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   async function withRows(rows: unknown[]) {
     const execute = jest.fn().mockResolvedValue([rows, []] as never);
@@ -310,8 +320,12 @@ describe("findSoloEntryUser", () => {
  * en individuel. Voir `docs/AUTHORIZATION_RULES.md` §2.3.
  */
 describe("entrée solo — avatar masqué", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("n'écrit aucun logo quand le joueur a masqué son avatar", async () => {
     const execute = jest
@@ -390,7 +404,9 @@ describe("entrée solo — avatar masqué", () => {
  * score ni déclarer l'abandon.
  */
 describe("ensureSoloEntry — compte supprimé", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   const DELETED = [
     [{ pseudo: "compte_supprime_12", avatar_url: null, visible_avatar: 0, is_deleted: 1 }],

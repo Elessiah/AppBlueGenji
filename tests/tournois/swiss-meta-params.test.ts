@@ -20,14 +20,18 @@ describe("loadSwissMeta — paramètres de la requête de classement", () => {
     swiss_tiebreakers_json: null,
   };
 
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("passe bien (tournamentId, phaseId) au classement", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce([[tournamentRow]]) // loadTournament
-      .mockResolvedValueOnce([[]]); // classement
+      .mockResolvedValueOnce([[tournamentRow]] as never) // loadTournament
+      .mockResolvedValueOnce([[]] as never); // classement
     const conn = { execute } as never;
 
     await loadSwissMeta(conn, 42);
@@ -41,9 +45,9 @@ describe("loadSwissMeta — paramètres de la requête de classement", () => {
   it("cible la phase demandée dans un tournoi multi-phases", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce([[tournamentRow]]) // phase
-      .mockResolvedValueOnce([[tournamentRow]]) // réglages du tournoi
-      .mockResolvedValueOnce([[]]); // classement
+      .mockResolvedValueOnce([[tournamentRow]] as never) // phase
+      .mockResolvedValueOnce([[tournamentRow]] as never) // réglages du tournoi
+      .mockResolvedValueOnce([[]] as never); // classement
     const conn = { execute } as never;
 
     await loadSwissMeta(conn, 42, 7);
@@ -53,7 +57,7 @@ describe("loadSwissMeta — paramètres de la requête de classement", () => {
   });
 
   it("renvoie null hors mode suisse", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[{ ...tournamentRow, format: "SINGLE" }]]);
+    const execute = jest.fn().mockResolvedValueOnce([[{ ...tournamentRow, format: "SINGLE" }]] as never);
     const conn = { execute } as never;
 
     await expect(loadSwissMeta(conn, 42)).resolves.toBeNull();

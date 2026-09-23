@@ -46,7 +46,7 @@ async function mockDb(teams: Row[], current: Row[], previous: Row[] = current) {
     return [[]];
   });
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute });
+  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
   return execute;
 }
 
@@ -143,7 +143,7 @@ describe("leaderboard de la landing", () => {
 
   it("rend une liste vide plutôt que de casser la page si la base tombe", async () => {
     const { getDatabase } = await import("@/lib/server/database");
-    (getDatabase as jest.Mock).mockRejectedValue(new Error("db down"));
+    (getDatabase as jest.Mock).mockRejectedValue(new Error("db down") as never);
 
     expect(await getLandingLeaderboard(8)).toEqual([]);
   });

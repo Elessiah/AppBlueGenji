@@ -28,7 +28,9 @@ describe("GET /api/teams/[id] — un identifiant d'entrée solo", () => {
     jest.clearAllMocks();
     (getCurrentUser as jest.Mock).mockResolvedValue(player as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rend le profil du joueur derrière l'entrée solo", async () => {
     (getTeamDetail as jest.Mock).mockResolvedValue(null as never);

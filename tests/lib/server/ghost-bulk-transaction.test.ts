@@ -40,7 +40,9 @@ describe("registerGhostTeams", () => {
     (flushBotLogs as jest.Mock).mockReturnValue(undefined);
     (discardBotLogs as jest.Mock).mockReturnValue(undefined);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("écrit tout le lot dans une seule transaction, et publie une seule fois", async () => {
     const connection = mockConnection();
@@ -50,7 +52,7 @@ describe("registerGhostTeams", () => {
 
     expect(connection.beginTransaction).toHaveBeenCalledTimes(1);
     expect(registerTeamsByIds).toHaveBeenCalledTimes(1);
-    expect(registerTeamsByIds).toHaveBeenCalledWith(connection, 5, [900, 901, 902]);
+    expect(registerTeamsByIds).toHaveBeenCalledWith(connection as never, 5, [900, 901, 902]);
     expect(connection.commit).toHaveBeenCalledTimes(1);
     expect(connection.rollback).not.toHaveBeenCalled();
     expect(flushBotLogs).toHaveBeenCalledTimes(1);

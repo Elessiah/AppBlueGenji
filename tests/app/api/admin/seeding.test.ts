@@ -30,8 +30,12 @@ const getReq = () => new Request("http://localhost/api/admin/tournaments/5/seedi
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
 describe("GET /api/admin/tournaments/[id]/seeding", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejette un visiteur anonyme avec 401", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
@@ -64,8 +68,12 @@ describe("GET /api/admin/tournaments/[id]/seeding", () => {
 });
 
 describe("PATCH /api/admin/tournaments/[id]/seeding", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejette un joueur sans permission tournois avec 403", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(player as never);

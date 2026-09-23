@@ -7,6 +7,10 @@
     // exécuter : un test qui importe un composant doit le voir transpilé.
     "jsx": "react-jsx",
     "noEmit": true
-  },
-  "include": ["tests", "**/*.test.ts", "**/*.test.tsx"]
+  }
+  // Pas d'`include` : ce fichier ne sert qu'aux **options de transpilation** de
+  // ts-jest (`isolatedModules`, un fichier à la fois). Celui qu'il portait
+  // (`tests`) était annulé par l'`exclude` hérité de `tsconfig.json` et ne
+  // sélectionnait rien — un `tsc -p` dessus passait au vert sans lire un test.
+  // La vérification des types des tests, c'est `tsconfig.typecheck.json`.
 }

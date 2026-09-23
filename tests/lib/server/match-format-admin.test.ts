@@ -79,7 +79,9 @@ function fakeConnection(matchFormat: { type: string; value: number } | null): {
 }
 
 describe("adminSaveMatchScores — respect du format de match", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("accepte un score partiel : l'arbitrage note un match en cours", async () => {
     const { conn, writes } = fakeConnection({ type: "BO", value: 5 });

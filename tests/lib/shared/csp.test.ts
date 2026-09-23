@@ -1,3 +1,4 @@
+import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { CSP_HEADER, CSP_MODE, CSP_REPORT_PATH, contentSecurityPolicy } from "@/lib/shared/csp";

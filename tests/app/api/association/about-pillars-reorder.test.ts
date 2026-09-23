@@ -19,8 +19,12 @@ function jsonReq(body: unknown) {
 }
 
 describe("PUT /api/association/about-pillars/reorder", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejects anonymous users with 401", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);

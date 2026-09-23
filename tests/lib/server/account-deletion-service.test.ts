@@ -77,7 +77,9 @@ const has = (queries: Query[], needle: string) => queries.some((q) => q.sql.incl
 
 const EMPTY = { tournaments: 0, organized: 0, owned: 0 };
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+});
 
 describe("deleteOwnAccount — effacement complet", () => {
   it("efface la ligne d'un compte qui n'a rien laissé", async () => {

@@ -44,8 +44,12 @@ function patchReq(body: unknown) {
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
 describe("POST /api/teams — sigle", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("transmet le sigle normalisé au service", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(player as never);
@@ -132,8 +136,12 @@ describe("POST /api/teams — sigle", () => {
 });
 
 describe("PATCH /api/teams/[id] — sigle", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("transmet le sigle au service", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(player as never);

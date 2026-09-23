@@ -159,7 +159,9 @@ function makeBoard(matches: MatchRow[], state = "RUNNING") {
 }
 
 describe("BlueGenji Survie — double forfait dans l'arbre final", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("enchaîne finale et petite finale par exemption, puis clôt le tournoi", async () => {
     // Tableau à 4 : 1 vs 4 (gagné par 1), 2 vs 3 (double forfait).

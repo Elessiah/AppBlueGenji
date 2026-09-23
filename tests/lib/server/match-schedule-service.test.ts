@@ -8,7 +8,7 @@ import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 
 async function mockDb(execute: jest.Mock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute });
+  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
 }
 
 /**
@@ -18,12 +18,16 @@ async function mockDb(execute: jest.Mock) {
 function found(startAt: Date | null = null) {
   return jest
     .fn()
-    .mockResolvedValueOnce([[{ id: 42, tournament_id: 7, start_at: startAt }]])
-    .mockResolvedValue([{ affectedRows: 1 }]);
+    .mockResolvedValueOnce([[{ id: 42, tournament_id: 7, start_at: startAt }]] as never)
+    .mockResolvedValue([{ affectedRows: 1 }] as never);
 }
 
-beforeEach(() => jest.clearAllMocks());
-afterEach(() => jest.restoreAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 describe("setMatchStartAt", () => {
   it("enregistre une date normalisée et réveille les pages ouvertes", async () => {
@@ -110,7 +114,7 @@ describe("setMatchStartAt", () => {
   });
 
   it("signale un match introuvable sans rien écrire", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[]]);
+    const execute = jest.fn().mockResolvedValueOnce([[]] as never);
     await mockDb(execute);
 
     await expect(setMatchStartAt(999, "2026-08-29T18:30:00Z")).rejects.toThrow("MATCH_NOT_FOUND");

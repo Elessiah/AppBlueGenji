@@ -23,8 +23,12 @@ function params(id: string) {
 }
 
 describe("POST /api/admin/users/[id]/roles", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejects anonymous users with 401", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);

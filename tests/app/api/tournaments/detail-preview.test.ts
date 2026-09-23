@@ -30,7 +30,9 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
     jest.clearAllMocks();
     (service.getTournamentDetail as jest.Mock).mockResolvedValue({ card: {} } as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("accorde gestion et aperçu à un administrateur", async () => {
     login({ id: 1, isAdmin: true, roles: ["ADMIN"] });

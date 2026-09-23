@@ -22,8 +22,12 @@ function jsonReq(body: unknown) {
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
 describe("POST /api/teams/[id]/transfer-ownership", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("rejette un visiteur anonyme avec 401", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(null as never);

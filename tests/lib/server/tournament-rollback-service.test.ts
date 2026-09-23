@@ -78,7 +78,7 @@ function playedRow(seed: MatchSeed) {
   });
 }
 
-type ExecuteMock = jest.Mock;
+type ExecuteMock = jest.Mock<(sql: string, params?: unknown[]) => Promise<unknown>>;
 
 /** Requêtes émises, normalisées sur une ligne. */
 function statements(execute: ExecuteMock): string[] {
@@ -468,11 +468,11 @@ describe("rollbackCurrentRound — re-remplissage du plateau", () => {
 });
 
 describe("rollbackCurrentRound — curseur de manche", () => {
-  it.each([
+  it.each<[TournamentFormat, string]>([
     ["SWISS", "swiss_current_round"],
     ["SURVIVAL", "survival_current_round"],
     ["BG_SURVIE", "endurance_current_round"],
-  ] as const)("recule le curseur d'un tournoi %s", async (format, column) => {
+  ])("recule le curseur d'un tournoi %s", async (format, column) => {
     // Le curseur n'est pas dérivé des matchs : le moteur pose la manche
     // « compteur + 1 ». Sans ce recul, défaire la manche 1 d'une ronde suisse à
     // huit créait une « ronde 3 » pendant que la 1 restait vierge.
@@ -736,11 +736,11 @@ describe("rollbackCurrentRound — entretien et diffusion", () => {
 
     await rollbackCurrentRound(7);
 
-    expect(tryAutoResolveByes).toHaveBeenCalledWith(connection, 7);
-    expect(reconcileSurvival).toHaveBeenCalledWith(7, connection);
-    expect(reconcileSwiss).toHaveBeenCalledWith(7, connection);
-    expect(reconcileEndurance).toHaveBeenCalledWith(7, connection);
-    expect(reconcilePhases).toHaveBeenCalledWith(7, connection);
+    expect(tryAutoResolveByes).toHaveBeenCalledWith(connection as never, 7);
+    expect(reconcileSurvival).toHaveBeenCalledWith(7, connection as never);
+    expect(reconcileSwiss).toHaveBeenCalledWith(7, connection as never);
+    expect(reconcileEndurance).toHaveBeenCalledWith(7, connection as never);
+    expect(reconcilePhases).toHaveBeenCalledWith(7, connection as never);
   });
 
   it("publie une seule fois, après le commit", async () => {
@@ -757,7 +757,7 @@ describe("rollbackCurrentRound — entretien et diffusion", () => {
     expect(connection.commit).toHaveBeenCalled();
     expect(publishUpdatedEvent).toHaveBeenCalledTimes(1);
     expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
-    expect(flushBotLogs).toHaveBeenCalledWith(connection);
+    expect(flushBotLogs).toHaveBeenCalledWith(connection as never);
   });
 
   it("ne publie ni ne journalise quand la transaction échoue", async () => {
@@ -765,7 +765,7 @@ describe("rollbackCurrentRound — entretien et diffusion", () => {
       format: "SWISS",
       matches: [playedRow({ id: 1, round_number: 1 })],
     });
-    (execute as jest.Mock).mockImplementation(async (sql: string) => {
+    execute.mockImplementation(async (sql: string) => {
       if (/SELECT id, name, format FROM bg_tournaments/.test(sql)) {
         return [[{ id: 7, name: "BlueGenji Open", format: "SWISS" }]];
       }

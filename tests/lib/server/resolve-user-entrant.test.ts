@@ -32,7 +32,9 @@ function activeTeam(roles: TeamRole[]) {
 }
 
 describe("resolveUserEntrant — tournoi par équipes", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it.each([["OWNER"], ["MANAGER"]] as TeamRole[][])(
     "accorde la qualité d'agir à un %s",
@@ -92,7 +94,9 @@ describe("resolveUserEntrant — tournoi par équipes", () => {
 });
 
 describe("resolveUserEntrant — tournoi individuel", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("accorde toujours la qualité : l'engagé est le joueur lui-même", async () => {
     // Une entrée solo n'a ni membre ni rôle — il n'y a personne à représenter.
@@ -127,7 +131,9 @@ describe("resolveUserEntrant — tournoi individuel", () => {
 });
 
 describe("resolveUserEntrantTeamId — même résolution, sans la qualité", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("rend l'identifiant de l'engagé, quel que soit le rôle porté", async () => {
     // Les appelants qui n'écrivent rien (report de score, signalement) n'ont

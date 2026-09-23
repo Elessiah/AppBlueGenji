@@ -7,18 +7,16 @@ import {
   flattenBuckets,
   countByGame,
 } from "@/app/(secured)/tournois/_lib/buckets";
+import { tournamentCard } from "../helpers/tournament-card";
 
-const mockCard = (overrides?: Partial<TournamentCard>): TournamentCard => ({
-  id: "1",
-  name: "Test Tournament",
-  description: "A test tournament",
-  game: "OW",
-  state: "UPCOMING",
-  startAt: "2026-05-20T10:00:00Z",
-  registeredTeams: 4,
-  maxTeams: 8,
-  ...overrides,
-});
+const mockCard = (overrides?: Partial<TournamentCard>): TournamentCard =>
+  tournamentCard({
+    name: "Test Tournament",
+    description: "A test tournament",
+    startAt: "2026-05-20T10:00:00Z",
+    registeredTeams: 4,
+    ...overrides,
+  });
 
 const mockBuckets = (overrides?: Partial<TournamentBuckets>): TournamentBuckets => ({
   upcoming: [],
@@ -164,22 +162,22 @@ describe("flattenBuckets", () => {
   it("remet les quatre paniers à plat dans l'ordre de lecture de la page", () => {
     const result = flattenBuckets(
       mockBuckets({
-        upcoming: [mockCard({ id: "3" })],
-        registration: [mockCard({ id: "2" })],
-        running: [mockCard({ id: "1" })],
-        finished: [mockCard({ id: "4" })],
+        upcoming: [mockCard({ id: 3 })],
+        registration: [mockCard({ id: 2 })],
+        running: [mockCard({ id: 1 })],
+        finished: [mockCard({ id: 4 })],
       }),
     );
 
-    expect(result.map((t) => t.id)).toEqual(["1", "2", "3", "4"]);
+    expect(result.map((t) => t.id)).toEqual([1, 2, 3, 4]);
   });
 
   it("préserve l'ordre interne de chaque panier", () => {
     const result = flattenBuckets(
-      mockBuckets({ finished: [mockCard({ id: "9" }), mockCard({ id: "5" })] }),
+      mockBuckets({ finished: [mockCard({ id: 9 }), mockCard({ id: 5 })] }),
     );
 
-    expect(result.map((t) => t.id)).toEqual(["9", "5"]);
+    expect(result.map((t) => t.id)).toEqual([9, 5]);
   });
 
   it("renvoie une liste vide pour des paniers vides", () => {

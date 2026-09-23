@@ -22,7 +22,7 @@ jest.mock("@/lib/server/users-service", () => {
   };
 });
 
-import { linkOAuthIdentity } from "@/lib/server/account-identities";
+import { linkOAuthIdentity, type OAuthIdentity } from "@/lib/server/account-identities";
 import { startDiscordVerification } from "@/lib/server/discord-verification";
 import { getDatabase } from "@/lib/server/database";
 import { resolveDiscordUser } from "@/lib/server/bot-integration";
@@ -65,7 +65,9 @@ function fakeDb(row: Record<string, unknown> | null) {
 
 const writes = (queries: Query[]) => queries.filter((q) => q.sql.startsWith("UPDATE bg_users"));
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+});
 
 describe("certification du tag Discord — jamais sur une ligne morte", () => {
   it("borne l'écriture aux comptes vivants", async () => {
@@ -99,15 +101,21 @@ describe("certification du tag Discord — jamais sur une ligne morte", () => {
 });
 
 describe("rattachement d'une identité OAuth — jamais sur une ligne morte", () => {
-  const identities = [
-    ["GOOGLE", { provider: "GOOGLE" as const, subject: "g-1" }],
-    ["DISCORD", { provider: "DISCORD" as const, subject: "d-1", handle: "keryan" }],
-    ["DISCORD sans tag publiable", { provider: "DISCORD" as const, subject: "d-1", handle: "123456" }],
-    ["BLIZZARD", { provider: "BLIZZARD" as const, subject: "b-1", handle: "Keryan#2100" }],
-    ["BLIZZARD sans BattleTag", { provider: "BLIZZARD" as const, subject: "b-1" }],
-  ] as const;
+  const identity = (
+    provider: OAuthIdentity["provider"],
+    subject: string,
+    handle: string | null = null,
+  ): OAuthIdentity => ({ provider, subject, handle, avatarUrl: null, displayName: null });
 
-  it.each(identities)("borne l'écriture %s aux comptes vivants", async (_label, identity) => {
+  const identities: [string, OAuthIdentity][] = [
+    ["GOOGLE", identity("GOOGLE", "g-1")],
+    ["DISCORD", identity("DISCORD", "d-1", "keryan")],
+    ["DISCORD sans tag publiable", identity("DISCORD", "d-1", "123456")],
+    ["BLIZZARD", identity("BLIZZARD", "b-1", "Keryan#2100")],
+    ["BLIZZARD sans BattleTag", identity("BLIZZARD", "b-1")],
+  ];
+
+  it.each(identities)("borne l'écriture %s aux comptes vivants", async (_label, linked) => {
     const { queries } = fakeDb({
       google_sub: null,
       discord_id: null,
@@ -116,7 +124,7 @@ describe("rattachement d'une identité OAuth — jamais sur une ligne morte", ()
       overwatch_battletag: null,
     });
 
-    await linkOAuthIdentity(7, identity);
+    await linkOAuthIdentity(7, linked);
 
     // Les cinq variantes d'écriture doivent porter la même condition : c'est
     // exactement la symétrie qui manquait face au détachement, qui l'avait déjà.
@@ -127,7 +135,7 @@ describe("rattachement d'une identité OAuth — jamais sur une ligne morte", ()
   it("refuse le rattachement quand la ligne n'est plus vivante", async () => {
     fakeDb(null);
     await expect(
-      linkOAuthIdentity(7, { provider: "GOOGLE", subject: "g-1" }),
+      linkOAuthIdentity(7, identity("GOOGLE", "g-1")),
     ).rejects.toThrow("PROFILE_NOT_FOUND");
   });
 });

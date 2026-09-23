@@ -341,7 +341,9 @@ describe("reconcileEndurance — réparation de l'arbre final", () => {
     jest.clearAllMocks();
     (createMatch as jest.Mock).mockResolvedValue(900 as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("ne touche pas à un arbre conforme", async () => {
     const conn = makeConn(

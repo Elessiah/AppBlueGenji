@@ -1,6 +1,9 @@
 import { describe, it, expect } from "@jest/globals";
 import type { TournamentBuckets } from "@/lib/shared/types";
+import { tournamentCard } from "../helpers/tournament-card";
 import { buildTickerItems } from "@/app/(secured)/tournois/_lib/ticker";
+
+const card = tournamentCard;
 
 const mockBuckets = (overrides?: Partial<TournamentBuckets>): TournamentBuckets => ({
   upcoming: [],
@@ -21,8 +24,8 @@ describe("ticker", () => {
     it("includes running tournaments", () => {
       const buckets = mockBuckets({
         running: [
-          {
-            id: "1",
+          card({
+            id: 1,
             name: "Championship",
             description: "",
             game: "OW",
@@ -30,7 +33,7 @@ describe("ticker", () => {
             startAt: "2026-05-12T10:00:00Z",
             registeredTeams: 8,
             maxTeams: 8,
-          },
+          }),
         ],
       });
       const result = buildTickerItems(buckets);
@@ -42,8 +45,8 @@ describe("ticker", () => {
     it("includes up to 3 registration tournaments", () => {
       const buckets = mockBuckets({
         registration: [
-          {
-            id: "1",
+          card({
+            id: 1,
             name: "Cup 1",
             description: "",
             game: "MR",
@@ -51,9 +54,9 @@ describe("ticker", () => {
             startAt: "2026-05-20T10:00:00Z",
             registeredTeams: 4,
             maxTeams: 8,
-          },
-          {
-            id: "2",
+          }),
+          card({
+            id: 2,
             name: "Cup 2",
             description: "",
             game: "OW",
@@ -61,9 +64,9 @@ describe("ticker", () => {
             startAt: "2026-05-21T10:00:00Z",
             registeredTeams: 6,
             maxTeams: 8,
-          },
-          {
-            id: "3",
+          }),
+          card({
+            id: 3,
             name: "Cup 3",
             description: "",
             game: "MR",
@@ -71,9 +74,9 @@ describe("ticker", () => {
             startAt: "2026-05-22T10:00:00Z",
             registeredTeams: 5,
             maxTeams: 8,
-          },
-          {
-            id: "4",
+          }),
+          card({
+            id: 4,
             name: "Cup 4",
             description: "",
             game: "OW",
@@ -81,7 +84,7 @@ describe("ticker", () => {
             startAt: "2026-05-23T10:00:00Z",
             registeredTeams: 3,
             maxTeams: 8,
-          },
+          }),
         ],
       });
       const result = buildTickerItems(buckets);
@@ -95,8 +98,8 @@ describe("ticker", () => {
     it("includes up to 2 upcoming tournaments", () => {
       const buckets = mockBuckets({
         upcoming: [
-          {
-            id: "1",
+          card({
+            id: 1,
             name: "Future Cup 1",
             description: "",
             game: "MR",
@@ -104,9 +107,9 @@ describe("ticker", () => {
             startAt: "2026-05-25T10:00:00Z",
             registeredTeams: 0,
             maxTeams: 8,
-          },
-          {
-            id: "2",
+          }),
+          card({
+            id: 2,
             name: "Future Cup 2",
             description: "",
             game: "OW",
@@ -114,9 +117,9 @@ describe("ticker", () => {
             startAt: "2026-05-26T10:00:00Z",
             registeredTeams: 0,
             maxTeams: 8,
-          },
-          {
-            id: "3",
+          }),
+          card({
+            id: 3,
             name: "Future Cup 3",
             description: "",
             game: "MR",
@@ -124,7 +127,7 @@ describe("ticker", () => {
             startAt: "2026-05-27T10:00:00Z",
             registeredTeams: 0,
             maxTeams: 8,
-          },
+          }),
         ],
       });
       const result = buildTickerItems(buckets);
@@ -137,8 +140,8 @@ describe("ticker", () => {
     it("does not include finished tournaments", () => {
       const buckets = mockBuckets({
         finished: [
-          {
-            id: "1",
+          card({
+            id: 1,
             name: "Old Cup",
             description: "",
             game: "OW",
@@ -146,7 +149,7 @@ describe("ticker", () => {
             startAt: "2026-05-01T10:00:00Z",
             registeredTeams: 8,
             maxTeams: 8,
-          },
+          }),
         ],
       });
       const result = buildTickerItems(buckets);
@@ -156,8 +159,8 @@ describe("ticker", () => {
     it("combines all relevant tournaments in correct order", () => {
       const buckets = mockBuckets({
         running: [
-          {
-            id: "1",
+          card({
+            id: 1,
             name: "Live Tournament",
             description: "",
             game: "OW",
@@ -165,11 +168,11 @@ describe("ticker", () => {
             startAt: "2026-05-12T10:00:00Z",
             registeredTeams: 8,
             maxTeams: 8,
-          },
+          }),
         ],
         registration: [
-          {
-            id: "2",
+          card({
+            id: 2,
             name: "Signup Tournament",
             description: "",
             game: "MR",
@@ -177,11 +180,11 @@ describe("ticker", () => {
             startAt: "2026-05-20T10:00:00Z",
             registeredTeams: 4,
             maxTeams: 8,
-          },
+          }),
         ],
         upcoming: [
-          {
-            id: "3",
+          card({
+            id: 3,
             name: "Future Tournament",
             description: "",
             game: "OW",
@@ -189,7 +192,7 @@ describe("ticker", () => {
             startAt: "2026-05-25T10:00:00Z",
             registeredTeams: 0,
             maxTeams: 8,
-          },
+          }),
         ],
       });
       const result = buildTickerItems(buckets);

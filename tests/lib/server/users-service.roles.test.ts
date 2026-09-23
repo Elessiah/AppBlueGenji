@@ -5,18 +5,22 @@ jest.mock("@/lib/server/database");
 
 async function mockDb(execute: jest.Mock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute });
+  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
 }
 
 describe("setUserRoles", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("persists ADMIN via is_admin and cumulative roles via platform_roles_json", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce([[{ id: 7 }]]) // existence check
-      .mockResolvedValueOnce([{ affectedRows: 1 }]); // update
+      .mockResolvedValueOnce([[{ id: 7 }]] as never) // existence check
+      .mockResolvedValueOnce([{ affectedRows: 1 }] as never); // update
     await mockDb(execute);
 
     const result = await setUserRoles(7, ["ADMIN", "ARBITRE"]);
@@ -31,8 +35,8 @@ describe("setUserRoles", () => {
   it("clears is_admin when ADMIN is absent", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce([[{ id: 7 }]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce([[{ id: 7 }]] as never)
+      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
     await mockDb(execute);
 
     await setUserRoles(7, ["COMMUNITY_MANAGER"]);
@@ -44,8 +48,8 @@ describe("setUserRoles", () => {
   it("normalizes: dedupes, drops invalid roles, stable order", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce([[{ id: 7 }]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce([[{ id: 7 }]] as never)
+      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
     await mockDb(execute);
 
     // @ts-expect-error — testing sanitization of untyped input
@@ -59,8 +63,8 @@ describe("setUserRoles", () => {
   it("persists an empty roles set (revokes everything)", async () => {
     const execute = jest
       .fn()
-      .mockResolvedValueOnce([[{ id: 7 }]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce([[{ id: 7 }]] as never)
+      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
     await mockDb(execute);
 
     await setUserRoles(7, []);
@@ -70,7 +74,7 @@ describe("setUserRoles", () => {
   });
 
   it("throws USER_NOT_FOUND without updating when the user does not exist", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[]]); // existence check → empty
+    const execute = jest.fn().mockResolvedValueOnce([[]] as never); // existence check → empty
     await mockDb(execute);
 
     await expect(setUserRoles(999, ["ADMIN"])).rejects.toThrow("USER_NOT_FOUND");

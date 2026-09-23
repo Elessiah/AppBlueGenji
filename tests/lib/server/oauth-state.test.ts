@@ -76,12 +76,12 @@ describe("saveOAuthState", () => {
   });
 
   it("pose `secure` en production, et pas en développement", async () => {
-    process.env.NODE_ENV = "production";
+    (process.env as Record<string, string | undefined>).NODE_ENV = "production";
     let store = fakeCookies();
     await saveOAuthState({ provider: "GOOGLE", state: "a", redirectTo: "/", intent: "LOGIN" });
     expect((store.set.mock.calls[0][2] as Record<string, unknown>).secure).toBe(true);
 
-    process.env.NODE_ENV = "development";
+    (process.env as Record<string, string | undefined>).NODE_ENV = "development";
     store = fakeCookies();
     await saveOAuthState({ provider: "GOOGLE", state: "a", redirectTo: "/", intent: "LOGIN" });
     expect((store.set.mock.calls[0][2] as Record<string, unknown>).secure).toBe(false);

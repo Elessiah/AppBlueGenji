@@ -42,7 +42,9 @@ const wrote = (execute: jest.Mock, fragment: string) =>
   execute.mock.calls.some(([sql]) => String(sql).includes(fragment));
 
 describe("requestToJoinTeam — ni une fantôme ni une entrée solo", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("refuse une demande d'adhésion à une équipe fantôme", async () => {
     const execute = await mockJoinDb(joinableTeam({ is_ghost: 1 }));

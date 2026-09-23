@@ -53,7 +53,9 @@ describe("POST /api/tournaments — mode MULTI avec phases", () => {
     (service.createTournament as jest.Mock).mockResolvedValue(42 as never);
   });
 
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   describe("création valide", () => {
     it("accepte un tournoi MULTI avec phases valides", async () => {
@@ -424,7 +426,7 @@ describe("POST /api/tournaments — mode MULTI avec phases", () => {
     });
 
     it("retourne 401 si pas authentifié", async () => {
-      (getCurrentUser as jest.Mock).mockResolvedValue(null);
+      (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
 
       const res = await POST(
         jsonReq({
@@ -442,7 +444,7 @@ describe("POST /api/tournaments — mode MULTI avec phases", () => {
   describe("erreurs serveur", () => {
     it("remonte une erreur de date invalide", async () => {
       (service.createTournament as jest.Mock).mockRejectedValueOnce(
-        new Error("INVALID_DATES"),
+        new Error("INVALID_DATES") as never,
       );
 
       const res = await POST(
@@ -458,7 +460,7 @@ describe("POST /api/tournaments — mode MULTI avec phases", () => {
     });
 
     it("retourne 500 sur erreur interne", async () => {
-      (service.createTournament as jest.Mock).mockRejectedValueOnce(new Error("DATABASE_ERROR"));
+      (service.createTournament as jest.Mock).mockRejectedValueOnce(new Error("DATABASE_ERROR") as never);
 
       const res = await POST(
         jsonReq({

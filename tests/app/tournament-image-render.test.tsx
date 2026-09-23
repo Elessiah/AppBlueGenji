@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
+import type { ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
 import { FinishedCard } from "@/app/(secured)/tournois/cards/FinishedCard";
@@ -8,7 +9,7 @@ import { UpcomingCard } from "@/app/(secured)/tournois/cards/UpcomingCard";
 import { priorityBannerIds } from "@/app/(secured)/tournois/cards/card-image";
 import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import type { TournamentImage } from "@/lib/shared/tournament-image";
-import type { TournamentCard } from "@/lib/shared/types";
+import type { TournamentCard, TournamentState } from "@/lib/shared/types";
 
 /**
  * Rendu de l'image d'un tournoi : une **illustration** devient un bandeau
@@ -82,12 +83,12 @@ describe("TournamentImageEmblem", () => {
 });
 
 describe("cartes de /tournois", () => {
-  const cards = [
+  const cards: [string, ComponentType<{ t: TournamentCard }>, TournamentState][] = [
     ["à venir", UpcomingCard, "UPCOMING"],
     ["inscriptions", RegistrationCard, "REGISTRATION"],
     ["en cours", RunningCard, "RUNNING"],
     ["terminé", FinishedCard, "FINISHED"],
-  ] as const;
+  ];
 
   it.each(cards)("carte %s : aucune image quand le tournoi n'en a pas", (_, Card, state) => {
     expect(imgTags(renderToStaticMarkup(<Card t={card({ state })} />))).toHaveLength(0);

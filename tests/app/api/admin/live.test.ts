@@ -39,8 +39,12 @@ const matchReq = (method: string, body: unknown) =>
 const tournamentParams = (id: string) => ({ params: Promise.resolve({ id }) });
 const matchParams = (matchId: string) => ({ params: Promise.resolve({ matchId }) });
 
-beforeEach(() => jest.clearAllMocks());
-afterEach(() => jest.restoreAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 describe("PUT /api/admin/tournaments/[id]/live", () => {
   it("rejette un visiteur anonyme avec 401", async () => {

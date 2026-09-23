@@ -85,12 +85,16 @@ function fakeDb(memberships: Row[], matches: Row[], registrations: Row[]) {
 
 async function mockDb(execute: jest.Mock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute });
+  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
   return execute;
 }
 
-beforeEach(() => jest.clearAllMocks());
-afterEach(() => jest.restoreAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 describe("loadPlayerRecords", () => {
   it("ne lit rien pour une liste vide", async () => {

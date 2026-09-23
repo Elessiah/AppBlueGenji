@@ -13,6 +13,8 @@ import { MIN_ENTRANTS_FOR_MATCHES } from "@/lib/shared/constants";
 import { computeTournamentState } from "@/lib/shared/tournament-state";
 import type { TournamentState } from "@/lib/shared/types";
 
+type DateField = "startVisibilityAt" | "registrationOpenAt" | "registrationCloseAt" | "startAt";
+
 const NOW = Date.parse("2026-03-10T12:00:00.000Z");
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -97,12 +99,12 @@ describe("launchBlockReason", () => {
     );
   });
 
-  it.each([
+  it.each<[DateField]>([
     ["startVisibilityAt"],
     ["registrationOpenAt"],
     ["registrationCloseAt"],
     ["startAt"],
-  ] as const)("refuse un tournoi dont %s est illisible", (field) => {
+  ])("refuse un tournoi dont %s est illisible", (field) => {
     // Sans ce refus, `NaN` rendrait toutes les comparaisons fausses et le
     // tournoi passerait chaque contrôle sans qu'aucun n'ait rien vérifié.
     expect(launchBlockReason({ ...STAGES.REGISTRATION, [field]: "pas une date" }, NOW)).toBe(
@@ -194,12 +196,12 @@ describe("abridgedStagesForLaunch", () => {
     expect(abridgedStagesForLaunch({ ...STAGES.REGISTRATION, state: "FINISHED" }, NOW)).toEqual([]);
   });
 
-  it.each([
+  it.each<[DateField]>([
     ["startVisibilityAt"],
     ["registrationOpenAt"],
     ["registrationCloseAt"],
     ["startAt"],
-  ] as const)("n'énumère plus rien quand %s est illisible", (field) => {
+  ])("n'énumère plus rien quand %s est illisible", (field) => {
     // `computeTournamentProgress` tolère une date abîmée (elle emprunte celle
     // de son voisin, pour que la frise reste dessinable) là où abréger s'y
     // refuse. Sans l'alignement sur `launchBlockReason`, la confirmation

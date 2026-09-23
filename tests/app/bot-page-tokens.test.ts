@@ -30,8 +30,9 @@ const read = readSource;
 const isSource = (path: string) => /\.(css|tsx?)$/.test(path);
 
 // Les définitions **qui valent partout** : les blocs `:root` des feuilles
-// globales (pas des modules CSS), et les polices que `next/font` expose par
-// `variable: "--font-…"`. Un jeton déclaré sous un sélecteur ne vaut que sous
+// globales (pas des modules CSS), et les polices que `app/site-fonts.ts` pose
+// sur `<body>` (`"--font-…": fontStack(…)`) — ou qu'un appel `next/font`
+// exposerait par `variable: "--font-…"`. Un jeton déclaré sous un sélecteur ne vaut que sous
 // lui : le compter ici laisserait passer un `var(--g-rgb)` que `/bot` ne
 // résout pas.
 const appAndComponents = [...walk(join(ROOT, "app")), ...walk(join(ROOT, "components"))];
@@ -41,8 +42,10 @@ for (const path of appAndComponents.filter((p) => p.endsWith(".css") && !p.endsW
     for (const m of block[1].matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)) defined.add(m[1]);
   }
 }
-for (const path of appAndComponents.filter((p) => p.endsWith(".tsx"))) {
-  for (const m of read(path).matchAll(/variable:\s*["'](--[a-zA-Z0-9-]+)["']/g)) defined.add(m[1]);
+for (const path of appAndComponents.filter((p) => /\.tsx?$/.test(p))) {
+  const source = read(path);
+  for (const m of source.matchAll(/variable:\s*["'](--[a-zA-Z0-9-]+)["']/g)) defined.add(m[1]);
+  for (const m of source.matchAll(/["'](--[a-zA-Z0-9-]+)["']\s*:\s*fontStack\(/g)) defined.add(m[1]);
 }
 
 const botFiles = [...walk(join(ROOT, "app", "bot")), ...walk(join(ROOT, "components", "bot"))].filter(isSource);

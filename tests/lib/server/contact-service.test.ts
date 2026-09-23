@@ -11,7 +11,7 @@ jest.mock("@/lib/server/database");
 
 async function mockDb(execute: jest.Mock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute });
+  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
 }
 
 describe("contact-service", () => {
@@ -28,7 +28,7 @@ describe("contact-service", () => {
 
   describe("getContactInfo", () => {
     it("falls back to defaults when no row is configured", async () => {
-      await mockDb(jest.fn().mockResolvedValue([[]]));
+      await mockDb(jest.fn().mockResolvedValue([[]] as never));
       expect(await getContactInfo()).toEqual(DEFAULT_CONTACT);
     });
 
@@ -38,7 +38,7 @@ describe("contact-service", () => {
       await mockDb(
         jest.fn().mockResolvedValue([
           [{ setting_key: CONTACT_EMAIL_KEY, setting_value: "" }],
-        ]),
+        ] as never),
       );
       const info = await getContactInfo();
       expect(info.email).toBe("");
@@ -53,7 +53,7 @@ describe("contact-service", () => {
             { setting_key: CONTACT_DISCORD_TAG_KEY, setting_value: "bluegenji" },
             { setting_key: CONTACT_DISCORD_URL_KEY, setting_value: "https://discord.gg/x" },
           ],
-        ]),
+        ] as never),
       );
       expect(await getContactInfo()).toEqual({
         email: "a@bg.fr",
@@ -64,14 +64,14 @@ describe("contact-service", () => {
 
     it("returns the full default set when the database is unreachable", async () => {
       const { getDatabase } = await import("@/lib/server/database");
-      (getDatabase as jest.Mock).mockRejectedValue(new Error("down"));
+      (getDatabase as jest.Mock).mockRejectedValue(new Error("down") as never);
       expect(await getContactInfo()).toEqual(DEFAULT_CONTACT);
     });
   });
 
   describe("setContactInfo", () => {
     it("validates then upserts the three channels", async () => {
-      const execute = jest.fn().mockResolvedValue([{}]);
+      const execute = jest.fn().mockResolvedValue([{}] as never);
       await mockDb(execute);
 
       const result = await setContactInfo({
@@ -116,7 +116,7 @@ describe("contact-service — mutualisation de la lecture", () => {
   });
 
   it("ne lit la base qu'une fois pour cent arrivées simultanées", async () => {
-    const execute = jest.fn().mockResolvedValue([[]]);
+    const execute = jest.fn().mockResolvedValue([[]] as never);
     await mockDb(execute);
 
     await Promise.all(Array.from({ length: 100 }, () => getContactInfo()));
@@ -125,7 +125,7 @@ describe("contact-service — mutualisation de la lecture", () => {
   });
 
   it("resert les coordonnées en cache aux visites suivantes", async () => {
-    const execute = jest.fn().mockResolvedValue([[]]);
+    const execute = jest.fn().mockResolvedValue([[]] as never);
     await mockDb(execute);
 
     await getContactInfo();
@@ -137,8 +137,8 @@ describe("contact-service — mutualisation de la lecture", () => {
   it("ne met pas un échec en cache", async () => {
     const execute = jest
       .fn()
-      .mockRejectedValueOnce(new Error("DOWN"))
-      .mockResolvedValue([[{ setting_key: CONTACT_EMAIL_KEY, setting_value: "a@bg.fr" }]]);
+      .mockRejectedValueOnce(new Error("DOWN") as never)
+      .mockResolvedValue([[{ setting_key: CONTACT_EMAIL_KEY, setting_value: "a@bg.fr" }]] as never);
     await mockDb(execute);
 
     expect(await getContactInfo()).toEqual(DEFAULT_CONTACT);
@@ -146,7 +146,7 @@ describe("contact-service — mutualisation de la lecture", () => {
   });
 
   it("oublie les coordonnées après une écriture du staff", async () => {
-    const execute = jest.fn().mockResolvedValue([[]]);
+    const execute = jest.fn().mockResolvedValue([[]] as never);
     await mockDb(execute);
 
     await getContactInfo();

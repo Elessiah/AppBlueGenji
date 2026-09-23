@@ -34,7 +34,9 @@ describe("POST /api/tournaments — format de match", () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
     (service.createTournament as jest.Mock).mockResolvedValue(7 as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("transmet un BO5", async () => {
     const res = await POST(jsonReq({ ...base, matchFormatType: "BO", matchFormatValue: 5 }));

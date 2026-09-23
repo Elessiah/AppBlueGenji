@@ -1,3 +1,4 @@
+import { describe, expect, it } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RecruitmentHighlight } from "@/components/recruitment-highlight";
 import type { RecruitmentAd } from "@/lib/shared/recruitment";

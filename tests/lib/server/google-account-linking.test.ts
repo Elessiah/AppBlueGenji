@@ -90,7 +90,9 @@ const find = (statements: Statement[], prefix: string) =>
   statements.find(({ sql }) => sql.startsWith(prefix));
 
 describe("createOrGetGoogleUser — aucune revendication par l'adresse", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("ne cherche **jamais** un compte par son adresse", async () => {
     // Le cœur de la règle. Un membre existe, son adresse est celle que Google

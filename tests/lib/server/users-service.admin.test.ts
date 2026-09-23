@@ -5,7 +5,7 @@ jest.mock("@/lib/server/database");
 
 async function mockDb(execute: jest.Mock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute });
+  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
 }
 
 function userRow(overrides: Record<string, unknown> = {}) {
@@ -30,17 +30,21 @@ function userRow(overrides: Record<string, unknown> = {}) {
 }
 
 describe("users-service admin management", () => {
-  beforeEach(() => jest.clearAllMocks());
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   describe("getFullProfile admin fields", () => {
     it("exposes the target admin status and viewer admin flag", async () => {
       const execute = jest
         .fn()
-        .mockResolvedValueOnce([[userRow({ id: 7, is_admin: 1 })]]) // user row
-        .mockResolvedValueOnce([[]]) // timeline
-        .mockResolvedValueOnce([[]]) // stats: appartenances (aucune)
-        .mockResolvedValueOnce([[]]); // (inutilisé : le joueur n'a aucune équipe)
+        .mockResolvedValueOnce([[userRow({ id: 7, is_admin: 1 })]] as never) // user row
+        .mockResolvedValueOnce([[]] as never) // timeline
+        .mockResolvedValueOnce([[]] as never) // stats: appartenances (aucune)
+        .mockResolvedValueOnce([[]] as never); // (inutilisé : le joueur n'a aucune équipe)
       await mockDb(execute);
 
       const profile = await getFullProfile({ id: 1, isAdmin: true }, 7);
@@ -54,10 +58,10 @@ describe("users-service admin management", () => {
       // La cible EST admin, mais le viewer ne l'est pas : on ne divulgue pas.
       const execute = jest
         .fn()
-        .mockResolvedValueOnce([[userRow({ id: 7, is_admin: 1 })]])
-        .mockResolvedValueOnce([[]])
-        .mockResolvedValueOnce([[]])
-        .mockResolvedValueOnce([[]]);
+        .mockResolvedValueOnce([[userRow({ id: 7, is_admin: 1 })]] as never)
+        .mockResolvedValueOnce([[]] as never)
+        .mockResolvedValueOnce([[]] as never)
+        .mockResolvedValueOnce([[]] as never);
       await mockDb(execute);
 
       const profile = await getFullProfile({ id: 1 }, 7);
@@ -71,10 +75,10 @@ describe("users-service admin management", () => {
         .fn()
         .mockResolvedValueOnce([
           [userRow({ id: 7, is_admin: 0, platform_roles_json: JSON.stringify(["RECRUTEUR", "ARBITRE"]) })],
-        ])
-        .mockResolvedValueOnce([[]])
-        .mockResolvedValueOnce([[]])
-        .mockResolvedValueOnce([[]]);
+        ] as never)
+        .mockResolvedValueOnce([[]] as never)
+        .mockResolvedValueOnce([[]] as never)
+        .mockResolvedValueOnce([[]] as never);
       await mockDb(execute);
 
       const profile = await getFullProfile({ id: 1 }, 7);
@@ -87,10 +91,10 @@ describe("users-service admin management", () => {
     it("includes ADMIN in displayRoles for an admin target", async () => {
       const execute = jest
         .fn()
-        .mockResolvedValueOnce([[userRow({ id: 7, is_admin: 1 })]])
-        .mockResolvedValueOnce([[]])
-        .mockResolvedValueOnce([[]])
-        .mockResolvedValueOnce([[]]);
+        .mockResolvedValueOnce([[userRow({ id: 7, is_admin: 1 })]] as never)
+        .mockResolvedValueOnce([[]] as never)
+        .mockResolvedValueOnce([[]] as never)
+        .mockResolvedValueOnce([[]] as never);
       await mockDb(execute);
 
       const profile = await getFullProfile({ id: 1 }, 7);

@@ -48,7 +48,9 @@ function fakeDb(handler?: (sql: string) => unknown) {
   return { queries };
 }
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+});
 
 describe("Le site ne demande jamais l'adresse à Google", () => {
   it("n'inclut pas le scope `email` dans l'URL d'autorisation", () => {

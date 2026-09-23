@@ -107,13 +107,13 @@ describe("updateTeamMeta — nom", () => {
 
 describe("assertTeamNameAvailable", () => {
   it("exclut l'équipe elle-même quand on le lui demande", async () => {
-    const exec = jest.fn(async () => [[], []]);
+    const exec = jest.fn(async (_sql: string, _params: unknown[]) => [[], []]);
     await assertTeamNameAvailable({ execute: exec } as never, "Rolex", 7);
     expect(exec).toHaveBeenCalledWith(expect.stringMatching(/AND id <> \?/), ["Rolex", 7]);
   });
 
   it("interroge sans exclusion à la création", async () => {
-    const exec = jest.fn(async () => [[], []]);
+    const exec = jest.fn(async (_sql: string, _params: unknown[]) => [[], []]);
     await assertTeamNameAvailable({ execute: exec } as never, "Rolex");
     expect(exec).toHaveBeenCalledWith(expect.not.stringMatching(/id <>/), ["Rolex"]);
   });

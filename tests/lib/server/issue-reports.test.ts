@@ -31,11 +31,11 @@ const VALID_MESSAGE = "adversaire absent depuis 20 minutes";
 
 /** Câble la base : `execute` sert la lecture de l'engagé puis celle du match. */
 async function mockDb(rows: unknown[][]) {
-  const execute = jest.fn<() => Promise<unknown>>();
+  const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>();
   for (const result of rows) execute.mockResolvedValueOnce([result]);
 
   const { getDatabase, withConnection } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute });
+  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
   (withConnection as jest.Mock).mockImplementation(
     (run: unknown) => (run as (c: unknown) => Promise<unknown>)({}),
   );
@@ -44,9 +44,9 @@ async function mockDb(rows: unknown[][]) {
 
 beforeEach(async () => {
   jest.clearAllMocks();
-  (loadTournamentRow as jest.Mock).mockResolvedValue({ participant_type: "TEAM" });
-  (resolveUserEntrantTeamId as jest.Mock).mockResolvedValue(101);
-  (pushRefereeAlert as jest.Mock).mockResolvedValue({ sent: 3, unresolved: [], failed: [] });
+  (loadTournamentRow as jest.Mock).mockResolvedValue({ participant_type: "TEAM" } as never);
+  (resolveUserEntrantTeamId as jest.Mock).mockResolvedValue(101 as never);
+  (pushRefereeAlert as jest.Mock).mockResolvedValue({ sent: 3, unresolved: [], failed: [] } as never);
 });
 
 describe("reportTournamentIssue", () => {
@@ -109,7 +109,7 @@ describe("reportTournamentIssue", () => {
 
   it("refuse un tournoi inexistant", async () => {
     await mockDb([]);
-    (loadTournamentRow as jest.Mock).mockResolvedValue(null);
+    (loadTournamentRow as jest.Mock).mockResolvedValue(null as never);
 
     await expect(reportTournamentIssue(7, 42, VALID_MESSAGE, null)).rejects.toThrow(
       "TOURNAMENT_NOT_FOUND",
@@ -118,7 +118,7 @@ describe("reportTournamentIssue", () => {
 
   it("refuse un joueur qui n'a rien à engager", async () => {
     await mockDb([]);
-    (resolveUserEntrantTeamId as jest.Mock).mockResolvedValue(null);
+    (resolveUserEntrantTeamId as jest.Mock).mockResolvedValue(null as never);
 
     await expect(reportTournamentIssue(7, 42, VALID_MESSAGE, null)).rejects.toThrow(
       "NOT_REGISTERED",
@@ -145,7 +145,7 @@ describe("reportTournamentIssue", () => {
 
   it("remonte l'injoignabilité du bot plutôt que de rassurer à tort", async () => {
     await mockDb([ENTRANT]);
-    (pushRefereeAlert as jest.Mock).mockResolvedValue(null);
+    (pushRefereeAlert as jest.Mock).mockResolvedValue(null as never);
 
     await expect(reportTournamentIssue(7, 42, VALID_MESSAGE, null)).rejects.toThrow(
       "BOT_INTERNAL_UNREACHABLE",
@@ -158,7 +158,7 @@ describe("reportTournamentIssue", () => {
       sent: 0,
       unresolved: [],
       failed: ["arbitre"],
-    });
+    } as never);
 
     // Le canal de logs, lui, a bien reçu le signalement : c'est un succès.
     expect(await reportTournamentIssue(7, 42, VALID_MESSAGE, null)).toEqual({

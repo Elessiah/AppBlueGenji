@@ -95,8 +95,12 @@ async function runSweep(options: {
   return { connection, synced, published };
 }
 
-beforeEach(() => jest.clearAllMocks());
-afterEach(() => jest.restoreAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 describe("syncVisibleTournaments — une transaction par tournoi", () => {
   it("ouvre et referme une transaction pour chaque candidat", async () => {

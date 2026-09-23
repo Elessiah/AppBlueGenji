@@ -12,7 +12,7 @@ jest.mock("@/lib/server/database");
 
 async function mockDb(execute: jest.Mock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute });
+  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
 }
 
 describe("about-stats-service", () => {
@@ -22,32 +22,34 @@ describe("about-stats-service", () => {
     jest.clearAllMocks();
     clearCache();
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   describe("listAboutStats", () => {
     it("returns rows from the database", async () => {
       const rows = [{ id: 1, value: "100%", label: "Bénévole" }];
-      await mockDb(jest.fn().mockResolvedValue([rows]));
+      await mockDb(jest.fn().mockResolvedValue([rows] as never));
 
       const result = await listAboutStats();
       expect(result).toEqual([{ id: 1, value: "100%", label: "Bénévole" }]);
     });
 
     it("returns the fallback when the table is empty", async () => {
-      await mockDb(jest.fn().mockResolvedValue([[]]));
+      await mockDb(jest.fn().mockResolvedValue([[]] as never));
       expect(await listAboutStats()).toBe(FALLBACK_ABOUT_STATS);
     });
 
     it("returns the fallback when the database is unreachable", async () => {
       const { getDatabase } = await import("@/lib/server/database");
-      (getDatabase as jest.Mock).mockRejectedValue(new Error("down"));
+      (getDatabase as jest.Mock).mockRejectedValue(new Error("down") as never);
       expect(await listAboutStats()).toBe(FALLBACK_ABOUT_STATS);
     });
   });
 
   describe("createAboutStat", () => {
     it("inserts and returns the new stat", async () => {
-      const execute = jest.fn().mockResolvedValue([{ insertId: 42 }]);
+      const execute = jest.fn().mockResolvedValue([{ insertId: 42 }] as never);
       await mockDb(execute);
 
       const stat = await createAboutStat({ value: "12", label: "Arbitres" });
@@ -65,7 +67,7 @@ describe("about-stats-service", () => {
 
   describe("updateAboutStat", () => {
     it("updates and returns the stat", async () => {
-      const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }]);
+      const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
       await mockDb(execute);
 
       const stat = await updateAboutStat(7, { value: "0 €", label: "Frais d'inscription" });
@@ -73,7 +75,7 @@ describe("about-stats-service", () => {
     });
 
     it("throws NOT_FOUND when no row matches", async () => {
-      await mockDb(jest.fn().mockResolvedValue([{ affectedRows: 0 }]));
+      await mockDb(jest.fn().mockResolvedValue([{ affectedRows: 0 }] as never));
       await expect(updateAboutStat(999, { value: "X", label: "Y" })).rejects.toThrow("ABOUT_STAT_NOT_FOUND");
     });
 
@@ -87,14 +89,14 @@ describe("about-stats-service", () => {
 
   describe("deleteAboutStat", () => {
     it("deletes an existing stat", async () => {
-      const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }]);
+      const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
       await mockDb(execute);
       await expect(deleteAboutStat(3)).resolves.toBeUndefined();
       expect(execute).toHaveBeenCalledWith(expect.stringContaining("DELETE"), [3]);
     });
 
     it("throws NOT_FOUND when nothing is deleted", async () => {
-      await mockDb(jest.fn().mockResolvedValue([{ affectedRows: 0 }]));
+      await mockDb(jest.fn().mockResolvedValue([{ affectedRows: 0 }] as never));
       await expect(deleteAboutStat(999)).rejects.toThrow("ABOUT_STAT_NOT_FOUND");
     });
   });

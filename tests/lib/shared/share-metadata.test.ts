@@ -12,6 +12,7 @@ import {
   truncateForShare,
 } from "@/lib/shared/share-metadata";
 import type { TournamentCard } from "@/lib/shared/types";
+import { tournamentCard } from "../../helpers/tournament-card";
 
 /**
  * Ce que raconte un lien du site quand on le colle ailleurs.
@@ -24,7 +25,7 @@ import type { TournamentCard } from "@/lib/shared/types";
 const NOW = Date.parse("2026-08-10T12:00:00.000Z");
 
 function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
-  return {
+  return tournamentCard({
     id: 42,
     name: "OW Open Cup",
     description: null,
@@ -45,7 +46,7 @@ function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
     matchFormat: null,
     liveUrl: null,
     ...overrides,
-  };
+  });
 }
 
 describe("Textes du site", () => {

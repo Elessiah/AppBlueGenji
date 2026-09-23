@@ -35,7 +35,9 @@ describe("POST /api/visits", () => {
     (recordSiteVisit as jest.Mock).mockResolvedValue({ recorded: true } as never);
     (syncSiteVisitStatsToBot as jest.Mock).mockResolvedValue(true as never);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("enregistre la visite d'un visiteur anonyme", async () => {
     const res = await POST(visitReq({ path: "/tournois" }));
