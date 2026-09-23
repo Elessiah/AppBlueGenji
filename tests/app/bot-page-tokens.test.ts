@@ -99,8 +99,16 @@ describe("/bot — les pastilles d'en-tête de panneau ont un habillage", () => 
  * n'est vérifiée que pour sa partie fixe.
  */
 describe("/bot — n'emploie que des classes que le site définit", () => {
+  // Seules les feuilles que `/bot` **charge** : la feuille globale de la mise
+  // en page racine et celles de `app/bot`. Une classe définie dans la feuille
+  // d'une autre route n'a aucun effet ici, l'App Router ne chargeant que ce
+  // que la route importe.
+  const botSheets = [
+    join(ROOT, "app", "globals.css"),
+    ...walk(join(ROOT, "app", "bot")).filter((p) => p.endsWith(".css") && !p.endsWith(".module.css")),
+  ];
   const definedClasses = new Set<string>();
-  for (const path of appAndComponents.filter((p) => p.endsWith(".css") && !p.endsWith(".module.css"))) {
+  for (const path of botSheets) {
     // Seuls les **sélecteurs** définissent une classe : les commentaires et
     // les blocs de déclarations sont vidés d'abord (un `url(x.webp)` ou un
     // `0.5s` n'est pas une classe).
@@ -135,10 +143,9 @@ describe("/bot — n'emploie que des classes que le site définit", () => {
         return " ";
       });
       // Un littéral comparé (`state === "OPERATIONAL"`) est une valeur testée,
-      // pas une classe posée.
-      // Les littéraux sont lus **tous**, dans l'ordre, et le contexte est
-      // examiné après coup : un motif qui en sauterait un se recalerait sur
-      // son guillemet fermant et lirait « " ? " » comme une chaîne.
+      // pas une classe posée. Les littéraux sont lus **tous**, dans l'ordre, et
+      // le contexte examiné après coup : un motif qui en sauterait un se
+      // recalerait sur son guillemet fermant et lirait « " ? " » comme une chaîne.
       const code = [expr, ...inner].join(" ");
       for (const lit of code.matchAll(/"([^"]*)"|'([^']*)'/g)) {
         const before = code.slice(0, lit.index);
@@ -155,6 +162,9 @@ describe("/bot — n'emploie que des classes que le site définit", () => {
 
   it("trouve bien des classes à confronter", () => {
     // Garde du balayage : un motif cassé rendrait l'ensemble vide — donc vert.
+    expect(botSheets.map((p) => relative(ROOT, p).replace(/\/g, "/"))).toEqual(
+      expect.arrayContaining(["app/globals.css", "app/bot/bot.css", "app/bot/docs/docs.css"]),
+    );
     for (const name of ["panel-head", "chip", "chip-on", "status-cell", "bot-cta"]) {
       expect(definedClasses).toContain(name);
     }

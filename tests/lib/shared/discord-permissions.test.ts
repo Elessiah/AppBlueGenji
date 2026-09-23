@@ -22,9 +22,18 @@ describe("decodeDiscordPermissions", () => {
   });
 
   it("ne perd aucun bit au-delà de 2⁵³", () => {
-    // Un `Number` arrondirait : 2⁵¹ + 1 s'écrirait 2⁵¹ et le bit 0 disparaîtrait.
-    const value = (BigInt(2) ** BigInt(51) + BigInt(1)).toString();
-    expect(decodeDiscordPermissions(value)?.map((p) => p.bit)).toEqual([0, 51]);
+    // Un `Number` arrondirait : 2⁶⁰ + 1 s'écrirait 2⁶⁰ et le bit 0 disparaîtrait.
+    const value = (BigInt(2) ** BigInt(60) + BigInt(1)).toString();
+    expect(Number(value).toString()).not.toBe(value);
+    expect(decodeDiscordPermissions(value)?.map((p) => p.bit)).toEqual([0, 60]);
+  });
+
+  it("nomme les permissions publiées les plus récentes", () => {
+    const value = ((BigInt(1) << BigInt(48)) | (BigInt(1) << BigInt(52))).toString();
+    expect(decodeDiscordPermissions(value)?.map((p) => p.flag)).toEqual([
+      "SET_VOICE_CHANNEL_STATUS",
+      "BYPASS_SLOWMODE",
+    ]);
   });
 
   it("nomme un bit inconnu plutôt que de le taire", () => {

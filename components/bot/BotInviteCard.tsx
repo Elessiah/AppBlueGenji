@@ -10,6 +10,9 @@ export function BotInviteCard() {
   // La liste se **déduit** de l'entier envoyé à Discord : écrite à la main,
   // elle annonçait cinq permissions que l'invitation ne demandait pas.
   const perms = decodeDiscordPermissions(permissions);
+  // Une seule ligne d'absence, dont seul le motif change.
+  const emptyNotice =
+    perms === null ? "Valeur de permissions illisible" : perms.length === 0 ? "Aucune permission de serveur" : null;
 
   return (
     <div className="card card-ticks invite-card" style={{ marginTop: 28 }}>
@@ -50,37 +53,27 @@ export function BotInviteCard() {
 
         <div className="perms">
           <span className="title">PERMISSIONS DEMANDÉES</span>
-          {perms === null ? (
+          {perms?.map((p) => (
+            <div key={p.bit} className="perm">
+              <svg className="check" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d="M3 8.5l3 3 7-7.5"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span className="lbl">{p.label}</span>
+              <span className="scope">{p.flag}</span>
+            </div>
+          ))}
+          {emptyNotice && (
             <div className="perm">
               <span />
-              <span className="lbl">Valeur de permissions illisible</span>
+              <span className="lbl">{emptyNotice}</span>
               <span className="scope">—</span>
             </div>
-          ) : (
-            <>
-              {perms.map((p) => (
-                <div key={p.bit} className="perm">
-                  <svg className="check" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                    <path
-                      d="M3 8.5l3 3 7-7.5"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <span className="lbl">{p.label}</span>
-                  <span className="scope">{p.flag}</span>
-                </div>
-              ))}
-              {perms.length === 0 && (
-                <div className="perm">
-                  <span />
-                  <span className="lbl">Aucune permission de serveur</span>
-                  <span className="scope">—</span>
-                </div>
-              )}
-            </>
           )}
           <div className="perms-foot">
             <span>SCOPES · BOT + APPLICATIONS.COMMANDS</span>

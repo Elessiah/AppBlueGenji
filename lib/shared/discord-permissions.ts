@@ -24,8 +24,9 @@ export type DiscordPermission = {
 };
 
 /**
- * Registre des permissions de serveur connues, par rang de bit — les rangs
- * 47 et 48 ne désignent aucune permission publiée.
+ * Registre des permissions de serveur connues, par rang de bit — calé sur
+ * `PermissionFlagsBits` de `discord-api-types` (dépendance du bot, pas du
+ * site). Le rang 47 ne désigne plus aucune permission publiée.
  */
 export const DISCORD_PERMISSIONS: readonly DiscordPermission[] = [
   { bit: 0, flag: "CREATE_INSTANT_INVITE", label: "Créer une invitation" },
@@ -75,9 +76,11 @@ export const DISCORD_PERMISSIONS: readonly DiscordPermission[] = [
   { bit: 44, flag: "CREATE_EVENTS", label: "Créer des évènements" },
   { bit: 45, flag: "USE_EXTERNAL_SOUNDS", label: "Utiliser des sons externes" },
   { bit: 46, flag: "SEND_VOICE_MESSAGES", label: "Envoyer des messages vocaux" },
+  { bit: 48, flag: "SET_VOICE_CHANNEL_STATUS", label: "Définir le statut du salon vocal" },
   { bit: 49, flag: "SEND_POLLS", label: "Créer des sondages" },
   { bit: 50, flag: "USE_EXTERNAL_APPS", label: "Utiliser des applications externes" },
   { bit: 51, flag: "PIN_MESSAGES", label: "Épingler des messages" },
+  { bit: 52, flag: "BYPASS_SLOWMODE", label: "Ignorer le mode lent" },
 ];
 
 const BY_BIT = new Map(DISCORD_PERMISSIONS.map((p) => [p.bit, p]));
@@ -98,7 +101,8 @@ export function decodeDiscordPermissions(bitfield: string): DiscordPermission[] 
 
   // `BigInt(…)` plutôt que des littéraux `0n` : la cible de compilation
   // (ES2017) ne les admet pas. Un `Number` perdrait les bits au-delà de 2⁵³,
-  // or les permissions récentes y sont déjà.
+  // et les permissions publiées atteignent déjà le bit 52 : la prochaine
+  // passerait la limite.
   const zero = BigInt(0);
   const one = BigInt(1);
   const value = BigInt(raw);
