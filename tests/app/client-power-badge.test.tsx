@@ -3,10 +3,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ClientPowerState } from "@/lib/shared/hooks/useClientPower";
 import { UNKNOWN_PROBE } from "@/lib/shared/client-power";
 import { readSource } from "../helpers/read-source";
+import { ClientPowerBadge } from "@/components/client-power-badge";
 
 /**
  * Le témoin du régime de charge. Les effets ne tournent pas au rendu serveur :
- * on fournit l'état du magasin à la main, comme le navigateur le ferait.
+ * on fournit l'état du magasin à la main, comme le navigateur le ferait
+ * (`jest.mock` est remonté au-dessus des imports, le composant reçoit donc le
+ * magasin simulé).
  */
 let state: ClientPowerState;
 
@@ -14,9 +17,6 @@ jest.mock("@/lib/shared/hooks/useClientPower", () => ({
   useClientPowerState: () => state,
   setIgnorePerformance: jest.fn(),
 }));
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { ClientPowerBadge } = require("@/components/client-power-badge") as typeof import("@/components/client-power-badge");
 
 const base = (overrides: Partial<ClientPowerState["input"]> = {}): ClientPowerState => ({
   input: { attention: "FOCUSED", matchFocus: false, ...overrides },
