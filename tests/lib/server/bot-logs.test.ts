@@ -26,6 +26,7 @@ const TOURNAMENT_ROW = {
   max_teams: 16,
   participant_type: "TEAM",
   start_at: new Date("2026-03-14T18:00:00.000Z"),
+  organizer_id: 3,
   organizer_pseudo: "Kiro",
   registered_teams: 3,
   champion_name: null,
@@ -242,13 +243,58 @@ describe("resolveBotLogs", () => {
     expect(messages).toHaveLength(1);
   });
 
-  it("nomme un organisateur inconnu plutôt que d'écrire « null »", async () => {
-    mockDb([[{ ...TOURNAMENT_ROW, organizer_pseudo: null }]]);
+  it("ne nomme pas l'organisateur sur Discord, mais dans les journaux du serveur", async () => {
+    mockDb([[TOURNAMENT_ROW]]);
+    const info = jest.spyOn(console, "info").mockImplementation(() => {});
 
     const [entry] = await resolveBotLogs([{ kind: "tournament_created", tournamentId: 12 }]);
 
-    expect(entry.message).toContain("créé par le staff");
+    expect(entry.message).not.toContain("Kiro");
+    expect(entry.message).not.toContain("créé par");
+    const audit = String(info.mock.calls[0]?.[0]);
+    expect(audit).toContain("[staff-audit]");
+    expect(audit).toContain("Kiro (#3)");
+    info.mockRestore();
+  });
+
+  it("n'écrit pas d'audit quand l'organisateur a disparu, et jamais « null »", async () => {
+    mockDb([[{ ...TOURNAMENT_ROW, organizer_id: null, organizer_pseudo: null }]]);
+    const info = jest.spyOn(console, "info").mockImplementation(() => {});
+
+    const [entry] = await resolveBotLogs([{ kind: "tournament_created", tournamentId: 12 }]);
+
     expect(entry.message).not.toContain("null");
+    expect(info).not.toHaveBeenCalled();
+    info.mockRestore();
+  });
+
+  it("n'écrit jamais le nom d'un engagé de tournoi individuel — c'est un pseudo", async () => {
+    mockDb([[{ ...TOURNAMENT_ROW, participant_type: "SOLO" }], [{ name: "Nova" }]]);
+
+    const [entry] = await resolveBotLogs([
+      { kind: "registration", tournamentId: 12, teamId: 101, byStaff: false },
+    ]);
+
+    expect(entry.message).not.toContain("Nova");
+    expect(entry.message).toContain("un joueur");
+  });
+
+  it("anonymise les deux joueurs d'un match individuel et la championne", async () => {
+    mockDb([
+      [{ ...MATCH_ROW, participant_type: "SOLO", team1_name: "Nova", team2_name: "Kiro" }],
+      [{ ...TOURNAMENT_ROW, participant_type: "SOLO", champion_name: "Nova" }],
+    ]);
+
+    const [match, finished] = await resolveBotLogs([
+      { kind: "match_finished", matchId: 31 },
+      { kind: "tournament_finished", tournamentId: 12 },
+    ]);
+
+    for (const entry of [match, finished]) {
+      expect(entry.message).not.toContain("Nova");
+      expect(entry.message).not.toContain("Kiro");
+    }
+    expect(finished.message).toContain("un joueur l'emporte");
   });
 
   it("retombe sur le vocabulaire d'équipe quand le type de participant est douteux", async () => {

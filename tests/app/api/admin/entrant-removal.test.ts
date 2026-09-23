@@ -69,21 +69,29 @@ describe("DELETE /api/admin/tournaments/[id]/registrations/[teamId]", () => {
     expect(removeTournamentEntrant).toHaveBeenCalledWith(7, 102);
   });
 
-  it("journalise le retrait en nommant son auteur", async () => {
+  it("journalise le retrait : anonyme sur Discord, auteur nommé dans pm2", async () => {
     (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
+    const info = jest.spyOn(console, "info").mockImplementation(() => {});
 
     await remove("7", "102");
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
     const line = (sendBotLog as jest.Mock).mock.calls[0][0] as string;
     // Le canal est la **seule** trace qui subsiste d'une inscription effacée :
-    // elle doit porter le tournoi, l'engagé, l'auteur et l'effectif restant.
+    // elle porte le tournoi, l'engagé et l'effectif restant — l'auteur y est
+    // « le staff », jamais son pseudo.
     expect(line).toContain("BlueGenji Open");
     expect(line).toContain("#7");
     expect(line).toContain("Team Nova");
-    expect(line).toContain("Sifflet");
-    expect(line).toContain("#2");
     expect(line).toContain("15/16");
+    expect(line).toContain("par le staff");
+    expect(line).not.toContain("Sifflet");
+    // La modération retrouve l'auteur dans les journaux du serveur.
+    const audit = String(info.mock.calls[0]?.[0]);
+    expect(audit).toContain("[staff-audit]");
+    expect(audit).toContain("Sifflet (#2)");
+    expect(audit).toContain(line);
+    info.mockRestore();
   });
 
   it("répond malgré un bot injoignable", async () => {

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import {
   emptySiteVisitStats,
+  visitHashSalt,
   getSiteVisitStats,
   recordSiteVisit,
   resetSiteVisitSyncThrottle,
@@ -78,25 +79,49 @@ describe("recordSiteVisit", () => {
     expect(params[2]).toBe("/equipes/12");
   });
 
-  it("attache le compte connecté et interroge la bonne fenêtre", async () => {
+  it("marque un compte connecté sans jamais écrire son identifiant", async () => {
     const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await recordSiteVisit({ userId: 321, path: "/profil" });
 
-    const params = execute.mock.calls[0][1] as unknown[];
-    expect(params[1]).toBe(321);
+    const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
+    expect(sql).not.toContain("user_id");
+    expect(sql).toContain("authenticated");
+    expect(params[1]).toBe(1);
+    expect(params).not.toContain(321);
+    expect(JSON.stringify(params)).not.toContain("321");
     expect(params[3]).toBe(params[0]); // même empreinte pour la clause NOT EXISTS
     expect(params[4]).toBe(SITE_VISIT_WINDOW_MINUTES);
   });
 
-  it("laisse `user_id` nul pour un visiteur anonyme", async () => {
+  it("marque un visiteur anonyme comme non connecté", async () => {
     const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await recordSiteVisit({ userId: null, ip: "1.2.3.4", userAgent: "Chrome" });
 
-    expect((execute.mock.calls[0][1] as unknown[])[1]).toBeNull();
+    const params = execute.mock.calls[0][1] as unknown[];
+    expect(params[1]).toBe(0);
+    expect(JSON.stringify(params)).not.toContain("1.2.3.4");
+  });
+
+  it("l'empreinte d'un compte dépend du sel : sans le secret, on ne la renverse pas", async () => {
+    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }]);
+    await mockDb(execute);
+    const saved = process.env.VISIT_HASH_SALT;
+
+    process.env.VISIT_HASH_SALT = "secret-a";
+    await recordSiteVisit({ userId: 7, path: "/" });
+    process.env.VISIT_HASH_SALT = "secret-b";
+    resetVisitRateLimit();
+    await recordSiteVisit({ userId: 7, path: "/" });
+    process.env.VISIT_HASH_SALT = saved;
+
+    const first = (execute.mock.calls[0][1] as unknown[])[0];
+    const second = (execute.mock.calls[1][1] as unknown[])[0];
+    expect(first).not.toBe(second);
+    expect(String(first)).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it("donne la même empreinte à deux visites du même compte", async () => {
@@ -299,5 +324,43 @@ describe("syncSiteVisitStatsToBot", () => {
 
     await expect(syncSiteVisitStatsToBot()).resolves.toBe(true);
     expect(pushSiteVisitStats).toHaveBeenCalledWith(emptySiteVisitStats());
+  });
+});
+
+describe("visitHashSalt", () => {
+  it("prend VISIT_HASH_SALT, puis le secret interne du bot", () => {
+    expect(visitHashSalt({ VISIT_HASH_SALT: " sel ", BOT_INTERNAL_TOKEN: "jeton" } as NodeJS.ProcessEnv)).toBe("sel");
+    expect(visitHashSalt({ BOT_INTERNAL_TOKEN: "jeton" } as NodeJS.ProcessEnv)).toBe("jeton");
+  });
+
+  it("garde une constante hors production", () => {
+    expect(visitHashSalt({ NODE_ENV: "development" } as NodeJS.ProcessEnv)).toBe("bg-site-visits");
+  });
+
+  it("refuse un sel connu en production : une empreinte au sel public se renverse par énumération", () => {
+    expect(visitHashSalt({ NODE_ENV: "production" } as NodeJS.ProcessEnv)).toBeNull();
+    expect(visitHashSalt({ NODE_ENV: "production", VISIT_HASH_SALT: "  " } as NodeJS.ProcessEnv)).toBeNull();
+  });
+});
+
+describe("recordSiteVisit — sans secret en production", () => {
+  it("ne compte rien plutôt que de compter de façon réversible, et le dit une fois", async () => {
+    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }]);
+    await mockDb(execute);
+    resetVisitRateLimit();
+    const env = { ...process.env };
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    Object.assign(process.env, { NODE_ENV: "production" });
+    delete process.env.VISIT_HASH_SALT;
+    delete process.env.BOT_INTERNAL_TOKEN;
+    try {
+      expect(await recordSiteVisit({ userId: 1, path: "/" })).toEqual({ recorded: false });
+      expect(await recordSiteVisit({ userId: 2, path: "/" })).toEqual({ recorded: false });
+      expect(execute).not.toHaveBeenCalled();
+      expect(error).toHaveBeenCalledTimes(1);
+    } finally {
+      process.env = env;
+      error.mockRestore();
+    }
   });
 });

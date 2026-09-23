@@ -13,8 +13,8 @@ import { loadTournamentRow } from "@/lib/server/tournaments/repository";
 const ENTRANT = [
   {
     tournament_name: "Coupe BlueGenji",
+    participant_type: "TEAM",
     entrant_name: "Les Renards",
-    reporter_pseudo: "Kiro",
   },
 ];
 
@@ -59,9 +59,33 @@ describe("reportTournamentIssue", () => {
     const [message, context] = (pushRefereeAlert as jest.Mock).mock.calls[0] as [string, string];
     expect(context).toBe("issue-report");
     expect(message).toContain("Tournoi : Coupe BlueGenji");
-    expect(message).toContain("Auteur : Kiro (Les Renards)");
+    expect(message).toContain("Auteur : un joueur de l'équipe Les Renards");
     expect(message).toContain("Portée : tournoi entier");
     expect(message).toContain(VALID_MESSAGE);
+  });
+
+  it("ne lit ni n'envoie le pseudo de l'auteur", async () => {
+    const execute = await mockDb([ENTRANT]);
+
+    await reportTournamentIssue(7, 42, VALID_MESSAGE, null);
+
+    // La requête ne va même plus chercher le compte : rien à filtrer ensuite.
+    expect(String(execute.mock.calls[0]?.[0])).not.toContain("bg_users");
+  });
+
+  it("n'écrit que « un joueur » en tournoi individuel, auteur comme adversaires", async () => {
+    await mockDb([
+      [{ tournament_name: "Solo Cup", participant_type: "SOLO", entrant_name: "Kiro" }],
+      [{ bracket: "UPPER", round_number: 1, team1_name: "Kiro", team2_name: "Nova" }],
+    ]);
+
+    await reportTournamentIssue(7, 42, VALID_MESSAGE, 31);
+
+    const [message] = (pushRefereeAlert as jest.Mock).mock.calls[0] as [string];
+    expect(message).not.toContain("Kiro");
+    expect(message).not.toContain("Nova");
+    expect(message).toContain("Auteur : un joueur");
+    expect(message).toContain("un joueur vs un joueur (#31)");
   });
 
   it("décrit la manche visée quand le signalement porte sur un match", async () => {

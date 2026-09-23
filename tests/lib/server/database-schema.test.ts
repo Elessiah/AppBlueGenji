@@ -225,7 +225,9 @@ describe("Schéma — la règle des deux endroits", () => {
     // `CREATE TABLE` des tables de notification et les deux rattrapages
     // permanents gardent leur `catch` muet, et c'est voulu — un rappel perdu
     // vaut mieux qu'un report de score en erreur.
-    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(3);
+    // Cinq : la boucle des changements récents, les trois retraits de colonne
+    // et le report `user_id` → `authenticated` des visites qui précède le sien.
+    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(5);
     expect(migrations).not.toMatch(/catch\s*\{\s*\}/);
     expect(migrations).not.toMatch(/catch\s*\{\s*\/\/[^\n]*\n\s*\}/);
   });
@@ -285,10 +287,13 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     expect(drops).toEqual([
       "await db.execute(`ALTER TABLE bg_recruitment_ads DROP COLUMN contact_email`);",
       'const DROP_EMAIL = "ALTER TABLE bg_users DROP COLUMN email";',
+      // Les visites ne désignent plus de compte : seul `authenticated` reste.
+      'const DROP_VISIT_USER = "ALTER TABLE bg_site_visits DROP COLUMN user_id";',
     ]);
     // Et la liste des changements récents, jouée par la boucle.
     expect(code).toContain("for (const statement of RECENT_SCHEMA_CHANGES)");
     expect(code).toContain("await db.execute(DROP_EMAIL);");
+    expect(code).toContain("await db.execute(DROP_VISIT_USER);");
   });
 
   it("garde les trois tables tolérantes, dont des chemins accessoires dépendent", () => {

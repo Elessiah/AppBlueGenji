@@ -107,7 +107,21 @@ describe("DELETE /api/admin/tournaments/[id]", () => {
     const message = (sendBotLog as jest.Mock).mock.calls[0][0] as string;
     expect(message).toContain("BlueGenji Open");
     expect(message).toContain("#7");
-    expect(message).toContain("Root");
+    // L'administrateur n'est pas nommé sur Discord…
+    expect(message).toContain("par le staff");
+    expect(message).not.toContain("Root");
+  });
+
+  it("nomme l'administrateur dans les journaux du serveur (pm2)", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    const info = jest.spyOn(console, "info").mockImplementation(() => {});
+
+    await del("7");
+
+    const audit = String(info.mock.calls[0]?.[0]);
+    expect(audit).toContain("[staff-audit]");
+    expect(audit).toContain("Root (#1)");
+    info.mockRestore();
   });
 
   it("reste un succès si le bot est injoignable", async () => {
