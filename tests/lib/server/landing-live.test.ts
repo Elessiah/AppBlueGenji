@@ -328,9 +328,9 @@ describe("getLandingLive — fiche des engagés du match", () => {
  * sur tous les matchs de tous les tournois. Les remplacer par la colonne
  * `bg_tournament_registrations.seed` ne suffit pas : cette colonne porte l'ordre
  * d'inscription, qui n'est le **tirage** que dans les formats qui seedent depuis
- * elle (`isSeedOrderEffective`). En Suisse, en Survie et en multi-phases, le
- * moteur seede depuis le classement du site — annoncer un seed y serait la même
- * invention, avec un chiffre plus crédible.
+ * elle (`isSeedOrderEffective`). En Suisse, en Survie, en BG Survie et en
+ * multi-phases, le moteur seede depuis le classement du site — annoncer un seed
+ * y serait la même invention, avec un chiffre plus crédible.
  */
 describe("getLandingLive — seeds du match mis en avant", () => {
   beforeEach(() => {
@@ -346,18 +346,17 @@ describe("getLandingLive — seeds du match mis en avant", () => {
     expect(live?.currentMatch?.team2Seed).toBe(6);
   });
 
-  it("expose aussi les seeds d'une double élimination et d'une BG Survie", async () => {
-    for (const format of ["DOUBLE", "BG_SURVIE"] as const) {
-      clearCache();
-      await mockDb([matchRow({ team1_seed: 2, team2_seed: 7 })]);
-      const live = await liveFrom(buckets([card(1, "Coupe A", format)]));
-      expect(live?.currentMatch?.team1Seed).toBe(2);
-      expect(live?.currentMatch?.team2Seed).toBe(7);
-    }
+  it("expose aussi les seeds d'une double élimination", async () => {
+    await mockDb([matchRow({ team1_seed: 2, team2_seed: 7 })]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A", "DOUBLE")]));
+
+    expect(live?.currentMatch?.team1Seed).toBe(2);
+    expect(live?.currentMatch?.team2Seed).toBe(7);
   });
 
   it("n'annonce aucun seed dans les formats qui seedent depuis le classement du site", async () => {
-    for (const format of ["SWISS", "SURVIVAL", "MULTI"] as const) {
+    for (const format of ["SWISS", "SURVIVAL", "BG_SURVIE", "MULTI"] as const) {
       clearCache();
       await mockDb([matchRow({ team1_seed: 1, team2_seed: 2 })]);
       const live = await liveFrom(buckets([card(1, "Coupe A", format)]));
