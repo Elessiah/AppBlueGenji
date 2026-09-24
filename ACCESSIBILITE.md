@@ -66,18 +66,3 @@ pipeline de `CLAUDE.md`.
 - **À faire** : parcours complet avec NVDA (Windows) et VoiceOver (macOS / iOS)
   — connexion, inscription d'une équipe, report de score, menu d'accessibilité.
   Aucun test automatique ne remplace celui-là.
-
-## 18. Zones défilantes focusables même sans rien à faire défiler
-
-- **Critère** : WCAG 2.4.3 / 2.1.1 · RGAA 12.8 (ordre de tabulation), 12.6 (repères).
-- **Constat** : `components/cyber/ScrollArea.tsx` pose toujours `tabIndex={0}`
-  et, dès qu'un `ariaLabel` est fourni, `role="region"`. Quand le contenu tient
-  dans la zone (grand écran), c'est un arrêt de tabulation qui ne fait rien et
-  un repère de plus autour d'un contenu souvent déjà nommé — ex. le classement
-  de la ronde suisse (`SwissView.tsx`), « Classement du tournoi — défilement
-  horizontal » autour du tableau « Classement du tournoi », ou les rondes du
-  même écran.
-- **À faire** : ne rendre la zone focusable (et n'en faire une région) que
-  lorsqu'elle déborde réellement (`scrollWidth > clientWidth`, relu par un
-  `ResizeObserver`), en gardant le rendu serveur sûr (focusable par défaut ou
-  non — à trancher) ; vérifier chaque appelant qui compte sur le `role`.
