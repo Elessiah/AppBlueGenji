@@ -21,6 +21,25 @@ describe("defaultTournamentFormValues", () => {
     expect(v.maxTeams).toBe(16);
   });
 
+  it("propose un plafond de cinq manches qualificatives en BG Survie", () => {
+    const v = defaultTournamentFormValues();
+    expect(v.enduranceMaxRounds).toBe(5);
+    expect(toApiPayload({ ...v, name: "Coupe", format: "BG_SURVIE" }).enduranceMaxRounds).toBe(5);
+  });
+
+  it("coche d'office les égalités en qualification", () => {
+    const v = defaultTournamentFormValues();
+    expect(v.matchFormat?.drawsAllowed).toBe(true);
+    expect(toApiPayload({ ...v, name: "Coupe", format: "BG_SURVIE" }).matchFormatDraws).toBe(true);
+  });
+
+  // La case n'existe qu'en BG Survie : cochée par défaut, elle ne doit pas
+  // faire refuser la création d'un tournoi d'un autre format.
+  it("n'envoie pas les égalités par défaut hors BG Survie", () => {
+    const v = defaultTournamentFormValues();
+    expect(toApiPayload({ ...v, name: "Coupe", format: "SINGLE" }).matchFormatDraws).toBe(false);
+  });
+
   it("propose quatre jalons dans l'ordre chronologique", () => {
     const v = defaultTournamentFormValues();
     const t = (s: string) => new Date(s).getTime();
@@ -131,6 +150,24 @@ describe("toFormValues", () => {
     expect(v.survivalRoundsPerCut).toBe(defaults.survivalRoundsPerCut);
     expect(v.endurancePoints).toBe(defaults.endurancePoints);
     expect(v.phases).toEqual(defaults.phases);
+  });
+
+  // Un tournoi BG Survie enregistré sans plafond doit le rester à l'édition :
+  // retomber sur le défaut de création poserait un plafond que personne n'a
+  // choisi à la prochaine sauvegarde.
+  it("garde « aucun plafond » d'un tournoi BG Survie existant", () => {
+    const v = toFormValues({ ...apiValues, format: "BG_SURVIE", enduranceMaxRounds: null });
+    expect(v.enduranceMaxRounds).toBe(0);
+  });
+
+  it("garde le plafond enregistré d'un tournoi BG Survie", () => {
+    const v = toFormValues({ ...apiValues, format: "BG_SURVIE", enduranceMaxRounds: 7 });
+    expect(v.enduranceMaxRounds).toBe(7);
+  });
+
+  it("propose le plafond par défaut hors BG Survie, pour une bascule de format", () => {
+    const v = toFormValues({ ...apiValues, format: "SINGLE", enduranceMaxRounds: null });
+    expect(v.enduranceMaxRounds).toBe(defaultTournamentFormValues().enduranceMaxRounds);
   });
 
   it("rend une description absente comme une saisie vide", () => {
