@@ -53,8 +53,20 @@ Trois points :
   lever ; `CodedError` garde le code à côté du message, pour que le `catch` du
   formulaire retrouve le champ. Au passage, la création d'un tournoi affichait
   le **code brut** en notification (`INVALID_DATE_ORDER`) : elle passe
-  désormais par `mapError` — il en reste que ce registre ne connaît pas, voir
-  `ERREUR.txt`.
+  désormais par `mapError`.
+- **Tous les refus du formulaire ont leur phrase.** `mapError` ne connaissait
+  qu'une partie des codes de `validateTournamentInput` (format, jeu, type de
+  participants, réglages suisse, survie et endurance, plan de phases) et rendait
+  les autres **tels quels**. Les phrases de phase vivent dans
+  `PHASE_ERROR_MESSAGES` (`creer/phase-form.ts`), table unique que lisent
+  `phaseErrorMessage` (contrôle local du plan) et `ERROR_MESSAGES` (refus du
+  serveur) ; `INVALID_SWISS_ROUNDS` et `INVALID_SURVIVAL_ROUNDS`, émis aussi
+  bien pour un tournoi que pour une phase, restent dans `ERROR_MESSAGES` avec
+  une phrase qui vaut dans les deux cas. Et un **code** que la table ignore
+  retombe désormais sur une phrase générique (`UNKNOWN_ERROR_MESSAGE`) plutôt
+  que sur lui-même — ce qui n'a pas la forme d'un code (une phrase déjà rédigée,
+  un échec réseau du navigateur) passe inchangé. Un balayage des sources de la
+  validation tient la table à jour (`tests/tournois/error-map.test.ts`).
 
 Au passage aussi, les étiquettes de `/connexion` n'étaient associées à **aucun**
 champ (`<label>` sans `htmlFor`) : elles le sont, et le code porte
