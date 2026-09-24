@@ -1721,6 +1721,13 @@ html {
   outline: none;
 }
 
+/* Les en-têtes de la vitrine et de l'espace connecté sont collants : une cible
+   ramenée en haut de la vue passerait dessous (WCAG 2.4.11). La marge couvre
+   la hauteur de l'en-tête, bannière de recrutement comprise. */
+[data-skip-target] {
+  scroll-margin-top: 96px;
+}
+
 @media (forced-colors: active) {
   .skip-link {
     border-color: CanvasText;
