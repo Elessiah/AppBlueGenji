@@ -237,7 +237,9 @@ les listes de la même façon.
 (« Prêt », lancement forcé ou d'office, ouverture du délai), hôte, caster,
 diffusion d'un match, horaire, rediff : ces écritures ne touchent ni
 `bg_tournaments`, ni les inscrites, ni un résultat. Elles passent donc par
-`publishMatchUpdatedEvent`, qui n'oublie que l'instantané du tournoi — plus le
+`publishMatchUpdatedEvent` (événement `match_updated`, distinct de `updated`
+pour qu'aucun abonné ne confonde les deux mesures), qui n'oublie que
+l'instantané du tournoi — plus le
 direct de l'accueil (`landing:live`) quand l'antenne bouge (`{ onAir: true }`).
 
 Elles passaient par `publishUpdatedEvent`, apparues avec le lancement des

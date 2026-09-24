@@ -66,7 +66,7 @@ export function publishMatchUpdatedEvent(
   invalidateTournamentSnapshot(tournamentId);
   if (options.onAir) invalidateLandingLive();
   publishTournamentEvent({
-    type: "updated",
+    type: "match_updated",
     tournamentId,
     emittedAt: new Date().toISOString(),
   });

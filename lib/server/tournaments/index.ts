@@ -51,7 +51,6 @@ export type { DeletedTournament } from "./deletion";
 
 // Notifications
 export {
-  publishMatchUpdatedEvent,
   publishUpdatedEvent,
   publishScoreReportedEvent,
   publishScoreResolvedEvent,

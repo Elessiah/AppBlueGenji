@@ -3,7 +3,9 @@ import { cached, clearCache } from "@/lib/server/cache";
 import {
   LANDING_TTL_MS,
   cachedLanding,
+  LANDING_LIVE_KEY,
   invalidateLandingAggregates,
+  invalidateLandingLive,
 } from "@/lib/server/landing-cache";
 
 /**
@@ -42,6 +44,29 @@ describe("cache de la vitrine", () => {
       expect(loader).toHaveBeenCalledTimes(2);
     },
   );
+
+  // Le test des notifications vérifie que l'invalidateur du direct est appelé ;
+  // celui-ci qu'il atteint bien l'entrée que `getLandingLive` écrit.
+  it("oublie le direct à l'invalidation du direct", async () => {
+    const loader = jest.fn(async () => "valeur");
+    await cachedLanding(LANDING_LIVE_KEY, LANDING_TTL_MS, loader as () => Promise<string>);
+
+    invalidateLandingLive();
+    await cachedLanding(LANDING_LIVE_KEY, LANDING_TTL_MS, loader as () => Promise<string>);
+
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("laisse le reste de la vitrine en place à l'invalidation du direct", async () => {
+    // Un réglage d'antenne ne doit pas relancer compteurs, classement et ticker.
+    const loader = jest.fn(async () => "valeur");
+    await cachedLanding("stats", LANDING_TTL_MS, loader as () => Promise<string>);
+
+    invalidateLandingLive();
+    await cachedLanding("stats", LANDING_TTL_MS, loader as () => Promise<string>);
+
+    expect(loader).toHaveBeenCalledTimes(1);
+  });
 
   it("range ses entrées sous un préfixe qui lui est propre", async () => {
     // Sans préfixe distinct, invalider la vitrine emporterait les instantanés

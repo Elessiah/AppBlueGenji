@@ -151,8 +151,10 @@ describe("notifications — événements publiés", () => {
 
   it("réveille la salle du tournoi à un changement de match", () => {
     publishMatchUpdatedEvent(7);
+    // Type distinct de `updated` : un abonné ne doit pas pouvoir prendre un
+    // changement de match pour une mise à jour du tournoi.
     expect(publishEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "updated", tournamentId: 7 }),
+      expect.objectContaining({ type: "match_updated", tournamentId: 7 }),
     );
   });
 

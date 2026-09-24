@@ -1,7 +1,12 @@
 ﻿import { EventEmitter } from "node:events";
 
 type TournamentLiveEvent = {
-  type: "updated" | "score_reported" | "score_resolved";
+  /**
+   * `match_updated` : un match a changé sans que son résultat bouge (lancement,
+   * antenne, horaire…). Distinct de `updated`, qui dit qu'un tournoi a changé,
+   * pour qu'aucun abonné ne confonde les deux mesures.
+   */
+  type: "updated" | "match_updated" | "score_reported" | "score_resolved";
   tournamentId: number;
   matchId?: number;
   emittedAt: string;
