@@ -1151,12 +1151,28 @@ async function runMigrations(db: Pool): Promise<void> {
   // pas de colonne neuve dont l'ajout effectif ferait foi, comme pour
   // `launched_at`.
   //
-  // Le remplissage **précède** le changement de défaut : s'il échoue (verrou de
-  // ligne sur `bg_users`), le défaut reste à 1 et tout se retente au démarrage
-  // suivant ; dans l'ordre inverse, un remplissage raté ne serait jamais rejoué.
+  // L'ordre est le propos. Le défaut bascule **d'abord** : un compte créé par un
+  // autre processus pendant la manœuvre naît donc fermé, ou existe déjà quand le
+  // remplissage passe — dans l'ordre inverse, celui qui naissait entre les deux
+  // gardait le défaut 1 pour toujours. Et un `ALTER` refusé n'entraîne aucun
+  // remplissage : sans quoi, rejoué à chaque démarrage faute de bascule, il
+  // refermerait la case des joueurs qui l'ont cochée entre-temps. Si c'est le
+  // **remplissage** qui échoue (verrou de ligne sur `bg_users`), le défaut est
+  // remis à 1 pour que tout se retente au démarrage suivant.
+  //
   // « Sans équipe » est la lecture de l'annuaire (`listPlayers`) : aucune
-  // appartenance en cours.
+  // appartenance en cours. Ce bloc se retire une fois la bascule constatée en
+  // production (`pm2 logs` : « Défaut de bg_users.open_to_recruitment passé
+  // à 0 »), la définition restant dans le `CREATE TABLE`.
   const OPEN_TO_RECRUITMENT_DEFAULT = "ALTER TABLE bg_users ALTER COLUMN open_to_recruitment SET DEFAULT 0";
+  const OPEN_TO_RECRUITMENT_BACKFILL = `UPDATE bg_users u
+            SET u.open_to_recruitment = 0
+          WHERE u.open_to_recruitment = 1
+            AND NOT EXISTS (
+              SELECT 1 FROM bg_team_members tm
+               WHERE tm.user_id = u.id AND tm.left_at IS NULL
+            )`;
+  let currentDefault: string | null = null;
   try {
     const [defaultRows] = await db.execute<(RowDataPacket & { columnDefault: string | null })[]>(
       `SELECT COLUMN_DEFAULT AS columnDefault
@@ -1165,25 +1181,39 @@ async function runMigrations(db: Pool): Promise<void> {
           AND TABLE_NAME = 'bg_users'
           AND COLUMN_NAME = 'open_to_recruitment'`,
     );
-    const currentDefault = defaultRows[0]?.columnDefault ?? null;
-    if (currentDefault !== null && currentDefault !== "0") {
-      const [closed] = await db.execute<ResultSetHeader>(
-        `UPDATE bg_users u
-            SET u.open_to_recruitment = 0
-          WHERE u.open_to_recruitment = 1
-            AND NOT EXISTS (
-              SELECT 1 FROM bg_team_members tm
-               WHERE tm.user_id = u.id AND tm.left_at IS NULL
-            )`,
-      );
-      await db.execute(OPEN_TO_RECRUITMENT_DEFAULT);
-      console.log(
-        `[migrations] Défaut de bg_users.open_to_recruitment passé à 0 : ` +
-          `${closed.affectedRows} joueur(s) sans équipe passé(s) « sans équipe ».`,
-      );
-    }
+    currentDefault = defaultRows[0]?.columnDefault ?? null;
   } catch (error) {
-    reportSchemaFailure(error, OPEN_TO_RECRUITMENT_DEFAULT);
+    reportSchemaFailure(error, "lecture du défaut de bg_users.open_to_recruitment");
+  }
+  if (currentDefault !== null && currentDefault !== "0") {
+    let defaultSwitched = false;
+    try {
+      await db.execute(OPEN_TO_RECRUITMENT_DEFAULT);
+      defaultSwitched = true;
+    } catch (error) {
+      reportSchemaFailure(error, OPEN_TO_RECRUITMENT_DEFAULT);
+    }
+    if (defaultSwitched) {
+      try {
+        const [closed] = await db.execute<ResultSetHeader>(OPEN_TO_RECRUITMENT_BACKFILL);
+        console.log(
+          `[migrations] Défaut de bg_users.open_to_recruitment passé à 0 : ` +
+            `${closed.affectedRows} joueur(s) sans équipe passé(s) « sans équipe ».`,
+        );
+      } catch (error) {
+        reportSchemaFailure(error, "UPDATE bg_users SET open_to_recruitment = 0 (joueurs sans équipe)");
+        try {
+          await db.execute(`ALTER TABLE bg_users ALTER COLUMN open_to_recruitment SET DEFAULT 1`);
+        } catch (restoreError) {
+          // Le défaut reste à 0 : la garde ne redemandera plus le remplissage.
+          console.error(
+            "[migrations] Le passage « sans équipe » des joueurs a échoué et le défaut n'a pas pu " +
+              "être remis à 1 : le remplissage ne sera pas rejoué, il est à jouer à la main.",
+            restoreError,
+          );
+        }
+      }
+    }
   }
 
   // **Un retrait de colonne ne se replie pas.** Une colonne qui part n'a aucune

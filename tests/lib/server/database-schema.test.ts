@@ -230,7 +230,14 @@ describe("Schéma — la règle des deux endroits", () => {
     const block = () => {
       const start = migrations.indexOf("const OPEN_TO_RECRUITMENT_DEFAULT");
       expect(start).toBeGreaterThan(-1);
-      return migrations.slice(start, migrations.indexOf("reportSchemaFailure(error, OPEN_TO_RECRUITMENT_DEFAULT)"));
+      return migrations.slice(start, migrations.indexOf("// **Un retrait de colonne ne se replie pas.**"));
+    };
+    const backfill = () => {
+      const code = block();
+      return code.slice(
+        code.indexOf("const OPEN_TO_RECRUITMENT_BACKFILL"),
+        code.indexOf("let currentDefault"),
+      );
     };
 
     it("crée la colonne fermée sur une base neuve", () => {
@@ -251,23 +258,53 @@ describe("Schéma — la règle des deux endroits", () => {
       const code = block();
       expect(code).toContain("COLUMN_DEFAULT");
       expect(code).toMatch(/if \(currentDefault !== null && currentDefault !== "0"\)/);
-      const guard = code.indexOf("if (currentDefault");
-      expect(code.indexOf("UPDATE bg_users u")).toBeGreaterThan(guard);
+      expect(code.indexOf("await db.execute<ResultSetHeader>(OPEN_TO_RECRUITMENT_BACKFILL)")).toBeGreaterThan(
+        code.indexOf("if (currentDefault"),
+      );
     });
 
-    it("remplit **avant** de basculer le défaut, pour qu'un échec se retente", () => {
+    it("bascule le défaut **avant** de remplir, et ne remplit que si la bascule a eu lieu", () => {
+      // Dans l'ordre inverse, un compte né entre les deux gardait le défaut 1
+      // pour toujours ; et un ALTER refusé rejouerait le remplissage à chaque
+      // démarrage, refermant les cases cochées entre-temps.
       const code = block();
-      expect(code.indexOf("UPDATE bg_users u")).toBeLessThan(
-        code.indexOf("await db.execute(OPEN_TO_RECRUITMENT_DEFAULT);"),
+      const alter = code.indexOf("await db.execute(OPEN_TO_RECRUITMENT_DEFAULT);");
+      const guard = code.indexOf("if (defaultSwitched)");
+      const update = code.indexOf("await db.execute<ResultSetHeader>(OPEN_TO_RECRUITMENT_BACKFILL)");
+      expect(alter).toBeGreaterThan(-1);
+      expect(guard).toBeGreaterThan(alter);
+      expect(update).toBeGreaterThan(guard);
+      expect(code.slice(alter, guard)).toContain("defaultSwitched = true;");
+    });
+
+    it("remet le défaut à 1 quand le remplissage échoue, pour qu'il se retente", () => {
+      const code = block();
+      const failure = code.slice(code.indexOf("await db.execute<ResultSetHeader>(OPEN_TO_RECRUITMENT_BACKFILL)"));
+      expect(failure).toContain("ALTER TABLE bg_users ALTER COLUMN open_to_recruitment SET DEFAULT 1");
+      // Et le dit quand même cela échoue : le remplissage ne serait plus rejoué.
+      expect(failure).toContain("il est à jouer à la main");
+    });
+
+    it("nomme l'étape qui a échoué, au lieu d'accuser toujours l'ALTER", () => {
+      const code = block();
+      expect(code).toContain('reportSchemaFailure(error, "lecture du défaut de bg_users.open_to_recruitment")');
+      expect(code).toContain("reportSchemaFailure(error, OPEN_TO_RECRUITMENT_DEFAULT)");
+      expect(code).toContain(
+        'reportSchemaFailure(error, "UPDATE bg_users SET open_to_recruitment = 0 (joueurs sans équipe)")',
       );
     });
 
     it("ne ferme que les joueurs sans appartenance en cours", () => {
-      const code = block();
-      const update = code.slice(code.indexOf("UPDATE bg_users u"), code.indexOf("await db.execute(OPEN_TO_RECRUITMENT_DEFAULT);"));
+      const update = backfill();
       expect(update).toContain("SET u.open_to_recruitment = 0");
       expect(update).toContain("WHERE u.open_to_recruitment = 1");
       expect(update).toMatch(/NOT EXISTS \(\s*SELECT 1 FROM bg_team_members tm\s*WHERE tm\.user_id = u\.id AND tm\.left_at IS NULL/);
+    });
+
+    it("dit quand le bloc pourra partir", () => {
+      const start = migrations.indexOf("// `open_to_recruitment` : un compte neuf");
+      const comment = migrations.slice(start, migrations.indexOf("const OPEN_TO_RECRUITMENT_DEFAULT"));
+      expect(comment).toContain("Ce bloc se retire une fois la bascule constatée en");
     });
   });
 
@@ -281,11 +318,12 @@ describe("Schéma — la règle des deux endroits", () => {
     // `CREATE TABLE` des tables de notification et les deux rattrapages
     // permanents gardent leur `catch` muet, et c'est voulu — un rappel perdu
     // vaut mieux qu'un report de score en erreur.
-    // Sept : la boucle des changements récents, les trois retraits de colonne,
+    // Neuf : la boucle des changements récents, les trois retraits de colonne,
     // le report `user_id` → `authenticated` des visites qui précède le sien,
-    // `launched_at`, dont le remplissage ne suit que l'ajout effectif, et le
-    // défaut de `open_to_recruitment`, dont le remplissage ne suit que la bascule.
-    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(7);
+    // `launched_at`, dont le remplissage ne suit que l'ajout effectif, et les
+    // trois étapes du défaut de `open_to_recruitment` (lecture, bascule,
+    // remplissage), chacune sous son propre libellé.
+    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(9);
     expect(migrations).not.toMatch(/catch\s*\{\s*\}/);
     expect(migrations).not.toMatch(/catch\s*\{\s*\/\/[^\n]*\n\s*\}/);
   });
