@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/toast";
+import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   type AboutPillar,
   ABOUT_PILLAR_TEXT_MAX,
@@ -29,22 +31,19 @@ export function AboutPillars({ initialPillars, isAdmin }: AboutPillarsProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const titleInputRef = useRef<HTMLInputElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // La modale est portée dans <body> : rendue dans la section, elle restait
+  // prisonnière de son contexte d'empilement (`position: relative; z-index: 1`)
+  // et passait sous la section des partenaires au défilement.
+  useEffect(() => setMounted(true), []);
+
+  // Focus initial (champ Titre), Échap, piège de tabulation et verrou du
+  // défilement de la page, tant que la modale est ouverte.
+  const dialogRef = useDialogBehavior({ open: open && mounted, onClose: close, locked: busy });
 
   // Les cartes de secours (id négatif) ne sont pas en base : non modifiables.
   const canManage = (p: AboutPillar) => isAdmin && p.id > 0;
-
-  // Fermeture au clavier (Échap) + focus initial sur le champ Titre à l'ouverture.
-  useEffect(() => {
-    if (!open) return;
-    titleInputRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) close();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, busy]);
 
   function openCreate() {
     setEditing(null);
@@ -224,9 +223,10 @@ export function AboutPillars({ initialPillars, isAdmin }: AboutPillarsProps) {
         </button>
       )}
 
-      {open && (
+      {open && mounted && createPortal(
         <div className={styles.modalOverlay} onClick={close} role="presentation">
           <div
+            ref={dialogRef}
             className={styles.modal}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
@@ -240,7 +240,6 @@ export function AboutPillars({ initialPillars, isAdmin }: AboutPillarsProps) {
             <label className={styles.modalField}>
               <span className={styles.modalLabel}>Titre</span>
               <input
-                ref={titleInputRef}
                 className={styles.modalInput}
                 value={form.title}
                 maxLength={ABOUT_PILLAR_TITLE_MAX}
@@ -277,7 +276,8 @@ export function AboutPillars({ initialPillars, isAdmin }: AboutPillarsProps) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
