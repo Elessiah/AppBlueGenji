@@ -50,11 +50,12 @@ export function playerPageTitle(player: PlayerPageIdentity | null): string {
 }
 
 /**
- * Identifiant de fiche lu dans l'URL : un entier strictement positif en base
- * 10, sans rien autour. Tout le reste ne désigne aucune fiche.
+ * Identifiant de fiche lu dans l'URL, **par la même règle que la page** : la
+ * fiche le passe tel quel à son API, qui le lit par `Number` (`/equipes/012`
+ * affiche l'équipe 12). Une règle plus stricte ici donnerait un titre générique
+ * à une page qui, elle, nomme bien l'équipe.
  */
 export function parseEntityPageId(raw: string): number | null {
-  if (!/^[1-9]\d*$/.test(raw)) return null;
   const id = Number(raw);
-  return Number.isSafeInteger(id) ? id : null;
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
 }

@@ -128,28 +128,43 @@ describe("classement de la ronde suisse", () => {
     expect(count(withAction, "<button")).toBe(1);
   });
 
-  it("réserve la largeur du bouton dans l'en-tête par un fantôme muet", () => {
-    const html = render(TWO_TEAMS, { canForfeit: () => true });
-    expect(html).toMatch(/<span class="btn" aria-hidden="true" style="[^"]*visibility:hidden[^"]*">Abandonner<\/span>/);
-  });
-
   it("fait commencer le nom du bouton d'abandon par son texte visible (WCAG 2.5.3)", () => {
     const html = render(TWO_TEAMS, { canForfeit: () => true });
     expect(html).toContain("aria-label=\"Abandonner : déclarer l&#x27;abandon de Frost Alliance\"");
   });
 
-  it("défile à l'horizontale sur un écran étroit plutôt que d'écraser le nom", () => {
+  it("aligne ses colonnes par une grille à sous-grilles, sans largeur écrite à la main", () => {
     const html = render(TWO_TEAMS);
-    expect(html).toContain('role="region" aria-label="Classement du tournoi — défilement horizontal"');
-    expect(html).toMatch(/role="table" aria-label="Classement du tournoi" style="min-width:380px"/);
-    // La colonne d'action élargit le plancher d'autant que le bouton.
-    expect(render(TWO_TEAMS, { canForfeit: () => true })).toMatch(/style="min-width:500px"/);
+    // Les colonnes suivent leur cellule la plus large ; seul le nom est élastique,
+    // avec un plancher qui suit la police.
+    expect(html).toContain("grid-template-columns:auto minmax(6em, 1fr) auto auto auto auto auto;");
+    expect(count(html, "grid-template-columns:subgrid")).toBe(2 + TWO_TEAMS.length + 1);
+    // Aucune largeur de colonne écrite à la main dans le tableau, aucun fantôme.
+    const table = html.slice(html.indexOf('role="table"'), html.indexOf("À points égaux"));
+    expect(table).not.toMatch(/(?:min-)?width:\d+px/);
+    expect(table).not.toContain("visibility:hidden");
+    // La colonne d'action ajoute une piste, rien de plus.
+    expect(render(TWO_TEAMS, { canForfeit: () => true })).toContain(
+      "grid-template-columns:auto minmax(6em, 1fr) auto auto auto auto auto auto;",
+    );
+  });
+
+  it("défile à l'horizontale sous le plancher du nom", () => {
+    expect(render(TWO_TEAMS)).toContain(
+      'role="region" aria-label="Classement du tournoi — défilement horizontal"',
+    );
   });
 
   it("remplace le tableau par une phrase quand aucune équipe n'est classée", () => {
     const html = render([]);
     expect(html).not.toContain('role="table"');
     expect(html).toContain("Aucune équipe classée pour l&#x27;instant.");
+  });
+
+  it("ne promet aucune suite à un tournoi clos sans équipe classée", () => {
+    const html = render([], { isFinished: true });
+    expect(html).toContain("Aucune équipe classée.</p>");
+    expect(html).not.toContain("Aucune équipe classée pour");
   });
 
   it("ne propose aucun abandon sur un tournoi terminé", () => {

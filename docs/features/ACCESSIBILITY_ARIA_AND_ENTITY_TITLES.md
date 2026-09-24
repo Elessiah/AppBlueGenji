@@ -21,16 +21,18 @@ vérifier » sur `/tournois/[id]`. Trois nœuds en cause :
   par ligne qui remplaçait son contenu. La liste rendue sans équipe laissait
   `aria-required-children` à vérifier ; surtout, un classement à colonnes est
   un **tableau**. Il passe en `role="table"` / `rowgroup` / `row` /
-  `columnheader` / `cell` — les lignes gardent leur mise en page `flex` —, les
+  `columnheader` / `cell`, les
   intitulés abrégés (« Pts », « Bch ») portent leur nom complet, la coche de
   victoire d'office est dite en toutes lettres, et la colonne d'action
-  n'existe que si une ligne au moins porte le bouton d'abandon (un fantôme
-  invisible du bouton réserve sa largeur dans l'en-tête, « Statut » s'aligne
-  enfin sur les statuts). Sans équipe classée, une phrase remplace le tableau.
-  Sur un écran étroit, colonnes fixes et bouton écrasaient le nom à zéro : le
-  tableau garde une largeur minimale (380 px, 500 avec la colonne d'action) et
-  défile à l'horizontale dans une `ScrollArea` — un tableau de données est
-  l'exception que prévoit WCAG 1.4.10.
+  n'existe que si une ligne au moins porte le bouton d'abandon. La mise en page
+  est une **grille à sous-grilles** (`grid-template-columns: subgrid` sur les
+  groupes et les lignes) : chaque colonne prend la largeur de sa cellule la plus
+  large — en-tête, statut, bouton, police agrandie comprise —, et « Statut »
+  s'aligne enfin sur les statuts. Seul le nom est élastique, avec un plancher
+  de `6em` ; en dessous, sur un écran étroit où il était écrasé à zéro, le
+  tableau défile à l'horizontale dans une `ScrollArea` — un tableau de données
+  est l'exception que prévoit WCAG 1.4.10. Sans équipe classée, une phrase
+  remplace le tableau (sans « pour l'instant » sur un tournoi clos).
   Le bouton d'abandon d'une autre équipe commence désormais par son texte
   visible (« Abandonner : déclarer l'abandon de … », WCAG 2.5.3).
 - **Modale de lancement de match** (`MatchLaunchCenter.tsx`) : le « VS » du
@@ -41,6 +43,9 @@ vérifier » sur `/tournois/[id]`. Trois nœuds en cause :
   fiche de joueur, les contacts d'une annonce de recrutement reçoivent
   `role="group"`. Le balayage `tests/app/aria-prohibited-attr.test.ts` couvre
   désormais tout `app/` et `components/`.
+- **Reste ouvert** : `ScrollArea` est toujours focusable et toujours une
+  région, même quand rien ne déborde — c'est le composant partagé, consigné en
+  tâche 18 d'`ACCESSIBILITE.md`.
 
 ## 16. Titres des fiches d'équipe et de joueur (WCAG 2.4.2 · RGAA 8.6)
 

@@ -56,15 +56,18 @@ describe("playerPageTitle", () => {
 });
 
 describe("parseEntityPageId", () => {
+  // Même lecture que la page et son API (`Number`) : un identifiant qu'elles
+  // acceptent doit donner le titre de la fiche qu'elles affichent.
   it.each<[string, number]>([
     ["1", 1],
     ["42", 42],
+    ["012", 12],
     ["9007199254740991", Number.MAX_SAFE_INTEGER],
   ])("lit %s", (raw, expected) => {
     expect(parseEntityPageId(raw)).toBe(expected);
   });
 
-  it.each(["0", "-3", "01", "1.5", "1e3", " 7", "7 ", "abc", "", "0x10", "9007199254740993"])(
+  it.each(["0", "-3", "1.5", "abc", "", "12abc", "9007199254740993", "Infinity"])(
     "refuse « %s »",
     (raw) => {
       expect(parseEntityPageId(raw)).toBeNull();

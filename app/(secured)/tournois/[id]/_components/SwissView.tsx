@@ -37,16 +37,27 @@ interface SwissViewProps {
 }
 
 /**
- * Largeur sous laquelle le classement défile plutôt que d'écraser le nom : les
- * colonnes fixes (≈ 280 px, espacements compris) et environ 80 px de nom — le
- * bouton d'abandon, quand sa colonne existe, en demande 120 de plus.
+ * Pistes du classement. Toutes les colonnes prennent la largeur de leur cellule
+ * la plus large, sauf le nom, qui prend le reste — avec un plancher, sans quoi
+ * un écran étroit l'écrasait à zéro. La colonne d'action n'existe que si une
+ * ligne au moins porte le bouton d'abandon.
  */
-const STANDINGS_MIN_WIDTH = 380;
-const STANDINGS_MIN_WIDTH_WITH_ACTION = 500;
+function standingsColumns(withAction: boolean): string {
+  return `auto minmax(6em, 1fr) auto auto auto auto auto${withAction ? " auto" : ""}`;
+}
 
-/** Bouton d'abandon du classement — partagé avec son fantôme d'en-tête. */
+/** Groupe ou ligne du classement : reprend les colonnes du tableau. */
+const SUBGRID: CSSProperties = {
+  display: "grid",
+  gridColumn: "1 / -1",
+  gridTemplateColumns: "subgrid",
+};
+
+const RIGHT: CSSProperties = { textAlign: "right" };
+const SECONDARY: CSSProperties = { fontSize: 12, color: "var(--text-2)" };
+
+/** Bouton d'abandon du classement. */
 const FORFEIT_BUTTON_STYLE: CSSProperties = {
-  flexShrink: 0,
   padding: "3px 8px",
   fontSize: 10,
   textTransform: "uppercase",
@@ -156,19 +167,23 @@ export function SwissView({
           {/* Un **tableau**, et non une liste : l'en-tête de colonnes est ce qui
               rend « 9 · 3-0-1 · 24 » lisible, et une liste le laissait à l'œil
               seul (`aria-hidden`), chaque ligne répétant ses intitulés dans un
-              `aria-label` qui écrasait son contenu. Les rôles ARIA gardent la
-              mise en page en `flex` des lignes ; `role="list"` rendu vide (aucune
-              équipe classée) laissait en outre `aria-required-children` à
-              vérifier. La colonne de statut est réservée dans l'en-tête, sinon
-              les chiffres dérivent d'un cran vers la droite sous leur intitulé.
-              Sur un écran étroit, les colonnes fixes et le bouton d'abandon
-              écrasaient le nom à zéro et les points s'imprimaient par-dessus
-              l'emblème : le tableau garde une largeur minimale et défile à
-              l'horizontale — un tableau de données est l'exception que prévoit
-              la règle de redistribution (WCAG 1.4.10). */}
+              `aria-label` qui écrasait son contenu ; vide, elle laissait en
+              outre `aria-required-children` à vérifier.
+
+              La mise en page est une **grille à sous-grilles** : chaque groupe
+              et chaque ligne reprend les pistes du tableau (`subgrid`), si bien
+              qu'une colonne prend d'elle-même la largeur de sa cellule la plus
+              large — en-tête, statut ou bouton d'abandon compris, police agrandie
+              par le menu d'accessibilité comprise. Des lignes en `flex`
+              séparées devaient se caler sur des largeurs écrites à la main, et
+              le nom, seule colonne élastique, était écrasé à zéro sur un écran
+              étroit. Il garde désormais un plancher (en `em`, qui suit la
+              police) ; en dessous, le tableau défile à l'horizontale — un
+              tableau de données est l'exception que prévoit la règle de
+              redistribution (WCAG 1.4.10). */}
           {swiss.standings.length === 0 ? (
             <p style={{ margin: 0, fontSize: 13, color: "var(--text-2)" }}>
-              Aucune équipe classée pour l&apos;instant.
+              {isFinished ? "Aucune équipe classée." : "Aucune équipe classée pour l'instant."}
             </p>
           ) : (
             <ScrollArea ariaLabel="Classement du tournoi — défilement horizontal">
@@ -176,16 +191,16 @@ export function SwissView({
                 role="table"
                 aria-label="Classement du tournoi"
                 style={{
-                  minWidth: anyForfeitable ? STANDINGS_MIN_WIDTH_WITH_ACTION : STANDINGS_MIN_WIDTH,
+                  display: "grid",
+                  gridTemplateColumns: standingsColumns(anyForfeitable),
+                  columnGap: 10,
                 }}
               >
-                <div role="rowgroup">
+                <div role="rowgroup" style={SUBGRID}>
                   <div
                     role="row"
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
+                      ...SUBGRID,
                       padding: "4px 10px",
                       fontSize: 10,
                       textTransform: "uppercase",
@@ -193,24 +208,17 @@ export function SwissView({
                       color: "var(--text-2)",
                     }}
                   >
-                    <span role="columnheader" aria-label="Rang" style={{ width: 22 }}>
+                    <span role="columnheader" aria-label="Rang">
                       #
                     </span>
-                    <span role="columnheader" style={{ flex: "1 1 72px", minWidth: 0 }}>
-                      Équipe
-                    </span>
-                    <span
-                      role="columnheader"
-                      aria-label="Points"
-                      style={{ width: 34, textAlign: "right" }}
-                      title="Points"
-                    >
+                    <span role="columnheader">Équipe</span>
+                    <span role="columnheader" aria-label="Points" style={RIGHT} title="Points">
                       Pts
                     </span>
                     <span
                       role="columnheader"
                       aria-label="Victoires-Nuls-Défaites"
-                      style={{ width: 52, textAlign: "right" }}
+                      style={RIGHT}
                       title="Victoires-Nuls-Défaites"
                     >
                       V-N-D
@@ -218,30 +226,20 @@ export function SwissView({
                     <span
                       role="columnheader"
                       aria-label="Buchholz"
-                      style={{ width: 38, textAlign: "right" }}
+                      style={RIGHT}
                       title="Buchholz : somme des points des adversaires rencontrés"
                     >
                       Bch
                     </span>
-                    <span role="columnheader" style={{ width: 10, flexShrink: 0 }}>
+                    <span role="columnheader">
                       <span className="sr-only">Victoire d&apos;office</span>
                     </span>
-                    <span role="columnheader" style={{ minWidth: 62, textAlign: "right" }}>
+                    <span role="columnheader" style={RIGHT}>
                       Statut
                     </span>
                     {anyForfeitable && (
-                      // La colonne prend la largeur du bouton : un fantôme invisible
-                      // du même bouton la réserve, sans quoi « Statut » glissait à
-                      // l'aplomb du bouton plutôt que du statut.
-                      <span role="columnheader" style={{ display: "flex", flexShrink: 0 }}>
+                      <span role="columnheader">
                         <span className="sr-only">Action</span>
-                        <span
-                          className="btn"
-                          aria-hidden="true"
-                          style={{ ...FORFEIT_BUTTON_STYLE, visibility: "hidden", height: 0, paddingBlock: 0, borderBlockWidth: 0 }}
-                        >
-                          Abandonner
-                        </span>
                       </span>
                     )}
                   </div>
@@ -249,7 +247,12 @@ export function SwissView({
 
                 <div
                   role="rowgroup"
-                  style={{ border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}
+                  style={{
+                    ...SUBGRID,
+                    border: `1px solid ${BORDER}`,
+                    borderRadius: 8,
+                    overflow: "hidden",
+                  }}
                 >
                   {swiss.standings.map((team, idx) => {
                     // Tournoi clos : la tête du classement est championne, pas « en lice ».
@@ -266,9 +269,8 @@ export function SwissView({
                         key={team.teamId}
                         role="row"
                         style={{
-                          display: "flex",
+                          ...SUBGRID,
                           alignItems: "center",
-                          gap: 10,
                           padding: "7px 10px",
                           borderTop: idx === 0 ? "none" : `1px solid ${BORDER}`,
                           background: isMine ? "rgba(89,212,255,0.06)" : undefined,
@@ -279,53 +281,36 @@ export function SwissView({
                         <span
                           role="cell"
                           className="num"
-                          style={{ width: 22, color: "var(--text-2)", fontWeight: 600 }}
+                          style={{ color: "var(--text-2)", fontWeight: 600 }}
                         >
                           {team.rank}
                         </span>
-                        {/* Base non nulle : avec `flex: 1` (base 0), le nom ne pesait
-                            rien dans la negociation d'espace et se faisait rogner a
-                            quelques pixels par les colonnes fixes et le bouton
-                            d'abandon. Il retrecit desormais comme les autres. La
-                            cellule porte la place, le nom s'y tronque. */}
-                        <span role="cell" style={{ flex: "1 1 72px", minWidth: 0, display: "flex" }}>
+                        {/* La cellule porte la place (piste élastique à
+                            plancher), le nom s'y tronque d'une ellipse. */}
+                        <span role="cell" style={{ display: "flex", minWidth: 0 }}>
                           <EntrantName
                             teamId={team.teamId}
                             name={team.teamName}
                             title={team.teamName}
                             truncate
-                            style={{ minWidth: 0 }}
                             textStyle={{ fontWeight: isMine ? 700 : 500 }}
                           />
                         </span>
-                        <span
-                          role="cell"
-                          className="num"
-                          style={{ width: 34, textAlign: "right", fontWeight: 700 }}
-                        >
+                        <span role="cell" className="num" style={{ ...RIGHT, fontWeight: 700 }}>
                           {formatPoints(team.points)}
                         </span>
-                        <span
-                          role="cell"
-                          className="mono"
-                          style={{ width: 52, textAlign: "right", fontSize: 12, color: "var(--text-2)" }}
-                        >
+                        <span role="cell" className="mono" style={{ ...RIGHT, ...SECONDARY }}>
                           {team.wins}-{team.draws}-{team.losses}
                         </span>
-                        <span
-                          role="cell"
-                          className="mono"
-                          style={{ width: 38, textAlign: "right", fontSize: 12, color: "var(--text-2)" }}
-                        >
+                        <span role="cell" className="mono" style={{ ...RIGHT, ...SECONDARY }}>
                           {formatPoints(team.buchholz)}
                         </span>
-                        {/* Emplacement réservé même sans bye : sinon la colonne de
-                            statut se décale d'une ligne à l'autre. La coche est
-                            décorative, la cellule dit le fait en toutes lettres. */}
+                        {/* La coche est décorative, la cellule dit le fait en
+                            toutes lettres. */}
                         <span
                           role="cell"
                           title={team.byes > 0 ? "Victoire d'office reçue (effectif impair)" : undefined}
-                          style={{ width: 10, fontSize: 10, color: AMBER, flexShrink: 0 }}
+                          style={{ fontSize: 10, color: AMBER }}
                         >
                           {team.byes > 0 && (
                             <>
@@ -337,18 +322,17 @@ export function SwissView({
                         <span
                           role="cell"
                           style={{
+                            ...RIGHT,
                             fontSize: 10,
                             textTransform: "uppercase",
                             letterSpacing: "0.04em",
                             color: meta.color,
-                            minWidth: 62,
-                            textAlign: "right",
                           }}
                         >
                           {meta.label}
                         </span>
                         {anyForfeitable && (
-                          <span role="cell" style={{ display: "flex", flexShrink: 0 }}>
+                          <span role="cell" style={{ display: "flex" }}>
                             {forfeitable && (
                               <button
                                 type="button"
