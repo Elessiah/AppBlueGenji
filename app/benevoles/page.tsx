@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/shared/page-metadata";
-import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
-import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
+import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
 import { listBenevoles } from "@/lib/server/benevoles-service";
@@ -22,9 +21,7 @@ export default async function BenevolesPage() {
   const isAdmin = can(user, "showcase");
 
   return (
-    <main style={{ position: "relative", zIndex: 1 }}>
-      <PublicHeader />
-
+    <PublicPageShell>
       <section className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
         <span className="eyebrow">L'ÉQUIPE · BÉNÉVOLES</span>
@@ -38,8 +35,6 @@ export default async function BenevolesPage() {
       </section>
 
       <BenevolesSection initialBenevoles={benevoles} isAdmin={isAdmin} />
-
-      <PublicFooter />
-    </main>
+    </PublicPageShell>
   );
 }

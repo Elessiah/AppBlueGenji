@@ -39,6 +39,22 @@ export function handleMenuEscape(
 }
 
 /**
+ * La tabulation a-t-elle quitté le menu ? Le panneau ouvert est posé par-dessus
+ * le contenu : laissé ouvert quand le focus en sort, il recouvre justement
+ * l'endroit où le clavier vient d'arriver (WCAG 2.4.3). `next` est la cible
+ * qui reçoit le focus (`relatedTarget` du `focusout`) ; `null` ne ferme **pas** —
+ * c'est le cas d'une fenêtre qui perd le focus (changement d'application), où
+ * l'on retrouve le menu tel qu'on l'a laissé, et d'un clic dans le vide, que
+ * l'écouteur de clic extérieur traite déjà.
+ */
+export function focusLeftMenu(
+  root: { contains(node: Node | null): boolean } | null,
+  next: EventTarget | null,
+): boolean {
+  return root !== null && next !== null && !root.contains(next as Node);
+}
+
+/**
  * Le panneau ouvert : les liens de la vitrine, la page courante signalée
  * autrement que par le style (`aria-current`, WCAG 1.3.1).
  */
@@ -74,7 +90,7 @@ export function PublicNavPanel({
 /**
  * Menu de navigation principal des pages vitrine, présenté sous forme de menu
  * burger : un bouton ouvre un panneau listant tous les liens. Se ferme au clic
- * en dehors, sur un lien, ou avec la touche Échap.
+ * en dehors, sur un lien, avec la touche Échap, ou quand la tabulation en sort.
  *
  * Le bouton porte un libellé « MENU » en plus des trois barres : l'icône seule
  * passait inaperçue à côté des CTA de l'en-tête. Il est rendu en tête de
@@ -108,7 +124,13 @@ export function PublicNavMenu() {
   }, [open]);
 
   return (
-    <div className={styles.root} ref={rootRef}>
+    <div
+      className={styles.root}
+      ref={rootRef}
+      onBlur={(e) => {
+        if (open && focusLeftMenu(rootRef.current, e.relatedTarget)) setOpen(false);
+      }}
+    >
       {/* Pas d'`aria-haspopup` : il annonce un `role="menu"`, dont le lecteur
           d'écran attend les flèches — le panneau est une simple navigation. */}
       <button

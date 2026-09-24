@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/shared/page-metadata";
-import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
-import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
+import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
 import { getRecruiterContactDefaults, listRecruitmentAds } from "@/lib/server/recruitment-service";
@@ -31,9 +30,7 @@ export default async function RecrutementPage() {
       : { discord: null, discordId: null };
 
   return (
-    <main style={{ position: "relative", zIndex: 1 }}>
-      <PublicHeader />
-
+    <PublicPageShell>
       <section className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
         <span className="eyebrow">ASSOCIATION · BÉNÉVOLAT</span>
@@ -48,8 +45,6 @@ export default async function RecrutementPage() {
       </section>
 
       <RecruitmentSection initialAds={ads} isAdmin={isAdmin} contactDefaults={contactDefaults} />
-
-      <PublicFooter />
-    </main>
+    </PublicPageShell>
   );
 }

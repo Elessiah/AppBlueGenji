@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/shared/page-metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
-import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
+import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { CyberCard, Pill } from "@/components/cyber";
 import { RuleDiagramFigure } from "@/components/rules/RuleDiagram";
 import { EmphasisText } from "@/components/rules/EmphasisText";
@@ -70,7 +69,7 @@ export default async function RuleModePage({ params }: PageProps) {
   const others = TOURNAMENT_RULE_MODES.filter((m) => m.slug !== mode.slug);
 
   return (
-    <main style={{ position: "relative", zIndex: 1 }}>
+    <PublicPageShell>
       {/*
         Le fil d'Ariane est ce qui remplace, dans un résultat de recherche,
         l'adresse brute par « bluegenji-esport.fr › Règles › Ronde suisse ».
@@ -89,7 +88,6 @@ export default async function RuleModePage({ params }: PageProps) {
           { name: mode.label, path: `/regles/${mode.slug}` },
         ])}
       />
-      <PublicHeader />
 
       <section className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
@@ -184,8 +182,6 @@ export default async function RuleModePage({ params }: PageProps) {
           ))}
         </div>
       </section>
-
-      <PublicFooter />
-    </main>
+    </PublicPageShell>
   );
 }

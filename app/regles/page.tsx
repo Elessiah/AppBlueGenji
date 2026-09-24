@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/shared/page-metadata";
 import Link from "next/link";
-import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
-import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
+import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { CyberCard, Pill } from "@/components/cyber";
 import { EmphasisText } from "@/components/rules/EmphasisText";
 import {
@@ -60,9 +59,7 @@ export default function ReglesPage() {
   const upcoming = upcomingRuleModes();
 
   return (
-    <main style={{ position: "relative", zIndex: 1 }}>
-      <PublicHeader />
-
+    <PublicPageShell>
       <section className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
         <span className="eyebrow">RÈGLES · MODES DE TOURNOI</span>
@@ -147,8 +144,6 @@ export default function ReglesPage() {
           ))}
         </div>
       </section>
-
-      <PublicFooter />
-    </main>
+    </PublicPageShell>
   );
 }

@@ -147,9 +147,6 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
 
   return (
     <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", position: "relative" }}>
-      {!consentGiven && (
-        <RgpdConsentModal onAccept={acceptConsent} onRefuse={refuseConsent} />
-      )}
       {oneTap && consentRead && consentGiven && (
         <GoogleOneTap clientId={oneTap.clientId} nonce={oneTap.nonce} redirect={redirect} />
       )}
@@ -336,6 +333,16 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
           </Link>
         </div>
       </CyberCard>
+      {/*
+        Rendue **après** la carte, dont elle recouvre pourtant l'écran : l'ordre
+        du document est celui de la lecture, et son titre (« Avant de
+        continuer », un `h2`) passait avant le `h1` de la page (RGAA 9.1). La
+        position fixe la met au-dessus quel que soit son rang ; le focus y est
+        porté par `useDialogBehavior`, pas par l'ordre.
+      */}
+      {!consentGiven && (
+        <RgpdConsentModal onAccept={acceptConsent} onRefuse={refuseConsent} />
+      )}
     </main>
   );
 }
