@@ -1,0 +1,100 @@
+/*
+ * Aperçu de la manche suivante (BlueGenji Survie).
+ *
+ * Il reprend le volet des manches (`BoardPanel`) pour se ranger dans la même
+ * pile, mais ses rencontres ne sont **pas** des cartes de match : rien ne s'y
+ * saisit, et imiter une carte ferait chercher un score là où il n'y en a pas.
+ * D'où une liste sobre, en pointillés — une rencontre à venir, pas une
+ * rencontre posée.
+ */
+.wrapper {
+  margin-bottom: 24px;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 14px;
+}
+
+.list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px dashed var(--line-strong-cy, rgba(255, 255, 255, 0.18));
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+/* Le nom cède la place, l'emblème non : même règle que les cartes de match. */
+.team {
+  min-width: 0;
+  max-width: 100%;
+  flex: 1 1 0;
+}
+
+.versus {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  text-transform: uppercase;
+}
+
+.bye {
+  flex: 1 1 auto;
+  font-size: 12px;
+  color: var(--text-1);
+}
+
+.tag {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border: 1px solid var(--line-strong-cy, rgba(255, 255, 255, 0.18));
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-1);
+}
+
+.warning {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--amber, #f5a524);
+  background: rgba(245, 165, 36, 0.08);
+  font-size: 12px;
+  color: var(--text-0);
+}
+
+.empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-1);
+}
+
+.footnote {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+@media (max-width: 620px) {
+  .list {
+    grid-template-columns: 1fr;
+  }
+}
