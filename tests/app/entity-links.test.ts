@@ -169,6 +169,13 @@ describe("Classements — le nom de l'engagé garde sa place", () => {
   for (const [name, path] of Object.entries(views)) {
     it(`${name} donne au nom une base non nulle`, () => {
       const code = read(path);
+      if (name === "SwissView") {
+        // Le classement suisse est une grille (tâche 9 d'`ACCESSIBILITE.md`) :
+        // le nom y est la seule piste élastique, avec un plancher qui suit la
+        // police, et les autres colonnes n'ont plus de largeur figée.
+        expect(code).toContain("minmax(6em, 1fr)");
+        return;
+      }
       // `flex: 1` vaut `flex: 1 1 0%` : le nom ne pèse alors rien dans la
       // négociation d'espace et se fait rogner en premier.
       expect(code).toContain('flex: "1 1 72px"');
