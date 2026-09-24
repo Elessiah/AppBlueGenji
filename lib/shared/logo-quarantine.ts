@@ -96,6 +96,37 @@ export function formatLogoHiddenNotice(input: { teamName: string; purgeAfter: Da
   );
 }
 
+/**
+ * Le logo a-t-il été supprimé **sans délai**, sans passer par la quarantaine ?
+ *
+ * Une suppression immédiate s'écrit comme une quarantaine close à l'instant de
+ * son ouverture (`hiddenAt === closedAt`) : c'est la même trace, rattachée au
+ * même signalement, et elle se lit ainsi partout où une quarantaine se lit.
+ */
+export function isImmediateLogoRemoval(view: Pick<LogoQuarantineView, "status" | "hiddenAt" | "closedAt">): boolean {
+  return view.status === "PURGED" && view.closedAt !== null && view.closedAt === view.hiddenAt;
+}
+
+/**
+ * Message privé aux membres d'une équipe dont le logo vient d'être supprimé
+ * sans délai (contenu manifestement illicite).
+ *
+ * Même règle que le masquage : l'équipe apprend la décision et le moyen d'y
+ * répondre (DSA art. 17 et 20). Le lien mène au signalement quand la
+ * suppression en découle ; retiré depuis la fiche de l'équipe, hors de tout
+ * signalement, le logo n'a pas de page à contester — le message renvoie alors
+ * vers l'association.
+ */
+export function formatLogoRemovedNotice(input: { teamName: string; url: string | null }): string {
+  const answer = input.url
+    ? `Si vous en détenez les droits, contestez ici : ${input.url}`
+    : "Si vous en détenez les droits, écrivez à l'association (« Signaler un problème », en bas de chaque page).";
+  return (
+    `🗑️ BlueGenji — Le logo de ton équipe « ${input.teamName} » a été supprimé par la modération du site` +
+    `${input.url ? " à la suite d'un signalement" : ""}. ${answer}`
+  );
+}
+
 /** Message privé aux membres d'une équipe dont le logo est rétabli. */
 export function formatLogoRestoredNotice(input: { teamName: string }): string {
   return `✅ BlueGenji — Le logo de ton équipe « ${input.teamName} » a été rétabli : la contestation a été acceptée.`;

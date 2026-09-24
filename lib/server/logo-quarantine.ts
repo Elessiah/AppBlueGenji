@@ -30,6 +30,7 @@ import {
   canAutoPurgeLogo,
   formatLogoHiddenLog,
   formatLogoHiddenNotice,
+  formatLogoRemovedNotice,
   formatLogoRestoredNotice,
   logoQuarantinePurgeDate,
   type LogoQuarantineStatus,
@@ -118,6 +119,137 @@ async function teamMemberRecipients(teamId: number): Promise<DiscordRecipient[]>
 }
 
 /**
+ * Le signalement existe et désigne cette équipe — c'est ce lien qui permettra à
+ * l'équipe de contester la décision prise sur son logo.
+ *
+ * @throws REPORT_NOT_FOUND
+ * @throws TEAM_NOT_TARGETED
+ */
+async function assertTeamTargeted(reportId: number, teamId: number): Promise<void> {
+  const db = await getDatabase();
+  const [reports] = await db.execute<RowDataPacket[]>(
+    `SELECT r.id FROM bg_reports r
+     JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = 'TEAM' AND t.target_id = ?
+     WHERE r.id = ? AND r.parent_report_id IS NULL LIMIT 1`,
+    [teamId, reportId],
+  );
+  if (reports.length > 0) return;
+  const [exists] = await db.execute<RowDataPacket[]>(
+    `SELECT id FROM bg_reports WHERE id = ? AND parent_report_id IS NULL LIMIT 1`,
+    [reportId],
+  );
+  throw new Error(exists.length === 0 ? "REPORT_NOT_FOUND" : "TEAM_NOT_TARGETED");
+}
+
+/**
+ * Prévient les membres actuels d'une équipe que son logo a été supprimé sans
+ * délai — depuis un signalement (`reportId`, le message porte le lien de
+ * contestation) ou depuis la fiche de l'équipe (`null`). Jamais attendu.
+ */
+export function notifyTeamLogoRemoved(teamId: number, teamName: string, reportId: number | null): void {
+  const url = reportId === null ? null : `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
+  void teamMemberRecipients(teamId)
+    .then((recipients) =>
+      recipients.length === 0
+        ? null
+        : pushDiscordDirectMessages(formatLogoRemovedNotice({ teamName, url }), recipients, "logo-removed"),
+    )
+    .catch((error) => console.error("[moderation] équipe non prévenue de la suppression", error));
+}
+
+/**
+ * Supprime **sans délai** le logo d'une équipe visée par un signalement — un
+ * contenu manifestement illicite, que la quarantaine ne ferait que garder.
+ *
+ * La décision laisse la même trace qu'un masquage — une ligne de
+ * `bg_logo_quarantines`, close à l'instant de son ouverture
+ * (`isImmediateLogoRemoval`) —, rattachée au signalement : le panneau la
+ * montre, la page de l'équipe visée aussi, et l'équipe est prévenue avec le
+ * lien pour contester. Son échéance (`purge_after`) est celle de la
+ * contestation, six mois comme au masquage : le signalement est gardé jusque-là
+ * (`purgeExpiredReports`), sans quoi l'équipe perdrait la page où répondre dès
+ * l'archivage. Un fichier que d'autres équipes désignent encore reste sur le
+ * disque, comme au masquage.
+ *
+ * @throws REPORT_NOT_FOUND
+ * @throws TEAM_NOT_TARGETED
+ * @throws TEAM_HAS_NO_LOGO
+ */
+export async function deleteTeamLogoForReport(
+  reportId: number,
+  teamId: number,
+  actor: ReportPerson,
+): Promise<LogoQuarantineView> {
+  await assertTeamTargeted(reportId, teamId);
+  const db = await getDatabase();
+  const removedAt = new Date();
+  // Rien n'attend plus d'être effacé ; l'échéance dit ici jusqu'à quand la
+  // décision se conteste (DSA art. 20), et retient le signalement jusque-là.
+  const contestUntil = logoQuarantinePurgeDate(removedAt);
+  let teamName: string;
+  let logoUrl: string;
+  let shared: boolean;
+  let quarantineId: number;
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [teams] = await connection.execute<(RowDataPacket & { name: string; logo_url: string | null })[]>(
+      `SELECT name, logo_url FROM bg_teams WHERE id = ? AND solo_user_id IS NULL FOR UPDATE`,
+      [teamId],
+    );
+    if (teams.length === 0 || !teams[0].logo_url) throw new Error("TEAM_HAS_NO_LOGO");
+    teamName = teams[0].name;
+    logoUrl = teams[0].logo_url;
+    await connection.execute(`UPDATE bg_teams SET logo_url = NULL WHERE id = ?`, [teamId]);
+    const [sharing] = await connection.execute<(RowDataPacket & { total: number })[]>(
+      `SELECT COUNT(*) AS total FROM bg_teams WHERE logo_url = ? AND id <> ?`,
+      [logoUrl, teamId],
+    );
+    shared = Number(sharing[0]?.total ?? 0) > 0;
+    const [inserted] = await connection.execute<ResultSetHeader>(
+      `INSERT INTO bg_logo_quarantines
+         (team_id, report_id, logo_url, hidden_by_user_id, hidden_at, purge_after, status, closed_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'PURGED', ?)`,
+      [teamId, reportId, logoUrl, actor.userId, removedAt, contestUntil, removedAt],
+    );
+    quarantineId = Number(inserted.insertId);
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+
+  // Après le commit : un `unlink` ne se défait pas. Une adresse étrangère n'a
+  // pas de fichier chez nous ; vider la colonne suffisait.
+  const files = shared ? null : logoFileLocations(logoUrl, teamId);
+  if (files) {
+    await unlinkIfPresent(files.live).catch((error) => {
+      console.error("[moderation] fichier du logo non effacé", error);
+    });
+  }
+
+  publishStaffAction(`🗑️ Logo de l'équipe « ${teamName} » supprimé sans délai par le staff (signalement #${reportId}).`, {
+    id: actor.userId,
+    pseudo: actor.pseudo,
+  });
+  notifyTeamLogoRemoved(teamId, teamName, reportId);
+
+  const at = removedAt.toISOString();
+  return {
+    id: quarantineId,
+    teamId,
+    teamName,
+    reportId,
+    status: "PURGED",
+    hiddenAt: at,
+    purgeAfter: contestUntil.toISOString(),
+    closedAt: at,
+  };
+}
+
+/**
  * Masque le logo d'une équipe visée par un signalement.
  *
  * Refusé si le signalement ne désigne pas cette équipe (le lien entre les deux
@@ -133,20 +265,7 @@ async function teamMemberRecipients(teamId: number): Promise<DiscordRecipient[]>
  */
 export async function hideTeamLogo(reportId: number, teamId: number, actor: ReportPerson): Promise<LogoQuarantineView> {
   const db = await getDatabase();
-
-  const [reports] = await db.execute<RowDataPacket[]>(
-    `SELECT r.id FROM bg_reports r
-     JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = 'TEAM' AND t.target_id = ?
-     WHERE r.id = ? AND r.parent_report_id IS NULL LIMIT 1`,
-    [teamId, reportId],
-  );
-  if (reports.length === 0) {
-    const [exists] = await db.execute<RowDataPacket[]>(
-      `SELECT id FROM bg_reports WHERE id = ? AND parent_report_id IS NULL LIMIT 1`,
-      [reportId],
-    );
-    throw new Error(exists.length === 0 ? "REPORT_NOT_FOUND" : "TEAM_NOT_TARGETED");
-  }
+  await assertTeamTargeted(reportId, teamId);
 
   const [teams] = await db.execute<(RowDataPacket & { name: string; logo_url: string | null })[]>(
     `SELECT name, logo_url FROM bg_teams WHERE id = ? AND solo_user_id IS NULL LIMIT 1`,

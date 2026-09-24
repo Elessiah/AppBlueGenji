@@ -15,7 +15,9 @@ import {
   canAutoPurgeLogo,
   formatLogoHiddenLog,
   formatLogoHiddenNotice,
+  formatLogoRemovedNotice,
   formatLogoRestoredNotice,
+  isImmediateLogoRemoval,
   formatQuarantineDate,
   logoQuarantinePurgeDate,
 } from "@/lib/shared/logo-quarantine";
@@ -104,5 +106,29 @@ describe("quarantaine des logos", () => {
     expect(formatLogoHiddenLog({ teamName: "Alpha", reportId: 4, purgeAfter: new Date("2026-06-30T10:00:00Z") })).toBe(
       "🙈 Logo de l'équipe « Alpha » masqué par le staff (signalement #4), suppression définitive le 30 juin 2026 sans contestation.",
     );
+  });
+});
+
+describe("suppression sans délai d'un logo", () => {
+  const at = "2026-09-24T10:00:00.000Z";
+
+  it("se reconnaît à une quarantaine close à l'instant de son ouverture", () => {
+    expect(isImmediateLogoRemoval({ status: "PURGED", hiddenAt: at, closedAt: at })).toBe(true);
+    // Masqué puis supprimé plus tard, rétabli, ou encore masqué : non.
+    expect(isImmediateLogoRemoval({ status: "PURGED", hiddenAt: at, closedAt: "2026-10-01T10:00:00.000Z" })).toBe(false);
+    expect(isImmediateLogoRemoval({ status: "RESTORED", hiddenAt: at, closedAt: at })).toBe(false);
+    expect(isImmediateLogoRemoval({ status: "HIDDEN", hiddenAt: at, closedAt: null })).toBe(false);
+  });
+
+  it("prévient l'équipe avec le lien du signalement, ou la renvoie vers l'association", () => {
+    const linked = formatLogoRemovedNotice({ teamName: "Alpha", url: "https://site.test/signalements/12" });
+    expect(linked).toContain("« Alpha »");
+    expect(linked).toContain("à la suite d'un signalement");
+    expect(linked).toContain("https://site.test/signalements/12");
+
+    const standalone = formatLogoRemovedNotice({ teamName: "Alpha", url: null });
+    expect(standalone).not.toContain("signalement.");
+    expect(standalone).toContain("Signaler un problème");
+    expect(standalone).not.toContain("https://");
   });
 });

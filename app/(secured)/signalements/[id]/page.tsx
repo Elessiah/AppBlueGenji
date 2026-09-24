@@ -12,7 +12,7 @@ import {
   reportTargetHref,
   type ConcernedReportView,
 } from "@/lib/shared/content-reports";
-import { formatQuarantineDate } from "@/lib/shared/logo-quarantine";
+import { formatQuarantineDate, isImmediateLogoRemoval } from "@/lib/shared/logo-quarantine";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import styles from "./concerned.module.css";
 
@@ -78,6 +78,7 @@ export default function ConcernedReportPage() {
   const { report } = state;
   const definition = REPORT_CATEGORY_DEFINITIONS[report.category];
   const hidden = report.quarantines.filter((quarantine) => quarantine.status === "HIDDEN");
+  const removed = report.quarantines.filter(isImmediateLogoRemoval);
 
   return (
     <section className={`fade-in container ${styles.page}`}>
@@ -95,6 +96,14 @@ export default function ConcernedReportPage() {
           Sans contestation de votre part, il sera <strong>supprimé définitivement le{" "}
           {formatQuarantineDate(new Date(quarantine.purgeAfter))}</strong>. Si la contestation aboutit, il est
           rétabli tel quel.
+        </div>
+      ))}
+
+      {removed.map((quarantine) => (
+        <div key={quarantine.id} className={styles.alert} role="status">
+          <strong>Le logo de « {quarantine.teamName} » a été supprimé</strong> le {formatDate(quarantine.hiddenAt)}{" "}
+          à la suite de ce signalement. Si vous en détenez les droits, contestez-le : si la contestation aboutit,
+          vous pourrez l&apos;envoyer de nouveau.
         </div>
       ))}
 

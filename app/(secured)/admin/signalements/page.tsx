@@ -151,11 +151,20 @@ function ReportsPanel() {
     );
   };
 
-  const onDeleteLogo = (teamId: number) =>
+  // Depuis un dossier, la suppression passe par le signalement : elle y reste
+  // inscrite, et l'équipe est prévenue avec le lien pour contester.
+  const onDeleteLogo = (teamId: number) => {
+    if (!selected) return;
     void run(
-      () => adminFetch(`/api/admin/teams/${teamId}/logo`, { method: "DELETE" }, "TEAM_LOGO_REMOVE_FAILED"),
-      "Logo supprimé définitivement.",
+      () =>
+        adminFetch(
+          `/api/admin/reports/${selected.id}/logo-removal`,
+          jsonBody("POST", { teamId }),
+          "TEAM_LOGO_REMOVE_FAILED",
+        ),
+      "Logo supprimé définitivement. L'équipe est prévenue et peut contester.",
     );
+  };
 
   const onRestore = (quarantineId: number) =>
     void run(

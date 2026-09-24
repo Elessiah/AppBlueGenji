@@ -17,8 +17,10 @@ import { getDatabase } from "@/lib/server/database";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import {
+  deleteTeamLogoForReport,
   hideTeamLogo,
   logoFileLocations,
+  notifyTeamLogoRemoved,
   purgeDueQuarantines,
   purgeQuarantinedLogo,
   quarantineDirectory,
@@ -74,6 +76,102 @@ describe("logoFileLocations", () => {
     "/api/uploads/teams/4-abc.png",
   ])("refuse ce qui n'est pas un logo d'équipe du site : %s", (url) => {
     expect(logoFileLocations(url, 4)).toBeNull();
+  });
+});
+
+describe("deleteTeamLogoForReport", () => {
+  const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = 'TEAM'/, () => [[{ id: 12 }]]];
+  const members: Route = [
+    /FROM bg_team_members tm\s+JOIN bg_users u/,
+    () => [[{ pseudo: "Capitaine", discord_id: "900000000000000005", discord_pseudo: null, discord_verified_at: null }]],
+  ];
+  const locked = (logoUrl: string | null): Route => [
+    /SELECT name, logo_url FROM bg_teams WHERE id = \? AND solo_user_id IS NULL FOR UPDATE/,
+    () => [[{ name: "Alpha", logo_url: logoUrl }]],
+  ];
+  const sharing = (total: number): Route => [/COUNT\(\*\) AS total FROM bg_teams WHERE logo_url = \?/, () => [[{ total }]]];
+
+  it("vide la colonne, trace la décision close sur-le-champ, efface le fichier et prévient l'équipe", async () => {
+    install(
+      [reportTargets, members],
+      [
+        locked(LOGO),
+        [/UPDATE bg_teams SET logo_url = NULL/, () => [{}]],
+        sharing(0),
+        [/INSERT INTO bg_logo_quarantines/, () => [{ insertId: 33 }]],
+      ],
+    );
+
+    const before = Date.now();
+    const view = await deleteTeamLogoForReport(12, 4, actor);
+    await flush();
+
+    expect(connection.commit).toHaveBeenCalled();
+    const insert = connection.execute.mock.calls.find(([sql]) => /INSERT INTO bg_logo_quarantines/.test(sql));
+    expect(insert?.[0]).toContain("'PURGED'");
+    const [teamId, reportId, logoUrl, hiddenBy, hiddenAt, purgeAfter, closedAt] = insert?.[1] as unknown[];
+    expect([teamId, reportId, logoUrl, hiddenBy]).toEqual([4, 12, LOGO, 1]);
+    // Ouverte et close au même instant ; l'échéance est celle de la contestation.
+    expect(closedAt).toBe(hiddenAt);
+    expect(Math.round(((purgeAfter as Date).getTime() - before) / 86_400_000)).toBe(180);
+
+    expect(unlink).toHaveBeenCalledWith(LIVE);
+    expect(rename).not.toHaveBeenCalled();
+    expect(view).toEqual(expect.objectContaining({ id: 33, status: "PURGED", reportId: 12, closedAt: view.hiddenAt }));
+
+    const [message, recipients, context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    expect(context).toBe("logo-removed");
+    expect(message).toContain("« Alpha »");
+    expect(message).toContain("https://site.test/signalements/12");
+    expect(recipients).toHaveLength(1);
+    expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("sans délai"), { id: 1, pseudo: "Admin" });
+  });
+
+  it("garde le fichier que d'autres équipes désignent encore", async () => {
+    install(
+      [reportTargets, members],
+      [
+        locked(LOGO),
+        [/UPDATE bg_teams SET logo_url = NULL/, () => [{}]],
+        sharing(1),
+        [/INSERT INTO bg_logo_quarantines/, () => [{ insertId: 34 }]],
+      ],
+    );
+    await deleteTeamLogoForReport(12, 4, actor);
+    expect(unlink).not.toHaveBeenCalled();
+  });
+
+  it("refuse une équipe sans logo, sans rien écrire", async () => {
+    install([reportTargets], [locked(null)]);
+    await expect(deleteTeamLogoForReport(12, 4, actor)).rejects.toThrow("TEAM_HAS_NO_LOGO");
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(connection.execute.mock.calls.some(([sql]) => /INSERT|UPDATE bg_teams/.test(sql))).toBe(false);
+    expect(unlink).not.toHaveBeenCalled();
+  });
+
+  it("refuse une équipe que le signalement ne vise pas", async () => {
+    install([
+      [/JOIN bg_report_targets/, () => [[]]],
+      [/SELECT id FROM bg_reports WHERE id = \?/, () => [[{ id: 12 }]]],
+    ]);
+    await expect(deleteTeamLogoForReport(12, 4, actor)).rejects.toThrow("TEAM_NOT_TARGETED");
+    expect(connection.execute).not.toHaveBeenCalled();
+  });
+});
+
+describe("notifyTeamLogoRemoved", () => {
+  it("prévient l'équipe sans lien quand le retrait ne découle d'aucun signalement", async () => {
+    install([
+      [
+        /FROM bg_team_members tm\s+JOIN bg_users u/,
+        () => [[{ pseudo: "Capitaine", discord_id: "900000000000000005", discord_pseudo: null, discord_verified_at: null }]],
+      ],
+    ]);
+    notifyTeamLogoRemoved(4, "Alpha", null);
+    await flush();
+    const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    expect(message).toContain("« Alpha »");
+    expect(message).not.toContain("https://");
   });
 });
 

@@ -82,7 +82,8 @@ rendent le même 404 : les identifiants sont consécutifs.
   listées à part ; elles n'ont pas de cycle de vie propre.
 - Gestes sur une équipe visée : **masquer le logo** (voir
   `LOGO_QUARANTINE.md`), **supprimer le logo** tout de suite (contenu
-  manifestement illicite), puis rétablir ou supprimer un logo masqué. Les gestes
+  manifestement illicite — la décision est inscrite au signalement et l'équipe
+  prévenue, comme au masquage), puis rétablir ou supprimer un logo masqué. Les gestes
   sans retour demandent un second clic (`ArmedButton`).
 - La navigation de l'espace connecté porte un lien « Signalements » avec le
   nombre à traiter, pour la seule permission `moderation`.
@@ -92,8 +93,10 @@ rendent le même 404 : les identifiants sont consécutifs.
 Un signalement ouvert est gardé le temps de son traitement ; archivé, il est
 effacé `REPORT_RETENTION_DAYS_AFTER_RESOLUTION` (30) jours plus tard, cibles et
 contestations comprises (cascade) — **sauf** s'il tient encore un logo masqué,
-qu'il garde jusqu'à l'échéance de la quarantaine (l'équipe doit pouvoir
-contester). La purge est **datée**, donc une base restaurée d'une sauvegarde se
+ou un logo supprimé dont le délai de contestation court : il est gardé jusqu'à
+cette échéance (l'équipe doit pouvoir contester). La suppression d'un compte
+visé efface le pseudo relevé sur ses cibles (`label_snapshot`) : le panneau
+retombe sinon sur ce relevé dès que le compte n'est plus vivant. La purge est **datée**, donc une base restaurée d'une sauvegarde se
 repurge d'elle-même. Elle tourne à chaque envoi, à chaque ouverture du panneau,
 et au plus une fois par heure depuis la mise en page racine
 (`schedulePurgeExpiredReports`).

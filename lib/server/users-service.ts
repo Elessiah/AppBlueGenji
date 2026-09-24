@@ -1495,6 +1495,17 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
       await anonymizeAccount(connection, userId);
     }
 
+    // Les signalements qui le visent gardent leur cible — ils restent à
+    // traiter —, mais pas son pseudo : relevé à l'envoi pour survivre à la
+    // disparition du compte, il est justement ce que la suppression promet de
+    // retirer. Aucune clé étrangère ne le couvre (une cible n'en a pas, pour
+    // ne pas emporter le signalement), et les deux modes sont concernés : le
+    // panneau ne relit que les comptes vivants et retombe sinon sur ce relevé.
+    await connection.execute(
+      `UPDATE bg_report_targets SET label_snapshot = NULL WHERE target_type = 'USER' AND target_id = ?`,
+      [userId],
+    );
+
     // Les défis de connexion par message privé, relevés sur la ligne **avant**
     // qu'elle ne parte ou ne soit vidée de son identifiant.
     //

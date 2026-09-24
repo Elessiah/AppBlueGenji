@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteStoredImage } from "@/lib/server/image-upload";
+import { notifyTeamLogoRemoved } from "@/lib/server/logo-quarantine";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { removeTeamLogoAsModerator } from "@/lib/server/teams-service";
 import { can } from "@/lib/shared/permissions";
@@ -11,6 +12,10 @@ import { toDiskUploadPath } from "@/lib/shared/uploads";
  * le geste qui éteint la responsabilité d'hébergeur de l'association après un
  * signalement de droit d'auteur. L'équipe garde tout le reste ; sa carte
  * retombe sur l'initiale de son nom.
+ *
+ * L'équipe en est prévenue en message privé (`notifyTeamLogoRemoved`). Depuis
+ * le panneau des signalements, la suppression passe plutôt par
+ * `/api/admin/reports/[id]/logo-removal`, qui la rattache au signalement.
  *
  * Le fichier est effacé du disque, donc du miroir des images au passage
  * suivant de sa synchronisation (`rclone sync`, suppression définitive).
@@ -38,6 +43,9 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
       id: user.id,
       pseudo: user.pseudo,
     });
+    // L'équipe apprend la décision et le moyen d'y répondre (DSA art. 17) ;
+    // hors de tout signalement, le message renvoie vers l'association.
+    notifyTeamLogoRemoved(teamId, teamName, null);
     return ok({ success: true });
   } catch (error) {
     const message = (error as Error).message;

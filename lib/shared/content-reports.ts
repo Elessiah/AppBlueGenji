@@ -538,7 +538,7 @@ export const REPORT_PRIVACY_NOTICE = {
     "Destinataires : les administrateurs de l'association. Une alerte part sur Discord, sans ton nom, ta description ni ton pseudo. L'auteur du signalement n'est pas informé de ta contestation.",
   // La prolongation est dite ici, et non seulement sur `/rgpd` : c'est cette
   // phrase-là que la case de consentement accepte.
-  retention: `Durée : le temps du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa résolution — le signalement est alors effacé. Si un logo est masqué à sa suite, il est gardé jusqu'à l'échéance de la contestation (${LOGO_QUARANTINE_DAYS / 30} mois au plus).`,
+  retention: `Durée : le temps du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa résolution — le signalement est alors effacé. Si un logo est masqué ou supprimé à sa suite, il est gardé jusqu'à l'échéance de la contestation (${LOGO_QUARANTINE_DAYS / 30} mois au plus).`,
   legalBasis:
     "Base légale : ton consentement, et pour un contenu illicite l'obligation faite à l'hébergeur de traiter les notifications (règlement européen sur les services numériques, art. 16).",
   rights:

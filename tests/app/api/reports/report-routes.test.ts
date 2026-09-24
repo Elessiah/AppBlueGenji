@@ -15,6 +15,7 @@ import { GET as contestable } from "@/app/api/reports/contestable/route";
 import { GET as adminList } from "@/app/api/admin/reports/route";
 import { PATCH as adminAction } from "@/app/api/admin/reports/[id]/route";
 import { POST as hideLogo } from "@/app/api/admin/reports/[id]/logo-quarantine/route";
+import { POST as deleteReportedLogo } from "@/app/api/admin/reports/[id]/logo-removal/route";
 import { POST as restoreLogo } from "@/app/api/admin/logo-quarantines/[id]/restore/route";
 import { DELETE as purgeLogo } from "@/app/api/admin/logo-quarantines/[id]/route";
 import { DELETE as removeTeamLogo } from "@/app/api/admin/teams/[id]/logo/route";
@@ -29,7 +30,13 @@ import {
   resolveReportTargets,
   searchReportTargets,
 } from "@/lib/server/content-reports";
-import { hideTeamLogo, purgeQuarantinedLogo, restoreTeamLogo } from "@/lib/server/logo-quarantine";
+import {
+  deleteTeamLogoForReport,
+  hideTeamLogo,
+  notifyTeamLogoRemoved,
+  purgeQuarantinedLogo,
+  restoreTeamLogo,
+} from "@/lib/server/logo-quarantine";
 import { recordTermsAcceptance } from "@/lib/server/terms-acceptance";
 import { removeTeamLogoAsModerator } from "@/lib/server/teams-service";
 import { deleteStoredImage } from "@/lib/server/image-upload";
@@ -188,6 +195,7 @@ describe("routes du panneau — permission `moderation`", () => {
     ["liste", () => adminList()],
     ["geste", () => adminAction(json("http://localhost", "PATCH", { action: "TAKE" }), params("3"))],
     ["masquage", () => hideLogo(json("http://localhost", "POST", { teamId: 4 }), params("3"))],
+    ["suppression depuis un signalement", () => deleteReportedLogo(json("http://localhost", "POST", { teamId: 4 }), params("3"))],
     ["rétablissement", () => restoreLogo(new Request("http://localhost"), params("3"))],
     ["suppression en quarantaine", () => purgeLogo(new Request("http://localhost"), params("3"))],
     ["retrait immédiat", () => removeTeamLogo(new Request("http://localhost"), params("4"))],
@@ -257,6 +265,43 @@ describe("routes du panneau — permission `moderation`", () => {
     expect((await hideLogo(json("http://localhost", "POST", { teamId: 4 }), params("3"))).status).toBe(status);
   });
 
+  it("supprime sans délai le logo d'une équipe visée, au titre du signalement", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(deleteTeamLogoForReport).mockResolvedValue({
+      id: 31,
+      teamId: 4,
+      teamName: "Alpha",
+      reportId: 3,
+      status: "PURGED",
+      hiddenAt: "2026-09-24T10:00:00.000Z",
+      purgeAfter: "2027-03-23T10:00:00.000Z",
+      closedAt: "2026-09-24T10:00:00.000Z",
+    });
+    const res = await deleteReportedLogo(json("http://localhost", "POST", { teamId: 4 }), params("3"));
+    expect(res.status).toBe(201);
+    expect(deleteTeamLogoForReport).toHaveBeenCalledWith(3, 4, { userId: 1, pseudo: "Admin" });
+  });
+
+  it.each<[string, number]>([
+    ["REPORT_NOT_FOUND", 404],
+    ["TEAM_NOT_TARGETED", 409],
+    ["TEAM_HAS_NO_LOGO", 409],
+    ["ER_LOCK_DEADLOCK", 500],
+  ])("traduit le refus de suppression %s en %i", async (code, status) => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(deleteTeamLogoForReport).mockRejectedValue(new Error(code));
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const res = await deleteReportedLogo(json("http://localhost", "POST", { teamId: 4 }), params("3"));
+    expect(res.status).toBe(status);
+  });
+
+  it("refuse une suppression sans équipe ou sur un identifiant invalide", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    expect((await deleteReportedLogo(json("http://localhost", "POST", {}), params("3"))).status).toBe(400);
+    expect((await deleteReportedLogo(json("http://localhost", "POST", { teamId: 4 }), params("x"))).status).toBe(400);
+    expect(deleteTeamLogoForReport).not.toHaveBeenCalled();
+  });
+
   it.each<[string, number]>([
     ["QUARANTINE_NOT_FOUND", 404],
     ["QUARANTINE_CLOSED", 409],
@@ -288,6 +333,8 @@ describe("DELETE /api/admin/teams/[id]/logo", () => {
     expect(res.status).toBe(200);
     expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/teams/4-a.webp");
     expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("« Alpha »"), { id: 1, pseudo: "Admin" });
+    // Hors de tout signalement : l'équipe est prévenue, sans lien de contestation.
+    expect(notifyTeamLogoRemoved).toHaveBeenCalledWith(4, "Alpha", null);
   });
 
   it("garde le fichier que d'autres équipes désignent encore", async () => {

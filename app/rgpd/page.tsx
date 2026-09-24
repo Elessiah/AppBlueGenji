@@ -13,7 +13,10 @@ import {
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { privacyPolicyUpdatedLabel } from "@/lib/shared/privacy-changes";
-import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
+import {
+  REPORT_RETENTION_DAYS_AFTER_RESOLUTION,
+  REPORT_TARGET_NOTICE_COOLDOWN_HOURS,
+} from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
 import styles from "./page.module.css";
 
@@ -339,8 +342,8 @@ export default function RgpdPage() {
             <li>
               <strong>Durée</strong> : le temps du traitement, puis{" "}
               {REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l&apos;archivage — prolongée tant
-              qu&apos;un logo masqué au titre du signalement attend son échéance, pour que
-              l&apos;équipe puisse encore le contester.
+              qu&apos;un logo masqué ou supprimé au titre du signalement peut encore être contesté par
+              son équipe. Un compte supprimé n&apos;y laisse pas son pseudo.
             </li>
           </ul>
 
@@ -350,7 +353,11 @@ export default function RgpdPage() {
             <strong>message privé Discord</strong> (s&apos;ils ont rattaché leur compte Discord ou
             certifié leur tag) qui mène à la page du signalement. Ils y lisent le motif et la
             description — <strong>jamais l&apos;identité du signalant</strong> (ni compte, ni nom, ni
-            adresse) — et seulement les éléments qui les concernent.
+            adresse) — et seulement les éléments qui les concernent. Pour qu&apos;un envoi répété ne
+            fasse pas écrire le bot en boucle, une personne déjà visée par un autre signalement depuis
+            moins de {REPORT_TARGET_NOTICE_COOLDOWN_HOURS} heures n&apos;est pas prévenue une seconde
+            fois : le nouveau signalement reste consultable et contestable depuis le formulaire
+            (catégorie « Contestation »).
           </p>
 
           <h3>3. Le droit de contestation</h3>
@@ -389,7 +396,8 @@ export default function RgpdPage() {
             </li>
             <li>
               Un contenu <strong>manifestement illicite</strong> peut être supprimé sans délai de
-              masquage.
+              masquage. L&apos;équipe en est prévenue de la même façon et peut contester la décision
+              pendant le même délai ; si elle aboutit, elle peut renvoyer son logo.
             </li>
           </ul>
           <p>

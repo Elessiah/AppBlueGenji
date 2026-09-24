@@ -471,6 +471,10 @@ describe("conservation", () => {
     expect(sql).toMatch(/parent_report_id IS NULL/);
     expect(sql).toMatch(/INTERVAL 30 DAY/);
     expect(sql).toMatch(/NOT EXISTS[\s\S]*bg_logo_quarantines[\s\S]*status = 'HIDDEN'/);
+    // Un logo supprimé retient le signalement jusqu'à la fin du délai de
+    // contestation ; un logo rétabli ne retient rien.
+    expect(sql).toMatch(/q.status = 'PURGED' AND q.purge_after > NOW\(\)/);
+    expect(sql).not.toMatch(/RESTORED/);
   });
 
   it("purge au plus une fois par heure, les logos échus avant les signalements", async () => {

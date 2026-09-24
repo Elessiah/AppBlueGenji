@@ -176,7 +176,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary: "Tu es prévenu d'un signalement qui te vise, et tu peux le contester.",
     details: [
       "Un signalement garde sa catégorie, sa description, les joueurs, équipes ou tournois désignés, le compte de son auteur et, s'il les indique, son nom et son adresse. Il est lu par les administrateurs, puis effacé " +
-        `${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après son archivage — plus tard s'il tient un logo masqué, jusqu'à l'échéance de la contestation.`,
+        `${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après son archivage — plus tard si un logo a été masqué ou supprimé à sa suite, jusqu'à l'échéance de la contestation.`,
       "Si un signalement te vise, toi ou une équipe dont tu es membre, tu reçois un message privé Discord (si ton compte Discord est rattaché ou ton tag certifié). Tu lis ce qui est reproché — jamais qui l'a signalé — et tu peux le contester ; une contestation rouvre un signalement archivé.",
       `Un logo d'équipe signalé peut être masqué : il n'est plus en ligne, et il est supprimé définitivement au bout de ${LOGO_QUARANTINE_DAYS / 30} mois sans contestation, ou rétabli si la contestation aboutit. Tes coéquipiers et toi en êtes prévenus.`,
       "L'acceptation des conditions d'utilisation (à la création du compte, d'une équipe, ou en recevant la gestion d'une équipe) est enregistrée avec sa date et sa version ; elle figure dans l'export de tes données.",

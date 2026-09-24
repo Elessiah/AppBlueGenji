@@ -984,9 +984,13 @@ export async function purgeExpiredReports(): Promise<number> {
        AND parent_report_id IS NULL
        AND resolved_at < NOW() - INTERVAL ${Number(REPORT_RETENTION_DAYS_AFTER_RESOLUTION)} DAY
        -- Un logo encore masqué au titre de ce signalement le garde : c'est sur
-       -- lui que l'équipe conteste, jusqu'à l'échéance de la quarantaine.
+       -- lui que l'équipe conteste, jusqu'à l'échéance de la quarantaine. Un
+       -- logo supprimé le garde aussi, jusqu'à la fin du délai de contestation
+       -- de la décision (DSA art. 20). Un logo rétabli ne retient plus rien.
        AND NOT EXISTS (
-         SELECT 1 FROM bg_logo_quarantines q WHERE q.report_id = bg_reports.id AND q.status = 'HIDDEN'
+         SELECT 1 FROM bg_logo_quarantines q
+         WHERE q.report_id = bg_reports.id
+           AND (q.status = 'HIDDEN' OR (q.status = 'PURGED' AND q.purge_after > NOW()))
        )`,
   );
   return Number(result.affectedRows);

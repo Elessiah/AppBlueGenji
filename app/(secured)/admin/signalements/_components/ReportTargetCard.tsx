@@ -8,7 +8,7 @@ import {
   type ReportCategory,
   type ReportTargetView,
 } from "@/lib/shared/content-reports";
-import { formatQuarantineDate, type LogoQuarantineView } from "@/lib/shared/logo-quarantine";
+import { formatQuarantineDate, isImmediateLogoRemoval, type LogoQuarantineView } from "@/lib/shared/logo-quarantine";
 import { ArmedButton } from "./ArmedButton";
 import styles from "../reports.module.css";
 
@@ -109,13 +109,19 @@ export function ReportTargetCard({
         </div>
       )}
 
-      {closed.map((quarantine) => (
-        <p key={quarantine.id} className={styles.muted}>
-          Logo masqué le {formatQuarantineDate(new Date(quarantine.hiddenAt))} —{" "}
-          {quarantine.status === "RESTORED" ? "rétabli" : "supprimé définitivement"}
-          {quarantine.closedAt ? ` le ${formatQuarantineDate(new Date(quarantine.closedAt))}` : ""}.
-        </p>
-      ))}
+      {closed.map((quarantine) =>
+        isImmediateLogoRemoval(quarantine) ? (
+          <p key={quarantine.id} className={styles.muted}>
+            Logo supprimé sans délai le {formatQuarantineDate(new Date(quarantine.hiddenAt))}.
+          </p>
+        ) : (
+          <p key={quarantine.id} className={styles.muted}>
+            Logo masqué le {formatQuarantineDate(new Date(quarantine.hiddenAt))} —{" "}
+            {quarantine.status === "RESTORED" ? "rétabli" : "supprimé définitivement"}
+            {quarantine.closedAt ? ` le ${formatQuarantineDate(new Date(quarantine.closedAt))}` : ""}.
+          </p>
+        ),
+      )}
 
       {canActOnLogo && !hidden && target.imageUrl && (
         <div className={styles.targetActions}>

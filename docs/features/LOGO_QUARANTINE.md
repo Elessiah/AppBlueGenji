@@ -75,8 +75,19 @@ signalements ensuite (`schedulePurgeExpiredReports`).
 
 ## Retrait immédiat
 
-`DELETE /api/admin/teams/[id]/logo` (permission `moderation`) supprime un logo
-sans quarantaine, pour un contenu manifestement illicite ; un fichier que
+Depuis le panneau, « Supprimer le logo » d'une équipe visée passe par
+`POST /api/admin/reports/[id]/logo-removal` (`deleteTeamLogoForReport`) : la
+décision laisse la **même trace** qu'un masquage — une ligne de
+`bg_logo_quarantines` `PURGED`, close à l'instant de son ouverture
+(`isImmediateLogoRemoval`), rattachée au signalement —, si bien que le panneau
+et la page de l'équipe visée la montrent, et l'équipe est prévenue en message
+privé avec le lien pour **contester** (DSA art. 17 et 20). Son `purge_after` est
+la fin du délai de contestation (six mois) : le signalement est gardé jusque-là.
+
+Hors de tout signalement, `DELETE /api/admin/teams/[id]/logo` (permission
+`moderation`, fiche de l'équipe) supprime un logo sans quarantaine, pour un
+contenu manifestement illicite ; l'équipe est prévenue aussi, le message la
+renvoyant vers l'association faute de signalement à contester ; un fichier que
 d'autres équipes désignent encore n'est pas effacé (même règle que le masquage) — depuis le panneau ou
 depuis la fiche de l'équipe (`ModerationLogoBar`). Trace dans les journaux du
 staff (`publishStaffAction`), sans nom de joueur sur Discord.
