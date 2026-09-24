@@ -7,6 +7,7 @@ import { UrgentPill } from "@/components/recruitment/UrgentPill";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
+import { type CountdownOverride, isCountdownHeld } from "@/lib/shared/pausable-countdown";
 import {
   RECRUITMENT_BANNER_COOKIE,
   RECRUITMENT_BANNER_ROTATION_MS,
@@ -147,6 +148,14 @@ export function RecruitmentHighlight({
  * banderole qui tourne derrière un jeu est une image prise au jeu. Un bouton
  * pause le fige pour de bon (WCAG 2.2.2), et les flèches parcourent les
  * annonces à la main.
+ *
+ * Le bouton pose un **choix explicite qui prime** sur le survol et le focus
+ * (`isCountdownHeld`, la règle des notifications) : « Pause » tient la
+ * banderole arrêtée, « Reprendre » la relance **sur-le-champ**. Sans cela la
+ * reprise ne reprenait rien — le pointeur qui vient de cliquer survole la
+ * banderole, et le focus clavier est posé sur le bouton lui-même : les deux
+ * tenaient le défilement figé. « Reprendre » s'efface au prochain survol ou
+ * focus, qui suspendent de nouveau.
  */
 function RecruitmentBanner({
   ads,
@@ -157,14 +166,17 @@ function RecruitmentBanner({
 }) {
   const [dismissed, setDismissed] = useState(false);
   const [index, setIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
+  const [override, setOverride] = useState<CountdownOverride>(null);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const { decorativeMotion } = useClientPower();
 
   const count = ads.length;
   const multiple = count > 1;
-  const rotating = multiple && decorativeMotion && !paused && !hovered && !focused;
+  const paused = override === "PAUSED";
+  const rotating = multiple && decorativeMotion && !isCountdownHeld(override, hovered, focused);
+  // Un nouveau survol ou focus rend la main à la règle ordinaire.
+  const releaseResume = () => setOverride((value) => (value === "RUNNING" ? null : value));
 
   // Un minuteur par annonce affichée, relancé à chaque changement : un clic sur
   // « suivante » redonne à la nouvelle annonce son plein temps de lecture.
@@ -195,11 +207,15 @@ function RecruitmentBanner({
   // Au doigt, un tap émet l'entrée du pointeur mais jamais sa sortie : compté
   // comme un survol, il figerait la banderole pour toute la visite.
   function onPointerEnter(event: PointerEvent<HTMLDivElement>) {
-    if (event.pointerType === "mouse") setHovered(true);
+    if (event.pointerType !== "mouse") return;
+    releaseResume();
+    setHovered(true);
   }
 
   function onFocus(event: FocusEvent<HTMLDivElement>) {
-    if (isKeyboardFocus(event.target)) setFocused(true);
+    if (!isKeyboardFocus(event.target)) return;
+    releaseResume();
+    setFocused(true);
   }
 
   function onBlur(event: FocusEvent<HTMLDivElement>) {
@@ -273,7 +289,7 @@ function RecruitmentBanner({
             <button
               type="button"
               className={styles.bannerButton}
-              onClick={() => setPaused((p) => !p)}
+              onClick={() => setOverride(paused ? "RUNNING" : "PAUSED")}
               aria-pressed={paused}
               aria-label={paused ? "Reprendre le défilement des annonces" : "Mettre en pause le défilement des annonces"}
               title={paused ? "Reprendre" : "Pause"}

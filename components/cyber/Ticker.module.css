@@ -26,9 +26,13 @@
   padding-left: 48px;
 }
 
-/* Arrêt au survol, au focus et au bouton pause (WCAG 2.2.2). */
-.ticker:hover .track,
-.ticker:focus-within .track,
+/* Arrêt au survol du texte et au bouton pause (WCAG 2.2.2). Le survol est lu
+   sur la piste et non sur le bandeau : le bouton n'en est pas un descendant,
+   si bien qu'un clic sur « ▶ » relance sur-le-champ au lieu d'attendre que le
+   pointeur quitte le bandeau. Pas d'arrêt au focus : le bouton est le seul
+   élément focalisable, et un clic le focalise — `:focus-within` tenait donc le
+   bandeau figé après « ▶ », à la souris comme au clavier. */
+.track:hover,
 .ticker[data-paused] .track {
   animation-play-state: paused;
 }
