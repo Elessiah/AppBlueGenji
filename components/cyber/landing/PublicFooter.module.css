@@ -1,8 +1,15 @@
+/* Le pied de page porte `a11y-always-contrast` : ses jetons de texte
+   secondaire (`--ink-mute`, `--ink-dim`) et ses traits y valent ceux du
+   réglage « Contraste renforcé », tous au-dessus de 4,5:1. Le fond est posé
+   ici, opaque, pour que le contraste ne dépende pas de ce qui se trouve
+   derrière (dégradé du `body`, décor d'une page). */
 .root {
   position: relative;
   z-index: 1;
   border-top: 1px solid var(--line-soft);
   padding: 30px 0 18px;
+  background: var(--cyber-bg);
+  color: var(--ink);
 }
 
 .inner {
@@ -62,13 +69,36 @@
   gap: 10px;
 }
 
-.columns a {
+/* Liens soulignés : on les reconnaît sans compter sur la couleur, et le
+   bouton « Accessibilité » se présente comme ses voisins. */
+.columns a,
+.linkButton {
   color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
   transition: color 0.18s ease;
 }
 
-.columns a:hover {
+.columns a:hover,
+.linkButton:hover {
   color: var(--blue-300);
+}
+
+/* Anneau explicite plutôt que celui du navigateur, qui varie d'un moteur à
+   l'autre : bleu clair sur fond noir, 11:1. */
+.root a:focus-visible,
+.root button:focus-visible {
+  outline: 2px solid var(--blue-300);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.linkButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
 }
 
 .bottom {
@@ -82,7 +112,7 @@
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.14em;
-  color: var(--ink-dim);
+  color: var(--ink-mute);
   text-transform: uppercase;
 }
 
