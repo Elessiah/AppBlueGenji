@@ -27,12 +27,20 @@ vérifier » sur `/tournois/[id]`. Trois nœuds en cause :
   n'existe que si une ligne au moins porte le bouton d'abandon (un fantôme
   invisible du bouton réserve sa largeur dans l'en-tête, « Statut » s'aligne
   enfin sur les statuts). Sans équipe classée, une phrase remplace le tableau.
+  Sur un écran étroit, colonnes fixes et bouton écrasaient le nom à zéro : le
+  tableau garde une largeur minimale (380 px, 500 avec la colonne d'action) et
+  défile à l'horizontale dans une `ScrollArea` — un tableau de données est
+  l'exception que prévoit WCAG 1.4.10.
   Le bouton d'abandon d'une autre équipe commence désormais par son texte
   visible (« Abandonner : déclarer l'abandon de … », WCAG 2.5.3).
 - **Modale de lancement de match** (`MatchLaunchCenter.tsx`) : le « VS » du
   titre portait `aria-label="contre"` sur un `<span>` — même interdiction, sur
   le titre qui **nomme** la modale. Le « VS » est masqué aux technologies
   d'assistance et « contre » écrit hors écran.
+- **Hors du périmètre audité, même défaut** : l'équipe et les rôles d'une
+  fiche de joueur, les contacts d'une annonce de recrutement reçoivent
+  `role="group"`. Le balayage `tests/app/aria-prohibited-attr.test.ts` couvre
+  désormais tout `app/` et `components/`.
 
 ## 16. Titres des fiches d'équipe et de joueur (WCAG 2.4.2 · RGAA 8.6)
 

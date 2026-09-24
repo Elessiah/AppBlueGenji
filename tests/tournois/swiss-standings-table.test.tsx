@@ -138,6 +138,14 @@ describe("classement de la ronde suisse", () => {
     expect(html).toContain("aria-label=\"Abandonner : déclarer l&#x27;abandon de Frost Alliance\"");
   });
 
+  it("défile à l'horizontale sur un écran étroit plutôt que d'écraser le nom", () => {
+    const html = render(TWO_TEAMS);
+    expect(html).toContain('role="region" aria-label="Classement du tournoi — défilement horizontal"');
+    expect(html).toMatch(/role="table" aria-label="Classement du tournoi" style="min-width:380px"/);
+    // La colonne d'action élargit le plancher d'autant que le bouton.
+    expect(render(TWO_TEAMS, { canForfeit: () => true })).toMatch(/style="min-width:500px"/);
+  });
+
   it("remplace le tableau par une phrase quand aucune équipe n'est classée", () => {
     const html = render([]);
     expect(html).not.toContain('role="table"');

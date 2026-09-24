@@ -13,16 +13,14 @@ import { join, relative } from "node:path";
  * s'y écrit en texte hors écran (`.sr-only`), ou l'élément reçoit un rôle qui
  * admet un nom.
  *
- * Le balayage couvre la fiche du tournoi et la modale de lancement, qui s'ouvre
- * par-dessus : c'est le périmètre audité. Un élément natif qui porte déjà un
- * rôle nommable (`<ul>`, `<ol>`, `<section>`, `<nav>`…) n'est pas visé.
+ * L'audit ne visait que la fiche du tournoi ; le balayage couvre tout le site
+ * — la fiche d'un joueur et les contacts d'une annonce de recrutement avaient
+ * le même défaut. Un élément natif qui porte déjà un rôle nommable (`<ul>`,
+ * `<ol>`, `<section>`, `<nav>`…) n'est pas visé.
  */
 
 const ROOT = join(__dirname, "..", "..");
-const SCOPES = [
-  join(ROOT, "app", "(secured)", "tournois", "[id]"),
-  join(ROOT, "components", "match-launch"),
-];
+const SCOPES = [join(ROOT, "app"), join(ROOT, "components")];
 
 /** Éléments au rôle `generic` (ou sans rôle nommable) les plus courants du JSX. */
 const GENERIC_TAGS = ["div", "span", "p", "b", "i", "strong", "em", "small"];
@@ -58,7 +56,7 @@ describe("aucun aria-label sur un élément sans rôle", () => {
   const files = SCOPES.flatMap((dir) => walk(dir));
 
   it("balaie bien des fichiers", () => {
-    expect(files.length).toBeGreaterThan(20);
+    expect(files.length).toBeGreaterThan(150);
   });
 
   it("le repère balayé trouve un défaut quand il y en a un", () => {
