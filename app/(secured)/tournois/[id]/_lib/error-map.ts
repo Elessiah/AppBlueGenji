@@ -1,6 +1,7 @@
 import { LAUNCH_ERROR_MESSAGES } from "@/lib/shared/match-launch";
 import { endurancePenaltyMessage } from "@/lib/shared/endurance-penalty";
 import { ENTRANT_REMOVAL_BLOCK_MESSAGES } from "@/lib/shared/entrant-removal";
+import { PHASE_ERROR_MESSAGES } from "../../creer/phase-form";
 
 export const ERROR_MESSAGES: Record<string, string> = {
   // Lancement des matchs : en tête, pour que les formulations propres à cette
@@ -71,9 +72,9 @@ export const ERROR_MESSAGES: Record<string, string> = {
   INVALID_DISCORD_REQUIREMENT: "Condition « Discord vérifié » invalide.",
   INVALID_BLIZZARD_REQUIREMENT: "Condition « Compte Blizzard » invalide.",
   INVALID_MIN_PLAYERS: "Nombre de joueurs minimum invalide.",
-  // Repli du panneau de contacts : `mapError` rend le code lui-même quand il ne
-  // le connaît pas, et une réponse sans corps exploitable (502 d'un relais)
-  // afficherait sinon un jeton en capitales au joueur.
+  // Repli du panneau de contacts, sur une réponse sans corps exploitable (502
+  // d'un relais) : dire ce qui n'a pas pu se charger vaut mieux que la phrase
+  // générique de `mapError`.
   CONTACTS_LOAD_FAILED: "Impossible de charger les contacts. Réessaie dans un instant.",
   // L'autre refus de la **même** route, et il est atteignable : le panneau n'est
   // pas rendu sur un tournoi clos, mais la clôture peut tomber entre le rendu et
@@ -125,6 +126,26 @@ export const ERROR_MESSAGES: Record<string, string> = {
   INVALID_DATES: "Une des dates est illisible.",
   INVALID_MAX_TEAMS: "Le nombre de places doit être compris entre 2 et 256.",
   MISSING_NAME: "Le nom du tournoi est obligatoire.",
+  // Autres refus de `validateTournamentInput`, partagés par la création et
+  // l'édition. Le formulaire borne déjà ces champs : ces phrases ne sortent que
+  // sur un client périmé ou une valeur contournée, mais elles doivent sortir en
+  // français — un code en capitales dans une notification n'apprend rien.
+  INVALID_FORMAT: "Format de tournoi invalide.",
+  INVALID_GAME: "Jeu invalide : Overwatch ou Marvel Rivals attendu.",
+  INVALID_PARTICIPANT_TYPE: "Type de participants invalide : équipes ou joueurs individuels attendus.",
+  // Émis pour un tournoi en ronde suisse **et** pour une phase suisse d'un
+  // multi-phases : la phrase vaut dans les deux cas.
+  INVALID_SWISS_ROUNDS: "Nombre de rondes suisses invalide : 1 à 20 attendues.",
+  INVALID_SWISS_POINTS:
+    "Barème de ronde suisse invalide : des points de 0 à 99, une victoire qui rapporte plus qu'une défaite, et un nul entre les deux.",
+  // Même double emploi que les rondes suisses : tournoi en Survie ou phase de Survie.
+  INVALID_SURVIVAL_ROUNDS: "Cadence de survie invalide : 1 à 50 manches entre deux coupes.",
+  INVALID_SURVIVAL_FIRST_CUT: "Première coupe de survie invalide : 1 à 50 manches avant elle.",
+  INVALID_ENDURANCE_SETTINGS:
+    "Réglages d'endurance invalides : capital de 1 à 99, gain et perte de 1 à 20, play-offs de 2 à 32 équipes, plafond de 1 à 50 manches.",
+  // Plan de phases (format multi-phases) : la table vit à côté du formulaire
+  // qui la montre aussi, pour qu'un code n'ait qu'une phrase.
+  ...PHASE_ERROR_MESSAGES,
   // Session expirée : le suivi en direct s'arrête, il faut se reconnecter.
   UNAUTHORIZED: "Ta session a expiré. Reconnecte-toi pour suivre le tournoi en direct.",
   // Diffusion en direct (`lib/shared/live-streams.ts`).
@@ -227,8 +248,29 @@ export const ERROR_MESSAGES: Record<string, string> = {
   PENALTY_LIFT_FAILED: "Erreur lors du retrait de la pénalité.",
 };
 
+/**
+ * Repli d'un code que la table ne connaît pas. Une phrase générique plutôt que
+ * le code : un jeton en capitales n'apprend rien au lecteur, et c'est aussi le
+ * repli des autres registres du site.
+ */
+export const UNKNOWN_ERROR_MESSAGE = "Une erreur inattendue est survenue. Réessaie dans un instant.";
+
+/** Forme d'un code d'erreur du serveur : `TOURNAMENT_NOT_FOUND`, `FORBIDDEN`… */
+const ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]*$/;
+
+/**
+ * Phrase française d'un refus.
+ *
+ * Seul un **code** inconnu retombe sur {@link UNKNOWN_ERROR_MESSAGE}. Ce qui
+ * n'a pas la forme d'un code passe tel quel : les appelants transmettent
+ * `error.message`, qui porte parfois déjà une phrase (rédigée par l'interface,
+ * ou venue d'un échec réseau du navigateur) — la remplacer par une formule
+ * générique ferait perdre une explication sans rien gagner.
+ */
 export function mapError(errorCode: string): string {
-  return ERROR_MESSAGES[errorCode] || errorCode;
+  const message = ERROR_MESSAGES[errorCode];
+  if (message) return message;
+  return ERROR_CODE_PATTERN.test(errorCode) ? UNKNOWN_ERROR_MESSAGE : errorCode;
 }
 
 /**
