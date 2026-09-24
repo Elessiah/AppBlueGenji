@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import Link from "next/link";
 import { ScrollArea } from "@/components/cyber/ScrollArea";
 import {
   A11Y_SETTINGS,
@@ -252,6 +253,12 @@ export function AccessibilityPanel({ id, titleId, settings, onToggle, onReset, o
         </p>
       </ScrollArea>
       <div className={styles.foot}>
+        {/* Le menu est la seule porte d'accessibilité présente sur **toutes** les
+            pages, espace connecté compris (qui n'a pas de pied de page) : la
+            déclaration s'y atteint de partout. */}
+        <Link href="/accessibilite" className={styles.statementLink}>
+          Déclaration d&apos;accessibilité
+        </Link>
         {/* `aria-disabled` et non `disabled` : le bouton garde le focus après
             avoir servi, au lieu de le jeter au `<body>` en se désactivant. */}
         <button

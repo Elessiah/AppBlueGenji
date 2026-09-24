@@ -17,8 +17,19 @@ import {
   DISCORD_CERTIFICATION_UNDO,
   DISCORD_TAG_AUDIENCE,
 } from "@/lib/shared/identity-sharing";
+import { CodedError, LOGIN_FIELD_ERRORS, errorCode } from "@/lib/shared/field-errors";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
+import { FieldErrorText } from "@/components/ui/field-error-text";
 
 const CONSENT_STORAGE_KEY = "bg_rgpd_consent";
+
+/**
+ * Contrôles de la connexion par code. Le compte Discord garde le même `id` sur
+ * les deux étapes : c'est le champ saisi à la première, montré figé à la
+ * seconde, et le refus qui le désigne (tag introuvable) tombe toujours à la
+ * première.
+ */
+const LOGIN_FIELD_IDS = { handle: "login-discord-handle", code: "login-discord-code" } as const;
 
 /** Ce qu'il faut à l'invite Google One Tap, résolu côté serveur par `page.tsx`. */
 export type OneTapConfig = { clientId: string; nonce?: string };
@@ -35,6 +46,7 @@ export type OneTapConfig = { clientId: string; nonce?: string };
 export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
   const router = useRouter();
   const { showError, showSuccess } = useToast();
+  const fieldErrors = useFieldErrors(LOGIN_FIELD_ERRORS, LOGIN_FIELD_IDS);
   // Destination d'après connexion. Toujours **filtrée** : la valeur vient de
   // l'URL, et une redirection ouverte est l'appât classique du hameçonnage
   // (`lib/shared/safe-redirect.ts`).
@@ -99,6 +111,7 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
 
   const requestCode = async (event: FormEvent) => {
     event.preventDefault();
+    fieldErrors.clear();
     setLoading(true);
     try {
       const response = await fetch("/api/auth/discord/request", {
@@ -112,13 +125,17 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
         discordId?: string;
         isNewAccount?: boolean;
       };
-      if (!response.ok) throw new Error(loginErrorMessage(payload.error || "FAILED"));
+      if (!response.ok) {
+        const code = payload.error || "FAILED";
+        throw new CodedError(code, loginErrorMessage(code));
+      }
       setResolvedId(payload.discordId || "");
       setIsNewAccount(payload.isNewAccount !== false);
       if (payload.isNewAccount === false) setPseudo("");
       setRequested(true);
       showSuccess(`Code envoyé en DM Discord (expiration : ${new Date(payload.expiresAt || "").toLocaleTimeString()}).`);
     } catch (e) {
+      fieldErrors.report(errorCode(e), (e as Error).message);
       showError((e as Error).message);
     } finally {
       setLoading(false);
@@ -127,6 +144,7 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
 
   const verifyCode = async (event: FormEvent) => {
     event.preventDefault();
+    fieldErrors.clear();
     setLoading(true);
     try {
       const response = await fetch("/api/auth/discord/verify", {
@@ -135,10 +153,14 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
         body: JSON.stringify({ discordId: resolvedId, code, pseudo: isNewAccount ? pseudo : undefined }),
       });
       const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(loginErrorMessage(payload.error || "FAILED"));
+      if (!response.ok) {
+        const code = payload.error || "FAILED";
+        throw new CodedError(code, loginErrorMessage(code));
+      }
       router.push(redirect);
       router.refresh();
     } catch (e) {
+      fieldErrors.report(errorCode(e), (e as Error).message);
       showError((e as Error).message);
     } finally {
       setLoading(false);
@@ -182,16 +204,22 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
 
             <form onSubmit={requestCode} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div className="field">
-                <label>Tag Discord ou ID</label>
+                <label htmlFor={LOGIN_FIELD_IDS.handle}>Tag Discord ou ID</label>
                 <input
+                  id={LOGIN_FIELD_IDS.handle}
                   type="text"
                   name="handle"
                   value={handle}
-                  onChange={(e) => setHandle(e.target.value)}
+                  onChange={(e) => {
+                    setHandle(e.target.value);
+                    fieldErrors.clear("handle");
+                  }}
                   placeholder="ton_pseudo ou 123456789012345678"
                   required
+                  {...fieldErrors.aria("handle", "login-discord-handle-help")}
                 />
-                <span className="mono" style={{ fontSize: 10, color: "var(--ink-dim)", letterSpacing: "0.08em", marginTop: 4, lineHeight: 1.5 }}>
+                <FieldErrorText fieldId={LOGIN_FIELD_IDS.handle} message={fieldErrors.message("handle")} />
+                <span id="login-discord-handle-help" className="mono" style={{ fontSize: 10, color: "var(--ink-dim)", letterSpacing: "0.08em", marginTop: 4, lineHeight: 1.5 }}>
                   Le bot doit partager un serveur avec toi pour t&apos;écrire en privé, que tu
                   saisisses ton tag ou ton ID : l&apos;ID évite seulement la recherche de ton tag.
                   Pas encore sur un de ses serveurs ?{" "}
@@ -231,8 +259,9 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
 
             <form onSubmit={verifyCode} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div className="field">
-                <label>Compte Discord</label>
+                <label htmlFor={LOGIN_FIELD_IDS.handle}>Compte Discord</label>
                 <input
+                  id={LOGIN_FIELD_IDS.handle}
                   type="text"
                   name="handle"
                   value={handle}
@@ -264,23 +293,32 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
                 )}
               </div>
               <div className="field">
-                <label>Code reçu en DM (6 chiffres)</label>
+                <label htmlFor={LOGIN_FIELD_IDS.code}>Code reçu en DM (6 chiffres)</label>
                 <input
+                  id={LOGIN_FIELD_IDS.code}
                   type="text"
                   name="code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
                   maxLength={6}
                   pattern="\d{6}"
                   value={code}
-                  onChange={(e) => setCode(e.target.value)}
+                  onChange={(e) => {
+                    setCode(e.target.value);
+                    fieldErrors.clear("code");
+                  }}
+                  {...fieldErrors.aria("code")}
                   className="num"
                   style={{ fontSize: 20, letterSpacing: "0.3em", textAlign: "center" }}
                   required
                 />
+                <FieldErrorText fieldId={LOGIN_FIELD_IDS.code} message={fieldErrors.message("code")} />
               </div>
               {isNewAccount && (
                 <div className="field">
-                  <label>Pseudo site <span style={{ color: "var(--ink-mute)", fontWeight: 400 }}>(première connexion)</span></label>
+                  <label htmlFor="login-site-pseudo">Pseudo site <span style={{ color: "var(--ink-mute)", fontWeight: 400 }}>(première connexion)</span></label>
                   <input
+                    id="login-site-pseudo"
                     type="text"
                     name="pseudo"
                     value={pseudo}
@@ -303,6 +341,7 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
               <button
                 type="button"
                 onClick={() => {
+                  fieldErrors.clear();
                   setRequested(false);
                   setCode("");
                   setIsNewAccount(true);
