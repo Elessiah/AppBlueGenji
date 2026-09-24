@@ -39,6 +39,7 @@ type MatchState = {
   team2_is_ghost: number;
   start_at: string | null;
   lobby_opened_at: string | null;
+  launch_pairing: string | null;
   launched_at: string | null;
   team1_ready_at: string | null;
   team2_ready_at: string | null;
@@ -72,6 +73,7 @@ function matchState(overrides: Partial<MatchState> = {}): MatchState {
     team2_is_ghost: 0,
     start_at: null,
     lobby_opened_at: null,
+    launch_pairing: `${TEAM1}:${TEAM2}`,
     launched_at: null,
     team1_ready_at: null,
     team2_ready_at: null,
@@ -116,6 +118,12 @@ function applyUpdate(state: World, sql: string, params: unknown[]) {
   if (sql.includes("SET caster_user_id = ?")) set("caster_user_id", params[0]);
   if (sql.includes("SET caster_user_id = NULL")) set("caster_user_id", null);
   if (sql.includes("SET host_team_id = ?")) set("host_team_id", params[0]);
+  if (sql.includes("SET launch_pairing = ?")) {
+    set("launch_pairing", params[0]);
+    for (const column of ["lobby_opened_at", "launched_at", "team1_ready_at", "team2_ready_at", "caster_ready_at"] as const) {
+      set(column, null);
+    }
+  }
 }
 
 function connectionFor(state: World): PoolConnection {
@@ -148,8 +156,13 @@ function connectionFor(state: World): PoolConnection {
     }
     if (sql.includes("FROM bg_matches m") && sql.includes("WHERE m.tournament_id = ?")) {
       const match = state.match;
+      const stale = match && match.launch_pairing !== `${match.team1_id}:${match.team2_id}`;
       const candidate =
-        match && match.status === "READY" && match.launched_at === null && match.team1_id && match.team2_id;
+        match &&
+        match.status === "READY" &&
+        (match.launched_at === null || stale) &&
+        match.team1_id &&
+        match.team2_id;
       return [candidate ? [{ ...match }] : [], []];
     }
     if (sql.includes("FROM bg_matches m")) {
@@ -249,6 +262,24 @@ describe("setMatchReady", () => {
     state.match = matchState({ launched_at: STAMP, team1_ready_at: STAMP });
     await expect(setMatchReady(42, 1, false)).rejects.toThrow("MATCH_ALREADY_LAUNCHED");
     expect(state.match?.team1_ready_at).toBe(STAMP);
+  });
+});
+
+describe("setMatchReady — appariement réécrit sur place", () => {
+  it("n'hérite pas du « Prêt » de l'équipe remplacée", async () => {
+    // Le créneau 2 portait l'équipe 30, prête ; une correction y a mis l'équipe
+    // 20. Son « Prêt » ne vaut rien pour la nouvelle.
+    state.match = matchState({ launch_pairing: `${TEAM1}:30`, team2_ready_at: STAMP });
+    await expect(setMatchReady(42, 1, true)).resolves.toEqual({ launched: false });
+    expect(state.match?.launch_pairing).toBe(`${TEAM1}:${TEAM2}`);
+    expect(state.match?.team2_ready_at).toBeNull();
+    expect(state.match?.team1_ready_at).toBe(STAMP);
+  });
+
+  it("ne tient pas pour lancé un match lancé sous un autre appariement", async () => {
+    state.match = matchState({ launch_pairing: `${TEAM1}:30`, launched_at: STAMP });
+    await expect(setMatchReady(42, 1, true)).resolves.toEqual({ launched: false });
+    expect(state.match?.launched_at).toBeNull();
   });
 });
 
@@ -409,6 +440,15 @@ describe("maintainMatchLaunches", () => {
     state.match = matchState({ team1_is_ghost: 1, team2_is_ghost: 1 });
     await maintainMatchLaunches(connection(), 7);
     expect(state.match?.launched_at).toBe(STAMP);
+  });
+
+  it("remet en lancement un match lancé sous un autre appariement", async () => {
+    state.match = matchState({ launch_pairing: `30:${TEAM2}`, launched_at: STAMP, lobby_opened_at: STAMP });
+    await expect(maintainMatchLaunches(connection(), 7)).resolves.toBe(1);
+    expect(state.match?.launch_pairing).toBe(`${TEAM1}:${TEAM2}`);
+    expect(state.match?.launched_at).toBeNull();
+    // Le délai repart de l'observation du nouvel appariement.
+    expect(state.match?.lobby_opened_at).toBe(STAMP);
   });
 
   it("ne touche pas un match programmé plus tard", async () => {

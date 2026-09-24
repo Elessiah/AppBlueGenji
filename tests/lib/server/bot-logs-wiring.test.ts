@@ -220,6 +220,7 @@ describe("reportMatchScore", () => {
     status: "READY",
     // Un match se joue une fois lancé (`lib/shared/match-launch.ts`).
     launched_at: "2026-01-01 20:00:00",
+    launch_pairing: "101:102",
   };
 
   /**

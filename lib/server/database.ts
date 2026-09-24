@@ -609,6 +609,7 @@ async function runMigrations(db: Pool): Promise<void> {
       host_team_id BIGINT NULL,
       caster_user_id BIGINT NULL,
       lobby_opened_at DATETIME NULL,
+      launch_pairing VARCHAR(48) NULL,
       launched_at DATETIME NULL,
       team1_ready_at DATETIME NULL,
       team2_ready_at DATETIME NULL,
@@ -1093,6 +1094,9 @@ async function runMigrations(db: Pool): Promise<void> {
        ADD CONSTRAINT fk_bg_matches_caster FOREIGN KEY (caster_user_id)
          REFERENCES bg_users(id) ON DELETE SET NULL`,
     `ALTER TABLE bg_matches ADD COLUMN lobby_opened_at DATETIME NULL AFTER caster_user_id`,
+    // Appariement auquel l'état de lancement se rapporte (`launchPairingKey`) :
+    // un match réécrit sur place ne doit pas hériter des « Prêt » d'avant.
+    `ALTER TABLE bg_matches ADD COLUMN launch_pairing VARCHAR(48) NULL AFTER lobby_opened_at`,
     `ALTER TABLE bg_matches ADD COLUMN team1_ready_at DATETIME NULL AFTER lobby_opened_at`,
     `ALTER TABLE bg_matches ADD COLUMN team2_ready_at DATETIME NULL AFTER team1_ready_at`,
     `ALTER TABLE bg_matches ADD COLUMN caster_ready_at DATETIME NULL AFTER team2_ready_at`,
@@ -1116,8 +1120,13 @@ async function runMigrations(db: Pool): Promise<void> {
   const launchedAtStatement = `ALTER TABLE bg_matches ADD COLUMN launched_at DATETIME NULL AFTER lobby_opened_at`;
   try {
     await db.execute(launchedAtStatement);
+    // L'empreinte de l'appariement est posée avec : sans elle, le lancement
+    // serait lu comme celui d'un autre appariement, donc ignoré.
     await db.execute(
-      `UPDATE bg_matches SET launched_at = NOW() WHERE status <> 'PENDING' AND launched_at IS NULL`,
+      `UPDATE bg_matches
+       SET launched_at = NOW(), launch_pairing = CONCAT(team1_id, ':', team2_id)
+       WHERE status <> 'PENDING' AND launched_at IS NULL
+         AND team1_id IS NOT NULL AND team2_id IS NOT NULL`,
     );
   } catch (error) {
     reportSchemaFailure(error, launchedAtStatement);

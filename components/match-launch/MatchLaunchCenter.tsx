@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { PRIVACY_POLICY_PATH } from "@/components/privacy/PrivacyChangesModal";
 import { useToast } from "@/components/ui/toast";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
@@ -9,6 +11,7 @@ import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import {
   launchErrorMessage,
   launchModalKey,
+  launchModalWaits,
   MATCH_LAUNCH_OPEN_EVENT,
   MATCH_LAUNCH_REFRESH_EVENT,
   readyCount,
@@ -17,6 +20,7 @@ import {
   type LaunchSide,
   type MatchLaunchInfo,
 } from "@/lib/shared/match-launch";
+import { PRIVACY_CHANGES_ANSWERED_EVENT } from "@/lib/shared/privacy-changes";
 import type { TeamRole } from "@/lib/shared/types";
 import styles from "./MatchLaunchCenter.module.css";
 
@@ -81,9 +85,17 @@ function wantsAutoOpen(info: MatchLaunchInfo, now: number): boolean {
  * suspendue onglet caché (`useClientPower().clocks`) ; une minuterie la relit à
  * l'heure exacte du prochain match programmé.
  */
-export function MatchLaunchCenter() {
+export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?: boolean }) {
   const { showError, showSuccess } = useToast();
   const { clocks } = useClientPower();
+  // Un choix de confidentialité dû passe d'abord (`launchModalWaits`).
+  const [privacyAnswered, setPrivacyAnswered] = useState(false);
+  const pathname = usePathname();
+  const waiting = launchModalWaits({
+    privacyPending,
+    privacyAnswered,
+    onPrivacyPage: pathname === PRIVACY_POLICY_PATH,
+  });
   const [launches, setLaunches] = useState<MatchLaunchInfo[]>([]);
   const [openMatchId, setOpenMatchId] = useState<number | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -156,10 +168,10 @@ export function MatchLaunchCenter() {
   // ouvert qui sort de la liste (terminé) ne bloque pas l'annonce du suivant,
   // et une ouverture demandée avant que la liste n'arrive se résout d'elle-même
   // à la relève qu'elle déclenche.
-  const current = launches.find((info) => info.matchId === openMatchId) ?? null;
+  const current = waiting ? null : (launches.find((info) => info.matchId === openMatchId) ?? null);
 
   useEffect(() => {
-    if (current !== null) return;
+    if (waiting || current !== null) return;
     if (dismissedRef.current === null) dismissedRef.current = readDismissed();
     const now = Date.now();
     const next = launches.find(
@@ -169,7 +181,14 @@ export function MatchLaunchCenter() {
       setConfirming(false);
       setOpenMatchId(next.matchId);
     }
-  }, [launches, current]);
+  }, [launches, current, waiting]);
+
+  useEffect(() => {
+    if (!privacyPending) return;
+    const onAnswered = () => setPrivacyAnswered(true);
+    window.addEventListener(PRIVACY_CHANGES_ANSWERED_EVENT, onAnswered);
+    return () => window.removeEventListener(PRIVACY_CHANGES_ANSWERED_EVENT, onAnswered);
+  }, [privacyPending]);
 
 
   const close = useCallback(() => {
@@ -233,7 +252,7 @@ export function MatchLaunchCenter() {
   const pending = launches.filter((info) => info.phase === "LOBBY" || info.phase === "LAUNCHED");
 
   if (!current) {
-    if (pending.length === 0) return null;
+    if (waiting || pending.length === 0) return null;
     const lobby = pending.find((info) => info.phase === "LOBBY");
     const target = lobby ?? pending[0];
     return (

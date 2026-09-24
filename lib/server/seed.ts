@@ -1380,7 +1380,9 @@ async function applyLiveStreams(
  * l'équipe 2 comme hôte (le cas où l'arbitrage a changé le défaut) et un
  * « Prêt » de l'équipe 1 — de quoi voir la modale avec ses trois parties, dont
  * une prête et deux attendues. Les autres manches jouables restent en
- * lancement, sans caster : le cas « deux équipes seules ».
+ * lancement, sans caster : le cas « deux équipes seules ». L'empreinte de
+ * l'appariement est posée avec le « Prêt », sans quoi il serait lu comme celui
+ * d'un autre appariement (`currentLaunchState`).
  */
 async function applyMatchLaunchCases(db: Pool, casterId: number | null): Promise<void> {
   if (casterId === null) return;
@@ -1397,7 +1399,8 @@ async function applyMatchLaunchCases(db: Pool, casterId: number | null): Promise
          AND m2.live_trigger IS NOT NULL
        GROUP BY m2.tournament_id
      ) first_casted ON first_casted.id = m.id
-     SET m.caster_user_id = ?, m.host_team_id = m.team2_id, m.team1_ready_at = NOW()`,
+     SET m.caster_user_id = ?, m.host_team_id = m.team2_id, m.team1_ready_at = NOW(),
+         m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)`,
     [casterId]
   );
 }

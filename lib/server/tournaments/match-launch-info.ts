@@ -34,7 +34,13 @@ import {
 import type { PlatformRole } from "@/lib/shared/permissions";
 import type { TeamRole } from "@/lib/shared/types";
 import { localUploadUrl } from "@/lib/shared/uploads";
-import { maintainMatchLaunches, rowReadiness, toLaunchInput, type LaunchMatchRow } from "./match-launch";
+import {
+  maintainMatchLaunches,
+  rowLaunchState,
+  rowReadiness,
+  toLaunchInput,
+  type LaunchMatchRow,
+} from "./match-launch";
 import { publishUpdatedEvent } from "./notifications";
 
 /**
@@ -113,7 +119,7 @@ async function loadCandidates(
     `SELECT
        m.id, m.tournament_id, t.state AS tournament_state, m.status, m.is_bye,
        m.team1_id, m.team2_id, t1.is_ghost AS team1_is_ghost, t2.is_ghost AS team2_is_ghost,
-       m.start_at, m.lobby_opened_at, m.launched_at, m.team1_ready_at, m.team2_ready_at,
+       m.start_at, m.lobby_opened_at, m.launch_pairing, m.launched_at, m.team1_ready_at, m.team2_ready_at,
        m.caster_user_id, m.caster_ready_at, m.host_team_id,
        t.name AS tournament_name,
        t1.name AS team1_name, t2.name AS team2_name,
@@ -209,7 +215,8 @@ async function maintainIfDue(connection: PoolConnection, rows: CandidateRow[]): 
   const due = new Set<number>();
   for (const row of rows) {
     if (matchLaunchPhase(toLaunchInput(row), now) !== "LOBBY") continue;
-    if (row.lobby_opened_at === null || isAutoLaunchDue(toIso(row.lobby_opened_at), now)) {
+    const opened = rowLaunchState(row).lobbyOpenedAt;
+    if (opened === null || isAutoLaunchDue(opened, now)) {
       due.add(Number(row.tournament_id));
     }
   }
@@ -362,7 +369,8 @@ export async function listViewerMatchLaunches(viewer: LaunchViewer): Promise<Mat
         }
       }
 
-      const lobbyOpenedAt = toIso(row.lobby_opened_at);
+      const launch = rowLaunchState(row);
+      const lobbyOpenedAt = launch.lobbyOpenedAt;
       result.push({
         matchId: Number(row.id),
         tournamentId: Number(row.tournament_id),
@@ -371,7 +379,7 @@ export async function listViewerMatchLaunches(viewer: LaunchViewer): Promise<Mat
         startAt: toIso(row.start_at),
         lobbyOpenedAt,
         autoLaunchAt: phase === "LOBBY" ? autoLaunchAt(lobbyOpenedAt) : null,
-        launchedAt: toIso(row.launched_at),
+        launchedAt: launch.launchedAt,
         hostTeamId: resolveHostTeamId(
           row.host_team_id === null ? null : Number(row.host_team_id),
           Number(row.team1_id),

@@ -16,6 +16,7 @@ import {
 } from "@/lib/shared/account-deletion";
 import {
   formatPrivacyChangeDate,
+  PRIVACY_CHANGES_ANSWERED_EVENT,
   privacyChangesHeading,
   type PrivacyChange,
 } from "@/lib/shared/privacy-changes";
@@ -106,6 +107,7 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
       });
       if (!response.ok) throw new Error();
       setAnswered(true);
+      window.dispatchEvent(new Event(PRIVACY_CHANGES_ANSWERED_EVENT));
       showSuccess("Merci, ton choix est enregistré.");
     } catch {
       showError("Ton acceptation n'a pas pu être enregistrée. Réessaie dans un instant.");

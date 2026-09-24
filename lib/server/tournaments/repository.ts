@@ -308,6 +308,7 @@ export async function getMatchRows(
       m.caster_user_id,
       cu.pseudo AS caster_pseudo,
       m.lobby_opened_at,
+      m.launch_pairing,
       m.launched_at,
       m.team1_ready_at,
       m.team2_ready_at,

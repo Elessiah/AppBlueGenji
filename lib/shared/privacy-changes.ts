@@ -49,6 +49,14 @@ export type PrivacyChange = {
   details: readonly string[];
 };
 
+/**
+ * Événement de fenêtre émis quand le joueur a accepté les changements
+ * présentés. Les autres modales de la mise en page racine (lancement d'un match)
+ * attendent ce signal pour s'ouvrir : deux modales ouvertes ensemble se
+ * disputeraient le piège de focus, et celle du dessous le gagnerait.
+ */
+export const PRIVACY_CHANGES_ANSWERED_EVENT = "bg:privacy-changes-answered";
+
 /** Forme d'un identifiant de changement. */
 export const PRIVACY_CHANGE_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 

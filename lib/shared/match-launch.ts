@@ -104,6 +104,52 @@ export function isAutoLaunchDue(lobbyOpenedAt: string | null, now: number): bool
   return due !== null && due <= now;
 }
 
+/**
+ * Empreinte de l'appariement auquel l'état de lancement se rapporte
+ * (`bg_matches.launch_pairing`). Le moteur réécrit parfois les équipes d'un
+ * match **sur place** — arbre de play-offs d'une BG Survie réparé, créneau
+ * d'élimination vidé puis regarni par une correction : les « Prêt », l'ouverture
+ * du lancement et le lancement lui-même appartenaient à l'appariement d'avant,
+ * et ne doivent pas passer au suivant. Même forme que le `CONCAT(team1_id, ':',
+ * team2_id)` du SQL qui la compare.
+ */
+export function launchPairingKey(team1Id: number | null, team2Id: number | null): string | null {
+  if (team1Id === null || team2Id === null) return null;
+  return `${team1Id}:${team2Id}`;
+}
+
+/** L'état de lancement tel qu'il est stocké, avant tout contrôle. */
+export type StoredLaunchState = {
+  launchPairing: string | null;
+  lobbyOpenedAt: string | null;
+  launchedAt: string | null;
+  team1ReadyAt: string | null;
+  team2ReadyAt: string | null;
+  casterReadyAt: string | null;
+};
+
+/**
+ * L'état de lancement **valable pour l'appariement courant** : tout est effacé
+ * quand l'empreinte stockée ne décrit plus les deux engagées du match. Seul le
+ * caster reste — il s'est inscrit sur le match, pas sur un appariement.
+ */
+export function currentLaunchState(
+  stored: StoredLaunchState,
+  team1Id: number | null,
+  team2Id: number | null,
+): StoredLaunchState {
+  const key = launchPairingKey(team1Id, team2Id);
+  if (key !== null && stored.launchPairing === key) return stored;
+  return {
+    launchPairing: stored.launchPairing,
+    lobbyOpenedAt: null,
+    launchedAt: null,
+    team1ReadyAt: null,
+    team2ReadyAt: null,
+    casterReadyAt: null,
+  };
+}
+
 /** État des « Prêt » d'un match. */
 export type LaunchReadiness = {
   team1Ready: boolean;
@@ -390,6 +436,22 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
 /** Message français d'un refus du lancement. */
 export function launchErrorMessage(code: string | null | undefined): string {
   return (code && LAUNCH_ERROR_MESSAGES[code]) || "L'action n'a pas pu aboutir. Réessaie dans un instant.";
+}
+
+/**
+ * La modale de lancement doit-elle attendre ? Oui tant qu'un choix de
+ * confidentialité est dû et pas encore fait : ouvertes ensemble, les deux
+ * modales se disputeraient le piège de focus, et celle de lancement — peinte
+ * dessous — l'emporterait, rendant « J'accepte » inatteignable au clavier. Sur
+ * la page de la politique, où la modale de confidentialité se tait, rien n'est
+ * à attendre.
+ */
+export function launchModalWaits(input: {
+  privacyPending: boolean;
+  privacyAnswered: boolean;
+  onPrivacyPage: boolean;
+}): boolean {
+  return input.privacyPending && !input.privacyAnswered && !input.onPrivacyPage;
 }
 
 /**

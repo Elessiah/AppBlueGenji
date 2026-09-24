@@ -5,11 +5,14 @@ import {
   canDeclareTeamReady,
   canPlayersReportScore,
   castBlockReason,
+  currentLaunchState,
   isAutoLaunchDue,
   LAUNCH_AUTO_DELAY_MINUTES,
   LAUNCH_ERROR_MESSAGES,
   launchErrorMessage,
   launchModalKey,
+  launchModalWaits,
+  launchPairingKey,
   launchReadiness,
   matchLaunchPhase,
   nextLaunchPhaseChangeAt,
@@ -129,6 +132,46 @@ describe("lancement d'office", () => {
     expect(autoLaunchAt(null)).toBeNull();
     expect(isAutoLaunchDue(null, NOW)).toBe(false);
     expect(autoLaunchAt("illisible")).toBeNull();
+  });
+});
+
+describe("launchPairingKey / currentLaunchState", () => {
+  const stored = {
+    launchPairing: "10:20",
+    lobbyOpenedAt: "a",
+    launchedAt: "b",
+    team1ReadyAt: "c",
+    team2ReadyAt: "d",
+    casterReadyAt: "e",
+  };
+
+  it("forme l'empreinte comme le `CONCAT` du SQL, et n'en a pas sans les deux engagées", () => {
+    expect(launchPairingKey(10, 20)).toBe("10:20");
+    expect(launchPairingKey(20, 10)).toBe("20:10");
+    expect(launchPairingKey(null, 20)).toBeNull();
+  });
+
+  it("garde l'état posé pour l'appariement courant", () => {
+    expect(currentLaunchState(stored, 10, 20)).toBe(stored);
+  });
+
+  it("efface ce qui a été posé pour un autre appariement — match réécrit sur place", () => {
+    const cleared = currentLaunchState(stored, 10, 30);
+    expect(cleared).toEqual({
+      launchPairing: "10:20",
+      lobbyOpenedAt: null,
+      launchedAt: null,
+      team1ReadyAt: null,
+      team2ReadyAt: null,
+      casterReadyAt: null,
+    });
+    // Les équipes qui échangent leurs créneaux forment aussi un autre appariement.
+    expect(currentLaunchState(stored, 20, 10).launchedAt).toBeNull();
+  });
+
+  it("ne reconnaît aucun état sans empreinte, ni sans les deux engagées", () => {
+    expect(currentLaunchState({ ...stored, launchPairing: null }, 10, 20).team1ReadyAt).toBeNull();
+    expect(currentLaunchState(stored, 10, null).launchedAt).toBeNull();
   });
 });
 
@@ -371,6 +414,21 @@ describe("launchModalKey", () => {
     expect(launchModalKey({ matchId: 4, phase: "LOBBY" })).not.toBe(
       launchModalKey({ matchId: 4, phase: "LAUNCHED" }),
     );
+  });
+});
+
+describe("launchModalWaits", () => {
+  it("attend qu'un choix de confidentialité dû soit fait", () => {
+    expect(launchModalWaits({ privacyPending: true, privacyAnswered: false, onPrivacyPage: false })).toBe(true);
+  });
+
+  it("s'ouvre une fois le choix fait, ou sans choix dû", () => {
+    expect(launchModalWaits({ privacyPending: true, privacyAnswered: true, onPrivacyPage: false })).toBe(false);
+    expect(launchModalWaits({ privacyPending: false, privacyAnswered: false, onPrivacyPage: false })).toBe(false);
+  });
+
+  it("n'attend pas sur la page de la politique, où la modale de confidentialité se tait", () => {
+    expect(launchModalWaits({ privacyPending: true, privacyAnswered: false, onPrivacyPage: true })).toBe(false);
   });
 });
 

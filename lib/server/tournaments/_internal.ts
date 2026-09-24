@@ -9,7 +9,7 @@ import {
 } from "@/lib/shared/registration-filters";
 import { normalizeStreamUrl, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import { parseTournamentImage } from "@/lib/shared/tournament-image";
-import { launchReadiness, resolveHostTeamId } from "@/lib/shared/match-launch";
+import { currentLaunchState, launchReadiness, resolveHostTeamId } from "@/lib/shared/match-launch";
 
 export type TournamentRow = RowDataPacket & {
   id: number;
@@ -117,6 +117,7 @@ export type MatchRow = RowDataPacket & {
   caster_user_id?: number | null;
   caster_pseudo?: string | null;
   lobby_opened_at?: Date | null;
+  launch_pairing?: string | null;
   launched_at?: Date | null;
   team1_ready_at?: Date | null;
   team2_ready_at?: Date | null;
@@ -279,20 +280,33 @@ function mapMatchLaunch(row: MatchRow) {
   const team1Id = nullableId(row.team1_id);
   const team2Id = nullableId(row.team2_id);
   const casterUserId = nullableId(row.caster_user_id);
+  // Un état posé pour un autre appariement ne vaut rien pour celui-ci.
+  const launch = currentLaunchState(
+    {
+      launchPairing: row.launch_pairing ?? null,
+      lobbyOpenedAt: toIso(row.lobby_opened_at ?? null),
+      launchedAt: toIso(row.launched_at ?? null),
+      team1ReadyAt: toIso(row.team1_ready_at ?? null),
+      team2ReadyAt: toIso(row.team2_ready_at ?? null),
+      casterReadyAt: toIso(row.caster_ready_at ?? null),
+    },
+    team1Id,
+    team2Id,
+  );
   const readiness = launchReadiness({
-    team1ReadyAt: toIso(row.team1_ready_at ?? null),
-    team2ReadyAt: toIso(row.team2_ready_at ?? null),
+    team1ReadyAt: launch.team1ReadyAt,
+    team2ReadyAt: launch.team2ReadyAt,
     team1IsGhost: Number(row.team1_is_ghost ?? 0) === 1,
     team2IsGhost: Number(row.team2_is_ghost ?? 0) === 1,
     casterUserId,
-    casterReadyAt: toIso(row.caster_ready_at ?? null),
+    casterReadyAt: launch.casterReadyAt,
   });
   return {
     hostTeamId: resolveHostTeamId(nullableId(row.host_team_id), team1Id, team2Id),
     casterUserId,
     casterPseudo: casterUserId === null ? null : (row.caster_pseudo ?? null),
-    lobbyOpenedAt: toIso(row.lobby_opened_at ?? null),
-    launchedAt: toIso(row.launched_at ?? null),
+    lobbyOpenedAt: launch.lobbyOpenedAt,
+    launchedAt: launch.launchedAt,
     team1Ready: readiness.team1Ready,
     team2Ready: readiness.team2Ready,
     casterReady: readiness.casterReady,

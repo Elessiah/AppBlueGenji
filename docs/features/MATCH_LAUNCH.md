@@ -42,7 +42,18 @@ annonce.
 ## Colonnes
 
 `bg_matches` : `host_team_id`, `caster_user_id`, `lobby_opened_at`,
-`launched_at`, `team1_ready_at`, `team2_ready_at`, `caster_ready_at`.
+`launch_pairing`, `launched_at`, `team1_ready_at`, `team2_ready_at`,
+`caster_ready_at`.
+
+- **`launch_pairing` rattache l'état à un appariement** (`"team1:team2"`,
+  `launchPairingKey`). Le moteur réécrit parfois les équipes d'un match **sur
+  place** — arbre de play-offs d'une BG Survie réparé après une correction,
+  créneau d'élimination vidé puis regarni. Sans empreinte, la nouvelle équipe
+  héritait du « Prêt » de l'ancienne, et un match lancé d'office sans saisie
+  restait lancé pour un appariement qui n'avait jamais été appelé. À la lecture,
+  `currentLaunchState` ignore tout état posé pour une autre paire ; à l'écriture,
+  `adoptCurrentPairing` l'efface en base avant d'écrire l'empreinte neuve. Le
+  caster, lui, reste : il s'est inscrit sur le match, pas sur un appariement.
 
 - `host_team_id` `NULL` = équipe 1 ; une valeur qui ne désigne plus une des deux
   engagées (appariement corrigé) retombe aussi sur l'équipe 1
@@ -131,7 +142,10 @@ Changement déclaré dans `PRIVACY_CHANGES` (`2026-09-lancement-des-matchs`),
   (`useClientPower().clocks`). Elle s'ouvre d'office au lancement puis au départ
   (annonce, dix minutes), une fois par phase et par session ; fermée, elle laisse
   une pastille pour la rouvrir. Au-dessus du recrutement (1200), sous les
-  changements de confidentialité (1300).
+  changements de confidentialité (1300) — et **elle attend** qu'un choix de
+  confidentialité dû soit fait (`launchModalWaits`, signal
+  `PRIVACY_CHANGES_ANSWERED_EVENT`) : ouvertes ensemble, la modale de lancement,
+  empilée en dernier, prenait le piège de focus sous l'autre.
 - **Carte de match** — `MatchLaunchStrip` : « Lancement · N/M prêts », hôte,
   caster ; pour les parties, un bouton qui ouvre la modale
   (`MATCH_LAUNCH_OPEN_EVENT`) ; pour l'arbitrage, « ⇄ Hôte » et « ▶ Forcer ».

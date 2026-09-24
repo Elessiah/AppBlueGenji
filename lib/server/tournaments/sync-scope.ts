@@ -96,11 +96,12 @@ async function findDueMaintenance(connection: PoolConnection): Promise<number[]>
          OR EXISTS (SELECT 1 FROM bg_matches m
                     WHERE m.tournament_id = t.id
                       AND m.status = 'READY'
-                      AND m.launched_at IS NULL
                       AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
                       AND (m.start_at IS NULL OR m.start_at <= NOW())
-                      AND (m.lobby_opened_at IS NULL
-                           OR m.lobby_opened_at <= NOW() - INTERVAL ${LAUNCH_AUTO_DELAY_MINUTES} MINUTE))
+                      AND (NOT (m.launch_pairing <=> CONCAT(m.team1_id, ':', m.team2_id))
+                           OR (m.launched_at IS NULL
+                               AND (m.lobby_opened_at IS NULL
+                                    OR m.lobby_opened_at <= NOW() - INTERVAL ${LAUNCH_AUTO_DELAY_MINUTES} MINUTE))))
          OR EXISTS (SELECT 1 FROM bg_matches m
                     WHERE m.tournament_id = t.id AND m.phase_id = 0
                       AND m.status <> 'COMPLETED'

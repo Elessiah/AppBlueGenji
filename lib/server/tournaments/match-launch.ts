@@ -16,7 +16,9 @@ import {
   allPartiesReady,
   canDeclareTeamReady,
   castBlockReason,
+  currentLaunchState,
   isAutoLaunchDue,
+  launchPairingKey,
   launchReadiness,
   matchLaunchPhase,
   type CastBlock,
@@ -39,6 +41,7 @@ export type LaunchMatchRow = RowDataPacket & {
   team2_is_ghost: number | null;
   start_at: Date | string | null;
   lobby_opened_at: Date | string | null;
+  launch_pairing: string | null;
   launched_at: Date | string | null;
   team1_ready_at: Date | string | null;
   team2_ready_at: Date | string | null;
@@ -50,8 +53,8 @@ export type LaunchMatchRow = RowDataPacket & {
 const LAUNCH_MATCH_COLUMNS = `
   m.id, m.tournament_id, t.state AS tournament_state, m.status, m.is_bye,
   m.team1_id, m.team2_id, t1.is_ghost AS team1_is_ghost, t2.is_ghost AS team2_is_ghost,
-  m.start_at, m.lobby_opened_at, m.launched_at, m.team1_ready_at, m.team2_ready_at,
-  m.caster_user_id, m.caster_ready_at, m.host_team_id`;
+  m.start_at, m.lobby_opened_at, m.launch_pairing, m.launched_at, m.team1_ready_at,
+  m.team2_ready_at, m.caster_user_id, m.caster_ready_at, m.host_team_id`;
 
 const LAUNCH_MATCH_FROM = `
   FROM bg_matches m
@@ -63,25 +66,72 @@ function nullableId(value: number | null): number | null {
   return value === null ? null : Number(value);
 }
 
+/**
+ * L'état de lancement de la ligne **valable pour son appariement courant**
+ * (`currentLaunchState`) : ce qui a été posé pour une paire d'équipes que le
+ * moteur a depuis remplacée sur place ne compte pas.
+ */
+export function rowLaunchState(row: LaunchMatchRow) {
+  return currentLaunchState(
+    {
+      launchPairing: row.launch_pairing ?? null,
+      lobbyOpenedAt: toIso(row.lobby_opened_at),
+      launchedAt: toIso(row.launched_at),
+      team1ReadyAt: toIso(row.team1_ready_at),
+      team2ReadyAt: toIso(row.team2_ready_at),
+      casterReadyAt: toIso(row.caster_ready_at),
+    },
+    nullableId(row.team1_id),
+    nullableId(row.team2_id),
+  );
+}
+
 export function toLaunchInput(row: LaunchMatchRow): MatchLaunchInput {
   return {
     status: row.status,
     team1Id: nullableId(row.team1_id),
     team2Id: nullableId(row.team2_id),
     startAt: toIso(row.start_at),
-    launchedAt: toIso(row.launched_at),
+    launchedAt: rowLaunchState(row).launchedAt,
   };
 }
 
 export function rowReadiness(row: LaunchMatchRow) {
+  const launch = rowLaunchState(row);
   return launchReadiness({
-    team1ReadyAt: toIso(row.team1_ready_at),
-    team2ReadyAt: toIso(row.team2_ready_at),
+    team1ReadyAt: launch.team1ReadyAt,
+    team2ReadyAt: launch.team2ReadyAt,
     team1IsGhost: Number(row.team1_is_ghost ?? 0) === 1,
     team2IsGhost: Number(row.team2_is_ghost ?? 0) === 1,
     casterUserId: nullableId(row.caster_user_id),
-    casterReadyAt: toIso(row.caster_ready_at),
+    casterReadyAt: launch.casterReadyAt,
   });
+}
+
+/**
+ * Rattache l'état de lancement de la ligne à son appariement courant avant
+ * toute écriture : si l'empreinte stockée décrit une autre paire d'équipes, les
+ * « Prêt », l'ouverture et le lancement qu'elle portait sont effacés en base,
+ * puis l'empreinte est réécrite. Sans ce ménage, un « Prêt » posé maintenant
+ * côtoierait en base celui de l'équipe d'avant, que la lecture rejetterait
+ * pourtant — et l'empreinte neuve le ressusciterait.
+ */
+async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchRow): Promise<void> {
+  const key = launchPairingKey(nullableId(row.team1_id), nullableId(row.team2_id));
+  if (key === null || row.launch_pairing === key) return;
+  await connection.execute(
+    `UPDATE bg_matches
+     SET launch_pairing = ?, lobby_opened_at = NULL, launched_at = NULL,
+         team1_ready_at = NULL, team2_ready_at = NULL, caster_ready_at = NULL
+     WHERE id = ?`,
+    [key, row.id],
+  );
+  row.launch_pairing = key;
+  row.lobby_opened_at = null;
+  row.launched_at = null;
+  row.team1_ready_at = null;
+  row.team2_ready_at = null;
+  row.caster_ready_at = null;
 }
 
 /**
@@ -166,6 +216,7 @@ export async function resolveMatchParty(
 async function launchIfAllReady(connection: PoolConnection, matchId: number): Promise<boolean> {
   const row = await lockLaunchMatch(connection, matchId);
   if (!row) return false;
+  await adoptCurrentPairing(connection, row);
   if (matchLaunchPhase(toLaunchInput(row), Date.now()) !== "LOBBY") return false;
   if (!allPartiesReady(rowReadiness(row))) return false;
   await connection.execute(`UPDATE bg_matches SET launched_at = NOW() WHERE id = ?`, [matchId]);
@@ -192,6 +243,7 @@ export async function setMatchReady(
     if (phase === "LAUNCHED") throw new Error("MATCH_ALREADY_LAUNCHED");
     if (phase !== "LOBBY") throw new Error("MATCH_NOT_IN_LOBBY");
 
+    await adoptCurrentPairing(connection, row);
     const party = await resolveMatchParty(connection, row, userId);
     if (!party) throw new Error("NOT_MATCH_PARTY");
     if (!party.canDeclareReady) throw new Error("NOT_TEAM_READY_ROLE");
@@ -232,6 +284,7 @@ export async function forceLaunchMatch(matchId: number): Promise<void> {
     const phase = matchLaunchPhase(toLaunchInput(row), Date.now());
     if (phase === "LAUNCHED") throw new Error("MATCH_ALREADY_LAUNCHED");
     if (phase === "NONE") throw new Error("MATCH_NOT_LAUNCHABLE");
+    await adoptCurrentPairing(connection, row);
     await connection.execute(
       `UPDATE bg_matches
        SET launched_at = NOW(), lobby_opened_at = COALESCE(lobby_opened_at, NOW())
@@ -394,14 +447,18 @@ export async function maintainMatchLaunches(
 ): Promise<number> {
   const [rows] = await connection.execute<LaunchMatchRow[]>(
     `SELECT ${LAUNCH_MATCH_COLUMNS} ${LAUNCH_MATCH_FROM}
-     WHERE m.tournament_id = ? AND m.status = 'READY' AND m.launched_at IS NULL
-       AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL`,
+     WHERE m.tournament_id = ? AND m.status = 'READY'
+       AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
+       AND (m.launched_at IS NULL
+            OR NOT (m.launch_pairing <=> CONCAT(m.team1_id, ':', m.team2_id)))`,
     [tournamentId],
   );
   const now = Date.now();
   let changed = 0;
   for (const row of rows) {
     if (matchLaunchPhase(toLaunchInput(row), now) !== "LOBBY") continue;
+    const stale = row.launch_pairing !== launchPairingKey(nullableId(row.team1_id), nullableId(row.team2_id));
+    await adoptCurrentPairing(connection, row);
     const launch =
       allPartiesReady(rowReadiness(row)) || isAutoLaunchDue(toIso(row.lobby_opened_at), now);
     if (launch) {
@@ -417,6 +474,8 @@ export async function maintainMatchLaunches(
         `UPDATE bg_matches SET lobby_opened_at = NOW() WHERE id = ? AND lobby_opened_at IS NULL`,
         [row.id],
       );
+      changed += 1;
+    } else if (stale) {
       changed += 1;
     }
   }

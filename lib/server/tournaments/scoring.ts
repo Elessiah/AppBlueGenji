@@ -2,7 +2,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { checkMatchScores, matchWinnerSide } from "@/lib/shared/match-format";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
-import { canPlayersReportScore } from "@/lib/shared/match-launch";
+import { canPlayersReportScore, launchPairingKey } from "@/lib/shared/match-launch";
 import { toIso } from "@/lib/server/serialization";
 import { MatchRow } from "./_internal";
 import {
@@ -219,7 +219,8 @@ export async function reportMatchScore(
       winner_team_id,
       status,
       start_at,
-      launched_at
+      launched_at,
+      launch_pairing
      FROM bg_matches
      WHERE id = ?
        AND tournament_id = ?
@@ -264,7 +265,12 @@ export async function reportMatchScore(
         team1Id: Number(match.team1_id),
         team2Id: Number(match.team2_id),
         startAt: toIso(match.start_at ?? null),
-        launchedAt: toIso(match.launched_at ?? null),
+        // Un lancement posé pour un autre appariement ne lance pas celui-ci.
+        launchedAt:
+          launchPairingKey(Number(match.team1_id), Number(match.team2_id)) ===
+          (match.launch_pairing ?? null)
+            ? toIso(match.launched_at ?? null)
+            : null,
       },
       Date.now(),
     )

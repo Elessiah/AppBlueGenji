@@ -36,6 +36,7 @@ function candidate(overrides: Candidate = {}): Candidate {
     team2_is_ghost: 0,
     start_at: null,
     lobby_opened_at: OPENED,
+    launch_pairing: `${TEAM1}:${TEAM2}`,
     launched_at: null,
     team1_ready_at: null,
     team2_ready_at: null,

@@ -28,6 +28,7 @@ type MatchOverrides = {
   status?: string;
   winner_team_id?: number | null;
   launched_at?: string | null;
+  launch_pairing?: string | null;
 };
 
 /**
@@ -60,6 +61,7 @@ function fakeConnection(overrides: MatchOverrides = {}): {
     status: "READY",
     // Un match se joue une fois lancé (`lib/shared/match-launch.ts`).
     launched_at: "2026-01-01 20:00:00",
+    launch_pairing: "100:200",
     ...overrides,
   };
 
@@ -150,6 +152,14 @@ describe("§4.3 — un engagé ne peut pas écraser un résultat déjà validé"
     // Les parties ne se sont pas toutes déclarées prêtes : le match n'a pas
     // commencé (`lib/shared/match-launch.ts`).
     const { conn, writes } = fakeConnection({ launched_at: null });
+
+    await expect(reportMatchScore(conn, 1, 10, 42, 2, 2)).rejects.toThrow("MATCH_NOT_LAUNCHED");
+    expect(writes).toHaveLength(0);
+  });
+
+  it("refuse le report quand le lancement appartenait à un autre appariement", async () => {
+    // Le match a été réécrit sur place : le lancement d'avant ne vaut plus.
+    const { conn, writes } = fakeConnection({ launch_pairing: "100:300" });
 
     await expect(reportMatchScore(conn, 1, 10, 42, 2, 2)).rejects.toThrow("MATCH_NOT_LAUNCHED");
     expect(writes).toHaveLength(0);

@@ -167,7 +167,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <PrivacyChangesModal changes={privacyChanges} />
           {/* Lancement des matchs du joueur, sur toutes les pages : la modale
               s'ouvre à l'heure du match, où qu'il se trouve sur le site. */}
-          {user && <MatchLaunchCenter />}
+          {user && <MatchLaunchCenter privacyPending={privacyChanges.length > 0} />}
           {children}
         </ToastProvider>
       </body>
