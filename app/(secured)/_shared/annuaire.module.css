@@ -145,11 +145,13 @@
   border: 1px solid var(--line-strong-cy);
   border-radius: var(--r-cy-md);
   background: var(--cyber-bg-1);
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
+/* Le champ n'a ni bordure ni `outline` : c'est la barre qui dit le focus. À
+   0,06 d'opacité, son halo ne se voyait pas (WCAG 2.4.7). */
 .search:focus-within {
-  border-color: rgba(var(--g-rgb, 90, 200, 255), 0.4);
-  box-shadow: 0 0 0 3px rgba(var(--g-rgb, 90, 200, 255), 0.06);
+  border-color: rgba(var(--g-rgb, 90, 200, 255), 0.55);
+  box-shadow: 0 0 0 3px rgba(var(--g-rgb, 90, 200, 255), 0.22);
 }
 .searchIcon {
   padding: 0 14px;

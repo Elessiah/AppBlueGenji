@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/shared/page-metadata";
-import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
-import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
+import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { BotLegalDoc } from "@/components/legal/BotLegalDoc";
 import { TERMS_OF_SERVICE } from "@/lib/shared/bot-legal-content";
 
@@ -14,10 +13,8 @@ export const metadata: Metadata = pageMetadata({
 
 export default function TermsOfServiceBotPage() {
   return (
-    <main style={{ position: "relative", zIndex: 1 }}>
-      <PublicHeader />
+    <PublicPageShell>
       <BotLegalDoc doc={TERMS_OF_SERVICE} />
-      <PublicFooter />
-    </main>
+    </PublicPageShell>
   );
 }

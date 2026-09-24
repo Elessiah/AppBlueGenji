@@ -5,12 +5,14 @@
  * un identifiant : quinze fichiers rendent chacun le leur, et une page ajoutée
  * demain est couverte sans qu'on ait à y penser.
  *
- * Mais `<main>` ne suffit pas. Les pages de la vitrine y rendent **leur
- * en-tête** (`PublicHeader`, précédé du JSON-LD) : poser le focus sur `<main>`
- * ferait repartir la tabulation du menu et de la marque — exactement ce que le
- * lien promet d'éviter. On descend donc sur le premier enfant qui n'est ni un
- * script, ni un en-tête, ni une navigation, ni un élément masqué aux
- * technologies d'assistance. Sans lui, `<main>` lui-même.
+ * Mais `<main>` ne suffit pas. Il s'ouvre souvent sur ce qui n'est pas du
+ * contenu : le JSON-LD des pages vitrine, le fond `.fabric` de `/connexion` —
+ * et les pages vitrine y rendaient leur en-tête, avant `PublicPageShell`. Une
+ * page qui y remettrait un en-tête ou une navigation ferait repartir la
+ * tabulation du menu — exactement ce que le lien promet d'éviter. On descend
+ * donc sur le premier enfant qui n'est ni un script, ni un en-tête, ni une
+ * navigation, ni un élément masqué aux technologies d'assistance. Sans lui,
+ * `<main>` lui-même.
  *
  * Module pur : il ne connaît de l'élément que ce qu'il lit, ce qui le rend
  * testable hors navigateur.

@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { pageMetadata } from "@/lib/shared/page-metadata";
-import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
-import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
+import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { CyberButton } from "@/components/cyber";
 import { RGPD_CONTACT_EMAIL_FALLBACK } from "@/lib/shared/rgpd-policy";
 import {
@@ -75,9 +74,7 @@ function ActivityCard({ activity }: { activity: ProcessingActivity }) {
 export default function RegistrePage() {
   const controller = registerController(process.env.RGPD_CONTACT_EMAIL ?? RGPD_CONTACT_EMAIL_FALLBACK);
   return (
-    <main style={{ position: "relative", zIndex: 1 }}>
-      <PublicHeader />
-
+    <PublicPageShell>
       <section className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
         <span className="eyebrow">RGPD · ARTICLE 30</span>
@@ -139,8 +136,6 @@ export default function RegistrePage() {
           ))}
         </div>
       </section>
-
-      <PublicFooter />
-    </main>
+    </PublicPageShell>
   );
 }

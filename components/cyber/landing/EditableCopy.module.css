@@ -67,6 +67,7 @@
 .input:focus-visible {
   outline: none;
   border-color: var(--blue-500, rgba(90, 200, 255, 0.8));
+  box-shadow: 0 0 0 3px rgba(var(--blue-500-rgb), 0.28);
 }
 
 .actions {

@@ -374,7 +374,7 @@ select {
   background: rgba(var(--search-color), 0.05);
   color: var(--text-0);
   padding: 9px 18px;
-  transition: border-color 0.18s ease, background 0.18s ease;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
   outline: none;
 }
 
@@ -382,9 +382,13 @@ select {
   color: var(--text-2);
 }
 
+/* Un anneau et pas seulement une bordure qui fonce : de 0,25 à 0,55 d'opacité,
+   le changement seul ne se voyait guère (WCAG 2.4.7). Même anneau que les
+   champs `.field`, dans la teinte de la barre. */
 .searchbar-input:focus {
   border-color: rgba(var(--search-color), 0.55);
   background: rgba(var(--search-color), 0.09);
+  box-shadow: 0 0 0 3px rgba(var(--search-color), 0.22);
 }
 
 .searchbar-btn {
@@ -1691,6 +1695,27 @@ input[type="radio"]:disabled:checked {
   .coche-input:focus-visible ~ .coche-pill {
     outline: 2px solid;
     outline-offset: 2px;
+  }
+}
+
+/* Contrastes forcés — un repère de focus pour **tout** contrôle (WCAG 2.4.7,
+   1.4.11). Une vingtaine de règles retirent l'`outline` au profit d'une bordure
+   qui change de couleur ou d'un halo (`box-shadow`) : ce mode impose une seule
+   couleur de bordure et supprime les ombres, si bien que le focus n'y laissait
+   **aucune** trace — champs des modales de la vitrine, barre de recherche,
+   champs de score. Une règle ici plutôt qu'une correction par feuille : les
+   `outline: none` sont éparpillés à toutes les spécificités (`.field input…:focus`
+   pèse (0,4,1)), et celui qu'on écrira demain doit être couvert sans que
+   personne y pense — d'où `!important`, qui ne vaut que dans ce mode, choisi par
+   le lecteur. Un conteneur focalisé par programme (`tabindex="-1"` : modale,
+   cible du lien d'évitement) en est exclu : il n'a pas été atteint au clavier,
+   un cadre autour de tout le panneau ne dirait rien. Le décalage, lui, reste
+   celui de chaque règle : imposé vers l'extérieur, le contour serait rogné par
+   un ancêtre `overflow: hidden` ou une zone défilante — et une règle qui le
+   rentre (`outline-offset: -2px`) le fait justement pour cela. */
+@media (forced-colors: active) {
+  :focus-visible:not([tabindex="-1"]) {
+    outline: 2px solid CanvasText !important;
   }
 }
 

@@ -25,8 +25,10 @@ une `<nav>`, ni un élément `aria-hidden="true"` ou `hidden` (où `focus()`
 échouerait sans bruit), ni un **décor vide** — sans enfant ni texte, comme le
 fond `.fabric` qui ouvre le `<main>` de `/connexion` — **en tête seulement** : un
 en-tête placé plus bas fait partie du contenu. Sans enfant de contenu, `<main>`
-lui-même. Le défaut de repères qui rend ce détour nécessaire est consigné à
-`ACCESSIBILITE.md` (§15) ; la règle restera juste une fois corrigé.
+lui-même. Le défaut de repères qui rendait ce détour nécessaire (ancienne
+tâche 15) est réglé depuis par `PublicPageShell`
+(`docs/features/ACCESSIBILITY_LANDMARKS_FOCUS.md`) ; la règle reste juste, et
+couvre le JSON-LD et le décor qui ouvrent encore certains `<main>`.
 
 La cible reçoit `tabindex="-1"` **le temps du focus seulement** : laissé en
 place, un clic dans une zone vide du contenu y ramènerait le focus. Une cible

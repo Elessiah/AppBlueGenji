@@ -5,8 +5,7 @@ import { AboutSection } from "@/components/cyber/landing/AboutSection";
 import { Hero } from "@/components/cyber/landing/Hero";
 import { JoinCTA } from "@/components/cyber/landing/JoinCTA";
 import { LeaderCal } from "@/components/cyber/landing/LeaderCal";
-import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
-import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
+import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { SponsorsGrid } from "@/components/cyber/landing/SponsorsGrid";
 import { TournamentBoard } from "@/components/cyber/landing/TournamentBoard";
 import {
@@ -84,7 +83,7 @@ export default async function HomePage() {
   const base = siteCanonicalBase();
 
   return (
-    <main style={{ position: "relative", zIndex: 1 }}>
+    <PublicPageShell>
       {/*
         L'association et le site sont deux nœuds distincts, liés par une identité
         stable : c'est ce qui permet à un moteur de rattacher la page association
@@ -96,7 +95,6 @@ export default async function HomePage() {
           webSiteJsonLd(base, SITE_DESCRIPTION),
         ]}
       />
-      <PublicHeader />
       <Hero stats={stats} live={live} nextUpcoming={featured} copy={copy} canEditCopy={isAdmin} />
       <Ticker items={ticker.items} />
       <TournamentBoard buckets={buckets} featured={featured} miniBracket={miniBracket} />
@@ -104,7 +102,6 @@ export default async function HomePage() {
       <AboutSection stats={aboutStats} pillars={aboutPillars} isAdmin={isAdmin} copy={copy} />
       <SponsorsGrid sponsors={sponsors} isAdmin={isAdmin} />
       <JoinCTA isAuthenticated={!!user} copy={copy} canEditCopy={isAdmin} />
-      <PublicFooter />
-    </main>
+    </PublicPageShell>
   );
 }

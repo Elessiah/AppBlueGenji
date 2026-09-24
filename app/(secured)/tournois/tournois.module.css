@@ -152,12 +152,14 @@
   border: 1px solid var(--line-strong-cy);
   border-radius: var(--r-cy-md);
   background: var(--cyber-bg-1);
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
+/* Même anneau que la barre des annuaires (`_shared/annuaire.module.css`) : à
+   0,06 d'opacité, le halo ne se voyait pas (WCAG 2.4.7). */
 .search:focus-within {
-  border-color: rgba(90, 200, 255, 0.4);
-  box-shadow: 0 0 0 3px rgba(90, 200, 255, 0.06);
+  border-color: rgba(90, 200, 255, 0.55);
+  box-shadow: 0 0 0 3px rgba(90, 200, 255, 0.22);
 }
 
 .searchIcon {

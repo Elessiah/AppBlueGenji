@@ -160,11 +160,12 @@
   font-family: var(--font-sans);
   font-size: 14px;
   outline: none;
-  transition: border-color 0.16s ease;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
 .modalInput:focus {
   border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px rgba(var(--blue-500-rgb), 0.28);
 }
 
 .modalActions {
