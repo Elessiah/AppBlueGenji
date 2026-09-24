@@ -88,6 +88,7 @@ export interface TournamentDef extends ReportStateCounts {
   live?: SeedLive; // diffusion en direct ; absent = aucune chaîne annoncée
   matchSchedule?: SeedMatchSchedule; // dates de début des manches ; absent = aucun horaire
   image?: SeedImage; // illustration ou logo ; absent = aucune image (cas majoritaire)
+  replays?: boolean; // rediff YouTube sur un match joué sur deux ; absent = aucune rediff
 }
 
 /**
@@ -190,7 +191,7 @@ export const TOURNAMENTS: TournamentDef[] = [
   // ---- RUNNING · diffusion en direct ---------------------------------------
   // Le cas nominal du bouton « Regarder le live » de l'accueil : chaîne
   // officielle + manches castées en automatique, donc réellement à l'antenne.
-  { name: "Live Auto (à l'antenne)", game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 60, live: { url: "https://www.twitch.tv/bluegenji", trigger: "AUTO", matchUrl: "https://www.twitch.tv/bluegenji" } },
+  { name: "Live Auto (à l'antenne)", game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 60, live: { url: "https://www.twitch.tv/bluegenji", trigger: "AUTO", matchUrl: "https://www.twitch.tv/bluegenji" }, replays: true },
   // Chaîne renseignée mais antenne fermée : les matchs restent « programmés »
   // et ce tournoi ne doit PAS faire apparaître le bouton d'accueil.
   { name: "Live Manuel (hors antenne)", game: "MR", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -2, playWaves: 1, teamOffset: 68, live: { url: "https://www.youtube.com/@bluegenji", trigger: "MANUAL" } },

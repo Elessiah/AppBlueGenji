@@ -28,6 +28,7 @@ function render(match: BracketMatch, viewer: Viewer = {}) {
         canSchedule={viewer.canSchedule ?? false}
         openConfig={() => undefined}
         openSchedule={() => undefined}
+        openReplay={() => undefined}
         viewerUserId={viewer.viewerUserId ?? 1}
         myTeamId={viewer.myTeamId ?? null}
         castBlock={viewer.castBlock === undefined ? "NOT_CASTER" : viewer.castBlock}

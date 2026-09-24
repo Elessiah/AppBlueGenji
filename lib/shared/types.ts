@@ -493,6 +493,13 @@ export type BracketMatch = {
   team1Ready: boolean;
   team2Ready: boolean;
   casterReady: boolean;
+  /**
+   * Lien YouTube de la rediff, posé par la permission `live` une fois le match
+   * joué ; `null` = aucune. Stocké tel quel : son **affichage** est décidé par
+   * `visibleReplayUrl` (`lib/shared/match-replay.ts`), qui le tait sur un match
+   * rouvert par un retour en arrière.
+   */
+  replayUrl: string | null;
 };
 
 /**

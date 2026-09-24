@@ -45,6 +45,7 @@ export function bracketMatch(overrides: Partial<BracketMatch> = {}): BracketMatc
     team1Ready: false,
     team2Ready: false,
     casterReady: false,
+    replayUrl: null,
     ...overrides,
   };
 }

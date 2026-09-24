@@ -30,6 +30,7 @@ import { AdminScoreDialog } from "./_components/AdminScoreDialog";
 import { GhostRegistrationDialog } from "./_components/GhostRegistrationDialog";
 import { MatchLiveDialog } from "./_components/MatchLiveDialog";
 import { MatchScheduleDialog } from "./_components/MatchScheduleDialog";
+import { MatchReplayDialog } from "./_components/MatchReplayDialog";
 import { LiveProvider } from "./_lib/live-context";
 import { canPlayersReportScore } from "@/lib/shared/match-launch";
 import { IssueReportProvider } from "./_lib/issue-report-context";
@@ -96,6 +97,8 @@ export default function TournamentDetailPage() {
   const [matchForLiveId, setMatchForLiveId] = useState<number | null>(null);
   // Même raison que ci-dessus : on retient l'identifiant, pas l'objet.
   const [matchForScheduleId, setMatchForScheduleId] = useState<number | null>(null);
+  // Même raison encore : identifiant, pas objet.
+  const [matchForReplayId, setMatchForReplayId] = useState<number | null>(null);
   // Stables pour la vie de la page : les `setState` de React le sont déjà. Sans
   // cela, deux flèches neuves à chaque rendu changeraient la valeur du contexte
   // de diffusion à chaque instantané SSE, et redessineraient les 127 bandeaux
@@ -104,6 +107,10 @@ export default function TournamentDetailPage() {
   const openMatchLive = useCallback((match: BracketMatch) => setMatchForLiveId(match.id), []);
   const openMatchSchedule = useCallback(
     (match: BracketMatch) => setMatchForScheduleId(match.id),
+    [],
+  );
+  const openMatchReplay = useCallback(
+    (match: BracketMatch) => setMatchForReplayId(match.id),
     [],
   );
   // Signalement de problème : `undefined` = fermé, `null` = ouvert sur tout le
@@ -507,6 +514,10 @@ export default function TournamentDetailPage() {
     matchForScheduleId === null
       ? null
       : detail.matches.find((match) => match.id === matchForScheduleId) ?? null;
+  const matchForReplay =
+    matchForReplayId === null
+      ? null
+      : detail.matches.find((match) => match.id === matchForReplayId) ?? null;
 
   const brackets = bracketOrder
     .map((b) => ({ type: b, matches: filteredMatches.filter((m) => m.bracket === b) }))
@@ -555,6 +566,7 @@ export default function TournamentDetailPage() {
         viewerUserId={detail.viewerUserId}
         myTeamId={detail.myTeamId}
         castBlock={detail.castBlock}
+        openReplay={openMatchReplay}
       >
       {/* Le bouton **par match** suit la règle de `frozen` : le plateau affiché
           ne bouge plus, et signaler « ce match » depuis une manche périmée
@@ -944,6 +956,15 @@ export default function TournamentDetailPage() {
           key={matchForSchedule.id}
           match={matchForSchedule}
           onClose={() => setMatchForScheduleId(null)}
+          onSaved={() => void refresh()}
+        />
+      )}
+
+      {matchForReplay && detail.canManageLive && (
+        <MatchReplayDialog
+          key={matchForReplay.id}
+          match={matchForReplay}
+          onClose={() => setMatchForReplayId(null)}
           onSaved={() => void refresh()}
         />
       )}

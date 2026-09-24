@@ -180,6 +180,7 @@ function match(overrides: Partial<BracketMatch> = {}): BracketMatch {
     team1Ready: false,
     team2Ready: false,
     casterReady: false,
+    replayUrl: null,
     ...overrides,
   };
 }

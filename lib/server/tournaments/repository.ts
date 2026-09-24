@@ -315,6 +315,7 @@ export async function getMatchRows(
       m.caster_ready_at,
       t1.is_ghost AS team1_is_ghost,
       t2.is_ghost AS team2_is_ghost,
+      m.replay_url,
       p.position AS phase_position
      FROM bg_matches m
      LEFT JOIN bg_teams t1 ON t1.id = m.team1_id

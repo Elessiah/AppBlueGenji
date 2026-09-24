@@ -7,7 +7,8 @@ jest.mock("@/lib/server/stats-service");
 import type { Pool } from "mysql2/promise";
 import { getFullProfile } from "@/lib/server/users-service";
 import { getDatabase } from "@/lib/server/database";
-import { getPlayerEntityStats, type EntityStats } from "@/lib/server/stats-service";
+import { getPlayerEntityStats } from "@/lib/server/stats-service";
+import { emptyDeepStats } from "@/lib/shared/stats";
 
 /**
  * Ce qui sort d'une fiche quand le BattleTag est **masqué** : le lecteur
@@ -66,11 +67,7 @@ const count = (queries: Query[], needle: string) =>
 
 beforeEach(() => {
   jest.clearAllMocks();
-  // Les statistiques ne sont pas l'objet de ces tests : une fiche vide suffit,
-  // réduite à la forme que `getFullProfile` lit.
-  jest
-    .mocked(getPlayerEntityStats)
-    .mockResolvedValue({ stats: {}, tournaments: [] } as unknown as EntityStats);
+  jest.mocked(getPlayerEntityStats).mockResolvedValue({ stats: emptyDeepStats(), tournaments: [] });
 });
 
 describe("getFullProfile — BattleTag masqué", () => {

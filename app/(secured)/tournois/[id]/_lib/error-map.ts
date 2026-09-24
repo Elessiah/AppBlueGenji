@@ -140,6 +140,12 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // Calendrier des matchs (`lib/shared/match-schedule.ts`).
   INVALID_MATCH_START_AT: "Date de début non reconnue.",
   MATCH_SCHEDULE_UPDATE_FAILED: "Erreur lors de la mise à jour de la date de début.",
+  // Rediffusion d'un match terminé (`lib/shared/match-replay.ts`).
+  INVALID_REPLAY_URL:
+    "Lien de rediff non reconnu : colle le lien d'une vidéo YouTube (youtube.com/watch?v=… ou youtu.be/…).",
+  MATCH_NOT_REPLAYABLE:
+    "Une rediff ne se pose que sur un match terminé et réellement disputé (ni exemption, ni forfait).",
+  MATCH_REPLAY_UPDATE_FAILED: "Erreur lors de la mise à jour de la rediff.",
   TOURNAMENT_LIVE_UPDATE_FAILED: "Erreur lors de la mise à jour de la chaîne officielle.",
   // Suppression définitive (`docs/features/TOURNAMENT_DELETION.md`).
   // `TOURNAMENT_NOT_FOUND` et `UNAUTHORIZED` sont déjà couverts plus haut.

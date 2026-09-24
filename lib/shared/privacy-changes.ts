@@ -117,6 +117,21 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ces accès s'éteignent à la fin du tournoi. Pour ne plus communiquer ton BattleTag du tout, efface-le depuis Mon profil.",
     ],
   },
+  // L'invite Google One Tap était chargée sur chaque page pour tout visiteur
+  // sans session : Google était sollicité sans que personne l'ait demandé. Le
+  // changement restreint qui lit la donnée — c'en est un quand même.
+  {
+    id: "2026-09-google-one-tap-connexion",
+    publishedAt: "2026-09-24",
+    title: "Google sollicité sur la seule page de connexion",
+    summary:
+      "L'invite « Continuer avec Google » ne se charge plus sur tout le site : seulement sur la page de connexion, et après que tu as accepté la politique de confidentialité.",
+    details: [
+      "Auparavant, tout visiteur non connecté chargeait l'invite de connexion de Google (Google One Tap) sur chaque page : Google recevait son adresse IP et la page consultée.",
+      "Désormais, aucune page du site ne fait appel à Google, sauf la page de connexion, une fois la politique acceptée. Google peut y déposer un cookie « g_state » pour retenir que tu as fermé l'invite.",
+      "Rien ne change pour ton compte : les moyens de connexion et les données conservées restent les mêmes.",
+    ],
+  },
   // Lancement des matchs : la modale présente à chaque partie d'un match les
   // contacts des autres — c'est un public de plus pour le tag Discord certifié,
   // et un nouveau public (le caster) pour le BattleTag.

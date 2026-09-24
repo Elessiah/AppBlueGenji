@@ -614,6 +614,7 @@ async function runMigrations(db: Pool): Promise<void> {
       team1_ready_at DATETIME NULL,
       team2_ready_at DATETIME NULL,
       caster_ready_at DATETIME NULL,
+      replay_url VARCHAR(255) NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_bg_matches_tournament (tournament_id),
@@ -1100,6 +1101,8 @@ async function runMigrations(db: Pool): Promise<void> {
     `ALTER TABLE bg_matches ADD COLUMN team1_ready_at DATETIME NULL AFTER lobby_opened_at`,
     `ALTER TABLE bg_matches ADD COLUMN team2_ready_at DATETIME NULL AFTER team1_ready_at`,
     `ALTER TABLE bg_matches ADD COLUMN caster_ready_at DATETIME NULL AFTER team2_ready_at`,
+    // Lien YouTube de la rediff d'un match terminé (`lib/shared/match-replay.ts`).
+    `ALTER TABLE bg_matches ADD COLUMN replay_url VARCHAR(255) NULL AFTER live_started_at`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

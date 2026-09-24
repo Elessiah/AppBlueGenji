@@ -23,6 +23,11 @@ type LiveControls = {
   myTeamId: number | null;
   /** Ce qui empêche le lecteur de caster, `null` s'il le peut. */
   castBlock: CastBlock | null;
+  /**
+   * Ouvre le lien de rediff d'un match terminé — même public que la diffusion
+   * (`canManage`), dont la rediff est la suite.
+   */
+  openReplay: (match: BracketMatch) => void;
 };
 
 const LiveContext = createContext<LiveControls>({
@@ -33,6 +38,7 @@ const LiveContext = createContext<LiveControls>({
   viewerUserId: null,
   myTeamId: null,
   castBlock: "NOT_CASTER",
+  openReplay: () => undefined,
 });
 
 /**
@@ -51,11 +57,21 @@ export function LiveProvider({
   viewerUserId,
   myTeamId,
   castBlock,
+  openReplay,
   children,
 }: LiveControls & { children: ReactNode }) {
   const value = useMemo(
-    () => ({ canManage, canSchedule, openConfig, openSchedule, viewerUserId, myTeamId, castBlock }),
-    [canManage, canSchedule, openConfig, openSchedule, viewerUserId, myTeamId, castBlock],
+    () => ({
+      canManage,
+      canSchedule,
+      openConfig,
+      openSchedule,
+      viewerUserId,
+      myTeamId,
+      castBlock,
+      openReplay,
+    }),
+    [canManage, canSchedule, openConfig, openSchedule, viewerUserId, myTeamId, castBlock, openReplay],
   );
   return <LiveContext.Provider value={value}>{children}</LiveContext.Provider>;
 }

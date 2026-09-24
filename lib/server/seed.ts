@@ -34,6 +34,7 @@ import {
 } from "./tournaments/survival";
 import { insertPhases, setCurrentPhase, loadPhases } from "./tournaments/phases-repository";
 import { normalizeStreamUrl } from "@/lib/shared/live-streams";
+import { normalizeReplayUrl } from "@/lib/shared/match-replay";
 import { initializeMultiTournament, startPhase, reconcilePhases } from "./tournaments/phases";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { matchWinsRequired } from "@/lib/shared/match-format";
@@ -1406,6 +1407,34 @@ async function applyMatchLaunchCases(db: Pool, casterId: number | null): Promise
 }
 
 /**
+ * Rediffs d'un tournoi seedé (`lib/shared/match-replay.ts`).
+ *
+ * Une rencontre jouée sur deux (par identifiant) reçoit un lien : le même
+ * plateau montre ainsi, côte à côte, des matchs terminés avec et sans bandeau
+ * « Rediff disponible ». Seules les rencontres réellement disputées sont
+ * visées — la même condition que la route, écrite en SQL.
+ */
+async function applyMatchReplays(
+  db: Pool,
+  tournamentId: number,
+  def: TournamentDef
+): Promise<void> {
+  if (!def.replays) return;
+  await db.execute(
+    `UPDATE bg_matches
+     SET replay_url = ?
+     WHERE tournament_id = ?
+       AND status = 'COMPLETED'
+       AND team1_id IS NOT NULL
+       AND team2_id IS NOT NULL
+       AND forfeit_team_id IS NULL
+       AND double_forfeit = 0
+       AND MOD(id, 2) = 0`,
+    [normalizeReplayUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), tournamentId]
+  );
+}
+
+/**
  * Visuels du jeu de test : deux images, une par mode — une bannière **large**
  * (le cas « illustration », recadrée au rendu sur son point focal) et un logo
  * **carré à fond transparent** (le cas « logo », toujours montré en entier).
@@ -1656,6 +1685,7 @@ async function createTournament(
 
   await applyMatchSchedule(db, tournamentId, def);
   await applyLiveStreams(db, tournamentId, def);
+  await applyMatchReplays(db, tournamentId, def);
   await applyTournamentImage(db, tournamentId, def);
 
   const gameLabel = def.game === "OW" ? "Overwatch" : "Marvel Rivals";

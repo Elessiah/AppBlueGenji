@@ -11,6 +11,7 @@ import { useIssueReport } from "../_lib/issue-report-context";
 import { useHighlightedMatch } from "../_lib/match-anchor-context";
 import { MatchLiveStrip } from "./MatchLiveStrip";
 import { MatchLaunchStrip } from "./MatchLaunchStrip";
+import { MatchReplayStrip } from "./MatchReplayStrip";
 import { EntrantName } from "./EntrantName";
 
 const CARD_W = 210;
@@ -181,6 +182,8 @@ export function MatchRow({
 
       <MatchLiveStrip match={match} />
       <MatchLaunchStrip match={match} />
+
+      <MatchReplayStrip match={match} />
 
       {reportable && (
         <form

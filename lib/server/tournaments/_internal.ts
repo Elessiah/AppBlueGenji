@@ -8,6 +8,7 @@ import {
   type PlayerRequirement,
 } from "@/lib/shared/registration-filters";
 import { normalizeStreamUrl, type MatchLiveTrigger } from "@/lib/shared/live-streams";
+import { normalizeReplayUrl } from "@/lib/shared/match-replay";
 import { parseTournamentImage } from "@/lib/shared/tournament-image";
 import { currentLaunchState, launchReadiness, resolveHostTeamId } from "@/lib/shared/match-launch";
 
@@ -124,6 +125,8 @@ export type MatchRow = RowDataPacket & {
   caster_ready_at?: Date | null;
   team1_is_ghost?: number | null;
   team2_is_ghost?: number | null;
+  /** NULL = aucune rediff (cf. `lib/shared/match-replay.ts`). */
+  replay_url?: string | null;
 };
 
 export type TournamentListRow = TournamentRow & {
@@ -268,6 +271,7 @@ export function mapMatch(row: MatchRow): BracketMatch {
     liveUrl: normalizeStreamUrl(row.live_url),
     liveStartedAt: toIso(row.live_started_at),
     ...mapMatchLaunch(row),
+    replayUrl: normalizeReplayUrl(row.replay_url ?? null),
   };
 }
 
