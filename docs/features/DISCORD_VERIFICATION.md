@@ -413,7 +413,8 @@ et sa sortie (recharger), sans affirmer un rattachement que rien n'établit.
   retombé, liste encore `null` après un échec —, qui laissait un bloc déplié
   parfaitement vide. `TOURNAMENT_FINISHED` est par ailleurs traduit comme
   `CONTACTS_LOAD_FAILED` : la clôture peut tomber entre le rendu et le clic, et
-  `mapError` rend le code brut faute d'entrée.
+  `mapError` rendait alors le code brut faute d'entrée (il rend désormais une
+  phrase générique, moins précise que celle-ci).
 
 La pastille (`components/discord-tag.tsx`, `public/badge-certifie.webp`) s'affiche
 donc **avec ou sans son tag** — `discordVerified` ne suit pas `discordPseudo`, les

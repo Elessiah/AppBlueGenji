@@ -1,4 +1,9 @@
-import type { PhaseConfig, PhaseIssue, PhaseIssueField } from "@/lib/shared/tournament-phases";
+import {
+  PHASE_ERROR_MESSAGES,
+  type PhaseConfig,
+  type PhaseIssue,
+  type PhaseIssueField,
+} from "@/lib/shared/tournament-phases";
 import type { PhaseFormat } from "@/lib/shared/types";
 
 export function createDefaultPhase(position: number, format: PhaseFormat): PhaseConfig {
@@ -70,27 +75,14 @@ export function phaseSummary(phase: PhaseConfig, isLast: boolean): string {
   return `${formatLabel} — ${phase.qualifierValue} % qualifiées`;
 }
 
+/**
+ * Phrase d'un refus du plan de phases. La table est partagée avec la
+ * notification des refus serveur (`PHASE_ERROR_MESSAGES`).
+ */
 export function phaseErrorMessage(code: string): string {
-  switch (code) {
-    case "INVALID_PHASE_COUNT":
-      return "Nombre de phases invalide : 2 à 8 phases attendues.";
-    case "INVALID_PHASE_POSITIONS":
-      return "Positions des phases invalides.";
-    case "INVALID_PHASE_FORMAT":
-      return "Format de phase invalide.";
-    case "DOUBLE_MUST_BE_LAST_PHASE":
-      return "La double élimination ne peut être que la dernière phase.";
-    case "INVALID_PHASE_QUALIFIER":
-      return "Qualification invalide : COUNT ≥ 1 ou PERCENT ∈ 1..99.";
-    case "NON_DECREASING_PHASE_QUALIFIERS":
-      return "Les qualifications en nombre fixe doivent décroître entre les phases.";
-    case "INVALID_PHASE_SWISS_ROUNDS":
-      return "Nombre de manches ronde suisse invalide : 1 à 20 attendues.";
-    case "INVALID_PHASE_SURVIVAL_ROUNDS":
-      return "Cadence de survie invalide : 1 à 50 attendues.";
-    default:
-      return "Erreur de configuration des phases.";
-  }
+  return Object.hasOwn(PHASE_ERROR_MESSAGES, code)
+    ? PHASE_ERROR_MESSAGES[code]
+    : "Erreur de configuration des phases.";
 }
 
 /**

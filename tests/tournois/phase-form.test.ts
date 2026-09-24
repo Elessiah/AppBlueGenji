@@ -248,6 +248,20 @@ describe("phase-form — phaseErrorMessage", () => {
     }
   });
 
+  it("traduit les refus du contrôle serveur, pas seulement ceux du formulaire", () => {
+    // `validateRawPhases` rend ses propres codes, qui arrivaient bruts dans la
+    // notification de la création.
+    for (const code of ["MISSING_PHASES", "INVALID_QUALIFIER_VALUE", "INVALID_QUALIFIER_COUNT"]) {
+      expect(phaseErrorMessage(code)).not.toBe("Erreur de configuration des phases.");
+    }
+  });
+
+  it("dit les bornes de la qualification en français, sans jargon", () => {
+    const msg = phaseErrorMessage("INVALID_PHASE_QUALIFIER");
+    expect(msg).not.toMatch(/COUNT|PERCENT|∈/);
+    expect(msg).toMatch(/99 %/);
+  });
+
   it("retourne un message par défaut pour un code inconnu", () => {
     const msg = phaseErrorMessage("UNKNOWN_CODE");
     expect(msg).toBe("Erreur de configuration des phases.");
