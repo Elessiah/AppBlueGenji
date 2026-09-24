@@ -9,51 +9,22 @@ Issu de l'audit du 2026-09-24. Déjà traité par la PR du menu d'accessibilité
   espacement du texte et réduction des animations — **en réglages activables**,
   désactivés par défaut.
 
+Puis par la PR `feature/accessibility-quick-wins` : lien d'évitement
+(ancienne tâche 1), titres des espaces connectés (2), langue des pages légales
+du bot (3), page courante et pictogrammes des navigations (4), indicateur de
+développement de Next (14).
+
 Chaque tâche ci-dessous est indépendante et peut être confiée à une session
 séparée. Une branche `feature/<nom>` par tâche, avec ses tests, selon le
 pipeline de `CLAUDE.md`. Retirer la tâche de ce fichier dans la PR qui la règle.
+Les numéros ne sont **pas** réattribués : d'autres sessions peuvent travailler
+sur une tâche en parallèle et la désigner par son numéro.
+
+**Tout problème d'accessibilité repéré en cours de développement et non réglé
+dans la PR en cours s'ajoute ici**, à la suite, avec le numéro suivant et le
+même format (critère, constat, à faire) — voir `CLAUDE.md`, « Accessibilité ».
 
 ---
-
-## 1. Lien d'évitement « Aller au contenu »
-
-- **Critère** : WCAG 2.4.1 · RGAA 12.7.
-- **Constat** : aucun lien d'évitement. Le premier arrêt du clavier est le bouton
-  d'accessibilité, puis la bannière de recrutement et toute la navigation.
-- **À faire** : un lien visible **au focus seulement** (aucun effet visuel sinon),
-  rendu dans `app/layout.tsx` juste après `<AccessibilityMenu>`, qui mène au
-  `<main>` de la page. Les pages ont chacune leur `<main>` (15 fichiers) : soit
-  un `id="contenu"` sur chacun, soit un gestionnaire qui cible `document.querySelector("main")`
-  (lui pose `tabIndex=-1` et le focus) — préférer la seconde, qui couvre la page
-  ajoutée demain.
-- **Acceptation** : Tab depuis le haut de n'importe quelle page atteint le lien
-  en deuxième position ; Entrée place le focus au début du contenu.
-
-## 2. Titres de page des espaces connectés
-
-- **Critère** : WCAG 2.4.2 · RGAA 8.6.
-- **Constat** : `/tournois`, `/equipes`, `/joueurs` et `/profil` s'intitulent
-  tous « BlueGenji Esport ». Ces pages sont des composants client
-  (`"use client"`), elles ne peuvent pas exporter `metadata`.
-- **À faire** : un `layout.tsx` serveur par segment (ou un `generateMetadata`)
-  qui déclare le titre via `pageMetadata()` (`lib/shared/page-metadata.ts`).
-- **Acceptation** : titres « Tournois · BlueGenji Esport », « Équipes · … »,
-  « Joueurs · … », « Mon profil · … ».
-
-## 3. Langue du contenu anglais des pages légales du bot
-
-- **Critère** : WCAG 3.1.2 · RGAA 8.7.
-- **Constat** : `components/legal/BotLegalDoc.tsx` bascule le texte en anglais
-  sans changer la langue déclarée (`<html lang="fr">`).
-- **À faire** : `lang={lang}` sur le conteneur du contenu affiché.
-
-## 4. Navigation connectée : page courante et pictogrammes
-
-- **Critère** : WCAG 1.3.1 / 4.1.2 · RGAA 12.
-- **Constat** : `components/arena-nav.tsx` ne signale la page courante que par
-  le style ; les pictogrammes « ⌂ » et « 🛡 » sont lus à voix haute.
-- **À faire** : `aria-current="page"` sur le lien actif ; pictogrammes dans un
-  `<span aria-hidden="true">`. Même revue pour `PublicHeader`.
 
 ## 5. Modales de la vitrine sans piège de focus
 
@@ -126,9 +97,39 @@ pipeline de `CLAUDE.md`. Retirer la tâche de ce fichier dans la PR qui la règl
   — connexion, inscription d'une équipe, report de score, menu d'accessibilité.
   Aucun test automatique ne remplace celui-là.
 
-## 14. Indicateur de développement de Next
+## 15. En-tête et pied de page des pages vitrine rendus dans `<main>`
 
-- **Constat** : en `next dev`, le bouton « N » des outils de Next occupe le coin
-  bas-gauche, sous le bouton d'accessibilité, et intercepte ses clics.
-- **À faire** : `devIndicators: { position: "top-right" }` dans `next.config.ts`
-  (sans effet en production).
+- **Critère** : WCAG 1.3.1 · RGAA 12.6.
+- **Constat** : l'accueil, `/association`, `/benevoles`, `/recrutement`,
+  `/regles`, `/regles/[slug]`, `/rgpd`, `/rgpd/registre`, `/mentions-legales` et
+  les deux pages légales du bot rendent `PublicHeader` et `PublicFooter`
+  **dans** leur `<main>`. Un `<header>` ou un `<footer>` imbriqué dans `<main>`
+  perd son rôle de repère (`banner`, `contentinfo`) : la navigation par repères
+  ne trouve ni l'en-tête ni le pied de page, et le « contenu principal » annoncé
+  commence par le menu. `/bot` et `/bot/docs` font déjà juste.
+- **À faire** : sortir `PublicHeader` et `PublicFooter` de `<main>` (fragment
+  autour des trois), en vérifiant l'empilement — `<main>` porte
+  `position: relative; z-index: 1`, et le panneau du menu burger doit rester
+  au-dessus du contenu. Le lien d'évitement saute déjà les en-têtes de tête de
+  `<main>` (`lib/shared/skip-link.ts`) et restera juste après la correction.
+
+## 16. Titres des fiches d'équipe et de joueur
+
+- **Critère** : WCAG 2.4.2 · RGAA 8.6.
+- **Constat** : `/equipes/[id]` et `/joueurs/[id]` s'intitulent « Équipes » et
+  « Joueurs », hérités de l'annuaire : deux onglets ouverts sur deux fiches
+  portent le même titre.
+- **À faire** : un `generateMetadata` dans une mise en page de segment, sur le
+  modèle de `app/(secured)/tournois/[id]/layout.tsx` — nom de l'équipe, pseudo
+  du joueur, en respectant la visibilité du profil (un compte anonymisé ou
+  masqué ne doit pas nommer quelqu'un dans l'onglet).
+
+## 17. Menu burger de la vitrine laissé ouvert quand le focus en sort
+
+- **Critère** : WCAG 2.4.3 · RGAA 12.8.
+- **Constat** : `PublicNavMenu` se ferme au clic dehors, sur un lien et avec
+  Échap (qui rend désormais le focus au bouton), mais pas quand la tabulation
+  quitte le panneau : il reste ouvert par-dessus le contenu où le focus est
+  parti.
+- **À faire** : fermer au `focusout` quand la nouvelle cible
+  (`relatedTarget`) est hors du composant.
