@@ -2,14 +2,17 @@ import { describe, expect, it } from "@jest/globals";
 import {
   applySeedOrder,
   canReorderSeeding,
+  isPreLaunchState,
   isSeedOrderEffective,
   isValidSeedOrder,
   moveInOrder,
+  orderByRanking,
+  registrationsFollowRanking,
   seedingLockReason,
   SEEDING_SOURCE_LABELS,
   seedingSource,
 } from "@/lib/shared/seeding";
-import type { TournamentFormat } from "@/lib/shared/types";
+import type { TournamentFormat, TournamentState } from "@/lib/shared/types";
 import type { MatchScoreState } from "@/lib/shared/match-lock";
 
 function match(overrides: Partial<MatchScoreState> = {}): MatchScoreState {
@@ -166,5 +169,73 @@ describe("isSeedOrderEffective", () => {
 
   it("ne l'est pas en RANKING : le classement du site prendra la main au lancement", () => {
     expect(isSeedOrderEffective("RANKING")).toBe(false);
+  });
+});
+
+describe("isPreLaunchState", () => {
+  it.each<[TournamentState, boolean]>([
+    ["UPCOMING", true],
+    ["REGISTRATION", true],
+    ["RUNNING", false],
+    ["FINISHED", false],
+  ])("%s → %s", (state, expected) => {
+    expect(isPreLaunchState(state)).toBe(expected);
+  });
+});
+
+describe("registrationsFollowRanking", () => {
+  it("suit le classement du site tant que le tournoi n'est pas lancé, clôture comprise", () => {
+    expect(registrationsFollowRanking("RANKING", "REGISTRATION")).toBe(true);
+    expect(registrationsFollowRanking("RANKING", "UPCOMING")).toBe(true);
+  });
+
+  it("ne le suit plus une fois le tirage fait", () => {
+    expect(registrationsFollowRanking("RANKING", "RUNNING")).toBe(false);
+    expect(registrationsFollowRanking("RANKING", "FINISHED")).toBe(false);
+  });
+
+  it("ne le suit jamais quand l'ordre vient du staff ou des inscriptions", () => {
+    expect(registrationsFollowRanking("MANUAL", "REGISTRATION")).toBe(false);
+    expect(registrationsFollowRanking("REGISTRATION", "REGISTRATION")).toBe(false);
+  });
+});
+
+describe("orderByRanking", () => {
+  const rows = [
+    { teamId: 1, name: "Alpha" },
+    { teamId: 2, name: "Beta" },
+    { teamId: 3, name: "Gamma" },
+  ];
+
+  it("range les inscriptions dans l'ordre du classement", () => {
+    expect(orderByRanking(rows, [3, 1, 2]).map((row) => row.name)).toEqual([
+      "Gamma",
+      "Alpha",
+      "Beta",
+    ]);
+  });
+
+  it("place une nouvelle inscrite à son rang de cote, pas en dernier", () => {
+    const withNewcomer = [...rows, { teamId: 4, name: "Delta" }];
+    expect(orderByRanking(withNewcomer, [3, 4, 1, 2]).map((row) => row.name)).toEqual([
+      "Gamma",
+      "Delta",
+      "Alpha",
+      "Beta",
+    ]);
+  });
+
+  it("garde après les classées, dans leur ordre relatif, les inscrites absentes du classement", () => {
+    expect(orderByRanking(rows, [2]).map((row) => row.name)).toEqual(["Beta", "Alpha", "Gamma"]);
+  });
+
+  it("ignore un identifiant classé qui n'est pas inscrit, sans muter l'entrée", () => {
+    const input = [...rows];
+    expect(orderByRanking(input, [99, 2, 3, 1]).map((row) => row.name)).toEqual([
+      "Beta",
+      "Gamma",
+      "Alpha",
+    ]);
+    expect(input).toEqual(rows);
   });
 });
