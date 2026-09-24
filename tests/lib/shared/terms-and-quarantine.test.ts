@@ -55,6 +55,17 @@ describe("conditions d'utilisation", () => {
     }
   });
 
+  it("décrit le processus de contestation que le site offre réellement", () => {
+    // La page d'un signalement y renvoie (« Comment se passe un signalement ? ») :
+    // elle doit y lire le chemin qu'elle vient de quitter, pas un autre.
+    const text = TERMS_SECTIONS.find((section) => section.id === "signalement")!.paragraphs.join(" ");
+    expect(text).toContain("message privé Discord");
+    expect(text).toContain("« Contestation »");
+    expect(text).toContain(`${LOGO_QUARANTINE_DAYS / 30} mois`);
+    expect(text).toContain("rétabli");
+    expect(text).not.toContain("en écrivant à l'association");
+  });
+
   it("date la version courante en toutes lettres", () => {
     expect(TERMS_UPDATED_AT).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(formatTermsDate("2026-09-24")).toBe("24 septembre 2026");
