@@ -1673,6 +1673,20 @@ input[type="radio"]:disabled:checked {
   }
 }
 
+/* Marge de défilement sous le bouton d'accessibilité (fixe, en bas à gauche) :
+   quand le focus clavier fait défiler la page, l'élément atteint s'arrête
+   au-dessus de lui au lieu de finir caché dessous (WCAG 2.4.11). Pas un
+   réglage : rien ne change à l'œil tant qu'on ne tabule pas. */
+html {
+  scroll-padding-bottom: 92px;
+}
+
+@media (max-width: 720px) {
+  html {
+    scroll-padding-bottom: 76px;
+  }
+}
+
 /* ── Réglages d'accessibilité du lecteur ─────────────────────────────────────
    Menu du bouton flottant (`components/accessibility/AccessibilityMenu.tsx`,
    registre `lib/shared/accessibility-settings.ts`). Chaque réglage change

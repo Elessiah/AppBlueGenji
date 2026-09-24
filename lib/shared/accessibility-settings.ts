@@ -40,7 +40,7 @@ export const A11Y_SETTINGS: readonly A11ySettingDefinition[] = [
   {
     key: "contrast",
     label: "Contraste renforcé",
-    description: "Textes secondaires plus clairs, bordures plus marquées, fonds moins transparents.",
+    description: "Textes secondaires plus clairs, bordures et séparateurs plus marqués, texte indicatif lisible.",
   },
   {
     key: "focus",

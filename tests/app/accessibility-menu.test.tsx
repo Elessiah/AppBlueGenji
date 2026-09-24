@@ -131,6 +131,11 @@ describe("AccessibilityMenu — comportement (source)", () => {
     expect(source).toMatch(/rootRef\.current\?\.contains\(event\.target as Node\)/);
   });
 
+  it("se referme quand le focus clavier quitte le menu — il masquerait la suite", () => {
+    expect(source).toMatch(/document\.addEventListener\("focusin", onOutside\)/);
+    expect(source).toMatch(/document\.removeEventListener\("focusin", onOutside\)/);
+  });
+
   it("laisse Échap à une modale ouverte par-dessus, sans lui reprendre le focus", () => {
     expect(source).toMatch(/if \(!inside && active !== null && active !== document\.body\) return;/);
   });

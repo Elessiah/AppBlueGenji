@@ -170,6 +170,18 @@ describe("éléments flottants — pas de chevauchement", () => {
     expect(toast).toMatch(/\.stack \{[^}]*max-width: min\(420px, calc\(50vw - 40px\)\)/);
   });
 
+  it("la marge de défilement tient l'élément focalisé au-dessus du bouton", () => {
+    // Deux déclarations : la première vaut partout, la seconde sous 720 px.
+    const [desktop, phone] = [...sheet.matchAll(/html \{\s*scroll-padding-bottom: (\d+)px;\s*\}/g)].map((m) =>
+      Number(m[1]),
+    );
+    expect(sheet).toMatch(/@media \(max-width: 720px\) \{\s*html \{\s*scroll-padding-bottom: \d+px;/);
+    expect(desktop).toBeGreaterThanOrEqual(px(menu, ".root", "bottom") + px(menu, ".fab", "height"));
+    expect(phone).toBeGreaterThanOrEqual(
+      px(menu, ".root", "bottom", mobile(menu)) + px(menu, ".fab", "height", mobile(menu)),
+    );
+  });
+
   it("le panneau ouvert passe devant les autres boutons flottants", () => {
     const zMenu = Number(menu.match(/\.root \{[^}]*z-index: (\d+)/)?.[1]);
     const zBadge = Number(badge.match(/\.root \{[^}]*z-index: (\d+)/)?.[1]);

@@ -14,7 +14,7 @@ réglages d'accessibilité. Deux règles de conception, voulues ensemble :
 
 | Clé | Intitulé | Effet |
 |---|---|---|
-| `contrast` | Contraste renforcé | Jetons de texte secondaire au-dessus de 4,5:1 sur tous les fonds (`--ink-dim` n'atteint que 2,8:1 d'origine), traits moins transparents, texte indicatif lisible |
+| `contrast` | Contraste renforcé | Jetons de texte secondaire au-dessus de 4,5:1 sur tous les fonds (`--ink-dim` n'atteint que 2,8:1 d'origine), bordures et séparateurs plus marqués, texte indicatif lisible |
 | `focus` | Focus très visible | Double anneau blanc + bleu sur liseré sombre, visible sur n'importe quel fond ; relayé sur la pastille de `Coche` |
 | `links` | Liens soulignés | Tous les liens de texte soulignés (WCAG 1.4.1) ; les liens habillés en bouton (`.btn`, `CyberButton`) et les plaques `cardOverlay` ne le sont pas |
 | `font` | Police simplifiée | Toutes les familles (`--font-title`, `--font-body`, `--font-mono`, `--font-display`) ramenées à Inter, sans capitales forcées ni lettres écartées |
@@ -63,9 +63,15 @@ Deux pièges de spécificité, tenus dans la feuille :
 - Une pastille compte les réglages actifs, et l'intitulé du bouton le dit aussi.
 - **Premier arrêt du clavier** sur chaque page.
 - Panneau **non modal** (motif « disclosure ») : on voit l'effet d'un réglage
-  en le cochant. Échap et un clic à côté le referment, Échap rend le focus au
-  bouton — mais Échap ne répond que si le focus est dans le menu ou nulle part :
-  une modale ouverte par-dessus (lancement de match) garde son focus. Panneau opaque — un texte qui transparaît derrière des réglages de
+  en le cochant. Échap, un clic à côté **et le focus clavier qui en sort** le
+  referment (laissé ouvert, il masquerait la suite de la tabulation) ; Échap
+  rend le focus au bouton — mais ne répond que si le focus est dans le menu ou
+  nulle part : une modale ouverte par-dessus (lancement de match) garde le sien.
+- `html { scroll-padding-bottom }` (92 px, 76 px sous 720 px) : un défilement
+  déclenché par le focus arrête l'élément atteint au-dessus du bouton au lieu
+  de le cacher dessous (WCAG 2.4.11). Invisible tant qu'on ne tabule pas, donc
+  acquis pour tous.
+- Panneau opaque — un texte qui transparaît derrière des réglages de
   lisibilité serait un contresens.
 - « Tout désactiver » est désactivé par `aria-disabled` et non `disabled` : il
   garde le focus après avoir servi au lieu de le jeter au `<body>`.

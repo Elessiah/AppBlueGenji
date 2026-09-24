@@ -73,14 +73,19 @@ export function AccessibilityMenu({ initialSettings }: AccessibilityMenuProps) {
       setOpen(false);
       if (inside) buttonRef.current?.focus();
     };
-    const onPointer = (event: PointerEvent) => {
+    // Un clic à côté, ou le focus clavier qui quitte le menu, le referment :
+    // laissé ouvert, le panneau masquerait le bas de la page où la tabulation
+    // continue (WCAG 2.4.11).
+    const onOutside = (event: Event) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
     document.addEventListener("keydown", onKey);
-    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("pointerdown", onOutside);
+    document.addEventListener("focusin", onOutside);
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("pointerdown", onOutside);
+      document.removeEventListener("focusin", onOutside);
     };
   }, [open]);
 
