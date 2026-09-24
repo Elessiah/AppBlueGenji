@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
+import type { CastBlock } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 
 type LiveControls = {
@@ -16,6 +17,12 @@ type LiveControls = {
   openConfig: (match: BracketMatch) => void;
   /** Ouvre la date de début d'un match. */
   openSchedule: (match: BracketMatch) => void;
+  /** Lecteur : reconnaître « je caste ce match ». */
+  viewerUserId: number | null;
+  /** Engagé du lecteur dans ce tournoi (`null` s'il n'y joue pas). */
+  myTeamId: number | null;
+  /** Ce qui empêche le lecteur de caster, `null` s'il le peut. */
+  castBlock: CastBlock | null;
 };
 
 const LiveContext = createContext<LiveControls>({
@@ -23,6 +30,9 @@ const LiveContext = createContext<LiveControls>({
   canSchedule: false,
   openConfig: () => undefined,
   openSchedule: () => undefined,
+  viewerUserId: null,
+  myTeamId: null,
+  castBlock: "NOT_CASTER",
 });
 
 /**
@@ -38,11 +48,14 @@ export function LiveProvider({
   canSchedule,
   openConfig,
   openSchedule,
+  viewerUserId,
+  myTeamId,
+  castBlock,
   children,
 }: LiveControls & { children: ReactNode }) {
   const value = useMemo(
-    () => ({ canManage, canSchedule, openConfig, openSchedule }),
-    [canManage, canSchedule, openConfig, openSchedule],
+    () => ({ canManage, canSchedule, openConfig, openSchedule, viewerUserId, myTeamId, castBlock }),
+    [canManage, canSchedule, openConfig, openSchedule, viewerUserId, myTeamId, castBlock],
   );
   return <LiveContext.Provider value={value}>{children}</LiveContext.Provider>;
 }

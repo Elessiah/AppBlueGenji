@@ -192,6 +192,13 @@ export async function syncTournamentState(
 
     await finalizeTournamentIfDone(connection, tournamentId);
 
+    // Lancement des matchs (`lib/shared/match-launch.ts`) : ouverture du délai,
+    // lancement des matchs dont toutes les parties sont prêtes — deux fantômes
+    // le sont d'office — et lancement d'office une fois le délai écoulé. Rien
+    // d'autre ne le ferait : aucune partie n'a à cliquer pour qu'il arrive.
+    const { maintainMatchLaunches } = await import("./match-launch");
+    const launchesChanged = await maintainMatchLaunches(connection, tournamentId);
+
     // `finalizeTournamentIfDone` a pu passer le tournoi à `FINISHED` : le
     // drapeau posé plus haut ne le sait pas. Sans cette comparaison, un tournoi
     // clos par un bye résolu à la lecture resterait annoncé « En cours » dans la
@@ -201,7 +208,7 @@ export async function syncTournamentState(
     return {
       row: refreshed,
       stateChanged: stateChanged || (refreshed !== null && refreshed.state !== stateAtEntry),
-      contentChanged: bracketCreated || resolvedByTimeout > 0,
+      contentChanged: bracketCreated || resolvedByTimeout > 0 || launchesChanged > 0,
     };
   }
 

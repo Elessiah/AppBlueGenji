@@ -9,6 +9,7 @@ import {
 } from "@/lib/shared/registration-filters";
 import { normalizeStreamUrl, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import { parseTournamentImage } from "@/lib/shared/tournament-image";
+import { launchReadiness, resolveHostTeamId } from "@/lib/shared/match-launch";
 
 export type TournamentRow = RowDataPacket & {
   id: number;
@@ -111,6 +112,17 @@ export type MatchRow = RowDataPacket & {
   live_trigger: MatchLiveTrigger | null;
   live_url: string | null;
   live_started_at: Date | null;
+  /** Lancement (`lib/shared/match-launch.ts`) — absents des lectures partielles. */
+  host_team_id?: number | null;
+  caster_user_id?: number | null;
+  caster_pseudo?: string | null;
+  lobby_opened_at?: Date | null;
+  launched_at?: Date | null;
+  team1_ready_at?: Date | null;
+  team2_ready_at?: Date | null;
+  caster_ready_at?: Date | null;
+  team1_is_ghost?: number | null;
+  team2_is_ghost?: number | null;
 };
 
 export type TournamentListRow = TournamentRow & {
@@ -254,5 +266,35 @@ export function mapMatch(row: MatchRow): BracketMatch {
     liveTrigger: row.live_trigger ?? null,
     liveUrl: normalizeStreamUrl(row.live_url),
     liveStartedAt: toIso(row.live_started_at),
+    ...mapMatchLaunch(row),
+  };
+}
+
+function nullableId(value: number | null | undefined): number | null {
+  return value === null || value === undefined ? null : Number(value);
+}
+
+/** Champs du lancement d'un match (`lib/shared/match-launch.ts`). */
+function mapMatchLaunch(row: MatchRow) {
+  const team1Id = nullableId(row.team1_id);
+  const team2Id = nullableId(row.team2_id);
+  const casterUserId = nullableId(row.caster_user_id);
+  const readiness = launchReadiness({
+    team1ReadyAt: toIso(row.team1_ready_at ?? null),
+    team2ReadyAt: toIso(row.team2_ready_at ?? null),
+    team1IsGhost: Number(row.team1_is_ghost ?? 0) === 1,
+    team2IsGhost: Number(row.team2_is_ghost ?? 0) === 1,
+    casterUserId,
+    casterReadyAt: toIso(row.caster_ready_at ?? null),
+  });
+  return {
+    hostTeamId: resolveHostTeamId(nullableId(row.host_team_id), team1Id, team2Id),
+    casterUserId,
+    casterPseudo: casterUserId === null ? null : (row.caster_pseudo ?? null),
+    lobbyOpenedAt: toIso(row.lobby_opened_at ?? null),
+    launchedAt: toIso(row.launched_at ?? null),
+    team1Ready: readiness.team1Ready,
+    team2Ready: readiness.team2Ready,
+    casterReady: readiness.casterReady,
   };
 }

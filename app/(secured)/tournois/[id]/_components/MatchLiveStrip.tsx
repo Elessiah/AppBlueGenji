@@ -220,14 +220,16 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
             type="button"
             className="btn ghost"
             onClick={() => openConfig(match)}
+            // « Diffuser » et non « Caster » : s'inscrire comme caster est un
+            // autre geste, celui du bandeau de lancement (`MatchLaunchStrip`).
             aria-label={
               match.liveTrigger === null
-                ? `Caster ${matchLabel}`
+                ? `Diffuser ${matchLabel}`
                 : `Configurer la diffusion de ${matchLabel}`
             }
             style={{ whiteSpace: "nowrap", padding: "2px 8px", fontSize: 11 }}
           >
-            {match.liveTrigger === null ? "＋ Caster" : "⚙ Live"}
+            {match.liveTrigger === null ? "＋ Live" : "⚙ Live"}
           </button>
         )}
         </span>

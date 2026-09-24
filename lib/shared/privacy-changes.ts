@@ -109,6 +109,22 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ces accès s'éteignent à la fin du tournoi. Pour ne plus communiquer ton BattleTag du tout, efface-le depuis Mon profil.",
     ],
   },
+  // Lancement des matchs : la modale présente à chaque partie d'un match les
+  // contacts des autres — c'est un public de plus pour le tag Discord certifié,
+  // et un nouveau public (le caster) pour le BattleTag.
+  {
+    id: "2026-09-lancement-des-matchs",
+    publishedAt: "2026-09-25",
+    title: "Lancement des matchs : tes contacts présentés à ton adversaire et au caster",
+    summary:
+      "Au lancement d'un match, les joueurs des deux équipes et le caster voient le tag Discord certifié et le BattleTag d'un ou deux joueurs de chaque équipe, le temps de la rencontre.",
+    details: [
+      "Pour chaque équipe, le site présente le capitaine, un manager ou le propriétaire — en priorité un joueur dont le tag Discord ou le BattleTag est vérifié —, et un second joueur si c'est le seul moyen d'avoir à la fois un contact Discord et un BattleTag.",
+      "Un tag Discord non certifié n'est jamais montré. Un BattleTag l'est même non vérifié, avec la mention « non vérifié » : c'est par lui qu'on s'ajoute en jeu.",
+      "Le caster inscrit sur un match se présente de la même façon aux deux équipes, et voit leurs contacts : s'inscrire pour caster exige un tag Discord certifié et un compte Battle.net rattaché.",
+      "Ces informations ne sont visibles qu'entre les parties du match, à partir de son lancement et jusqu'à ce qu'il soit terminé. Le site garde aussi l'heure à laquelle chaque partie s'est déclarée prête, avec le match.",
+    ],
+  },
 ];
 
 /**

@@ -177,6 +177,11 @@ interface SpecialUserDef {
    * regarder, et il n'existe qu'ici.
    */
   discordVerified?: boolean;
+  /**
+   * Compte Battle.net rattaché (`blizzard_sub`). Avec un tag certifié, c'est ce
+   * qu'il faut pour s'inscrire comme caster d'un match (`castBlockReason`).
+   */
+  blizzardSub?: string;
 }
 
 const SPECIAL_USERS: SpecialUserDef[] = [
@@ -200,9 +205,14 @@ const SPECIAL_USERS: SpecialUserDef[] = [
   },
   {
     pseudo: "Caster",
-    purpose: "rôle CASTER : aperçu du plateau (lecture seule) + diffusion des matchs",
+    purpose:
+      "rôle CASTER : aperçu du plateau (lecture seule) + diffusion ; identité vérifiée, peut s'inscrire pour caster",
     platformRoles: ["CASTER"],
     isAdult: 1,
+    discordId: "900000000000000009",
+    discordTag: "test_caster",
+    discordVerified: true,
+    blizzardSub: "seed-blizzard-caster",
   },
   {
     pseudo: "CommunityManager",
@@ -562,14 +572,15 @@ async function createSpecialUsers(db: Pool): Promise<Map<string, number>> {
       const [result] = await db.execute<ResultSetHeader>(
         `INSERT INTO bg_users
          (pseudo, discord_id, discord_pseudo, discord_verified_at,
-          overwatch_battletag, marvel_rivals_tag,
+          blizzard_sub, overwatch_battletag, marvel_rivals_tag,
           visible_avatar, visible_overwatch, visible_marvel, visible_major,
           open_to_recruitment, is_adult, is_admin, is_deleted, platform_roles_json)
-         VALUES (?, ?, ?, ${def.discordVerified ? "NOW()" : "NULL"}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ${def.discordVerified ? "NOW()" : "NULL"}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           pseudo,
           def.discordId ?? null,
           def.discordTag ?? null,
+          def.blizzardSub ?? null,
           withTags ? `${def.pseudo}#1000` : null,
           withTags ? `${def.pseudo}#2023` : null,
           visibility.avatar,
@@ -1364,6 +1375,34 @@ async function applyLiveStreams(
 }
 
 /**
+ * Lancement des matchs (`lib/shared/match-launch.ts`) : sur chaque tournoi
+ * casté du jeu de test, la première manche jouable reçoit le caster de test,
+ * l'équipe 2 comme hôte (le cas où l'arbitrage a changé le défaut) et un
+ * « Prêt » de l'équipe 1 — de quoi voir la modale avec ses trois parties, dont
+ * une prête et deux attendues. Les autres manches jouables restent en
+ * lancement, sans caster : le cas « deux équipes seules ».
+ */
+async function applyMatchLaunchCases(db: Pool, casterId: number | null): Promise<void> {
+  if (casterId === null) return;
+  await db.execute(
+    `UPDATE bg_matches m
+     JOIN (
+       SELECT MIN(m2.id) AS id
+       FROM bg_matches m2
+       JOIN bg_tournaments t ON t.id = m2.tournament_id
+       WHERE t.name LIKE 'Test - %'
+         AND t.state = 'RUNNING'
+         AND m2.status = 'READY'
+         AND m2.team1_id IS NOT NULL AND m2.team2_id IS NOT NULL
+         AND m2.live_trigger IS NOT NULL
+       GROUP BY m2.tournament_id
+     ) first_casted ON first_casted.id = m.id
+     SET m.caster_user_id = ?, m.host_team_id = m.team2_id, m.team1_ready_at = NOW()`,
+    [casterId]
+  );
+}
+
+/**
  * Visuels du jeu de test : deux images, une par mode — une bannière **large**
  * (le cas « illustration », recadrée au rendu sur son point focal) et un logo
  * **carré à fond transparent** (le cas « logo », toujours montré en entier).
@@ -1713,6 +1752,7 @@ async function seed(db: Pool): Promise<void> {
   for (let i = 0; i < TOURNAMENTS.length; i++) {
     await createTournament(db, organizerId, teamIds, soloEntryIds, TOURNAMENTS[i], i);
   }
+  await applyMatchLaunchCases(db, specialUserIds.get("Caster") ?? null);
 
   const byState = (state: TournamentDef["state"]) =>
     TOURNAMENTS.filter((t) => t.state === state).length;

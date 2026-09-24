@@ -1,7 +1,11 @@
+import { LAUNCH_ERROR_MESSAGES } from "@/lib/shared/match-launch";
 import { endurancePenaltyMessage } from "@/lib/shared/endurance-penalty";
 import { ENTRANT_REMOVAL_BLOCK_MESSAGES } from "@/lib/shared/entrant-removal";
 
 export const ERROR_MESSAGES: Record<string, string> = {
+  // Lancement des matchs : en tête, pour que les formulations propres à cette
+  // page l'emportent sur les codes communs (match introuvable, tournoi arrêté).
+  ...LAUNCH_ERROR_MESSAGES,
   CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES: "Score verrouillé : la manche suivante a déjà des scores saisis.",
   MATCH_NOT_FOUND: "Match introuvable.",
   MATCH_NOT_READY: "Le match n'a pas deux équipes.",

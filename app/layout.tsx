@@ -8,6 +8,7 @@ import { VisitTracker } from "@/components/visit-tracker";
 import { ClientPowerRoot } from "@/components/client-power-root";
 import { GoogleOneTap } from "@/components/auth/google-one-tap";
 import { PrivacyChangesModal } from "@/components/privacy/PrivacyChangesModal";
+import { MatchLaunchCenter } from "@/components/match-launch/MatchLaunchCenter";
 import { getHighlightedAd } from "@/lib/server/recruitment-service";
 import { getCurrentUser } from "@/lib/server/auth";
 import { loadPendingPrivacyChanges } from "@/lib/server/privacy-consent";
@@ -164,6 +165,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             onAdPage={onRecruitmentPage}
           />
           <PrivacyChangesModal changes={privacyChanges} />
+          {/* Lancement des matchs du joueur, sur toutes les pages : la modale
+              s'ouvre à l'heure du match, où qu'il se trouve sur le site. */}
+          {user && <MatchLaunchCenter />}
           {children}
         </ToastProvider>
       </body>

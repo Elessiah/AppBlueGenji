@@ -117,6 +117,9 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
     // Droit de diffusion : comme les autres droits, il tient à la personne et
     // non au plateau — un instantané ne peut ni l'accorder ni le retirer.
     canManageLive: state.detail.canManageLive,
+    // Inscription comme caster : tient à l'identité du lecteur, pas au plateau.
+    viewerUserId: state.detail.viewerUserId,
+    castBlock: state.detail.castBlock,
     // L'aperçu du plateau n'arrive qu'à la connexion, comme le reste du contexte
     // du lecteur : le flux ne le transporte pas, il est réservé au staff et au
     // cast (`docs/features/TOURNAMENT_PREVIEW.md`).

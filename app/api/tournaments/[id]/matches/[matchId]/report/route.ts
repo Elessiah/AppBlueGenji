@@ -49,6 +49,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       return fail(message, 400);
     }
 
+    // Le match existe et le score est bien formé : c'est son état qui refuse,
+    // le temps que les parties se déclarent prêtes (`lib/shared/match-launch.ts`).
+    if (message === "MATCH_NOT_LAUNCHED") return fail(message, 409);
+
     if (message === "TOURNAMENT_NOT_FOUND" || message === "MATCH_NOT_FOUND") {
       return fail(message, 404);
     }

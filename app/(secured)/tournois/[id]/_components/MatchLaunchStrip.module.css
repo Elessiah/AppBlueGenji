@@ -1,0 +1,82 @@
+/* Bandeau de lancement d'un match (`MatchLaunchStrip`). La carte fait 210 px :
+   tout y tient sur une ou deux lignes, en 11 px, comme le bandeau de diffusion. */
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border-top: 1px solid var(--border, #444);
+  font-size: 11px;
+}
+
+.strip[data-phase="LOBBY"] {
+  background: rgba(255, 157, 46, 0.08);
+}
+
+.lobby {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 176, 92, 0.98);
+  white-space: nowrap;
+}
+
+.launched {
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--green, #4fe0a2);
+  white-space: nowrap;
+}
+
+.fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--text-1);
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 110px;
+}
+
+.ok {
+  color: var(--green, #4fe0a2);
+}
+
+.wait {
+  color: var(--text-2);
+}
+
+.actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.small {
+  padding: 2px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.primary {
+  padding: 2px 10px;
+  font-size: 11px;
+  white-space: nowrap;
+  background: rgba(89, 212, 255, 0.16);
+  border-color: rgba(89, 212, 255, 0.45);
+}
+
+.force {
+  background: rgba(255, 157, 46, 0.14);
+  border-color: rgba(255, 157, 46, 0.45);
+}

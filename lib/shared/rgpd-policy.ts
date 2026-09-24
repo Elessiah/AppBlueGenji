@@ -27,7 +27,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // seconde écrase la première à chaque connexion : le dire est la condition
     // pour que le joueur comprenne pourquoi sa saisie a changé.
     finalite:
-      "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net. Masqué, il reste lisible des joueurs de tes matchs et de l'arbitrage, tant que le tournoi n'est pas terminé",
+      "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net. Masqué, il reste lisible des joueurs de tes matchs, de leur caster et de l'arbitrage, tant que le tournoi n'est pas terminé",
     base: "Consentement",
     duree: "Durée du compte",
   },
@@ -40,7 +40,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // uniquement à deux publics. La phrase dit les deux régimes, parce que les
     // deux existent en base au même instant.
     finalite:
-      "Authentification Discord, notifications bot. Une fois certifié : contact par l'organisation pendant un tournoi (administrateurs en permanence, arbitres tant que le joueur est engagé). Non certifié : visible de son seul titulaire",
+      "Authentification Discord, notifications bot. Une fois certifié : contact par l'organisation pendant un tournoi (administrateurs en permanence, arbitres tant que le joueur est engagé) et entre les parties d'un match (joueurs des deux équipes et caster), de son lancement à sa fin. Non certifié : visible de son seul titulaire",
     base: "Consentement",
     duree: "Durée du compte",
   },

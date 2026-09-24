@@ -167,6 +167,7 @@ import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
 import { getTournamentPreview } from "./preview-cache";
 import { dispatchDueMatchReminders } from "./match-reminders";
 import { findTournamentsNeedingSync } from "./sync-scope";
+import { loadViewerCastBlock } from "./match-launch";
 
 let pendingSync: Promise<void> | null = null;
 let lastSyncAt = 0;
@@ -880,6 +881,10 @@ export async function getTournamentViewerContext(
   // une fois par lecteur.
   const preview = canPreview ? await getTournamentPreview(snapshot.card.id) : null;
 
+  // Inscription comme caster : la permission ne suffit pas, il faut aussi une
+  // identité vérifiée (`castBlockReason`).
+  const castBlock = await loadViewerCastBlock(userId, canManageLive);
+
   return {
     preview,
     // En individuel, un joueur sans entrée solo peut s'inscrire : elle sera
@@ -892,6 +897,8 @@ export async function getTournamentViewerContext(
     isAdmin: canManage,
     canDelete,
     canManageLive,
+    viewerUserId: userId,
+    castBlock,
   };
 }
 

@@ -304,10 +304,21 @@ export async function getMatchRows(
       m.live_trigger,
       m.live_url,
       m.live_started_at,
+      m.host_team_id,
+      m.caster_user_id,
+      cu.pseudo AS caster_pseudo,
+      m.lobby_opened_at,
+      m.launched_at,
+      m.team1_ready_at,
+      m.team2_ready_at,
+      m.caster_ready_at,
+      t1.is_ghost AS team1_is_ghost,
+      t2.is_ghost AS team2_is_ghost,
       p.position AS phase_position
      FROM bg_matches m
      LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
      LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
+     LEFT JOIN bg_users cu ON cu.id = m.caster_user_id
      LEFT JOIN bg_tournament_phases p ON p.id = m.phase_id
      WHERE m.tournament_id = ?
      ORDER BY

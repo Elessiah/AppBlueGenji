@@ -2,6 +2,7 @@
 import type { ConnectionMethod } from "./account-connections";
 import type { MatchFormat } from "./match-format";
 import type { MatchLiveTrigger } from "./live-streams";
+import type { CastBlock } from "./match-launch";
 import type { ParticipantType } from "./participants";
 import type {
   RegistrationFilterError,
@@ -475,6 +476,23 @@ export type BracketMatch = {
   liveUrl: string | null;
   /** Ouverture d'antenne (mode `MANUAL`) ; `null` = antenne fermée. */
   liveStartedAt: string | null;
+  /**
+   * Équipe qui héberge la partie, **résolue** : celle que l'arbitrage a
+   * désignée, sinon l'équipe 1 (`resolveHostTeamId`, `lib/shared/match-launch.ts`).
+   */
+  hostTeamId: number | null;
+  /** Caster inscrit sur ce match ; `null` = aucun. */
+  casterUserId: number | null;
+  /** Pseudo du caster (public, comme tout pseudo du site). */
+  casterPseudo: string | null;
+  /** Ouverture du lancement (ISO), posée à la première observation. */
+  lobbyOpenedAt: string | null;
+  /** Lancement du match (ISO) ; `null` = pas encore lancé. */
+  launchedAt: string | null;
+  /** « Prêt » de chaque partie ; une fantôme est prête d'office. */
+  team1Ready: boolean;
+  team2Ready: boolean;
+  casterReady: boolean;
 };
 
 /**
@@ -592,6 +610,14 @@ export type TournamentViewerContext = {
    * les contrôles de diffusion des matchs, distincts des droits d'arbitrage.
    */
   canManageLive: boolean;
+  /** Identifiant du lecteur : reconnaître « c'est moi qui caste ce match ». */
+  viewerUserId: number;
+  /**
+   * Ce qui empêche le lecteur de s'inscrire pour caster un match, `null` s'il
+   * le peut : permission `live` **et** tag Discord certifié **et** compte
+   * Battle.net rattaché (`castBlockReason`, `lib/shared/match-launch.ts`).
+   */
+  castBlock: CastBlock | null;
 };
 
 /** Détail complet d'un tournoi pour un lecteur donné. */
