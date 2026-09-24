@@ -378,10 +378,8 @@ export function TournamentForm({
                 max={256}
                 disabled={locked("maxTeams")}
                 value={maxTeams}
-                onValueChange={(next) => {
-                  setMaxTeams(next);
-                  fieldErrors.clear("maxTeams");
-                }}
+                onValueChange={setMaxTeams}
+                onEdit={() => fieldErrors.clear("maxTeams")}
                 {...fieldAttrs("maxTeams")}
               />
               <FieldErrorText fieldId={FIELD_IDS.maxTeams} message={fieldErrors.message("maxTeams")} />
@@ -441,8 +439,8 @@ export function TournamentForm({
                   onValueChange={(value) => {
                     setLastMatchFormatValue(value);
                     patchMatchFormat({ value });
-                    fieldErrors.clear("matchFormatValue");
                   }}
+                  onEdit={() => fieldErrors.clear("matchFormatValue")}
                   {...fieldErrors.aria(
                     "matchFormatValue",
                     locked("matchFormat") && explanationId,

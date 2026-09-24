@@ -145,11 +145,6 @@ export function launchBlockReason(
   return null;
 }
 
-/** Raccourci de lecture : le tournoi peut-il être avancé maintenant ? */
-export function canLaunchNow(tournament: LaunchableTournament, now: number = Date.now()): boolean {
-  return launchBlockReason(tournament, now) === null;
-}
-
 /**
  * Les quatre jalons ramenés au plus tôt, de façon qu'à l'instant `now` le
  * tournoi soit `RUNNING`.
@@ -201,8 +196,16 @@ const TARGET_MILESTONE: Record<AdvanceTarget, number> = {
 
 /**
  * Étape suivante du tournoi, ou `null` quand il n'y a plus rien à avancer.
- * `null` exactement quand `launchBlockReason` refuse : c'est ce refus qui le
- * décide, pour les mêmes raisons que `abridgedStagesForLaunch`.
+ *
+ * **`null` exactement quand `launchBlockReason` refuse**, et c'est ce refus qui
+ * le décide, pas un second calcul qui lui ressemblerait : `computeTournamentProgress`
+ * remplace un jalon illisible par celui de son voisin pour que la frise reste
+ * dessinable, là où avancer s'y refuse. Sans cette ligne, un tournoi aux dates
+ * corrompues afficherait le bouton sur une action que le serveur refuse en 400.
+ *
+ * L'étape, elle, est bien celle de `computeTournamentProgress` et non l'état du
+ * moteur : c'est la seule des deux à distinguer « masqué » d'« annoncé » et
+ * l'avant de l'après-inscriptions.
  */
 export function advanceTarget(
   tournament: LaunchableTournament,

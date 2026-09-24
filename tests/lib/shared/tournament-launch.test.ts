@@ -4,7 +4,6 @@ import {
   LAUNCH_BACKDATE_MS,
   advanceSuccessMessage,
   advanceTarget,
-  canLaunchNow,
   launchBlockReason,
   shortenScheduleForAdvance,
   shortenScheduleForLaunch,
@@ -80,7 +79,7 @@ function stateAfterLaunch(tournament: LaunchableTournament): TournamentState {
 describe("launchBlockReason", () => {
   it.each(STAGE_NAMES)("laisse abréger depuis l'étape %s", (name) => {
     expect(launchBlockReason(STAGES[name], NOW)).toBeNull();
-    expect(canLaunchNow(STAGES[name], NOW)).toBe(true);
+    expect(advanceTarget(STAGES[name], NOW)).not.toBeNull();
   });
 
   it("refuse un tournoi dont le coup d'envoi est passé", () => {

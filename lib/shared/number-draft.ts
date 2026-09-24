@@ -32,3 +32,16 @@ export function displayedNumber(draft: string | null, value: number | null | und
   if (value === null || value === undefined || !Number.isFinite(value)) return "";
   return String(value);
 }
+
+/**
+ * Valeur à retenir quand le champ perd le focus.
+ *
+ * Un champ quitté vide ou illisible revient à la valeur qu'il avait **avant
+ * l'édition** : vider « 16 » au Retour arrière passe par « 1 », valeur
+ * intermédiaire que personne n'a voulu garder. Sinon, la dernière valeur lue
+ * reste.
+ */
+export function valueAfterEdit(draft: string | null, current: number, beforeEdit: number): number {
+  if (draft !== null && parseNumberDraft(draft) === null) return beforeEdit;
+  return current;
+}

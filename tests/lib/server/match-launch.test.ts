@@ -266,6 +266,26 @@ describe("setMatchReady", () => {
     await expect(setMatchReady(42, 1, true)).rejects.toThrow("MATCH_NOT_FOUND");
   });
 
+  it("tient pour introuvable un match dont le tournoi a disparu", async () => {
+    // Même effet que l'ancienne jointure interne : pas de ligne, donc pas un
+    // « tournoi pas en cours » qui laisserait croire qu'il existe encore.
+    const base = executeFor(state);
+    jest.mocked(withConnection).mockImplementation((run) =>
+      run(
+        fakeConnection({
+          execute: async (sql: string, params: unknown[] = []) =>
+            /AS tournament_state/.test(sql) && !/FROM bg_matches/.test(sql)
+              ? [[{ tournament_state: null, team1_is_ghost: null, team2_is_ghost: null }], []]
+              : base(sql, params),
+          beginTransaction: async () => undefined,
+          commit: async () => undefined,
+          rollback: async () => undefined,
+        }),
+      ),
+    );
+    await expect(setMatchReady(42, 1, true)).rejects.toThrow("MATCH_NOT_FOUND");
+  });
+
   it("refuse hors d'un tournoi en cours", async () => {
     state.match = matchState({ tournament_state: "FINISHED" });
     await expect(setMatchReady(42, 1, true)).rejects.toThrow("TOURNAMENT_NOT_RUNNING");

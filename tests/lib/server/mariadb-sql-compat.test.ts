@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { stripLineComments } from "../../helpers/strip-comments";
 
 /**
  * La production tourne sous **MariaDB** (11.8), pas MySQL 8.
@@ -24,18 +25,10 @@ function walk(dir: string): string[] {
   });
 }
 
-/**
- * Le code sans ses commentaires : un commentaire peut nommer la syntaxe refusée
- * pour expliquer pourquoi elle l'est.
- */
-function withoutComments(text: string): string {
-  return text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-}
-
 const sources = ["app", "components", "lib"]
   .flatMap((dir) => walk(join(ROOT, dir)))
   .filter((path) => /\.(ts|tsx)$/.test(path))
-  .map((path) => ({ path: relative(ROOT, path), text: withoutComments(readFileSync(path, "utf8")) }));
+  .map((path) => ({ path: relative(ROOT, path), text: stripLineComments(readFileSync(path, "utf8")) }));
 
 const FORBIDDEN: { pattern: RegExp; why: string }[] = [
   {

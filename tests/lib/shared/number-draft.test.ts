@@ -1,7 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { displayedNumber, parseNumberDraft } from "@/lib/shared/number-draft";
+import { displayedNumber, parseNumberDraft, valueAfterEdit } from "@/lib/shared/number-draft";
+import { stripLineComments } from "../../helpers/strip-comments";
 
 describe("parseNumberDraft", () => {
   it("lit un nombre", () => {
@@ -44,6 +45,35 @@ describe("displayedNumber", () => {
   });
 });
 
+describe("valueAfterEdit", () => {
+  it("rétablit la valeur d'avant l'édition quand le champ est quitté vide", () => {
+    // « 16 » vidé au Retour arrière passe par « 1 » : on ne le garde pas.
+    expect(valueAfterEdit("", 1, 16)).toBe(16);
+    expect(valueAfterEdit("-", 1, 16)).toBe(16);
+  });
+
+  it("garde la dernière valeur lue quand le champ porte un nombre", () => {
+    expect(valueAfterEdit("32", 32, 16)).toBe(32);
+    expect(valueAfterEdit("0", 0, 16)).toBe(0);
+  });
+
+  it("ne change rien hors édition", () => {
+    expect(valueAfterEdit(null, 9, 16)).toBe(9);
+  });
+});
+
+describe("stripLineComments", () => {
+  it("ne coupe pas dans une chaîne qui contient « /* »", () => {
+    const source = ['const a = "image/*";', "const sql = `FOR SHARE`;", "/** doc */", ""].join("\n");
+    expect(stripLineComments(source)).toContain("FOR SHARE");
+  });
+
+  it("retire les commentaires qui ouvrent une ligne", () => {
+    const source = ["// FOR SHARE", "  /* FOR SHARE */", "{/* FOR SHARE */}", "code();"].join("\n");
+    expect(stripLineComments(source)).not.toContain("FOR SHARE");
+  });
+});
+
 describe("champs numériques des formulaires", () => {
   const ROOT = join(__dirname, "..", "..", "..");
   const walk = (dir: string): string[] =>
@@ -61,10 +91,7 @@ describe("champs numériques des formulaires", () => {
       .flatMap((dir) => walk(join(ROOT, dir)))
       .filter((path) => path.endsWith(".tsx"))
       .filter((path) =>
-        /(?<!\? )Number\((e|event)\.target\.value\)/.test(
-          // Sans les commentaires, qui peuvent citer le motif pour l'expliquer.
-          readFileSync(path, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, ""),
-        ),
+        /(?<!\? )Number\((e|event)\.target\.value\)/.test(stripLineComments(readFileSync(path, "utf8"))),
       )
       .map((path) => relative(ROOT, path));
     expect(offenders).toEqual([]);

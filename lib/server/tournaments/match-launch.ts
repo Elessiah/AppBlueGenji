@@ -193,7 +193,11 @@ async function lockLaunchMatch(
        (SELECT is_ghost FROM bg_teams WHERE id = ?) AS team2_is_ghost`,
     [row.tournament_id, nullableId(row.team1_id), nullableId(row.team2_id)],
   );
-  row.tournament_state = context[0]?.tournament_state ?? "";
+  // Même effet que l'ancienne jointure interne : un match dont le tournoi a
+  // disparu n'est pas un match à lancer.
+  const tournamentState = context[0]?.tournament_state ?? null;
+  if (tournamentState === null) return null;
+  row.tournament_state = tournamentState;
   row.team1_is_ghost = context[0]?.team1_is_ghost ?? null;
   row.team2_is_ghost = context[0]?.team2_is_ghost ?? null;
   return row;
