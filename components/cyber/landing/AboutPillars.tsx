@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
 import { useToast } from "@/components/ui/toast";
-import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   type AboutPillar,
   ABOUT_PILLAR_TEXT_MAX,
   ABOUT_PILLAR_TITLE_MAX,
   FALLBACK_ABOUT_PILLARS,
 } from "@/lib/shared/about-pillars";
+import { LandingDialog } from "./LandingDialog";
 import styles from "./AboutPillars.module.css";
 
 interface AboutPillarsProps {
@@ -31,16 +30,6 @@ export function AboutPillars({ initialPillars, isAdmin }: AboutPillarsProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  // La modale est portée dans <body> : rendue dans la section, elle restait
-  // prisonnière de son contexte d'empilement (`position: relative; z-index: 1`)
-  // et passait sous la section des partenaires au défilement.
-  useEffect(() => setMounted(true), []);
-
-  // Focus initial (champ Titre), Échap, piège de tabulation et verrou du
-  // défilement de la page, tant que la modale est ouverte.
-  const dialogRef = useDialogBehavior({ open: open && mounted, onClose: close, locked: busy });
 
   // Les cartes de secours (id négatif) ne sont pas en base : non modifiables.
   const canManage = (p: AboutPillar) => isAdmin && p.id > 0;
@@ -223,61 +212,51 @@ export function AboutPillars({ initialPillars, isAdmin }: AboutPillarsProps) {
         </button>
       )}
 
-      {open && mounted && createPortal(
-        <div className={styles.modalOverlay} onClick={close} role="presentation">
-          <div
-            ref={dialogRef}
-            className={styles.modal}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="about-pillar-modal-title"
-          >
-            <h3 id="about-pillar-modal-title" className={styles.modalTitle}>
-              {editing ? "Modifier la carte" : "Ajouter une carte"}
-            </h3>
+      {open && (
+        <LandingDialog onClose={close} busy={busy} className={styles.modal} labelledBy="about-pillar-modal-title">
+          <h3 id="about-pillar-modal-title" className={styles.modalTitle}>
+            {editing ? "Modifier la carte" : "Ajouter une carte"}
+          </h3>
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Titre</span>
-              <input
-                className={styles.modalInput}
-                value={form.title}
-                maxLength={ABOUT_PILLAR_TITLE_MAX}
-                placeholder="Accessible"
-                enterKeyHint="next"
-                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              />
-            </label>
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Titre</span>
+            <input
+              className={styles.modalInput}
+              value={form.title}
+              maxLength={ABOUT_PILLAR_TITLE_MAX}
+              placeholder="Accessible"
+              enterKeyHint="next"
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+            />
+          </label>
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Texte</span>
-              <textarea
-                className={styles.modalInput}
-                value={form.text}
-                maxLength={ABOUT_PILLAR_TEXT_MAX}
-                placeholder="Inscription gratuite, matchmaking par niveau…"
-                rows={3}
-                onChange={(e) => setForm((f) => ({ ...f, text: e.target.value }))}
-              />
-            </label>
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Texte</span>
+            <textarea
+              className={styles.modalInput}
+              value={form.text}
+              maxLength={ABOUT_PILLAR_TEXT_MAX}
+              placeholder="Inscription gratuite, matchmaking par niveau…"
+              rows={3}
+              onChange={(e) => setForm((f) => ({ ...f, text: e.target.value }))}
+            />
+          </label>
 
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.action} onClick={close} disabled={busy}>
-                Annuler
-              </button>
-              <button
-                type="button"
-                className={styles.actionPrimary}
-                onClick={submit}
-                disabled={busy}
-                aria-busy={busy}
-              >
-                {busy ? "…" : editing ? "Enregistrer" : "Ajouter"}
-              </button>
-            </div>
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.action} onClick={close} disabled={busy}>
+              Annuler
+            </button>
+            <button
+              type="button"
+              className={styles.actionPrimary}
+              onClick={submit}
+              disabled={busy}
+              aria-busy={busy}
+            >
+              {busy ? "…" : editing ? "Enregistrer" : "Ajouter"}
+            </button>
           </div>
-        </div>,
-        document.body,
+        </LandingDialog>
       )}
     </>
   );

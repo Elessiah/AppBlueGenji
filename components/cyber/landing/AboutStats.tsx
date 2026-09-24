@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
 import { useToast } from "@/components/ui/toast";
-import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   type AboutStat,
   ABOUT_STAT_LABEL_MAX,
   ABOUT_STAT_VALUE_MAX,
   FALLBACK_ABOUT_STATS,
 } from "@/lib/shared/about-stats";
+import { LandingDialog } from "./LandingDialog";
 import styles from "./AboutStats.module.css";
 
 interface AboutStatsProps {
@@ -31,16 +30,6 @@ export function AboutStats({ initialStats, isAdmin }: AboutStatsProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  // La modale est portée dans <body> : rendue dans la section, elle restait
-  // prisonnière de son contexte d'empilement (`position: relative; z-index: 1`)
-  // et passait sous la section des partenaires au défilement.
-  useEffect(() => setMounted(true), []);
-
-  // Focus initial (champ Valeur), Échap, piège de tabulation et verrou du
-  // défilement de la page, tant que la modale est ouverte.
-  const dialogRef = useDialogBehavior({ open: open && mounted, onClose: close, locked: busy });
 
   // Les cartes de secours (id négatif) ne sont pas en base : non modifiables.
   const canManage = (s: AboutStat) => isAdmin && s.id > 0;
@@ -222,64 +211,54 @@ export function AboutStats({ initialStats, isAdmin }: AboutStatsProps) {
         </button>
       )}
 
-      {open && mounted && createPortal(
-        <div className={styles.modalOverlay} onClick={close} role="presentation">
-          <div
-            ref={dialogRef}
-            className={styles.modal}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="about-stat-modal-title"
-          >
-            <h3 id="about-stat-modal-title" className={styles.modalTitle}>
-              {editing ? "Modifier la carte" : "Ajouter une carte"}
-            </h3>
+      {open && (
+        <LandingDialog onClose={close} busy={busy} className={styles.modal} labelledBy="about-stat-modal-title">
+          <h3 id="about-stat-modal-title" className={styles.modalTitle}>
+            {editing ? "Modifier la carte" : "Ajouter une carte"}
+          </h3>
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Valeur</span>
-              <input
-                className={styles.modalInput}
-                value={form.value}
-                maxLength={ABOUT_STAT_VALUE_MAX}
-                placeholder="100%"
-                enterKeyHint="next"
-                onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
-              />
-            </label>
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Valeur</span>
+            <input
+              className={styles.modalInput}
+              value={form.value}
+              maxLength={ABOUT_STAT_VALUE_MAX}
+              placeholder="100%"
+              enterKeyHint="next"
+              onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
+            />
+          </label>
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Titre</span>
-              <input
-                className={styles.modalInput}
-                value={form.label}
-                maxLength={ABOUT_STAT_LABEL_MAX}
-                placeholder="Bénévole"
-                enterKeyHint="done"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !busy) submit();
-                }}
-                onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
-              />
-            </label>
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Titre</span>
+            <input
+              className={styles.modalInput}
+              value={form.label}
+              maxLength={ABOUT_STAT_LABEL_MAX}
+              placeholder="Bénévole"
+              enterKeyHint="done"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !busy) submit();
+              }}
+              onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
+            />
+          </label>
 
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.action} onClick={close} disabled={busy}>
-                Annuler
-              </button>
-              <button
-                type="button"
-                className={styles.actionPrimary}
-                onClick={submit}
-                disabled={busy}
-                aria-busy={busy}
-              >
-                {busy ? "…" : editing ? "Enregistrer" : "Ajouter"}
-              </button>
-            </div>
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.action} onClick={close} disabled={busy}>
+              Annuler
+            </button>
+            <button
+              type="button"
+              className={styles.actionPrimary}
+              onClick={submit}
+              disabled={busy}
+              aria-busy={busy}
+            >
+              {busy ? "…" : editing ? "Enregistrer" : "Ajouter"}
+            </button>
           </div>
-        </div>,
-        document.body,
+        </LandingDialog>
       )}
     </>
   );
