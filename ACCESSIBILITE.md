@@ -45,6 +45,22 @@ pipeline de `CLAUDE.md`.
 
 ---
 
+## 10. Erreurs de formulaire liées aux champs — formulaires restants
+
+- **Critère** : WCAG 3.3.1 / 3.3.3 · RGAA 11.10 / 11.11.
+- **Constat** : réglée en partie par `feature/accessibility-form-errors-statement`
+  (`docs/features/ACCESSIBILITY_FORM_ERRORS_STATEMENT.md`) : création d'équipe,
+  équipe fantôme, identité d'une équipe, profil, connexion par code, formulaire
+  de tournoi. Restent sans rattachement au champ : l'invitation d'un joueur et
+  l'attribution d'une fantôme (`PlayerPseudoCombobox` — `USER_NOT_FOUND`,
+  `ALREADY_INVITED` ; le refus est rendu par `useMemberManagement`, qui ne
+  remonte que `true`/`false`), la saisie du tag de `DiscordVerificationDialog`,
+  et les phases d'un tournoi multi-phases (`PhaseBuilder`, refus de
+  `validatePhases`).
+- **À faire** : même mécanique (`useFieldErrors`, `FieldErrorText`, table dans
+  `lib/shared/field-errors.ts`) ; pour la liste déroulante du pseudo, ne pas
+  ramener le focus sans empêcher l'ouverture des suggestions qu'il déclenche.
+
 ## 13. Passe au lecteur d'écran
 
 - **À faire** : parcours complet avec NVDA (Windows) et VoiceOver (macOS / iOS)
