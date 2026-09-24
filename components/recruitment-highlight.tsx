@@ -7,7 +7,7 @@ import { UrgentPill } from "@/components/recruitment/UrgentPill";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
-import { type CountdownOverride, isCountdownHeld } from "@/lib/shared/pausable-countdown";
+import type { CountdownOverride } from "@/lib/shared/pausable-countdown";
 import {
   RECRUITMENT_BANNER_COOKIE,
   RECRUITMENT_BANNER_ROTATION_MS,
@@ -17,6 +17,7 @@ import {
   RECRUITMENT_PRIORITY_EXPOSURE,
   type RecruitmentAd,
   buildRecruitmentPreview,
+  isRecruitmentBannerRotating,
   recruitmentAdAnchor,
   recruitmentModalStart,
   serializeRecruitmentSeen,
@@ -150,12 +151,8 @@ export function RecruitmentHighlight({
  * annonces à la main.
  *
  * Le bouton pose un **choix explicite qui prime** sur le survol et le focus
- * (`isCountdownHeld`, la règle des notifications) : « Pause » tient la
- * banderole arrêtée, « Reprendre » la relance **sur-le-champ**. Sans cela la
- * reprise ne reprenait rien — le pointeur qui vient de cliquer survole la
- * banderole, et le focus clavier est posé sur le bouton lui-même : les deux
- * tenaient le défilement figé. « Reprendre » s'efface au prochain survol ou
- * focus, qui suspendent de nouveau.
+ * ({@link isRecruitmentBannerRotating}) : « Reprendre » relance sur-le-champ,
+ * et s'efface au prochain survol ou focus, qui suspendent de nouveau.
  */
 function RecruitmentBanner({
   ads,
@@ -174,7 +171,7 @@ function RecruitmentBanner({
   const count = ads.length;
   const multiple = count > 1;
   const paused = override === "PAUSED";
-  const rotating = multiple && decorativeMotion && !isCountdownHeld(override, hovered, focused);
+  const rotating = isRecruitmentBannerRotating({ count, decorativeMotion, override, hovered, focused });
   // Un nouveau survol ou focus rend la main à la règle ordinaire.
   const releaseResume = () => setOverride((value) => (value === "RUNNING" ? null : value));
 

@@ -221,12 +221,11 @@ describe("RecruitmentHighlight — ce qui ne doit plus exister", () => {
     expect(code).not.toMatch(/visibilitychange|setInterval\(/);
   });
 
-  it("relance le défilement sur « Reprendre », pointeur et focus encore sur le bouton", () => {
-    // La reprise ne reprenait rien : le pointeur qui vient de cliquer survole
-    // la banderole, le focus clavier est sur le bouton, et l'un comme l'autre
-    // tenaient la rotation figée. Le choix explicite prime désormais, par la
-    // même règle que les notifications — et le bouton pose ce choix.
-    expect(code).toMatch(/isCountdownHeld\(override, hovered, focused\)/);
+  it("décide du défilement par la règle pure, que le bouton pause alimente", () => {
+    // La règle elle-même est testée dans `tests/lib/shared/recruitment.test.ts` ;
+    // ici, seulement que la banderole la lit et que « Reprendre » pose le choix
+    // explicite qui prime sur le survol et le focus.
+    expect(code).toContain("isRecruitmentBannerRotating(");
     expect(code).toMatch(/setOverride\(paused \? "RUNNING" : "PAUSED"\)/);
     expect(code).not.toMatch(/!hovered && !focused/);
   });
