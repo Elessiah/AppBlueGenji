@@ -349,19 +349,14 @@
   font-family: var(--font-sans);
   font-size: 14px;
   outline: none;
-  transition: border-color 0.16s ease;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
   width: 100%;
   box-sizing: border-box;
 }
 
-/* Au focus, un **anneau** et pas seulement une bordure recolorée : un
-   changement de teinte d'un trait d'un pixel ne se voit pas (WCAG 2.4.7 /
-   1.4.11). Même anneau que `.searchbar-input` et que le halo de `.field`,
-   dans le bleu de la vitrine. En contrastes forcés, la règle globale de
-   `app/globals.css` prend le relais. */
 .modalInput:focus {
   border-color: var(--blue-500);
-  box-shadow: 0 0 0 3px rgba(90, 200, 255, 0.28);
+  box-shadow: 0 0 0 3px rgba(var(--blue-500-rgb), 0.28);
 }
 
 select.modalInput {

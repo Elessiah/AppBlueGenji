@@ -382,12 +382,13 @@ select {
   color: var(--text-2);
 }
 
-/* Un anneau, pas seulement une bordure un peu plus opaque : ce seul
-   changement de teinte ne se voyait pas (WCAG 2.4.7 / 1.4.11). */
+/* Un anneau et pas seulement une bordure qui fonce : de 0,25 à 0,55 d'opacité,
+   le changement seul ne se voyait guère (WCAG 2.4.7). Même anneau que les
+   champs `.field`, dans la teinte de la barre. */
 .searchbar-input:focus {
   border-color: rgba(var(--search-color), 0.55);
   background: rgba(var(--search-color), 0.09);
-  box-shadow: 0 0 0 3px rgba(var(--search-color), 0.28);
+  box-shadow: 0 0 0 3px rgba(var(--search-color), 0.22);
 }
 
 .searchbar-btn {
@@ -1625,8 +1626,7 @@ input[type="radio"]:disabled:checked {
    juste. Le mode force la `background-color` mais **pas** l'image de fond, si
    bien qu'une coche presque noire se retrouverait sur un fond noir imposé —
    cochée et décochée deviennent alors indiscernables. L'anneau de focus étant
-   un `box-shadow`, lui aussi supprimé, l'`outline` le remplace — par la règle
-   globale sur `:focus-visible`, plus bas, qui vaut pour tout élément. */
+   un `box-shadow`, lui aussi supprimé, l'`outline` native le remplace. */
 @media (forced-colors: active) {
   input[type="checkbox"],
   input[type="radio"] {
@@ -1666,6 +1666,12 @@ input[type="radio"]:disabled:checked {
   input[type="radio"]:checked {
     background-image: none;
   }
+
+  input[type="checkbox"]:focus-visible,
+  input[type="radio"]:focus-visible {
+    outline: 2px solid;
+    outline-offset: 2px;
+  }
 }
 
 /* Pastille `Coche` — l'anneau de focus, relayé par le frère de l'input.
@@ -1689,6 +1695,27 @@ input[type="radio"]:disabled:checked {
   .coche-input:focus-visible ~ .coche-pill {
     outline: 2px solid;
     outline-offset: 2px;
+  }
+}
+
+/* Contrastes forcés — un repère de focus pour **tout** contrôle (WCAG 2.4.7,
+   1.4.11). Une vingtaine de règles retirent l'`outline` au profit d'une bordure
+   qui change de couleur ou d'un halo (`box-shadow`) : ce mode impose une seule
+   couleur de bordure et supprime les ombres, si bien que le focus n'y laissait
+   **aucune** trace — champs des modales de la vitrine, barre de recherche,
+   champs de score. Une règle ici plutôt qu'une correction par feuille : les
+   `outline: none` sont éparpillés à toutes les spécificités (`.field input…:focus`
+   pèse (0,4,1)), et celui qu'on écrira demain doit être couvert sans que
+   personne y pense — d'où `!important`, qui ne vaut que dans ce mode, choisi par
+   le lecteur. Un conteneur focalisé par programme (`tabindex="-1"` : modale,
+   cible du lien d'évitement) en est exclu : il n'a pas été atteint au clavier,
+   un cadre autour de tout le panneau ne dirait rien. Le décalage, lui, reste
+   celui de chaque règle : imposé vers l'extérieur, le contour serait rogné par
+   un ancêtre `overflow: hidden` ou une zone défilante — et une règle qui le
+   rentre (`outline-offset: -2px`) le fait justement pour cela. */
+@media (forced-colors: active) {
+  :focus-visible:not([tabindex="-1"]) {
+    outline: 2px solid CanvasText !important;
   }
 }
 
@@ -1751,24 +1778,6 @@ html {
 @media (forced-colors: active) {
   .skip-link {
     border-color: CanvasText;
-  }
-}
-
-/* Focus en contrastes forcés — règle **unique**, posée sur l'état et non sur
-   un composant. Le mode supprime les `box-shadow` et impose la couleur des
-   bordures : tout repère de focus fait d'un anneau en ombre (halo de `.field`,
-   `.searchbar-input`, `.modalInput`, recherche de l'annuaire, liens de
-   navigation de `/profil`, recherche du dialogue des fantômes…) disparaissait,
-   et dix-neuf feuilles posent `outline: none`. Une correction classe par classe
-   laissait la suivante sans repère ; celle-ci couvre aussi l'élément ajouté
-   demain. `!important` parce qu'elle doit l'emporter sur chacun de ces
-   `outline: none`, quelle que soit leur spécificité ; le réglage « Focus très
-   visible », plus spécifique, garde la main. L'`outline` est peinte dans la
-   couleur système du focus. */
-@media (forced-colors: active) {
-  :focus-visible {
-    outline: 2px solid !important;
-    outline-offset: 2px;
   }
 }
 

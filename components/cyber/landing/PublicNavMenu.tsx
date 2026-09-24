@@ -39,37 +39,19 @@ export function handleMenuEscape(
 }
 
 /**
- * La tabulation qui quitte le menu le ferme : resté ouvert, le panneau
- * recouvrait le contenu où le focus venait de partir (WCAG 2.4.3). Seule une
- * cible **connue et extérieure** ferme — `relatedTarget` vaut `null` quand le
- * focus part vers la barre du navigateur ou qu'un clic tombe sur une zone non
- * focalisable, y compris à l'intérieur du panneau : le clic dehors a déjà son
- * propre écouteur, et fermer sur un clic dans le panneau lui-même serait faux.
+ * La tabulation a-t-elle quitté le menu ? Le panneau ouvert est posé par-dessus
+ * le contenu : laissé ouvert quand le focus en sort, il recouvre justement
+ * l'endroit où le clavier vient d'arriver (WCAG 2.4.3). `next` est la cible
+ * qui reçoit le focus (`relatedTarget` du `focusout`) ; `null` ne ferme **pas** —
+ * c'est le cas d'une fenêtre qui perd le focus (changement d'application), où
+ * l'on retrouve le menu tel qu'on l'a laissé, et d'un clic dans le vide, que
+ * l'écouteur de clic extérieur traite déjà.
  */
-export function focusLeavesMenu(
-  nextFocus: EventTarget | null,
+export function focusLeftMenu(
   root: { contains(node: Node | null): boolean } | null,
+  next: EventTarget | null,
 ): boolean {
-  if (!nextFocus || !root) return false;
-  return !root.contains(nextFocus as Node);
-}
-
-/**
- * Sortie de focus de la racine du menu (`onBlur`, qui remonte depuis chaque
- * lien) : ferme le panneau ouvert quand le focus part hors du menu. Rend `true`
- * quand il l'a fermé.
- */
-export function handleMenuBlur(
-  event: {
-    relatedTarget: EventTarget | null;
-    currentTarget: { contains(node: Node | null): boolean };
-  },
-  open: boolean,
-  close: () => void,
-): boolean {
-  if (!open || !focusLeavesMenu(event.relatedTarget, event.currentTarget)) return false;
-  close();
-  return true;
+  return root !== null && next !== null && !root.contains(next as Node);
 }
 
 /**
@@ -145,7 +127,9 @@ export function PublicNavMenu() {
     <div
       className={styles.root}
       ref={rootRef}
-      onBlur={(event) => handleMenuBlur(event, open, () => setOpen(false))}
+      onBlur={(e) => {
+        if (open && focusLeftMenu(rootRef.current, e.relatedTarget)) setOpen(false);
+      }}
     >
       {/* Pas d'`aria-haspopup` : il annonce un `role="menu"`, dont le lecteur
           d'écran attend les flèches — le panneau est une simple navigation. */}

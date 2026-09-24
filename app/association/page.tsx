@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/shared/page-metadata";
 import Link from "next/link";
-import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
-import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
+import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { AboutSection } from "@/components/cyber/landing/AboutSection";
 import { CyberButton } from "@/components/cyber";
 import { getCurrentUser } from "@/lib/server/auth";
@@ -60,15 +59,13 @@ export default async function AssociationPage() {
   const isAdmin = can(user, "showcase");
 
   return (
-    <main style={{ position: "relative", zIndex: 1 }}>
+    <PublicPageShell>
         {/*
           Le même nœud qu'à l'accueil, à la même identité : c'est *la* page qui
           parle de l'association, et un moteur doit y retrouver la structure
           qu'il connaît déjà plutôt qu'une seconde du même nom.
         */}
         <JsonLd data={organizationJsonLd(siteCanonicalBase(), ASSOCIATION_DESCRIPTION)} />
-        <PublicHeader />
-
         {/* HERO */}
         <section className={`${styles.section} ${styles.heroSection}`}>
           <div className="fabric" />
@@ -96,10 +93,10 @@ export default async function AssociationPage() {
                 </h1>
               </EditableCopy>
             </div>
-            {/* Un `div` et non un `aside` : ces faits font partie de la section,
-                ils ne sont pas un contenu complémentaire à part — et un repère
-                `complementary` imbriqué dans `<main>` n'est pas au premier
-                niveau (RGAA 12.6). */}
+            {/* Un `<div>` et non un `<aside>` : ces faits (et les avantages de
+                l'adhésion, plus bas) sont le contenu de la page, pas un contenu
+                complémentaire — et un repère `complementary` imbriqué dans
+                `<main>` n'est pas un repère de premier niveau (RGAA 12.6). */}
             <div className={styles.heroSide}>
               <div className={styles.heroFact}>
                 <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 10, letterSpacing: "0.2em" }}>
@@ -247,9 +244,7 @@ export default async function AssociationPage() {
             </li>
           </ul>
         </section>
-
-        <PublicFooter />
-      </main>
+    </PublicPageShell>
   );
 }
 

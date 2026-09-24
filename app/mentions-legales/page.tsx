@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/shared/page-metadata";
 import Link from "next/link";
-import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
-import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
+import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { CyberButton } from "@/components/cyber";
 import styles from "./page.module.css";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
@@ -26,9 +25,7 @@ export const metadata: Metadata = pageMetadata({
 
 export default function MentionsLegalesPage() {
   return (
-    <main style={{ position: "relative", zIndex: 1 }}>
-      <PublicHeader />
-
+    <PublicPageShell>
       {/* HERO */}
       <section className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
@@ -37,7 +34,9 @@ export default function MentionsLegalesPage() {
           <div>
             <h1 className={`display ${styles.heroTitle}`}>Mentions légales</h1>
           </div>
-          <aside className={styles.heroSide}>
+          {/* Un `<div>` : même raison que sur `/association` — un `<aside>` dans
+              `<main>` n'est pas un repère de premier niveau (RGAA 12.6). */}
+          <div className={styles.heroSide}>
             <div className={styles.heroFact}>
               <span className={styles.heroFactLabel}>ÉDITEUR</span>
               <span style={{ fontSize: 17 }}>Bluegenji Esport</span>
@@ -50,7 +49,7 @@ export default function MentionsLegalesPage() {
               <span className={styles.heroFactLabel}>MISE À JOUR</span>
               <span style={{ fontSize: 17 }}>Juin 2026</span>
             </div>
-          </aside>
+          </div>
         </div>
       </section>
 
@@ -127,9 +126,7 @@ export default function MentionsLegalesPage() {
           Bluegenji Esport · Association loi 1901 · Siège social : 4 impasse des Cyprès, 51210 Janvilliers
         </div>
       </section>
-
-      <PublicFooter />
-    </main>
+    </PublicPageShell>
   );
 }
 

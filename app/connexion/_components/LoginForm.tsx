@@ -333,10 +333,13 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
           </Link>
         </div>
       </CyberCard>
-      {/* Rendue **après** la carte : c'est une surcouche fixe, sa place dans le
-          document ne change rien à l'écran, mais elle fixe l'ordre des titres.
-          Placée en tête, son « Avant de continuer » (h2) précédait le h1
-          « Connexion » de la page (RGAA 9.1). */}
+      {/*
+        Rendue **après** la carte, dont elle recouvre pourtant l'écran : l'ordre
+        du document est celui de la lecture, et son titre (« Avant de
+        continuer », un `h2`) passait avant le `h1` de la page (RGAA 9.1). La
+        position fixe la met au-dessus quel que soit son rang ; le focus y est
+        porté par `useDialogBehavior`, pas par l'ordre.
+      */}
       {!consentGiven && (
         <RgpdConsentModal onAccept={acceptConsent} onRefuse={refuseConsent} />
       )}

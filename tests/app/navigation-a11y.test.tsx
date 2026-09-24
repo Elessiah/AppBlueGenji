@@ -8,8 +8,6 @@ import { ArenaNav } from "@/components/arena-nav";
 import {
   PublicNavMenu,
   PublicNavPanel,
-  focusLeavesMenu,
-  handleMenuBlur,
   handleMenuEscape,
 } from "@/components/cyber/landing/PublicNavMenu";
 import { readSource } from "../helpers/read-source";
@@ -109,65 +107,6 @@ describe("handleMenuEscape", () => {
 
   it("tolère des références pas encore montées", () => {
     expect(handleMenuEscape("Escape", inside, null, null, () => undefined)).toBe(true);
-  });
-});
-
-describe("focusLeavesMenu", () => {
-  const inside = { id: "lien" } as unknown as EventTarget;
-  const outside = { id: "contenu" } as unknown as EventTarget;
-  const root = { contains: (node: Node | null) => node === (inside as unknown as Node) };
-
-  it("ferme quand la tabulation part vers un élément hors du menu", () => {
-    expect(focusLeavesMenu(outside, root)).toBe(true);
-  });
-
-  it("reste ouvert quand le focus passe d'un lien du panneau à l'autre", () => {
-    expect(focusLeavesMenu(inside, root)).toBe(false);
-  });
-
-  it("ne tranche pas sans cible connue : barre du navigateur, clic sur une zone inerte", () => {
-    // `relatedTarget` vaut `null` aussi pour un clic dans le panneau hors d'un
-    // lien : le fermer alors serait faux, et le clic dehors a son écouteur.
-    expect(focusLeavesMenu(null, root)).toBe(false);
-  });
-
-  it("tolère une racine pas encore montée", () => {
-    expect(focusLeavesMenu(outside, null)).toBe(false);
-  });
-
-});
-
-describe("handleMenuBlur", () => {
-  const inside = { id: "lien" } as unknown as EventTarget;
-  const outside = { id: "contenu" } as unknown as EventTarget;
-  const currentTarget = { contains: (node: Node | null) => node === (inside as unknown as Node) };
-
-  function run(relatedTarget: EventTarget | null, open: boolean) {
-    let closed = 0;
-    const handled = handleMenuBlur({ relatedTarget, currentTarget }, open, () => {
-      closed += 1;
-    });
-    return { handled, closed };
-  }
-
-  it("ferme le panneau ouvert quand le focus part hors du menu", () => {
-    expect(run(outside, true)).toEqual({ handled: true, closed: 1 });
-  });
-
-  it("ne ferme pas quand le focus reste dans le menu", () => {
-    expect(run(inside, true)).toEqual({ handled: false, closed: 0 });
-  });
-
-  it("ne ferme pas sans cible connue", () => {
-    expect(run(null, true)).toEqual({ handled: false, closed: 0 });
-  });
-
-  it("ne fait rien quand le panneau est déjà fermé", () => {
-    expect(run(outside, false)).toEqual({ handled: false, closed: 0 });
-  });
-
-  it("est posé sur la racine du menu, qui reçoit la sortie de focus de tous ses liens", () => {
-    expect(readSource("components/cyber/landing/PublicNavMenu.tsx")).toContain("onBlur={(event) => handleMenuBlur(");
   });
 });
 

@@ -145,15 +145,13 @@
   border: 1px solid var(--line-strong-cy);
   border-radius: var(--r-cy-md);
   background: var(--cyber-bg-1);
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-/* Le champ retire son outline : c'est la boîte qui signale le focus. À 6 %
-   d'opacité, l'anneau ne se voyait pas, et la bordure seule n'est qu'un trait
-   qui change de teinte (WCAG 2.4.7 / 1.4.11). En contrastes forcés, la règle
-   globale de `app/globals.css` pose une outline sur le champ lui-même. */
+/* Le champ n'a ni bordure ni `outline` : c'est la barre qui dit le focus. À
+   0,06 d'opacité, son halo ne se voyait pas (WCAG 2.4.7). */
 .search:focus-within {
   border-color: rgba(var(--g-rgb, 90, 200, 255), 0.55);
-  box-shadow: 0 0 0 3px rgba(var(--g-rgb, 90, 200, 255), 0.28);
+  box-shadow: 0 0 0 3px rgba(var(--g-rgb, 90, 200, 255), 0.22);
 }
 .searchIcon {
   padding: 0 14px;

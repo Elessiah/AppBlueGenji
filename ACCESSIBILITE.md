@@ -14,13 +14,15 @@ Puis par la PR `feature/accessibility-quick-wins` : lien d'évitement
 du bot (3), page courante et pictogrammes des navigations (4), indicateur de
 développement de Next (14).
 
-Puis par la PR #183 (`feature/deploy-accessibility-features-fe6371`) : modales de la vitrine
-(5 — déjà passées par `LandingDialog` et `useDialogBehavior`, la tâche était
-restée ouverte), lien « Voir » de la bannière de recrutement (6), focus des
-champs hors `.field` (7, recherche de l'annuaire comprise, et repère de focus
-de **tout** élément en contrastes forcés), ordre des titres de
-`/connexion` et repères de `/association` (8), menu burger fermé quand le focus
-en sort (17).
+Puis par la PR `feature/accessibility-landing-fixes`
+(`docs/features/ACCESSIBILITY_LANDMARKS_FOCUS.md`) : focus des champs hors
+`.field` (7), ordre des titres de `/connexion` et repères de `/association` (8),
+en-tête et pied de page des pages vitrine hors de `<main>` (15), fermeture du
+menu burger quand le focus en sort (17). La tâche 5 (modales de la vitrine)
+était déjà réglée par `LandingDialog`, qui passe par `useDialogBehavior`.
+
+Puis par la PR #183 (`docs/features/ACCESSIBILITY_RECRUITMENT_BANNER_LINK.md`) :
+lien « Voir » de la bannière de recrutement (6).
 
 Chaque tâche ci-dessous est indépendante et peut être confiée à une session
 séparée. Une branche `feature/<nom>` par tâche, avec ses tests, selon le
@@ -73,22 +75,6 @@ ajout.
 - **À faire** : parcours complet avec NVDA (Windows) et VoiceOver (macOS / iOS)
   — connexion, inscription d'une équipe, report de score, menu d'accessibilité.
   Aucun test automatique ne remplace celui-là.
-
-## 15. En-tête et pied de page des pages vitrine rendus dans `<main>`
-
-- **Critère** : WCAG 1.3.1 · RGAA 12.6.
-- **Constat** : l'accueil, `/association`, `/benevoles`, `/recrutement`,
-  `/regles`, `/regles/[slug]`, `/rgpd`, `/rgpd/registre`, `/mentions-legales` et
-  les deux pages légales du bot rendent `PublicHeader` et `PublicFooter`
-  **dans** leur `<main>`. Un `<header>` ou un `<footer>` imbriqué dans `<main>`
-  perd son rôle de repère (`banner`, `contentinfo`) : la navigation par repères
-  ne trouve ni l'en-tête ni le pied de page, et le « contenu principal » annoncé
-  commence par le menu. `/bot` et `/bot/docs` font déjà juste.
-- **À faire** : sortir `PublicHeader` et `PublicFooter` de `<main>` (fragment
-  autour des trois), en vérifiant l'empilement — `<main>` porte
-  `position: relative; z-index: 1`, et le panneau du menu burger doit rester
-  au-dessus du contenu. Le lien d'évitement saute déjà les en-têtes de tête de
-  `<main>` (`lib/shared/skip-link.ts`) et restera juste après la correction.
 
 ## 16. Titres des fiches d'équipe et de joueur
 

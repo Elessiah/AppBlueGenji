@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CyberButton } from "@/components/cyber";
 import { pageMetadata } from "@/lib/shared/page-metadata";
-import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
-import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
+import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import {
   DONNEES_PROFIL,
   DONNEE_SAUVEGARDES,
@@ -30,9 +29,7 @@ export default function RgpdPage() {
   // pendant que la politique changeait.
   const updatedLabel = privacyPolicyUpdatedLabel() ?? "septembre 2026";
   return (
-    <main style={{ position: "relative", zIndex: 1 }}>
-      <PublicHeader />
-
+    <PublicPageShell>
       {/* HERO */}
       <section className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
@@ -370,8 +367,6 @@ export default function RgpdPage() {
           Dernière mise à jour : {updatedLabel} · Applicable depuis la création de la plateforme
         </div>
       </section>
-
-      <PublicFooter />
-    </main>
+    </PublicPageShell>
   );
 }
